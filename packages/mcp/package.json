@@ -1,6 +1,6 @@
 {
   "name": "@12-apps/mcp",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "App-agnostic MCP server core: generate one MCP tool per OpenAPI operation and proxy each call to the endpoint carrying the caller's bearer token (permission passthrough).",
   "exports": {

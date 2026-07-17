@@ -1,6 +1,7 @@
 {
-  "name": "shared-packages",
-  "private": true,
+  "name": "@12-apps/shared-packages",
+  "version": "1.0.0",
+  "description": "Shared packages for 12-apps",
   "scripts": {
     "build": "turbo run build",
     "lint": "turbo run lint",
@@ -40,5 +41,6 @@
   "packageManager": "pnpm@9.0.0",
   "engines": {
     "node": ">=18"
-  }
+  },
+  "private": true
 }
