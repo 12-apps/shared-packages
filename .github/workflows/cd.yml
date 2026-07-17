@@ -76,4 +76,8 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -o pipefail
+          # Write the concrete token (shell-expanded, never printed) so pnpm/npm
+          # authenticate reliably — .npmrc ${VAR} expansion is not honored across
+          # the pnpm -> npm publish boundary. GitHub masks the secret in logs.
+          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> .npmrc
           pnpm -r publish --no-git-checks --access restricted 2>&1 | tee publish.log
