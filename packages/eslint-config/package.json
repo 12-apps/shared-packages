@@ -1,6 +1,6 @@
 {
   "name": "@12-apps/eslint-config",
-  "version": "0.0.0",
+  "version": "1.0.1",
   "type": "module",
   "exports": {
     "./base": "./base.js",
@@ -20,10 +20,6 @@
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.50.0"
   },
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org",
-    "access": "restricted"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/12-apps/shared-packages.git",
@@ -36,5 +32,9 @@
     "*.js",
     "*.mjs",
     "*.md"
-  ]
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "restricted"
+  }
 }

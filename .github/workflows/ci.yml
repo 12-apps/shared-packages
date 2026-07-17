@@ -121,6 +121,79 @@ jobs:
       run-affected-e2e: false
       install-playwright: false
 
+  # Tokenless publish to npm via OIDC Trusted Publishing. Only on push to main,
+  # after the gates pass. No NPM_TOKEN: npm exchanges the GitHub OIDC id-token
+  # for a short-lived credential (requires a one-time Trusted Publisher on npm
+  # pointing at this repo + ci.yml). semantic-release versions/tags/releases each
+  # package (npmPublish:false); the actual upload is the OIDC npm publish below.
+  release:
+    name: Release
+    needs: [lint, type-check, build, unit-tests, quality]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # tags + GitHub releases
+      issues: write # semantic-release release comments
+      pull-requests: write
+      id-token: write # OIDC trusted publishing — no token
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      - name: Build packages
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee build.log
+      - name: Version + tag + release (semantic-release)
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          for pkg in typescript-config eslint-config shared-helpers ui auth mcp onboarding; do
+            echo "::group::semantic-release $pkg"
+            ( cd "packages/$pkg" \
+                && pnpm dlx semantic-release --tag-format "$pkg-v\${version}" )
+            echo "::endgroup::"
+          done
+      # OIDC trusted publishing needs npm >= 11.5.1 (Node 24 ships an older npm).
+      - name: Upgrade npm for OIDC
+        run: npm install -g npm@latest
+      - name: Publish to npm (OIDC, tokenless)
+        shell: bash
+        run: |
+          set -o pipefail
+          # npm cannot resolve workspace:* — rewrite interdeps to concrete versions.
+          node scripts/prepare-publish.mjs
+          # setup-node wrote an empty _authToken=${NODE_AUTH_TOKEN} that SHADOWS
+          # OIDC (forcing anonymous auth -> 404). Remove it so npm uses the OIDC
+          # id-token for trusted publishing.
+          npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
+          for pkg in typescript-config eslint-config shared-helpers auth mcp ui onboarding; do
+            echo "::group::npm publish $pkg"
+            if ( cd "packages/$pkg" && npm publish --access restricted ) 2>&1 | tee -a publish.log; then
+              echo "published $pkg"
+            else
+              grep -q "cannot publish over the previously published versions" publish.log \
+                && echo "skip $pkg (version already published)" || exit 1
+            fi
+            echo "::endgroup::"
+          done
+
   # Required-checks aggregation: one status that branch protection can gate on,
   # green only when every prerequisite job succeeded.
   ci-success:
