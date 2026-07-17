@@ -7,39 +7,48 @@ import { join } from "node:path";
 
 const PKGS = new URL("../packages/", import.meta.url).pathname;
 const MF = "package.json";
-
-// name -> current version, across every workspace package.
-const versions = new Map();
-for (const dir of readdirSync(PKGS)) {
-  const mf = join(PKGS, dir, MF);
-  if (!existsSync(mf)) continue;
-  const pkg = JSON.parse(readFileSync(mf, "utf8"));
-  versions.set(pkg.name, pkg.version);
-}
-
 const DEP_FIELDS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
 const WS = /^workspace:(.*)$/;
 
-for (const dir of readdirSync(PKGS)) {
-  const mf = join(PKGS, dir, MF);
-  if (!existsSync(mf)) continue;
-  const pkg = JSON.parse(readFileSync(mf, "utf8"));
-  let changed = false;
-  for (const field of DEP_FIELDS) {
-    const deps = pkg[field];
-    if (!deps) continue;
-    for (const [name, range] of Object.entries(deps)) {
-      const m = WS.exec(range);
-      if (!m) continue;
-      const v = versions.get(name);
-      if (!v) throw new Error(`${pkg.name}: ${field}.${name} is workspace but ${name} has no version`);
-      // workspace:* / workspace:^ / workspace:~ -> ^v ; workspace:<range> -> <range>
-      const spec = m[1] === "" || m[1] === "*" || m[1] === "^" ? `^${v}` : m[1] === "~" ? `~${v}` : m[1];
-      deps[name] = spec;
-      changed = true;
-      console.log(`${pkg.name}: ${field}.${name} ${range} -> ${spec}`);
-    }
-  }
-  if (changed) writeFileSync(mf, JSON.stringify(pkg, null, 2) + "\n");
+function readManifests() {
+  return readdirSync(PKGS)
+    .map((dir) => join(PKGS, dir, MF))
+    .filter((mf) => existsSync(mf))
+    .map((mf) => ({ mf, pkg: JSON.parse(readFileSync(mf, "utf8")) }));
 }
+
+// workspace:* / workspace:^ -> ^v ; workspace:~ -> ~v ; workspace:<range> -> <range>
+function toConcrete(range, version) {
+  const m = WS.exec(range);
+  if (!m) return null;
+  const t = m[1];
+  return t === "" || t === "*" || t === "^" ? `^${version}` : t === "~" ? `~${version}` : t;
+}
+
+// One loop, in its own function, so nothing is lexically nested.
+function resolveField(owner, field, deps, versions) {
+  let changed = false;
+  for (const name of Object.keys(deps)) {
+    const m = WS.exec(deps[name]);
+    if (!m) continue;
+    const v = versions.get(name);
+    if (!v) throw new Error(`${owner}: ${field}.${name} is workspace but ${name} has no version`);
+    const spec = toConcrete(deps[name], v);
+    console.log(`${owner}: ${field}.${name} ${deps[name]} -> ${spec}`);
+    deps[name] = spec;
+    changed = true;
+  }
+  return changed;
+}
+
+function resolveManifest(entry, versions) {
+  const touched = DEP_FIELDS
+    .filter((field) => entry.pkg[field])
+    .map((field) => resolveField(entry.pkg.name, field, entry.pkg[field], versions));
+  if (touched.some(Boolean)) writeFileSync(entry.mf, JSON.stringify(entry.pkg, null, 2) + "\n");
+}
+
+const manifests = readManifests();
+const versions = new Map(manifests.map((e) => [e.pkg.name, e.pkg.version]));
+manifests.forEach((e) => resolveManifest(e, versions));
 console.log("workspace deps resolved for publish");
