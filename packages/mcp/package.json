@@ -1,0 +1,29 @@
+{
+  "name": "@repo/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "App-agnostic MCP server core: generate one MCP tool per OpenAPI operation and proxy each call to the endpoint carrying the caller's bearer token (permission passthrough).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "eslint": "^9.39.1",
+    "typescript": "^5.8.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT"
+}

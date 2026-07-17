@@ -1,0 +1,1122 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7 relocates the connection URL out of schema.prisma; the CLI reads it
+// from prisma.config.ts and the runtime PrismaClient reads it via its driver
+// adapter (see src/prisma/index.ts).
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  name            String?
+  image           String?
+  provider        String?
+  // Reusable buyer contact for checkout pre-fill (opt-in, LGPD consent via the
+  // "salvar meus dados" checkbox). `buyerName` is kept SEPARATE from `name` (the
+  // OAuth display name, refreshed on every sign-in) so a custom buyer name isn't
+  // clobbered. `phone` is stored as entered; `taxId` (CPF) is sensitive PII kept
+  // AES-256-GCM-encrypted at rest (see lib/crypto/field-encryption) — decrypted
+  // server-side only to pre-fill the buyer's own form. All nullable (may never save).
+  buyerName       String?   @map("buyer_name")
+  phone           String?
+  taxId           String?   @map("tax_id")
+  // Preferred e-mail for the PagBank charge, distinct from the account `email`
+  // (identity). Lets a buyer — e.g. the store owner testing, whose account e-mail
+  // equals the merchant e-mail PagBank rejects — save a different payment e-mail
+  // once and reuse it. Non-sensitive; stored as entered.
+  paymentEmail    String?   @map("payment_email")
+  lastLoginAt     DateTime? @map("last_login_at")
+  // LGPD consent: when the user accepted the terms, and which version. A user
+  // is "signed up" only once termsAcceptedAt is set.
+  termsAcceptedAt DateTime? @map("terms_accepted_at")
+  termsVersion    String?   @map("terms_version")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  orders      Order[]
+  savedCards  SavedCard[]
+  // One persisted cart per (user, tenant) — see `carts @@unique([userId, clientId])`.
+  // Each cart "follows" the user across sign-out/sign-in within its tenant.
+  carts       Cart[]
+  // Per-tenant memberships + roles. The User stays global and shared across
+  // tenants; tenancy lives here (a user is in a tenant's roster iff a row exists).
+  memberships Membership[]
+  // Per-tenant denormalized spend profile (FUT-148): one row per store the user
+  // has completed a purchase at. Rolled up on order completion, never here.
+  customerProfiles CustomerProfile[]
+  // Reusable guided-onboarding progress, one row per (user, tenant, feature).
+  onboardingStates OnboardingState[]
+  // Live AI-assistant (MCP) connections this user has authorized.
+  mcpConnections   McpConnection[]
+
+  @@map("users")
+}
+
+// A tenant. `Client` is the physical/legacy name (kept to avoid a churny table
+// rename); the domain vocabulary is "Tenant". `slug` is the URL-safe handle
+// chosen at onboarding and is the addressable key for the storefront
+// (`/<slug>/menu`) and tenant admin (`/admin/<slug>/…`). `name` is a display
+// label and is NO LONGER unique (two tenants may share a display name). Profile
+// fields are captured at `/company/signup` and are nullable so a half-finished
+// tenant can persist. `status` is a String with a DB CHECK
+// (ACTIVE | SUSPENDED | PENDING).
+model Client {
+  id           String    @id @default(uuid())
+  slug         String    @unique
+  name         String
+  status       String    @default("ACTIVE")
+  legalName    String?   @map("legal_name")
+  contactEmail String?   @map("contact_email")
+  contactPhone String?   @map("contact_phone")
+  documentId   String?   @map("document_id")
+  onboardedAt  DateTime? @map("onboarded_at")
+  // Cost-of-goods-sold method used when a sale consumes stock, selectable per
+  // tenant in admin settings. String + DB CHECK (FIFO | FEFO | WEIGHTED_AVERAGE),
+  // the same String+CHECK pattern used elsewhere rather than a Prisma enum.
+  //   FIFO             — consume oldest lot first; COGS = that lot's unit cost.
+  //   FEFO             — consume soonest-to-expire lot first (waste-minimizing).
+  //   WEIGHTED_AVERAGE — COGS = running average across remaining lots.
+  costingMethod String  @default("FIFO") @map("costing_method")
+  // Storefront config: when true, the product selection sheet shows a free-text
+  // "observação" note field per line (persisted onto the cart/order line). Off by
+  // default so tenants opt in.
+  enableOrderNotes Boolean @default(false) @map("enable_order_notes")
+  // Physical address + coordinates for "stores near you" discovery (FUT-113).
+  // All optional — existing tenants are untouched until an owner fills them in
+  // the admin config tab. Coordinates are float8 (the Haversine query needs
+  // doubles); ranges are CHECK-enforced in the migration (lat −90..90,
+  // lng −180..180), and (latitude, longitude) is indexed for the
+  // bounding-box prefilter of the nearby query.
+  addressLine String? @map("address_line")
+  city        String?
+  state       String?
+  postalCode  String? @map("postal_code")
+  latitude    Float?
+  longitude   Float?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  productCategories ProductCategory[]
+  products          Product[]
+  carts             Cart[]
+  orders            Order[]
+  memberships       Membership[]
+  stockLots         StockLot[]
+  stockMovements    StockMovement[]
+  productVariations    ProductVariation[]
+  productOptionGroups  ProductOptionGroup[]
+  productOptionChoices ProductOptionChoice[]
+  productExtras        ProductExtra[]
+  savedViews           SavedView[]
+  suppliers            Supplier[]
+  adminSearchEvents    AdminSearchEvent[]
+  paymentIntegrations  PaymentIntegration[]
+  customerProfiles     CustomerProfile[]
+  onboardingStates     OnboardingState[]
+
+  @@index([latitude, longitude])
+  @@map("clients")
+}
+
+// Per-store payment provider integration (FUT-174). One row per store per
+// provider, so each tenant charges into its OWN merchant account instead of a
+// single global env token. `provider`/`environment`/`status` are Strings with
+// DB CHECKs (the same String+CHECK house style used by Order/Membership rather
+// than a Prisma enum) — `provider` is a closed set today (PAGBANK) but designed
+// to grow to more providers with NO schema change. `credentials` holds an
+// AES-256-GCM ciphertext of a JSON secrets blob (token / publicKey /
+// webhookToken) produced by lib/crypto/field-encryption — never plaintext, so
+// the sensitive credentials are encrypted at rest. Server-only reads.
+model PaymentIntegration {
+  id             String    @id @default(uuid())
+  clientId       String    @map("client_id")
+  // PAGBANK (CHECK in migration). A second provider is purely additive.
+  provider       String    @default("PAGBANK")
+  enabled        Boolean   @default(false)
+  // SANDBOX | PRODUCTION (CHECK in migration).
+  environment    String    @default("SANDBOX")
+  // AES-256-GCM ciphertext (v1.<iv>.<tag>.<ct>) of the JSON secrets blob.
+  credentials    String
+  // UNVERIFIED | VERIFIED | FAILED (CHECK in migration).
+  status         String    @default("UNVERIFIED")
+  lastVerifiedAt DateTime? @map("last_verified_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, provider])
+  @@index([clientId])
+  @@map("payment_integrations")
+}
+
+// A user's membership in a tenant (Client). One row per (user, tenant); this
+// row is what scopes a user to a tenant — a user shows up in tenant A's roster
+// iff a Membership exists there, while the underlying User (profile, saved
+// cards, phone) stays global and shared across every tenant. `role` is a String
+// with a DB CHECK (OWNER | ADMIN | CUSTOMER) — the same String+CHECK pattern
+// used by Order/Inventory rather than a Prisma enum. The env superadmin
+// (ADMIN_EMAILS) holds NO membership rows yet can administer every tenant.
+model Membership {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  clientId  String   @map("client_id")
+  role      String   @default("CUSTOMER")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
+  @@index([clientId])
+  @@index([userId])
+  @@map("memberships")
+}
+
+// Reusable guided-onboarding progress for ANY feature, one row per
+// (user, tenant, featureKey). `featureKey` namespaces the flow
+// ("ai_integration" | "payments" | ...) so a single table backs every guided
+// setup. `status` is a String with a DB CHECK
+// (not_started | in_progress | completed | dismissed) — the house String+CHECK
+// pattern, not a Prisma enum. `step` is the resume point (which step the user
+// stopped on); `data` is an opaque per-feature JSON payload (e.g. the selected
+// AI host) so features evolve their own state with no schema change. Scoped to
+// the DB user id (resolve by email — session.user.id is the OAuth sub) and the
+// tenant. Indexed on (client, feature, status) for the "who is mid-integration"
+// superadmin query.
+model OnboardingState {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  clientId    String    @map("client_id")
+  featureKey  String    @map("feature_key")
+  status      String    @default("not_started")
+  step        String?
+  data        Json      @default("{}")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId, featureKey])
+  @@index([clientId, featureKey, status])
+  @@map("onboarding_states")
+}
+
+// A live AI-assistant (MCP) connection a user has authorized (FUT-178). MCP is
+// auth-passthrough / per-user (a token isn't tenant-scoped), so this is keyed by
+// the DB user + the registered OAuth client (Claude / ChatGPT / …), NOT by
+// tenant. `clientName` snapshots the OAuthClient display name for the UI (the
+// registration can change). `lastActiveAt` is bumped (throttled, fire-and-forget)
+// on each verified /api/mcp call so the config page can show "Conectado via
+// Claude · ativo há 2 min" and the superadmin panel can distinguish active from
+// stalled. `revokedAt` is the explicit disconnect path.
+model McpConnection {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  oauthClientId String    @map("oauth_client_id")
+  clientName    String?   @map("client_name")
+  connectedAt   DateTime  @default(now()) @map("connected_at")
+  lastActiveAt  DateTime  @default(now()) @map("last_active_at")
+  revokedAt     DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, oauthClientId])
+  @@index([userId])
+  @@index([lastActiveAt])
+  @@map("mcp_connections")
+}
+
+model Unit {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("units")
+}
+
+// Multi-tenant: `name` is unique PER TENANT via @@unique([clientId, name]) on
+// both ProductCategory and Product (below), so two tenants can each have a
+// category/product with the same name. The seed upserts are keyed on the
+// { clientId, name } composite to stay idempotent.
+model ProductCategory {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  parentId  String?  @map("parent_id")
+  name      String
+  // Display order within the same level (top-level categories and the children
+  // of a given parent). Lower sorts first; ties fall back to `name`.
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  // Change attribution (FUT-168): the admin `users.id` that created / last edited
+  // this record. Scalar FK (no back-relation, same house pattern as SavedView);
+  // nullable so pre-existing rows and system writes are untracked. Powers the
+  // command-palette "From me" / "Modificados por mim" filters.
+  createdBy String?  @map("created_by")
+  updatedBy String?  @map("updated_by")
+  // Accent/case-insensitive search key (FUT-168): normalizeSearchText(name),
+  // kept in sync by the Prisma audit extension. Lets "sabao" match "Sabão".
+  searchName String? @map("search_name")
+
+  client   Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  parent   ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children ProductCategory[] @relation("CategoryHierarchy")
+  products Product[]
+
+  @@unique([clientId, name])
+  @@index([parentId])
+  @@map("product_categories")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  clientId    String   @map("client_id")
+  categoryId  String?  @map("category_id")
+  name        String
+  description String?
+  sku         String?
+  priceCents  Int      @map("price_cents")
+  currency    String   @default("BRL")
+  imageKey    String?  @map("image_key")
+  active      Boolean  @default(true)
+  // When false the product is a real stock item but is NEVER shown as a standalone
+  // menu card (FUT-74) — e.g. a variation-child ("Coca zero lata") or an
+  // extras-only product ("Arroz 250g"). The public menu filters `listed = true`.
+  listed      Boolean  @default(true)
+  // Cap on the TOTAL portions of paid extras a customer may add to one line of
+  // this product ("até N opções" in the selection sheet). Null = unlimited.
+  maxExtras   Int?     @map("max_extras")
+  // Soft-delete (FUT-80): a non-null timestamp hides the product from the admin
+  // catalog and public menu while preserving COGS/order/stock history. Null =
+  // active. Preferred over a hard delete because a product is referenced by
+  // orders, stock movements and variation links.
+  archivedAt  DateTime? @map("archived_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  // Change attribution (FUT-168): admin `users.id` that created / last edited this
+  // record. Scalar FK (no back-relation), nullable for pre-existing/system rows.
+  createdBy   String?  @map("created_by")
+  updatedBy   String?  @map("updated_by")
+  // Accent/case-insensitive search key (FUT-168): normalizeSearchText(name).
+  searchName  String?  @map("search_name")
+
+  client         Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category       ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  inventory      Inventory?
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
+  stockLots      StockLot[]
+  stockMovements StockMovement[]
+
+  // Customizable-product graph (FUT-74). A product can offer variations (each is
+  // another Product carrying its own stock/price), free optional groups, and paid
+  // extras (each an add-on Product). The reverse links let a Product be used AS a
+  // variation/extra of others.
+  variationsOffered   ProductVariation[]   @relation("VariationParent")
+  variantLinks        ProductVariation[]   @relation("VariationVariant")
+  optionGroups        ProductOptionGroup[]
+  extrasOffered       ProductExtra[]       @relation("ExtraParent")
+  extraLinks          ProductExtra[]       @relation("ExtraChild")
+  variationCartItems  CartItem[]           @relation("CartItemVariation")
+  variationOrderItems OrderItem[]          @relation("OrderItemVariation")
+  cartItemExtras      CartItemExtra[]
+  orderItemExtras     OrderItemExtra[]
+
+  @@unique([clientId, name])
+  // SKU (a stock-keeping identifier) is unique within a tenant. `sku` is nullable
+  // and Postgres treats NULLs as distinct, so "no SKU" stays legal for any number
+  // of products; uniqueness bites only once a value is set.
+  @@unique([clientId, sku])
+  @@index([clientId])
+  @@index([categoryId])
+  @@map("products")
+}
+
+// A variation option of a "grouping" product (FUT-74). The parent product
+// (`parentProductId`, e.g. "Coca Cola") is grouping-only — it carries no stock of
+// its own and the customer MUST pick exactly one variation. Each variation points
+// at another Product (`variantProductId`, e.g. "Coca zero lata", typically
+// `listed = false`) which supplies the real price and stock that a sale draws
+// down. Tenant-scoped; `position` orders the radios.
+model ProductVariation {
+  id               String   @id @default(uuid())
+  clientId         String   @map("client_id")
+  parentProductId  String   @map("parent_product_id")
+  variantProductId String   @map("variant_product_id")
+  position         Int      @default(0)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  client  Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  parent  Product @relation("VariationParent", fields: [parentProductId], references: [id], onDelete: Cascade)
+  variant Product @relation("VariationVariant", fields: [variantProductId], references: [id], onDelete: Cascade)
+
+  @@unique([parentProductId, variantProductId])
+  @@index([clientId])
+  @@index([variantProductId])
+  @@map("product_variations")
+}
+
+// A "select-one" category of FREE optional choices on a product (FUT-74) — e.g.
+// "Ponto da carne" → mal passada / ao ponto / bem passada. No price, no stock:
+// choices are pure kitchen labels. A product may have n groups; `required`
+// (obrigatório) forces the customer to pick one.
+model ProductOptionGroup {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  productId String   @map("product_id")
+  name      String
+  required  Boolean  @default(true)
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  client  Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  product Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
+  choices ProductOptionChoice[]
+
+  @@index([clientId])
+  @@index([productId])
+  @@map("product_option_groups")
+}
+
+// One free label within a {@link ProductOptionGroup} (e.g. "AO PONTO"). No price
+// or stock — selecting it only records the label for the kitchen.
+model ProductOptionChoice {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  groupId   String   @map("group_id")
+  label     String
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  client Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  group  ProductOptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([groupId])
+  @@map("product_option_choices")
+}
+
+// A PAID add-on offered on a product (FUT-74) — e.g. "Filet" → +arroz / +farofa.
+// Each extra points at another Product (`extraProductId`) whose own stock is
+// decremented on sale; the price is that product's `priceCents` unless
+// `priceCentsOverride` is set. m:n — one add-on Product can be an extra on many
+// products. The per-line quantity + max come from the selection (Product.maxExtras).
+model ProductExtra {
+  id                 String   @id @default(uuid())
+  clientId           String   @map("client_id")
+  productId          String   @map("product_id")
+  extraProductId     String   @map("extra_product_id")
+  priceCentsOverride Int?     @map("price_cents_override")
+  position           Int      @default(0)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  client       Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  product      Product @relation("ExtraParent", fields: [productId], references: [id], onDelete: Cascade)
+  extraProduct Product @relation("ExtraChild", fields: [extraProductId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, extraProductId])
+  @@index([clientId])
+  @@index([extraProductId])
+  @@map("product_extras")
+}
+
+// Per-product stock aggregate. `quantity` carries a DB-enforced
+// `CHECK (quantity >= 0)` constraint (added in the migration) so the database
+// itself rejects overselling — PGlite and real Postgres behave identically. The
+// public menu only lists products with quantity > 0.
+//
+// `quantity` is a CACHED AGGREGATE: it equals `SUM(StockLot.quantityRemaining)`
+// for the product, an invariant maintained inside every mutating transaction
+// (registerLot / adjustStock / consumeForOrder). The per-lot cost + expiry truth
+// lives in `StockLot`; the audit trail in `StockMovement`. Keeping the aggregate
+// here lets the hot read paths (menu, checkout) stay a single indexed lookup
+// instead of summing lots.
+//
+// `lowStockThreshold` drives the admin low-stock badge (quantity <= threshold).
+model Inventory {
+  id                String   @id @default(uuid())
+  productId         String   @unique @map("product_id")
+  quantity          Int      @default(0)
+  lowStockThreshold Int      @default(0) @map("low_stock_threshold")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("inventory")
+}
+
+// A single purchase or production lot — the cost + expiry TRUTH behind the
+// `Inventory.quantity` aggregate, and the basis for profit margin / markup /
+// gain / loss. Each lot records what was paid (`unitCostCents` / `totalCostCents`,
+// integer cents), when it was bought/produced (`purchaseDate`), and its shelf
+// life (`expiryDate`, nullable — not everything expires). `quantityReceived` is
+// immutable history; `quantityRemaining` is the consumable balance that sales
+// draw down (FIFO/FEFO/weighted, per the tenant's `Client.costingMethod`).
+//
+// `source` is a String + DB CHECK (PURCHASE | PRODUCTION | ADJUSTMENT) — an
+// ADJUSTMENT lot carries an opening balance / manual correction whose acquisition
+// cost is unknown (unitCost 0). `quantityRemaining` carries its own
+// `CHECK (>= 0 AND <= quantity_received)` — the race-safe backstop mirroring the
+// inventory aggregate's guard.
+model StockLot {
+  id                String    @id @default(uuid())
+  clientId          String    @map("client_id")
+  productId         String    @map("product_id")
+  source            String    @default("PURCHASE")
+  quantityReceived  Int       @map("quantity_received")
+  quantityRemaining Int       @map("quantity_remaining")
+  unitCostCents     Int       @map("unit_cost_cents")
+  totalCostCents    Int       @map("total_cost_cents")
+  purchaseDate      DateTime  @map("purchase_date")
+  expiryDate        DateTime? @map("expiry_date")
+  // Legacy free-text supplier label (kept for existing rows). Prefer the
+  // structured `supplierId` FK below when present (FUT-82).
+  supplier          String?
+  supplierId        String?   @map("supplier_id")
+  notes             String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  product      Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplierRef  Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  movements    StockMovement[]
+
+  @@index([clientId])
+  @@index([productId])
+  // FEFO consumption order + soonest-expiry lookups for expiry warnings.
+  @@index([productId, expiryDate])
+  @@index([supplierId])
+  @@map("stock_lots")
+}
+
+// Append-only stock ledger. Every quantity change — a receipt (RESTOCK), a sale
+// (SALE), a manual correction (ADJUST), or an expiry write-off (SPOILAGE) — is one
+// immutable row (no `updatedAt`). `quantityDelta` is signed (+received / -sold /
+// -spoiled). A SALE row carries the cost of the specific lot it consumed
+// (`unitCostCents` + `costCents = |delta| * unitCostCents`) — that is the COGS
+// basis rolled up onto `OrderItem.costCents` for margin reporting. A sale that
+// spans two lots emits one SALE row per lot, so COGS stays exact.
+//
+// `type` is a String + DB CHECK (RESTOCK | SALE | ADJUST | SPOILAGE). `lotId` /
+// `orderId` are nullable + ON DELETE SET NULL so the ledger survives lot/order
+// deletion.
+model StockMovement {
+  id            String   @id @default(uuid())
+  clientId      String   @map("client_id")
+  productId     String   @map("product_id")
+  lotId         String?  @map("lot_id")
+  type          String
+  quantityDelta Int      @map("quantity_delta")
+  unitCostCents Int?     @map("unit_cost_cents")
+  costCents     Int?     @map("cost_cents")
+  orderId       String?  @map("order_id")
+  reason        String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  client  Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  product Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lot     StockLot? @relation(fields: [lotId], references: [id], onDelete: SetNull)
+  order   Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([clientId])
+  @@index([productId])
+  @@index([orderId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+// Storefront cart (FUT-37). An anonymous shopper's cart is identified by an
+// opaque id handed to the browser in an httpOnly cookie — persisted in the DB
+// (not localStorage) so it survives reloads and is readable server-side at
+// checkout. Single-tenant MVP: scoped to the one seeded client.
+//
+// `userId` (FUT-44 cart-per-user) links the cart to a signed-in user so it
+// persists across sign-out and is restored (merged) on the next sign-in. Multi-
+// tenant: a signed-in user has one cart PER TENANT (`@@unique([userId, clientId])`)
+// so visiting two tenants keeps two independent carts; an anonymous cart has
+// `userId` null (and NULLs stay distinct in the unique index, so they never collide).
+model Cart {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  userId    String?  @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  client Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items  CartItem[]
+
+  @@unique([userId, clientId])
+  @@index([clientId])
+  @@map("carts")
+}
+
+// A product line within a cart. `@@unique([cartId, productId])` makes "add"
+// idempotent per product (increment the row instead of duplicating it), and
+// `quantity` carries a DB-enforced `CHECK (quantity > 0)` (added in the
+// migration) so a zero/negative line can never persist — removal deletes the row.
+// A configured product line within a cart. `productId` is the BASE (grouping)
+// product; `variationProductId` is the chosen variation (the Product that actually
+// supplies price + stock when variations exist), and the selected free optionals
+// + paid extras hang off the child tables below.
+//
+// FUT-74 replaces the old `@@unique([cartId, productId])` with
+// `@@unique([cartId, compositionHash])`: `compositionHash` is a deterministic
+// canonical SIGNATURE of the whole composition (base + variation + sorted option
+// choices + sorted extras), so two DIFFERENT configurations of the same base
+// product are distinct lines while an IDENTICAL re-add still merges (increments
+// quantity). `quantity` keeps its DB `CHECK (quantity > 0)`.
+model CartItem {
+  id                 String   @id @default(uuid())
+  cartId             String   @map("cart_id")
+  productId          String   @map("product_id")
+  variationProductId String?  @map("variation_product_id")
+  compositionHash    String   @map("composition_hash")
+  quantity           Int      @default(1)
+  note               String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  cart             Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variationProduct Product?        @relation("CartItemVariation", fields: [variationProductId], references: [id], onDelete: SetNull)
+  options          CartItemOption[]
+  extras           CartItemExtra[]
+
+  @@unique([cartId, compositionHash])
+  @@index([cartId])
+  // Serves the products→cart_items ON DELETE CASCADE FK (product_id-only lookup).
+  @@index([productId])
+  @@map("cart_items")
+}
+
+// A chosen free optional on a cart line (FUT-74). `labelSnapshot` freezes the
+// choice text so the line reads correctly even if the catalog label later changes.
+model CartItemOption {
+  id             String  @id @default(uuid())
+  cartItemId     String  @map("cart_item_id")
+  optionGroupId  String  @map("option_group_id")
+  optionChoiceId String  @map("option_choice_id")
+  groupName      String  @map("group_name")
+  labelSnapshot  String  @map("label_snapshot")
+
+  cartItem CartItem @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+
+  @@index([cartItemId])
+  @@map("cart_item_options")
+}
+
+// A chosen paid extra on a cart line (FUT-74). `quantity` is the per-line portion
+// count; `unitPriceCents` snapshots the extra's price at add time. Stock for
+// `extraProductId` is drawn down on PAID (quantity × line quantity).
+model CartItemExtra {
+  id             String @id @default(uuid())
+  cartItemId     String @map("cart_item_id")
+  extraProductId String @map("extra_product_id")
+  quantity       Int    @default(1)
+  unitPriceCents Int    @map("unit_price_cents")
+
+  cartItem     CartItem @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  extraProduct Product  @relation(fields: [extraProductId], references: [id], onDelete: Cascade)
+
+  @@index([cartItemId])
+  @@index([extraProductId])
+  @@map("cart_item_extras")
+}
+
+// A checkout order (FUT-42/43). Created from a cart with a server-side price
+// snapshot (client totals are never trusted). `userId` links to the DB user the
+// order was placed by (resolved from the session email at checkout). `status`
+// and `method` are stored as strings with DB-enforced CHECK constraints (added
+// in the migration) — the same String+CHECK pattern used by Inventory/CartItem
+// rather than Prisma enums. Stock is decremented only when the order reaches
+// PAID (in the webhook transaction), so an unpaid/expired order never holds
+// stock. Money is integer cents throughout.
+model Order {
+  id           String    @id @default(uuid())
+  clientId     String    @map("client_id")
+  userId       String    @map("user_id")
+  // AWAITING_PAYMENT | PAID | FAILED | EXPIRED (CHECK in migration).
+  status       String    @default("AWAITING_PAYMENT")
+  // Admin-driven fulfillment lifecycle, separate from the webhook-owned payment
+  // `status`: PENDING | DELIVERED | COMPLETED | CANCELED (CHECK in migration).
+  fulfillmentStatus String @default("PENDING") @map("fulfillment_status")
+  // PIX | CARD (CHECK in migration).
+  method       String
+  totalCents   Int       @map("total_cents")
+  buyerName    String?   @map("buyer_name")
+  buyerEmail   String?   @map("buyer_email")
+  buyerPhone   String?   @map("buyer_phone")
+  // PagBank Orders API identifiers, filled once a charge is raised.
+  providerOrderId String? @map("provider_order_id")
+  // PIX "copia e cola" payload + expiry (null for card orders).
+  pixCopyPaste String?   @map("pix_copy_paste")
+  pixExpiresAt DateTime? @map("pix_expires_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items          OrderItem[]
+  payments       Payment[]
+  charges        OrderCharge[]
+  stockMovements StockMovement[]
+
+  @@index([clientId])
+  @@index([userId])
+  @@map("orders")
+}
+
+// One row per PIX charge raised against an order (FUT-190). A reused
+// AWAITING_PAYMENT order (FUT-179 de-dup) raises a fresh PagBank charge on every
+// checkout retry, but `Order.providerOrderId` only keeps the LATEST charge — so a
+// webhook for an earlier still-valid charge could not resolve the order. Persisting
+// every attempt lets `getOrderByProviderOrderId` resolve an order by ANY of its
+// charges. `providerOrderId` is UNIQUE: it is the idempotency key that also makes a
+// duplicate charge insert a DB-level no-op (mirroring `Payment.providerChargeId`).
+model OrderCharge {
+  id               String    @id @default(uuid())
+  orderId          String    @map("order_id")
+  providerOrderId  String    @unique @map("provider_order_id")
+  providerChargeId String?   @map("provider_charge_id")
+  pixExpiresAt     DateTime? @map("pix_expires_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_charges")
+}
+
+// A line within an order. Prices/name are SNAPSHOTTED at order time so order
+// history is durable and independent of later catalog edits; `productId` is
+// nullable + ON DELETE SET NULL so deleting a product never erases past orders.
+model OrderItem {
+  id             String   @id @default(uuid())
+  orderId        String   @map("order_id")
+  productId      String?  @map("product_id")
+  // The chosen variation Product (FUT-74), when the base product is a grouping.
+  // `productName` snapshots the VARIANT's name so history reads correctly.
+  variationProductId String? @map("variation_product_id")
+  productName    String   @map("product_name")
+  quantity       Int
+  // Base/variation unit price snapshot. Paid extras are snapshotted on
+  // {@link OrderItemExtra}; the line's `unitPriceCents` is the base only.
+  unitPriceCents Int      @map("unit_price_cents")
+  // COGS snapshot: the summed cost of the lots consumed to fulfil this line,
+  // captured when the order reaches PAID. Nullable — legacy rows (paid before
+  // cost tracking) and unpaid orders report a null (unknown) margin.
+  costCents      Int?     @map("cost_cents")
+  // Free-text customer note ("observação"), when the tenant enables order notes.
+  note           String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  order            Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product          Product?         @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variationProduct Product?         @relation("OrderItemVariation", fields: [variationProductId], references: [id], onDelete: SetNull)
+  options          OrderItemOption[]
+  extras           OrderItemExtra[]
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// Snapshot of a chosen free optional on an order line (FUT-74). Labels are frozen
+// at order time (`groupName` / `choiceLabel`) so order history is durable and
+// independent of later catalog edits. No stock, no price.
+model OrderItemOption {
+  id          String @id @default(uuid())
+  orderItemId String @map("order_item_id")
+  groupName   String @map("group_name")
+  choiceLabel String @map("choice_label")
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([orderItemId])
+  @@map("order_item_options")
+}
+
+// Snapshot of a chosen paid extra on an order line (FUT-74). Price + name are
+// frozen; `extraProductId` is nullable + ON DELETE SET NULL so deleting the extra
+// product never erases order history. `quantity` is the ABSOLUTE portions for the
+// line (per-line portions × line quantity), so fulfillment consumes exactly this
+// from the extra product's stock. `costCents` is its COGS captured on PAID.
+model OrderItemExtra {
+  id             String   @id @default(uuid())
+  orderItemId    String   @map("order_item_id")
+  extraProductId String?  @map("extra_product_id")
+  nameSnapshot   String   @map("name_snapshot")
+  unitPriceCents Int      @map("unit_price_cents")
+  quantity       Int
+  costCents      Int?     @map("cost_cents")
+
+  orderItem    OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  extraProduct Product?  @relation(fields: [extraProductId], references: [id], onDelete: SetNull)
+
+  @@index([orderItemId])
+  @@index([extraProductId])
+  @@map("order_item_extras")
+}
+
+// A payment attempt against an order. `providerChargeId` is UNIQUE — it is the
+// idempotency key: a duplicate PagBank webhook delivery is a no-op at the DB
+// level (insert-or-ignore on the unique constraint), never a check-then-insert
+// race. `rawPayload` stores the verbatim provider payload for audit.
+model Payment {
+  id               String   @id @default(uuid())
+  orderId          String   @map("order_id")
+  // PIX | CARD (CHECK in migration).
+  method           String
+  // PENDING | AUTHORIZED | PAID | DECLINED (CHECK in migration).
+  status           String   @default("PENDING")
+  providerChargeId String   @unique @map("provider_charge_id")
+  amountCents      Int      @map("amount_cents")
+  rawPayload       String?  @map("raw_payload")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+// Per-(tenant, buyer) denormalized customer profile (FUT-148). A row exists once
+// a buyer completes their FIRST paid order at a store; the aggregates are rolled
+// up on order completion (see `markOrderPaid`), NEVER edited by hand — the
+// Clientes directory is read-only. Denormalized (Squire pattern) so the admin can
+// sort/segment by lifetime spend without re-summing orders on every page load.
+//
+// Tenant isolation is the whole point: keyed by (client_id, user_id), so the same
+// person buying at two stores has two independent profiles — one store never sees
+// the other's spend. Amounts are integer cents; averageSpendCents = lifetime /
+// visitCount (recomputed on each rollup, so it can't drift).
+model CustomerProfile {
+  id       String @id @default(uuid())
+  clientId String @map("client_id")
+  userId   String @map("user_id")
+  // Contact snapshot at rollup time (denormalized for fast list rendering; the
+  // live User row stays the source of truth for the detail view).
+  name     String?
+  email    String
+  phone    String?
+  lifetimeSpendCents Int       @default(0) @map("lifetime_spend_cents")
+  // Number of PAID orders rolled into this profile (the "visits" count).
+  visitCount         Int       @default(0) @map("visit_count")
+  averageSpendCents  Int       @default(0) @map("average_spend_cents")
+  firstOrderAt       DateTime? @map("first_order_at")
+  lastOrderAt        DateTime? @map("last_order_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // One profile per buyer per store — makes the rollup an idempotent upsert.
+  @@unique([clientId, userId])
+  // "top spenders / recent buyers of tenant X" — the directory's default sorts.
+  @@index([clientId, lifetimeSpendCents])
+  @@index([clientId, lastOrderAt])
+  @@index([userId])
+  @@map("customer_profiles")
+}
+
+// A reusable card token saved against a user ("save the credit card for future
+// uses"). Only the provider vault token + display metadata are stored — never a
+// PAN. Keyed to the DB user so cards follow the buyer across sessions.
+model SavedCard {
+  id                 String   @id @default(uuid())
+  userId             String   @map("user_id")
+  providerCardToken  String   @map("provider_card_token")
+  brand              String
+  last4              String
+  expMonth           Int      @map("exp_month")
+  expYear            Int      @map("exp_year")
+  holder             String
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("saved_cards")
+}
+
+// A durable log of inbound provider webhooks (transactional inbox). Each delivery
+// is persisted verbatim on arrival, then processed asynchronously off the HTTP
+// response path — so deliveries are debuggable (headers + payload + error kept)
+// and retriable (a drain re-runs PENDING/FAILED). `externalId` (a hash of the
+// raw body) is UNIQUE, so a redelivery of the same event collapses to a no-op;
+// combined with the unique `Payment.providerChargeId`, confirmation is
+// idempotent end-to-end.
+model WebhookEvent {
+  id          String    @id @default(uuid())
+  provider    String    @default("pagbank")
+  externalId  String    @unique @map("external_id")
+  // Provider order id from the `x-product-id` header, for correlation/debugging.
+  productId   String?   @map("product_id")
+  // PENDING | PROCESSED | FAILED | IGNORED (CHECK in migration).
+  status      String    @default("PENDING")
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error")
+  headers     String?
+  payload     String
+  receivedAt  DateTime  @default(now()) @map("received_at")
+  processedAt DateTime? @map("processed_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("webhook_events")
+}
+
+// A named, reusable table VIEW owned by one admin (FUT-87, evolving FUT-79's
+// shared SavedFilter). `scope` ties the view to a table (PRODUCTS | INVENTORY |
+// SUPPLIERS — CHECK in migration); `filterState` is opaque JSON
+// ({ filters, sortBy, visibleColumns }) the DataViews bar serializes. Owned per
+// user (`userId`, scalar FK to users — no back-relation, house pattern); `shared`
+// makes it visible to the whole tenant. `pinned` surfaces it in the sidebar;
+// `isDefault` auto-applies it (one default per user+scope, app-enforced). Unique
+// per (client, user, scope, name) so each admin can reuse a name.
+model SavedView {
+  id          String   @id @default(uuid())
+  clientId    String   @map("client_id")
+  userId      String   @map("user_id")
+  scope       String
+  name        String
+  description String?
+  filterState Json     @map("filter_state")
+  shared      Boolean  @default(false)
+  pinned      Boolean  @default(false)
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, userId, scope, name])
+  @@index([clientId, userId, scope])
+  @@index([clientId, scope])
+  @@map("saved_filters")
+}
+
+// Command-palette "Populares" source (FUT-168): the most-picked search results
+// per tenant. One row per (client, entity_type, entity_id); `count` increments
+// on every palette selection and `label` snapshots the display name at pick
+// time so the popular list renders WITHOUT joining across products/suppliers/
+// categories. Deep-link targets are rebuilt from (entity_type, entity_id) by the
+// source registry, so no href is stored. `entity_type` is a String + DB CHECK
+// (PRODUCT | SUPPLIER | CATEGORY), the same house pattern as costing_method.
+model AdminSearchEvent {
+  id         String   @id @default(uuid())
+  clientId   String   @map("client_id")
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  label      String
+  count      Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, entityType, entityId])
+  @@index([clientId, count])
+  @@map("admin_search_events")
+}
+
+// A supplier (fornecedor) a tenant buys stock from (FUT-82). Adapted from a
+// Square-style vendor, trimmed to a single primary contact + simple address for
+// MVP. `status` is a String + DB CHECK (ACTIVE | INACTIVE). Unique name per
+// tenant. Referenced (optionally) by a purchase StockLot via `supplierId`.
+model Supplier {
+  id            String   @id @default(uuid())
+  clientId      String   @map("client_id")
+  name          String
+  contactName   String?  @map("contact_name")
+  email         String?
+  phone         String?
+  addressLine1  String?  @map("address_line1")
+  addressLine2  String?  @map("address_line2")
+  city          String?
+  state         String?
+  postalCode    String?  @map("postal_code")
+  accountNumber String?  @map("account_number")
+  note          String?
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  // Change attribution (FUT-168): admin `users.id` that created / last edited this
+  // record. Scalar FK (no back-relation), nullable for pre-existing/system rows.
+  createdBy     String?  @map("created_by")
+  updatedBy     String?  @map("updated_by")
+  // Accent/case-insensitive search key (FUT-168): normalizeSearchText(name).
+  searchName    String?  @map("search_name")
+
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  stockLots StockLot[]
+
+  @@unique([clientId, name])
+  @@index([clientId, status])
+  @@map("suppliers")
+}
+
+// A configurable stock-movement reason (FUT-83, extended for gains in FUT-180).
+// Tenants define their own list (e.g. "Queimou", "Vencido", "Quebra" for losses;
+// "Devolução", "Contagem" for gains). `kind` splits the list into loss vs gain —
+// String + DB CHECK (LOSS | GAIN); the stock Ajuste picker shows both. `category`
+// sub-classifies losses for reports — String + DB CHECK (WASTE | LOSS | SPOILAGE)
+// and stays at its default for gains. `position` orders the picker.
+model LossReason {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  name      String
+  kind      String   @default("LOSS")
+  category  String   @default("LOSS")
+  active    Boolean  @default(true)
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([clientId, name])
+  @@index([clientId, active])
+  @@map("loss_reasons")
+}
+
+// A recorded stock-loss event (FUT-83 model; written when a compra/produção
+// records loss in FUT-85). Reports-ready: carries the quantity lost, the reason,
+// and the unit cost at the time. FKs (client/product/lot/reason) are enforced in
+// the migration; kept as scalars here to avoid back-relations on hot models.
+model LossEvent {
+  id            String   @id @default(uuid())
+  clientId      String   @map("client_id")
+  productId     String   @map("product_id")
+  lotId         String?  @map("lot_id")
+  lossReasonId  String   @map("loss_reason_id")
+  quantity      Int
+  unitCostCents Int?     @map("unit_cost_cents")
+  notes         String?
+  occurredAt    DateTime @default(now()) @map("occurred_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([clientId, occurredAt])
+  @@index([lossReasonId])
+  @@map("loss_events")
+}
+
+// A recipe / bill of materials for a producible product (FUT-84). Registering
+// "produção" of the product consumes each component's stock (FUT-85). One recipe
+// per product (`productId` unique). Product FKs are enforced in the migration
+// (kept scalar here to avoid back-relations on the hot Product model).
+model Recipe {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  productId String   @unique @map("product_id")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  components RecipeComponent[]
+
+  @@index([clientId])
+  @@map("recipes")
+}
+
+// One component line of a recipe: how much of `componentProductId`'s stock a
+// single unit of the output product consumes. `unit` is a free-text label
+// ("un", "g", "ml"). Unique per (recipe, component).
+model RecipeComponent {
+  id                 String  @id @default(uuid())
+  recipeId           String  @map("recipe_id")
+  componentProductId String  @map("component_product_id")
+  quantity           Int
+  unit               String?
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, componentProductId])
+  @@index([componentProductId])
+  @@map("recipe_components")
+}
+
+// A registered external OAuth host (FUT-105) — a Claude.ai / ChatGPT connector
+// produced by RFC 7591 dynamic client registration (or static registration).
+// This is the OAuth *client application*, NOT the multi-tenant `Client`/tenant
+// model above — namespaced `OAuth*` to avoid that collision. It has no relation
+// to `User`: clients are host apps, not people. `clientId` is the public,
+// unique identifier; `clientSecretHash` is null for public PKCE clients (which
+// authenticate via `token_endpoint_auth_method = "none"`) and holds a hash for
+// confidential ones. `redirectUris` is the exact-match allowlist that the
+// authorization endpoint validates against for open-redirect prevention.
+// `grantTypes` / `scopes` are the DCR metadata. Array columns are Postgres
+// `TEXT[]` (PGlite matches Postgres array semantics).
+model OAuthClient {
+  id                      String   @id @default(uuid())
+  clientId                String   @unique @map("client_id")
+  clientSecretHash        String?  @map("client_secret_hash")
+  redirectUris            String[] @map("redirect_uris")
+  clientName              String?  @map("client_name")
+  // "none" (public PKCE) | "client_secret_basic" (confidential). String + house
+  // convention (validated at the register route), not a Prisma enum.
+  tokenEndpointAuthMethod String   @default("none") @map("token_endpoint_auth_method")
+  grantTypes              String[] @map("grant_types")
+  scopes                  String[]
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@map("oauth_clients")
+}
+
+// A rotating OAuth refresh token bound to a signed-in user + a registered
+// client (FUT-105). Stored HASHED (`tokenHash` = SHA-256 of the opaque token,
+// never plaintext) and rotated on every use. Identity is the user's EMAIL
+// (`userEmail`) per the repo identity rule — the AS binds to email and the
+// route guards resolve the DB user by email (`getUserByEmail`); it is a scalar,
+// not a `User` FK, so the token store stays decoupled from the user table.
+// `clientId` is a by-value link to `OAuthClient.clientId` (scalar, no
+// back-relation on the hot client model). Rotation lineage: `rotatedFrom` holds
+// the prior token's hash so reuse of a rotated token is detectable and revokes
+// the whole lineage; `revokedAt` is the explicit revoke path. Indexed on
+// `tokenHash` (lookup on presentation) and `(userEmail, clientId)` (per-user
+// per-client enumeration / bulk revoke).
+model OAuthRefreshToken {
+  id         String    @id @default(uuid())
+  tokenHash  String    @unique @map("token_hash")
+  userEmail  String    @map("user_email")
+  // The original OAuth subject (Google `sub`) the token was issued for. Carried
+  // so a rotated successor mints an access token with the SAME stable `sub` as
+  // the initial token (RFC 6749 §5.1 / OIDC §2); without it a refreshed token's
+  // `sub` would fall back to the email and diverge, breaking host-side identity
+  // correlation after the first refresh.
+  userSub    String    @map("user_sub")
+  clientId   String    @map("client_id")
+  scopes     String[]
+  expiresAt  DateTime  @map("expires_at")
+  rotatedFrom String?  @map("rotated_from")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  // `tokenHash` is already indexed by its `@unique` constraint
+  // (`oauth_refresh_tokens_token_hash_key`) — the lookup-on-presentation path —
+  // so no separate `@@index([tokenHash])` is added (it would be redundant). The
+  // composite index serves per-user/per-client enumeration and bulk revoke.
+  @@index([userEmail, clientId])
+  @@map("oauth_refresh_tokens")
+}
