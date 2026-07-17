@@ -1,0 +1,78 @@
+name: CD
+
+# Publishes the workspace packages to GitHub Packages on every push to main.
+# Phase 1 runs semantic-release per package (conventional-commit versioning,
+# git tag `<pkg>-v<version>`, GitHub release, and an in-tree package.json
+# version bump — but no npm publish). Phase 2 runs `pnpm -r publish`, which
+# resolves each `workspace:*` interdependency to the freshly-bumped sibling
+# version and uploads every package to the registry in dependency order.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create tags + GitHub releases
+  packages: write # publish to GitHub Packages
+  issues: write # semantic-release release comments
+  pull-requests: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so semantic-release can read tags + commit range.
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+
+      - name: Build packages
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee build.log
+
+      # Phase 1 — version, tag, and release each package (no publish). Version
+      # order is irrelevant here: publish (phase 2) resolves interdeps after all
+      # versions are set. A package with no releasable commits is simply skipped.
+      - name: Version + tag + release (semantic-release)
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          for pkg in typescript-config eslint-config shared-helpers ui auth mcp onboarding; do
+            echo "::group::semantic-release $pkg"
+            ( cd "packages/$pkg" \
+                && pnpm dlx semantic-release --tag-format "$pkg-v\${version}" )
+            echo "::endgroup::"
+          done
+
+      # Phase 2 — publish every package whose version is not yet in the registry.
+      # pnpm rewrites `workspace:*` to the concrete sibling versions bumped above
+      # and publishes in dependency order. Already-published versions are skipped.
+      - name: Publish to GitHub Packages
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          pnpm -r publish --no-git-checks --access restricted 2>&1 | tee publish.log

@@ -1,9 +1,22 @@
 {
   "name": "@12-apps/typescript-config",
   "version": "0.0.0",
-  "private": true,
   "license": "MIT",
   "publishConfig": {
-    "access": "public"
-  }
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/typescript-config"
+  },
+  "files": [
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md"
+  ]
 }

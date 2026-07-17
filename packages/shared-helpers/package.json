@@ -79,5 +79,22 @@
     "config",
     "typescript"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/shared-helpers"
+  },
+  "files": [
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md"
+  ]
 }

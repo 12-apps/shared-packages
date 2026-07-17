@@ -1,6 +1,5 @@
 {
   "name": "@12-apps/ui",
-  "private": true,
   "version": "0.0.0",
   "packageManager": "pnpm@9.0.0",
   "type": "module",
@@ -228,5 +227,22 @@
     "vite": "^6.4.1",
     "vite-plugin-istanbul": "^7.2.1",
     "vitest": "^3.2.4"
-  }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/ui"
+  },
+  "files": [
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md"
+  ]
 }

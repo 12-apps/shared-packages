@@ -1,7 +1,6 @@
 {
   "name": "@12-apps/onboarding",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -20,5 +19,22 @@
     "@12-apps/typescript-config": "workspace:*",
     "@types/react": "19.2.2",
     "typescript": "5.9.2"
-  }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/onboarding"
+  },
+  "files": [
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md"
+  ]
 }

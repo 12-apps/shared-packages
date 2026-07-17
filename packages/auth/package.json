@@ -1,7 +1,6 @@
 {
   "name": "@12-apps/auth",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
@@ -33,5 +32,22 @@
     "@types/react": "19.2.2",
     "eslint": "^9.39.1",
     "typescript": "5.9.2"
-  }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/auth"
+  },
+  "files": [
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md"
+  ]
 }
