@@ -34,7 +34,7 @@
     "typescript": "5.9.2"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
+    "registry": "https://registry.npmjs.org",
     "access": "restricted"
   },
   "repository": {
