@@ -132,7 +132,7 @@ jobs:
       - name: Verify all required jobs passed
         shell: bash
         run: |
-          results='${{ join(needs.*.result, ",") }}'
+          results='${{ join(needs.*.result, ',') }}'
           echo "Upstream results: $results"
           if echo "$results" | tr ',' '\n' | grep -qvE '^(success|skipped)$'; then
             echo "::error::One or more required jobs failed."
