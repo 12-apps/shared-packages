@@ -1,0 +1,190 @@
+{
+  "$comment": "Full storefront catalog — the default development dataset. Edit freely to add categories/subcategories/products; shape matches SeedCategory[] in seed.ts. Select with SEED_DATASET=regular (the default).",
+  "categories": [
+    {
+      "name": "Bebidas",
+      "subcategories": [
+        {
+          "name": "Refrigerante",
+          "products": [
+            { "name": "Coca-Cola Lata 350ml", "description": "350ml gelada", "priceCents": 600, "quantity": 24 },
+            { "name": "Guaraná Antarctica 350ml", "description": "350ml", "priceCents": 550, "quantity": 18 }
+          ]
+        },
+        {
+          "name": "Cerveja",
+          "products": [
+            { "name": "Heineken Long Neck 330ml", "description": "330ml", "priceCents": 900, "quantity": 12 },
+            { "name": "Brahma Lata 350ml", "description": "350ml", "priceCents": 500, "quantity": 30 }
+          ]
+        },
+        {
+          "name": "Energetico",
+          "products": [
+            { "name": "Red Bull 250ml", "description": "250ml", "priceCents": 1200, "quantity": 0 },
+            { "name": "Monster Energy 473ml", "description": "473ml", "priceCents": 1100, "quantity": 8 }
+          ]
+        },
+        {
+          "name": "Água",
+          "products": [
+            { "name": "Água Crystal sem Gás 500ml", "description": "500ml", "priceCents": 400, "quantity": 40 },
+            { "name": "Água com Gás 500ml", "description": "500ml", "priceCents": 450, "quantity": 20 }
+          ]
+        },
+        {
+          "name": "Suco",
+          "products": [
+            { "name": "Suco de Laranja 300ml", "description": "300ml natural", "priceCents": 850, "quantity": 10 },
+            { "name": "Suco de Uva Integral 300ml", "description": "300ml", "priceCents": 900, "quantity": 6 }
+          ]
+        },
+        {
+          "name": "Vinho",
+          "products": [
+            { "name": "Vinho Tinto Seco (taça)", "description": "150ml", "priceCents": 1800, "quantity": 5 }
+          ]
+        },
+        {
+          "name": "Destilado",
+          "products": [
+            { "name": "Whisky 12 anos (dose)", "description": "50ml", "priceCents": 2200, "quantity": 4 }
+          ]
+        },
+        {
+          "name": "Chá",
+          "products": [
+            { "name": "Chá Gelado Limão 350ml", "description": "350ml", "priceCents": 650, "quantity": 15 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Snacks",
+      "subcategories": [
+        {
+          "name": "Salgadinhos",
+          "products": [
+            { "name": "Batata Lay's Clássica 96g", "description": "96g", "priceCents": 800, "quantity": 14 },
+            { "name": "Doritos Nacho 84g", "description": "84g", "priceCents": 950, "quantity": 9 }
+          ]
+        },
+        {
+          "name": "Castanhas",
+          "products": [
+            { "name": "Amendoim Japonês 150g", "description": "150g", "priceCents": 650, "quantity": 0 },
+            { "name": "Castanha de Caju 100g", "description": "100g", "priceCents": 1500, "quantity": 7 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Doces",
+      "subcategories": [
+        {
+          "name": "Chocolates",
+          "products": [
+            { "name": "Chocolate ao Leite 90g", "description": "90g", "priceCents": 700, "quantity": 20 },
+            { "name": "Bombom Sortido 50g", "description": "50g", "priceCents": 400, "quantity": 25 }
+          ]
+        },
+        {
+          "name": "Balas",
+          "products": [
+            { "name": "Bala de Goma 80g", "description": "80g", "priceCents": 350, "quantity": 30 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Padaria",
+      "subcategories": [
+        {
+          "name": "Pães",
+          "products": [
+            { "name": "Pão Francês (un)", "description": "Unidade", "priceCents": 100, "quantity": 50 },
+            { "name": "Pão de Forma 500g", "description": "500g", "priceCents": 900, "quantity": 12 }
+          ]
+        },
+        {
+          "name": "Bolos",
+          "products": [
+            { "name": "Bolo de Cenoura (fatia)", "description": "Fatia", "priceCents": 600, "quantity": 8 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mercearia",
+      "subcategories": [
+        {
+          "name": "Massas",
+          "products": [
+            { "name": "Macarrão Espaguete 500g", "description": "500g", "priceCents": 550, "quantity": 18 }
+          ]
+        },
+        {
+          "name": "Enlatados",
+          "products": [
+            { "name": "Milho em Conserva 200g", "description": "200g", "priceCents": 450, "quantity": 22 },
+            { "name": "Atum em Lata 170g", "description": "170g", "priceCents": 1100, "quantity": 10 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Laticínios",
+      "subcategories": [
+        {
+          "name": "Queijos",
+          "products": [
+            { "name": "Queijo Mussarela 200g", "description": "200g", "priceCents": 1300, "quantity": 9 }
+          ]
+        },
+        {
+          "name": "Iogurtes",
+          "products": [
+            { "name": "Iogurte Natural 170g", "description": "170g", "priceCents": 500, "quantity": 16 },
+            { "name": "Iogurte de Morango 170g", "description": "170g", "priceCents": 550, "quantity": 14 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Higiene",
+      "subcategories": [
+        {
+          "name": "Cuidado Bucal",
+          "products": [
+            { "name": "Creme Dental 90g", "description": "90g", "priceCents": 600, "quantity": 20 },
+            { "name": "Escova de Dente (un)", "description": "Unidade", "priceCents": 800, "quantity": 15 }
+          ]
+        },
+        {
+          "name": "Cuidado Pessoal",
+          "products": [
+            { "name": "Sabonete 90g", "description": "90g", "priceCents": 300, "quantity": 40 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Limpeza",
+      "subcategories": [
+        {
+          "name": "Limpeza Cozinha",
+          "products": [
+            { "name": "Detergente 500ml", "description": "500ml", "priceCents": 350, "quantity": 28 },
+            { "name": "Esponja (un)", "description": "Unidade", "priceCents": 200, "quantity": 35 }
+          ]
+        },
+        {
+          "name": "Limpeza Roupas",
+          "products": [
+            { "name": "Sabão em Pó 1kg", "description": "1kg", "priceCents": 1600, "quantity": 6 }
+          ]
+        }
+      ]
+    }
+  ]
+}
