@@ -3,7 +3,7 @@
  *
  * In Prisma 7 the connection URL and the seed command no longer live in
  * schema.prisma / package.json — they move here. The Prisma CLI is invoked with
- * cwd = packages/shared-helpers (`pnpm --filter @repo/shared-helpers prisma:*`),
+ * cwd = packages/shared-helpers (`pnpm --filter @12-apps/shared-helpers prisma:*`),
  * so the `schema` / `migrations` paths resolve relative to this file.
  *
  * Prisma 7 also stopped auto-loading `.env`, hence the explicit `dotenv/config`

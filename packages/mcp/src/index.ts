@@ -1,5 +1,5 @@
 /**
- * @repo/mcp — app-agnostic MCP server core.
+ * @12-apps/mcp — app-agnostic MCP server core.
  *
  * Turn an OpenAPI document into MCP tools (one per operation) and dispatch each
  * tool call by proxying to the endpoint with the caller's bearer token, so an

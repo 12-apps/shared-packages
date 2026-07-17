@@ -17,7 +17,7 @@ It is framework-agnostic (pure MUI, no app coupling) so other projects can reuse
 ## Composition
 
 ```tsx
-import { Dashboard } from '@repo/ui/layout/Dashboard';
+import { Dashboard } from '@12-apps/ui/layout/Dashboard';
 
 <Dashboard activeFilterCount={activeCount}>
   <Dashboard.Breadcrumb items={[{ label: 'Admin', href: '/admin' }, { label: 'Products' }]} />

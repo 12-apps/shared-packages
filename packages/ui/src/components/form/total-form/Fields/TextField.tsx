@@ -20,7 +20,7 @@ export interface TextFieldProps {
 
 /**
  * Text input field bound to {@link useFormContext}. Composes the existing
- * `@repo/ui` `Form*` presentational primitives and the `Input` control,
+ * `@12-apps/ui` `Form*` presentational primitives and the `Input` control,
  * reading its value/error from context and writing changes back through it.
  *
  * Renders its error via `total-form-field-<name>-message` and the input via

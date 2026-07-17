@@ -13,7 +13,7 @@ export interface FormErrorSnackbarProps {
 
 /**
  * Surfaces form-level validation failures. Thin wrapper over the existing
- * `@repo/ui` `Toast`: renders nothing while the form is valid and shows an
+ * `@12-apps/ui` `Toast`: renders nothing while the form is valid and shows an
  * error toast (testid `total-form-error-snackbar`) once any field has an error.
  */
 export function FormErrorSnackbar({

@@ -21,7 +21,7 @@ export interface SelectFieldProps {
 
 /**
  * Select field bound to {@link useFormContext}. Composes the existing
- * `@repo/ui` `Form*` primitives and the `Select` control, reading its
+ * `@12-apps/ui` `Form*` primitives and the `Select` control, reading its
  * value/error from context and writing the chosen value back through it.
  *
  * Renders its error via `total-form-field-<name>-message` and the select via

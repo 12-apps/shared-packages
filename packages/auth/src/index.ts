@@ -18,7 +18,7 @@ export const auth = nextAuth.auth;
 
 /**
  * Re-export the config (and its `ExtendedSession` type) so consumers can reach
- * it from the package root, while `@repo/auth/config` stays importable without
+ * it from the package root, while `@12-apps/auth/config` stays importable without
  * constructing the NextAuth instance (tests / edge).
  */
 export { authConfig };
@@ -26,7 +26,7 @@ export { setSignInGate, setSessionAdminResolver } from "./config";
 export type { ExtendedSession, SignInGate, SessionAdminResolver } from "./config";
 
 /**
- * Admin allowlist helpers (also available via `@repo/auth/admin` for
+ * Admin allowlist helpers (also available via `@12-apps/auth/admin` for
  * dependency-free contexts such as Edge middleware and unit tests).
  */
 export { isAdminEmail, parseAdminEmails };

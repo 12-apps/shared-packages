@@ -1,9 +1,9 @@
 "use client";
 
-import { Button } from "@repo/ui/form/Button";
-import { SectionOnboarding } from "@repo/ui/data-display/SectionOnboarding";
-import { Box } from "@repo/ui/mui/Box";
-import { Stack } from "@repo/ui/mui/Stack";
+import { Button } from "@12-apps/ui/form/Button";
+import { SectionOnboarding } from "@12-apps/ui/data-display/SectionOnboarding";
+import { Box } from "@12-apps/ui/mui/Box";
+import { Stack } from "@12-apps/ui/mui/Stack";
 import type { ReactNode } from "react";
 
 import { useOnboarding } from "./onboarding-context";

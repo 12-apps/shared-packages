@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { email, required } from "@repo/shared-helpers/forms";
+import { email, required } from "@12-apps/shared-helpers/forms";
 
 import { FormContainer, Fields, FormErrorSnackbar, SubmitButton } from "./index";
 import type { FormSubmitHelpers } from "./index";

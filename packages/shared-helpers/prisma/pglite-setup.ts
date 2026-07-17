@@ -9,9 +9,9 @@
  * whole run, then exits, releasing the OS file lock before the web server opens
  * the same directory.
  *
- *   PGLITE_DATA_DIR=./.e2e-db pnpm --filter @repo/shared-helpers exec tsx prisma/pglite-setup.ts
+ *   PGLITE_DATA_DIR=./.e2e-db pnpm --filter @12-apps/shared-helpers exec tsx prisma/pglite-setup.ts
  *   # or, via the package script:
- *   PGLITE_DATA_DIR=./.e2e-db pnpm --filter @repo/shared-helpers db:pglite:setup
+ *   PGLITE_DATA_DIR=./.e2e-db pnpm --filter @12-apps/shared-helpers db:pglite:setup
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';

@@ -21,7 +21,7 @@ For a plain text type-ahead with local filtering and multi-select chips, use
 ## Usage
 
 ```tsx
-import { SearchPalette } from '@repo/ui/form/SearchPalette';
+import { SearchPalette } from '@12-apps/ui/form/SearchPalette';
 
 <SearchPalette
   value={query}

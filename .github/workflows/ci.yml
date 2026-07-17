@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      - name: Lint
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm lint 2>&1 | tee lint.log
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      - name: Type check
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm check-types 2>&1 | tee typecheck.log
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      - name: Build
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee build.log
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      - name: Run unit tests
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm test 2>&1 | tee unit.log
+
+  # Static-quality gate via the org's reusable workflow (12-apps/ci): complexity,
+  # flakiness, duplication, flaky quarantine, knip (shrink-only ratchet), and the
+  # .quality-exceptions burn-down. No e2e lanes here — this repo ships libraries,
+  # not a runnable app — so both e2e inputs are disabled.
+  quality:
+    name: Quality
+    # Least-privilege: the reusable quality gate only reads the repo. Grant
+    # exactly this so nothing broader leaks into the reusable workflow.
+    permissions:
+      contents: read
+    uses: 12-apps/ci/.github/workflows/quality.yml@v1
+    with:
+      run-e2e-reliability: false
+      run-affected-e2e: false
+      install-playwright: false
+
+  # Required-checks aggregation: one status that branch protection can gate on,
+  # green only when every prerequisite job succeeded.
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [lint, type-check, build, unit-tests, quality]
+    steps:
+      - name: Verify all required jobs passed
+        shell: bash
+        run: |
+          results='${{ join(needs.*.result, ",") }}'
+          echo "Upstream results: $results"
+          if echo "$results" | tr ',' '\n' | grep -qvE '^(success|skipped)$'; then
+            echo "::error::One or more required jobs failed."
+            exit 1
+          fi
+          echo "All required jobs passed."

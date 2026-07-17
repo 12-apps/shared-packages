@@ -1,5 +1,5 @@
 {
-  "name": "@repo/onboarding",
+  "name": "@12-apps/onboarding",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,14 +10,14 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@repo/ui": "workspace:*",
+    "@12-apps/ui": "workspace:*",
     "react": "^19.2.0"
   },
   "peerDependencies": {
     "react": ">=19.0.0"
   },
   "devDependencies": {
-    "@repo/typescript-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
     "@types/react": "19.2.2",
     "typescript": "5.9.2"
   }

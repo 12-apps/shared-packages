@@ -1,4 +1,4 @@
-# @repo/onboarding
+# @12-apps/onboarding
 
 Reusable, resumable, per-user×tenant **onboarding progress** for guided setup
 flows — one small system any app/page can adopt.
@@ -8,7 +8,7 @@ flows — one small system any app/page can adopt.
 - **Persistence-agnostic**: the UI + hook talk to an injected `OnboardingStore`,
   so you back it with Prisma server actions, tRPC, REST, or anything.
 - Ships a **Prisma helper** (`createOnboardingRepository`) for the common case,
-  and a **`GuidedSection`** UI that binds the state to `@repo/ui`'s
+  and a **`GuidedSection`** UI that binds the state to `@12-apps/ui`'s
   `SectionOnboarding` + stepper.
 
 ## Exports
