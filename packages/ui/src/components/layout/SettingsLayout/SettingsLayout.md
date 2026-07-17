@@ -29,7 +29,7 @@ it themes automatically in light/dark.
 ```tsx
 import NextLink from 'next/link';
 import { usePathname } from 'next/navigation';
-import { SettingsLayout, type SettingsNavGroup } from '@repo/ui/layout/SettingsLayout';
+import { SettingsLayout, type SettingsNavGroup } from '@12-apps/ui/layout/SettingsLayout';
 
 const groups: SettingsNavGroup[] = [
   {

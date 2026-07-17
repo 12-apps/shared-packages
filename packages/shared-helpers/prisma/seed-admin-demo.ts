@@ -5,7 +5,7 @@
  * (`prisma/seed.ts`) — run AFTER provisioning the dev DB. Idempotent (upserts).
  *
  *   PGLITE_DATA_DIR=<abs .dev-db> USE_FILE_DB=1 SKIP_ENV_VALIDATION=1 \
- *     pnpm --filter @repo/shared-helpers exec tsx prisma/seed-admin-demo.ts
+ *     pnpm --filter @12-apps/shared-helpers exec tsx prisma/seed-admin-demo.ts
  */
 import type { PrismaClient } from "@prisma/client";
 

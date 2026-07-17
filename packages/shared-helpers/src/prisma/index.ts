@@ -33,7 +33,7 @@ import { applyAuditStamps } from './audit-extension';
 // Change-attribution context helpers (FUT-168): the auth layer calls `setActor`
 // once a request is authorized; the audit extension applied below reads it to
 // stamp created_by/updated_by. Re-exported here so consumers import them from
-// the same `@repo/shared-helpers/prisma` entry point as `getPrismaClient`.
+// the same `@12-apps/shared-helpers/prisma` entry point as `getPrismaClient`.
 export { getActorUserId, runWithActor, setActor, type ActorContext } from './actor-context';
 export { normalizeSearchText } from './search-normalize';
 
@@ -187,7 +187,7 @@ export const getPrismaClient = async (): Promise<PrismaClient> => {
       globalStore.__futurePayPrismaInit = undefined;
       throw new Error(
         `Prisma client not available (${pglite ? 'PGlite' : 'PostgreSQL'} mode). ` +
-          'Run "pnpm --filter @repo/shared-helpers prisma generate" from the ' +
+          'Run "pnpm --filter @12-apps/shared-helpers prisma generate" from the ' +
           'monorepo root, or "pnpm prisma generate" from packages/shared-helpers. ' +
           `Cause: ${error instanceof Error ? error.message : String(error)}`,
         { cause: error },

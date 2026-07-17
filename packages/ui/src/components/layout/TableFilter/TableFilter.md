@@ -20,8 +20,8 @@ Compound **filter-panel** system — MUI port of the reference `TableFilter`. A
 ## Usage
 
 ```tsx
-import { TableFilter } from '@repo/ui/layout/TableFilter';
-import { FilterTrigger } from '@repo/ui/layout/ContentToolbar';
+import { TableFilter } from '@12-apps/ui/layout/TableFilter';
+import { FilterTrigger } from '@12-apps/ui/layout/ContentToolbar';
 
 const [open, setOpen] = useState(false);
 

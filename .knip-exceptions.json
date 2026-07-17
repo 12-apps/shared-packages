@@ -1,0 +1,19 @@
+{
+  "files": [],
+  "exports": [
+    "packages/shared-helpers/src/requests/lib/successRateMetrics.ts#SuccessRateTripError",
+    "packages/shared-helpers/src/requests/lib/successRateMetrics.ts#applySuccessRateGuard"
+  ],
+  "types": [
+    "packages/shared-helpers/src/requests/lib/abortController.ts#IWithAbortController",
+    "packages/shared-helpers/src/requests/lib/successRateMetrics.ts#SuccessRateOptions"
+  ],
+  "dependencies": [],
+  "devDependencies": [
+    "package.json#@electric-sql/pglite",
+    "package.json#prettier",
+    "package.json#prisma"
+  ],
+  "unlisted": [],
+  "unresolved": []
+}

@@ -1,6 +1,6 @@
 # Using `getPrismaClient()` in a server action
 
-`@repo/shared-helpers/prisma` exports `getPrismaClient()`, a lazily-initialised,
+`@12-apps/shared-helpers/prisma` exports `getPrismaClient()`, a lazily-initialised,
 singleton `PrismaClient`. Call it from a server action (or any server-side
 module) to read the rows that `prisma/seed.ts` upserts:
 
@@ -15,8 +15,8 @@ Both rows are returned as the generated Prisma model types (`Client` and
 Generate the client and seed the baseline rows once:
 
 ```bash
-pnpm --filter @repo/shared-helpers prisma:generate
-pnpm --filter @repo/shared-helpers db:seed
+pnpm --filter @12-apps/shared-helpers prisma:generate
+pnpm --filter @12-apps/shared-helpers db:seed
 ```
 
 ## Example: a Next.js server action
@@ -24,7 +24,7 @@ pnpm --filter @repo/shared-helpers db:seed
 ```ts
 'use server';
 
-import { getPrismaClient } from '@repo/shared-helpers/prisma';
+import { getPrismaClient } from '@12-apps/shared-helpers/prisma';
 import type { Client, Unit } from '@prisma/client';
 
 /**

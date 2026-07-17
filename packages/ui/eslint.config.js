@@ -3,7 +3,7 @@ import tsParser from '@typescript-eslint/parser';
 import storybook from "eslint-plugin-storybook";
 import globals from 'globals';
 
-import { config } from "@repo/eslint-config/base";
+import { config } from "@12-apps/eslint-config/base";
 
 export default [
   {

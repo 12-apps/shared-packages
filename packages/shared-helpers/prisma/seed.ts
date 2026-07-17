@@ -16,7 +16,7 @@
  * by `productId` — so the whole seed can re-run without creating duplicates or
  * hitting a unique-constraint error.
  *
- * Invoked deterministically via `pnpm --filter @repo/shared-helpers db:seed`
+ * Invoked deterministically via `pnpm --filter @12-apps/shared-helpers db:seed`
  * (Prisma `prisma.seed` config: `tsx prisma/seed.ts`).
  */
 

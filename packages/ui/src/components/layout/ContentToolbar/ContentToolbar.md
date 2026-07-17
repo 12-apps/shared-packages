@@ -36,7 +36,7 @@ import {
   SortByDropdown,
   MultiSelectDropdown,
   FilterTrigger,
-} from '@repo/ui/layout/ContentToolbar';
+} from '@12-apps/ui/layout/ContentToolbar';
 
 <ContentToolbar
   hasSelection={selected.size > 0}

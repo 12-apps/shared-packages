@@ -1,5 +1,5 @@
 {
-  "name": "@repo/shared-helpers",
+  "name": "@12-apps/shared-helpers",
   "version": "1.0.0",
   "description": "Shared helper utilities",
   "main": "dist/index.js",
@@ -57,8 +57,8 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@repo/eslint-config": "workspace:*",
-    "@repo/typescript-config": "workspace:*",
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
     "@types/node": "^22.10.6",
     "@types/pg": "^8.16.0",
     "@vitest/coverage-v8": "^3.2.4",

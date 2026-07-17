@@ -12,7 +12,7 @@ export interface SubmitButtonProps {
 }
 
 /**
- * Submit control wired to {@link useFormContext}. Wraps the existing `@repo/ui`
+ * Submit control wired to {@link useFormContext}. Wraps the existing `@12-apps/ui`
  * `Button` as a `type="submit"` button (testid `total-form-submit`) and
  * reflects the form's `submitting` state via `loading`/`disabled`.
  */

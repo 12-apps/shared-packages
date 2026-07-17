@@ -1,0 +1,48 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "rules": {
+    "duplicates": "off"
+  },
+  "ignore": ["**/generated/**", "**/*.d.ts"],
+  "ignoreBinaries": ["only-allow"],
+  "ignoreDependencies": [],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "eslint.complexity.config.mjs",
+        "eslint.flakiness.config.mjs",
+        "eslint.config.mjs",
+        "scripts/*.mjs"
+      ],
+      "ignoreDependencies": [
+        "@eslint/js",
+        "eslint-config-prettier",
+        "typescript-eslint",
+        "eslint-plugin-react-hooks",
+        "eslint-plugin-react"
+      ]
+    },
+    "packages/ui": {
+      "entry": [
+        "src/index.ts",
+        "src/**/index.ts",
+        "src/**/*.stories.{ts,tsx}",
+        "src/components/**/*.tsx",
+        "src/components/**/*.types.ts",
+        "src/mui/*.ts",
+        "src/utils/index.ts",
+        "scripts/*.js"
+      ],
+      "ignoreDependencies": ["@playwright/test", "playwright", "@storybook/builder-vite"]
+    },
+    "packages/shared-helpers": {
+      "entry": ["src/index.{ts,tsx}", "index.{ts,tsx}", "scripts/*.mjs", "prisma/seed-admin-demo.ts"]
+    },
+    "packages/*": {
+      "entry": ["src/index.{ts,tsx}", "index.{ts,tsx}"]
+    }
+  },
+  "vitest": {
+    "config": ["vitest.config.ts"]
+  }
+}

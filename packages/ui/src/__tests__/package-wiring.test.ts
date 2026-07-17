@@ -16,10 +16,10 @@ function readPkg(): UiPackageJson {
   return JSON.parse(readFileSync(pkgPath, "utf8")) as UiPackageJson;
 }
 
-describe("@repo/ui package wiring (Task 5)", () => {
-  it("declares @repo/shared-helpers as a workspace:* dependency", () => {
+describe("@12-apps/ui package wiring (Task 5)", () => {
+  it("declares @12-apps/shared-helpers as a workspace:* dependency", () => {
     const pkg = readPkg();
-    expect(pkg.dependencies?.["@repo/shared-helpers"]).toBe("workspace:*");
+    expect(pkg.dependencies?.["@12-apps/shared-helpers"]).toBe("workspace:*");
   });
 
   it("exposes the ./form/total-form package export", () => {

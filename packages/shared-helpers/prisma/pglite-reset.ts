@@ -7,8 +7,8 @@
  * new migration — it removes the dataDir, then replays every migration + the
  * idempotent seed.
  *
- *   pnpm --filter @repo/shared-helpers db:pglite:reset
- *   PGLITE_DATA_DIR=/abs/path pnpm --filter @repo/shared-helpers db:pglite:reset
+ *   pnpm --filter @12-apps/shared-helpers db:pglite:reset
+ *   PGLITE_DATA_DIR=/abs/path pnpm --filter @12-apps/shared-helpers db:pglite:reset
  */
 import { execFileSync } from 'node:child_process';
 import { rmSync } from 'node:fs';

@@ -1,4 +1,4 @@
-# @repo/mcp
+# @12-apps/mcp
 
 App-agnostic core for exposing an app's HTTP endpoints as an MCP server, where
 **the agent acts with exactly the calling user's permissions**.
