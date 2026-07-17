@@ -76,8 +76,12 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -o pipefail
-          # Write the concrete token (shell-expanded, never printed) so pnpm/npm
-          # authenticate reliably — .npmrc ${VAR} expansion is not honored across
-          # the pnpm -> npm publish boundary. GitHub masks the secret in logs.
-          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> .npmrc
+          # pnpm -r publish shells out to `npm publish` from each package dir, and
+          # npm does NOT merge the repo-root .npmrc — only cwd + user/global. Write
+          # auth + scope routing to the user-level ~/.npmrc so every per-package
+          # publish sees it. Shell-expanded token, never printed; GitHub masks it.
+          {
+            echo "@12-apps:registry=https://npm.pkg.github.com"
+            echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}"
+          } >> ~/.npmrc
           pnpm -r publish --no-git-checks --access restricted 2>&1 | tee publish.log
