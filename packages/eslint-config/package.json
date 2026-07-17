@@ -2,7 +2,6 @@
   "name": "@12-apps/eslint-config",
   "version": "0.0.0",
   "type": "module",
-  "private": true,
   "exports": {
     "./base": "./base.js",
     "./next-js": "./next.js",
@@ -20,5 +19,22 @@
     "globals": "^16.5.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.50.0"
-  }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/eslint-config"
+  },
+  "files": [
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md"
+  ]
 }
