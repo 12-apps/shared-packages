@@ -1,11 +1,8 @@
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import {
-  alpha,
   Box,
-  Checkbox,
   FormControlLabel,
   IconButton,
-  keyframes,
   Menu,
   MenuItem,
   Skeleton,
@@ -14,19 +11,14 @@ import {
   TableBody,
   TableCell,
   TableContainer,
-  TableHead,
-  TableRow,
-  TableSortLabel,
-  useMediaQuery,
-  useTheme} from '@mui/material';
+  TableRow
+  } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import React, { useCallback,useEffect, useMemo, useState } from 'react';
+import React from 'react';
 
 import type {
   ColumnConfig,
-  TableBodyProps,
   TableDensity,
-  TableHeaderProps,
   TableProps,
   TableStripeColor} from './Table.types';
 import { TABLE_DEFAULTS, definedProps } from './Table.helpers';
@@ -34,30 +26,22 @@ import { useTableSelection } from './Table.hooks';
 import { EnhancedTableBody, EnhancedTableHeader } from './TableParts';
 import { EmptyRow, NoDataPlaceholder } from './TableStates';
 import {
-  getDensityConfig,
-  getStripeColorFromTheme,
-  pulseAnimation,
-  tableStyles,
-} from './Table.styles';
+  tableStyles } from './Table.styles';
 
 // Define pulse animation
 const StyledTableContainer = styled(TableContainer, {
-  shouldForwardProp: (prop) => !['virtualScrolling', 'containerHeight'].includes(prop as string),
-})<{ 
+  shouldForwardProp: (prop) => !['virtualScrolling', 'containerHeight'].includes(prop as string) })<{ 
   virtualScrolling?: boolean; 
   containerHeight?: number | string;
 }>(({ virtualScrolling, containerHeight }) => ({
   ...(virtualScrolling && {
     height: containerHeight || 400,
-    overflow: 'auto',
-  }),
-}));
+    overflow: 'auto' }) }));
 
 // Helper function to get stripe color from theme
 const StyledTable = styled(MuiTable, {
   shouldForwardProp: (prop) =>
-    !['customVariant', 'glow', 'pulse', 'hoverable', 'density', 'stickyHeader', 'stripeColor'].includes(prop as string),
-})<{
+    !['customVariant', 'glow', 'pulse', 'hoverable', 'density', 'stickyHeader', 'stripeColor'].includes(prop as string) })<{
   customVariant?: string;
   glow?: boolean;
   pulse?: boolean;
@@ -74,8 +58,7 @@ const StyledTable = styled(MuiTable, {
     hoverable,
     density,
     stickyHeader,
-    stripeColor,
-  });
+    stripeColor });
 });
 
 // Virtual Scrolling Hook
@@ -102,8 +85,7 @@ const TableShell: React.FC<{
   stickyHeader,
   header,
   rest,
-  children,
-}) => (
+  children }) => (
   <StyledTableContainer>
     <StyledTable
       ref={innerRef}
@@ -277,8 +259,7 @@ const buildShell = ({
   selection,
   innerRef,
   rest,
-  finalColumns,
-}: RendererProps & { finalColumns?: ColumnConfig[] }) => ({
+  finalColumns }: RendererProps & { finalColumns?: ColumnConfig[] }) => ({
   innerRef,
   variant: resolved.variant,
   stripeColor: resolved.stripeColor,
@@ -301,8 +282,7 @@ const buildShell = ({
       stickyHeader={resolved.stickyHeader}
     />
   ) : null,
-  rest: rest as Record<string, unknown>,
-});
+  rest: rest as Record<string, unknown> });
 
 const TableLoadingState: React.FC<{
   shell: TableShellProps;
@@ -347,8 +327,7 @@ export const Table = React.forwardRef<globalThis.HTMLTableElement, TableProps>(
       columnPriorities: resolved.columnPriorities,
       selectedRows: resolved.selectedRows ?? [],
       rowKeyExtractor: resolved.rowKeyExtractor,
-      onSelectionChange: resolved.onSelectionChange,
-    });
+      onSelectionChange: resolved.onSelectionChange });
 
     const rest = props as unknown as Record<string, unknown>;
     const renderer: RendererProps = { resolved, selection, innerRef: ref, rest };

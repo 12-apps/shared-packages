@@ -494,8 +494,6 @@ export const Performance: Story = {
       const endTime = performance.now();
 
       const renderTime = endTime - startTime;
-      // eslint-disable-next-line no-console
-      console.log(`Render time for ${separators.length} separators: ${renderTime}ms`);
 
       // Verify all separators are rendered
       await expect(separators.length).toBe(20);

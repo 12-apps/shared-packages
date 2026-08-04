@@ -751,9 +751,6 @@ export const Performance: Story = {
       const endTime = Date.now();
       const renderTime = endTime - startTime;
 
-      // Log render time for debugging (allow console in tests)
-      // eslint-disable-next-line no-console
-      console.log(`Render time for ${manyOptions.length} options: ${renderTime}ms`);
 
       // Assert reasonable render time
       await expect(renderTime).toBeLessThan(2000);

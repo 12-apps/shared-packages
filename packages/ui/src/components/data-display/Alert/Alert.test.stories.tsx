@@ -445,9 +445,6 @@ export const PerformanceTest: Story = {
       const endTime = window.performance.now();
 
       const renderTime = endTime - startTime;
-      // Log render time for performance monitoring (can be removed in production)
-      // eslint-disable-next-line no-console
-      console.log(`Render time for ${alerts.length} alerts: ${renderTime}ms`);
 
       expect(alerts).toHaveLength(50);
       await expect(renderTime).toBeLessThan(1000);

@@ -1,33 +1,11 @@
-import Code from '@mui/icons-material/Code';
-import FormatBold from '@mui/icons-material/FormatBold';
-import FormatItalic from '@mui/icons-material/FormatItalic';
-import FormatListBulleted from '@mui/icons-material/FormatListBulleted';
-import FormatListNumbered from '@mui/icons-material/FormatListNumbered';
-import FormatQuote from '@mui/icons-material/FormatQuote';
-import FormatStrikethrough from '@mui/icons-material/FormatStrikethrough';
-import FormatUnderlined from '@mui/icons-material/FormatUnderlined';
-import Image from '@mui/icons-material/Image';
-import Link from '@mui/icons-material/Link';
 import {
   alpha,
   Box,
-  Divider,
-  IconButton,
   Paper,
-  Toolbar,
-  Tooltip,
-  Typography,
-  useTheme,
-} from '@mui/material';
-import React, { forwardRef, useCallback, useEffect,useRef, useState } from 'react';
+  useTheme } from '@mui/material';
+import React, { forwardRef } from 'react';
 
 import type { Theme } from '@mui/material';
-import {
-  insertImage,
-  toggleList,
-  wrapSelection,
-  wrapSelectionWithLink,
-} from './RichTextEditor.dom';
 import { useRichTextEditor } from './RichTextEditor.hooks';
 import type { RichTextEditorProps, ToolbarConfig } from './RichTextEditor.types';
 import { RichTextEditorToolbar } from './RichTextEditorToolbar';
@@ -43,8 +21,7 @@ const DEFAULT_TOOLBAR: Required<Omit<ToolbarConfig, 'customItems'>> & Pick<Toolb
   image: false,
   codeBlock: false,
   quote: false,
-  customItems: [],
-};
+  customItems: [] };
 
 const RICH_TEXT_DEFAULTS: Partial<RichTextEditorProps> = {
   value: '',
@@ -52,8 +29,7 @@ const RICH_TEXT_DEFAULTS: Partial<RichTextEditorProps> = {
   disabled: false,
   readOnly: false,
   toolbar: {},
-  height: 300,
-};
+  height: 300 };
 
 // Strips explicitly-undefined props before the merge, so `prop={undefined}`
 // still falls back to the default as a destructuring default would.
@@ -72,31 +48,26 @@ const editorContentSx = (theme: Theme, disabled: boolean, placeholder?: string, 
   '&:empty::before': {
     content: `"${placeholder}"`,
     color: theme.palette.text.disabled,
-    pointerEvents: 'none',
-  },
+    pointerEvents: 'none' },
   '& p': {
     margin: '8px 0',
     '&:first-of-type': { marginTop: 0 },
-    '&:last-of-type': { marginBottom: 0 },
-  },
+    '&:last-of-type': { marginBottom: 0 } },
   '& ul, & ol': { marginLeft: theme.spacing(2) },
   '& blockquote': {
     borderLeft: `4px solid ${theme.palette.primary.main}`,
     paddingLeft: theme.spacing(2),
     margin: `${theme.spacing(1)} 0`,
     fontStyle: 'italic',
-    backgroundColor: alpha(theme.palette.primary.main, 0.05),
-  },
+    backgroundColor: alpha(theme.palette.primary.main, 0.05) },
   '& pre': {
     backgroundColor: alpha(theme.palette.text.primary, 0.08),
     padding: theme.spacing(1),
     borderRadius: 1,
     fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
     fontSize: '0.875rem',
-    overflow: 'auto',
-  },
-  '& a': { color: theme.palette.primary.main, textDecoration: 'underline' },
-});
+    overflow: 'auto' },
+  '& a': { color: theme.palette.primary.main, textDecoration: 'underline' } });
 
 const shellSx = (theme: Theme, isFocused: boolean, disabled: boolean) => ({
   border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
@@ -105,13 +76,10 @@ const shellSx = (theme: Theme, isFocused: boolean, disabled: boolean) => ({
   transition: 'border-color 0.2s ease-in-out',
   ...(isFocused && {
     borderColor: theme.palette.primary.main,
-    boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}`,
-  }),
+    boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}` }),
   ...(disabled && {
     backgroundColor: theme.palette.action.disabledBackground,
-    color: theme.palette.text.disabled,
-  }),
-});
+    color: theme.palette.text.disabled }) });
 
 export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
   (editorProps, ref) => {
@@ -142,8 +110,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
       onBlur,
       disabled,
       readOnly,
-      maxLength,
-    });
+      maxLength });
 
     return (
       <Paper

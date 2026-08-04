@@ -1,18 +1,11 @@
-import CheckCircle from '@mui/icons-material/CheckCircle';
 import Close from '@mui/icons-material/Close';
-import Error from '@mui/icons-material/Error';
-import Info from '@mui/icons-material/Info';
-import Warning from '@mui/icons-material/Warning';
 import {
   Alert as MuiAlert,
   AlertTitle,
   alpha,
   Box,
   Collapse,
-  IconButton,
-  keyframes,
-} from '@mui/material';
-import type { Theme } from '@mui/material/styles';
+  IconButton } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React from 'react';
 
@@ -22,18 +15,14 @@ import {
   fadeInScale,
   getColorFromTheme,
   getVariantIcon,
-  iconRotate,
-  pulseAnimation,
-  shimmerAnimation,
-} from './Alert.styles';
+  iconRotate } from './Alert.styles';
 import type { AlertColor } from '@mui/material';
 import type { AlertProps } from './Alert.types';
 
 // Define animations
 const StyledAlert = styled(MuiAlert, {
   shouldForwardProp: (prop) =>
-    !['customVariant', 'customColor', 'glow', 'pulse', 'animate'].includes(prop as string),
-})<{
+    !['customVariant', 'customColor', 'glow', 'pulse', 'animate'].includes(prop as string) })<{
   customVariant?: string;
   customColor?: string;
   glow?: boolean;
@@ -56,14 +45,12 @@ const StyledAlert = styled(MuiAlert, {
       flexDirection: 'column',
       gap: theme.spacing(0.5),
       fontSize: '0.95rem',
-      lineHeight: 1.5,
-    },
+      lineHeight: 1.5 },
 
     '.MuiAlert-icon': {
       transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       alignItems: 'center',
-      animation: animate ? `${iconRotate} 0.6s ease-out` : 'none',
-    },
+      animation: animate ? `${iconRotate} 0.6s ease-out` : 'none' },
 
     // Hover effects
     '&:hover': {
@@ -72,31 +59,25 @@ const StyledAlert = styled(MuiAlert, {
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
 
       '.MuiAlert-icon': {
-        transform: 'scale(1.15) rotate(10deg)',
-      },
+        transform: 'scale(1.15) rotate(10deg)' },
 
       '&::before': {
-        opacity: 1,
-      },
-    },
+        opacity: 1 } },
 
     // Active state
     '&:active': {
       transform: 'translateY(-1px) scale(0.99)',
-      transition: 'transform 0.1s ease',
-    },
+      transition: 'transform 0.1s ease' },
 
     // Focus styles for accessibility
     '&:focus-within': {
       outline: `3px solid ${alpha(colorPalette.main, 0.5)}`,
       outlineOffset: '3px',
       boxShadow: `0 0 0 6px ${alpha(colorPalette.main, 0.1)}`,
-      transition: 'all 0.2s ease',
-    },
+      transition: 'all 0.2s ease' },
 
     ...alertVariantStyles(theme, customVariant, colorPalette),
-    ...alertEmphasisStyles(colorPalette, Boolean(glow), Boolean(pulse)),
-  };
+    ...alertEmphasisStyles(colorPalette, Boolean(glow), Boolean(pulse)) };
 });
 
 const ALERT_DEFAULTS = {
@@ -108,8 +89,7 @@ const ALERT_DEFAULTS = {
   animate: true,
   role: 'alert',
   'aria-atomic': 'true',
-  'data-testid': 'alert',
-} satisfies Partial<AlertProps>;
+  'data-testid': 'alert' } satisfies Partial<AlertProps>;
 
 // Strips explicitly-undefined props before the merge so `prop={undefined}` still
 // falls back to the default, the way a destructuring default would.
@@ -126,8 +106,7 @@ const testIdFor = (base: string | undefined, suffix: string) =>
 const MUI_SEVERITY: Record<string, AlertColor> = {
   danger: 'error',
   glass: 'info',
-  gradient: 'info',
-};
+  gradient: 'info' };
 
 const toMuiSeverity = (variant: string): AlertColor =>
   MUI_SEVERITY[variant] ?? (variant as AlertColor);
@@ -148,8 +127,7 @@ const AlertContent: React.FC<{
           marginBottom: description ? 0.5 : 0,
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
-          wordBreak: 'break-word',
-        }}
+          wordBreak: 'break-word' }}
       >
         {title}
       </AlertTitle>
@@ -163,8 +141,7 @@ const AlertContent: React.FC<{
           fontSize: '0.925rem',
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
-          wordBreak: 'break-word',
-        }}
+          wordBreak: 'break-word' }}
       >
         {description}
       </Box>
@@ -175,8 +152,7 @@ const AlertContent: React.FC<{
 
 const AlertCloseButton: React.FC<{ dataTestId?: string; onClose: () => void }> = ({
   dataTestId,
-  onClose,
-}) => (
+  onClose }) => (
   <IconButton
     data-testid={testIdFor(dataTestId, 'close')}
     aria-label="close alert"
@@ -189,14 +165,11 @@ const AlertCloseButton: React.FC<{ dataTestId?: string; onClose: () => void }> =
       '&:hover': {
         transform: 'rotate(90deg) scale(1.1)',
         opacity: 1,
-        backgroundColor: alpha(theme.palette.action.hover, 0.1),
-      },
+        backgroundColor: alpha(theme.palette.action.hover, 0.1) },
       '&:focus': {
         opacity: 1,
         outline: 'none',
-        backgroundColor: alpha(theme.palette.action.focus, 0.1),
-      },
-    })}
+        backgroundColor: alpha(theme.palette.action.focus, 0.1) } })}
   >
     <Close fontSize="inherit" />
   </IconButton>

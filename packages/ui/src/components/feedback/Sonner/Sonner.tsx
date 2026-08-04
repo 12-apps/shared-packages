@@ -1,20 +1,6 @@
-import SuccessIcon from '@mui/icons-material/CheckCircle';
-import CloseIcon from '@mui/icons-material/Close';
-import ErrorIcon from '@mui/icons-material/Error';
-import InfoIcon from '@mui/icons-material/Info';
-import WarningIcon from '@mui/icons-material/Warning';
 import {
-  alpha,
   Box,
-  Button,
-  CircularProgress,
-  Collapse,
-  IconButton,
-  Portal,
-  Typography,
-  useTheme,
-} from '@mui/material';
-import type { CSSObject, Theme } from '@mui/material/styles';
+  Portal } from '@mui/material';
 import React, { createContext, useCallback, useContext, useRef,useState, useMemo } from 'react';
 
 import type { SonnerContextType, SonnerItem,SonnerProps } from './Sonner.types';
@@ -32,8 +18,7 @@ const buildToastItem = (
   id,
   type: type || toast.type || 'default',
   createdAt: Date.now(),
-  visible: true,
-});
+  visible: true });
 
 // Persistent toasts and `duration: 0` stay until dismissed explicitly.
 const scheduleAutoDismiss = (
@@ -149,8 +134,7 @@ export const SonnerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     info,
     loading,
     dismiss,
-    promise,
-  };
+    promise };
 
   // Register this context globally for imperative API
   useRegisterGlobalToast(contextValue);
@@ -196,8 +180,7 @@ const SonnerToaster: React.FC<{
           pointerEvents: 'none',
           maxHeight: 'calc(100vh - 32px)',
           overflowY: 'auto',
-          overflowX: 'hidden',
-        }}
+          overflowX: 'hidden' }}
       >
         {hiddenCount > 0 && (
           <Box
@@ -207,8 +190,7 @@ const SonnerToaster: React.FC<{
               textAlign: 'center',
               fontSize: '0.75rem',
               color: 'text.secondary',
-              pointerEvents: 'none',
-            }}
+              pointerEvents: 'none' }}
           >
             +{hiddenCount} more
           </Box>
@@ -308,8 +290,7 @@ const createToastInstance = (): SonnerContextType => {
         throw new Error('No SonnerProvider found');
       }
       return globalToastContext.promise(promiseToResolve, options);
-    },
-  };
+    } };
 
   return methods;
 };

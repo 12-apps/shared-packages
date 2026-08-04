@@ -724,7 +724,7 @@ const PersistentModalComponent = () => {
         open={open && !forceClose}
         onClose={() => {
           // This will be ignored due to persistent=true
-          // eslint-disable-next-line no-console
+          // eslint-disable-next-line no-console -- demo output for the Storybook docs page
           console.log('Close attempted but modal is persistent');
         }}
         variant="center"

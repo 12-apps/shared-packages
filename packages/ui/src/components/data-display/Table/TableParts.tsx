@@ -1,22 +1,13 @@
-import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
 import {
   Box,
   Checkbox,
-  CircularProgress,
-  Collapse,
-  IconButton,
-  Skeleton,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
-  TableSortLabel,
-  Typography,
-} from '@mui/material';
-import React, { useCallback, useMemo, useState } from 'react';
+  TableSortLabel } from '@mui/material';
+import React, { useCallback } from 'react';
 
-import { getDensityConfig } from './Table.styles';
 import { useVirtualScrolling } from './Table.hooks';
 import { useTableRowRenderer } from './TableParts.hooks';
 import type { ColumnConfig, TableBodyProps, TableHeaderProps } from './Table.types';
@@ -75,8 +66,7 @@ export const EnhancedTableHeader: React.FC<TableHeaderProps> = React.memo(({
   onSortChange,
   selectable,
   selectedRows = [],
-  onSelectAll,
-}) => {
+  onSelectAll }) => {
   const handleSort = useCallback(
     (columnKey: string) => {
       if (!sortable || !onSortChange) return;
@@ -156,8 +146,7 @@ export const TableDataRow: React.FC<{
   onRowBlur,
   onSelect,
   virtualScrolling,
-  renderCell,
-}) => (
+  renderCell }) => (
 
       <TableRow
         key={String(rowKey)}
@@ -172,8 +161,7 @@ export const TableDataRow: React.FC<{
           top: 0,
           left: 0,
           right: 0,
-          height: rowHeight,
-        } : undefined}
+          height: rowHeight } : undefined}
       >
         {selectable && (
           <TableCell padding="checkbox">
@@ -225,14 +213,12 @@ const VirtualisedBody: React.FC<{
       style={{
         height: containerHeight,
         overflow: 'auto',
-        position: 'relative',
-      }}
+        position: 'relative' }}
     >
       <TableBody
         style={{
           height: visibleItems.totalHeight,
-          position: 'relative',
-        }}
+          position: 'relative' }}
       >
         {visibleItems.items.map((rowData, index) => 
           renderTableRow(rowData, visibleItems.startIndex + index, visibleItems.offsetY + index * rowHeight)
@@ -268,8 +254,7 @@ export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo(({
   virtualScrolling,
   containerHeight,
   rowHeight,
-  overscan = 5,
-}) => {
+  overscan = 5 }) => {
   const renderTableRow = useTableRowRenderer({
     columns,
     selectedRows,
@@ -282,8 +267,7 @@ export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo(({
     renderRow,
     renderCell,
     virtualScrolling,
-    rowHeight,
-  });
+    rowHeight });
 
   const { visibleItems, handleScroll } = useVirtualScrolling(
     data, 

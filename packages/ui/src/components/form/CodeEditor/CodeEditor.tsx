@@ -1,24 +1,13 @@
-import type { Monaco } from '@monaco-editor/react';
 import Editor from '@monaco-editor/react';
-import CodeIcon from '@mui/icons-material/Code';
-import CopyIcon from '@mui/icons-material/ContentCopy';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import ExitFullscreenIcon from '@mui/icons-material/FullscreenExit';
-import WrapIcon from '@mui/icons-material/WrapText';
 import {
   alpha,
   Box,
-  IconButton,
   Paper,
-  Stack,
   styled,
-  Tooltip,
-  Typography,
-  useTheme,
-} from '@mui/material';
+  Typography } from '@mui/material';
 import type { editor } from 'monaco-editor';
 import type { FC} from 'react';
-import React, { useEffect,useRef } from 'react';
+import React, {  } from 'react';
 
 import { makeTestId, resolveCodeEditorProps } from './CodeEditor.helpers';
 import { useCodeEditor } from './CodeEditor.hooks';
@@ -34,12 +23,10 @@ const EditorContainer = styled(Paper)(({ theme }) => ({
   WebkitBackdropFilter: 'blur(10px)',
   border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
   borderRadius: theme.shape.borderRadius * 2,
-  overflow: 'hidden',
-}));
+  overflow: 'hidden' }));
 
 const EditorWrapper = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'fullscreen',
-})<{ fullscreen: boolean }>(({ theme, fullscreen }) => ({
+  shouldForwardProp: (prop) => prop !== 'fullscreen' })<{ fullscreen: boolean }>(({ theme, fullscreen }) => ({
   position: 'relative',
   flex: 1,
   minHeight: 200,
@@ -50,9 +37,7 @@ const EditorWrapper = styled(Box, {
     right: 0,
     bottom: 0,
     zIndex: theme.zIndex.modal,
-    background: theme.palette.background.paper,
-  }),
-}));
+    background: theme.palette.background.paper }) }));
 
 const PlaceholderOverlay = styled(Box)(({ theme }) => ({
   position: 'absolute',
@@ -62,8 +47,7 @@ const PlaceholderOverlay = styled(Box)(({ theme }) => ({
   fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
   fontSize: '0.875rem',
   pointerEvents: 'none',
-  userSelect: 'none',
-}));
+  userSelect: 'none' }));
 
 // Monaco editor themes
 const EditorLoading: FC = () => (
@@ -73,8 +57,7 @@ const EditorLoading: FC = () => (
       alignItems: 'center',
       justifyContent: 'center',
       height: '100%',
-      color: 'text.secondary',
-    }}
+      color: 'text.secondary' }}
   >
     <Typography variant="body2">Loading editor...</Typography>
   </Box>
@@ -85,8 +68,7 @@ const buildEditorOptions = ({
   fontSize,
   isWrapped,
   lineNumbers,
-  readOnly,
-}: {
+  readOnly }: {
   minimap?: boolean;
   fontSize: number;
   isWrapped: boolean;
@@ -116,8 +98,7 @@ const buildEditorOptions = ({
     roundedSelection: true,
     padding: { top: 16, bottom: 16 },
     fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
-    fontLigatures: true,
-});
+    fontLigatures: true });
 
 export const CodeEditor: FC<CodeEditorProps> = (componentProps) => {
   const {
@@ -135,8 +116,7 @@ export const CodeEditor: FC<CodeEditorProps> = (componentProps) => {
     autoFormat,
     placeholder,
     onSave,
-    dataTestId,
-  } = resolveCodeEditorProps(componentProps);
+    dataTestId } = resolveCodeEditorProps(componentProps);
 
   const testId = makeTestId(dataTestId);
   const editor = useCodeEditor({ themeProp, wordWrap, autoFormat, readOnly, onSave });
@@ -146,8 +126,7 @@ export const CodeEditor: FC<CodeEditorProps> = (componentProps) => {
     fontSize,
     isWrapped: editor.isWrapped,
     lineNumbers,
-    readOnly,
-  });
+    readOnly });
 
   return (
     <EditorContainer elevation={2} data-testid={dataTestId || 'code-editor'}>

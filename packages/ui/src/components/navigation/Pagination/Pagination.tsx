@@ -4,15 +4,9 @@ import NavigateBefore from '@mui/icons-material/NavigateBefore';
 import NavigateNext from '@mui/icons-material/NavigateNext';
 import type { PaginationRenderItemParams } from '@mui/material';
 import {
-  alpha,
   Box,
-  FormControl,
-  MenuItem,
   Pagination as MuiPagination,
-  PaginationItem,
-  Select,
-  Typography,
-} from '@mui/material';
+  PaginationItem } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React from 'react';
 
@@ -23,32 +17,15 @@ import type { PaginationProps } from './Pagination.types';
 import { ItemsPerPageSelect, PageInfo } from './PaginationParts';
 
 const StyledPagination = styled(MuiPagination, {
-  shouldForwardProp: (prop) => !['customVariant', 'customSize'].includes(prop as string),
-})<{ customVariant?: string; customSize?: string }>(({ theme, customVariant, customSize }) => ({
-  ...paginationStyles({ theme, customVariant, customSize }),
-}));
-
-const PageInfoContainer = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: theme.spacing(2),
-  marginLeft: theme.spacing(2),
-}));
-
-const ItemsPerPageContainer = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: theme.spacing(1),
-  marginRight: theme.spacing(2),
-}));
+  shouldForwardProp: (prop) => !['customVariant', 'customSize'].includes(prop as string) })<{ customVariant?: string; customSize?: string }>(({ theme, customVariant, customSize }) => ({
+  ...paginationStyles({ theme, customVariant, customSize }) }));
 
 const PaginationContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   flexWrap: 'wrap',
-  gap: theme.spacing(1),
-}));
+  gap: theme.spacing(1) }));
 
 // Arrow items get a short suffix, pages carry their number. This was two
 // parallel switch statements that differed only in whether the prefix came from
@@ -57,8 +34,7 @@ const ITEM_TEST_SUFFIX: Record<string, string> = {
   first: 'first',
   last: 'last',
   previous: 'prev',
-  next: 'next',
-};
+  next: 'next' };
 
 const paginationItemTestId = (
   base: string | undefined,
@@ -77,10 +53,9 @@ const paginationItemTestId = (
 const renderPaginationItem = ({
   item,
   variant,
-  size,
+  size: _size,
   dataTestId,
-  icons,
-}: {
+  icons }: {
   item: PaginationRenderItemParams;
   variant: string;
   size: string;
@@ -106,9 +81,7 @@ const renderPaginationItem = ({
               '&.MuiPaginationItem-page': {
                 fontSize: 0,
                 overflow: 'hidden',
-                textIndent: '-9999px',
-              },
-            }}
+                textIndent: '-9999px' } }}
           />
         );
       }
@@ -120,8 +93,7 @@ const renderPaginationItem = ({
       first: firstIcon as React.ReactElement,
       last: lastIcon as React.ReactElement,
       previous: previousIcon as React.ReactElement,
-      next: nextIcon as React.ReactElement,
-    };
+      next: nextIcon as React.ReactElement };
 
     return (
       <PaginationItem
@@ -131,8 +103,7 @@ const renderPaginationItem = ({
           first: () => iconMap.first || <FirstPage />,
           last: () => iconMap.last || <LastPage />,
           previous: () => iconMap.previous || <NavigateBefore />,
-          next: () => iconMap.next || <NavigateNext />,
-        }}
+          next: () => iconMap.next || <NavigateNext /> }}
       />
     );
   
@@ -183,19 +154,19 @@ export const Pagination = React.forwardRef<HTMLElement, PaginationProps>(
       size,
       page,
       count,
-      onChange,
-      boundaryCount,
-      siblingCount,
-      hideNextButton,
-      hidePrevButton,
-      showFirstButton,
-      showLastButton,
+      onChange: _onChange,
+      boundaryCount: _boundaryCount,
+      siblingCount: _siblingCount,
+      hideNextButton: _hideNextButton,
+      hidePrevButton: _hidePrevButton,
+      showFirstButton: _showFirstButton,
+      showLastButton: _showLastButton,
       firstIcon,
       lastIcon,
       previousIcon,
       nextIcon,
       disabled,
-      color,
+      color: _color,
       showPageInfo,
       pageInfoFormat,
       showItemsPerPage,
@@ -215,8 +186,7 @@ export const Pagination = React.forwardRef<HTMLElement, PaginationProps>(
         variant,
         size,
         dataTestId,
-        icons: { firstIcon, lastIcon, previousIcon, nextIcon },
-      });
+        icons: { firstIcon, lastIcon, previousIcon, nextIcon } });
 
     return (
       <PaginationContainer className={className} data-testid={dataTestId || 'pagination'}>

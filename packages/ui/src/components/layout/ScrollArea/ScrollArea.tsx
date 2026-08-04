@@ -3,12 +3,6 @@ import { alpha, Box, CircularProgress,Fab, useTheme, Zoom } from '@mui/material'
 import type { FC } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import {
-  getOverflowStyle,
-  getScrollbarColors,
-  getScrollbarSize,
-  getVariantStyles,
-} from './ScrollArea.styles';
 import type { ResolvedScrollAreaProps } from './ScrollArea.helpers';
 import { resolveScrollAreaProps } from './ScrollArea.helpers';
 import type { ScrollAreaProps } from './ScrollArea.types';
@@ -19,8 +13,7 @@ import { ScrollViewport } from './ScrollViewport';
 // reports size changes through a ResizeObserver.
 const useObservedScrollRef = ({
   externalScrollRef,
-  onResize,
-}: {
+  onResize }: {
   externalScrollRef?: React.Ref<HTMLDivElement>;
   onResize?: ScrollAreaProps['onResize'];
 }) => {
@@ -68,8 +61,7 @@ const useObservedScrollRef = ({
 const useAutoHide = ({
   autoHide,
   alwaysShowScrollbar,
-  autoHideDelay,
-}: {
+  autoHideDelay }: {
   autoHide: boolean;
   alwaysShowScrollbar: boolean;
   autoHideDelay: number;
@@ -103,19 +95,16 @@ const useScrollArea = (
     alwaysShowScrollbar,
     scrollToTopButton,
     scrollToTopThreshold,
-    smoothScroll,
-  } = props;
+    smoothScroll } = props;
 
   const { scrollRef, setScrollRef, containerDimensions } = useObservedScrollRef({
     externalScrollRef,
-    onResize,
-  });
+    onResize });
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const { isScrolling, noteScroll } = useAutoHide({
     autoHide,
     alwaysShowScrollbar,
-    autoHideDelay,
-  });
+    autoHideDelay });
 
   const handleScroll = useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
@@ -143,8 +132,7 @@ const useScrollArea = (
     showScrollToTop,
     containerDimensions,
     handleScroll,
-    scrollToTop,
-  };
+    scrollToTop };
 };
 
 const LoadingOverlay: FC = () => (
@@ -154,8 +142,7 @@ const LoadingOverlay: FC = () => (
       top: '50%',
       left: '50%',
       transform: 'translate(-50%, -50%)',
-      zIndex: 10,
-    }}
+      zIndex: 10 }}
   >
     <CircularProgress />
   </Box>
@@ -164,8 +151,7 @@ const LoadingOverlay: FC = () => (
 const ScrollToTopFab: FC<{ visible: boolean; glass: boolean; onClick: () => void }> = ({
   visible,
   glass,
-  onClick,
-}) => {
+  onClick }) => {
   const theme = useTheme();
 
   return (
@@ -186,9 +172,7 @@ const ScrollToTopFab: FC<{ visible: boolean; glass: boolean; onClick: () => void
           '&:hover': {
             backgroundColor: glass
               ? alpha(theme.palette.primary.main, 0.3)
-              : theme.palette.primary.dark,
-          },
-        }}
+              : theme.palette.primary.dark } }}
       >
         <KeyboardArrowUp />
       </Fab>
@@ -204,30 +188,29 @@ export const ScrollArea: React.FC<ScrollAreaProps> = (componentProps) => {
     height,
     maxHeight,
     maxWidth,
-    orientation,
-    scrollbarSize,
+    orientation: _orientation,
+    scrollbarSize: _scrollbarSize,
     autoHide,
-    autoHideDelay,
-    smoothScroll,
+    autoHideDelay: _autoHideDelay,
+    smoothScroll: _smoothScroll,
     variant,
-    onScroll,
+    onScroll: _onScroll,
     scrollToTopButton,
-    scrollToTopThreshold,
-    scrollbarColor,
-    scrollbarTrackColor,
-    contentPadding,
+    scrollToTopThreshold: _scrollToTopThreshold,
+    scrollbarColor: _scrollbarColor,
+    scrollbarTrackColor: _scrollbarTrackColor,
+    contentPadding: _contentPadding,
     alwaysShowScrollbar,
     disabled,
     loading,
     emptyContent,
     testId,
     scrollRef: externalScrollRef,
-    onResize,
+    onResize: _onResize,
     sx,
     ...props
   } = resolved;
 
-  const theme = useTheme();
   const {
     scrollRef,
     setScrollRef,
@@ -235,8 +218,7 @@ export const ScrollArea: React.FC<ScrollAreaProps> = (componentProps) => {
     showScrollToTop,
     containerDimensions,
     handleScroll,
-    scrollToTop,
-  } = useScrollArea({ ...resolved, externalScrollRef });
+    scrollToTop } = useScrollArea({ ...resolved, externalScrollRef });
 
   // Auto-hide keeps the scrollbar out of the way until the user is scrolling.
   const shouldShowScrollbar = alwaysShowScrollbar || !autoHide || isScrolling;

@@ -1,24 +1,14 @@
-import CompleteIcon from '@mui/icons-material/CheckCircle';
-import CloseIcon from '@mui/icons-material/Close';
-import PrevIcon from '@mui/icons-material/NavigateBefore';
-import NextIcon from '@mui/icons-material/NavigateNext';
-import RestartIcon from '@mui/icons-material/Refresh';
 import {
   alpha,
   Box,
-  Button,
   Fade,
-  IconButton,
   keyframes,
   LinearProgress,
   Paper,
   Portal,
-  Stack,
-  styled,
-  Typography,
-} from '@mui/material';
+  styled } from '@mui/material';
 import type { FC} from 'react';
-import React, { useCallback,useEffect, useRef, useState } from 'react';
+import React, {  } from 'react';
 
 import { useTutorialOverlay } from './TutorialOverlay.hooks';
 import { TutorialStepBody } from './TutorialStepBody';
@@ -48,8 +38,7 @@ const floatAnimation = keyframes`
 
 // Styled components
 const Overlay = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'allowClickThrough',
-})<{ allowClickThrough?: boolean }>(({ theme, allowClickThrough }) => ({
+  shouldForwardProp: (prop) => prop !== 'allowClickThrough' })<{ allowClickThrough?: boolean }>(({ theme, allowClickThrough }) => ({
   position: 'fixed',
   top: 0,
   left: 0,
@@ -57,8 +46,7 @@ const Overlay = styled(Box, {
   bottom: 0,
   zIndex: theme.zIndex.modal + 100,
   pointerEvents: allowClickThrough ? 'none' : 'auto',
-  transition: 'opacity 0.3s ease',
-}));
+  transition: 'opacity 0.3s ease' }));
 
 const Backdrop = styled(Box)(() => ({
   position: 'absolute',
@@ -67,12 +55,10 @@ const Backdrop = styled(Box)(() => ({
   right: 0,
   bottom: 0,
   background: alpha('#000', 0.7),
-  backdropFilter: 'blur(2px)',
-}));
+  backdropFilter: 'blur(2px)' }));
 
 const Spotlight = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'bounds' && prop !== 'padding',
-})<{ bounds: globalThis.DOMRect; padding: number }>(({ bounds, padding }) => ({
+  shouldForwardProp: (prop) => prop !== 'bounds' && prop !== 'padding' })<{ bounds: globalThis.DOMRect; padding: number }>(({ bounds, padding }) => ({
   position: 'absolute',
   top: bounds.top - padding,
   left: bounds.left - padding,
@@ -88,13 +74,10 @@ const Spotlight = styled(Box, {
     inset: -2,
     borderRadius: 8,
     background: 'transparent',
-    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
-  },
-}));
+    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)' } }));
 
 const TooltipContainer = styled(Paper, {
-  shouldForwardProp: (prop) => prop !== 'placement',
-})<{ placement: string }>(({ theme, placement }) => ({
+  shouldForwardProp: (prop) => prop !== 'placement' })<{ placement: string }>(({ theme, placement }) => ({
   position: 'absolute',
   maxWidth: 360,
   padding: theme.spacing(3),
@@ -119,31 +102,25 @@ const TooltipContainer = styled(Paper, {
       left: '50%',
       marginLeft: -6,
       borderTop: 'none',
-      borderLeft: 'none',
-    }),
+      borderLeft: 'none' }),
     ...(placement === 'bottom' && {
       top: -7,
       left: '50%',
       marginLeft: -6,
       borderBottom: 'none',
-      borderRight: 'none',
-    }),
+      borderRight: 'none' }),
     ...(placement === 'left' && {
       right: -7,
       top: '50%',
       marginTop: -6,
       borderLeft: 'none',
-      borderBottom: 'none',
-    }),
+      borderBottom: 'none' }),
     ...(placement === 'right' && {
       left: -7,
       top: '50%',
       marginTop: -6,
       borderRight: 'none',
-      borderTop: 'none',
-    }),
-  },
-}));
+      borderTop: 'none' }) } }));
 
 const ProgressBar = styled(LinearProgress)(({ theme }) => ({
   position: 'fixed',
@@ -153,9 +130,7 @@ const ProgressBar = styled(LinearProgress)(({ theme }) => ({
   height: 4,
   zIndex: theme.zIndex.modal + 102,
   '& .MuiLinearProgress-bar': {
-    background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-  },
-}));
+    background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)` } }));
 
 type TutorialDefaultedKeys =
   | 'initialStep'
@@ -178,8 +153,7 @@ const TUTORIAL_DEFAULTS: Pick<TutorialOverlayProps, TutorialDefaultedKeys> = {
   allowClickThrough: false,
   variant: 'tooltip',
   allowSkip: false,
-  animated: true,
-};
+  animated: true };
 
 // Strips explicitly-undefined props before the merge, so `prop={undefined}` still
 // falls back to the default exactly as a destructuring default would. Applied as
@@ -190,8 +164,7 @@ const resolveProps = (props: TutorialOverlayProps): ResolvedTutorialProps =>
     ...TUTORIAL_DEFAULTS,
     ...(Object.fromEntries(
       Object.entries(props).filter(([, value]) => value !== undefined),
-    ) as Partial<TutorialOverlayProps>),
-  }) as ResolvedTutorialProps;
+    ) as Partial<TutorialOverlayProps>) }) as ResolvedTutorialProps;
 
 // The dimming layer and the cut-out over the highlighted element. Local because
 // Backdrop and Spotlight cannot cross a module boundary (TS2742).
@@ -238,8 +211,7 @@ const TutorialTooltip: React.FC<{
             style={{
               top: tutorial.tooltipPosition.top,
               left: tutorial.tooltipPosition.left,
-              animation: animated ? undefined : 'none',
-            }}
+              animation: animated ? undefined : 'none' }}
             role="dialog"
             aria-labelledby={`tutorial-title-${tutorial.currentStep}`}
             aria-describedby={`tutorial-content-${tutorial.currentStep}`}
@@ -276,8 +248,7 @@ export const TutorialOverlay: FC<TutorialOverlayProps> = (componentProps) => {
     allowClickThrough,
     variant,
     allowSkip,
-    animated,
-  } = resolveProps(componentProps);
+    animated } = resolveProps(componentProps);
 
   const tutorial = useTutorialOverlay({
     steps,
@@ -286,8 +257,7 @@ export const TutorialOverlay: FC<TutorialOverlayProps> = (componentProps) => {
     allowKeyboardNavigation,
     onComplete,
     onSkip,
-    onStepComplete,
-  });
+    onStepComplete });
   const { currentStepData, isLastStep, isVisible, targetBounds, progress } = tutorial;
 
   const requiresActionBeforeNext = Boolean(currentStepData?.requiresAction) && !isLastStep;

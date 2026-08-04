@@ -36,25 +36,21 @@ const BAR_VARIANTS: Record<string, (theme: Theme, elevation: number) => CSSObjec
       boxShadow:
         theme.palette.mode === 'dark'
           ? `0 ${elevation * 4}px ${elevation * 8}px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)`
-          : `0 ${elevation * 4}px ${elevation * 8}px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)`,
-    }),
+          : `0 ${elevation * 4}px ${elevation * 8}px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)` }),
   elevated: (theme, elevation) => ({
       background: theme.palette.background.paper,
       boxShadow: theme.shadows[elevation] || theme.shadows[1],
-      borderRadius: theme.spacing(1.5),
-    }),
-  outlined: (theme, elevation) => ({
+      borderRadius: theme.spacing(1.5) }),
+  outlined: (theme, _elevation) => ({
       border: `1px solid ${theme.palette.divider}`,
-      borderRadius: theme.spacing(1),
-    }),
-};
+      borderRadius: theme.spacing(1) }) };
 
 // Spacing and colour for the separator glyphs between crumbs.
 const separatorStyles = (
   theme: Theme,
   size: string | undefined,
   color: string | undefined,
-  visualStyle: string | undefined,
+  _visualStyle: string | undefined,
 ): CSSObject => ({
   '& .MuiBreadcrumbs-separator': {
       marginLeft: theme.spacing(size === 'sm' ? 0.5 : size === 'lg' ? 1.5 : 1),
@@ -62,13 +58,9 @@ const separatorStyles = (
       opacity: 0.6,
       transition: 'all 0.2s ease',
       ...(color === 'primary' && {
-        color: theme.palette.primary.main,
-      }),
+        color: theme.palette.primary.main }),
       ...(color === 'secondary' && {
-        color: theme.palette.secondary.main,
-      }),
-    },
-});
+        color: theme.palette.secondary.main }) } });
 
 // Only one visual style applies at a time, so a lookup replaces three mutually
 // exclusive spreads.
@@ -82,8 +74,7 @@ export const breadcrumbsBarStyles = ({
   size,
   color,
   visualStyle,
-  elevation = 0,
-}: {
+  elevation = 0 }: {
   theme: Theme;
   size?: string;
   color?: string;
@@ -111,9 +102,7 @@ export const breadcrumbsBarStyles = ({
       flexWrap: 'nowrap',
       [theme.breakpoints.down('sm')]: {
         flexWrap: 'wrap',
-        gap: theme.spacing(0.5),
-      },
-    },
+        gap: theme.spacing(0.5) } },
 
     ...separatorStyles(theme, size, color, visualStyle),
 
@@ -125,10 +114,7 @@ export const breadcrumbsBarStyles = ({
         boxShadow:
           theme.palette.mode === 'dark'
             ? `0 ${elevation * 6}px ${elevation * 12}px rgba(0, 0, 0, 0.4)`
-            : `0 ${elevation * 6}px ${elevation * 12}px rgba(0, 0, 0, 0.12)`,
-      }),
-    },
-  });
+            : `0 ${elevation * 6}px ${elevation * 12}px rgba(0, 0, 0, 0.12)` }) } });
 
 // The idle glass treatment and the active-crumb treatment are mutually
 // exclusive; keeping them as named pieces takes both branches out of the main
@@ -144,9 +130,7 @@ const linkGlassIdleStyles = (theme: Theme): CSSObject => ({
           background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
           opacity: 0,
           transition: 'opacity 0.3s ease',
-          borderRadius: 'inherit',
-        },
-      });
+          borderRadius: 'inherit' } });
 
 const linkActiveStyles = (theme: Theme, visualStyle?: string): CSSObject => ({
       pointerEvents: 'none',
@@ -156,9 +140,7 @@ const linkActiveStyles = (theme: Theme, visualStyle?: string): CSSObject => ({
 
       ...(visualStyle === 'glass' && {
         background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-        animation: `${pulse} 2s infinite`,
-      }),
-    });
+        animation: `${pulse} 2s infinite` }) });
 
 // Hover treatment. The tint is a touch stronger on the glass variant so it still
 // reads against the translucent bar.
@@ -169,21 +151,16 @@ const linkHoverStyles = (theme: Theme, visualStyle?: string): CSSObject => ({
       transform: 'translateY(-1px)',
 
       '&::before': {
-        opacity: 1,
-      },
+        opacity: 1 },
 
       '& .breadcrumb-icon': {
-        transform: 'scale(1.1)',
-      },
-    },
-});
+        transform: 'scale(1.1)' } } });
 
 export const breadcrumbLinkStyles = ({
   theme,
   size,
   active,
-  visualStyle,
-}: {
+  visualStyle }: {
   theme: Theme;
   size?: string;
   active?: boolean;
@@ -212,30 +189,24 @@ export const breadcrumbLinkStyles = ({
 
     '&:active': {
       transform: 'translateY(0)',
-      backgroundColor: alpha(theme.palette.primary.main, 0.12),
-    },
+      backgroundColor: alpha(theme.palette.primary.main, 0.12) },
 
     '&:focus-visible': {
       outline: `2px solid ${theme.palette.primary.main}`,
       outlineOffset: 2,
-      backgroundColor: alpha(theme.palette.primary.main, 0.04),
-    },
+      backgroundColor: alpha(theme.palette.primary.main, 0.04) },
 
 
 
     '& .breadcrumb-icon': {
-      transition: 'transform 0.2s ease',
-    },
+      transition: 'transform 0.2s ease' },
 
     // Mobile responsiveness
     [theme.breakpoints.down('sm')]: {
       fontSize: size === 'lg' ? '1rem' : size === 'sm' ? '0.75rem' : '0.875rem',
-      padding: theme.spacing(0.375, 0.5),
-    },
-  });
+      padding: theme.spacing(0.375, 0.5) } });
 
 export const sizeIconMap = {
   sm: 'small' as const,
   md: 'small' as const,
-  lg: 'medium' as const,
-};
+  lg: 'medium' as const };

@@ -6,7 +6,7 @@ import type { NavigationMenuItem } from './NavigationMenu.types';
 // from the trigger into the popover without it closing underneath.
 const CLOSE_DELAY_MS = 150;
 
-export const useHoverIntent = ({
+const useHoverIntent = ({
   enabled,
   closeTimerRef,
   setAnchorEl,

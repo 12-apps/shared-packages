@@ -1,6 +1,6 @@
 import Home from '@mui/icons-material/Home';
 import MoreHoriz from '@mui/icons-material/MoreHoriz';
-import { alpha, Box, Fade, IconButton, Link, Tooltip, Typography } from '@mui/material';
+import { alpha, Box, Fade, Link, Tooltip, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React from 'react';
 
@@ -8,16 +8,13 @@ import { breadcrumbLinkStyles } from './Breadcrumbs.styles';
 import type { BreadcrumbItem } from './Breadcrumbs.types';
 
 const BreadcrumbLink = styled(Link, {
-  shouldForwardProp: (prop) => prop !== 'size' && prop !== 'active' && prop !== 'visualStyle',
-})<{ size?: string; active?: boolean; visualStyle?: string }>(
+  shouldForwardProp: (prop) => prop !== 'size' && prop !== 'active' && prop !== 'visualStyle' })<{ size?: string; active?: boolean; visualStyle?: string }>(
   ({ theme, size, active, visualStyle }) => ({
-    ...breadcrumbLinkStyles({ theme, size, active, visualStyle }),
-  }),
+    ...breadcrumbLinkStyles({ theme, size, active, visualStyle }) }),
 );
 
 const BreadcrumbText = styled(Typography, {
-  shouldForwardProp: (prop) => prop !== 'size' && prop !== 'visualStyle',
-})<{ size?: string; visualStyle?: string }>(({ theme, size, visualStyle }) => ({
+  shouldForwardProp: (prop) => prop !== 'size' && prop !== 'visualStyle' })<{ size?: string; visualStyle?: string }>(({ theme, size, visualStyle }) => ({
   display: 'flex',
   alignItems: 'center',
   gap: theme.spacing(0.5),
@@ -31,19 +28,15 @@ const BreadcrumbText = styled(Typography, {
   ...(visualStyle === 'glass' && {
     background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
     backdropFilter: 'blur(4px)',
-    border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-  }),
+    border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}` }),
 
   '& .breadcrumb-icon': {
-    color: theme.palette.primary.main,
-  },
+    color: theme.palette.primary.main },
 
   // Mobile responsiveness
   [theme.breakpoints.down('sm')]: {
     fontSize: size === 'lg' ? '1rem' : size === 'sm' ? '0.75rem' : '0.875rem',
-    padding: theme.spacing(0.375, 0.5),
-  },
-}));
+    padding: theme.spacing(0.375, 0.5) } }));
 
 // Animated separator wrapper
 
@@ -56,7 +49,7 @@ const CollapsedItemsPopover: React.FC<{
   visualStyle?: string;
   dataTestId?: string;
   onSelect: () => void;
-}> = ({ open, items, size, visualStyle, dataTestId, onSelect }) => (
+}> = ({ open, items, dataTestId, onSelect }) => (
 <Fade in={open}>
     <Box
       sx={{
@@ -68,8 +61,7 @@ const CollapsedItemsPopover: React.FC<{
         borderRadius: 1,
         boxShadow: 3,
         p: 1,
-        minWidth: 150,
-      }}
+        minWidth: 150 }}
     >
       {items.map((item, index) => (
         <Box
@@ -90,9 +82,7 @@ const CollapsedItemsPopover: React.FC<{
             transition: 'all 0.2s',
             '&:hover': {
               backgroundColor: 'action.hover',
-              color: 'primary.main',
-            },
-          }}
+              color: 'primary.main' } }}
           data-testid={dataTestId ? `${dataTestId}-collapsed-item-${index}` : `breadcrumbs-collapsed-item-${index}`}
         >
           {item.label}
@@ -106,8 +96,7 @@ const CollapsedMenu = ({
   items,
   size,
   visualStyle,
-  dataTestId,
-}: {
+  dataTestId }: {
   items: BreadcrumbItem[];
   size: string;
   visualStyle?: string;
@@ -144,8 +133,7 @@ const CollapsedMenu = ({
           left: 0,
           mt: 1,
           display: open ? 'block' : 'none',
-          zIndex: 1000,
-        }}
+          zIndex: 1000 }}
         data-testid={dataTestId ? `${dataTestId}-collapsed-menu-items` : 'breadcrumbs-collapsed-menu-items'}
       >
         <CollapsedItemsPopover
@@ -167,8 +155,7 @@ const crumbIcon = ({
   item,
   isFirst,
   showHomeIcon,
-  iconSize,
-}: {
+  iconSize }: {
   item: BreadcrumbItem;
   isFirst: boolean;
   showHomeIcon: boolean;
@@ -189,16 +176,14 @@ const crumbIcon = ({
 
 const EllipsisCrumb: React.FC<{ label: string; dataTestId?: string }> = ({
   label,
-  dataTestId,
-}) => (
+  dataTestId }) => (
   <Tooltip title="More items" arrow>
             <Box
               sx={{
                 px: 1,
                 color: 'text.disabled',
                 cursor: 'default',
-                userSelect: 'none',
-              }}
+                userSelect: 'none' }}
               data-testid={dataTestId ? `${dataTestId}-ellipsis` : 'breadcrumbs-ellipsis'}
             >
               {label}
@@ -263,8 +248,7 @@ export const BreadcrumbEntry: React.FC<{
   iconSize,
   size,
   variant,
-  dataTestId,
-}) => {
+  dataTestId }) => {
   const testId = makeTestId(dataTestId);
   const isLast = index === itemCount - 1;
   // The tail crumb is the current page unless it is the ellipsis placeholder.

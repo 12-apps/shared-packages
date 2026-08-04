@@ -41,7 +41,6 @@ const customDarkTheme = {
 
 // Main component
 const AUTO_FORMAT_DELAY_MS = 100;
-const COPIED_FEEDBACK_MS = 2000;
 
 export const registerEditorThemes = (monaco: Monaco) => {
   monaco.editor.defineTheme('custom-light', customLightTheme);

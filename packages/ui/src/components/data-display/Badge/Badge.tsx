@@ -1,15 +1,17 @@
-import CloseIcon from '@mui/icons-material/Close';
-import { alpha, Badge as MuiBadge, IconButton, keyframes, Zoom } from '@mui/material';
-import type { Theme } from '@mui/material/styles';
+import { Badge as MuiBadge, Zoom } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React, { useEffect,useState } from 'react';
 
 import {
   badgeStyles,
-  getAnchorOrigin,
-  getColorFromTheme,
-  getSizeStyles,
-} from './Badge.styles';
+  getAnchorOrigin } from './Badge.styles';
+import {
+  badgeContentOf,
+  definedAria,
+  formatCount,
+  resolveBadgeProps } from './Badge.helpers';
+import type { ResolvedBadgeProps } from './Badge.helpers';
+import { buildBadgeContent } from './BadgeContent';
 import type { BadgeProps, BadgeSize, BadgeVariant } from './Badge.types';
 export type { BadgeProps } from './Badge.types';
 
@@ -26,8 +28,7 @@ const StyledBadge = styled(MuiBadge, {
       'shimmer',
       'bounce',
       'hasIcon',
-    ].includes(prop as string),
-})<{
+    ].includes(prop as string) })<{
   customVariant?: BadgeVariant;
   customSize?: BadgeSize;
   customColor?: string;
@@ -47,8 +48,7 @@ const StyledBadge = styled(MuiBadge, {
   animate,
   shimmer,
   bounce,
-  hasIcon,
-}) => {
+  hasIcon }) => {
   return badgeStyles({
     theme,
     customVariant,
@@ -59,233 +59,142 @@ const StyledBadge = styled(MuiBadge, {
     animate,
     shimmer,
     bounce,
-    hasIcon,
-  });
+    hasIcon });
 });
 
-const CLOSE_ICON_SIZES: Record<string, string> = {
-  xs: '0.5rem',
-  sm: '0.625rem',
-  md: '0.75rem',
+const CLOSE_DELAY_MS = 300;
+const ANIMATION_MS = 1000;
+
+// A one-shot flag so bounce/animate run on mount and then stop.
+const useMountAnimation = (enabled: boolean) => {
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    setIsAnimating(true);
+    const timer = window.setTimeout(() => setIsAnimating(false), ANIMATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [enabled]);
+
+  return isAnimating;
 };
 
-// Icon, content and close button, assembled in order. Split out of the component
-// so its branching does not count against the render.
-const buildBadgeContent = ({
-  variant,
-  size,
-  icon,
-  closable,
-  dataTestId,
-  baseContent,
-  onClose,
-}: {
-  variant: string;
-  size: BadgeSize;
-  icon?: React.ReactNode;
-  closable?: boolean;
-  dataTestId?: string;
-  baseContent: React.ReactNode;
-  onClose: (e: React.MouseEvent) => void;
-}) => {
+// The chip itself. Local because StyledBadge cannot cross a module boundary
+// (TS2742).
+const BadgeSurface: React.FC<
+  ResolvedBadgeProps & {
+    innerRef: React.Ref<HTMLSpanElement>;
+    isVisible: boolean;
+    isAnimating: boolean;
+    shouldBeInvisible: boolean;
+    finalBadgeContent: React.ReactNode;
+    aria: Record<string, string | boolean>;
+    rest: Record<string, unknown>;
+  }
+> = ({ innerRef, isVisible, isAnimating, shouldBeInvisible, finalBadgeContent, aria, rest, ...p }) => {
+  const testId = p['data-testid'];
 
-    if (variant === 'dot') return '';
-
-    const contentElements: React.ReactNode[] = [];
-
-    // Add icon if provided
-    if (icon) {
-      const sizeStyles = getSizeStyles(size);
-      contentElements.push(
-        <span
-          key="icon"
-          data-testid={dataTestId ? `${dataTestId}-icon` : 'badge-icon'}
-          style={{ fontSize: sizeStyles.iconSize, display: 'inline-flex', alignItems: 'center' }}
-        >
-          {icon}
-        </span>,
-      );
-    }
-
-    // Add main content
-    if (baseContent !== null && baseContent !== undefined) {
-      contentElements.push(
-        <span key="content" data-testid={dataTestId ? `${dataTestId}-content` : 'badge-content'}>
-          {baseContent}
-        </span>,
-      );
-    }
-
-    // Add close button if closable
-    if (closable && !variant.includes('dot')) {
-      const closeIconSize =
-        size === 'xs'
-          ? '0.5rem'
-          : size === 'sm'
-            ? '0.625rem'
-            : size === 'md'
-              ? '0.75rem'
-              : '0.875rem';
-      contentElements.push(
-        <IconButton
-          key="close"
-          size="small"
-          onClick={onClose}
-          data-testid={dataTestId ? `${dataTestId}-close` : 'badge-close'}
-          sx={{
-            p: 0,
-            ml: 0.5,
-            color: 'inherit',
-            '& svg': { fontSize: closeIconSize },
-            '&:hover': { opacity: 0.8 },
-          }}
-        >
-          <CloseIcon />
-        </IconButton>,
-      );
-    }
-
-    return contentElements.length > 0 ? (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-        {contentElements}
-      </span>
-    ) : null;
-  
+  return (
+    <Zoom in={isVisible} timeout={CLOSE_DELAY_MS}>
+      <StyledBadge
+        ref={innerRef}
+        className={p.className}
+        customVariant={p.variant}
+        customSize={p.size}
+        customColor={p.color}
+        glow={p.glow}
+        pulse={p.pulse}
+        animate={p.animate}
+        shimmer={p.shimmer}
+        bounce={p.bounce && isAnimating}
+        hasIcon={Boolean(p.icon)}
+        badgeContent={finalBadgeContent}
+        variant={p.variant === 'dot' ? 'dot' : 'standard'}
+        anchorOrigin={getAnchorOrigin(p.position)}
+        invisible={shouldBeInvisible}
+        data-testid={testId || 'badge'}
+        slotProps={{
+          badge: {
+            ...aria,
+            // @ts-expect-error - MUI Badge slotProps doesn't include data-testid in types, but it works at runtime
+            'data-testid': testId ? `${testId}-content-wrapper` : 'badge-content-wrapper' } }}
+        {...rest}
+      >
+        {p.children}
+      </StyledBadge>
+    </Zoom>
+  );
 };
 
-export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
-  (
-    {
-      variant = 'default',
-      size = 'md',
-      color = 'primary',
-      glow = false,
-      pulse = false,
-      animate = true,
-      shimmer = false,
-      bounce = false,
-      max = 99,
-      showZero = false,
-      content,
-      position = 'top-right',
-      badgeContent,
-      children,
-      invisible,
-      closable = false,
-      onClose,
-      icon,
-      'aria-label': ariaLabel,
-      'aria-live': ariaLive = 'polite',
-      'aria-atomic': ariaAtomic = true,
-      'data-testid': dataTestId,
-      className,
-      ...props
-    },
-    ref,
-  ) => {
-    const [isVisible, setIsVisible] = useState(true);
-    const [isAnimating, setIsAnimating] = useState(false);
+export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>((componentProps, ref) => {
+  const resolved = resolveBadgeProps(componentProps);
+  const {
+    variant,
+    size,
+    color: _color,
+    glow: _glow,
+    pulse: _pulse,
+    animate,
+    shimmer: _shimmer,
+    bounce,
+    max,
+    showZero,
+    position: _position,
+    children: _children,
+    invisible,
+    closable,
+    onClose,
+    icon,
+    'aria-label': ariaLabel,
+    'aria-live': ariaLive = 'polite',
+    'aria-atomic': ariaAtomic = true,
+    'data-testid': dataTestId,
+    className: _className,
+    content: _content,
+    badgeContent: _badgeContent,
+    ...props
+  } = resolved;
 
-    useEffect(() => {
-      if (animate || bounce) {
-        setIsAnimating(true);
-        const timer = window.setTimeout(() => setIsAnimating(false), 1000);
-        return () => window.clearTimeout(timer);
-      }
-    }, [animate, bounce]);
+  const [isVisible, setIsVisible] = useState(true);
+  const isAnimating = useMountAnimation(animate || bounce);
 
-    // Determine the badge content
-    const getBadgeContent = () => {
-      if (content !== undefined) return content;
-      if (badgeContent !== undefined) return badgeContent;
-      return null;
-    };
+  const handleClose = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    setIsVisible(false);
+    // Let the Zoom finish before telling the caller.
+    window.setTimeout(() => onClose?.(), CLOSE_DELAY_MS);
+  };
 
-    // For count variant, format numbers
-    const formatCount = (count: React.ReactNode): React.ReactNode => {
-      if (typeof count === 'number') {
-        if (count === 0 && !showZero) return null;
-        if (count > max) return `${max}+`;
-        return count;
-      }
-      return count;
-    };
+  const rawContent = badgeContentOf(resolved);
+  const finalBadgeContent = buildBadgeContent({
+    variant,
+    size,
+    icon,
+    closable,
+    dataTestId,
+    baseContent: variant === 'count' ? formatCount(rawContent, { max, showZero }) : rawContent,
+    onClose: handleClose });
 
-    // Handle close action
-    const handleClose = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setIsVisible(false);
-      window.setTimeout(() => {
-        onClose?.();
-      }, 300);
-    };
+  // A count that formatted away leaves nothing worth showing.
+  const shouldBeInvisible =
+    invisible || (variant === 'count' && finalBadgeContent === null && !showZero) || !isVisible;
 
-    // Prepare badge content with icon and close button
-    const prepareBadgeContent = () =>
-      buildBadgeContent({
-        variant,
-        size,
-        icon,
-        closable,
-        dataTestId,
-        baseContent: variant === 'count' ? formatCount(getBadgeContent()) : getBadgeContent(),
-        onClose: handleClose,
-      });
-
-    const finalBadgeContent = prepareBadgeContent();
-    const anchorOrigin = getAnchorOrigin(position);
-
-    // Determine if badge should be invisible
-    const shouldBeInvisible =
-      invisible || (variant === 'count' && finalBadgeContent === null && !showZero) || !isVisible;
-
-    // Build accessibility props
-    const accessibilityProps: Record<string, string | boolean | undefined> = {
-      'aria-label': ariaLabel,
-      'aria-live': ariaLive,
-      'aria-atomic': ariaAtomic,
-    };
-
-    // Remove undefined values
-    Object.keys(accessibilityProps).forEach((key) => {
-      if (accessibilityProps[key] === undefined) {
-        delete accessibilityProps[key];
-      }
-    });
-
-    return (
-      <Zoom in={isVisible} timeout={300}>
-        <StyledBadge
-          ref={ref}
-          className={className}
-          customVariant={variant}
-          customSize={size}
-          customColor={color}
-          glow={glow}
-          pulse={pulse}
-          animate={animate}
-          shimmer={shimmer}
-          bounce={bounce && isAnimating}
-          hasIcon={!!icon}
-          badgeContent={finalBadgeContent}
-          variant={variant === 'dot' ? 'dot' : 'standard'}
-          anchorOrigin={anchorOrigin}
-          invisible={shouldBeInvisible}
-          data-testid={dataTestId || 'badge'}
-          slotProps={{
-            badge: {
-              ...accessibilityProps,
-              // @ts-expect-error - MUI Badge slotProps doesn't include data-testid in types, but it works at runtime
-              'data-testid': dataTestId ? `${dataTestId}-content-wrapper` : 'badge-content-wrapper',
-            },
-          }}
-          {...props}
-        >
-          {children}
-        </StyledBadge>
-      </Zoom>
-    );
-  },
-);
+  return (
+    <BadgeSurface
+      {...resolved}
+      innerRef={ref}
+      isVisible={isVisible}
+      isAnimating={isAnimating}
+      shouldBeInvisible={shouldBeInvisible}
+      finalBadgeContent={finalBadgeContent}
+      aria={definedAria({
+        'aria-label': ariaLabel,
+        'aria-live': ariaLive,
+        'aria-atomic': ariaAtomic })}
+      rest={props as unknown as Record<string, unknown>}
+    />
+  );
+});
 
 Badge.displayName = 'Badge';

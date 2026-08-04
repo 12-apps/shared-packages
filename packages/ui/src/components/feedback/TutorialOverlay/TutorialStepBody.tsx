@@ -7,20 +7,12 @@ import {
   alpha,
   Box,
   Button,
-  Fade,
   IconButton,
-  keyframes,
-  LinearProgress,
-  Paper,
-  Portal,
   Stack,
   styled,
-  Typography,
-} from '@mui/material';
-import type { FC} from 'react';
-import React, { useCallback,useEffect, useRef, useState } from 'react';
+  Typography } from '@mui/material';
+import React, {  } from 'react';
 
-import { useTutorialOverlay } from './TutorialOverlay.hooks';
 import type { TutorialOverlayProps } from './TutorialOverlay.types';
 
 // Animation keyframes
@@ -29,13 +21,11 @@ const StepIndicator = styled(Box)(({ theme }) => ({
   display: 'flex',
   gap: theme.spacing(1),
   marginTop: theme.spacing(2),
-  marginBottom: theme.spacing(2),
-}));
+  marginBottom: theme.spacing(2) }));
 
 
 const StepDot = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'active' && prop !== 'completed',
-})<{ active?: boolean; completed?: boolean }>(({ theme, active, completed }) => ({
+  shouldForwardProp: (prop) => prop !== 'active' && prop !== 'completed' })<{ active?: boolean; completed?: boolean }>(({ theme, active, completed }) => ({
   width: 8,
   height: 8,
   borderRadius: '50%',
@@ -46,9 +36,7 @@ const StepDot = styled(Box, {
       : alpha(theme.palette.text.primary, 0.3),
   transition: 'all 0.3s ease',
   ...(active && {
-    transform: 'scale(1.5)',
-  }),
-}));
+    transform: 'scale(1.5)' }) }));
 
 // Title, body copy, the step dots and the navigation row.
 
@@ -72,8 +60,7 @@ const TutorialStepNav: React.FC<{
   onNext,
   onPrev,
   onSkip,
-  onRestart,
-}) => (
+  onRestart }) => (
         <Stack
           direction="row"
           spacing={1}
@@ -130,8 +117,7 @@ const TutorialStepNav: React.FC<{
                 endIcon={<CompleteIcon />}
                 onClick={onNext}
                 sx={{
-                  background: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)',
-                }}
+                  background: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)' }}
                 data-testid="tutorial-finish-button"
               >
                 {stepCount === 1 ? 'Complete' : 'Finish'}
@@ -143,8 +129,7 @@ const TutorialStepNav: React.FC<{
 
 const StepDots: React.FC<{ currentStep: number; stepCount: number }> = ({
   currentStep,
-  stepCount,
-}) => (
+  stepCount }) => (
   <StepIndicator data-testid="tutorial-step-indicators">
     {Array.from({ length: stepCount }).map((_, index) => (
       <StepDot
@@ -206,7 +191,7 @@ export const TutorialStepBody: React.FC<{
   step,
   currentStep,
   stepCount,
-  progress,
+  progress: _progress,
   isLastStep,
   allowSkip,
   showProgress,
@@ -214,8 +199,7 @@ export const TutorialStepBody: React.FC<{
   onNext,
   onPrev,
   onSkip,
-  onRestart,
-}) => (
+  onRestart }) => (
       <Stack spacing={2}>
         <TutorialStepHeader
           title={step.title}
@@ -246,8 +230,7 @@ export const TutorialStepBody: React.FC<{
             onClick={step.action.onClick}
             sx={{
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-            }}
+              color: 'white' }}
           >
             {step.action.label}
           </Button>

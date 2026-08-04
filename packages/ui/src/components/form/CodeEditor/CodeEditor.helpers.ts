@@ -17,7 +17,7 @@ type CodeEditorDefaultedKeys =
   | 'showToolbar'
   | 'autoFormat';
 
-export type ResolvedCodeEditorProps = CodeEditorProps &
+type ResolvedCodeEditorProps = CodeEditorProps &
   Required<Pick<CodeEditorProps, CodeEditorDefaultedKeys>>;
 
 const CODE_EDITOR_DEFAULTS: Pick<CodeEditorProps, CodeEditorDefaultedKeys> = {

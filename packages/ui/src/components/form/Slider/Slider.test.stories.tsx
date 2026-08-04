@@ -707,8 +707,6 @@ export const Performance: Story = {
       const endTime = window.performance.now();
       const renderTime = endTime - startTime;
 
-      // eslint-disable-next-line no-console
-      console.log(`Render time for 5 sliders: ${renderTime}ms`);
       expect(renderTime).toBeLessThan(2000);
     });
   },

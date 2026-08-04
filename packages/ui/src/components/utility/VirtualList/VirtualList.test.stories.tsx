@@ -965,9 +965,6 @@ export const Integration: Story = {
                 <ListItem
                   button
                   onClick={() => {
-                    // Integration with external handlers
-                    // eslint-disable-next-line no-console
-                    console.log('Clicked item:', item.id);
                   }}
                 >
                   <ListItemAvatar>
@@ -1008,9 +1005,6 @@ export const Integration: Story = {
                   },
                 }}
                 onClick={() => {
-                  // Integration with external handlers
-                  // eslint-disable-next-line no-console
-                  console.log('Clicked grid item:', item.id);
                 }}
               >
                 <Typography variant="body2" color="white">

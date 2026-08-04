@@ -1,47 +1,32 @@
 import CloseIcon from '@mui/icons-material/Close';
-import RecentIcon from '@mui/icons-material/History';
 import EnterIcon from '@mui/icons-material/KeyboardReturn';
 import SearchIcon from '@mui/icons-material/Search';
 import {
   alpha,
   Box,
-  Chip,
   Dialog,
   DialogContent,
-  Divider,
   IconButton,
   InputBase,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
   Paper,
   Slide,
   styled,
   Typography,
-  useTheme,
-} from '@mui/material';
+  useTheme } from '@mui/material';
 import type { TransitionProps } from '@mui/material/transitions';
-import Fuse from 'fuse.js';
 import type { FC} from 'react';
-import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
+import React, {  } from 'react';
 
-import {
-  createPaletteKeyHandler,
-  filterCommands,
-  groupByCategory,
-} from './CommandPalette.helpers';
 import { useCommandPalette } from './CommandPalette.hooks';
 import { PaletteResults } from './CommandPaletteResults';
 import { ShortcutChip } from './ShortcutChip';
-import type { PaletteCommand, CommandPaletteProps } from './CommandPalette.types';
+import type { CommandPaletteProps } from './CommandPalette.types';
 
 // Styled components
 const StyledDialog = styled(Dialog)(() => ({
   '& .MuiBackdrop-root': {
     backgroundColor: alpha('#000', 0.6),
-    backdropFilter: 'blur(4px)',
-  },
+    backdropFilter: 'blur(4px)' },
   '& .MuiDialog-paper': {
     position: 'fixed',
     top: '20%',
@@ -49,9 +34,7 @@ const StyledDialog = styled(Dialog)(() => ({
     maxHeight: 'none',
     background: 'transparent',
     boxShadow: 'none',
-    overflow: 'visible',
-  },
-}));
+    overflow: 'visible' } }));
 
 const PaletteContainer = styled(Paper)(({ theme }) => ({
   width: '100%',
@@ -62,16 +45,14 @@ const PaletteContainer = styled(Paper)(({ theme }) => ({
   border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
   borderRadius: theme.shape.borderRadius * 2,
   overflow: 'hidden',
-  boxShadow: theme.shadows[24],
-}));
+  boxShadow: theme.shadows[24] }));
 
 const SearchContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   padding: theme.spacing(2),
   borderBottom: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
-  background: alpha(theme.palette.background.default, 0.4),
-}));
+  background: alpha(theme.palette.background.default, 0.4) }));
 
 const SearchInput = styled(InputBase)(({ theme }) => ({
   flex: 1,
@@ -81,10 +62,7 @@ const SearchInput = styled(InputBase)(({ theme }) => ({
     padding: theme.spacing(0, 1),
     '&::placeholder': {
       color: theme.palette.text.secondary,
-      opacity: 0.8,
-    },
-  },
-}));
+      opacity: 0.8 } } }));
 
 const Transition = React.forwardRef<unknown, TransitionProps & { children: React.ReactElement }>(
   function Transition(props, ref) {
@@ -131,8 +109,7 @@ const PaletteFooter: React.FC<{ commandCount: number }> = ({ commandCount }) => 
         alignItems: 'center',
         padding: 1,
         borderTop: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
-        background: alpha(theme.palette.background.default, 0.4),
-      }}
+        background: alpha(theme.palette.background.default, 0.4) }}
     >
       <Box sx={{ display: 'flex', gap: 1 }}>
         <ShortcutChip icon={<EnterIcon sx={{ fontSize: 12 }} />} label="Execute" size="small" />
@@ -156,9 +133,7 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
   showRecent = true,
   recentCommands = [],
   onCommandExecute,
-  dataTestId = 'command-palette',
-}) => {
-  const theme = useTheme();
+  dataTestId = 'command-palette' }) => {
   const {
     searchQuery,
     setSearchQuery,
@@ -169,15 +144,13 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
     filteredCommands,
     groupedCommands,
     executeCommand,
-    recentCommandIds,
-  } = useCommandPalette({
+    recentCommandIds } = useCommandPalette({
     open,
     commands,
     showRecent,
     recentCommands,
     onCommandExecute,
-    onClose,
-  });
+    onClose });
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);

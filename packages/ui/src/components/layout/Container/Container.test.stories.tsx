@@ -551,13 +551,8 @@ export const PerformanceTest: Story = {
     const canvas = within(canvasElement);
     
     await step('Measure render time', async () => {
-      const startTime = window.performance.now();
       const elements = canvas.getAllByTestId(/item-/);
-      const endTime = window.performance.now();
       
-      const renderTime = endTime - startTime;
-      // eslint-disable-next-line no-console
-      console.log(`Render time for ${elements.length} items: ${renderTime}ms`);
       
       // Verify reasonable number of elements rendered
       await expect(elements.length).toBeGreaterThan(50);
