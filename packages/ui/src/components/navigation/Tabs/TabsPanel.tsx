@@ -1,5 +1,5 @@
 import { Box, CircularProgress, Fade } from '@mui/material';
-import { alpha, styled } from '@mui/material/styles';
+import { styled } from '@mui/material/styles';
 import React from 'react';
 
 import type { TabPanelProps } from './Tabs.types';
@@ -28,6 +28,26 @@ const LoadingContainer = styled(Box)(({ theme }) => ({
   color: theme.palette.text.secondary,
 }));
 
+// A loading panel shows the caller's placeholder, or a spinner if there isn't one.
+const panelContent = (
+  loading: boolean,
+  loadingComponent: React.ReactNode,
+  children: React.ReactNode,
+): React.ReactNode => {
+  if (!loading) return children;
+
+  return (
+    loadingComponent || (
+      <LoadingContainer>
+        <CircularProgress size={32} />
+      </LoadingContainer>
+    )
+  );
+};
+
+const panelTestId = (dataTestId: string | undefined, index: number): string =>
+  dataTestId ? `${dataTestId}-panel-${index}` : `tabs-panel-${index}`;
+
 export const CustomTabPanel: React.FC<TabPanelProps & { dataTestId?: string; index: number }> = ({
   children,
   id,
@@ -49,37 +69,10 @@ export const CustomTabPanel: React.FC<TabPanelProps & { dataTestId?: string; ind
     return null;
   }
 
-  const content = loading
-    ? loadingComponent || (
-        <LoadingContainer>
-          <CircularProgress size={32} />
-        </LoadingContainer>
-      )
-    : children;
+  const content = panelContent(loading, loadingComponent, children);
+  const testId = panelTestId(dataTestId, index);
 
-  const testId = dataTestId ? `${dataTestId}-panel-${index}` : `tabs-panel-${index}`;
-
-  if (animate) {
-    return (
-      <Fade in={isActive} timeout={animationDuration}>
-        <TabPanel
-          role="tabpanel"
-          hidden={!isActive}
-          id={`tabpanel-${id}`}
-          aria-labelledby={`tab-${id}`}
-          animate={animate}
-          persist={persist}
-          className={className}
-          data-testid={testId}
-          {...props}
-        >
-          {content}
-        </TabPanel>
-      </Fade>
-    );
-  }
-
-  return (
+  const panel = (
     <TabPanel
       role="tabpanel"
       hidden={!isActive}
@@ -93,5 +86,15 @@ export const CustomTabPanel: React.FC<TabPanelProps & { dataTestId?: string; ind
     >
       {content}
     </TabPanel>
+  );
+
+  // The animated and plain panels are the same element; only the Fade wrapper
+  // differs.
+  if (!animate) return panel;
+
+  return (
+    <Fade in={isActive} timeout={animationDuration}>
+      {panel}
+    </Fade>
   );
 };
