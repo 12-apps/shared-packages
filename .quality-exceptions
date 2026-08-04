@@ -84,7 +84,6 @@ packages/ui/src/components/form/Label/Label.tsx
 packages/ui/src/components/form/Menubar/Menubar.test.stories.tsx
 packages/ui/src/components/form/Menubar/Menubar.tsx
 packages/ui/src/components/form/PasswordStrength/PasswordStrength.test.stories.tsx
-packages/ui/src/components/form/PasswordStrength/PasswordStrength.tsx
 packages/ui/src/components/form/PhoneInput/PhoneInput.test.stories.tsx
 packages/ui/src/components/form/PhoneInput/PhoneInput.tsx
 packages/ui/src/components/form/RadioGroup/RadioGroup.test.stories.tsx
