@@ -92,7 +92,7 @@ export const NoCreateRowWhenOnCreateOmitted: Story = {
       await userEvent.click(input);
       await userEvent.type(input, 'Zzz');
       await waitFor(() => expect(canvas.getByText('Nada encontrado')).toBeInTheDocument());
-      expect(canvas.queryByText(/^Criar /)).not.toBeInTheDocument();
+      await waitFor(() => expect(canvas.queryByText(/^Criar /)).not.toBeInTheDocument());
     });
   },
 };

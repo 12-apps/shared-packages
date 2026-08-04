@@ -1,7 +1,7 @@
 import { Alert, Box, Button, Paper, TextField,Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
-import { expect, userEvent, waitFor,within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { Portal } from './Portal';
 
@@ -63,7 +63,7 @@ export const BasicInteraction: Story = {
     const toggleButton = canvas.getByTestId('toggle-portal');
 
     // Initially, portal content should not exist
-    expect(canvas.queryByTestId('portal-content')).not.toBeInTheDocument();
+    await waitFor(() => expect(canvas.queryByTestId('portal-content')).not.toBeInTheDocument());
 
     // Click to show portal
     await userEvent.click(toggleButton);
@@ -404,7 +404,7 @@ export const KeyboardNavigation: Story = {
     const triggerButton = canvas.getByTestId('keyboard-trigger');
 
     // Focus and press Enter to open portal
-    triggerButton.focus();
+    await userEvent.click(triggerButton);
     await userEvent.keyboard('{Enter}');
 
     // Wait for portal to appear
@@ -415,15 +415,15 @@ export const KeyboardNavigation: Story = {
     // Test Tab navigation within portal
     await userEvent.keyboard('{Tab}');
     const firstButton = document.querySelector('[data-testid="first-button"]') as HTMLButtonElement;
-    expect(firstButton).toHaveFocus();
+    await waitFor(() => expect(firstButton).toHaveFocus());
 
     await userEvent.keyboard('{Tab}');
     const secondButton = document.querySelector('[data-testid="second-button"]') as HTMLButtonElement;
-    expect(secondButton).toHaveFocus();
+    await waitFor(() => expect(secondButton).toHaveFocus());
 
     await userEvent.keyboard('{Tab}');
     const closeButton = document.querySelector('[data-testid="close-button"]') as HTMLButtonElement;
-    expect(closeButton).toHaveFocus();
+    await waitFor(() => expect(closeButton).toHaveFocus());
 
     // Test Escape key to close
     await userEvent.keyboard('{Escape}');
@@ -618,8 +618,8 @@ export const FocusManagement: Story = {
       const closePortal = () => {
         setShowPortal(false);
         // Restore focus after a brief delay to allow DOM updates
-        window.setTimeout(() => {
-          previousFocus?.focus();
+        window.setTimeout(async () => {
+          await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { previousFocus?.focus() }) }) }) }) }) }) }) }) }) })
         }, 10);
       };
 
@@ -693,8 +693,8 @@ export const FocusManagement: Story = {
 
     // Focus on the trigger button
     const triggerButton = canvas.getByTestId('focus-trigger');
-    triggerButton.focus();
-    expect(triggerButton).toHaveFocus();
+    await userEvent.click(triggerButton);
+    await waitFor(() => expect(triggerButton).toHaveFocus());
 
     // Open portal
     await userEvent.click(triggerButton);
@@ -717,17 +717,17 @@ export const FocusManagement: Story = {
     const secondInput = document.querySelector(
       '[data-testid="second-portal-input"] input',
     ) as HTMLInputElement;
-    expect(secondInput).toHaveFocus();
+    await waitFor(() => expect(secondInput).toHaveFocus());
 
     await userEvent.keyboard('{Tab}');
     const cancelButton = document.querySelector(
       '[data-testid="focus-cancel"]',
     ) as HTMLButtonElement;
-    expect(cancelButton).toHaveFocus();
+    await waitFor(() => expect(cancelButton).toHaveFocus());
 
     await userEvent.keyboard('{Tab}');
     const saveButton = document.querySelector('[data-testid="focus-save"]') as HTMLButtonElement;
-    expect(saveButton).toHaveFocus();
+    await waitFor(() => expect(saveButton).toHaveFocus());
 
     // Close portal and verify focus returns to trigger
     await userEvent.click(saveButton);
@@ -1763,11 +1763,11 @@ export const Integration: Story = {
       const [showDropdown, setShowDropdown] = useState(false);
       const [notifications, setNotifications] = useState<string[]>([]);
 
-      const addNotification = (message: string) => {
+      const addNotification = async (message: string) => {
         setNotifications((prev) => [...prev, message]);
-        window.setTimeout(() => {
-          setNotifications((prev) => prev.slice(1));
-        }, 3000);
+        await waitFor(async () => {
+  setNotifications((prev) => prev.slice(1));
+}, { timeout: 3000 });
       };
 
       return (

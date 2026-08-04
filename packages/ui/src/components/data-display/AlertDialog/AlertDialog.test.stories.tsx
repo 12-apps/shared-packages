@@ -1,7 +1,7 @@
 import { Button, createTheme,ThemeProvider } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
-import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { AlertDialog } from './AlertDialog';
 import type { AlertDialogProps } from './AlertDialog.types';
@@ -288,13 +288,13 @@ export const FocusManagement: Story = {
     await step('Tab through focusable elements', async () => {
       // Tab cycles through dialog elements
       await userEvent.tab();
-      expect(document.activeElement?.getAttribute('aria-label')).toBe('close');
+      await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('close'));
 
       await userEvent.tab();
-      expect(document.activeElement?.textContent).toContain('Cancel');
+      await waitFor(() => expect(document.activeElement?.textContent).toContain('Cancel'));
 
       await userEvent.tab();
-      expect(document.activeElement?.textContent).toContain('Confirm');
+      await waitFor(() => expect(document.activeElement?.textContent).toContain('Confirm'));
     });
 
     await step('Close dialog and verify focus return', async () => {

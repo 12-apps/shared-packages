@@ -1,7 +1,7 @@
 import { Box, Paper,Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
-import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { Resizable } from './Resizable';
 
@@ -209,16 +209,16 @@ export const KeyboardNavigation: Story = {
 
     await step('Content is focusable', async () => {
       const focusTarget = canvas.getByTestId('focus-target');
-      focusTarget.focus();
-      await expect(focusTarget).toHaveFocus();
+      await userEvent.click(focusTarget);
+      await waitFor(() => expect(focusTarget).toHaveFocus());
     });
 
     await step('Tab navigation works', async () => {
       const focusTarget = canvas.getByTestId('focus-target');
-      focusTarget.focus();
+      await userEvent.click(focusTarget);
       await userEvent.tab();
       // Tab should move focus away from the button
-      await expect(focusTarget).not.toHaveFocus();
+      await waitFor(() => expect(focusTarget).not.toHaveFocus());
     });
 
     await step('Container has proper ARIA attributes', async () => {

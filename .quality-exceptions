@@ -1,9 +1,3 @@
-# .quality-exceptions — grandfathered files for the `pnpm quality` gate.
-# These files pre-date the gate; their complexity/size/flakiness findings are
-# DOWNGRADED to warnings so the gate ships without a mass refactor. Any NEW or
-# MODIFIED file NOT listed here hard-fails. Burn this list down: when you clean a
-# file, delete its line — it then must pass or the gate blocks the PR.
-# Regenerate is manual/append-only; do not auto-add new files.
 packages/auth/src/__tests__/admin-allowlist.test.ts
 packages/auth/src/__tests__/device-detection.test.ts
 packages/auth/src/device-detection.ts
@@ -19,33 +13,24 @@ packages/shared-helpers/src/utils/lib/withBatchSize.ts
 packages/shared-helpers/src/utils/lib/withGracefulShutdown.ts
 packages/shared-helpers/tests/db/database.test.ts
 packages/ui/scripts/storybook.js
-packages/ui/src/__tests__/social-login-button.test.tsx
 packages/ui/src/components/data-display/AlertDialog/AlertDialog.test.stories.tsx
-packages/ui/src/components/data-display/AsyncStateContainer/AsyncStateContainer.test.stories.tsx
 packages/ui/src/components/data-display/AsyncStateContainer/AsyncStateContainer.tsx
 packages/ui/src/components/data-display/Banner/Banner.test.stories.tsx
 packages/ui/src/components/data-display/Carousel/Carousel.test.stories.tsx
 packages/ui/src/components/data-display/Carousel/Carousel.tsx
 packages/ui/src/components/data-display/Chip/Chip.tsx
-packages/ui/src/components/data-display/DataGrid/DataGrid.test.stories.tsx
 packages/ui/src/components/data-display/DateTimeDisplay/DateTimeDisplay.tsx
 packages/ui/src/components/data-display/DescriptionItem/DescriptionItem.tsx
-packages/ui/src/components/data-display/EmptyState/EmptyState.test.stories.tsx
 packages/ui/src/components/data-display/EmptyState/EmptyState.tsx
-packages/ui/src/components/data-display/ErrorState/ErrorState.test.stories.tsx
 packages/ui/src/components/data-display/ErrorState/ErrorState.tsx
-packages/ui/src/components/data-display/HoverCard/HoverCard.test.stories.tsx
 packages/ui/src/components/data-display/HoverCard/HoverCard.tsx
 packages/ui/src/components/data-display/InteractiveTooltip/InteractiveTooltip.tsx
 packages/ui/src/components/data-display/LazyImage/LazyImage.tsx
 packages/ui/src/components/data-display/LoadingState/LoadingState.tsx
-packages/ui/src/components/data-display/Popover/Popover.test.stories.tsx
 packages/ui/src/components/data-display/Progress/Progress.test.stories.tsx
 packages/ui/src/components/data-display/Progress/Progress.tsx
 packages/ui/src/components/data-display/Sheet/Sheet.test.stories.tsx
 packages/ui/src/components/data-display/Sheet/Sheet.tsx
-packages/ui/src/components/data-display/Stepper/Stepper.test.stories.tsx
-packages/ui/src/components/data-display/Table/Table.test.stories.tsx
 packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.test.stories.tsx
 packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.tsx
 packages/ui/src/components/data-display/Tooltip/Tooltip.tsx
@@ -55,29 +40,17 @@ packages/ui/src/components/feedback/Modal/Modal.tsx
 packages/ui/src/components/feedback/Sonner/Sonner.test.stories.tsx
 packages/ui/src/components/feedback/StackedModal/StackedModal.test.stories.tsx
 packages/ui/src/components/feedback/Toast/Toast.test.stories.tsx
-packages/ui/src/components/feedback/TutorialOverlay/TutorialOverlay.test.stories.tsx
 packages/ui/src/components/form/Button/Button.tsx
 packages/ui/src/components/form/Checkbox/Checkbox.tsx
-packages/ui/src/components/form/CodeEditor/CodeEditor.test.stories.tsx
 packages/ui/src/components/form/Command/Command.tsx
-packages/ui/src/components/form/CreatableSelect/CreatableSelect.test.stories.tsx
 packages/ui/src/components/form/Input/Input.tsx
-packages/ui/src/components/form/InputOTP/InputOTP.test.stories.tsx
 packages/ui/src/components/form/InputOTP/InputOTP.tsx
 packages/ui/src/components/form/Label/Label.test.stories.tsx
 packages/ui/src/components/form/Label/Label.tsx
-packages/ui/src/components/form/Menubar/Menubar.test.stories.tsx
 packages/ui/src/components/form/Menubar/Menubar.tsx
-packages/ui/src/components/form/PasswordStrength/PasswordStrength.test.stories.tsx
-packages/ui/src/components/form/PhoneInput/PhoneInput.test.stories.tsx
-packages/ui/src/components/form/RadioGroup/RadioGroup.test.stories.tsx
 packages/ui/src/components/form/RadioGroup/RadioGroup.tsx
-packages/ui/src/components/form/RichTextEditor/RichTextEditor.test.stories.tsx
 packages/ui/src/components/form/Slider/Slider.tsx
-packages/ui/src/components/form/Switch/Switch.test.stories.tsx
 packages/ui/src/components/form/Switch/Switch.tsx
-packages/ui/src/components/form/Textarea/Textarea.test.stories.tsx
-packages/ui/src/components/form/Toggle/Toggle.test.stories.tsx
 packages/ui/src/components/form/Toggle/Toggle.tsx
 packages/ui/src/components/form/ToggleGroup/ToggleGroup.test.stories.tsx
 packages/ui/src/components/layout/Accordion/Accordion.tsx
@@ -87,24 +60,17 @@ packages/ui/src/components/layout/Resizable/Resizable.test.stories.tsx
 packages/ui/src/components/layout/Resizable/Resizable.tsx
 packages/ui/src/components/layout/ScrollArea/ScrollArea.test.stories.tsx
 packages/ui/src/components/layout/Separator/Separator.tsx
-packages/ui/src/components/layout/Skeleton/Skeleton.test.stories.tsx
 packages/ui/src/components/layout/Skeleton/Skeleton.tsx
 packages/ui/src/components/layout/Spacer/Spacer.test.stories.tsx
 packages/ui/src/components/navigation/ContextMenu/ContextMenu.tsx
 packages/ui/src/components/navigation/Pagination/Pagination.test.stories.tsx
 packages/ui/src/components/typography/Blockquote/Blockquote.test.stories.tsx
-packages/ui/src/components/typography/Code/Code.test.stories.tsx
-packages/ui/src/components/typography/Heading/Heading.test.stories.tsx
 packages/ui/src/components/typography/Heading/Heading.tsx
-packages/ui/src/components/typography/Paragraph/Paragraph.test.stories.tsx
 packages/ui/src/components/typography/Text/Text.test.stories.tsx
 packages/ui/src/components/typography/Text/Text.tsx
 packages/ui/src/components/utility/AnimatedIcon/AnimatedIcon.tsx
-packages/ui/src/components/utility/AspectRatio/AspectRatio.test.stories.tsx
-packages/ui/src/components/utility/InfiniteScroll/InfiniteScroll.test.stories.tsx
 packages/ui/src/components/utility/InfiniteScroll/InfiniteScroll.tsx
 packages/ui/src/components/utility/Portal/Portal.test.stories.tsx
 packages/ui/src/components/utility/Transition/Transition.tsx
 packages/ui/src/components/utility/VirtualList/VirtualList.tsx
-packages/ui/src/components/utility/WorkflowStep/WorkflowStep.test.stories.tsx
 packages/ui/src/components/utility/WorkflowStep/WorkflowStep.tsx

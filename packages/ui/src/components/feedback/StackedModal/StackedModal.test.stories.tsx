@@ -1,7 +1,7 @@
 import { Box, Button, Paper,Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { StackedModalActions, StackedModalContent, ModalStackProvider, StackedModal } from './StackedModal';
 
@@ -359,11 +359,11 @@ export const KeyboardNavigation: Story = {
       const firstButton = screen.getByTestId('first-button');
       const secondButton = screen.getByTestId('second-button');
 
-      firstButton.focus();
-      await expect(firstButton).toHaveFocus();
+      await userEvent.click(firstButton);
+      await waitFor(() => expect(firstButton).toHaveFocus());
 
       await userEvent.tab();
-      await expect(secondButton).toHaveFocus();
+      await waitFor(() => expect(secondButton).toHaveFocus());
     });
 
     await step('Escape key closes modal', async () => {
@@ -474,11 +474,11 @@ export const FocusManagement: Story = {
       const modalButton1 = screen.getByTestId('modal-button-1');
       const modalButton2 = screen.getByTestId('modal-button-2');
 
-      modalButton1.focus();
-      await expect(modalButton1).toHaveFocus();
+      await userEvent.click(modalButton1);
+      await waitFor(() => expect(modalButton1).toHaveFocus());
 
       await userEvent.tab();
-      await expect(modalButton2).toHaveFocus();
+      await waitFor(() => expect(modalButton2).toHaveFocus());
     });
 
     await step('Verify focus trap', async () => {
@@ -628,7 +628,6 @@ export const Performance: Story = {
   },
   play: async ({ step }) => {
     const screen = within(document.body);
-    const startTime = Date.now();
 
     await step('Wait for modal to render', async () => {
       await waitFor(() => {

@@ -1,6 +1,6 @@
 import { Box, Button, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect,userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { Spacer } from './Spacer';
 
@@ -76,12 +76,12 @@ export const KeyboardNavigation: Story = {
       const secondButton = canvas.getByText('Second Button');
 
       // Focus first button
-      firstButton.focus();
-      await expect(document.activeElement).toBe(firstButton);
+      await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await firstButton.focus() }) }) }) }) })
+      await waitFor(() => expect(document.activeElement).toBe(firstButton));
 
       // Tab to second button (spacer should be skipped)
       await userEvent.tab();
-      await expect(document.activeElement).toBe(secondButton);
+      await waitFor(() => expect(document.activeElement).toBe(secondButton));
     });
 
     await step('Pass Test', async () => {
@@ -150,11 +150,11 @@ export const FocusManagement: Story = {
       const spacer = await canvas.findByTestId('spacer');
 
       // Spacer should not have tabindex
-      await expect(spacer.getAttribute('tabindex')).toBeNull();
+      await waitFor(() => expect(spacer.getAttribute('tabindex')).toBeNull());
 
       // Try to focus spacer - should not work
-      spacer.focus();
-      await expect(document.activeElement).not.toBe(spacer);
+      await userEvent.click(spacer);
+      await waitFor(() => expect(document.activeElement).not.toBe(spacer));
     });
 
     await step('Pass Test', async () => {

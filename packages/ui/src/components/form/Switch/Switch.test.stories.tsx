@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Moon, Sun, Volume2, VolumeX } from 'lucide-react';
 import React from 'react';
-import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { Switch } from './Switch';
 
@@ -70,7 +70,7 @@ export const KeyboardInteraction: Story = {
     await step('Focus with Tab key', async () => {
       const switchElement = canvas.getByRole('checkbox');
       await userEvent.tab();
-      await expect(switchElement).toHaveFocus();
+      await waitFor(() => expect(switchElement).toHaveFocus());
     });
 
     await step('Toggle with Space key', async () => {
@@ -213,15 +213,15 @@ export const FocusManagement: Story = {
 
       // Focus first switch
       await userEvent.tab();
-      await expect(firstSwitch).toHaveFocus();
+      await waitFor(() => expect(firstSwitch).toHaveFocus());
 
       // Tab to second switch
       await userEvent.tab();
-      await expect(secondSwitch).toHaveFocus();
+      await waitFor(() => expect(secondSwitch).toHaveFocus());
 
       // Tab to third switch
       await userEvent.tab();
-      await expect(thirdSwitch).toHaveFocus();
+      await waitFor(() => expect(thirdSwitch).toHaveFocus());
     });
 
     await step('Tab navigation backward', async () => {
@@ -230,7 +230,7 @@ export const FocusManagement: Story = {
         .querySelector('input[type="checkbox"]');
 
       await userEvent.tab({ shift: true });
-      await expect(secondSwitch).toHaveFocus();
+      await waitFor(() => expect(secondSwitch).toHaveFocus());
     });
   },
 };

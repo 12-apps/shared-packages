@@ -165,16 +165,16 @@ export const FocusManagement: Story = {
     const afterBtn = canvas.getByText('After Blockquote');
 
     // Start from before button
-    beforeBtn.focus();
-    await expect(beforeBtn).toHaveFocus();
+    await userEvent.click(beforeBtn);
+    await waitFor(() => expect(beforeBtn).toHaveFocus());
 
     // Tab to blockquote
     await userEvent.tab();
-    await expect(blockquote).toHaveFocus();
+    await waitFor(() => expect(blockquote).toHaveFocus());
 
     // Tab to after button
     await userEvent.tab();
-    await expect(afterBtn).toHaveFocus();
+    await waitFor(() => expect(afterBtn).toHaveFocus());
   },
 };
 

@@ -116,31 +116,31 @@ export const KeyboardNavigation: Story = {
 
     // Focus the banner
     const banner = canvas.getByRole('status');
-    banner.focus();
-    expect(banner).toHaveFocus();
+    await userEvent.click(banner);
+    await waitFor(() => expect(banner).toHaveFocus());
 
     // Tab to first action button
     await userEvent.tab();
     const action1 = canvas.getByRole('button', { name: 'Action 1' });
-    expect(action1).toHaveFocus();
+    await waitFor(() => expect(action1).toHaveFocus());
 
     // Tab to second action button
     await userEvent.tab();
     const action2 = canvas.getByRole('button', { name: 'Action 2' });
-    expect(action2).toHaveFocus();
+    await waitFor(() => expect(action2).toHaveFocus());
 
     // Tab to dismiss button
     await userEvent.tab();
     const dismissButton = canvas.getByRole('button', { name: /dismiss banner/i });
-    expect(dismissButton).toHaveFocus();
+    await waitFor(() => expect(dismissButton).toHaveFocus());
 
     // Test Enter key on action button
-    action1.focus();
+    await userEvent.click(action1);
     await userEvent.keyboard('{Enter}');
     expect(args.actions![0].onClick).toHaveBeenCalledTimes(1);
 
     // Test Space key on dismiss button
-    dismissButton.focus();
+    await userEvent.click(dismissButton);
     await userEvent.keyboard(' ');
 
     // Verify onDismiss was called
@@ -198,17 +198,17 @@ export const FocusManagement: Story = {
     expect(banner).toHaveAttribute('tabIndex', '0');
 
     // Test focus visibility
-    banner.focus();
-    expect(banner).toHaveFocus();
+    await userEvent.click(banner);
+    await waitFor(() => expect(banner).toHaveFocus());
 
     // Test that focus moves properly through interactive elements
     await userEvent.tab();
     const actionButton = canvas.getByRole('button', { name: 'Focus Test' });
-    expect(actionButton).toHaveFocus();
+    await waitFor(() => expect(actionButton).toHaveFocus());
 
     await userEvent.tab();
     const dismissButton = canvas.getByRole('button', { name: /dismiss banner/i });
-    expect(dismissButton).toHaveFocus();
+    await waitFor(() => expect(dismissButton).toHaveFocus());
   },
 };
 

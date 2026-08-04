@@ -15,7 +15,7 @@ import {
   Underline,
 } from 'lucide-react';
 import React from 'react';
-import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { ToggleGroup } from './ToggleGroup';
 
@@ -141,10 +141,10 @@ export const KeyboardNavigation: Story = {
     const firstButton = canvas.getAllByRole('button')[0];
 
     // Focus the first button
-    firstButton.focus();
-    await waitFor(() => {
+    await userEvent.click(firstButton);
+    await waitFor(() => waitFor(() => {
       expect(firstButton).toHaveFocus();
-    });
+    }))
 
     // Test Tab navigation between buttons (MUI default behavior)
     await userEvent.tab();
@@ -209,10 +209,10 @@ export const FocusManagement: Story = {
     const buttons = canvas.getAllByRole('button');
 
     // Test initial focus
-    buttons[0].focus();
-    await waitFor(() => {
+    await userEvent.click(buttons[0]);
+    await waitFor(() => waitFor(() => {
       expect(buttons[0]).toHaveFocus();
-    });
+    }))
 
     // Test focus moves correctly with tab navigation  
     await userEvent.tab();

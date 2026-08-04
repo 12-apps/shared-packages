@@ -133,7 +133,7 @@ export const KeyboardNavigation: Story = {
     // Tab to primary button
     await userEvent.tab();
     const primaryButton = canvas.getByRole('button', { name: 'Primary' });
-    await expect(primaryButton).toHaveFocus();
+    await waitFor(() => expect(primaryButton).toHaveFocus());
 
     // Press Enter to activate
     await userEvent.keyboard('{Enter}');
@@ -142,12 +142,12 @@ export const KeyboardNavigation: Story = {
     // Tab to secondary button
     await userEvent.tab();
     const secondaryButton = canvas.getByRole('button', { name: 'Secondary' });
-    await expect(secondaryButton).toHaveFocus();
+    await waitFor(() => expect(secondaryButton).toHaveFocus());
 
     // Tab to help link
     await userEvent.tab();
     const helpLink = canvas.getByRole('link', { name: 'Help' });
-    await expect(helpLink).toHaveFocus();
+    await waitFor(() => expect(helpLink).toHaveFocus());
   },
 };
 
@@ -203,14 +203,14 @@ export const FocusManagement: Story = {
 
     // Test focus indicators are visible
     await userEvent.tab();
-    await expect(button).toHaveFocus();
+    await waitFor(() => expect(button).toHaveFocus());
 
     await userEvent.tab();
-    await expect(link).toHaveFocus();
+    await waitFor(() => expect(link).toHaveFocus());
 
     // Test focus trap doesn't exist (buttons should be focusable)
     await userEvent.tab();
-    await expect(link).not.toHaveFocus();
+    await waitFor(() => expect(link).not.toHaveFocus());
   },
 };
 

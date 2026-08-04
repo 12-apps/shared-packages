@@ -118,7 +118,7 @@ export const KeyboardNavigation: Story = {
 
     // Tab to country selector
     await userEvent.tab();
-    await expect(countrySelector).toHaveFocus();
+    await waitFor(() => expect(countrySelector).toHaveFocus());
 
     // Press Enter to open country menu
     await userEvent.keyboard('[Enter]');
@@ -189,12 +189,12 @@ export const FocusManagement: Story = {
 
     // Focus the input
     await userEvent.click(input);
-    await expect(input).toHaveFocus();
+    await waitFor(() => expect(input).toHaveFocus());
 
     // Tab away and back
     await userEvent.tab();
     await userEvent.tab({ shift: true });
-    await expect(input).toHaveFocus();
+    await waitFor(() => expect(input).toHaveFocus());
   },
 };
 
@@ -226,7 +226,7 @@ export const ResponsiveDesign: Story = {
     // Test input functionality on mobile
     await userEvent.clear(input);
     await userEvent.click(input);
-    await expect(input).toHaveFocus();
+    await waitFor(() => expect(input).toHaveFocus());
 
     // Type phone number on mobile viewport
     await userEvent.type(input, '5551234567');

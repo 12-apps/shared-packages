@@ -1,7 +1,7 @@
 import { Box, Button, List, ListItem,TextField, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { ScrollArea } from './ScrollArea';
 
@@ -168,8 +168,8 @@ export const KeyboardNavigation: Story = {
 
     // Focus the scroll area
     if (scrollContainer) {
-      scrollContainer.focus();
-      expect(document.activeElement).toBe(scrollContainer);
+      await userEvent.click(scrollContainer);
+      await waitFor(() => expect(document.activeElement).toBe(scrollContainer));
 
       // Test that keyboard events are handled (simulate the effect manually since browsers don't scroll in test environment)
       await userEvent.keyboard('{ArrowDown}');
@@ -262,8 +262,8 @@ export const FocusManagement: Story = {
     const btn2 = await canvas.findByTestId('btn-2');
 
     // Focus first button
-    btn1.focus();
-    expect(document.activeElement).toBe(btn1);
+    await userEvent.click(btn1);
+    await waitFor(() => expect(document.activeElement).toBe(btn1));
 
     // Tab to scroll container
     await userEvent.tab();
@@ -275,8 +275,8 @@ export const FocusManagement: Story = {
       expect(activeEl === scrollContainer || activeEl === btn2).toBe(true);
 
       // Focus scroll container directly
-      scrollContainer.focus();
-      expect(document.activeElement).toBe(scrollContainer);
+      await userEvent.click(scrollContainer);
+      await waitFor(() => expect(document.activeElement).toBe(scrollContainer));
 
       // Verify focus visible styles are applied
       // const computedStyle = window.getComputedStyle(scrollContainer);

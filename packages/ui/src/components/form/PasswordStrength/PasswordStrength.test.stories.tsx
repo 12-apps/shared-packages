@@ -1,6 +1,6 @@
 import { Stack, TextField } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { userEvent, within, expect } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import React, { useState } from 'react';
 
 import { PasswordStrength } from './PasswordStrength';
@@ -98,7 +98,7 @@ export const KeyboardNavigation: Story = {
 
      await step('User clears the input', async () => {
       await userEvent.clear(input);
-      expect(canvas.queryByText(/Weak|Fair|Good|Strong/i)).not.toBeInTheDocument();
+      await waitFor(() => expect(canvas.queryByText(/Weak|Fair|Good|Strong/i)).not.toBeInTheDocument());
     });
   },
 };
@@ -274,7 +274,7 @@ export const EdgeCases: Story = {
       const emptyContainer = await canvas.findByTestId('empty-password');
       expect(emptyContainer).toBeInTheDocument();
       const label = within(emptyContainer).queryByText(/Very Weak|Weak|Fair|Good|Strong/i);
-      expect(label).not.toBeInTheDocument();
+      await waitFor(() => expect(label).not.toBeInTheDocument());
     });
 
     await step('Verify very long password state shows "Strong"', async () => {
