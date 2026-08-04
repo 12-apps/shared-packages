@@ -104,16 +104,14 @@ export const BasicInteraction: Story = {
 
     // Initially collapsed - description should not be visible
     const firstDescription = sampleItems[0].description!;
-    let descriptionElement = canvas.queryByText(firstDescription);
-    await expect(descriptionElement).not.toBeVisible();
+    await waitFor(() => expect(canvas.queryByText(firstDescription)).not.toBeVisible());
 
     // Click to expand
     await userEvent.click(expandButtons[0]);
 
     // Wait for expansion animation and verify description is now visible
     await waitFor(() => {
-      descriptionElement = canvas.getByText(firstDescription);
-      expect(descriptionElement).toBeVisible();
+      expect(canvas.getByText(firstDescription)).toBeVisible();
     }, { timeout: 3000 });
 
     // Verify the expand button rotated (indicates expanded state)
@@ -126,8 +124,7 @@ export const BasicInteraction: Story = {
 
     // Wait for collapse animation
     await waitFor(() => {
-      descriptionElement = canvas.queryByText(firstDescription);
-      expect(descriptionElement).not.toBeVisible();
+      expect(canvas.queryByText(firstDescription)).not.toBeVisible();
     }, { timeout: 3000 });
 
     // Verify the expand button rotated back
@@ -306,7 +303,7 @@ export const ScreenReader: Story = {
     for (const button of expandButtons) {
       // Button should be focusable
       await expect(button).not.toHaveAttribute('disabled');
-      await expect(button.tabIndex).toBeGreaterThanOrEqual(0);
+      await expect(button).not.toHaveAttribute('tabindex', '-1');
     }
 
     // Verify icons are decorative (aria-hidden) or have labels
@@ -356,14 +353,15 @@ export const FocusManagement: Story = {
     // Test focus retention on expand/collapse
     await expect(expandButtons.length).toBeGreaterThan(0);
     
-    expandButtons[0].focus();
-    await expect(document.activeElement).toBe(expandButtons[0]);
+    // Tab in from the body to reach the first expand button.
+    await userEvent.tab();
+    await waitFor(() => expect(expandButtons[0]).toHaveFocus());
 
     // Click to expand
     await userEvent.click(expandButtons[0]);
 
     // Focus should remain on the button after expansion
-    await expect(document.activeElement).toBe(expandButtons[0]);
+    await waitFor(() => expect(expandButtons[0]).toHaveFocus());
 
     // Wait for expansion to complete
     await waitFor(() => {
@@ -373,12 +371,10 @@ export const FocusManagement: Story = {
 
     // Now action button should be available
     const actionButton = canvas.getByRole('button', { name: /View Details/i });
-    actionButton.focus();
-    await expect(document.activeElement).toBe(actionButton);
 
-    // Click action button and verify focus remains
+    // Clicking focuses the button, so the pre-focus only asserted focus() works.
     await userEvent.click(actionButton);
-    await expect(document.activeElement).toBe(actionButton);
+    await waitFor(() => expect(actionButton).toHaveFocus());
     await expect(args.items[0].action?.onClick).toHaveBeenCalled();
 
     // Test focus on card click
@@ -387,19 +383,18 @@ export const FocusManagement: Story = {
 
     // Test focus trap prevention (focus can move outside component)
     const lastExpandButton = expandButtons[expandButtons.length - 1];
-    lastExpandButton.focus();
-    await userEvent.tab();
 
-    // Focus should move outside the timeline component
-    await expect(document.activeElement).not.toBe(lastExpandButton);
-    
-    // Test programmatic focus
-    expandButtons[1].focus();
-    await expect(document.activeElement).toBe(expandButtons[1]);
-    
-    // Click to expand second item
+    // Walk the keyboard to the last expand button, then once more: focus has to
+    // leave the timeline rather than wrap back into it.
+    await userEvent.click(lastExpandButton);
+    await waitFor(() => expect(lastExpandButton).toHaveFocus());
+
+    await userEvent.tab();
+    await waitFor(() => expect(lastExpandButton).not.toHaveFocus());
+
+    // Clicking the second item's expand button focuses it and keeps focus there.
     await userEvent.click(expandButtons[1]);
-    await expect(document.activeElement).toBe(expandButtons[1]);
+    await waitFor(() => expect(expandButtons[1]).toHaveFocus());
     
     // Verify multiple items can be expanded simultaneously
     await waitFor(() => {
@@ -425,17 +420,13 @@ export const ResponsiveDesign: Story = {
     const canvas = within(canvasElement);
 
     // Verify timeline renders on mobile - wait longer for mobile viewport
-    let container: HTMLElement | null = null;
+    // Read the container after the wait rather than assigning to an outer
+    // binding from inside the callback — the callback reruns, so the binding
+    // held whichever value the last retry happened to leave behind.
     await waitFor(() => {
-      container = canvas.getByTestId('timeline-container') as HTMLElement;
-      expect(container).toBeInTheDocument();
-      expect(container).not.toBeNull();
+      expect(canvas.getByTestId('timeline-container')).toBeInTheDocument();
     }, { timeout: 5000 });
-
-    // Assert container is not null for TypeScript
-    if (!container) {
-      throw new Error('Timeline container not found');
-    }
+    const container = canvas.getByTestId('timeline-container');
 
     // Wait for all items to render
     await waitFor(() => {
@@ -728,19 +719,11 @@ export const Performance: Story = {
       await expect(style.animation).toContain('none');
     }
 
-    // Test interaction performance with many items
-    const startTime = Date.now();
-    
-    // Click multiple items quickly
+    // Click multiple items quickly. No wall-clock budget: a 1s ceiling on three
+    // clicks measures how loaded the runner is, not how the component performs.
     await userEvent.click(items[0]);
     await userEvent.click(items[10]);
     await userEvent.click(items[20]);
-    
-    const endTime = Date.now();
-    const interactionTime = endTime - startTime;
-    
-    // Interactions should be responsive (under 1 second for 3 clicks)
-    await expect(interactionTime).toBeLessThan(1000);
     
     // Verify clicks were registered
     await expect(args.onItemClick).toHaveBeenCalledTimes(3);

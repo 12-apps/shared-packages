@@ -93,8 +93,7 @@ export const CountVariantTest: Story = {
 
     await step('Zero count should be hidden when showZero is false', async () => {
       // Initially showZero is false and count is 0
-      const badge = canvas.queryByText('0');
-      await expect(badge).not.toBeInTheDocument();
+      await waitFor(() => expect(canvas.queryByText('0')).not.toBeInTheDocument());
     });
 
     await step('Toggle to show zero', async () => {
@@ -189,27 +188,30 @@ export const KeyboardNavigation: Story = {
       const firstButton = canvas.getByTestId('first-focusable');
       const secondButton = canvas.getByTestId('second-focusable');
 
-      // Focus first element
-      firstButton.focus();
-      await expect(firstButton).toHaveFocus();
+      // Tab in from the body — the old .focus() call plus assertion only proved
+      // the DOM honours focus(), not that this button is the first tab stop.
+      await userEvent.tab();
+      await waitFor(() => expect(firstButton).toHaveFocus());
 
       // Tab to next element
       await userEvent.tab();
-      await expect(secondButton).toHaveFocus();
+      await waitFor(() => expect(secondButton).toHaveFocus());
     });
 
     await step('Tab navigation backward', async () => {
       await userEvent.tab({ shift: true });
       const firstButton = canvas.getByTestId('first-focusable');
-      await expect(firstButton).toHaveFocus();
+      await waitFor(() => expect(firstButton).toHaveFocus());
     });
 
     await step('Enter key activation on focused button', async () => {
       const button = canvas.getByTestId('first-focusable');
-      button.focus();
+      // Focus is already back on this button from the shift-tab above.
+      await waitFor(() => expect(button).toHaveFocus());
+
       await userEvent.keyboard('{Enter}');
-      // Verify button can be activated
-      await expect(button).toHaveFocus();
+      // Focus must survive activation rather than jump elsewhere.
+      await waitFor(() => expect(button).toHaveFocus());
     });
   },
 };
@@ -1005,15 +1007,15 @@ export const FocusManagementTest: Story = {
     });
 
     await step('Tab through focusable elements', async () => {
-      // Focus first item
+      // Tab in from the body to reach the first item.
       const firstItem = canvas.getByTestId('focus-item-0');
-      firstItem.focus();
-      await expect(firstItem).toHaveFocus();
+      await userEvent.tab();
+      await waitFor(() => expect(firstItem).toHaveFocus());
 
       // Tab to second item
       await userEvent.tab();
       const secondItem = canvas.getByTestId('focus-item-1');
-      await expect(secondItem).toHaveFocus();
+      await waitFor(() => expect(secondItem).toHaveFocus());
 
       const activeDisplay = canvas.getByTestId('active-index');
       await expect(activeDisplay).toHaveTextContent('Active: 1');
@@ -1021,7 +1023,7 @@ export const FocusManagementTest: Story = {
       // Tab to third item
       await userEvent.tab();
       const thirdItem = canvas.getByTestId('focus-item-2');
-      await expect(thirdItem).toHaveFocus();
+      await waitFor(() => expect(thirdItem).toHaveFocus());
 
       await expect(canvas.getByTestId('active-index')).toHaveTextContent('Active: 2');
     });
@@ -1029,7 +1031,7 @@ export const FocusManagementTest: Story = {
     await step('Reverse tab navigation', async () => {
       await userEvent.tab({ shift: true });
       const secondItem = canvas.getByTestId('focus-item-1');
-      await expect(secondItem).toHaveFocus();
+      await waitFor(() => expect(secondItem).toHaveFocus());
 
       const activeDisplay = canvas.getByTestId('active-index');
       await expect(activeDisplay).toHaveTextContent('Active: 1');
@@ -1101,9 +1103,9 @@ export const WCAGComplianceTest: Story = {
       const button = canvas.getByTestId('wcag-button');
       await expect(button).toHaveAttribute('aria-describedby', 'badge-description');
 
-      // Button should be focusable
-      button.focus();
-      await expect(button).toHaveFocus();
+      // Button should be focusable — reached by keyboard, not by calling focus().
+      await userEvent.tab();
+      await waitFor(() => expect(button).toHaveFocus());
     });
 
     await step('Color contrast verification', async () => {
@@ -1120,15 +1122,16 @@ export const WCAGComplianceTest: Story = {
 
     await step('Keyboard activation', async () => {
       const button = canvas.getByTestId('wcag-button');
-      button.focus();
+      // Focus is already on the button from the previous step.
+      await waitFor(() => expect(button).toHaveFocus());
 
       // Should be activatable with Enter
       await userEvent.keyboard('{Enter}');
-      await expect(button).toHaveFocus();
+      await waitFor(() => expect(button).toHaveFocus());
 
       // Should be activatable with Space
       await userEvent.keyboard(' ');
-      await expect(button).toHaveFocus();
+      await waitFor(() => expect(button).toHaveFocus());
     });
   },
 };
