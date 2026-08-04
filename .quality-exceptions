@@ -51,7 +51,6 @@ packages/ui/src/components/data-display/Sheet/Sheet.test.stories.tsx
 packages/ui/src/components/data-display/Sheet/Sheet.tsx
 packages/ui/src/components/data-display/Stepper/Stepper.test.stories.tsx
 packages/ui/src/components/data-display/Table/Table.test.stories.tsx
-packages/ui/src/components/data-display/Table/Table.tsx
 packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.test.stories.tsx
 packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.tsx
 packages/ui/src/components/data-display/Tooltip/Tooltip.tsx

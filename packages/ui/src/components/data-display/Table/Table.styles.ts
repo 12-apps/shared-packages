@@ -103,6 +103,79 @@ type VariantArgs = {
 const tableVariantStyles = (args: VariantArgs, customVariant?: string): CSSObject =>
   customVariant ? (TABLE_VARIANTS[customVariant]?.(args) ?? {}) : {};
 
+// Sticky headers and row hover are independent of the variant.
+const stickyHeaderStyles = (
+  theme: Theme,
+  densityConfig: ReturnType<typeof getDensityConfig>,
+): CSSObject => ({
+      '& .MuiTableHead-root': {
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+        backgroundColor: theme.palette.background.paper,
+        '& .MuiTableCell-root': {
+          borderBottom: `2px solid ${theme.palette.divider}`,
+          fontWeight: 600,
+          padding: densityConfig.headerPadding,
+        },
+      },
+    });
+
+const hoverableRowStyles = (theme: Theme): CSSObject => ({
+      '& .MuiTableBody-root .MuiTableRow-root:hover': {
+        backgroundColor: alpha(theme.palette.primary.main, 0.08),
+        cursor: 'pointer',
+        transition: 'background-color 0.15s ease-in-out',
+      },
+    });
+
+// glow and pulse combine into three distinct looks, spelled out rather than
+// layered — the glow-only shadow differs from the one used when both are on.
+const emphasisStyles = (theme: Theme, glow?: boolean, pulse?: boolean): CSSObject => {
+  if (glow && pulse) return ({
+      position: 'relative',
+      boxShadow: `0 0 20px 5px ${alpha(theme.palette.primary.main, 0.3)} !important`,
+      filter: 'brightness(1.05)',
+      '&::after': {
+        content: '""',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        borderRadius: 'inherit',
+        backgroundColor: theme.palette.primary.main,
+        opacity: 0.1,
+        animation: `${pulseAnimation} 2s infinite`,
+        pointerEvents: 'none',
+        zIndex: -1,
+      },
+    });
+  if (glow) return ({
+      boxShadow: `0 0 20px 5px ${alpha(theme.palette.primary.main, 0.3)} !important`,
+      filter: 'brightness(1.05)',
+    });
+  if (pulse) return ({
+      position: 'relative',
+      '&::after': {
+        content: '""',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        borderRadius: 'inherit',
+        backgroundColor: theme.palette.primary.main,
+        opacity: 0.1,
+        animation: `${pulseAnimation} 2s infinite`,
+        pointerEvents: 'none',
+        zIndex: -1,
+      },
+    });
+
+  return {};
+};
+
 // The table's own styling, lifted out so the styled() callback just forwards
 // its props.
 export const tableStyles = ({
@@ -141,19 +214,10 @@ export const tableStyles = ({
 
     // Sticky header
     ...tableVariantStyles({ theme, densityConfig, stripeColor }, customVariant),
-    ...(stickyHeader && {
-      '& .MuiTableHead-root': {
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        backgroundColor: theme.palette.background.paper,
-        '& .MuiTableCell-root': {
-          borderBottom: `2px solid ${theme.palette.divider}`,
-          fontWeight: 600,
-          padding: densityConfig.headerPadding,
-        },
-      },
-    }),
+    ...(stickyHeader ? stickyHeaderStyles(theme, densityConfig) : {}),
+    ...(hoverable ? hoverableRowStyles(theme) : {}),
+    ...emphasisStyles(theme, glow, pulse),
+
 
     // Variant styles
 
@@ -167,13 +231,7 @@ export const tableStyles = ({
 
 
     // Hoverable rows
-    ...(hoverable && {
-      '& .MuiTableBody-root .MuiTableRow-root:hover': {
-        backgroundColor: alpha(theme.palette.primary.main, 0.08),
-        cursor: 'pointer',
-        transition: 'background-color 0.15s ease-in-out',
-      },
-    }),
+
 
     // Selection styles
     '& .MuiTableRow-root.selected': {
@@ -184,49 +242,12 @@ export const tableStyles = ({
     },
 
     // Glow effect
-    ...(glow && !pulse && {
-      boxShadow: `0 0 20px 5px ${alpha(theme.palette.primary.main, 0.3)} !important`,
-      filter: 'brightness(1.05)',
-    }),
+
 
     // Pulse animation
-    ...(pulse && !glow && {
-      position: 'relative',
-      '&::after': {
-        content: '""',
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        borderRadius: 'inherit',
-        backgroundColor: theme.palette.primary.main,
-        opacity: 0.1,
-        animation: `${pulseAnimation} 2s infinite`,
-        pointerEvents: 'none',
-        zIndex: -1,
-      },
-    }),
+
 
     // Both glow and pulse
-    ...(glow && pulse && {
-      position: 'relative',
-      boxShadow: `0 0 20px 5px ${alpha(theme.palette.primary.main, 0.3)} !important`,
-      filter: 'brightness(1.05)',
-      '&::after': {
-        content: '""',
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        borderRadius: 'inherit',
-        backgroundColor: theme.palette.primary.main,
-        opacity: 0.1,
-        animation: `${pulseAnimation} 2s infinite`,
-        pointerEvents: 'none',
-        zIndex: -1,
-      },
-    }),
+
   };
 }
