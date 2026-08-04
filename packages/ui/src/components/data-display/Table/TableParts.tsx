@@ -18,6 +18,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 
 import { getDensityConfig } from './Table.styles';
 import { useVirtualScrolling } from './Table.hooks';
+import { useTableRowRenderer } from './TableParts.hooks';
 import type { ColumnConfig, TableBodyProps, TableHeaderProps } from './Table.types';
 
 // Mirrors the visible sort indicator for assistive technology; undefined when
@@ -126,7 +127,7 @@ EnhancedTableHeader.displayName = 'EnhancedTableHeader';
 
 // One data row. Split out of the memoised renderTableRow callback so the
 // callback stays a short dispatch and the row markup is readable on its own.
-const TableDataRow: React.FC<{
+export const TableDataRow: React.FC<{
   rowData: Record<string, unknown>;
   rowKey: string | number;
   index: number;
@@ -269,69 +270,20 @@ export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo(({
   rowHeight,
   overscan = 5,
 }) => {
-  const getRowKey = useCallback(
-    (rowData: Record<string, unknown>, index: number): string | number => rowKeyExtractor ? rowKeyExtractor(rowData, index) : (rowData.id as string | number) || index,
-    [rowKeyExtractor]
-  );
-
-  const isRowSelected = useCallback(
-    (rowKey: string | number) => selectedRows.includes(rowKey),
-    [selectedRows]
-  );
-
-  const handleRowSelection = useCallback(
-    (event: React.MouseEvent | React.ChangeEvent, rowKey: string | number) => {
-      // Stop propagation to prevent row click conflict
-      event.stopPropagation();
-      if (!onSelectionChange) return;
-      const isSelected = selectedRows.includes(rowKey);
-      onSelectionChange(rowKey, !isSelected);
-    },
-    [onSelectionChange, selectedRows]
-  );
-
-  const renderTableRow = useCallback(
-    (rowData: Record<string, unknown>, index: number, offsetY: number = 0) => {
-      const rowKey = getRowKey(rowData, index);
-      const selected = isRowSelected(rowKey);
-
-      if (renderRow) return renderRow(rowData, index, selected);
-
-      return (
-        <TableDataRow
-          key={rowKey}
-          rowData={rowData}
-          rowKey={rowKey}
-          index={index}
-          offsetY={offsetY}
-          columns={columns}
-          selected={selected}
-          selectable={selectable}
-          rowHeight={rowHeight}
-          onRowClick={onRowClick}
-          onRowFocus={onRowFocus}
-          onRowBlur={onRowBlur}
-          onSelect={handleRowSelection}
-          virtualScrolling={virtualScrolling}
-          renderCell={renderCell}
-        />
-      );
-    },
-    [
-      columns,
-      getRowKey,
-      isRowSelected,
-      handleRowSelection,
-      onRowClick,
-      onRowFocus,
-      onRowBlur,
-      renderRow,
-      renderCell,
-      rowHeight,
-      selectable,
-      virtualScrolling,
-    ],
-  );
+  const renderTableRow = useTableRowRenderer({
+    columns,
+    selectedRows,
+    onRowClick,
+    onRowFocus,
+    onRowBlur,
+    onSelectionChange,
+    rowKeyExtractor,
+    selectable,
+    renderRow,
+    renderCell,
+    virtualScrolling,
+    rowHeight,
+  });
 
   const { visibleItems, handleScroll } = useVirtualScrolling(
     data, 
