@@ -24,7 +24,6 @@ packages/ui/src/components/data-display/Alert/Alert.test.stories.tsx
 packages/ui/src/components/data-display/AlertDialog/AlertDialog.test.stories.tsx
 packages/ui/src/components/data-display/AsyncStateContainer/AsyncStateContainer.test.stories.tsx
 packages/ui/src/components/data-display/AsyncStateContainer/AsyncStateContainer.tsx
-packages/ui/src/components/data-display/Badge/Badge.tsx
 packages/ui/src/components/data-display/Banner/Banner.test.stories.tsx
 packages/ui/src/components/data-display/Carousel/Carousel.test.stories.tsx
 packages/ui/src/components/data-display/Carousel/Carousel.tsx
