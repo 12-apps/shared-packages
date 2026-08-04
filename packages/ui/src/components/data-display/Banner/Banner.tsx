@@ -3,66 +3,13 @@ import Close from '@mui/icons-material/Close';
 import Error from '@mui/icons-material/Error';
 import Info from '@mui/icons-material/Info';
 import Warning from '@mui/icons-material/Warning';
-import {
-  alpha,
-  Box,
-  Button,
-  IconButton,
-  keyframes,
-  Typography,
-} from '@mui/material';
+import { alpha, Box, Button, IconButton, Typography } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
 import { styled } from '@mui/material/styles';
 import React from 'react';
 
+import { bannerPartStyles, fadeInSlide, getVariantColor } from './Banner.styles';
 import type { BannerProps, BannerVariant } from './Banner.types';
-
-// Animations
-const fadeInSlide = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-`;
-
-const pulseAnimation = keyframes`
-  0% {
-    box-shadow: 0 0 0 0 currentColor;
-    opacity: 0.7;
-  }
-  70% {
-    box-shadow: 0 0 0 8px currentColor;
-    opacity: 0;
-  }
-  100% {
-    box-shadow: 0 0 0 0 currentColor;
-    opacity: 0;
-  }
-`;
-
-const getVariantIcon = (variant: BannerVariant) => {
-  const iconMap: Record<BannerVariant, React.ReactNode> = {
-    info: <Info />,
-    success: <CheckCircle />,
-    warning: <Warning />,
-    critical: <Error />,
-  };
-  return iconMap[variant];
-};
-
-const getVariantColor = (theme: Theme, variant: BannerVariant) => {
-  const colorMap = {
-    info: theme.palette.info,
-    success: theme.palette.success,
-    warning: theme.palette.warning,
-    critical: theme.palette.error,
-  };
-  return colorMap[variant];
-};
 
 const StyledBanner = styled(Box, {
   shouldForwardProp: (prop) => !['variant', 'sticky', 'fullWidth'].includes(prop as string),
@@ -71,6 +18,7 @@ const StyledBanner = styled(Box, {
   sticky: boolean;
   fullWidth: boolean;
 }>(({ theme, variant, sticky, fullWidth }) => {
+
   const colorPalette = getVariantColor(theme, variant);
 
   return {
@@ -97,82 +45,7 @@ const StyledBanner = styled(Box, {
       outlineOffset: '2px',
     },
 
-    // Icon container
-    '.banner-icon': {
-      flexShrink: 0,
-      marginTop: theme.spacing(0.25),
-      color: colorPalette.main,
-      fontSize: '1.25rem',
-      display: 'flex',
-      alignItems: 'center',
-      position: 'relative',
-
-      '&::before': {
-        content: '""',
-        position: 'absolute',
-        inset: -4,
-        borderRadius: '50%',
-        background: alpha(colorPalette.main, 0.1),
-        animation: `${pulseAnimation} 3s infinite`,
-      },
-    },
-
-    // Content area
-    '.banner-content': {
-      flex: 1,
-      minWidth: 0, // Prevents flex item overflow
-    },
-
-    // Title styles
-    '.banner-title': {
-      fontWeight: 600,
-      fontSize: '1rem',
-      lineHeight: 1.4,
-      marginBottom: theme.spacing(0.5),
-      color: colorPalette.dark || colorPalette.main,
-    },
-
-    // Description styles  
-    '.banner-description': {
-      fontSize: '0.875rem',
-      lineHeight: 1.5,
-      opacity: 0.9,
-      color: 'inherit',
-    },
-
-    // Actions area
-    '.banner-actions': {
-      display: 'flex',
-      flexShrink: 0,
-      gap: theme.spacing(1),
-      alignItems: 'center',
-      marginTop: theme.spacing(1),
-
-      [theme.breakpoints.up('sm')]: {
-        marginTop: 0,
-        marginLeft: theme.spacing(2),
-      },
-    },
-
-    // Dismiss button
-    '.banner-dismiss': {
-      color: 'inherit',
-      opacity: 0.7,
-      marginLeft: theme.spacing(1),
-      flexShrink: 0,
-
-      '&:hover': {
-        opacity: 1,
-        backgroundColor: alpha(colorPalette.main, 0.1),
-        transform: 'rotate(90deg)',
-      },
-
-      '&:focus': {
-        opacity: 1,
-        outline: `2px solid ${colorPalette.main}`,
-        outlineOffset: '2px',
-      },
-    },
+    ...bannerPartStyles(theme, colorPalette),
 
     // Responsive layout
     [theme.breakpoints.down('sm')]: {
@@ -206,6 +79,160 @@ const StyledBanner = styled(Box, {
   };
 });
 
+const getVariantIcon = (variant: BannerVariant) => {
+  const iconMap: Record<BannerVariant, React.ReactNode> = {
+    info: <Info />,
+    success: <CheckCircle />,
+    warning: <Warning />,
+    critical: <Error />,
+  };
+  return iconMap[variant];
+};
+
+type BannerAction = NonNullable<BannerProps['actions']>[number];
+
+// Warnings and criticals interrupt the screen reader; the rest are announced
+// politely when it next pauses.
+const resolveAriaAnnouncement = (variant: BannerVariant) => ({
+  role: variant === 'warning' || variant === 'critical' ? 'alert' : 'status',
+  live: (variant === 'critical' ? 'assertive' : 'polite') as 'assertive' | 'polite',
+});
+
+const testIdFor = (base: string | undefined, suffix: string) =>
+  base ? `${base}-${suffix}` : `banner-${suffix}`;
+
+// Resolves the banner's palette once, rather than per property as the inline
+// version did — getVariantColor was being called nine times to build one button.
+const buildActionSx = (
+  theme: Theme,
+  variant: BannerVariant,
+  actionVariant: BannerAction['variant'],
+) => {
+  const palette = getVariantColor(theme, variant);
+
+  return {
+    minWidth: 'auto',
+    px: 1.5,
+    py: 0.5,
+    fontSize: '0.8125rem',
+    fontWeight: 500,
+    borderRadius: 1,
+
+    ...(actionVariant === 'primary' && {
+      backgroundColor: palette.main,
+      color: theme.palette.getContrastText(palette.main),
+
+      '&:hover': {
+        backgroundColor: palette.dark || palette.main,
+        transform: 'translateY(-1px)',
+      },
+    }),
+
+    ...(actionVariant === 'secondary' && {
+      borderColor: palette.main,
+      color: palette.main,
+
+      '&:hover': {
+        backgroundColor: alpha(palette.main, 0.1),
+        borderColor: palette.main,
+        transform: 'translateY(-1px)',
+      },
+    }),
+  };
+};
+
+const BannerActionButton: React.FC<{
+  action: BannerAction;
+  variant: BannerVariant;
+  dataTestId?: string;
+}> = ({ action, variant, dataTestId }) => (
+  <Button
+    size="small"
+    variant={action.variant === 'primary' ? 'contained' : 'outlined'}
+    onClick={action.onClick}
+    data-testid={testIdFor(dataTestId, 'action')}
+    sx={(theme) => buildActionSx(theme, variant, action.variant)}
+  >
+    {action.label}
+  </Button>
+);
+
+const BannerBody: React.FC<{
+  displayIcon: React.ReactNode;
+  title?: BannerProps['title'];
+  description?: BannerProps['description'];
+  dataTestId?: string;
+  children?: React.ReactNode;
+}> = ({ displayIcon, title, description, dataTestId, children }) => (
+  <>
+    {displayIcon && (
+      <Box className="banner-icon" aria-hidden="true" data-testid={testIdFor(dataTestId, 'icon')}>
+        {displayIcon}
+      </Box>
+    )}
+
+    <Box className="banner-content">
+      {title && (
+        <Typography
+          className="banner-title"
+          variant="subtitle2"
+          component="div"
+          data-testid={testIdFor(dataTestId, 'title')}
+        >
+          {title}
+        </Typography>
+      )}
+      {description && (
+        <Typography
+          className="banner-description"
+          variant="body2"
+          component="div"
+          data-testid={testIdFor(dataTestId, 'message')}
+        >
+          {description}
+        </Typography>
+      )}
+      {children}
+    </Box>
+  </>
+);
+
+const BannerTrailing: React.FC<{
+  actions?: BannerProps['actions'];
+  variant: BannerVariant;
+  dismissible: boolean;
+  onDismissClick: () => void;
+  dataTestId?: string;
+}> = ({ actions, variant, dismissible, onDismissClick, dataTestId }) => (
+  <Box display="flex" alignItems="center" gap={1}>
+    {actions && actions.length > 0 && (
+      <Box className="banner-actions">
+        {actions.map((action, index) => (
+          <BannerActionButton
+            key={index}
+            action={action}
+            variant={variant}
+            dataTestId={dataTestId}
+          />
+        ))}
+      </Box>
+    )}
+
+    {dismissible && (
+      <IconButton
+        className="banner-dismiss"
+        size="small"
+        onClick={onDismissClick}
+        aria-label="Dismiss banner"
+        data-testid={testIdFor(dataTestId, 'close')}
+        sx={{ transition: 'all 0.2s ease' }}
+      >
+        <Close fontSize="small" />
+      </IconButton>
+    )}
+  </Box>
+);
+
 export const Banner = React.forwardRef<HTMLDivElement, BannerProps>(
   (
     {
@@ -234,9 +261,7 @@ export const Banner = React.forwardRef<HTMLDivElement, BannerProps>(
 
     const displayIcon = icon || getVariantIcon(variant);
 
-    // Determine appropriate ARIA role based on variant
-    const ariaRole = variant === 'warning' || variant === 'critical' ? 'alert' : 'status';
-    const ariaLive = variant === 'critical' ? 'assertive' : 'polite';
+    const { role: ariaRole, live: ariaLive } = resolveAriaAnnouncement(variant);
 
     if (!visible) {
       return null;
@@ -256,90 +281,22 @@ export const Banner = React.forwardRef<HTMLDivElement, BannerProps>(
         data-testid={dataTestId}
         {...props}
       >
-        {/* Icon */}
-        {displayIcon && (
-          <Box className="banner-icon" aria-hidden="true" data-testid={dataTestId ? `${dataTestId}-icon` : 'banner-icon'}>
-            {displayIcon}
-          </Box>
-        )}
-
-        {/* Main content */}
-        <Box className="banner-content">
-          {title && (
-            <Typography className="banner-title" variant="subtitle2" component="div" data-testid={dataTestId ? `${dataTestId}-title` : 'banner-title'}>
-              {title}
-            </Typography>
-          )}
-          {description && (
-            <Typography className="banner-description" variant="body2" component="div" data-testid={dataTestId ? `${dataTestId}-message` : 'banner-message'}>
-              {description}
-            </Typography>
-          )}
+        <BannerBody
+          displayIcon={displayIcon}
+          title={title}
+          description={description}
+          dataTestId={dataTestId}
+        >
           {children}
-        </Box>
+        </BannerBody>
 
-        {/* Actions and dismiss button container */}
-        <Box display="flex" alignItems="center" gap={1}>
-          {/* Action buttons */}
-          {actions && actions.length > 0 && (
-            <Box className="banner-actions">
-              {actions.map((action, index) => (
-                <Button
-                  key={index}
-                  size="small"
-                  variant={action.variant === 'primary' ? 'contained' : 'outlined'}
-                  onClick={action.onClick}
-                  data-testid={dataTestId ? `${dataTestId}-action` : 'banner-action'}
-                  sx={(theme) => ({
-                    minWidth: 'auto',
-                    px: 1.5,
-                    py: 0.5,
-                    fontSize: '0.8125rem',
-                    fontWeight: 500,
-                    borderRadius: 1,
-                    
-                    ...(action.variant === 'primary' && {
-                      backgroundColor: getVariantColor(theme, variant).main,
-                      color: theme.palette.getContrastText(getVariantColor(theme, variant).main),
-                      
-                      '&:hover': {
-                        backgroundColor: getVariantColor(theme, variant).dark || getVariantColor(theme, variant).main,
-                        transform: 'translateY(-1px)',
-                      },
-                    }),
-                    
-                    ...(action.variant === 'secondary' && {
-                      borderColor: getVariantColor(theme, variant).main,
-                      color: getVariantColor(theme, variant).main,
-                      
-                      '&:hover': {
-                        backgroundColor: alpha(getVariantColor(theme, variant).main, 0.1),
-                        borderColor: getVariantColor(theme, variant).main,
-                        transform: 'translateY(-1px)',
-                      },
-                    }),
-                  })}
-                >
-                  {action.label}
-                </Button>
-              ))}
-            </Box>
-          )}
-
-          {/* Dismiss button */}
-          {dismissible && (
-            <IconButton
-              className="banner-dismiss"
-              size="small"
-              onClick={handleDismiss}
-              aria-label="Dismiss banner"
-              data-testid={dataTestId ? `${dataTestId}-close` : 'banner-close'}
-              sx={{ transition: 'all 0.2s ease' }}
-            >
-              <Close fontSize="small" />
-            </IconButton>
-          )}
-        </Box>
+        <BannerTrailing
+          actions={actions}
+          variant={variant}
+          dismissible={dismissible}
+          onDismissClick={handleDismiss}
+          dataTestId={dataTestId}
+        />
       </StyledBanner>
     );
   },
