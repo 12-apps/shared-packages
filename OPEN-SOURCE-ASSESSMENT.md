@@ -5,55 +5,99 @@ would cut the CI bill. Both repos were audited in full (working tree + complete
 git history) on 2026-08-04.
 
 **Short answer:** publishing does not hurt — the code is clean and the community
-value is real — but it will **not** meaningfully cut the CI bill, because Actions
-minutes are billed to the *calling* repo, and almost all the org's minutes are
-spent by `12-apps/future-pay`, which stays private either way.
+value is real — and it *does* cut the CI bill, but the lever is **where the code
+lives**, not which repo hosts the workflows. Every line that sits in a public
+package is a line whose lint/test/build is free, once, forever, instead of
+billed inside each private consumer.
 
 ---
 
-## 1. The CI-cost premise does not hold
+## 1. The CI-cost model
 
 GitHub Actions is free on public repos with standard runners; private repos get
-2,000 min/month (Free), 3,000 (Team), or 50,000 (Enterprise Cloud). So going
-public *is* free-CI — for the repo that goes public.
+2,000 min/month (Free), 3,000 (Team), or 50,000 (Enterprise Cloud). Going public
+*is* free CI — for the repo that goes public.
 
-The catch is which repo pays. From GitHub's billing docs: **"If you reuse a
+Which repo pays matters, though. From GitHub's billing docs: **"If you reuse a
 workflow, billing is always associated with the caller workflow."** Minutes are
 charged to the repository that triggers the run, not the one hosting the
-reusable workflow.
+reusable workflow. That has one narrow consequence and one broad one, and they
+point in opposite directions.
 
-All four org repos are private today: `future-pay`, `ci`, `base-app`,
-`shared-packages`. That means:
+### The narrow consequence: publishing `ci` saves nothing directly
 
-| Repo | Public would save | Why |
-|------|-------------------|-----|
-| `12-apps/future-pay` | **all of it** — but it stays private | The actual monorepo (16.5 MB, pushed daily). Every `uses: 12-apps/ci/...@v1` run bills here. |
-| `12-apps/ci` | ~nothing | 218 KB, 38 commits. Its own CI is one `release-major-tag` workflow on push. Consumers' runs never bill here. |
-| `12-apps/shared-packages` | small but real | 14 runs total, all on 2026-07-17. Its own 6-job CI would become free. |
+`12-apps/ci` is a workflow host. It is 218 KB across 38 commits, and its own CI
+is a single `release-major-tag` workflow on push. Consumers' runs bill to the
+consumer, never here. Publishing it is worth doing — see §3 — but not for the
+minutes.
 
-So open-sourcing `ci` buys **zero** CI savings — the minutes it appears to
-"cost" are already being billed to `future-pay`. Open-sourcing
-`shared-packages` makes this repo's own CI free, which is worth having but is
-not where the bill comes from.
+### The broad consequence: code placement is the real lever
 
-### What would actually cut the bill
+This is where the saving actually is. CI cost scales with the code a repo has to
+lint, type-check, build, and test. So:
 
-Billed minutes are the *sum* of all job-minutes, not wall-clock. This repo's
-`ci.yml` runs `lint`, `type-check`, `build`, and `unit-tests` as four separate
-jobs — four runners, four checkouts, four full `pnpm install --frozen-lockfile`
-of a workspace carrying MUI, Prisma, Storybook and Playwright. The installs
-dominate, and they are paid four times over.
+- Code in a **private** repo costs minutes on every PR touching it.
+- Code in a **public** package costs nothing, forever.
+- Code shared by *N* private consumers, if it lives in each of them, costs
+  minutes *N* times over. Centralised in one public package, it costs nothing
+  and is tested once.
 
-Collapsing those four into one job with a single install is the single largest
-lever available today. It trades wall-clock (jobs no longer run in parallel) for
-minutes. If fail-fast feedback matters more than cost, keep them split and
-accept the multiplier — but that is the tradeoff to decide, not visibility.
+That third point is the compounding one, and it grows with the org. Today
+`future-pay` is the only serious consumer. With `future-drink` arriving as a
+second, and `base-app` as a third, the ratio of "shared code that could be
+public" to "app-specific code that must stay private" moves further in favour of
+publishing.
 
-Second lever: `turbo --affected` with a cross-run `.turbo` cache is already
-wired into `12-apps/ci`'s `monorepo-static.yml` but this repo's `ci.yml` calls
-`pnpm lint` / `pnpm check-types` directly, so it rebuilds everything on every
-PR. Routing this repo through the org's own reusable static pipeline would pick
-that up.
+So the strategy is sound: move as much as possible into `shared-packages`, make
+it public, and let each private app repo carry only its thin app-specific layer.
+The historical run count in this repo (14 runs, all on 2026-07-17) is not
+evidence against that — it is a two-week-old repo that has barely started
+absorbing code.
+
+**What still bills in the private consumers**, so the saving is large but not
+total: dependency install, type-checking *against* the packages, e2e that
+exercises them, and all app-specific code. What goes away is the unit tests,
+lint, and build of the shared code — which is most of the per-PR cost.
+
+**Second cost line, same decision:** every package currently sets
+`publishConfig.access: "restricted"`, and `ci.yml` publishes with
+`npm publish --access restricted`. Restricted scoped packages require a paid npm
+organisation. Going public means `access: public`, which removes that bill
+entirely.
+
+### The third lever, independent of visibility
+
+Billed minutes are the *sum* of all job-minutes, rounded up per job, not
+wall-clock. This repo's `ci.yml` runs `lint`, `type-check`, `build`, and
+`unit-tests` as four separate jobs — four runners, four checkouts, four full
+`pnpm install --frozen-lockfile` of a workspace carrying MUI, Prisma, Storybook
+and Playwright. The installs dominate, and they are paid four times over.
+
+Measured on the run for PR #4, a docs commit plus two one-line edits:
+
+| Job | Duration | Billed |
+|-----|----------|--------|
+| Lint | 67s | 2 min |
+| Type Check | 61s | 2 min |
+| Build | 60s | 1 min |
+| Unit Tests | 122s | 3 min |
+| Quality / Static Gates | 96s | 2 min |
+| CI Success | 4s | 1 min |
+| **Total** | **2m13s wall** | **11 min billed** |
+
+Five times the wall-clock, for a change that touched no shared code.
+Consolidating the four install-heavy jobs into one removes three redundant
+installs and most of the per-job rounding. It trades parallel wall-clock for
+minutes — if fail-fast feedback matters more, keep them split and accept the
+multiplier, but that is a tradeoff to make deliberately.
+
+Also: `turbo --affected` with a cross-run `.turbo` cache is already wired into
+`12-apps/ci`'s `monorepo-static.yml`, but this repo's `ci.yml` calls `pnpm lint`
+/ `pnpm check-types` directly, so it rebuilds everything on every PR. Routing
+this repo through the org's own reusable static pipeline would pick that up.
+
+This lever applies whether or not the repo goes public — but it stops mattering
+here the moment it does, and starts mattering more in the private consumers.
 
 ---
 
@@ -77,39 +121,49 @@ that up.
 - **Test fixtures are already generic** — `example.com` throughout, apart from
   the one case fixed below.
 
-### Fixed in this change
+### Fixed in PR #4
 
 1. `packages/shared-helpers/prisma/seed-admin-demo.ts` hardcoded a real personal
    Gmail address as the default dev-admin when `DEV_ADMIN_EMAIL` is unset.
-   Replaced with `dev-admin@example.com`. This is worth fixing whether or not
-   the repo ever goes public.
+   Replaced with `dev-admin@example.com`. Worth fixing whether or not the repo
+   ever goes public.
 2. `packages/mcp/src/auth/authorization-server-metadata.test.ts` used
-   `https://tenant.futuredrink.com.br` — a real-looking customer domain — as an
-   OAuth issuer fixture. Replaced with `tenant.example.com`.
+   `https://tenant.futuredrink.com.br` as an OAuth issuer fixture. Replaced with
+   `tenant.example.com`. This is *not* a customer domain — it is the org's own
+   `future-drink` project. The redaction still stands, for a different reason: a
+   public repo should not telegraph an unannounced product name, and a test
+   fixture should not hardcode any product's domain.
 
-### Blocker — must be resolved before flipping public
+### Blocker — and it is now a prerequisite, not just hygiene
 
-**`packages/shared-helpers/prisma/` is the product's data model, not a shared
+**`packages/shared-helpers/prisma/` is one app's data model, not a shared
 helper.** It carries a 1,122-line schema with 38 models, 27 migrations, and
-seed data. The models are the full commerce domain: `Order`, `OrderCharge`,
-`Payment`, `SavedCard`, `CustomerProfile`, `StockLot`, `StockMovement`,
-`Recipe`, `RecipeComponent`, `Supplier`, `LossEvent`, `OAuthClient`,
-`OAuthRefreshToken`, `McpConnection`, `Membership`, `PaymentIntegration`.
-Publishing it publishes `future-pay`'s design — every entity, every
-relationship, every payment state transition. It also carries 41 `FUT-*`
-internal tracker references.
+seed data — the full commerce domain: `Order`, `OrderCharge`, `Payment`,
+`SavedCard`, `CustomerProfile`, `StockLot`, `StockMovement`, `Recipe`,
+`RecipeComponent`, `Supplier`, `LossEvent`, `OAuthClient`, `OAuthRefreshToken`,
+`McpConnection`, `Membership`, `PaymentIntegration`. Publishing it publishes
+`future-pay`'s design — every entity, every relationship, every payment state
+transition. It also carries 41 `FUT-*` internal tracker references.
 
-This is a packaging problem independent of open source: a schema for one app
-does not belong in a package named "shared helpers", and no community consumer
-can use it. Two options:
+Two independent reasons this has to be resolved first, and the second is the
+important one:
 
-- **Recommended:** move `prisma/` (schema, migrations, seeds) back into
-  `future-pay`, or into a separate private `@12-apps/db` package. Keep the
-  genuinely generic Prisma *helpers* that live in `src/prisma/` —
+1. **Disclosure.** A public repo would expose the product's complete data model.
+2. **It blocks the multi-project plan outright.** The entire point of pushing
+   code into `shared-packages` is that `future-drink` and `future-pay` can share
+   it. A schema hardcoded to one app's domain cannot be shared by two apps — so
+   this split has to happen for the refactor to work *even if the repo stays
+   private forever*. Open-sourcing just makes the deadline visible.
+
+Options:
+
+- **Recommended:** move `prisma/` (schema, migrations, seeds) into the consuming
+  app, or into a separate private `@12-apps/db` package per app. Keep the
+  genuinely generic Prisma *helpers* in `src/prisma/` —
   `audit-extension.ts`, `actor-context.ts`, `search-normalize.ts` — which are
-  reusable and reveal nothing.
-- **Minimum:** exclude `packages/shared-helpers` from the public split entirely
-  and publish the other packages.
+  reusable across both apps and reveal nothing.
+- **Minimum:** exclude `packages/shared-helpers` from the public split and
+  publish the other packages first.
 
 ### Legal and hygiene gaps
 
@@ -120,10 +174,8 @@ can use it. Two options:
    `license` field on every package, and include `LICENSE` in each package's
    `files` array. MIT is the already-declared intent.
 4. **`publishConfig.access` is `"restricted"` on every package**, and `ci.yml`
-   publishes with `npm publish --access restricted`. Restricted scoped packages
-   require a paid npm organisation. Going open source means flipping these to
-   `public` — which removes an npm cost as a side effect. This is a real saving,
-   just not a CI one.
+   publishes with `npm publish --access restricted` — see §1, this is the second
+   cost line the same decision removes.
 5. **No `README` worth the name** (one line), no `CONTRIBUTING.md`,
    `SECURITY.md`, or issue templates. A public repo without them collects
    low-quality issues and has no channel for vulnerability reports.
@@ -195,17 +247,32 @@ deliberate commitment.
 
 ## 4. Recommended sequence
 
-1. Publish **`12-apps/ci`** as-is. Add LICENSE, README badge, CONTRIBUTING,
-   SECURITY. Zero cleanup needed, highest community value, removes consumer
-   setup friction. It saves no CI minutes — do it for the other reasons.
-2. Split **`@12-apps/mcp`** out and publish it, `access: public`. It is the
-   flagship.
-3. Decide the `prisma/` split in `shared-helpers` before publishing anything
-   else from this repo.
-4. Separately from all of the above, if the CI bill is the real problem:
-   consolidate this repo's four install-heavy jobs into one, and route it
-   through `monorepo-static.yml` so `turbo --affected` and the `.turbo` cache
-   apply. That is where the minutes are.
+The `future-drink` refactor and the open-source decision are the same project.
+Both require the shared/app-specific boundary to be drawn properly, so do that
+once and get both payoffs.
+
+1. **Do the `prisma/` split first.** It gates everything else: the multi-project
+   refactor cannot work with one app's schema in the shared package, and the
+   repo cannot go public with it either. Move the schema out; keep the generic
+   helpers in `src/prisma/`.
+2. **While splitting, sort every module into shared vs app-specific.** Whatever
+   lands on the shared side is code that will be CI-free forever and reused by
+   both apps; whatever lands app-specific keeps costing minutes in a private
+   repo. That sort *is* the cost decision — make it deliberately rather than by
+   default.
+3. **Publish `12-apps/ci`** as-is. Add LICENSE, CONTRIBUTING, SECURITY. Zero
+   cleanup needed, highest community value, and it removes the org-access/PAT
+   setup step every consumer currently needs. It saves no minutes directly — do
+   it for those reasons.
+4. **Publish `@12-apps/mcp`** with `access: public`. It is the flagship and it
+   is ready now.
+5. **Flip `shared-packages` public** once step 1 lands, with `access: public` on
+   every package and a root LICENSE. This is where the recurring saving is, on
+   both the Actions and the npm line.
+6. **Independently, fix the job topology** — consolidate the four install-heavy
+   jobs, route through `monorepo-static.yml` for `turbo --affected` and the
+   `.turbo` cache. It stops mattering here once the repo is public, but the same
+   fix applies in `future-pay` and `future-drink`, where it will keep mattering.
 
 ## Sources
 
