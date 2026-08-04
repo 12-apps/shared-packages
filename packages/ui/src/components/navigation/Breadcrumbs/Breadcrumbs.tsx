@@ -113,26 +113,62 @@ const collapseItems = ({
   return { displayItems: items, collapsedItems: [] };
 };
 
+type BreadcrumbsDefaultedKeys =
+  | 'variant'
+  | 'separatorType'
+  | 'maxItems'
+  | 'showHomeIcon'
+  | 'size'
+  | 'color'
+  | 'elevation'
+  | 'collapseBehavior'
+  | 'mobileMaxItems';
+
+type ResolvedBreadcrumbsProps = BreadcrumbsProps &
+  Required<Pick<BreadcrumbsProps, BreadcrumbsDefaultedKeys>>;
+
+const BREADCRUMBS_DEFAULTS: Pick<BreadcrumbsProps, BreadcrumbsDefaultedKeys> = {
+  variant: 'default',
+  separatorType: 'default',
+  maxItems: 8,
+  showHomeIcon: true,
+  size: 'md',
+  color: 'default',
+  elevation: 1,
+  collapseBehavior: 'menu',
+  mobileMaxItems: 3,
+};
+
+// Strips explicitly-undefined props before the merge, so `prop={undefined}` still
+// falls back to the default exactly as a destructuring default would. Applied as
+// a merge rather than destructuring defaults, which would otherwise put nine
+// branches into the component's own complexity budget.
+const resolveProps = (props: BreadcrumbsProps): ResolvedBreadcrumbsProps =>
+  ({
+    ...BREADCRUMBS_DEFAULTS,
+    ...(Object.fromEntries(
+      Object.entries(props).filter(([, value]) => value !== undefined),
+    ) as Partial<BreadcrumbsProps>),
+  }) as ResolvedBreadcrumbsProps;
+
 export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
-  (
-    {
-      variant = 'default',
-      separatorType = 'default',
+  (componentProps, ref) => {
+    const {
+      variant,
+      separatorType,
       items,
       separator,
-      maxItems = 8,
-      showHomeIcon = true,
-      size = 'md',
-      color = 'default',
-      elevation = 1,
-      collapseBehavior = 'menu',
-      mobileMaxItems = 3,
+      maxItems,
+      showHomeIcon,
+      size,
+      color,
+      elevation,
+      collapseBehavior,
+      mobileMaxItems,
       ariaLabel,
       dataTestId,
       ...props
-    },
-    ref,
-  ) => {
+    } = resolveProps(componentProps);
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const finalSeparator = separator || getSeparator(separatorType);

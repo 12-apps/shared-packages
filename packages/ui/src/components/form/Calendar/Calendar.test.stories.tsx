@@ -19,6 +19,13 @@ const meta: Meta<typeof Calendar> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+// Pinned so the min/max assertions describe the same calendar whatever day the
+// suite runs on.
+const REFERENCE_DATE = new Date(2025, 5, 15); // 15 June 2025
+const DAY_MS = 24 * 60 * 60 * 1000;
+const daysFromReference = (days: number): Date =>
+  new Date(REFERENCE_DATE.getTime() + days * DAY_MS);
+
 // Test wrapper component for controlled state
 interface TestWrapperProps {
   selectionMode?: 'single' | 'range';
@@ -132,8 +139,10 @@ export const KeyboardNavigation: Story = {
     const calendar = canvas.getByRole('application', { name: 'Calendar' });
     expect(calendar).toBeInTheDocument();
 
-    // Focus the calendar
-    calendar.focus();
+    // Focus the calendar the way a user would, and confirm it took — the keyboard
+    // assertions below are meaningless if the container never held focus.
+    await userEvent.click(calendar);
+    await waitFor(() => expect(calendar).toHaveFocus());
 
     // Test arrow key navigation
     await userEvent.keyboard('{ArrowRight}');
@@ -198,7 +207,8 @@ export const FocusManagement: Story = {
     const calendar = canvas.getByRole('application', { name: 'Calendar' });
 
     // Focus should be managed properly
-    calendar.focus();
+    await userEvent.click(calendar);
+    await waitFor(() => expect(calendar).toHaveFocus());
 
     // Navigate and verify focus moves correctly
     await userEvent.keyboard('{ArrowRight}');
@@ -282,9 +292,9 @@ export const VisualStates: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <TestWrapper
-        value={new Date()}
-        minDate={new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)}
-        maxDate={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)}
+        value={REFERENCE_DATE}
+        minDate={daysFromReference(-7)}
+        maxDate={daysFromReference(7)}
       />
     </Box>
   ),
@@ -297,16 +307,13 @@ export const VisualStates: Story = {
 
     const dateButtons = canvas.getAllByRole('gridcell');
 
-    // Check for today's date styling
-    const todayButton = dateButtons.find(
-      (button) => button.getAttribute('aria-current') === 'date',
-    );
-    if (todayButton) {
-      const todayStyle = window.getComputedStyle(todayButton);
-      expect(todayStyle.fontWeight).toBe('700'); // bold
-    }
+    // The selected day carries its own marker. (Today's styling is not asserted
+    // here: the pinned reference date is not today, so no cell is aria-current.)
+    const selectedMarkers = canvas.getAllByTestId('calendar-selected-date');
+    expect(selectedMarkers.length).toBeGreaterThan(0);
 
-    // Check for disabled dates
+    // Everything more than a week either side of the reference date is out of
+    // bounds, so June has disabled cells at both ends.
     const disabledButtons = dateButtons.filter(
       (button) => button.getAttribute('aria-disabled') === 'true',
     );
@@ -314,13 +321,13 @@ export const VisualStates: Story = {
   },
 };
 
+// Multi-month rendering and navigation. This previously bracketed the queries
+// below with Date.now() and asserted wall-clock budgets, which measured the
+// machine rather than the component and could not meaningfully fail.
 export const PerformanceTest: Story = {
   render: () => <TestWrapper numberOfMonths={3} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-
-    // Measure rendering performance
-    const startTime = Date.now();
 
     const calendar = canvas.getByRole('application', { name: 'Calendar' });
     expect(calendar).toBeInTheDocument();
@@ -329,23 +336,15 @@ export const PerformanceTest: Story = {
     const grids = canvas.getAllByRole('grid');
     expect(grids).toHaveLength(3);
 
-    const endTime = Date.now();
-    const renderTime = endTime - startTime;
+    // Advancing moves every visible month along. The old lookup searched for an
+    // aria-label the buttons never had, so this branch never ran.
+    const headingBefore = canvas.getAllByTestId('calendar-header')[0]?.textContent;
+    await userEvent.click(canvas.getByTestId('calendar-next-month'));
 
-    // Rendering should be reasonably fast (less than 100ms for 3 months)
-    expect(renderTime).toBeLessThan(100);
-
-    // Test navigation performance
-    const navButtons = canvas.getAllByRole('button');
-    const nextButton = navButtons.find((btn) => btn.getAttribute('aria-label')?.includes('next'));
-
-    if (nextButton) {
-      const navigationStart = Date.now();
-      await userEvent.click(nextButton);
-      const navigationEnd = Date.now();
-
-      expect(navigationEnd - navigationStart).toBeLessThan(50);
-    }
+    await waitFor(() => {
+      const headingAfter = canvas.getAllByTestId('calendar-header')[0]?.textContent;
+      expect(headingAfter).not.toBe(headingBefore);
+    });
   },
 };
 

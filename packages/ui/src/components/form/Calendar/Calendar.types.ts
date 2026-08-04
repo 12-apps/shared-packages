@@ -63,6 +63,22 @@ export interface CalendarProps {
   dayClassName?: (args: DayRenderArgs) => string;
 }
 
+type CalendarDefaultedKeys =
+  | 'selectionMode'
+  | 'value'
+  | 'range'
+  | 'firstDayOfWeek'
+  | 'locale'
+  | 'showOutsideDays'
+  | 'minRangeLength'
+  | 'allowSameDayRange'
+  | 'autoFocus';
+
+// CalendarProps with the defaults already applied, plus the month count resolved
+// from numberOfMonths and the selection mode.
+export type ResolvedCalendarProps = CalendarProps &
+  Required<Pick<CalendarProps, CalendarDefaultedKeys>> & { monthsToShow: number };
+
 export interface MonthMatrixDay {
   date: Date;
   inCurrentMonth: boolean;
