@@ -108,7 +108,6 @@ packages/ui/src/components/layout/Skeleton/Skeleton.test.stories.tsx
 packages/ui/src/components/layout/Skeleton/Skeleton.tsx
 packages/ui/src/components/layout/Spacer/Spacer.test.stories.tsx
 packages/ui/src/components/navigation/ContextMenu/ContextMenu.tsx
-packages/ui/src/components/navigation/NavigationMenu/NavigationMenu.tsx
 packages/ui/src/components/navigation/Pagination/Pagination.test.stories.tsx
 packages/ui/src/components/navigation/Pagination/Pagination.tsx
 packages/ui/src/components/typography/Blockquote/Blockquote.test.stories.tsx
