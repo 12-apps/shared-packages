@@ -235,7 +235,7 @@ jobs:
           for dir in $PUBLISH_DIRS; do
             pkg="$(basename "$dir")"
             echo "::group::npm publish $pkg"
-            if ( cd "$dir" && npm publish --access restricted ) 2>&1 | tee -a publish.log; then
+            if ( cd "$dir" && npm publish --access public ) 2>&1 | tee -a publish.log; then
               echo "published $pkg"
             else
               grep -q "cannot publish over the previously published versions" publish.log \

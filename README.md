@@ -76,6 +76,11 @@ pnpm quality:all    # complexity, flakiness, duplication, quarantine, knip
 Packages are published to npm from `main` by semantic-release via OIDC trusted
 publishing — no token. See `.github/workflows/ci.yml`.
 
+They publish **public** (`publishConfig.access`), matching this repository. The
+seven published while it was private are still restricted on npm; their next
+release flips them, and a package's access covers every version it has, so the
+versions already up there become readable too.
+
 ### The first publish of a new package
 
 OIDC cannot make a package's first publish. A Trusted Publisher is configured

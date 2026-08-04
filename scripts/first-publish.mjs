@@ -33,10 +33,11 @@ function accessUrl(name) {
   return `https://www.npmjs.com/package/${name}/access`;
 }
 
-// These packages are RESTRICTED, so an unauthenticated read 404s identically
-// for "no such package" and "no access to it" — this answer is only trustworthy
-// because the step runs with NODE_AUTH_TOKEN set. Anything other than a 404 is
-// left to the caller rather than guessed at.
+// A 404 means the name is free. That reading needs the step to run with
+// NODE_AUTH_TOKEN set: the seven packages published before this repo went
+// public are still RESTRICTED on npm, and an unauthenticated read 404s on those
+// exactly as it does on a package that was never published. Anything other than
+// a 404 is left to the caller rather than guessed at.
 function isOnRegistry(name) {
   const { ok, output } = npm(["view", name, "version", `--registry=${REGISTRY}`]);
   if (ok) return true;
@@ -50,7 +51,7 @@ function firstPublish(dir) {
   const { name, version } = JSON.parse(readFileSync(manifest, "utf8"));
   if (isOnRegistry(name)) return null;
   console.log(`::group::first publish ${name}@${version}`);
-  const { ok, output } = npm(["publish", "--access", "restricted"], resolve(dir));
+  const { ok, output } = npm(["publish", "--access", "public"], resolve(dir));
   console.log(tail(output, 40));
   console.log("::endgroup::");
   if (!ok) throw new Error(`first publish of ${name} failed:\n${tail(output)}`);
