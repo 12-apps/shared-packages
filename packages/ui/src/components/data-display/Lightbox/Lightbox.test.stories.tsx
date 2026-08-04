@@ -488,11 +488,14 @@ export const EdgeCases: Story = {
         expect(lightbox).toBeInTheDocument();
       });
 
-      // Should not show navigation controls for empty gallery
-      const nextButton = document.querySelector('[aria-label="Next item"]');
-      const prevButton = document.querySelector('[aria-label="Previous item"]');
-      expect(nextButton).not.toBeInTheDocument();
-      expect(prevButton).not.toBeInTheDocument();
+      // The close button always renders, so waiting for it first means the
+      // absence checks below describe what an empty gallery omits, rather than
+      // passing because nothing had rendered yet.
+      await waitFor(() => {
+        expect(document.querySelector('[aria-label="Close lightbox"]')).toBeInTheDocument();
+        expect(document.querySelector('[aria-label="Next item"]')).not.toBeInTheDocument();
+        expect(document.querySelector('[aria-label="Previous item"]')).not.toBeInTheDocument();
+      });
     });
   },
 };
@@ -514,59 +517,49 @@ export const SingleImageGallery: Story = {
     });
 
     await step('Should not show navigation controls for single image', async () => {
-      const nextButton = document.querySelector('[aria-label="Next item"]');
-      const prevButton = document.querySelector('[aria-label="Previous item"]');
-
-      expect(nextButton).not.toBeInTheDocument();
-      expect(prevButton).not.toBeInTheDocument();
+      // The close button proves the overlay rendered, so the absences here are
+      // about what a one-item gallery omits rather than about timing.
+      await waitFor(() => {
+        expect(document.querySelector('[aria-label="Close lightbox"]')).toBeInTheDocument();
+        expect(document.querySelector('[aria-label="Next item"]')).not.toBeInTheDocument();
+        expect(document.querySelector('[aria-label="Previous item"]')).not.toBeInTheDocument();
+      });
     });
 
     await step('Should show correct counter for single image', async () => {
-      const counter = document.querySelector('[aria-live="polite"]');
-      expect(counter).not.toBeInTheDocument(); // No counter for single image
+      await waitFor(() => {
+        // No counter for single image
+        expect(document.querySelector('[aria-live="polite"]')).not.toBeInTheDocument();
+      });
     });
   },
 };
 
-// 11. Performance Tests
+// 11. Open and navigate.
+// The two steps below used to bracket their waitFor calls with Date.now() and
+// assert 2s/500ms budgets. Those measured the machine rather than the component,
+// and could not fail independently of the waitFor timeout that already bounds
+// each wait.
 export const Performance: Story = {
   render: () => <LightboxTestWrapper />,
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
-    await step('Should open lightbox quickly', async () => {
-      const startTime = Date.now();
-
+    await step('Should open lightbox', async () => {
       const openButton = canvas.getByTestId('open-lightbox');
       await userEvent.click(openButton);
 
       await waitFor(() => {
-        const lightbox = document.querySelector('[role="dialog"]');
-        expect(lightbox).toBeInTheDocument();
-
-        const endTime = Date.now();
-        const openTime = endTime - startTime;
-
-        // Should open within reasonable time (2 seconds)
-        expect(openTime).toBeLessThan(2000);
+        expect(document.querySelector('[role="dialog"]')).toBeInTheDocument();
       });
     });
 
-    await step('Should navigate between images smoothly', async () => {
-      const startTime = Date.now();
-
+    await step('Should navigate between images', async () => {
       const nextButton = document.querySelector('[aria-label="Next item"]');
       await userEvent.click(nextButton!);
 
       await waitFor(() => {
-        const image = document.querySelector('img[alt="Test Image 2"]');
-        expect(image).toBeInTheDocument();
-
-        const endTime = Date.now();
-        const navigateTime = endTime - startTime;
-
-        // Navigation should be fast (500ms)
-        expect(navigateTime).toBeLessThan(500);
+        expect(document.querySelector('img[alt="Test Image 2"]')).toBeInTheDocument();
       });
     });
   },

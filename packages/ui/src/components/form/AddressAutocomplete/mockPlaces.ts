@@ -10,8 +10,6 @@ export interface MockPrediction {
   types?: string[];
 }
 
-
-
 // Canned Places data so the component renders and is testable without a Google
 // Maps key.
 export const MOCK_ADDRESSES: MockPrediction[] = [
@@ -173,4 +171,38 @@ export const MOCK_PLACE_DETAILS: Record<string, MockPlaceDetails> = {
   },
 };
 
-// Styled components
+// Every word has to appear somewhere in the address, which is roughly how Google
+// treats a multi-word query.
+const matchesAllWords = (address: MockPrediction, searchTerm: string): boolean => {
+  const description = address.description.toLowerCase();
+  const mainText = address.structured_formatting.main_text.toLowerCase();
+  const secondaryText = address.structured_formatting.secondary_text?.toLowerCase() || '';
+
+  return searchTerm
+    .split(' ')
+    .every(
+      (word) =>
+        description.includes(word) || mainText.includes(word) || secondaryText.includes(word),
+    );
+};
+
+// Addresses whose street line starts with the query come first; the rest sort
+// alphabetically.
+const byRelevance =
+  (searchTerm: string) =>
+  (a: MockPrediction, b: MockPrediction): number => {
+    const aMain = a.structured_formatting.main_text.toLowerCase();
+    const bMain = b.structured_formatting.main_text.toLowerCase();
+
+    if (aMain.startsWith(searchTerm) && !bMain.startsWith(searchTerm)) return -1;
+    if (!aMain.startsWith(searchTerm) && bMain.startsWith(searchTerm)) return 1;
+    return aMain.localeCompare(bMain);
+  };
+
+export const searchMockAddresses = (input: string): MockPrediction[] => {
+  const searchTerm = input.toLowerCase().trim();
+
+  return MOCK_ADDRESSES.filter((address) => matchesAllWords(address, searchTerm)).sort(
+    byRelevance(searchTerm),
+  );
+};

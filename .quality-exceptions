@@ -39,11 +39,7 @@ packages/ui/src/components/data-display/HoverCard/HoverCard.test.stories.tsx
 packages/ui/src/components/data-display/HoverCard/HoverCard.tsx
 packages/ui/src/components/data-display/InteractiveTooltip/InteractiveTooltip.tsx
 packages/ui/src/components/data-display/LazyImage/LazyImage.tsx
-packages/ui/src/components/data-display/Lightbox/Lightbox.test.stories.tsx
-packages/ui/src/components/data-display/Lightbox/Lightbox.tsx
 packages/ui/src/components/data-display/LoadingState/LoadingState.tsx
-packages/ui/src/components/data-display/MapPreview/MapPreview.test.stories.tsx
-packages/ui/src/components/data-display/MapPreview/MapPreview.tsx
 packages/ui/src/components/data-display/Popover/Popover.test.stories.tsx
 packages/ui/src/components/data-display/Progress/Progress.test.stories.tsx
 packages/ui/src/components/data-display/Progress/Progress.tsx
@@ -61,11 +57,7 @@ packages/ui/src/components/feedback/Sonner/Sonner.test.stories.tsx
 packages/ui/src/components/feedback/StackedModal/StackedModal.test.stories.tsx
 packages/ui/src/components/feedback/Toast/Toast.test.stories.tsx
 packages/ui/src/components/feedback/TutorialOverlay/TutorialOverlay.test.stories.tsx
-packages/ui/src/components/form/AddressAutocomplete/AddressAutocomplete.test.stories.tsx
-packages/ui/src/components/form/AddressAutocomplete/AddressAutocomplete.tsx
 packages/ui/src/components/form/Button/Button.tsx
-packages/ui/src/components/form/Calendar/Calendar.test.stories.tsx
-packages/ui/src/components/form/Calendar/Calendar.tsx
 packages/ui/src/components/form/Checkbox/Checkbox.tsx
 packages/ui/src/components/form/CodeEditor/CodeEditor.test.stories.tsx
 packages/ui/src/components/form/Command/Command.tsx

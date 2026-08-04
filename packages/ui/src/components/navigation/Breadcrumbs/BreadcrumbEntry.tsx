@@ -206,6 +206,38 @@ const EllipsisCrumb: React.FC<{ label: string; dataTestId?: string }> = ({
           </Tooltip>
 );
 
+// The same conditional test id was written at each crumb variant.
+const makeTestId =
+  (dataTestId?: string) =>
+  (suffix: string): string =>
+    dataTestId ? `${dataTestId}-${suffix}` : `breadcrumbs-${suffix}`;
+
+const ClickableCrumb: React.FC<{
+  item: BreadcrumbItem;
+  index: number;
+  icon: React.ReactNode;
+  size: string;
+  variant: string;
+  isActive: boolean;
+  testId: (suffix: string) => string;
+}> = ({ item, index, icon, size, variant, isActive, testId }) => (
+  <Tooltip title={item.tooltip || item.label} arrow disableHoverListener={!item.tooltip}>
+    <BreadcrumbLink
+      href={item.href || '#'}
+      onClick={item.onClick}
+      size={size}
+      visualStyle={variant}
+      active={isActive}
+      underline="none"
+      aria-label={item.ariaLabel || item.label}
+      data-testid={testId(`link-${index}`)}
+    >
+      {icon}
+      <span>{item.label}</span>
+    </BreadcrumbLink>
+  </Tooltip>
+);
+
 // One crumb: the collapsed-menu stand-in, the ellipsis, the active tail item or
 // a plain link.
 export const BreadcrumbEntry: React.FC<{
@@ -233,65 +265,57 @@ export const BreadcrumbEntry: React.FC<{
   variant,
   dataTestId,
 }) => {
+  const testId = makeTestId(dataTestId);
+  const isLast = index === itemCount - 1;
+  // The tail crumb is the current page unless it is the ellipsis placeholder.
+  const isActive = item.active || (isLast && !item.isEllipsis);
 
-          const isFirst = index === 0;
-          const isLast = index === itemCount - 1;
-          const isActive = item.active || (isLast && !item.isEllipsis);
-          const isEllipsis = item.isEllipsis;
+  const isCollapsePoint =
+    index === 1 && collapsedItems.length > 0 && collapseBehavior === 'menu';
 
-          if (index === 1 && collapsedItems.length > 0 && collapseBehavior === 'menu') {
+  if (isCollapsePoint) {
     return (
-      <React.Fragment key="collapsed">
-        <CollapsedMenu items={collapsedItems} size={size} visualStyle={variant} dataTestId={dataTestId} />
+      <>
+        <CollapsedMenu
+          items={collapsedItems}
+          size={size}
+          visualStyle={variant}
+          dataTestId={dataTestId}
+        />
         {separator}
-      </React.Fragment>
+      </>
     );
   }
 
-  if (isEllipsis) {
+  if (item.isEllipsis) {
     return <EllipsisCrumb label={item.label} dataTestId={dataTestId} />;
   }
 
-  const icon = crumbIcon({ item, isFirst, showHomeIcon, iconSize });
+  const icon = crumbIcon({ item, isFirst: index === 0, showHomeIcon, iconSize });
 
-  // Render active/last item
-          if (isActive) {
-            return (
-              <BreadcrumbText
-                key={index}
-                size={size}
-                visualStyle={variant}
-                aria-current="page"
-                data-testid={dataTestId ? `${dataTestId}-item-${index}` : `breadcrumbs-item-${index}`}
-              >
-                {icon}
-                <span>{item.label}</span>
-              </BreadcrumbText>
-            );
-          }
+  if (isActive) {
+    return (
+      <BreadcrumbText
+        size={size}
+        visualStyle={variant}
+        aria-current="page"
+        data-testid={testId(`item-${index}`)}
+      >
+        {icon}
+        <span>{item.label}</span>
+      </BreadcrumbText>
+    );
+  }
 
-          // Render clickable breadcrumb
-          return (
-            <Tooltip
-              key={index}
-              title={item.tooltip || item.label}
-              arrow
-              disableHoverListener={!item.tooltip}
-            >
-              <BreadcrumbLink
-                href={item.href || '#'}
-                onClick={item.onClick}
-                size={size}
-                visualStyle={variant}
-                active={isActive}
-                underline="none"
-                aria-label={item.ariaLabel || item.label}
-                data-testid={dataTestId ? `${dataTestId}-link-${index}` : `breadcrumbs-link-${index}`}
-              >
-                {icon}
-                <span>{item.label}</span>
-              </BreadcrumbLink>
-            </Tooltip>
-          );
-        
+  return (
+    <ClickableCrumb
+      item={item}
+      index={index}
+      icon={icon}
+      size={size}
+      variant={variant}
+      isActive={isActive}
+      testId={testId}
+    />
+  );
 };
