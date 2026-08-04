@@ -1,6 +1,7 @@
 import type { SxProps, Theme } from '@mui/material';
 import { alpha, keyframes } from '@mui/material';
 
+import { dynamicViewportHeight } from '../../../utils/viewport';
 import type { DialogProps } from './Dialog.types';
 
 /**
@@ -133,7 +134,8 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
         borderRadius: 0,
         margin: 0,
         width: '100vw',
-        height: '100vh',
+        // `100dvh`, not `100vh` — see `dynamicViewportHeight`.
+        ...dynamicViewportHeight('height'),
         maxWidth: 'none',
         maxHeight: 'none',
         ...decorations,
@@ -144,7 +146,7 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
         borderRadius: `${radius}px 0 0 ${radius}px`,
         margin: 0,
         width: maxWidthOf(opts.size),
-        height: '100vh',
+        ...dynamicViewportHeight('height'),
         maxHeight: 'none',
         position: 'absolute' as const,
         right: 0,

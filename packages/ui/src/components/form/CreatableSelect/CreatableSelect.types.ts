@@ -32,6 +32,11 @@ export interface CreatableSelectProps {
   loading?: boolean;
   /** Stretch to the container width (default: true). */
   fullWidth?: boolean;
+  /**
+   * Control height, matching {@link Input}'s scale so the two line up when they
+   * share a grid row (default: `md`).
+   */
+  size?: 'sm' | 'md';
   /** Base test id; the input is `<dataTestId>-input`. */
   dataTestId?: string;
 }

@@ -1,4 +1,4 @@
-import { Close } from '@mui/icons-material';
+import Close from '@mui/icons-material/Close';
 import { alpha,Box, Drawer as MuiDrawer, IconButton, Typography, useTheme } from '@mui/material';
 import React from 'react';
 

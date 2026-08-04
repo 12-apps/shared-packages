@@ -1,3 +1,4 @@
+export * from './ConfirmAction';
 export * from './Dialog';
 export * from './Modal';
 export * from './Sonner';

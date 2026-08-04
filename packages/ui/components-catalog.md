@@ -186,6 +186,13 @@ Components for displaying data, visualizations, and information to users.
 **Location**: `src/components/data-display/Sheet`
 **Docs**: `src/components/data-display/Sheet/Sheet.md`
 
+### StatCard
+**Purpose**: Display one KPI figure with its period-over-period change
+**Use Cases**: Dashboard KPI rows, summary bands above a table, report headers
+**Features**: Pre-formatted label/value, optional delta with independent arrow direction and semantic tone (so rising cost reads negative), optional icon + hint, loading skeletons, `role="group"` with a localizable screen-reader sentence
+**Location**: `src/components/data-display/StatCard`
+**Docs**: `src/components/data-display/StatCard/StatCard.md`
+
 ### Stepper
 **Purpose**: Display progress through multi-step processes
 **Use Cases**: Wizards, checkout flows, onboarding processes

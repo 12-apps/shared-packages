@@ -1,15 +1,13 @@
-import {
-  Code,
-  FormatBold,
-  FormatColorFill,
-  FormatColorText,
-  FormatItalic,
-  FormatListBulleted,
-  FormatListNumbered,
-  FormatQuote,
-  FormatUnderlined,
-  Link,
-} from '@mui/icons-material';
+import Code from '@mui/icons-material/Code';
+import FormatBold from '@mui/icons-material/FormatBold';
+import FormatColorFill from '@mui/icons-material/FormatColorFill';
+import FormatColorText from '@mui/icons-material/FormatColorText';
+import FormatItalic from '@mui/icons-material/FormatItalic';
+import FormatListBulleted from '@mui/icons-material/FormatListBulleted';
+import FormatListNumbered from '@mui/icons-material/FormatListNumbered';
+import FormatQuote from '@mui/icons-material/FormatQuote';
+import FormatUnderlined from '@mui/icons-material/FormatUnderlined';
+import Link from '@mui/icons-material/Link';
 import {
   alpha,
   Box,

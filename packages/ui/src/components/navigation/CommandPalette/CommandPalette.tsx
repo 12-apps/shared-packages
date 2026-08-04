@@ -1,9 +1,7 @@
-import {
-  Close as CloseIcon,
-  History as RecentIcon,
-  KeyboardReturn as EnterIcon,
-  Search as SearchIcon,
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import RecentIcon from '@mui/icons-material/History';
+import EnterIcon from '@mui/icons-material/KeyboardReturn';
+import SearchIcon from '@mui/icons-material/Search';
 import {
   alpha,
   Box,

@@ -1,4 +1,8 @@
-import { CheckCircle, Close,Error, Info, Warning } from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Close from '@mui/icons-material/Close';
+import Error from '@mui/icons-material/Error';
+import Info from '@mui/icons-material/Info';
+import Warning from '@mui/icons-material/Warning';
 import {
   Alert as MuiAlert,
   AlertTitle,

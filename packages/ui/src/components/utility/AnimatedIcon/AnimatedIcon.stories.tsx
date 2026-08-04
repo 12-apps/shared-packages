@@ -1,24 +1,22 @@
-import {
-  AccountCircle,
-  AutoAwesome,
-  Bolt,
-  Diamond,
-  Download,
-  Favorite,
-  FlashOn,
-  Home,
-  Lens,
-  Lightbulb,
-  Notifications,
-  Psychology,
-  Refresh,
-  Rocket,
-  Search,
-  Settings,
-  Star,
-  Upload,
-  Waves,
-} from '@mui/icons-material';
+import AccountCircle from '@mui/icons-material/AccountCircle';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import Bolt from '@mui/icons-material/Bolt';
+import Diamond from '@mui/icons-material/Diamond';
+import Download from '@mui/icons-material/Download';
+import Favorite from '@mui/icons-material/Favorite';
+import FlashOn from '@mui/icons-material/FlashOn';
+import Home from '@mui/icons-material/Home';
+import Lens from '@mui/icons-material/Lens';
+import Lightbulb from '@mui/icons-material/Lightbulb';
+import Notifications from '@mui/icons-material/Notifications';
+import Psychology from '@mui/icons-material/Psychology';
+import Refresh from '@mui/icons-material/Refresh';
+import Rocket from '@mui/icons-material/Rocket';
+import Search from '@mui/icons-material/Search';
+import Settings from '@mui/icons-material/Settings';
+import Star from '@mui/icons-material/Star';
+import Upload from '@mui/icons-material/Upload';
+import Waves from '@mui/icons-material/Waves';
 import { Box, Chip,Grid, Paper, Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';

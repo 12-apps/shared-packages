@@ -1,0 +1,400 @@
+import type { SettlementHints } from './settlement-hints';
+
+export type { SettlementHints };
+/** The probe verdict types, re-exported so `core/types` stays the one door. */
+export type { ProbeFault, ProbeOutcome } from './probe';
+/**
+ * Domain types for the vendor-agnostic payments core.
+ *
+ * Everything a host app or a provider adapter exchanges goes through THESE
+ * shapes — provider payloads never leak past an adapter boundary (they are
+ * kept only as `raw` for audit). Amounts are integer minor units (cents),
+ * matching the repo-wide "integer cents" house rule; there is no float money
+ * anywhere in this package.
+ */
+
+/**
+ * Open set of provider identifiers. Adapters self-describe their name; the
+ * registry narrows it to a literal union per host (see `registry.ts`), so a
+ * typo'd provider name fails typecheck in the host rather than at runtime.
+ */
+export type ProviderName = string;
+
+/** Which credential set / API host an operation runs against. */
+export type PaymentEnvironment = 'SANDBOX' | 'PRODUCTION';
+
+/**
+ * How the buyer pays. A closed union on purpose: hosts switch on it for UI
+ * and adapters declare which kinds they support via capabilities. Growing it
+ * is additive (adapters that don't list a kind simply never receive it).
+ */
+export type PaymentMethodKind = 'PIX' | 'CARD' | 'BOLETO';
+
+/**
+ * Normalized charge lifecycle. Every provider's status vocabulary is mapped
+ * into this set by its adapter — hosts never branch on provider-specific
+ * strings.
+ *
+ *   PENDING     created, awaiting payer action (PIX not yet paid, boleto open)
+ *   AUTHORIZED  card authorized but not captured
+ *   PAID        funds confirmed
+ *   DECLINED    provider refused (see `declineReason`)
+ *   CANCELED    voided before payment
+ *   EXPIRED     payer window elapsed (PIX QR / boleto due date)
+ *   REFUNDED    fully returned after payment
+ *   PARTIALLY_REFUNDED  some amount returned, remainder kept
+ */
+export type ChargeStatus =
+  | 'PENDING'
+  | 'AUTHORIZED'
+  | 'PAID'
+  | 'DECLINED'
+  | 'CANCELED'
+  | 'EXPIRED'
+  | 'REFUNDED'
+  | 'PARTIALLY_REFUNDED';
+
+/** Integer minor units + ISO-4217 currency. Never floats. */
+export interface Money {
+  amountCents: number;
+  /** ISO 4217, e.g. 'BRL'. */
+  currency: string;
+}
+
+/**
+ * WHO is receiving the money for a given operation. This is the seam that
+ * makes the library bidirectional:
+ *
+ *   - `PLATFORM` — the platform itself is the merchant (you charging your
+ *     tenants: subscriptions, plan upgrades). Credentials come from the
+ *     platform's own provider account.
+ *   - `TENANT` — a tenant of the platform is the merchant (your customers
+ *     charging THEIR buyers). Credentials come from that tenant's connected
+ *     provider account, so funds land in the tenant's wallet, not yours.
+ *
+ * The core never hardcodes either direction; the host's `CredentialStore`
+ * resolves a `MerchantRef` to whatever credential rows it keeps.
+ */
+export interface MerchantRef {
+  kind: 'PLATFORM' | 'TENANT';
+  /** Platform id (any stable constant) or the tenant/client id. */
+  id: string;
+}
+
+/** Buyer identity an adapter forwards to the provider. */
+export interface CustomerInfo {
+  name: string;
+  email: string;
+  /** CPF/CNPJ digits (Brazilian providers require it); optional elsewhere. */
+  taxId?: string;
+  phone?: string;
+}
+
+/**
+ * Card payment details. Only tokens/ciphertexts ever transit here — a raw PAN
+ * must never reach this library. Which token flavor applies depends on the
+ * provider's `clientTokenization` capability (public-key encryption blob,
+ * SDK-minted token, or a saved-card vault token).
+ */
+export interface CardDetails {
+  /** One-time token or encrypted card blob minted client-side. */
+  token?: string;
+  /** Provider vault token of a previously saved card. */
+  savedCardToken?: string;
+  /**
+   * The provider-side CUSTOMER the vaulted instrument hangs off, where the
+   * provider scopes its vault that way. Stripe does — a `pm_…` is attached to
+   * a `cus_…` and charging it without naming the customer is rejected — while
+   * PagBank's card ids are merchant-global and need none. Adapters take it
+   * only if their vault requires it.
+   */
+  customerRef?: string;
+  /**
+   * MERCHANT-INITIATED: a subsequent charge in an agreed series, raised with
+   * no cardholder present (a subscription cycle falling due).
+   *
+   * It has to be declared rather than inferred, because the card schemes treat
+   * it as a different transaction: the issuer sees no authentication and, told
+   * nothing, is entitled to decline for exactly that reason. Naming it is what
+   * carries the stored-credential agreement, and it is also what waives the
+   * customer-present authentication a scheduled job could never satisfy.
+   *
+   *   Stripe   `off_session: true`
+   *   PagBank  `recurring: { type: 'SUBSEQUENT' }`
+   */
+  merchantInitiated?: boolean;
+  /** 1..12 installments; adapters clamp to what the provider supports. */
+  installments?: number;
+  /** Cardholder name as typed at checkout (some providers require it). */
+  holder?: string;
+  /**
+   * Which provider the bare instrument above was minted for. A card token is
+   * always provider-bound (see `core/card-instrument.ts`), so the gateway has
+   * to know whose it is. Defaults to the head of the merchant's chain.
+   */
+  tokenProvider?: ProviderName;
+  /**
+   * Instruments minted per provider — what makes CARD failover possible at
+   * all. Without it a card charge is attemptable only on its own provider and
+   * the gateway skips the rest rather than send a token that cannot work.
+   */
+  tokensByProvider?: Record<ProviderName, string>;
+}
+
+/** Everything needed to create a charge, provider-agnostically. */
+export interface ChargeInput {
+  /**
+   * Host-side reference (e.g. the order id). Sent to the provider as its
+   * reference/external id so provider dashboards correlate back to the host.
+   */
+  reference: string;
+  amount: Money;
+  method: PaymentMethodKind;
+  customer: CustomerInfo;
+  card?: CardDetails;
+  pix?: { expiresInSeconds?: number };
+  boleto?: { dueDate?: string };
+  /** Free-form pairs forwarded to the provider where supported. */
+  metadata?: Record<string, string>;
+  /**
+   * Caller-supplied retry key (e.g. `${orderId}:${attempt}`), scoped to the
+   * charging merchant. The gateway uses it to return the SAME stored charge
+   * on a retried call, and adapters forward it to providers with native
+   * idempotency support (e.g. Stripe's `Idempotency-Key` header) so even a
+   * race that reaches the provider twice cannot double-charge.
+   */
+  idempotencyKey?: string;
+}
+
+/** Normalized decline taxonomy (superset of common acquirer reasons). */
+export type DeclineReason =
+  | 'INSUFFICIENT_FUNDS'
+  | 'CARD_DECLINED'
+  | 'INVALID_CARD'
+  | 'EXPIRED_CARD'
+  | 'FRAUD_SUSPECTED'
+  | 'PROVIDER_ERROR'
+  | 'UNKNOWN';
+
+/**
+ * The normalized view of a charge as the provider reports it — returned by
+ * `createCharge`/`getCharge` and rebuilt from webhooks. This is what hosts
+ * persist and render; `raw` carries the verbatim provider payload for audit
+ * only.
+ */
+export interface ChargeSnapshot {
+  provider: ProviderName;
+  /** The provider's id for this charge — the cross-system idempotency key. */
+  providerChargeId: string;
+  /**
+   * OUR reference (the order id), echoed back by the provider — the only field
+   * here that can name the thing being paid for.
+   *
+   * `providerChargeId` cannot: what it means is a per-vendor accident (unique
+   * per charge for PagBank/Stripe/Stone, EQUAL to this reference for
+   * InfinitePay). A core that resolves orders through it is correct only while
+   * vendors mint fresh ids; the first one that doesn't makes every attempt on
+   * an order collide, and the order can then never be settled or re-paid. That
+   * took a store's checkout down for a week.
+   *
+   * Every adapter already SENDS it (`reference_id`, `code`, `order_nsu`,
+   * `metadata.reference`); `__tests__/snapshot-reference.test.ts` is where a new
+   * provider finds out it must echo it back. Optional, because a payload may
+   * omit it — callers then fall back to the `(provider, providerChargeId)`
+   * lookup, exactly today's behaviour.
+   */
+  reference?: string;
+  status: ChargeStatus;
+  amount: Money;
+  method: PaymentMethodKind;
+  /** Present for PIX charges: what the buyer scans/copies. */
+  pix?: { qrText: string; qrImageUrl?: string; expiresAt?: string };
+  /** Present for boleto charges. */
+  boleto?: { barcode?: string; documentUrl?: string; dueDate?: string };
+  /** Present for card charges. */
+  card?: { brand?: string; last4?: string; authorizationCode?: string };
+  /**
+   * Present when the provider runs a redirect/hosted checkout (e.g.
+   * InfinitePay checkout links): send the buyer here instead of rendering a
+   * native form.
+   */
+  hostedCheckoutUrl?: string;
+  /**
+   * Correlation the provider DEMANDS back when asked whether this charge
+   * settled, and that only THIS response carries ({@link SettlementHints}).
+   */
+  settlementHints?: SettlementHints;
+  declineReason?: DeclineReason;
+  /**
+   * The provider's OWN verdict on whether another attempt with the same
+   * instrument could ever succeed — PagBank's "Retentável" column, Stripe's
+   * documented next-step per decline code. Undefined when the provider offers
+   * no such guidance.
+   *
+   * Separate from {@link declineReason} because the two answer different
+   * questions and the reason cannot carry both: a malformed request and a
+   * cancelled recurring mandate are terminal for completely different causes,
+   * and a seven-value taxonomy has to flatten one of them into a lie. A caller
+   * retrying on a timer reads THIS; a caller writing a message to a human
+   * reads the reason.
+   */
+  declineRetriable?: boolean;
+  /** Verbatim provider payload, for audit/debugging. Never branch on it. */
+  raw?: unknown;
+}
+
+/** Refund request against a previously paid charge. */
+export interface RefundInput {
+  providerChargeId: string;
+  /** Omit for a full refund; set for partial (capability-gated). */
+  amount?: Money;
+  reason?: string;
+}
+
+export interface RefundSnapshot {
+  provider: ProviderName;
+  providerChargeId: string;
+  providerRefundId: string;
+  status: 'PENDING' | 'REFUNDED' | 'FAILED';
+  amount: Money;
+  raw?: unknown;
+}
+
+/**
+ * How card data gets from the buyer's browser to the provider without
+ * touching the host's servers:
+ *
+ *   NONE        no client-side step (PIX/boleto only, or hosted checkout)
+ *   PUBLIC_KEY  encrypt the card in-browser with the provider's public key
+ *   SDK         load the provider's JS SDK / elements to mint a token
+ *   REDIRECT    hosted checkout page; no card data in the host at all
+ */
+export type ClientTokenization = 'NONE' | 'PUBLIC_KEY' | 'SDK' | 'REDIRECT';
+
+/**
+ * What a provider adapter can actually do. The gateway consults this BEFORE
+ * calling an adapter, so "provider X can't do boleto" is a typed, uniform
+ * `UnsupportedOperationError` — not a provider 400 with a vendor-specific
+ * message.
+ */
+export interface ProviderCapabilities {
+  methods: readonly PaymentMethodKind[];
+  savedCards: boolean;
+  refunds: boolean;
+  partialRefunds: boolean;
+  /** Marketplace-style split of one charge across recipients. */
+  splits: boolean;
+  webhooks: boolean;
+  tokenization: ClientTokenization;
+  /**
+   * A browser can mint a card token for this provider, so the R$0,01
+   * activation charge (FUT-463) is actually runnable.
+   *
+   * Separate from {@link tokenization} because that field does not answer the
+   * question: PagBank and Stone both report `PUBLIC_KEY` while speaking
+   * different protocols, and Stripe reports `SDK` with no client integration
+   * written. Gating activation on `tokenization` alone bricked three providers
+   * — the charge was required to enable them and there was no way to make it.
+   *
+   * Optional and defaulting to FALSE at the gate: a new adapter cannot be
+   * accidentally held to a proof it has no means of producing.
+   */
+  activationCharge?: boolean;
+}
+
+/**
+ * A resolved credential set for one (merchant, provider, environment). The
+ * `fields` keys correspond to the adapter's `credentialSchema`. Produced by
+ * the host's `CredentialStore` — the core never reads env vars or a database
+ * itself.
+ */
+export interface ResolvedCredentials {
+  environment: PaymentEnvironment;
+  fields: Record<string, string>;
+  /**
+   * When true the adapter must not call the real provider: it returns
+   * deterministic fake results so local dev / CI run with no network and no
+   * real account (mirrors the existing PagBank integration's stub mode).
+   */
+  stub?: boolean;
+}
+
+/**
+ * How a merchant CONNECTS a provider:
+ *
+ *   credentials  the merchant pastes API keys into a form (PagBank token,
+ *                Stripe secret key) — the shape `credentialSchema` describes
+ *   oauth        the merchant clicks "connect" and authorizes the platform
+ *                on the provider's own site (Stripe Connect, PagBank
+ *                Connect); the platform holds application-level client
+ *                credentials and stores per-merchant tokens that EXPIRE
+ *
+ * An adapter may support both — OAuth as the happy path with manual token
+ * entry as a fallback. Adapters that omit `authMode` are `credentials`.
+ */
+export type ProviderAuthMode = 'credentials' | 'oauth';
+
+/** Where to send the merchant to authorize, plus the CSRF state to echo. */
+export interface OAuthAuthorizeRequest {
+  url: string;
+  state: string;
+}
+
+/**
+ * Tokens returned by an OAuth exchange or refresh. `expiresAt` is what makes
+ * proactive refresh possible — it is stored in its own queryable column, not
+ * buried in the encrypted blob.
+ */
+export interface OAuthTokens {
+  fields: Record<string, string>;
+  expiresAt?: Date | null;
+}
+
+/**
+ * The provider ONBOARDING descriptors — how a merchant connects an account,
+ * not how money moves. They live in their own module and are re-exported here
+ * so every consumer keeps importing them from `core/types`, which is the only
+ * path any adapter or host has ever used.
+ */
+export type {
+  CredentialFieldSpec, OnboardingStage, ProviderSetupGuide, SetupCopy, SetupGuideContext,
+  SetupLink, SetupProgress, SetupSection, SetupStep,
+} from './setup-guide-types';
+
+/**
+ * Vaulting descriptors — saving an instrument for later off-session use. Their
+ * own module for the same reason as the setup-guide types, and re-exported
+ * here so adapters and hosts keep importing from `core/types`.
+ */
+export type {
+  VaultBeginInput,
+  VaultCompleteInput,
+  VaultedInstrument,
+  VaultForgetInput,
+  VaultSession,
+} from './vault-types';
+
+/** An inbound webhook delivery exactly as the HTTP layer received it. */
+export interface WebhookDelivery {
+  provider: ProviderName;
+  /** Raw body BYTES-as-string — signature checks need the unparsed body. */
+  rawBody: string;
+  /** Lower-cased header map. */
+  headers: Record<string, string>;
+}
+
+/** Normalized event an adapter extracts from a verified webhook delivery. */
+export interface NormalizedWebhookEvent {
+  provider: ProviderName;
+  /**
+   * Provider-side unique id for THIS delivery/event — the inbox dedup key. A
+   * provider that lacks one should hash the raw body.
+   */
+  eventId: string;
+  type: 'CHARGE_UPDATED' | 'REFUND_UPDATED' | 'UNKNOWN';
+  /** Present when the event carries a charge state change. */
+  charge?: ChargeSnapshot;
+  /** Present when the event carries a refund state change. */
+  refund?: RefundSnapshot;
+  raw?: unknown;
+}

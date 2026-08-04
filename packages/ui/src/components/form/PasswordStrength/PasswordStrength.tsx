@@ -1,10 +1,8 @@
-import {
-  CheckCircle as SuccessIcon,
-  Security as SecurityIcon,
-  Warning as WarningIcon,
-  Check as CheckIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
+import SuccessIcon from '@mui/icons-material/CheckCircle';
+import SecurityIcon from '@mui/icons-material/Security';
+import WarningIcon from '@mui/icons-material/Warning';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
 
 import {
   alpha,

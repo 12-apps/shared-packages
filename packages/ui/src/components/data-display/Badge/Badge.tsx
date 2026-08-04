@@ -1,4 +1,4 @@
-import { Close as CloseIcon } from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
 import { alpha, Badge as MuiBadge, IconButton, keyframes, Zoom } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
 import { styled } from '@mui/material/styles';

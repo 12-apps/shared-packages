@@ -1,12 +1,10 @@
-import {
-  Dashboard,
-  Email,
-  Home,
-  Notifications,
-  Person,
-  Security,
-  Settings,
-} from '@mui/icons-material';
+import Dashboard from '@mui/icons-material/Dashboard';
+import Email from '@mui/icons-material/Email';
+import Home from '@mui/icons-material/Home';
+import Notifications from '@mui/icons-material/Notifications';
+import Person from '@mui/icons-material/Person';
+import Security from '@mui/icons-material/Security';
+import Settings from '@mui/icons-material/Settings';
 import { Box, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';

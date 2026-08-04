@@ -1,26 +1,24 @@
-import {
-  Analytics,
-  BugReport,
-  Cancel,
-  CheckCircle,
-  Code,
-  Dashboard,
-  Edit,
-  Email,
-  Error,
-  Info,
-  LocationOn,
-  Notifications,
-  Palette,
-  Person,
-  Phone,
-  PieChart,
-  Save,
-  Security,
-  Settings,
-  Timeline,
-  Warning,
-} from '@mui/icons-material';
+import Analytics from '@mui/icons-material/Analytics';
+import BugReport from '@mui/icons-material/BugReport';
+import Cancel from '@mui/icons-material/Cancel';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Code from '@mui/icons-material/Code';
+import Dashboard from '@mui/icons-material/Dashboard';
+import Edit from '@mui/icons-material/Edit';
+import Email from '@mui/icons-material/Email';
+import Error from '@mui/icons-material/Error';
+import Info from '@mui/icons-material/Info';
+import LocationOn from '@mui/icons-material/LocationOn';
+import Notifications from '@mui/icons-material/Notifications';
+import Palette from '@mui/icons-material/Palette';
+import Person from '@mui/icons-material/Person';
+import Phone from '@mui/icons-material/Phone';
+import PieChart from '@mui/icons-material/PieChart';
+import Save from '@mui/icons-material/Save';
+import Security from '@mui/icons-material/Security';
+import Settings from '@mui/icons-material/Settings';
+import Timeline from '@mui/icons-material/Timeline';
+import Warning from '@mui/icons-material/Warning';
 import {
   Avatar,
   Box,

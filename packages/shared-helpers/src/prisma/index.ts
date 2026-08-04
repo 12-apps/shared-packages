@@ -28,13 +28,27 @@ export type { PrismaClient } from '@prisma/client';
 
 import type { Prisma, PrismaClient } from '@prisma/client';
 
+import { applyAppendOnlyGuard } from './append-only-extension';
 import { applyAuditStamps } from './audit-extension';
+
+// Append-only guard for the audit log (FUT-209): mutating the AuditLog model
+// throws. Re-exported so tests can assert on the error type.
+export { AppendOnlyViolationError } from './append-only-extension';
 
 // Change-attribution context helpers (FUT-168): the auth layer calls `setActor`
 // once a request is authorized; the audit extension applied below reads it to
 // stamp created_by/updated_by. Re-exported here so consumers import them from
 // the same `@12-apps/shared-helpers/prisma` entry point as `getPrismaClient`.
-export { getActorUserId, runWithActor, setActor, type ActorContext } from './actor-context';
+export {
+  getActorAttribution,
+  getActorUserId,
+  runWithActor,
+  runWithActorScope,
+  setActor,
+  type ActorAttribution,
+  type ActorAttributionSnapshot,
+  type ActorContext,
+} from './actor-context';
 export { normalizeSearchText } from './search-normalize';
 
 // The singleton and its in-flight init promise live on `globalThis` so that
@@ -137,7 +151,9 @@ const createPgliteClient = async (dataDir?: string): Promise<PrismaClient> => {
   const adapter = new PrismaPGlite(
     client,
   ) as Prisma.PrismaClientOptions['adapter'];
-  return applyAuditStamps(new GeneratedPrismaClient({ adapter, log: prismaLog() }));
+  return applyAppendOnlyGuard(
+    applyAuditStamps(new GeneratedPrismaClient({ adapter, log: prismaLog() })),
+  );
 };
 
 /** Build the default PostgreSQL-backed `PrismaClient` (real / production DB). */
@@ -159,7 +175,9 @@ const createPostgresClient = async (): Promise<PrismaClient> => {
   const adapter = new PrismaPg({
     connectionString,
   }) as Prisma.PrismaClientOptions['adapter'];
-  return applyAuditStamps(new GeneratedPrismaClient({ adapter, log: prismaLog() }));
+  return applyAppendOnlyGuard(
+    applyAuditStamps(new GeneratedPrismaClient({ adapter, log: prismaLog() })),
+  );
 };
 
 /**

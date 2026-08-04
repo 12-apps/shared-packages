@@ -1,12 +1,10 @@
-import {
-  CheckCircle,
-  Mail,
-  Notifications,
-  Person,
-  Settings,
-  ShoppingCart,
-  Star,
-} from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Mail from '@mui/icons-material/Mail';
+import Notifications from '@mui/icons-material/Notifications';
+import Person from '@mui/icons-material/Person';
+import Settings from '@mui/icons-material/Settings';
+import ShoppingCart from '@mui/icons-material/ShoppingCart';
+import Star from '@mui/icons-material/Star';
 import { Box, Button, IconButton } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';

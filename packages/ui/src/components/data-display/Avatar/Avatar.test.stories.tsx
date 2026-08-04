@@ -1,4 +1,4 @@
-import { Person } from '@mui/icons-material';
+import Person from '@mui/icons-material/Person';
 import { Box,Stack } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';

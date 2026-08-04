@@ -1,0 +1,51 @@
+{
+  "name": "@12-apps/jobs",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Generic background-job library: a typed job registry with retries, exponential backoff and cron schedules, behind a swappable driver port (BullMQ/Redis in production, inline execution in tests). Framework-free; knows nothing about the host app's domain, ORM or transport.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./bullmq": "./src/drivers/bullmq.ts",
+    "./inline": "./src/drivers/inline.ts"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "bullmq": "^5.81.2"
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/jobs"
+  },
+  "files": [
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md"
+  ]
+}

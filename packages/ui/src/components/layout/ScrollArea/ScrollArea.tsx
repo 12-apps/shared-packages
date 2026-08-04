@@ -1,4 +1,4 @@
-import { KeyboardArrowUp } from '@mui/icons-material';
+import KeyboardArrowUp from '@mui/icons-material/KeyboardArrowUp';
 import { alpha, Box, CircularProgress,Fab, useTheme, Zoom } from '@mui/material';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
 

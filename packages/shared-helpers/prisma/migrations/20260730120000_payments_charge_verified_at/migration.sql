@@ -1,0 +1,23 @@
+-- @12-apps/payments-backend owned migration: record when a REAL charge last
+-- succeeded, so activation can be earned instead of asserted (FUT-463).
+--
+-- `last_verified_at` cannot answer this. It is stamped by the credential
+-- PROBE, and the probe only asks "do these keys authenticate" — a PagBank
+-- Connect grant answers yes while refusing every real charge with
+-- `403 ACCESS_DENIED` until the integration is homologated. That is not a
+-- hypothetical: a store showed `VERIFIED`, was switched on by hand, and every
+-- shopper was declined at checkout.
+--
+-- Nullable with NO backfill, deliberately. Backfilling from `last_verified_at`
+-- would grandfather exactly the rows this exists to catch — including the one
+-- that prompted it, which is enabled today and cannot charge. Leaving it null
+-- means "never proven", which is the truth for every pre-existing row.
+--
+-- No row is disabled here either: taking a working store's checkout offline
+-- from a migration is not recoverable by the person it happens to. The
+-- application enforces the rule from both ends instead — enabling REQUIRES a
+-- proven charge, and a failed verification disables — so a connection that
+-- cannot charge switches itself off the next time it is tested, in front of
+-- the owner, rather than silently at deploy time.
+ALTER TABLE "payment_provider_configs"
+    ADD COLUMN "charge_verified_at" TIMESTAMP(3);

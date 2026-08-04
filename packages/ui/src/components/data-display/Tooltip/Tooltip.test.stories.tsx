@@ -1,4 +1,6 @@
-import { Delete, Help, Info } from '@mui/icons-material';
+import Delete from '@mui/icons-material/Delete';
+import Help from '@mui/icons-material/Help';
+import Info from '@mui/icons-material/Info';
 import { Box, Button, IconButton, Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';

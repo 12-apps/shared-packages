@@ -1,4 +1,8 @@
-import { Dashboard,Home, Menu as MenuIcon, Person, Settings } from '@mui/icons-material';
+import Dashboard from '@mui/icons-material/Dashboard';
+import Home from '@mui/icons-material/Home';
+import MenuIcon from '@mui/icons-material/Menu';
+import Person from '@mui/icons-material/Person';
+import Settings from '@mui/icons-material/Settings';
 import {
   Box,
   Button,

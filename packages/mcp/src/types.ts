@@ -15,6 +15,23 @@
 /** A JSON Schema object (draft 2020-12). We treat schemas opaquely and forward them. */
 export type JsonSchema = Record<string, unknown>;
 
+/**
+ * MCP tool-behavior annotations used by clients for review and confirmation.
+ *
+ * Every value is required intentionally. ChatGPT App review treats a missing
+ * hint as a blocker, and an implicit protocol default is not enough evidence
+ * that a tool's behavior was audited. The Anthropic connector directory
+ * additionally requires a human-readable `title` on every tool, and derives
+ * auto-permissions from `readOnlyHint`/`destructiveHint`.
+ */
+export interface ToolAnnotations {
+  /** Human-readable tool label (required by the Anthropic connector review). */
+  title: string;
+  readOnlyHint: boolean;
+  openWorldHint: boolean;
+  destructiveHint: boolean;
+}
+
 /** Where an operation parameter is carried in the HTTP request. */
 export type ParameterLocation = "path" | "query" | "header";
 
@@ -43,6 +60,18 @@ export interface GeneratedTool {
   inputSchema: JsonSchema;
   /** Documented success-response schema, when the spec provides one. */
   outputSchema?: JsonSchema;
+  /** Explicit, behavior-audited MCP review hints. */
+  annotations: ToolAnnotations;
+  /**
+   * Dotted response paths stripped before the result reaches the agent.
+   *
+   * `outputSchema` is advertisement only — the dispatcher forwards the upstream
+   * body verbatim — so narrowing a schema alone would misdescribe what is
+   * actually sent. Redaction is what removes the value; the narrowed schema
+   * just keeps the advertisement honest. A segment that lands on an array is
+   * applied to every element.
+   */
+  redactResponse?: readonly string[];
   /** Path/query/header parameters, in declaration order. */
   parameters: ToolParameter[];
   /** Top-level property names sourced from the request body (routed to the body). */

@@ -17,7 +17,7 @@ An animated icon wrapper component that can animate any icon or SVG with various
 
 ```tsx
 import { AnimatedIcon } from '@/components/enhanced/AnimatedIcon';
-import { Settings } from '@mui/icons-material';
+import Settings from '@mui/icons-material/Settings';
 
 // Simple rotating animation
 <AnimatedIcon variant="rotate">
@@ -199,7 +199,7 @@ The AnimatedIcon component includes comprehensive test support through the `data
 ```tsx
 import { render, screen } from '@testing-library/react';
 import { AnimatedIcon } from '@/components/enhanced/AnimatedIcon';
-import { Settings } from '@mui/icons-material';
+import Settings from '@mui/icons-material/Settings';
 
 // In your tests
 test('should render with test ID', () => {
@@ -220,7 +220,7 @@ test('should render with test ID', () => {
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AnimatedIcon } from '@/components/enhanced/AnimatedIcon';
-import { Favorite } from '@mui/icons-material';
+import Favorite from '@mui/icons-material/Favorite';
 
 test('should handle click events', async () => {
   const handleClick = jest.fn();
@@ -247,7 +247,7 @@ test('should handle click events', async () => {
 ```tsx
 import { render, screen } from '@testing-library/react';
 import { AnimatedIcon } from '@/components/enhanced/AnimatedIcon';
-import { Refresh } from '@mui/icons-material';
+import Refresh from '@mui/icons-material/Refresh';
 
 test('should have proper accessibility attributes', () => {
   render(

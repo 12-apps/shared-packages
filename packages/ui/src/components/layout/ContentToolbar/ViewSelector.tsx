@@ -1,12 +1,11 @@
 'use client';
 
-import {
-  Check as CheckIcon,
-  KeyboardArrowDown as ChevronDownIcon,
-  GridViewOutlined as GridIcon,
-  FormatListBulletedRounded as ListIcon,
-} from '@mui/icons-material';
+import CheckIcon from '@mui/icons-material/Check';
+import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import GridIcon from '@mui/icons-material/GridViewOutlined';
+import ListIcon from '@mui/icons-material/FormatListBulletedRounded';
 import { Box, Button, ListItemIcon, ListItemText, Menu, MenuItem, Slider } from '@mui/material';
+// Type-only, so it is erased at build time and costs no barrel transform.
 import type { SvgIconComponent } from '@mui/icons-material';
 import React, { useState } from 'react';
 

@@ -1,13 +1,11 @@
-import {
-  ChevronLeft as PrevIcon,
-  ChevronRight as NextIcon,
-  Close as CloseIcon,
-  Pause as PauseIcon,
-  PlayArrow as PlayIcon,
-  RestartAlt as ResetZoomIcon,
-  ZoomIn as ZoomInIcon,
-  ZoomOut as ZoomOutIcon,
-} from '@mui/icons-material';
+import PrevIcon from '@mui/icons-material/ChevronLeft';
+import NextIcon from '@mui/icons-material/ChevronRight';
+import CloseIcon from '@mui/icons-material/Close';
+import PauseIcon from '@mui/icons-material/Pause';
+import PlayIcon from '@mui/icons-material/PlayArrow';
+import ResetZoomIcon from '@mui/icons-material/RestartAlt';
+import ZoomInIcon from '@mui/icons-material/ZoomIn';
+import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import {
   Box,
   CircularProgress,

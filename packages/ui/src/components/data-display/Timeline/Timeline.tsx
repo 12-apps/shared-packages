@@ -1,4 +1,5 @@
-import { Circle as DotIcon, ExpandMore as ExpandIcon } from '@mui/icons-material';
+import DotIcon from '@mui/icons-material/Circle';
+import ExpandIcon from '@mui/icons-material/ExpandMore';
 import {
   alpha,
   Box,

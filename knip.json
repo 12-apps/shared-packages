@@ -3,8 +3,17 @@
   "rules": {
     "duplicates": "off"
   },
-  "ignore": ["**/generated/**", "**/*.d.ts"],
-  "ignoreBinaries": ["only-allow"],
+  "ignore": [
+    "**/generated/**",
+    "**/*.d.ts",
+    "// Schema partials are consumed by scripts/sync-*-schema.mjs, which COPY",
+    "// them by path rather than importing them, so knip cannot see the edge",
+    "// and reports every partial as an unused file.",
+    "**/prisma/*.prisma"
+  ],
+  "ignoreBinaries": [
+    "only-allow"
+  ],
   "ignoreDependencies": [],
   "workspaces": {
     ".": {
@@ -33,16 +42,42 @@
         "src/utils/index.ts",
         "scripts/*.js"
       ],
-      "ignoreDependencies": ["@playwright/test", "playwright", "@storybook/builder-vite"]
+      "ignoreDependencies": [
+        "@playwright/test",
+        "playwright",
+        "@storybook/builder-vite"
+      ]
     },
     "packages/shared-helpers": {
-      "entry": ["src/index.{ts,tsx}", "index.{ts,tsx}", "scripts/*.mjs", "prisma/seed-admin-demo.ts"]
+      "entry": [
+        "src/index.{ts,tsx}",
+        "index.{ts,tsx}",
+        "scripts/*.mjs"
+      ],
+      "ignoreDependencies": [
+        "@12-apps/entity-lifecycle",
+        "@12-apps/payments-backend",
+        "@12-apps/product-research",
+        "@12-apps/report-builder",
+        "@12-apps/shift"
+      ]
     },
     "packages/*": {
-      "entry": ["src/index.{ts,tsx}", "index.{ts,tsx}"]
+      "entry": [
+        "src/index.{ts,tsx}",
+        "index.{ts,tsx}"
+      ]
+    },
+    "packages/payments/*": {
+      "entry": [
+        "src/index.{ts,tsx}",
+        "index.{ts,tsx}"
+      ]
     }
   },
   "vitest": {
-    "config": ["vitest.config.ts"]
+    "config": [
+      "vitest.config.ts"
+    ]
   }
 }

@@ -1,4 +1,5 @@
-import { Face, Star } from '@mui/icons-material';
+import Face from '@mui/icons-material/Face';
+import Star from '@mui/icons-material/Star';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Chip } from './Chip';

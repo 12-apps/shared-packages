@@ -56,7 +56,9 @@ A flexible and feature-rich navigation menu component that supports horizontal, 
 
 ```tsx
 import { NavigationMenu } from '@procurement/ui';
-import { Dashboard, ShoppingCart, People } from '@mui/icons-material';
+import Dashboard from '@mui/icons-material/Dashboard';
+import ShoppingCart from '@mui/icons-material/ShoppingCart';
+import People from '@mui/icons-material/People';
 
 const items = [
   {
@@ -129,7 +131,10 @@ function TopNav() {
 
 ```tsx
 import { NavigationMenu } from '@procurement/ui';
-import { Home, ShoppingCart, Business, Analytics } from '@mui/icons-material';
+import Home from '@mui/icons-material/Home';
+import ShoppingCart from '@mui/icons-material/ShoppingCart';
+import Business from '@mui/icons-material/Business';
+import Analytics from '@mui/icons-material/Analytics';
 
 const horizontalWithDropdowns = [
   {

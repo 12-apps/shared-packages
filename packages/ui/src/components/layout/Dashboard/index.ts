@@ -1,4 +1,5 @@
-export { Dashboard } from './Dashboard';
+export { Dashboard, markDashboardSlot } from './Dashboard';
+export type { DashboardSlot } from './Dashboard';
 export { DashboardContext, useDashboardContext } from './DashboardContext';
 export type { DashboardContextValue } from './DashboardContext';
 export type {

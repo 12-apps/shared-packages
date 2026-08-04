@@ -1,11 +1,9 @@
 'use client';
 
-import {
-  ExpandLess as ExpandLessIcon,
-  ExpandMore as ExpandMoreIcon,
-  FilterListRounded as FilterIcon,
-  NavigateNext as NavigateNextIcon,
-} from '@mui/icons-material';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import FilterIcon from '@mui/icons-material/FilterListRounded';
+import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import {
   Box,
   Breadcrumbs as MuiBreadcrumbs,
@@ -41,10 +39,31 @@ import type {
  * a `<Dashboard.Header>` still renders below it.
  */
 const SLOT_ORDER = ['breadcrumb', 'header', 'filters', 'body'] as const;
-type SlotKey = (typeof SLOT_ORDER)[number];
+/** A slot a component can occupy in the canonical Dashboard order. */
+export type DashboardSlot = (typeof SLOT_ORDER)[number];
 
 /** Marker attached to each sub-component so the root can rank it by slot. */
-type SlottedComponent = { dashboardSlot?: SlotKey };
+type SlottedComponent = { dashboardSlot?: DashboardSlot };
+
+/**
+ * Tag a component with the Dashboard slot it occupies so the root ranks it in
+ * canonical order. The root inspects only its DIRECT children's `type`, so a
+ * page that wraps a `<Dashboard.Header>` (or any part) in its own component MUST
+ * mark that wrapper — otherwise it counts as an unrecognised child and sinks
+ * below the body. Returns the component for convenient inline use.
+ *
+ * @example
+ * ```tsx
+ * function ProductsHeader(props) {
+ *   return <Dashboard.Header title="Products">{/* … *\/}</Dashboard.Header>;
+ * }
+ * markDashboardSlot(ProductsHeader, 'header');
+ * ```
+ */
+export function markDashboardSlot<T>(component: T, slot: DashboardSlot): T {
+  (component as SlottedComponent).dashboardSlot = slot;
+  return component;
+}
 
 const Root = styled(Box)(({ theme }) => ({
   display: 'flex',

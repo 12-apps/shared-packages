@@ -259,7 +259,8 @@ Control the position of the label relative to the switch:
 Add custom icons that transition based on the switch state:
 
 ```tsx
-import { Check, Close } from '@mui/icons-material';
+import Check from '@mui/icons-material/Check';
+import Close from '@mui/icons-material/Close';
 
 <Switch
   onIcon={<Check />}

@@ -1,6 +1,6 @@
 'use client';
 
-import { FilterListRounded as FilterIcon } from '@mui/icons-material';
+import FilterIcon from '@mui/icons-material/FilterListRounded';
 import { Box, Button } from '@mui/material';
 import React from 'react';
 

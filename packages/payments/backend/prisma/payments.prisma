@@ -1,0 +1,218 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// OWNED BY @12-apps/payments-backend — the host's multi-file schema folder holds
+// only a SYMLINK to this file (created/verified by `pnpm --filter
+// @12-apps/payments-backend prisma:sync`): every payment model lives here, in
+// the package, never in the application.
+//
+// Deliberately self-contained: merchant scoping is (merchant_kind,
+// merchant_id) String columns — NO foreign key into any host table — so the
+// same three models work in every repo (and in a future standalone payments
+// service) without schema coupling. String-over-enum house style; the CHECK
+// constraints live in the migration.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// One (merchant, provider) connection: enablement, rank in the failover
+// chain, active environment, verification state, and the AES-encrypted
+// credential blob (both environments' decrypted shape is
+// `StoredProviderConfig.environments`, ciphered as ONE JSON blob by the
+// host's cipher — never plaintext at rest).
+model PaymentProviderConfig {
+  id             String    @id @default(uuid())
+  // PLATFORM | TENANT (CHECK in migration).
+  merchantKind   String    @map("merchant_kind")
+  merchantId     String    @map("merchant_id")
+  provider       String
+  // In the failover chain (enabled) vs merely configured. A merchant may
+  // keep credentials for a provider it has taken out of rotation.
+  enabled        Boolean   @default(false)
+  // Rank in the failover chain, ASCENDING — 0 is tried first. Meaningful
+  // only while `enabled`; the migration's partial unique index keeps ranks
+  // distinct among a merchant's enabled rows so routing is never ambiguous.
+  priority       Int       @default(0)
+  // SANDBOX | PRODUCTION (CHECK in migration).
+  environment    String    @default("SANDBOX")
+  // UNVERIFIED | VERIFIED | FAILED | RECONNECT_REQUIRED (CHECK in migration).
+  status         String    @default("UNVERIFIED")
+  lastVerifiedAt DateTime? @map("last_verified_at")
+  // When a real charge through THIS connection last succeeded — the only
+  // thing that may put the row in the failover chain (FUT-463).
+  //
+  // Distinct from `lastVerifiedAt`, which the credential PROBE stamps: the
+  // probe asks "do these keys authenticate", and a PagBank connection answers
+  // yes while refusing every real charge with `403 ACCESS_DENIED` until the
+  // integration is homologated. A store read `VERIFIED`, was switched on by
+  // hand, and every shopper was declined.
+  //
+  // Its own nullable column rather than being inferred from `enabled`, because
+  // the two answer different questions: this one is "was it ever proven",
+  // which must SURVIVE an owner switching the provider off and back on.
+  chargeVerifiedAt DateTime? @map("charge_verified_at")
+  // The activation charge currently OUTSTANDING: `{ reference, checkoutUrl,
+  // slug, startedAt }`, or null when none is in flight (FUT-463).
+  //
+  // It has to be durable, and the reason is money. The attempt used to live in
+  // React state, so a refresh — or simply coming back to the tab after paying
+  // on the provider's site — erased it and offered to "generate a charge"
+  // again. That mints a SECOND real charge on the owner's own card, and the
+  // first one, already paid, is never looked at again.
+  //
+  // It also carries what confirmation needs and creation is the only chance to
+  // learn: InfinitePay's `payment_check` wants `slug` (the invoice code, in the
+  // link response) alongside `order_nsu`, and asking with the reference alone
+  // answers "not paid" forever — which is exactly what it did to a genuinely
+  // paid R$ 1,01, right up to the ten-minute timeout that then blamed the owner
+  // for not paying in time.
+  pendingVerification Json? @map("pending_verification")
+  // When an OAuth connection stops working. Its own column (not inside the
+  // encrypted blob) so a refresh sweep can query it; null for credential-mode
+  // providers, which never expire.
+  expiresAt      DateTime? @map("expires_at")
+  stub           Boolean   @default(false)
+  // Cipher text of the JSON environments blob (host cipher, AES-256-GCM).
+  credentials    String
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@unique([merchantKind, merchantId, provider])
+  @@index([merchantKind, merchantId])
+  // The migration also carries a PARTIAL unique index on
+  // (merchant_kind, merchant_id, priority) WHERE enabled — two enabled
+  // providers can never share a rank, so the chain order is total. Partial
+  // indexes cannot be expressed here, same as the CHECK constraints above.
+  @@map("payment_provider_configs")
+}
+
+// Merchant-level payment settings — the things that belong to the STORE
+// rather than to any one provider connection.
+//
+// Currently just the failover policy. It lives here and not on
+// PaymentProviderConfig because "may a decline cascade to the next acquirer"
+// is a decision about the chain as a whole; putting it on each provider row
+// would let a merchant hold two contradictory answers at once.
+model PaymentMerchantSettings {
+  id             String   @id @default(uuid())
+  merchantKind   String   @map("merchant_kind")
+  merchantId     String   @map("merchant_id")
+  // TECHNICAL | TECHNICAL_AND_DECLINE (CHECK in migration).
+  //
+  // Defaults to TECHNICAL: technical failures fail over, declines do not.
+  // Cascading a declined card onto a second acquirer is a real practice and a
+  // real fraud-and-interchange risk, so it is never the silent default.
+  failoverPolicy String   @default("TECHNICAL") @map("failover_policy")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([merchantKind, merchantId])
+  @@map("payment_merchant_settings")
+}
+
+// One charge as the gateway persists it. `(provider, provider_charge_id)`
+// UNIQUE is the cross-system idempotency key (insert-or-ignore, never
+// check-then-insert); `(merchant, idempotency_key)` UNIQUE closes the
+// concurrent-retry window at the row level.
+model PaymentCharge {
+  id               String   @id @default(uuid())
+  merchantKind     String   @map("merchant_kind")
+  merchantId       String   @map("merchant_id")
+  provider         String
+  providerChargeId String   @map("provider_charge_id")
+  // Host-side reference (order id, invoice id, ...) — correlation only.
+  reference        String
+  idempotencyKey   String?  @map("idempotency_key")
+  // Normalized ChargeStatus (CHECK in migration).
+  status           String   @default("PENDING")
+  // PIX | CARD | BOLETO (CHECK in migration).
+  method           String
+  amountCents      Int      @map("amount_cents")
+  currency         String   @default("BRL")
+  // The full normalized ChargeSnapshot (client-safe fields + raw audit).
+  snapshot         Json
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@unique([provider, providerChargeId])
+  @@unique([merchantKind, merchantId, idempotencyKey])
+  @@index([merchantKind, merchantId, createdAt])
+  @@index([reference])
+  @@map("payment_charges")
+}
+
+// Durable webhook inbox (transactional-inbox): persist first, process off
+// the response path, dedup on the (merchant, provider, event_id) triple.
+model PaymentWebhookEvent {
+  id          String    @id @default(uuid())
+  merchantKind String   @map("merchant_kind")
+  merchantId  String    @map("merchant_id")
+  provider    String
+  eventId     String    @map("event_id")
+  // PENDING | PROCESSED | FAILED (CHECK in migration).
+  status      String    @default("PENDING")
+  // Every processing attempt, live deliveries and replays together. Support
+  // telemetry: "how many times has anything tried this row".
+  attempts    Int       @default(0)
+  // Attempts made by the RETRY DRAIN, and only by it. Separate from `attempts`
+  // because it is a BUDGET, not a count: the drain stops listing a row once
+  // this reaches the cap. A provider redelivering a broken handler every few
+  // minutes would exhaust a shared counter on the live path alone, and the row
+  // would drop out of the drain's work list having never been replayed once —
+  // the recovery mechanism switching itself off for the rows that needed it
+  // most, invisibly, since an unlisted row moves no counter.
+  replayAttempts Int    @default(0) @map("replay_attempts")
+  lastError   String?   @map("last_error")
+  headers     String?
+  payload     String
+  receivedAt  DateTime  @default(now()) @map("received_at")
+  processedAt DateTime? @map("processed_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([merchantKind, merchantId, provider, eventId])
+  @@index([status])
+  // The drain's own query: unsettled rows, one branch per eligible
+  // `replay_attempts` count, each with its own `updated_at` cutoff, ordered by
+  // `updated_at`. Leading with status keeps it off the PROCESSED rows, which
+  // are the overwhelming majority of the table.
+  @@index([status, replayAttempts, updatedAt], map: "payment_webhook_events_replay_idx")
+  @@map("payment_webhook_events")
+}
+
+// One ATTEMPT within a failover walk — the audit trail behind every routing
+// decision. Written whether the attempt succeeded, was failed over, or
+// stopped the walk, so "why did this order go to Stone instead of PagBank"
+// is answerable from data rather than from logs.
+//
+// It is also load-bearing, not merely observational: a retried charge reads
+// its own prior attempts and resumes AFTER them instead of re-walking the
+// chain from the top, which would re-hit a provider that already refused.
+model PaymentChargeAttempt {
+  id             String   @id @default(uuid())
+  merchantKind   String   @map("merchant_kind")
+  merchantId     String   @map("merchant_id")
+  // Null for charges raised without one: still audited, never resumable
+  // (there is no key to correlate a retry to this walk).
+  idempotencyKey String?  @map("idempotency_key")
+  // Host-side reference (order id) — the column support actually searches by.
+  reference      String
+  provider       String
+  // 1-based position within THIS walk, not a global counter.
+  attemptNo      Int      @map("attempt_no")
+  // SUCCEEDED | ADOPTED | FAILED_OVER | STOPPED | DECLINED | SKIPPED
+  // (CHECK in migration).
+  outcome        String
+  // DEFINITELY_NOT_CHARGED | AMBIGUOUS | BUSINESS_OUTCOME (CHECK in
+  // migration); null when the attempt did not fail.
+  failureBucket  String?  @map("failure_bucket")
+  // NOT_CHARGED | CHARGE_FOUND | PROBE_FAILED | UNSUPPORTED (CHECK in
+  // migration); null when no reconciliation probe was needed.
+  probeResult    String?  @map("probe_result")
+  // The provider charge id, once one is known (success or adopted).
+  providerChargeId String? @map("provider_charge_id")
+  // Operator-facing failure text. Never carries credentials or PAN data.
+  error          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Resume lookup: "what has this idempotency key already tried?"
+  @@index([merchantKind, merchantId, idempotencyKey])
+  @@index([reference])
+  @@index([merchantKind, merchantId, createdAt])
+  @@map("payment_charge_attempts")
+}

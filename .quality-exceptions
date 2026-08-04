@@ -6,15 +6,11 @@
 # Regenerate is manual/append-only; do not auto-add new files.
 packages/auth/src/__tests__/admin-allowlist.test.ts
 packages/auth/src/__tests__/device-detection.test.ts
-packages/auth/src/__tests__/hooks.test.tsx
 packages/auth/src/device-detection.ts
 packages/shared-helpers/package.test.ts
 packages/shared-helpers/src/cache/lib/withFileCache.ts
 packages/shared-helpers/src/db/lib/config.ts
 packages/shared-helpers/src/db/lib/database.ts
-packages/shared-helpers/src/forms/validators.ts
-packages/shared-helpers/src/impersonation/lib/graph-api.ts
-packages/shared-helpers/src/impersonation/lib/token.ts
 packages/shared-helpers/src/requests/lib/createFetcherFactory.ts
 packages/shared-helpers/src/requests/lib/retry.ts
 packages/shared-helpers/src/requests/lib/successRateMetrics.ts
@@ -23,7 +19,6 @@ packages/shared-helpers/src/utils/lib/stripHtml.ts
 packages/shared-helpers/src/utils/lib/withBatchSize.ts
 packages/shared-helpers/src/utils/lib/withGracefulShutdown.ts
 packages/shared-helpers/tests/db/database.test.ts
-packages/shared-helpers/tests/prisma/schema.test.ts
 packages/ui/scripts/storybook.js
 packages/ui/src/__tests__/package-wiring.test.ts
 packages/ui/src/__tests__/social-login-button.test.tsx

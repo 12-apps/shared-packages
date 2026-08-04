@@ -1,4 +1,6 @@
-import { Close, Error, Info } from '@mui/icons-material';
+import Close from '@mui/icons-material/Close';
+import Error from '@mui/icons-material/Error';
+import Info from '@mui/icons-material/Info';
 import type { ButtonProps } from '@mui/material';
 import {
   alpha,
@@ -54,8 +56,17 @@ const StyledDialog = styled(Dialog, {
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
     }),
 
+    // The error tint is LAYERED over the paper, not used as the background
+    // itself: `alpha(error, 0.05)` alone leaves the panel 95% transparent, so
+    // the page behind it showed straight through the question and its buttons.
+    // A confirm nobody can read is the one dialog that must never be hard to
+    // read. Same tint, opaque base.
     ...(customVariant === 'destructive' && {
-      backgroundColor: alpha(theme.palette.error.main, 0.05),
+      backgroundColor: theme.palette.background.paper,
+      backgroundImage: `linear-gradient(${alpha(theme.palette.error.main, 0.05)}, ${alpha(
+        theme.palette.error.main,
+        0.05,
+      )})`,
       border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
     }),
 
@@ -141,6 +152,155 @@ const CloseButton = styled(IconButton)(({ theme }) => ({
   color: theme.palette.grey[500],
 }));
 
+/**
+ * Per-variant lookups, hoisted out of the render function. They depend on
+ * nothing but their arguments, so keeping them at module scope means they are
+ * not rebuilt on every render — and it keeps the component's own branch count
+ * inside the repo's complexity budget.
+ */
+const variantIcon = (
+  variant: AlertDialogProps['variant'],
+  icon: AlertDialogProps['icon'],
+): React.ReactNode => {
+  if (icon) return icon;
+  return variant === 'destructive' ? <Error color="error" /> : <Info color="primary" />;
+};
+
+/**
+ * Ids for the two elements that give the dialog its accessible name and
+ * description. Derived from the test id so they are stable and unique per
+ * dialog without a generated id that would change on every render.
+ */
+const titleId = (dataTestId: string): string => `${dataTestId}-title`;
+const descriptionId = (dataTestId: string): string => `${dataTestId}-description`;
+
+/**
+ * `alertdialog`, not `dialog`.
+ *
+ * This component interrupts what the operator was doing and will not go away
+ * until they answer — which is exactly the distinction the two roles draw, and
+ * it is what makes a screen reader announce the message itself on open rather
+ * than just the dialog's name. MUI hardcodes `role="dialog"` on the paper, so
+ * it has to be overridden through the paper slot.
+ */
+const ALERT_ROLE = 'alertdialog';
+
+/**
+ * The paper slot's a11y props: the role, plus the name and description wired to
+ * the elements that actually carry them, so the announcement is the QUESTION
+ * rather than the word "dialog".
+ *
+ * Both references are conditional — pointing `aria-labelledby` at an element
+ * that was never rendered leaves a dangling id, which screen readers treat as
+ * no name at all, i.e. worse than omitting it.
+ */
+function ariaSlotProps(
+  dataTestId: string,
+  title: AlertDialogProps['title'],
+  description: AlertDialogProps['description'],
+): { paper: Record<string, string> } {
+  return {
+    paper: {
+      role: ALERT_ROLE,
+      ...(title ? { 'aria-labelledby': titleId(dataTestId) } : {}),
+      ...(description ? { 'aria-describedby': descriptionId(dataTestId) } : {}),
+    },
+  };
+}
+
+/** Both variants render a filled confirm; only the colour distinguishes them. */
+const CONFIRM_BUTTON_VARIANT: ButtonProps['variant'] = 'contained';
+const confirmButtonColor = (variant: AlertDialogProps['variant']): 'error' | 'primary' =>
+  variant === 'destructive' ? 'error' : 'primary';
+
+/** Title row: the variant icon (unless explicitly suppressed with `null`) + the title. */
+function AlertDialogHeader({
+  title,
+  icon,
+  variant,
+  dataTestId,
+}: {
+  title: AlertDialogProps['title'];
+  icon: AlertDialogProps['icon'];
+  variant: AlertDialogProps['variant'];
+  dataTestId: string;
+}): React.ReactElement | null {
+  if (!title) return null;
+  return (
+    <StyledDialogTitle id={titleId(dataTestId)} data-testid={`${dataTestId}-title`}>
+      {icon !== null && (
+        <span data-testid={`${dataTestId}-icon`}>{variantIcon(variant, icon)}</span>
+      )}
+      <Typography variant="h6" component="span">
+        {title}
+      </Typography>
+    </StyledDialogTitle>
+  );
+}
+
+/** Action row: the optional cancel button and the (variant-coloured) confirm. */
+function AlertDialogFooter({
+  variant,
+  cancelText = 'Cancel',
+  confirmText = 'Confirm',
+  showCancel = true,
+  loading = false,
+  confirmDisabled = false,
+  initialFocus = 'confirm',
+  onCancel,
+  onConfirm,
+  dataTestId,
+}: Pick<
+  AlertDialogProps,
+  | 'variant'
+  | 'cancelText'
+  | 'confirmText'
+  | 'showCancel'
+  | 'loading'
+  | 'confirmDisabled'
+  | 'initialFocus'
+> & {
+  onCancel: () => void;
+  onConfirm: () => void;
+  dataTestId: string;
+}): React.ReactElement {
+  return (
+    <StyledDialogActions data-testid={`${dataTestId}-actions`}>
+      {showCancel && (
+        <Button
+          onClick={onCancel}
+          variant="outlined"
+          color="inherit"
+          disabled={loading}
+          autoFocus={initialFocus === 'cancel'}
+          data-testid={`${dataTestId}-cancel-button`}
+        >
+          {cancelText}
+        </Button>
+      )}
+      <Button
+        onClick={onConfirm}
+        variant={CONFIRM_BUTTON_VARIANT}
+        color={confirmButtonColor(variant)}
+        disabled={confirmDisabled || loading}
+        startIcon={
+          loading ? (
+            <CircularProgress
+              size={16}
+              color="inherit"
+              data-testid={`${dataTestId}-loading-spinner`}
+            />
+          ) : undefined
+        }
+        autoFocus={initialFocus !== 'cancel'}
+        data-testid={`${dataTestId}-confirm-button`}
+      >
+        {confirmText}
+      </Button>
+    </StyledDialogActions>
+  );
+}
+
 export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
   ({
     variant = 'default',
@@ -149,55 +309,22 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
     title,
     description,
     icon,
-    cancelText = 'Cancel',
-    confirmText = 'Confirm',
+    cancelText,
+    confirmText,
     onCancel,
     onConfirm,
-    showCancel = true,
-    loading = false,
-    confirmDisabled = false,
+    showCancel,
+    loading,
+    confirmDisabled,
+    initialFocus,
     children,
     onClose,
     'data-testid': dataTestId = 'alert-dialog',
     ...props
   }, ref) => {
-    
     const handleCancel = () => {
       onCancel?.();
       onClose?.({}, 'backdropClick');
-    };
-
-    const handleConfirm = () => {
-      onConfirm?.();
-    };
-
-    const getVariantIcon = () => {
-      if (icon) return icon;
-      
-      switch (variant) {
-        case 'destructive':
-          return <Error color="error" />;
-        default:
-          return <Info color="primary" />;
-      }
-    };
-
-    const getConfirmButtonVariant = (): ButtonProps['variant'] => {
-      switch (variant) {
-        case 'destructive':
-          return 'contained';
-        default:
-          return 'contained';
-      }
-    };
-
-    const getConfirmButtonColor = () => {
-      switch (variant) {
-        case 'destructive':
-          return 'error';
-        default:
-          return 'primary';
-      }
     };
 
     return (
@@ -208,6 +335,7 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
         pulse={pulse}
         onClose={onClose}
         data-testid={dataTestId}
+        slotProps={ariaSlotProps(dataTestId, title, description)}
         {...props}
       >
         <CloseButton
@@ -219,52 +347,37 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
           <Close />
         </CloseButton>
 
-        {title && (
-          <StyledDialogTitle data-testid={`${dataTestId}-title`}>
-            {(icon !== null) && (
-              <span data-testid={`${dataTestId}-icon`}>
-                {getVariantIcon()}
-              </span>
-            )}
-            <Typography variant="h6" component="span">
-              {title}
-            </Typography>
-          </StyledDialogTitle>
-        )}
+        <AlertDialogHeader
+          title={title}
+          icon={icon}
+          variant={variant}
+          dataTestId={dataTestId}
+        />
 
         <StyledDialogContent data-testid={`${dataTestId}-content`}>
           {description && (
-            <DialogContentText data-testid={`${dataTestId}-description`}>
+            <DialogContentText
+              id={descriptionId(dataTestId)}
+              data-testid={`${dataTestId}-description`}
+            >
               {description}
             </DialogContentText>
           )}
           {children}
         </StyledDialogContent>
 
-        <StyledDialogActions data-testid={`${dataTestId}-actions`}>
-          {showCancel && (
-            <Button
-              onClick={handleCancel}
-              variant="outlined"
-              color="inherit"
-              disabled={loading}
-              data-testid={`${dataTestId}-cancel-button`}
-            >
-              {cancelText}
-            </Button>
-          )}
-          <Button
-            onClick={handleConfirm}
-            variant={getConfirmButtonVariant()}
-            color={getConfirmButtonColor()}
-            disabled={confirmDisabled || loading}
-            startIcon={loading ? <CircularProgress size={16} color="inherit" data-testid={`${dataTestId}-loading-spinner`} /> : undefined}
-            autoFocus
-            data-testid={`${dataTestId}-confirm-button`}
-          >
-            {confirmText}
-          </Button>
-        </StyledDialogActions>
+        <AlertDialogFooter
+          variant={variant}
+          cancelText={cancelText}
+          confirmText={confirmText}
+          showCancel={showCancel}
+          loading={loading}
+          confirmDisabled={confirmDisabled}
+          initialFocus={initialFocus}
+          onCancel={handleCancel}
+          onConfirm={() => onConfirm?.()}
+          dataTestId={dataTestId}
+        />
       </StyledDialog>
     );
   }

@@ -216,7 +216,7 @@ function BasicModalExample() {
 
 ```tsx
 import { Box, Typography, Button, IconButton } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
 
 function ComplexModalExample() {
   const [open, setOpen] = useState(false);

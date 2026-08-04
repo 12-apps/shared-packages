@@ -1,14 +1,12 @@
-import {
-  Archive,
-  ContentCopy,
-  ContentCut,
-  ContentPaste,
-  Delete,
-  Edit,
-  Settings,
-  Share,
-  Star,
-} from '@mui/icons-material';
+import Archive from '@mui/icons-material/Archive';
+import ContentCopy from '@mui/icons-material/ContentCopy';
+import ContentCut from '@mui/icons-material/ContentCut';
+import ContentPaste from '@mui/icons-material/ContentPaste';
+import Delete from '@mui/icons-material/Delete';
+import Edit from '@mui/icons-material/Edit';
+import Settings from '@mui/icons-material/Settings';
+import Share from '@mui/icons-material/Share';
+import Star from '@mui/icons-material/Star';
 import { Box, Paper, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';

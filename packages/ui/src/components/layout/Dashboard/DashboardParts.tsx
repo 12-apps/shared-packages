@@ -1,17 +1,14 @@
 'use client';
 
-import {
-  Close as CloseIcon,
-  ExpandMore as ExpandMoreIcon,
-  FileDownloadOutlined as ExportIcon,
-  FilterListRounded as FilterIcon,
-  InfoOutlined as InfoIcon,
-  SettingsOutlined as SettingsIcon,
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExportIcon from '@mui/icons-material/FileDownloadOutlined';
+import FilterIcon from '@mui/icons-material/FilterListRounded';
+import InfoIcon from '@mui/icons-material/InfoOutlined';
+import SettingsIcon from '@mui/icons-material/SettingsOutlined';
 import {
   Badge,
   Box,
-  Button,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -24,6 +21,7 @@ import {
 } from '@mui/material';
 import React, { useState } from 'react';
 
+import { HeaderButton } from '../../form/HeaderButton';
 import { useDashboardContext } from './DashboardContext';
 import type {
   DashboardActionProps,
@@ -175,22 +173,17 @@ export const DashboardExport = ({
   const open = Boolean(anchorEl);
   return (
     <>
-      <Button
+      <HeaderButton
         variant="outlined"
-        size="medium"
         color="inherit"
-        startIcon={<ExportIcon fontSize="small" />}
+        text={label}
+        icon={<ExportIcon fontSize="small" />}
         endIcon={<ExpandMoreIcon fontSize="small" />}
         onClick={(e) => setAnchorEl(e.currentTarget)}
         aria-haspopup="menu"
         aria-expanded={open}
-        data-testid={`${testIdPrefix}-export-trigger`}
-        // Match the sibling primary action button (repo Button `md`): same
-        // padding/height and a 1rem non-uppercased label.
-        sx={{ py: 1, px: 2, fontSize: '1rem', textTransform: 'none' }}
-      >
-        {label}
-      </Button>
+        dataTestId={`${testIdPrefix}-export-trigger`}
+      />
       <Menu anchorEl={anchorEl} open={open} onClose={() => setAnchorEl(null)} data-testid={`${testIdPrefix}-export-menu`}>
         {formats.map((format) => (
           <MenuItem

@@ -1,14 +1,12 @@
-import {
-  Add,
-  Check,
-  Close,
-  Delete,
-  Edit,
-  FileCopy,
-  Save,
-  Settings,
-  Share,
-} from '@mui/icons-material';
+import Add from '@mui/icons-material/Add';
+import Check from '@mui/icons-material/Check';
+import Close from '@mui/icons-material/Close';
+import Delete from '@mui/icons-material/Delete';
+import Edit from '@mui/icons-material/Edit';
+import FileCopy from '@mui/icons-material/FileCopy';
+import Save from '@mui/icons-material/Save';
+import Settings from '@mui/icons-material/Settings';
+import Share from '@mui/icons-material/Share';
 import { Box } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
