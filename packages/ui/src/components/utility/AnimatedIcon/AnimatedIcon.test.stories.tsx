@@ -163,17 +163,18 @@ export const KeyboardNavigation: Story = {
     const secondIcon = canvas.getByLabelText('Second animated icon');
     const thirdIcon = canvas.getByLabelText('Third animated icon');
 
-    // Focus first icon
-    firstIcon.focus();
-    await expect(firstIcon).toHaveFocus();
+    // Tab to the first icon rather than focusing it directly, so the whole
+    // sequence below exercises one keyboard journey through the three icons.
+    await userEvent.tab();
+    await waitFor(() => expect(firstIcon).toHaveFocus());
 
     // Tab to second icon
     await userEvent.tab();
-    await expect(secondIcon).toHaveFocus();
+    await waitFor(() => expect(secondIcon).toHaveFocus());
 
     // Tab to third icon
     await userEvent.tab();
-    await expect(thirdIcon).toHaveFocus();
+    await waitFor(() => expect(thirdIcon).toHaveFocus());
 
     // Test Enter key activation
     await userEvent.keyboard('{Enter}');
@@ -279,13 +280,16 @@ export const FocusManagement: Story = {
     const secondIcon = canvas.getByLabelText('Focus test icon 2');
 
     // Focus first icon
-    firstIcon.focus();
-    await expect(firstIcon).toHaveFocus();
+    await userEvent.tab();
+    await waitFor(() => expect(firstIcon).toHaveFocus());
 
-    // Move focus to second icon
-    secondIcon.focus();
-    await expect(secondIcon).toHaveFocus();
-    await expect(firstIcon).not.toHaveFocus();
+    // Move focus to second icon — asserted together so the hand-off is checked
+    // as one state, not as two reads that could straddle a re-render.
+    await userEvent.tab();
+    await waitFor(() => {
+      expect(secondIcon).toHaveFocus();
+      expect(firstIcon).not.toHaveFocus();
+    });
   },
 };
 

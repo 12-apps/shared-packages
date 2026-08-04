@@ -130,7 +130,6 @@ packages/ui/src/components/layout/Spacer/Spacer.test.stories.tsx
 packages/ui/src/components/navigation/Breadcrumbs/Breadcrumbs.test.stories.tsx
 packages/ui/src/components/navigation/Breadcrumbs/Breadcrumbs.tsx
 packages/ui/src/components/navigation/CommandPalette/CommandPalette.tsx
-packages/ui/src/components/navigation/ContextMenu/ContextMenu.test.stories.tsx
 packages/ui/src/components/navigation/ContextMenu/ContextMenu.tsx
 packages/ui/src/components/navigation/DropdownMenu/DropdownMenu.test.stories.tsx
 packages/ui/src/components/navigation/DropdownMenu/DropdownMenu.tsx
@@ -148,7 +147,6 @@ packages/ui/src/components/typography/Heading/Heading.tsx
 packages/ui/src/components/typography/Paragraph/Paragraph.test.stories.tsx
 packages/ui/src/components/typography/Text/Text.test.stories.tsx
 packages/ui/src/components/typography/Text/Text.tsx
-packages/ui/src/components/utility/AnimatedIcon/AnimatedIcon.test.stories.tsx
 packages/ui/src/components/utility/AnimatedIcon/AnimatedIcon.tsx
 packages/ui/src/components/utility/AspectRatio/AspectRatio.test.stories.tsx
 packages/ui/src/components/utility/InfiniteScroll/InfiniteScroll.test.stories.tsx
