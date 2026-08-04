@@ -196,46 +196,131 @@ const useTableSelection = ({
   };
 };
 
+const TABLE_DEFAULTS: Partial<TableProps> = {
+  variant: 'default',
+  stripeColor: 'neutral',
+  glow: false,
+  pulse: false,
+  hoverable: false,
+  loading: false,
+  density: 'normal',
+  stickyHeader: false,
+  selectable: false,
+  selectedRows: [],
+  sortable: false,
+  virtualScrolling: false,
+  rowHeight: 52,
+  overscan: 5,
+  responsive: false,
+  showColumnToggle: true,
+};
+
+// Strips explicitly-undefined props before the merge, so `prop={undefined}` still
+// falls back to the default as a destructuring default would. Eighteen separate
+// destructuring defaults were most of this component's branch count.
+const definedProps = (props: TableProps): Partial<TableProps> =>
+  Object.fromEntries(
+    Object.entries(props).filter(([, value]) => value !== undefined),
+  ) as Partial<TableProps>;
+
+// The container + styled table + optional header, shared by the loading, empty
+// and populated renders.
+const TableShell: React.FC<{
+  innerRef: React.Ref<globalThis.HTMLTableElement>;
+  variant?: string;
+  stripeColor?: TableStripeColor;
+  glow?: boolean;
+  pulse?: boolean;
+  hoverable?: boolean;
+  density?: TableDensity;
+  stickyHeader?: boolean;
+  header: React.ReactNode;
+  rest: Record<string, unknown>;
+  children: React.ReactNode;
+}> = ({
+  innerRef,
+  variant,
+  stripeColor,
+  glow,
+  pulse,
+  hoverable,
+  density,
+  stickyHeader,
+  header,
+  rest,
+  children,
+}) => (
+  <StyledTableContainer>
+    <StyledTable
+      ref={innerRef}
+      customVariant={variant}
+      stripeColor={stripeColor}
+      glow={glow}
+      pulse={pulse}
+      hoverable={hoverable}
+      density={density}
+      stickyHeader={stickyHeader}
+      {...rest}
+    >
+      {header}
+      {children}
+    </StyledTable>
+  </StyledTableContainer>
+);
+
+const SKELETON_ROW_COUNT = 5;
+
+const LoadingSkeletonRows: React.FC<{ columns?: ColumnConfig[] }> = ({ columns }) => (
+  <>
+    {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+      <TableRow key={index}>
+        {columns?.map((column) => (
+          <TableCell key={column.key}>
+            <Skeleton height={20} />
+          </TableCell>
+        ))}
+      </TableRow>
+    ))}
+  </>
+);
+
 export const Table = React.forwardRef<globalThis.HTMLTableElement, TableProps>(
-  ({
-    // Basic props
-    variant = 'default',
-    stripeColor = 'neutral',
-    glow = false,
-    pulse = false,
-    hoverable = false,
-    loading = false,
-    children,
-    
-    // Advanced feature props
-    density = 'normal',
-    stickyHeader = false,
-    selectable = false,
-    selectedRows = [],
-    onSelectionChange,
-    rowKeyExtractor,
-    sortable = false,
-    sortConfig,
-    onSortChange,
-    columns,
-    data,
-    virtualScrolling = false,
-    rowHeight = 52,
-    overscan = 5,
-    responsive = false,
-    columnPriorities,
-    showColumnToggle = true,
-    containerHeight,
-    loadingComponent,
-    emptyStateComponent,
-    renderRow,
-    renderCell,
-    onRowClick,
-    onRowFocus,
-    onRowBlur,
-    
-    ...props
-  }, ref) => {
+  (tableProps, ref) => {
+    const {
+      variant,
+      stripeColor,
+      glow,
+      pulse,
+      hoverable,
+      loading,
+      children,
+      density,
+      stickyHeader,
+      selectable,
+      selectedRows,
+      onSelectionChange,
+      rowKeyExtractor,
+      sortable,
+      sortConfig,
+      onSortChange,
+      columns,
+      data,
+      virtualScrolling,
+      rowHeight,
+      overscan,
+      responsive,
+      columnPriorities,
+      showColumnToggle,
+      containerHeight,
+      loadingComponent,
+      emptyStateComponent,
+      renderRow,
+      renderCell,
+      onRowClick,
+      onRowFocus,
+      onRowBlur,
+      ...props
+    } = { ...TABLE_DEFAULTS, ...definedProps(tableProps) } as TableProps;
     useTheme(); // Required for responsive behavior
 
     const {
@@ -252,99 +337,67 @@ export const Table = React.forwardRef<globalThis.HTMLTableElement, TableProps>(
       data,
       responsive,
       columnPriorities,
-      selectedRows,
+      selectedRows: selectedRows ?? [],
       rowKeyExtractor,
       onSelectionChange,
     });
 
-    if (loading) {
-      const loadingRows = Array.from({ length: 5 }, (_, index) => (
-        <TableRow key={index}>
-          {columns?.map((column) => (
-            <TableCell key={column.key}>
-              <Skeleton height={20} />
-            </TableCell>
-          ))}
-        </TableRow>
-      ));
+    // The loading and empty states render the same shell as the populated table,
+    // so they share TableShell rather than repeating it three times.
+    const shell = {
+      innerRef: ref,
+      variant,
+      stripeColor,
+      glow,
+      pulse,
+      hoverable,
+      density,
+      stickyHeader,
+      header: columns ? (
+        <EnhancedTableHeader
+          columns={responsive ? visibleColumns : columns}
+          data={[]}
+          sortable={sortable}
+          sortConfig={sortConfig}
+          onSortChange={onSortChange}
+          selectable={selectable}
+          selectedRows={selectedRows}
+          onSelectAll={handleSelectAll}
+          density={density}
+          stickyHeader={stickyHeader}
+        />
+      ) : null,
+      rest: props,
+    };
 
+    if (loading) {
       return (
-        <StyledTableContainer>
-          <StyledTable
-            ref={ref}
-            customVariant={variant}
-            stripeColor={stripeColor}
-            glow={glow}
-            pulse={pulse}
-            hoverable={hoverable}
-            density={density}
-            stickyHeader={stickyHeader}
-            {...props}
-          >
-            {columns && (
-              <EnhancedTableHeader
-                columns={responsive ? visibleColumns : columns}
-                data={[]}
-                sortable={sortable}
-                sortConfig={sortConfig}
-                onSortChange={onSortChange}
-                selectable={selectable}
-                selectedRows={selectedRows}
-                onSelectAll={handleSelectAll}
-                density={density}
-                stickyHeader={stickyHeader}
-              />
-            )}
-            <TableBody data-testid="table-loading">
-              {loadingComponent || loadingRows}
-            </TableBody>
-          </StyledTable>
-        </StyledTableContainer>
+        <TableShell {...shell}>
+          <TableBody data-testid="table-loading">
+            {loadingComponent || <LoadingSkeletonRows columns={columns} />}
+          </TableBody>
+        </TableShell>
       );
     }
 
-    // Empty state
     if (data && data.length === 0) {
       return (
-        <StyledTableContainer>
-          <StyledTable
-            ref={ref}
-            customVariant={variant}
-            stripeColor={stripeColor}
-            glow={glow}
-            pulse={pulse}
-            hoverable={hoverable}
-            density={density}
-            stickyHeader={stickyHeader}
-            {...props}
-          >
-            {columns && (
-              <EnhancedTableHeader
-                columns={responsive ? visibleColumns : columns}
-                data={[]}
-                sortable={sortable}
-                sortConfig={sortConfig}
-                onSortChange={onSortChange}
-                selectable={selectable}
-                selectedRows={selectedRows}
-                onSelectAll={handleSelectAll}
-                density={density}
-                stickyHeader={stickyHeader}
-              />
-            )}
-            <TableBody>
-              <TableRow>
-                <TableCell colSpan={(responsive ? visibleColumns : columns)?.length || 1} align="center">
-                  {emptyStateComponent || (
-                    <Box py={4} color="text.secondary">
-                      No data available
-                    </Box>
-                  )}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </StyledTable>
-        </StyledTableContainer>
+        <TableShell {...shell}>
+          <TableBody>
+            <TableRow>
+              <TableCell
+                colSpan={(responsive ? visibleColumns : columns)?.length || 1}
+                align="center"
+              >
+                {emptyStateComponent || (
+                  <Box py={4} color="text.secondary">
+                    No data available
+                  </Box>
+                )}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </TableShell>
       );
     }
 
