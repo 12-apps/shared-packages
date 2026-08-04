@@ -132,7 +132,6 @@ packages/ui/src/components/navigation/CommandPalette/CommandPalette.tsx
 packages/ui/src/components/navigation/ContextMenu/ContextMenu.tsx
 packages/ui/src/components/navigation/DropdownMenu/DropdownMenu.tsx
 packages/ui/src/components/navigation/NavigationMenu/NavigationMenu.tsx
-packages/ui/src/components/navigation/NavigationMenu/stories/NavigationMenu.test.stories.tsx
 packages/ui/src/components/navigation/Pagination/Pagination.test.stories.tsx
 packages/ui/src/components/navigation/Pagination/Pagination.tsx
 packages/ui/src/components/navigation/Tabs/Tabs.test.stories.tsx
