@@ -1,3 +1,10 @@
+export type MapType = 'roadmap' | 'satellite' | 'hybrid' | 'terrain';
+
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
 export interface MapMarker {
   position: { lat: number; lng: number };
   title?: string;
@@ -30,7 +37,7 @@ export interface MapPreviewProps {
   /** Google Maps API key */
   googleMapsApiKey?: string;
   /** Map display type */
-  mapType?: 'roadmap' | 'satellite' | 'hybrid' | 'terrain';
+  mapType?: MapType;
   /** Map style variant */
   variant?: 'default' | 'glass' | 'satellite' | 'dark';
   /** Show map controls */
