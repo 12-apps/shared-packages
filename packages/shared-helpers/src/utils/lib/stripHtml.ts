@@ -92,24 +92,35 @@ const removeComments = (text: string): string => {
 const removeNonTextBlocks = (text: string): string =>
   removeComments(removeSpans(removeSpans(text, 'style'), 'script'));
 
-// Removing a tag can splice its neighbours into a new one ("<<a>script>"), so
-// keep stripping until the text stops changing.
-const stripTags = (text: string): string => {
-  let current = text;
-
-  for (;;) {
-    const next = current.replace(/<[^>]*>/g, '');
-    if (next === current) return next;
-    current = next;
-  }
-};
-
 // Turn the block-level tags into the breaks they imply, before all tags go.
 const tagsToLineBreaks = (text: string): string =>
   text
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
     .replace(/<\/div>/gi, '\n');
+
+// Removes every <…> run in one left-to-right pass. A regex is wrong twice here:
+// /<[^>]*>/g rescans from every '<' on input that has no '>', which is
+// quadratic, and one pass of it can splice neighbours into a fresh tag
+// ("<<a>script>"). Scanning drops every '<' and everything through its '>', so
+// nothing survives to be reassembled and an unterminated tag takes the rest of
+// the string with it.
+const stripTags = (text: string): string => {
+  let out = '';
+  let inTag = false;
+
+  for (const char of text) {
+    if (char === '<') {
+      inTag = true;
+    } else if (char === '>') {
+      inTag = false;
+    } else if (!inTag) {
+      out += char;
+    }
+  }
+
+  return out;
+};
 
 const truncate = (text: string, maxLength?: number): string =>
   maxLength && text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;

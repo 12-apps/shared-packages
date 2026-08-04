@@ -1,6 +1,7 @@
 {
   "name": "@12-apps/forms-core",
   "version": "1.0.0",
+  "license": "MIT",
   "type": "module",
   "description": "Pure, framework-agnostic form primitives \u2014 field validators, the Result type, and createServerAction. Zero dependencies, consumed from source by @12-apps/ui and apps.",
   "exports": {

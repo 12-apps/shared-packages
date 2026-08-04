@@ -22,6 +22,11 @@ describe('stripHTML security', () => {
     expect(stripHTML('<<a>script>payload')).not.toContain('<script');
   });
 
+  it('drops an unterminated tag rather than leaving it in the text', () => {
+    // The old regex left `<script` here because it never found a closing '>'.
+    expect(stripHTML('safe<script')).toBe('safe');
+  });
+
   it('preserves line breaks when asked', () => {
     expect(stripHTML('<p>one</p><p>two</p>', { preserveLineBreaks: true })).toBe('one\n\ntwo');
   });
