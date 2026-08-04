@@ -94,7 +94,6 @@ packages/ui/src/components/form/Slider/Slider.tsx
 packages/ui/src/components/form/Switch/Switch.test.stories.tsx
 packages/ui/src/components/form/Switch/Switch.tsx
 packages/ui/src/components/form/Textarea/Textarea.test.stories.tsx
-packages/ui/src/components/form/Textarea/Textarea.tsx
 packages/ui/src/components/form/Toggle/Toggle.test.stories.tsx
 packages/ui/src/components/form/Toggle/Toggle.tsx
 packages/ui/src/components/form/ToggleGroup/ToggleGroup.test.stories.tsx

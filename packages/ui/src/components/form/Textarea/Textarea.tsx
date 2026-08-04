@@ -23,6 +23,13 @@ import type { Theme } from '@mui/material/styles';
 import { styled } from '@mui/material/styles';
 import React, { useEffect,useRef, useState } from 'react';
 
+import {
+  floatAnimation,
+  getColorFromTheme,
+  glowAnimation,
+  textareaEmphasisStyles,
+} from './Textarea.styles';
+import { TextareaRichEditor } from './TextareaRichEditor';
 import type { TextareaProps } from './Textarea.types';
 
 // Interface for styled component props
@@ -38,76 +45,6 @@ interface StyledTextareaProps {
 }
 
 // Glow animation for enhanced visual effects
-const glowAnimation = keyframes`
-  0% {
-    box-shadow: 0 0 5px currentColor;
-  }
-  50% {
-    box-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
-  }
-  100% {
-    box-shadow: 0 0 5px currentColor;
-  }
-`;
-
-// Ripple animation for buttons (commented out - not currently used)
-// const rippleAnimation = keyframes`
-//   0% {
-//     transform: scale(0);
-//     opacity: 1;
-//   }
-//   100% {
-//     transform: scale(4);
-//     opacity: 0;
-//   }
-// `;
-
-// Float animation for rich text toolbar
-const floatAnimation = keyframes`
-  0% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-3px);
-  }
-  100% {
-    transform: translateY(0px);
-  }
-`;
-
-const getColorFromTheme = (theme: Theme, color: string) => {
-  if (color === 'neutral') {
-    const grey = theme.palette.grey as unknown as Record<number, string>;
-    return {
-      main: grey?.[700] || '#616161',
-      dark: grey?.[800] || '#424242',
-      light: grey?.[500] || '#9e9e9e',
-      contrastText: '#fff',
-    };
-  }
-
-  const colorMap: Record<
-    string,
-    { main: string; dark?: string; light?: string; contrastText?: string }
-  > = {
-    primary: theme.palette.primary,
-    secondary: theme.palette.secondary,
-    success: theme.palette.success,
-    warning: theme.palette.warning,
-    danger: theme.palette.error,
-  };
-
-  const palette = colorMap[color] || theme.palette.primary;
-
-  // Ensure palette has required properties
-  return {
-    main: palette?.main || theme.palette.primary.main,
-    dark: palette?.dark || palette?.main || theme.palette.primary.dark,
-    light: palette?.light || palette?.main || theme.palette.primary.light,
-    contrastText: palette?.contrastText || '#fff',
-  };
-};
-
 const StyledTextarea = styled(TextareaAutosize, {
   shouldForwardProp: (prop) =>
     !['customVariant', 'customColor', 'customSize', 'glow', 'glass', 'gradient', 'error'].includes(
@@ -165,48 +102,9 @@ const StyledTextarea = styled(TextareaAutosize, {
   };
 
   // Glass morphism effect
-  const glassStyles = glass
-    ? {
-        backgroundColor: alpha(theme.palette.background.paper, 0.1),
-        backdropFilter: 'blur(20px)',
-        border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-        '&:hover': {
-          backgroundColor: alpha(theme.palette.background.paper, 0.15),
-          backdropFilter: 'blur(25px)',
-        },
-        '&:focus': {
-          backgroundColor: alpha(theme.palette.background.paper, 0.2),
-          backdropFilter: 'blur(30px)',
-        },
-      }
-    : {};
-
-  // Gradient border effect
-  const gradientStyles = gradient
-    ? {
-        background: `linear-gradient(${theme.palette.background.paper}, ${theme.palette.background.paper}) padding-box,
-                 linear-gradient(135deg, ${colorPalette.main}, ${colorPalette.light}) border-box`,
-        border: '2px solid transparent',
-        '&:focus': {
-          background: `linear-gradient(${theme.palette.background.paper}, ${theme.palette.background.paper}) padding-box,
-                   linear-gradient(135deg, ${colorPalette.main}, ${colorPalette.dark}) border-box`,
-        },
-      }
-    : {};
-
-  // Glow effect
-  const glowStyles = glow
-    ? {
-        animation: `${glowAnimation} 2s ease-in-out infinite`,
-        boxShadow: `0 0 10px ${alpha(colorPalette.main, 0.3)}`,
-      }
-    : {};
-
   return {
     ...baseStyles,
-    ...glassStyles,
-    ...gradientStyles,
-    ...glowStyles,
+    ...textareaEmphasisStyles({ theme, colorPalette, glass, gradient, glow }),
   };
 });
 
@@ -240,371 +138,118 @@ const StyledLabel = styled(InputLabel, {
 // });
 
 // Rich text toolbar styling
-const RichToolbar = styled(Box)<{ glass?: boolean }>(({ theme, glass }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: theme.spacing(0.5),
-  padding: theme.spacing(1),
-  borderRadius: `${theme.spacing(1)} ${theme.spacing(1)} 0 0`,
-  borderBottom: `1px solid ${theme.palette.divider}`,
-  background: glass ? alpha(theme.palette.background.paper, 0.1) : theme.palette.background.paper,
-  ...(glass && {
-    backdropFilter: 'blur(15px)',
-  }),
-  '& .MuiDivider-root': {
-    height: 24,
-    margin: `0 ${theme.spacing(1)}`,
-  },
-}));
 
-const ToolbarButton = styled(IconButton, {
-  shouldForwardProp: (prop) => prop !== 'active',
-})<{ active?: boolean }>(({ theme, active }) => ({
-  padding: theme.spacing(0.75),
-  borderRadius: theme.spacing(0.5),
-  color: active ? theme.palette.primary.main : theme.palette.text.secondary,
-  backgroundColor: active ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
-  transition: 'all 0.2s ease',
-  position: 'relative',
-  overflow: 'hidden',
+const ICON_GUTTER = '40px';
 
-  '&::before': {
-    content: '""',
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 0,
-    height: 0,
-    borderRadius: '50%',
-    backgroundColor: alpha(theme.palette.primary.main, 0.3),
-    transform: 'translate(-50%, -50%)',
-    transition: 'width 0.3s, height 0.3s',
-  },
+const TEXTAREA_DEFAULTS = {
+  variant: 'default',
+  color: 'primary',
+  size: 'md',
+  error: false,
+  glassLabel: false,
+  glow: false,
+  glass: false,
+  gradient: false,
+  iconPosition: 'start',
+  minRows: 3,
+} satisfies Partial<TextareaProps>;
 
-  '&:hover': {
-    color: theme.palette.primary.main,
-    backgroundColor: alpha(theme.palette.primary.main, 0.15),
-    transform: 'translateY(-1px)',
-    animation: `${floatAnimation} 1.5s ease-in-out infinite`,
+// Strips explicitly-undefined props before the merge, so `prop={undefined}`
+// still falls back to the default as a destructuring default would.
+const definedProps = (props: TextareaProps): Partial<TextareaProps> =>
+  Object.fromEntries(
+    Object.entries(props).filter(([, value]) => value !== undefined),
+  ) as Partial<TextareaProps>;
 
-    '&::before': {
-      width: '100%',
-      height: '100%',
-    },
-  },
+// Label above, helper text below — identical for the plain and rich variants,
+// which previously duplicated both.
+const TextareaShell: React.FC<{
+  testId?: string;
+  label?: React.ReactNode;
+  glassLabel: boolean;
+  error: boolean;
+  helperText?: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ testId, label, glassLabel, error, helperText, children }) => (
+  <Box
+    sx={{ position: 'relative', width: '100%' }}
+    data-testid={testId ? `${testId}-wrapper` : undefined}
+  >
+    {label && (
+      <StyledLabel glass={glassLabel} error={error}>
+        {label}
+      </StyledLabel>
+    )}
 
-  '&:active': {
-    transform: 'scale(0.95)',
-  },
-}));
+    {children}
 
-const CharacterCount = styled(Box)<{ limit?: number; count: number }>(({ theme, limit, count }) => {
-  const isWarning = limit && count > limit * 0.8;
-  const isError = limit && count > limit;
+    {helperText && (
+      <FormHelperText error={error} sx={{ mt: 1 }}>
+        {helperText}
+      </FormHelperText>
+    )}
+  </Box>
+);
 
-  return {
-    position: 'absolute',
-    bottom: theme.spacing(1),
-    right: theme.spacing(1),
-    fontSize: '0.75rem',
-    color: isError
-      ? theme.palette.error.main
-      : isWarning
-        ? theme.palette.warning.main
-        : theme.palette.text.secondary,
-    padding: '2px 6px',
-    borderRadius: theme.spacing(0.5),
-    backgroundColor: alpha(theme.palette.background.paper, 0.8),
-    backdropFilter: 'blur(10px)',
-    transition: 'all 0.3s ease',
-  };
-});
+const TextareaIcon: React.FC<{
+  icon?: React.ReactNode;
+  iconPosition: 'start' | 'end';
+}> = ({ icon, iconPosition }) => (
+  <Box
+    sx={{
+      position: 'absolute',
+      top: '12px',
+      ...(iconPosition === 'start' ? { left: '12px' } : { right: '12px' }),
+      color: 'text.secondary',
+      pointerEvents: 'none',
+      zIndex: 1,
+    }}
+  >
+    {icon}
+  </Box>
+);
 
-const ContentEditableDiv = styled('div')<{
-  error?: boolean;
-  focused?: boolean;
-  glass?: boolean;
-  customColor?: string;
-  theme?: Theme;
-}>(({ theme, error, focused, glass, customColor = 'primary' }) => {
-  if (!theme) return {};
-  const colorPalette = getColorFromTheme(theme, customColor);
-  const errorColor = theme.palette.error;
+export const Textarea: React.FC<TextareaProps> = (textareaProps) => {
+  const {
+    variant,
+    color,
+    size,
+    error,
+    helperText,
+    label,
+    glassLabel,
+    glow,
+    glass,
+    gradient,
+    icon,
+    iconPosition,
+    minRows,
+    maxRows,
+    style,
+    'data-testid': dataTestId,
+    dataTestId: dataTestIdCamelCase,
+    ...props
+  } = { ...TEXTAREA_DEFAULTS, ...definedProps(textareaProps) };
 
-  return {
-    minHeight: '120px',
-    padding: theme.spacing(1.5),
-    borderRadius: `0 0 ${theme.spacing(1)} ${theme.spacing(1)}`,
-    border: `2px solid ${error ? errorColor.main : focused ? colorPalette.main : theme.palette.divider}`,
-    borderTop: 'none',
-    backgroundColor: glass
-      ? alpha(theme.palette.background.paper, 0.1)
-      : theme.palette.background.paper,
-    color: theme.palette.text.primary,
-    fontFamily: theme.typography.fontFamily,
-    fontSize: '1rem',
-    lineHeight: 1.5,
-    outline: 'none',
-    transition: 'all 0.3s ease',
-    cursor: 'text',
-
-    ...(glass && {
-      backdropFilter: 'blur(20px)',
-    }),
-
-    '&:hover': {
-      backgroundColor: glass
-        ? alpha(theme.palette.background.paper, 0.15)
-        : alpha(theme.palette.background.paper, 0.9),
-    },
-
-    '&:focus': {
-      borderColor: error ? errorColor.main : colorPalette.main,
-      boxShadow: `0 0 0 3px ${alpha(error ? errorColor.main : colorPalette.main, 0.1)}`,
-    },
-
-    '& > *': {
-      margin: '0.5em 0',
-    },
-
-    '&[contenteditable="true"]:empty::before': {
-      content: 'attr(data-placeholder)',
-      color: theme.palette.text.secondary,
-      opacity: 0.6,
-    },
-  };
-});
-
-// Rich text formatting functions
-const formatText = (command: string, value?: string) => {
-  document.execCommand(command, false, value);
-};
-
-const RichTextEditor: React.FC<{
-  value?: string;
-  onChange?: (html: string) => void;
-  placeholder?: string;
-  error?: boolean;
-  glass?: boolean;
-  color?: string;
-  characterLimit?: number;
-}> = ({ value, onChange, placeholder, error, glass, color, characterLimit }) => {
-  const [focused, setFocused] = useState(false);
-  const [characterCount, setCharacterCount] = useState(0);
-  const [activeFormats, setActiveFormats] = useState({
-    bold: false,
-    italic: false,
-    underline: false,
-    list: false,
-    orderedList: false,
-    quote: false,
-    code: false,
-  });
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (contentRef.current && value !== undefined) {
-      if (contentRef.current.innerHTML !== value) {
-        contentRef.current.innerHTML = value;
-      }
-      setCharacterCount(contentRef.current.innerText.length);
-    }
-  }, [value]);
-
-  const handleInput = () => {
-    if (contentRef.current) {
-      const html = contentRef.current.innerHTML;
-      onChange?.(html);
-      setCharacterCount(contentRef.current.innerText.length);
-      updateActiveFormats();
-    }
-  };
-
-  const updateActiveFormats = () => {
-    setActiveFormats({
-      bold: document.queryCommandState('bold'),
-      italic: document.queryCommandState('italic'),
-      underline: document.queryCommandState('underline'),
-      list: document.queryCommandState('insertUnorderedList'),
-      orderedList: document.queryCommandState('insertOrderedList'),
-      quote: false,
-      code: false,
-    });
-  };
-
-  const handleFormat = (command: string, value?: string) => {
-    formatText(command, value);
-    updateActiveFormats();
-    contentRef.current?.focus();
-  };
-
-  return (
-    <Box sx={{ position: 'relative' }}>
-      <RichToolbar glass={glass}>
-        <Tooltip title="Bold" arrow>
-          <ToolbarButton
-            size="small"
-            active={activeFormats.bold}
-            onClick={() => handleFormat('bold')}
-          >
-            <FormatBold fontSize="small" />
-          </ToolbarButton>
-        </Tooltip>
-
-        <Tooltip title="Italic" arrow>
-          <ToolbarButton
-            size="small"
-            active={activeFormats.italic}
-            onClick={() => handleFormat('italic')}
-          >
-            <FormatItalic fontSize="small" />
-          </ToolbarButton>
-        </Tooltip>
-
-        <Tooltip title="Underline" arrow>
-          <ToolbarButton
-            size="small"
-            active={activeFormats.underline}
-            onClick={() => handleFormat('underline')}
-          >
-            <FormatUnderlined fontSize="small" />
-          </ToolbarButton>
-        </Tooltip>
-
-        <Divider orientation="vertical" flexItem />
-
-        <Tooltip title="Bullet List" arrow>
-          <ToolbarButton
-            size="small"
-            active={activeFormats.list}
-            onClick={() => handleFormat('insertUnorderedList')}
-          >
-            <FormatListBulleted fontSize="small" />
-          </ToolbarButton>
-        </Tooltip>
-
-        <Tooltip title="Numbered List" arrow>
-          <ToolbarButton
-            size="small"
-            active={activeFormats.orderedList}
-            onClick={() => handleFormat('insertOrderedList')}
-          >
-            <FormatListNumbered fontSize="small" />
-          </ToolbarButton>
-        </Tooltip>
-
-        <Divider orientation="vertical" flexItem />
-
-        <Tooltip title="Quote" arrow>
-          <ToolbarButton size="small" onClick={() => handleFormat('formatBlock', 'blockquote')}>
-            <FormatQuote fontSize="small" />
-          </ToolbarButton>
-        </Tooltip>
-
-        <Tooltip title="Code" arrow>
-          <ToolbarButton size="small" onClick={() => handleFormat('formatBlock', 'pre')}>
-            <Code fontSize="small" />
-          </ToolbarButton>
-        </Tooltip>
-
-        <Divider orientation="vertical" flexItem />
-
-        <Tooltip title="Insert Link" arrow>
-          <ToolbarButton
-            size="small"
-            onClick={() => {
-              const url = window.prompt('Enter URL:');
-              if (url) handleFormat('createLink', url);
-            }}
-          >
-            <Link fontSize="small" />
-          </ToolbarButton>
-        </Tooltip>
-
-        <Tooltip title="Text Color" arrow>
-          <ToolbarButton size="small">
-            <FormatColorText fontSize="small" />
-          </ToolbarButton>
-        </Tooltip>
-
-        <Tooltip title="Background Color" arrow>
-          <ToolbarButton size="small">
-            <FormatColorFill fontSize="small" />
-          </ToolbarButton>
-        </Tooltip>
-      </RichToolbar>
-
-      <ContentEditableDiv
-        ref={contentRef}
-        contentEditable
-        data-placeholder={placeholder}
-        error={error}
-        focused={focused}
-        glass={glass}
-        customColor={color}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        onInput={handleInput}
-        onKeyUp={updateActiveFormats}
-        onMouseUp={updateActiveFormats}
-        role="textbox"
-        aria-multiline="true"
-        aria-label={placeholder || 'Rich text editor'}
-      />
-
-      {characterLimit && (
-        <CharacterCount limit={characterLimit} count={characterCount}>
-          {characterCount}
-          {characterLimit ? `/${characterLimit}` : ''}
-        </CharacterCount>
-      )}
-    </Box>
-  );
-};
-
-export const Textarea: React.FC<TextareaProps> = ({
-  variant = 'default',
-  color = 'primary',
-  size = 'md',
-  error = false,
-  helperText,
-  label,
-  glassLabel = false,
-  glow = false,
-  glass = false,
-  gradient = false,
-  icon,
-  iconPosition = 'start',
-  minRows = 3,
-  maxRows,
-  style,
-  'data-testid': dataTestId,
-  dataTestId: dataTestIdCamelCase,
-  ...props
-}) => {
   const [richTextValue, setRichTextValue] = useState('');
   const hasIcon = Boolean(icon);
-  const iconPadding = hasIcon ? (iconPosition === 'start' ? '40px' : '40px') : '0px';
   const testId = dataTestId || dataTestIdCamelCase;
 
   const textareaStyle = {
     ...style,
+    // Same gap either side; only which side it applies to changes. The previous
+    // version had `iconPosition === 'start' ? '40px' : '40px'`, a ternary whose
+    // two branches were identical.
     ...(hasIcon && {
-      [iconPosition === 'start' ? 'paddingLeft' : 'paddingRight']: iconPadding,
+      [iconPosition === 'start' ? 'paddingLeft' : 'paddingRight']: ICON_GUTTER,
     }),
   };
 
   // If rich text variant, use the rich text editor
   if (variant === 'rich') {
     return (
-      <Box sx={{ position: 'relative', width: '100%' }} data-testid={testId ? `${testId}-wrapper` : undefined}>
-        {label && (
-          <StyledLabel glass={glassLabel} error={error}>
-            {label}
-          </StyledLabel>
-        )}
-
-        <RichTextEditor
+      <TextareaShell testId={testId} label={label} glassLabel={glassLabel} error={error} helperText={helperText}>
+        <TextareaRichEditor
           value={richTextValue}
           onChange={setRichTextValue}
           placeholder={props.placeholder}
@@ -613,39 +258,14 @@ export const Textarea: React.FC<TextareaProps> = ({
           color={color}
           characterLimit={props.maxLength}
         />
-
-        {helperText && (
-          <FormHelperText error={error} sx={{ mt: 1 }}>
-            {helperText}
-          </FormHelperText>
-        )}
-      </Box>
+      </TextareaShell>
     );
   }
 
   return (
-    <Box sx={{ position: 'relative', width: '100%' }} data-testid={testId ? `${testId}-wrapper` : undefined}>
-      {label && (
-        <StyledLabel glass={glassLabel} error={error}>
-          {label}
-        </StyledLabel>
-      )}
-
+    <TextareaShell testId={testId} label={label} glassLabel={glassLabel} error={error} helperText={helperText}>
       <Box sx={{ position: 'relative' }}>
-        {hasIcon && (
-          <Box
-            sx={{
-              position: 'absolute',
-              top: '12px',
-              ...(iconPosition === 'start' ? { left: '12px' } : { right: '12px' }),
-              color: 'text.secondary',
-              pointerEvents: 'none',
-              zIndex: 1,
-            }}
-          >
-            {icon}
-          </Box>
-        )}
+        {hasIcon && <TextareaIcon icon={icon} iconPosition={iconPosition} />}
 
         <StyledTextarea
           customVariant={variant}
@@ -663,13 +283,7 @@ export const Textarea: React.FC<TextareaProps> = ({
           {...props}
         />
       </Box>
-
-      {helperText && (
-        <FormHelperText error={error} sx={{ mt: 1 }}>
-          {helperText}
-        </FormHelperText>
-      )}
-    </Box>
+    </TextareaShell>
   );
 };
 
