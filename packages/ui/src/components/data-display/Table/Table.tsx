@@ -1,69 +1,15 @@
-import MoreVertIcon from '@mui/icons-material/MoreVert';
 import {
-  Box,
-  FormControlLabel,
-  IconButton,
-  Menu,
-  MenuItem,
-  Skeleton,
-  Switch,
-  Table as MuiTable,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableRow,
   useMediaQuery,
   useTheme} from '@mui/material';
-import { styled } from '@mui/material/styles';
 import React, { useCallback,useEffect, useState } from 'react';
 
 import type {
   ColumnConfig,
-  TableDensity,
-  TableProps,
-  TableStripeColor} from './Table.types';
-import { EnhancedTableBody, EnhancedTableHeader } from './TableParts';
-import {
-  tableStyles,
-} from './Table.styles';
+  TableProps} from './Table.types';
+import { EnhancedTableHeader } from './TableParts';
+import { AdvancedTable, BasicTable, EmptyTable, LoadingTable } from './TableStates';
 
 // Define pulse animation
-const StyledTableContainer = styled(TableContainer, {
-  shouldForwardProp: (prop) => !['virtualScrolling', 'containerHeight'].includes(prop as string),
-})<{ 
-  virtualScrolling?: boolean; 
-  containerHeight?: number | string;
-}>(({ virtualScrolling, containerHeight }) => ({
-  ...(virtualScrolling && {
-    height: containerHeight || 400,
-    overflow: 'auto',
-  }),
-}));
-
-// Helper function to get stripe color from theme
-const StyledTable = styled(MuiTable, {
-  shouldForwardProp: (prop) =>
-    !['customVariant', 'glow', 'pulse', 'hoverable', 'density', 'stickyHeader', 'stripeColor'].includes(prop as string),
-})<{
-  customVariant?: string;
-  glow?: boolean;
-  pulse?: boolean;
-  hoverable?: boolean;
-  density?: TableDensity;
-  stickyHeader?: boolean;
-  stripeColor?: TableStripeColor;
-}>(({ theme, customVariant, glow, pulse, hoverable, density, stickyHeader, stripeColor = 'neutral' }) => {
-  return tableStyles({
-    theme,
-    customVariant,
-    glow,
-    pulse,
-    hoverable,
-    density,
-    stickyHeader,
-    stripeColor,
-  });
-});
 
 // Virtual Scrolling Hook
 const useResponsive = (
@@ -213,295 +159,114 @@ const definedProps = (props: TableProps): Partial<TableProps> =>
     Object.entries(props).filter(([, value]) => value !== undefined),
   ) as Partial<TableProps>;
 
-// The container + styled table + optional header, shared by the loading, empty
-// and populated renders.
-const TableShell: React.FC<{
-  innerRef: React.Ref<globalThis.HTMLTableElement>;
-  variant?: string;
-  stripeColor?: TableStripeColor;
-  glow?: boolean;
-  pulse?: boolean;
-  hoverable?: boolean;
-  density?: TableDensity;
-  stickyHeader?: boolean;
-  header: React.ReactNode;
-  rest: Record<string, unknown>;
-  children: React.ReactNode;
-}> = ({
+
+// Which of the four renders a set of props asks for. The order matters: a
+// loading table says nothing about its data, and an empty one still has columns
+// to draw a header from.
+const OWN_PROP_KEYS = [
+  'variant', 'stripeColor', 'glow', 'pulse', 'hoverable', 'loading', 'children',
+  'density', 'stickyHeader', 'selectable', 'selectedRows', 'onSelectionChange',
+  'rowKeyExtractor', 'sortable', 'sortConfig', 'onSortChange', 'columns', 'data',
+  'virtualScrolling', 'rowHeight', 'overscan', 'responsive', 'columnPriorities',
+  'showColumnToggle', 'containerHeight', 'loadingComponent', 'emptyStateComponent',
+  'renderRow', 'renderCell', 'onRowClick', 'onRowFocus', 'onRowBlur',
+];
+
+// Anything not in OWN_PROP_KEYS belongs to the underlying MUI table.
+const forwardedProps = (table: TableProps): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(table).filter(([key]) => !OWN_PROP_KEYS.includes(key)));
+
+// The loading and empty states render the same shell as the populated table,
+// so they share TableShell rather than repeating it three times.
+const buildShell = ({
+  table,
+  columns,
   innerRef,
-  variant,
-  stripeColor,
-  glow,
-  pulse,
-  hoverable,
-  density,
-  stickyHeader,
-  header,
   rest,
-  children,
-}) => (
-  <StyledTableContainer>
-    <StyledTable
-      ref={innerRef}
-      customVariant={variant}
-      stripeColor={stripeColor}
-      glow={glow}
-      pulse={pulse}
-      hoverable={hoverable}
-      density={density}
-      stickyHeader={stickyHeader}
-      {...rest}
-    >
-      {header}
-      {children}
-    </StyledTable>
-  </StyledTableContainer>
-);
-
-const SKELETON_ROW_COUNT = 5;
-
-const LoadingSkeletonRows: React.FC<{ columns?: ColumnConfig[] }> = ({ columns }) => (
-  <>
-    {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-      <TableRow key={index}>
-        {columns?.map((column) => (
-          <TableCell key={column.key}>
-            <Skeleton height={20} />
-          </TableCell>
-        ))}
-      </TableRow>
-    ))}
-  </>
-);
+  onSelectAll,
+}: {
+  table: TableProps;
+  columns?: ColumnConfig[];
+  innerRef: React.Ref<globalThis.HTMLTableElement>;
+  rest: Record<string, unknown>;
+  onSelectAll: (selected: boolean) => void;
+}) => ({
+  innerRef,
+  variant: table.variant,
+  stripeColor: table.stripeColor,
+  glow: table.glow,
+  pulse: table.pulse,
+  hoverable: table.hoverable,
+  density: table.density,
+  stickyHeader: table.stickyHeader,
+  header: columns ? (
+    <EnhancedTableHeader
+      columns={columns}
+      data={[]}
+      sortable={table.sortable}
+      sortConfig={table.sortConfig}
+      onSortChange={table.onSortChange}
+      selectable={table.selectable}
+      selectedRows={table.selectedRows}
+      onSelectAll={onSelectAll}
+      density={table.density}
+      stickyHeader={table.stickyHeader}
+    />
+  ) : null,
+  rest,
+});
 
 export const Table = React.forwardRef<globalThis.HTMLTableElement, TableProps>(
   (tableProps, ref) => {
-    const {
-      variant,
-      stripeColor,
-      glow,
-      pulse,
-      hoverable,
-      loading,
-      children,
-      density,
-      stickyHeader,
-      selectable,
-      selectedRows,
-      onSelectionChange,
-      rowKeyExtractor,
-      sortable,
-      sortConfig,
-      onSortChange,
-      columns,
-      data,
-      virtualScrolling,
-      rowHeight,
-      overscan,
-      responsive,
-      columnPriorities,
-      showColumnToggle,
-      containerHeight,
-      loadingComponent,
-      emptyStateComponent,
-      renderRow,
-      renderCell,
-      onRowClick,
-      onRowFocus,
-      onRowBlur,
-      ...props
-    } = { ...TABLE_DEFAULTS, ...definedProps(tableProps) } as TableProps;
+    const table = { ...TABLE_DEFAULTS, ...definedProps(tableProps) } as TableProps;
+    const { columns, data, responsive } = table;
     useTheme(); // Required for responsive behavior
 
-    const {
-      visibleColumns,
-      hiddenColumns,
-      isMobile,
-      columnMenuAnchor,
-      setColumnMenuAnchor,
-      setHiddenColumns,
-      handleSelectionChange,
-      handleSelectAll,
-    } = useTableSelection({
+    const selection = useTableSelection({
       columns,
       data,
       responsive,
-      columnPriorities,
-      selectedRows: selectedRows ?? [],
-      rowKeyExtractor,
-      onSelectionChange,
+      columnPriorities: table.columnPriorities,
+      selectedRows: table.selectedRows ?? [],
+      rowKeyExtractor: table.rowKeyExtractor,
+      onSelectionChange: table.onSelectionChange,
     });
+    const shownColumns = responsive ? selection.visibleColumns : columns;
+    const rest = forwardedProps(table);
 
-    // The loading and empty states render the same shell as the populated table,
-    // so they share TableShell rather than repeating it three times.
-    const shell = {
-      innerRef: ref,
-      variant,
-      stripeColor,
-      glow,
-      pulse,
-      hoverable,
-      density,
-      stickyHeader,
-      header: columns ? (
-        <EnhancedTableHeader
-          columns={responsive ? visibleColumns : columns}
-          data={[]}
-          sortable={sortable}
-          sortConfig={sortConfig}
-          onSortChange={onSortChange}
-          selectable={selectable}
-          selectedRows={selectedRows}
-          onSelectAll={handleSelectAll}
-          density={density}
-          stickyHeader={stickyHeader}
-        />
-      ) : null,
-      rest: props,
-    };
+    const shell = buildShell({ table, columns: shownColumns ?? columns, innerRef: ref, rest, onSelectAll: selection.handleSelectAll });
 
-    if (loading) {
+    if (table.loading) {
       return (
-        <TableShell {...shell}>
-          <TableBody data-testid="table-loading">
-            {loadingComponent || <LoadingSkeletonRows columns={columns} />}
-          </TableBody>
-        </TableShell>
+        <LoadingTable shell={shell} loadingComponent={table.loadingComponent} columns={columns} />
       );
     }
 
     if (data && data.length === 0) {
       return (
-        <TableShell {...shell}>
-          <TableBody>
-            <TableRow>
-              <TableCell
-                colSpan={(responsive ? visibleColumns : columns)?.length || 1}
-                align="center"
-              >
-                {emptyStateComponent || (
-                  <Box py={4} color="text.secondary">
-                    No data available
-                  </Box>
-                )}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </TableShell>
+        <EmptyTable
+          shell={shell}
+          columns={shownColumns}
+          emptyStateComponent={table.emptyStateComponent}
+        />
       );
     }
 
     // Advanced table with columns and data
     if (columns && data) {
-      const finalColumns = responsive ? visibleColumns : columns;
-
       return (
-        <Box position="relative">
-          <StyledTableContainer
-            virtualScrolling={virtualScrolling}
-            containerHeight={containerHeight}
-          >
-            <StyledTable
-              ref={ref}
-              customVariant={variant}
-              stripeColor={stripeColor}
-              glow={glow}
-              pulse={pulse}
-              hoverable={hoverable}
-              density={density}
-              stickyHeader={stickyHeader}
-              {...props}
-            >
-              <EnhancedTableHeader
-                columns={finalColumns}
-                data={data}
-                sortable={sortable}
-                sortConfig={sortConfig}
-                onSortChange={onSortChange}
-                selectable={selectable}
-                selectedRows={selectedRows}
-                onSelectAll={handleSelectAll}
-                density={density}
-                stickyHeader={stickyHeader}
-              />
-              <EnhancedTableBody
-                data={data}
-                columns={finalColumns}
-                selectedRows={selectedRows}
-                onRowClick={onRowClick}
-                onRowFocus={onRowFocus}
-                onRowBlur={onRowBlur}
-                onSelectionChange={handleSelectionChange}
-                rowKeyExtractor={rowKeyExtractor}
-                density={density}
-                selectable={selectable}
-                hoverable={hoverable}
-                renderRow={renderRow}
-                renderCell={renderCell}
-                virtualScrolling={virtualScrolling}
-                containerHeight={typeof containerHeight === 'number' ? containerHeight : undefined}
-                rowHeight={rowHeight}
-                overscan={overscan}
-              />
-            </StyledTable>
-          </StyledTableContainer>
-
-          {/* Column Toggle Menu for Responsive */}
-          {responsive && isMobile && showColumnToggle && hiddenColumns.length > 0 && (
-            <Box position="absolute" top={8} right={8}>
-              <IconButton
-                onClick={(event) => setColumnMenuAnchor(event.currentTarget)}
-                size="small"
-              >
-                <MoreVertIcon />
-              </IconButton>
-              <Menu
-                anchorEl={columnMenuAnchor}
-                open={Boolean(columnMenuAnchor)}
-                onClose={() => setColumnMenuAnchor(null)}
-              >
-                {columns.map((column, index) => (
-                  <MenuItem key={column.key}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={!hiddenColumns.includes(index)}
-                          onChange={(e) => {
-                            const newHidden = e.target.checked 
-                              ? hiddenColumns.filter(i => i !== index)
-                              : [...hiddenColumns, index];
-                            setHiddenColumns(newHidden);
-                          }}
-                          size="small"
-                        />
-                      }
-                      label={column.label}
-                    />
-                  </MenuItem>
-                ))}
-              </Menu>
-            </Box>
-          )}
-        </Box>
+        <AdvancedTable
+          table={table}
+          columns={shownColumns ?? columns}
+          data={data}
+          innerRef={ref}
+          rest={rest}
+          selection={selection}
+        />
       );
     }
 
-    // Basic table (backward compatibility)
-    return (
-      <StyledTable
-        ref={ref}
-        customVariant={variant}
-        stripeColor={stripeColor}
-        glow={glow}
-        pulse={pulse}
-        hoverable={hoverable}
-        density={density}
-        stickyHeader={stickyHeader}
-        {...props}
-      >
-        {children}
-      </StyledTable>
-    );
+    return <BasicTable table={table} innerRef={ref} rest={rest} />;
   }
 );
 
