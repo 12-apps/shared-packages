@@ -1,0 +1,126 @@
+// ---------------------------------------------------------------------------
+// @12-apps/entity-lifecycle — CANONICAL Prisma model partial (plug-and-play).
+//
+// This file is the single source of truth for the four generic lifecycle
+// tables. A host project does NOT copy these models into its main schema by
+// hand: it uses Prisma's multi-file schema folder and SYNCS this file into it
+// (see packages/shared-helpers/scripts/sync-lifecycle-schema.mjs in this repo
+// for the reference sync step — run before `prisma generate`).
+//
+// Host-agnostic by design:
+//   - The tracked record is named BY VALUE via (entity_type, entity_id) — no
+//     FK to the host's entity tables, so any collection plugs in with zero
+//     schema change here.
+//   - The tenant is a by-value `client_id` scalar — no relation to the host's
+//     tenant model (whose name this package cannot know). The host's SQL
+//     migration may add the FK constraint (recommended: ON DELETE CASCADE).
+//   - `kind` / `status` / `action` are Strings; the host migration adds CHECK
+//     constraints for the closed sets documented on each field.
+// ---------------------------------------------------------------------------
+
+// One row of an entity's version history. Version 1 (and any retention-
+// compaction base) is a FULL snapshot (`is_snapshot`, `data` = whole entity);
+// every other row is a DELTA: `data` holds only the top-level fields that
+// changed (their new values) and `removed_fields` the fields that disappeared.
+// The state at version N is rebuilt by replaying rows 1..N. `kind` is
+// CREATE | UPDATE | RESTORE. `actor_id` is the host's user id (by value);
+// null = system write. Append-only: no `updated_at`.
+model EntityVersion {
+  id            String   @id @default(uuid())
+  clientId      String   @map("client_id")
+  entityType    String   @map("entity_type")
+  entityId      String   @map("entity_id")
+  version       Int
+  kind          String
+  isSnapshot    Boolean  @map("is_snapshot")
+  data          Json
+  removedFields Json     @default("[]") @map("removed_fields")
+  actorId       String?  @map("actor_id")
+  // For kind RESTORE: which version was restored.
+  restoredFrom  Int?     @map("restored_from")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([clientId, entityType, entityId, version])
+  @@index([clientId, entityType, entityId])
+  // Serves the retention sweep ("versions older than N days").
+  @@index([createdAt])
+  @@map("entity_versions")
+}
+
+// One deleted record in a tenant's recycle bin. Deleting an aggregate records
+// a TREE: the root entry plus one child entry per dependent record deleted
+// along with it, linked via `parent_entry_id` — the registry the bin page
+// renders so a restore shows what it brings back. `snapshot` freezes the data
+// needed to preview/restore. `status` is DELETED | RESTORED | PURGED:
+// restore/purge KEEP the row as an audit trail (status flip, never deleted).
+model RecycleBinEntry {
+  id            String   @id @default(uuid())
+  clientId      String   @map("client_id")
+  entityType    String   @map("entity_type")
+  entityId      String   @map("entity_id")
+  parentEntryId String?  @map("parent_entry_id")
+  label         String
+  snapshot      Json
+  status        String   @default("DELETED")
+  deletedBy     String?  @map("deleted_by")
+  deletedAt     DateTime @default(now()) @map("deleted_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  parent   RecycleBinEntry?  @relation("RecycleBinTree", fields: [parentEntryId], references: [id], onDelete: Cascade)
+  children RecycleBinEntry[] @relation("RecycleBinTree")
+
+  // The bin page: a tenant's deleted roots, newest first.
+  @@index([clientId, status, deletedAt])
+  @@index([clientId, entityType, entityId])
+  @@index([parentEntryId])
+  @@map("recycle_bin_entries")
+}
+
+// A per-item draft: unpublished edits kept next to the live record.
+// `entity_id` NULL = a draft of a brand-new item that doesn't exist yet. At
+// most one OPEN draft per (tenant, type, entity) — enforce with a partial
+// unique index in the host migration (WHERE status = 'OPEN' AND entity_id IS
+// NOT NULL; Prisma cannot express the filter). `status` is
+// OPEN | PUBLISHED | DISCARDED; publish/discard keep the row as history.
+model EntityDraft {
+  id         String   @id @default(uuid())
+  clientId   String   @map("client_id")
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  data       Json
+  status     String   @default("OPEN")
+  createdBy  String?  @map("created_by")
+  updatedBy  String?  @map("updated_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([clientId, entityType, status])
+  @@index([clientId, entityType, entityId])
+  @@map("entity_drafts")
+}
+
+// A pending change awaiting approval. When the approvals feature is active
+// for a tenant+collection, a write by an actor without the approve permission
+// is parked here instead of applied; an approver later applies or rejects it.
+// `payload` is the full desired snapshot for CREATE/UPDATE (empty for
+// DELETE). `action` is CREATE | UPDATE | DELETE; `status` is
+// PENDING | APPROVED | REJECTED. Decided rows are kept as an audit trail.
+model ChangeRequest {
+  id           String    @id @default(uuid())
+  clientId     String    @map("client_id")
+  entityType   String    @map("entity_type")
+  entityId     String?   @map("entity_id")
+  action       String
+  payload      Json
+  status       String    @default("PENDING")
+  requestedBy  String?   @map("requested_by")
+  requestedAt  DateTime  @default(now()) @map("requested_at")
+  decidedBy    String?   @map("decided_by")
+  decidedAt    DateTime? @map("decided_at")
+  decisionNote String?   @map("decision_note")
+
+  // The approvals inbox: a tenant's pending requests, newest first.
+  @@index([clientId, status, requestedAt])
+  @@index([clientId, entityType, entityId])
+  @@map("change_requests")
+}

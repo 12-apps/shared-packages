@@ -58,7 +58,7 @@ function App() {
 ### Custom Fallback Component
 
 ```tsx
-import { BrokenImageIcon } from '@mui/icons-material';
+import BrokenImageIcon from '@mui/icons-material/BrokenImageIcon';
 
 <LazyImage
   src="https://example.com/image.jpg"

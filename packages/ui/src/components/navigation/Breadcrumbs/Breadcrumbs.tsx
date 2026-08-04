@@ -1,4 +1,8 @@
-import { ArrowForwardIos, ChevronRight, Home, MoreHoriz,NavigateNext } from '@mui/icons-material';
+import ArrowForwardIos from '@mui/icons-material/ArrowForwardIos';
+import ChevronRight from '@mui/icons-material/ChevronRight';
+import Home from '@mui/icons-material/Home';
+import MoreHoriz from '@mui/icons-material/MoreHoriz';
+import NavigateNext from '@mui/icons-material/NavigateNext';
 import {
   alpha,
   Box,

@@ -1,4 +1,5 @@
-import { LocationOn as LocationIcon, MyLocation as CurrentLocationIcon } from '@mui/icons-material';
+import LocationIcon from '@mui/icons-material/LocationOn';
+import CurrentLocationIcon from '@mui/icons-material/MyLocation';
 import {
   Alert,
   alpha,

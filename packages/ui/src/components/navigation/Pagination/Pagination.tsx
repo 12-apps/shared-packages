@@ -1,4 +1,7 @@
-import { FirstPage, LastPage, NavigateBefore, NavigateNext } from '@mui/icons-material';
+import FirstPage from '@mui/icons-material/FirstPage';
+import LastPage from '@mui/icons-material/LastPage';
+import NavigateBefore from '@mui/icons-material/NavigateBefore';
+import NavigateNext from '@mui/icons-material/NavigateNext';
 import type { PaginationRenderItemParams } from '@mui/material';
 import {
   alpha,

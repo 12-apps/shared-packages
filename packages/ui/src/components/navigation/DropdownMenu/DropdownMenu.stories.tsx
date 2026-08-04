@@ -1,22 +1,20 @@
-import {
-  Add,
-  Check,
-  Close,
-  Delete,
-  Download,
-  Edit,
-  FileCopy,
-  Logout,
-  MoreVert,
-  Person,
-  Print,
-  Refresh,
-  Remove,
-  Save,
-  Settings,
-  Share,
-  Upload,
-} from '@mui/icons-material';
+import Add from '@mui/icons-material/Add';
+import Check from '@mui/icons-material/Check';
+import Close from '@mui/icons-material/Close';
+import Delete from '@mui/icons-material/Delete';
+import Download from '@mui/icons-material/Download';
+import Edit from '@mui/icons-material/Edit';
+import FileCopy from '@mui/icons-material/FileCopy';
+import Logout from '@mui/icons-material/Logout';
+import MoreVert from '@mui/icons-material/MoreVert';
+import Person from '@mui/icons-material/Person';
+import Print from '@mui/icons-material/Print';
+import Refresh from '@mui/icons-material/Refresh';
+import Remove from '@mui/icons-material/Remove';
+import Save from '@mui/icons-material/Save';
+import Settings from '@mui/icons-material/Settings';
+import Share from '@mui/icons-material/Share';
+import Upload from '@mui/icons-material/Upload';
 import { Box, IconButton } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 

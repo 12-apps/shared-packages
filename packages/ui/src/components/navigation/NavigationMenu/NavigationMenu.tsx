@@ -1,4 +1,6 @@
-import { ChevronRight, ExpandMore, Menu as MenuIcon } from '@mui/icons-material';
+import ChevronRight from '@mui/icons-material/ChevronRight';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import MenuIcon from '@mui/icons-material/Menu';
 import {
   alpha,
   Box,

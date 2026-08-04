@@ -1,17 +1,15 @@
-import {
-  AccountTree,
-  Analytics,
-  Article,
-  Category,
-  CloudUpload,
-  Code,
-  Dashboard,
-  Folder,
-  Home,
-  Security,
-  Settings,
-  Storage,
-} from '@mui/icons-material';
+import AccountTree from '@mui/icons-material/AccountTree';
+import Analytics from '@mui/icons-material/Analytics';
+import Article from '@mui/icons-material/Article';
+import Category from '@mui/icons-material/Category';
+import CloudUpload from '@mui/icons-material/CloudUpload';
+import Code from '@mui/icons-material/Code';
+import Dashboard from '@mui/icons-material/Dashboard';
+import Folder from '@mui/icons-material/Folder';
+import Home from '@mui/icons-material/Home';
+import Security from '@mui/icons-material/Security';
+import Settings from '@mui/icons-material/Settings';
+import Storage from '@mui/icons-material/Storage';
 import { Box, createTheme, CssBaseline, Paper, Stack,ThemeProvider } from '@mui/material';
 import { Button, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';

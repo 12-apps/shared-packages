@@ -302,6 +302,28 @@ export function PaletteBody<T>(view: BodyView<T>): React.JSX.Element | null {
   );
 }
 
+/**
+ * The palette card: a flex column capped at the height its container allows, so
+ * the input and the filter chips stay pinned while only the results scroll and a
+ * long result set can never push the palette past the bottom of the viewport.
+ */
+export const PALETTE_CARD_SX = {
+  width: '100%',
+  maxWidth: 640,
+  maxHeight: '100%',
+  borderRadius: 2,
+  overflow: 'hidden',
+  display: 'flex',
+  flexDirection: 'column',
+} as const;
+
+/** The scrolling region of the card — the results, and nothing above them. */
+export function PaletteScrollArea({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <Box sx={{ minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>{children}</Box>
+  );
+}
+
 export { Paper };
 
 /** Context for the keydown handler builder. */

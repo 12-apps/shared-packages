@@ -2,6 +2,8 @@ import { Box, FormControl, FormLabel } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import React from 'react';
+
 import { UploadButton } from './UploadButton';
 
 const meta: Meta<typeof UploadButton> = {
@@ -175,9 +177,11 @@ export const KeyboardNavigation: Story = {
     const canvas = within(canvasElement);
     const uploadButton = canvas.getByRole('button');
 
-    // Test keyboard navigation
-    uploadButton.focus();
-    await expect(uploadButton).toHaveFocus();
+    // Test keyboard navigation. Focus is driven with `tab()` and awaited via
+    // waitFor: a bare `.focus()` plus an immediate assertion races the browser's
+    // own focus handling.
+    await userEvent.tab();
+    await waitFor(() => expect(uploadButton).toHaveFocus());
 
     // Test Enter key activation
     await userEvent.keyboard('{Enter}');
@@ -232,7 +236,7 @@ export const FocusManagement: Story = {
 
     // Test focus management
     await userEvent.tab();
-    await expect(uploadButton).toHaveFocus();
+    await waitFor(() => expect(uploadButton).toHaveFocus());
 
     // Test focus styles
     await expect(uploadButton).toBeVisible();
@@ -450,5 +454,120 @@ export const IntegrationTest: Story = {
 
     await expect(imageInput).toBeInTheDocument();
     await expect(documentInput).toBeInTheDocument();
+  },
+};
+
+/**
+ * Multi-file mode hands the whole selection over at once. Single-file callers
+ * are untouched — they neither set `multiple` nor pass `onSelectMany`.
+ */
+export const MultipleFilesGoToOnSelectMany: Story = {
+  render: function MultipleStory() {
+    const [names, setNames] = React.useState<string[]>([]);
+    return (
+      <Box>
+        <UploadButton
+          variant="dropzone"
+          multiple
+          accept=".xml"
+          onSelect={fn()}
+          onSelectMany={(files) => setNames(files.map((file) => file.name))}
+          data-testid="multi-dropzone"
+        />
+        <span data-testid="picked">{names.join(',')}</span>
+      </Box>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvasElement.querySelector('input[type="file"]') as HTMLInputElement;
+
+    // `multiple` reaches the real input, so the OS picker allows a selection.
+    await expect(input).toHaveAttribute('multiple');
+
+    await userEvent.upload(input, [
+      new File(['<nfeProc/>'], 'a.xml', { type: 'text/xml' }),
+      new File(['<nfeProc/>'], 'b.xml', { type: 'text/xml' }),
+    ]);
+
+    await waitFor(() => expect(canvas.getByTestId('picked')).toHaveTextContent('a.xml,b.xml'));
+  },
+};
+
+/**
+ * A rejected file does not cost the caller the valid ones beside it: the error
+ * is surfaced AND the good files are handed over. Dropping a folder that also
+ * holds a PDF should still import the XMLs.
+ */
+export const RejectedFilesDoNotBlockTheRest: Story = {
+  render: function PartialStory() {
+    const [names, setNames] = React.useState<string[]>([]);
+    return (
+      <Box>
+        <UploadButton
+          variant="dropzone"
+          multiple
+          onSelect={fn()}
+          onSelectMany={(files) => setNames(files.map((file) => file.name))}
+          validate={(file) => (file.name.endsWith('.xml') ? null : 'Somente arquivos XML.')}
+          data-testid="partial-dropzone"
+        />
+        <span data-testid="accepted">{names.join(',')}</span>
+      </Box>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvasElement.querySelector('input[type="file"]') as HTMLInputElement;
+
+    await userEvent.upload(input, [
+      new File(['<nfeProc/>'], 'nota.xml', { type: 'text/xml' }),
+      new File(['%PDF'], 'danfe.pdf', { type: 'application/pdf' }),
+    ]);
+
+    // The XML still arrives…
+    await waitFor(() => expect(canvas.getByTestId('accepted')).toHaveTextContent('nota.xml'));
+    // …and the rejection is reported rather than swallowed.
+    await waitFor(() => expect(canvas.getByText('Somente arquivos XML.')).toBeInTheDocument());
+  },
+};
+
+/**
+ * `onUpload` means the same thing in both modes. It ran only for single files
+ * once, which made it a silent no-op for a multi-file caller — nothing failed,
+ * nothing uploaded.
+ */
+export const MultipleFilesStillRunOnUpload: Story = {
+  render: function MultiUploadStory() {
+    const [uploaded, setUploaded] = React.useState<string[]>([]);
+    return (
+      <Box>
+        <UploadButton
+          variant="dropzone"
+          multiple
+          onSelect={fn()}
+          onSelectMany={fn()}
+          onUpload={async (file) => {
+            setUploaded((prev) => [...prev, file.name]);
+          }}
+          data-testid="multi-upload-dropzone"
+        />
+        <span data-testid="uploaded">{uploaded.join(',')}</span>
+      </Box>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvasElement.querySelector('input[type="file"]') as HTMLInputElement;
+
+    await userEvent.upload(input, [
+      new File(['a'], 'a.xml', { type: 'text/xml' }),
+      new File(['b'], 'b.xml', { type: 'text/xml' }),
+    ]);
+
+    // Every accepted file goes through the upload path, in order.
+    await waitFor(() => expect(canvas.getByTestId('uploaded')).toHaveTextContent('a.xml,b.xml'), {
+      timeout: 5000,
+    });
   },
 };

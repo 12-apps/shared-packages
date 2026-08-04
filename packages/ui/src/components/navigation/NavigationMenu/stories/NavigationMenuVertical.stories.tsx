@@ -1,14 +1,12 @@
-import {
-  Analytics,
-  Business,
-  Dashboard,
-  Home,
-  Inventory,
-  People,
-  Report,
-  Settings,
-  ShoppingCart,
-} from '@mui/icons-material';
+import Analytics from '@mui/icons-material/Analytics';
+import Business from '@mui/icons-material/Business';
+import Dashboard from '@mui/icons-material/Dashboard';
+import Home from '@mui/icons-material/Home';
+import Inventory from '@mui/icons-material/Inventory';
+import People from '@mui/icons-material/People';
+import Report from '@mui/icons-material/Report';
+import Settings from '@mui/icons-material/Settings';
+import ShoppingCart from '@mui/icons-material/ShoppingCart';
 import { Avatar,Box, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 

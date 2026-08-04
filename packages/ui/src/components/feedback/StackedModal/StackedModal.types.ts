@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
 
+/** A modal's position in the stack: the top panel, the one behind it, or hidden. */
+export type ModalPanelRole = 'primary' | 'secondary' | 'background';
+
+/** The breakpoint the panel's width is capped at, or `false` for uncapped. */
+export type PanelMaxWidth = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | false;
+
 export interface StackedModalProps {
   /** Controls the visibility of the modal */
   open: boolean;
@@ -9,6 +15,14 @@ export interface StackedModalProps {
   glass?: boolean;
   /** Title displayed in the modal navigation bar */
   navigationTitle?: string | ReactNode;
+  /**
+   * Drops the header's ✕ so the navigation bar is a breadcrumb only. For panels
+   * whose CONTENT owns the dismiss (a sticky action bar with its own close):
+   * two ✕ a few pixels apart are the same action twice with nothing to tell
+   * them apart. Never hides the BACK arrow of a stacked panel — that one is a
+   * different action, and it is the only way out of depth ≥2.
+   */
+  hideClose?: boolean;
   /** Modal content */
   children?: ReactNode;
   /** Actions to display in the modal header (desktop) or footer (mobile) */
@@ -26,7 +40,7 @@ export interface StackedModalProps {
   /** Make modal full screen */
   fullScreen?: boolean;
   /** Maximum width of the modal */
-  maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | false;
+  maxWidth?: PanelMaxWidth;
   /** Disable the backdrop click behavior */
   disableBackdrop?: boolean;
   /** Disable focus trap functionality */
@@ -49,7 +63,7 @@ export interface ModalInfo {
   /** Z-index value for stacking */
   zIndex: number;
   /** Role in the modal stack */
-  role: 'primary' | 'secondary' | 'background';
+  role: ModalPanelRole;
 }
 
 export interface ModalStackContextValue {
@@ -66,5 +80,5 @@ export interface ModalStackContextValue {
   /** Check if a modal is in the stack */
   isModalInStack: (modalId: string) => boolean;
   /** Get the role of a modal in the stack */
-  getModalRole: (modalId: string) => 'primary' | 'secondary' | 'background' | null;
+  getModalRole: (modalId: string) => ModalPanelRole | null;
 }

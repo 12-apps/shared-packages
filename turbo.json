@@ -2,74 +2,113 @@
   "$schema": "https://turborepo.com/schema.json",
   "ui": "tui",
   "globalEnv": [
-    "NODE_ENV",
-    "DATABASE_URL",
-    "USE_FILE_DB",
-    "PGLITE_DATA_DIR",
-    "PRISMA_LOG_QUERIES",
-    "SKIP_ENV_VALIDATION",
-    "NEXT_PHASE",
-    "NEXT_RUNTIME",
     "ADMIN_EMAILS",
-    "AUTH_SECRET",
-    "AUTH_URL",
-    "AUTH_TRUST_HOST",
-    "AUTH_DEBUG",
-    "GOOGLE_CLIENT_ID",
-    "GOOGLE_CLIENT_SECRET",
-    "FACEBOOK_CLIENT_ID",
-    "FACEBOOK_CLIENT_SECRET",
     "APPLE_CLIENT_ID",
     "APPLE_CLIENT_SECRET",
-    "AZURE_AD_TENANT_ID",
+    "AUTH_DEBUG",
+    "AUTH_SECRET",
+    "AUTH_TRUST_HOST",
+    "AUTH_URL",
     "AZURE_AD_CLIENT_ID",
     "AZURE_AD_CLIENT_SECRET",
-    "OAUTH_MOCK_ISSUER",
+    "AZURE_AD_TENANT_ID",
+    "CACHE_DEBUG",
+    "COMPONENT",
+    "COVERAGE",
+    "DATABASE_URL",
+    "DATA_ENCRYPTION_KEY",
     "DEFAULT_TENANT_SLUG",
-    "SEED_DATASET",
     "DEV_ADMIN_EMAIL",
-    "S3_REGION",
+    "FACEBOOK_CLIENT_ID",
+    "FACEBOOK_CLIENT_SECRET",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "LOG_LEVEL",
+    "MAXMIND_ACCOUNT_ID",
+    "MAXMIND_LICENSE_KEY",
+    "MAX_WORKERS",
+    "MCP_BEARER_ENABLED",
+    "MCP_DISPATCH_BASE_URL",
+    "NEXT_PHASE",
+    "NEXT_RUNTIME",
+    "NODE_ENV",
+    "OAUTH_MOCK_ISSUER",
+    "OVERRIDE_DATE",
+    "PGLITE_DATA_DIR",
+    "PRISMA_LOG_QUERIES",
     "S3_ACCESS_KEY_ID",
-    "S3_SECRET_ACCESS_KEY",
     "S3_BUCKET",
     "S3_ENDPOINT",
     "S3_FORCE_PATH_STYLE",
+    "S3_REGION",
+    "S3_SECRET_ACCESS_KEY",
+    "SEED_DATASET",
+    "SHARD",
+    "SHIFT_POSTGRES_TEST_URL",
+    "SITE_DOMAIN",
+    "SKIP_ENV_VALIDATION",
+    "SKIP_STORYBOOK_PING",
+    "SNOW_CONNECT_TIMEOUT_MS",
+    "SNOW_TIMEOUT_MS",
     "STORAGE_DRIVER",
     "STORAGE_PUBLIC_BASE_URL",
+    "STORYBOOK_URL",
+    "TEST_TIMEOUT",
     "UPLOADS_DIR",
-    "DATA_ENCRYPTION_KEY",
-    "MCP_BEARER_ENABLED",
-    "MCP_DISPATCH_BASE_URL",
-    "SITE_DOMAIN",
-    "CACHE_DEBUG",
-    "LOG_LEVEL",
-    "WRITE_HEAP_SNAPSHOTS",
-    "SNOW_TIMEOUT_MS",
-    "SNOW_CONNECT_TIMEOUT_MS",
-    "MAXMIND_ACCOUNT_ID",
-    "MAXMIND_LICENSE_KEY"
+    "USE_FILE_DB",
+    "WRITE_HEAP_SNAPSHOTS"
   ],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": ["dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint"
+      ]
     },
     "check-types": {
-      "dependsOn": ["^build", "^check-types"]
+      "dependsOn": [
+        "^build",
+        "^check-types"
+      ]
     },
     "test": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "src/**", "**/*.test.{ts,tsx}", "vitest.config.*"],
-      "outputs": ["coverage/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "src/**",
+        "**/*.test.{ts,tsx}",
+        "vitest.config.*"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
     },
     "test:coverage": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "src/**", "**/*.test.{ts,tsx}", "vitest.config.*"],
-      "outputs": ["coverage/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "src/**",
+        "**/*.test.{ts,tsx}",
+        "vitest.config.*"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
     },
     "dev": {
       "cache": false,

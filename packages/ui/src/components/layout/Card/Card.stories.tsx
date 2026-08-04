@@ -1,14 +1,12 @@
-import {
-  Edit,
-  Email,
-  Favorite,
-  LocationOn,
-  MoreVert,
-  Phone,
-  Share,
-  ShoppingCart,
-  Star,
-} from '@mui/icons-material';
+import Edit from '@mui/icons-material/Edit';
+import Email from '@mui/icons-material/Email';
+import Favorite from '@mui/icons-material/Favorite';
+import LocationOn from '@mui/icons-material/LocationOn';
+import MoreVert from '@mui/icons-material/MoreVert';
+import Phone from '@mui/icons-material/Phone';
+import Share from '@mui/icons-material/Share';
+import ShoppingCart from '@mui/icons-material/ShoppingCart';
+import Star from '@mui/icons-material/Star';
 import { Avatar, Box, Button, Chip, Grid,IconButton, Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 

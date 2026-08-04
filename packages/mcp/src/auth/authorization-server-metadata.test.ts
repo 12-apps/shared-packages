@@ -37,15 +37,15 @@ describe("buildAuthorizationServerMetadata", () => {
 
   it("passes the supplied scopes through to scopes_supported", () => {
     const meta = buildAuthorizationServerMetadata({
-      issuer: "https://tenant.example.com",
+      issuer: "https://tenant.futuredrink.com.br",
       scopesSupported: ["mcp:read"],
     });
 
     expect(meta.scopes_supported).toEqual(["mcp:read"]);
     // Endpoints stay on the supplied issuer origin.
-    expect(meta.issuer).toBe("https://tenant.example.com");
+    expect(meta.issuer).toBe("https://tenant.futuredrink.com.br");
     expect(meta.authorization_endpoint).toBe(
-      "https://tenant.example.com/api/oauth/authorize",
+      "https://tenant.futuredrink.com.br/api/oauth/authorize",
     );
   });
 

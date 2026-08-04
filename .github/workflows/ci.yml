@@ -136,6 +136,30 @@ jobs:
       issues: write # semantic-release release comments
       pull-requests: write
       id-token: write # OIDC trusted publishing — no token
+    env:
+      # Every publishable package, in topological order (dependencies first).
+      # Paths rather than names because payments is a nested workspace.
+      PUBLISH_DIRS: >-
+        packages/eslint-config
+        packages/typescript-config
+        packages/auth
+        packages/entitlements
+        packages/entity-lifecycle
+        packages/forms-core
+        packages/jobs
+        packages/payments/backend
+        packages/product-research
+        packages/rbac
+        packages/realtime
+        packages/shift
+        packages/stock-domain
+        packages/payments/frontend
+        packages/ui
+        packages/onboarding
+        packages/product-research-ui
+        packages/report-builder
+        packages/mcp
+        packages/shared-helpers
     steps:
       - uses: actions/checkout@v4
         with:
@@ -164,9 +188,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -o pipefail
-          for pkg in typescript-config eslint-config shared-helpers ui auth mcp onboarding; do
+          # Directory paths, not bare names: payments ships as a nested
+          # workspace (packages/payments/{backend,frontend}). Order is
+          # topological — a package is released only after everything it
+          # depends on, so prepare-publish.mjs always resolves workspace:*
+          # interdeps to a version that already exists.
+          for dir in $PUBLISH_DIRS; do
+            pkg="$(basename "$dir")"
             echo "::group::semantic-release $pkg"
-            ( cd "packages/$pkg" \
+            ( cd "$dir" \
                 && pnpm dlx semantic-release --tag-format "$pkg-v\${version}" )
             echo "::endgroup::"
           done
@@ -183,9 +213,10 @@ jobs:
           # OIDC (forcing anonymous auth -> 404). Remove it so npm uses the OIDC
           # id-token for trusted publishing.
           npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
-          for pkg in typescript-config eslint-config shared-helpers auth mcp ui onboarding; do
+          for dir in $PUBLISH_DIRS; do
+            pkg="$(basename "$dir")"
             echo "::group::npm publish $pkg"
-            if ( cd "packages/$pkg" && npm publish --access restricted ) 2>&1 | tee -a publish.log; then
+            if ( cd "$dir" && npm publish --access restricted ) 2>&1 | tee -a publish.log; then
               echo "published $pkg"
             else
               grep -q "cannot publish over the previously published versions" publish.log \

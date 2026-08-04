@@ -1,4 +1,6 @@
-import { Delete as DeleteIcon, Edit as EditIcon, Star as StarIcon } from '@mui/icons-material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import StarIcon from '@mui/icons-material/Star';
 import {
   Avatar,
   Box,

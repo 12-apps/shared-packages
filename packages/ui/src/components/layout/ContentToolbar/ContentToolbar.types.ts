@@ -124,6 +124,15 @@ export interface MultiSelectDropdownProps<TValue extends string = string> {
   searchPlaceholder?: string;
   /** Shown when the search matches no options. @default "No results" */
   noResultsLabel?: string;
+  /**
+   * Trigger layout. `inline` (default) renders a compact `Label:` text button for
+   * a horizontal toolbar. `stacked` renders the label on its own line above a
+   * full-width, outlined select-style control (a filter panel). `pill` renders a
+   * rounded outlined chip (`Label ▾`, with a count when a selection is active) —
+   * for a horizontal filter row.
+   * @default "inline"
+   */
+  layout?: 'inline' | 'stacked' | 'pill';
   'data-testid'?: string;
 }
 

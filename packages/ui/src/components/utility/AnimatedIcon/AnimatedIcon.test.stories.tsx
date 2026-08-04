@@ -1,4 +1,7 @@
-import { Favorite, Refresh,Settings, Star } from '@mui/icons-material';
+import Favorite from '@mui/icons-material/Favorite';
+import Refresh from '@mui/icons-material/Refresh';
+import Settings from '@mui/icons-material/Settings';
+import Star from '@mui/icons-material/Star';
 import { Box, Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';

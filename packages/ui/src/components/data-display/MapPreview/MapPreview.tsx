@@ -1,14 +1,12 @@
-import {
-  Fullscreen as FullscreenIcon,
-  Layers as LayersIcon,
-  LocationOn as LocationIcon,
-  MyLocation as CenterIcon,
-  Navigation as NavigationIcon,
-  Place as PlaceIcon,
-  Search as SearchIcon,
-  ZoomIn as ZoomInIcon,
-  ZoomOut as ZoomOutIcon,
-} from '@mui/icons-material';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import LayersIcon from '@mui/icons-material/Layers';
+import LocationIcon from '@mui/icons-material/LocationOn';
+import CenterIcon from '@mui/icons-material/MyLocation';
+import NavigationIcon from '@mui/icons-material/Navigation';
+import PlaceIcon from '@mui/icons-material/Place';
+import SearchIcon from '@mui/icons-material/Search';
+import ZoomInIcon from '@mui/icons-material/ZoomIn';
+import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import { alpha, Box, IconButton, InputAdornment,Paper, styled, TextField, Tooltip, Typography, useTheme } from '@mui/material';
 import type { FC} from 'react';
 import React, { useCallback,useEffect, useRef, useState } from 'react';

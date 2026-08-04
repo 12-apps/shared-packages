@@ -1,14 +1,21 @@
-import Google from "next-auth/providers/google";
-import Facebook from "next-auth/providers/facebook";
-import Apple from "next-auth/providers/apple";
-import type { NextAuthConfig, Session, DefaultSession } from "next-auth";
+import type { AuthConfig } from "@auth/core";
+import Google from "@auth/core/providers/google";
+import Facebook from "@auth/core/providers/facebook";
+import Apple from "@auth/core/providers/apple";
+import type { DefaultSession, Session } from "@auth/core/types";
 import { z } from "zod";
 import { isAdminEmail } from "./admin";
 
 /**
- * NextAuth configuration, split out from the `NextAuth()` instance (index.ts) so
- * it can be imported without pulling the full server runtime — useful for tests
- * and edge contexts.
+ * Auth.js configuration, split out from the request handler (index.ts) so it can
+ * be imported without pulling the full server runtime — useful for tests.
+ *
+ * It targets `@auth/core` directly rather than the `next-auth` wrapper (FUT-665).
+ * The wrapper's only additions over core were a Next-flavoured `auth()` built on
+ * `next/headers` and a handler that rebuilt the request as a `NextRequest` — both
+ * of which pinned this package to a framework `apps/web` no longer runs. The
+ * providers are the same modules (`next-auth/providers/google` was a re-export of
+ * `@auth/core/providers/google`), so the sign-in behaviour is unchanged.
  */
 
 /**
@@ -19,7 +26,7 @@ import { isAdminEmail } from "./admin";
  * OWNER/ADMIN rights are NOT on the session — a user can administer one tenant
  * and not another, so those are resolved per request from `Membership`.
  */
-declare module "next-auth" {
+declare module "@auth/core/types" {
   interface Session {
     user: {
       id: string;
@@ -58,8 +65,6 @@ let _envCache: EnvConfig | null = null;
 function isBuildTime(): boolean {
   // Explicit skip flag
   if (process.env.SKIP_ENV_VALIDATION === "true") return true;
-  // Next.js build phase indicator
-  if (process.env.NEXT_PHASE === "phase-production-build") return true;
   // AUTH_SECRET not available (likely build time)
   if (!process.env.AUTH_SECRET) return true;
   return false;
@@ -245,10 +250,10 @@ function redactSecrets(value: unknown, seen = new WeakSet<object>()): unknown {
 }
 
 /**
- * Auth configuration for NextAuth.js v5
+ * Auth.js configuration.
  * Supports Google, Facebook, and Apple OAuth providers (configured dynamically)
  */
-export const authConfig: NextAuthConfig = {
+export const authConfig: AuthConfig = {
   providers: buildProviders(),
   pages: {
     signIn: "/login",

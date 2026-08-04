@@ -1,19 +1,17 @@
-import {
-  CheckCircle,
-  Error as ErrorIcon,
-  Favorite,
-  FiberManualRecord,
-  Info,
-  Mail,
-  NewReleases,
-  Notifications,
-  Schedule,
-  ShoppingCart,
-  Star,
-  TrendingUp,
-  Verified,
-  Warning,
-} from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import Favorite from '@mui/icons-material/Favorite';
+import FiberManualRecord from '@mui/icons-material/FiberManualRecord';
+import Info from '@mui/icons-material/Info';
+import Mail from '@mui/icons-material/Mail';
+import NewReleases from '@mui/icons-material/NewReleases';
+import Notifications from '@mui/icons-material/Notifications';
+import Schedule from '@mui/icons-material/Schedule';
+import ShoppingCart from '@mui/icons-material/ShoppingCart';
+import Star from '@mui/icons-material/Star';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import Verified from '@mui/icons-material/Verified';
+import Warning from '@mui/icons-material/Warning';
 import {
   Avatar,
   Box,

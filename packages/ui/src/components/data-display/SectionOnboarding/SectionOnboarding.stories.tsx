@@ -1,4 +1,4 @@
-import { CreditCard } from '@mui/icons-material';
+import CreditCard from '@mui/icons-material/CreditCard';
 import { Box, Chip, SvgIcon, TextField, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { fn } from 'storybook/test';

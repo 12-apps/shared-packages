@@ -156,7 +156,8 @@ function CompleteExample() {
 ### With Custom Icons
 
 ```tsx
-import { ArrowBack, ArrowForward } from '@mui/icons-material';
+import ArrowBack from '@mui/icons-material/ArrowBack';
+import ArrowForward from '@mui/icons-material/ArrowForward';
 
 <Pagination
   page={1}

@@ -2,7 +2,7 @@ import { Box, Button, TextField, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
-import { Dashboard } from './Dashboard';
+import { Dashboard, markDashboardSlot } from './Dashboard';
 
 const meta: Meta<typeof Dashboard> = {
   title: 'Layout/Dashboard/Tests',
@@ -158,6 +158,32 @@ export const OrderIndependentRendering: Story = {
       const bcBeforeHeader = breadcrumb.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING;
       const headerBeforeBody = header.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING;
       await expect(Boolean(bcBeforeHeader)).toBe(true);
+      await expect(Boolean(headerBeforeBody)).toBe(true);
+    });
+  },
+};
+
+/** A page-owned wrapper around `<Dashboard.Header>`, tagged with its slot. */
+const WrappedHeader = markDashboardSlot(
+  ({ title }: { title: string }) => <Dashboard.Header title={title} />,
+  'header',
+);
+
+export const MarkedWrapperKeepsHeaderAboveBody: Story = {
+  name: '🧪 A slot-marked header wrapper still renders above the body',
+  render: () => (
+    <Dashboard>
+      <Dashboard.Breadcrumb items={[{ label: 'Admin', href: '#' }, { label: 'Wrapped' }]} />
+      <WrappedHeader title="Wrapped" />
+      <Dashboard.Body>{body}</Dashboard.Body>
+    </Dashboard>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    await step('Wrapped header sits above the body, not below it', async () => {
+      const header = canvas.getByTestId('dashboard-header');
+      const content = canvas.getByTestId('dashboard-body');
+      const headerBeforeBody = header.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING;
       await expect(Boolean(headerBeforeBody)).toBe(true);
     });
   },

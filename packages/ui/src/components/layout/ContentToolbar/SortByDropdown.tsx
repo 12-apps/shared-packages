@@ -1,6 +1,7 @@
 'use client';
 
-import { Check as CheckIcon, KeyboardArrowDown as ChevronDownIcon } from '@mui/icons-material';
+import CheckIcon from '@mui/icons-material/Check';
+import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { Box, Button, Divider, ListSubheader, Menu, MenuItem, Typography } from '@mui/material';
 import React, { useState } from 'react';
 
@@ -43,6 +44,20 @@ function buildTriggerLabel(
     if (other) return `${fieldDef.label} (${orderOption.label.toLowerCase()}-${other.label.toLowerCase()})`;
   }
   return `${fieldDef.label} (${orderOption.label.toLowerCase()})`;
+}
+
+/** The trigger's full label (md+), short label (mobile), and direction arrow. */
+function resolveTriggerParts(
+  fieldDef: SortFieldDefinition | undefined,
+  orderOption: SortOrderOption | undefined,
+  orderOptions: SortOrderOption[],
+): { full: string; short: string; arrowSuffix: string } {
+  const useRangeLabel = fieldDef?.triggerLabelStyle === 'range' && orderOptions.length === 2;
+  const orderIndex = orderOptions.findIndex((option) => option.value === orderOption?.value);
+  const arrow = resolveArrowDirection(orderOption, orderIndex);
+  const arrowSuffix = orderOptions.length > 0 && !useRangeLabel ? ` ${arrow === 'down' ? '↓' : '↑'}` : '';
+  const full = buildTriggerLabel(fieldDef, orderOption);
+  return { full, short: fieldDef?.label ?? full, arrowSuffix };
 }
 
 const sectionLabelSx = { px: 1, py: 0.75, fontSize: '0.75rem', fontWeight: 600, color: 'text.primary', lineHeight: 1.5 } as const;
@@ -162,22 +177,24 @@ export function SortByDropdown<TField extends string = string>({
   const activeFieldDef = findActiveField(fields, activeField);
   const orderOptions = activeFieldDef?.orderOptions ?? [];
   const activeOrderOption = findActiveOrder(activeFieldDef, activeOrder);
-  const useRangeLabel = activeFieldDef?.triggerLabelStyle === 'range' && orderOptions.length === 2;
-
-  const orderIndex = orderOptions.findIndex((option) => option.value === activeOrderOption?.value);
-  const arrow = resolveArrowDirection(activeOrderOption, orderIndex);
-  const arrowSuffix = orderOptions.length > 0 && !useRangeLabel ? ` ${arrow === 'down' ? '↓' : '↑'}` : '';
+  const trigger = resolveTriggerParts(activeFieldDef, activeOrderOption, orderOptions);
 
   function handleFieldChange(field: TField): void {
+    // Switch field in ONE callback. Previously this also fired `onOrderChange`
+    // to reset the order, but a consumer whose `onOrderChange` derives the field
+    // from its own (now-stale) prop would re-apply the OLD field — silently
+    // reverting the field change (e.g. picking "E-mail" snapped back to "Nome").
+    // The field-change consumer owns the resulting order.
     onFieldChange(field);
-    const nextOrder = safeFields.find((candidate) => candidate.value === field)?.orderOptions?.[0]?.value;
-    if (nextOrder && onOrderChange) onOrderChange(nextOrder);
     close();
   }
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.875rem' }}>
-      <Typography component="span" sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+      <Typography
+        component="span"
+        sx={{ display: { xs: 'none', md: 'inline' }, color: 'text.secondary', fontSize: '0.875rem' }}
+      >
         Sort By:
       </Typography>
       <Button
@@ -190,8 +207,15 @@ export function SortByDropdown<TField extends string = string>({
         onClick={(event) => setAnchorEl(event.currentTarget)}
         sx={{ minWidth: 0, height: 32, px: 1, gap: 0.5, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
       >
-        {buildTriggerLabel(activeFieldDef, activeOrderOption)}
-        {arrowSuffix}
+        {/* Full "Nome (crescente)" on md+; just the field name on mobile — the
+            arrow already conveys the direction, so the parenthetical is dropped. */}
+        <Box component="span" sx={{ display: { xs: 'none', md: 'inline' } }}>
+          {trigger.full}
+        </Box>
+        <Box component="span" sx={{ display: { xs: 'inline', md: 'none' } }}>
+          {trigger.short}
+        </Box>
+        {trigger.arrowSuffix}
         <ChevronDownIcon sx={{ fontSize: 14 }} />
       </Button>
       <SortMenu

@@ -1,10 +1,8 @@
-import {
-  CheckCircle as CompleteIcon,
-  Close as CloseIcon,
-  NavigateBefore as PrevIcon,
-  NavigateNext as NextIcon,
-  Refresh as RestartIcon,
-} from '@mui/icons-material';
+import CompleteIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import PrevIcon from '@mui/icons-material/NavigateBefore';
+import NextIcon from '@mui/icons-material/NavigateNext';
+import RestartIcon from '@mui/icons-material/Refresh';
 import {
   alpha,
   Box,

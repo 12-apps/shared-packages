@@ -1,4 +1,7 @@
-import { CheckCircle, Error as ErrorIcon, Info, Warning } from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import Info from '@mui/icons-material/Info';
+import Warning from '@mui/icons-material/Warning';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,Mock,userEvent, waitFor, within } from 'storybook/test';
 

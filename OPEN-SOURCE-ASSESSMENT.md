@@ -134,9 +134,19 @@ here the moment it does, and starts mattering more in the private consumers.
    public repo should not telegraph an unannounced product name, and a test
    fixture should not hardcode any product's domain.
 
-### Blocker — and it is now a prerequisite, not just hygiene
+### Blocker — RESOLVED
 
-**`packages/shared-helpers/prisma/` is one app's data model, not a shared
+> **Status:** resolved when the packages were re-imported from `future-pay`.
+> `packages/shared-helpers/prisma/schema/schema.prisma` is now datasource +
+> generator only; the app's domain models never came across. What the host
+> schema holds is 17 models, every one of them owned by a plugin package in
+> this repo (`entity-lifecycle`, `product-research`, `report-builder`, `shift`,
+> `payments-backend`), synced in by each package's own script. `prisma generate`
+> and the full test suite pass against it. Two modules stayed behind for the
+> same reason the schema did — see *Excluded* below. The original finding is
+> kept here because it is why the split was done.
+
+**`packages/shared-helpers/prisma/` was one app's data model, not a shared
 helper.** It carries a 1,122-line schema with 38 models, 27 migrations, and
 seed data — the full commerce domain: `Order`, `OrderCharge`, `Payment`,
 `SavedCard`, `CustomerProfile`, `StockLot`, `StockMovement`, `Recipe`,
@@ -155,15 +165,29 @@ important one:
    this split has to happen for the refactor to work *even if the repo stays
    private forever*. Open-sourcing just makes the deadline visible.
 
-Options:
+What was done: the schema, its migrations and its seeds stayed in the app. The
+generic Prisma *helpers* in `src/prisma/` — `actor-context.ts`,
+`audit-extension.ts`, `append-only-extension.ts`, `search-normalize.ts` — came
+across, because they carry no models and are reusable by both apps.
 
-- **Recommended:** move `prisma/` (schema, migrations, seeds) into the consuming
-  app, or into a separate private `@12-apps/db` package per app. Keep the
-  genuinely generic Prisma *helpers* in `src/prisma/` —
-  `audit-extension.ts`, `actor-context.ts`, `search-normalize.ts` — which are
-  reusable across both apps and reveal nothing.
-- **Minimum:** exclude `packages/shared-helpers` from the public split and
-  publish the other packages first.
+### Excluded — host-coupled, not shareable
+
+Three things were deliberately left in `future-pay`, each for the same reason:
+they cannot function without the app's schema or its screens.
+
+- **`shared-helpers/src/notifications/`** — the only module in the package that
+  touches Prisma model delegates, and it needs five app-owned models
+  (`Notification`, `NotificationPreference`, `NotificationDelivery`,
+  `PushSubscription`, and `User`). Its own header already flagged it as a
+  placement call that could lift out later; it needs its own schema partial
+  before it can ship, plus a port for the user lookup.
+- **`spa-shared`** — app glue, not a library: `brand.ts` is literally product
+  branding, and the impersonation UI is wired to `apps/admin`.
+- **`state-api-library`** — unclear provenance. It is ISC-licensed, `private`,
+  outside the `@repo` scope, and its own description refers to "each G2i AI
+  app", so it appears to be vendored from elsewhere. Publishing code whose
+  origin is not established is the one licence risk in the set; establish where
+  it came from before moving it anywhere.
 
 ### Legal and hygiene gaps
 

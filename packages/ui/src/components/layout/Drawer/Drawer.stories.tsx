@@ -1,13 +1,11 @@
-import {
-  Analytics,
-  Dashboard,
-  Help,
-  Home,
-  Menu as MenuIcon,
-  Notifications,
-  Person,
-  Settings,
-} from '@mui/icons-material';
+import Analytics from '@mui/icons-material/Analytics';
+import Dashboard from '@mui/icons-material/Dashboard';
+import Help from '@mui/icons-material/Help';
+import Home from '@mui/icons-material/Home';
+import MenuIcon from '@mui/icons-material/Menu';
+import Notifications from '@mui/icons-material/Notifications';
+import Person from '@mui/icons-material/Person';
+import Settings from '@mui/icons-material/Settings';
 import {
   Box,
   Button,

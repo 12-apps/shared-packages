@@ -1,4 +1,6 @@
-import { Business, Home, LocalShipping } from '@mui/icons-material';
+import Business from '@mui/icons-material/Business';
+import Home from '@mui/icons-material/Home';
+import LocalShipping from '@mui/icons-material/LocalShipping';
 import { Alert,Box, Paper, Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';

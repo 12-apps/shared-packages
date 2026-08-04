@@ -1,4 +1,5 @@
-import { ChevronRight, MoreVert } from '@mui/icons-material';
+import ChevronRight from '@mui/icons-material/ChevronRight';
+import MoreVert from '@mui/icons-material/MoreVert';
 import {
   alpha,
   Box,

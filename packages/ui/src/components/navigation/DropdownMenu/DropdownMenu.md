@@ -19,7 +19,9 @@ A click-triggered dropdown menu component with multiple variants, nested items s
 
 ```tsx
 import { DropdownMenu } from '@app-services-monitoring/ui';
-import { Edit, Delete, Share } from '@mui/icons-material';
+import Edit from '@mui/icons-material/Edit';
+import Delete from '@mui/icons-material/Delete';
+import Share from '@mui/icons-material/Share';
 import { Button } from '@mui/material';
 
 function MyComponent() {

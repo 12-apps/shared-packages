@@ -4,7 +4,7 @@
  * Authorization model: there are no roles. Admin access is granted by an email
  * allowlist supplied via the `ADMIN_EMAILS` environment variable (a
  * comma-separated list). These helpers are intentionally dependency-free — they
- * import neither `next-auth` nor `next` — so they can run unchanged in the Node
+ * import neither `@auth/core` nor any framework — so they can run unchanged in the Node
  * server, the Edge middleware, and unit tests without constructing a NextAuth
  * instance.
  */

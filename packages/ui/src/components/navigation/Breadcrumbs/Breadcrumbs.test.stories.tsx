@@ -1,4 +1,10 @@
-import { AccountTree, Article, Code,Dashboard, Folder, Home, Settings } from '@mui/icons-material';
+import AccountTree from '@mui/icons-material/AccountTree';
+import Article from '@mui/icons-material/Article';
+import Code from '@mui/icons-material/Code';
+import Dashboard from '@mui/icons-material/Dashboard';
+import Folder from '@mui/icons-material/Folder';
+import Home from '@mui/icons-material/Home';
+import Settings from '@mui/icons-material/Settings';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 

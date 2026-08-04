@@ -1,252 +1,166 @@
-import { BrokenImage, Person } from '@mui/icons-material';
-import { alpha, Avatar as MuiAvatar, Badge, Fade, keyframes, useTheme } from '@mui/material';
-import type { Theme } from '@mui/material/styles';
+import BrokenImage from '@mui/icons-material/BrokenImage';
+import Person from '@mui/icons-material/Person';
 import { styled } from '@mui/material/styles';
 import React, { useCallback, useEffect, useState } from 'react';
 
-import type { AvatarProps, AvatarSize, AvatarStatus } from './Avatar.types';
+import type { AvatarProps } from './Avatar.types';
+import { AvatarView, type AvatarViewProps, type ContentType } from './Avatar.view';
 
-// Define animations
-const pulseAnimation = keyframes`
-  0% {
-    box-shadow: 0 0 0 0 currentColor;
-    opacity: 1;
+/** Applied via a single spread so no per-field default inflates cyclomatic complexity. */
+const AVATAR_DEFAULTS = {
+  variant: 'circle',
+  size: 'md',
+  glow: false,
+  pulse: false,
+  bordered: false,
+  color: 'primary',
+  loading: false,
+  interactive: false,
+  showFallbackOnError: true,
+  animationDelay: 0,
+} satisfies Partial<AvatarProps>;
+
+/**
+ * Pick what renders inside the avatar. On an image error (with fallback enabled)
+ * the fallback/icon/broken-image wins; otherwise children → fallback → icon → the
+ * default person glyph.
+ */
+function resolveContent(args: {
+  children?: React.ReactNode;
+  fallback?: React.ReactNode;
+  icon?: React.ReactNode;
+  imageError: boolean;
+  showFallbackOnError: boolean;
+}): { content: React.ReactNode; contentType: ContentType } {
+  const { children, fallback, icon, imageError, showFallbackOnError } = args;
+  if (imageError && showFallbackOnError) {
+    if (fallback) return { content: fallback, contentType: 'fallback' };
+    if (icon) return { content: icon, contentType: 'icon' };
+    return { content: <BrokenImage />, contentType: 'icon' };
   }
-  70% {
-    box-shadow: 0 0 0 10px currentColor;
-    opacity: 0;
-  }
-  100% {
-    box-shadow: 0 0 0 0 currentColor;
-    opacity: 0;
-  }
-`;
+  if (children) return { content: children, contentType: 'children' };
+  if (fallback) return { content: fallback, contentType: 'fallback' };
+  if (icon) return { content: icon, contentType: 'icon' };
+  return { content: <Person />, contentType: 'default' };
+}
 
-const shimmerAnimation = keyframes`
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-`;
+/** Fades the avatar in after `animationDelay`ms. */
+function useMountedFade(animationDelay: number): boolean {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMounted(true), animationDelay);
+    return () => window.clearTimeout(timer);
+  }, [animationDelay]);
+  return mounted;
+}
 
-const scaleInAnimation = keyframes`
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-`;
+interface ImageState {
+  imageError: boolean;
+  imageLoading: boolean;
+  handleImageError: React.ReactEventHandler;
+  handleImageLoad: () => void;
+}
 
-const rotateAnimation = keyframes`
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-`;
+/**
+ * Tracks the `<img>` load lifecycle. `imageLoading` starts true whenever there is
+ * a `src` and clears on load/error — the handlers must be wired to the actual img
+ * (via `slotProps.img` in the view), since load/error don't bubble to the root.
+ */
+function useImageState(src: string | undefined, onError?: React.ReactEventHandler): ImageState {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(!!src);
 
-const getColorFromTheme = (theme: Theme, color: string) => {
-  const colorMap: Record<
-    string,
-    { main: string; contrastText?: string; light?: string; dark?: string }
-  > = {
-    primary: theme.palette.primary,
-    secondary: theme.palette.secondary,
-    success: theme.palette.success,
-    warning: theme.palette.warning,
-    error: theme.palette.error,
-    neutral: { main: theme.palette.grey[700], contrastText: '#fff' },
-  };
+  useEffect(() => {
+    setImageError(false);
+    setImageLoading(!!src);
+  }, [src]);
 
-  return colorMap[color] || theme.palette.primary;
-};
+  const handleImageError = useCallback<React.ReactEventHandler>(
+    (event) => {
+      setImageError(true);
+      setImageLoading(false);
+      onError?.(event);
+    },
+    [onError],
+  );
 
-const getSizeStyles = (size: AvatarSize) => {
-  const sizeMap: Record<AvatarSize, { width: number; height: number; fontSize: string }> = {
-    xs: { width: 24, height: 24, fontSize: '0.75rem' },
-    sm: { width: 32, height: 32, fontSize: '0.875rem' },
-    md: { width: 40, height: 40, fontSize: '1rem' },
-    lg: { width: 48, height: 48, fontSize: '1.125rem' },
-    xl: { width: 64, height: 64, fontSize: '1.5rem' },
-    xxl: { width: 80, height: 80, fontSize: '2rem' },
-  };
+  const handleImageLoad = useCallback(() => setImageLoading(false), []);
 
-  return sizeMap[size] || sizeMap.md;
-};
+  return { imageError, imageLoading, handleImageError, handleImageLoad };
+}
 
-const getStatusColor = (status: AvatarStatus, theme: Theme) => {
-  const statusColorMap: Record<AvatarStatus, string> = {
-    online: theme.palette.success.main,
-    offline: theme.palette.grey[500],
-    away: theme.palette.warning.main,
-    busy: theme.palette.error.main,
-  };
+/** Normalizes props (defaults + rest passthrough) and derives everything the view needs. */
+function useAvatarModel(raw: AvatarProps, ref: React.Ref<HTMLDivElement>): AvatarViewProps {
+  const {
+    variant,
+    size,
+    glow,
+    pulse,
+    status,
+    fallback,
+    icon,
+    bordered,
+    color,
+    src,
+    alt,
+    children,
+    loading,
+    onError,
+    onClick,
+    interactive,
+    showFallbackOnError,
+    animationDelay,
+    className,
+    dataTestId,
+    ...rest
+  } = { ...AVATAR_DEFAULTS, ...raw };
 
-  return statusColorMap[status] || statusColorMap.offline;
-};
-
-const StyledAvatar = styled(MuiAvatar, {
-  shouldForwardProp: (prop) =>
-    ![
-      'customVariant',
-      'customSize',
-      'customColor',
-      'glow',
-      'pulse',
-      'bordered',
-      'isLoading',
-      'hasError',
-      'interactive',
-    ].includes(prop as string),
-})<{
-  customVariant?: string;
-  customSize?: AvatarSize;
-  customColor?: string;
-  glow?: boolean;
-  pulse?: boolean;
-  bordered?: boolean;
-  isLoading?: boolean;
-  hasError?: boolean;
-  interactive?: boolean;
-}>(({
-  theme,
-  customVariant,
-  customSize = 'md',
-  customColor = 'primary',
-  glow,
-  pulse,
-  bordered,
-  isLoading,
-  hasError,
-  interactive,
-}) => {
-  const colorPalette = getColorFromTheme(theme, customColor);
-  const sizeStyles = getSizeStyles(customSize);
+  const mounted = useMountedFade(animationDelay);
+  const { imageError, imageLoading, handleImageError, handleImageLoad } = useImageState(src, onError);
+  const handleClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => onClick?.(event),
+    [onClick],
+  );
+  const { content, contentType } = resolveContent({
+    children,
+    fallback,
+    icon,
+    imageError,
+    showFallbackOnError,
+  });
 
   return {
-    ...sizeStyles,
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    position: 'relative',
-    overflow: 'visible',
-    animation: `${scaleInAnimation} 0.3s ease-out`,
-    cursor: interactive ? 'pointer' : 'default',
-
-    // Base background color when no image
-    backgroundColor: hasError ? theme.palette.error.main : colorPalette.main,
-    color: hasError ? theme.palette.error.contrastText : (colorPalette.contrastText ?? '#fff'),
-
-    // Interactive hover effects
-    ...(interactive && {
-      '&:hover': {
-        transform: 'scale(1.1) translateY(-2px)',
-        boxShadow: `0 8px 20px ${alpha(colorPalette.main, 0.3)}`,
-        filter: 'brightness(1.1)',
-        zIndex: 10,
-      },
-      '&:active': {
-        transform: 'scale(1.05)',
-      },
-    }),
-
-    // Loading state with shimmer
-    ...(isLoading && {
-      background: `linear-gradient(
-        90deg,
-        ${alpha(colorPalette.main, 0.6)},
-        ${alpha(colorPalette.main, 0.8)},
-        ${alpha(colorPalette.main, 0.6)}
-      )`,
-      backgroundSize: '200% 100%',
-      animation: `${shimmerAnimation} 1.5s ease-in-out infinite`,
-    }),
-
-    // Variant styles
-    ...(customVariant === 'circle' && {
-      borderRadius: '50%',
-    }),
-
-    ...(customVariant === 'square' && {
-      borderRadius: 0,
-    }),
-
-    ...(customVariant === 'rounded' && {
-      borderRadius: theme.spacing(1),
-    }),
-
-    ...(customVariant === 'status' && {
-      borderRadius: '50%',
-    }),
-
-    // Border
-    ...(bordered && {
-      border: `2px solid ${theme.palette.background.paper}`,
-      boxShadow: `0 0 0 1px ${alpha(theme.palette.divider, 0.2)}`,
-    }),
-
-    // Glow effect
-    ...(glow &&
-      !pulse && {
-        boxShadow: `0 0 20px 5px ${alpha(colorPalette.main, 0.4)} !important`,
-        filter: 'brightness(1.05)',
-      }),
-
-    // Pulse animation
-    ...(pulse &&
-      !glow && {
-        position: 'relative',
-        '&::after': {
-          content: '""',
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          width: '100%',
-          height: '100%',
-          borderRadius: 'inherit',
-          transform: 'translate(-50%, -50%)',
-          backgroundColor: colorPalette.main,
-          opacity: 0.3,
-          animation: `${pulseAnimation} 2s infinite`,
-          pointerEvents: 'none',
-          zIndex: -1,
-        },
-      }),
-
-    // Both glow and pulse
-    ...(glow &&
-      pulse && {
-        position: 'relative',
-        boxShadow: `0 0 20px 5px ${alpha(colorPalette.main, 0.4)} !important`,
-        filter: 'brightness(1.05)',
-        '&::after': {
-          content: '""',
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          width: '100%',
-          height: '100%',
-          borderRadius: 'inherit',
-          transform: 'translate(-50%, -50%)',
-          backgroundColor: colorPalette.main,
-          opacity: 0.3,
-          animation: `${pulseAnimation} 2s infinite`,
-          pointerEvents: 'none',
-          zIndex: -1,
-        },
-      }),
-
-    // Focus state for accessibility
-    '&:focus-visible': {
-      outline: `3px solid ${alpha(colorPalette.main, 0.5)}`,
-      outlineOffset: 2,
-    },
+    mounted,
+    variant,
+    size,
+    color,
+    glow,
+    pulse,
+    bordered,
+    showSpinner: loading || imageLoading,
+    imageError,
+    clickable: interactive || !!onClick,
+    imgSrc: imageError ? undefined : src,
+    alt,
+    ariaLabel: (rest['aria-label'] as string) || alt || 'Avatar',
+    content,
+    contentType,
+    className,
+    dataTestId,
+    status,
+    forwardedRef: ref,
+    onClick: handleClick,
+    handleImageError,
+    handleImageLoad,
+    rest,
   };
-});
+}
+
+export const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>((props, ref) => (
+  <AvatarView {...useAvatarModel(props, ref)} />
+));
+
+Avatar.displayName = 'Avatar';
 
 const AvatarGroupContainer = styled('div')<{ overlap?: number }>(({ theme, overlap = 8 }) => ({
   display: 'flex',
@@ -265,216 +179,6 @@ const AvatarGroupContainer = styled('div')<{ overlap?: number }>(({ theme, overl
     },
   },
 }));
-
-const LoadingOverlay = styled('div')<{ size: AvatarSize }>(({ theme, size }) => {
-  const sizeStyles = getSizeStyles(size);
-  return {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: sizeStyles.width,
-    height: sizeStyles.height,
-    borderRadius: 'inherit',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: alpha(theme.palette.background.paper, 0.7),
-    backdropFilter: 'blur(2px)',
-    '& .loading-spinner': {
-      width: sizeStyles.width * 0.4,
-      height: sizeStyles.height * 0.4,
-      border: `2px solid ${alpha(theme.palette.primary.main, 0.3)}`,
-      borderTopColor: theme.palette.primary.main,
-      borderRadius: '50%',
-      animation: `${rotateAnimation} 0.8s linear infinite`,
-    },
-  };
-});
-
-const StatusBadge = styled(Badge, {
-  shouldForwardProp: (prop) => !['statusColor', 'avatarSize'].includes(prop as string),
-})<{
-  statusColor?: string;
-  avatarSize?: AvatarSize;
-}>(({ theme, statusColor, avatarSize = 'md' }) => {
-  const sizeStyles = getSizeStyles(avatarSize);
-  const badgeSize = Math.max(8, sizeStyles.width * 0.2);
-
-  return {
-    '& .MuiBadge-badge': {
-      backgroundColor: statusColor || theme.palette.success.main,
-      color: statusColor || theme.palette.success.main,
-      width: badgeSize,
-      height: badgeSize,
-      borderRadius: '50%',
-      border: `2px solid ${theme.palette.background.paper}`,
-      '&::after': {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        borderRadius: '50%',
-        backgroundColor: 'currentColor',
-        content: '""',
-      },
-    },
-  };
-});
-
-export const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(
-  (
-    {
-      variant = 'circle',
-      size = 'md',
-      glow = false,
-      pulse = false,
-      status,
-      fallback,
-      icon,
-      bordered = false,
-      color = 'primary',
-      src,
-      alt,
-      children,
-      loading = false,
-      onError,
-      onClick,
-      interactive = false,
-      showFallbackOnError = true,
-      animationDelay = 0,
-      className,
-      dataTestId,
-      ...props
-    },
-    ref,
-  ) => {
-    const theme = useTheme();
-    const [imageError, setImageError] = useState(false);
-    const [imageLoading, setImageLoading] = useState(!!src);
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-      const timer = window.setTimeout(() => setMounted(true), animationDelay);
-      return () => window.clearTimeout(timer);
-    }, [animationDelay]);
-
-    useEffect(() => {
-      setImageError(false);
-      setImageLoading(!!src);
-    }, [src]);
-
-    const handleImageError = useCallback<React.ReactEventHandler>(
-      (event) => {
-        setImageError(true);
-        setImageLoading(false);
-        onError?.(event);
-      },
-      [onError],
-    );
-
-    const handleImageLoad = useCallback(() => {
-      setImageLoading(false);
-    }, []);
-
-    const handleClick = useCallback(
-      (event: React.MouseEvent<HTMLDivElement>) => {
-        if (interactive || onClick) {
-          onClick?.(event);
-        }
-      },
-      [interactive, onClick],
-    );
-
-    // Determine what content to show
-    let avatarContent = children || fallback || icon || <Person />;
-    let contentType: 'children' | 'fallback' | 'icon' | 'default' = 'default';
-
-    if (children) {
-      contentType = 'children';
-    } else if (fallback) {
-      contentType = 'fallback';
-    } else if (icon) {
-      contentType = 'icon';
-    }
-
-    if (imageError && showFallbackOnError) {
-      if (fallback) {
-        avatarContent = fallback;
-        contentType = 'fallback';
-      } else if (icon) {
-        avatarContent = icon;
-        contentType = 'icon';
-      } else {
-        avatarContent = <BrokenImage />;
-        contentType = 'icon';
-      }
-    }
-
-    const ariaLabel = props['aria-label'] || alt || 'Avatar';
-
-    const avatarElement = (
-      <Fade in={mounted} timeout={300}>
-        <div style={{ position: 'relative', display: 'inline-block' }}>
-          <StyledAvatar
-            ref={ref}
-            className={className}
-            customVariant={variant}
-            customSize={size}
-            customColor={color}
-            glow={glow}
-            pulse={pulse}
-            bordered={bordered}
-            isLoading={loading || imageLoading}
-            hasError={imageError}
-            interactive={interactive || !!onClick}
-            src={!imageError ? src : undefined}
-            alt={alt}
-            onClick={handleClick}
-            onError={handleImageError}
-            onLoad={handleImageLoad}
-            tabIndex={interactive || onClick ? 0 : undefined}
-            role={interactive || onClick ? 'button' : undefined}
-            aria-label={ariaLabel}
-            data-testid={dataTestId}
-            {...props}
-          >
-            {loading || imageLoading ? null : (
-              <span data-testid={dataTestId ? `${dataTestId}-${contentType}` : undefined}>
-                {avatarContent}
-              </span>
-            )}
-          </StyledAvatar>
-          {(loading || imageLoading) && (
-            <LoadingOverlay size={size} data-testid={dataTestId ? `${dataTestId}-loading` : undefined}>
-              <div className="loading-spinner" data-testid={dataTestId ? `${dataTestId}-loading-spinner` : undefined} />
-            </LoadingOverlay>
-          )}
-        </div>
-      </Fade>
-    );
-
-    // Wrap with status badge if variant is 'status' and status is provided
-    if (variant === 'status' && status) {
-      return (
-        <StatusBadge
-          overlap="circular"
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          variant="dot"
-          statusColor={getStatusColor(status, theme)}
-          avatarSize={size}
-          data-testid={dataTestId ? `${dataTestId}-badge` : undefined}
-        >
-          {avatarElement}
-        </StatusBadge>
-      );
-    }
-
-    return avatarElement;
-  },
-);
-
-Avatar.displayName = 'Avatar';
 
 // Export AvatarGroup for grouped avatars
 export const AvatarGroup: React.FC<{

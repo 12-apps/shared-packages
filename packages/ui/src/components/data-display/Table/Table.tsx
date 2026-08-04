@@ -1,6 +1,4 @@
-import { 
-  MoreVert as MoreVertIcon
-} from '@mui/icons-material';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import {
   alpha,
   Box,
