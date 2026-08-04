@@ -494,8 +494,10 @@ export const AvatarGroupTest: Story = {
       await expect(avatar3).toBeInTheDocument();
 
       // Avatar 4 and 5 should not be in the document (hidden by max=3)
-      await expect(canvas.queryByTestId('group-avatar-4')).not.toBeInTheDocument();
-      await expect(canvas.queryByTestId('group-avatar-5')).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(canvas.queryByTestId('group-avatar-4')).not.toBeInTheDocument();
+        expect(canvas.queryByTestId('group-avatar-5')).not.toBeInTheDocument();
+      });
     });
 
     await step('Verify overflow indicator', async () => {
