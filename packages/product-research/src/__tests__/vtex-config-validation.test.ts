@@ -78,7 +78,10 @@ describe('validateVtexSourceConfig', () => {
     expect(await validateVtexSourceConfig({ baseUrl: GIGA }, ctx)).toEqual({ ok: true });
     expect(seen.urls).toHaveLength(1);
     expect(seen.urls[0]).toMatch(PROBE_URL);
-    expect(seen.urls[0]?.startsWith(GIGA)).toBe(true);
+    // Compare parsed origins rather than a string prefix: startsWith(GIGA) also
+    // accepts https://www.giga.com.vc.example.com (CodeQL: incomplete URL
+    // substring sanitization).
+    expect(new URL(seen.urls[0] ?? '').origin).toBe(new URL(GIGA).origin);
   });
 
   it('passes an EMPTY result and a 206 — the probe judges the API, not the hits', async () => {

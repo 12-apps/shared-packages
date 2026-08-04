@@ -226,29 +226,30 @@ export const KeyboardNavigation: Story = {
       const tab2 = canvas.getByRole('tab', { name: /Tab 2/i });
       const tab3 = canvas.getByRole('tab', { name: /Tab 3/i });
 
-      // Focus first tab
-      tab1.focus();
-      await expect(tab1).toHaveFocus();
+      // A tab list is a single tab stop (roving tabindex), so tabbing in from
+      // the body lands on the selected tab — the first one here.
+      await userEvent.tab();
+      await waitFor(() => expect(tab1).toHaveFocus());
 
       // Navigate right with arrow key
       await userEvent.keyboard('{ArrowRight}');
-      await expect(tab2).toHaveFocus();
+      await waitFor(() => expect(tab2).toHaveFocus());
 
       // Navigate right again
       await userEvent.keyboard('{ArrowRight}');
-      await expect(tab3).toHaveFocus();
+      await waitFor(() => expect(tab3).toHaveFocus());
 
       // Navigate left
       await userEvent.keyboard('{ArrowLeft}');
-      await expect(tab2).toHaveFocus();
+      await waitFor(() => expect(tab2).toHaveFocus());
     });
 
     await step('Tab activation with Enter key', async () => {
       const tab3 = canvas.getByRole('tab', { name: /Tab 3/i });
 
-      // Focus tab3
-      tab3.focus();
-      await expect(tab3).toHaveFocus();
+      // Focus is on tab 2 from the previous step; arrow right to reach tab 3.
+      await userEvent.keyboard('{ArrowRight}');
+      await waitFor(() => expect(tab3).toHaveFocus());
 
       // Activate with Enter
       await userEvent.keyboard('{Enter}');
@@ -263,17 +264,15 @@ export const KeyboardNavigation: Story = {
     });
 
     await step('Tab navigation with Tab key', async () => {
-      const tab1 = canvas.getByRole('tab', { name: /Tab 1/i });
+      const tab3 = canvas.getByRole('tab', { name: /Tab 3/i });
 
-      // Focus first tab
-      tab1.focus();
-      await expect(tab1).toHaveFocus();
+      // Focus is still on tab 3, activated in the previous step.
+      await waitFor(() => expect(tab3).toHaveFocus());
 
-      // Tab to content
+      // Tab to content. Because the list is one tab stop, Tab has to leave the
+      // list entirely rather than step to the next tab.
       await userEvent.tab();
-
-      // Should have moved focus out of tabs
-      await expect(tab1).not.toHaveFocus();
+      await waitFor(() => expect(tab3).not.toHaveFocus());
     });
   },
 };
@@ -384,8 +383,9 @@ export const ClosableTabsTest: Story = {
       const tab3 = canvas.getByRole('tab', { name: /Tab 3/i });
 
       // Should not have a close button within Tab 3
-      const closeButtonInTab3 = within(tab3).queryByRole('button', { name: 'Close tab' });
-      await expect(closeButtonInTab3).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(within(tab3).queryByRole('button', { name: 'Close tab' })).not.toBeInTheDocument(),
+      );
     });
   },
 };
@@ -526,8 +526,9 @@ export const DisabledTabsTest: Story = {
 
     await step('Verify disabled content is not shown', async () => {
       // The disabled tab's content should not be visible
-      const disabledContent = canvas.queryByText('This should not be visible');
-      await expect(disabledContent).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(canvas.queryByText('This should not be visible')).not.toBeInTheDocument(),
+      );
     });
   },
 };
@@ -829,8 +830,9 @@ export const LoadingStateTest: Story = {
 
     await step('Verify content is not shown while loading', async () => {
       // Content should not be visible
-      const content = canvas.queryByText('Content for Tab 1');
-      await expect(content).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(canvas.queryByText('Content for Tab 1')).not.toBeInTheDocument(),
+      );
     });
   },
 };
@@ -883,17 +885,17 @@ export const AccessibilityTest: Story = {
     await step('Verify keyboard accessibility', async () => {
       const firstTab = canvas.getByRole('tab', { name: /Home/i });
 
-      // Focus first tab
-      firstTab.focus();
-      await expect(firstTab).toHaveFocus();
+      // Tab in from the body — the selected tab is the list's single tab stop.
+      await userEvent.tab();
+      await waitFor(() => expect(firstTab).toHaveFocus());
 
       // Tab key should move focus out of tablist
       await userEvent.tab();
-      await expect(firstTab).not.toHaveFocus();
+      await waitFor(() => expect(firstTab).not.toHaveFocus());
 
       // Shift+Tab should return focus to tablist
       await userEvent.tab({ shift: true });
-      await expect(firstTab).toHaveFocus();
+      await waitFor(() => expect(firstTab).toHaveFocus());
     });
   },
 };
