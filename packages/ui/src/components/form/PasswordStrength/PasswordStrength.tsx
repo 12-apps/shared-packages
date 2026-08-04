@@ -19,6 +19,16 @@ import {
 import type { FC} from 'react';
 import React, { useMemo } from 'react';
 
+import type { RequirementChecks } from './PasswordStrength.helpers';
+import {
+  buildSuggestions,
+  calculatePasswordStrength,
+  defaultRequirements,
+  evaluateRequirements,
+  getStrengthIcon,
+  getStrengthLabel,
+  SuggestionsList,
+} from './PasswordStrength.helpers';
 import type { PasswordRequirements, PasswordStrengthProps } from './PasswordStrength.types';
 
 interface RequirementIconProps {
@@ -33,14 +43,6 @@ interface RequirementIconProps {
 };
 
 // Default requirements
-const defaultRequirements: PasswordRequirements = {
-  minLength: 8,
-  uppercase: true,
-  lowercase: true,
-  numbers: true,
-  special: true,
-};
-
 // Animation keyframes
 const pulseAnimation = keyframes`
   0%, 100% {
@@ -169,52 +171,176 @@ const Step = styled(Box, {
   }),
 );
 
-// Helper functions
-const calculatePasswordStrength = (
-  password: string,
-  requirements: PasswordRequirements,
-): number => {
-  if (!password) return 0;
+// The three indicator variants, out of the component body so the render keeps
+// only its own layout branches.
+const StrengthIndicator: React.FC<{
+  variant: PasswordStrengthProps['variant'];
+  strength: number;
+  animated: boolean;
+}> = ({ variant, strength, animated }) => {
+  const theme = useTheme();
 
-  let strength = 0;
-  const checks = {
-    length: password.length >= (requirements.minLength || 8),
-    uppercase: !requirements.uppercase || /[A-Z]/.test(password),
-    lowercase: !requirements.lowercase || /[a-z]/.test(password),
-    numbers: !requirements.numbers || /\d/.test(password),
-    special: !requirements.special || /[!@#$%^&*(),.?":{}|<>]/.test(password),
-  };
+  switch (variant) {
+    case 'circular':
+      return (
+        <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+          <Box
+            sx={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              background: `conic-gradient(
+                ${theme.palette.success.main} 0deg ${strength * 3.6}deg,
+                ${alpha(theme.palette.action.disabled, 0.1)} ${strength * 3.6}deg 360deg
+              )`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: `0 4px 12px ${alpha(theme.palette.success.main, strength / 200)}`,
+            }}
+          >
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                background: theme.palette.background.paper,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+              }}
+            >
+              <Typography variant="h6" fontWeight="bold">
+                {strength}%
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+      );
 
-  // Base strength from length
-  strength += Math.min(password.length * 3, 30);
+    case 'steps': {
+      const steps = 5;
+      const activeStep = Math.ceil((strength / 100) * steps);
+      return (
+        <StepsContainer>
+          {Array.from({ length: steps }, (_, i) => (
+            <Step key={i} active={i === activeStep - 1} completed={i < activeStep - 1} animated={animated} />
+          ))}
+        </StepsContainer>
+      );
+    }
 
-  // Add points for meeting requirements
-  if (checks.length) strength += 20;
-  if (checks.uppercase) strength += 10;
-  if (checks.lowercase) strength += 10;
-  if (checks.numbers) strength += 15;
-  if (checks.special) strength += 15;
-
-  // Bonus for complexity
-  if (password.length > 12) strength += 10;
-  if (password.length > 16) strength += 10;
-
-  return Math.min(strength, 100);
+    default:
+      return <StrengthBar variant="determinate" value={strength} strength={strength} animated={animated} />;
+  }
 };
 
-const getStrengthLabel = (strength: number): string => {
-  if (strength <= 20) return 'Very Weak';
-  if (strength <= 40) return 'Weak';
-  if (strength <= 60) return 'Fair';
-  if (strength <= 80) return 'Good';
-  return 'Strong';
+const StrengthHeading: React.FC<{
+  strength: number;
+  hasValue: boolean;
+  animated: boolean;
+}> = ({ strength, hasValue, animated }) => (
+  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <Typography variant="body2" color="text.secondary">
+      Password Strength
+    </Typography>
+    {hasValue && (
+      <Fade in={true}>
+        <StrengthLabel
+          label={getStrengthLabel(strength)}
+          icon={getStrengthIcon(strength)}
+          size="small"
+          strength={strength}
+          animated={animated}
+        />
+      </Fade>
+    )}
+  </Box>
+);
+
+// One row per enabled requirement. Previously five near-identical JSX blocks,
+// each with its own `requirements.x &&` guard.
+const RequirementsList: React.FC<{
+  requirements: PasswordRequirements;
+  checks: RequirementChecks;
+  animated: boolean;
+}> = ({ requirements, checks, animated }) => {
+  const rows: ReadonlyArray<[unknown, keyof RequirementChecks, React.ReactNode]> = [
+    [requirements.minLength, 'length', `At least ${requirements.minLength} characters`],
+    [requirements.uppercase, 'uppercase', 'One uppercase letter'],
+    [requirements.lowercase, 'lowercase', 'One lowercase letter'],
+    [requirements.numbers, 'numbers', 'One number'],
+    [requirements.special, 'special', 'One special character'],
+  ];
+
+  return (
+    <Stack spacing={1}>
+      <Typography variant="caption" color="text.secondary" fontWeight="medium">
+        Requirements:
+      </Typography>
+      {rows
+        .filter(([enabled]) => Boolean(enabled))
+        .map(([, key, label]) => (
+          <RequirementItem key={key} met={checks[key]} animated={animated}>
+            <RequirementIcon met={checks[key]} />
+            <Typography variant="caption">{label}</Typography>
+          </RequirementItem>
+        ))}
+    </Stack>
+  );
 };
 
-const getStrengthIcon = (strength: number) => {
-  if (strength <= 40) return <WarningIcon />;
-  if (strength <= 80) return <SecurityIcon />;
-  return <SuccessIcon />;
-};
+// The visible sections. Kept apart from PasswordStrength itself so the exported
+// component is just prop defaults plus the three memos, and every display guard
+// lives in one place.
+const PasswordStrengthBody: React.FC<{
+  value: string;
+  strength: number;
+  requirements: PasswordRequirements;
+  requirementChecks: RequirementChecks;
+  suggestions: string[];
+  showStrengthLabel: boolean;
+  showRequirements: boolean;
+  showSuggestions: boolean;
+  variant: PasswordStrengthProps['variant'];
+  animated: boolean;
+}> = ({
+  value,
+  strength,
+  requirements,
+  requirementChecks,
+  suggestions,
+  showStrengthLabel,
+  showRequirements,
+  showSuggestions,
+  variant,
+  animated,
+}) => (
+    <Stack spacing={2}>
+      {showStrengthLabel && (
+        <StrengthHeading strength={strength} hasValue={value.length > 0} animated={animated} />
+      )}
+
+      <StrengthIndicator variant={variant} strength={strength} animated={animated} />
+
+      {showRequirements && (
+        <Fade in={value.length > 0}>
+          <RequirementsList
+            requirements={requirements}
+            checks={requirementChecks}
+            animated={animated}
+          />
+        </Fade>
+      )}
+
+      {showSuggestions && suggestions.length > 0 && value.length > 0 && (
+        <Fade in={true}>
+          <SuggestionsList suggestions={suggestions} />
+        </Fade>
+      )}
+    </Stack>
+);
 
 // Main component
 export const PasswordStrength: FC<PasswordStrengthProps> = ({
@@ -234,181 +360,27 @@ export const PasswordStrength: FC<PasswordStrengthProps> = ({
     [value, requirements],
   );
 
-  const requirementChecks = useMemo(() => {
-    if (!value)
-      return {
-        length: false,
-        uppercase: false,
-        lowercase: false,
-        numbers: false,
-        special: false,
-      };
+  const requirementChecks = useMemo(
+    () => evaluateRequirements(value, requirements),
+    [value, requirements],
+  );
 
-    return {
-      length: value.length >= (requirements.minLength || 8),
-      uppercase: !requirements.uppercase || /[A-Z]/.test(value),
-      lowercase: !requirements.lowercase || /[a-z]/.test(value),
-      numbers: !requirements.numbers || /\d/.test(value),
-      special: !requirements.special || /[!@#$%^&*(),.?":{}|<>]/.test(value),
-    };
-  }, [value, requirements]);
-
-  const suggestions = useMemo(() => {
-    const tips = [];
-    if (!requirementChecks.length) tips.push('Use at least 8 characters');
-    if (!requirementChecks.uppercase) tips.push('Add uppercase letters');
-    if (!requirementChecks.lowercase) tips.push('Add lowercase letters');
-    if (!requirementChecks.numbers) tips.push('Include numbers');
-    if (!requirementChecks.special) tips.push('Add special characters');
-    return tips;
-  }, [requirementChecks]);
-
-  const renderStrengthIndicator = () => {
-    switch (variant) {
-      case 'circular':
-        return (
-          <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-            <Box
-              sx={{
-                width: 80,
-                height: 80,
-                borderRadius: '50%',
-                background: `conic-gradient(
-                  ${theme.palette.success.main} 0deg ${strength * 3.6}deg,
-                  ${alpha(theme.palette.action.disabled, 0.1)} ${strength * 3.6}deg 360deg
-                )`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: `0 4px 12px ${alpha(theme.palette.success.main, strength / 200)}`,
-              }}
-            >
-              <Box
-                sx={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: '50%',
-                  background: theme.palette.background.paper,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'column',
-                }}
-              >
-                <Typography variant="h6" fontWeight="bold">
-                  {strength}%
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
-        );
-
-      case 'steps': {
-        const steps = 5;
-        const activeStep = Math.ceil((strength / 100) * steps);
-        return (
-          <StepsContainer>
-            {Array.from({ length: steps }, (_, i) => (
-              <Step key={i} active={i === activeStep - 1} completed={i < activeStep - 1} animated={animated} />
-            ))}
-          </StepsContainer>
-        );
-      }
-
-      default:
-        return <StrengthBar variant="determinate" value={strength} strength={strength} animated={animated} />;
-    }
-  };
+  const suggestions = useMemo(() => buildSuggestions(requirementChecks), [requirementChecks]);
 
   return (
     <StrengthContainer animated={animated} data-testid={dataTestId}>
-      <Stack spacing={2}>
-        {showStrengthLabel && (
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
-              Password Strength
-            </Typography>
-            {value.length > 0 && (
-              <Fade in={true}>
-                <StrengthLabel
-                  label={getStrengthLabel(strength)}
-                  icon={getStrengthIcon(strength)}
-                  size="small"
-                  strength={strength}
-                  animated={animated}
-                />
-              </Fade>
-            )}
-          </Box>
-        )}
-
-        {renderStrengthIndicator()}
-
-        {showRequirements && (
-          <Fade in={value.length > 0}>
-            <Stack spacing={1}>
-              <Typography variant="caption" color="text.secondary" fontWeight="medium">
-                Requirements:
-              </Typography>
-              {requirements.minLength && (
-                <RequirementItem met={requirementChecks.length} animated={animated}>
-                  <RequirementIcon met={requirementChecks.length} />
-                  <Typography variant="caption">
-                    At least {requirements.minLength} characters
-                  </Typography>
-                </RequirementItem>
-              )}
-              {requirements.uppercase && (
-                <RequirementItem met={requirementChecks.uppercase} animated={animated}>
-                  <RequirementIcon met={requirementChecks.uppercase} />
-                  <Typography variant="caption">One uppercase letter</Typography>
-                </RequirementItem>
-              )}
-              {requirements.lowercase && (
-                <RequirementItem met={requirementChecks.lowercase} animated={animated}>
-                  <RequirementIcon met={requirementChecks.lowercase} />
-                  <Typography variant="caption">One lowercase letter</Typography>
-                </RequirementItem>
-              )}
-              {requirements.numbers && (
-                <RequirementItem met={requirementChecks.numbers} animated={animated}>
-                  <RequirementIcon met={requirementChecks.numbers} />
-                  <Typography variant="caption">One number</Typography>
-                </RequirementItem>
-              )}
-              {requirements.special && (
-                <RequirementItem met={requirementChecks.special} animated={animated}>
-                  <RequirementIcon met={requirementChecks.special} />
-                  <Typography variant="caption">One special character</Typography>
-                </RequirementItem>
-              )}
-            </Stack>
-          </Fade>
-        )}
-
-        {showSuggestions && suggestions.length > 0 && value.length > 0 && (
-          <Fade in={true}>
-            <Box>
-              <Typography variant="caption" color="text.secondary" fontWeight="medium">
-                Suggestions:
-              </Typography>
-              <Box sx={{ mt: 1 }}>
-                {suggestions.map((tip, index) => (
-                  <Typography
-                    key={index}
-                    variant="caption"
-                    display="block"
-                    color="warning.main"
-                    sx={{ ml: 2 }}
-                  >
-                    • {tip}
-                  </Typography>
-                ))}
-              </Box>
-            </Box>
-          </Fade>
-        )}
-      </Stack>
+      <PasswordStrengthBody
+        value={value}
+        strength={strength}
+        requirements={requirements}
+        requirementChecks={requirementChecks}
+        suggestions={suggestions}
+        showStrengthLabel={showStrengthLabel}
+        showRequirements={showRequirements}
+        showSuggestions={showSuggestions}
+        variant={variant}
+        animated={animated}
+      />
     </StrengthContainer>
   );
 };
