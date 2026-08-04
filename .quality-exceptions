@@ -71,7 +71,6 @@ packages/ui/src/components/form/Calendar/Calendar.test.stories.tsx
 packages/ui/src/components/form/Calendar/Calendar.tsx
 packages/ui/src/components/form/Checkbox/Checkbox.tsx
 packages/ui/src/components/form/CodeEditor/CodeEditor.test.stories.tsx
-packages/ui/src/components/form/CodeEditor/CodeEditor.tsx
 packages/ui/src/components/form/Command/Command.tsx
 packages/ui/src/components/form/CreatableSelect/CreatableSelect.test.stories.tsx
 packages/ui/src/components/form/Input/Input.tsx

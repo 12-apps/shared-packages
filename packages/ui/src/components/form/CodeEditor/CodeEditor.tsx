@@ -20,6 +20,7 @@ import type { editor } from 'monaco-editor';
 import type { FC} from 'react';
 import React, { useEffect,useRef } from 'react';
 
+import { EditorToolbar } from './CodeEditorToolbar';
 import type { CodeEditorProps } from './CodeEditor.types';
 
 // Styled components
@@ -32,29 +33,6 @@ const EditorContainer = styled(Paper)(({ theme }) => ({
   border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
   borderRadius: theme.shape.borderRadius * 2,
   overflow: 'hidden',
-}));
-
-const Toolbar = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: theme.spacing(1, 2),
-  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
-  background: alpha(theme.palette.background.default, 0.4),
-}));
-
-const LanguageBadge = styled(Box)(({ theme }) => ({
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: theme.spacing(0.5),
-  padding: theme.spacing(0.5, 1),
-  borderRadius: theme.shape.borderRadius,
-  background: alpha(theme.palette.primary.main, 0.1),
-  color: theme.palette.primary.main,
-  fontSize: '0.75rem',
-  fontWeight: 600,
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
 }));
 
 const EditorWrapper = styled(Box, {
@@ -125,6 +103,113 @@ const customDarkTheme = {
 };
 
 // Main component
+const AUTO_FORMAT_DELAY_MS = 100;
+const COPIED_FEEDBACK_MS = 2000;
+
+const registerEditorThemes = (monaco: Monaco) => {
+  monaco.editor.defineTheme('custom-light', customLightTheme);
+  monaco.editor.defineTheme('custom-dark', customDarkTheme);
+};
+
+// Best-effort: a Monaco build without the TypeScript worker (as in jsdom) throws
+// here, and the editor is still usable without it.
+const configureTypeScriptDefaults = (monaco: Monaco) => {
+  try {
+    const tsLanguage = monaco.languages
+      .getLanguages()
+      .find((language) => language.id === 'typescript');
+
+    if (!tsLanguage) return;
+
+    monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+      target: monaco.languages.typescript.ScriptTarget.ES2020,
+      allowNonTsExtensions: true,
+      moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+      module: monaco.languages.typescript.ModuleKind.CommonJS,
+      noEmit: true,
+      esModuleInterop: true,
+      jsx: monaco.languages.typescript.JsxEmit.React,
+      reactNamespace: 'React',
+      allowJs: true,
+      typeRoots: ['node_modules/@types'],
+    });
+
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: false,
+      noSyntaxValidation: false,
+      noSuggestionDiagnostics: true,
+    });
+  } catch {
+    // Silently handle any TypeScript configuration errors in test environments
+  }
+};
+
+const scheduleAutoFormat = (mountedEditor: editor.IStandaloneCodeEditor, enabled: boolean) => {
+  if (!enabled) return;
+
+  window.setTimeout(() => {
+    mountedEditor.getAction('editor.action.formatDocument')?.run();
+  }, AUTO_FORMAT_DELAY_MS);
+};
+
+const registerSaveShortcut = (
+  mountedEditor: editor.IStandaloneCodeEditor,
+  monaco: Monaco,
+  onSave?: (value: string) => void,
+) => {
+  mountedEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+    onSave?.(mountedEditor.getValue());
+  });
+};
+
+// 'auto' follows the MUI palette; otherwise the caller's choice wins.
+const resolveEditorTheme = (themeProp: string, paletteMode: string) => {
+  const wantsDark = themeProp === 'auto' ? paletteMode === 'dark' : themeProp === 'dark';
+
+  return wantsDark ? 'custom-dark' : 'custom-light';
+};
+
+// Monaco's options object. Only the first five entries vary with our props; the
+// rest are fixed editor preferences.
+const buildEditorOptions = ({
+  minimap,
+  fontSize,
+  isWrapped,
+  lineNumbers,
+  readOnly,
+}: {
+  minimap?: boolean;
+  fontSize: number;
+  isWrapped: boolean;
+  lineNumbers: boolean;
+  readOnly: boolean;
+}): editor.IStandaloneEditorConstructionOptions => ({
+    readOnly,
+    // Explicitly convert minimap to boolean to ensure Monaco receives a definitive value
+    // This prevents undefined from being interpreted differently in various environments
+    minimap: { enabled: minimap === true },
+    fontSize,
+    wordWrap: isWrapped ? 'on' : 'off',
+    lineNumbers: lineNumbers ? 'on' : 'off',
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
+    tabSize: 2,
+    insertSpaces: true,
+    folding: true,
+    foldingStrategy: 'indentation',
+    showFoldingControls: 'mouseover',
+    smoothScrolling: true,
+    cursorBlinking: 'smooth',
+    cursorSmoothCaretAnimation: 'on',
+    renderWhitespace: 'selection',
+    renderLineHighlight: 'all',
+    selectOnLineNumbers: true,
+    roundedSelection: true,
+    padding: { top: 16, bottom: 16 },
+    fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
+    fontLigatures: true,
+});
+
 export const CodeEditor: FC<CodeEditorProps> = ({
   language,
   height = '400px',
@@ -150,87 +235,35 @@ export const CodeEditor: FC<CodeEditorProps> = ({
   const [isCopied, setIsCopied] = React.useState(false);
 
   // Determine theme
-  const editorTheme = React.useMemo(() => {
-    if (themeProp === 'auto') {
-      return theme.palette.mode === 'dark' ? 'custom-dark' : 'custom-light';
-    }
-    return themeProp === 'dark' ? 'custom-dark' : 'custom-light';
-  }, [themeProp, theme.palette.mode]);
+  const editorTheme = React.useMemo(
+    () => resolveEditorTheme(themeProp, theme.palette.mode),
+    [themeProp, theme.palette.mode],
+  );
 
-  // Handle editor mount
-  const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
-    editorRef.current = editor;
+  const handleEditorDidMount = (
+    mountedEditor: editor.IStandaloneCodeEditor,
+    monaco: Monaco,
+  ) => {
+    editorRef.current = mountedEditor;
     monacoRef.current = monaco;
 
-    // Define custom themes
-    monaco.editor.defineTheme('custom-light', customLightTheme);
-    monaco.editor.defineTheme('custom-dark', customDarkTheme);
-
-    // Configure TypeScript compiler options for better test compatibility
-    try {
-      // Ensure TypeScript language is registered
-      const languages = monaco.languages.getLanguages();
-      const tsLanguage = languages.find((lang) => lang.id === 'typescript');
-
-      if (tsLanguage) {
-        monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-          target: monaco.languages.typescript.ScriptTarget.ES2020,
-          allowNonTsExtensions: true,
-          moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-          module: monaco.languages.typescript.ModuleKind.CommonJS,
-          noEmit: true,
-          esModuleInterop: true,
-          jsx: monaco.languages.typescript.JsxEmit.React,
-          reactNamespace: 'React',
-          allowJs: true,
-          typeRoots: ['node_modules/@types'],
-        });
-
-        // Set diagnostic options to be less strict in test environments
-        monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
-          noSemanticValidation: false,
-          noSyntaxValidation: false,
-          noSuggestionDiagnostics: true,
-        });
-      }
-    } catch {
-      // Silently handle any TypeScript configuration errors in test environments
-    }
-
-    // Auto format on mount if enabled
-    if (autoFormat && !readOnly) {
-      window.setTimeout(() => {
-        editor.getAction('editor.action.formatDocument')?.run();
-      }, 100);
-    }
-
-    // Add save shortcut
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-      if (onSave) {
-        const currentValue = editor.getValue();
-        onSave(currentValue);
-      }
-    });
+    registerEditorThemes(monaco);
+    configureTypeScriptDefaults(monaco);
+    scheduleAutoFormat(mountedEditor, autoFormat && !readOnly);
+    registerSaveShortcut(mountedEditor, monaco, onSave);
   };
 
   // Handle copy to clipboard
+  // No-ops where the clipboard API is unavailable, as in jsdom.
   const handleCopy = async () => {
-    if (editorRef.current) {
-      const text = editorRef.current.getValue();
+    if (!editorRef.current || !navigator.clipboard?.writeText) return;
 
-      // Check if clipboard API is available (may not be in test environments)
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        try {
-          await navigator.clipboard.writeText(text);
-          setIsCopied(true);
-          window.setTimeout(() => setIsCopied(false), 2000);
-        } catch {
-          // Silently handle clipboard errors in test environments
-        }
-      } else {
-        // Fallback for environments without clipboard API
-        // console.warn('Clipboard API not available');
-      }
+    try {
+      await navigator.clipboard.writeText(editorRef.current.getValue());
+      setIsCopied(true);
+      window.setTimeout(() => setIsCopied(false), COPIED_FEEDBACK_MS);
+    } catch {
+      // Silently handle clipboard errors in test environments
     }
   };
 
@@ -269,105 +302,23 @@ export const CodeEditor: FC<CodeEditorProps> = ({
     }
   }, [isFullscreen]);
 
-  const editorOptions: editor.IStandaloneEditorConstructionOptions = {
-    readOnly,
-    // Explicitly convert minimap to boolean to ensure Monaco receives a definitive value
-    // This prevents undefined from being interpreted differently in various environments
-    minimap: { enabled: minimap === true },
-    fontSize,
-    wordWrap: isWrapped ? 'on' : 'off',
-    lineNumbers: lineNumbers ? 'on' : 'off',
-    scrollBeyondLastLine: false,
-    automaticLayout: true,
-    tabSize: 2,
-    insertSpaces: true,
-    folding: true,
-    foldingStrategy: 'indentation',
-    showFoldingControls: 'mouseover',
-    smoothScrolling: true,
-    cursorBlinking: 'smooth',
-    cursorSmoothCaretAnimation: 'on',
-    renderWhitespace: 'selection',
-    renderLineHighlight: 'all',
-    selectOnLineNumbers: true,
-    roundedSelection: true,
-    padding: { top: 16, bottom: 16 },
-    fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
-    fontLigatures: true,
-  };
+  const editorOptions = buildEditorOptions({ minimap, fontSize, isWrapped, lineNumbers, readOnly });
 
   return (
     <EditorContainer elevation={2} data-testid={dataTestId || 'code-editor'}>
       {showToolbar && (
-        <Toolbar data-testid={dataTestId ? `${dataTestId}-toolbar` : 'code-editor-toolbar'}>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <LanguageBadge
-              data-testid={
-                dataTestId ? `${dataTestId}-language-badge` : 'code-editor-language-badge'
-              }
-            >
-              <CodeIcon sx={{ fontSize: 14 }} />
-              {language}
-            </LanguageBadge>
-            {readOnly && (
-              <Typography variant="caption" color="text.secondary">
-                Read Only
-              </Typography>
-            )}
-          </Stack>
-
-          <Stack direction="row" spacing={1}>
-            {!readOnly && (
-              <Tooltip title="Format Code (Ctrl+Shift+F)">
-                <IconButton
-                  size="small"
-                  onClick={handleFormat}
-                  data-testid={dataTestId ? `${dataTestId}-format-btn` : 'code-editor-format-btn'}
-                >
-                  <CodeIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-
-            <Tooltip title={isWrapped ? 'Disable Word Wrap' : 'Enable Word Wrap'}>
-              <IconButton
-                size="small"
-                onClick={handleWrapToggle}
-                color={isWrapped ? 'primary' : 'default'}
-                data-testid={dataTestId ? `${dataTestId}-wrap-btn` : 'code-editor-wrap-btn'}
-              >
-                <WrapIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-
-            <Tooltip title={isCopied ? 'Copied!' : 'Copy to Clipboard'}>
-              <IconButton
-                size="small"
-                onClick={handleCopy}
-                color={isCopied ? 'success' : 'default'}
-                data-testid={dataTestId ? `${dataTestId}-copy-btn` : 'code-editor-copy-btn'}
-              >
-                <CopyIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-
-            <Tooltip title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>
-              <IconButton
-                size="small"
-                onClick={handleFullscreenToggle}
-                data-testid={
-                  dataTestId ? `${dataTestId}-fullscreen-btn` : 'code-editor-fullscreen-btn'
-                }
-              >
-                {isFullscreen ? (
-                  <ExitFullscreenIcon fontSize="small" />
-                ) : (
-                  <FullscreenIcon fontSize="small" />
-                )}
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        </Toolbar>
+        <EditorToolbar
+          language={language}
+          readOnly={readOnly}
+          isWrapped={isWrapped}
+          isCopied={isCopied}
+          isFullscreen={isFullscreen}
+          dataTestId={dataTestId}
+          onFormat={handleFormat}
+          onCopy={handleCopy}
+          onWrapToggle={handleWrapToggle}
+          onFullscreenToggle={handleFullscreenToggle}
+        />
       )}
 
       <EditorWrapper
