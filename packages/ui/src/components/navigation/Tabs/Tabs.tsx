@@ -13,135 +13,14 @@ import { styled } from '@mui/material/styles';
 import React from 'react';
 
 import { CustomTabPanel } from './TabsPanel';
+import { tabsRootStyles } from './Tabs.styles';
 import type { TabItem, TabsProps } from './Tabs.types';
 
 const StyledTabs = styled(MuiTabs, {
   shouldForwardProp: (prop) => !['customVariant', 'size', 'showDividers'].includes(prop as string),
 })<{ customVariant?: string; size?: string; showDividers?: boolean }>(
   ({ theme, customVariant, size, showDividers }) => ({
-    position: 'relative',
-
-    // Collapse disabled scroll buttons (e.g. the left button at the start of a
-    // scrollable row) so they don't reserve empty space before the first tab.
-    '& .MuiTabs-scrollButtons.Mui-disabled': {
-      width: 0,
-      minWidth: 0,
-      overflow: 'hidden',
-    },
-
-    // Size variants
-    ...(size === 'sm' && {
-      minHeight: 32,
-      '& .MuiTab-root': {
-        fontSize: '0.875rem',
-        minHeight: 32,
-        padding: theme.spacing(0.5, 1.5),
-      },
-    }),
-
-    ...(size === 'lg' && {
-      minHeight: 56,
-      '& .MuiTab-root': {
-        fontSize: '1.125rem',
-        minHeight: 56,
-        padding: theme.spacing(1.5, 3),
-      },
-    }),
-
-    // Default variant (standard Material-UI style)
-    ...(customVariant === 'default' && {
-      '& .MuiTabs-indicator': {
-        height: 3,
-        borderRadius: '3px 3px 0 0',
-        background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-      },
-    }),
-
-    // Pills variant (rounded tabs)
-    ...(customVariant === 'pills' && {
-      '& .MuiTabs-indicator': {
-        display: 'none',
-      },
-      '& .MuiTab-root': {
-        borderRadius: theme.spacing(3),
-        margin: theme.spacing(0, 0.5),
-        minWidth: 'auto',
-        transition: 'all 0.3s ease',
-        '&:hover': {
-          backgroundColor: alpha(theme.palette.primary.main, 0.08),
-          transform: 'translateY(-1px)',
-        },
-        '&.Mui-selected': {
-          backgroundColor: theme.palette.primary.main,
-          color: theme.palette.primary.contrastText,
-          boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
-          '&:hover': {
-            backgroundColor: theme.palette.primary.dark,
-          },
-        },
-      },
-    }),
-
-    // Underline variant (minimal underline indicator)
-    ...(customVariant === 'underline' && {
-      '& .MuiTabs-flexContainer': {
-        gap: theme.spacing(2),
-      },
-      '& .MuiTabs-indicator': {
-        height: 2,
-        backgroundColor: theme.palette.primary.main,
-        borderRadius: 1,
-      },
-      '& .MuiTab-root': {
-        textTransform: 'none',
-        fontWeight: 500,
-        padding: theme.spacing(1, 0),
-        minWidth: 'auto',
-        '&:hover': {
-          color: theme.palette.primary.main,
-        },
-        '&.Mui-selected': {
-          color: theme.palette.primary.main,
-          fontWeight: 600,
-        },
-      },
-    }),
-
-    // Enclosed variant (bordered tabs)
-    ...(customVariant === 'enclosed' && {
-      '& .MuiTabs-indicator': {
-        display: 'none',
-      },
-      '& .MuiTabs-flexContainer': {
-        borderBottom: `1px solid ${theme.palette.divider}`,
-      },
-      '& .MuiTab-root': {
-        border: `1px solid ${theme.palette.divider}`,
-        borderBottom: 'none',
-        borderRadius: `${theme.spacing(1)} ${theme.spacing(1)} 0 0`,
-        margin: theme.spacing(0, 0.5),
-        marginBottom: -1,
-        backgroundColor: alpha(theme.palette.action.hover, 0.5),
-        '&:hover': {
-          backgroundColor: alpha(theme.palette.action.hover, 0.8),
-        },
-        '&.Mui-selected': {
-          backgroundColor: theme.palette.background.paper,
-          borderColor: theme.palette.divider,
-          borderBottomColor: theme.palette.background.paper,
-          zIndex: 1,
-        },
-      },
-    }),
-
-    // Show dividers
-    ...(showDividers &&
-      customVariant !== 'enclosed' &&
-      customVariant !== 'pills' && {
-        '& .MuiTab-root:not(:last-child)': {
-          borderRight: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-        },
-      }),
+    ...tabsRootStyles({ theme, customVariant, size, showDividers }),
   }),
 );
 
@@ -288,44 +167,108 @@ const TabLabel: React.FC<{
   );
 };
 
+type ResolvedTabs = TabsProps;
+
+// The tab strip. Kept in this file because StyledTabs cannot cross a module
+// boundary (TS2742).
+const TabsBar: React.FC<
+  ResolvedTabs & {
+    rest: Record<string, unknown>;
+    onChange: (event: React.SyntheticEvent, newValue: string) => void;
+    onCloseTab: (event: React.MouseEvent | React.KeyboardEvent, tabId: string) => void;
+  }
+> = ({ rest, items, value, onChange, onCloseTab, dataTestId, ...p }) => (
+  <StyledTabs
+    {...rest}
+    value={value}
+    onChange={onChange}
+    customVariant={p.variant}
+    size={p.size}
+    showDividers={p.showDividers}
+    orientation={p.orientation}
+    centered={p.centered}
+    // MUI only scrolls when its own `variant` is `scrollable`; map our
+    // `scrollable` flag onto it so overflowing tab rows actually scroll.
+    variant={p.scrollable ? 'scrollable' : 'standard'}
+    data-testid={dataTestId ? `${dataTestId}-list` : 'tabs-list'}
+    scrollButtons={resolveScrollButtons(p.scrollable)}
+    allowScrollButtonsMobile={p.scrollable}
+    textColor={p.color}
+    indicatorColor={p.color}
+    sx={buildTabsSx({
+      fullWidth: p.fullWidth,
+      sticky: p.sticky,
+      stickyOffset: p.stickyOffset,
+      indicatorColor: p.indicatorColor,
+      disabled: p.disabled,
+    })}
+  >
+    {items.map((item, index) => (
+      <MuiTab
+        key={item.id}
+        value={item.id}
+        label={<TabLabel item={item} onClose={onCloseTab} />}
+        disabled={item.disabled || p.disabled}
+        className={item.className}
+        id={`tab-${item.id}`}
+        aria-controls={`tabpanel-${item.id}`}
+        aria-disabled={item.disabled || p.disabled}
+        data-testid={dataTestId ? `${dataTestId}-tab-${index}` : `tabs-tab-${index}`}
+      />
+    ))}
+  </StyledTabs>
+);
+
+const TabsPanels: React.FC<ResolvedTabs> = ({
+  items,
+  value,
+  variant,
+  animateContent,
+  animationDuration,
+  persistContent,
+  loading,
+  loadingComponent,
+  tabPanelProps,
+  dataTestId,
+}) => (
+  <Box sx={{ mt: variant === 'enclosed' ? 0 : 2 }}>
+    {items.map((item, index) => (
+      <CustomTabPanel
+        key={item.id}
+        id={item.id}
+        value={value}
+        animate={animateContent}
+        animationDuration={animationDuration}
+        persist={persistContent}
+        loading={loading}
+        loadingComponent={loadingComponent}
+        className={tabPanelProps?.className}
+        dataTestId={dataTestId}
+        index={index}
+      >
+        {item.content}
+      </CustomTabPanel>
+    ))}
+  </Box>
+);
+
 export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
-  (
-    tabsProps,
-    ref,
-  ) => {
+  (tabsProps, ref) => {
+    const resolved = { ...TABS_DEFAULTS, ...definedProps(tabsProps) } as TabsProps;
     const {
-      variant,
-      size,
-      items,
       value,
       onChange,
-      color,
-      fullWidth,
-      orientation,
-      showDividers,
-      centered,
-      scrollable,
-      scrollButtons,
-      sticky,
-      stickyOffset,
-      animateContent,
-      animationDuration,
-      persistContent,
       onTabClose,
       className,
       disabled,
-      indicatorColor,
-      tabPanelProps,
-      loading,
-      loadingComponent,
+      showDividers,
+      variant,
       dataTestId,
-      ...props
-    } = { ...TABS_DEFAULTS, ...definedProps(tabsProps) } as TabsProps;
+      ...rest
+    } = resolved;
 
     const handleChange = (event: React.SyntheticEvent, newValue: string) => {
-      if (!disabled) {
-        onChange(event, newValue);
-      }
+      if (!disabled) onChange(event, newValue);
     };
 
     const handleTabClose = (event: React.MouseEvent | React.KeyboardEvent, tabId: string) => {
@@ -335,61 +278,16 @@ export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
 
     return (
       <Box className={className} ref={ref} data-testid={dataTestId || 'tabs'}>
-        <StyledTabs
-          {...props}
-          value={value}
+        <TabsBar
+          {...resolved}
+          rest={rest as unknown as Record<string, unknown>}
           onChange={handleChange}
-          customVariant={variant}
-          size={size}
-          showDividers={showDividers}
-          orientation={orientation}
-          centered={centered}
-          // MUI only scrolls when its own `variant` is `scrollable`; map our
-          // `scrollable` flag onto it so overflowing tab rows actually scroll.
-          variant={scrollable ? 'scrollable' : 'standard'}
-          data-testid={dataTestId ? `${dataTestId}-list` : 'tabs-list'}
-          scrollButtons={resolveScrollButtons(scrollable)}
-          allowScrollButtonsMobile={scrollable}
-          textColor={color}
-          indicatorColor={color}
-          sx={buildTabsSx({ fullWidth, sticky, stickyOffset, indicatorColor, disabled })}
-        >
-          {items.map((item, index) => (
-            <MuiTab
-              key={item.id}
-              value={item.id}
-              label={<TabLabel item={item} onClose={handleTabClose} />}
-              disabled={item.disabled || disabled}
-              className={item.className}
-              id={`tab-${item.id}`}
-              aria-controls={`tabpanel-${item.id}`}
-              aria-disabled={item.disabled || disabled}
-              data-testid={dataTestId ? `${dataTestId}-tab-${index}` : `tabs-tab-${index}`}
-            />
-          ))}
-        </StyledTabs>
+          onCloseTab={handleTabClose}
+        />
 
         {showDividers && variant !== 'enclosed' && <Divider />}
 
-        <Box sx={{ mt: variant === 'enclosed' ? 0 : 2 }}>
-          {items.map((item, index) => (
-            <CustomTabPanel
-              key={item.id}
-              id={item.id}
-              value={value}
-              animate={animateContent}
-              animationDuration={animationDuration}
-              persist={persistContent}
-              loading={loading}
-              loadingComponent={loadingComponent}
-              className={tabPanelProps?.className}
-              dataTestId={dataTestId}
-              index={index}
-            >
-              {item.content}
-            </CustomTabPanel>
-          ))}
-        </Box>
+        <TabsPanels {...resolved} />
       </Box>
     );
   },
