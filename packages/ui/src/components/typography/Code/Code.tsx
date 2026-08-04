@@ -140,6 +140,73 @@ const LanguageLabel = styled(Box)(({ theme }) => ({
   boxShadow: theme.palette.mode === 'light' ? theme.shadows[1] : 'none',
 }));
 
+// Renders each source line beside a gutter number. Keys combine the line number
+// with a slice of the content and its length, so editing one line in place does
+// not reshuffle the keys of the lines around it.
+const renderNumberedLines = (source: string) =>
+  source.split('\n').map((line, index) => {
+    const stableKey = `line-${index + 1}-${line.slice(0, 10).replace(/\s+/g, '')}-${line.length}`;
+
+    return (
+      <div key={stableKey} style={{ display: 'flex' }}>
+        <span
+          style={{
+            display: 'inline-block',
+            minWidth: '3em',
+            opacity: 0.5,
+            userSelect: 'none',
+            marginRight: '1em',
+            textAlign: 'right',
+          }}
+        >
+          {index + 1}
+        </span>
+        <span>{line}</span>
+      </div>
+    );
+  });
+
+// Only block-ish variants get a language label or a copy affordance.
+const resolveCodeFlags = (
+  variant: CodeProps['variant'],
+  copyable: boolean,
+  language: CodeProps['language'],
+) => {
+  const isBlock = variant === 'block' || variant === 'highlight';
+  return {
+    isBlock,
+    showCopy: copyable && isBlock,
+    showLanguage: Boolean(language) && isBlock,
+  };
+};
+
+// Owns its own "just copied" flash. Keeping it here rather than inline in Code
+// means the copied/not-copied branches do not count against the main render, and
+// the flash re-renders only the button. Non-string children are still a no-op on
+// click, exactly as before.
+const CodeCopyButton: React.FC<{ source: React.ReactNode }> = ({ source }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    if (typeof source !== 'string') return;
+    try {
+      await navigator.clipboard.writeText(source);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Silently fail if clipboard access is denied
+    }
+  };
+
+  return (
+    <Tooltip title={copied ? 'Copied!' : 'Copy code'}>
+      <CopyButton onClick={handleCopy} size="small" color={copied ? 'success' : 'default'}>
+        {copied ? <Check /> : <ContentCopy />}
+      </CopyButton>
+    </Tooltip>
+  );
+};
+
 export const Code = React.forwardRef<HTMLElement, CodeProps>(
   (
     {
@@ -153,23 +220,7 @@ export const Code = React.forwardRef<HTMLElement, CodeProps>(
     },
     ref,
   ) => {
-    const [copied, setCopied] = useState(false);
-
-    const handleCopy = async () => {
-      if (typeof children === 'string') {
-        try {
-          await navigator.clipboard.writeText(children);
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 2000);
-        } catch {
-          // Silently fail if clipboard access is denied
-        }
-      }
-    };
-
-    const isBlock = variant === 'block' || variant === 'highlight';
-    const shouldShowCopy = copyable && isBlock;
-    const shouldShowLanguage = language && isBlock;
+    const { isBlock, showCopy, showLanguage } = resolveCodeFlags(variant, copyable, language);
 
     // Process children for line numbers if needed
     const processedChildren = React.useMemo(() => {
@@ -177,28 +228,7 @@ export const Code = React.forwardRef<HTMLElement, CodeProps>(
         return children;
       }
 
-      return children.split('\n').map((line, index) => {
-        // Use line content hash + line number for more stable keys
-        const stableKey = `line-${index + 1}-${line.slice(0, 10).replace(/\s+/g, '')}-${line.length}`;
-        
-        return (
-          <div key={stableKey} style={{ display: 'flex' }}>
-            <span
-              style={{
-                display: 'inline-block',
-                minWidth: '3em',
-                opacity: 0.5,
-                userSelect: 'none',
-                marginRight: '1em',
-                textAlign: 'right',
-              }}
-            >
-              {index + 1}
-            </span>
-            <span>{line}</span>
-          </div>
-        );
-      });
+      return renderNumberedLines(children);
     }, [children, lineNumbers, isBlock]);
 
     return (
@@ -207,20 +237,14 @@ export const Code = React.forwardRef<HTMLElement, CodeProps>(
         component={variant === 'inline' ? 'span' : 'div'}
         customVariant={variant}
         customSize={size}
-        copyable={shouldShowCopy}
+        copyable={showCopy}
         {...props}
       >
-        {shouldShowLanguage && <LanguageLabel>{language}</LanguageLabel>}
+        {showLanguage && <LanguageLabel>{language}</LanguageLabel>}
 
         <StyledCode>{processedChildren}</StyledCode>
 
-        {shouldShowCopy && (
-          <Tooltip title={copied ? 'Copied!' : 'Copy code'}>
-            <CopyButton onClick={handleCopy} size="small" color={copied ? 'success' : 'default'}>
-              {copied ? <Check /> : <ContentCopy />}
-            </CopyButton>
-          </Tooltip>
-        )}
+        {showCopy && <CodeCopyButton source={children} />}
       </StyledCodeContainer>
     );
   },
