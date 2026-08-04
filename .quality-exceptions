@@ -25,7 +25,6 @@ packages/ui/src/components/data-display/Alert/Alert.tsx
 packages/ui/src/components/data-display/AlertDialog/AlertDialog.test.stories.tsx
 packages/ui/src/components/data-display/AsyncStateContainer/AsyncStateContainer.test.stories.tsx
 packages/ui/src/components/data-display/AsyncStateContainer/AsyncStateContainer.tsx
-packages/ui/src/components/data-display/Badge/Badge.test.stories.tsx
 packages/ui/src/components/data-display/Badge/Badge.tsx
 packages/ui/src/components/data-display/Banner/Banner.test.stories.tsx
 packages/ui/src/components/data-display/Banner/Banner.tsx
@@ -56,11 +55,9 @@ packages/ui/src/components/data-display/Sheet/Sheet.tsx
 packages/ui/src/components/data-display/Stepper/Stepper.test.stories.tsx
 packages/ui/src/components/data-display/Table/Table.test.stories.tsx
 packages/ui/src/components/data-display/Table/Table.tsx
-packages/ui/src/components/data-display/Timeline/Timeline.test.stories.tsx
 packages/ui/src/components/data-display/Timeline/Timeline.tsx
 packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.test.stories.tsx
 packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.tsx
-packages/ui/src/components/data-display/Tooltip/Tooltip.test.stories.tsx
 packages/ui/src/components/data-display/Tooltip/Tooltip.tsx
 packages/ui/src/components/feedback/Dialog/Dialog.test.stories.tsx
 packages/ui/src/components/feedback/Modal/Modal.test.stories.tsx
@@ -81,7 +78,6 @@ packages/ui/src/components/form/CodeEditor/CodeEditor.test.stories.tsx
 packages/ui/src/components/form/CodeEditor/CodeEditor.tsx
 packages/ui/src/components/form/Command/Command.tsx
 packages/ui/src/components/form/CreatableSelect/CreatableSelect.test.stories.tsx
-packages/ui/src/components/form/Input/Input.test.stories.tsx
 packages/ui/src/components/form/Input/Input.tsx
 packages/ui/src/components/form/InputOTP/InputOTP.test.stories.tsx
 packages/ui/src/components/form/InputOTP/InputOTP.tsx
