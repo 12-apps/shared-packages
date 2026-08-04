@@ -16,10 +16,11 @@ const SLUG = "default-client";
 /**
  * Dev admin seeded as an OWNER of the baseline tenant so local manual testing
  * has a ready-to-use admin without going through the Google sign-up + terms
- * flow. Email is overridable via `DEV_ADMIN_EMAIL`.
+ * flow. Set `DEV_ADMIN_EMAIL` to your own address so the Google sign-in maps to
+ * this row; the placeholder default keeps personal addresses out of the repo.
  */
 const DEV_ADMIN = {
-  email: process.env.DEV_ADMIN_EMAIL ?? "thomfilg.bingo@gmail.com",
+  email: process.env.DEV_ADMIN_EMAIL ?? "dev-admin@example.com",
   name: "Dev Admin",
 };
 
