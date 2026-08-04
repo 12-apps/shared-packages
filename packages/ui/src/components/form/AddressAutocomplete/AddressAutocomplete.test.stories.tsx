@@ -180,7 +180,7 @@ export const KeyboardNavigation: Story = {
     googleMapsApiKey: 'demo-key',
     onSelect: fn(),
   },
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
 
     try {
@@ -188,9 +188,9 @@ export const KeyboardNavigation: Story = {
       const input = await canvas.findByPlaceholderText('Use Tab and Enter...');
       await expect(input).not.toBeDisabled();
 
-      // Focus the input
-      input.focus();
-      await expect(input).toHaveFocus();
+      // Focus the input the way a user would
+      await userEvent.click(input);
+      await waitFor(() => expect(input).toHaveFocus());
 
       // Type to trigger suggestions
       await userEvent.type(input, 'main');
@@ -215,8 +215,9 @@ export const KeyboardNavigation: Story = {
       // Try to select with Enter key
       await userEvent.keyboard('{Enter}');
 
-      // Wait a moment for any selection to process
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Selection resolves the place asynchronously, so wait on the callback
+      // rather than on the clock.
+      await waitFor(() => expect(args.onSelect).toHaveBeenCalled());
 
       // Test Escape key closes suggestions
       await userEvent.clear(input);
@@ -313,16 +314,17 @@ export const FocusManagementTest: Story = {
       const input = await canvas.findByPlaceholderText('Test focus behavior...');
       await expect(input).not.toBeDisabled();
 
-      // Test focus
-      input.focus();
-      await expect(input).toHaveFocus();
+      // Clicking focuses the field and tabbing away releases it. The DOM
+      // focus()/blur() calls this used to make asserted the browser's own API
+      // rather than the component's focus handling.
+      await userEvent.click(input);
+      await waitFor(() => expect(input).toHaveFocus());
 
-      // Test blur
-      input.blur();
-      await expect(input).not.toHaveFocus();
+      await userEvent.tab();
+      await waitFor(() => expect(input).not.toHaveFocus());
 
       // Focus again and type
-      input.focus();
+      await userEvent.click(input);
       await userEvent.type(input, 'Focus test');
       await expect(input).toHaveValue('Focus test');
 
@@ -462,7 +464,7 @@ export const VisualStatesTest: Story = {
 
       // Test focus state
       await userEvent.click(input);
-      await expect(input).toHaveFocus();
+      await waitFor(() => expect(input).toHaveFocus());
 
       // Test typing state
       await userEvent.type(input, 'Testing');
@@ -549,8 +551,10 @@ export const EdgeCasesTest: Story = {
 
       // Test empty input doesn't trigger suggestions
       await expect(input).toHaveValue('');
-      const initialSuggestion = body.queryByTestId('address-suggestion-0');
-      expect(initialSuggestion).not.toBeInTheDocument();
+      await waitFor(() => {
+        const initialSuggestion = body.queryByTestId('address-suggestion-0');
+        expect(initialSuggestion).not.toBeInTheDocument();
+      });
 
       // Test minimum characters requirement (less than 3 chars)
       await userEvent.type(input, 'ab');

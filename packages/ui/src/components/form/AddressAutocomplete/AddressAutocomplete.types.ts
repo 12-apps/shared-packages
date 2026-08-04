@@ -1,6 +1,17 @@
 import type { ReactNode } from 'react';
 
+import type { MockPrediction } from './mockPlaces';
+
 /// <reference types="@types/google.maps" />
+
+// What the Autocomplete holds: a live prediction, a canned one, or — in freeSolo
+// mode — the raw text.
+export type AddressOptionValue =
+  | string
+  | google.maps.places.AutocompletePrediction
+  | MockPrediction;
+
+export type AddressPrediction = google.maps.places.AutocompletePrediction | MockPrediction;
 
 export interface AddressDetails {
   formatted: string;
