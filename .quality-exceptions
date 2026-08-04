@@ -115,7 +115,6 @@ packages/ui/src/components/layout/Card/Card.test.stories.tsx
 packages/ui/src/components/layout/Card/Card.tsx
 packages/ui/src/components/layout/Collapsible/Collapsible.tsx
 packages/ui/src/components/layout/Container/Container.test.stories.tsx
-packages/ui/src/components/layout/Drawer/Drawer.test.stories.tsx
 packages/ui/src/components/layout/Drawer/Drawer.tsx
 packages/ui/src/components/layout/Resizable/Resizable.test.stories.tsx
 packages/ui/src/components/layout/Resizable/Resizable.tsx
@@ -131,7 +130,6 @@ packages/ui/src/components/navigation/Breadcrumbs/Breadcrumbs.test.stories.tsx
 packages/ui/src/components/navigation/Breadcrumbs/Breadcrumbs.tsx
 packages/ui/src/components/navigation/CommandPalette/CommandPalette.tsx
 packages/ui/src/components/navigation/ContextMenu/ContextMenu.tsx
-packages/ui/src/components/navigation/DropdownMenu/DropdownMenu.test.stories.tsx
 packages/ui/src/components/navigation/DropdownMenu/DropdownMenu.tsx
 packages/ui/src/components/navigation/NavigationMenu/NavigationMenu.tsx
 packages/ui/src/components/navigation/NavigationMenu/stories/NavigationMenu.test.stories.tsx
