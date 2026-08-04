@@ -16,7 +16,6 @@ packages/ui/src/components/data-display/Carousel/Carousel.test.stories.tsx
 packages/ui/src/components/data-display/Carousel/Carousel.tsx
 packages/ui/src/components/data-display/Chip/Chip.tsx
 packages/ui/src/components/data-display/DateTimeDisplay/DateTimeDisplay.tsx
-packages/ui/src/components/data-display/DescriptionItem/DescriptionItem.tsx
 packages/ui/src/components/data-display/EmptyState/EmptyState.tsx
 packages/ui/src/components/data-display/ErrorState/ErrorState.tsx
 packages/ui/src/components/data-display/HoverCard/HoverCard.tsx

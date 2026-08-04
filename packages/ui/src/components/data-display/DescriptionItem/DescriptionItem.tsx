@@ -54,47 +54,65 @@ export interface DescriptionItemProps {
  * />
  * ```
  */
+// Vertical stacks the label above the value; horizontal sets them side by side
+// with the label sized to its content.
+const containerSx = (isHorizontal: boolean) => ({
+  display: 'flex',
+  flexDirection: isHorizontal ? ('row' as const) : ('column' as const),
+  alignItems: isHorizontal ? 'center' : 'flex-start',
+  gap: isHorizontal ? 1 : 0,
+});
+
+const labelStyle = (isHorizontal: boolean) => ({
+  textTransform: 'uppercase' as const,
+  marginBottom: isHorizontal ? 0 : '0.25rem',
+  minWidth: isHorizontal ? ('fit-content' as const) : undefined,
+  flexShrink: isHorizontal ? 0 : undefined,
+});
+
+const makeTestId =
+  (dataTestId?: string) =>
+  (suffix: string): string =>
+    dataTestId ? `${dataTestId}-${suffix}` : `description-item-${suffix}`;
+
 export const DescriptionItem: React.FC<DescriptionItemProps> = ({
   label,
   value,
   orientation = 'vertical',
   className,
   'data-testid': dataTestId,
-}) => (
-  <Box
-    className={className}
-    sx={{
-      display: 'flex',
-      flexDirection: orientation === 'vertical' ? 'column' : 'row',
-      alignItems: orientation === 'horizontal' ? 'center' : 'flex-start',
-      gap: orientation === 'horizontal' ? 1 : 0,
-    }}
-    data-testid={dataTestId || 'description-item'}
-  >
-    <Text
-      variant="caption"
-      size="xs"
-      color="secondary"
-      style={{
-        textTransform: 'uppercase',
-        marginBottom: orientation === 'vertical' ? '0.25rem' : 0,
-        minWidth: orientation === 'horizontal' ? 'fit-content' : undefined,
-        flexShrink: orientation === 'horizontal' ? 0 : undefined,
-      }}
-      data-testid={dataTestId ? `${dataTestId}-label` : 'description-item-label'}
+}) => {
+  const isHorizontal = orientation === 'horizontal';
+  const testId = makeTestId(dataTestId);
+
+  return (
+    <Box
+      className={className}
+      sx={containerSx(isHorizontal)}
+      data-testid={dataTestId || 'description-item'}
     >
-      {label}
-    </Text>
-    <Box data-testid={dataTestId ? `${dataTestId}-value` : 'description-item-value'}>
-      {typeof value === 'string' || typeof value === 'number' ? (
-        <Text variant="body" size="sm" weight="semibold">
-          {value}
-        </Text>
-      ) : (
-        value
-      )}
+      <Text
+        variant="caption"
+        size="xs"
+        color="secondary"
+        style={labelStyle(isHorizontal)}
+        data-testid={testId('label')}
+      >
+        {label}
+      </Text>
+      <Box data-testid={testId('value')}>
+        {/* Plain text gets the component's own typography; anything else is
+            rendered as given. */}
+        {typeof value === 'string' || typeof value === 'number' ? (
+          <Text variant="body" size="sm" weight="semibold">
+            {value}
+          </Text>
+        ) : (
+          value
+        )}
+      </Box>
     </Box>
-  </Box>
-);
+  );
+};
 
 DescriptionItem.displayName = 'DescriptionItem';

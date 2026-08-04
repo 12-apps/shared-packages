@@ -46,12 +46,63 @@ function decodeHTMLEntities(text: string): string {
  * @param options - Configuration options
  * @returns Plain text with HTML removed and entities decoded
  */
+// Removes every <tag>…</tag> span, case-insensitively, by scanning rather than
+// by regex. A regex here is wrong three ways: /<\/script>/ misses `</script >`,
+// a single pass can leave a partial `<script` behind when spans overlap, and
+// `<style[^>]*>` backtracks polynomially on input full of `<style`.
+const removeSpans = (text: string, tag: string): string => {
+  const lower = text.toLowerCase();
+  const open = `<${tag}`;
+  let out = '';
+  let cursor = 0;
+
+  for (;;) {
+    const start = lower.indexOf(open, cursor);
+    if (start === -1) return out + text.slice(cursor);
+
+    out += text.slice(cursor, start);
+
+    const close = lower.indexOf(`</${tag}`, start);
+    // Unterminated: the rest of the document is inside the element.
+    if (close === -1) return out;
+
+    const end = text.indexOf('>', close);
+    if (end === -1) return out;
+    cursor = end + 1;
+  }
+};
+
+const removeComments = (text: string): string => {
+  let out = '';
+  let cursor = 0;
+
+  for (;;) {
+    const start = text.indexOf('<!--', cursor);
+    if (start === -1) return out + text.slice(cursor);
+
+    out += text.slice(cursor, start);
+
+    const end = text.indexOf('-->', start);
+    if (end === -1) return out;
+    cursor = end + 3;
+  }
+};
+
 // Style, script and comment blocks go entirely — their contents are not text.
 const removeNonTextBlocks = (text: string): string =>
-  text
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '');
+  removeComments(removeSpans(removeSpans(text, 'style'), 'script'));
+
+// Removing a tag can splice its neighbours into a new one ("<<a>script>"), so
+// keep stripping until the text stops changing.
+const stripTags = (text: string): string => {
+  let current = text;
+
+  for (;;) {
+    const next = current.replace(/<[^>]*>/g, '');
+    if (next === current) return next;
+    current = next;
+  }
+};
 
 // Turn the block-level tags into the breaks they imply, before all tags go.
 const tagsToLineBreaks = (text: string): string =>
@@ -93,7 +144,7 @@ export function stripHTML(
     text = tagsToLineBreaks(text);
   }
 
-  text = decodeHTMLEntities(text.replace(/<[^>]*>/g, ''));
+  text = decodeHTMLEntities(stripTags(text));
   text = collapseWhitespace(text, preserveLineBreaks);
 
   text = truncate(text, options?.maxLength);
