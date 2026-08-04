@@ -2,16 +2,21 @@
   "name": "@12-apps/typescript-config",
   "version": "1.0.2",
   "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "restricted"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/12-apps/shared-packages.git",
     "directory": "packages/typescript-config"
   },
   "files": [
-    "*.json"
-  ],
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org",
-    "access": "restricted"
-  }
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md"
+  ]
 }

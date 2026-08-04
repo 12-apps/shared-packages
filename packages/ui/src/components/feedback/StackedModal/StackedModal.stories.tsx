@@ -1,18 +1,16 @@
-import {
-  Add as AddIcon,
-  CheckCircle as CheckCircleIcon,
-  CloudUpload as CloudUploadIcon,
-  Delete as DeleteIcon,
-  Download as DownloadIcon,
-  Edit as EditIcon,
-  FilterList as FilterListIcon,
-  Info as InfoIcon,
-  MoreVert as MoreVertIcon,
-  Save as SaveIcon,
-  Search as SearchIcon,
-  Settings as SettingsIcon,
-  Share as ShareIcon,
-} from '@mui/icons-material';
+import AddIcon from '@mui/icons-material/Add';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
+import EditIcon from '@mui/icons-material/Edit';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import InfoIcon from '@mui/icons-material/Info';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import SaveIcon from '@mui/icons-material/Save';
+import SearchIcon from '@mui/icons-material/Search';
+import SettingsIcon from '@mui/icons-material/Settings';
+import ShareIcon from '@mui/icons-material/Share';
 import {
   Alert,
   Avatar,

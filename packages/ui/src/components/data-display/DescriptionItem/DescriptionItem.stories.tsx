@@ -1,4 +1,4 @@
-import { ContentCopy as ContentCopyIcon } from '@mui/icons-material';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { Box, Stack } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 

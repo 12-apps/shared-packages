@@ -1,7 +1,7 @@
-import { Star } from '@mui/icons-material';
+import Star from '@mui/icons-material/Star';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, fn, Mock, userEvent, within } from 'storybook/test';
+import { expect, fn, Mock, userEvent, waitFor, within } from 'storybook/test';
 
 import { Chip } from './Chip';
 
@@ -47,9 +47,10 @@ export const KeyboardNavigation: Story = {
     const canvas = within(canvasElement);
     const chip = canvas.getByRole('option');
 
-    // Focus the chip
-    chip.focus();
-    expect(chip).toHaveFocus();
+    // Tab to the chip rather than calling .focus() directly: the keyboard is how
+    // a user reaches it, and the direct call asserts nothing about the component.
+    await userEvent.tab();
+    await waitFor(() => expect(chip).toHaveFocus());
 
     // Test Enter key
     await userEvent.keyboard('{Enter}');
@@ -73,9 +74,11 @@ export const FocusManagement: Story = {
     const canvas = within(canvasElement);
     const chip = canvas.getByRole('button');
 
-    // Test programmatic focus
-    chip.focus();
-    expect(chip).toHaveFocus();
+    // Tab rather than .focus(): the chip is the only focusable node here, so this
+    // proves it is keyboard-reachable — a real property of the component, unlike
+    // asserting that a direct .focus() call took effect.
+    await userEvent.tab();
+    await waitFor(() => expect(chip).toHaveFocus());
   },
 };
 

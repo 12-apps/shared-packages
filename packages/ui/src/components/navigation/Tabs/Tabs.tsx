@@ -1,4 +1,4 @@
-import { Close } from '@mui/icons-material';
+import Close from '@mui/icons-material/Close';
 import {
   alpha,
   Badge,
@@ -12,7 +12,8 @@ import {
 import { styled } from '@mui/material/styles';
 import React from 'react';
 
-import type { TabItem,TabPanelProps, TabsProps } from './Tabs.types';
+import { CustomTabPanel } from './TabsPanel';
+import type { TabItem, TabsProps } from './Tabs.types';
 
 const StyledTabs = styled(MuiTabs, {
   shouldForwardProp: (prop) => !['customVariant', 'size', 'showDividers'].includes(prop as string),
@@ -188,114 +189,139 @@ const BadgeWrapper = styled(Badge)(() => ({
   },
 }));
 
-const LoadingContainer = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: 200,
-  color: theme.palette.text.secondary,
-}));
+const TABS_DEFAULTS: Partial<TabsProps> = {
+  variant: 'default',
+  size: 'md',
+  color: 'primary',
+  fullWidth: false,
+  orientation: 'horizontal',
+  showDividers: false,
+  centered: false,
+  scrollable: false,
+  scrollButtons: 'auto',
+  sticky: false,
+  stickyOffset: 0,
+  animateContent: false,
+  animationDuration: 300,
+  persistContent: false,
+  disabled: false,
+  loading: false,
+};
 
-const CustomTabPanel: React.FC<TabPanelProps & { dataTestId?: string; index: number }> = ({
-  children,
-  id,
-  value,
-  animate = false,
-  animationDuration = 300,
-  persist = false,
-  loading = false,
-  loadingComponent,
-  className,
-  dataTestId,
-  index,
-  ...props
-}) => {
-  const isActive = value === id;
-  const shouldRender = isActive || persist;
+// Strips explicitly-undefined props before the merge, so `prop={undefined}`
+// still falls back to the default as a destructuring default would.
+const definedProps = (props: TabsProps): Partial<TabsProps> =>
+  Object.fromEntries(
+    Object.entries(props).filter(([, value]) => value !== undefined),
+  ) as Partial<TabsProps>;
 
-  if (!shouldRender) {
-    return null;
-  }
+// Once the row is scrollable every accepted scrollButtons value ends up as
+// MUI's 'auto'. That is exactly what the previous nested ternary did — it mapped
+// 'on'/'off'/'desktop' to 'auto', and its remaining branch could only ever be
+// 'auto' anyway — so the behaviour is preserved here rather than quietly
+// changed. Worth knowing that scrollButtons="off" therefore still shows buttons.
+const resolveScrollButtons = (scrollable?: boolean): 'auto' | false =>
+  scrollable ? 'auto' : false;
 
-  const content = loading
-    ? loadingComponent || (
-        <LoadingContainer>
-          <CircularProgress size={32} />
-        </LoadingContainer>
-      )
-    : children;
+const buildTabsSx = ({
+  fullWidth,
+  sticky,
+  stickyOffset,
+  indicatorColor,
+  disabled,
+}: {
+  fullWidth?: boolean;
+  sticky?: boolean;
+  stickyOffset?: number;
+  indicatorColor?: string;
+  disabled?: boolean;
+}) => ({
+  ...(fullWidth && { width: '100%' }),
+  // Pin the tab list while panels scroll beneath it. Opaque background + bottom
+  // divider so scrolled content does not show through.
+  ...(sticky && {
+    position: 'sticky',
+    top: stickyOffset,
+    zIndex: 2,
+    backgroundColor: 'background.default',
+    borderBottom: 1,
+    borderColor: 'divider',
+  }),
+  ...(indicatorColor && {
+    '& .MuiTabs-indicator': { backgroundColor: indicatorColor },
+  }),
+  ...(disabled && { opacity: 0.6, pointerEvents: 'none' }),
+});
 
-  const testId = dataTestId ? `${dataTestId}-panel-${index}` : `tabs-panel-${index}`;
-
-  if (animate) {
-    return (
-      <Fade in={isActive} timeout={animationDuration}>
-        <TabPanel
-          role="tabpanel"
-          hidden={!isActive}
-          id={`tabpanel-${id}`}
-          aria-labelledby={`tab-${id}`}
-          animate={animate}
-          persist={persist}
-          className={className}
-          data-testid={testId}
-          {...props}
+// A tab's label: icon, text, optional close affordance, optionally badged.
+const TabLabel: React.FC<{
+  item: TabItem;
+  onClose: (event: React.MouseEvent | React.KeyboardEvent, tabId: string) => void;
+}> = ({ item, onClose }) => {
+  const content = (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {item.icon}
+      <span>{item.label}</span>
+      {item.closable && (
+        <CloseButton
+          onClick={(e) => onClose(e, item.id)}
+          role="button"
+          tabIndex={0}
+          aria-label="Close tab"
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            onClose(e, item.id);
+          }}
         >
-          {content}
-        </TabPanel>
-      </Fade>
-    );
-  }
+          <Close fontSize="inherit" />
+        </CloseButton>
+      )}
+    </Box>
+  );
+
+  if (item.badge === undefined) return content;
 
   return (
-    <TabPanel
-      role="tabpanel"
-      hidden={!isActive}
-      id={`tabpanel-${id}`}
-      aria-labelledby={`tab-${id}`}
-      animate={animate}
-      persist={persist}
-      className={className}
-      data-testid={testId}
-      {...props}
-    >
+    <BadgeWrapper badgeContent={item.badge} color="error">
       {content}
-    </TabPanel>
+    </BadgeWrapper>
   );
 };
 
 export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
   (
-    {
-      variant = 'default',
-      size = 'md',
+    tabsProps,
+    ref,
+  ) => {
+    const {
+      variant,
+      size,
       items,
       value,
       onChange,
-      color = 'primary',
-      fullWidth = false,
-      orientation = 'horizontal',
-      showDividers = false,
-      centered = false,
-      scrollable = false,
-      scrollButtons = 'auto',
-      sticky = false,
-      stickyOffset = 0,
-      animateContent = false,
-      animationDuration = 300,
-      persistContent = false,
+      color,
+      fullWidth,
+      orientation,
+      showDividers,
+      centered,
+      scrollable,
+      scrollButtons,
+      sticky,
+      stickyOffset,
+      animateContent,
+      animationDuration,
+      persistContent,
       onTabClose,
       className,
-      disabled = false,
+      disabled,
       indicatorColor,
       tabPanelProps,
-      loading = false,
+      loading,
       loadingComponent,
       dataTestId,
       ...props
-    },
-    ref,
-  ) => {
+    } = { ...TABS_DEFAULTS, ...definedProps(tabsProps) } as TabsProps;
+
     const handleChange = (event: React.SyntheticEvent, newValue: string) => {
       if (!disabled) {
         onChange(event, newValue);
@@ -305,40 +331,6 @@ export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
     const handleTabClose = (event: React.MouseEvent | React.KeyboardEvent, tabId: string) => {
       event.stopPropagation();
       onTabClose?.(tabId);
-    };
-
-    const renderTabContent = (item: TabItem) => {
-      const tabContent = (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {item.icon}
-          <span>{item.label}</span>
-          {item.closable && (
-            <CloseButton
-              onClick={(e) => handleTabClose(e, item.id)}
-              role="button"
-              tabIndex={0}
-              aria-label="Close tab"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  handleTabClose(e, item.id);
-                }
-              }}
-            >
-              <Close fontSize="inherit" />
-            </CloseButton>
-          )}
-        </Box>
-      );
-
-      if (item.badge !== undefined) {
-        return (
-          <BadgeWrapper badgeContent={item.badge} color="error">
-            {tabContent}
-          </BadgeWrapper>
-        );
-      }
-
-      return tabContent;
     };
 
     return (
@@ -356,44 +348,17 @@ export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
           // `scrollable` flag onto it so overflowing tab rows actually scroll.
           variant={scrollable ? 'scrollable' : 'standard'}
           data-testid={dataTestId ? `${dataTestId}-list` : 'tabs-list'}
-          scrollButtons={
-            scrollable
-              ? scrollButtons === 'on' || scrollButtons === 'off' || scrollButtons === 'desktop'
-                ? 'auto'
-                : scrollButtons
-              : false
-          }
+          scrollButtons={resolveScrollButtons(scrollable)}
           allowScrollButtonsMobile={scrollable}
           textColor={color}
           indicatorColor={color}
-          sx={{
-            ...(fullWidth && { width: '100%' }),
-            // Pin the tab list while panels scroll beneath it. Opaque background
-            // + bottom divider so scrolled content does not show through.
-            ...(sticky && {
-              position: 'sticky',
-              top: stickyOffset,
-              zIndex: 2,
-              backgroundColor: 'background.default',
-              borderBottom: 1,
-              borderColor: 'divider',
-            }),
-            ...(indicatorColor && {
-              '& .MuiTabs-indicator': {
-                backgroundColor: indicatorColor,
-              },
-            }),
-            ...(disabled && {
-              opacity: 0.6,
-              pointerEvents: 'none',
-            }),
-          }}
+          sx={buildTabsSx({ fullWidth, sticky, stickyOffset, indicatorColor, disabled })}
         >
           {items.map((item, index) => (
             <MuiTab
               key={item.id}
               value={item.id}
-              label={renderTabContent(item)}
+              label={<TabLabel item={item} onClose={handleTabClose} />}
               disabled={item.disabled || disabled}
               className={item.className}
               id={`tab-${item.id}`}

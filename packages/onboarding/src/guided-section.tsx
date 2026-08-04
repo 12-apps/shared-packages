@@ -82,7 +82,12 @@ export interface GuidedSectionProps {
   /** Compact summary shown once completed. */
   configuredTitle?: string;
   configuredSummary?: ReactNode;
-  /** Optional editable content revealed behind "Editar" when completed. */
+  /**
+   * Label for the button that reveals `completedContent` in the configured
+   * state. @default 'Editar' (from the shell).
+   */
+  editLabel?: string;
+  /** Optional editable content revealed behind the edit toggle when completed. */
   completedContent?: (nav: GuidedNav) => ReactNode;
   /**
    * Show a dev-only "reset onboarding" button (wipes progress → fresh first-run).
@@ -118,6 +123,7 @@ interface DefaultSectionProps {
   onStart: () => void;
   configuredTitle?: string;
   configuredSummary?: ReactNode;
+  editLabel?: string;
   landingExtra?: ReactNode;
   stepBody: ReactNode;
   dataTestId: string;
@@ -140,6 +146,7 @@ function DefaultSection(p: DefaultSectionProps): React.JSX.Element {
         primaryAction={{ label: p.startLabel, onClick: p.onStart }}
         configuredTitle={p.configuredTitle}
         configuredSummary={p.configuredSummary}
+        editLabel={p.editLabel}
         dataTestId={`${p.dataTestId}-section`}
       >
         {p.stepBody}
@@ -166,6 +173,7 @@ export function GuidedSection({
   landingExtra,
   configuredTitle,
   configuredSummary,
+  editLabel,
   completedContent,
   renderLanding,
   devReset = false,
@@ -202,6 +210,7 @@ export function GuidedSection({
           onStart={startFlow}
           configuredTitle={configuredTitle}
           configuredSummary={configuredSummary}
+          editLabel={editLabel}
           landingExtra={landingExtra}
           stepBody={stepBody}
           dataTestId={dataTestId}

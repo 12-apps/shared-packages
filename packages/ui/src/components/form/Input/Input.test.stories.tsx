@@ -1,4 +1,8 @@
-import { Email, Lock, Person,Visibility, VisibilityOff } from '@mui/icons-material';
+import Email from '@mui/icons-material/Email';
+import Lock from '@mui/icons-material/Lock';
+import Person from '@mui/icons-material/Person';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { IconButton } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
@@ -160,9 +164,11 @@ export const StateChangeTest: Story = {
         setError(inputValue.length < 3);
       };
 
+      // Toggle only. The old version also queued a 2s timer to clear the flag,
+      // which made the rendered state depend on wall-clock time — a play
+      // function that ran slowly would see `loading` flip under it.
       const handleLoadingToggle = () => {
-        setLoading(!loading);
-        window.setTimeout(() => setLoading(false), 2000);
+        setLoading((previous) => !previous);
       };
 
       return (
@@ -277,13 +283,13 @@ export const KeyboardNavigation: Story = {
       const firstInput = canvas.getByTestId('first-input');
       const secondInput = canvas.getByTestId('second-input');
 
-      // Focus first element
-      firstInput.focus();
-      await expect(firstInput).toHaveFocus();
+      // Tab in from the body rather than calling .focus().
+      await userEvent.tab();
+      await waitFor(() => expect(firstInput).toHaveFocus());
 
       // Tab to next element
       await userEvent.tab();
-      await expect(secondInput).toHaveFocus();
+      await waitFor(() => expect(secondInput).toHaveFocus());
     });
 
     await step('Tab navigation continues', async () => {
@@ -291,28 +297,28 @@ export const KeyboardNavigation: Story = {
       const button = canvas.getByTestId('after-inputs');
 
       await userEvent.tab();
-      await expect(thirdInput).toHaveFocus();
+      await waitFor(() => expect(thirdInput).toHaveFocus());
 
       await userEvent.tab();
-      await expect(button).toHaveFocus();
+      await waitFor(() => expect(button).toHaveFocus());
     });
 
     await step('Tab navigation backward', async () => {
       const thirdInput = canvas.getByTestId('third-input');
 
       await userEvent.tab({ shift: true });
-      await expect(thirdInput).toHaveFocus();
+      await waitFor(() => expect(thirdInput).toHaveFocus());
     });
 
     await step('Enter key in input (should not submit)', async () => {
       const firstInput = canvas.getByTestId('first-input');
-      firstInput.focus();
 
+      // Typing into an input focuses it, so the extra .focus() was redundant.
       await userEvent.type(firstInput, 'test');
       await userEvent.keyboard('{Enter}');
 
       // Input should still have focus and content
-      await expect(firstInput).toHaveFocus();
+      await waitFor(() => expect(firstInput).toHaveFocus());
       await expect(firstInput).toHaveValue('test');
     });
   },
@@ -471,8 +477,9 @@ export const FocusManagement: Story = {
       const closeButton = within(modal).getByTestId('close-modal');
       const openButton = canvas.getByTestId('open-modal');
 
-      // Set focus to open button before closing
-      openButton.focus();
+      // No pre-focus: the assertion below is about the modal being removed, and
+      // .focus() on the open button neither affected that nor was ever checked.
+      await expect(openButton).toBeInTheDocument();
       await userEvent.click(closeButton);
 
       // Modal should be gone
@@ -567,13 +574,13 @@ export const ResponsiveDesign: Story = {
 
       // Test interaction on each input
       await userEvent.click(input1);
-      await expect(input1).toHaveFocus();
+      await waitFor(() => expect(input1).toHaveFocus());
 
       await userEvent.click(input2);
-      await expect(input2).toHaveFocus();
+      await waitFor(() => expect(input2).toHaveFocus());
 
       await userEvent.click(input3);
-      await expect(input3).toHaveFocus();
+      await waitFor(() => expect(input3).toHaveFocus());
     });
   },
 };
@@ -630,10 +637,10 @@ export const ThemeVariations: Story = {
 
       // Focus each input to test theme-aware focus styles
       await userEvent.click(outlinedInput);
-      await expect(outlinedInput).toHaveFocus();
+      await waitFor(() => expect(outlinedInput).toHaveFocus());
 
       await userEvent.click(glassInput);
-      await expect(glassInput).toHaveFocus();
+      await waitFor(() => expect(glassInput).toHaveFocus());
     });
   },
 };
@@ -692,7 +699,7 @@ export const VisualStates: Story = {
     await step('Focus state interaction', async () => {
       const focusInput = canvas.getByTestId('focus-state');
       await userEvent.click(focusInput);
-      await expect(focusInput).toHaveFocus();
+      await waitFor(() => expect(focusInput).toHaveFocus());
     });
 
     await step('Disabled state verification', async () => {
@@ -700,7 +707,7 @@ export const VisualStates: Story = {
       await expect(disabledInput).toBeDisabled();
       // Try to click (should not gain focus)
       await userEvent.click(disabledInput);
-      await expect(disabledInput).not.toHaveFocus();
+      await waitFor(() => expect(disabledInput).not.toHaveFocus());
     });
 
     await step('Error state verification', async () => {
@@ -720,7 +727,7 @@ export const VisualStates: Story = {
     await step('Glow state interaction', async () => {
       const glowInput = canvas.getByTestId('glow-state');
       await userEvent.click(glowInput);
-      await expect(glowInput).toHaveFocus();
+      await waitFor(() => expect(glowInput).toHaveFocus());
       // Glow effect should be visible via CSS
     });
   },
@@ -811,7 +818,7 @@ export const EdgeCases: Story = {
 
       // Should be visible and interactive despite all effects
       await userEvent.click(allEffectsInput);
-      await expect(allEffectsInput).toHaveFocus();
+      await waitFor(() => expect(allEffectsInput).toHaveFocus());
 
       await userEvent.type(allEffectsInput, 'works with all effects');
       await expect(allEffectsInput).toHaveValue('works with all effects');

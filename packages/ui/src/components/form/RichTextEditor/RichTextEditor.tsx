@@ -1,15 +1,13 @@
-import {
-  Code,
-  FormatBold,
-  FormatItalic,
-  FormatListBulleted,
-  FormatListNumbered,
-  FormatQuote,
-  FormatStrikethrough,
-  FormatUnderlined,
-  Image,
-  Link,
-} from '@mui/icons-material';
+import Code from '@mui/icons-material/Code';
+import FormatBold from '@mui/icons-material/FormatBold';
+import FormatItalic from '@mui/icons-material/FormatItalic';
+import FormatListBulleted from '@mui/icons-material/FormatListBulleted';
+import FormatListNumbered from '@mui/icons-material/FormatListNumbered';
+import FormatQuote from '@mui/icons-material/FormatQuote';
+import FormatStrikethrough from '@mui/icons-material/FormatStrikethrough';
+import FormatUnderlined from '@mui/icons-material/FormatUnderlined';
+import Image from '@mui/icons-material/Image';
+import Link from '@mui/icons-material/Link';
 import {
   alpha,
   Box,
@@ -24,6 +22,12 @@ import {
 import DOMPurify from 'dompurify';
 import React, { forwardRef, useCallback, useEffect,useRef, useState } from 'react';
 
+import {
+  insertImage,
+  toggleList,
+  wrapSelection,
+  wrapSelectionWithLink,
+} from './RichTextEditor.dom';
 import type { RichTextEditorProps, ToolbarConfig } from './RichTextEditor.types';
 
 const DEFAULT_TOOLBAR: Required<Omit<ToolbarConfig, 'customItems'>> & Pick<ToolbarConfig, 'customItems'> = {
@@ -40,16 +44,88 @@ const DEFAULT_TOOLBAR: Required<Omit<ToolbarConfig, 'customItems'>> & Pick<Toolb
   customItems: [],
 };
 
+const RICH_TEXT_DEFAULTS: Partial<RichTextEditorProps> = {
+  value: '',
+  placeholder: 'Start typing...',
+  disabled: false,
+  readOnly: false,
+  toolbar: {},
+  height: 300,
+};
+
+// Strips explicitly-undefined props before the merge, so `prop={undefined}`
+// still falls back to the default as a destructuring default would.
+const definedProps = (props: RichTextEditorProps): Partial<RichTextEditorProps> =>
+  Object.fromEntries(
+    Object.entries(props).filter(([, v]) => v !== undefined),
+  ) as Partial<RichTextEditorProps>;
+
+// Simple inline formats are a tag swap; lists and the value-carrying formats
+// need their own handling. This was one nine-case switch.
+const WRAP_TAGS: Record<string, string> = {
+  bold: 'strong',
+  italic: 'em',
+  underline: 'u',
+  strikethrough: 's',
+};
+
+const LIST_TAGS: Record<string, 'ol' | 'ul'> = {
+  insertOrderedList: 'ol',
+  insertUnorderedList: 'ul',
+};
+
+// formatBlock is the only format whose value names the tag, and only these two
+// are accepted.
+const BLOCK_TAGS = new Set(['pre', 'blockquote']);
+
+const applyFormatToRange = ({
+  formatType,
+  value,
+  range,
+  editor,
+}: {
+  formatType: string;
+  value?: string;
+  range: globalThis.Range;
+  editor: HTMLElement | null;
+}) => {
+  const wrapTag = WRAP_TAGS[formatType];
+  if (wrapTag) {
+    wrapSelection(range, wrapTag);
+    return;
+  }
+
+  const listTag = LIST_TAGS[formatType];
+  if (listTag) {
+    toggleList(range, listTag, editor);
+    return;
+  }
+
+  if (formatType === 'createLink' && value) {
+    wrapSelectionWithLink(range, value);
+    return;
+  }
+
+  if (formatType === 'insertImage' && value) {
+    insertImage(range, value);
+    return;
+  }
+
+  if (formatType === 'formatBlock' && value && BLOCK_TAGS.has(value)) {
+    wrapSelection(range, value);
+  }
+};
+
 export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
-  (
-    {
-      value = '',
+  (editorProps, ref) => {
+    const {
+      value,
       onChange,
-      placeholder = 'Start typing...',
-      disabled = false,
-      readOnly = false,
-      toolbar = {},
-      height = 300,
+      placeholder,
+      disabled,
+      readOnly,
+      toolbar,
+      height,
       maxLength,
       onFocus,
       onBlur,
@@ -58,13 +134,12 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
       'aria-label': ariaLabel,
       'aria-describedby': ariaDescribedBy,
       ...props
-    },
-    ref
-  ) => {
+    } = { ...RICH_TEXT_DEFAULTS, ...definedProps(editorProps) } as RichTextEditorProps;
+
     const theme = useTheme();
     const editorRef = useRef<HTMLDivElement>(null);
     const [isFocused, setIsFocused] = useState(false);
-    const [content, setContent] = useState(value);
+    const [content, setContent] = useState(value ?? '');
 
     const toolbarConfig = { ...DEFAULT_TOOLBAR, ...toolbar };
 
@@ -105,150 +180,15 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
       
       const range = selection.getRangeAt(0);
       
-      switch (formatType) {
-        case 'bold':
-          wrapSelection(range, 'strong');
-          break;
-        case 'italic':
-          wrapSelection(range, 'em');
-          break;
-        case 'underline':
-          wrapSelection(range, 'u');
-          break;
-        case 'strikethrough':
-          wrapSelection(range, 's');
-          break;
-        case 'insertOrderedList':
-          toggleList(range, 'ol');
-          break;
-        case 'insertUnorderedList':
-          toggleList(range, 'ul');
-          break;
-        case 'createLink':
-          if (value) {
-            wrapSelectionWithLink(range, value);
-          }
-          break;
-        case 'insertImage':
-          if (value) {
-            insertImage(range, value);
-          }
-          break;
-        case 'formatBlock':
-          if (value === 'pre') {
-            wrapSelection(range, 'pre');
-          } else if (value === 'blockquote') {
-            wrapSelection(range, 'blockquote');
-          }
-          break;
-      }
+      applyFormatToRange({ formatType, value, range, editor: editorRef.current });
       
       handleContentChange();
       editorRef.current.focus();
     }, [disabled, readOnly, handleContentChange]);
     
-    const wrapSelection = (range: globalThis.Range, tagName: string) => {
-      const selectedText = range.toString();
-      if (!selectedText) return;
-      
-      const wrapper = document.createElement(tagName);
-      wrapper.appendChild(document.createTextNode(selectedText));
-      
-      range.deleteContents();
-      range.insertNode(wrapper);
-      
-      // Move cursor after inserted element
-      const newRange = document.createRange();
-      newRange.setStartAfter(wrapper);
-      newRange.collapse(true);
-      
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(newRange);
-    };
     
-    const wrapSelectionWithLink = (range: globalThis.Range, url: string) => {
-      const selectedText = range.toString();
-      if (!selectedText) return;
-      
-      const link = document.createElement('a');
-      link.href = url.startsWith('http') ? url : `https://${url}`;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.appendChild(document.createTextNode(selectedText));
-      
-      range.deleteContents();
-      range.insertNode(link);
-      
-      // Move cursor after inserted element
-      const newRange = document.createRange();
-      newRange.setStartAfter(link);
-      newRange.collapse(true);
-      
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(newRange);
-    };
     
-    const insertImage = (range: globalThis.Range, src: string) => {
-      const img = document.createElement('img');
-      img.src = src;
-      img.style.maxWidth = '100%';
-      img.style.height = 'auto';
-      
-      range.deleteContents();
-      range.insertNode(img);
-      
-      // Move cursor after inserted element
-      const newRange = document.createRange();
-      newRange.setStartAfter(img);
-      newRange.collapse(true);
-      
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(newRange);
-    };
     
-    const toggleList = (range: globalThis.Range, listType: 'ol' | 'ul') => {
-      if (!editorRef.current) return;
-      
-      // Get the parent block element
-      let parentBlock = range.commonAncestorContainer;
-      if (parentBlock.nodeType === globalThis.Node.TEXT_NODE) {
-        parentBlock = parentBlock.parentElement || parentBlock;
-      }
-      
-      // Check if we're already in a list
-      const existingList = (parentBlock as globalThis.Element).closest(listType);
-      if (existingList) {
-        // Remove from list
-        const listItem = (parentBlock as globalThis.Element).closest('li');
-        if (listItem && listItem.parentElement) {
-          const text = document.createTextNode(listItem.textContent || '');
-          listItem.parentElement.replaceChild(text, listItem);
-        }
-      } else {
-        // Create new list
-        const list = document.createElement(listType);
-        const listItem = document.createElement('li');
-        
-        const selectedText = range.toString() || 'List item';
-        listItem.appendChild(document.createTextNode(selectedText));
-        list.appendChild(listItem);
-        
-        range.deleteContents();
-        range.insertNode(list);
-        
-        // Move cursor inside list item
-        const newRange = document.createRange();
-        newRange.selectNodeContents(listItem);
-        newRange.collapse(false);
-        
-        const selection = window.getSelection();
-        selection?.removeAllRanges();
-        selection?.addRange(newRange);
-      }
-    };
 
     const getToolbarButton = (
       key: string,

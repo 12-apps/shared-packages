@@ -1,6 +1,9 @@
 'use client';
 
-import { Check as CheckIcon, KeyboardArrowDown as ChevronDownIcon, MoreVert as KebabIcon } from '@mui/icons-material';
+import CheckIcon from '@mui/icons-material/Check';
+import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KebabIcon from '@mui/icons-material/MoreVert';
+import ViewIcon from '@mui/icons-material/Visibility';
 import { Box, Button, IconButton, Menu, MenuItem, Popover, Stack, Typography } from '@mui/material';
 import React, { useState } from 'react';
 
@@ -278,7 +281,6 @@ export function SavedViewsMenu<V extends SavedViewLike = SavedViewLike>({
     close();
   };
   const labels = { ...DEFAULT_LABELS, ...labelOverrides };
-
   const pinned = views.filter((view) => view.pinned);
   const recent = views.filter((view) => !view.pinned).slice(0, RECENT_LIMIT);
 
@@ -304,9 +306,14 @@ export function SavedViewsMenu<V extends SavedViewLike = SavedViewLike>({
         data-testid={`${testIdPrefix}-button`}
         aria-haspopup="menu"
         aria-expanded={Boolean(anchorEl)}
+        aria-label={activeViewName ?? labels.mainView}
         sx={{ minWidth: 0, height: 32, px: 1, gap: 0.5, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
       >
-        {activeViewName ?? labels.mainView}
+        {/* Mobile: an eye icon stands in for the view name to keep the toolbar one line. */}
+        <ViewIcon sx={{ fontSize: 18, display: { xs: 'inline-flex', md: 'none' } }} />
+        <Box component="span" sx={{ display: { xs: 'none', md: 'inline' } }}>
+          {activeViewName ?? labels.mainView}
+        </Box>
         <ChevronDownIcon sx={{ fontSize: 14 }} />
       </Button>
       <Popover

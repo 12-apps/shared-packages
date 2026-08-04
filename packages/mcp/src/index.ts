@@ -9,6 +9,22 @@
  */
 
 export * from "./types";
+// Shared AI-connect guide content (pure data, no React) — the single source of
+// truth for BOTH the `@12-apps/mcp/react` onboarding UI and the server-side connect
+// tools, so what an agent reads via MCP cannot drift from what owners see.
+export {
+  AI_HOST_GUIDES,
+  AI_CAPABILITIES,
+  AI_PERMISSION_MODEL,
+  AI_CONNECT_PROMPT,
+  providerForHostId,
+  type AiHostBrand,
+  type AiHostLink,
+  type AiHostConfigureStage,
+  type AiHostGuide,
+  type AiProvider,
+  type AiCapability,
+} from "./guide";
 export { generateTools } from "./openapi/generate";
 export { inlineSchemaRefs, UnsupportedSchemaError } from "./openapi/refs";
 export type {
@@ -21,6 +37,7 @@ export type {
 export { dispatchTool, DispatchInputError } from "./dispatch/proxy";
 export {
   createToolRegistry,
+  HTTP_STATUS_META_KEY,
   type ToolRegistry,
   type RegistryOptions,
   type McpToolDescriptor,

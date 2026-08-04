@@ -1,13 +1,11 @@
-import {
-  Analytics,
-  Dashboard,
-  Home,
-  Inventory,
-  Notifications,
-  People,
-  Settings,
-  ShoppingCart,
-} from '@mui/icons-material';
+import Analytics from '@mui/icons-material/Analytics';
+import Dashboard from '@mui/icons-material/Dashboard';
+import Home from '@mui/icons-material/Home';
+import Inventory from '@mui/icons-material/Inventory';
+import Notifications from '@mui/icons-material/Notifications';
+import People from '@mui/icons-material/People';
+import Settings from '@mui/icons-material/Settings';
+import ShoppingCart from '@mui/icons-material/ShoppingCart';
 import { Box, createTheme,ThemeProvider, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
@@ -226,10 +224,13 @@ export const KeyboardNavigation: Story = {
     // Test basic keyboard interactions
     const dashboardItem = canvas.getByText('Dashboard').closest('button, a, [role="button"]') as HTMLElement;
     if (dashboardItem) {
-      dashboardItem.focus();
+      // Dashboard is the first item in the menu, so one tab reaches it. Tabbing
+      // rather than calling .focus() keeps this a keyboard journey, and the tab
+      // below continues it to the next item.
+      await userEvent.tab();
 
       // Test that item can receive focus
-      expect(dashboardItem).toHaveFocus();
+      await waitFor(() => expect(dashboardItem).toHaveFocus());
 
       // Test tab navigation to next item
       await userEvent.tab();
@@ -313,10 +314,11 @@ export const FocusManagement: Story = {
 
     // Test focus ring visibility
     const dashboardItem = canvas.getByText('Dashboard').closest('a, div[role="button"]') as HTMLElement;
-    dashboardItem?.focus();
+    // Dashboard is the first focusable item in the menu.
+    await userEvent.tab();
 
     // Check focus is visible
-    expect(dashboardItem).toHaveFocus();
+    await waitFor(() => expect(dashboardItem).toHaveFocus());
 
     // Test focus trap in expanded menu
     const analyticsItem = canvas.getByText('Analytics');
@@ -326,10 +328,13 @@ export const FocusManagement: Story = {
       expect(canvas.getByText('Overview')).toBeInTheDocument();
     });
 
-    // Focus should move to submenu items
+    // The submenu item is reachable and rendered. Whether focus moves into the
+    // submenu automatically is deliberately NOT asserted here: the previous
+    // version called .focus() itself and then checked the element was focused,
+    // which proved only that the DOM honours focus(), never that the component
+    // moved it.
     const overviewItem = canvas.getByText('Overview').closest('a, div[role="button"]') as HTMLElement;
-    overviewItem?.focus();
-    expect(overviewItem).toHaveFocus();
+    expect(overviewItem).toBeVisible();
   },
 };
 
@@ -492,8 +497,9 @@ export const PerformanceTest: Story = {
       canvas.getByRole('list').closest('[role="list"]') || canvas.getByRole('list');
     expect(menuContainer).toBeTruthy();
 
-    // Basic scroll behavior test - check if container is scrollable
-    expect(menuContainer.scrollHeight).toBeGreaterThanOrEqual(menuContainer.clientHeight);
+    // Scrollability is not asserted: scrollHeight >= clientHeight holds for every
+    // element that has ever been laid out, so the check could not fail, and both
+    // figures move with the runner's window size.
   },
 };
 
@@ -896,11 +902,9 @@ export const AdvancedKeyboardNavigation: Story = {
     const canvas = within(canvasElement);
 
     // Focus first menu item
+    // No pre-focus needed: the step below clicks this button directly.
     const firstMenuItem = canvas.getByText('Dashboard').closest('button');
-    if (firstMenuItem) {
-      firstMenuItem.focus();
-      await expect(firstMenuItem).toHaveFocus();
-    }
+    expect(firstMenuItem).toBeInTheDocument();
 
     // Test Enter key activation - click the focused button directly
     if (firstMenuItem) {

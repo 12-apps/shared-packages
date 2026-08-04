@@ -16,7 +16,13 @@ import { getActorUserId } from './actor-context';
 import { normalizeSearchText } from './search-normalize';
 
 /** Prisma model names that carry `created_by`/`updated_by` + `search_name`. */
-const TRACKED_MODELS = new Set(['Product', 'ProductCategory', 'Supplier']);
+const TRACKED_MODELS = new Set([
+  'MenuItem',
+  'InventoryItem',
+  'ProductCategory',
+  'Supplier',
+  'Discount',
+]);
 
 type MutableData = Record<string, unknown>;
 

@@ -1,4 +1,8 @@
-import { Email, Lock, Search, Visibility, VisibilityOff } from '@mui/icons-material';
+import Email from '@mui/icons-material/Email';
+import Lock from '@mui/icons-material/Lock';
+import Search from '@mui/icons-material/Search';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { IconButton } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';

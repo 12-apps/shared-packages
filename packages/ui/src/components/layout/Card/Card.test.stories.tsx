@@ -1,4 +1,6 @@
-import { Favorite, MoreVert, Share } from '@mui/icons-material';
+import Favorite from '@mui/icons-material/Favorite';
+import MoreVert from '@mui/icons-material/MoreVert';
+import Share from '@mui/icons-material/Share';
 import { Avatar, Box,Button, Chip, IconButton, Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
@@ -538,19 +540,21 @@ export const KeyboardNavigationTest: Story = {
       const firstCard = canvas.getByTestId('interactive-card-1');
       const secondCard = canvas.getByTestId('interactive-card-2');
 
-      // Focus first card
-      firstCard.focus();
-      await expect(firstCard).toHaveFocus();
+      // Tab in from the body rather than calling .focus() — that made the first
+      // assertion a tautology about the DOM honouring focus(), not about this
+      // card being the first tab stop.
+      await userEvent.tab();
+      await waitFor(() => expect(firstCard).toHaveFocus());
 
       // Tab to next card
       await userEvent.tab();
-      await expect(secondCard).toHaveFocus();
+      await waitFor(() => expect(secondCard).toHaveFocus());
     });
 
     await step('Tab navigation backward', async () => {
       await userEvent.tab({ shift: true });
       const firstCard = canvas.getByTestId('interactive-card-1');
-      await expect(firstCard).toHaveFocus();
+      await waitFor(() => expect(firstCard).toHaveFocus());
     });
   },
 };
@@ -813,10 +817,15 @@ export const ScreenReaderTest: Story = {
 
     await step('Keyboard activation', async () => {
       const accessibleCard = canvas.getByTestId('accessible-card');
-      accessibleCard.focus();
+
+      // Tab in rather than calling .focus(), so this covers the card actually
+      // being reachable by keyboard, and assert focus survives Enter — pressing
+      // Enter on a card must not send focus somewhere else.
+      await userEvent.tab();
+      await waitFor(() => expect(accessibleCard).toHaveFocus());
+
       await userEvent.keyboard('{Enter}');
-      // Card should respond to Enter key when focused
-      await expect(accessibleCard).toHaveFocus();
+      await waitFor(() => expect(accessibleCard).toHaveFocus());
     });
   },
 };
@@ -847,23 +856,26 @@ export const FocusManagementTest: Story = {
       const card1 = canvas.getByTestId('focus-card-1');
       const innerButton1 = canvas.getByTestId('inner-button-1');
 
-      // Focus card
-      card1.focus();
-      // In testing environment, focus might immediately move to the button
-      // Check that either the card or its inner button has focus
-      const hasFocus = document.activeElement === card1 || document.activeElement === innerButton1;
-      await expect(hasFocus).toBeTruthy();
+      // Tab in from the body. contains() is true for the node itself, so this
+      // holds whether the card is its own tab stop or focus goes straight to the
+      // button inside it.
+      await userEvent.tab();
+      await waitFor(() => expect(card1.contains(document.activeElement)).toBeTruthy());
 
-      // If card has focus, tab to inner element
-      if (document.activeElement === card1) {
+      // Whether the card is a tab stop of its own is a Card implementation
+      // detail, so step forward only if focus is not already on the button. The
+      // previous version wrapped the assertion itself in that condition, which
+      // meant one of its two paths asserted nothing at all.
+      if (document.activeElement !== innerButton1) {
         await userEvent.tab();
-        await expect(innerButton1).toHaveFocus();
       }
+      await waitFor(() => expect(innerButton1).toHaveFocus());
     });
 
     await step('Focus visibility', async () => {
       const card1 = canvas.getByTestId('focus-card-1');
-      card1.focus();
+      // Focus is already inside card 1 from the previous step.
+      await waitFor(() => expect(card1.contains(document.activeElement)).toBeTruthy());
 
       // Check for focus ring (outline)
       const styles = window.getComputedStyle(card1);
@@ -873,21 +885,15 @@ export const FocusManagementTest: Story = {
     await step('Focus restoration', async () => {
       const card1 = canvas.getByTestId('focus-card-1');
       const card2 = canvas.getByTestId('focus-card-2');
-      const innerButton2 = canvas.getByTestId('inner-button-2');
 
-      // Focus on second card or its button
-      card2.focus();
-      // Check that focus moved to second card area
-      const secondCardHasFocus =
-        document.activeElement === card2 || document.activeElement === innerButton2;
-      await expect(secondCardHasFocus).toBeTruthy();
+      // Continue the journey forward out of card 1 and into card 2...
+      await userEvent.tab();
+      await waitFor(() => expect(card2.contains(document.activeElement)).toBeTruthy());
 
-      // Focus back on first card
-      card1.focus();
-      // Check that focus moved back to first card area
-      const firstCardArea = canvas.getByTestId('focus-card-1');
-      const focusIsInFirstCard = firstCardArea.contains(document.activeElement);
-      await expect(focusIsInFirstCard).toBeTruthy();
+      // ...then shift-tab back, which is the restoration this step is named for.
+      // Calling .focus() on each card in turn only proved that focus() works.
+      await userEvent.tab({ shift: true });
+      await waitFor(() => expect(card1.contains(document.activeElement)).toBeTruthy());
     });
   },
 };
@@ -1011,7 +1017,6 @@ export const PerformanceTest: Story = {
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
-    const startTime = Date.now();
 
     await step('Render performance', async () => {
       const container = canvas.getByTestId('performance-container');
@@ -1021,25 +1026,20 @@ export const PerformanceTest: Story = {
       const cards = canvas.getAllByTestId(/^perf-card-/);
       await expect(cards).toHaveLength(50);
 
-      const renderTime = Date.now() - startTime;
-      // Performance metric logged to test report
-
-      // Expect reasonable render time (under 1000ms)
-      await expect(renderTime).toBeLessThan(1000);
+      // No wall-clock budget here: the queries above run against DOM that has
+      // already rendered, so a duration around them measures query time, and any
+      // millisecond threshold is really a bet on how loaded the CI runner is.
     });
 
     await step('Interaction performance', async () => {
       const interactiveCard = canvas.getByTestId('perf-card-0');
-      const interactionStart = Date.now();
 
       await userEvent.hover(interactiveCard);
       await userEvent.unhover(interactiveCard);
 
-      const interactionTime = Date.now() - interactionStart;
-      // Interaction metric logged to test report
-
-      // Expect quick interaction (under 100ms)
-      await expect(interactionTime).toBeLessThan(100);
+      // The card survives a hover/unhover cycle. Timing it was a runner-speed
+      // assertion, not a component one.
+      await expect(interactiveCard).toBeInTheDocument();
     });
 
     await step('Memory efficiency', async () => {

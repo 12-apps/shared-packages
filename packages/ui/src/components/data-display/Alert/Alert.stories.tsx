@@ -1,10 +1,8 @@
-import {
-  CheckCircle,
-  Notifications,
-  Security,
-  Star,
-  Warning as MuiWarning,
-} from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Notifications from '@mui/icons-material/Notifications';
+import Security from '@mui/icons-material/Security';
+import Star from '@mui/icons-material/Star';
+import MuiWarning from '@mui/icons-material/Warning';
 import { Box, Button,Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';

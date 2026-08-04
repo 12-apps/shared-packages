@@ -1,4 +1,5 @@
-import { Delete,Save } from '@mui/icons-material';
+import Delete from '@mui/icons-material/Delete';
+import Save from '@mui/icons-material/Save';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
@@ -132,22 +133,26 @@ export const KeyboardNavigation: Story = {
   play: async ({ canvasElement, step, args }) => {
     const canvas = within(canvasElement);
 
+    // The story renders this single button, so one tab reaches it. Focus then
+    // stays put across the activation steps — pressing Enter or Space on a
+    // button does not move it — which is what makes this one keyboard journey
+    // rather than three re-focused fragments.
     await step('Focus via Tab navigation', async () => {
       const button = canvas.getByTestId('keyboard-button');
-      button.focus();
-      await expect(button).toHaveFocus();
+      await userEvent.tab();
+      await waitFor(() => expect(button).toHaveFocus());
     });
 
     await step('Enter key activation', async () => {
       const button = canvas.getByTestId('keyboard-button');
-      button.focus();
+      await waitFor(() => expect(button).toHaveFocus());
       await userEvent.keyboard('{Enter}');
       await expect(args.onClick).toHaveBeenCalled();
     });
 
     await step('Space key activation', async () => {
       const button = canvas.getByTestId('keyboard-button');
-      button.focus();
+      await waitFor(() => expect(button).toHaveFocus());
       await userEvent.keyboard(' ');
       await expect(args.onClick).toHaveBeenCalled();
     });
@@ -225,8 +230,10 @@ export const DisabledAccessibility: Story = {
     });
 
     await step('Verify keyboard interaction is prevented', async () => {
-      const button = canvas.getByTestId('disabled-button');
-      button.focus();
+      // A disabled button is not tabbable and cannot take focus, so keyboard
+      // input never reaches it. The previous version called .focus() on it,
+      // which is a no-op on a disabled element — the step passed for the wrong
+      // reason. Sending the keys with focus left on the body is the real check.
       await userEvent.keyboard('{Enter}');
       await userEvent.keyboard(' ');
       await expect(args.onClick).not.toHaveBeenCalled();
@@ -441,16 +448,12 @@ export const PerformanceTest: Story = {
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
-    await step('Measure render time', async () => {
-      const startTime = Date.now();
+    await step('All buttons rendered', async () => {
+      // The timing assertion that used to live here bracketed getAllByTestId,
+      // which queries DOM that is already rendered — it measured query time, not
+      // render time, and a 100ms wall-clock budget is exactly what a loaded CI
+      // runner blows through. The count is the part that actually held.
       const buttons = canvas.getAllByTestId(/perf-button-/);
-      const endTime = Date.now();
-
-      const renderTime = endTime - startTime;
-      // Performance measurement for testing - no console output
-
-      // Assert reasonable render time (adjust threshold as needed)
-      await expect(renderTime).toBeLessThan(100);
       await expect(buttons.length).toBe(50);
     });
 
@@ -519,13 +522,14 @@ export const LoadingWithIcon: Story = {
       const button = canvas.getByTestId('loading-icon-button');
       await expect(button).toBeInTheDocument();
 
-      // Icon should not be visible when loading
-      const icon = canvas.queryByTestId('delete-icon');
-      await expect(icon).not.toBeInTheDocument();
-
-      // Loading spinner should be visible
+      // Assert the positive condition first: the spinner being present is what
+      // establishes that the loading state actually rendered. Without it the
+      // absence check below would also pass on a button that rendered nothing.
       const spinner = canvas.getByRole('progressbar');
       await expect(spinner).toBeInTheDocument();
+
+      // Icon should not be visible when loading
+      await waitFor(() => expect(canvas.queryByTestId('delete-icon')).not.toBeInTheDocument());
     });
   },
 };

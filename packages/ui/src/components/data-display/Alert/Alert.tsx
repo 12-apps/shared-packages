@@ -1,4 +1,8 @@
-import { CheckCircle, Close,Error, Info, Warning } from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Close from '@mui/icons-material/Close';
+import Error from '@mui/icons-material/Error';
+import Info from '@mui/icons-material/Info';
+import Warning from '@mui/icons-material/Warning';
 import {
   Alert as MuiAlert,
   AlertTitle,
@@ -12,116 +16,20 @@ import type { Theme } from '@mui/material/styles';
 import { styled } from '@mui/material/styles';
 import React from 'react';
 
+import {
+  alertEmphasisStyles,
+  alertVariantStyles,
+  fadeInScale,
+  getColorFromTheme,
+  getVariantIcon,
+  iconRotate,
+  pulseAnimation,
+  shimmerAnimation,
+} from './Alert.styles';
+import type { AlertColor } from '@mui/material';
 import type { AlertProps } from './Alert.types';
 
 // Define animations
-const pulseAnimation = keyframes`
-  0% {
-    box-shadow: 0 0 0 0 currentColor;
-    opacity: 1;
-  }
-  70% {
-    box-shadow: 0 0 0 10px currentColor;
-    opacity: 0;
-  }
-  100% {
-    box-shadow: 0 0 0 0 currentColor;
-    opacity: 0;
-  }
-`;
-
-// Additional animations can be enabled as needed
-// const slideInAnimation = keyframes`
-//   from {
-//     transform: translateX(-100%);
-//     opacity: 0;
-//   }
-//   to {
-//     transform: translateX(0);
-//     opacity: 1;
-//   }
-// `;
-
-// const bounceIn = keyframes`
-//   0% {
-//     transform: scale(0.3);
-//     opacity: 0;
-//   }
-//   50% {
-//     transform: scale(1.05);
-//   }
-//   70% {
-//     transform: scale(0.9);
-//   }
-//   100% {
-//     transform: scale(1);
-//     opacity: 1;
-//   }
-// `;
-
-// Removed unused slideInAnimation - can be re-added if needed for future features
-
-const shimmerAnimation = keyframes`
-  0% {
-    background-position: -1000px 0;
-  }
-  100% {
-    background-position: 1000px 0;
-  }
-`;
-
-const fadeInScale = keyframes`
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-`;
-
-const iconRotate = keyframes`
-  0% {
-    transform: rotate(0deg) scale(0.8);
-  }
-  50% {
-    transform: rotate(180deg) scale(1.1);
-  }
-  100% {
-    transform: rotate(360deg) scale(1);
-  }
-`;
-
-const getColorFromTheme = (theme: Theme, variant: string) => {
-  const colorMap: Record<string, { main: string; light?: string; dark?: string }> = {
-    info: theme.palette.info,
-    success: theme.palette.success,
-    warning: theme.palette.warning,
-    danger: theme.palette.error,
-    primary: theme.palette.primary,
-    secondary: theme.palette.secondary,
-    neutral: {
-      main: theme.palette.grey[500] || '#9E9E9E',
-      light: theme.palette.grey[300] || '#E0E0E0',
-      dark: theme.palette.grey[700] || '#616161',
-    },
-  };
-
-  return colorMap[variant] || theme.palette.info;
-};
-
-const getVariantIcon = (variant: string) => {
-  const iconMap: Record<string, React.ReactNode> = {
-    info: <Info />,
-    success: <CheckCircle />,
-    warning: <Warning />,
-    danger: <Error />,
-  };
-
-  return iconMap[variant];
-};
-
 const StyledAlert = styled(MuiAlert, {
   shouldForwardProp: (prop) =>
     !['customVariant', 'customColor', 'glow', 'pulse', 'animate'].includes(prop as string),
@@ -186,152 +94,141 @@ const StyledAlert = styled(MuiAlert, {
       transition: 'all 0.2s ease',
     },
 
-    // Variant styles
-    ...(customVariant === 'info' && {
-      backgroundColor: alpha(colorPalette.main, 0.1),
-      color: colorPalette.main,
-      border: `1px solid ${alpha(colorPalette.main, 0.2)}`,
-      '.MuiAlert-icon': {
-        color: colorPalette.main,
-      },
-    }),
-
-    ...(customVariant === 'success' && {
-      backgroundColor: alpha(colorPalette.main, 0.1),
-      color: colorPalette.main,
-      border: `1px solid ${alpha(colorPalette.main, 0.2)}`,
-      '.MuiAlert-icon': {
-        color: colorPalette.main,
-      },
-    }),
-
-    ...(customVariant === 'warning' && {
-      backgroundColor: alpha(colorPalette.main, 0.1),
-      color: colorPalette.main,
-      border: `1px solid ${alpha(colorPalette.main, 0.2)}`,
-      '.MuiAlert-icon': {
-        color: colorPalette.main,
-      },
-    }),
-
-    ...(customVariant === 'danger' && {
-      backgroundColor: alpha(colorPalette.main, 0.1),
-      color: colorPalette.main,
-      border: `1px solid ${alpha(colorPalette.main, 0.2)}`,
-      '.MuiAlert-icon': {
-        color: colorPalette.main,
-      },
-    }),
-
-    ...(customVariant === 'glass' && {
-      backgroundColor: alpha(theme.palette.background.paper, 0.1),
-      backdropFilter: 'blur(20px)',
-      border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-      color: theme.palette.text.primary,
-      '.MuiAlert-icon': {
-        color: theme.palette.primary.main,
-      },
-    }),
-
-    ...(customVariant === 'gradient' && {
-      background: `linear-gradient(135deg, ${alpha(colorPalette.light || colorPalette.main, 0.9)}, ${alpha(colorPalette.dark || colorPalette.main, 0.9)})`,
-      color: theme.palette.getContrastText(colorPalette.main),
-      border: 'none',
-      position: 'relative',
-      overflow: 'hidden',
-      '.MuiAlert-icon': {
-        color: theme.palette.getContrastText(colorPalette.main),
-      },
-      '&::before': {
-        content: '""',
-        position: 'absolute',
-        top: 0,
-        left: '-1000px',
-        width: '100%',
-        height: '100%',
-        background: `linear-gradient(90deg, transparent, ${alpha(theme.palette.common.white, 0.2)}, transparent)`,
-        animation: `${shimmerAnimation} 3s infinite`,
-      },
-      '&:hover': {
-        filter: 'brightness(1.1)',
-        transform: 'translateY(-2px) scale(1.01)',
-      },
-    }),
-
-    // Glow effect
-    ...(glow &&
-      !pulse && {
-        boxShadow: `0 0 20px 5px ${alpha(colorPalette.main, 0.3)} !important`,
-        filter: 'brightness(1.05)',
-      }),
-
-    // Pulse animation
-    ...(pulse &&
-      !glow && {
-        position: 'relative',
-        '&::after': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          borderRadius: 'inherit',
-          backgroundColor: colorPalette.main,
-          opacity: 0.2,
-          animation: `${pulseAnimation} 2s infinite`,
-          pointerEvents: 'none',
-          zIndex: -1,
-        },
-      }),
-
-    // Both glow and pulse
-    ...(glow &&
-      pulse && {
-        position: 'relative',
-        boxShadow: `0 0 20px 5px ${alpha(colorPalette.main, 0.3)} !important`,
-        filter: 'brightness(1.05)',
-        '&::after': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          borderRadius: 'inherit',
-          backgroundColor: colorPalette.main,
-          opacity: 0.2,
-          animation: `${pulseAnimation} 2s infinite`,
-          pointerEvents: 'none',
-          zIndex: -1,
-        },
-      }),
+    ...alertVariantStyles(theme, customVariant, colorPalette),
+    ...alertEmphasisStyles(colorPalette, Boolean(glow), Boolean(pulse)),
   };
 });
 
+const ALERT_DEFAULTS = {
+  variant: 'info',
+  glow: false,
+  pulse: false,
+  showIcon: true,
+  closable: false,
+  animate: true,
+  role: 'alert',
+  'aria-atomic': 'true',
+  'data-testid': 'alert',
+} satisfies Partial<AlertProps>;
+
+// Strips explicitly-undefined props before the merge so `prop={undefined}` still
+// falls back to the default, the way a destructuring default would.
+const definedProps = (props: AlertProps): Partial<AlertProps> =>
+  Object.fromEntries(
+    Object.entries(props).filter(([, value]) => value !== undefined),
+  ) as Partial<AlertProps>;
+
+const testIdFor = (base: string | undefined, suffix: string) =>
+  base ? `${base}-${suffix}` : `alert-${suffix}`;
+
+// glass and gradient are our own looks with no MUI severity of their own; both
+// borrow info's. danger is MUI's error.
+const MUI_SEVERITY: Record<string, AlertColor> = {
+  danger: 'error',
+  glass: 'info',
+  gradient: 'info',
+};
+
+const toMuiSeverity = (variant: string): AlertColor =>
+  MUI_SEVERITY[variant] ?? (variant as AlertColor);
+
+const AlertContent: React.FC<{
+  title?: AlertProps['title'];
+  description?: AlertProps['description'];
+  dataTestId?: string;
+  children?: React.ReactNode;
+}> = ({ title, description, dataTestId, children }) => (
+  <>
+    {title && (
+      <AlertTitle
+        data-testid={testIdFor(dataTestId, 'title')}
+        sx={{
+          fontWeight: 600,
+          fontSize: '1.05rem',
+          marginBottom: description ? 0.5 : 0,
+          wordWrap: 'break-word',
+          overflowWrap: 'break-word',
+          wordBreak: 'break-word',
+        }}
+      >
+        {title}
+      </AlertTitle>
+    )}
+    {description && (
+      <Box
+        component="div"
+        data-testid={testIdFor(dataTestId, 'message')}
+        sx={{
+          opacity: 0.9,
+          fontSize: '0.925rem',
+          wordWrap: 'break-word',
+          overflowWrap: 'break-word',
+          wordBreak: 'break-word',
+        }}
+      >
+        {description}
+      </Box>
+    )}
+    {children}
+  </>
+);
+
+const AlertCloseButton: React.FC<{ dataTestId?: string; onClose: () => void }> = ({
+  dataTestId,
+  onClose,
+}) => (
+  <IconButton
+    data-testid={testIdFor(dataTestId, 'close')}
+    aria-label="close alert"
+    color="inherit"
+    size="small"
+    onClick={onClose}
+    sx={(theme) => ({
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      opacity: 0.7,
+      '&:hover': {
+        transform: 'rotate(90deg) scale(1.1)',
+        opacity: 1,
+        backgroundColor: alpha(theme.palette.action.hover, 0.1),
+      },
+      '&:focus': {
+        opacity: 1,
+        outline: 'none',
+        backgroundColor: alpha(theme.palette.action.focus, 0.1),
+      },
+    })}
+  >
+    <Close fontSize="inherit" />
+  </IconButton>
+);
+
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
   (
-    {
-      variant = 'info',
+    alertProps,
+    ref,
+  ) => {
+    const {
+      variant,
       color,
-      glow = false,
-      pulse = false,
+      glow,
+      pulse,
       icon,
-      showIcon = true,
-      closable = false,
+      showIcon,
+      closable,
       onClose,
       title,
       description,
       children,
-      animate = true,
-      role = 'alert',
-      'aria-live': ariaLive = variant === 'danger' ? 'assertive' : 'polite',
-      'aria-atomic': ariaAtomic = 'true',
-      'data-testid': dataTestId = 'alert',
+      animate,
+      role,
+      'aria-atomic': ariaAtomic,
+      'data-testid': dataTestId,
       ...props
-    },
-    ref,
-  ) => {
+    } = { ...ALERT_DEFAULTS, ...definedProps(alertProps) };
+
+    // Depends on `variant`, so it cannot live in the static defaults above.
+    const ariaLive = alertProps['aria-live'] ?? (variant === 'danger' ? 'assertive' : 'polite');
+
     const [open, setOpen] = React.useState(true);
     const [isClosing, setIsClosing] = React.useState(false);
 
@@ -343,55 +240,18 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
       }, 200);
     };
 
-    const severity =
-      variant === 'danger'
-        ? 'error'
-        : variant === 'glass'
-          ? 'info'
-          : variant === 'gradient'
-            ? 'info'
-            : variant;
+    const severity = toMuiSeverity(variant);
 
     const displayIcon = showIcon ? (
-      <Box component="span" data-testid={dataTestId ? `${dataTestId}-icon` : 'alert-icon'}>
+      <Box component="span" data-testid={testIdFor(dataTestId, 'icon')}>
         {icon || getVariantIcon(variant)}
       </Box>
     ) : false;
 
     const content = (
-      <>
-        {title && (
-          <AlertTitle
-            data-testid={dataTestId ? `${dataTestId}-title` : 'alert-title'}
-            sx={{
-              fontWeight: 600,
-              fontSize: '1.05rem',
-              marginBottom: description ? 0.5 : 0,
-              wordWrap: 'break-word',
-              overflowWrap: 'break-word',
-              wordBreak: 'break-word',
-            }}
-          >
-            {title}
-          </AlertTitle>
-        )}
-        {description && (
-          <Box
-            component="div"
-            data-testid={dataTestId ? `${dataTestId}-message` : 'alert-message'}
-            sx={{
-              opacity: 0.9,
-              fontSize: '0.925rem',
-              wordWrap: 'break-word',
-              overflowWrap: 'break-word',
-              wordBreak: 'break-word',
-            }}
-          >
-            {description}
-          </Box>
-        )}
+      <AlertContent title={title} description={description} dataTestId={dataTestId}>
         {children}
-      </>
+      </AlertContent>
     );
 
     return (
@@ -410,33 +270,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
           aria-live={ariaLive}
           aria-atomic={ariaAtomic}
           tabIndex={0}
-          action={
-            closable && (
-              <IconButton
-                data-testid={dataTestId ? `${dataTestId}-close` : 'alert-close'}
-                aria-label="close alert"
-                color="inherit"
-                size="small"
-                onClick={handleClose}
-                sx={(theme) => ({
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  opacity: 0.7,
-                  '&:hover': {
-                    transform: 'rotate(90deg) scale(1.1)',
-                    opacity: 1,
-                    backgroundColor: alpha(theme.palette.action.hover, 0.1),
-                  },
-                  '&:focus': {
-                    opacity: 1,
-                    outline: 'none',
-                    backgroundColor: alpha(theme.palette.action.focus, 0.1),
-                  },
-                })}
-              >
-                <Close fontSize="inherit" />
-              </IconButton>
-            )
-          }
+          action={closable && <AlertCloseButton dataTestId={dataTestId} onClose={handleClose} />}
           {...props}
         >
           {content}

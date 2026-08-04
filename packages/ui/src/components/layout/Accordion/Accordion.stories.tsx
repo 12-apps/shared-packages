@@ -1,4 +1,8 @@
-import { ExpandMore, Help,Info, Security, Settings } from '@mui/icons-material';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import Help from '@mui/icons-material/Help';
+import Info from '@mui/icons-material/Info';
+import Security from '@mui/icons-material/Security';
+import Settings from '@mui/icons-material/Settings';
 import { Box, Button, Stack,Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';

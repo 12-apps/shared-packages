@@ -1,4 +1,8 @@
-import { ArrowForwardIos, ChevronRight, Home, MoreHoriz,NavigateNext } from '@mui/icons-material';
+import ArrowForwardIos from '@mui/icons-material/ArrowForwardIos';
+import ChevronRight from '@mui/icons-material/ChevronRight';
+import Home from '@mui/icons-material/Home';
+import MoreHoriz from '@mui/icons-material/MoreHoriz';
+import NavigateNext from '@mui/icons-material/NavigateNext';
 import {
   alpha,
   Box,
@@ -13,220 +17,26 @@ import {
 import { keyframes,styled } from '@mui/material/styles';
 import React from 'react';
 
+import {
+  breadcrumbLinkStyles,
+  breadcrumbsBarStyles,
+  pulse,
+  sizeIconMap,
+  slideIn,
+} from './Breadcrumbs.styles';
+import { BreadcrumbEntry } from './BreadcrumbEntry';
 import type { BreadcrumbItem,BreadcrumbsProps } from './Breadcrumbs.types';
 
 // Animation keyframes
-const slideIn = keyframes`
-  from {
-    opacity: 0;
-    transform: translateX(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-`;
-
-const pulse = keyframes`
-  0% {
-    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
-  }
-`;
-
 const StyledBreadcrumbs = styled(MuiBreadcrumbs, {
   shouldForwardProp: (prop) =>
     prop !== 'size' && prop !== 'color' && prop !== 'visualStyle' && prop !== 'elevation',
 })<{ size?: string; color?: string; visualStyle?: string; elevation?: number }>(
   ({ theme, size, color, visualStyle, elevation = 0 }) => ({
-    padding: theme.spacing(size === 'sm' ? 0.75 : size === 'lg' ? 1.5 : 1, 2),
-    borderRadius: theme.spacing(visualStyle === 'glass' ? 2 : 1),
-    animation: `${slideIn} 0.3s ease-out`,
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    position: 'relative',
-
-    // Glass morphism effect
-    ...(visualStyle === 'glass' && {
-      background:
-        theme.palette.mode === 'dark' ? 'rgba(17, 24, 39, 0.7)' : 'rgba(255, 255, 255, 0.7)',
-      backdropFilter: 'blur(10px)',
-      WebkitBackdropFilter: 'blur(10px)',
-      border: `1px solid ${
-        theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-      }`,
-      boxShadow:
-        theme.palette.mode === 'dark'
-          ? `0 ${elevation * 4}px ${elevation * 8}px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)`
-          : `0 ${elevation * 4}px ${elevation * 8}px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)`,
-    }),
-
-    // Elevated variant
-    ...(visualStyle === 'elevated' && {
-      background: theme.palette.background.paper,
-      boxShadow: theme.shadows[elevation] || theme.shadows[1],
-      borderRadius: theme.spacing(1.5),
-    }),
-
-    // Outlined variant
-    ...(visualStyle === 'outlined' && {
-      border: `1px solid ${theme.palette.divider}`,
-      borderRadius: theme.spacing(1),
-    }),
-
-    '& .MuiBreadcrumbs-ol': {
-      alignItems: 'center',
-      flexWrap: 'nowrap',
-      [theme.breakpoints.down('sm')]: {
-        flexWrap: 'wrap',
-        gap: theme.spacing(0.5),
-      },
-    },
-
-    '& .MuiBreadcrumbs-separator': {
-      marginLeft: theme.spacing(size === 'sm' ? 0.5 : size === 'lg' ? 1.5 : 1),
-      marginRight: theme.spacing(size === 'sm' ? 0.5 : size === 'lg' ? 1.5 : 1),
-      opacity: 0.6,
-      transition: 'all 0.2s ease',
-      ...(color === 'primary' && {
-        color: theme.palette.primary.main,
-      }),
-      ...(color === 'secondary' && {
-        color: theme.palette.secondary.main,
-      }),
-    },
-
-    '&:hover': {
-      ...(visualStyle === 'glass' && {
-        background:
-          theme.palette.mode === 'dark' ? 'rgba(17, 24, 39, 0.85)' : 'rgba(255, 255, 255, 0.85)',
-        boxShadow:
-          theme.palette.mode === 'dark'
-            ? `0 ${elevation * 6}px ${elevation * 12}px rgba(0, 0, 0, 0.4)`
-            : `0 ${elevation * 6}px ${elevation * 12}px rgba(0, 0, 0, 0.12)`,
-      }),
-    },
+    ...breadcrumbsBarStyles({ theme, size, color, visualStyle, elevation }),
   }),
 );
 
-const BreadcrumbLink = styled(Link, {
-  shouldForwardProp: (prop) => prop !== 'size' && prop !== 'active' && prop !== 'visualStyle',
-})<{ size?: string; active?: boolean; visualStyle?: string }>(
-  ({ theme, size, active, visualStyle }) => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing(0.5),
-    textDecoration: 'none',
-    fontSize: size === 'sm' ? '0.875rem' : size === 'lg' ? '1.125rem' : '1rem',
-    fontWeight: active ? 600 : 400,
-    color: active ? theme.palette.text.primary : theme.palette.text.secondary,
-    padding: theme.spacing(0.5, 0.75),
-    borderRadius: theme.spacing(0.75),
-    position: 'relative',
-    overflow: 'hidden',
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-
-    // Add subtle background for glass variant
-    ...(visualStyle === 'glass' &&
-      !active && {
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-          opacity: 0,
-          transition: 'opacity 0.3s ease',
-          borderRadius: 'inherit',
-        },
-      }),
-
-    '&:hover, &[data-hover="true"]': {
-      color: theme.palette.primary.main,
-      backgroundColor: alpha(theme.palette.primary.main, visualStyle === 'glass' ? 0.1 : 0.08),
-      transform: 'translateY(-1px)',
-
-      '&::before': {
-        opacity: 1,
-      },
-
-      '& .breadcrumb-icon': {
-        transform: 'scale(1.1)',
-      },
-    },
-
-    '&:active': {
-      transform: 'translateY(0)',
-      backgroundColor: alpha(theme.palette.primary.main, 0.12),
-    },
-
-    '&:focus-visible': {
-      outline: `2px solid ${theme.palette.primary.main}`,
-      outlineOffset: 2,
-      backgroundColor: alpha(theme.palette.primary.main, 0.04),
-    },
-
-    ...(active && {
-      pointerEvents: 'none',
-      cursor: 'default',
-      color: theme.palette.primary.main,
-      fontWeight: 600,
-
-      ...(visualStyle === 'glass' && {
-        background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-        animation: `${pulse} 2s infinite`,
-      }),
-    }),
-
-    '& .breadcrumb-icon': {
-      transition: 'transform 0.2s ease',
-    },
-
-    // Mobile responsiveness
-    [theme.breakpoints.down('sm')]: {
-      fontSize: size === 'lg' ? '1rem' : size === 'sm' ? '0.75rem' : '0.875rem',
-      padding: theme.spacing(0.375, 0.5),
-    },
-  }),
-);
-
-const BreadcrumbText = styled(Typography, {
-  shouldForwardProp: (prop) => prop !== 'size' && prop !== 'visualStyle',
-})<{ size?: string; visualStyle?: string }>(({ theme, size, visualStyle }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: theme.spacing(0.5),
-  fontSize: size === 'sm' ? '0.875rem' : size === 'lg' ? '1.125rem' : '1rem',
-  fontWeight: 600,
-  color: theme.palette.primary.main,
-  padding: theme.spacing(0.5, 0.75),
-  borderRadius: theme.spacing(0.75),
-  position: 'relative',
-
-  ...(visualStyle === 'glass' && {
-    background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-    backdropFilter: 'blur(4px)',
-    border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-  }),
-
-  '& .breadcrumb-icon': {
-    color: theme.palette.primary.main,
-  },
-
-  // Mobile responsiveness
-  [theme.breakpoints.down('sm')]: {
-    fontSize: size === 'lg' ? '1rem' : size === 'sm' ? '0.75rem' : '0.875rem',
-    padding: theme.spacing(0.375, 0.5),
-  },
-}));
-
-// Animated separator wrapper
 const AnimatedSeparator = styled(Box)(() => ({
   display: 'flex',
   alignItems: 'center',
@@ -260,105 +70,47 @@ const getSeparator = (separatorType: string) => {
   return <AnimatedSeparator>{separatorContent}</AnimatedSeparator>;
 };
 
-const sizeIconMap = {
-  sm: 'small' as const,
-  md: 'small' as const,
-  lg: 'medium' as const,
-};
+type DisplayItem = BreadcrumbItem & { isEllipsis?: boolean };
 
-// Mobile collapsed menu component
-const CollapsedMenu = ({
+// Long trails either hide their middle behind a menu or replace it with an
+// ellipsis crumb; short ones pass straight through.
+const collapseItems = ({
   items,
-  size,
-  visualStyle,
-  dataTestId,
+  effectiveMaxItems,
+  collapseBehavior,
 }: {
   items: BreadcrumbItem[];
-  size: string;
-  visualStyle?: string;
-  dataTestId?: string;
-}) => {
-  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const open = Boolean(anchorEl);
+  effectiveMaxItems: number;
+  collapseBehavior: string;
+}): { displayItems: DisplayItem[]; collapsedItems: BreadcrumbItem[] } => {
+  if (items.length <= effectiveMaxItems) {
+    return { displayItems: items, collapsedItems: [] };
+  }
 
-  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
+  if (collapseBehavior === 'menu') {
+    const firstItem = items[0];
+    const tail = items.slice(-(effectiveMaxItems - 2));
 
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
+    return {
+      displayItems: firstItem ? [firstItem, ...tail] : tail,
+      collapsedItems: items.slice(1, -(effectiveMaxItems - 2)),
+    };
+  }
 
-  return (
-    <>
-      <Tooltip title="Show more" arrow>
-        <BreadcrumbLink
-          onClick={handleClick}
-          size={size}
-          visualStyle={visualStyle}
-          sx={{ cursor: 'pointer' }}
-          data-testid={dataTestId ? `${dataTestId}-collapsed-menu` : 'breadcrumbs-collapsed-menu'}
-        >
-          <MoreHoriz className="breadcrumb-icon" />
-        </BreadcrumbLink>
-      </Tooltip>
-      <Box
-        sx={{
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          mt: 1,
-          display: open ? 'block' : 'none',
-          zIndex: 1000,
-        }}
-        data-testid={dataTestId ? `${dataTestId}-collapsed-menu-items` : 'breadcrumbs-collapsed-menu-items'}
-      >
-        <Fade in={open}>
-          <Box
-            sx={{
-              background: (theme) =>
-                theme.palette.mode === 'dark'
-                  ? 'rgba(17, 24, 39, 0.95)'
-                  : 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(10px)',
-              borderRadius: 1,
-              boxShadow: 3,
-              p: 1,
-              minWidth: 150,
-            }}
-          >
-            {items.map((item, index) => (
-              <Box
-                key={index}
-                component="a"
-                href={item.href || '#'}
-                onClick={(e) => {
-                  handleClose();
-                  item.onClick?.(e);
-                }}
-                sx={{
-                  display: 'block',
-                  px: 2,
-                  py: 1,
-                  color: 'text.secondary',
-                  textDecoration: 'none',
-                  borderRadius: 0.5,
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    backgroundColor: 'action.hover',
-                    color: 'primary.main',
-                  },
-                }}
-                data-testid={dataTestId ? `${dataTestId}-collapsed-item-${index}` : `breadcrumbs-collapsed-item-${index}`}
-              >
-                {item.label}
-              </Box>
-            ))}
-          </Box>
-        </Fade>
-      </Box>
-    </>
-  );
+  if (collapseBehavior === 'ellipsis') {
+    const half = Math.floor(effectiveMaxItems / 2);
+
+    return {
+      displayItems: [
+        ...items.slice(0, half),
+        { label: '...', href: '#', isEllipsis: true },
+        ...items.slice(-half),
+      ],
+      collapsedItems: [],
+    };
+  }
+
+  return { displayItems: items, collapsedItems: [] };
 };
 
 export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
@@ -390,26 +142,16 @@ export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
     const effectiveMaxItems = isMobile ? mobileMaxItems : maxItems;
     const shouldCollapse = items.length > effectiveMaxItems;
 
-    let displayItems: (BreadcrumbItem & { isEllipsis?: boolean })[] = items;
-    let collapsedItems: typeof items = [];
-
-    if (shouldCollapse && collapseBehavior === 'menu') {
-      const firstItem = items[0];
-      const lastItems = items.slice(-(effectiveMaxItems - 2));
-      collapsedItems = items.slice(1, -(effectiveMaxItems - 2));
-      displayItems = firstItem ? [firstItem, ...lastItems] : lastItems;
-    } else if (shouldCollapse && collapseBehavior === 'ellipsis') {
-      displayItems = [
-        ...items.slice(0, Math.floor(effectiveMaxItems / 2)),
-        { label: '...', href: '#', isEllipsis: true },
-        ...items.slice(-Math.floor(effectiveMaxItems / 2)),
-      ];
-    }
+    const { displayItems, collapsedItems } = collapseItems({
+      items,
+      effectiveMaxItems,
+      collapseBehavior,
+    });
 
     return (
       <StyledBreadcrumbs
         ref={ref}
-        separator={finalSeparator}
+        separator={separator}
         maxItems={shouldCollapse ? undefined : effectiveMaxItems}
         size={size}
         color={color}
@@ -420,94 +162,22 @@ export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
         data-testid={dataTestId || 'breadcrumbs'}
         {...props}
       >
-        {displayItems.map((item, index) => {
-          const isFirst = index === 0;
-          const isLast = index === displayItems.length - 1;
-          const isActive = item.active || (isLast && !item.isEllipsis);
-          const isEllipsis = item.isEllipsis;
-
-          // Handle collapsed menu after first item
-          if (index === 1 && collapsedItems.length > 0 && collapseBehavior === 'menu') {
-            return (
-              <React.Fragment key="collapsed">
-                <CollapsedMenu items={collapsedItems} size={size} visualStyle={variant} dataTestId={dataTestId} />
-                {finalSeparator}
-              </React.Fragment>
-            );
-          }
-
-          // Handle ellipsis
-          if (isEllipsis) {
-            return (
-              <Tooltip key={index} title="More items" arrow>
-                <Box
-                  sx={{
-                    px: 1,
-                    color: 'text.disabled',
-                    cursor: 'default',
-                    userSelect: 'none',
-                  }}
-                  data-testid={dataTestId ? `${dataTestId}-ellipsis` : 'breadcrumbs-ellipsis'}
-                >
-                  {item.label}
-                </Box>
-              </Tooltip>
-            );
-          }
-
-          const icon =
-            isFirst && showHomeIcon && !item.icon ? (
-              <Home className="breadcrumb-icon" fontSize={iconSize} />
-            ) : item.icon ? (
-              <Box
-                component="span"
-                className="breadcrumb-icon"
-                sx={{ display: 'flex', alignItems: 'center' }}
-              >
-                {item.icon}
-              </Box>
-            ) : null;
-
-          // Render active/last item
-          if (isActive) {
-            return (
-              <BreadcrumbText
-                key={index}
-                size={size}
-                visualStyle={variant}
-                aria-current="page"
-                data-testid={dataTestId ? `${dataTestId}-item-${index}` : `breadcrumbs-item-${index}`}
-              >
-                {icon}
-                <span>{item.label}</span>
-              </BreadcrumbText>
-            );
-          }
-
-          // Render clickable breadcrumb
-          return (
-            <Tooltip
-              key={index}
-              title={item.tooltip || item.label}
-              arrow
-              disableHoverListener={!item.tooltip}
-            >
-              <BreadcrumbLink
-                href={item.href || '#'}
-                onClick={item.onClick}
-                size={size}
-                visualStyle={variant}
-                active={isActive}
-                underline="none"
-                aria-label={item.ariaLabel || item.label}
-                data-testid={dataTestId ? `${dataTestId}-link-${index}` : `breadcrumbs-link-${index}`}
-              >
-                {icon}
-                <span>{item.label}</span>
-              </BreadcrumbLink>
-            </Tooltip>
-          );
-        })}
+        {displayItems.map((item, index) => (
+          <BreadcrumbEntry
+            key={index}
+            item={item}
+            index={index}
+            itemCount={displayItems.length}
+            collapsedItems={collapsedItems}
+            collapseBehavior={collapseBehavior}
+            separator={separator}
+            showHomeIcon={showHomeIcon}
+            iconSize={iconSize}
+            size={size}
+            variant={variant}
+            dataTestId={dataTestId}
+          />
+        ))}
       </StyledBreadcrumbs>
     );
   },

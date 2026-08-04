@@ -1,4 +1,6 @@
-import { Add, Favorite,Home } from '@mui/icons-material';
+import Add from '@mui/icons-material/Add';
+import Favorite from '@mui/icons-material/Favorite';
+import Home from '@mui/icons-material/Home';
 import { Button, Chip,Paper, Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';

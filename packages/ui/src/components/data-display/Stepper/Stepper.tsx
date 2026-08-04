@@ -1,4 +1,4 @@
-import { CheckCircle } from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
 import {
   Box,
   Button,

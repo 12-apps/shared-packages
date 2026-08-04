@@ -61,5 +61,7 @@ export interface ChartProps {
   responsive?: boolean;
   innerRadius?: number;
   centerLabel?: string | { label: string; value: string | number };
+  /** Formats numeric tooltip values and y-axis ticks (e.g. centavos → BRL). */
+  valueFormatter?: (value: number) => string;
   'data-testid'?: string;
 }

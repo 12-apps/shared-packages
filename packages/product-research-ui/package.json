@@ -1,0 +1,59 @@
+{
+  "name": "@12-apps/product-research-ui",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Host-agnostic research screens for the product-research engine: search form, streaming per-source status, ranked offer comparison, history. Components take a ResearchApiClient the host implements \u2014 no fetch, no router, no auth assumptions \u2014 and every string comes from an overridable pt-BR messages layer.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@12-apps/product-research": "workspace:*",
+    "@12-apps/ui": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0"
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@storybook/react-vite": "^9.1.10",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^19.2.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.1.0",
+    "jsdom": "^25.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/product-research-ui"
+  },
+  "files": [
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md"
+  ]
+}

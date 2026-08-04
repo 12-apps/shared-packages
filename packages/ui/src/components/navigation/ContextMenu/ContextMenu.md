@@ -18,7 +18,9 @@ A right-click context menu component with multiple visual variants and customiza
 
 ```tsx
 import { ContextMenu } from '@app-services-monitoring/ui';
-import { ContentCopy, Edit, Delete } from '@mui/icons-material';
+import ContentCopy from '@mui/icons-material/ContentCopy';
+import Edit from '@mui/icons-material/Edit';
+import Delete from '@mui/icons-material/Delete';
 
 function MyComponent() {
   const menuItems = [

@@ -1,13 +1,11 @@
-import {
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Home as HomeIcon,
-  LocalShipping as LocalShippingIcon,
-  LocationOn as LocationOnIcon,
-  Payment as PaymentIcon,
-  Person as PersonIcon,
-  ShoppingCart as ShoppingCartIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import HomeIcon from '@mui/icons-material/Home';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import PaymentIcon from '@mui/icons-material/Payment';
+import PersonIcon from '@mui/icons-material/Person';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { Box, Paper } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 

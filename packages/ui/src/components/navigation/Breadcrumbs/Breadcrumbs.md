@@ -443,7 +443,8 @@ test('collapses items on mobile', () => {
 #### Scenario 3: Testing with Icons
 
 ```tsx
-import { Home, Settings } from '@mui/icons-material';
+import Home from '@mui/icons-material/Home';
+import Settings from '@mui/icons-material/Settings';
 
 test('renders breadcrumbs with custom icons', () => {
   const items = [

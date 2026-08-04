@@ -1,40 +1,25 @@
-import { KeyboardArrowUp } from '@mui/icons-material';
+import KeyboardArrowUp from '@mui/icons-material/KeyboardArrowUp';
 import { alpha, Box, CircularProgress,Fab, useTheme, Zoom } from '@mui/material';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
 
+import {
+  getOverflowStyle,
+  getScrollbarColors,
+  getScrollbarSize,
+  getVariantStyles,
+} from './ScrollArea.styles';
 import type { ScrollAreaProps } from './ScrollArea.types';
 
-export const ScrollArea: React.FC<ScrollAreaProps> = ({
-  children,
-  width = '100%',
-  height = '100%',
-  maxHeight,
-  maxWidth,
-  orientation = 'vertical',
-  scrollbarSize = 'medium',
-  autoHide = true,
-  autoHideDelay = 1000,
-  smoothScroll = true,
-  variant = 'default',
-  onScroll,
-  scrollToTopButton = false,
-  scrollToTopThreshold = 100,
-  scrollbarColor,
-  scrollbarTrackColor,
-  contentPadding = 0,
-  alwaysShowScrollbar = false,
-  disabled = false,
-  loading = false,
-  emptyContent,
-  testId = 'scroll-area',
-  scrollRef: externalScrollRef,
+// Owns the scroll container ref (merging in any ref the caller passed) and
+// reports size changes through a ResizeObserver.
+const useObservedScrollRef = ({
+  externalScrollRef,
   onResize,
-  sx,
-  ...props
+}: {
+  externalScrollRef?: React.Ref<HTMLDivElement>;
+  onResize?: ScrollAreaProps['onResize'];
 }) => {
-  const theme = useTheme();
   const internalScrollRef = useRef<HTMLDivElement>(null);
-  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
 
   // Track container dimensions with ResizeObserver
@@ -68,246 +53,168 @@ export const ScrollArea: React.FC<ScrollAreaProps> = ({
   );
 
   // Use internal ref for accessing the element
-  const scrollRef = internalScrollRef;
-  const [isScrolling, setIsScrolling] = useState(false);
-  const scrollTimeoutRef = useRef<number | undefined>(undefined);
 
-  // Get scrollbar size in pixels
-  const getScrollbarSize = () => {
-    switch (scrollbarSize) {
-      case 'thin':
-        return 8;
-      case 'thick':
-        return 16;
-      default:
-        return 12;
-    }
-  };
+  return { scrollRef: internalScrollRef, setScrollRef, containerDimensions };
+};
 
-  // Get scrollbar colors
-  const getScrollbarColors = () => {
-    const defaultScrollbarColor =
-      variant === 'glass'
-        ? alpha(theme.palette.primary.main, 0.5)
-        : theme.palette.mode === 'dark'
-          ? theme.palette.grey[600]
-          : theme.palette.grey[400];
+// Scroll position, the transient "is scrolling" flag that drives auto-hide, the
+// observed container size, and the scroll-to-top affordance.
+const useScrollArea = ({
+  disabled,
+  onScroll,
+  onResize,
+  externalScrollRef,
+  autoHide,
+  autoHideDelay,
+  alwaysShowScrollbar,
+  scrollToTopButton,
+  scrollToTopThreshold = 200,
+  smoothScroll,
+}: {
+  disabled?: boolean;
+  onScroll?: ScrollAreaProps['onScroll'];
+  onResize?: ScrollAreaProps['onResize'];
+  externalScrollRef?: React.Ref<HTMLDivElement>;
+  autoHide?: boolean;
+  autoHideDelay?: number;
+  alwaysShowScrollbar?: boolean;
+  scrollToTopButton?: boolean;
+  scrollToTopThreshold?: number;
+  smoothScroll?: boolean;
+}) => {
+  const { scrollRef, setScrollRef, containerDimensions } = useObservedScrollRef({
+    externalScrollRef,
+    onResize,
+  });
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
 
-    const defaultTrackColor =
-      variant === 'glass'
-        ? alpha(theme.palette.background.paper, 0.1)
-        : theme.palette.mode === 'dark'
-          ? theme.palette.grey[900]
-          : theme.palette.grey[200];
+const [isScrolling, setIsScrolling] = useState(false);
+const scrollTimeoutRef = useRef<number | undefined>(undefined);
 
-    return {
-      scrollbar: scrollbarColor || defaultScrollbarColor,
-      track: scrollbarTrackColor || defaultTrackColor,
-    };
-  };
+// Get scrollbar size in pixels
+// Get scrollbar colors
+// Get overflow style based on orientation
+// Handle scroll event
+const handleScroll = useCallback(
+  (event: React.UIEvent<HTMLDivElement>) => {
+    if (disabled) return;
 
-  // Get overflow style based on orientation
-  const getOverflowStyle = () => {
-    if (disabled) return { overflow: 'hidden' as const };
-
-    switch (orientation) {
-      case 'horizontal':
-        return {
-          overflow: 'hidden' as const,
-          overflowX: 'auto' as const,
-          overflowY: 'hidden' as const,
-        };
-      case 'both':
-        return { overflow: 'auto' as const };
-      default:
-        return {
-          overflow: 'hidden' as const,
-          overflowY: 'auto' as const,
-          overflowX: 'hidden' as const,
-        };
-    }
-  };
-
-  // Handle scroll event
-  const handleScroll = useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
-      if (disabled) return;
-
-      // Handle auto-hide behavior
-      if (autoHide && !alwaysShowScrollbar) {
-        setIsScrolling(true);
-        if (scrollTimeoutRef.current) {
-          window.clearTimeout(scrollTimeoutRef.current);
-        }
-        scrollTimeoutRef.current = window.setTimeout(() => {
-          setIsScrolling(false);
-        }, autoHideDelay);
-      }
-
-      // Check if should show scroll to top button
-      if (scrollToTopButton && scrollRef.current) {
-        const scrollTop = scrollRef.current.scrollTop;
-        setShowScrollToTop(scrollTop > scrollToTopThreshold);
-      }
-
-      // Call user's onScroll handler
-      if (onScroll) {
-        onScroll(event);
-      }
-    },
-    [
-      disabled,
-      autoHide,
-      alwaysShowScrollbar,
-      autoHideDelay,
-      scrollToTopButton,
-      scrollToTopThreshold,
-      onScroll,
-    ],
-  );
-
-  // Scroll to top function
-  const scrollToTop = useCallback(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: 0,
-        behavior: smoothScroll ? 'smooth' : 'auto',
-      });
-    }
-  }, [smoothScroll]);
-
-  // Clean up timeout on unmount
-  useEffect(() => () => {
+    // Handle auto-hide behavior
+    if (autoHide && !alwaysShowScrollbar) {
+      setIsScrolling(true);
       if (scrollTimeoutRef.current) {
         window.clearTimeout(scrollTimeoutRef.current);
       }
-    }, []);
+      scrollTimeoutRef.current = window.setTimeout(() => {
+        setIsScrolling(false);
+      }, autoHideDelay);
+    }
 
-  // Determine if scrollbar should be visible
+    // Check if should show scroll to top button
+    if (scrollToTopButton && scrollRef.current) {
+      const scrollTop = scrollRef.current.scrollTop;
+      setShowScrollToTop(scrollTop > scrollToTopThreshold);
+    }
+
+    // Call user's onScroll handler
+    if (onScroll) {
+      onScroll(event);
+    }
+  },
+  [
+    disabled,
+    autoHide,
+    alwaysShowScrollbar,
+    autoHideDelay,
+    scrollToTopButton,
+    scrollToTopThreshold,
+    onScroll,
+  ],
+);
+
+// Scroll to top function
+const scrollToTop = useCallback(() => {
+  if (scrollRef.current) {
+    scrollRef.current.scrollTo({
+      top: 0,
+      behavior: smoothScroll ? 'smooth' : 'auto',
+    });
+  }
+}, [smoothScroll]);
+
+// Clean up timeout on unmount
+useEffect(() => () => {
+    if (scrollTimeoutRef.current) {
+      window.clearTimeout(scrollTimeoutRef.current);
+    }
+  }, []);
+
+// Determine if scrollbar should be visible
+
+  return {
+    scrollRef,
+    setScrollRef,
+    isScrolling,
+    showScrollToTop,
+    containerDimensions,
+    handleScroll,
+    scrollToTop,
+  };
+};
+
+export const ScrollArea: React.FC<ScrollAreaProps> = ({
+  children,
+  width = '100%',
+  height = '100%',
+  maxHeight,
+  maxWidth,
+  orientation = 'vertical',
+  scrollbarSize = 'medium',
+  autoHide = true,
+  autoHideDelay = 1000,
+  smoothScroll = true,
+  variant = 'default',
+  onScroll,
+  scrollToTopButton = false,
+  scrollToTopThreshold = 100,
+  scrollbarColor,
+  scrollbarTrackColor,
+  contentPadding = 0,
+  alwaysShowScrollbar = false,
+  disabled = false,
+  loading = false,
+  emptyContent,
+  testId = 'scroll-area',
+  scrollRef: externalScrollRef,
+  onResize,
+  sx,
+  ...props
+}) => {
+  const theme = useTheme();
+  const {
+    scrollRef,
+    setScrollRef,
+    isScrolling,
+    showScrollToTop,
+    containerDimensions,
+    handleScroll,
+    scrollToTop,
+  } = useScrollArea({
+    disabled,
+    onScroll,
+    onResize,
+    externalScrollRef,
+    autoHide,
+    autoHideDelay,
+    alwaysShowScrollbar,
+    scrollToTopButton,
+    scrollToTopThreshold,
+    smoothScroll,
+  });
+
   const shouldShowScrollbar = alwaysShowScrollbar || !autoHide || isScrolling;
 
   // Get variant-specific styles
-  const getVariantStyles = () => {
-    const colors = getScrollbarColors();
-    const size = getScrollbarSize();
-
-    // Common scrollbar styles with auto-hide support
-    const getAutoHideStyles = (thumbColor: string, trackColor: string) => ({
-      '&::-webkit-scrollbar': {
-        width: orientation !== 'horizontal' ? size : '100%',
-        height: orientation !== 'vertical' ? size : '100%',
-      },
-      '&::-webkit-scrollbar-track': {
-        background: shouldShowScrollbar ? trackColor : 'transparent',
-        borderRadius: size / 2,
-        transition: 'background 0.3s ease',
-      },
-      '&::-webkit-scrollbar-thumb': {
-        background: shouldShowScrollbar ? thumbColor : 'transparent',
-        borderRadius: size / 2,
-        transition: 'background 0.3s ease',
-        '&:hover': {
-          background: shouldShowScrollbar ? theme.palette.primary.main : 'transparent',
-        },
-      },
-      '&::-webkit-scrollbar-corner': {
-        background: shouldShowScrollbar ? trackColor : 'transparent',
-      },
-      // Firefox scrollbar styling
-      scrollbarWidth: shouldShowScrollbar
-        ? scrollbarSize === 'thin'
-          ? ('thin' as const)
-          : ('auto' as const)
-        : ('none' as const),
-      scrollbarColor: shouldShowScrollbar
-        ? `${thumbColor} ${trackColor}`
-        : 'transparent transparent',
-    });
-
-    switch (variant) {
-      case 'overlay':
-        return {
-          '&::-webkit-scrollbar': {
-            width: orientation !== 'horizontal' ? size : '100%',
-            height: orientation !== 'vertical' ? size : '100%',
-            position: 'absolute',
-            right: 0,
-            top: 0,
-          },
-          '&::-webkit-scrollbar-track': {
-            background: 'transparent',
-            borderRadius: size / 2,
-          },
-          '&::-webkit-scrollbar-thumb': {
-            background: shouldShowScrollbar
-              ? alpha(colors.scrollbar, 0.5)
-              : 'transparent',
-            borderRadius: size / 2,
-            transition: 'background 0.3s ease',
-            border: '2px solid transparent',
-            backgroundClip: 'padding-box',
-            '&:hover': {
-              background: shouldShowScrollbar ? theme.palette.primary.main : 'transparent',
-            },
-          },
-          '&::-webkit-scrollbar-corner': {
-            background: 'transparent',
-          },
-          scrollbarWidth: shouldShowScrollbar
-            ? scrollbarSize === 'thin'
-              ? ('thin' as const)
-              : ('auto' as const)
-            : ('none' as const),
-          scrollbarColor: shouldShowScrollbar
-            ? `${alpha(colors.scrollbar, 0.5)} transparent`
-            : 'transparent transparent',
-        };
-
-      case 'glass': {
-        const glassThumbColor = `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.3)}, ${alpha(theme.palette.secondary.main, 0.3)})`;
-        const glassTrackColor = alpha(theme.palette.background.paper, 0.1);
-        return {
-          '&::-webkit-scrollbar': {
-            width: orientation !== 'horizontal' ? size : '100%',
-            height: orientation !== 'vertical' ? size : '100%',
-          },
-          '&::-webkit-scrollbar-track': {
-            background: shouldShowScrollbar ? glassTrackColor : 'transparent',
-            borderRadius: size / 2,
-            backdropFilter: shouldShowScrollbar ? 'blur(5px)' : 'none',
-            transition: 'background 0.3s ease',
-          },
-          '&::-webkit-scrollbar-thumb': {
-            background: shouldShowScrollbar ? glassThumbColor : 'transparent',
-            borderRadius: size / 2,
-            transition: 'background 0.3s ease',
-            boxShadow: shouldShowScrollbar
-              ? `inset 0 0 6px ${alpha(theme.palette.common.white, 0.3)}`
-              : 'none',
-            '&:hover': {
-              background: shouldShowScrollbar ? theme.palette.primary.main : 'transparent',
-            },
-          },
-          '&::-webkit-scrollbar-corner': {
-            background: shouldShowScrollbar ? glassTrackColor : 'transparent',
-          },
-          scrollbarWidth: shouldShowScrollbar
-            ? scrollbarSize === 'thin'
-              ? ('thin' as const)
-              : ('auto' as const)
-            : ('none' as const),
-          scrollbarColor: shouldShowScrollbar
-            ? `${colors.scrollbar} ${glassTrackColor}`
-            : 'transparent transparent',
-          backdropFilter: 'blur(10px)',
-        };
-      }
-
-      default:
-        return getAutoHideStyles(colors.scrollbar, colors.track);
-    }
-  };
-
   // Render empty content if no children and emptyContent is provided
   const renderContent = () => {
     if (!children && emptyContent) {
@@ -338,7 +245,7 @@ export const ScrollArea: React.FC<ScrollAreaProps> = ({
         // Auto-inject scrollContainerRef, disableInternalScroll, and container width
         if ('disableInternalScroll' in childProps || childProps.scrollContainerRef !== undefined) {
           const enhancedProps: Record<string, unknown> = {
-            scrollContainerRef: internalScrollRef,
+            scrollContainerRef: scrollRef,
             disableInternalScroll: true,
           };
 
@@ -390,8 +297,16 @@ export const ScrollArea: React.FC<ScrollAreaProps> = ({
               outlineOffset: -2,
             },
           },
-          ...getOverflowStyle(),
-          ...getVariantStyles(),
+          ...getOverflowStyle({ disabled, orientation }),
+          ...getVariantStyles({
+    theme,
+    variant,
+    orientation,
+    scrollbarSize,
+    scrollbarColor,
+    scrollbarTrackColor,
+    shouldShowScrollbar,
+  }),
         }}
         style={{
           scrollBehavior: smoothScroll ? 'smooth' : 'auto',

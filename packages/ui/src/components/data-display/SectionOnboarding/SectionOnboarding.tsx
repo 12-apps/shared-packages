@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle } from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
 import { Box, Button, Collapse, Stack, Typography, useTheme } from '@mui/material';
 import React from 'react';
 

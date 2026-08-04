@@ -1,4 +1,8 @@
-import { Cookie, Payment, Security, Star, Update } from '@mui/icons-material';
+import Cookie from '@mui/icons-material/Cookie';
+import Payment from '@mui/icons-material/Payment';
+import Security from '@mui/icons-material/Security';
+import Star from '@mui/icons-material/Star';
+import Update from '@mui/icons-material/Update';
 import { Box, Container, Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';

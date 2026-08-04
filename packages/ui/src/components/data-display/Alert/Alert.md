@@ -73,7 +73,7 @@ import { Alert } from '@procurement/ui';
 ### Custom Icon
 
 ```tsx
-import { Star } from '@mui/icons-material';
+import Star from '@mui/icons-material/Star';
 
 <Alert 
   variant="info" 

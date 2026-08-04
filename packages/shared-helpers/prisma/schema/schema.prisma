@@ -1,0 +1,19 @@
+// Host schema root for @12-apps/shared-helpers.
+//
+// Datasource + generator ONLY — this package deliberately owns no domain
+// models. The app's models live in the consuming application's own schema
+// folder; what lands here besides this file are the model PARTIALS owned by the
+// plugin packages in this repo, copied in by scripts/sync-*-schema.mjs.
+//
+// That is the whole plug-and-play contract: a host adopts a plugin by running
+// the same sync step against its own schema folder, and generates a client that
+// knows the plugin's models without hand-copying them. Generating here with no
+// domain models is what a fresh consumer gets before adding their own.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}

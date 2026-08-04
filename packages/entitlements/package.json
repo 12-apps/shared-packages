@@ -1,0 +1,65 @@
+{
+  "name": "@12-apps/entitlements",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Generic, portable plan/feature entitlements library: layered resolution (code/plan/status/tenant), numeric quotas, per-feature revoke policy and 402-vs-403 denial semantics. Framework-free core with storage adapters plus an optional React binding. Knows nothing about money. Zero app coupling.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react/index.ts"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "jsdom": "^25.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/entitlements"
+  },
+  "files": [
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md"
+  ]
+}
