@@ -8,13 +8,11 @@ packages/shared-helpers/src/requests/lib/createFetcherFactory.ts
 packages/shared-helpers/src/requests/lib/retry.ts
 packages/shared-helpers/src/requests/lib/successRateMetrics.ts
 packages/shared-helpers/src/utils/lib/getGeoLocation.ts
-packages/shared-helpers/src/utils/lib/stripHtml.ts
 packages/shared-helpers/src/utils/lib/withBatchSize.ts
 packages/shared-helpers/src/utils/lib/withGracefulShutdown.ts
 packages/shared-helpers/tests/db/database.test.ts
 packages/ui/scripts/storybook.js
 packages/ui/src/components/data-display/AlertDialog/AlertDialog.test.stories.tsx
-packages/ui/src/components/data-display/AsyncStateContainer/AsyncStateContainer.tsx
 packages/ui/src/components/data-display/Banner/Banner.test.stories.tsx
 packages/ui/src/components/data-display/Carousel/Carousel.test.stories.tsx
 packages/ui/src/components/data-display/Carousel/Carousel.tsx
