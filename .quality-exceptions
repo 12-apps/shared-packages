@@ -39,8 +39,6 @@ packages/ui/src/components/data-display/HoverCard/HoverCard.test.stories.tsx
 packages/ui/src/components/data-display/HoverCard/HoverCard.tsx
 packages/ui/src/components/data-display/InteractiveTooltip/InteractiveTooltip.tsx
 packages/ui/src/components/data-display/LazyImage/LazyImage.tsx
-packages/ui/src/components/data-display/Lightbox/Lightbox.test.stories.tsx
-packages/ui/src/components/data-display/Lightbox/Lightbox.tsx
 packages/ui/src/components/data-display/LoadingState/LoadingState.tsx
 packages/ui/src/components/data-display/MapPreview/MapPreview.test.stories.tsx
 packages/ui/src/components/data-display/MapPreview/MapPreview.tsx
