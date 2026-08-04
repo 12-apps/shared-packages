@@ -16,181 +16,14 @@ import {
 import type { FC} from 'react';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
 
+import type { MockPrediction } from './mockPlaces';
+import { MOCK_ADDRESSES, MOCK_PLACE_DETAILS } from './mockPlaces';
+import { useGoogleMapsAPI } from './useGoogleMapsAPI';
 import type { AddressAutocompleteProps,AddressDetails } from './AddressAutocomplete.types';
 
 // Mock data for testing when API key is not available or in test environment
-interface MockPrediction {
-  place_id: string;
-  description: string;
-  structured_formatting: {
-    main_text: string;
-    secondary_text: string;
-  };
-  matched_substrings?: google.maps.places.PredictionSubstring[];
-  terms?: google.maps.places.PredictionTerm[];
-  types?: string[];
-}
 
-const MOCK_ADDRESSES: MockPrediction[] = [
-  {
-    place_id: 'mock_1',
-    description: '123 Main Street, San Francisco, CA 94105, USA',
-    structured_formatting: {
-      main_text: '123 Main Street',
-      secondary_text: 'San Francisco, CA 94105, USA',
-    },
-    matched_substrings: [],
-    terms: [],
-    types: ['street_address'],
-  },
-  {
-    place_id: 'mock_2',
-    description: '456 Oak Avenue, New York, NY 10001, USA',
-    structured_formatting: {
-      main_text: '456 Oak Avenue',
-      secondary_text: 'New York, NY 10001, USA',
-    },
-    matched_substrings: [],
-    terms: [],
-    types: ['street_address'],
-  },
-  {
-    place_id: 'mock_3',
-    description: '789 Pine Boulevard, Los Angeles, CA 90001, USA',
-    structured_formatting: {
-      main_text: '789 Pine Boulevard',
-      secondary_text: 'Los Angeles, CA 90001, USA',
-    },
-    matched_substrings: [],
-    terms: [],
-    types: ['street_address'],
-  },
-  {
-    place_id: 'mock_4',
-    description: '321 Elm Street, Chicago, IL 60601, USA',
-    structured_formatting: {
-      main_text: '321 Elm Street',
-      secondary_text: 'Chicago, IL 60601, USA',
-    },
-    matched_substrings: [],
-    terms: [],
-    types: ['street_address'],
-  },
-  {
-    place_id: 'mock_5',
-    description: '654 Maple Drive, Austin, TX 78701, USA',
-    structured_formatting: {
-      main_text: '654 Maple Drive',
-      secondary_text: 'Austin, TX 78701, USA',
-    },
-    matched_substrings: [],
-    terms: [],
-    types: ['street_address'],
-  },
-];
 
-interface MockPlaceDetails {
-  formatted_address: string;
-  address_components: Array<{
-    long_name: string;
-    types: string[];
-  }>;
-  geometry: {
-    location: {
-      lat: () => number;
-      lng: () => number;
-    };
-  };
-}
-
-const MOCK_PLACE_DETAILS: Record<string, MockPlaceDetails> = {
-  mock_1: {
-    formatted_address: '123 Main Street, San Francisco, CA 94105, USA',
-    address_components: [
-      { long_name: '123', types: ['street_number'] },
-      { long_name: 'Main Street', types: ['route'] },
-      { long_name: 'San Francisco', types: ['locality'] },
-      { long_name: 'California', types: ['administrative_area_level_1'] },
-      { long_name: 'United States', types: ['country'] },
-      { long_name: '94105', types: ['postal_code'] },
-    ],
-    geometry: { location: { lat: () => 37.7749, lng: () => -122.4194 } },
-  },
-  mock_2: {
-    formatted_address: '456 Oak Avenue, New York, NY 10001, USA',
-    address_components: [
-      { long_name: '456', types: ['street_number'] },
-      { long_name: 'Oak Avenue', types: ['route'] },
-      { long_name: 'New York', types: ['locality'] },
-      { long_name: 'New York', types: ['administrative_area_level_1'] },
-      { long_name: 'United States', types: ['country'] },
-      { long_name: '10001', types: ['postal_code'] },
-    ],
-    geometry: { location: { lat: () => 40.7128, lng: () => -74.0060 } },
-  },
-  mock_3: {
-    formatted_address: '789 Pine Boulevard, Los Angeles, CA 90001, USA',
-    address_components: [
-      { long_name: '789', types: ['street_number'] },
-      { long_name: 'Pine Boulevard', types: ['route'] },
-      { long_name: 'Los Angeles', types: ['locality'] },
-      { long_name: 'California', types: ['administrative_area_level_1'] },
-      { long_name: 'United States', types: ['country'] },
-      { long_name: '90001', types: ['postal_code'] },
-    ],
-    geometry: { location: { lat: () => 34.0522, lng: () => -118.2437 } },
-  },
-  mock_4: {
-    formatted_address: '321 Elm Street, Chicago, IL 60601, USA',
-    address_components: [
-      { long_name: '321', types: ['street_number'] },
-      { long_name: 'Elm Street', types: ['route'] },
-      { long_name: 'Chicago', types: ['locality'] },
-      { long_name: 'Illinois', types: ['administrative_area_level_1'] },
-      { long_name: 'United States', types: ['country'] },
-      { long_name: '60601', types: ['postal_code'] },
-    ],
-    geometry: { location: { lat: () => 41.8781, lng: () => -87.6298 } },
-  },
-  mock_5: {
-    formatted_address: '654 Maple Drive, Austin, TX 78701, USA',
-    address_components: [
-      { long_name: '654', types: ['street_number'] },
-      { long_name: 'Maple Drive', types: ['route'] },
-      { long_name: 'Austin', types: ['locality'] },
-      { long_name: 'Texas', types: ['administrative_area_level_1'] },
-      { long_name: 'United States', types: ['country'] },
-      { long_name: '78701', types: ['postal_code'] },
-    ],
-    geometry: { location: { lat: () => 30.2672, lng: () => -97.7431 } },
-  },
-  mock_6: {
-    formatted_address: '1000 Broadway, New York, NY 10001, USA',
-    address_components: [
-      { long_name: '1000', types: ['street_number'] },
-      { long_name: 'Broadway', types: ['route'] },
-      { long_name: 'New York', types: ['locality'] },
-      { long_name: 'New York', types: ['administrative_area_level_1'] },
-      { long_name: 'United States', types: ['country'] },
-      { long_name: '10001', types: ['postal_code'] },
-    ],
-    geometry: { location: { lat: () => 40.7589, lng: () => -73.9851 } },
-  },
-  mock_7: {
-    formatted_address: '250 Market Street, San Francisco, CA 94102, USA',
-    address_components: [
-      { long_name: '250', types: ['street_number'] },
-      { long_name: 'Market Street', types: ['route'] },
-      { long_name: 'San Francisco', types: ['locality'] },
-      { long_name: 'California', types: ['administrative_area_level_1'] },
-      { long_name: 'United States', types: ['country'] },
-      { long_name: '94102', types: ['postal_code'] },
-    ],
-    geometry: { location: { lat: () => 37.7879, lng: () => -122.4075 } },
-  },
-};
-
-// Styled components
 const GlassTextField = styled(TextField)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {
     background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.background.paper, 0.6)} 100%)`,
@@ -244,82 +77,9 @@ const AddressText = styled(Box)(({ theme }) => ({
 }));
 
 // Google Maps API service interface  
-interface GoogleMapsService {
-  autocompleteService: google.maps.places.AutocompleteService | null;
-  placesService: google.maps.places.PlacesService | null;
-  geocoder: google.maps.Geocoder | null;
-}
+
 
 // Hook for Google Maps API initialization
-const useGoogleMapsAPI = (apiKey: string) => {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [useMockData, setUseMockData] = useState(false);
-  const serviceRef = useRef<GoogleMapsService>({
-    autocompleteService: null,
-    placesService: null,
-    geocoder: null,
-  });
-
-  useEffect(() => {
-    // Use mock data for demo key or test environment
-    if (!apiKey || apiKey === 'demo-key' || apiKey === 'test-key') {
-      setUseMockData(true);
-      setIsLoaded(true);
-      setError(null);
-      return;
-    }
-
-    // Check if Google Maps is already loaded
-    if (window.google && window.google.maps && window.google.maps.places) {
-      initializeServices();
-      return;
-    }
-
-    // Load Google Maps API
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    
-    script.onload = () => {
-      initializeServices();
-    };
-    
-    script.onerror = () => {
-      setError('Failed to load Google Maps API');
-    };
-
-    document.head.appendChild(script);
-
-    return () => {
-      // Cleanup script if component unmounts
-      if (document.head.contains(script)) {
-        document.head.removeChild(script);
-      }
-    };
-  }, [apiKey]);
-
-  const initializeServices = () => {
-    try {
-      if (window.google && window.google.maps && window.google.maps.places) {
-        serviceRef.current = {
-          autocompleteService: new window.google.maps.places.AutocompleteService(),
-          placesService: new window.google.maps.places.PlacesService(document.createElement('div')),
-          geocoder: new window.google.maps.Geocoder(),
-        };
-        setIsLoaded(true);
-        setError(null);
-      }
-    } catch {
-      setError('Failed to initialize Google Maps services');
-    }
-  };
-
-  return { isLoaded, error, services: serviceRef.current, useMockData };
-};
-
-// Main component with proper Google Maps integration
 export const AddressAutocomplete: FC<AddressAutocompleteProps> = ({
   variant = 'outlined',
   label = 'Address',
@@ -347,6 +107,7 @@ export const AddressAutocomplete: FC<AddressAutocompleteProps> = ({
   const { isLoaded, error: mapsError, services, useMockData } = useGoogleMapsAPI(googleMapsApiKey);
 
   // Debounced autocomplete function
+
   const debouncedAutocomplete = useCallback(
     (input: string) => {
       if (debounceTimeoutRef.current) {
@@ -414,7 +175,7 @@ export const AddressAutocomplete: FC<AddressAutocompleteProps> = ({
           request,
           (predictions, status) => {
             setLoading(false);
-            
+          
             if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
               setOptions(predictions);
               setApiError(null);
@@ -516,10 +277,10 @@ export const AddressAutocomplete: FC<AddressAutocompleteProps> = ({
 
       services.placesService.getDetails(request, (place, status) => {
         setLoading(false);
-        
+      
         if (status === google.maps.places.PlacesServiceStatus.OK && place) {
           const addressComponents = place.address_components || [];
-          
+        
           const getComponent = (type: string) => {
             const component = addressComponents.find(c => c.types.includes(type));
             return component?.long_name || '';
@@ -571,7 +332,7 @@ export const AddressAutocomplete: FC<AddressAutocompleteProps> = ({
           setApiError('Mock location details not found');
           return;
         }
-        
+      
         const addressComponents = mockDetails.address_components || [];
         const getComponent = (type: string) => {
           const component = addressComponents.find((c) => c.types.includes(type));
@@ -612,11 +373,11 @@ export const AddressAutocomplete: FC<AddressAutocompleteProps> = ({
 
         services.geocoder!.geocode({ location: latLng }, (results, status) => {
           setLoading(false);
-          
+        
           if (status === 'OK' && results && results[0]) {
             const place = results[0];
             const addressComponents = place.address_components || [];
-            
+          
             const getComponent = (type: string) => {
               const component = addressComponents.find(c => c.types.includes(type));
               return component?.long_name || '';
