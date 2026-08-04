@@ -82,7 +82,6 @@ packages/ui/src/components/form/PhoneInput/PhoneInput.test.stories.tsx
 packages/ui/src/components/form/RadioGroup/RadioGroup.test.stories.tsx
 packages/ui/src/components/form/RadioGroup/RadioGroup.tsx
 packages/ui/src/components/form/RichTextEditor/RichTextEditor.test.stories.tsx
-packages/ui/src/components/form/RichTextEditor/RichTextEditor.tsx
 packages/ui/src/components/form/Select/Select.test.stories.tsx
 packages/ui/src/components/form/Slider/Slider.test.stories.tsx
 packages/ui/src/components/form/Slider/Slider.tsx
