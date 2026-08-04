@@ -62,7 +62,6 @@ packages/ui/src/components/feedback/Dialog/Dialog.test.stories.tsx
 packages/ui/src/components/feedback/Modal/Modal.test.stories.tsx
 packages/ui/src/components/feedback/Modal/Modal.tsx
 packages/ui/src/components/feedback/Sonner/Sonner.test.stories.tsx
-packages/ui/src/components/feedback/Sonner/Sonner.tsx
 packages/ui/src/components/feedback/StackedModal/StackedModal.test.stories.tsx
 packages/ui/src/components/feedback/Toast/Toast.test.stories.tsx
 packages/ui/src/components/feedback/TutorialOverlay/TutorialOverlay.test.stories.tsx

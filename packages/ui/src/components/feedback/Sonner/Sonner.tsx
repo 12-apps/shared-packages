@@ -14,127 +14,130 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
-import React, { createContext, useCallback, useContext, useRef,useState } from 'react';
+import type { CSSObject, Theme } from '@mui/material/styles';
+import React, { createContext, useCallback, useContext, useRef,useState, useMemo } from 'react';
 
-import type { SonnerContextType,SonnerProps } from './Sonner.types';
+import type { SonnerContextType, SonnerItem,SonnerProps } from './Sonner.types';
 
 const SonnerContext = createContext<SonnerContextType | null>(null);
 
-interface SonnerItem extends SonnerProps {
-  id: string;
-  createdAt: number;
-  visible: boolean;
-}
+const DEFAULT_DURATION_MS = 4000;
+
+const buildToastItem = (
+  toast: Omit<SonnerProps, 'id'>,
+  id: string,
+  type?: SonnerProps['type'],
+): SonnerItem => ({
+  ...toast,
+  id,
+  type: type || toast.type || 'default',
+  createdAt: Date.now(),
+  visible: true,
+});
+
+// Persistent toasts and `duration: 0` stay until dismissed explicitly.
+const scheduleAutoDismiss = (
+  toast: Omit<SonnerProps, 'id'>,
+  id: string,
+  dismiss: (id?: string) => void,
+) => {
+  if (toast.persistent || toast.duration === 0) return;
+
+  window.setTimeout(() => dismiss(id), toast.duration ?? DEFAULT_DURATION_MS);
+};
+
+const EXIT_TRANSITION_MS = 300;
+
+type SonnerPromiseOptions<T> = {
+  loading: React.ReactNode;
+  success: React.ReactNode | ((data: T) => React.ReactNode);
+  error: React.ReactNode | ((error: Error) => React.ReactNode);
+};
+
+const resolveMessage = <T,>(
+  message: React.ReactNode | ((value: T) => React.ReactNode),
+  value: T,
+): React.ReactNode => (typeof message === 'function' ? message(value) : message);
+
+// Shows a pinned loading toast for the life of a promise, then swaps it for a
+// success or error one. Takes the shortcuts it needs rather than reaching for
+// context, so it is testable on its own.
+const trackPromiseWithToasts = async <T,>(
+  promiseToResolve: Promise<T>,
+  options: SonnerPromiseOptions<T>,
+  toasts: {
+    loading: (message: React.ReactNode) => string;
+    success: (message: React.ReactNode) => string;
+    error: (message: React.ReactNode) => string;
+    dismiss: (id?: string) => void;
+  },
+): Promise<T> => {
+  const toastId = toasts.loading(options.loading);
+
+  try {
+    const data = await promiseToResolve;
+    toasts.dismiss(toastId);
+    toasts.success(resolveMessage(options.success, data));
+    return data;
+  } catch (err) {
+    toasts.dismiss(toastId);
+    toasts.error(resolveMessage(options.error, err instanceof Error ? err : new Error(String(err))));
+    throw err;
+  }
+};
 
 export const SonnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<SonnerItem[]>([]);
   const toastCounter = useRef(0);
 
+  // Hide first, then drop after the exit transition. Passing no id targets every
+  // toast; the two branches only differ in which toasts they match, so that is
+  // the only thing that varies here.
   const dismiss = useCallback((id?: string) => {
-    if (id) {
-      setToasts((prev) =>
-        prev.map((toast) => (toast.id === id ? { ...toast, visible: false } : toast)),
-      );
+    const matches = (toast: SonnerItem) => id === undefined || toast.id === id;
 
-      window.setTimeout(() => {
-        setToasts((prev) => prev.filter((toast) => toast.id !== id));
-      }, 300);
-    } else {
-      setToasts((prev) => prev.map((toast) => ({ ...toast, visible: false })));
+    setToasts((prev) =>
+      prev.map((toast) => (matches(toast) ? { ...toast, visible: false } : toast)),
+    );
 
-      window.setTimeout(() => {
-        setToasts([]);
-      }, 300);
-    }
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => !matches(toast)));
+    }, EXIT_TRANSITION_MS);
   }, []);
 
   const addToast = useCallback(
     (toast: Omit<SonnerProps, 'id'>, type?: SonnerProps['type']): string => {
       const id = `sonner-${++toastCounter.current}`;
-      const newToast: SonnerItem = {
-        ...toast,
-        id,
-        type: type || toast.type || 'default',
-        createdAt: Date.now(),
-        visible: true,
-      };
-
-      setToasts((prev) => [...prev, newToast]);
-
-      if (!toast.persistent && toast.duration !== 0) {
-        const duration = toast.duration ?? 4000;
-        window.setTimeout(() => {
-          dismiss(id);
-        }, duration);
-      }
-
+      setToasts((prev) => [...prev, buildToastItem(toast, id, type)]);
+      scheduleAutoDismiss(toast, id, dismiss);
       return id;
     },
     [dismiss],
   );
 
-  const toast = useCallback(
-    (message: React.ReactNode, options?: Partial<SonnerProps>) => addToast({ ...options, title: message }, 'default'),
+  // The six shortcuts differ only by the type they tag and, for loading, by
+  // pinning persistent. Built from one factory rather than six near-identical
+  // useCallback blocks.
+  const makeShortcut = useCallback(
+    (type: SonnerProps['type'], extra?: Partial<SonnerProps>) =>
+      (message: React.ReactNode, options?: Partial<SonnerProps>) =>
+        addToast({ ...options, ...extra, title: message }, type),
     [addToast],
   );
 
-  const success = useCallback(
-    (message: React.ReactNode, options?: Partial<SonnerProps>) => addToast({ ...options, title: message }, 'success'),
-    [addToast],
-  );
-
-  const error = useCallback(
-    (message: React.ReactNode, options?: Partial<SonnerProps>) => addToast({ ...options, title: message }, 'error'),
-    [addToast],
-  );
-
-  const warning = useCallback(
-    (message: React.ReactNode, options?: Partial<SonnerProps>) => addToast({ ...options, title: message }, 'warning'),
-    [addToast],
-  );
-
-  const info = useCallback(
-    (message: React.ReactNode, options?: Partial<SonnerProps>) => addToast({ ...options, title: message }, 'info'),
-    [addToast],
-  );
-
-  const loading = useCallback(
-    (message: React.ReactNode, options?: Partial<SonnerProps>) => addToast({ ...options, title: message, persistent: true }, 'loading'),
-    [addToast],
+  const toast = useMemo(() => makeShortcut('default'), [makeShortcut]);
+  const success = useMemo(() => makeShortcut('success'), [makeShortcut]);
+  const error = useMemo(() => makeShortcut('error'), [makeShortcut]);
+  const warning = useMemo(() => makeShortcut('warning'), [makeShortcut]);
+  const info = useMemo(() => makeShortcut('info'), [makeShortcut]);
+  const loading = useMemo(
+    () => makeShortcut('loading', { persistent: true }),
+    [makeShortcut],
   );
 
   const promise = useCallback(
-    async <T,>(
-      promiseToResolve: Promise<T>,
-      options: {
-        loading: React.ReactNode;
-        success: React.ReactNode | ((data: T) => React.ReactNode);
-        error: React.ReactNode | ((error: Error) => React.ReactNode);
-      },
-    ): Promise<T> => {
-      const toastId = loading(options.loading);
-
-      try {
-        const data = await promiseToResolve;
-        dismiss(toastId);
-
-        const successMessage =
-          typeof options.success === 'function' ? options.success(data) : options.success;
-
-        success(successMessage);
-        return data;
-      } catch (err) {
-        dismiss(toastId);
-
-        const errorMessage =
-          typeof options.error === 'function'
-            ? options.error(err instanceof Error ? err : new Error(String(err)))
-            : options.error;
-
-        error(errorMessage);
-        throw err;
-      }
-    },
+    <T,>(promiseToResolve: Promise<T>, options: SonnerPromiseOptions<T>): Promise<T> =>
+      trackPromiseWithToasts(promiseToResolve, options, { loading, success, error, dismiss }),
     [loading, success, error, dismiss],
   );
 
@@ -168,174 +171,8 @@ export const useSonner = (): SonnerContextType => {
   return context;
 };
 
-const SonnerToast: React.FC<SonnerItem & { onDismiss: (id: string) => void }> = ({
-  id,
-  title,
-  description,
-  type = 'default',
-  variant = 'default',
-  closable = true,
-  action,
-  cancel,
-  icon,
-  important = false,
-  visible,
-  onDismiss,
-}) => {
-  const theme = useTheme();
-
-  const getIcon = () => {
-    if (icon) return icon;
-
-    switch (type) {
-      case 'success':
-        return <SuccessIcon sx={{ fontSize: 20, color: 'success.main' }} />;
-      case 'error':
-        return <ErrorIcon sx={{ fontSize: 20, color: 'error.main' }} />;
-      case 'warning':
-        return <WarningIcon sx={{ fontSize: 20, color: 'warning.main' }} />;
-      case 'info':
-        return <InfoIcon sx={{ fontSize: 20, color: 'info.main' }} />;
-      case 'loading':
-        return <CircularProgress size={16} />;
-      default:
-        return null;
-    }
-  };
-
-  const getVariantStyles = () => {
-    const baseStyles = {
-      borderRadius: theme.spacing(1.5),
-      border: `1px solid ${theme.palette.divider}`,
-      backgroundColor: theme.palette.background.paper,
-      boxShadow: theme.shadows[4],
-      transition: theme.transitions.create(['all', 'transform', 'opacity'], {
-        duration: theme.transitions.duration.short,
-      }),
-      transform: visible ? 'scale(1)' : 'scale(0.95)',
-      opacity: visible ? 1 : 0,
-    };
-
-    switch (variant) {
-      case 'glass':
-        return {
-          ...baseStyles,
-          backgroundColor: alpha(theme.palette.background.paper, 0.1),
-          backdropFilter: 'blur(20px)',
-          border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-          boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
-        };
-
-      case 'minimal':
-        return {
-          ...baseStyles,
-          backgroundColor: theme.palette.background.default,
-          border: 'none',
-          boxShadow: 'none',
-          borderLeft: `4px solid ${theme.palette.primary.main}`,
-          borderRadius: 0,
-        };
-
-      default:
-        return baseStyles;
-    }
-  };
-
-  const handleDismiss = () => {
-    onDismiss(id);
-  };
-
-  return (
-    <Collapse in={visible} timeout={200}>
-      <Box
-        role={important || type === 'error' ? 'alert' : 'status'}
-        aria-live={important || type === 'error' ? 'assertive' : 'polite'}
-        aria-atomic="true"
-        sx={{
-          ...getVariantStyles(),
-          p: 2,
-          mb: 1,
-          minWidth: 356,
-          maxWidth: 400,
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 1.5,
-        }}
-      >
-        {getIcon()}
-
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          {title && (
-            <Typography
-              variant="body2"
-              sx={{
-                fontWeight: important ? 600 : 500,
-                color: 'text.primary',
-                mb: description ? 0.5 : 0,
-              }}
-            >
-              {title}
-            </Typography>
-          )}
-
-          {description && (
-            <Typography
-              variant="body2"
-              sx={{
-                color: 'text.secondary',
-                fontSize: '0.875rem',
-              }}
-            >
-              {description}
-            </Typography>
-          )}
-
-          {(action || cancel) && (
-            <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
-              {action && (
-                <Button
-                  size="small"
-                  onClick={action.onClick}
-                  variant="contained"
-                  sx={{ fontSize: '0.75rem', py: 0.5, px: 1.5 }}
-                >
-                  {action.label}
-                </Button>
-              )}
-              {cancel && (
-                <Button
-                  size="small"
-                  onClick={cancel.onClick}
-                  variant="outlined"
-                  sx={{ fontSize: '0.75rem', py: 0.5, px: 1.5 }}
-                >
-                  {cancel.label}
-                </Button>
-              )}
-            </Box>
-          )}
-        </Box>
-
-        {closable && (
-          <IconButton
-            size="small"
-            onClick={handleDismiss}
-            aria-label="Dismiss notification"
-            sx={{
-              ml: 'auto',
-              color: 'text.secondary',
-              '&:hover': {
-                backgroundColor: 'action.hover',
-              },
-            }}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        )}
-      </Box>
-    </Collapse>
-  );
-};
+// A caller-supplied icon always wins; otherwise the type picks one.
+import { SonnerToast } from './SonnerToast';
 
 const SonnerToaster: React.FC<{
   toasts: SonnerItem[];
