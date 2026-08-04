@@ -105,7 +105,6 @@ packages/ui/src/components/utility/InfiniteScroll/InfiniteScroll.test.stories.ts
 packages/ui/src/components/utility/InfiniteScroll/InfiniteScroll.tsx
 packages/ui/src/components/utility/Portal/Portal.test.stories.tsx
 packages/ui/src/components/utility/Transition/Transition.tsx
-packages/ui/src/components/utility/VirtualList/VirtualList.test.stories.tsx
 packages/ui/src/components/utility/VirtualList/VirtualList.tsx
 packages/ui/src/components/utility/WorkflowStep/WorkflowStep.test.stories.tsx
 packages/ui/src/components/utility/WorkflowStep/WorkflowStep.tsx

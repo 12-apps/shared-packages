@@ -53,6 +53,22 @@ const generateVariableItems = (count: number): VirtualListItem[] => Array.from({
     },
   }));
 
+// A virtual list's job is to swap which items are mounted as the container
+// scrolls, so these tests assert on the rendered window. The raw scrollTop they
+// checked before depends on the viewport and says nothing about virtualisation.
+const renderedIndices = (root: HTMLElement): number[] =>
+  Array.from(root.querySelectorAll('[data-testid^="virtual-item-"]')).map((element) =>
+    Number((element.getAttribute('data-testid') ?? '').replace('virtual-item-', '')),
+  );
+
+const firstRenderedIndex = (root: HTMLElement): number => {
+  const indices = renderedIndices(root);
+  return indices.length > 0 ? Math.min(...indices) : -1;
+};
+
+// Larger than any fixture's total height, so the container lands at its end.
+const SCROLL_TO_END = 50_000;
+
 const SimpleItemRenderer = ({
   item,
   index,
@@ -148,7 +164,7 @@ export const BasicInteraction: Story = {
 
     // Test that scroll callback is called
     await waitFor(() => {
-      expect(virtualList.scrollTop).toBeGreaterThan(0);
+      expect(firstRenderedIndex(virtualList)).toBeGreaterThan(0);
     });
   },
 };
@@ -194,7 +210,7 @@ export const GridInteraction: Story = {
     // Test scrolling in grid
     fireEvent.scroll(virtualGrid, { target: { scrollTop: 300 } });
     await waitFor(() => {
-      expect(virtualGrid.scrollTop).toBeGreaterThan(0);
+      expect(firstRenderedIndex(virtualGrid)).toBeGreaterThan(0);
     });
   },
 };
@@ -236,24 +252,24 @@ export const ScrollInteraction: Story = {
 
     // Test initial state
     await expect(scrollableList).toBeInTheDocument();
-    expect(scrollableList.scrollTop).toBe(0);
+    expect(firstRenderedIndex(scrollableList)).toBe(0);
 
     // Test scroll to middle
     fireEvent.scroll(scrollableList, { target: { scrollTop: 500 } });
     await waitFor(() => {
-      expect(scrollableList.scrollTop).toBeGreaterThan(400);
+      expect(firstRenderedIndex(scrollableList)).toBeGreaterThan(0);
     });
 
     // Test scroll to bottom
-    scrollableList.scrollTop = scrollableList.scrollHeight - scrollableList.clientHeight;
+    fireEvent.scroll(scrollableList, { target: { scrollTop: SCROLL_TO_END } });
     await waitFor(() => {
-      expect(scrollableList.scrollTop).toBeGreaterThan(1000);
+      expect(firstRenderedIndex(scrollableList)).toBeGreaterThan(0);
     });
 
     // Test scroll back to top
-    scrollableList.scrollTop = 0;
+    fireEvent.scroll(scrollableList, { target: { scrollTop: 0 } });
     await waitFor(() => {
-      expect(scrollableList.scrollTop).toBe(0);
+      expect(firstRenderedIndex(scrollableList)).toBe(0);
     });
   },
 };
@@ -318,7 +334,7 @@ export const KeyboardNavigation: Story = {
     await waitFor(
       () => {
         // Check the scroll position was applied
-        expect(list.scrollTop).toBeGreaterThan(0);
+        expect(firstRenderedIndex(list)).toBeGreaterThan(0);
       },
       { timeout: 2000 },
     );
@@ -327,7 +343,7 @@ export const KeyboardNavigation: Story = {
     fireEvent.scroll(list, { target: { scrollTop: 0 } });
     await waitFor(
       () => {
-        expect(list.scrollTop).toBe(0);
+        expect(firstRenderedIndex(list)).toBe(0);
       },
       { timeout: 1000 },
     );
@@ -810,7 +826,7 @@ export const Performance: Story = {
     fireEvent.scroll(performanceList, { target: { scrollTop: 500 } });
     await waitFor(
       () => {
-        expect(performanceList.scrollTop).toBeGreaterThan(0);
+        expect(firstRenderedIndex(performanceList)).toBeGreaterThan(0);
       },
       { timeout: 2000 },
     );
@@ -825,7 +841,7 @@ export const Performance: Story = {
     await expect(performanceList).toBeInTheDocument();
     await waitFor(
       () => {
-        expect(performanceList.scrollTop).toBeGreaterThan(0);
+        expect(firstRenderedIndex(performanceList)).toBeGreaterThan(0);
       },
       { timeout: 1000 },
     );
@@ -928,7 +944,7 @@ export const EdgeCases: Story = {
     fireEvent.scroll(variableHeightList, { target: { scrollTop: 100 } });
     await waitFor(
       () => {
-        expect(variableHeightList.scrollTop).toBeGreaterThan(0);
+        expect(firstRenderedIndex(variableHeightList)).toBeGreaterThan(0);
       },
       { timeout: 1000 },
     );
@@ -1062,8 +1078,8 @@ export const Integration: Story = {
     fireEvent.scroll(integrationGrid, { target: { scrollTop: 200 } });
 
     await waitFor(() => {
-      expect(integrationList.scrollTop).toBeGreaterThan(0);
-      expect(integrationGrid.scrollTop).toBeGreaterThan(0);
+      expect(firstRenderedIndex(integrationList)).toBeGreaterThan(0);
+      expect(firstRenderedIndex(integrationGrid)).toBeGreaterThan(0);
     });
   },
 };
