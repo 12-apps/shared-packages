@@ -1,11 +1,9 @@
 packages/auth/src/__tests__/admin-allowlist.test.ts
 packages/auth/src/__tests__/device-detection.test.ts
-packages/auth/src/device-detection.ts
 packages/shared-helpers/src/cache/lib/withFileCache.ts
 packages/shared-helpers/src/db/lib/config.ts
 packages/shared-helpers/src/db/lib/database.ts
 packages/shared-helpers/src/requests/lib/createFetcherFactory.ts
-packages/shared-helpers/src/requests/lib/retry.ts
 packages/shared-helpers/src/requests/lib/successRateMetrics.ts
 packages/shared-helpers/src/utils/lib/getGeoLocation.ts
 packages/shared-helpers/src/utils/lib/withBatchSize.ts
