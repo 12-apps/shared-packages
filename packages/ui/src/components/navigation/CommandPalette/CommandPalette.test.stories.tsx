@@ -1,8 +1,6 @@
-import {
-  Home as HomeIcon,
-  Search as SearchIcon,
-  Settings as SettingsIcon,
-} from '@mui/icons-material';
+import HomeIcon from '@mui/icons-material/Home';
+import SearchIcon from '@mui/icons-material/Search';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { Button } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';

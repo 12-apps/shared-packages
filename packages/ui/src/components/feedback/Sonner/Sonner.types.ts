@@ -63,3 +63,10 @@ export interface SonnerContextType {
     },
   ) => Promise<T>;
 }
+
+// Shared with SonnerToast.tsx, which renders one of these.
+export interface SonnerItem extends SonnerProps {
+  id: string;
+  createdAt: number;
+  visible: boolean;
+}

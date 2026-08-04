@@ -1,4 +1,7 @@
-import { Email, Notifications, Phone, Settings } from '@mui/icons-material';
+import Email from '@mui/icons-material/Email';
+import Notifications from '@mui/icons-material/Notifications';
+import Phone from '@mui/icons-material/Phone';
+import Settings from '@mui/icons-material/Settings';
 import { Badge, Box, Paper, Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';

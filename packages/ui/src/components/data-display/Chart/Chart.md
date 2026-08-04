@@ -350,3 +350,50 @@ expect(lines).toHaveLength(expectedSeriesCount);
 18. **Animation** - Test animation behavior with animate and animationDuration props
 19. **Stacked Charts** - Verify stacked bar/area charts with stacked prop
 20. **Curved vs Linear** - Test curved vs linear line rendering with curved prop
+## Serializable ChartSpec API (FUT-129)
+
+`SpecChart` renders a chart from a **JSON-serializable** `ChartSpec` plus plain
+data rows — the declarative surface consumed by the report builder, admin
+reports and any spec-driven host. It is layered over the prop-driven `Chart`
+(one rendering implementation).
+
+```tsx
+import { SpecChart, parseChartSpec } from '@12-apps/ui/charts';
+
+const spec = parseChartSpec(JSON.parse(storedJson)); // validates untrusted JSON
+<SpecChart spec={spec} data={rows} />;
+```
+
+### Spec shape
+
+```ts
+{
+  type: 'line' | 'bar' | 'area' | 'pie' | 'donut',
+  title?, subtitle?,
+  xAxis: { key, label? },          // row property for the category axis / slice name
+  yAxis?: { label? },
+  series: [{ key, label?, color? }], // color = semantic token, never hex
+  stacked?, legend?, tooltip?, curved?, height?,
+  numberFormat?: 'brl' | 'percent' | 'compact' | 'integer' | 'decimal',
+  colorScheme?: ['primary', ...],  // cycled across series without explicit color
+  centerLabel?                     // donut only
+}
+```
+
+- **Colors are semantic theme tokens** (`primary`, `secondary`, `success`,
+  `warning`, `error`, `info`) resolved against the active MUI palette at render
+  time — light/dark both correct, raw hex is rejected by `parseChartSpec`.
+- **`brl` format expects integer centavos** (repo-wide money convention);
+  `percent` expects fractions (`0.15` → `15%`). Formats drive the tooltip and
+  y-axis ticks.
+- **Renderer registry**: new chart types plug in via
+  `registerChartSpecRenderer(type, renderer)` without touching consumers.
+- **Composables**: `ChartContainer`, `ChartTooltip`/`ChartTooltipContent`,
+  `ChartLegend`/`ChartLegendContent` are exported for bespoke Recharts
+  compositions and used by `Chart` itself.
+- **Entry point**: import from `@12-apps/ui/charts` (sanctioned path for the
+  report builder) or `@12-apps/ui/data-display/Chart`.
+
+The raw chart library stays domain-free: report-specific defaults, block
+chrome, entity/block compatibility rules and spec presets belong to
+`@12-apps/report-builder`, not here.

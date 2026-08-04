@@ -1,6 +1,7 @@
 'use client';
 
-import { ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import SearchIcon from '@mui/icons-material/Search';
 import {
   alpha,
   Box,

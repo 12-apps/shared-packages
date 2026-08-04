@@ -6,8 +6,6 @@
     ".": "./src/index.ts",
     "./config": "./src/config.ts",
     "./admin": "./src/admin.ts",
-    "./providers": "./src/providers.tsx",
-    "./hooks": "./src/hooks.ts",
     "./device-detection": "./src/device-detection.ts"
   },
   "scripts": {
@@ -18,18 +16,13 @@
     "test:coverage": "node ../../scripts/vitest-with-teardown.mjs run --coverage"
   },
   "dependencies": {
-    "next-auth": "^5.0.0-beta.25",
-    "react": "^19.2.0",
+    "@auth/core": "0.41.0",
     "zod": "^4.3.5"
-  },
-  "peerDependencies": {
-    "next": ">=14.0.0"
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@types/node": "^22.15.3",
-    "@types/react": "19.2.2",
     "eslint": "^9.39.1",
     "typescript": "5.9.2"
   },

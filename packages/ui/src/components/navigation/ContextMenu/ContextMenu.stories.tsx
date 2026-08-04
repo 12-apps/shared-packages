@@ -1,4 +1,7 @@
-import { ContentCopy, Edit, Folder, Star } from '@mui/icons-material';
+import ContentCopy from '@mui/icons-material/ContentCopy';
+import Edit from '@mui/icons-material/Edit';
+import Folder from '@mui/icons-material/Folder';
+import Star from '@mui/icons-material/Star';
 import { Box, Card, CardContent,Paper, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 

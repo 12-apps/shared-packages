@@ -25,7 +25,7 @@ export interface AlertDialogProps extends Omit<MuiDialogProps, 'variant'> {
   /**
    * Description text
    */
-  description?: string;
+  description?: React.ReactNode;
 
   /**
    * Icon to display in the dialog
@@ -66,6 +66,13 @@ export interface AlertDialogProps extends Omit<MuiDialogProps, 'variant'> {
    * Whether the confirm button is disabled
    */
   confirmDisabled?: boolean;
+
+  /**
+   * Which button owns focus when the dialog opens. Defaults to `confirm`, which
+   * is right for an acknowledgement; a destructive dialog should pass `cancel`
+   * so a stray Enter on the trigger cannot complete the action.
+   */
+  initialFocus?: 'confirm' | 'cancel';
 
   /**
    * Optional data-testid attribute for testing

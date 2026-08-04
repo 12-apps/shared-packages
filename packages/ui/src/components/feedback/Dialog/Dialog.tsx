@@ -1,4 +1,4 @@
-import { Close as CloseIcon } from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
 import {
   Backdrop,
   Box,
@@ -199,6 +199,30 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({
   );
 };
 
+/**
+ * Top padding for a body that sits directly under the title.
+ *
+ * MUI zeroes it there (`.MuiDialogTitle-root + &` on a non-`dividers` content),
+ * assuming the title's own bottom padding is the whole gap. That assumption
+ * breaks for a body opening with an outlined field: a filled field floats its
+ * label ABOVE the input's border box, and `DialogContent` is `overflow-y: auto`
+ * — a clipping box — so the label gets sliced in half (FUT-544: "Tipo" in the
+ * "Novo insumo" dialog).
+ *
+ * Reserve the overhang rather than restore the full 24px: the title already
+ * contributes its bottom padding, so a shrunk label's `translate(…, -9px)` is
+ * all that is missing. 12px clears it and leaves the gap visually tight.
+ */
+const TITLED_BODY_PADDING_TOP = 1.5;
+
+/**
+ * `.MuiDialogTitle-root + &` is `(0,2,0)`-specific and a plain `sx` entry is
+ * `(0,1,0)`, so the padding above only survives the cascade by naming the class
+ * again — `(0,3,0)`. Scoped to the title-following case so an untitled dialog
+ * keeps MUI's roomier default.
+ */
+const TITLED_BODY_SELECTOR = '.MuiDialogTitle-root + &.MuiDialogContent-root';
+
 export const DialogContent: React.FC<DialogContentProps> = ({
   children,
   dividers = false,
@@ -211,6 +235,7 @@ export const DialogContent: React.FC<DialogContentProps> = ({
       dividers={dividers}
       sx={{
         padding: dense ? 1.5 : 3,
+        [TITLED_BODY_SELECTOR]: { paddingTop: TITLED_BODY_PADDING_TOP },
         '&.MuiDialogContent-dividers': {
           borderTop: dividers ? '1px solid' : 'none',
           borderBottom: dividers ? '1px solid' : 'none',

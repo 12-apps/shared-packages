@@ -1,0 +1,34 @@
+// @12-apps/shift — canonical host-agnostic Prisma partial.
+//
+// Tenant, user and resource-assignment identifiers are stored by value so the
+// package does not depend on host model names. The package migration adds the
+// host's PostgreSQL CHECK/partial-index guarantees that Prisma cannot express.
+model Shift {
+  id                   String    @id @default(uuid())
+  clientId             String    @map("client_id")
+  userId               String    @map("user_id")
+  kind                 String
+  startedAt            DateTime  @default(now()) @map("started_at")
+  endedAt              DateTime? @map("ended_at")
+  endedReason          String?   @map("ended_reason")
+  endedByUserId        String?   @map("ended_by_user_id")
+  resourceAssignmentId String?   @unique @map("resource_assignment_id")
+  // Immutable snapshots retain the resource identity even if a generic
+  // ResourceAssignment is later removed with its host user or tenant.
+  resourceType         String?   @map("resource_type")
+  resourceId           String?   @map("resource_id")
+
+  @@index([clientId, endedAt])
+  @@index([clientId, userId, startedAt])
+  @@map("shifts")
+}
+
+// Optional per-tenant override. No row means the package default (16 hours);
+// materialising a row also defaults to 16, keeping host reads simple.
+model ShiftTenantConfig {
+  clientId      String   @id @map("client_id")
+  autoCloseHours Int     @default(16) @map("auto_close_hours")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("shift_tenant_configs")
+}

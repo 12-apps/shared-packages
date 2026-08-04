@@ -1,6 +1,6 @@
 'use client';
 
-import { KeyboardArrowDown as ChevronDownIcon, Search as SearchIcon } from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
 import {
   Box,
   Button,
@@ -11,7 +11,6 @@ import {
   Menu,
   MenuItem,
   TextField,
-  Typography,
 } from '@mui/material';
 import React, { useMemo, useState } from 'react';
 
@@ -20,25 +19,7 @@ import type {
   MultiSelectExtraOption,
   MultiSelectOption,
 } from './ContentToolbar.types';
-
-/**
- * Trigger label from the current selection: `allLabel` when none/all are
- * selected, the single label when one, else "first (+N)". Uses Set iteration
- * order so the label reflects the first-clicked option.
- */
-function buildTriggerLabel<TValue extends string>(
-  selected: ReadonlySet<TValue>,
-  options: MultiSelectOption<TValue>[],
-  allLabel: string,
-): string {
-  const size = selected.size;
-  if (size === 0 || size === options.length) return allLabel;
-  const labelMap = new Map(options.map((option) => [option.value, option.label]));
-  const firstValue = selected.values().next().value as TValue;
-  const firstLabel = labelMap.get(firstValue) ?? allLabel;
-  if (size === 1) return firstLabel;
-  return `${firstLabel} (+${size - 1})`;
-}
+import { buildTriggerLabel, InlineTrigger, PillTrigger, StackedTrigger } from './MultiSelectTriggers';
 
 /** One checkbox menu row with an optional trailing count. */
 function CheckboxRow({
@@ -84,11 +65,13 @@ export function MultiSelectDropdown<TValue extends string = string>({
   searchable,
   searchPlaceholder = 'Search…',
   noResultsLabel = 'No results',
+  layout = 'inline',
   'data-testid': testId,
 }: MultiSelectDropdownProps<TValue>): React.JSX.Element {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [query, setQuery] = useState('');
   const open = Boolean(anchorEl);
+  const stacked = layout === 'stacked';
   // Reset the query each time the menu closes so it reopens showing everything.
   const close = (): void => {
     setAnchorEl(null);
@@ -100,24 +83,18 @@ export function MultiSelectDropdown<TValue extends string = string>({
   const anyExtraChecked = extraOptions?.some((option) => option.checked) ?? false;
   const clearDisabled = selected.size === 0 && !anyExtraChecked;
 
+  const openMenu = (event: React.MouseEvent<HTMLElement>): void => setAnchorEl(event.currentTarget);
+  const triggerProps = { triggerLabel, open, onOpen: openMenu, testId };
+
+  const renderTrigger = (): React.JSX.Element => {
+    if (stacked) return <StackedTrigger label={label} {...triggerProps} />;
+    if (layout === 'pill') return <PillTrigger label={label} selectedCount={selected.size} {...triggerProps} />;
+    return <InlineTrigger label={label} {...triggerProps} />;
+  };
+
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.875rem' }}>
-      <Typography component="span" sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
-        {label}:
-      </Typography>
-      <Button
-        variant="text"
-        size="small"
-        color="inherit"
-        data-testid={testId}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={(event) => setAnchorEl(event.currentTarget)}
-        sx={{ minWidth: 0, height: 32, px: 1, gap: 0.5, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
-      >
-        {triggerLabel}
-        <ChevronDownIcon sx={{ fontSize: 14 }} />
-      </Button>
+    <>
+      {renderTrigger()}
       <MultiSelectMenu
         anchorEl={anchorEl}
         open={open}
@@ -133,9 +110,10 @@ export function MultiSelectDropdown<TValue extends string = string>({
         onQueryChange={setQuery}
         searchPlaceholder={searchPlaceholder}
         noResultsLabel={noResultsLabel}
+        matchAnchorWidth={stacked}
         testId={testId}
       />
-    </Box>
+    </>
   );
 }
 
@@ -191,7 +169,22 @@ interface MultiSelectMenuProps<TValue extends string> {
   onQueryChange: (value: string) => void;
   searchPlaceholder: string;
   noResultsLabel: string;
+  /** Match the menu width to the trigger and left-align it (stacked select). */
+  matchAnchorWidth?: boolean;
   testId?: string;
+}
+
+/**
+ * Menu placement. Default: anchored to the trigger's right (toolbar). When
+ * `matchAnchorWidth` (stacked select), match the trigger width and left-align so
+ * the menu sits flush under the full-width control.
+ */
+function resolveMenuPlacement(
+  matchAnchorWidth: boolean | undefined,
+  anchorEl: HTMLElement | null,
+): { anchorWidth: number | undefined; align: 'left' | 'right' } {
+  if (!matchAnchorWidth) return { anchorWidth: undefined, align: 'right' };
+  return { anchorWidth: anchorEl?.offsetWidth, align: 'left' };
 }
 
 /** The (optional) search box + checkbox list + optional "Options" section + a "Clear" footer. */
@@ -210,6 +203,7 @@ function MultiSelectMenu<TValue extends string>({
   onQueryChange,
   searchPlaceholder,
   noResultsLabel,
+  matchAnchorWidth,
   testId,
 }: MultiSelectMenuProps<TValue>): React.JSX.Element {
   const trimmed = query.trim().toLowerCase();
@@ -217,18 +211,24 @@ function MultiSelectMenu<TValue extends string>({
     () => (trimmed ? options.filter((option) => option.label.toLowerCase().includes(trimmed)) : options),
     [options, trimmed],
   );
+  const { anchorWidth, align } = resolveMenuPlacement(matchAnchorWidth, anchorEl);
   return (
     <Menu
       anchorEl={anchorEl}
       open={open}
       onClose={close}
-      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      anchorOrigin={{ vertical: 'bottom', horizontal: align }}
+      transformOrigin={{ vertical: 'top', horizontal: align }}
       // Keep focus on the search box (don't let the Menu grab the first item),
       // and stop MUI's typeahead from swallowing keystrokes meant for the input.
       autoFocus={!showSearch}
       disableAutoFocusItem
-      slotProps={{ paper: { sx: { minWidth: 180 } }, list: { sx: { pt: showSearch ? 0 : undefined } } }}
+      slotProps={{
+        // Cap the height so a long list (e.g. many categories) scrolls instead
+        // of running off-screen; the sticky search box stays pinned on top.
+        paper: { sx: { minWidth: anchorWidth ?? 180, width: anchorWidth, maxHeight: 360 } },
+        list: { sx: { pt: showSearch ? 0 : undefined, pb: 0 } },
+      }}
     >
       {showSearch && (
         <MenuSearchField query={query} onQueryChange={onQueryChange} placeholder={searchPlaceholder} testId={testId} />
@@ -277,7 +277,22 @@ function MenuClearFooter({
   testId?: string;
 }): React.JSX.Element {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'flex-end', borderTop: 1, borderColor: 'divider', px: 1, py: 0.75 }}>
+    <Box
+      sx={{
+        // Pin to the bottom of the scroll viewport so it stays visible while the
+        // options list scrolls (mirrors the sticky search box on top).
+        position: 'sticky',
+        bottom: 0,
+        zIndex: 1,
+        display: 'flex',
+        justifyContent: 'flex-end',
+        borderTop: 1,
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+        px: 1,
+        py: 0.75,
+      }}
+    >
       <Button
         variant="text"
         size="small"

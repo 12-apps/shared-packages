@@ -19,6 +19,22 @@ export interface UploadButtonProps {
   /** File selection callback (required) */
   onSelect: (file: globalThis.File) => void;
 
+  /** Accept more than one file per pick/drop. Pair with {@link onSelectMany}. */
+  multiple?: boolean;
+
+  /**
+   * Batch selection callback. Called INSTEAD of `onSelect` when `multiple` is
+   * set, with every file that passed validation.
+   *
+   * Rejected files don't block the rest: the first rejection is surfaced as the
+   * component's error while the valid files are still handed over, so dropping
+   * a folder that happens to contain a PDF imports the XMLs beside it.
+   *
+   * {@link UploadButtonProps.onUpload} still applies, running once per accepted
+   * file in sequence.
+   */
+  onSelectMany?: (files: globalThis.File[]) => void;
+
   /** Optional built-in upload handler with progress */
   onUpload?: (file: globalThis.File) => Promise<void>;
 

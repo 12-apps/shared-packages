@@ -108,3 +108,24 @@ describe('MultiSelectDropdown search (FUT-169)', () => {
     expect(screen.getByTestId('cat-search')).toBeInTheDocument();
   });
 });
+
+describe('MultiSelectDropdown stacked trigger accessibility', () => {
+  it("names the trigger by the field label AND value so it isn't announced as just its value", () => {
+    render(
+      <MultiSelectDropdown
+        label="Papéis"
+        layout="stacked"
+        options={MANY_OPTIONS}
+        selected={new Set<string>()}
+        onToggle={vi.fn()}
+        onClear={vi.fn()}
+        allLabel="Todas"
+        data-testid="roles"
+      />,
+    );
+
+    // The accessible name resolves aria-labelledby to "<label> <value>", so the
+    // field name (not just "Todas") distinguishes this trigger from a sibling.
+    expect(screen.getByRole('button', { name: 'Papéis Todas' })).toBe(screen.getByTestId('roles'));
+  });
+});

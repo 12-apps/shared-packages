@@ -1,0 +1,217 @@
+// ---------------------------------------------------------------------------
+// @12-apps/product-research — CANONICAL Prisma model partial (plug-and-play).
+//
+// This file is the single source of truth for the four research-to-buy tables.
+// A host project does NOT copy these models into its main schema by hand: it
+// uses Prisma's multi-file schema folder and SYNCS this file into it (see
+// packages/shared-helpers/scripts/sync-research-schema.mjs in this repo for
+// the reference sync step — run before `prisma generate`). Migrations are
+// owned by this package too (prisma/migrations) and reach the host through
+// scripts/sync-prisma-plugins.mjs.
+//
+// Host-agnostic by design (entity-lifecycle / payments-backend doctrine):
+//   - The tenant is a by-value `client_id` scalar — no relation to the host's
+//     tenant model. The host's repository layer scopes every read/write.
+//   - The researched catalog item is named BY VALUE via
+//     (catalog_ref_type, catalog_ref_id) — no FK to host catalog tables, so a
+//     restaurant's MenuItem and a dental system's product plug in identically.
+//   - `type` / `status` are Strings; the migration adds CHECK constraints for
+//     the closed sets documented on each field.
+//   - Money is integer cents with an explicit `currency` (BRL first host).
+// ---------------------------------------------------------------------------
+
+// One configured offer source for a tenant. `type` is the connector key:
+// VTEX | MERCADO_LIVRE | SERP | AMAZON | MANUAL. `config` holds the
+// connector-specific settings (e.g. a VTEX store's baseUrl + sales channel).
+// `status` is ACTIVE | DEGRADED — a connector that keeps failing is marked
+// DEGRADED (with `last_error_at`) so the UI can say "results may be
+// incomplete" instead of silently shrinking.
+//
+// Paid connectors (SERP | AMAZON | MERCADO_LIVRE) are singleton INTEGRATIONS
+// (FUT-434): at most one row per (client_id, type), holding the tenant's own
+// encrypted API credential inside `config`. Enforced by a partial unique
+// index in this package's migrations — like the CHECK constraints, DDL the
+// Prisma schema cannot express (see src/integrations.ts for the config keys).
+model PriceSource {
+  id          String    @id @default(uuid())
+  clientId    String    @map("client_id")
+  type        String
+  name        String
+  config      Json      @default("{}")
+  enabled     Boolean   @default(true)
+  status      String    @default("ACTIVE")
+  lastErrorAt DateTime? @map("last_error_at")
+  // Soft-delete: a non-null timestamp removes the source from the roster and
+  // from every new research run, while its SupplierOffer rows keep their FK so
+  // finished runs stay fully readable. The host filters `archived_at IS NULL`
+  // on every live read; there is no restore path.
+  archivedAt  DateTime? @map("archived_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  offers        SupplierOffer[]
+  manualEntries ManualPriceEntry[]
+
+  // NO @@unique on (clientId, name): the tenant unique exists in the DB as a
+  // PARTIAL index — `price_sources_client_id_name_key` WHERE `archived_at IS
+  // NULL` (20260729120000_price_source_soft_delete). Prisma cannot express a
+  // filtered unique, and an unconditional `@@unique` would both be a lie the
+  // client acts on (a `clientId_name` findUnique the index cannot serve) and
+  // let a soft-deleted source squat its name forever. Same arrangement as the
+  // host's `discounts_client_id_name_key`.
+  @@index([clientId, enabled])
+  @@map("price_sources")
+}
+
+// What a buyer asked to research: a catalog item (by value) or a free-text
+// term, a quantity and a region code (CEP in Brazil) that selects regional
+// pricing. `requested_by` is the host's user id, by value; null = system.
+// `term_normalized` mirrors normalizeText(term) — accent/case/punctuation
+// folded — the indexed key the widened widget lookup prefilters by (FUT-430);
+// hosts set it on write (no unaccent/pg_trgm, which PGlite lacks), and the
+// owning migration backfills pre-existing rows in plain SQL.
+model ResearchRequest {
+  id             String   @id @default(uuid())
+  clientId       String   @map("client_id")
+  catalogRefType String?  @map("catalog_ref_type")
+  catalogRefId   String?  @map("catalog_ref_id")
+  term           String
+  termNormalized String?  @map("term_normalized")
+  brand          String?
+  ean            String?
+  quantity       Int      @default(1)
+  region         String?
+  requestedBy    String?  @map("requested_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  runs ResearchRun[]
+
+  @@index([clientId, createdAt])
+  @@index([clientId, termNormalized])
+  @@map("research_requests")
+}
+
+// One execution of a request across the enabled sources. `status` is
+// PENDING | RUNNING | COMPLETED | FAILED. `source_stats` records one entry per
+// source ({sourceId, type, name, status, offerCount, ms, error?}) — the data
+// behind the per-source streaming row and the "degraded/cap" banners.
+model ResearchRun {
+  id          String    @id @default(uuid())
+  clientId    String    @map("client_id")
+  requestId   String    @map("request_id")
+  status      String    @default("PENDING")
+  sourceStats Json      @default("[]") @map("source_stats")
+  error       String?
+  startedAt   DateTime? @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  request ResearchRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  offers  SupplierOffer[]
+
+  @@index([clientId, createdAt])
+  @@index([requestId])
+  // Cross-tenant reads by time alone (the host's superadmin diagnostics inbox:
+  // "every failed source in the last 24 h"). `(client_id, created_at)` cannot
+  // serve those — the leading column is unbound and Postgres has no btree skip
+  // scan — so without this index the query degrades to a full sequential scan
+  // of a table that nothing prunes.
+  @@index([createdAt])
+  @@map("research_runs")
+}
+
+// One purchasable offer found by a run. Prices are integer cents;
+// `unit_price_cents` is the pack-normalized comparison key (a 12x350ml fardo
+// and a single can compete on the same axis) and `total_cents` is the cost for
+// the requested quantity plus whatever shipping the source stated — a LOWER
+// BOUND when it stated none (see `shipping_cents`). `relevance_score` is the 0..1
+// no-AI token-match confidence; offers below the threshold are never stored.
+// `expires_at` is the freshness horizon — an expired offer must not be shown
+// as a current price. `purchased_at` closes the loop when the buyer marks the
+// offer they actually bought. `source_id` survives source deletion as NULL so
+// history keeps its offers.
+//
+// `outside_delivery_area` (FUT-491) marks an offer whose price belongs to the
+// STORE'S DEFAULT REGION because the store does not deliver to the researched
+// CEP. A real column rather than a corner of `raw`: `raw` is the verbatim
+// connector payload kept for offline replay, so writing our own field into it
+// would break that contract, and the flag has to survive re-reads, cached runs
+// and the offers API — plus be filterable — which a blob cannot promise.
+//
+// `shipping_cents` is NULLABLE with no default (FUT-518): NULL = the source
+// never stated a shipping cost, 0 = the source stated FREE. It used to be
+// `NOT NULL DEFAULT 0`, which made those two the same value — so every SERP
+// offer (serp.ts states shipping never) was persisted as free shipping and
+// competed on an understated total. Nullable rather than a companion boolean
+// because `eta_days Int?` two lines down is this model's existing way of
+// saying "the source did not say", and a flag beside an Int would be two
+// facts where one suffices. HISTORICAL ROWS ARE UNRECOVERABLE: every row
+// written before the migration holds 0 and stays 0 — see the migration.
+model SupplierOffer {
+  id                  String    @id @default(uuid())
+  clientId            String    @map("client_id")
+  runId               String    @map("run_id")
+  sourceId            String?   @map("source_id")
+  sourceType          String    @map("source_type")
+  supplierName        String    @map("supplier_name")
+  title               String
+  url                 String?
+  imageUrl            String?   @map("image_url")
+  currency            String    @default("BRL")
+  priceCents          Int       @map("price_cents")
+  shippingCents       Int?      @map("shipping_cents")
+  packQuantity        Int       @default(1) @map("pack_quantity")
+  unitPriceCents      Int       @map("unit_price_cents")
+  totalCents          Int       @map("total_cents")
+  availability        String?
+  etaDays             Int?      @map("eta_days")
+  relevanceScore      Float     @map("relevance_score")
+  rank                Int?
+  raw                 Json?
+  expiresAt           DateTime? @map("expires_at")
+  purchasedAt         DateTime? @map("purchased_at")
+  hiddenAt            DateTime? @map("hidden_at")
+  outsideDeliveryArea Boolean   @default(false) @map("outside_delivery_area")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  run    ResearchRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  source PriceSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([runId, rank])
+  @@index([clientId, createdAt])
+  @@index([clientId, expiresAt])
+  @@map("supplier_offers")
+}
+
+// One row of a manually imported price list (or a one-off typed quote),
+// belonging to a MANUAL-type PriceSource. This is the standing dataset the
+// manual connector reads DURING research runs — unlike SupplierOffer rows,
+// which are per-run results. `valid_until` is the staleness horizon: expired
+// entries stop appearing in new research results (the host's store filters
+// them), never shown as current prices. `batch_id` groups one import so a
+// re-import replaces the previous list atomically. Tenant is a by-value
+// `client_id` scalar, same doctrine as every other research table.
+model ManualPriceEntry {
+  id           String   @id @default(uuid())
+  clientId     String   @map("client_id")
+  sourceId     String   @map("source_id")
+  batchId      String   @map("batch_id")
+  supplierName String   @map("supplier_name")
+  title        String
+  brand        String?
+  ean          String?
+  packQuantity Int?     @map("pack_quantity")
+  priceCents   Int      @map("price_cents")
+  currency     String   @default("BRL")
+  url          String?
+  availability String?
+  etaDays      Int?     @map("eta_days")
+  validUntil   DateTime @map("valid_until")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  source PriceSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, sourceId, validUntil])
+  @@map("manual_price_entries")
+}

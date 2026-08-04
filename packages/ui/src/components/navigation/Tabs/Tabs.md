@@ -148,7 +148,9 @@ function BasicExample() {
 ### Tabs with Icons and Badges
 
 ```tsx
-import { Home, Settings, Notifications } from '@mui/icons-material';
+import Home from '@mui/icons-material/Home';
+import Settings from '@mui/icons-material/Settings';
+import Notifications from '@mui/icons-material/Notifications';
 
 function TabsWithIconsAndBadges() {
   const [activeTab, setActiveTab] = useState('home');

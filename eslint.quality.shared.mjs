@@ -97,7 +97,11 @@ export const TEST_GLOBS = [
 export const INTEGRATION_GLOBS = [
   "**/*.integration.test.{ts,tsx}",
   "**/*.stress.test.{ts,tsx}",
-  "tests/integration/**/*.{ts,tsx}",
+  // Leading `**/` so this matches a package's own suite
+  // (packages/shift/tests/integration/**), not just a repo-root one. These run
+  // against a real PGlite database, so the DB/network/fs/state flakiness rules
+  // are relaxed for the tests AND their helpers and fixtures.
+  "**/tests/integration/**/*.{ts,tsx}",
 ];
 
 // Everything under tests/e2e/ is e2e infrastructure — specs AND their support

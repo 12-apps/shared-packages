@@ -1,4 +1,5 @@
-import { ArrowDropDown,Phone as PhoneIcon } from '@mui/icons-material';
+import ArrowDropDown from '@mui/icons-material/ArrowDropDown';
+import PhoneIcon from '@mui/icons-material/Phone';
 import {
   alpha,
   Box,
@@ -17,58 +18,11 @@ import { parsePhoneNumber } from 'libphonenumber-js';
 import type { FC} from 'react';
 import React, { useEffect, useRef,useState } from 'react';
 
+import { countries } from './countries';
+import { usePhoneInput } from './PhoneInput.hooks';
 import type { CountryData,PhoneInputProps } from './PhoneInput.types';
 
 // Country data with expanded support
-const countries: CountryData[] = [
-  { code: 'US' as CountryCode, name: 'United States', dial: '+1', flag: '🇺🇸' },
-  { code: 'GB' as CountryCode, name: 'United Kingdom', dial: '+44', flag: '🇬🇧' },
-  { code: 'CA' as CountryCode, name: 'Canada', dial: '+1', flag: '🇨🇦' },
-  { code: 'AU' as CountryCode, name: 'Australia', dial: '+61', flag: '🇦🇺' },
-  { code: 'DE' as CountryCode, name: 'Germany', dial: '+49', flag: '🇩🇪' },
-  { code: 'FR' as CountryCode, name: 'France', dial: '+33', flag: '🇫🇷' },
-  { code: 'IT' as CountryCode, name: 'Italy', dial: '+39', flag: '🇮🇹' },
-  { code: 'ES' as CountryCode, name: 'Spain', dial: '+34', flag: '🇪🇸' },
-  { code: 'NL' as CountryCode, name: 'Netherlands', dial: '+31', flag: '🇳🇱' },
-  { code: 'JP' as CountryCode, name: 'Japan', dial: '+81', flag: '🇯🇵' },
-  { code: 'CN' as CountryCode, name: 'China', dial: '+86', flag: '🇨🇳' },
-  { code: 'IN' as CountryCode, name: 'India', dial: '+91', flag: '🇮🇳' },
-  { code: 'BR' as CountryCode, name: 'Brazil', dial: '+55', flag: '🇧🇷' },
-  { code: 'MX' as CountryCode, name: 'Mexico', dial: '+52', flag: '🇲🇽' },
-  { code: 'KR' as CountryCode, name: 'South Korea', dial: '+82', flag: '🇰🇷' },
-  { code: 'SE' as CountryCode, name: 'Sweden', dial: '+46', flag: '🇸🇪' },
-  { code: 'NO' as CountryCode, name: 'Norway', dial: '+47', flag: '🇳🇴' },
-  { code: 'DK' as CountryCode, name: 'Denmark', dial: '+45', flag: '🇩🇰' },
-  { code: 'CH' as CountryCode, name: 'Switzerland', dial: '+41', flag: '🇨🇭' },
-  { code: 'AT' as CountryCode, name: 'Austria', dial: '+43', flag: '🇦🇹' },
-  { code: 'BE' as CountryCode, name: 'Belgium', dial: '+32', flag: '🇧🇪' },
-  { code: 'FI' as CountryCode, name: 'Finland', dial: '+358', flag: '🇫🇮' },
-  { code: 'IE' as CountryCode, name: 'Ireland', dial: '+353', flag: '🇮🇪' },
-  { code: 'PT' as CountryCode, name: 'Portugal', dial: '+351', flag: '🇵🇹' },
-  { code: 'GR' as CountryCode, name: 'Greece', dial: '+30', flag: '🇬🇷' },
-  { code: 'PL' as CountryCode, name: 'Poland', dial: '+48', flag: '🇵🇱' },
-  { code: 'CZ' as CountryCode, name: 'Czech Republic', dial: '+420', flag: '🇨🇿' },
-  { code: 'HU' as CountryCode, name: 'Hungary', dial: '+36', flag: '🇭🇺' },
-  { code: 'RU' as CountryCode, name: 'Russia', dial: '+7', flag: '🇷🇺' },
-  { code: 'ZA' as CountryCode, name: 'South Africa', dial: '+27', flag: '🇿🇦' },
-  { code: 'EG' as CountryCode, name: 'Egypt', dial: '+20', flag: '🇪🇬' },
-  { code: 'NG' as CountryCode, name: 'Nigeria', dial: '+234', flag: '🇳🇬' },
-  { code: 'KE' as CountryCode, name: 'Kenya', dial: '+254', flag: '🇰🇪' },
-  { code: 'AR' as CountryCode, name: 'Argentina', dial: '+54', flag: '🇦🇷' },
-  { code: 'CL' as CountryCode, name: 'Chile', dial: '+56', flag: '🇨🇱' },
-  { code: 'CO' as CountryCode, name: 'Colombia', dial: '+57', flag: '🇨🇴' },
-  { code: 'PE' as CountryCode, name: 'Peru', dial: '+51', flag: '🇵🇪' },
-  { code: 'MY' as CountryCode, name: 'Malaysia', dial: '+60', flag: '🇲🇾' },
-  { code: 'SG' as CountryCode, name: 'Singapore', dial: '+65', flag: '🇸🇬' },
-  { code: 'TH' as CountryCode, name: 'Thailand', dial: '+66', flag: '🇹🇭' },
-  { code: 'VN' as CountryCode, name: 'Vietnam', dial: '+84', flag: '🇻🇳' },
-  { code: 'PH' as CountryCode, name: 'Philippines', dial: '+63', flag: '🇵🇭' },
-  { code: 'ID' as CountryCode, name: 'Indonesia', dial: '+62', flag: '🇮🇩' },
-  { code: 'TR' as CountryCode, name: 'Turkey', dial: '+90', flag: '🇹🇷' },
-  { code: 'IL' as CountryCode, name: 'Israel', dial: '+972', flag: '🇮🇱' },
-  { code: 'AE' as CountryCode, name: 'United Arab Emirates', dial: '+971', flag: '🇦🇪' },
-  { code: 'SA' as CountryCode, name: 'Saudi Arabia', dial: '+966', flag: '🇸🇦' },
-].sort((a, b) => a.name.localeCompare(b.name));
 
 // Styled components
 const GlassTextField = styled(TextField)(({ theme }) => ({
@@ -120,161 +74,57 @@ const CountryMenu = styled(Menu)(({ theme }) => ({
 }));
 
 // Helper functions with enhanced validation
-const formatPhoneNumber = (value: string, country: CountryCode): string => {
-  if (!value || value.trim() === '') return value;
-
-  try {
-    const phoneNumber = parsePhoneNumber(value, country);
-    // Format if we have a phone number object, regardless of strict validity
-    // This allows formatting of test numbers (like 555 prefix) and partially valid numbers
-    if (phoneNumber) {
-      return phoneNumber.formatInternational();
-    }
-  } catch {
-    // Silently handle formatting errors
-  }
-  return value;
-};
-
-const validatePhoneNumber = (value: string, country: CountryCode): boolean => {
-  if (!value || value.trim() === '') return false;
-
-  try {
-    const phoneNumber = parsePhoneNumber(value, country);
-    // Consider a number valid if it can be parsed and has the right format
-    // This allows test numbers (like 555 prefix) which isPossible but not isValid
-    return phoneNumber ? phoneNumber.isPossible() : false;
-  } catch {
-    // Silently handle validation errors
-    return false;
-  }
-};
-
-// Enhanced helper to detect country from number
-const detectCountryFromNumber = (value: string): CountryCode | undefined => {
-  if (!value || !value.startsWith('+')) return undefined;
-
-  try {
-    const phoneNumber = parsePhoneNumber(value);
-    return phoneNumber?.country;
-  } catch {
-    return undefined;
-  }
-};
-
-// Main component
-export const PhoneInput: FC<PhoneInputProps> = ({
-  variant = 'outlined',
-  label = 'Phone Number',
-  placeholder = 'Enter phone number',
-  icon = <PhoneIcon />,
-  defaultValue = '',
-  countryCode: initialCountryCode = 'US',
-  floating = false,
+// The text field itself with its two adornments. Split out so PhoneInput is
+// prop defaults, the hook call and composition.
+const PhoneField: React.FC<{
+  TextFieldComponent: React.ElementType;
+  variant: PhoneInputProps['variant'];
+  label?: React.ReactNode;
+  placeholder?: string;
+  value: string;
+  validation: { hasError: boolean; helperText?: React.ReactNode };
+  disabled: boolean;
+  required: boolean;
+  fullWidth: boolean;
+  icon?: React.ReactNode;
+  isValid: boolean;
+  selectedCountry?: CountryData;
+  anchorEl: HTMLElement | null;
+  onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onFocus: () => void;
+  onBlur: () => void;
+  onCountryOpen: (event: React.MouseEvent<HTMLElement>) => void;
+  onCountryOpenViaKeyboard: (element: HTMLElement) => void;
+}> = ({
+  TextFieldComponent,
+  variant,
+  label,
+  placeholder,
+  value,
+  validation,
+  disabled,
+  required,
+  fullWidth,
+  icon,
+  isValid,
+  selectedCountry,
+  anchorEl,
   onChange,
-  helper,
-  error = false,
-  errorMessage,
-  disabled = false,
-  required = false,
-  fullWidth = true,
-}) => {
-  const theme = useTheme();
-  const [value, setValue] = useState(defaultValue);
-  const [selectedCountry, setSelectedCountry] = useState(
-    countries.find((c) => c.code === initialCountryCode) || countries[0],
-  );
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [isValid, setIsValid] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
-  const onChangeRef = useRef(onChange);
-  const isInitialMountRef = useRef(true);
-
-  // Update ref when onChange changes
-  useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
-
-  useEffect(() => {
-    if (!selectedCountry) return;
-
-    const valid = validatePhoneNumber(value, selectedCountry.code);
-    setIsValid(valid);
-
-    // Skip onChange call on initial mount
-    if (isInitialMountRef.current) {
-      isInitialMountRef.current = false;
-      return;
-    }
-
-    // Call onChange for all value/country changes after initial mount
-    if (onChangeRef.current) {
-      onChangeRef.current(value, valid, selectedCountry.code);
-    }
-  }, [value, selectedCountry]);
-
-  const handleCountryClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleCountryClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleCountrySelect = (country: CountryData) => {
-    setSelectedCountry(country);
-    handleCountryClose();
-
-    // Reformat number with new country code
-    if (value) {
-      const formatted = formatPhoneNumber(value, country.code);
-      setValue(formatted);
-    }
-  };
-
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = event.target.value;
-    setValue(newValue);
-
-    // Auto-detect country if user types international format
-    if (newValue.startsWith('+')) {
-      const detectedCountry = detectCountryFromNumber(newValue);
-      if (detectedCountry) {
-        const detectedCountryData = countries.find((c) => c.code === detectedCountry);
-        if (detectedCountryData && detectedCountryData.code !== selectedCountry?.code) {
-          setSelectedCountry(detectedCountryData);
-        }
-      }
-    }
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
-    if (value && selectedCountry) {
-      const formatted = formatPhoneNumber(value, selectedCountry.code);
-      setValue(formatted);
-    }
-  };
-
-  const TextFieldComponent = variant === 'glass' ? GlassTextField : TextField;
-
-  return (
-    <Box data-testid="phone-input-container">
+  onFocus,
+  onBlur,
+  onCountryOpen,
+  onCountryOpenViaKeyboard,
+}) => (
       <TextFieldComponent
         variant={variant === 'glass' ? 'outlined' : variant}
-        label={floating ? undefined : label}
+        label={label}
         placeholder={placeholder}
         value={value}
-        onChange={handleChange}
-        onFocus={() => setIsFocused(true)}
-        onBlur={handleBlur}
-        error={error || (!isValid && value !== '' && !isFocused)}
-        helperText={
-          errorMessage ||
-          (!isValid && value !== '' && !isFocused
-            ? `Invalid phone number for ${selectedCountry?.name || 'selected country'}`
-            : helper)
-        }
+        onChange={onChange}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        error={validation.hasError}
+        helperText={validation.helperText}
         disabled={disabled}
         required={required}
         fullWidth={fullWidth}
@@ -282,44 +132,14 @@ export const PhoneInput: FC<PhoneInputProps> = ({
         data-testid="phone-input-field"
         InputProps={{
           startAdornment: (
-            <InputAdornment position="start" data-testid="phone-input-start-adornment">
-              <CountrySelector
-                onClick={handleCountryClick}
-                role="button"
-                aria-label="Select country"
-                aria-expanded={Boolean(anchorEl)}
-                tabIndex={0}
-                data-testid="country-selector"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setAnchorEl(e.currentTarget as HTMLElement);
-                  }
-                }}
-              >
-                <Typography variant="h6" component="span" sx={{ mr: 0.5 }} data-testid="country-flag">
-                  {selectedCountry?.flag}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mr: 0.5 }} data-testid="country-dial-code">
-                  {selectedCountry?.dial}
-                </Typography>
-                <ArrowDropDown fontSize="small" data-testid="country-dropdown-icon" />
-              </CountrySelector>
-            </InputAdornment>
+            <CountryAdornment
+              country={selectedCountry}
+              menuOpen={Boolean(anchorEl)}
+              onOpen={onCountryOpen}
+              onOpenViaKeyboard={onCountryOpenViaKeyboard}
+            />
           ),
-          endAdornment: icon && (
-            <InputAdornment position="end" data-testid="phone-input-end-adornment">
-              <Box
-                sx={{
-                  color: isValid ? theme.palette.success.main : theme.palette.text.secondary,
-                  transition: 'color 0.3s ease',
-                }}
-                data-testid="phone-input-icon"
-              >
-                {icon}
-              </Box>
-            </InputAdornment>
-          ),
+          endAdornment: <ValidityAdornment icon={icon} isValid={isValid} />,
         }}
         sx={{
           '& input': {
@@ -327,47 +147,245 @@ export const PhoneInput: FC<PhoneInputProps> = ({
           },
         }}
       />
+);
 
-      <CountryMenu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleCountryClose}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
-        data-testid="country-menu"
+const PHONE_INPUT_DEFAULTS = {
+  variant: 'outlined',
+  label: 'Phone Number',
+  placeholder: 'Enter phone number',
+  icon: <PhoneIcon />,
+  defaultValue: '',
+  countryCode: 'US',
+  floating: false,
+  error: false,
+  disabled: false,
+  required: false,
+  fullWidth: true,
+} satisfies Partial<PhoneInputProps>;
+
+// Drops explicitly-undefined props before the merge, so `prop={undefined}` falls
+// back to the default exactly as a destructuring default would. Eleven separate
+// destructuring defaults were most of this component's branch count.
+const definedProps = (props: PhoneInputProps): Partial<PhoneInputProps> =>
+  Object.fromEntries(
+    Object.entries(props).filter(([, value]) => value !== undefined),
+  ) as Partial<PhoneInputProps>;
+
+const CountryAdornment: React.FC<{
+  country?: CountryData;
+  menuOpen: boolean;
+  onOpen: (event: React.MouseEvent<HTMLElement>) => void;
+  onOpenViaKeyboard: (element: HTMLElement) => void;
+}> = ({ country, menuOpen, onOpen, onOpenViaKeyboard }) => (
+  <InputAdornment position="start" data-testid="phone-input-start-adornment">
+    <CountrySelector
+      onClick={onOpen}
+      role="button"
+      aria-label="Select country"
+      aria-expanded={menuOpen}
+      tabIndex={0}
+      data-testid="country-selector"
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        onOpenViaKeyboard(e.currentTarget as HTMLElement);
+      }}
+    >
+      <Typography variant="h6" component="span" sx={{ mr: 0.5 }} data-testid="country-flag">
+        {country?.flag}
+      </Typography>
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ mr: 0.5 }}
+        data-testid="country-dial-code"
       >
-        {countries.map((country) => (
-          <MenuItem
-            key={country.code}
-            onClick={() => handleCountrySelect(country)}
-            selected={country.code === selectedCountry?.code}
-            data-testid={`country-option-${country.code}`}
-            sx={{
-              '&:hover': {
-                background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-              },
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 36 }}>
-              <Typography variant="h5" component="span">
-                {country.flag}
-              </Typography>
-            </ListItemIcon>
-            <ListItemText
-              primary={country.name}
-              secondary={country.dial}
-              primaryTypographyProps={{ fontSize: '0.9rem' }}
-              secondaryTypographyProps={{ fontSize: '0.8rem' }}
-            />
-          </MenuItem>
-        ))}
-      </CountryMenu>
+        {country?.dial}
+      </Typography>
+      <ArrowDropDown fontSize="small" data-testid="country-dropdown-icon" />
+    </CountrySelector>
+  </InputAdornment>
+);
+
+// The trailing icon turns green once the number validates.
+const ValidityAdornment: React.FC<{ icon?: React.ReactNode; isValid: boolean }> = ({
+  icon,
+  isValid,
+}) => {
+  const theme = useTheme();
+
+  if (!icon) return null;
+
+  return (
+    <InputAdornment position="end" data-testid="phone-input-end-adornment">
+      <Box
+        sx={{
+          color: isValid ? theme.palette.success.main : theme.palette.text.secondary,
+          transition: 'color 0.3s ease',
+        }}
+        data-testid="phone-input-icon"
+      >
+        {icon}
+      </Box>
+    </InputAdornment>
+  );
+};
+
+const CountryPicker: React.FC<{
+  anchorEl: HTMLElement | null;
+  selectedCode?: CountryData['code'];
+  onClose: () => void;
+  onSelect: (country: CountryData) => void;
+}> = ({ anchorEl, selectedCode, onClose, onSelect }) => {
+  const theme = useTheme();
+
+  return (
+        <CountryMenu
+          anchorEl={anchorEl}
+          open={Boolean(anchorEl)}
+          onClose={onClose}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'left',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'left',
+          }}
+          data-testid="country-menu"
+        >
+          {countries.map((country) => (
+            <MenuItem
+              key={country.code}
+              onClick={() => onSelect(country)}
+              selected={country.code === selectedCode}
+              data-testid={`country-option-${country.code}`}
+              sx={{
+                '&:hover': {
+                  background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
+                },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <Typography variant="h5" component="span">
+                  {country.flag}
+                </Typography>
+              </ListItemIcon>
+              <ListItemText
+                primary={country.name}
+                secondary={country.dial}
+                primaryTypographyProps={{ fontSize: '0.9rem' }}
+                secondaryTypographyProps={{ fontSize: '0.8rem' }}
+              />
+            </MenuItem>
+          ))}
+        </CountryMenu>
+  );
+};
+
+// The field shows an error either because the caller says so, or because what
+// has been typed does not validate and the user has moved on.
+const resolveValidation = ({
+  error,
+  errorMessage,
+  isValid,
+  value,
+  isFocused,
+  helper,
+  countryName,
+}: {
+  error: boolean;
+  errorMessage?: string;
+  isValid: boolean;
+  value: string;
+  isFocused: boolean;
+  helper?: React.ReactNode;
+  countryName?: string;
+}) => {
+  const looksInvalid = !isValid && value !== '' && !isFocused;
+
+  return {
+    hasError: error || looksInvalid,
+    helperText:
+      errorMessage ||
+      (looksInvalid ? `Invalid phone number for ${countryName || 'selected country'}` : helper),
+  };
+};
+
+export const PhoneInput: FC<PhoneInputProps> = (props) => {
+  const {
+    variant,
+    label,
+    placeholder,
+    icon,
+    defaultValue,
+    countryCode: initialCountryCode,
+    floating,
+    onChange,
+    helper,
+    error,
+    errorMessage,
+    disabled,
+    required,
+    fullWidth,
+  } = { ...PHONE_INPUT_DEFAULTS, ...definedProps(props) };
+  const theme = useTheme();
+  const {
+    value,
+    selectedCountry,
+    anchorEl,
+    isValid,
+    isFocused,
+    setIsFocused,
+    setAnchorEl,
+    handleCountryClick,
+    handleCountryClose,
+    handleCountrySelect,
+    handleChange,
+    handleBlur,
+  } = usePhoneInput({ defaultValue, initialCountryCode, onChange });
+
+  const validation = resolveValidation({
+    error,
+    errorMessage,
+    isValid,
+    value,
+    isFocused,
+    helper,
+    countryName: selectedCountry?.name,
+  });
+
+  const TextFieldComponent = variant === 'glass' ? GlassTextField : TextField;
+
+  return (
+    <Box data-testid="phone-input-container">
+      <PhoneField
+        TextFieldComponent={TextFieldComponent}
+        variant={variant}
+        label={floating ? undefined : label}
+        placeholder={placeholder}
+        value={value}
+        validation={validation}
+        disabled={disabled}
+        required={required}
+        fullWidth={fullWidth}
+        icon={icon}
+        isValid={isValid}
+        selectedCountry={selectedCountry}
+        anchorEl={anchorEl}
+        onChange={handleChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={handleBlur}
+        onCountryOpen={handleCountryClick}
+        onCountryOpenViaKeyboard={setAnchorEl}
+      />
+
+      <CountryPicker
+        anchorEl={anchorEl}
+        selectedCode={selectedCountry?.code}
+        onClose={handleCountryClose}
+        onSelect={handleCountrySelect}
+      />
     </Box>
   );
 };

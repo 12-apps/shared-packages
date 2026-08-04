@@ -4,8 +4,10 @@ import {
   createKeyDownHandler,
   FilterChips,
   ghostRemainder,
+  PALETTE_CARD_SX,
   PaletteBody,
   PaletteInput,
+  PaletteScrollArea,
   Paper,
 } from './SearchPalette.parts';
 import type { SearchPaletteProps } from './SearchPalette.types';
@@ -104,7 +106,7 @@ export function SearchPalette<T>(props: SearchPaletteProps<T>): React.JSX.Elemen
       elevation={8}
       className={props.className}
       data-testid={text.dataTestId}
-      sx={{ width: '100%', maxWidth: 640, borderRadius: 2, overflow: 'hidden' }}
+      sx={PALETTE_CARD_SX}
     >
       <PaletteInput
         value={props.value}
@@ -124,14 +126,16 @@ export function SearchPalette<T>(props: SearchPaletteProps<T>): React.JSX.Elemen
           onToggleFilter={props.onToggleFilter}
         />
       )}
-      <PaletteBody<T>
-        hasQuery={hasQuery} emptyQueryContent={props.emptyQueryContent} visible={visible}
-        isLoading={opts.isLoading} noResultsLabel={text.noResultsLabel} showFooter={showFooter}
-        footerIndex={footerIndex} activeIndex={activeIndex} trimmed={trimmed}
-        submitAllLabel={text.submitAllLabel} getKey={props.getKey} getPrimary={props.getPrimary}
-        getSecondary={props.getSecondary} getLead={props.getLead} getTrailing={props.getTrailing}
-        onSelect={props.onSelect} onSubmitAll={props.onSubmitAll} setActiveIndex={setActiveIndex}
-      />
+      <PaletteScrollArea>
+        <PaletteBody<T>
+          hasQuery={hasQuery} emptyQueryContent={props.emptyQueryContent} visible={visible}
+          isLoading={opts.isLoading} noResultsLabel={text.noResultsLabel} showFooter={showFooter}
+          footerIndex={footerIndex} activeIndex={activeIndex} trimmed={trimmed}
+          submitAllLabel={text.submitAllLabel} getKey={props.getKey} getPrimary={props.getPrimary}
+          getSecondary={props.getSecondary} getLead={props.getLead} getTrailing={props.getTrailing}
+          onSelect={props.onSelect} onSubmitAll={props.onSubmitAll} setActiveIndex={setActiveIndex}
+        />
+      </PaletteScrollArea>
     </Paper>
   );
 }

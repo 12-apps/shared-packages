@@ -1,7 +1,7 @@
 'use client';
 
-import { validateFields } from '@12-apps/shared-helpers/forms';
-import type { ValidatorSchema } from '@12-apps/shared-helpers/forms';
+import { validateFields } from '@12-apps/forms-core';
+import type { ValidatorSchema } from '@12-apps/forms-core';
 import React, { useCallback, useMemo, useState } from 'react';
 
 import { Form } from '../Form';
@@ -39,7 +39,7 @@ export interface FormContainerProps<T extends Record<string, string>> {
 /**
  * Stateful, domain-agnostic form container ported from the gym-app
  * `total-form`. Holds values/errors/submitting in {@link FormContext}, runs the
- * field validators from `@12-apps/shared-helpers/forms` on submit, and only calls
+ * field validators from `@12-apps/forms-core` on submit, and only calls
  * `onSubmit` with the validated values when no field errors remain. Uses no
  * zod and no react-hook-form.
  *

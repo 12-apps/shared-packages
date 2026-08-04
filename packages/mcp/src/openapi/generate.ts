@@ -3,6 +3,7 @@ import type {
   GenerateOptions,
   JsonSchema,
   ParameterLocation,
+  ToolAnnotations,
   ToolParameter,
 } from "../types";
 
@@ -18,6 +19,10 @@ export interface OpenApiOperation {
   summary?: string;
   description?: string;
   tags?: string[];
+  /** Paladira's required projection of MCP tool annotations into OpenAPI. */
+  "x-mcp-tool-annotations"?: ToolAnnotations;
+  /** Dotted response paths stripped from the result before the agent sees it. */
+  "x-mcp-redact-response"?: readonly string[];
   parameters?: OpenApiParameter[];
   requestBody?: OpenApiRequestBody;
   responses?: Record<string, OpenApiResponse>;
@@ -45,7 +50,15 @@ export interface OpenApiDocument {
   security?: Array<Record<string, string[]>>;
 }
 
-const HTTP_METHODS = ["get", "put", "post", "delete", "patch", "options", "head"] as const;
+const HTTP_METHODS = [
+  "get",
+  "put",
+  "post",
+  "delete",
+  "patch",
+  "options",
+  "head",
+] as const;
 const MUTATING = new Set(["post", "put", "patch", "delete"]);
 const PARAM_LOCATIONS = new Set<ParameterLocation>(["path", "query", "header"]);
 
@@ -63,7 +76,9 @@ function slugify(method: string, path: string): string {
 
 function securityNames(op: OpenApiOperation, doc: OpenApiDocument): string[] {
   const requirements = op.security ?? doc.security ?? [];
-  return [...new Set(requirements.flatMap((requirement) => Object.keys(requirement)))];
+  return [
+    ...new Set(requirements.flatMap((requirement) => Object.keys(requirement))),
+  ];
 }
 
 function bodySchema(op: OpenApiOperation): JsonSchema | undefined {
@@ -72,12 +87,37 @@ function bodySchema(op: OpenApiOperation): JsonSchema | undefined {
 
 function responseSchema(op: OpenApiOperation): JsonSchema | undefined {
   const responses = op.responses ?? {};
-  const code = ["200", "201", "2XX", "default"].find((c) => responses[c]?.content?.[JSON_CONTENT]?.schema);
+  const code = ["200", "201", "2XX", "default"].find(
+    (c) => responses[c]?.content?.[JSON_CONTENT]?.schema,
+  );
   return code ? responses[code]?.content?.[JSON_CONTENT]?.schema : undefined;
 }
 
+function annotations(op: OpenApiOperation, name: string): ToolAnnotations {
+  const value = op["x-mcp-tool-annotations"];
+  if (
+    !value ||
+    typeof value.readOnlyHint !== "boolean" ||
+    typeof value.openWorldHint !== "boolean" ||
+    typeof value.destructiveHint !== "boolean"
+  ) {
+    throw new Error(
+      `OpenAPI operation "${name}" must explicitly set readOnlyHint, openWorldHint, and destructiveHint`,
+    );
+  }
+  if (typeof value.title !== "string" || !value.title.trim()) {
+    throw new Error(
+      `OpenAPI operation "${name}" must set a human-readable annotations.title`,
+    );
+  }
+  return value;
+}
+
 /** Path params are always required regardless of how the spec marks them. */
-function paramRequired(location: ParameterLocation, raw: OpenApiParameter): boolean {
+function paramRequired(
+  location: ParameterLocation,
+  raw: OpenApiParameter,
+): boolean {
   return location === "path" ? true : Boolean(raw.required);
 }
 
@@ -111,11 +151,19 @@ interface BodyContribution {
  */
 function bodyContribution(op: OpenApiOperation): BodyContribution {
   const body = bodySchema(op);
-  if (!body) return { properties: {}, bodyProps: [], requiredProps: [], bodyIsWhole: false };
+  if (!body)
+    return {
+      properties: {},
+      bodyProps: [],
+      requiredProps: [],
+      bodyIsWhole: false,
+    };
 
   const propSchemas = body.properties as Record<string, JsonSchema> | undefined;
   if (body.type === "object" && propSchemas) {
-    const bodyRequired = new Set(Array.isArray(body.required) ? (body.required as string[]) : []);
+    const bodyRequired = new Set(
+      Array.isArray(body.required) ? (body.required as string[]) : [],
+    );
     const bodyProps = Object.keys(propSchemas);
     return {
       properties: propSchemas,
@@ -162,7 +210,12 @@ function buildInput(op: OpenApiOperation): BuiltInput {
     properties,
     ...(allRequired.length ? { required: allRequired } : {}),
   };
-  return { inputSchema, parameters, bodyProps: body.bodyProps, bodyIsWhole: body.bodyIsWhole };
+  return {
+    inputSchema,
+    parameters,
+    bodyProps: body.bodyProps,
+    bodyIsWhole: body.bodyIsWhole,
+  };
 }
 
 /** The declared operations of a path item, as (method, operation) pairs. */
@@ -189,11 +242,16 @@ function buildTool(
   const { inputSchema, parameters, bodyProps, bodyIsWhole } = buildInput(op);
   return {
     name,
-    description: op.summary ?? op.description ?? `${method.toUpperCase()} ${path}`,
+    description:
+      op.summary ?? op.description ?? `${method.toUpperCase()} ${path}`,
     method: method.toUpperCase(),
     path,
     inputSchema,
     outputSchema: responseSchema(op),
+    annotations: annotations(op, name),
+    ...(op["x-mcp-redact-response"]?.length
+      ? { redactResponse: op["x-mcp-redact-response"] }
+      : {}),
     parameters,
     bodyProps,
     bodyIsWhole,

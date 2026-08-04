@@ -3,6 +3,7 @@ export * from './AddressAutocomplete';
 export * from './Autocomplete';
 export * from './Button';
 export * from './Calendar';
+export * from './CepField';
 export * from './Checkbox';
 export * from './CodeEditor';
 export * from './Command';

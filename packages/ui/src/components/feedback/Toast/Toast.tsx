@@ -1,10 +1,9 @@
-import {
-  CheckCircle as SuccessIcon,
-  Close as CloseIcon,
-  Error as ErrorIcon,
-  Info as InfoIcon,
-  Warning as WarningIcon,
-} from '@mui/icons-material';
+import SuccessIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import ErrorIcon from '@mui/icons-material/Error';
+import InfoIcon from '@mui/icons-material/Info';
+import WarningIcon from '@mui/icons-material/Warning';
+import type { Theme } from '@mui/material';
 import {
   Alert,
   alpha,
@@ -22,6 +21,46 @@ import React, { createContext, useCallback,useContext, useState } from 'react';
 import type { ToastContainerProps, ToastContextType, ToastItem,ToastProps } from './Toast.types';
 
 const ToastContext = createContext<ToastContextType | null>(null);
+
+type PromiseToastOptions<T> = {
+  loading: string;
+  success: string | ((data: T) => string);
+  error: string | ((error: unknown) => string);
+};
+
+// success/error may be a literal or a formatter over the settled value.
+const resolveToastMessage = <T,>(message: string | ((value: T) => string), value: T): string =>
+  typeof message === 'function' ? message(value) : message;
+
+// Shows a persistent "loading" toast for the life of a promise, then swaps it
+// for a success or error one. Lives outside the provider so the provider body
+// stays readable; it takes add/remove rather than reaching for context.
+const trackPromiseWithToasts = async <T,>(
+  promiseToResolve: Promise<T>,
+  options: PromiseToastOptions<T>,
+  addToast: (toast: Omit<ToastProps, 'id'>) => string,
+  removeToast: (id: string) => void,
+): Promise<T> => {
+  const toastId = addToast({
+    message: options.loading,
+    variant: 'promise',
+    persistent: true,
+  });
+
+  try {
+    const data = await promiseToResolve;
+
+    removeToast(toastId);
+    addToast({ message: resolveToastMessage(options.success, data), variant: 'success' });
+
+    return data;
+  } catch (error) {
+    removeToast(toastId);
+    addToast({ message: resolveToastMessage(options.error, error), variant: 'error' });
+
+    throw error;
+  }
+};
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -58,40 +97,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const promise = useCallback(
-    async <T,>(
-      promiseToResolve: Promise<T>,
-      options: {
-        loading: string;
-        success: string | ((data: T) => string);
-        error: string | ((error: unknown) => string);
-      },
-    ): Promise<T> => {
-      const toastId = addToast({
-        message: options.loading,
-        variant: 'promise',
-        persistent: true,
-      });
-
-      try {
-        const data = await promiseToResolve;
-
-        removeToast(toastId);
-        addToast({
-          message: typeof options.success === 'function' ? options.success(data) : options.success,
-          variant: 'success',
-        });
-
-        return data;
-      } catch (error) {
-        removeToast(toastId);
-        addToast({
-          message: typeof options.error === 'function' ? options.error(error) : options.error,
-          variant: 'error',
-        });
-
-        throw error;
-      }
-    },
+    <T,>(promiseToResolve: Promise<T>, options: PromiseToastOptions<T>): Promise<T> =>
+      trackPromiseWithToasts(promiseToResolve, options, addToast, removeToast),
     [addToast, removeToast],
   );
 
@@ -114,6 +121,47 @@ export const useToast = (): ToastContextType => {
   return context;
 };
 
+const renderVariantIcon = (variant: ToastProps['variant']) => {
+  switch (variant) {
+    case 'success':
+      return <SuccessIcon />;
+    case 'error':
+      return <ErrorIcon />;
+    case 'warning':
+      return <WarningIcon />;
+    case 'info':
+      return <InfoIcon />;
+    case 'promise':
+      return <CircularProgress size={20} />;
+    default:
+      return null;
+  }
+};
+
+// 'default' and 'promise' have no MUI severity of their own; both read as info.
+const toAlertSeverity = (variant: ToastProps['variant']) =>
+  variant === 'default' || variant === 'promise' ? 'info' : variant;
+
+const buildToastStyles = (theme: Theme, glass: boolean) => {
+  const baseStyles = {
+    borderRadius: theme.spacing(1.5),
+    transition: theme.transitions.create(['background-color', 'backdrop-filter'], {
+      duration: theme.transitions.duration.standard,
+    }),
+  };
+
+  if (glass) {
+    return {
+      ...baseStyles,
+      backgroundColor: alpha(theme.palette.background.paper, 0.1),
+      backdropFilter: 'blur(20px)',
+      border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+    };
+  }
+
+  return baseStyles;
+};
+
 export const Toast: React.FC<ToastProps> = ({
   id = '',
   message,
@@ -126,43 +174,6 @@ export const Toast: React.FC<ToastProps> = ({
 }) => {
   const theme = useTheme();
 
-  const getIcon = () => {
-    switch (variant) {
-      case 'success':
-        return <SuccessIcon />;
-      case 'error':
-        return <ErrorIcon />;
-      case 'warning':
-        return <WarningIcon />;
-      case 'info':
-        return <InfoIcon />;
-      case 'promise':
-        return <CircularProgress size={20} />;
-      default:
-        return null;
-    }
-  };
-
-  const getVariantStyles = () => {
-    const baseStyles = {
-      borderRadius: theme.spacing(1.5),
-      transition: theme.transitions.create(['background-color', 'backdrop-filter'], {
-        duration: theme.transitions.duration.standard,
-      }),
-    };
-
-    if (glass) {
-      return {
-        ...baseStyles,
-        backgroundColor: alpha(theme.palette.background.paper, 0.1),
-        backdropFilter: 'blur(20px)',
-        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-      };
-    }
-
-    return baseStyles;
-  };
-
   const handleClose = () => {
     if (onClose && id) {
       onClose(id);
@@ -172,8 +183,8 @@ export const Toast: React.FC<ToastProps> = ({
   return (
     <Alert
       data-testid={dataTestId}
-      icon={getIcon()}
-      severity={variant === 'default' || variant === 'promise' ? 'info' : variant}
+      icon={renderVariantIcon(variant)}
+      severity={toAlertSeverity(variant)}
       onClose={closable ? handleClose : undefined}
       action={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -200,7 +211,7 @@ export const Toast: React.FC<ToastProps> = ({
           )}
         </Box>
       }
-      sx={getVariantStyles()}
+      sx={buildToastStyles(theme, glass)}
     >
       <Typography data-testid={`${dataTestId}-message`} variant="body2">{message}</Typography>
     </Alert>

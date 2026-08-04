@@ -1,0 +1,51 @@
+{
+  "name": "@12-apps/realtime",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Generic realtime pub/sub library: typed topic/event envelopes and a publish/subscribe bus behind a swappable driver port (Redis pub/sub across processes in production, inline in-process delivery in dev/tests). Framework-free; knows nothing about the host app's domain, transport or auth.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./redis": "./src/drivers/redis.ts",
+    "./ticket": "./src/core/ticket.ts"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ioredis": "^5.11.1"
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/realtime"
+  },
+  "files": [
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md"
+  ]
+}

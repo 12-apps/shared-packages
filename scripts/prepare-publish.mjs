@@ -10,11 +10,24 @@ const MF = "package.json";
 const DEP_FIELDS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
 const WS = /^workspace:(.*)$/;
 
+function manifestAt(dir) {
+  const mf = join(dir, MF);
+  return existsSync(mf) ? [{ mf, pkg: JSON.parse(readFileSync(mf, "utf8")) }] : [];
+}
+
+function subdirectories(dir) {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(dir, entry.name));
+}
+
+// `packages/<pkg>` AND one level deeper (`packages/payments/<pkg>`): a package
+// group ships its halves as a nested workspace, and missing them here would
+// publish a manifest still carrying `workspace:*` — which npm cannot resolve,
+// so the package installs broken rather than failing loudly at publish time.
 function readManifests() {
-  return readdirSync(PKGS)
-    .map((dir) => join(PKGS, dir, MF))
-    .filter((mf) => existsSync(mf))
-    .map((mf) => ({ mf, pkg: JSON.parse(readFileSync(mf, "utf8")) }));
+  const top = subdirectories(PKGS);
+  return [...top, ...top.flatMap(subdirectories)].flatMap(manifestAt);
 }
 
 // workspace:* / workspace:^ -> ^v ; workspace:~ -> ~v ; workspace:<range> -> <range>

@@ -1,6 +1,7 @@
 'use client';
 
-import { Close as CloseIcon, Search as SearchIcon } from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import SearchIcon from '@mui/icons-material/Search';
 import {
   Box,
   Checkbox,

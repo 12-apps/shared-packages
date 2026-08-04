@@ -1,15 +1,13 @@
-import {
-  CheckCircle,
-  Error,
-  Flag,
-  Inventory,
-  LocalShipping,
-  Payment,
-  Person,
-  Schedule,
-  Star,
-  Warning,
-} from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Error from '@mui/icons-material/Error';
+import Flag from '@mui/icons-material/Flag';
+import Inventory from '@mui/icons-material/Inventory';
+import LocalShipping from '@mui/icons-material/LocalShipping';
+import Payment from '@mui/icons-material/Payment';
+import Person from '@mui/icons-material/Person';
+import Schedule from '@mui/icons-material/Schedule';
+import Star from '@mui/icons-material/Star';
+import Warning from '@mui/icons-material/Warning';
 import { Box, Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';

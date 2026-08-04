@@ -1,8 +1,71 @@
-import { Close } from '@mui/icons-material';
+import Close from '@mui/icons-material/Close';
+import type { Theme } from '@mui/material';
 import { alpha,Box, Drawer as MuiDrawer, IconButton, Typography, useTheme } from '@mui/material';
 import React from 'react';
 
 import type { DrawerContentProps,DrawerHeaderProps, DrawerProps } from './Drawer.types';
+
+type DrawerAnchor = 'left' | 'right' | 'top' | 'bottom';
+
+// `variant` doubles as a position preset, but an explicit `anchor` always wins.
+const resolveAnchor = (
+  anchor: DrawerProps['anchor'],
+  variant: DrawerProps['variant'],
+): DrawerAnchor => {
+  if (anchor) return anchor;
+
+  // Map variant to anchor position
+  switch (variant) {
+    case 'right':
+      return 'right';
+    case 'top':
+      return 'top';
+    case 'bottom':
+      return 'bottom';
+    case 'glass':
+      return 'right';
+    case 'left':
+    default:
+      return 'left';
+  }
+};
+
+const buildDrawerStyles = (
+  theme: Theme,
+  anchor: DrawerAnchor,
+  variant: DrawerProps['variant'],
+  width: DrawerProps['width'],
+  height: DrawerProps['height'],
+) => {
+  const baseStyles = {
+    width: ['left', 'right'].includes(anchor) ? width : '100%',
+    height: ['top', 'bottom'].includes(anchor) ? height : '100%',
+    flexShrink: 0,
+  };
+
+  if (variant === 'glass') {
+    return {
+      ...baseStyles,
+      '& .MuiDrawer-paper': {
+        width,
+        height: '100%',
+        backgroundColor: alpha(theme.palette.background.paper, 0.1),
+        backdropFilter: 'blur(20px)',
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+        boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
+      },
+    };
+  }
+
+  return {
+    ...baseStyles,
+    '& .MuiDrawer-paper': {
+      width: ['left', 'right'].includes(anchor) ? width : '100%',
+      height: ['top', 'bottom'].includes(anchor) ? height : '100%',
+      boxSizing: 'border-box',
+    },
+  };
+};
 
 export const Drawer: React.FC<DrawerProps> = ({
   children,
@@ -21,60 +84,11 @@ export const Drawer: React.FC<DrawerProps> = ({
   ...rest
 }) => {
   const theme = useTheme();
-
-  const getAnchor = (): 'left' | 'right' | 'top' | 'bottom' => {
-    if (anchor) return anchor;
-
-    // Map variant to anchor position
-    switch (variant) {
-      case 'right':
-        return 'right';
-      case 'top':
-        return 'top';
-      case 'bottom':
-        return 'bottom';
-      case 'glass':
-        return 'right';
-      case 'left':
-      default:
-        return 'left';
-    }
-  };
-
-  const getDrawerStyles = () => {
-    const baseStyles = {
-      width: ['left', 'right'].includes(getAnchor()) ? width : '100%',
-      height: ['top', 'bottom'].includes(getAnchor()) ? height : '100%',
-      flexShrink: 0,
-    };
-
-    if (variant === 'glass') {
-      return {
-        ...baseStyles,
-        '& .MuiDrawer-paper': {
-          width,
-          height: '100%',
-          backgroundColor: alpha(theme.palette.background.paper, 0.1),
-          backdropFilter: 'blur(20px)',
-          border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-          boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
-        },
-      };
-    }
-
-    return {
-      ...baseStyles,
-      '& .MuiDrawer-paper': {
-        width: ['left', 'right'].includes(getAnchor()) ? width : '100%',
-        height: ['top', 'bottom'].includes(getAnchor()) ? height : '100%',
-        boxSizing: 'border-box',
-      },
-    };
-  };
+  const drawerAnchor = resolveAnchor(anchor, variant);
 
   return (
     <MuiDrawer
-      anchor={getAnchor()}
+      anchor={drawerAnchor}
       open={open}
       onClose={onClose}
       variant={persistent ? 'persistent' : 'temporary'}
@@ -85,7 +99,7 @@ export const Drawer: React.FC<DrawerProps> = ({
           invisible: !backdrop,
         },
       }}
-      sx={getDrawerStyles()}
+      sx={buildDrawerStyles(theme, drawerAnchor, variant, width, height)}
       className={className}
       data-testid={dataTestId || 'drawer'}
       {...rest}

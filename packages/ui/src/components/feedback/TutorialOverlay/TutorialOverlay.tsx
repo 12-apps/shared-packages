@@ -1,10 +1,8 @@
-import {
-  CheckCircle as CompleteIcon,
-  Close as CloseIcon,
-  NavigateBefore as PrevIcon,
-  NavigateNext as NextIcon,
-  Refresh as RestartIcon,
-} from '@mui/icons-material';
+import CompleteIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import PrevIcon from '@mui/icons-material/NavigateBefore';
+import NextIcon from '@mui/icons-material/NavigateNext';
+import RestartIcon from '@mui/icons-material/Refresh';
 import {
   alpha,
   Box,
@@ -22,6 +20,7 @@ import {
 import type { FC} from 'react';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
 
+import { useTutorialOverlay } from './TutorialOverlay.hooks';
 import type { TutorialOverlayProps } from './TutorialOverlay.types';
 
 // Animation keyframes
@@ -181,78 +180,166 @@ const StepDot = styled(Box, {
   }),
 }));
 
-// Helper function to get element bounds
-const getElementBounds = (selector: string): globalThis.DOMRect | null => {
-  const element = document.querySelector(selector);
-  if (!element) return null;
-  return element.getBoundingClientRect();
-};
+// Title, body copy, the step dots and the navigation row.
+const TutorialStepBody: React.FC<{
+  step: TutorialOverlayProps['steps'][number];
+  currentStep: number;
+  stepCount: number;
+  progress: number;
+  isLastStep: boolean;
+  allowSkip: boolean;
+  showProgress: boolean;
+  requiresActionBeforeNext?: boolean;
+  onNext: () => void;
+  onPrev: () => void;
+  onSkip: () => void;
+  onRestart: () => void;
+}> = ({
+  step,
+  currentStep,
+  stepCount,
+  progress,
+  isLastStep,
+  allowSkip,
+  showProgress,
+  requiresActionBeforeNext,
+  onNext,
+  onPrev,
+  onSkip,
+  onRestart,
+}) => (
+      <Stack spacing={2}>
+        <Box
+          sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
+        >
+          <Typography
+            id={`tutorial-title-${currentStep}`}
+            variant="h6"
+            fontWeight="bold"
+            sx={{ flex: 1 }}
+            data-testid="tutorial-step-title"
+          >
+            {step.title}
+          </Typography>
+          {allowSkip && (
+            <IconButton
+              size="small"
+              onClick={onSkip}
+              sx={{ ml: 1, mt: -1, mr: -1 }}
+              data-testid="tutorial-close-button"
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          )}
+        </Box>
 
-// Helper function to calculate tooltip position
-const calculateTooltipPosition = (
-  targetBounds: globalThis.DOMRect,
-  tooltipBounds: globalThis.DOMRect,
-  placement: string,
-  padding = 16,
-) => {
-  const viewport = {
-    width: window.innerWidth,
-    height: window.innerHeight,
-  };
+        <Typography
+          id={`tutorial-content-${currentStep}`}
+          variant="body2"
+          color="text.secondary"
+          data-testid="tutorial-step-content"
+        >
+          {step.content}
+        </Typography>
 
-  let position = { top: 0, left: 0 };
-  let finalPlacement = placement;
+        {showProgress && (
+          <Typography variant="caption" color="text.secondary" align="center">
+            {currentStep + 1} of {stepCount}
+          </Typography>
+        )}
 
-  if (placement === 'auto') {
-    // Determine best placement based on available space
-    const spaces = {
-      top: targetBounds.top,
-      bottom: viewport.height - targetBounds.bottom,
-      left: targetBounds.left,
-      right: viewport.width - targetBounds.right,
-    };
-    finalPlacement = Object.entries(spaces).reduce((a, b) => (b[1] > a[1] ? b : a))[0];
-  }
+        {step.action && (
+          <Button
+            variant="contained"
+            size="small"
+            onClick={step.action.onClick}
+            sx={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+            }}
+          >
+            {step.action.label}
+          </Button>
+        )}
 
-  switch (finalPlacement) {
-    case 'top':
-      position = {
-        top: targetBounds.top - tooltipBounds.height - padding,
-        left: targetBounds.left + targetBounds.width / 2 - tooltipBounds.width / 2,
-      };
-      break;
-    case 'bottom':
-      position = {
-        top: targetBounds.bottom + padding,
-        left: targetBounds.left + targetBounds.width / 2 - tooltipBounds.width / 2,
-      };
-      break;
-    case 'left':
-      position = {
-        top: targetBounds.top + targetBounds.height / 2 - tooltipBounds.height / 2,
-        left: targetBounds.left - tooltipBounds.width - padding,
-      };
-      break;
-    case 'right':
-      position = {
-        top: targetBounds.top + targetBounds.height / 2 - tooltipBounds.height / 2,
-        left: targetBounds.right + padding,
-      };
-      break;
-  }
+        <StepIndicator data-testid="tutorial-step-indicators">
+          {Array.from({ length: stepCount }).map((_, index) => (
+            <StepDot
+              key={index}
+              active={index === currentStep}
+              completed={index < currentStep}
+              data-testid={`tutorial-indicator-${index}`}
+            />
+          ))}
+        </StepIndicator>
 
-  // Ensure tooltip stays within viewport
-  position.top = Math.max(
-    padding,
-    Math.min(position.top, viewport.height - tooltipBounds.height - padding),
-  );
-  position.left = Math.max(
-    padding,
-    Math.min(position.left, viewport.width - tooltipBounds.width - padding),
-  );
+        <Stack
+          direction="row"
+          spacing={1}
+          justifyContent="space-between"
+          data-testid="tutorial-navigation"
+        >
+          <Stack direction="row" spacing={1}>
+            {allowSkip && (
+              <Button size="small" onClick={onSkip} variant="text">
+                Skip
+              </Button>
+            )}
+            {stepCount > 1 && (
+              <IconButton
+                size="small"
+                onClick={onRestart}
+                disabled={currentStep === 0}
+                title="Restart"
+              >
+                <RestartIcon fontSize="small" />
+              </IconButton>
+            )}
+          </Stack>
 
-  return { position, placement: finalPlacement };
-};
+          <Stack direction="row" spacing={1}>
+            {stepCount > 1 && currentStep > 0 && (
+              <Button
+                size="small"
+                startIcon={<PrevIcon />}
+                onClick={onPrev}
+                disabled={currentStep === 0}
+                data-testid="tutorial-prev-button"
+              >
+                Previous
+              </Button>
+            )}
+
+            {!isLastStep ? (
+              <Button
+                variant="contained"
+                size="small"
+                endIcon={<NextIcon />}
+                onClick={onNext}
+                disabled={requiresActionBeforeNext}
+                title={requiresActionBeforeNext ? 'Complete the required action first' : ''}
+                data-testid="tutorial-next-button"
+              >
+                Next
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                size="small"
+                endIcon={<CompleteIcon />}
+                onClick={onNext}
+                sx={{
+                  background: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)',
+                }}
+                data-testid="tutorial-finish-button"
+              >
+                {stepCount === 1 ? 'Complete' : 'Finish'}
+              </Button>
+            )}
+          </Stack>
+        </Stack>
+      </Stack>
+);
 
 // Main component
 export const TutorialOverlay: FC<TutorialOverlayProps> = ({
@@ -269,113 +356,33 @@ export const TutorialOverlay: FC<TutorialOverlayProps> = ({
   allowSkip = false,
   animated = true,
 }) => {
-  const [currentStep, setCurrentStep] = useState(initialStep);
-  const [targetBounds, setTargetBounds] = useState<globalThis.DOMRect | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
-  const [actualPlacement, setActualPlacement] = useState<string>('bottom');
-  const [isVisible, setIsVisible] = useState(false);
-  const tooltipRef = useRef<HTMLDivElement>(null);
+  const {
+    currentStep,
+    currentStepData,
+    isLastStep,
+    isVisible,
+    targetBounds,
+    tooltipRef,
+    tooltipPosition,
+    actualPlacement,
+    progress,
+    handleNext,
+    handlePrev,
+    handleSkip,
+    handleRestart,
+  } = useTutorialOverlay({
+    steps,
+    initialStep,
+    active,
+    allowKeyboardNavigation,
+    onComplete,
+    onSkip,
+    onStepComplete,
+  });
 
-  const currentStepData = steps[currentStep];
-  const progress = ((currentStep + 1) / steps.length) * 100;
   const isModal = variant === 'modal';
   const isSpotlight = variant === 'spotlight' || variant === 'highlight';
-  const isLastStep = currentStep === steps.length - 1;
   const requiresActionBeforeNext = currentStepData?.requiresAction && !isLastStep;
-
-  // Update target bounds when step changes
-  useEffect(() => {
-    if (!active || !currentStepData) return;
-
-    const updateBounds = () => {
-      const bounds = getElementBounds(currentStepData.target);
-      if (bounds) {
-        setTargetBounds(bounds);
-        setIsVisible(true);
-      } else {
-        setIsVisible(false);
-      }
-    };
-
-    // Initial update
-    updateBounds();
-
-    // Update on resize/scroll
-    const handleUpdate = () => updateBounds();
-    window.addEventListener('resize', handleUpdate);
-    window.addEventListener('scroll', handleUpdate, true);
-
-    return () => {
-      window.removeEventListener('resize', handleUpdate);
-      window.removeEventListener('scroll', handleUpdate, true);
-    };
-  }, [currentStep, currentStepData, active]);
-
-  // Calculate tooltip position
-  useEffect(() => {
-    if (!targetBounds || !tooltipRef.current || !isVisible || !currentStepData) return;
-
-    const tooltipBounds = tooltipRef.current.getBoundingClientRect();
-    const { position, placement } = calculateTooltipPosition(
-      targetBounds,
-      tooltipBounds,
-      currentStepData.position || 'auto',
-    );
-    setTooltipPosition(position);
-    setActualPlacement(placement);
-  }, [targetBounds, currentStepData, isVisible]);
-
-  // Handler functions
-  const handleNext = useCallback(() => {
-    const currentStepId = steps[currentStep]?.id;
-    if (currentStepId && onStepComplete) {
-      onStepComplete(currentStepId);
-    }
-
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else if (onComplete) {
-      onComplete();
-    }
-  }, [currentStep, steps, onComplete, onStepComplete]);
-
-  const handlePrev = useCallback(() => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  }, [currentStep]);
-
-  const handleSkip = useCallback(() => {
-    if (onSkip) {
-      onSkip();
-    }
-  }, [onSkip]);
-
-  const handleRestart = useCallback(() => {
-    setCurrentStep(0);
-  }, []);
-
-  // Keyboard navigation
-  useEffect(() => {
-    if (!allowKeyboardNavigation || !active) return;
-
-    const handleKeyPress = (e: globalThis.KeyboardEvent) => {
-      switch (e.key) {
-        case 'ArrowLeft':
-          handlePrev();
-          break;
-        case 'ArrowRight':
-          handleNext();
-          break;
-        case 'Escape':
-          handleSkip();
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [active, allowKeyboardNavigation, handleNext, handlePrev, handleSkip]);
 
   if (!active || !currentStepData) return null;
 
@@ -412,137 +419,20 @@ export const TutorialOverlay: FC<TutorialOverlayProps> = ({
             aria-describedby={`tutorial-content-${currentStep}`}
             data-testid={`tutorial-step-${currentStep}`}
           >
-            <Stack spacing={2}>
-              <Box
-                sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
-              >
-                <Typography
-                  id={`tutorial-title-${currentStep}`}
-                  variant="h6"
-                  fontWeight="bold"
-                  sx={{ flex: 1 }}
-                  data-testid="tutorial-step-title"
-                >
-                  {currentStepData.title}
-                </Typography>
-                {allowSkip && (
-                  <IconButton
-                    size="small"
-                    onClick={handleSkip}
-                    sx={{ ml: 1, mt: -1, mr: -1 }}
-                    data-testid="tutorial-close-button"
-                  >
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
-                )}
-              </Box>
-
-              <Typography
-                id={`tutorial-content-${currentStep}`}
-                variant="body2"
-                color="text.secondary"
-                data-testid="tutorial-step-content"
-              >
-                {currentStepData.content}
-              </Typography>
-
-              {showProgress && (
-                <Typography variant="caption" color="text.secondary" align="center">
-                  {currentStep + 1} of {steps.length}
-                </Typography>
-              )}
-
-              {currentStepData.action && (
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={currentStepData.action.onClick}
-                  sx={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                  }}
-                >
-                  {currentStepData.action.label}
-                </Button>
-              )}
-
-              <StepIndicator data-testid="tutorial-step-indicators">
-                {steps.map((_, index) => (
-                  <StepDot
-                    key={index}
-                    active={index === currentStep}
-                    completed={index < currentStep}
-                    data-testid={`tutorial-indicator-${index}`}
-                  />
-                ))}
-              </StepIndicator>
-
-              <Stack
-                direction="row"
-                spacing={1}
-                justifyContent="space-between"
-                data-testid="tutorial-navigation"
-              >
-                <Stack direction="row" spacing={1}>
-                  {allowSkip && (
-                    <Button size="small" onClick={handleSkip} variant="text">
-                      Skip
-                    </Button>
-                  )}
-                  {steps.length > 1 && (
-                    <IconButton
-                      size="small"
-                      onClick={handleRestart}
-                      disabled={currentStep === 0}
-                      title="Restart"
-                    >
-                      <RestartIcon fontSize="small" />
-                    </IconButton>
-                  )}
-                </Stack>
-
-                <Stack direction="row" spacing={1}>
-                  {steps.length > 1 && currentStep > 0 && (
-                    <Button
-                      size="small"
-                      startIcon={<PrevIcon />}
-                      onClick={handlePrev}
-                      disabled={currentStep === 0}
-                      data-testid="tutorial-prev-button"
-                    >
-                      Previous
-                    </Button>
-                  )}
-
-                  {!isLastStep ? (
-                    <Button
-                      variant="contained"
-                      size="small"
-                      endIcon={<NextIcon />}
-                      onClick={handleNext}
-                      disabled={requiresActionBeforeNext}
-                      title={requiresActionBeforeNext ? 'Complete the required action first' : ''}
-                      data-testid="tutorial-next-button"
-                    >
-                      Next
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="contained"
-                      size="small"
-                      endIcon={<CompleteIcon />}
-                      onClick={handleNext}
-                      sx={{
-                        background: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)',
-                      }}
-                      data-testid="tutorial-finish-button"
-                    >
-                      {steps.length === 1 ? 'Complete' : 'Finish'}
-                    </Button>
-                  )}
-                </Stack>
-              </Stack>
-            </Stack>
+            <TutorialStepBody
+              step={currentStepData}
+              currentStep={currentStep}
+              stepCount={steps.length}
+              progress={progress}
+              isLastStep={isLastStep}
+              allowSkip={allowSkip}
+              showProgress={showProgress}
+              requiresActionBeforeNext={requiresActionBeforeNext}
+              onNext={handleNext}
+              onPrev={handlePrev}
+              onSkip={handleSkip}
+              onRestart={handleRestart}
+            />
           </TooltipContainer>
         </Fade>
       </Overlay>

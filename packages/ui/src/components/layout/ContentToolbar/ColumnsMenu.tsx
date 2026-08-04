@@ -1,6 +1,6 @@
 'use client';
 
-import { ViewColumnRounded as ColumnsIcon } from '@mui/icons-material';
+import ColumnsIcon from '@mui/icons-material/ViewColumnRounded';
 import { Box, Checkbox, IconButton, ListSubheader, Menu, MenuItem } from '@mui/material';
 import React, { useState } from 'react';
 
