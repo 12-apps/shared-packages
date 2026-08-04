@@ -40,11 +40,12 @@ const generateItems = (count: number): VirtualListItem[] => Array.from({ length:
 
 const generateVariableItems = (count: number): VirtualListItem[] => Array.from({ length: count }, (_, i) => ({
     id: i,
-    height: 60 + Math.floor(Math.random() * 100),
+    // Cycles 60/95/130/165 so the mix of heights is fixed per run.
+    height: 60 + (i % 4) * 35,
     data: {
       name: `Variable Item ${i + 1}`,
       description: `This item has a variable height. ${
-        Math.random() > 0.5
+        i % 2 === 0
           ? 'It contains additional content that makes it taller than other items in the list.'
           : 'Short description.'
       }`,
@@ -199,12 +200,13 @@ export const GridInteraction: Story = {
 };
 
 // Form Interaction Tests (Scroll behaviors)
-export const ScrollInteraction: Story = {
-  render: () => {
-    const items = generateItems(1000);
-    let scrollPosition = 0;
+// The read-out was a plain `let` mutated from the scroll callback, so it never
+// re-rendered and always showed 0px.
+const ScrollInteractionDemo: React.FC = () => {
+  const items = React.useMemo(() => generateItems(1000), []);
+  const [scrollPosition, setScrollPosition] = React.useState(0);
 
-    return (
+  return (
       <Box sx={{ display: 'flex', gap: 2 }}>
         <Paper sx={{ width: 400, height: 300 }}>
           <VirtualList
@@ -212,9 +214,7 @@ export const ScrollInteraction: Story = {
             variant="fixed"
             height={300}
             itemHeight={50}
-            onScroll={(scrollTop) => {
-              scrollPosition = scrollTop;
-            }}
+            onScroll={setScrollPosition}
             renderItem={SimpleItemRenderer}
             data-testid="scrollable-list"
           />
@@ -223,10 +223,13 @@ export const ScrollInteraction: Story = {
           <Typography variant="body2" data-testid="scroll-info">
             Scroll Position: {Math.round(scrollPosition)}px
           </Typography>
-        </Box>
       </Box>
-    );
-  },
+    </Box>
+  );
+};
+
+export const ScrollInteraction: Story = {
+  render: () => <ScrollInteractionDemo />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const scrollableList = canvas.getByTestId('scrollable-list');
@@ -432,7 +435,7 @@ export const FocusManagement: Story = {
     // Test external focus
     const externalButton = canvas.getByTestId('external-button');
     await userEvent.click(externalButton);
-    expect(externalButton).toHaveFocus();
+    await waitFor(() => expect(externalButton).toHaveFocus());
 
     // Test tab into list
     await userEvent.tab();
@@ -815,9 +818,7 @@ export const Performance: Story = {
     // Test multiple scroll events
     for (let i = 1; i <= 3; i++) {
       fireEvent.scroll(performanceList, { target: { scrollTop: i * 200 } });
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 50);
-      });
+      await waitFor(() => expect(performanceList).toBeInTheDocument());
     }
 
     // Verify list is still responsive

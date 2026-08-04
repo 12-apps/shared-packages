@@ -88,8 +88,8 @@ export const BasicInteraction: Story = {
       expect(slider).toHaveAttribute('aria-valuenow', '50');
 
       // Verify slider is focusable
-      slider.focus();
-      expect(slider).toHaveFocus();
+      await userEvent.click(slider);
+      await waitFor(() => expect(slider).toHaveFocus());
 
       // Verify slider ARIA label or accessible name
       expect(slider).toHaveAttribute('aria-orientation', 'horizontal');
@@ -273,8 +273,8 @@ export const KeyboardNavigation: Story = {
       const slider = sliders[0] as HTMLElement; // First slider is the single-slider
       expect(slider).toBeInTheDocument();
 
-      slider.focus();
-      await expect(slider).toHaveFocus();
+      await userEvent.click(slider);
+      await waitFor(() => expect(slider).toHaveFocus());
 
       // Verify keyboard accessibility attributes are present
       expect(slider).toHaveAttribute('aria-valuenow', '50');
@@ -405,17 +405,17 @@ export const FocusManagement: Story = {
       const toggleButton = canvas.getByTestId('toggle-button');
       const afterButton = canvas.getByTestId('after-button');
 
-      toggleButton.focus();
-      await expect(toggleButton).toHaveFocus();
+      await userEvent.click(toggleButton);
+      await waitFor(() => expect(toggleButton).toHaveFocus());
 
       await userEvent.tab();
       // Find the slider directly by role
       const slider = canvas.getByRole('slider') as HTMLElement;
       expect(slider).toBeInTheDocument();
-      await expect(slider).toHaveFocus();
+      await waitFor(() => expect(slider).toHaveFocus());
 
       await userEvent.tab();
-      await expect(afterButton).toHaveFocus();
+      await waitFor(() => expect(afterButton).toHaveFocus());
     });
   },
 };
@@ -505,7 +505,7 @@ export const ThemeVariations: Story = {
               label={`${color.charAt(0).toUpperCase() + color.slice(1)} Slider`}
               showValue
               unit="%"
-              defaultValue={Math.floor(Math.random() * 100)}
+              defaultValue={42}
             />
           </Box>
         ),

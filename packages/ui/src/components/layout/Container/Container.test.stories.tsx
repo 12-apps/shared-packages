@@ -1,6 +1,6 @@
 import { Box, Button, Card, CardContent,Paper, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn,userEvent, within } from 'storybook/test';
+import { expect, fn,userEvent, within, waitFor } from 'storybook/test';
 
 import { Container } from './Container';
 
@@ -196,17 +196,17 @@ export const KeyboardNavigation: Story = {
       
       // Focus first element
       await userEvent.click(firstButton);
-      await expect(firstButton).toHaveFocus();
+      await waitFor(() => expect(firstButton).toHaveFocus());
       
       // Tab to next element
       await userEvent.tab();
-      await expect(secondButton).toHaveFocus();
+      await waitFor(() => expect(secondButton).toHaveFocus());
     });
     
     await step('Tab navigation backward', async () => {
       await userEvent.tab({ shift: true });
       const firstButton = canvas.getByTestId('first-focusable');
-      await expect(firstButton).toHaveFocus();
+      await waitFor(() => expect(firstButton).toHaveFocus());
     });
     
     await step('Enter key activation', async () => {
@@ -214,14 +214,14 @@ export const KeyboardNavigation: Story = {
       await userEvent.click(button);
       await userEvent.keyboard('{Enter}');
       // Verify button is still focused after activation
-      await expect(button).toHaveFocus();
+      await waitFor(() => expect(button).toHaveFocus());
     });
     
     await step('Space key activation', async () => {
       const nativeButton = canvas.getByTestId('native-button');
-      nativeButton.focus();
+      await userEvent.click(nativeButton);
       await userEvent.keyboard(' ');
-      await expect(nativeButton).toHaveFocus();
+      await waitFor(() => expect(nativeButton).toHaveFocus());
     });
   }
 };
@@ -296,23 +296,23 @@ export const FocusManagement: Story = {
     await step('Initial focus state', async () => {
       const triggerButton = canvas.getByTestId('trigger-button');
       await userEvent.click(triggerButton);
-      await expect(triggerButton).toHaveFocus();
+      await waitFor(() => expect(triggerButton).toHaveFocus());
     });
     
     await step('Focus cycling through elements', async () => {
       await userEvent.tab();
       const firstElement = canvas.getByTestId('first-focus-element');
-      await expect(firstElement).toHaveFocus();
+      await waitFor(() => expect(firstElement).toHaveFocus());
       
       await userEvent.tab();
       const secondElement = canvas.getByTestId('second-focus-element');
-      await expect(secondElement).toHaveFocus();
+      await waitFor(() => expect(secondElement).toHaveFocus());
     });
     
     await step('Focus restoration', async () => {
       const triggerButton = canvas.getByTestId('trigger-button');
       await userEvent.click(triggerButton);
-      await expect(triggerButton).toHaveFocus();
+      await waitFor(() => expect(triggerButton).toHaveFocus());
     });
   }
 };

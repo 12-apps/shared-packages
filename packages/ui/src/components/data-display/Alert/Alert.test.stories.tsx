@@ -127,14 +127,14 @@ export const KeyboardNavigation: Story = {
 
     await step('Tab navigation to alert', async () => {
       const alert = canvas.getByRole('alert');
-      alert.focus();
-      await expect(alert).toHaveFocus();
+      await userEvent.click(alert);
+      await waitFor(() => expect(alert).toHaveFocus());
     });
 
     await step('Tab to close button', async () => {
       await userEvent.tab();
       const closeButton = canvas.getByLabelText('close alert');
-      await expect(closeButton).toHaveFocus();
+      await waitFor(() => expect(closeButton).toHaveFocus());
     });
 
     await step('Activate close button with Enter', async () => {
@@ -504,21 +504,21 @@ export const FocusManagement: Story = {
 
     await step('Alert receives focus', async () => {
       const alert = canvas.getByRole('alert');
-      alert.focus();
-      await expect(alert).toHaveFocus();
+      await userEvent.click(alert);
+      await waitFor(() => expect(alert).toHaveFocus());
     });
 
     await step('Tab to close button', async () => {
       await userEvent.tab();
       const closeButton = canvas.getByLabelText('close alert');
-      await expect(closeButton).toHaveFocus();
+      await waitFor(() => expect(closeButton).toHaveFocus());
     });
 
     await step('Tab cycles back', async () => {
       await userEvent.tab();
       // Should cycle back to document or next focusable element
       const alert = canvas.getByRole('alert');
-      await expect(alert).not.toHaveFocus();
+      await waitFor(() => expect(alert).not.toHaveFocus());
     });
   },
 };
@@ -634,9 +634,10 @@ export const CustomIconTest: Story = {
 
     await step('Verify no icon when disabled', async () => {
       const noIconAlert = canvas.getByTestId('no-icon-alert');
-      await expect(noIconAlert).toBeInTheDocument();
-      const icon = noIconAlert.querySelector('.MuiAlert-icon');
-      await expect(icon).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(noIconAlert).toBeInTheDocument();
+        expect(noIconAlert.querySelector('.MuiAlert-icon')).not.toBeInTheDocument();
+      });
     });
   },
 };

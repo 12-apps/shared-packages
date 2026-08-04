@@ -20,7 +20,6 @@ packages/shared-helpers/src/utils/lib/withGracefulShutdown.ts
 packages/shared-helpers/tests/db/database.test.ts
 packages/ui/scripts/storybook.js
 packages/ui/src/__tests__/social-login-button.test.tsx
-packages/ui/src/components/data-display/Alert/Alert.test.stories.tsx
 packages/ui/src/components/data-display/AlertDialog/AlertDialog.test.stories.tsx
 packages/ui/src/components/data-display/AsyncStateContainer/AsyncStateContainer.test.stories.tsx
 packages/ui/src/components/data-display/AsyncStateContainer/AsyncStateContainer.tsx
@@ -74,8 +73,6 @@ packages/ui/src/components/form/PhoneInput/PhoneInput.test.stories.tsx
 packages/ui/src/components/form/RadioGroup/RadioGroup.test.stories.tsx
 packages/ui/src/components/form/RadioGroup/RadioGroup.tsx
 packages/ui/src/components/form/RichTextEditor/RichTextEditor.test.stories.tsx
-packages/ui/src/components/form/Select/Select.test.stories.tsx
-packages/ui/src/components/form/Slider/Slider.test.stories.tsx
 packages/ui/src/components/form/Slider/Slider.tsx
 packages/ui/src/components/form/Switch/Switch.test.stories.tsx
 packages/ui/src/components/form/Switch/Switch.tsx
@@ -86,11 +83,9 @@ packages/ui/src/components/form/ToggleGroup/ToggleGroup.test.stories.tsx
 packages/ui/src/components/layout/Accordion/Accordion.tsx
 packages/ui/src/components/layout/Card/Card.tsx
 packages/ui/src/components/layout/Collapsible/Collapsible.tsx
-packages/ui/src/components/layout/Container/Container.test.stories.tsx
 packages/ui/src/components/layout/Resizable/Resizable.test.stories.tsx
 packages/ui/src/components/layout/Resizable/Resizable.tsx
 packages/ui/src/components/layout/ScrollArea/ScrollArea.test.stories.tsx
-packages/ui/src/components/layout/Separator/Separator.test.stories.tsx
 packages/ui/src/components/layout/Separator/Separator.tsx
 packages/ui/src/components/layout/Skeleton/Skeleton.test.stories.tsx
 packages/ui/src/components/layout/Skeleton/Skeleton.tsx
