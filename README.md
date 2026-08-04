@@ -71,5 +71,33 @@ pnpm test
 pnpm quality:all    # complexity, flakiness, duplication, quarantine, knip
 ```
 
+## Publishing
+
 Packages are published to npm from `main` by semantic-release via OIDC trusted
 publishing — no token. See `.github/workflows/ci.yml`.
+
+### The first publish of a new package
+
+OIDC cannot make a package's first publish. A Trusted Publisher is configured
+from a package's settings page on npmjs.com, and that page exists only once the
+package does, so a name nobody has published yet has nowhere to point the trust
+at and the tokenless publish 404s ([npm/cli#8544][oidc-issue]). Every package
+needs one token-authenticated publish before OIDC can take over.
+
+CI does that bootstrap itself when the repository has an `NPM_TOKEN` secret —
+a [granular access token][granular] with **read and write** on the `@12-apps`
+scope. `scripts/first-publish.mjs` runs one step ahead of the tokenless publish
+loop and does only what that loop cannot: it publishes the names the registry
+does not have, and skips every package it does. Packages already on npm are
+never touched by it, and with no secret set the step is a no-op.
+
+Each newly published package then needs a Trusted Publisher before its **next**
+release, which CI names in the step summary — npmjs.com → the package →
+Settings → Trusted Publisher → GitHub Actions, repository
+`12-apps/shared-packages`, workflow `ci.yml`. Once every package has one the
+secret is dead weight and can be revoked; npm is
+[phasing out token-based publishing][2fa] in favour of exactly this.
+
+[oidc-issue]: https://github.com/npm/cli/issues/8544
+[granular]: https://docs.npmjs.com/creating-and-viewing-access-tokens
+[2fa]: https://gh.io/npm-gat-bypass2fa-deprecation
