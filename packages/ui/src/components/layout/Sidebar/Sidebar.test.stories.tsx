@@ -263,35 +263,35 @@ export const KeyboardNavigation: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    // Test Tab navigation through sidebar items
+    // Test Tab navigation through sidebar items. The first nav item is the
+    // first focusable node in the story, so tabbing in from the body reaches it
+    // — the old .focus() call asserted only that focus() works.
     const firstNavItem = canvas.getByTestId('keyboard-nav-home');
-    firstNavItem.focus();
-    await expect(firstNavItem).toHaveFocus();
+    await userEvent.tab();
+    await waitFor(() => expect(firstNavItem).toHaveFocus());
+
+    // Enter key activation, checked here while focus is already on the item
+    // rather than by re-focusing it at the end of the journey.
+    await userEvent.keyboard('{Enter}');
+    await expect(firstNavItem).toBeInTheDocument();
 
     // Tab to next item
     await userEvent.tab();
-    await expect(canvas.getByTestId('keyboard-nav-dashboard')).toHaveFocus();
+    await waitFor(() => expect(canvas.getByTestId('keyboard-nav-dashboard')).toHaveFocus());
 
     // Tab to next item
     await userEvent.tab();
-    await expect(canvas.getByTestId('keyboard-nav-inbox')).toHaveFocus();
+    await waitFor(() => expect(canvas.getByTestId('keyboard-nav-inbox')).toHaveFocus());
 
     // Tab to footer button
     await userEvent.tab();
     await userEvent.tab();
     await userEvent.tab();
-    await expect(canvas.getByTestId('footer-button')).toHaveFocus();
+    await waitFor(() => expect(canvas.getByTestId('footer-button')).toHaveFocus());
 
     // Tab to main content
     await userEvent.tab();
-    await expect(canvas.getByTestId('main-button')).toHaveFocus();
-
-    // Test Enter key activation
-    const homeItem = canvas.getByTestId('keyboard-nav-home');
-    homeItem.focus();
-    await userEvent.keyboard('{Enter}');
-    // Verify item is still accessible after Enter
-    await expect(homeItem).toBeInTheDocument();
+    await waitFor(() => expect(canvas.getByTestId('main-button')).toHaveFocus());
   },
 };
 
@@ -458,22 +458,22 @@ export const FocusManagement: Story = {
 
     // Test initial focus on first sidebar item
     const firstItem = canvas.getByTestId('focus-nav-home');
-    firstItem.focus();
-    await expect(firstItem).toHaveFocus();
+    await userEvent.tab();
+    await waitFor(() => expect(firstItem).toHaveFocus());
 
     // Test focus moves through sidebar elements
     await userEvent.tab();
-    await expect(canvas.getByTestId('focus-nav-dashboard')).toHaveFocus();
+    await waitFor(() => expect(canvas.getByTestId('focus-nav-dashboard')).toHaveFocus());
 
     await userEvent.tab();
-    await expect(canvas.getByTestId('focus-nav-inbox')).toHaveFocus();
+    await waitFor(() => expect(canvas.getByTestId('focus-nav-inbox')).toHaveFocus());
 
     await userEvent.tab();
-    await expect(canvas.getByTestId('sidebar-action')).toHaveFocus();
+    await waitFor(() => expect(canvas.getByTestId('sidebar-action')).toHaveFocus());
 
     // Test focus moves to main content
     await userEvent.tab();
-    await expect(canvas.getByTestId('main-focus-button')).toHaveFocus();
+    await waitFor(() => expect(canvas.getByTestId('main-focus-button')).toHaveFocus());
 
     // Test hiding sidebar
     const hideButton = canvas.getByTestId('hide-sidebar-button');
@@ -789,8 +789,7 @@ export const VisualStates: Story = {
     await expect(canvas.getByTestId('expanded-footer')).toBeInTheDocument();
 
     // Test sidebar width when expanded
-    let sidebarStyles = window.getComputedStyle(sidebar);
-    await expect(sidebarStyles.width).toBe('280px');
+    await expect(window.getComputedStyle(sidebar).width).toBe('280px');
 
     // Test collapsing
     const collapseToggle = canvas.getByTestId('collapse-toggle');
@@ -800,10 +799,11 @@ export const VisualStates: Story = {
       expect(canvas.getByTestId('collapse-status')).toHaveTextContent('Sidebar is collapsed');
     });
 
-    // Test sidebar width when collapsed
+    // Test sidebar width when collapsed. Read the computed style inside the
+    // waitFor rather than reassigning an outer variable from it — the callback
+    // reruns, so the shared binding held whichever value the last retry left.
     await waitFor(() => {
-      sidebarStyles = window.getComputedStyle(sidebar);
-      expect(sidebarStyles.width).toBe('64px');
+      expect(window.getComputedStyle(sidebar).width).toBe('64px');
     });
 
     // Test collapsed avatar is visible
