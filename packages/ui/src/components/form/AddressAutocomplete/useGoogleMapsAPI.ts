@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { MOCK_ADDRESSES, MOCK_PLACE_DETAILS } from './mockPlaces';
 export interface GoogleMapsService {
   autocompleteService: google.maps.places.AutocompleteService | null;
   placesService: google.maps.places.PlacesService | null;
@@ -74,5 +73,3 @@ export const useGoogleMapsAPI = (apiKey: string) => {
 
   return { isLoaded, error, services: serviceRef.current, useMockData };
 };
-
-// Main component with proper Google Maps integration

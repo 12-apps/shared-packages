@@ -61,8 +61,6 @@ packages/ui/src/components/feedback/Sonner/Sonner.test.stories.tsx
 packages/ui/src/components/feedback/StackedModal/StackedModal.test.stories.tsx
 packages/ui/src/components/feedback/Toast/Toast.test.stories.tsx
 packages/ui/src/components/feedback/TutorialOverlay/TutorialOverlay.test.stories.tsx
-packages/ui/src/components/form/AddressAutocomplete/AddressAutocomplete.test.stories.tsx
-packages/ui/src/components/form/AddressAutocomplete/AddressAutocomplete.tsx
 packages/ui/src/components/form/Button/Button.tsx
 packages/ui/src/components/form/Calendar/Calendar.test.stories.tsx
 packages/ui/src/components/form/Calendar/Calendar.tsx
