@@ -7,6 +7,12 @@ import { Box, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import { alpha, styled } from '@mui/material/styles';
 import React from 'react';
 
+// Each button repeated the same conditional test id; this is that ternary once.
+const makeTestId =
+  (dataTestId?: string) =>
+  (suffix: string): string =>
+    dataTestId ? `${dataTestId}-${suffix}` : `code-editor-${suffix}`;
+
 const Toolbar = styled(Box)(({ theme }) => ({
   display: 'flex',
   justifyContent: 'space-between',
@@ -50,14 +56,17 @@ const EditorActions: React.FC<{
   onCopy,
   onWrapToggle,
   onFullscreenToggle,
-}) => (
-  <Stack direction="row" spacing={1}>
+}) => {
+  const testId = makeTestId(dataTestId);
+
+  return (
+    <Stack direction="row" spacing={1}>
     {!readOnly && (
       <Tooltip title="Format Code (Ctrl+Shift+F)">
         <IconButton
           size="small"
           onClick={onFormat}
-          data-testid={dataTestId ? `${dataTestId}-format-btn` : 'code-editor-format-btn'}
+          data-testid={testId('format-btn')}
         >
           <CodeIcon fontSize="small" />
         </IconButton>
@@ -69,7 +78,7 @@ const EditorActions: React.FC<{
         size="small"
         onClick={onWrapToggle}
         color={isWrapped ? 'primary' : 'default'}
-        data-testid={dataTestId ? `${dataTestId}-wrap-btn` : 'code-editor-wrap-btn'}
+        data-testid={testId('wrap-btn')}
       >
         <WrapIcon fontSize="small" />
       </IconButton>
@@ -80,7 +89,7 @@ const EditorActions: React.FC<{
         size="small"
         onClick={onCopy}
         color={isCopied ? 'success' : 'default'}
-        data-testid={dataTestId ? `${dataTestId}-copy-btn` : 'code-editor-copy-btn'}
+        data-testid={testId('copy-btn')}
       >
         <CopyIcon fontSize="small" />
       </IconButton>
@@ -90,9 +99,7 @@ const EditorActions: React.FC<{
       <IconButton
         size="small"
         onClick={onFullscreenToggle}
-        data-testid={
-          dataTestId ? `${dataTestId}-fullscreen-btn` : 'code-editor-fullscreen-btn'
-        }
+        data-testid={testId('fullscreen-btn')}
       >
         {isFullscreen ? (
           <ExitFullscreenIcon fontSize="small" />
@@ -100,9 +107,10 @@ const EditorActions: React.FC<{
           <FullscreenIcon fontSize="small" />
         )}
       </IconButton>
-    </Tooltip>
-  </Stack>
-);
+      </Tooltip>
+    </Stack>
+  );
+};
 
 // Language badge, read-only marker and the four action buttons.
 export const EditorToolbar: React.FC<{
@@ -127,14 +135,13 @@ export const EditorToolbar: React.FC<{
   onCopy,
   onWrapToggle,
   onFullscreenToggle,
-}) => (
-  <Toolbar data-testid={dataTestId ? `${dataTestId}-toolbar` : 'code-editor-toolbar'}>
+}) => {
+  const testId = makeTestId(dataTestId);
+
+  return (
+  <Toolbar data-testid={testId('toolbar')}>
     <Stack direction="row" spacing={2} alignItems="center">
-      <LanguageBadge
-        data-testid={
-          dataTestId ? `${dataTestId}-language-badge` : 'code-editor-language-badge'
-        }
-      >
+      <LanguageBadge data-testid={testId('language-badge')}>
         <CodeIcon sx={{ fontSize: 14 }} />
         {language}
       </LanguageBadge>
@@ -157,4 +164,5 @@ export const EditorToolbar: React.FC<{
       onFullscreenToggle={onFullscreenToggle}
     />
   </Toolbar>
-);
+  );
+};
