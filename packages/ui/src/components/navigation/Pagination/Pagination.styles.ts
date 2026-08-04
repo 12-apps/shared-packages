@@ -19,7 +19,7 @@ const ITEM_SIZE_STYLES: Record<string, (theme: Theme) => CSSObject> = {
 // One variant applies at a time, so a lookup replaces the mutually exclusive
 // spreads.
 const ITEM_VARIANTS: Record<string, (theme: Theme, customSize?: string) => CSSObject> = {
-  default: (theme, customSize) => ({
+  default: (theme, _customSize) => ({
       borderRadius: theme.spacing(1),
       '&:hover': {
         backgroundColor: alpha(theme.palette.primary.main, 0.08),
@@ -79,7 +79,7 @@ const ITEM_VARIANTS: Record<string, (theme: Theme, customSize?: string) => CSSOb
         display: 'none',
       },
     }),
-  minimal: (theme, customSize) => ({
+  minimal: (theme, _customSize) => ({
       borderRadius: theme.spacing(0.5),
       backgroundColor: 'transparent',
       color: theme.palette.text.secondary,

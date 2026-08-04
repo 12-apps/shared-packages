@@ -4,7 +4,6 @@ import NavigateBefore from '@mui/icons-material/NavigateBefore';
 import NavigateNext from '@mui/icons-material/NavigateNext';
 import type { PaginationRenderItemParams } from '@mui/material';
 import {
-  alpha,
   Box,
   FormControl,
   MenuItem,
@@ -74,7 +73,6 @@ const paginationItemTestId = (
 const renderPaginationItem = ({
   item,
   variant,
-  size,
   dataTestId,
   icons,
 }: {

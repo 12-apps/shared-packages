@@ -4,8 +4,6 @@ import React, { useCallback,useEffect, useRef, useState } from 'react';
 
 import {
   getOverflowStyle,
-  getScrollbarColors,
-  getScrollbarSize,
   getVariantStyles,
 } from './ScrollArea.styles';
 import type { ScrollAreaProps } from './ScrollArea.types';

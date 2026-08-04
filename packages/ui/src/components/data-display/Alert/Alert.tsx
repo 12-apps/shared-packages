@@ -1,8 +1,4 @@
-import CheckCircle from '@mui/icons-material/CheckCircle';
 import Close from '@mui/icons-material/Close';
-import Error from '@mui/icons-material/Error';
-import Info from '@mui/icons-material/Info';
-import Warning from '@mui/icons-material/Warning';
 import {
   Alert as MuiAlert,
   AlertTitle,
@@ -10,9 +6,7 @@ import {
   Box,
   Collapse,
   IconButton,
-  keyframes,
 } from '@mui/material';
-import type { Theme } from '@mui/material/styles';
 import { styled } from '@mui/material/styles';
 import React from 'react';
 
@@ -23,8 +17,6 @@ import {
   getColorFromTheme,
   getVariantIcon,
   iconRotate,
-  pulseAnimation,
-  shimmerAnimation,
 } from './Alert.styles';
 import type { AlertColor } from '@mui/material';
 import type { AlertProps } from './Alert.types';

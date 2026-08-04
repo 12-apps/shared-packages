@@ -1,28 +1,14 @@
-import ArrowForwardIos from '@mui/icons-material/ArrowForwardIos';
-import ChevronRight from '@mui/icons-material/ChevronRight';
-import Home from '@mui/icons-material/Home';
-import MoreHoriz from '@mui/icons-material/MoreHoriz';
-import NavigateNext from '@mui/icons-material/NavigateNext';
 import {
-  alpha,
-  Box,
   Breadcrumbs as MuiBreadcrumbs,
-  Fade,
-  Link,
-  Tooltip,
-  Typography,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { keyframes,styled } from '@mui/material/styles';
+import { styled } from '@mui/material/styles';
 import React from 'react';
 
 import {
-  breadcrumbLinkStyles,
   breadcrumbsBarStyles,
-  pulse,
   sizeIconMap,
-  slideIn,
 } from './Breadcrumbs.styles';
 import { BreadcrumbEntry } from './BreadcrumbEntry';
 import type { BreadcrumbItem,BreadcrumbsProps } from './Breadcrumbs.types';
@@ -37,38 +23,7 @@ const StyledBreadcrumbs = styled(MuiBreadcrumbs, {
   }),
 );
 
-const AnimatedSeparator = styled(Box)(() => ({
-  display: 'flex',
-  alignItems: 'center',
-  opacity: 0.6,
-  transition: 'all 0.2s ease',
 
-  '&:hover': {
-    opacity: 1,
-    transform: 'scale(1.1)',
-  },
-}));
-
-const getSeparator = (separatorType: string) => {
-  const separatorContent = (() => {
-    switch (separatorType) {
-      case 'slash':
-        return '/';
-      case 'arrow':
-        return <NavigateNext fontSize="small" />;
-      case 'chevron':
-        return <ChevronRight fontSize="small" />;
-      case 'dot':
-        return '•';
-      case 'pipe':
-        return '|';
-      default:
-        return <ArrowForwardIos sx={{ fontSize: 12 }} />;
-    }
-  })();
-
-  return <AnimatedSeparator>{separatorContent}</AnimatedSeparator>;
-};
 
 type DisplayItem = BreadcrumbItem & { isEllipsis?: boolean };
 
@@ -155,7 +110,6 @@ export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
   (componentProps, ref) => {
     const {
       variant,
-      separatorType,
       items,
       separator,
       maxItems,
@@ -171,8 +125,7 @@ export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
     } = resolveProps(componentProps);
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-    const finalSeparator = separator || getSeparator(separatorType);
-    const iconSize = sizeIconMap[size];
+        const iconSize = sizeIconMap[size];
 
     // Handle mobile collapsing
     const effectiveMaxItems = isMobile ? mobileMaxItems : maxItems;

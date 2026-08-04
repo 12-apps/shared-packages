@@ -1,11 +1,8 @@
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import {
-  alpha,
   Box,
-  Checkbox,
   FormControlLabel,
   IconButton,
-  keyframes,
   Menu,
   MenuItem,
   Skeleton,
@@ -14,26 +11,19 @@ import {
   TableBody,
   TableCell,
   TableContainer,
-  TableHead,
   TableRow,
-  TableSortLabel,
   useMediaQuery,
   useTheme} from '@mui/material';
 import { styled } from '@mui/material/styles';
-import React, { useCallback,useEffect, useMemo, useState } from 'react';
+import React, { useCallback,useEffect, useState } from 'react';
 
 import type {
   ColumnConfig,
-  TableBodyProps,
   TableDensity,
-  TableHeaderProps,
   TableProps,
   TableStripeColor} from './Table.types';
 import { EnhancedTableBody, EnhancedTableHeader } from './TableParts';
 import {
-  getDensityConfig,
-  getStripeColorFromTheme,
-  pulseAnimation,
   tableStyles,
 } from './Table.styles';
 

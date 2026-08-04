@@ -11,7 +11,7 @@ import Link from '@mui/icons-material/Link';
 import { alpha, Box, Divider, IconButton, Tooltip } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
 import { styled } from '@mui/material/styles';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { floatAnimation, getColorFromTheme } from './Textarea.styles';
 

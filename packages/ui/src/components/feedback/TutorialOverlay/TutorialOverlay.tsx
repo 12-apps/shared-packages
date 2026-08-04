@@ -18,7 +18,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { FC} from 'react';
-import React, { useCallback,useEffect, useRef, useState } from 'react';
+import React from 'react';
 
 import { useTutorialOverlay } from './TutorialOverlay.hooks';
 import type { TutorialOverlayProps } from './TutorialOverlay.types';
@@ -198,7 +198,6 @@ const TutorialStepBody: React.FC<{
   step,
   currentStep,
   stepCount,
-  progress,
   isLastStep,
   allowSkip,
   showProgress,

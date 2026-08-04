@@ -15,7 +15,7 @@ export const fadeInSlide = keyframes`
   }
 `;
 
-export const pulseAnimation = keyframes`
+const pulseAnimation = keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 0.7;

@@ -6,7 +6,7 @@ import type { BadgeSize, BadgeVariant } from './Badge.types';
 type BadgePalette = { main: string; light?: string; dark?: string; contrastText?: string };
 type BadgeSizeStyles = ReturnType<typeof getSizeStyles>;
 
-export const pulseAnimation = keyframes`
+const pulseAnimation = keyframes`
   0% {
     transform: scale(1);
     opacity: 1;
@@ -22,7 +22,7 @@ export const pulseAnimation = keyframes`
 `;
 
 // Define bounce animation
-export const bounceAnimation = keyframes`
+const bounceAnimation = keyframes`
   0%, 20%, 50%, 80%, 100% {
     transform: translateY(0) scale(1);
   }
@@ -35,7 +35,7 @@ export const bounceAnimation = keyframes`
 `;
 
 // Define shimmer animation
-export const shimmerAnimation = keyframes`
+const shimmerAnimation = keyframes`
   0% {
     background-position: -1000px 0;
   }
@@ -45,7 +45,7 @@ export const shimmerAnimation = keyframes`
 `;
 
 // Define fade in animation with scale
-export const fadeInScaleAnimation = keyframes`
+const fadeInScaleAnimation = keyframes`
   0% {
     opacity: 0;
     transform: scale(0.5);
@@ -60,7 +60,7 @@ export const fadeInScaleAnimation = keyframes`
 `;
 
 // Define glow pulse animation
-export const glowPulseAnimation = keyframes`
+const glowPulseAnimation = keyframes`
   0% {
     box-shadow: 0 0 5px 2px rgba(var(--glow-color), 0.4);
   }
@@ -72,7 +72,7 @@ export const glowPulseAnimation = keyframes`
   }
 `;
 
-export const getColorFromTheme = (theme: Theme, color: string) => {
+const getColorFromTheme = (theme: Theme, color: string) => {
   const colorMap: Record<string, ReturnType<typeof theme.palette.augmentColor>> = {
     primary: theme.palette.primary,
     secondary: theme.palette.secondary,

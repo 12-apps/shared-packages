@@ -1,13 +1,11 @@
 import CloseIcon from '@mui/icons-material/Close';
-import { alpha, Badge as MuiBadge, IconButton, keyframes, Zoom } from '@mui/material';
-import type { Theme } from '@mui/material/styles';
+import { Badge as MuiBadge, IconButton, Zoom } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React, { useEffect,useState } from 'react';
 
 import {
   badgeStyles,
   getAnchorOrigin,
-  getColorFromTheme,
   getSizeStyles,
 } from './Badge.styles';
 import type { BadgeProps, BadgeSize, BadgeVariant } from './Badge.types';
@@ -63,11 +61,6 @@ const StyledBadge = styled(MuiBadge, {
   });
 });
 
-const CLOSE_ICON_SIZES: Record<string, string> = {
-  xs: '0.5rem',
-  sm: '0.625rem',
-  md: '0.75rem',
-};
 
 // Icon, content and close button, assembled in order. Split out of the component
 // so its branching does not count against the render.

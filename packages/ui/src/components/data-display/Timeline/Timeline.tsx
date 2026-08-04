@@ -1,27 +1,13 @@
-import DotIcon from '@mui/icons-material/Circle';
-import ExpandIcon from '@mui/icons-material/ExpandMore';
 import {
   alpha,
   Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  Collapse,
-  Fade,
-  IconButton,
-  keyframes,
-  Stack,
   styled,
-  Typography,
 } from '@mui/material';
 import type { FC } from 'react';
 import React from 'react';
 import { TimelineRow } from './TimelineRow';
-import type { TimelineItem, TimelineProps } from './Timeline.types';
+import type { TimelineProps } from './Timeline.types';
 
-const slideInAnimation = keyframes`from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); }`;
-const pulseAnimation = keyframes`0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; }`;
 // ---
 
 // --- Styled Components ---

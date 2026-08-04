@@ -43,7 +43,7 @@ const BAR_VARIANTS: Record<string, (theme: Theme, elevation: number) => CSSObjec
       boxShadow: theme.shadows[elevation] || theme.shadows[1],
       borderRadius: theme.spacing(1.5),
     }),
-  outlined: (theme, elevation) => ({
+  outlined: (theme, _elevation) => ({
       border: `1px solid ${theme.palette.divider}`,
       borderRadius: theme.spacing(1),
     }),
@@ -54,7 +54,7 @@ const separatorStyles = (
   theme: Theme,
   size: string | undefined,
   color: string | undefined,
-  visualStyle: string | undefined,
+  _visualStyle: string | undefined,
 ): CSSObject => ({
   '& .MuiBreadcrumbs-separator': {
       marginLeft: theme.spacing(size === 'sm' ? 0.5 : size === 'lg' ? 1.5 : 1),

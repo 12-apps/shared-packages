@@ -1,22 +1,14 @@
-import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
 import {
   Box,
   Checkbox,
-  CircularProgress,
-  Collapse,
-  IconButton,
-  Skeleton,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
   TableSortLabel,
-  Typography,
 } from '@mui/material';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback } from 'react';
 
-import { getDensityConfig } from './Table.styles';
 import { useVirtualScrolling } from './Table.hooks';
 import type { ColumnConfig, TableBodyProps, TableHeaderProps } from './Table.types';
 

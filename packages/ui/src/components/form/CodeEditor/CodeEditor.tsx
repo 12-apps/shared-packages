@@ -1,18 +1,10 @@
 import type { Monaco } from '@monaco-editor/react';
 import Editor from '@monaco-editor/react';
-import CodeIcon from '@mui/icons-material/Code';
-import CopyIcon from '@mui/icons-material/ContentCopy';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import ExitFullscreenIcon from '@mui/icons-material/FullscreenExit';
-import WrapIcon from '@mui/icons-material/WrapText';
 import {
   alpha,
   Box,
-  IconButton,
   Paper,
-  Stack,
   styled,
-  Tooltip,
   Typography,
   useTheme,
 } from '@mui/material';

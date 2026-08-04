@@ -1,20 +1,13 @@
 import CloseIcon from '@mui/icons-material/Close';
-import RecentIcon from '@mui/icons-material/History';
 import EnterIcon from '@mui/icons-material/KeyboardReturn';
 import SearchIcon from '@mui/icons-material/Search';
 import {
   alpha,
   Box,
-  Chip,
   Dialog,
   DialogContent,
-  Divider,
   IconButton,
   InputBase,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
   Paper,
   Slide,
   styled,
@@ -22,19 +15,13 @@ import {
   useTheme,
 } from '@mui/material';
 import type { TransitionProps } from '@mui/material/transitions';
-import Fuse from 'fuse.js';
 import type { FC} from 'react';
-import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
+import React from 'react';
 
-import {
-  createPaletteKeyHandler,
-  filterCommands,
-  groupByCategory,
-} from './CommandPalette.helpers';
 import { useCommandPalette } from './CommandPalette.hooks';
 import { PaletteResults } from './CommandPaletteResults';
 import { ShortcutChip } from './ShortcutChip';
-import type { PaletteCommand, CommandPaletteProps } from './CommandPalette.types';
+import type { CommandPaletteProps } from './CommandPalette.types';
 
 // Styled components
 const StyledDialog = styled(Dialog)(() => ({
@@ -158,8 +145,7 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
   onCommandExecute,
   dataTestId = 'command-palette',
 }) => {
-  const theme = useTheme();
-  const {
+    const {
     searchQuery,
     setSearchQuery,
     selectedIndex,
