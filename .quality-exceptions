@@ -73,7 +73,6 @@ packages/ui/src/components/feedback/TutorialOverlay/TutorialOverlay.test.stories
 packages/ui/src/components/feedback/TutorialOverlay/TutorialOverlay.tsx
 packages/ui/src/components/form/AddressAutocomplete/AddressAutocomplete.test.stories.tsx
 packages/ui/src/components/form/AddressAutocomplete/AddressAutocomplete.tsx
-packages/ui/src/components/form/Button/Button.test.stories.tsx
 packages/ui/src/components/form/Button/Button.tsx
 packages/ui/src/components/form/Calendar/Calendar.test.stories.tsx
 packages/ui/src/components/form/Calendar/Calendar.tsx
@@ -110,7 +109,6 @@ packages/ui/src/components/form/Toggle/Toggle.tsx
 packages/ui/src/components/form/ToggleGroup/ToggleGroup.test.stories.tsx
 packages/ui/src/components/layout/Accordion/Accordion.test.stories.tsx
 packages/ui/src/components/layout/Accordion/Accordion.tsx
-packages/ui/src/components/layout/Card/Card.test.stories.tsx
 packages/ui/src/components/layout/Card/Card.tsx
 packages/ui/src/components/layout/Collapsible/Collapsible.tsx
 packages/ui/src/components/layout/Container/Container.test.stories.tsx
@@ -120,7 +118,6 @@ packages/ui/src/components/layout/ScrollArea/ScrollArea.test.stories.tsx
 packages/ui/src/components/layout/ScrollArea/ScrollArea.tsx
 packages/ui/src/components/layout/Separator/Separator.test.stories.tsx
 packages/ui/src/components/layout/Separator/Separator.tsx
-packages/ui/src/components/layout/Sidebar/Sidebar.test.stories.tsx
 packages/ui/src/components/layout/Skeleton/Skeleton.test.stories.tsx
 packages/ui/src/components/layout/Skeleton/Skeleton.tsx
 packages/ui/src/components/layout/Spacer/Spacer.test.stories.tsx
