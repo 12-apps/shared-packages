@@ -40,8 +40,6 @@ packages/ui/src/components/data-display/HoverCard/HoverCard.tsx
 packages/ui/src/components/data-display/InteractiveTooltip/InteractiveTooltip.tsx
 packages/ui/src/components/data-display/LazyImage/LazyImage.tsx
 packages/ui/src/components/data-display/LoadingState/LoadingState.tsx
-packages/ui/src/components/data-display/MapPreview/MapPreview.test.stories.tsx
-packages/ui/src/components/data-display/MapPreview/MapPreview.tsx
 packages/ui/src/components/data-display/Popover/Popover.test.stories.tsx
 packages/ui/src/components/data-display/Progress/Progress.test.stories.tsx
 packages/ui/src/components/data-display/Progress/Progress.tsx

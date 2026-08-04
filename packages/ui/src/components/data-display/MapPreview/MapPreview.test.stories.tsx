@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, fn, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { MapPreview } from './MapPreview';
 import type { HeatmapPoint,MapMarker } from './MapPreview.types';
@@ -43,7 +43,7 @@ export const BasicInteraction: Story = {
     const canvas = within(canvasElement);
 
     // Wait for map container to render with extended timeout
-    const _mapContainer = await waitFor(
+    await waitFor(
       async () => {
         const container = await canvas.findByTestId('map-preview-container');
         expect(container).toBeInTheDocument();
@@ -93,7 +93,7 @@ export const MarkerInteraction: Story = {
     );
 
     // Test marker renders with extended wait
-    const _marker = await waitFor(
+    await waitFor(
       async () => {
         const markerElement = await canvas.findByTestId('map-marker-0');
         expect(markerElement).toBeInTheDocument();
@@ -117,7 +117,7 @@ export const KeyboardNavigation: Story = {
     const canvas = within(canvasElement);
 
     // Wait for map to render and test container is focusable
-    const _mapContainer = await waitFor(
+    await waitFor(
       async () => {
         const container = await canvas.findByTestId('map-preview-container');
         expect(container).toBeInTheDocument();
@@ -142,7 +142,7 @@ export const ScreenReader: Story = {
     const canvas = within(canvasElement);
 
     // Wait for map and test ARIA labels
-    const _mapContainer = await waitFor(
+    await waitFor(
       async () => {
         const container = await canvas.findByTestId('map-preview-container');
         expect(container).toBeInTheDocument();
@@ -168,7 +168,7 @@ export const FocusManagement: Story = {
     const canvas = within(canvasElement);
 
     // Wait for map and test initial focus
-    const _mapContainer = await waitFor(
+    const mapContainer = await waitFor(
       async () => {
         const container = await canvas.findByTestId('map-preview-container');
         expect(container).toBeInTheDocument();
@@ -177,8 +177,9 @@ export const FocusManagement: Story = {
       { timeout: 10000 }
     );
 
-    mapContainer.focus();
-    expect(mapContainer).toBeInTheDocument();
+    // The container carries tabIndex={0}, so clicking it should focus it.
+    await userEvent.click(mapContainer);
+    await waitFor(() => expect(mapContainer).toHaveFocus());
 
     // Mark test as passed
     const statusElement = document.createElement('div');
@@ -270,10 +271,13 @@ export const Performance: Story = {
   render: () => (
     <MapPreview
       center={defaultCenter}
+      // Spread deterministically around the centre. These were random offsets,
+      // which meant the marker layout — and any snapshot of it — differed on
+      // every run.
       markers={Array.from({ length: 5 }, (_, i) => ({
         position: {
-          lat: defaultCenter.lat + (Math.random() - 0.5) * 0.1,
-          lng: defaultCenter.lng + (Math.random() - 0.5) * 0.1,
+          lat: defaultCenter.lat + (i - 2) * 0.02,
+          lng: defaultCenter.lng + (2 - i) * 0.02,
         },
         title: `Marker ${i + 1}`,
       }))}
