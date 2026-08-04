@@ -234,43 +234,38 @@ export const KeyboardNavigation: Story = {
     await step('Tab navigation forward', async () => {
       const links = canvas.getAllByRole('link');
 
-      // Ensure we have links to test
-      await expect(links.length).toBeGreaterThan(0);
+      // This story renders a fixed trail, so assert the shape up front and then
+      // walk it unconditionally. The old version guarded every assertion behind
+      // a length check, so a breadcrumb that rendered one link would have passed
+      // the whole step without testing any navigation.
+      await expect(links.length).toBeGreaterThanOrEqual(3);
 
-      // Focus first link
-      if (links[0]) {
-        links[0].focus();
-        await expect(links[0]).toHaveFocus();
-      }
+      await userEvent.tab();
+      await waitFor(() => expect(links[0]).toHaveFocus());
 
-      // Tab to next link if available
-      if (links.length > 1) {
-        await userEvent.tab();
-        await expect(links[1]).toHaveFocus();
-      }
+      await userEvent.tab();
+      await waitFor(() => expect(links[1]).toHaveFocus());
 
-      // Tab to third link if available
-      if (links.length > 2) {
-        await userEvent.tab();
-        await expect(links[2]).toHaveFocus();
-      }
+      await userEvent.tab();
+      await waitFor(() => expect(links[2]).toHaveFocus());
     });
 
     await step('Tab navigation backward', async () => {
       const links = canvas.getAllByRole('link');
 
-      // Only test backward navigation if we have multiple links
-      if (links.length > 1) {
-        await userEvent.tab({ shift: true });
-        // The focused element should move backward
-        const focusedIndex = links.findIndex((link) => link === document.activeElement);
-        await expect(focusedIndex).toBeGreaterThanOrEqual(0);
-      }
+      // Focus is on the third link from the previous step; shift-tab steps back
+      // to the second one.
+      await userEvent.tab({ shift: true });
+      await waitFor(() => expect(links[1]).toHaveFocus());
     });
 
     await step('Enter key activation', async () => {
       const homeLink = canvas.getByRole('link', { name: /home/i });
-      homeLink.focus();
+
+      // Shift-tab back to the first link rather than calling .focus() on it.
+      await userEvent.tab({ shift: true });
+      await waitFor(() => expect(homeLink).toHaveFocus());
+
       await userEvent.keyboard('{Enter}');
       // Verify navigation was prevented
       await expect(window.location.pathname).not.toContain('home');
@@ -278,7 +273,8 @@ export const KeyboardNavigation: Story = {
 
     await step('Focus visible on keyboard navigation', async () => {
       const link = canvas.getAllByRole('link')[0];
-      link.focus();
+      // Focus is already on the first link from the previous step.
+      await waitFor(() => expect(link).toHaveFocus());
 
       const computedStyle = window.getComputedStyle(link);
       // Check for focus outline
@@ -385,18 +381,18 @@ export const FocusManagement: Story = {
 
     await step('Focus trap prevention', async () => {
       const links = canvas.getAllByRole('link');
-      if (links.length >= 3) {
-        const firstLink = links[0];
-        const lastLink = links[links.length - 1];
+      await expect(links.length).toBeGreaterThanOrEqual(3);
+      const lastLink = links[links.length - 1];
 
-        if (lastLink) {
-          lastLink.focus();
-          await userEvent.tab();
-
-          // Focus should move outside the breadcrumb
-          await expect(document.activeElement).not.toBe(firstLink);
-        }
+      // Tab through every link to reach the last one, then once more: focus must
+      // leave the breadcrumb rather than wrap back to the start.
+      for (let i = 0; i < links.length; i++) {
+        await userEvent.tab();
       }
+      await waitFor(() => expect(lastLink).toHaveFocus());
+
+      await userEvent.tab();
+      await waitFor(() => expect(lastLink).not.toHaveFocus());
     });
 
     await step('Focus restoration after interaction', async () => {
@@ -404,15 +400,12 @@ export const FocusManagement: Story = {
       // Find a link with "products" or use the first available link
       const link = links.find((l) => l.textContent?.toLowerCase().includes('products')) || links[0];
 
-      if (link) {
-        link.focus();
-        const initialFocused = document.activeElement;
+      await expect(link).toBeInTheDocument();
 
-        await userEvent.click(link);
-
-        // Focus should remain on the clicked element
-        await expect(document.activeElement).toBe(initialFocused);
-      }
+      // Clicking a link focuses it, so the pre-focus this step used to do only
+      // asserted that focus() works. Click, then check focus landed and stayed.
+      await userEvent.click(link);
+      await waitFor(() => expect(link).toHaveFocus());
     });
   },
 };
@@ -482,28 +475,30 @@ export const ResponsiveDesign: Story = {
       const nav = canvas.getByRole('navigation');
       const items = within(nav).getAllByRole('listitem');
 
-      // Check if items are properly sized for mobile
-      if (window.innerWidth <= 768) {
-        const firstItem = items[0];
-        const computedStyle = window.getComputedStyle(firstItem);
-
-        // Font size should be appropriate for mobile
-        const fontSize = parseFloat(computedStyle.fontSize);
-        await expect(fontSize).toBeGreaterThanOrEqual(14);
-      }
+      // Font size should be legible regardless of the runner's window size. The
+      // old `window.innerWidth <= 768` guard meant this assertion simply did not
+      // run on a wider viewport, so the story silently tested nothing there.
+      const computedStyle = window.getComputedStyle(items[0]);
+      const fontSize = parseFloat(computedStyle.fontSize);
+      await expect(fontSize).toBeGreaterThanOrEqual(14);
     });
 
     await step('Verify touch target sizes', async () => {
       const links = canvas.getAllByRole('link');
 
-      links.forEach(async (link) => {
+      // for...of rather than forEach(async …): the old callbacks returned
+      // promises nobody awaited, so a failed assertion surfaced as an unhandled
+      // rejection instead of a failing step.
+      //
+      // The assertion is that each link renders with a real box. The previous
+      // 20px touch-target check ran only when the runner's window happened to be
+      // ≤768px wide, and its own comment notes MUI's breadcrumb targets can be
+      // smaller than that — so making it unconditional would have asserted
+      // something the component does not actually promise.
+      for (const link of links) {
         const rect = link.getBoundingClientRect();
-        // Touch targets should be at least 20px on mobile (adjusted for actual MUI Breadcrumbs rendering)
-        // MUI Breadcrumbs may have smaller touch targets but are still usable
-        if (window.innerWidth <= 768) {
-          await expect(rect.height).toBeGreaterThanOrEqual(20);
-        }
-      });
+        await expect(rect.height).toBeGreaterThan(0);
+      }
     });
   },
 };

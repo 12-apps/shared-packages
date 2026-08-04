@@ -308,10 +308,22 @@ export interface MercadoLivreConnectorOptions {
   apiBaseUrl?: string;
 }
 
+// Scans back from the end instead of matching /\/+$/. The regex is
+// polynomial-time on a base URL that is mostly slashes (CodeQL: polynomial
+// regular expression used on uncontrolled data), and apiBaseUrl comes from
+// caller configuration.
+const stripTrailingSlashes = (url: string): string => {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === '/') {
+    end -= 1;
+  }
+  return url.slice(0, end);
+};
+
 export const createMercadoLivreConnector = (
   options: MercadoLivreConnectorOptions,
 ): PriceSourceConnector => {
-  const base = (options.apiBaseUrl ?? DEFAULT_ML_API_BASE_URL).replace(/\/+$/, '');
+  const base = stripTrailingSlashes(options.apiBaseUrl ?? DEFAULT_ML_API_BASE_URL);
   const { auth } = options;
 
   return {

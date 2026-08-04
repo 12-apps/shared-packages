@@ -98,6 +98,20 @@ export function CredentialField({ spec, state, value, onChange }: CredentialFiel
  * to TYPE the value. Beside the value itself it is answered by the thing it
  * sits next to, so the summary row shows the bare name.
  */
+// Drops a trailing "(...)" qualifier from a field label. Done by scanning
+// rather than with /\s*\([^)]*\)\s*$/, which is polynomial-time on labels made
+// of many spaces or many open parens (CodeQL: polynomial regular expression
+// used on uncontrolled data) — the label is supplied by the caller.
+function stripTrailingParenthetical(label: string): string {
+  const trimmed = label.trimEnd();
+  if (!trimmed.endsWith(')')) return trimmed;
+
+  const open = trimmed.lastIndexOf('(');
+  if (open === -1) return trimmed;
+
+  return trimmed.slice(0, open).trimEnd();
+}
+
 export function DoneRow({
   label,
   value,
@@ -125,7 +139,7 @@ export function DoneRow({
         ✓
       </Box>
       <Typography variant="body2" color="text.secondary">
-        {label.replace(/\s*\([^)]*\)\s*$/, '')}
+        {stripTrailingParenthetical(label)}
       </Typography>
       <Typography variant="body2" sx={mono ? MONO_INPUT : undefined}>
         {value}

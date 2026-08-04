@@ -216,18 +216,22 @@ export const KeyboardNavigation: Story = {
       const firstSummary = canvas.getByTestId('first-summary');
       const secondSummary = canvas.getByTestId('second-summary');
 
-      // Focus first summary
-      firstSummary.focus();
-      await expect(firstSummary).toHaveFocus();
+      // Tab in from the body rather than calling .focus() — the old first
+      // assertion only proved the DOM honours focus().
+      await userEvent.tab();
+      await waitFor(() => expect(firstSummary).toHaveFocus());
 
       // Tab to second summary
       await userEvent.tab();
-      await expect(secondSummary).toHaveFocus();
+      await waitFor(() => expect(secondSummary).toHaveFocus());
     });
 
     await step('Enter key to expand accordion', async () => {
       const firstSummary = canvas.getByTestId('first-summary');
-      firstSummary.focus();
+
+      // Focus is on the second summary from the previous step; shift-tab back.
+      await userEvent.tab({ shift: true });
+      await waitFor(() => expect(firstSummary).toHaveFocus());
 
       await userEvent.keyboard('{Enter}');
 
@@ -240,12 +244,15 @@ export const KeyboardNavigation: Story = {
     await step('Tab into expanded content', async () => {
       const firstButton = canvas.getByTestId('first-button');
       await userEvent.tab();
-      await expect(firstButton).toHaveFocus();
+      await waitFor(() => expect(firstButton).toHaveFocus());
     });
 
     await step('Space key to expand accordion', async () => {
       const secondSummary = canvas.getByTestId('second-summary');
-      secondSummary.focus();
+
+      // Continue the journey forward from the button inside the first panel.
+      await userEvent.tab();
+      await waitFor(() => expect(secondSummary).toHaveFocus());
 
       await userEvent.keyboard(' ');
 
@@ -352,14 +359,14 @@ export const FocusManagement: Story = {
 
     await step('Initial focus state', async () => {
       const externalTrigger = canvas.getByTestId('external-trigger');
-      externalTrigger.focus();
-      await expect(externalTrigger).toHaveFocus();
+      await userEvent.tab();
+      await waitFor(() => expect(externalTrigger).toHaveFocus());
     });
 
     await step('Focus on accordion summary', async () => {
       const summary = canvas.getByTestId('focus-summary');
-      summary.focus();
-      await expect(summary).toHaveFocus();
+      await userEvent.tab();
+      await waitFor(() => expect(summary).toHaveFocus());
     });
 
     await step('Expand accordion and check focus flow', async () => {
@@ -375,9 +382,6 @@ export const FocusManagement: Story = {
         },
         { timeout: 1000 },
       );
-
-      // Small delay to ensure DOM is stable after animation
-      await new Promise((resolve) => setTimeout(resolve, 150));
 
       // Tab through the expanded content with proper focus waiting
       await userEvent.tab();
@@ -439,15 +443,8 @@ export const FocusManagement: Story = {
     await step('Focus restoration after collapse', async () => {
       const summary = canvas.getByTestId('focus-summary');
 
-      // First ensure summary has focus before clicking
-      summary.focus();
-      await waitFor(
-        () => {
-          expect(summary).toHaveFocus();
-        },
-        { timeout: 500 },
-      );
-
+      // No pre-focus: clicking the summary focuses it, so calling .focus()
+      // first only asserted that focus() works.
       // Click to collapse
       await userEvent.click(summary);
 
@@ -528,8 +525,9 @@ export const VisualStates: Story = {
       await expect(styles.pointerEvents).toBe('none');
 
       // Content should remain hidden since it can't be clicked
-      const details = canvas.queryByText('This should not be accessible');
-      await expect(details).not.toBeVisible();
+      await waitFor(() =>
+        expect(canvas.queryByText('This should not be accessible')).not.toBeVisible(),
+      );
     });
 
     await step('Expand animation test', async () => {
@@ -1320,44 +1318,29 @@ export const PerformanceTest: Story = {
 
     await step('Measure initial render time', async () => {
 
-      const startTime = performance.now();
+      // No wall-clock budget: getAllByTestId queries DOM that has already
+      // rendered, so timing around it measured query time, and any threshold is
+      // really a bet on how loaded the runner is. The count is the real check.
       const accordions = canvas.getAllByTestId(/^perf-accordion-\d+$/);
-
-      const endTime = performance.now();
-
-      const renderTime = endTime - startTime;
-      // eslint-disable-next-line no-console
-      console.log(`Render time for ${accordions.length} accordions: ${renderTime}ms`);
-
       await expect(accordions.length).toBe(20);
-      // Assert reasonable render time (lenient threshold for CI/CD variability)
-      await expect(renderTime).toBeLessThan(500);
     });
 
     await step('Test rapid expand/collapse performance', async () => {
 
-      const startTime = performance.now();
-
-      // Rapidly expand/collapse multiple accordions
+      // Expand then collapse each accordion, waiting on the state the click is
+      // supposed to produce rather than sleeping 50ms and hoping it landed.
       for (let i = 0; i < 5; i++) {
         const accordion = canvas.getByTestId(`perf-accordion-${i}`);
         const summary = accordion.querySelector('.MuiAccordionSummary-root');
 
         if (summary) {
           await userEvent.click(summary);
+          await waitFor(() => expect(summary).toHaveAttribute('aria-expanded', 'true'));
 
-          await new Promise((resolve) => setTimeout(resolve, 50));
           await userEvent.click(summary);
+          await waitFor(() => expect(summary).toHaveAttribute('aria-expanded', 'false'));
         }
       }
-
-      const endTime = performance.now();
-      const interactionTime = endTime - startTime;
-      // eslint-disable-next-line no-console
-      console.log(`Interaction time for 5 accordions: ${interactionTime}ms`);
-
-      // Verify no performance issues (lenient threshold for CI/CD variability)
-      await expect(interactionTime).toBeLessThan(3000);
     });
   },
 };

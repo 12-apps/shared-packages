@@ -107,7 +107,6 @@ packages/ui/src/components/form/Textarea/Textarea.tsx
 packages/ui/src/components/form/Toggle/Toggle.test.stories.tsx
 packages/ui/src/components/form/Toggle/Toggle.tsx
 packages/ui/src/components/form/ToggleGroup/ToggleGroup.test.stories.tsx
-packages/ui/src/components/layout/Accordion/Accordion.test.stories.tsx
 packages/ui/src/components/layout/Accordion/Accordion.tsx
 packages/ui/src/components/layout/Card/Card.tsx
 packages/ui/src/components/layout/Collapsible/Collapsible.tsx
@@ -121,7 +120,6 @@ packages/ui/src/components/layout/Separator/Separator.tsx
 packages/ui/src/components/layout/Skeleton/Skeleton.test.stories.tsx
 packages/ui/src/components/layout/Skeleton/Skeleton.tsx
 packages/ui/src/components/layout/Spacer/Spacer.test.stories.tsx
-packages/ui/src/components/navigation/Breadcrumbs/Breadcrumbs.test.stories.tsx
 packages/ui/src/components/navigation/Breadcrumbs/Breadcrumbs.tsx
 packages/ui/src/components/navigation/CommandPalette/CommandPalette.tsx
 packages/ui/src/components/navigation/ContextMenu/ContextMenu.tsx
@@ -129,7 +127,6 @@ packages/ui/src/components/navigation/DropdownMenu/DropdownMenu.tsx
 packages/ui/src/components/navigation/NavigationMenu/NavigationMenu.tsx
 packages/ui/src/components/navigation/Pagination/Pagination.test.stories.tsx
 packages/ui/src/components/navigation/Pagination/Pagination.tsx
-packages/ui/src/components/navigation/Tabs/Tabs.test.stories.tsx
 packages/ui/src/components/navigation/Tabs/Tabs.tsx
 packages/ui/src/components/typography/Blockquote/Blockquote.test.stories.tsx
 packages/ui/src/components/typography/Code/Code.test.stories.tsx
