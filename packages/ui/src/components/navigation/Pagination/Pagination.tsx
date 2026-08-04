@@ -133,79 +133,193 @@ const renderPaginationItem = ({
   
 };
 
+// One place for the three-way size choice the sub-parts each make.
+const bySize = <T,>(size: PaginationProps['size'], choices: { sm: T; md: T; lg: T }): T =>
+  size === 'sm' ? choices.sm : size === 'lg' ? choices.lg : choices.md;
+
+// Prop defaults live in these resolvers rather than the component's parameter
+// list: nineteen `= default` branches leave no complexity budget for the render.
+type Chrome = Pick<
+  PaginationProps,
+  | 'variant'
+  | 'size'
+  | 'color'
+  | 'showPageInfo'
+  | 'pageInfoFormat'
+  | 'showItemsPerPage'
+  | 'itemsPerPageOptions'
+  | 'itemsPerPage'
+>;
+
+const resolveChrome = ({
+  variant = 'default',
+  size = 'md',
+  color = 'primary',
+  showPageInfo = false,
+  pageInfoFormat = (page, count) => `Page ${page} of ${count}`,
+  showItemsPerPage = false,
+  itemsPerPageOptions = [10, 25, 50, 100],
+  itemsPerPage = 10,
+}: Chrome) => ({
+  variant,
+  size,
+  color,
+  showPageInfo,
+  pageInfoFormat,
+  showItemsPerPage,
+  itemsPerPageOptions,
+  itemsPerPage,
+});
+
+type Icons = Pick<PaginationProps, 'firstIcon' | 'lastIcon' | 'previousIcon' | 'nextIcon'>;
+
+const resolveIcons = ({
+  firstIcon = <FirstPage />,
+  lastIcon = <LastPage />,
+  previousIcon = <NavigateBefore />,
+  nextIcon = <NavigateNext />,
+}: Icons) => ({ firstIcon, lastIcon, previousIcon, nextIcon });
+
+type Navigation = Pick<
+  PaginationProps,
+  | 'boundaryCount'
+  | 'siblingCount'
+  | 'hideNextButton'
+  | 'hidePrevButton'
+  | 'showFirstButton'
+  | 'showLastButton'
+  | 'disabled'
+>;
+
+const resolveNavigation = ({
+  boundaryCount = 1,
+  siblingCount = 1,
+  hideNextButton = false,
+  hidePrevButton = false,
+  showFirstButton = false,
+  showLastButton = false,
+  disabled = false,
+}: Navigation) => ({
+  boundaryCount,
+  siblingCount,
+  hideNextButton,
+  hidePrevButton,
+  showFirstButton,
+  showLastButton,
+  disabled,
+});
+
+// The dots variant shows no numbered pages, so it drops the sibling/boundary
+// counts and the step buttons that only make sense alongside them.
+const applyDotsVariant = (
+  navigation: ReturnType<typeof resolveNavigation>,
+  dots: boolean,
+) => ({
+  ...navigation,
+  boundaryCount: dots ? 0 : navigation.boundaryCount,
+  siblingCount: dots ? 0 : navigation.siblingCount,
+  hideNextButton: navigation.hideNextButton || dots,
+  hidePrevButton: navigation.hidePrevButton || dots,
+  showFirstButton: navigation.showFirstButton && !dots,
+  showLastButton: navigation.showLastButton && !dots,
+});
+
+const ItemsPerPageSelect: React.FC<{
+  size: PaginationProps['size'];
+  itemsPerPage: number;
+  options: number[];
+  disabled: boolean;
+  dataTestId?: string;
+  onChange?: (value: number) => void;
+}> = ({ size, itemsPerPage, options, disabled, dataTestId, onChange }) => {
+  if (!onChange) return null;
+
+  return (
+    <ItemsPerPageContainer>
+      <Typography variant="body2" color="text.secondary">
+        Show:
+      </Typography>
+      <FormControl size="small" sx={{ minWidth: 80 }}>
+        <Select
+          value={itemsPerPage}
+          onChange={(e) => onChange(e.target.value as number)}
+          disabled={disabled}
+          data-testid={dataTestId ? `${dataTestId}-items-per-page` : 'pagination-items-per-page'}
+          sx={{
+            '& .MuiSelect-select': {
+              fontSize: bySize(size, { sm: '0.875rem', md: '1rem', lg: '1.125rem' }),
+              py: bySize(size, { sm: 0.5, md: 1, lg: 1.5 }),
+            },
+          }}
+        >
+          {options.map((option) => (
+            <MenuItem key={option} value={option}>
+              {option}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </ItemsPerPageContainer>
+  );
+};
+
+const PageInfo: React.FC<{
+  size: PaginationProps['size'];
+  page: number;
+  count: number;
+  format: NonNullable<PaginationProps['pageInfoFormat']>;
+  dataTestId?: string;
+}> = ({ size, page, count, format, dataTestId }) => (
+  <PageInfoContainer>
+    <Typography
+      variant="body2"
+      color="text.secondary"
+      fontSize={bySize(size, { sm: '0.75rem', md: '0.875rem', lg: '1rem' })}
+      data-testid={dataTestId ? `${dataTestId}-info` : 'pagination-info'}
+    >
+      {format(page, count)}
+    </Typography>
+  </PageInfoContainer>
+);
+
 export const Pagination = React.forwardRef<HTMLElement, PaginationProps>(
   (
     {
-      variant = 'default',
-      size = 'md',
-      page,
-      count,
-      onChange,
-      boundaryCount = 1,
-      siblingCount = 1,
-      hideNextButton = false,
-      hidePrevButton = false,
-      showFirstButton = false,
-      showLastButton = false,
-      firstIcon = <FirstPage />,
-      lastIcon = <LastPage />,
-      previousIcon = <NavigateBefore />,
-      nextIcon = <NavigateNext />,
-      disabled = false,
-      color = 'primary',
-      showPageInfo = false,
-      pageInfoFormat = (page, count) => `Page ${page} of ${count}`,
-      showItemsPerPage = false,
-      itemsPerPageOptions = [10, 25, 50, 100],
-      itemsPerPage = 10,
-      onItemsPerPageChange,
-      className,
-      dataTestId,
-      ...props
+      variant, size, page, count, onChange, boundaryCount, siblingCount,
+      hideNextButton, hidePrevButton, showFirstButton, showLastButton,
+      firstIcon, lastIcon, previousIcon, nextIcon, disabled, color,
+      showPageInfo, pageInfoFormat, showItemsPerPage, itemsPerPageOptions,
+      itemsPerPage, onItemsPerPageChange, className, dataTestId, ...props
     },
     ref,
   ) => {
-    // For dots variant, we show fewer pages
-    const adjustedBoundaryCount = variant === 'dots' ? 0 : boundaryCount;
-    const adjustedSiblingCount = variant === 'dots' ? 0 : siblingCount;
+    const chrome = resolveChrome({
+      variant, size, color, showPageInfo, pageInfoFormat,
+      showItemsPerPage, itemsPerPageOptions, itemsPerPage,
+    });
+    const icons = resolveIcons({ firstIcon, lastIcon, previousIcon, nextIcon });
+    const navigation = applyDotsVariant(
+      resolveNavigation({
+        boundaryCount, siblingCount, hideNextButton, hidePrevButton,
+        showFirstButton, showLastButton, disabled,
+      }),
+      chrome.variant === 'dots',
+    );
 
     const renderItem = (item: PaginationRenderItemParams) =>
-      renderPaginationItem({
-        item,
-        variant,
-        size,
-        dataTestId,
-        icons: { firstIcon, lastIcon, previousIcon, nextIcon },
-      });
+      renderPaginationItem({ item, variant: chrome.variant, size: chrome.size, dataTestId, icons });
 
     return (
       <PaginationContainer className={className} data-testid={dataTestId || 'pagination'}>
-        {showItemsPerPage && onItemsPerPageChange && (
-          <ItemsPerPageContainer>
-            <Typography variant="body2" color="text.secondary">
-              Show:
-            </Typography>
-            <FormControl size="small" sx={{ minWidth: 80 }}>
-              <Select
-                value={itemsPerPage}
-                onChange={(e) => onItemsPerPageChange(e.target.value as number)}
-                disabled={disabled}
-                data-testid={dataTestId ? `${dataTestId}-items-per-page` : 'pagination-items-per-page'}
-                sx={{
-                  '& .MuiSelect-select': {
-                    fontSize: size === 'sm' ? '0.875rem' : size === 'lg' ? '1.125rem' : '1rem',
-                    py: size === 'sm' ? 0.5 : size === 'lg' ? 1.5 : 1,
-                  },
-                }}
-              >
-                {itemsPerPageOptions.map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </ItemsPerPageContainer>
+        {chrome.showItemsPerPage && (
+          <ItemsPerPageSelect
+            size={chrome.size}
+            itemsPerPage={chrome.itemsPerPage}
+            options={chrome.itemsPerPageOptions}
+            disabled={navigation.disabled}
+            dataTestId={dataTestId}
+            onChange={onItemsPerPageChange}
+          />
         )}
 
         <StyledPagination
@@ -213,33 +327,24 @@ export const Pagination = React.forwardRef<HTMLElement, PaginationProps>(
           page={page}
           count={count}
           onChange={onChange}
-          customVariant={variant}
-          customSize={size}
+          customVariant={chrome.variant}
+          customSize={chrome.size}
           variant="outlined"
-          size={size === 'sm' ? 'small' : size === 'lg' ? 'large' : 'medium'}
-          boundaryCount={adjustedBoundaryCount}
-          siblingCount={adjustedSiblingCount}
-          hideNextButton={hideNextButton || variant === 'dots'}
-          hidePrevButton={hidePrevButton || variant === 'dots'}
-          showFirstButton={showFirstButton && variant !== 'dots'}
-          showLastButton={showLastButton && variant !== 'dots'}
-          disabled={disabled}
-          color={color}
+          size={bySize(chrome.size, { sm: 'small', md: 'medium', lg: 'large' })}
+          color={chrome.color}
           renderItem={renderItem}
+          {...navigation}
           {...props}
         />
 
-        {showPageInfo && (
-          <PageInfoContainer>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              fontSize={size === 'sm' ? '0.75rem' : size === 'lg' ? '1rem' : '0.875rem'}
-              data-testid={dataTestId ? `${dataTestId}-info` : 'pagination-info'}
-            >
-              {pageInfoFormat(page, count)}
-            </Typography>
-          </PageInfoContainer>
+        {chrome.showPageInfo && (
+          <PageInfo
+            size={chrome.size}
+            page={page}
+            count={count}
+            format={chrome.pageInfoFormat}
+            dataTestId={dataTestId}
+          />
         )}
       </PaginationContainer>
     );
