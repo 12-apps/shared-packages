@@ -100,7 +100,6 @@ packages/ui/src/components/layout/Container/Container.test.stories.tsx
 packages/ui/src/components/layout/Resizable/Resizable.test.stories.tsx
 packages/ui/src/components/layout/Resizable/Resizable.tsx
 packages/ui/src/components/layout/ScrollArea/ScrollArea.test.stories.tsx
-packages/ui/src/components/layout/ScrollArea/ScrollArea.tsx
 packages/ui/src/components/layout/Separator/Separator.test.stories.tsx
 packages/ui/src/components/layout/Separator/Separator.tsx
 packages/ui/src/components/layout/Skeleton/Skeleton.test.stories.tsx
