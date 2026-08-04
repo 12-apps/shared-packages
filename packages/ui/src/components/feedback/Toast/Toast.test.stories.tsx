@@ -2,7 +2,7 @@
 import { Box, Button, Stack,TextField, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useEffect, useRef,useState } from 'react';
-import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { expect, userEvent, waitFor,within } from 'storybook/test';
 
 import { Toast, ToastContainer,ToastProvider, useToast } from './Toast';
 
@@ -161,10 +161,7 @@ export const FormInteraction: Story = {
     await userEvent.type(messageInput, 'Test form message');
 
     // Wait a bit for React state to update
-    await waitFor(() => {
-  // TODO: Add assertion or condition
-  expect(true).toBe(true);
-});
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Button should now be enabled
     expect(submitButton).not.toBeDisabled();
@@ -192,10 +189,10 @@ export const KeyboardNavigation: Story = {
     const { addToast } = useToast();
     const buttonRef = useRef<HTMLButtonElement>(null);
 
-    useEffect(async () => {
+    useEffect(() => {
       // Auto-focus for keyboard testing
       if (buttonRef.current) {
-        await userEvent.click(buttonRef.current);
+        buttonRef.current.focus();
       }
     }, []);
 
@@ -233,7 +230,7 @@ export const KeyboardNavigation: Story = {
     const triggerButton = canvas.getByTestId('keyboard-trigger');
 
     // Test keyboard activation
-    await userEvent.click(triggerButton);
+    triggerButton.focus();
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
@@ -245,7 +242,7 @@ export const KeyboardNavigation: Story = {
     await userEvent.keyboard('{Tab}');
     const closeButton = document.querySelector('[aria-label="close"]');
     if (closeButton) {
-      await waitFor(() => expect(closeButton).toHaveFocus());
+      expect(closeButton).toHaveFocus();
       await userEvent.keyboard('{Enter}');
 
       await waitFor(
@@ -368,7 +365,7 @@ export const FocusManagement: Story = {
     const focusTarget = canvas.getByTestId('focus-target');
 
     // Focus trigger and activate
-    await userEvent.click(triggerButton);
+    triggerButton.focus();
     await userEvent.click(triggerButton);
 
     await waitFor(() => {
@@ -386,14 +383,14 @@ export const FocusManagement: Story = {
 
     // Simplified focus test - just verify action button is focusable
     await waitFor(
-      async () => {
+      () => {
         const actionButton = document.querySelector(
           '[role="alert"] button:not([aria-label="close"])',
         );
         if (actionButton) {
           // Test that we can focus the action button
-          await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { (actionButton as HTMLElement).focus() }) }) }) }) })
-          await waitFor(() => expect(actionButton).toHaveFocus());
+          (actionButton as HTMLElement).focus();
+          expect(actionButton).toHaveFocus();
         }
       },
       { timeout: 1000 },
@@ -402,8 +399,8 @@ export const FocusManagement: Story = {
     // Test basic tab navigation works
     const focusTargetInput = focusTarget.querySelector('input') as HTMLElement;
     if (focusTargetInput) {
-      await userEvent.click(focusTargetInput);
-      await waitFor(() => expect(focusTargetInput).toHaveFocus());
+      focusTargetInput.focus();
+      expect(focusTargetInput).toHaveFocus();
     }
   },
 };
@@ -603,14 +600,14 @@ export const Performance: Story = {
       const endTime = window.performance.now();
       const duration = endTime - startTime;
 
-      await waitFor(async () => {
-  addToast({
+      window.setTimeout(() => {
+        addToast({
           message: `Stress test completed in ${duration.toFixed(2)}ms`,
           variant: 'success',
           persistent: true,
         });
         setIsStressing(false);
-}, { timeout: 1000 });
+      }, 1000);
     };
 
     return (
@@ -678,9 +675,9 @@ export const EdgeCases: Story = {
     const testPromiseRace = async () => {
       // Test multiple promises at once
       const promises = [
-        new Promise(async (resolve) => await waitFor(async () => resolve('First'), { timeout: 1000 })),
-        new Promise(async (resolve) => await waitFor(async () => resolve('Second'), { timeout: 1500 })),
-        new Promise(async (_, reject) => await waitFor(async () => reject('Third failed'), { timeout: 2000 })),
+        new Promise((resolve) => window.setTimeout(() => resolve('First'), 1000)),
+        new Promise((resolve) => window.setTimeout(() => resolve('Second'), 1500)),
+        new Promise((_, reject) => window.setTimeout(() => reject('Third failed'), 2000)),
       ];
 
       promises.forEach((p, i) => {
@@ -775,12 +772,12 @@ export const Integration: Story = {
         <Stack spacing={2}>
           <Button
             data-testid="integration-setup"
-            onClick={async () => {
+            onClick={() => {
               // Simulate a complete user workflow
               addToast({ message: 'Step 1: Initializing...', variant: 'info' });
 
-              await waitFor(async () => {
-  addToast({
+              window.setTimeout(() => {
+                addToast({
                   message: 'Step 2: Processing data...',
                   variant: 'warning',
                   action: {
@@ -788,16 +785,16 @@ export const Integration: Story = {
                     onClick: () => addToast({ message: 'Process cancelled', variant: 'error' }),
                   },
                 });
-}, { timeout: 1000 });
+              }, 1000);
 
-              await waitFor(async () => {
-  addToast({
+              window.setTimeout(() => {
+                addToast({
                   message: 'Step 3: Operation completed successfully!',
                   variant: 'success',
                   glass: true,
                   duration: 8000,
                 });
-}, { timeout: 2000 });
+              }, 2000);
             }}
           >
             Run Integration Test

@@ -252,7 +252,7 @@ export const KeyboardNavigation: Story = {
     // Focus on the carousel container
     const carousel = canvasElement.querySelector('[class*="MuiBox-root"]');
     if (carousel) {
-      await userEvent.click(carousel);
+      carousel.focus();
 
       // Press right arrow key
       await userEvent.keyboard('{ArrowRight}');
@@ -330,7 +330,7 @@ export const FocusManagement: Story = {
     // Focus on carousel container
     const carousel = canvasElement.querySelector('[class*="MuiBox-root"]');
     if (carousel instanceof HTMLElement) {
-      await userEvent.click(carousel);
+      carousel.focus();
 
       // Tab through interactive elements
       await userEvent.tab();

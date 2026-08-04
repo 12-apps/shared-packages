@@ -1,7 +1,7 @@
 import { Box, createTheme,ThemeProvider } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { Pagination } from './Pagination';
 
@@ -101,14 +101,14 @@ export const KeyboardNavigation: Story = {
 
     // Focus on the pagination component
     const firstButton = canvas.getAllByRole('button')[0];
-    await userEvent.click(firstButton);
+    firstButton.focus();
 
     // Tab through buttons
     await userEvent.tab();
-    await waitFor(() => expect(document.activeElement).toHaveAttribute(
+    await expect(document.activeElement).toHaveAttribute(
       'aria-label',
       expect.stringContaining('page'),
-    ))
+    );
 
     // Press Enter on focused button
     await userEvent.keyboard('{Enter}');
@@ -188,24 +188,24 @@ export const FocusManagement: Story = {
 
     // Test focus on first button
     const firstButton = buttons[0];
-    await userEvent.click(firstButton);
-    await waitFor(() => expect(document.activeElement).toBe(firstButton));
+    firstButton.focus();
+    await expect(document.activeElement).toBe(firstButton);
 
     // Tab through all interactive elements
     for (let i = 1; i < buttons.length; i++) {
       await userEvent.tab();
-      await waitFor(() => expect(document.activeElement).toBe(buttons[i]));
+      await expect(document.activeElement).toBe(buttons[i]);
     }
 
     // Test shift+tab backwards
     await userEvent.tab({ shift: true });
-    await waitFor(() => expect(document.activeElement).toBe(buttons[buttons.length - 2]));
+    await expect(document.activeElement).toBe(buttons[buttons.length - 2]);
 
     // Test focus trap doesn't occur
     await userEvent.tab();
     await userEvent.tab();
     // Focus should move outside pagination
-    await waitFor(() => expect(document.activeElement).not.toBe(buttons[0]));
+    await expect(document.activeElement).not.toBe(buttons[0]);
   },
 };
 
@@ -314,10 +314,7 @@ export const VisualStates: Story = {
 
     // Small delay to allow hover styles to apply
     // Hover state might be subtle or handled differently by MUI, skip strict check
-    await waitFor(() => {
-  // TODO: Add assertion or condition
-  expect(true).toBe(true);
-});
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Test active/pressed state
     await userEvent.click(page4Button);
@@ -339,6 +336,7 @@ export const Performance: Story = {
     onChange: fn(),
   },
   play: async ({ canvasElement, args }) => {
+    const startTime = Date.now();
     const canvas = within(canvasElement);
 
     // Render check
@@ -350,6 +348,7 @@ export const Performance: Story = {
     await expect(renderTime).toBeLessThan(100);
 
     // Interaction performance
+    const interactionStart = Date.now();
 
     // Click multiple pages rapidly
     const page49Button = canvas.getByRole('button', { name: /go to page 49/i });

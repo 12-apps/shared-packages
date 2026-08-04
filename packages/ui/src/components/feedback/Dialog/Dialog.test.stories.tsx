@@ -2,7 +2,7 @@
 import { Box,Button, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { Dialog, DialogActions,DialogContent, DialogHeader } from './Dialog';
 
@@ -215,24 +215,24 @@ export const KeyboardNavigation: Story = {
     await step('Tab navigation forward', async () => {
       // First focusable element should be the first button
       const firstButton = within(document.body).getByTestId('first-focusable');
-      await userEvent.click(firstButton);
-      await waitFor(() => expect(firstButton).toHaveFocus());
+      firstButton.focus();
+      await expect(firstButton).toHaveFocus();
 
       // Tab to next element
       await userEvent.tab();
       const secondButton = within(document.body).getByTestId('second-focusable');
-      await waitFor(() => expect(secondButton).toHaveFocus());
+      await expect(secondButton).toHaveFocus();
 
       // Continue tabbing to action buttons
       await userEvent.tab();
       const cancelButton = within(document.body).getByTestId('cancel-action');
-      await waitFor(() => expect(cancelButton).toHaveFocus());
+      await expect(cancelButton).toHaveFocus();
     });
 
     await step('Tab navigation backward', async () => {
       await userEvent.tab({ shift: true });
       const secondButton = within(document.body).getByTestId('second-focusable');
-      await waitFor(() => expect(secondButton).toHaveFocus());
+      await expect(secondButton).toHaveFocus();
     });
 
     await step('Escape key handling', async () => {
@@ -344,8 +344,8 @@ export const FocusManagement: Story = {
 
     await step('Focus initial trigger button', async () => {
       const triggerButton = canvas.getByTestId('trigger-button');
-      await userEvent.click(triggerButton);
-      await waitFor(() => expect(triggerButton).toHaveFocus());
+      triggerButton.focus();
+      await expect(triggerButton).toHaveFocus();
     });
 
     await step('Open modal and verify focus management', async () => {
@@ -359,10 +359,10 @@ export const FocusManagement: Story = {
 
       // Focus should move to the first focusable element in the dialog
       // In MUI Dialog, focus typically goes to the dialog container or first interactive element
-      await waitFor(async () => {
+      await waitFor(() => {
         const firstElement = within(document.body).getByTestId('first-modal-element');
-        await userEvent.click(firstElement);
-        await waitFor(() => expect(document.activeElement).toBeTruthy());
+        firstElement.focus();
+        expect(document.activeElement).toBeTruthy();
       });
     });
 
@@ -372,16 +372,16 @@ export const FocusManagement: Story = {
       const closeModalButton = within(document.body).getByTestId('close-modal-button');
 
       // Focus first element explicitly
-      await userEvent.click(firstElement);
-      await waitFor(() => expect(firstElement).toHaveFocus());
+      firstElement.focus();
+      await expect(firstElement).toHaveFocus();
 
       // Tab to next element
       await userEvent.tab();
-      await waitFor(() => expect(secondElement).toHaveFocus());
+      await expect(secondElement).toHaveFocus();
 
       // Tab to close button
       await userEvent.tab();
-      await waitFor(() => expect(closeModalButton).toHaveFocus());
+      await expect(closeModalButton).toHaveFocus();
 
       // Tab should cycle back (focus trap) - verify focus is managed
       await userEvent.tab();
@@ -409,7 +409,7 @@ export const FocusManagement: Story = {
 
       // Focus should return to the open button
       const openButton = canvas.getByTestId('open-dialog-button');
-      await waitFor(() => expect(openButton).toHaveFocus());
+      await expect(openButton).toHaveFocus();
     });
   },
 };
@@ -744,7 +744,7 @@ export const PersistentDialogTest: Story = {
       // This dialog is persistent - no close button in header
       const dialogHeader = document.querySelector('[class*="MuiDialogTitle"]');
       const closeButton = dialogHeader ? dialogHeader.querySelector('[aria-label="close"]') : null;
-      await waitFor(() => expect(closeButton).not.toBeInTheDocument());
+      await expect(closeButton).not.toBeInTheDocument();
     });
 
     await step('Test dialog can only be closed via action buttons', async () => {

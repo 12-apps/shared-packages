@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { expect, userEvent,waitFor, within } from 'storybook/test';
 
 import { TimingDiagram } from './TimingDiagram';
 
@@ -270,6 +270,7 @@ export const PerformanceTest: Story = {
     animated: true,
   },
   play: async ({ canvasElement }) => {
+    const startTime = Date.now();
     const canvas = within(canvasElement);
 
     // Verify rendering with large data
@@ -347,11 +348,11 @@ export const EdgeCasesTest: Story = {
 
     // DNS segment should not exist (zero value)
     const dnsSegment = container.querySelector('[data-testid="timing-segment-dns"]');
-    await waitFor(() => expect(dnsSegment).not.toBeInTheDocument());
+    await expect(dnsSegment).not.toBeInTheDocument();
 
     // Connect segment should not exist (undefined)
     const connectSegment = container.querySelector('[data-testid="timing-segment-connect"]');
-    await waitFor(() => expect(connectSegment).not.toBeInTheDocument());
+    await expect(connectSegment).not.toBeInTheDocument();
 
     // Request segment should exist with correct width
     const requestSegment = container.querySelector(
@@ -462,8 +463,8 @@ export const KeyboardNavigationTest: Story = {
     await expect(container).toBeInTheDocument();
 
     // Focus on the container
-    await userEvent.click(container);
-    await waitFor(() => waitFor(() => expect(document.activeElement).toBe(container)))
+    container.focus();
+    await waitFor(() => expect(document.activeElement).toBe(container));
 
     // Tab through interactive elements
     await userEvent.tab();
@@ -474,7 +475,7 @@ export const KeyboardNavigationTest: Story = {
       const firstSegment = segments[0] as HTMLElement;
 
       // Simulate keyboard focus
-      await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { firstSegment.focus?.() }) }) }) }) }) }) }) }) }) })
+      firstSegment.focus?.();
 
       // Verify segment can receive focus for tooltip
       const hasAriaDescribedBy = firstSegment.closest('[aria-describedby]');
@@ -558,8 +559,8 @@ export const FocusManagementTest: Story = {
     await expect(container).toBeInTheDocument();
 
     // Check container can receive focus
-    await userEvent.click(container);
-    await waitFor(() => waitFor(() => expect(document.activeElement).toBe(container)))
+    container.focus();
+    await waitFor(() => expect(document.activeElement).toBe(container));
 
     // Verify segments have hover states (visual feedback)
     const segments = container.querySelectorAll('[data-testid^="timing-segment"]');

@@ -2,7 +2,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import { Box, Stack,TextField } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { Label } from './Label';
 
@@ -247,23 +247,23 @@ export const KeyboardNavigation: Story = {
       const firstInput = firstInputContainer.querySelector('input');
 
       // Focus first label
-      await userEvent.click(firstLabel);
-      await waitFor(() => expect(firstLabel).toHaveFocus());
+      firstLabel.focus();
+      await expect(firstLabel).toHaveFocus();
 
       // Tab to input
       await userEvent.tab();
-      await waitFor(() => expect(firstInput).toHaveFocus());
+      await expect(firstInput).toHaveFocus();
     });
 
     await step('Tab navigation backward', async () => {
       await userEvent.tab({ shift: true });
       const firstLabel = canvas.getByTestId('first-label');
-      await waitFor(() => expect(firstLabel).toHaveFocus());
+      await expect(firstLabel).toHaveFocus();
     });
 
     await step('Enter key activation on clickable label', async () => {
       const firstLabel = canvas.getByTestId('first-label');
-      await userEvent.click(firstLabel);
+      firstLabel.focus();
       await userEvent.keyboard('{Enter}');
       // Verify click handler would be called
     });

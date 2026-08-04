@@ -1,6 +1,6 @@
 import { Box,Button, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn,userEvent, within } from 'storybook/test';
 
 import { Modal, ModalContent } from './Modal';
 
@@ -116,15 +116,15 @@ export const KeyboardNavigation: Story = {
       const thirdElement = within(document.body).getByTestId('third-focusable');
 
       // Test that elements are focusable
-      await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await firstElement.focus() }) }) }) }) })
-      await waitFor(() => expect(firstElement).toHaveFocus());
+      firstElement.focus();
+      await expect(firstElement).toHaveFocus();
 
       // Test tab navigation
       await userEvent.tab();
-      await waitFor(() => expect(secondElement).toHaveFocus());
+      await expect(secondElement).toHaveFocus();
 
       await userEvent.tab();
-      await waitFor(() => expect(thirdElement).toHaveFocus());
+      await expect(thirdElement).toHaveFocus();
     });
   },
 };

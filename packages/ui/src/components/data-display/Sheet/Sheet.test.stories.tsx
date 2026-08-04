@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { Sheet } from './Sheet';
 
@@ -331,10 +331,10 @@ export const KeyboardNavigation: Story = {
       const firstElement = body.getByTestId('first-focusable');
       const secondElement = body.getByLabelText('Input Field') as HTMLElement;
 
-      await userEvent.click(firstElement);
-      await waitFor(() => waitFor(() => {
+      firstElement.focus();
+      await waitFor(() => {
         expect(firstElement).toHaveFocus();
-      }))
+      });
 
       // Use keyboard instead of tab for better reliability
       await userEvent.keyboard('{Tab}');
@@ -457,10 +457,10 @@ export const FocusManagement: Story = {
             onOpenChange={setOpen}
             title="Focus Test"
             showCloseButton
-            onClose={async () => {
+            onClose={() => {
               setOpen(false);
               // Return focus to trigger
-              await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { triggerRef.current?.focus() }) }) }) }) }) }) }) }) }) })
+              triggerRef.current?.focus();
             }}
           >
             <Stack spacing={2}>
@@ -492,10 +492,10 @@ export const FocusManagement: Story = {
 
       // Manually focus the element since autoFocus might not work in tests
       const firstElement = body.getByTestId('first-modal-element');
-      await userEvent.click(firstElement);
-      await waitFor(() => waitFor(() => {
+      firstElement.focus();
+      await waitFor(() => {
         expect(firstElement).toHaveFocus();
-      }))
+      });
     });
 
     await step('Tab through sheet elements', async () => {

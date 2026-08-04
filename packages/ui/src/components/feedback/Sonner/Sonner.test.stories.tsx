@@ -1,7 +1,7 @@
 import { Box,Button, Stack, TextField } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { expect, userEvent, waitFor,within } from 'storybook/test';
 
 import { SonnerProvider, useSonner } from './Sonner';
 
@@ -147,8 +147,8 @@ const FocusManagementTest: React.FC = () => {
     toast('Focus management test', {
       action: {
         label: 'Focus Button',
-        onClick: async () => {
-          await act(async () => { await act(async () => { await act(async () => { await act(async () => { await act(async () => { buttonRef.current?.focus() }) }) }) }) })
+        onClick: () => {
+          buttonRef.current?.focus();
         },
       },
     });
@@ -253,9 +253,11 @@ const PerformanceTest: React.FC = () => {
   const { toast, dismiss } = useSonner();
 
   const handleManyToasts = () => {
+    const startTime = Date.now();
     for (let i = 0; i < 10; i++) {
       toast(`Toast ${i + 1}`);
     }
+    const endTime = Date.now();
     window.setTimeout(() => {
       toast(`Created 10 toasts in ${endTime - startTime}ms`);
     }, 100);
@@ -290,8 +292,8 @@ const EdgeCasesTest: React.FC = () => {
   };
 
   const handlePromiseToast = () => {
-    const testPromise = new Promise(async (resolve) => {
-      await waitFor(async () => resolve('Success!'), { timeout: 2000 });
+    const testPromise = new Promise((resolve) => {
+      window.setTimeout(() => resolve('Success!'), 2000);
     });
 
     promise(testPromise, {
@@ -327,22 +329,22 @@ const IntegrationTest: React.FC = () => {
     setStep(1);
     toast('Step 1: Starting integration test');
 
-    await waitFor(async () => {
-  setStep(2);
+    window.setTimeout(() => {
+      setStep(2);
       success('Step 2: First action completed');
-}, { timeout: 1000 });
+    }, 1000);
 
-    await waitFor(async () => {
-  setStep(3);
+    window.setTimeout(() => {
+      setStep(3);
       error('Step 3: Simulated error occurred');
-}, { timeout: 2000 });
+    }, 2000);
 
-    await waitFor(async () => {
-  setStep(4);
+    window.setTimeout(() => {
+      setStep(4);
       dismiss();
       success('Step 4: Integration test completed');
       setStep(0);
-}, { timeout: 3000 });
+    }, 3000);
   };
 
   return (
