@@ -21,7 +21,6 @@ packages/shared-helpers/tests/db/database.test.ts
 packages/ui/scripts/storybook.js
 packages/ui/src/__tests__/social-login-button.test.tsx
 packages/ui/src/components/data-display/Alert/Alert.test.stories.tsx
-packages/ui/src/components/data-display/Alert/Alert.tsx
 packages/ui/src/components/data-display/AlertDialog/AlertDialog.test.stories.tsx
 packages/ui/src/components/data-display/AsyncStateContainer/AsyncStateContainer.test.stories.tsx
 packages/ui/src/components/data-display/AsyncStateContainer/AsyncStateContainer.tsx
