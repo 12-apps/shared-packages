@@ -115,7 +115,6 @@ packages/ui/src/components/layout/Card/Card.test.stories.tsx
 packages/ui/src/components/layout/Card/Card.tsx
 packages/ui/src/components/layout/Collapsible/Collapsible.tsx
 packages/ui/src/components/layout/Container/Container.test.stories.tsx
-packages/ui/src/components/layout/Drawer/Drawer.tsx
 packages/ui/src/components/layout/Resizable/Resizable.test.stories.tsx
 packages/ui/src/components/layout/Resizable/Resizable.tsx
 packages/ui/src/components/layout/ScrollArea/ScrollArea.test.stories.tsx
@@ -138,7 +137,6 @@ packages/ui/src/components/navigation/Tabs/Tabs.test.stories.tsx
 packages/ui/src/components/navigation/Tabs/Tabs.tsx
 packages/ui/src/components/typography/Blockquote/Blockquote.test.stories.tsx
 packages/ui/src/components/typography/Code/Code.test.stories.tsx
-packages/ui/src/components/typography/Code/Code.tsx
 packages/ui/src/components/typography/Heading/Heading.test.stories.tsx
 packages/ui/src/components/typography/Heading/Heading.tsx
 packages/ui/src/components/typography/Paragraph/Paragraph.test.stories.tsx
