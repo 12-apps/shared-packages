@@ -106,8 +106,11 @@ export const KeyboardNavigation: Story = {
 
     await step('Focus trigger with Tab', async () => {
       const trigger = canvas.getByTestId('keyboard-trigger');
-      trigger.focus();
-      await expect(trigger).toHaveFocus();
+      // Tab rather than .focus(): the trigger is the only focusable node in this
+      // story, so this proves it is reachable by keyboard — which is what the
+      // step claims to check. Asserting that .focus() focused only tests the DOM.
+      await userEvent.tab();
+      await waitFor(() => expect(trigger).toHaveFocus());
     });
 
     await step('Verify keyboard accessibility', async () => {
