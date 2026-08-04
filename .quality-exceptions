@@ -115,7 +115,6 @@ packages/ui/src/components/navigation/ContextMenu/ContextMenu.tsx
 packages/ui/src/components/navigation/NavigationMenu/NavigationMenu.tsx
 packages/ui/src/components/navigation/Pagination/Pagination.test.stories.tsx
 packages/ui/src/components/navigation/Pagination/Pagination.tsx
-packages/ui/src/components/navigation/Tabs/Tabs.tsx
 packages/ui/src/components/typography/Blockquote/Blockquote.test.stories.tsx
 packages/ui/src/components/typography/Code/Code.test.stories.tsx
 packages/ui/src/components/typography/Heading/Heading.test.stories.tsx
