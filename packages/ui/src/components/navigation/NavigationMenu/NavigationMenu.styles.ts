@@ -48,7 +48,7 @@ const horizontalStyles = (theme: Theme): CSSObject => ({
       // border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
     });
 
-const collapsedStyles = (theme: Theme): CSSObject => ({
+const collapsedStyles = (_theme: Theme): CSSObject => ({
       justifyContent: 'center',
       minHeight: 56,
       '& .MuiListItemIcon-root': {
@@ -56,7 +56,7 @@ const collapsedStyles = (theme: Theme): CSSObject => ({
       },
     });
 
-const activeStyles = (theme: Theme, variant?: string): CSSObject => ({
+const activeStyles = (theme: Theme, _variant?: string): CSSObject => ({
       color: theme.palette.primary.main,
       cursor: 'default',
 

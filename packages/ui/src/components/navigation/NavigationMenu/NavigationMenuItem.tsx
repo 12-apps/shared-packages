@@ -1,12 +1,8 @@
 import ChevronRight from '@mui/icons-material/ChevronRight';
-import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import {
-  Badge,
   Box,
-  Chip,
   Collapse,
-  Divider,
   Fade,
   List,
   ListItem,
@@ -15,11 +11,9 @@ import {
   Grow,
   ListItemText,
   Popover,
-  Tooltip,
-  Typography,
 } from '@mui/material';
-import { alpha, keyframes, styled } from '@mui/material/styles';
-import React, { useState } from 'react';
+import { alpha, styled } from '@mui/material/styles';
+import React from 'react';
 
 import { useMenuItemState } from './NavigationMenuItem.hooks';
 import { navItemButtonStyles, pulseGlow } from './NavigationMenu.styles';
@@ -136,7 +130,7 @@ const MenuItemLabel: React.FC<{
   hasChildren?: boolean;
   size?: string;
   variant?: string;
-}> = ({ item, collapsed, minimal, open, hasChildren, size, variant }) => (
+}> = ({ item, collapsed, open, hasChildren, size, variant }) => (
   <Fade in={!collapsed} timeout={400}>
     <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', gap: 1 }}>
       <ListItemText
@@ -223,7 +217,6 @@ const MenuItemContent: React.FC<{
   item,
   variant,
   size,
-  active,
   collapsed,
   minimal,
   level,

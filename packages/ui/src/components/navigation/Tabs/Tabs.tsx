@@ -3,9 +3,7 @@ import {
   alpha,
   Badge,
   Box,
-  CircularProgress,
   Divider,
-  Fade,
   Tab as MuiTab,
   Tabs as MuiTabs,
 } from '@mui/material';
@@ -24,21 +22,6 @@ const StyledTabs = styled(MuiTabs, {
   }),
 );
 
-const TabPanel = styled(Box, {
-  shouldForwardProp: (prop) => !['animate', 'persist'].includes(prop as string),
-})<{ animate?: boolean; persist?: boolean }>(({ animate, persist }) => ({
-  width: '100%',
-
-  ...(animate && {
-    transition: 'all 0.3s ease-in-out',
-  }),
-
-  ...(persist && {
-    '&[hidden]': {
-      display: 'none !important',
-    },
-  }),
-}));
 
 const CloseButton = styled(Box)(({ theme }) => ({
   marginLeft: theme.spacing(0.5),
@@ -256,7 +239,6 @@ export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
   (tabsProps, ref) => {
     const resolved = { ...TABS_DEFAULTS, ...definedProps(tabsProps) } as TabsProps;
     const {
-      value,
       onChange,
       onTabClose,
       className,

@@ -1,20 +1,7 @@
-import SuccessIcon from '@mui/icons-material/CheckCircle';
-import CloseIcon from '@mui/icons-material/Close';
-import ErrorIcon from '@mui/icons-material/Error';
-import InfoIcon from '@mui/icons-material/Info';
-import WarningIcon from '@mui/icons-material/Warning';
 import {
-  alpha,
   Box,
-  Button,
-  CircularProgress,
-  Collapse,
-  IconButton,
   Portal,
-  Typography,
-  useTheme,
 } from '@mui/material';
-import type { CSSObject, Theme } from '@mui/material/styles';
 import React, { createContext, useCallback, useContext, useRef,useState, useMemo } from 'react';
 
 import type { SonnerContextType, SonnerItem,SonnerProps } from './Sonner.types';

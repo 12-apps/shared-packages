@@ -3,7 +3,7 @@ import type { CSSObject, Theme } from '@mui/material/styles';
 
 import type { TableDensity, TableStripeColor } from './Table.types';
 
-export const pulseAnimation = keyframes`
+const pulseAnimation = keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
@@ -19,7 +19,7 @@ export const pulseAnimation = keyframes`
 `;
 
 // Density configurations
-export const getDensityConfig = (density: TableDensity = 'normal') => {
+const getDensityConfig = (density: TableDensity = 'normal') => {
   const configs = {
     compact: {
       rowHeight: 36,
@@ -43,7 +43,7 @@ export const getDensityConfig = (density: TableDensity = 'normal') => {
   return configs[density];
 };
 
-export const getStripeColorFromTheme = (theme: { palette: { primary: { main: string }; secondary: { main: string }; info: { main: string }; success: { main: string }; warning: { main: string }; error: { main: string }; action: { hover: string } } }, stripeColor: TableStripeColor = 'neutral') => {
+const getStripeColorFromTheme = (theme: { palette: { primary: { main: string }; secondary: { main: string }; info: { main: string }; success: { main: string }; warning: { main: string }; error: { main: string }; action: { hover: string } } }, stripeColor: TableStripeColor = 'neutral') => {
   const colorMap: Record<TableStripeColor, string> = {
     primary: theme.palette.primary.main,
     secondary: theme.palette.secondary.main,
@@ -59,30 +59,30 @@ export const getStripeColorFromTheme = (theme: { palette: { primary: { main: str
 // One variant applies at a time, so a lookup replaces the mutually exclusive
 // spreads.
 const TABLE_VARIANTS: Record<string, (args: VariantArgs) => CSSObject> = {
-  default: ({ theme, densityConfig, stripeColor }) => ({
+  default: ({ theme }) => ({
       backgroundColor: theme.palette.background.paper,
       '& .MuiTableHead-root': {
         backgroundColor: alpha(theme.palette.primary.main, 0.1),
       },
     }),
-  striped: ({ theme, densityConfig, stripeColor }) => ({
+  striped: ({ theme, stripeColor }) => ({
       backgroundColor: theme.palette.background.paper,
       '& .MuiTableBody-root .MuiTableRow-root:nth-of-type(even)': {
         backgroundColor: alpha(getStripeColorFromTheme(theme, stripeColor), stripeColor === 'neutral' ? 0.5 : 0.15),
       },
     }),
-  glass: ({ theme, densityConfig, stripeColor }) => ({
+  glass: ({ theme }) => ({
       backgroundColor: alpha(theme.palette.background.paper, 0.1),
       backdropFilter: 'blur(20px)',
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
     }),
-  minimal: ({ theme, densityConfig, stripeColor }) => ({
+  minimal: ({ theme }) => ({
       backgroundColor: 'transparent',
       '& .MuiTableCell-root': {
         borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
       },
     }),
-  gradient: ({ theme, densityConfig, stripeColor }) => ({
+  gradient: ({ theme }) => ({
       background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)}, ${alpha(theme.palette.secondary.main, 0.05)})`,
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
       '& .MuiTableHead-root': {
