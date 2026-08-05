@@ -19,8 +19,6 @@ packages/ui/src/components/data-display/Progress/Progress.tsx
 packages/ui/src/components/data-display/Sheet/Sheet.test.stories.tsx
 packages/ui/src/components/data-display/Sheet/Sheet.tsx
 packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.test.stories.tsx
-packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.tsx
-packages/ui/src/components/data-display/Tooltip/Tooltip.tsx
 packages/ui/src/components/feedback/Dialog/Dialog.test.stories.tsx
 packages/ui/src/components/feedback/Modal/Modal.test.stories.tsx
 packages/ui/src/components/feedback/Modal/Modal.tsx
@@ -28,7 +26,6 @@ packages/ui/src/components/feedback/Sonner/Sonner.test.stories.tsx
 packages/ui/src/components/feedback/StackedModal/StackedModal.test.stories.tsx
 packages/ui/src/components/feedback/Toast/Toast.test.stories.tsx
 packages/ui/src/components/form/Button/Button.tsx
-packages/ui/src/components/form/Checkbox/Checkbox.tsx
 packages/ui/src/components/form/Command/Command.tsx
 packages/ui/src/components/form/Input/Input.tsx
 packages/ui/src/components/form/InputOTP/InputOTP.tsx
@@ -40,13 +37,11 @@ packages/ui/src/components/form/Slider/Slider.tsx
 packages/ui/src/components/form/Switch/Switch.tsx
 packages/ui/src/components/form/Toggle/Toggle.tsx
 packages/ui/src/components/form/ToggleGroup/ToggleGroup.test.stories.tsx
-packages/ui/src/components/layout/Accordion/Accordion.tsx
 packages/ui/src/components/layout/Card/Card.tsx
 packages/ui/src/components/layout/Collapsible/Collapsible.tsx
 packages/ui/src/components/layout/Resizable/Resizable.test.stories.tsx
 packages/ui/src/components/layout/Resizable/Resizable.tsx
 packages/ui/src/components/layout/ScrollArea/ScrollArea.test.stories.tsx
-packages/ui/src/components/layout/Separator/Separator.tsx
 packages/ui/src/components/layout/Skeleton/Skeleton.tsx
 packages/ui/src/components/layout/Spacer/Spacer.test.stories.tsx
 packages/ui/src/components/navigation/ContextMenu/ContextMenu.tsx
@@ -57,6 +52,5 @@ packages/ui/src/components/typography/Text/Text.test.stories.tsx
 packages/ui/src/components/utility/AnimatedIcon/AnimatedIcon.tsx
 packages/ui/src/components/utility/InfiniteScroll/InfiniteScroll.tsx
 packages/ui/src/components/utility/Portal/Portal.test.stories.tsx
-packages/ui/src/components/utility/Transition/Transition.tsx
 packages/ui/src/components/utility/VirtualList/VirtualList.tsx
 packages/ui/src/components/utility/WorkflowStep/WorkflowStep.tsx
