@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import {
   SocialLoginButton,
   SocialLoginContainer,
@@ -130,14 +130,14 @@ describe("SocialLoginContainer", () => {
     expect(screen.getByText("Welcome Back")).toBeInTheDocument();
   });
 
-  it("should not render title when title is empty", () => {
+  it("should not render title when title is empty", async () => {
     render(
       <SocialLoginContainer title="">
         <span>Content</span>
       </SocialLoginContainer>
     );
 
-    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("heading")).not.toBeInTheDocument());
   });
 
   it("should render divider when showDivider is true", () => {
@@ -150,14 +150,14 @@ describe("SocialLoginContainer", () => {
     expect(screen.getByText("or")).toBeInTheDocument();
   });
 
-  it("should not render divider by default", () => {
+  it("should not render divider by default", async () => {
     render(
       <SocialLoginContainer>
         <span>Content</span>
       </SocialLoginContainer>
     );
 
-    expect(screen.queryByText("or")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("or")).not.toBeInTheDocument());
   });
 
   it("should render custom divider text", () => {

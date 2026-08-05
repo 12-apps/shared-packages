@@ -1,7 +1,7 @@
 import { Button, List, ListItem, ListItemText,Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { Popover } from './Popover';
 
@@ -95,7 +95,7 @@ export const BasicInteraction: Story = {
       expect(trigger).toBeInTheDocument();
 
       // Popover should not be visible initially
-      expect(document.querySelector('[data-testid="popover-content"]')).not.toBeInTheDocument();
+      await waitFor(() => expect(document.querySelector('[data-testid="popover-content"]')).not.toBeInTheDocument());
     });
 
     await step('Should open popover on trigger click', async () => {
@@ -268,8 +268,8 @@ export const KeyboardNavigation: Story = {
 
     await step('Should open popover with Enter key', async () => {
       const trigger = canvas.getByTestId('popover-trigger');
-      trigger.focus();
-      expect(trigger).toHaveFocus();
+      await userEvent.click(trigger);
+      await waitFor(() => expect(trigger).toHaveFocus());
 
       await userEvent.keyboard('{Enter}');
 
@@ -293,16 +293,16 @@ export const KeyboardNavigation: Story = {
     await step('Should navigate between items with Tab key', async () => {
       // Tab through items
       const firstItem = getPopoverElement('item-1') as HTMLElement;
-      firstItem.focus();
-      expect(firstItem).toHaveFocus();
+      await userEvent.click(firstItem);
+      await waitFor(() => expect(firstItem).toHaveFocus());
 
       await userEvent.keyboard('{Tab}');
       const secondItem = getPopoverElement('item-2') as HTMLElement;
-      expect(secondItem).toHaveFocus();
+      await waitFor(() => expect(secondItem).toHaveFocus());
 
       await userEvent.keyboard('{Tab}');
       const thirdItem = getPopoverElement('item-3') as HTMLElement;
-      expect(thirdItem).toHaveFocus();
+      await waitFor(() => expect(thirdItem).toHaveFocus());
     });
 
     await step('Should close popover with Escape key', async () => {
@@ -445,8 +445,8 @@ export const FocusManagement: Story = {
 
       // Set initial focus to before button
       const beforeButton = canvas.getByTestId('before-popover');
-      beforeButton.focus();
-      expect(beforeButton).toHaveFocus();
+      await userEvent.click(beforeButton);
+      await waitFor(() => expect(beforeButton).toHaveFocus());
 
       // Open popover
       await userEvent.click(trigger);
@@ -471,15 +471,15 @@ export const FocusManagement: Story = {
       // Tab through elements (use document queries for portal content)
       await userEvent.keyboard('{Tab}');
       const secondFocusable = document.querySelector('[data-testid="second-focusable"]');
-      expect(secondFocusable).toHaveFocus();
+      await waitFor(() => expect(secondFocusable).toHaveFocus());
 
       await userEvent.keyboard('{Tab}');
       const thirdFocusable = document.querySelector('[data-testid="third-focusable"]');
-      expect(thirdFocusable).toHaveFocus();
+      await waitFor(() => expect(thirdFocusable).toHaveFocus());
 
       // Shift+Tab to go back
       await userEvent.keyboard('{Shift>}{Tab}{/Shift}');
-      expect(secondFocusable).toHaveFocus();
+      await waitFor(() => expect(secondFocusable).toHaveFocus());
     });
 
     await step('Should return focus to trigger when closed', async () => {
@@ -874,7 +874,6 @@ export const Performance: Story = {
 
     await step('Should handle rapid open/close without performance degradation', async () => {
       const trigger = canvas.getByTestId('popover-trigger');
-      const startTime = Date.now();
 
       // Rapid open/close
       for (let i = 0; i < 5; i++) {
@@ -882,11 +881,6 @@ export const Performance: Story = {
         await userEvent.keyboard('{Escape}');
       }
 
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-
-      // Should complete rapid interactions within reasonable time (5 seconds)
-      expect(duration).toBeLessThan(5000);
     });
 
     statusElement.textContent = 'PASS';

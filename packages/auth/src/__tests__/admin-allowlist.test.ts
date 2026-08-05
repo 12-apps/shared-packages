@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { isAdminEmail, parseAdminEmails } from "../admin";
 
@@ -50,21 +50,21 @@ describe("isAdminEmail", () => {
   });
 
   describe("with the ADMIN_EMAILS environment variable", () => {
-    const original = process.env.ADMIN_EMAILS;
-
+    // vi.stubEnv rather than assigning to process.env: it records the previous
+    // value itself, so a failing assertion cannot leave the variable set for
+    // whatever runs next in the same worker.
     afterEach(() => {
-      if (original === undefined) delete process.env.ADMIN_EMAILS;
-      else process.env.ADMIN_EMAILS = original;
+      vi.unstubAllEnvs();
     });
 
     it("falls back to process.env.ADMIN_EMAILS when no allowlist is passed", () => {
-      process.env.ADMIN_EMAILS = "env-admin@example.com";
+      vi.stubEnv("ADMIN_EMAILS", "env-admin@example.com");
       expect(isAdminEmail("env-admin@example.com")).toBe(true);
       expect(isAdminEmail("someone-else@example.com")).toBe(false);
     });
 
     it("denies everyone when process.env.ADMIN_EMAILS is unset", () => {
-      delete process.env.ADMIN_EMAILS;
+      vi.stubEnv("ADMIN_EMAILS", undefined);
       expect(isAdminEmail("admin@example.com")).toBe(false);
     });
   });

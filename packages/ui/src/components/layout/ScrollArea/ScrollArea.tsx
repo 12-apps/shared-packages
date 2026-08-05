@@ -1,20 +1,19 @@
-import type { Theme } from '@mui/material';
-import { Box, useTheme } from '@mui/material';
-import React, { useCallback,useEffect, useRef, useState } from 'react';
+import KeyboardArrowUp from '@mui/icons-material/KeyboardArrowUp';
+import { alpha, Box, CircularProgress,Fab, useTheme, Zoom } from '@mui/material';
+import type { FC } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import {
-  getOverflowStyle,
-  getVariantStyles,
-} from './ScrollArea.styles';
-import { LoadingOverlay, ScrollAreaContent, ScrollToTopButton } from './ScrollArea.parts';
+import type { ResolvedScrollAreaProps } from './ScrollArea.helpers';
+import { resolveScrollAreaProps } from './ScrollArea.helpers';
 import type { ScrollAreaProps } from './ScrollArea.types';
+import { ScrollAreaContent } from './ScrollAreaContent';
+import { ScrollViewport } from './ScrollViewport';
 
 // Owns the scroll container ref (merging in any ref the caller passed) and
 // reports size changes through a ResizeObserver.
 const useObservedScrollRef = ({
   externalScrollRef,
-  onResize,
-}: {
+  onResize }: {
   externalScrollRef?: React.Ref<HTMLDivElement>;
   onResize?: ScrollAreaProps['onResize'];
 }) => {
@@ -56,97 +55,72 @@ const useObservedScrollRef = ({
   return { scrollRef: internalScrollRef, setScrollRef, containerDimensions };
 };
 
-// The transient "is scrolling" flag that drives auto-hide. Its timer is the only
-// thing here that outlives a render, so it owns the unmount cleanup too.
-const useAutoHideFlag = ({
+// Scroll position, the transient "is scrolling" flag that drives auto-hide, the
+// observed container size, and the scroll-to-top affordance.
+// The scrollbar shows while scrolling and hides once movement stops.
+const useAutoHide = ({
   autoHide,
-  autoHideDelay,
   alwaysShowScrollbar,
-}: {
-  autoHide?: boolean;
-  autoHideDelay?: number;
-  alwaysShowScrollbar?: boolean;
+  autoHideDelay }: {
+  autoHide: boolean;
+  alwaysShowScrollbar: boolean;
+  autoHideDelay: number;
 }) => {
   const [isScrolling, setIsScrolling] = useState(false);
-  const scrollTimeoutRef = useRef<number | undefined>(undefined);
+  const timeoutRef = useRef<number | undefined>(undefined);
 
-  // Clean up timeout on unmount
-  useEffect(
-    () => () => {
-      if (scrollTimeoutRef.current) {
-        window.clearTimeout(scrollTimeoutRef.current);
-      }
-    },
-    [],
-  );
-
-  const markScrolling = useCallback(() => {
+  const noteScroll = useCallback(() => {
     if (!autoHide || alwaysShowScrollbar) return;
 
     setIsScrolling(true);
-    if (scrollTimeoutRef.current) {
-      window.clearTimeout(scrollTimeoutRef.current);
-    }
-    scrollTimeoutRef.current = window.setTimeout(() => setIsScrolling(false), autoHideDelay);
+    window.clearTimeout(timeoutRef.current);
+    timeoutRef.current = window.setTimeout(() => setIsScrolling(false), autoHideDelay);
   }, [autoHide, alwaysShowScrollbar, autoHideDelay]);
 
-  return { isScrolling, markScrolling };
+  useEffect(() => () => window.clearTimeout(timeoutRef.current), []);
+
+  return { isScrolling, noteScroll };
 };
 
-// Scroll position, the observed container size, and the scroll-to-top
-// affordance, composed over the ref and auto-hide hooks above.
-const useScrollArea = ({
-  disabled,
-  onScroll,
-  onResize,
-  externalScrollRef,
-  autoHide,
-  autoHideDelay,
-  alwaysShowScrollbar,
-  scrollToTopButton,
-  scrollToTopThreshold = 200,
-  smoothScroll,
-}: {
-  disabled?: boolean;
-  onScroll?: ScrollAreaProps['onScroll'];
-  onResize?: ScrollAreaProps['onResize'];
-  externalScrollRef?: React.Ref<HTMLDivElement>;
-  autoHide?: boolean;
-  autoHideDelay?: number;
-  alwaysShowScrollbar?: boolean;
-  scrollToTopButton?: boolean;
-  scrollToTopThreshold?: number;
-  smoothScroll?: boolean;
-}) => {
-  const { scrollRef, setScrollRef, containerDimensions } = useObservedScrollRef({
-    externalScrollRef,
+const useScrollArea = (
+  props: ResolvedScrollAreaProps & { externalScrollRef?: React.Ref<HTMLDivElement> },
+) => {
+  const {
+    disabled,
+    onScroll,
     onResize,
-  });
-  const [showScrollToTop, setShowScrollToTop] = useState(false);
-  const { isScrolling, markScrolling } = useAutoHideFlag({
+    externalScrollRef,
     autoHide,
     autoHideDelay,
     alwaysShowScrollbar,
-  });
+    scrollToTopButton,
+    scrollToTopThreshold,
+    smoothScroll } = props;
 
-  // Handle scroll event
+  const { scrollRef, setScrollRef, containerDimensions } = useObservedScrollRef({
+    externalScrollRef,
+    onResize });
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const { isScrolling, noteScroll } = useAutoHide({
+    autoHide,
+    alwaysShowScrollbar,
+    autoHideDelay });
+
   const handleScroll = useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
       if (disabled) return;
 
-      markScrolling();
+      noteScroll();
 
-      // Check if should show scroll to top button
       if (scrollToTopButton && scrollRef.current) {
         setShowScrollToTop(scrollRef.current.scrollTop > scrollToTopThreshold);
       }
 
       onScroll?.(event);
     },
-    [disabled, markScrolling, scrollToTopButton, scrollToTopThreshold, onScroll, scrollRef],
+    [disabled, noteScroll, scrollToTopButton, scrollToTopThreshold, onScroll, scrollRef],
   );
 
-  // Scroll to top function
   const scrollToTop = useCallback(() => {
     scrollRef.current?.scrollTo({ top: 0, behavior: smoothScroll ? 'smooth' : 'auto' });
   }, [smoothScroll, scrollRef]);
@@ -158,125 +132,85 @@ const useScrollArea = ({
     showScrollToTop,
     containerDimensions,
     handleScroll,
-    scrollToTop,
-  };
+    scrollToTop };
 };
 
-// Prop defaults sit in these two resolvers rather than the component's own
-// parameter list: fifteen `= default` branches would spend the whole complexity
-// budget before the render's first conditional. Split in two so neither
-// resolver reaches the limit either.
-type Appearance = Pick<
-  ScrollAreaProps,
-  'width' | 'height' | 'orientation' | 'scrollbarSize' | 'variant' | 'contentPadding' | 'testId'
->;
+const LoadingOverlay: FC = () => (
+  <Box
+    sx={{
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      zIndex: 10 }}
+  >
+    <CircularProgress />
+  </Box>
+);
 
-const resolveAppearance = ({
-  width = '100%',
-  height = '100%',
-  orientation = 'vertical',
-  scrollbarSize = 'medium',
-  variant = 'default',
-  contentPadding = 0,
-  testId = 'scroll-area',
-}: Appearance) => ({ width, height, orientation, scrollbarSize, variant, contentPadding, testId });
-
-type Behaviour = Pick<
-  ScrollAreaProps,
-  | 'autoHide'
-  | 'autoHideDelay'
-  | 'smoothScroll'
-  | 'scrollToTopButton'
-  | 'scrollToTopThreshold'
-  | 'alwaysShowScrollbar'
-  | 'disabled'
-  | 'loading'
->;
-
-const resolveBehaviour = ({
-  autoHide = true,
-  autoHideDelay = 1000,
-  smoothScroll = true,
-  scrollToTopButton = false,
-  scrollToTopThreshold = 100,
-  alwaysShowScrollbar = false,
-  disabled = false,
-  loading = false,
-}: Behaviour) => ({
-  autoHide,
-  autoHideDelay,
-  smoothScroll,
-  scrollToTopButton,
-  scrollToTopThreshold,
-  alwaysShowScrollbar,
-  disabled,
-  loading,
-});
-
-// The scrollable surface's own styling, kept out of the component so its
-// conditionals are measured here rather than against the render.
-const buildSurfaceSx = ({
-  theme,
-  height,
-  maxHeight,
-  contentPadding,
-  loading,
-  disabled,
-  variant,
-  orientation,
-  scrollbarSize,
-  scrollbarColor,
-  scrollbarTrackColor,
-  shouldShowScrollbar,
-}: Appearance &
-  Pick<ScrollAreaProps, 'maxHeight' | 'scrollbarColor' | 'scrollbarTrackColor'> & {
-    theme: Theme;
-    loading: boolean;
-    disabled: boolean;
-    shouldShowScrollbar: boolean;
-  }) => ({
-  width: '100%',
-  height: '100%',
-  // Use explicit maxHeight when height is 'auto', otherwise inherit from parent
-  maxHeight: height === 'auto' && maxHeight ? maxHeight : '100%',
-  padding: contentPadding,
-  opacity: loading ? 0.5 : 1,
-  pointerEvents: disabled || loading ? ('none' as const) : ('auto' as const),
-  transition: 'opacity 0.3s ease',
-  '&:focus': {
-    outline: 'none',
-    '&:focus-visible': {
-      outline: `2px solid ${theme.palette.primary.main}`,
-      outlineOffset: -2,
-    },
-  },
-  ...getOverflowStyle({ disabled, orientation }),
-  ...getVariantStyles({
-    theme,
-    variant,
-    orientation,
-    scrollbarSize,
-    scrollbarColor,
-    scrollbarTrackColor,
-    shouldShowScrollbar,
-  }),
-});
-
-export const ScrollArea: React.FC<ScrollAreaProps> = ({
-  children, width, height, maxHeight, maxWidth, orientation, scrollbarSize,
-  autoHide, autoHideDelay, smoothScroll, variant, onScroll, scrollToTopButton,
-  scrollToTopThreshold, scrollbarColor, scrollbarTrackColor, contentPadding,
-  alwaysShowScrollbar, disabled, loading, emptyContent, testId,
-  scrollRef: externalScrollRef, onResize, sx, ...props
-}) => {
+const ScrollToTopFab: FC<{ visible: boolean; glass: boolean; onClick: () => void }> = ({
+  visible,
+  glass,
+  onClick }) => {
   const theme = useTheme();
-  const appearance = resolveAppearance({
-    width, height, orientation, scrollbarSize, variant, contentPadding, testId,
-  });
-  const behaviour = resolveBehaviour({
-    autoHide, autoHideDelay, smoothScroll, scrollToTopButton,
-    scrollToTopThreshold, alwaysShowScrollbar, disabled, loading,
-  });
+
+  return (
+    <Zoom in={visible}>
+      <Fab
+        size="small"
+        aria-label="Scroll to top"
+        onClick={onClick}
+        sx={{
+          position: 'absolute',
+          bottom: 16,
+          right: 16,
+          zIndex: 1,
+          backgroundColor: glass
+            ? alpha(theme.palette.primary.main, 0.2)
+            : theme.palette.primary.main,
+          backdropFilter: glass ? 'blur(10px)' : 'none',
+          '&:hover': {
+            backgroundColor: glass
+              ? alpha(theme.palette.primary.main, 0.3)
+              : theme.palette.primary.dark } }}
+      >
+        <KeyboardArrowUp />
+      </Fab>
+    </Zoom>
+  );
+};
+
+export const ScrollArea: React.FC<ScrollAreaProps> = (componentProps) => {
+  const resolved = resolveScrollAreaProps(componentProps);
+  const {
+    children,
+    width,
+    height,
+    maxHeight,
+    maxWidth,
+    orientation: _orientation,
+    scrollbarSize: _scrollbarSize,
+    autoHide,
+    autoHideDelay: _autoHideDelay,
+    smoothScroll: _smoothScroll,
+    variant,
+    onScroll: _onScroll,
+    scrollToTopButton,
+    scrollToTopThreshold: _scrollToTopThreshold,
+    scrollbarColor: _scrollbarColor,
+    scrollbarTrackColor: _scrollbarTrackColor,
+    contentPadding: _contentPadding,
+    alwaysShowScrollbar,
+    disabled,
+    loading,
+    emptyContent,
+    testId,
+    scrollRef: externalScrollRef,
+    onResize: _onResize,
+    sx,
+    ...props
+  } = resolved;
+
   const {
     scrollRef,
     setScrollRef,
@@ -284,43 +218,22 @@ export const ScrollArea: React.FC<ScrollAreaProps> = ({
     showScrollToTop,
     containerDimensions,
     handleScroll,
-    scrollToTop,
-  } = useScrollArea({ ...behaviour, onScroll, onResize, externalScrollRef });
+    scrollToTop } = useScrollArea({ ...resolved, externalScrollRef });
 
-  const shouldShowScrollbar =
-    behaviour.alwaysShowScrollbar || !behaviour.autoHide || isScrolling;
+  // Auto-hide keeps the scrollbar out of the way until the user is scrolling.
+  const shouldShowScrollbar = alwaysShowScrollbar || !autoHide || isScrolling;
 
   return (
     <Box
-      data-testid={appearance.testId}
-      sx={{
-        position: 'relative',
-        width: appearance.width,
-        height: appearance.height,
-        maxHeight,
-        maxWidth,
-        ...sx,
-      }}
+      data-testid={testId}
+      sx={{ position: 'relative', width, height, maxHeight, maxWidth, ...sx }}
       {...props}
     >
-      <Box
-        ref={setScrollRef}
+      <ScrollViewport
+        {...resolved}
+        shouldShowScrollbar={shouldShowScrollbar}
+        setScrollRef={setScrollRef}
         onScroll={handleScroll}
-        role="region"
-        aria-label="Scrollable content"
-        aria-busy={behaviour.loading}
-        tabIndex={behaviour.disabled ? -1 : 0}
-        sx={buildSurfaceSx({
-          ...appearance,
-          theme,
-          maxHeight,
-          loading: behaviour.loading,
-          disabled: behaviour.disabled,
-          scrollbarColor,
-          scrollbarTrackColor,
-          shouldShowScrollbar,
-        })}
-        style={{ scrollBehavior: behaviour.smoothScroll ? 'smooth' : 'auto' }}
       >
         <ScrollAreaContent
           emptyContent={emptyContent}
@@ -329,16 +242,17 @@ export const ScrollArea: React.FC<ScrollAreaProps> = ({
         >
           {children}
         </ScrollAreaContent>
-      </Box>
+      </ScrollViewport>
 
-      <LoadingOverlay loading={behaviour.loading} />
+      {loading && <LoadingOverlay />}
 
-      <ScrollToTopButton
-        visible={behaviour.scrollToTopButton && !behaviour.disabled && !behaviour.loading}
-        shown={showScrollToTop}
-        glass={appearance.variant === 'glass'}
-        onClick={scrollToTop}
-      />
+      {scrollToTopButton && !disabled && !loading && (
+        <ScrollToTopFab
+          visible={showScrollToTop}
+          glass={variant === 'glass'}
+          onClick={scrollToTop}
+        />
+      )}
     </Box>
   );
 };

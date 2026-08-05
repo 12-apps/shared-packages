@@ -23,15 +23,34 @@ function sleep(ms: number) {
  * Run a task with exponential backoff retry. Delays sequence (default): 2s, 4s, 8s ...
  * Example delays: baseDelayMs * factor^(attempt-1) where attempt starts at 1 for first retry.
  */
+const RETRY_DEFAULTS = {
+  retries: 3,
+  baseDelayMs: 2000,
+  factor: 2,
+  shouldRetry: defaultShouldRetry,
+};
+
+// Strips explicitly-undefined options before the merge, so `{ retries: undefined }`
+// still falls back to the default exactly as a destructuring default would.
+const withDefaults = (options?: RetryOptions) => ({
+  ...RETRY_DEFAULTS,
+  ...(Object.fromEntries(
+    Object.entries(options ?? {}).filter(([, value]) => value !== undefined),
+  ) as RetryOptions),
+});
+
+const delayFor = (
+  attempt: number,
+  baseDelayMs: number,
+  factor: number,
+  maxDelayMs?: number,
+): number => {
+  const base = baseDelayMs * Math.pow(factor, attempt); // attempt 0 -> baseDelayMs
+  return maxDelayMs ? Math.min(base, maxDelayMs) : base;
+};
+
 export async function withRetry<T>(task: () => Promise<T>, options?: RetryOptions): Promise<T> {
-  const {
-    retries = 3,
-    baseDelayMs = 2000,
-    factor = 2,
-    maxDelayMs,
-    shouldRetry = defaultShouldRetry,
-    onRetry,
-  } = options || {};
+  const { retries, baseDelayMs, factor, maxDelayMs, shouldRetry, onRetry } = withDefaults(options);
 
   let attempt = 0; // 0 = first attempt
   while (true) {
@@ -41,8 +60,8 @@ export async function withRetry<T>(task: () => Promise<T>, options?: RetryOption
       if (attempt >= retries || !shouldRetry(err, attempt)) {
         throw err;
       }
-      const delayBase = baseDelayMs * Math.pow(factor, attempt); // attempt 0 -> baseDelayMs
-      const delay = maxDelayMs ? Math.min(delayBase, maxDelayMs) : delayBase;
+
+      const delay = delayFor(attempt, baseDelayMs, factor, maxDelayMs);
       onRetry?.(err, attempt + 1, delay);
       await sleep(delay);
       attempt++;

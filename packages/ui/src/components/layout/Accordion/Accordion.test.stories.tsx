@@ -810,8 +810,6 @@ export const FormInteraction: Story = {
                 variant="contained"
                 onClick={() => {
                   // Form submission handler
-                  // eslint-disable-next-line no-console
-                  console.log('Form submitted:', formData);
                 }}
               >
                 Submit

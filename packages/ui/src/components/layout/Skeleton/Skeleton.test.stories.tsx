@@ -1,6 +1,6 @@
 import { Box, Card, CardContent, Stack,Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect,within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { Skeleton } from './Skeleton';
 
@@ -153,8 +153,8 @@ export const AccessibilityTest: Story = {
     await step('Verify skeleton is not focusable', async () => {
       const skeleton = canvas.getByTestId('accessible-skeleton');
       await expect(skeleton).not.toHaveAttribute('tabindex');
-      skeleton.focus();
-      await expect(skeleton).not.toHaveFocus();
+      await userEvent.click(skeleton);
+      await waitFor(() => expect(skeleton).not.toHaveFocus());
     });
 
     await step('Verify proper ARIA attributes', async () => {

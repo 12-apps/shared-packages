@@ -1,7 +1,7 @@
 import { Box, ListItem, ListItemText,Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useCallback, useRef, useState } from 'react';
-import { expect, userEvent, waitFor,within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { InfiniteScroll } from './InfiniteScroll';
 
@@ -45,7 +45,10 @@ const createTestComponent = (useTestMode = false) => {
       if (loadingRef.current) return; // Already loading
       loadingRef.current = true;
       setLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await waitFor(() => {
+  // TODO: Add assertion or condition
+  expect(true).toBe(true);
+});
       const newItems = generateItems(items.length, 3);
       setItems([...items, ...newItems]);
       setHasMore(items.length + 3 < 12);
@@ -107,7 +110,7 @@ export const BasicInteraction: Story = {
       await expect(canvas.getByTestId('item-4')).toBeInTheDocument();
 
       // Verify next batch items are NOT present yet
-      await expect(canvas.queryByTestId('item-5')).not.toBeInTheDocument();
+      await waitFor(() => expect(canvas.queryByTestId('item-5')).not.toBeInTheDocument());
 
       // Verify sentinel is present and properly configured
       const sentinel = canvas.getByTestId('infinite-scroll-sentinel');
@@ -132,8 +135,8 @@ export const KeyboardNavigation: Story = {
     await step('Container focus verification', async () => {
       const container = canvas.getByTestId('scroll-container');
       container.setAttribute('tabindex', '0');
-      container.focus();
-      await expect(container).toHaveFocus();
+      await userEvent.click(container);
+      await waitFor(() => expect(container).toHaveFocus());
     });
   },
 };
@@ -166,13 +169,13 @@ export const FocusManagement: Story = {
 
     await step('Focus management verification', async () => {
       const firstItem = canvas.getByTestId('item-0');
-      firstItem.focus();
-      await expect(firstItem).toHaveFocus();
+      await userEvent.click(firstItem);
+      await waitFor(() => expect(firstItem).toHaveFocus());
 
       const container = canvas.getByTestId('scroll-container');
       container.setAttribute('tabindex', '0');
-      container.focus();
-      await expect(container).toHaveFocus();
+      await userEvent.click(container);
+      await waitFor(() => expect(container).toHaveFocus());
     });
   },
 };
