@@ -12,7 +12,6 @@ packages/ui/src/components/feedback/Sonner/Sonner.test.stories.tsx
 packages/ui/src/components/feedback/StackedModal/StackedModal.test.stories.tsx
 packages/ui/src/components/feedback/Toast/Toast.test.stories.tsx
 packages/ui/src/components/form/Label/Label.test.stories.tsx
-packages/ui/src/components/form/Label/Label.tsx
 packages/ui/src/components/form/ToggleGroup/ToggleGroup.test.stories.tsx
 packages/ui/src/components/layout/Resizable/Resizable.test.stories.tsx
 packages/ui/src/components/layout/ScrollArea/ScrollArea.test.stories.tsx
