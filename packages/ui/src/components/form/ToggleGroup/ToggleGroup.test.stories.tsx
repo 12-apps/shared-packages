@@ -141,7 +141,7 @@ export const KeyboardNavigation: Story = {
     const firstButton = canvas.getAllByRole('button')[0];
 
     // Focus the first button
-    firstButton.focus();
+    await userEvent.click(firstButton);
     await waitFor(() => {
       expect(firstButton).toHaveFocus();
     });
@@ -206,24 +206,28 @@ export const FocusManagement: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const buttons = canvas.getAllByRole('button');
+    // Named rather than indexed: a positional lookup silently follows whatever
+    // order the options happen to render in, so it keeps passing after a
+    // reorder while no longer testing what it says it does.
+    const likeButton = canvas.getByRole('button', { name: /like/i });
+    const starButton = canvas.getByRole('button', { name: /star/i });
 
     // Test initial focus
-    buttons[0].focus();
+    await userEvent.click(likeButton);
     await waitFor(() => {
-      expect(buttons[0]).toHaveFocus();
+      expect(likeButton).toHaveFocus();
     });
 
-    // Test focus moves correctly with tab navigation  
+    // Test focus moves correctly with tab navigation
     await userEvent.tab();
     await waitFor(() => {
-      expect(buttons[1]).toHaveFocus();
+      expect(starButton).toHaveFocus();
     });
 
     // Test focus doesn't get lost after selection
-    await userEvent.click(buttons[1]);
+    await userEvent.click(starButton);
     await waitFor(() => {
-      expect(buttons[1]).toHaveFocus();
+      expect(starButton).toHaveFocus();
     });
   },
 };
@@ -390,31 +394,24 @@ export const Performance: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const startTime = window.performance.now();
-
-    // Test rendering performance with many options
+    // All twenty options render — the assertion the wall-clock budgets that used
+    // to sit here were standing in for. A millisecond threshold measures the
+    // machine running the story, not the component, and the timings were
+    // already padded to 100ms and 600ms to survive CI.
     const buttons = canvas.getAllByRole('button');
     expect(buttons).toHaveLength(20);
 
-    const renderTime = window.performance.now() - startTime;
+    // Clicking a spread of them, by name, still exercises the multi-select path.
+    for (const label of ['Option 1', 'Option 6', 'Option 11']) {
+      await userEvent.click(canvas.getByRole('button', { name: new RegExp(label + '$') }));
+    }
 
-    // Should render within reasonable time (less than 100ms for initial query)
-    expect(renderTime).toBeLessThan(100);
-
-    // Test interaction performance
-    const interactionStart = window.performance.now();
-
-    // Click multiple buttons rapidly
-    await userEvent.click(buttons[0]);
-    await userEvent.click(buttons[5]);
-    await userEvent.click(buttons[10]);
-
-    const interactionTime = window.performance.now() - interactionStart;
-
-    // Interactions should be responsive (less than 600ms for 3 clicks)
-    // This accounts for userEvent simulation delays, React state updates,
-    // browser reflows, and Storybook rendering overhead in CI/CD environments
-    expect(interactionTime).toBeLessThan(600);
+    await waitFor(() => {
+      expect(canvas.getByRole('button', { name: /Option 11$/ })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    });
   },
 };
 

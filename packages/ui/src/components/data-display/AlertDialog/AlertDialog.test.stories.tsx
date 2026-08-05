@@ -288,13 +288,15 @@ export const FocusManagement: Story = {
     await step('Tab through focusable elements', async () => {
       // Tab cycles through dialog elements
       await userEvent.tab();
-      expect(document.activeElement?.getAttribute('aria-label')).toBe('close');
+      await waitFor(() =>
+        expect(document.activeElement?.getAttribute('aria-label')).toBe('close'),
+      );
 
       await userEvent.tab();
-      expect(document.activeElement?.textContent).toContain('Cancel');
+      await waitFor(() => expect(document.activeElement?.textContent).toContain('Cancel'));
 
       await userEvent.tab();
-      expect(document.activeElement?.textContent).toContain('Confirm');
+      await waitFor(() => expect(document.activeElement?.textContent).toContain('Confirm'));
     });
 
     await step('Close dialog and verify focus return', async () => {
@@ -519,6 +521,10 @@ const PerformanceComponent = () => {
     const startTime = window.performance.now();
     setDialogCount((prev) => prev + 1);
     setCurrentDialog(dialogCount + 1);
+    // This is the demo measuring itself for display, not an assertion — the
+    // story renders the number rather than asserting on it, so nothing here
+    // can fail on a slow machine.
+    // eslint-disable-next-line test-flakiness/no-animation-wait -- demo self-measurement, not an assertion
     window.requestAnimationFrame(() => {
       const endTime = window.performance.now();
       setRenderTime(endTime - startTime);
@@ -670,9 +676,13 @@ const IntegrationComponent = () => {
 
   const handleDelete = async () => {
     setIsDeleting(true);
-    // Simulate API call
+    // The delay is the point of this story — it shows the pending state — so it
+    // is the demo's own behaviour rather than a test waiting for something.
+    // eslint-disable-next-line test-flakiness/no-hard-coded-timeout -- simulated latency is what this story demonstrates
     await new Promise((resolve) => window.setTimeout(resolve, 1000));
-    setConfirmations((prev) => [...prev, `Deleted at ${new Date().toLocaleTimeString()}`]);
+    // Numbered rather than timestamped: the entry only needs to be distinct, and
+    // a clock reading makes the rendered text different on every run.
+    setConfirmations((prev) => [...prev, `Deleted item ${prev.length + 1}`]);
     setIsDeleting(false);
   };
 
@@ -746,7 +756,7 @@ export const Integration: Story = {
 
     await step('Verify action was logged', async () => {
       await waitFor(() => {
-        expect(canvas.getByText(/Deleted at/)).toBeInTheDocument();
+        expect(canvas.getByText(/Deleted item/)).toBeInTheDocument();
       });
     });
   },
