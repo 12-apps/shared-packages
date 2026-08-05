@@ -18,51 +18,49 @@ export interface DeviceInfo {
  * @param userAgent - Optional user agent string (for SSR usage)
  * @returns DeviceInfo object with detection results
  */
+const SSR_DEFAULTS: DeviceInfo = {
+  isAppleDevice: false,
+  isIOS: false,
+  isMac: false,
+  isSafari: false,
+  userAgent: "",
+};
+
+// An iPad on iOS 13+ reports itself as a Mac, so it takes three strategies to
+// recognise: the plain iOS user agent, the Mac+Mobile pairing an SSR string
+// gives us, and multi-touch support on the client.
+const detectIOS = (uaLower: string): boolean => {
+  if (/iphone|ipad|ipod/.test(uaLower)) return true;
+  if (uaLower.includes("mac") && uaLower.includes("mobile")) return true;
+
+  return (
+    typeof navigator !== "undefined" &&
+    "maxTouchPoints" in navigator &&
+    navigator.maxTouchPoints > 1 &&
+    uaLower.includes("mac")
+  );
+};
+
+const detectSafari = (uaLower: string): boolean =>
+  /safari/.test(uaLower) && !/chrome|chromium|edg/.test(uaLower);
+
 export function detectAppleDevice(userAgent?: string): DeviceInfo {
   // For SSR, return defaults if no userAgent provided
   if (typeof window === "undefined" && !userAgent) {
-    return {
-      isAppleDevice: false,
-      isIOS: false,
-      isMac: false,
-      isSafari: false,
-      userAgent: "",
-    };
+    return SSR_DEFAULTS;
   }
 
   const ua = userAgent ?? (typeof navigator !== "undefined" ? navigator.userAgent : "");
   const uaLower = ua.toLowerCase();
 
-  // iOS detection - iPhone, iPad, iPod
-  // iPad on iOS 13+ reports as Mac in UA, so we need multiple detection strategies
-  const hasIOSUserAgent = /iphone|ipad|ipod/.test(uaLower);
-
-  // For SSR with UA string: detect iPad by checking for "Mac" + "Mobile" Safari indicator
-  const isLikelyiPadFromUA = uaLower.includes("mac") && uaLower.includes("mobile");
-
-  // For client-side: iPad on iOS 13+ reports as Mac but has touch support
-  const isIPadWithTouchPoints =
-    typeof navigator !== "undefined" &&
-    "maxTouchPoints" in navigator &&
-    navigator.maxTouchPoints > 1 &&
-    uaLower.includes("mac");
-
-  const isIOS = hasIOSUserAgent || isLikelyiPadFromUA || isIPadWithTouchPoints;
-
-  // macOS detection
+  const isIOS = detectIOS(uaLower);
   const isMac = /macintosh|mac os x/.test(uaLower) && !isIOS;
 
-  // Safari detection
-  const isSafari = /safari/.test(uaLower) && !/chrome|chromium|edg/.test(uaLower);
-
-  // Combined Apple device check
-  const isAppleDevice = isIOS || isMac;
-
   return {
-    isAppleDevice,
+    isAppleDevice: isIOS || isMac,
     isIOS,
     isMac,
-    isSafari,
+    isSafari: detectSafari(uaLower),
     userAgent: ua,
   };
 }

@@ -2,6 +2,8 @@ import { WebServiceClient } from '@maxmind/geoip2-node';
 
 import { logger } from './logger';
 
+type CityResponse = Awaited<ReturnType<WebServiceClient['city']>>;
+
 export type GeoLocation = {
   continent_code: string;
   continent: string;
@@ -17,6 +19,37 @@ export type GeoLocation = {
   isp_name: string;
   error: string;
 }
+
+// Every field on a MaxMind response is optional — a lookup that resolves to a
+// country but no city still returns a City object, just a sparse one. These two
+// give every absent field the empty value the callers already expect.
+const text = (value: string | null | undefined): string => value ?? '';
+const num = (value: number | null | undefined): number => value ?? 0;
+
+const placeOf = (response: CityResponse) => ({
+  continent_code: text(response.continent?.code),
+  continent: text(response.continent?.names.en),
+  country_code: text(response.country?.isoCode),
+  country: text(response.country?.names.en),
+});
+
+// Region lives under the first subdivision, which is absent for the countries
+// MaxMind holds no subdivision data for.
+const areaOf = (response: CityResponse) => {
+  const subdivision = response.subdivisions?.[0];
+  return {
+    region_code: text(subdivision?.isoCode),
+    region: text(subdivision?.names.en),
+    city: text(response.city?.names.en),
+    postal_code: text(response.postal?.code),
+  };
+};
+
+const coordinatesOf = (response: CityResponse) => ({
+  timezone: text(response.location?.timeZone),
+  latitude: num(response.location?.latitude),
+  longitude: num(response.location?.longitude),
+});
 
 // Call the Maxmind Geo Location API
 // Queries to the GeoLite2 web services are capped at 1000 queries/day
@@ -45,18 +78,10 @@ export async function getGeoLocation (ipAddress: string | unknown) {
     }
 
     const geoLocation: GeoLocation = {
-      continent_code: response.continent?.code || '',
-      continent: response.continent?.names.en || '',
-      country_code: response.country?.isoCode || '',
-      country: response.country?.names.en || '',
-      region_code: response.subdivisions?.[0]?.isoCode ?? '',
-      region: response.subdivisions?.[0]?.names.en ?? '',
-      city: response.city?.names.en || '',
-      postal_code: response.postal?.code || '',
-      timezone: response.location?.timeZone || '',
-      latitude: response.location?.latitude || 0,
-      longitude: response.location?.longitude || 0,
-      isp_name: response.traits?.autonomousSystemOrganization || '',
+      ...placeOf(response),
+      ...areaOf(response),
+      ...coordinatesOf(response),
+      isp_name: text(response.traits?.autonomousSystemOrganization),
       error: '',
     };
     return geoLocation;

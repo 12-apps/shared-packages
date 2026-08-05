@@ -1,34 +1,15 @@
-import { alpha, keyframes, Tooltip as MuiTooltip } from '@mui/material';
+import { Tooltip as MuiTooltip } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React from 'react';
 
+import { resolveTooltipProps, usePinnedTooltip } from './InteractiveTooltip.hooks';
+import {
+  arrowColor,
+  emphasisStyles,
+  getSizeStyles,
+  variantStyles,
+} from './InteractiveTooltip.styles';
 import type { InteractiveTooltipProps } from './InteractiveTooltip.types';
-
-// Define pulse animation
-const pulseAnimation = keyframes`
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  70% {
-    transform: scale(1.05);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-`;
-
-const getSizeStyles = (size: string): { fontSize: string; padding: string } => {
-  const sizeMap = {
-    sm: { fontSize: '0.75rem', padding: '4px 8px' },
-    md: { fontSize: '0.875rem', padding: '6px 12px' },
-    lg: { fontSize: '1rem', padding: '8px 16px' },
-  } as const;
-
-  return sizeMap[size as keyof typeof sizeMap] || sizeMap.md;
-};
 
 const StyledTooltip = styled(MuiTooltip, {
   shouldForwardProp: (prop) =>
@@ -38,7 +19,7 @@ const StyledTooltip = styled(MuiTooltip, {
   customSize?: string;
   glow?: boolean;
   pulse?: boolean;
-}>(({ theme, customVariant, customSize = 'md', glow, pulse }) => {
+}>(({ theme, customVariant, customSize, glow, pulse }) => {
   const sizeStyles = getSizeStyles(customSize);
 
   return {
@@ -50,148 +31,40 @@ const StyledTooltip = styled(MuiTooltip, {
       transition: 'all 0.3s ease',
       position: 'relative',
       overflow: 'hidden',
-
-      // Variant styles - made more distinct
-      ...(customVariant === 'default' && {
-        backgroundColor: alpha(theme.palette.grey[900], 0.92),
-        color: theme.palette.common.white,
-        boxShadow: `0 4px 12px ${alpha(theme.palette.common.black, 0.3)}`,
-      }),
-
-      ...(customVariant === 'dark' && {
-        backgroundColor: '#000000',
-        color: theme.palette.common.white,
-        boxShadow: `0 6px 16px ${alpha(theme.palette.common.black, 0.5)}`,
-        border: `1px solid ${alpha(theme.palette.common.white, 0.1)}`,
-      }),
-
-      ...(customVariant === 'light' && {
-        backgroundColor: theme.palette.common.white,
-        color: theme.palette.grey[900],
-        border: `1px solid ${alpha(theme.palette.grey[400], 0.4)}`,
-        boxShadow: `0 4px 16px ${alpha(theme.palette.common.black, 0.15)}`,
-      }),
-
-      ...(customVariant === 'glass' && {
-        backgroundColor: alpha(theme.palette.background.paper, 0.75),
-        backdropFilter: 'blur(24px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-        border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
-        color: theme.palette.text.primary,
-        boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
-      }),
-
-      // Glow effect
-      ...(glow &&
-        !pulse && {
-          boxShadow: `0 0 15px 3px ${alpha(theme.palette.primary.main, 0.4)} !important`,
-          filter: 'brightness(1.05)',
-        }),
-
-      // Pulse animation
-      ...(pulse &&
-        !glow && {
-          animation: `${pulseAnimation} 2s infinite`,
-        }),
-
-      // Both glow and pulse
-      ...(glow &&
-        pulse && {
-          boxShadow: `0 0 15px 3px ${alpha(theme.palette.primary.main, 0.4)} !important`,
-          filter: 'brightness(1.05)',
-          animation: `${pulseAnimation} 2s infinite`,
-        }),
+      ...variantStyles(theme, customVariant),
+      ...emphasisStyles(theme, glow, pulse),
     },
 
     '& .MuiTooltip-arrow': {
-      color:
-        customVariant === 'light'
-          ? theme.palette.common.white
-          : customVariant === 'glass'
-            ? alpha(theme.palette.background.paper, 0.75)
-            : customVariant === 'dark'
-              ? '#000000'
-              : alpha(theme.palette.grey[900], 0.92),
+      color: arrowColor(theme, customVariant),
     },
   };
 });
 
 export const InteractiveTooltip = React.forwardRef<HTMLDivElement, InteractiveTooltipProps>(
-  (
-    {
-      variant = 'default',
-      size = 'md',
-      glow = false,
-      pulse = false,
-      maxWidth = 300,
+  (rawProps, ref) => {
+    const {
+      variant,
+      size,
+      glow,
+      pulse,
+      maxWidth,
       dataTestId,
       hoverContent,
       pinnedContent,
-      clickable = true,
+      clickable,
       onPin,
       onUnpin,
       className,
       children,
       ...props
-    },
-    ref,
-  ) => {
-    const [isPinned, setIsPinned] = useState(false);
-    const [isControlledOpen, setIsControlledOpen] = useState(false);
-    const wrapperRef = useRef<HTMLDivElement>(null);
-    const _tooltipId = useId();
+    } = resolveTooltipProps(rawProps);
 
-    // Handle outside clicks to unpin
-    useEffect(() => {
-      if (!isPinned || !clickable) {
-        return;
-      }
-
-      const handleClickOutside = (event: MouseEvent) => {
-        const targetElement = event.target as Element;
-
-        // Check if click was on tooltip or trigger
-        const isClickOnTooltip = targetElement.closest('[role="tooltip"]');
-        const isClickOnTrigger = wrapperRef.current?.contains(targetElement);
-
-        if (isClickOnTooltip || isClickOnTrigger) {
-          return;
-        }
-
-        // Click was outside - unpin
-        setIsPinned(false);
-        setIsControlledOpen(false);
-        onUnpin?.();
-      };
-
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }, [isPinned, clickable, onUnpin]);
-
-    const handleClick = useCallback(
-      (e: React.MouseEvent) => {
-        if (!clickable) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        setIsPinned((current) => {
-          const newPinned = !current;
-          setIsControlledOpen(newPinned);
-
-          if (newPinned) {
-            onPin?.();
-          } else {
-            onUnpin?.();
-          }
-
-          return newPinned;
-        });
-      },
-      [clickable, onPin, onUnpin],
-    );
+    const { isPinned, isControlledOpen, wrapperRef, handleClick } = usePinnedTooltip({
+      clickable,
+      onPin,
+      onUnpin,
+    });
 
     // Determine which content to show
     const tooltipContent = isPinned ? pinnedContent : hoverContent;

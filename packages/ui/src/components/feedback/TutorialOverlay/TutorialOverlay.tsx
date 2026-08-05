@@ -6,14 +6,13 @@ import {
   LinearProgress,
   Paper,
   Portal,
-  styled,
-} from '@mui/material';
+  styled } from '@mui/material';
 import type { FC} from 'react';
-import React from 'react';
+import React, {  } from 'react';
 
 import { useTutorialOverlay } from './TutorialOverlay.hooks';
+import { TutorialStepBody } from './TutorialStepBody';
 import type { TutorialOverlayProps } from './TutorialOverlay.types';
-import { TutorialStepBody } from './TutorialStep';
 
 // Animation keyframes
 const pulseAnimation = keyframes`
@@ -39,8 +38,7 @@ const floatAnimation = keyframes`
 
 // Styled components
 const Overlay = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'allowClickThrough',
-})<{ allowClickThrough?: boolean }>(({ theme, allowClickThrough }) => ({
+  shouldForwardProp: (prop) => prop !== 'allowClickThrough' })<{ allowClickThrough?: boolean }>(({ theme, allowClickThrough }) => ({
   position: 'fixed',
   top: 0,
   left: 0,
@@ -48,8 +46,7 @@ const Overlay = styled(Box, {
   bottom: 0,
   zIndex: theme.zIndex.modal + 100,
   pointerEvents: allowClickThrough ? 'none' : 'auto',
-  transition: 'opacity 0.3s ease',
-}));
+  transition: 'opacity 0.3s ease' }));
 
 const Backdrop = styled(Box)(() => ({
   position: 'absolute',
@@ -58,12 +55,10 @@ const Backdrop = styled(Box)(() => ({
   right: 0,
   bottom: 0,
   background: alpha('#000', 0.7),
-  backdropFilter: 'blur(2px)',
-}));
+  backdropFilter: 'blur(2px)' }));
 
 const Spotlight = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'bounds' && prop !== 'padding',
-})<{ bounds: globalThis.DOMRect; padding: number }>(({ bounds, padding }) => ({
+  shouldForwardProp: (prop) => prop !== 'bounds' && prop !== 'padding' })<{ bounds: globalThis.DOMRect; padding: number }>(({ bounds, padding }) => ({
   position: 'absolute',
   top: bounds.top - padding,
   left: bounds.left - padding,
@@ -79,13 +74,10 @@ const Spotlight = styled(Box, {
     inset: -2,
     borderRadius: 8,
     background: 'transparent',
-    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
-  },
-}));
+    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)' } }));
 
 const TooltipContainer = styled(Paper, {
-  shouldForwardProp: (prop) => prop !== 'placement',
-})<{ placement: string }>(({ theme, placement }) => ({
+  shouldForwardProp: (prop) => prop !== 'placement' })<{ placement: string }>(({ theme, placement }) => ({
   position: 'absolute',
   maxWidth: 360,
   padding: theme.spacing(3),
@@ -110,31 +102,25 @@ const TooltipContainer = styled(Paper, {
       left: '50%',
       marginLeft: -6,
       borderTop: 'none',
-      borderLeft: 'none',
-    }),
+      borderLeft: 'none' }),
     ...(placement === 'bottom' && {
       top: -7,
       left: '50%',
       marginLeft: -6,
       borderBottom: 'none',
-      borderRight: 'none',
-    }),
+      borderRight: 'none' }),
     ...(placement === 'left' && {
       right: -7,
       top: '50%',
       marginTop: -6,
       borderLeft: 'none',
-      borderBottom: 'none',
-    }),
+      borderBottom: 'none' }),
     ...(placement === 'right' && {
       left: -7,
       top: '50%',
       marginTop: -6,
       borderRight: 'none',
-      borderTop: 'none',
-    }),
-  },
-}));
+      borderTop: 'none' }) } }));
 
 const ProgressBar = styled(LinearProgress)(({ theme }) => ({
   position: 'fixed',
@@ -144,14 +130,9 @@ const ProgressBar = styled(LinearProgress)(({ theme }) => ({
   height: 4,
   zIndex: theme.zIndex.modal + 102,
   '& .MuiLinearProgress-bar': {
-    background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-  },
-}));
+    background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)` } }));
 
-// Prop defaults resolve here rather than in the component's parameter list:
-// eight `= default` branches would leave the render no budget of its own.
-type Options = Pick<
-  TutorialOverlayProps,
+type TutorialDefaultedKeys =
   | 'initialStep'
   | 'active'
   | 'showProgress'
@@ -159,46 +140,49 @@ type Options = Pick<
   | 'allowClickThrough'
   | 'variant'
   | 'allowSkip'
-  | 'animated'
->;
+  | 'animated';
 
-const resolveOptions = ({
-  initialStep = 0,
-  active = true,
-  showProgress = true,
-  allowKeyboardNavigation = true,
-  allowClickThrough = false,
-  variant = 'tooltip',
-  allowSkip = false,
-  animated = true,
-}: Options) => ({
-  initialStep,
-  active,
-  showProgress,
-  allowKeyboardNavigation,
-  allowClickThrough,
-  variant,
-  allowSkip,
-  animated,
-});
+type ResolvedTutorialProps = TutorialOverlayProps &
+  Required<Pick<TutorialOverlayProps, TutorialDefaultedKeys>>;
 
-// What sits behind the tooltip: the dimming backdrop, and the cut-out that
-// draws attention to the step's target.
-const OverlayLayers: React.FC<{
+const TUTORIAL_DEFAULTS: Pick<TutorialOverlayProps, TutorialDefaultedKeys> = {
+  initialStep: 0,
+  active: true,
+  showProgress: true,
+  allowKeyboardNavigation: true,
+  allowClickThrough: false,
+  variant: 'tooltip',
+  allowSkip: false,
+  animated: true };
+
+// Strips explicitly-undefined props before the merge, so `prop={undefined}` still
+// falls back to the default exactly as a destructuring default would. Applied as
+// a merge rather than destructuring defaults, which would otherwise put eight
+// branches into the component's own complexity budget.
+const resolveProps = (props: TutorialOverlayProps): ResolvedTutorialProps =>
+  ({
+    ...TUTORIAL_DEFAULTS,
+    ...(Object.fromEntries(
+      Object.entries(props).filter(([, value]) => value !== undefined),
+    ) as Partial<TutorialOverlayProps>) }) as ResolvedTutorialProps;
+
+// The dimming layer and the cut-out over the highlighted element. Local because
+// Backdrop and Spotlight cannot cross a module boundary (TS2742).
+const TutorialLayers: React.FC<{
   variant: string;
-  bounds: ReturnType<typeof useTutorialOverlay>['targetBounds'];
+  targetBounds: globalThis.DOMRect | null;
   isVisible: boolean;
   spotlightPadding?: number;
-}> = ({ variant, bounds, isVisible, spotlightPadding }) => {
+}> = ({ variant, targetBounds, isVisible, spotlightPadding }) => {
   const isSpotlight = variant === 'spotlight' || variant === 'highlight';
+  const dimmed = variant === 'modal' || isSpotlight;
 
   return (
     <>
-      {(variant === 'modal' || isSpotlight) && <Backdrop />}
-
-      {bounds && isVisible && isSpotlight && (
+      {dimmed && <Backdrop />}
+      {targetBounds && isVisible && isSpotlight && (
         <Spotlight
-          bounds={bounds}
+          bounds={targetBounds}
           padding={spotlightPadding || 8}
           data-testid="tutorial-highlight"
         />
@@ -207,26 +191,76 @@ const OverlayLayers: React.FC<{
   );
 };
 
-// Main component
-export const TutorialOverlay: FC<TutorialOverlayProps> = (props) => {
-  const { steps, onComplete, onSkip, onStepComplete } = props;
+// The positioned card. Local because TooltipContainer cannot cross a module
+// boundary (TS2742).
+const TutorialTooltip: React.FC<{
+  tutorial: ReturnType<typeof useTutorialOverlay> & {
+    currentStepData: TutorialOverlayProps['steps'][number];
+  };
+  steps: TutorialOverlayProps['steps'];
+  allowSkip: boolean;
+  showProgress: boolean;
+  animated: boolean;
+  requiresActionBeforeNext: boolean;
+}> = ({ tutorial, steps, allowSkip, showProgress, animated, requiresActionBeforeNext }) => (
+        <Fade in={tutorial.isVisible} timeout={300}>
+          <TooltipContainer
+            ref={tutorial.tooltipRef}
+            placement={tutorial.actualPlacement}
+            elevation={12}
+            style={{
+              top: tutorial.tooltipPosition.top,
+              left: tutorial.tooltipPosition.left,
+              animation: animated ? undefined : 'none' }}
+            role="dialog"
+            aria-labelledby={`tutorial-title-${tutorial.currentStep}`}
+            aria-describedby={`tutorial-content-${tutorial.currentStep}`}
+            data-testid={`tutorial-step-${tutorial.currentStep}`}
+          >
+            <TutorialStepBody
+              step={tutorial.currentStepData}
+              currentStep={tutorial.currentStep}
+              stepCount={steps.length}
+              progress={tutorial.progress}
+              isLastStep={tutorial.isLastStep}
+              allowSkip={allowSkip}
+              showProgress={showProgress}
+              requiresActionBeforeNext={requiresActionBeforeNext}
+              onNext={tutorial.handleNext}
+              onPrev={tutorial.handlePrev}
+              onSkip={tutorial.handleSkip}
+              onRestart={tutorial.handleRestart}
+            />
+          </TooltipContainer>
+        </Fade>
+);
+
+export const TutorialOverlay: FC<TutorialOverlayProps> = (componentProps) => {
   const {
-    initialStep, active, showProgress, allowKeyboardNavigation,
-    allowClickThrough, variant, allowSkip, animated,
-  } = resolveOptions(props);
-  const {
-    currentStep, currentStepData, isLastStep, isVisible, targetBounds, tooltipRef,
-    tooltipPosition, actualPlacement, progress, handleNext, handlePrev, handleSkip,
-    handleRestart,
-  } = useTutorialOverlay({
+    steps,
+    onComplete,
+    onSkip,
+    onStepComplete,
+    initialStep,
+    active,
+    showProgress,
+    allowKeyboardNavigation,
+    allowClickThrough,
+    variant,
+    allowSkip,
+    animated } = resolveProps(componentProps);
+
+  const tutorial = useTutorialOverlay({
     steps,
     initialStep,
     active,
     allowKeyboardNavigation,
     onComplete,
     onSkip,
-    onStepComplete,
-  });
+    onStepComplete });
+  const { currentStepData, isLastStep, isVisible, targetBounds, progress } = tutorial;
+
+  const requiresActionBeforeNext = Boolean(currentStepData?.requiresAction) && !isLastStep;
 
   if (!active || !currentStepData) return null;
 
@@ -238,44 +272,21 @@ export const TutorialOverlay: FC<TutorialOverlayProps> = (props) => {
       <Overlay allowClickThrough={allowClickThrough} data-testid="tutorial-overlay">
         {showProgress && <ProgressBar variant="determinate" value={progress} />}
 
-        <OverlayLayers
+        <TutorialLayers
           variant={variant}
-          bounds={targetBounds}
+          targetBounds={targetBounds}
           isVisible={isVisible}
           spotlightPadding={currentStepData.spotlightPadding}
         />
 
-        <Fade in={isVisible} timeout={300}>
-          <TooltipContainer
-            ref={tooltipRef}
-            placement={actualPlacement}
-            elevation={12}
-            style={{
-              top: tooltipPosition.top,
-              left: tooltipPosition.left,
-              animation: animated ? undefined : 'none',
-            }}
-            role="dialog"
-            aria-labelledby={`tutorial-title-${currentStep}`}
-            aria-describedby={`tutorial-content-${currentStep}`}
-            data-testid={`tutorial-step-${currentStep}`}
-          >
-            <TutorialStepBody
-              step={currentStepData}
-              currentStep={currentStep}
-              stepCount={steps.length}
-              progress={progress}
-              isLastStep={isLastStep}
-              allowSkip={allowSkip}
-              showProgress={showProgress}
-              requiresActionBeforeNext={currentStepData.requiresAction && !isLastStep}
-              onNext={handleNext}
-              onPrev={handlePrev}
-              onSkip={handleSkip}
-              onRestart={handleRestart}
-            />
-          </TooltipContainer>
-        </Fade>
+        <TutorialTooltip
+          tutorial={{ ...tutorial, currentStepData }}
+          steps={steps}
+          allowSkip={allowSkip}
+          showProgress={showProgress}
+          animated={animated}
+          requiresActionBeforeNext={requiresActionBeforeNext}
+        />
       </Overlay>
     </Portal>
   );

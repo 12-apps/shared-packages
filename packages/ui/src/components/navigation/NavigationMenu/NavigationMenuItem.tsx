@@ -10,35 +10,28 @@ import {
   ListItemIcon,
   Grow,
   ListItemText,
-  Popover,
-} from '@mui/material';
+  Popover } from '@mui/material';
 import { alpha, styled } from '@mui/material/styles';
-import React from 'react';
+import React, {  } from 'react';
 
 import { useMenuItemState } from './NavigationMenuItem.hooks';
 import { navItemButtonStyles, pulseGlow } from './NavigationMenu.styles';
 import type { NavigationMenuItem } from './NavigationMenu.types';
 
 const StyledListItem = styled(ListItem, {
-  shouldForwardProp: (prop) => !['variant', 'active', 'size', 'level'].includes(prop as string),
-})<{ variant?: string; active?: boolean; size?: string; level?: number }>(
+  shouldForwardProp: (prop) => !['variant', 'active', 'size', 'level'].includes(prop as string) })<{ variant?: string; active?: boolean; size?: string; level?: number }>(
   ({ theme, variant, level = 0 }) => ({
     padding: 0,
     ...(variant === 'horizontal' && {
-      width: 'auto',
-    }),
+      width: 'auto' }),
     ...(level > 0 && {
-      paddingLeft: theme.spacing(2 * level),
-    }),
-  }),
+      paddingLeft: theme.spacing(2 * level) }) }),
 );
 
 const StyledListItemButton = styled(ListItemButton, {
-  shouldForwardProp: (prop) => !['variant', 'active', 'size', 'collapsed', 'minimal'].includes(prop as string),
-})<{ variant?: string; active?: boolean; size?: string; collapsed?: boolean; minimal?: boolean }>(
+  shouldForwardProp: (prop) => !['variant', 'active', 'size', 'collapsed', 'minimal'].includes(prop as string) })<{ variant?: string; active?: boolean; size?: string; collapsed?: boolean; minimal?: boolean }>(
   ({ theme, variant, active, size, collapsed, minimal }) => ({
-    ...navItemButtonStyles({ theme, variant, active, size, collapsed, minimal }),
-  }),
+    ...navItemButtonStyles({ theme, variant, active, size, collapsed, minimal }) }),
 );
 
 interface MenuItemRendererProps {
@@ -70,16 +63,13 @@ const MenuItemPopover: React.FC<{
     onClose={onClose}
     anchorOrigin={{
       vertical: 'bottom',
-      horizontal: 'left',
-    }}
+      horizontal: 'left' }}
     transformOrigin={{
       vertical: 'top',
-      horizontal: 'left',
-    }}
+      horizontal: 'left' }}
     disableRestoreFocus
     sx={{
-      pointerEvents: 'none',
-    }}
+      pointerEvents: 'none' }}
     slotProps={{
       paper: {
         onMouseEnter,
@@ -93,10 +83,7 @@ const MenuItemPopover: React.FC<{
           background: (theme) =>
             `linear-gradient(145deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.background.default, 0.95)} 100%)`,
           backdropFilter: 'blur(10px)',
-          minWidth: 200,
-        },
-      },
-    }}
+          minWidth: 200 } } }}
   >
     <List sx={{ p: 1 }}>
       {item.children?.map((child) => {
@@ -145,16 +132,11 @@ const MenuItemLabel: React.FC<{
             variant: size === 'sm' ? 'body2' : size === 'lg' ? 'h6' : 'body1',
             sx: {
               fontWeight: item.active ? 600 : 400,
-              transition: 'all 0.3s ease',
-            },
-          },
+              transition: 'all 0.3s ease' } },
           secondary: {
             sx: {
               opacity: 0.7,
-              transition: 'all 0.3s ease',
-            },
-          },
-        }}
+              transition: 'all 0.3s ease' } } }}
       />
       {item.badge && (
         <Box
@@ -176,8 +158,7 @@ const MenuItemLabel: React.FC<{
             animation:
               typeof item.badge === 'number' && item.badge > 0
                 ? `${pulseGlow} 2s infinite`
-                : 'none',
-          }}
+                : 'none' }}
         >
           {item.badge}
         </Box>
@@ -189,8 +170,7 @@ const MenuItemLabel: React.FC<{
             alignItems: 'center',
             flexShrink: 0, // Prevents expand icon from shrinking
             transition: 'transform 0.3s ease',
-            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-          }}
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
         >
           {variant === 'horizontal' ? <ChevronRight fontSize="small" /> : <ExpandMore />}
         </Box>
@@ -217,6 +197,7 @@ const MenuItemContent: React.FC<{
   item,
   variant,
   size,
+  active: _active,
   collapsed,
   minimal,
   level,
@@ -224,8 +205,7 @@ const MenuItemContent: React.FC<{
   hasChildren,
   onClick,
   onMouseEnter,
-  onMouseLeave,
-}) => (
+  onMouseLeave }) => (
 <StyledListItem key={item.id} variant={variant} active={item.active} size={size} level={level}>
       <StyledListItemButton
         variant={variant}
@@ -241,8 +221,7 @@ const MenuItemContent: React.FC<{
           ? {
               component: 'a' as React.ElementType,
               href: item.href,
-              target: item.target,
-            }
+              target: item.target }
           : {})}
       >
         {item.icon && (
@@ -253,9 +232,7 @@ const MenuItemContent: React.FC<{
               transition: 'all 0.3s ease',
               '& svg': {
                 filter: item.active ? 'drop-shadow(0 2px 8px rgba(0,0,0,0.15))' : 'none',
-                transition: 'all 0.3s ease',
-              },
-            }}
+                transition: 'all 0.3s ease' } }}
           >
             <Grow in={true} timeout={600}>
               <Box>{item.icon}</Box>
@@ -284,8 +261,7 @@ const MenuItemRenderer: React.FC<MenuItemRendererProps> = ({
   collapsed,
   minimal,
   level,
-  onItemClick,
-}) => {
+  onItemClick }) => {
   const {
     open,
     anchorEl,
@@ -295,8 +271,7 @@ const MenuItemRenderer: React.FC<MenuItemRendererProps> = ({
     handleMouseLeave,
     handlePopoverMouseEnter,
     handlePopoverMouseLeave,
-    closePopover,
-  } = useMenuItemState({ item, variant, onItemClick });
+    closePopover } = useMenuItemState({ item, variant, onItemClick });
 
   const itemContent = (
     <MenuItemContent

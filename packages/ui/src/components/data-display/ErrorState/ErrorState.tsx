@@ -2,9 +2,87 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { Box, Button, Stack, Typography, useTheme } from '@mui/material';
+import type { Theme } from '@mui/material';
 import React from 'react';
 
-import type { ErrorStateProps } from './ErrorState.types';
+import type { ErrorStateProps, ErrorStateSeverity } from './ErrorState.types';
+
+const makeTestId =
+  (dataTestId?: string) =>
+  (suffix: string): string =>
+    dataTestId ? `${dataTestId}-${suffix}` : `error-state-${suffix}`;
+
+const paletteFor = (theme: Theme, severity: ErrorStateSeverity) =>
+  severity === 'error' ? theme.palette.error : theme.palette.warning;
+
+const ErrorIcon: React.FC<{
+  severity: ErrorStateSeverity;
+  icon?: React.ReactNode;
+  testId: string;
+}> = ({ severity, icon, testId }) => {
+  const theme = useTheme();
+  const color = paletteFor(theme, severity);
+  const Fallback = severity === 'error' ? ErrorOutlineIcon : WarningAmberIcon;
+
+  return (
+    <Box
+      data-testid={testId}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 80,
+        height: 80,
+        borderRadius: '50%',
+        backgroundColor: color.light,
+        opacity: 0.9,
+      }}
+    >
+      {icon || <Fallback sx={{ fontSize: 48, color: color.main }} />}
+    </Box>
+  );
+};
+
+const ErrorText: React.FC<{
+  title?: string;
+  message: string;
+  titleId: string;
+  testId: (suffix: string) => string;
+}> = ({ title, message, titleId, testId }) => {
+  const theme = useTheme();
+
+  return (
+    <Stack spacing={1} alignItems="center">
+      {title && (
+        <Typography
+          id={titleId}
+          variant="h6"
+          component="h3"
+          data-testid={testId('title')}
+          sx={{
+            fontWeight: theme.typography.fontWeightMedium,
+            color: theme.palette.text.primary,
+          }}
+        >
+          {title}
+        </Typography>
+      )}
+
+      <Typography
+        id={`${titleId}-message`}
+        variant="body2"
+        color="text.secondary"
+        data-testid={testId('message')}
+        sx={{
+          maxWidth: 400,
+          lineHeight: 1.6,
+        }}
+      >
+        {message}
+      </Typography>
+    </Stack>
+  );
+};
 
 export const ErrorState: React.FC<ErrorStateProps> = React.memo(
   ({
@@ -19,15 +97,7 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo(
   }) => {
     const theme = useTheme();
     const titleId = React.useId();
-
-    const color = severity === 'error' ? theme.palette.error : theme.palette.warning;
-
-    const defaultIcon =
-      severity === 'error' ? (
-        <ErrorOutlineIcon sx={{ fontSize: 48, color: color.main }} />
-      ) : (
-        <WarningAmberIcon sx={{ fontSize: 48, color: color.main }} />
-      );
+    const testId = makeTestId(dataTestId);
 
     return (
       <Box
@@ -47,51 +117,9 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo(
           gap: theme.spacing(2),
         }}
       >
-        <Box
-          data-testid={dataTestId ? `${dataTestId}-icon` : 'error-state-icon'}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 80,
-            height: 80,
-            borderRadius: '50%',
-            backgroundColor: color.light,
-            opacity: 0.9,
-          }}
-        >
-          {icon || defaultIcon}
-        </Box>
+        <ErrorIcon severity={severity} icon={icon} testId={testId('icon')} />
 
-        <Stack spacing={1} alignItems="center">
-          {title && (
-            <Typography
-              id={titleId}
-              variant="h6"
-              component="h3"
-              data-testid={dataTestId ? `${dataTestId}-title` : 'error-state-title'}
-              sx={{
-                fontWeight: theme.typography.fontWeightMedium,
-                color: theme.palette.text.primary,
-              }}
-            >
-              {title}
-            </Typography>
-          )}
-
-          <Typography
-            id={`${titleId}-message`}
-            variant="body2"
-            color="text.secondary"
-            data-testid={dataTestId ? `${dataTestId}-message` : 'error-state-message'}
-            sx={{
-              maxWidth: 400,
-              lineHeight: 1.6,
-            }}
-          >
-            {message}
-          </Typography>
-        </Stack>
+        <ErrorText title={title} message={message} titleId={titleId} testId={testId} />
 
         {onRetry && (
           <Button
@@ -99,7 +127,7 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo(
             color={severity}
             onClick={onRetry}
             startIcon={<RefreshIcon />}
-            data-testid={dataTestId ? `${dataTestId}-retry-button` : 'error-state-retry-button'}
+            data-testid={testId('retry-button')}
             sx={{
               mt: theme.spacing(1),
               minWidth: 120,

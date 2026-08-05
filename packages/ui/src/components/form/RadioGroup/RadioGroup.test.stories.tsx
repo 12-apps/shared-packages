@@ -1,7 +1,7 @@
 import { Box, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Banknote, CreditCard, Globe, Heart, Shield,Smartphone, Star, Zap } from 'lucide-react';
-import { expect, fn, userEvent, waitFor,within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { RadioGroup } from './RadioGroup';
 
@@ -257,7 +257,7 @@ export const KeyboardNavigation: Story = {
 
       // Click to focus first radio
       await userEvent.click(firstRadio);
-      await expect(firstRadio).toHaveFocus();
+      await waitFor(() => expect(firstRadio).toHaveFocus());
 
       // Arrow down should move to next radio
       await userEvent.keyboard('{ArrowDown}');
@@ -277,7 +277,7 @@ export const KeyboardNavigation: Story = {
 
       // Click to focus
       await userEvent.click(firstRadio);
-      await expect(firstRadio).toHaveFocus();
+      await waitFor(() => expect(firstRadio).toHaveFocus());
 
       // Space should select it
       await userEvent.keyboard(' ');
@@ -339,14 +339,14 @@ export const FocusManagement: Story = {
 
     await step('Focus on first option', async () => {
       const firstButton = canvas.getByRole('button', { name: /low/i });
-      firstButton.focus();
-      await expect(firstButton).toHaveFocus();
+      await userEvent.click(firstButton);
+      await waitFor(() => expect(firstButton).toHaveFocus());
     });
 
     await step('Focus persistence after selection', async () => {
       const mediumButton = canvas.getByRole('button', { name: /medium/i });
       await userEvent.click(mediumButton);
-      await expect(mediumButton).toHaveFocus();
+      await waitFor(() => expect(mediumButton).toHaveFocus());
     });
 
     await step('Tab order verification', async () => {
@@ -354,12 +354,12 @@ export const FocusManagement: Story = {
       const mediumButton = canvas.getByRole('button', { name: /medium/i });
       const highButton = canvas.getByRole('button', { name: /high/i });
 
-      lowButton.focus();
+      await userEvent.click(lowButton);
       await userEvent.tab();
-      await expect(mediumButton).toHaveFocus();
+      await waitFor(() => expect(mediumButton).toHaveFocus());
 
       await userEvent.tab();
-      await expect(highButton).toHaveFocus();
+      await waitFor(() => expect(highButton).toHaveFocus());
     });
   },
 };

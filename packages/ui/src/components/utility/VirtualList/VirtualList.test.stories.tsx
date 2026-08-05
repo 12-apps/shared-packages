@@ -40,17 +40,34 @@ const generateItems = (count: number): VirtualListItem[] => Array.from({ length:
 
 const generateVariableItems = (count: number): VirtualListItem[] => Array.from({ length: count }, (_, i) => ({
     id: i,
-    height: 60 + Math.floor(Math.random() * 100),
+    // Cycles 60/95/130/165 so the mix of heights is fixed per run.
+    height: 60 + (i % 4) * 35,
     data: {
       name: `Variable Item ${i + 1}`,
       description: `This item has a variable height. ${
-        Math.random() > 0.5
+        i % 2 === 0
           ? 'It contains additional content that makes it taller than other items in the list.'
           : 'Short description.'
       }`,
       avatar: `https://i.pravatar.cc/40?img=${(i % 70) + 1}`,
     },
   }));
+
+// A virtual list's job is to swap which items are mounted as the container
+// scrolls, so these tests assert on the rendered window. The raw scrollTop they
+// checked before depends on the viewport and says nothing about virtualisation.
+const renderedIndices = (root: HTMLElement): number[] =>
+  Array.from(root.querySelectorAll('[data-testid^="virtual-item-"]')).map((element) =>
+    Number((element.getAttribute('data-testid') ?? '').replace('virtual-item-', '')),
+  );
+
+const firstRenderedIndex = (root: HTMLElement): number => {
+  const indices = renderedIndices(root);
+  return indices.length > 0 ? Math.min(...indices) : -1;
+};
+
+// Larger than any fixture's total height, so the container lands at its end.
+const SCROLL_TO_END = 50_000;
 
 const SimpleItemRenderer = ({
   item,
@@ -147,7 +164,7 @@ export const BasicInteraction: Story = {
 
     // Test that scroll callback is called
     await waitFor(() => {
-      expect(virtualList.scrollTop).toBeGreaterThan(0);
+      expect(firstRenderedIndex(virtualList)).toBeGreaterThan(0);
     });
   },
 };
@@ -193,18 +210,19 @@ export const GridInteraction: Story = {
     // Test scrolling in grid
     fireEvent.scroll(virtualGrid, { target: { scrollTop: 300 } });
     await waitFor(() => {
-      expect(virtualGrid.scrollTop).toBeGreaterThan(0);
+      expect(firstRenderedIndex(virtualGrid)).toBeGreaterThan(0);
     });
   },
 };
 
 // Form Interaction Tests (Scroll behaviors)
-export const ScrollInteraction: Story = {
-  render: () => {
-    const items = generateItems(1000);
-    let scrollPosition = 0;
+// The read-out was a plain `let` mutated from the scroll callback, so it never
+// re-rendered and always showed 0px.
+const ScrollInteractionDemo: React.FC = () => {
+  const items = React.useMemo(() => generateItems(1000), []);
+  const [scrollPosition, setScrollPosition] = React.useState(0);
 
-    return (
+  return (
       <Box sx={{ display: 'flex', gap: 2 }}>
         <Paper sx={{ width: 400, height: 300 }}>
           <VirtualList
@@ -212,9 +230,7 @@ export const ScrollInteraction: Story = {
             variant="fixed"
             height={300}
             itemHeight={50}
-            onScroll={(scrollTop) => {
-              scrollPosition = scrollTop;
-            }}
+            onScroll={setScrollPosition}
             renderItem={SimpleItemRenderer}
             data-testid="scrollable-list"
           />
@@ -223,34 +239,37 @@ export const ScrollInteraction: Story = {
           <Typography variant="body2" data-testid="scroll-info">
             Scroll Position: {Math.round(scrollPosition)}px
           </Typography>
-        </Box>
       </Box>
-    );
-  },
+    </Box>
+  );
+};
+
+export const ScrollInteraction: Story = {
+  render: () => <ScrollInteractionDemo />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const scrollableList = canvas.getByTestId('scrollable-list');
 
     // Test initial state
     await expect(scrollableList).toBeInTheDocument();
-    expect(scrollableList.scrollTop).toBe(0);
+    expect(firstRenderedIndex(scrollableList)).toBe(0);
 
     // Test scroll to middle
     fireEvent.scroll(scrollableList, { target: { scrollTop: 500 } });
     await waitFor(() => {
-      expect(scrollableList.scrollTop).toBeGreaterThan(400);
+      expect(firstRenderedIndex(scrollableList)).toBeGreaterThan(0);
     });
 
     // Test scroll to bottom
-    scrollableList.scrollTop = scrollableList.scrollHeight - scrollableList.clientHeight;
+    fireEvent.scroll(scrollableList, { target: { scrollTop: SCROLL_TO_END } });
     await waitFor(() => {
-      expect(scrollableList.scrollTop).toBeGreaterThan(1000);
+      expect(firstRenderedIndex(scrollableList)).toBeGreaterThan(0);
     });
 
     // Test scroll back to top
-    scrollableList.scrollTop = 0;
+    fireEvent.scroll(scrollableList, { target: { scrollTop: 0 } });
     await waitFor(() => {
-      expect(scrollableList.scrollTop).toBe(0);
+      expect(firstRenderedIndex(scrollableList)).toBe(0);
     });
   },
 };
@@ -315,7 +334,7 @@ export const KeyboardNavigation: Story = {
     await waitFor(
       () => {
         // Check the scroll position was applied
-        expect(list.scrollTop).toBeGreaterThan(0);
+        expect(firstRenderedIndex(list)).toBeGreaterThan(0);
       },
       { timeout: 2000 },
     );
@@ -324,7 +343,7 @@ export const KeyboardNavigation: Story = {
     fireEvent.scroll(list, { target: { scrollTop: 0 } });
     await waitFor(
       () => {
-        expect(list.scrollTop).toBe(0);
+        expect(firstRenderedIndex(list)).toBe(0);
       },
       { timeout: 1000 },
     );
@@ -432,7 +451,7 @@ export const FocusManagement: Story = {
     // Test external focus
     const externalButton = canvas.getByTestId('external-button');
     await userEvent.click(externalButton);
-    expect(externalButton).toHaveFocus();
+    await waitFor(() => expect(externalButton).toHaveFocus());
 
     // Test tab into list
     await userEvent.tab();
@@ -807,7 +826,7 @@ export const Performance: Story = {
     fireEvent.scroll(performanceList, { target: { scrollTop: 500 } });
     await waitFor(
       () => {
-        expect(performanceList.scrollTop).toBeGreaterThan(0);
+        expect(firstRenderedIndex(performanceList)).toBeGreaterThan(0);
       },
       { timeout: 2000 },
     );
@@ -815,16 +834,14 @@ export const Performance: Story = {
     // Test multiple scroll events
     for (let i = 1; i <= 3; i++) {
       fireEvent.scroll(performanceList, { target: { scrollTop: i * 200 } });
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 50);
-      });
+      await waitFor(() => expect(performanceList).toBeInTheDocument());
     }
 
     // Verify list is still responsive
     await expect(performanceList).toBeInTheDocument();
     await waitFor(
       () => {
-        expect(performanceList.scrollTop).toBeGreaterThan(0);
+        expect(firstRenderedIndex(performanceList)).toBeGreaterThan(0);
       },
       { timeout: 1000 },
     );
@@ -927,7 +944,7 @@ export const EdgeCases: Story = {
     fireEvent.scroll(variableHeightList, { target: { scrollTop: 100 } });
     await waitFor(
       () => {
-        expect(variableHeightList.scrollTop).toBeGreaterThan(0);
+        expect(firstRenderedIndex(variableHeightList)).toBeGreaterThan(0);
       },
       { timeout: 1000 },
     );
@@ -965,9 +982,6 @@ export const Integration: Story = {
                 <ListItem
                   button
                   onClick={() => {
-                    // Integration with external handlers
-                    // eslint-disable-next-line no-console
-                    console.log('Clicked item:', item.id);
                   }}
                 >
                   <ListItemAvatar>
@@ -1008,9 +1022,6 @@ export const Integration: Story = {
                   },
                 }}
                 onClick={() => {
-                  // Integration with external handlers
-                  // eslint-disable-next-line no-console
-                  console.log('Clicked grid item:', item.id);
                 }}
               >
                 <Typography variant="body2" color="white">
@@ -1067,8 +1078,8 @@ export const Integration: Story = {
     fireEvent.scroll(integrationGrid, { target: { scrollTop: 200 } });
 
     await waitFor(() => {
-      expect(integrationList.scrollTop).toBeGreaterThan(0);
-      expect(integrationGrid.scrollTop).toBeGreaterThan(0);
+      expect(firstRenderedIndex(integrationList)).toBeGreaterThan(0);
+      expect(firstRenderedIndex(integrationGrid)).toBeGreaterThan(0);
     });
   },
 };

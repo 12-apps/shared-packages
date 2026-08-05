@@ -224,7 +224,7 @@ const WithValidationComponent = () => {
     } else {
       setError(false);
       setHelperText('');
-      // eslint-disable-next-line no-console
+      // eslint-disable-next-line no-console -- demo output for the Storybook docs page
       console.log(`Address confirmed: ${address.formatted}`);
     }
   };

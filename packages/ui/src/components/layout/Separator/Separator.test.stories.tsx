@@ -486,22 +486,13 @@ export const Performance: Story = {
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
-    await step('Measure render time for multiple separators', async () => {
-
-      const startTime = performance.now();
+    // This bracketed the query below with performance.now() and asserted a
+    // wall-clock budget. That measured the machine, not the component.
+    await step('Render multiple separators', async () => {
       const separators = canvas.getAllByRole('separator');
-
-      const endTime = performance.now();
-
-      const renderTime = endTime - startTime;
-      // eslint-disable-next-line no-console
-      console.log(`Render time for ${separators.length} separators: ${renderTime}ms`);
 
       // Verify all separators are rendered
       await expect(separators.length).toBe(20);
-
-      // Assert reasonable render time (adjust threshold as needed)
-      await expect(renderTime).toBeLessThan(100);
     });
 
     await step('Test memory usage with many separators', async () => {

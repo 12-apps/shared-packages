@@ -312,15 +312,15 @@ export const WithEventCallbacks: Story = {
     width: 600,
     height: 400,
     onLoadStart: () => {
-      // eslint-disable-next-line no-console
+      // eslint-disable-next-line no-console -- demo output for the Storybook docs page
       console.info('🚀 Started loading image');
     },
     onLoad: (event) => {
-      // eslint-disable-next-line no-console
+      // eslint-disable-next-line no-console -- demo output for the Storybook docs page
       console.info('✅ Image loaded successfully', event);
     },
     onError: (event) => {
-      // eslint-disable-next-line no-console
+      // eslint-disable-next-line no-console -- demo output for the Storybook docs page
       console.error('❌ Image failed to load', event);
     },
   },

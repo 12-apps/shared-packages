@@ -7,6 +7,126 @@ import { type SuccessRateStats, withSuccessRateMetrics } from './successRateMetr
 
 const onErrorFn = <T>(err: unknown, key: T) => logger.error(`Error fetching ${key}: `, err);
 
+type Fetch<T, V> = (key: T) => Promise<V>;
+
+interface SuccessRateSettings {
+  minRequests?: number;
+  minSuccessPercent?: number;
+  includeLastErrorMessage?: boolean;
+  onTrip?: (stats: SuccessRateStats) => void;
+  cooldownMs?: number;
+}
+
+interface FetcherFactoryOptions<T extends string | number, V> {
+  getKey: (key: T) => T;
+  fetcher: Fetch<T, V>;
+  cacheFileName?: string;
+  shouldCache?: (val: V) => boolean;
+  onError?: (err: unknown, key: T) => void;
+  concurrency?: number; // optional max concurrent underlying fetches
+  rateLimit?: { max: number; windowMs?: number }; // optional rate limiting
+  enableMemoryCache?: boolean; // default true
+  successRate?: SuccessRateSettings;
+}
+
+interface ResolvedFetcherOptions<T extends string | number, V>
+  extends FetcherFactoryOptions<T, V> {
+  shouldCache: (val: V) => boolean;
+  onError: (err: unknown, key: T) => void;
+  enableMemoryCache: boolean;
+  successRate: SuccessRateSettings;
+}
+
+const DEFAULT_SUCCESS_RATE: SuccessRateSettings = {
+  minRequests: 20,
+  minSuccessPercent: 50,
+  includeLastErrorMessage: false,
+  onTrip: (stats) => logger.warning(`Success rate trip for ${stats.name}: ${stats.successPercent}%`),
+  cooldownMs: 60000,
+};
+
+/** Default `shouldCache`: anything that is not empty, null or absent is worth keeping. */
+const isCacheable = (val: unknown): boolean => val !== '' && val !== undefined && val !== null;
+
+const resolveOptions = <T extends string | number, V>(
+  opts: FetcherFactoryOptions<T, V>,
+): ResolvedFetcherOptions<T, V> => ({
+  ...opts,
+  shouldCache: opts.shouldCache ?? isCacheable,
+  onError: opts.onError ?? onErrorFn,
+  enableMemoryCache: opts.enableMemoryCache ?? true,
+  successRate: opts.successRate ?? DEFAULT_SUCCESS_RATE,
+});
+
+const successRateLayer = <T extends string | number, V>(
+  next: Fetch<T, V>,
+  settings: SuccessRateSettings,
+  fetcherName: string,
+): Fetch<T, V> =>
+  withSuccessRateMetrics<[T], V>(async (k: T) => next(k), {
+    ...settings,
+    name: `fetcher:${fetcherName || 'anonymous'}`,
+  });
+
+const memoryLayer = <T extends string | number, V>(
+  next: Fetch<T, V>,
+  opts: ResolvedFetcherOptions<T, V>,
+): Fetch<T, V> => {
+  const layer = withMemoryCache<[T], T, V>({
+    fetcher: (k: T) => next(k),
+    getKey: (k: T) => opts.getKey(k),
+    onError: opts.onError,
+    shouldCacheEmpty: true,
+  });
+  return (k: T) => layer(k) as Promise<V>;
+};
+
+const fileLayer = <T extends string | number, V>(
+  next: Fetch<T, V>,
+  opts: ResolvedFetcherOptions<T, V>,
+  fileName: string,
+): Fetch<T, V> => {
+  const layer = withFileCache<[T], T, V>({
+    fileName,
+    getKey: (k: T) => opts.getKey(k),
+    fetcher: (k: T) => next(k) as Promise<V>,
+    shouldCache: (val) => opts.shouldCache(val as V),
+    onError: opts.onError,
+  });
+  return (k: T) => layer(k) as Promise<V>;
+};
+
+// Each enabled layer wraps the one built before it, so the last one added is the
+// first consulted: a call goes file cache -> memory cache -> rate limiter ->
+// concurrency gate -> success-rate guard -> the real fetcher. The guard sits
+// innermost deliberately, so it only counts calls that a cache did not answer.
+const buildFetcher = <T extends string | number, V>(
+  opts: ResolvedFetcherOptions<T, V>,
+): Fetch<T, V> => {
+  const { concurrency, rateLimit, cacheFileName } = opts;
+  let next: Fetch<T, V> = opts.fetcher;
+
+  if (opts.successRate) {
+    next = successRateLayer(next, opts.successRate, opts.fetcher.name);
+  }
+  if (concurrency && concurrency > 0) {
+    const prev = next;
+    next = withConcurrencyLimit<[T], V>(concurrency, async (k: T) => prev(k));
+  }
+  if (rateLimit && rateLimit.max > 0) {
+    const prev = next;
+    next = withRateLimit<[T], V>(rateLimit, async (k: T) => prev(k));
+  }
+  if (opts.enableMemoryCache) {
+    next = memoryLayer(next, opts);
+  }
+  if (cacheFileName) {
+    next = fileLayer(next, opts, cacheFileName);
+  }
+
+  return next;
+};
+
 /**
  * Generic factory that creates a 2‑tier (in‑memory + persistent) cached fetcher.
  * Encapsulates the previous verbose pattern used for getUserGrp.
@@ -54,89 +174,10 @@ const onErrorFn = <T>(err: unknown, key: T) => logger.error(`Error fetching ${ke
  *
  * const name = await getUserName(42);
  */
-export const createFetcherFactory = <T extends string | number, V = string | undefined>(opts: {
-  getKey: (key: T) => T;
-  fetcher: (key: T) => Promise<V>;
-  cacheFileName?: string;
-  shouldCache?: (val: V) => boolean;
-  onError?: (err: unknown, key: T) => void;
-  concurrency?: number; // optional max concurrent underlying fetches
-  rateLimit?: { max: number; windowMs?: number }; // optional rate limiting
-  enableMemoryCache?: boolean; // default true
-  successRate?: {
-    minRequests?: number;
-    minSuccessPercent?: number;
-    includeLastErrorMessage?: boolean;
-    onTrip?: (stats: SuccessRateStats) => void;
-    cooldownMs?: number;
-  };
-}) => {
-  const {
-    getKey,
-    fetcher,
-    cacheFileName,
-    shouldCache = (val: V) => (val) !== '' && val !== undefined && val !== null,
-    onError = onErrorFn,
-    concurrency,
-    rateLimit,
-    enableMemoryCache = true,
-    successRate = {
-      minRequests: 20,
-      minSuccessPercent: 50,
-      includeLastErrorMessage: false,
-      onTrip: (stats) => logger.warning(`Success rate trip for ${stats.name}: ${stats.successPercent}%`),
-      cooldownMs: 60000,
-    },
-  } = opts;
-
-  let baseFetcher: (k: T) => Promise<V> = fetcher;
-
-  if (successRate) {
-    const original = baseFetcher;
-      baseFetcher = withSuccessRateMetrics<[T], V>(
-      async (k: T) => original(k),
-      {
-        minRequests: successRate.minRequests,
-        minSuccessPercent: successRate.minSuccessPercent,
-        includeLastErrorMessage: successRate.includeLastErrorMessage,
-        onTrip: successRate.onTrip,
-        cooldownMs: successRate.cooldownMs,
-        name: `fetcher:${(fetcher).name || 'anonymous'}`,
-      },
-    );
-  }
-  if (concurrency && concurrency > 0) {
-    const prev = baseFetcher;
-    baseFetcher = withConcurrencyLimit <[T], V>(concurrency, async (k: T) => prev(k));
-  }
-  if (rateLimit && rateLimit.max > 0) {
-    const prev = baseFetcher;
-    baseFetcher = withRateLimit<[T], V>(rateLimit, async (k: T) => prev(k));
-  }
-
-  if (enableMemoryCache) {
-    const prev = baseFetcher;
-    const memoryLayer = withMemoryCache<[T], T, V>({
-      fetcher: (k: T) => prev(k),
-      getKey: (k: T) => getKey(k),
-      onError,
-      shouldCacheEmpty: true,
-    });
-    baseFetcher = (k: T) => memoryLayer(k) as Promise<V>;
-  }
-
-  if (cacheFileName) {
-    const prev = baseFetcher;
-    const fileLayer = withFileCache<[T], T, V>({
-      fileName: cacheFileName,
-      getKey: (k: T) => getKey(k),
-      fetcher: (k: T) => prev(k) as Promise<V>,
-      shouldCache: (val) => shouldCache(val as V),
-      onError,
-    });
-    baseFetcher = (k: T) => fileLayer(k) as Promise<V>;
-  }
-
+export const createFetcherFactory = <T extends string | number, V = string | undefined>(
+  opts: FetcherFactoryOptions<T, V>,
+) => {
+  const baseFetcher = buildFetcher(resolveOptions(opts));
   const debug = !!process.env.CACHE_DEBUG;
   const get = async (key: T): Promise<V> => {
     const val = (await baseFetcher(key)) as V;

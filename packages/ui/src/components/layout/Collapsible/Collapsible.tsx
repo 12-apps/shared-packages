@@ -1,48 +1,25 @@
 import { Box, Collapse,useTheme } from '@mui/material';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
 
+import {
+  dimmedStyles,
+  regionAttrs,
+  transitionSettings,
+  triggerStyles,
+} from './Collapsible.helpers';
 import type { CollapsibleContentProps,CollapsibleProps, CollapsibleTriggerProps } from './Collapsible.types';
 
-export const Collapsible: React.FC<CollapsibleProps> = ({
-  children,
-  open,
-  variant = 'default',
-  duration = 300,
-  easing,
-  onToggle,
-  disabled = false,
-  keepMounted = false,
-  maxHeight,
-  sx,
-  className,
-  dataTestId,
-  ...otherProps
-}) => {
-  const theme = useTheme();
+/**
+ * The smooth and spring variants animate an explicit pixel height, so the content
+ * has to be measured after every render that could have changed it.
+ */
+const useMeasuredHeight = (
+  open: boolean,
+  maxHeight: number | undefined,
+  children: React.ReactNode,
+) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | 'auto'>('auto');
-
-  const getTransitionSettings = () => {
-    switch (variant) {
-      case 'smooth':
-        return {
-          duration,
-          easing: easing || theme.transitions.easing.easeInOut,
-        };
-      case 'spring':
-        return {
-          duration: duration * 1.2,
-          easing: easing || 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-        };
-      default:
-        return {
-          duration,
-          easing: easing || theme.transitions.easing.easeInOut,
-        };
-    }
-  };
-
-  const transition = getTransitionSettings();
 
   const measureHeight = useCallback(() => {
     if (contentRef.current) {
@@ -60,41 +37,64 @@ export const Collapsible: React.FC<CollapsibleProps> = ({
     }
   }, [open, measureHeight, children]);
 
-  // Trigger onToggle callback when open state changes
-  useEffect(() => {
-    if (onToggle && !disabled) {
-      onToggle(open);
-    }
-  }, [open, onToggle, disabled]);
+  return { contentRef, height };
+};
 
+type VariantProps = Omit<CollapsibleProps, 'variant' | 'onToggle'> & {
+  duration: number;
+  disabled: boolean;
+  keepMounted: boolean;
+  transition: { duration: number; easing: string };
+};
 
-  if (variant === 'default') {
-    // Use MUI's built-in Collapse for default variant
-    return (
-      <Collapse
-        in={open && !disabled}
-        timeout={disabled ? 0 : duration}
-        sx={{
-          opacity: disabled ? 0.6 : 1,
-          pointerEvents: disabled ? 'none' : 'auto',
-          ...(maxHeight && { maxHeight, overflow: 'hidden' }),
-          ...sx,
-        }}
-        className={className}
-        unmountOnExit={!keepMounted}
-        data-disabled={disabled}
-        data-testid={dataTestId}
-        role="region"
-        aria-expanded={open && !disabled}
-        aria-hidden={disabled || !open}
-        {...otherProps}
-      >
-        <Box>{children}</Box>
-      </Collapse>
-    );
-  }
+// Use MUI's built-in Collapse for the default variant.
+const DefaultCollapsible: React.FC<VariantProps> = ({
+  children,
+  open,
+  duration,
+  disabled,
+  keepMounted,
+  maxHeight,
+  sx,
+  className,
+  dataTestId,
+  transition: _transition,
+  easing: _easing,
+  ...otherProps
+}) => (
+  <Collapse
+    in={open && !disabled}
+    timeout={disabled ? 0 : duration}
+    sx={{
+      ...dimmedStyles(disabled),
+      ...(maxHeight && { maxHeight, overflow: 'hidden' }),
+      ...sx,
+    }}
+    className={className}
+    unmountOnExit={!keepMounted}
+    {...regionAttrs({ open, disabled, dataTestId })}
+    {...otherProps}
+  >
+    <Box>{children}</Box>
+  </Collapse>
+);
 
-  // Custom implementation for smooth and spring variants
+const AnimatedCollapsible: React.FC<VariantProps> = ({
+  children,
+  open,
+  disabled,
+  keepMounted,
+  maxHeight,
+  transition,
+  sx,
+  className,
+  dataTestId,
+  duration: _duration,
+  easing: _easing,
+  ...otherProps
+}) => {
+  const { contentRef, height } = useMeasuredHeight(open, maxHeight, children);
+
   return (
     <Box
       component="div"
@@ -103,22 +103,50 @@ export const Collapsible: React.FC<CollapsibleProps> = ({
         height: open && !disabled ? height : 0,
         transition: disabled ? 'none' : `height ${transition.duration}ms ${transition.easing}`,
         willChange: disabled ? 'auto' : 'height',
-        opacity: disabled ? 0.6 : 1,
-        pointerEvents: disabled ? 'none' : 'auto',
+        ...dimmedStyles(disabled),
         ...sx,
       }}
       className={className}
-      data-disabled={disabled}
-      data-testid={dataTestId}
-      role="region"
-      aria-expanded={open && !disabled}
-      aria-hidden={disabled || !open}
+      {...regionAttrs({ open, disabled, dataTestId })}
       {...otherProps}
     >
-      <Box ref={contentRef}>
-        {(keepMounted || (open && !disabled)) && children}
-      </Box>
+      <Box ref={contentRef}>{(keepMounted || (open && !disabled)) && children}</Box>
     </Box>
+  );
+};
+
+export const Collapsible: React.FC<CollapsibleProps> = ({
+  variant = 'default',
+  duration = 300,
+  easing,
+  onToggle,
+  disabled = false,
+  keepMounted = false,
+  ...rest
+}) => {
+  const theme = useTheme();
+  const { open } = rest;
+
+  // Trigger onToggle callback when open state changes
+  useEffect(() => {
+    if (onToggle && !disabled) {
+      onToggle(open);
+    }
+  }, [open, onToggle, disabled]);
+
+  const variantProps: VariantProps = {
+    ...rest,
+    duration,
+    easing,
+    disabled,
+    keepMounted,
+    transition: transitionSettings(theme, variant, duration, easing),
+  };
+
+  return variant === 'default' ? (
+    <DefaultCollapsible {...variantProps} />
+  ) : (
+    <AnimatedCollapsible {...variantProps} />
   );
 };
 
@@ -145,31 +173,7 @@ export const CollapsibleTrigger: React.FC<CollapsibleTriggerProps> = ({
       role="button"
       tabIndex={disabled ? -1 : 0}
       data-state={expanded ? 'open' : 'closed'}
-      sx={{
-        width: '100%',
-        padding: theme.spacing(1, 2),
-        border: 'none',
-        backgroundColor: expanded ? theme.palette.action.selected : 'transparent',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        transition: theme.transitions.create(['background-color', 'opacity'], {
-          duration: theme.transitions.duration.short,
-        }),
-        opacity: disabled ? 0.6 : 1,
-        '&:hover': {
-          backgroundColor: disabled ? 'transparent' :
-            expanded ? theme.palette.action.selected : theme.palette.action.hover,
-        },
-        '&:focus': {
-          outline: `2px solid ${theme.palette.primary.main}`,
-          outlineOffset: 2,
-        },
-        '&:active': {
-          backgroundColor: disabled ? 'transparent' : theme.palette.action.focus,
-        },
-      }}
+      sx={triggerStyles(theme, { disabled, expanded })}
       {...otherProps}
     >
       {children}

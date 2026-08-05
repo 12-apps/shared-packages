@@ -1,9 +1,26 @@
 import CancelIcon from '@mui/icons-material/Cancel';
-import { Avatar, Chip as MuiChip } from '@mui/material';
-import type { KeyboardEvent, ReactElement } from 'react';
-import React, { forwardRef } from 'react';
+import { Chip as MuiChip } from '@mui/material';
+import { forwardRef } from 'react';
 
+import {
+  avatarFor,
+  chipRole,
+  chipStyles,
+  iconWithTestId,
+  isClickable,
+  makeKeyDownHandler,
+  makeTestId,
+} from './Chip.helpers';
 import type { ChipProps } from './Chip.types';
+
+type MuiChipColor =
+  | 'primary'
+  | 'secondary'
+  | 'error'
+  | 'info'
+  | 'success'
+  | 'warning'
+  | 'default';
 
 export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
   label,
@@ -23,109 +40,29 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
   dataTestId,
   ...props
 }, ref) => {
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (disabled) return;
-
-    // Handle delete/backspace keys for deletion
-    if ((event.key === 'Delete' || event.key === 'Backspace') && deletable && onDelete) {
-      event.preventDefault();
-      onDelete();
-      return;
-    }
-
-    // Handle enter/space for selection
-    if ((event.key === 'Enter' || event.key === ' ') && (onClick || selectable)) {
-      event.preventDefault();
-      onClick?.();
-    }
-  };
-
-  const getAvatarComponent = (): ReactElement | undefined => {
-    if (avatar && React.isValidElement(avatar)) {
-      return avatar;
-    }
-    if (avatarSrc) {
-      return <Avatar src={avatarSrc} sx={{ width: 24, height: 24 }} />;
-    }
-    return undefined;
-  };
-
-  // Determine the role based on context
-  const role = selectable ? 'option' : (onClick ? 'button' : undefined);
-  
-  // Determine if clickable
-  const clickable = !disabled && (!!onClick || selectable);
-
-  // Enhance icon with test ID if present
-  const enhancedIcon = icon && React.isValidElement(icon)
-    ? React.cloneElement(icon as ReactElement, {
-        'data-testid': dataTestId ? `${dataTestId}-icon` : 'chip-icon',
-      } as Record<string, unknown>)
-    : undefined;
-
-  // Wrap label with test ID
-  const enhancedLabel = (
-    <span data-testid={dataTestId ? `${dataTestId}-label` : 'chip-label'}>
-      {label}
-    </span>
-  );
-
-  // Custom delete icon with test ID
-  const enhancedDeleteIcon = deletable ? (
-    <CancelIcon data-testid={dataTestId ? `${dataTestId}-delete` : 'chip-delete'} />
-  ) : undefined;
+  const testId = makeTestId(dataTestId);
+  const clickable = isClickable(disabled, onClick, selectable);
 
   return (
     <MuiChip
       ref={ref}
-      label={enhancedLabel}
+      label={<span data-testid={testId('label')}>{label}</span>}
       variant={variant}
       size={size}
-      color={color as 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' | 'default' | undefined}
-      avatar={getAvatarComponent()}
-      icon={enhancedIcon}
+      color={color as MuiChipColor | undefined}
+      avatar={avatarFor(avatar, avatarSrc)}
+      icon={iconWithTestId(icon, testId('icon'))}
       onDelete={deletable ? onDelete : undefined}
-      deleteIcon={enhancedDeleteIcon}
+      deleteIcon={deletable ? <CancelIcon data-testid={testId('delete')} /> : undefined}
       disabled={disabled}
       clickable={clickable}
       onClick={clickable ? onClick : undefined}
-      onKeyDown={handleKeyDown}
+      onKeyDown={makeKeyDownHandler({ disabled, deletable, selectable, onClick, onDelete })}
       className={className}
-      role={role}
+      role={chipRole(selectable, onClick)}
       aria-selected={selectable ? selected : undefined}
       data-testid={dataTestId || 'chip'}
-      sx={{
-        // Enhanced styling for outlined variant
-        ...(variant === 'outlined' && {
-          borderWidth: '1px',
-          borderStyle: 'solid',
-          backgroundColor: 'transparent',
-        }),
-        // Selection styling uses SEMANTIC palette tokens (not hardcoded rgba).
-        // A filled selected chip keeps MUI's solid `color.main` + contrast text
-        // (clear active state); an outlined selected chip gets a subtle
-        // theme-driven `action.selected` tint so it reads as active without
-        // muddying the fill.
-        ...(selected &&
-          variant === 'outlined' && {
-            backgroundColor: (theme) => theme.palette.action.selected,
-          }),
-        '&:hover': {
-          ...(clickable && !disabled && {
-            transform: 'translateY(-1px)',
-            boxShadow: (theme) =>
-              theme.palette.mode === 'dark'
-                ? '0 4px 12px rgba(0, 0, 0, 0.3)'
-                : '0 4px 12px rgba(0, 0, 0, 0.15)',
-          }),
-        },
-        '&:active': {
-          ...(clickable && !disabled && {
-            transform: 'translateY(0px)',
-          }),
-        },
-        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      }}
+      sx={chipStyles({ variant, selected, clickable, disabled })}
       {...props}
     />
   );

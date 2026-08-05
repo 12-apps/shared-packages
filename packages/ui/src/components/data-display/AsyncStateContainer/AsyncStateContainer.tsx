@@ -38,6 +38,37 @@ import type { AsyncStateContainerProps } from './AsyncStateContainer.types';
  *   <DataGrid data={data} />
  * </AsyncStateContainer>
  */
+// The four states render the same wrapper, differing only in data-state and
+// what goes inside it.
+const StateBox: React.FC<{
+  state: 'loading' | 'error' | 'empty' | 'success';
+  className?: string;
+  dataTestId?: string;
+  children: React.ReactNode;
+}> = ({ state, className, dataTestId, children }) => (
+  <Box
+    className={className}
+    data-testid={dataTestId || 'async-state-container'}
+    data-state={state}
+  >
+    {children}
+  </Box>
+);
+
+const errorMessageOf = (error: unknown): string => {
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return error.message;
+  return 'An unexpected error occurred';
+};
+
+// Each state takes a ready-made node, else a render function, else the default.
+const pickNode = (
+  node: React.ReactNode,
+  render: (() => React.ReactNode) | undefined,
+  fallback: React.ReactNode,
+): React.ReactNode => node || render?.() || fallback;
+
 export const AsyncStateContainer: React.FC<AsyncStateContainerProps> = React.memo(
   ({
     isLoading = false,
@@ -53,60 +84,38 @@ export const AsyncStateContainer: React.FC<AsyncStateContainerProps> = React.mem
     className,
     dataTestId,
   }) => {
-    // Helper to extract error message from various error types
-    const getErrorMessage = (): string => {
-      if (!error) return '';
-      if (typeof error === 'string') return error;
-      if (error instanceof Error) return error.message;
-      return 'An unexpected error occurred';
-    };
+    const box = { className, dataTestId };
 
     // Priority: loading > error > empty > children
     if (isLoading) {
       return (
-        <Box
-          className={className}
-          data-testid={dataTestId || 'async-state-container'}
-          data-state="loading"
-        >
-          {loadingComponent || renderLoading?.() || <LoadingState />}
-        </Box>
+        <StateBox state="loading" {...box}>
+          {pickNode(loadingComponent, renderLoading, <LoadingState />)}
+        </StateBox>
       );
     }
 
     if (error) {
-      const errorMessage = getErrorMessage();
+      const message = errorMessageOf(error);
       return (
-        <Box
-          className={className}
-          data-testid={dataTestId || 'async-state-container'}
-          data-state="error"
-        >
-          {errorComponent || renderError?.(errorMessage) || <ErrorState message={errorMessage} />}
-        </Box>
+        <StateBox state="error" {...box}>
+          {errorComponent || renderError?.(message) || <ErrorState message={message} />}
+        </StateBox>
       );
     }
 
     if (isEmpty) {
       return (
-        <Box
-          className={className}
-          data-testid={dataTestId || 'async-state-container'}
-          data-state="empty"
-        >
-          {emptyComponent || renderEmpty?.() || <EmptyState title="No data available" />}
-        </Box>
+        <StateBox state="empty" {...box}>
+          {pickNode(emptyComponent, renderEmpty, <EmptyState title="No data available" />)}
+        </StateBox>
       );
     }
 
     return (
-      <Box
-        className={className}
-        data-testid={dataTestId || 'async-state-container'}
-        data-state="success"
-      >
+      <StateBox state="success" {...box}>
         {children}
-      </Box>
+      </StateBox>
     );
   },
 );

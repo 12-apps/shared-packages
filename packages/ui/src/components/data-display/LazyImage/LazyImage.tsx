@@ -1,7 +1,9 @@
 import { Box, CircularProgress, styled, useTheme } from '@mui/material';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { Skeleton } from '../../layout/Skeleton';
-import type { LazyImageProps, LazyImageState } from './LazyImage.types';
+import type { ResolvedLazyImageProps } from './LazyImage.hooks';
+import { imgPassThrough, resolveLazyImageProps, useLazyImage } from './LazyImage.hooks';
+import type { LazyImageProps } from './LazyImage.types';
 
 const ImageContainer = styled(Box)(() => ({
   position: 'relative',
@@ -47,275 +49,174 @@ const FallbackContainer = styled(Box)(({ theme }) => ({
   left: 0,
 }));
 
+/** The box the image occupies, shared by the real image and every stand-in for it. */
+interface BoxMetrics {
+  width?: number | string;
+  height?: number | string;
+  objectFit: NonNullable<LazyImageProps['objectFit']>;
+  objectPosition: string;
+  borderRadius?: number | string;
+}
+
+interface IndicatorProps {
+  props: ResolvedLazyImageProps;
+  metrics: BoxMetrics;
+}
+
+const SkeletonIndicator: React.FC<IndicatorProps> = ({ props, metrics }) => (
+  <Skeleton
+    variant="rectangular"
+    width={metrics.width || '100%'}
+    height={metrics.height || 200}
+    animation={props.skeletonProps.animation || 'pulse'}
+    intensity={props.skeletonProps.intensity}
+    borderRadius={props.borderRadius}
+    data-testid={`${props['data-testid']}-skeleton`}
+  />
+);
+
+const SpinnerIndicator: React.FC<IndicatorProps> = ({ props }) => {
+  const theme = useTheme();
+  const { spinnerProps } = props;
+
+  return (
+    <SpinnerOverlay>
+      <CircularProgress
+        size={spinnerProps.size || 40}
+        thickness={spinnerProps.thickness || 4}
+        sx={{ color: spinnerProps.color || theme.palette.primary.main }}
+        data-testid={`${props['data-testid']}-spinner`}
+      />
+    </SpinnerOverlay>
+  );
+};
+
+const PlaceholderIndicator: React.FC<IndicatorProps & { hasSrc: boolean }> = ({
+  props,
+  metrics,
+  hasSrc,
+}) => {
+  // Once a src has been chosen the real <img> is on screen, so the placeholder
+  // would only stack behind it.
+  if (!props.placeholder || hasSrc) return null;
+
+  return (
+    <StyledImage
+      src={props.placeholder}
+      alt={`${props.alt} (loading)`}
+      style={metrics}
+      data-testid={`${props['data-testid']}-placeholder`}
+    />
+  );
+};
+
+const LoadingIndicator: React.FC<
+  IndicatorProps & { kind: NonNullable<LazyImageProps['loadingState']>; hasSrc: boolean }
+> = ({ kind, hasSrc, ...rest }) => {
+  switch (kind) {
+    case 'skeleton':
+      return <SkeletonIndicator {...rest} />;
+    case 'spinner':
+      return <SpinnerIndicator {...rest} />;
+    case 'placeholder':
+      return <PlaceholderIndicator {...rest} hasSrc={hasSrc} />;
+    default:
+      return null;
+  }
+};
+
+const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
+  const { alt, fallback, borderRadius } = props;
+  const testId = props['data-testid'];
+
+  if (!fallback) return null;
+
+  if (typeof fallback === 'string') {
+    return (
+      <StyledImage
+        src={fallback}
+        alt={`${alt} (fallback)`}
+        style={metrics}
+        fadeIn={false}
+        isLoaded={true}
+        data-testid={`${testId}-fallback`}
+      />
+    );
+  }
+
+  return (
+    <FallbackContainer
+      sx={{ width: metrics.width, height: metrics.height, borderRadius }}
+      data-testid={`${testId}-fallback`}
+    >
+      {fallback}
+    </FallbackContainer>
+  );
+};
+
 /**
  * LazyImage component with enhanced features for optimized image loading
  * Supports lazy loading, placeholders, error handling, and various loading states
  */
-export const LazyImage = React.memo<LazyImageProps>(function LazyImage({
-  src,
-  alt,
-  width,
-  height = 'auto',
-  placeholder,
-  fallback,
-  loadingState = 'skeleton',
-  showSpinner,
-  objectFit = 'cover',
-  objectPosition = 'center',
-  borderRadius,
-  lazy = true,
-  rootMargin = '100px',
-  threshold = 0,
-  fadeIn = true,
-  fadeInDuration = 300,
-  onLoad,
-  onError,
-  onLoadStart,
-  retryOnError = false,
-  maxRetries = 3,
-  retryDelay = 1000,
-  decoding = 'async',
-  loading: nativeLoading,
-  fetchPriority: _fetchPriority,
-  skeletonProps = {},
-  spinnerProps = {},
-  sx = {},
-  className,
-  'data-testid': dataTestId,
-  'aria-label': ariaLabel,
-  'aria-describedby': ariaDescribedBy,
-  role = 'img',
-  ...imgProps
-}) {
-  const theme = useTheme();
-  const imgRef = useRef<HTMLImageElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps) {
+  const props = resolveLazyImageProps(rawProps);
+  const {
+    state,
+    containerRef,
+    effectiveLoadingState,
+    handleImageLoad,
+    handleImageError,
+    showImage,
+    showLoading,
+  } = useLazyImage(props);
 
-  // Handle deprecated showSpinner prop
-  const effectiveLoadingState = showSpinner ? 'spinner' : loadingState;
-
-  const [state, setState] = useState<LazyImageState>({
-    isLoading: true,
-    hasError: false,
-    isVisible: !lazy, // If not lazy, load immediately
-    retryCount: 0,
-    currentSrc: lazy ? (placeholder || null) : src,
-  });
-
-  // Clean up retry timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Intersection Observer for lazy loading
-  useEffect(() => {
-    if (!lazy || state.isVisible) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setState((prev) => ({ ...prev, isVisible: true, currentSrc: src }));
-            onLoadStart?.();
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      {
-        rootMargin,
-        threshold,
-      }
-    );
-
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-
-    return () => {
-      if (containerRef.current) {
-        observer.unobserve(containerRef.current);
-      }
-    };
-  }, [lazy, src, rootMargin, threshold, state.isVisible, onLoadStart]);
-
-  // Load image when it becomes visible
-  useEffect(() => {
-    if (!state.isVisible || !src || state.currentSrc === src) {
-      return;
-    }
-
-    setState((prev) => ({ ...prev, currentSrc: src, isLoading: true, hasError: false }));
-  }, [state.isVisible, src, state.currentSrc]);
-
-  const handleImageLoad = useCallback(
-    (event: React.SyntheticEvent<HTMLImageElement>) => {
-      setState((prev) => ({ ...prev, isLoading: false, hasError: false, retryCount: 0 }));
-      onLoad?.(event);
-    },
-    [onLoad]
-  );
-
-  const handleImageError = useCallback(
-    (event: React.SyntheticEvent<HTMLImageElement>) => {
-      const shouldRetry = retryOnError && state.retryCount < maxRetries;
-
-      if (shouldRetry) {
-        retryTimeoutRef.current = setTimeout(() => {
-          setState((prev) => ({
-            ...prev,
-            retryCount: prev.retryCount + 1,
-            currentSrc: `${src}?retry=${prev.retryCount + 1}`, // Force reload with cache buster
-          }));
-        }, retryDelay);
-      } else {
-        setState((prev) => ({ ...prev, isLoading: false, hasError: true }));
-        onError?.(event);
-      }
-    },
-    [onError, retryOnError, state.retryCount, maxRetries, retryDelay, src]
-  );
-
-  // Determine what to show for loading state
-  const renderLoadingState = () => {
-    if (!state.isLoading) return null;
-
-    switch (effectiveLoadingState) {
-      case 'skeleton':
-        return (
-          <Skeleton
-            variant="rectangular"
-            width={width || '100%'}
-            height={height || 200}
-            animation={skeletonProps.animation || 'pulse'}
-            intensity={skeletonProps.intensity}
-            borderRadius={borderRadius}
-            data-testid={`${dataTestId}-skeleton`}
-          />
-        );
-      case 'spinner':
-        return (
-          <SpinnerOverlay>
-            <CircularProgress
-              size={spinnerProps.size || 40}
-              thickness={spinnerProps.thickness || 4}
-              sx={{ color: spinnerProps.color || theme.palette.primary.main }}
-              data-testid={`${dataTestId}-spinner`}
-            />
-          </SpinnerOverlay>
-        );
-      case 'placeholder':
-        if (placeholder && !state.currentSrc) {
-          return (
-            <StyledImage
-              src={placeholder}
-              alt={`${alt} (loading)`}
-              style={{
-                width,
-                height,
-                objectFit,
-                objectPosition,
-              }}
-              data-testid={`${dataTestId}-placeholder`}
-            />
-          );
-        }
-        return null;
-      case 'none':
-      default:
-        return null;
-    }
-  };
-
-  // Render error fallback
-  const renderErrorFallback = () => {
-    if (!state.hasError || !fallback) return null;
-
-    if (typeof fallback === 'string') {
-      return (
-        <StyledImage
-          src={fallback}
-          alt={`${alt} (fallback)`}
-          style={{
-            width,
-            height,
-            objectFit,
-            objectPosition,
-          }}
-          fadeIn={false}
-          isLoaded={true}
-          data-testid={`${dataTestId}-fallback`}
-        />
-      );
-    }
-
-    return (
-      <FallbackContainer
-        sx={{
-          width,
-          height,
-          borderRadius,
-        }}
-        data-testid={`${dataTestId}-fallback`}
-      >
-        {fallback}
-      </FallbackContainer>
-    );
-  };
-
-  const imageStyles: React.CSSProperties = {
+  const { width, height, borderRadius, alt } = props;
+  const testId = props['data-testid'];
+  const metrics: BoxMetrics = {
     width,
     height,
-    objectFit,
-    objectPosition,
+    objectFit: props.objectFit,
+    objectPosition: props.objectPosition,
     borderRadius,
-    ...sx,
   };
-
-  const showImage = state.currentSrc && !state.hasError;
-  const showLoading = state.isLoading && (!state.currentSrc || effectiveLoadingState !== 'placeholder');
 
   return (
     <ImageContainer
       ref={containerRef}
-      className={className}
-      sx={{
-        width: width || 'auto',
-        height: height || 'auto',
-        borderRadius,
-      }}
-      data-testid={dataTestId}
+      className={props.className}
+      sx={{ width: width || 'auto', height: height || 'auto', borderRadius }}
+      data-testid={testId}
     >
-      {showLoading && renderLoadingState()}
+      {showLoading && (
+        <LoadingIndicator
+          kind={effectiveLoadingState}
+          props={props}
+          metrics={metrics}
+          hasSrc={Boolean(state.currentSrc)}
+        />
+      )}
 
       {showImage && (
         <StyledImage
-          ref={imgRef}
           src={state.currentSrc || undefined}
           alt={alt}
           onLoad={handleImageLoad}
           onError={handleImageError}
-          fadeIn={fadeIn}
-          fadeInDuration={fadeInDuration}
+          fadeIn={props.fadeIn}
+          fadeInDuration={props.fadeInDuration}
           isLoaded={!state.isLoading}
-          decoding={decoding}
-          loading={lazy ? 'lazy' : nativeLoading}
-          style={imageStyles}
-          aria-label={ariaLabel || alt}
-          aria-describedby={ariaDescribedBy}
-          role={role}
-          data-testid={`${dataTestId}-img`}
-          {...imgProps}
+          decoding={props.decoding}
+          loading={props.lazy ? 'lazy' : props.loading}
+          style={{ ...metrics, ...props.sx }}
+          aria-label={props['aria-label'] || alt}
+          aria-describedby={props['aria-describedby']}
+          role={props.role}
+          data-testid={`${testId}-img`}
+          {...imgPassThrough(props)}
         />
       )}
 
-      {state.hasError && renderErrorFallback()}
+      {state.hasError && <ErrorFallback props={props} metrics={metrics} />}
     </ImageContainer>
   );
 });

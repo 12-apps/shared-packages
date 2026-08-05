@@ -1,6 +1,13 @@
-import { Alert,Box, CircularProgress, Typography } from '@mui/material';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Box } from '@mui/material';
+import React from 'react';
 
+import { useLoadMore, useSentinel } from './InfiniteScroll.hooks';
+import {
+  containerStyles,
+  DefaultEndMessage,
+  DefaultError,
+  DefaultLoader,
+} from './InfiniteScroll.parts';
 import type { InfiniteScrollProps } from './InfiniteScroll.types';
 
 export const InfiniteScroll: React.FC<InfiniteScrollProps> = ({
@@ -22,151 +29,25 @@ export const InfiniteScroll: React.FC<InfiniteScrollProps> = ({
   testMode = false,
   testTriggerRef,
 }) => {
-  const [isIntersecting, setIsIntersecting] = useState(false);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const loadingRef = useRef(false);
+  const { sentinelRef, isIntersecting } = useSentinel({ testMode, threshold, scrollableTarget });
 
-  const defaultLoader = (
-    <Box
-      sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        p: 2,
-      }}
-    >
-      <CircularProgress size={24} />
-      <Typography variant="body2" sx={{ ml: 1 }}>
-        Loading...
-      </Typography>
-    </Box>
-  );
+  useLoadMore({
+    hasMore,
+    loading,
+    error,
+    loadMore,
+    onError,
+    isIntersecting,
+    testMode,
+    testTriggerRef,
+  });
 
-  const defaultEndMessage = (
-    <Box
-      sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        p: 2,
-      }}
-    >
-      <Typography variant="body2" color="text.secondary">
-        No more items to load
-      </Typography>
-    </Box>
-  );
-
-  const defaultErrorComponent = error ? (
-    <Alert severity="error" sx={{ m: 2 }}>
-      {error.message || 'An error occurred while loading more items'}
-    </Alert>
-  ) : null;
-
-  const handleLoadMore = useCallback(async () => {
-    if (loadingRef.current || !hasMore || error) {
-      return;
-    }
-
-    loadingRef.current = true;
-
-    try {
-      await loadMore();
-    } catch (err) {
-      const errorObj = err instanceof Error ? err : new Error('Unknown error');
-      onError?.(errorObj);
-    } finally {
-      loadingRef.current = false;
-    }
-  }, [hasMore, error, loadMore, onError]);
-
-  // Expose test trigger for test mode
-  useEffect(() => {
-    if (testMode && testTriggerRef) {
-      testTriggerRef.current = handleLoadMore;
-    }
-
-    return () => {
-      if (testMode && testTriggerRef) {
-        testTriggerRef.current = undefined;
-      }
-    };
-  }, [testMode, testTriggerRef, handleLoadMore]);
-
-  useEffect(() => {
-    if (testMode || !sentinelRef.current) return;
-
-    const getScrollableElement = () => {
-      if (!scrollableTarget) return null;
-
-      if (typeof scrollableTarget === 'string') {
-        return (
-          document.getElementById(scrollableTarget) || document.querySelector(scrollableTarget)
-        );
-      }
-
-      return scrollableTarget;
-    };
-
-    const scrollableElement = getScrollableElement();
-    const rootElement = scrollableElement || undefined;
-
-    const observer = new window.IntersectionObserver(
-      ([entry]) => {
-        if (entry) {
-          setIsIntersecting(entry.isIntersecting);
-        }
-      },
-      {
-        root: rootElement,
-        rootMargin: `${threshold}px`,
-        threshold: 0,
-      },
-    );
-
-    observer.observe(sentinelRef.current);
-
-    return () => observer.disconnect();
-  }, [threshold, scrollableTarget]);
-
-  useEffect(() => {
-    if (isIntersecting && hasMore && !loading && !error) {
-      handleLoadMore();
-    }
-  }, [isIntersecting, hasMore, loading, error, handleLoadMore]);
-
-  const getContainerStyles = () => {
-    const baseStyles = {
-      width: variant === 'horizontal' ? width || '100%' : '100%',
-      height: variant === 'horizontal' ? '100%' : 'auto',
-      overflowX: variant === 'horizontal' ? 'auto' : 'hidden',
-      overflowY: variant === 'horizontal' ? 'hidden' : 'visible',
-      display: 'flex',
-      flexDirection: variant === 'horizontal' ? 'row' : 'column',
-    };
-
-    if (variant === 'reverse') {
-      return {
-        ...baseStyles,
-        flexDirection: 'column-reverse',
-      };
-    }
-
-    return baseStyles;
-  };
-
+  // The tail of the list is one of four things: the end message, an error, a
+  // spinner, or the sentinel that asks for the next page.
   const renderSentinel = () => {
-    if (!hasMore) {
-      return endMessage || defaultEndMessage;
-    }
-
-    if (error) {
-      return errorComponent || defaultErrorComponent;
-    }
-
-    if (loading) {
-      return loader || defaultLoader;
-    }
+    if (!hasMore) return endMessage || <DefaultEndMessage />;
+    if (error) return errorComponent || <DefaultError error={error} />;
+    if (loading) return loader || <DefaultLoader />;
 
     return (
       <div
@@ -184,7 +65,7 @@ export const InfiniteScroll: React.FC<InfiniteScrollProps> = ({
     <Box
       className={className}
       sx={{
-        ...getContainerStyles(),
+        ...containerStyles(variant, width),
         ...style,
       }}
     >

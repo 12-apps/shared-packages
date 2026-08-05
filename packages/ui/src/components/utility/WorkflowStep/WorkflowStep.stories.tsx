@@ -250,7 +250,7 @@ export const InteractiveStates: Story = {
     currentStep: 1,
     interactive: true,
     onStepClick: (stepIndex, step) => {
-      // eslint-disable-next-line no-console
+      // eslint-disable-next-line no-console -- demo output for the Storybook docs page
       console.log(`Clicked step ${stepIndex}:`, step.title);
     },
   },

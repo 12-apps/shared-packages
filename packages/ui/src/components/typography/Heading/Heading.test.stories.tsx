@@ -89,10 +89,10 @@ const FocusManagementComponent = () => {
     h3: React.useRef<globalThis.HTMLHeadingElement>(null),
   };
 
-  const focusHeading = (level: string) => {
+  const focusHeading = async (level: string) => {
     const ref = headingRefs[level as keyof typeof headingRefs];
     if (ref.current) {
-      ref.current.focus();
+      await userEvent.click(ref.current);
       setActiveHeading(level);
     }
   };
@@ -342,21 +342,21 @@ export const KeyboardNavigation: Story = {
 
     // Tab to first heading
     await userEvent.tab();
-    expect(h1).toHaveFocus();
+    await waitFor(() => expect(h1).toHaveFocus());
     await waitFor(() => {
       expect(focusDisplay).toHaveTextContent('Focused: h1');
     });
 
     // Tab to second heading
     await userEvent.tab();
-    expect(h2).toHaveFocus();
+    await waitFor(() => expect(h2).toHaveFocus());
     await waitFor(() => {
       expect(focusDisplay).toHaveTextContent('Focused: h2');
     });
 
     // Tab to third heading
     await userEvent.tab();
-    expect(h3).toHaveFocus();
+    await waitFor(() => expect(h3).toHaveFocus());
     await waitFor(() => {
       expect(focusDisplay).toHaveTextContent('Focused: h3');
     });
@@ -433,21 +433,21 @@ export const FocusManagement: Story = {
 
     // Focus H1
     await userEvent.click(focusH1Btn);
-    expect(h1).toHaveFocus();
+    await waitFor(() => expect(h1).toHaveFocus());
     await waitFor(() => {
       expect(activeDisplay).toHaveTextContent('Active: h1');
     });
 
     // Focus H2
     await userEvent.click(focusH2Btn);
-    expect(h2).toHaveFocus();
+    await waitFor(() => expect(h2).toHaveFocus());
     await waitFor(() => {
       expect(activeDisplay).toHaveTextContent('Active: h2');
     });
 
     // Focus H3
     await userEvent.click(focusH3Btn);
-    expect(h3).toHaveFocus();
+    await waitFor(() => expect(h3).toHaveFocus());
     await waitFor(() => {
       expect(activeDisplay).toHaveTextContent('Active: h3');
     });

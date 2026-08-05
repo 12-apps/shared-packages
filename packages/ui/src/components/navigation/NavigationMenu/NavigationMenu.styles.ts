@@ -48,7 +48,7 @@ const horizontalStyles = (theme: Theme): CSSObject => ({
       // border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
     });
 
-const collapsedStyles = (_theme: Theme): CSSObject => ({
+const collapsedStyles = (): CSSObject => ({
       justifyContent: 'center',
       minHeight: 56,
       '& .MuiListItemIcon-root': {
@@ -193,7 +193,7 @@ export const navItemButtonStyles = ({
 }): CSSObject => ({
   ...(size ? (SIZE_STYLES[size]?.(theme) ?? {}) : {}),
   ...(variant === 'horizontal' ? horizontalStyles(theme) : {}),
-  ...(collapsed ? collapsedStyles(theme) : {}),
+  ...(collapsed ? collapsedStyles() : {}),
   ...(active ? activeStyles(theme, variant) : {}),
   ...navDecorationStyles(theme),
   ...navInteractionStyles(theme, minimal, collapsed, size),

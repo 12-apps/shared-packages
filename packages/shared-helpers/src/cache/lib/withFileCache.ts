@@ -19,86 +19,103 @@ export interface PersistentCacheOptions<A extends any[], K, V> {
   onError?: (err: unknown, key: K) => void;
 }
 
+// One cache's mutable bookkeeping. It used to live in the factory closure, which
+// made the factory a single 86-line function; passing it explicitly lets each
+// operation below stand on its own.
+interface FileCacheState<V> {
+  cacheDir: string;
+  filePath: string;
+  ttlMs: number;
+  data: FileCacheData<V>;
+  loaded: boolean;
+  dirty: boolean;
+  flushTimer: NodeJS.Timeout | null;
+}
+
+// Writes to a sibling temp file and renames, so a crash mid-write leaves the
+// previous cache intact rather than a truncated JSON file.
+const flush = async <V>(state: FileCacheState<V>): Promise<void> => {
+  state.flushTimer = null;
+  if (!state.dirty) return;
+  state.dirty = false;
+  try {
+    await fs.mkdir(state.cacheDir, { recursive: true });
+    const tmp = `${state.filePath}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(state.data, null, 2), 'utf8');
+    await fs.rename(tmp, state.filePath);
+  } catch {
+    // Silently ignore file write errors
+  }
+};
+
+const scheduleFlush = <V>(state: FileCacheState<V>): void => {
+  if (state.flushTimer) return;
+  state.flushTimer = setTimeout(() => void flush(state), 250);
+};
+
+const prune = <V>(state: FileCacheState<V>): void => {
+  const now = Date.now();
+  let changed = false;
+  for (const [key, entry] of Object.entries(state.data.entries)) {
+    if (!entry || entry.expiresAt < now) {
+      delete state.data.entries[key];
+      changed = true;
+    }
+  }
+  if (changed) {
+    scheduleFlush(state);
+  }
+};
+
+const load = async <V>(state: FileCacheState<V>): Promise<void> => {
+  if (state.loaded) {
+    return;
+  }
+  state.loaded = true;
+  try {
+    const parsed = JSON.parse(await fs.readFile(state.filePath, 'utf8'));
+    if (parsed && typeof parsed === 'object' && parsed.entries) {
+      state.data = parsed;
+    }
+  } catch {
+    logger.error(`Failure parsing cache ${state.filePath}`);
+  }
+  prune(state);
+};
+
+const set = <K extends string | number, V>(state: FileCacheState<V>, key: K, value: V): void => {
+  state.data.entries[String(key)] = { value, expiresAt: Date.now() + state.ttlMs };
+  state.dirty = true;
+  scheduleFlush(state);
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withFileCache<A extends any[], K extends string | number, V>(opts: PersistentCacheOptions<A, K, V>) {
-  const ttlMs = opts.ttlMs ?? DEFAULT_TTL_MS;
   const cacheDir = opts.cacheDir ?? path.resolve(process.cwd(), '.cache');
-  const fileName = opts.fileName ?? 'persistent-cache.json';
-  const filePath = path.join(cacheDir, fileName);
-  let loaded = false;
-  let dirty = false;
-  let flushTimer: NodeJS.Timeout | null = null;
-  let data: FileCacheData<V> = { entries: {} };
-
-  async function load() {
-    if (loaded) {
-      return;
-    }
-    loaded = true;
-    try {
-      const raw = await fs.readFile(filePath, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object' && parsed.entries) {
-        data = parsed;
-      }
-    } catch {
-      logger.error(`Failure parsing cache ${filePath}`);
-    }
-    prune();
-  }
-
-  function prune() {
-    const now = Date.now();
-    let changed = false;
-    for (const [k, v] of Object.entries(data.entries)) {
-      if (!v || v.expiresAt < now) {
-        delete data.entries[k];
-        changed = true;
-      }
-    }
-    if (changed) {
-      scheduleFlush();
-    };
-  }
-
-  function scheduleFlush() {
-    if (flushTimer) return;
-    flushTimer = setTimeout(async () => {
-      flushTimer = null;
-      if (!dirty) return;
-      dirty = false;
-      try {
-        await fs.mkdir(cacheDir, { recursive: true });
-        const tmp = `${filePath}.tmp`;
-        await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');
-        await fs.rename(tmp, filePath);
-      } catch {
-        // Silently ignore file write errors
-      }
-    }, 250);
-  }
-
-  function set(key: K, value: V) {
-    data.entries[String(key)] = { value, expiresAt: Date.now() + ttlMs };
-    dirty = true;
-    scheduleFlush();
-  }
+  const state: FileCacheState<V> = {
+    cacheDir,
+    filePath: path.join(cacheDir, opts.fileName ?? 'persistent-cache.json'),
+    ttlMs: opts.ttlMs ?? DEFAULT_TTL_MS,
+    data: { entries: {} },
+    loaded: false,
+    dirty: false,
+    flushTimer: null,
+  };
 
   return async (...args: A): Promise<V | undefined> => {
     const key = opts.getKey(...args);
     if (key === undefined || key === null || key === '') {
       return undefined;
     }
-    await load();
-    prune();
-    const k = String(key);
-    const entry = data.entries[k];
+    await load(state);
+    prune(state);
+    const entry = state.data.entries[String(key)];
     if (entry && entry.expiresAt > Date.now()) {
       return entry.value;
     }
     try {
       const val = await opts.fetcher(...args);
-      if (opts.shouldCache ? opts.shouldCache(val) : true) set(key as K, val);
+      if (opts.shouldCache ? opts.shouldCache(val) : true) set(state, key as K, val);
       return val;
     } catch (e) {
       opts.onError?.(e, key as K);

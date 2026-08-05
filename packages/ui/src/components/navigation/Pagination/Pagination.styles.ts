@@ -6,15 +6,12 @@ const ITEM_SIZE_STYLES: Record<string, (theme: Theme) => CSSObject> = {
       fontSize: '0.875rem',
       minWidth: 28,
       height: 28,
-      padding: theme.spacing(0.25, 0.5),
-    }),
+      padding: theme.spacing(0.25, 0.5) }),
   lg: (theme) => ({
       fontSize: '1.125rem',
       minWidth: 44,
       height: 44,
-      padding: theme.spacing(1, 1.5),
-    }),
-};
+      padding: theme.spacing(1, 1.5) }) };
 
 // One variant applies at a time, so a lookup replaces the mutually exclusive
 // spreads.
@@ -24,18 +21,14 @@ const ITEM_VARIANTS: Record<string, (theme: Theme, customSize?: string) => CSSOb
       '&:hover': {
         backgroundColor: alpha(theme.palette.primary.main, 0.08),
         transform: 'translateY(-1px)',
-        boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.15)}`,
-      },
+        boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.15)}` },
       '&.Mui-selected': {
         backgroundColor: theme.palette.primary.main,
         color: theme.palette.primary.contrastText,
         boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
         '&:hover': {
           backgroundColor: theme.palette.primary.dark,
-          transform: 'translateY(-2px)',
-        },
-      },
-    }),
+          transform: 'translateY(-2px)' } } }),
   rounded: (theme, customSize) => ({
       borderRadius: '50%',
       minWidth: customSize === 'sm' ? 28 : customSize === 'lg' ? 44 : 36,
@@ -43,8 +36,7 @@ const ITEM_VARIANTS: Record<string, (theme: Theme, customSize?: string) => CSSOb
       '&:hover': {
         backgroundColor: alpha(theme.palette.primary.main, 0.08),
         transform: 'scale(1.1)',
-        boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.2)}`,
-      },
+        boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.2)}` },
       '&.Mui-selected': {
         backgroundColor: theme.palette.primary.main,
         color: theme.palette.primary.contrastText,
@@ -52,10 +44,7 @@ const ITEM_VARIANTS: Record<string, (theme: Theme, customSize?: string) => CSSOb
         boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.3)}`,
         '&:hover': {
           backgroundColor: theme.palette.primary.dark,
-          transform: 'scale(1.15)',
-        },
-      },
-    }),
+          transform: 'scale(1.15)' } } }),
   dots: (theme, customSize) => ({
       borderRadius: '50%',
       minWidth: customSize === 'sm' ? 8 : customSize === 'lg' ? 12 : 10,
@@ -65,20 +54,15 @@ const ITEM_VARIANTS: Record<string, (theme: Theme, customSize?: string) => CSSOb
       backgroundColor: alpha(theme.palette.text.secondary, 0.3),
       '&:hover': {
         backgroundColor: alpha(theme.palette.primary.main, 0.5),
-        transform: 'scale(1.3)',
-      },
+        transform: 'scale(1.3)' },
       '&.Mui-selected': {
         backgroundColor: theme.palette.primary.main,
         transform: 'scale(1.2)',
         '&:hover': {
           backgroundColor: theme.palette.primary.dark,
-          transform: 'scale(1.4)',
-        },
-      },
+          transform: 'scale(1.4)' } },
       '&.MuiPaginationItem-previousNext, &.MuiPaginationItem-firstLast': {
-        display: 'none',
-      },
-    }),
+        display: 'none' } }),
   minimal: (theme, _customSize) => ({
       borderRadius: theme.spacing(0.5),
       backgroundColor: 'transparent',
@@ -86,8 +70,7 @@ const ITEM_VARIANTS: Record<string, (theme: Theme, customSize?: string) => CSSOb
       padding: theme.spacing(0.5, 1),
       '&:hover': {
         backgroundColor: alpha(theme.palette.primary.main, 0.04),
-        color: theme.palette.primary.main,
-      },
+        color: theme.palette.primary.main },
       '&.Mui-selected': {
         backgroundColor: 'transparent',
         color: theme.palette.primary.main,
@@ -102,11 +85,7 @@ const ITEM_VARIANTS: Record<string, (theme: Theme, customSize?: string) => CSSOb
           width: '60%',
           height: 2,
           backgroundColor: theme.palette.primary.main,
-          borderRadius: 1,
-        },
-      },
-    }),
-};
+          borderRadius: 1 } } }) };
 
 const itemSizeStyles = (theme: Theme, customSize?: string): CSSObject =>
   customSize ? (ITEM_SIZE_STYLES[customSize]?.(theme) ?? {}) : {};
@@ -119,15 +98,13 @@ const itemVariantStyles = (theme: Theme, customVariant?: string, customSize?: st
 export const paginationStyles = ({
   theme,
   customVariant,
-  customSize,
-}: {
+  customSize }: {
   theme: Theme;
   customVariant?: string;
   customSize?: string;
 }): CSSObject => ({
   '& .MuiPagination-ul': {
-    gap: customVariant === 'minimal' ? theme.spacing(0.5) : theme.spacing(1),
-  },
+    gap: customVariant === 'minimal' ? theme.spacing(0.5) : theme.spacing(1) },
 
   '& .MuiPaginationItem-root': {
     ...itemSizeStyles(theme, customSize),
@@ -155,7 +132,4 @@ export const paginationStyles = ({
   // Hide ellipsis for dots variant
   ...(customVariant === 'dots' && {
     '& .MuiPaginationItem-ellipsis': {
-      display: 'none',
-    },
-  }),
-});
+      display: 'none' } }) });

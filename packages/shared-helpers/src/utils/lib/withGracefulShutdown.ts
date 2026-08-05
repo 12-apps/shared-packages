@@ -29,6 +29,71 @@ export interface GracefulShutdownOptions {
   initFn?: () => Promise<void>;
 }
 
+// The "already shutting down" flag belongs to the handler, not to the factory, so
+// a second signal arriving while cleanup is still running is ignored.
+const makeShutdownHandler = (
+  workerName: string,
+  shutdownGracePeriodMs: number,
+  onShutdown?: () => Promise<void> | void,
+) => {
+  let isShuttingDown = false;
+
+  return async (signal: string): Promise<void> => {
+    if (isShuttingDown) {
+      return;
+    }
+
+    isShuttingDown = true;
+    logger.info(`Received ${signal} signal, shutting down ${workerName} gracefully...`);
+
+    // Run custom cleanup if provided
+    if (onShutdown) {
+      try {
+        await onShutdown();
+      } catch (error) {
+        logger.error(`Error during custom cleanup in ${workerName}`, error);
+      }
+    }
+
+    // Give the process a bit of time to complete any ongoing operations
+    setTimeout(() => {
+      logger.info(`Graceful shutdown of ${workerName} completed`);
+      process.exit(0); // Exit with success code
+    }, shutdownGracePeriodMs);
+  };
+};
+
+const registerProcessHandlers = (
+  workerName: string,
+  gracefulShutdown: (signal: string) => Promise<void>,
+): void => {
+  // Register signal handlers for Kubernetes/Docker termination
+  process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
+  process.on('SIGHUP', () => void gracefulShutdown('SIGHUP'));
+
+  // Handle uncaught exceptions
+  process.on('uncaughtException', (error) => {
+    logger.error(`Uncaught exception in ${workerName}`, error);
+    process.exit(1);
+  });
+
+  // Handle unhandled promise rejections
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error(`Unhandled promise rejection in ${workerName}`, { reason, promise });
+    process.exit(1);
+  });
+
+  // Handle process warnings (memory leaks, deprecations, etc.)
+  process.on('warning', (warning) => {
+    logger.warn(`Process warning in ${workerName}`, {
+      name: warning.name,
+      message: warning.message,
+      stack: warning.stack,
+    });
+  });
+};
+
 /**
  * Higher-order function that wraps a worker's main function with graceful shutdown handling.
  *
@@ -63,58 +128,10 @@ export function withGracefulShutdown(
     initFn,
   } = options;
 
-  let isShuttingDown = false;
-
-  // Graceful shutdown handler
-  const gracefulShutdown = async (signal: string) => {
-    if (isShuttingDown) {
-      return;
-    }
-
-    isShuttingDown = true;
-    logger.info(`Received ${signal} signal, shutting down ${workerName} gracefully...`);
-
-    // Run custom cleanup if provided
-    if (onShutdown) {
-      try {
-        await onShutdown();
-      } catch (error) {
-        logger.error(`Error during custom cleanup in ${workerName}`, error);
-      }
-    }
-
-    // Give the process a bit of time to complete any ongoing operations
-    setTimeout(() => {
-      logger.info(`Graceful shutdown of ${workerName} completed`);
-      process.exit(0); // Exit with success code
-    }, shutdownGracePeriodMs);
-  };
-
-  // Register signal handlers for Kubernetes/Docker termination
-  process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
-  process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
-  process.on('SIGHUP', () => void gracefulShutdown('SIGHUP'));
-
-  // Handle uncaught exceptions
-  process.on('uncaughtException', (error) => {
-    logger.error(`Uncaught exception in ${workerName}`, error);
-    process.exit(1);
-  });
-
-  // Handle unhandled promise rejections
-  process.on('unhandledRejection', (reason, promise) => {
-    logger.error(`Unhandled promise rejection in ${workerName}`, { reason, promise });
-    process.exit(1);
-  });
-
-  // Handle process warnings (memory leaks, deprecations, etc.)
-  process.on('warning', (warning) => {
-    logger.warn(`Process warning in ${workerName}`, {
-      name: warning.name,
-      message: warning.message,
-      stack: warning.stack,
-    });
-  });
+  registerProcessHandlers(
+    workerName,
+    makeShutdownHandler(workerName, shutdownGracePeriodMs, onShutdown),
+  );
 
   // Return wrapped main function
   return async () => {

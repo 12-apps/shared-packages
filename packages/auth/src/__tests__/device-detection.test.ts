@@ -7,7 +7,6 @@ import {
 
 describe("device-detection", () => {
   const originalNavigator = global.navigator;
-  const _originalWindow = global.window;
 
   beforeEach(() => {
     // Reset mocks before each test
@@ -20,14 +19,15 @@ describe("device-detection", () => {
       value: originalNavigator,
       writable: true,
     });
+    vi.unstubAllGlobals();
   });
 
   describe("detectAppleDevice", () => {
     it("should return default values when no userAgent is provided in SSR", () => {
-      // Simulate SSR environment by making window undefined
-      const windowBackup = global.window;
-      // @ts-expect-error - simulating SSR
-      delete global.window;
+      // Simulate SSR environment by making window undefined. vi.stubGlobal
+      // records the previous value itself, so a failing assertion below cannot
+      // leave the suite without a window.
+      vi.stubGlobal("window", undefined);
 
       const result = detectAppleDevice();
 
@@ -38,8 +38,6 @@ describe("device-detection", () => {
         isSafari: false,
         userAgent: "",
       });
-
-      global.window = windowBackup;
     });
 
     it("should detect iPhone", () => {

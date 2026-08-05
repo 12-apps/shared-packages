@@ -1,4 +1,5 @@
 import { alpha, keyframes,Tooltip as MuiTooltip } from '@mui/material';
+import type { CSSObject, Theme } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React from 'react';
 
@@ -20,14 +21,69 @@ const pulseAnimation = keyframes`
   }
 `;
 
-const getSizeStyles = (size: string): { fontSize: string; padding: string } => {
-  const sizeMap = {
-    sm: { fontSize: '0.75rem', padding: '4px 8px' },
-    md: { fontSize: '0.875rem', padding: '6px 12px' },
-    lg: { fontSize: '1rem', padding: '8px 16px' },
-  } as const;
+const SIZE_MAP = {
+  sm: { fontSize: '0.75rem', padding: '4px 8px' },
+  md: { fontSize: '0.875rem', padding: '6px 12px' },
+  lg: { fontSize: '1rem', padding: '8px 16px' },
+} as const;
 
-  return sizeMap[size as keyof typeof sizeMap] || sizeMap.md;
+const getSizeStyles = (size?: string): { fontSize: string; padding: string } =>
+  SIZE_MAP[size as keyof typeof SIZE_MAP] || SIZE_MAP.md;
+
+const variantStyles = (theme: Theme, variant?: string): CSSObject => {
+  switch (variant) {
+    case 'default':
+      return {
+        backgroundColor: alpha(theme.palette.grey[900], 0.9),
+        color: theme.palette.common.white,
+      };
+    case 'dark':
+      return {
+        backgroundColor: theme.palette.grey[900],
+        color: theme.palette.common.white,
+      };
+    case 'light':
+      return {
+        backgroundColor: theme.palette.common.white,
+        color: theme.palette.text.primary,
+        border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+        boxShadow: theme.shadows[4],
+      };
+    case 'glass':
+      return {
+        backgroundColor: alpha(theme.palette.background.paper, 0.1),
+        backdropFilter: 'blur(20px)',
+        border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+        color: theme.palette.text.primary,
+      };
+    default:
+      return {};
+  }
+};
+
+// glow and pulse are independent flags. The three combinations used to be spelled
+// out one by one, but each is just the union of whichever flags are set.
+const emphasisStyles = (theme: Theme, glow?: boolean, pulse?: boolean): CSSObject => ({
+  ...(glow && {
+    boxShadow: `0 0 15px 3px ${alpha(theme.palette.primary.main, 0.4)} !important`,
+    filter: 'brightness(1.05)',
+  }),
+  ...(pulse && {
+    animation: `${pulseAnimation} 2s infinite`,
+  }),
+});
+
+const arrowColor = (theme: Theme, variant?: string): string => {
+  switch (variant) {
+    case 'light':
+      return theme.palette.common.white;
+    case 'glass':
+      return alpha(theme.palette.background.paper, 0.1);
+    case 'dark':
+      return theme.palette.grey[900];
+    default:
+      return alpha(theme.palette.grey[900], 0.9);
+  }
 };
 
 const StyledTooltip = styled(MuiTooltip, {
@@ -38,7 +94,7 @@ const StyledTooltip = styled(MuiTooltip, {
   customSize?: string;
   glow?: boolean;
   pulse?: boolean;
-}>(({ theme, customVariant, customSize = 'md', glow, pulse }) => {
+}>(({ theme, customVariant, customSize, glow, pulse }) => {
   const sizeStyles = getSizeStyles(customSize);
 
   return {
@@ -50,63 +106,12 @@ const StyledTooltip = styled(MuiTooltip, {
       transition: 'all 0.3s ease',
       position: 'relative',
       overflow: 'hidden',
-
-      // Variant styles
-      ...(customVariant === 'default' && {
-        backgroundColor: alpha(theme.palette.grey[900], 0.9),
-        color: theme.palette.common.white,
-      }),
-
-      ...(customVariant === 'dark' && {
-        backgroundColor: theme.palette.grey[900],
-        color: theme.palette.common.white,
-      }),
-
-      ...(customVariant === 'light' && {
-        backgroundColor: theme.palette.common.white,
-        color: theme.palette.text.primary,
-        border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-        boxShadow: theme.shadows[4],
-      }),
-
-      ...(customVariant === 'glass' && {
-        backgroundColor: alpha(theme.palette.background.paper, 0.1),
-        backdropFilter: 'blur(20px)',
-        border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-        color: theme.palette.text.primary,
-      }),
-
-      // Glow effect
-      ...(glow &&
-        !pulse && {
-          boxShadow: `0 0 15px 3px ${alpha(theme.palette.primary.main, 0.4)} !important`,
-          filter: 'brightness(1.05)',
-        }),
-
-      // Pulse animation
-      ...(pulse &&
-        !glow && {
-          animation: `${pulseAnimation} 2s infinite`,
-        }),
-
-      // Both glow and pulse
-      ...(glow &&
-        pulse && {
-          boxShadow: `0 0 15px 3px ${alpha(theme.palette.primary.main, 0.4)} !important`,
-          filter: 'brightness(1.05)',
-          animation: `${pulseAnimation} 2s infinite`,
-        }),
+      ...variantStyles(theme, customVariant),
+      ...emphasisStyles(theme, glow, pulse),
     },
 
     '& .MuiTooltip-arrow': {
-      color:
-        customVariant === 'light'
-          ? theme.palette.common.white
-          : customVariant === 'glass'
-            ? alpha(theme.palette.background.paper, 0.1)
-            : customVariant === 'dark'
-              ? theme.palette.grey[900]
-              : alpha(theme.palette.grey[900], 0.9),
+      color: arrowColor(theme, customVariant),
     },
   };
 });

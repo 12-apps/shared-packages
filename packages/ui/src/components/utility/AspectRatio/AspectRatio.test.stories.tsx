@@ -1,6 +1,6 @@
 import { Box, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, waitFor,within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { AspectRatio } from './AspectRatio';
 
@@ -198,8 +198,8 @@ export const KeyboardNavigation: Story = {
       const component = canvas.getByTestId('keyboard-aspect-ratio');
 
       // Focus the component
-      component.focus();
-      await expect(component).toHaveFocus();
+      await userEvent.click(component);
+      await waitFor(() => expect(component).toHaveFocus());
     });
 
     await step('Tab navigation', async () => {
@@ -207,7 +207,7 @@ export const KeyboardNavigation: Story = {
 
       // Tab to next element
       await userEvent.tab();
-      await expect(nextButton).toHaveFocus();
+      await waitFor(() => expect(nextButton).toHaveFocus());
     });
   },
 };
@@ -294,20 +294,20 @@ export const FocusManagement: Story = {
       const afterButton = canvas.getByTestId('after-button');
 
       // Start with first button
-      beforeButton.focus();
-      await expect(beforeButton).toHaveFocus();
+      await userEvent.click(beforeButton);
+      await waitFor(() => expect(beforeButton).toHaveFocus());
 
       // Tab to aspect ratio container
       await userEvent.tab();
-      await expect(aspectRatio).toHaveFocus();
+      await waitFor(() => expect(aspectRatio).toHaveFocus());
 
       // Tab to focusable content inside
       await userEvent.tab();
-      await expect(focusableContent).toHaveFocus();
+      await waitFor(() => expect(focusableContent).toHaveFocus());
 
       // Tab to after button
       await userEvent.tab();
-      await expect(afterButton).toHaveFocus();
+      await waitFor(() => expect(afterButton).toHaveFocus());
     });
   },
 };

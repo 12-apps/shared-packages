@@ -66,13 +66,26 @@ export class Database implements DatabaseInstance {
     return this.pool;
   }
 
+  // Callers can supply their own error sink; without one the failure still has to
+  // reach the shared logger, so a dropped query is never silent.
+  private reportQueryError(error: unknown, text: string, params?: unknown[]): void {
+    if (this.config.logError) {
+      this.config.logError(error, text, params);
+      return;
+    }
+    getLogger().error('Database query error', error, {
+      query: text,
+      params,
+      database: this.config.name || 'unknown',
+    });
+  }
+
   async query<T extends QueryResultRow = QueryResultRow>(
     text: string,
     params?: unknown[],
     options: QueryOptions = {},
   ): Promise<QueryResult<T> | undefined> {
     const pool = await this.getPoolWithRetry();
-    const logger = getLogger();
     const shouldLog = this.config.enableLogging && !options.skipLogging;
     const shouldProfile = this.config.enableProfiling && !options.skipProfiling;
 
@@ -93,15 +106,7 @@ export class Database implements DatabaseInstance {
         profiler(result.rowCount, text);
       }
     } catch (error) {
-      if (this.config.logError) {
-        this.config.logError(error, text, params);
-      } else {
-        logger.error('Database query error', error, {
-          query: text,
-          params,
-          database: this.config.name || 'unknown',
-        });
-      }
+      this.reportQueryError(error, text, params);
       throw error;
     }
 

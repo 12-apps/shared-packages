@@ -1,0 +1,225 @@
+import { alpha, keyframes } from '@mui/material';
+import type { CSSObject, Theme } from '@mui/material';
+
+// Define pulse animation globally
+const pulseAnimation = keyframes`
+  0% {
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 1;
+  }
+  70% {
+    box-shadow: 0 0 0 15px currentColor;
+    opacity: 0;
+  }
+  100% {
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 0;
+  }
+`;
+
+interface ColorPalette {
+  main: string;
+  dark: string;
+  light: string;
+  contrastText: string;
+}
+
+const shade = (
+  palette: ColorPalette | undefined,
+  key: 'dark' | 'light',
+  fallback: ColorPalette,
+): string => palette?.[key] || palette?.main || fallback[key];
+
+/** `neutral` has no MUI palette entry, so its four shades come from grey. */
+const neutralPalette = (theme: Theme): ColorPalette => ({
+  main: theme.palette.grey?.[700] || '#616161',
+  dark: theme.palette.grey?.[800] || '#424242',
+  light: theme.palette.grey?.[500] || '#9e9e9e',
+  contrastText: '#fff',
+});
+
+export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
+  if (color === 'neutral') return neutralPalette(theme);
+
+  const colorMap: Record<string, ColorPalette> = {
+    primary: theme.palette.primary as ColorPalette,
+    secondary: theme.palette.secondary as ColorPalette,
+    success: theme.palette.success as ColorPalette,
+    warning: theme.palette.warning as ColorPalette,
+    danger: theme.palette.error as ColorPalette,
+  };
+
+  const fallback = theme.palette.primary as ColorPalette;
+  const palette = colorMap[color] || fallback;
+
+  // Ensure palette has required properties
+  return {
+    main: palette?.main || fallback.main,
+    dark: shade(palette, 'dark', fallback),
+    light: shade(palette, 'light', fallback),
+    contrastText: palette?.contrastText || '#fff',
+  };
+};
+
+export const SIZE_MAP: Record<string, CSSObject> = {
+  xs: { padding: '2px 8px', fontSize: '0.75rem' },
+  sm: { padding: '6px 12px', fontSize: '0.875rem' },
+  md: { padding: '8px 16px', fontSize: '1rem' },
+  lg: { padding: '10px 20px', fontSize: '1.125rem' },
+  xl: { padding: '12px 24px', fontSize: '1.25rem' },
+};
+
+/**
+ * MUI centres icons with a negative margin that fights our own padding, so the
+ * flex alignment is restated here rather than fought with `!important`.
+ */
+export const iconAlignmentStyles = (theme: Theme): CSSObject => ({
+  '& .MuiButton-startIcon, & .MuiButton-endIcon': {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 0,
+    verticalAlign: 'middle',
+    '& > *': {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      lineHeight: 0,
+    },
+  },
+  '& .MuiButton-startIcon': {
+    marginRight: theme.spacing(0.5),
+  },
+  '& .MuiButton-endIcon': {
+    marginLeft: theme.spacing(0.5),
+  },
+});
+
+// Gradients run between two related hues; the named colours pick a specific pair,
+// anything else runs from its own main to its own dark.
+const GRADIENT_PAIRS: Record<string, (theme: Theme) => [string, string]> = {
+  primary: (theme) => [theme.palette.primary.main, theme.palette.secondary.main],
+  secondary: (theme) => [theme.palette.secondary.main, theme.palette.primary.main],
+  success: (theme) => [theme.palette.success.light, theme.palette.success.dark],
+  warning: (theme) => [theme.palette.warning.light, theme.palette.warning.dark],
+  danger: (theme) => [theme.palette.error.light, theme.palette.error.dark],
+};
+
+const gradientFor = (theme: Theme, color: string, palette: ColorPalette): string => {
+  const [from, to] = GRADIENT_PAIRS[color]?.(theme) ?? [palette.main, palette.dark];
+  return `linear-gradient(135deg, ${from} 0%, ${to} 100%)`;
+};
+
+const VARIANT_STYLES: Record<
+  string,
+  (theme: Theme, palette: ColorPalette, color: string) => CSSObject
+> = {
+  solid: (theme, palette) => ({
+    backgroundColor: palette.main,
+    color: palette.contrastText || '#fff',
+    '&:hover': {
+      backgroundColor: palette.dark,
+      transform: 'translateY(-2px)',
+      boxShadow: theme.shadows[8],
+    },
+  }),
+  outline: (_theme, palette) => ({
+    backgroundColor: 'transparent',
+    color: palette.main,
+    border: `1px solid ${palette.main}`,
+    '&:hover': {
+      backgroundColor: alpha(palette.main, 0.1),
+      borderColor: palette.dark,
+    },
+  }),
+  ghost: (_theme, palette) => ({
+    backgroundColor: 'transparent',
+    color: palette.main,
+    '&:hover': {
+      backgroundColor: alpha(palette.main, 0.1),
+    },
+  }),
+  text: (_theme, palette) => ({
+    backgroundColor: 'transparent',
+    color: palette.main,
+    border: `none`,
+    '&:hover': {
+      backgroundColor: alpha(palette.main, 0.1),
+    },
+    '&.active': {
+      backgroundColor: alpha(palette.main, 0.1),
+      color: palette.main,
+    },
+  }),
+  glass: (theme, palette) => ({
+    backgroundColor: alpha(theme.palette.background.paper, 0.1),
+    backdropFilter: 'blur(20px)',
+    border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+    color: palette.main,
+    '&:hover': {
+      backgroundColor: alpha(theme.palette.background.paper, 0.2),
+      transform: 'translateY(-2px)',
+    },
+  }),
+  gradient: (theme, palette, color) => ({
+    background: gradientFor(theme, color, palette),
+    color: '#fff',
+    '&:hover': {
+      filter: 'brightness(1.1)',
+      transform: 'translateY(-2px)',
+      boxShadow: theme.shadows[12],
+    },
+  }),
+};
+
+export const buttonVariantStyles = (
+  theme: Theme,
+  variant: string | undefined,
+  palette: ColorPalette,
+  color: string,
+): CSSObject => VARIANT_STYLES[variant ?? '']?.(theme, palette, color) ?? {};
+
+// Glow effect - applied with !important to override variant shadows
+const glowStyles = (palette: ColorPalette): CSSObject => ({
+  boxShadow: `0 0 20px 5px ${alpha(palette.main, 0.6)}, 0 0 40px 10px ${alpha(palette.main, 0.3)} !important`,
+  filter: 'brightness(1.05)',
+  '&:hover': {
+    boxShadow: `0 0 25px 8px ${alpha(palette.main, 0.7)}, 0 0 50px 15px ${alpha(palette.main, 0.4)} !important`,
+    filter: 'brightness(1.1)',
+    transform: 'translateY(-2px) scale(1.02)',
+  },
+});
+
+// Pulse animation using pseudo-element
+const pulseStyles = (palette: ColorPalette): CSSObject => ({
+  position: 'relative',
+  overflow: 'visible',
+  '&::after': {
+    content: '""',
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: '100%',
+    height: '100%',
+    borderRadius: 'inherit',
+    transform: 'translate(-50%, -50%)',
+    backgroundColor: palette.main,
+    opacity: 0.3,
+    animation: `${pulseAnimation} 2s infinite`,
+    pointerEvents: 'none',
+    zIndex: -1,
+  },
+});
+
+/**
+ * glow and pulse are independent flags. The three combinations used to be spelled
+ * out one by one, but each is just the union of whichever flags are set.
+ */
+export const buttonEmphasisStyles = (
+  palette: ColorPalette,
+  glow?: boolean,
+  pulse?: boolean,
+): CSSObject => ({
+  ...(glow ? glowStyles(palette) : {}),
+  ...(pulse ? pulseStyles(palette) : {}),
+});

@@ -1,7 +1,7 @@
 import { Box, Button, Card, CardContent, TextField,Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { TutorialOverlay } from './TutorialOverlay';
 
@@ -544,7 +544,7 @@ export const EdgeCases: Story = {
     });
 
     // Single step should not show "Next" button
-    expect(body.queryByText('Next')).not.toBeInTheDocument();
+    await waitFor(() => expect(body.queryByText('Next')).not.toBeInTheDocument());
   },
 };
 

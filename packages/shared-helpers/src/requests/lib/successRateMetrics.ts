@@ -40,88 +40,117 @@ export class SuccessRateTripError extends Error {
   }
 }
 
+// One guard's counters. They used to be `let`s in the factory closure, which made
+// the factory a single 87-line function; naming the record lets the operations
+// below be read one at a time.
+interface SuccessRateState {
+  name?: string;
+  minRequests: number;
+  minSuccessPercent: number;
+  total: number;
+  success: number;
+  failures: number;
+  tripped: boolean;
+  lastError?: unknown;
+  tripAt?: number;
+}
+
+const computeStats = (state: SuccessRateState): SuccessRateStats => ({
+  name: state.name,
+  total: state.total,
+  success: state.success,
+  failures: state.failures,
+  successPercent: state.total === 0 ? 100 : (state.success / state.total) * 100,
+  tripped: state.tripped,
+  minRequests: state.minRequests,
+  minSuccessPercent: state.minSuccessPercent,
+  lastError: state.lastError,
+});
+
+const resetCounters = (state: SuccessRateState): void => {
+  state.total = 0;
+  state.success = 0;
+  state.failures = 0;
+  state.tripped = false;
+  state.lastError = undefined;
+  state.tripAt = undefined;
+};
+
+const lastErrorSuffix = (stats: SuccessRateStats, include?: boolean): string => {
+  if (!include || !stats.lastError) return '';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const message = (stats.lastError as any)?.message;
+  return `; last error: ${message || String(stats.lastError)}`;
+};
+
+const maybeTrip = (state: SuccessRateState, opts: SuccessRateOptions): void => {
+  if (state.tripped) return;
+  if (state.total < state.minRequests) return; // not enough samples yet
+  const rate = (state.success / state.total) * 100;
+  if (rate >= state.minSuccessPercent) return;
+
+  state.tripped = true;
+  state.tripAt = Date.now();
+  const stats = computeStats(state);
+  opts.onTrip?.(stats);
+  // Throwing here affects ONLY the current call; future calls will fast-fail at top.
+  throw new SuccessRateTripError(
+    `Success rate ${rate.toFixed(2)}% below required ${state.minSuccessPercent}% after ` +
+      `${state.total} calls${lastErrorSuffix(stats, opts.includeLastErrorMessage)}`,
+    stats,
+  );
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withSuccessRateMetrics<Args extends any[], R>(
   fn: (...args: Args) => Promise<R>,
   opts: SuccessRateOptions = {},
 ) {
-  const minRequests = opts.minRequests ?? 20;
-  const minSuccessPercent = opts.minSuccessPercent ?? 50;
-  const name = opts.name;
+  const state: SuccessRateState = {
+    name: opts.name,
+    minRequests: opts.minRequests ?? 20,
+    minSuccessPercent: opts.minSuccessPercent ?? 50,
+    total: 0,
+    success: 0,
+    failures: 0,
+    tripped: false,
+  };
 
-  let total = 0;
-  let success = 0;
-  let failures = 0;
-  let tripped = false;
-  let lastError: unknown;
-  let tripAt: number | undefined;
-
-  const computeStats = (): SuccessRateStats => ({
-    name,
-    total,
-    success,
-    failures,
-    successPercent: total === 0 ? 100 : (success / total) * 100,
-    tripped,
-    minRequests,
-    minSuccessPercent,
-    lastError,
-  });
+  const cooldownElapsed = (): boolean =>
+    Boolean(opts.cooldownMs && state.tripAt && Date.now() - state.tripAt >= opts.cooldownMs);
 
   const wrapped = async (...args: Args): Promise<R> => {
-    if (tripped) {
+    if (state.tripped) {
       // If cooldown configured and elapsed, auto-reset and continue.
-      if (opts.cooldownMs && tripAt && Date.now() - tripAt >= opts.cooldownMs) {
-        total = 0; success = 0; failures = 0; tripped = false; lastError = undefined; tripAt = undefined;
-      } else {
+      if (!cooldownElapsed()) {
         throw new SuccessRateTripError(
-          `Success rate guard already tripped for ${name || 'unnamed fetcher'}`,
-          computeStats(),
+          `Success rate guard already tripped for ${state.name || 'unnamed fetcher'}`,
+          computeStats(state),
         );
       }
+      resetCounters(state);
     }
 
     try {
       const result = await fn(...args);
-      total++;
-      success++;
-      maybeTrip();
+      state.total++;
+      state.success++;
+      maybeTrip(state, opts);
       return result;
     } catch (err) {
-      total++;
-      failures++;
-      lastError = err;
-      maybeTrip();
+      state.total++;
+      state.failures++;
+      state.lastError = err;
+      maybeTrip(state, opts);
       throw err;
     }
   };
 
-  function maybeTrip() {
-    if (tripped) return;
-    if (total < minRequests) return; // not enough samples yet
-    const rate = (success / total) * 100;
-    if (rate < minSuccessPercent) {
-      tripped = true;
-  tripAt = Date.now();
-  const stats = computeStats();
-      opts.onTrip?.(stats);
-      // Throwing here affects ONLY the current call; future calls will fast-fail at top.
-      throw new SuccessRateTripError(
-        `Success rate ${(rate).toFixed(2)}% below required ${minSuccessPercent}% after ${total} calls${
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          opts.includeLastErrorMessage && stats.lastError ? `; last error: ${(stats.lastError as any)?.message || stats.lastError}` : ''}`,
-        stats,
-      );
-    }
-  }
-
   // Introspection helpers
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (wrapped as any).getSuccessRateStats = () => computeStats();
+  (wrapped as any).getSuccessRateStats = () => computeStats(state);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (wrapped as any).resetSuccessRateStats = () => {
-    total = 0; success = 0; failures = 0; tripped = false; lastError = undefined;
-  };
+  (wrapped as any).resetSuccessRateStats = () => resetCounters(state);
 
   return wrapped as ((...args: Args) => Promise<R>) & {
     getSuccessRateStats: () => SuccessRateStats;

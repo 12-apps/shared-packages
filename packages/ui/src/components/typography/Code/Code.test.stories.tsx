@@ -1,7 +1,7 @@
 import { Box, createTheme,ThemeProvider, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { Code } from './Code';
 
@@ -189,8 +189,8 @@ export const KeyboardNavigation: Story = {
       const copyButton = canvas.getByRole('button', { name: /copy code/i });
 
       // Focus the copy button
-      copyButton.focus();
-      expect(copyButton).toHaveFocus();
+      await userEvent.click(copyButton);
+      await waitFor(() => expect(copyButton).toHaveFocus());
 
       // Test Enter key
       await userEvent.keyboard('{Enter}');
@@ -213,8 +213,8 @@ export const KeyboardNavigation: Story = {
 
       // Focus the first button (which should be the copy button)
       const copyButton = buttons[0];
-      copyButton.focus();
-      expect(copyButton).toHaveFocus();
+      await userEvent.click(copyButton);
+      await waitFor(() => expect(copyButton).toHaveFocus());
 
       // Verify that keyboard navigation works by checking the button is focusable
       expect(copyButton).toHaveAttribute('tabindex');

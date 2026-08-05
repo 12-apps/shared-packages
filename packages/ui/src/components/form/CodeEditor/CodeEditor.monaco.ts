@@ -1,7 +1,6 @@
 import type { Monaco } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 
-// Monaco editor themes
 const customLightTheme = {
   base: 'vs' as const,
   inherit: true,
@@ -42,7 +41,6 @@ const customDarkTheme = {
 
 // Main component
 const AUTO_FORMAT_DELAY_MS = 100;
-export const COPIED_FEEDBACK_MS = 2000;
 
 export const registerEditorThemes = (monaco: Monaco) => {
   monaco.editor.defineTheme('custom-light', customLightTheme);
@@ -109,41 +107,3 @@ export const resolveEditorTheme = (themeProp: string, paletteMode: string) => {
 
 // Monaco's options object. Only the first five entries vary with our props; the
 // rest are fixed editor preferences.
-export const buildEditorOptions = ({
-  minimap,
-  fontSize,
-  isWrapped,
-  lineNumbers,
-  readOnly,
-}: {
-  minimap?: boolean;
-  fontSize: number;
-  isWrapped: boolean;
-  lineNumbers: boolean;
-  readOnly: boolean;
-}): editor.IStandaloneEditorConstructionOptions => ({
-    readOnly,
-    // Explicitly convert minimap to boolean to ensure Monaco receives a definitive value
-    // This prevents undefined from being interpreted differently in various environments
-    minimap: { enabled: minimap === true },
-    fontSize,
-    wordWrap: isWrapped ? 'on' : 'off',
-    lineNumbers: lineNumbers ? 'on' : 'off',
-    scrollBeyondLastLine: false,
-    automaticLayout: true,
-    tabSize: 2,
-    insertSpaces: true,
-    folding: true,
-    foldingStrategy: 'indentation',
-    showFoldingControls: 'mouseover',
-    smoothScrolling: true,
-    cursorBlinking: 'smooth',
-    cursorSmoothCaretAnimation: 'on',
-    renderWhitespace: 'selection',
-    renderLineHighlight: 'all',
-    selectOnLineNumbers: true,
-    roundedSelection: true,
-    padding: { top: 16, bottom: 16 },
-    fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
-    fontLigatures: true,
-});
