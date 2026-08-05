@@ -13,10 +13,8 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
-import type { CountryCode } from 'libphonenumber-js';
-import { parsePhoneNumber } from 'libphonenumber-js';
 import type { FC} from 'react';
-import React, { useEffect, useRef,useState } from 'react';
+import React from 'react';
 
 import { countries } from './countries';
 import { usePhoneInput } from './PhoneInput.hooks';
@@ -329,8 +327,7 @@ export const PhoneInput: FC<PhoneInputProps> = (props) => {
     required,
     fullWidth,
   } = { ...PHONE_INPUT_DEFAULTS, ...definedProps(props) };
-  const theme = useTheme();
-  const {
+    const {
     value,
     selectedCountry,
     anchorEl,

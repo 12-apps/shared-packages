@@ -1,22 +1,14 @@
-import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
 import {
   Box,
   Checkbox,
-  CircularProgress,
-  Collapse,
-  IconButton,
-  Skeleton,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
   TableSortLabel,
-  Typography,
 } from '@mui/material';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback } from 'react';
 
-import { getDensityConfig } from './Table.styles';
 import { useVirtualScrolling } from './Table.hooks';
 import type { ColumnConfig, TableBodyProps, TableHeaderProps } from './Table.types';
 
@@ -251,9 +243,9 @@ const PlainBody: React.FC<{
     </TableBody>
 );
 
-// Enhanced Table Body Component  
-export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo(({
-  data,
+// The per-row callbacks, lifted out of EnhancedTableBody: together they ran the
+// component past the size gate, and none of them care which body renders them.
+const useTableRowRenderer = ({
   columns,
   selectedRows = [],
   onRowClick,
@@ -265,10 +257,8 @@ export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo(({
   renderRow,
   renderCell,
   virtualScrolling,
-  containerHeight,
   rowHeight,
-  overscan = 5,
-}) => {
+}: TableBodyProps) => {
   const getRowKey = useCallback(
     (rowData: Record<string, unknown>, index: number): string | number => rowKeyExtractor ? rowKeyExtractor(rowData, index) : (rowData.id as string | number) || index,
     [rowKeyExtractor]
@@ -290,7 +280,7 @@ export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo(({
     [onSelectionChange, selectedRows]
   );
 
-  const renderTableRow = useCallback(
+  return useCallback(
     (rowData: Record<string, unknown>, index: number, offsetY: number = 0) => {
       const rowKey = getRowKey(rowData, index);
       const selected = isRowSelected(rowKey);
@@ -332,11 +322,17 @@ export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo(({
       virtualScrolling,
     ],
   );
+};
+
+// Enhanced Table Body Component
+export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo((props) => {
+  const { data, virtualScrolling, containerHeight, rowHeight, overscan = 5 } = props;
+  const renderTableRow = useTableRowRenderer(props);
 
   const { visibleItems, handleScroll } = useVirtualScrolling(
-    data, 
-    rowHeight || 40, 
-    typeof containerHeight === 'number' ? containerHeight : 400, 
+    data,
+    rowHeight || 40,
+    typeof containerHeight === 'number' ? containerHeight : 400,
     overscan
   );
 

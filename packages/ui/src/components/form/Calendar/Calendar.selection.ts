@@ -9,7 +9,7 @@ import type {
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-export type RangeUpdate =
+type RangeUpdate =
   | { kind: 'start'; range: DateRange }
   | { kind: 'complete'; range: Required<DateRange> }
   | { kind: 'rejected' };
@@ -59,7 +59,7 @@ export const nextRangeStep = ({
   return { kind: 'complete', range: { start: rangeStart, end: rangeEnd } };
 };
 
-export const isDateSelected = ({
+const isDateSelected = ({
   selectionMode,
   value,
   range,
@@ -76,7 +76,7 @@ export const isDateSelected = ({
   return Boolean((start && isSameDay(date, start)) || (end && isSameDay(date, end)));
 };
 
-export const isDateInRange = ({
+const isDateInRange = ({
   selectionMode,
   range,
   hoveredDate,

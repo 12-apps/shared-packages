@@ -28,7 +28,7 @@
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
-    "access": "restricted"
+    "access": "public"
   },
   "repository": {
     "type": "git",

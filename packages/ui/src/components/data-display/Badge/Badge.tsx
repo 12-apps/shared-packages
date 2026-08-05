@@ -1,13 +1,11 @@
 import CloseIcon from '@mui/icons-material/Close';
-import { alpha, Badge as MuiBadge, IconButton, keyframes, Zoom } from '@mui/material';
-import type { Theme } from '@mui/material/styles';
+import { Badge as MuiBadge, IconButton, Zoom } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React, { useEffect,useState } from 'react';
 
 import {
   badgeStyles,
   getAnchorOrigin,
-  getColorFromTheme,
   getSizeStyles,
 } from './Badge.styles';
 import type { BadgeProps, BadgeSize, BadgeVariant } from './Badge.types';
@@ -63,11 +61,83 @@ const StyledBadge = styled(MuiBadge, {
   });
 });
 
-const CLOSE_ICON_SIZES: Record<string, string> = {
+
+const CLOSE_ICON_SIZES: Record<BadgeSize, string> = {
   xs: '0.5rem',
   sm: '0.625rem',
   md: '0.75rem',
+  lg: '0.875rem',
 };
+
+// Add icon if provided
+const iconElement = ({
+  icon,
+  size,
+  dataTestId,
+}: {
+  icon?: React.ReactNode;
+  size: BadgeSize;
+  dataTestId?: string;
+}) =>
+  icon ? (
+    <span
+      key="icon"
+      data-testid={dataTestId ? `${dataTestId}-icon` : 'badge-icon'}
+      style={{
+        fontSize: getSizeStyles(size).iconSize,
+        display: 'inline-flex',
+        alignItems: 'center',
+      }}
+    >
+      {icon}
+    </span>
+  ) : null;
+
+// Add main content
+const contentElement = ({
+  baseContent,
+  dataTestId,
+}: {
+  baseContent: React.ReactNode;
+  dataTestId?: string;
+}) =>
+  baseContent !== null && baseContent !== undefined ? (
+    <span key="content" data-testid={dataTestId ? `${dataTestId}-content` : 'badge-content'}>
+      {baseContent}
+    </span>
+  ) : null;
+
+// Add close button if closable
+const closeElement = ({
+  closable,
+  variant,
+  size,
+  dataTestId,
+  onClose,
+}: {
+  closable?: boolean;
+  variant: string;
+  size: BadgeSize;
+  dataTestId?: string;
+  onClose: (e: React.MouseEvent) => void;
+}) =>
+  closable && !variant.includes('dot') ? (
+    <IconButton
+      key="close"
+      size="small"
+      onClick={onClose}
+      data-testid={dataTestId ? `${dataTestId}-close` : 'badge-close'}
+      sx={{
+        p: 0,
+        ml: 0.5,
+        color: 'inherit',
+        '& svg': { fontSize: CLOSE_ICON_SIZES[size] },
+        '&:hover': { opacity: 0.8 },
+      }}
+    >
+      <CloseIcon />
+    </IconButton>
+  ) : null;
 
 // Icon, content and close button, assembled in order. Split out of the component
 // so its branching does not count against the render.
@@ -88,169 +158,146 @@ const buildBadgeContent = ({
   baseContent: React.ReactNode;
   onClose: (e: React.MouseEvent) => void;
 }) => {
+  if (variant === 'dot') return '';
 
-    if (variant === 'dot') return '';
+  const contentElements = [
+    iconElement({ icon, size, dataTestId }),
+    contentElement({ baseContent, dataTestId }),
+    closeElement({ closable, variant, size, dataTestId, onClose }),
+  ].filter(Boolean);
 
-    const contentElements: React.ReactNode[] = [];
+  return contentElements.length > 0 ? (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+      {contentElements}
+    </span>
+  ) : null;
+};
 
-    // Add icon if provided
-    if (icon) {
-      const sizeStyles = getSizeStyles(size);
-      contentElements.push(
-        <span
-          key="icon"
-          data-testid={dataTestId ? `${dataTestId}-icon` : 'badge-icon'}
-          style={{ fontSize: sizeStyles.iconSize, display: 'inline-flex', alignItems: 'center' }}
-        >
-          {icon}
-        </span>,
-      );
-    }
+// Prop defaults live in these resolvers rather than the component's parameter
+// list: fourteen `= default` branches would leave the render no budget of its
+// own against the complexity gate.
+type Look = Pick<BadgeProps, 'variant' | 'size' | 'color' | 'position'>;
 
-    // Add main content
-    if (baseContent !== null && baseContent !== undefined) {
-      contentElements.push(
-        <span key="content" data-testid={dataTestId ? `${dataTestId}-content` : 'badge-content'}>
-          {baseContent}
-        </span>,
-      );
-    }
+const resolveLook = ({
+  variant = 'default',
+  size = 'md',
+  color = 'primary',
+  position = 'top-right',
+}: Look) => ({ variant, size, color, position });
 
-    // Add close button if closable
-    if (closable && !variant.includes('dot')) {
-      const closeIconSize =
-        size === 'xs'
-          ? '0.5rem'
-          : size === 'sm'
-            ? '0.625rem'
-            : size === 'md'
-              ? '0.75rem'
-              : '0.875rem';
-      contentElements.push(
-        <IconButton
-          key="close"
-          size="small"
-          onClick={onClose}
-          data-testid={dataTestId ? `${dataTestId}-close` : 'badge-close'}
-          sx={{
-            p: 0,
-            ml: 0.5,
-            color: 'inherit',
-            '& svg': { fontSize: closeIconSize },
-            '&:hover': { opacity: 0.8 },
-          }}
-        >
-          <CloseIcon />
-        </IconButton>,
-      );
-    }
+type Effects = Pick<BadgeProps, 'glow' | 'pulse' | 'animate' | 'shimmer' | 'bounce'>;
 
-    return contentElements.length > 0 ? (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-        {contentElements}
-      </span>
-    ) : null;
-  
+const resolveEffects = ({
+  glow = false,
+  pulse = false,
+  animate = true,
+  shimmer = false,
+  bounce = false,
+}: Effects) => ({ glow, pulse, animate, shimmer, bounce });
+
+type Counting = Pick<BadgeProps, 'max' | 'showZero' | 'closable'>;
+
+const resolveCounting = ({ max = 99, showZero = false, closable = false }: Counting) => ({
+  max,
+  showZero,
+  closable,
+});
+
+// aria-* that carry no value are dropped rather than rendered empty.
+const accessibilityProps = ({
+  ariaLabel,
+  ariaLive = 'polite',
+  ariaAtomic = true,
+}: {
+  ariaLabel?: string;
+  ariaLive?: string;
+  ariaAtomic?: boolean;
+}) =>
+  Object.fromEntries(
+    Object.entries({
+      'aria-label': ariaLabel,
+      'aria-live': ariaLive,
+      'aria-atomic': ariaAtomic,
+    }).filter(([, value]) => value !== undefined),
+  );
+
+// The count variant hides itself when it has nothing to count, which is not the
+// same thing as the caller asking for it to be invisible.
+const isInvisible = ({
+  invisible,
+  variant,
+  content,
+  showZero,
+  isVisible,
+}: {
+  invisible?: boolean;
+  variant: string;
+  content: React.ReactNode;
+  showZero: boolean;
+  isVisible: boolean;
+}) => invisible || (variant === 'count' && content === null && !showZero) || !isVisible;
+
+// The mount animation is a one-shot: it runs for a second, then stops driving
+// the styled badge.
+const useAnimationFlag = (animate: boolean, bounce: boolean) => {
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    if (!animate && !bounce) return;
+
+    setIsAnimating(true);
+    const timer = window.setTimeout(() => setIsAnimating(false), 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [animate, bounce]);
+
+  return isAnimating;
+};
+
+// Determine the badge content; for the count variant, format numbers
+const badgeValue = (
+  { content, badgeContent }: Pick<BadgeProps, 'content' | 'badgeContent'>,
+  { variant, max, showZero }: { variant: string; max: number; showZero: boolean },
+): React.ReactNode => {
+  const value = content ?? badgeContent ?? null;
+  if (variant !== 'count' || typeof value !== 'number') return value;
+  if (value === 0 && !showZero) return null;
+
+  return value > max ? `${max}+` : value;
 };
 
 export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
   (
     {
-      variant = 'default',
-      size = 'md',
-      color = 'primary',
-      glow = false,
-      pulse = false,
-      animate = true,
-      shimmer = false,
-      bounce = false,
-      max = 99,
-      showZero = false,
-      content,
-      position = 'top-right',
-      badgeContent,
-      children,
-      invisible,
-      closable = false,
-      onClose,
-      icon,
-      'aria-label': ariaLabel,
-      'aria-live': ariaLive = 'polite',
-      'aria-atomic': ariaAtomic = true,
-      'data-testid': dataTestId,
-      className,
-      ...props
+      variant, size, color, glow, pulse, animate, shimmer, bounce, max, showZero,
+      content, position, badgeContent, children, invisible, closable, onClose, icon,
+      'aria-label': ariaLabel, 'aria-live': ariaLive, 'aria-atomic': ariaAtomic,
+      'data-testid': dataTestId, className, ...props
     },
     ref,
   ) => {
+    const look = resolveLook({ variant, size, color, position });
+    const effects = resolveEffects({ glow, pulse, animate, shimmer, bounce });
+    const counting = resolveCounting({ max, showZero, closable });
     const [isVisible, setIsVisible] = useState(true);
-    const [isAnimating, setIsAnimating] = useState(false);
-
-    useEffect(() => {
-      if (animate || bounce) {
-        setIsAnimating(true);
-        const timer = window.setTimeout(() => setIsAnimating(false), 1000);
-        return () => window.clearTimeout(timer);
-      }
-    }, [animate, bounce]);
-
-    // Determine the badge content
-    const getBadgeContent = () => {
-      if (content !== undefined) return content;
-      if (badgeContent !== undefined) return badgeContent;
-      return null;
-    };
-
-    // For count variant, format numbers
-    const formatCount = (count: React.ReactNode): React.ReactNode => {
-      if (typeof count === 'number') {
-        if (count === 0 && !showZero) return null;
-        if (count > max) return `${max}+`;
-        return count;
-      }
-      return count;
-    };
+    const isAnimating = useAnimationFlag(effects.animate, effects.bounce);
 
     // Handle close action
     const handleClose = (e: React.MouseEvent) => {
       e.stopPropagation();
       setIsVisible(false);
-      window.setTimeout(() => {
-        onClose?.();
-      }, 300);
+      window.setTimeout(() => onClose?.(), 300);
     };
 
     // Prepare badge content with icon and close button
-    const prepareBadgeContent = () =>
-      buildBadgeContent({
-        variant,
-        size,
-        icon,
-        closable,
-        dataTestId,
-        baseContent: variant === 'count' ? formatCount(getBadgeContent()) : getBadgeContent(),
-        onClose: handleClose,
-      });
-
-    const finalBadgeContent = prepareBadgeContent();
-    const anchorOrigin = getAnchorOrigin(position);
-
-    // Determine if badge should be invisible
-    const shouldBeInvisible =
-      invisible || (variant === 'count' && finalBadgeContent === null && !showZero) || !isVisible;
-
-    // Build accessibility props
-    const accessibilityProps: Record<string, string | boolean | undefined> = {
-      'aria-label': ariaLabel,
-      'aria-live': ariaLive,
-      'aria-atomic': ariaAtomic,
-    };
-
-    // Remove undefined values
-    Object.keys(accessibilityProps).forEach((key) => {
-      if (accessibilityProps[key] === undefined) {
-        delete accessibilityProps[key];
-      }
+    const finalBadgeContent = buildBadgeContent({
+      variant: look.variant,
+      size: look.size,
+      icon,
+      closable: counting.closable,
+      dataTestId,
+      baseContent: badgeValue({ content, badgeContent }, { ...counting, variant: look.variant }),
+      onClose: handleClose,
     });
 
     return (
@@ -258,23 +305,29 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
         <StyledBadge
           ref={ref}
           className={className}
-          customVariant={variant}
-          customSize={size}
-          customColor={color}
-          glow={glow}
-          pulse={pulse}
-          animate={animate}
-          shimmer={shimmer}
-          bounce={bounce && isAnimating}
+          customVariant={look.variant}
+          customSize={look.size}
+          customColor={look.color}
+          glow={effects.glow}
+          pulse={effects.pulse}
+          animate={effects.animate}
+          shimmer={effects.shimmer}
+          bounce={effects.bounce && isAnimating}
           hasIcon={!!icon}
           badgeContent={finalBadgeContent}
-          variant={variant === 'dot' ? 'dot' : 'standard'}
-          anchorOrigin={anchorOrigin}
-          invisible={shouldBeInvisible}
+          variant={look.variant === 'dot' ? 'dot' : 'standard'}
+          anchorOrigin={getAnchorOrigin(look.position)}
+          invisible={isInvisible({
+            invisible,
+            variant: look.variant,
+            content: finalBadgeContent,
+            showZero: counting.showZero,
+            isVisible,
+          })}
           data-testid={dataTestId || 'badge'}
           slotProps={{
             badge: {
-              ...accessibilityProps,
+              ...accessibilityProps({ ariaLabel, ariaLive, ariaAtomic }),
               // @ts-expect-error - MUI Badge slotProps doesn't include data-testid in types, but it works at runtime
               'data-testid': dataTestId ? `${dataTestId}-content-wrapper` : 'badge-content-wrapper',
             },

@@ -70,7 +70,7 @@ export const MOCK_ADDRESSES: MockPrediction[] = [
   },
 ];
 
-export interface MockPlaceDetails {
+interface MockPlaceDetails {
   formatted_address: string;
   address_components: Array<{
     long_name: string;

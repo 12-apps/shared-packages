@@ -1,6 +1,6 @@
 import Home from '@mui/icons-material/Home';
 import MoreHoriz from '@mui/icons-material/MoreHoriz';
-import { alpha, Box, Fade, IconButton, Link, Tooltip, Typography } from '@mui/material';
+import { alpha, Box, Fade, Link, Tooltip, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React from 'react';
 
@@ -56,7 +56,7 @@ const CollapsedItemsPopover: React.FC<{
   visualStyle?: string;
   dataTestId?: string;
   onSelect: () => void;
-}> = ({ open, items, size, visualStyle, dataTestId, onSelect }) => (
+}> = ({ open, items, dataTestId, onSelect }) => (
 <Fade in={open}>
     <Box
       sx={{

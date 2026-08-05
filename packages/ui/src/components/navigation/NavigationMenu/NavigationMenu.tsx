@@ -1,36 +1,15 @@
-import ChevronRight from '@mui/icons-material/ChevronRight';
-import ExpandMore from '@mui/icons-material/ExpandMore';
-import MenuIcon from '@mui/icons-material/Menu';
 import {
-  alpha,
   Box,
-  Collapse,
-  Divider,
-  Fade,
-  Grow,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   Paper,
-  Popover,
-  Typography,
 } from '@mui/material';
-import { keyframes,styled } from '@mui/material/styles';
 import React, { useState } from 'react';
 
 import { NavigationMegaSection } from './NavigationMegaSection';
 import { NavigationStandardBody } from './NavigationStandardBody';
-import { slideIn } from './NavigationMenu.styles';
 import {
-  CollapseToggle,
   LogoBar,
-  MegaSection,
-  MenuList,
   NavigationShell,
 } from './NavigationMenu.shell';
-import { renderMenuItem } from './NavigationMenuItem';
 import type { NavigationMenuItem,NavigationMenuProps } from './NavigationMenu.types';
 
 
@@ -52,13 +31,10 @@ const MegaMenuLayout = React.forwardRef<HTMLDivElement, MegaMenuLayoutProps>(
   (
     {
       variant,
-      collapsed,
       logo,
       items,
       size,
       minimal,
-      onItemClick,
-      dataTestId,
       className,
       maxWidth,
       style,

@@ -1,6 +1,3 @@
-import SuccessIcon from '@mui/icons-material/CheckCircle';
-import SecurityIcon from '@mui/icons-material/Security';
-import WarningIcon from '@mui/icons-material/Warning';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -353,8 +350,6 @@ export const PasswordStrength: FC<PasswordStrengthProps> = ({
   animated = true,
   'data-testid': dataTestId,
 }) => {
-  const theme = useTheme();
-
   const strength = useMemo(
     () => calculatePasswordStrength(value, requirements),
     [value, requirements],

@@ -1,7 +1,6 @@
 import type { CountryCode } from 'libphonenumber-js';
-import { AsYouType, parsePhoneNumber } from 'libphonenumber-js';
+import { parsePhoneNumber } from 'libphonenumber-js';
 
-import { countries } from './countries';
 
 export const formatPhoneNumber = (value: string, country: CountryCode): string => {
   if (!value || value.trim() === '') return value;
