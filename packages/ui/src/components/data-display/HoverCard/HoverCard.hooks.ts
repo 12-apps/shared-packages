@@ -85,7 +85,7 @@ const useEscapeKey = (active: boolean, onEscape: () => void) => {
   }, [active, onEscape]);
 };
 
-export interface HoverCardTimingInput {
+interface HoverCardTimingInput {
   disabled: boolean;
   touchEnabled: boolean;
   enterDelay: number;

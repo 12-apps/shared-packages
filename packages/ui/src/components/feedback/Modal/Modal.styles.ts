@@ -7,7 +7,7 @@ type Variant = NonNullable<ModalProps['variant']>;
 type Size = NonNullable<ModalProps['size']>;
 type Radius = NonNullable<ModalProps['borderRadius']>;
 
-export const pulseAnimation = keyframes`
+const pulseAnimation = keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
@@ -48,7 +48,7 @@ const PLACEMENTS: Record<string, CSSObject> = {
   },
 };
 
-export interface ModalStyleFlags {
+interface ModalStyleFlags {
   variant: Variant;
   size: Size;
   borderRadius: Radius;

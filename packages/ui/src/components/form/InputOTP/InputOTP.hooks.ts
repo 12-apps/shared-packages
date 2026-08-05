@@ -17,7 +17,7 @@ const isAllowed = (variant: string, text: string) => (PATTERNS[variant] ?? /.*/)
 const padTo = (digits: string[], length: number) =>
   Array.from({ length }, (_, i) => digits[i] ?? '');
 
-export interface OtpInput {
+interface OtpInput {
   variant: string;
   length: number;
   value: string;

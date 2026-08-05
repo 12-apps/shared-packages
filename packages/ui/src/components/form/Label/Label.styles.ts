@@ -25,7 +25,7 @@ const WEIGHTS: Record<Weight, number> = {
   bold: 700,
 };
 
-export const fontWeight = (weight: Weight) => WEIGHTS[weight] ?? WEIGHTS.regular;
+const fontWeight = (weight: Weight) => WEIGHTS[weight] ?? WEIGHTS.regular;
 
 export interface LabelStyleFlags {
   variant: Variant;

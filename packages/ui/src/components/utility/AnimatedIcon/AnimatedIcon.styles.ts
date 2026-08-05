@@ -55,7 +55,7 @@ const ANIMATIONS: Record<string, { keyframes: string; easing: string; scale: num
   breathe: { keyframes: `${breatheAnimation}`, easing: 'ease-in-out', scale: 1.5 },
 };
 
-export const animationFor = (
+const animationFor = (
   variant: AnimationVariant,
   duration: number,
   delay: number,

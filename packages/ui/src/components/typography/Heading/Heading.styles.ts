@@ -5,7 +5,7 @@ import type { HeadingProps } from './Heading.types';
 type Level = NonNullable<HeadingProps['level']>;
 type Weight = NonNullable<HeadingProps['weight']>;
 
-export const getColorFromTheme = (theme: Theme, color: string): string => {
+const getColorFromTheme = (theme: Theme, color: string): string => {
   if (color === 'neutral') {
     return theme.palette.text.primary;
   }

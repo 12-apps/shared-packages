@@ -31,7 +31,7 @@ const colorStyles = (theme: Theme, color: Color, transparent: boolean): CSSObjec
   return transparent ? { ...surface, backgroundColor: 'transparent' } : surface;
 };
 
-export interface MenubarStyleFlags {
+interface MenubarStyleFlags {
   variant: Variant;
   size: Size;
   color: Color;

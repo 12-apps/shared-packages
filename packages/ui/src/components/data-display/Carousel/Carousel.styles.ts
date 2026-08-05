@@ -15,9 +15,9 @@ const SIZES: Record<Size, { height: number; fontSize: string }> = {
   xl: { height: 600, fontSize: '1.25rem' },
 };
 
-export const sizeStyles = (size: Size) => SIZES[size] ?? SIZES.md;
+const sizeStyles = (size: Size) => SIZES[size] ?? SIZES.md;
 
-export interface ContainerStyleInput {
+interface ContainerStyleInput {
   theme: Theme;
   variant: Variant;
   size: Size;

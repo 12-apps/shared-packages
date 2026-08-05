@@ -1,7 +1,7 @@
 import { alpha } from '@mui/material';
 import type { CSSObject, Theme } from '@mui/material';
 
-export interface ColorPalette {
+interface ColorPalette {
   main: string;
   dark?: string;
   light?: string;
@@ -29,7 +29,7 @@ const namedPalette = (theme: Theme, color: string): ColorPalette => {
   return colorMap[color] || theme.palette.primary;
 };
 
-export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
+const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
   if (color === 'neutral') {
     return neutralPalette(theme);
   }

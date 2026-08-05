@@ -12,7 +12,7 @@ import {
 import type { HoverCardAnimation, HoverCardPlacement } from './HoverCard.types';
 
 /** The edge the card sits on, ignoring the `-start`/`-end` alignment suffix. */
-export type Side = 'top' | 'bottom' | 'left' | 'right';
+type Side = 'top' | 'bottom' | 'left' | 'right';
 
 export const sideOf = (placement: HoverCardPlacement): Side => {
   if (placement.startsWith('top')) return 'top';

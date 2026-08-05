@@ -10,7 +10,7 @@ import {
   spinAnimation,
 } from './Switch.animations';
 
-export interface ColorPalette {
+interface ColorPalette {
   main: string;
   dark?: string;
   light?: string;
@@ -45,7 +45,7 @@ const namedPalette = (theme: Theme, color: string): ColorPalette => {
  * Resolves a colour name to a full palette, filling any step the theme leaves
  * out from `main` and then from the primary palette.
  */
-export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
+const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
   if (color === 'neutral') {
     return neutralPalette(theme);
   }

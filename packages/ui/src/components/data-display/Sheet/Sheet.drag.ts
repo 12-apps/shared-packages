@@ -9,7 +9,7 @@ type AnyPointerEvent =
   | globalThis.TouchEvent;
 
 /** Reads the pointer's y from either a mouse or a touch event. */
-export const clientYOf = (e: AnyPointerEvent) =>
+const clientYOf = (e: AnyPointerEvent) =>
   'touches' in e ? (e.touches[0]?.clientY ?? 0) : e.clientY;
 
 /**

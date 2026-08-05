@@ -36,7 +36,7 @@ const VERTICAL_SIZES: Record<Size, number | string> = {
   full: '100%',
 };
 
-export interface SizeStyleInput {
+interface SizeStyleInput {
   position: Position;
   size: Size;
   isDraggableVariant: boolean;
@@ -44,7 +44,7 @@ export interface SizeStyleInput {
   currentHeight: number | null;
 }
 
-export const sizeStyles = ({
+const sizeStyles = ({
   position,
   size,
   isDraggableVariant,
@@ -82,7 +82,7 @@ const roundedStyles = (theme: Theme, position: Position) => {
   return { borderRadius: byPosition[position] };
 };
 
-export interface VariantStyleInput {
+interface VariantStyleInput {
   theme: Theme;
   variant: Variant;
   color: Color;
@@ -209,7 +209,7 @@ const baseSurface = (input: VariantStyleInput, accent: string) => {
   };
 };
 
-export const variantStyles = (input: VariantStyleInput) => {
+const variantStyles = (input: VariantStyleInput) => {
   const { theme, variant, color, position, glow, pulse, rounded } = input;
   const accent = theme.palette[color]?.main || theme.palette.primary.main;
 
@@ -224,7 +224,7 @@ export const variantStyles = (input: VariantStyleInput) => {
   };
 };
 
-export interface PanelSxInput extends VariantStyleInput {
+interface PanelSxInput extends VariantStyleInput {
   size: Size;
   currentHeight: number | null;
   fullHeight: boolean;

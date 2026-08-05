@@ -3,7 +3,7 @@ import type { CSSObject, Theme } from '@mui/material/styles';
 
 import { glowAnimation, rippleAnimation, scaleAnimation, slideAnimation } from './RadioGroup.animations';
 
-export interface ColorPalette {
+interface ColorPalette {
   main: string;
   dark?: string;
   light?: string;
@@ -40,7 +40,7 @@ const namedPalette = (theme: Theme, color: string): ColorPalette => {
  * out from `main` and then from the primary palette. Split into three so the
  * fallback chains do not all count against one function.
  */
-export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
+const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
   if (color === 'neutral') {
     return neutralPalette(theme);
   }

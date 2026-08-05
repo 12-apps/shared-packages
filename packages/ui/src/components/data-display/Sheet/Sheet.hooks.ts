@@ -243,7 +243,7 @@ export const useSheetDrag = (input: SheetDragInput) => {
   };
 };
 
-export interface SheetOpenInput {
+interface SheetOpenInput {
   open: boolean;
   persistent: boolean;
   disabled: boolean;

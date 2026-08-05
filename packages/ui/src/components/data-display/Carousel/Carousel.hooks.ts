@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export interface CarouselNavigationInput {
+interface CarouselNavigationInput {
   count: number;
   loop: boolean;
   autoPlay: boolean;
