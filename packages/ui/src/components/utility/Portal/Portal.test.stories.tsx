@@ -716,12 +716,14 @@ export const FocusManagement: Story = {
       expect(document.querySelector('[data-testid="focus-portal"]')).toBeInTheDocument();
     });
 
-    // Verify focus moved to first input in portal
+    // Verify focus moved to first input in portal. One waitFor, not a waitFor
+    // nested in a non-async waitFor: that was a syntax error, and the query has
+    // to be re-run on each retry anyway, since the portal mounts the input.
     await waitFor(() => {
       const firstInput = document.querySelector(
         '[data-testid="first-portal-input"] input',
       ) as HTMLInputElement;
-      await waitFor(() => expect(firstInput).toHaveFocus());
+      expect(firstInput).toHaveFocus();
     });
 
     // Test tab navigation within portal
@@ -748,13 +750,10 @@ export const FocusManagement: Story = {
       expect(document.querySelector('[data-testid="focus-portal"]')).not.toBeInTheDocument();
     });
 
-    // Verify focus returned to trigger button
-    await waitFor(
-      () => {
-        await waitFor(() => expect(triggerButton).toHaveFocus());
-      },
-      { timeout: 200 },
-    );
+    // Verify focus returned to trigger button. Was a waitFor nested in a
+    // non-async waitFor — a syntax error, and redundant: the inner call was the
+    // whole outer body. Matches the bare waitFor the tab assertions above use.
+    await waitFor(() => expect(triggerButton).toHaveFocus());
   },
 };
 
