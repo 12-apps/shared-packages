@@ -239,7 +239,7 @@ const createCharge: PaymentProviderAdapter['createCharge'] = async (input, crede
   if (scripted) stubCreateFault(scripted);
   if (credentials.stub) {
     return {
-      ...stubCharge(NAME, input),
+      ...stubCharge(NAME, input, credentials),
       status: 'PENDING',
       hostedCheckoutUrl: `https://checkout.example.invalid/stub/${stubChargeId(NAME, input.reference)}`,
     };

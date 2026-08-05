@@ -4,10 +4,11 @@ import {
   recordAttempt,
 } from './charge-context';
 import { validateCustomer } from './customer-schema';
-import type { CustomerFieldIssue, CustomerFieldKey } from './customer-schema';
+import type { CustomerFieldIssue } from './customer-schema';
 import { CustomerRequirementsError } from './errors';
 import type { PaymentProviderAdapter } from './provider';
 import type { ProviderName } from './types';
+import type { WalkFailure } from './walk-failure';
 
 /**
  * THE BUYER-REQUIREMENTS GATE (FUT-595): refuse to attempt a provider whose
@@ -64,7 +65,7 @@ export async function gateCustomerRequirements(
   provider: ProviderName,
   adapter: PaymentProviderAdapter,
   pinned: boolean,
-): Promise<{ provider: ProviderName; message: string } | null> {
+): Promise<WalkFailure | null> {
   if (adapter.capabilities.tokenization === 'REDIRECT') return null;
   const blockers = validateCustomer(adapter.customerSchema, ctx.input.method, ctx.input.customer)
     .filter((issue) => issue.required);
@@ -76,53 +77,27 @@ export async function gateCustomerRequirements(
     error: message,
   });
   if (pinned) throw new CustomerRequirementsError(provider, blockers);
-  return { provider, message };
+  // The issues travel TYPED (FUT-563). They used to travel only inside the
+  // message, which a host had to read back with a regex over the field names —
+  // and that regex bailed on the first failure in the chain it did not
+  // recognise, which for a two-provider chain is the ordinary case, not an
+  // exotic one. See `walk-failure.ts` for the whole story.
+  return { provider, message, kind: 'GATE', issues: blockers };
 }
 
 /**
- * The wire text a gate skip carries into `NoProviderSucceededError.failures`.
+ * The operator-facing detail a gate skip records — in the ledger and in the
+ * exhausted-chain error's message.
  *
- * An UNPINNED walk reports its refusals as `{ provider, message }` strings —
- * that is the whole failure channel — so this text is the only place the typed
- * issues survive to. A host that must tell the buyer WHICH field to fix
- * therefore has to read it back, which is why the formatter and the recognizer
- * below are one pair in one file: two copies of this format, one writing and
- * one reading, would drift the first time a word changed and the host would
- * silently fall back to a generic 5xx for buyer input.
+ * It is DETAIL, never a protocol: the typed `issues` above are what any caller
+ * decides on. Nothing reads this string back.
  */
-export function customerRequirementsMessage(
+function customerRequirementsMessage(
   provider: ProviderName,
   issues: readonly CustomerFieldIssue[],
 ): string {
   return (
-    `provider ${provider}${REQUIREMENTS_MARKER}` +
+    `provider ${provider} requires buyer fields: ` +
     issues.map((issue) => `${issue.field} (${issue.reason})`).join(', ')
   );
-}
-
-const REQUIREMENTS_MARKER = ' requires buyer fields: ';
-const ISSUE_PATTERN = /^(name|email|taxId|phone) \((MISSING|INVALID)\)$/;
-
-/**
- * Read a gate skip back off a walk failure, or `null` when the failure is
- * anything else — see {@link customerRequirementsMessage}.
- *
- * Every issue comes back `required: true`: only required issues ever reach the
- * message (the gate filters first), and it is requiredness that made the
- * provider unattemptable.
- */
-export function parseCustomerRequirements(message: string): CustomerFieldIssue[] | null {
-  const at = message.indexOf(REQUIREMENTS_MARKER);
-  if (at < 0 || !message.startsWith('provider ')) return null;
-  const issues: CustomerFieldIssue[] = [];
-  for (const part of message.slice(at + REQUIREMENTS_MARKER.length).split(', ')) {
-    const match = ISSUE_PATTERN.exec(part);
-    if (!match) return null;
-    issues.push({
-      field: match[1] as CustomerFieldKey,
-      reason: match[2] as CustomerFieldIssue['reason'],
-      required: true,
-    });
-  }
-  return issues.length > 0 ? issues : null;
 }

@@ -37,6 +37,8 @@ export async function tokenizeWithStripe(
   publicKey: string,
   brand: string,
   last4: string,
+  /** Deadline for the round trip; an abort reads as "could not contact". */
+  signal?: AbortSignal,
 ): Promise<Result<CardToken>> {
   const match = /^(\d{2})\/(\d{2})$/.exec(card.expiry.trim());
   if (!match) return err("Validade inválida ou expirada.");
@@ -60,6 +62,7 @@ export async function tokenizeWithStripe(
         Authorization: `Bearer ${publicKey}`,
       },
       body: body.toString(),
+      signal,
     });
   } catch {
     return err("Não foi possível contatar o provedor do cartão. Verifique sua conexão.");

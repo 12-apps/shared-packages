@@ -176,6 +176,16 @@ export interface ChargeCardInput {
   orderId: string;
   /** A fresh token, or a saved card's id for reuse. */
   token: string;
+  /**
+   * One instrument per provider, keyed by provider name (FUT-563).
+   *
+   * A card token is bound to whoever minted it, so a store with a failover
+   * chain needs one per entry: without them the server can only ever attempt
+   * the provider the browser tokenized for, and the walk skips the rest rather
+   * than hand them a blob they cannot read. Omitted for a saved card (its owner
+   * is the vault that holds it) and for a store with a single provider.
+   */
+  tokensByProvider?: Record<string, string>;
   /** Persist the token for future purchases (backend saves it against the buyer). */
   saveCard: boolean;
   /**
@@ -189,10 +199,24 @@ export interface ChargeCardInput {
 }
 
 /**
- * The store's active payment protocol, as `GET /api/checkout/config` answers
- * it (FUT-697). Extends the tokenization triple the card path consumes with
- * `tokenization`, which the method picker reads (`REDIRECT` ⇒ the provider's
- * hosted page takes the card, so no in-browser card form is needed).
+ * ONE enabled provider of the store's chain (FUT-563), as the buyer's config
+ * answers it. The same protocol facts as the head, stated per provider —
+ * which is what lets the card path mint an instrument for each of them.
+ */
+export interface CheckoutChainLink {
+  provider: string;
+  tokenization: "NONE" | "PUBLIC_KEY" | "SDK" | "REDIRECT";
+  publicKey: string | null;
+  mockTokenization: boolean;
+  methods: ("PIX" | "CARD" | "BOLETO")[];
+}
+
+/**
+ * The store's payment protocol, as `GET /api/checkout/config` answers it
+ * (FUT-697 / FUT-563). Extends the tokenization triple the card path consumes
+ * with `tokenization`, which the method picker reads (`REDIRECT` ⇒ the
+ * provider's hosted page takes the card, so no in-browser card form is
+ * needed), and with the whole enabled `chain`.
  */
 export interface CheckoutProviderConfig {
   /** Active provider's name, or `null` when the store has none connected. */
@@ -209,6 +233,17 @@ export interface CheckoutProviderConfig {
    * never offers PIX. Empty when no provider is connected.
    */
   methods: ("PIX" | "CARD" | "BOLETO")[];
+  /**
+   * EVERY enabled provider, in the merchant's own failover order (FUT-563) —
+   * the order the server will walk. The client is a READER of it: it never
+   * sorts, filters or re-heads this list, because the order is the merchant's
+   * decision and the server has already truncated it to the plan's ceiling.
+   *
+   * Optional so a config served by an older host (or a mocked one) still
+   * renders: absent, the card path behaves exactly as it did before, minting
+   * for the head alone.
+   */
+  chain?: CheckoutChainLink[];
 }
 
 /**

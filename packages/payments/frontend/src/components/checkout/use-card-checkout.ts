@@ -4,7 +4,6 @@ import {
   NEW_CARD,
   detectBrand,
   onlyDigits,
-  tokenizeForCheckout,
   tokenizerFor,
   validateCardNumber,
   validateCvv,
@@ -14,82 +13,22 @@ import {
   type CardDetails,
   type CardFieldErrors,
   type CardTokenizationConfig,
-  type CardToken,
   type SavedCard,
 } from "../../card";
 import { ok, type Result } from "../../result";
 
+import { resolveNewCardToken, type CardInstruments } from "./card-instruments";
 import {
   chargeCard,
   listSavedCards,
   refreshCardPublicKey,
 } from "./client";
 import { rememberHostedOrder } from "./hosted-return";
-import type {
-  BuyerInfo,
-  CheckoutOrder,
-  OrderStatus,
-  SavedCardMeta,
-} from "./types";
+import type { CardChainLink } from "./method-capability";
+import type { BuyerInfo, CheckoutOrder, OrderStatus } from "./types";
 import { usePaymentPolling } from "./use-payment-polling";
 
 const EMPTY_CARD: CardDetails = { number: "", holder: "", expiry: "", cvv: "" };
-
-/**
- * Tokenize a new card in the ACTIVE provider's protocol (FUT-697), self-healing
- * a rotated public key (FUT-174): the card has already passed local validation,
- * so a real-key encryption failure most likely means the store's key rotated.
- * Refresh the store's key once and retry before surfacing the error;
- * `onKeyRefreshed` caches the new key for the session. The refresh is scoped to
- * the buyer's OWN `orderId` (the route derives the store from it server-side),
- * never a client-supplied store id — and only PagBank can mint a key on demand,
- * so the self-heal is gated on its scheme.
- */
-async function tokenizeNewCard(
-  card: CardDetails,
-  config: CardTokenizationConfig,
-  orderId: string,
-  onKeyRefreshed: (key: string) => void,
-): Promise<Result<CardToken>> {
-  const first = await tokenizeForCheckout(card, config);
-  if (first.ok || !config.publicKey) return first;
-  if (config.provider === null || tokenizerFor(config.provider) !== "pagbank-sdk") return first;
-
-  const refreshed = await refreshCardPublicKey({ orderId });
-  if (refreshed.ok && refreshed.data.publicKey && refreshed.data.publicKey !== config.publicKey) {
-    onKeyRefreshed(refreshed.data.publicKey);
-    return tokenizeForCheckout(card, { ...config, publicKey: refreshed.data.publicKey });
-  }
-  return first;
-}
-
-/** Non-sensitive display metadata for saving a card (the PAN never leaves the form). */
-function toCardMeta(card: CardDetails, token: CardToken): SavedCardMeta {
-  const [mm = "", yy = ""] = card.expiry.split("/");
-  return {
-    brand: token.brand,
-    last4: token.last4,
-    expMonth: Number(mm),
-    expYear: 2000 + Number(yy),
-    holder: card.holder.trim(),
-  };
-}
-
-/** The charge token for a new card (tokenize + self-heal), plus optional save-meta. */
-async function resolveNewCardToken(
-  card: CardDetails,
-  config: CardTokenizationConfig,
-  orderId: string,
-  onKeyRefreshed: (key: string) => void,
-  saveCard: boolean,
-): Promise<Result<{ token: string; cardMeta?: SavedCardMeta }>> {
-  const tokenized = await tokenizeNewCard(card, config, orderId, onKeyRefreshed);
-  if (!tokenized.ok) return tokenized;
-  return ok({
-    token: tokenized.data.token,
-    ...(saveCard ? { cardMeta: toCardMeta(card, tokenized.data) } : {}),
-  });
-}
 
 /**
  * Saved-card list + current selection, loaded once on mount — scoped to the
@@ -168,6 +107,8 @@ interface CardCheckout {
   saveCard: boolean;
   setSaveCard: (checked: boolean) => void;
   error: string | null;
+  /** The failure's machine code, when the server sent one — drives PRESENTATION. */
+  errorCode: string | null;
   submitting: boolean;
   submitted: boolean;
   pollError: string | null;
@@ -189,7 +130,13 @@ interface CardFormState {
 /** The submit slice of {@link useCardCheckout}. */
 type CardSubmit = Pick<
   CardCheckout,
-  "submitting" | "submitted" | "error" | "pollError" | "pollTimedOut" | "handlePay"
+  | "submitting"
+  | "submitted"
+  | "error"
+  | "errorCode"
+  | "pollError"
+  | "pollTimedOut"
+  | "handlePay"
 >;
 
 /**
@@ -209,6 +156,41 @@ function handOverToChallenge(order: CheckoutOrder, url: string): void {
   window.location.assign(url);
 }
 
+/** The buyer's card is invalid — block the submit and show which field. */
+function blockedByForm(form: CardFormState): boolean {
+  if (!form.usingNewCard) return false;
+  const errors = form.validate();
+  form.setFieldErrors(errors);
+  return Object.values(errors).some(Boolean);
+}
+
+/**
+ * What to charge with: a saved card's vault id, or fresh instruments minted for
+ * every provider the walk may reach (FUT-563).
+ *
+ * A saved card is deliberately never chained — a vault token names a card in
+ * whichever provider's vault holds it, which the server resolves; the
+ * instruments minted this session say nothing about who that is.
+ */
+async function resolveInstruments(input: {
+  form: CardFormState;
+  orderId: string;
+  config: CardTokenizationConfig;
+  onKeyRefreshed: (key: string) => void;
+  providerChain: readonly CardChainLink[];
+}): Promise<Result<CardInstruments>> {
+  const { form } = input;
+  if (!form.usingNewCard) return ok({ token: form.selection });
+  return resolveNewCardToken(
+    form.card,
+    input.config,
+    input.orderId,
+    input.onKeyRefreshed,
+    form.saveCard,
+    input.providerChain,
+  );
+}
+
 /**
  * The submit state machine (FUT-58): validate → tokenize (self-heal) → charge →
  * poll for the async confirmation, bubbling the terminal status up via
@@ -221,10 +203,12 @@ function useCardSubmit(
   onResolved: (status: OrderStatus) => void,
   pollIntervalMs: number,
   form: CardFormState,
+  providerChain: readonly CardChainLink[],
 ): CardSubmit {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   // The active key: resolved by the checkout config, overridden by the
   // rotated-key self-heal for the rest of the session.
   const { publicKey, setPublicKey } = useCardPublicKey(order.orderId, providerConfig);
@@ -239,27 +223,19 @@ function useCardSubmit(
     if (status && status !== "AWAITING_PAYMENT") onResolved(status);
   }, [status, onResolved]);
 
-  async function resolveToken(): Promise<Result<{ token: string; cardMeta?: SavedCardMeta }>> {
-    if (!form.usingNewCard) return ok({ token: form.selection }); // reuse saved card's token id
-    return resolveNewCardToken(
-      form.card,
-      { ...providerConfig, publicKey },
-      order.orderId,
-      setPublicKey,
-      form.saveCard,
-    );
-  }
-
   const handlePay = async (): Promise<void> => {
     setError(null);
-    if (form.usingNewCard) {
-      const errors = form.validate();
-      form.setFieldErrors(errors);
-      if (Object.values(errors).some(Boolean)) return; // block submit until valid
-    }
+    setErrorCode(null);
+    if (blockedByForm(form)) return;
     setSubmitting(true);
 
-    const resolved = await resolveToken();
+    const resolved = await resolveInstruments({
+      form,
+      orderId: order.orderId,
+      config: { ...providerConfig, publicKey },
+      onKeyRefreshed: setPublicKey,
+      providerChain,
+    });
     if (!resolved.ok) {
       setError(resolved.error);
       setSubmitting(false);
@@ -269,12 +245,16 @@ function useCardSubmit(
     const charged = await chargeCard({
       orderId: order.orderId,
       token: resolved.data.token,
+      tokensByProvider: resolved.data.tokensByProvider,
       saveCard: form.usingNewCard && form.saveCard,
       cardMeta: resolved.data.cardMeta,
       taxId: buyer.taxId,
     });
     if (!charged.ok) {
       setError(charged.error); // transport/validation problem — stay on the form
+      // An UNRESOLVED charge is not a decline: some provider may be holding the
+      // money, so the view must not dress it as one (`card-view.tsx`).
+      setErrorCode(charged.code ?? null);
       setSubmitting(false);
       return;
     }
@@ -289,7 +269,7 @@ function useCardSubmit(
     else setSubmitted(true);
   };
 
-  return { submitting, submitted, error, pollError, pollTimedOut, handlePay };
+  return { submitting, submitted, error, errorCode, pollError, pollTimedOut, handlePay };
 }
 
 /**
@@ -304,6 +284,11 @@ export function useCardCheckout(
   pollIntervalMs: number,
   /** The store whose saved cards may be offered (host routing owns the slug). */
   tenantSlug?: string,
+  /**
+   * The merchant's ordered provider chain (FUT-563) — one instrument is minted
+   * per entry so a card charge can fail over. Omitted ⇒ the head alone.
+   */
+  providerChain: readonly CardChainLink[] = [],
 ): CardCheckout {
   const { savedCards, selection, setSelection } = useSavedCards(tenantSlug);
   const [card, setCard] = useState<CardDetails>(EMPTY_CARD);
@@ -320,14 +305,15 @@ export function useCardCheckout(
     cvv: validateCvv(card.cvv, brand),
   });
 
-  const submit = useCardSubmit(order, buyer, providerConfig, onResolved, pollIntervalMs, {
-    card,
-    usingNewCard,
-    selection,
-    saveCard,
-    validate,
-    setFieldErrors,
-  });
+  const submit = useCardSubmit(
+    order,
+    buyer,
+    providerConfig,
+    onResolved,
+    pollIntervalMs,
+    { card, usingNewCard, selection, saveCard, validate, setFieldErrors },
+    providerChain,
+  );
 
   return {
     savedCards,
