@@ -1,16 +1,12 @@
-packages/ui/src/components/data-display/AlertDialog/AlertDialog.test.stories.tsx
 packages/ui/src/components/data-display/Banner/Banner.test.stories.tsx
 packages/ui/src/components/data-display/Progress/Progress.test.stories.tsx
-packages/ui/src/components/data-display/Sheet/Sheet.test.stories.tsx
 packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.test.stories.tsx
 packages/ui/src/components/feedback/Dialog/Dialog.test.stories.tsx
 packages/ui/src/components/feedback/Sonner/Sonner.test.stories.tsx
 packages/ui/src/components/feedback/StackedModal/StackedModal.test.stories.tsx
 packages/ui/src/components/feedback/Toast/Toast.test.stories.tsx
 packages/ui/src/components/form/ToggleGroup/ToggleGroup.test.stories.tsx
-packages/ui/src/components/layout/Resizable/Resizable.test.stories.tsx
 packages/ui/src/components/layout/ScrollArea/ScrollArea.test.stories.tsx
-packages/ui/src/components/layout/Spacer/Spacer.test.stories.tsx
 packages/ui/src/components/navigation/Pagination/Pagination.test.stories.tsx
 packages/ui/src/components/typography/Text/Text.test.stories.tsx
 packages/ui/src/components/utility/Portal/Portal.test.stories.tsx
