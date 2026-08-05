@@ -30,6 +30,20 @@ const manyOptions = Array.from({ length: 50 }, (_, i) => ({
   label: `Option ${i + 1}`,
 }));
 
+/**
+ * MUI portals the Select's menu to document.body and mounts it behind a
+ * transition, so the trigger's `aria-expanded` flips a beat BEFORE the options
+ * are actually in the DOM. That gap is what the 300ms sleeps in this file used
+ * to paper over; this waits for the thing they were waiting for instead.
+ */
+const expectMenuOpenWithOptions = async (): Promise<void> => {
+  await waitFor(() => {
+    const listbox = document.querySelector('[role="listbox"]');
+    expect(listbox).toBeInTheDocument();
+    expect(listbox?.querySelectorAll('[role="option"]').length ?? 0).toBeGreaterThan(0);
+  });
+};
+
 // ==================== INTERACTION TESTS ====================
 
 export const BasicInteraction: Story = {
@@ -128,10 +142,7 @@ export const FormInteraction: Story = {
         { timeout: 3000 },
       );
 
-      await waitFor(() => {
-  // TODO: Add assertion or condition
-  expect(true).toBe(true);
-});
+      await expectMenuOpenWithOptions();
 
       const option1 = await waitFor(
         () => {
@@ -165,10 +176,7 @@ export const FormInteraction: Story = {
         { timeout: 3000 },
       );
 
-      await waitFor(() => {
-  // TODO: Add assertion or condition
-  expect(true).toBe(true);
-});
+      await expectMenuOpenWithOptions();
 
       const option2 = await waitFor(
         () => {
@@ -255,10 +263,7 @@ export const StateChangeTest: Story = {
         { timeout: 3000 },
       );
 
-      await waitFor(() => {
-  // TODO: Add assertion or condition
-  expect(true).toBe(true);
-});
+      await expectMenuOpenWithOptions();
 
       const option1 = await waitFor(
         () => {
@@ -840,10 +845,22 @@ export const EdgeCases: Story = {
 
       // Should be able to click without errors
       await userEvent.click(selectElement);
+      await waitFor(() => {
+        expect(selectElement).toHaveAttribute('aria-expanded', 'true');
+      });
 
       // No options should be available
       const options = document.querySelectorAll('[data-testid^="empty-options-option-"]');
       expect(options.length).toBe(0);
+
+      // Close it again. This step used to leave the menu open for the rest of
+      // the story: MUI stacks each Select's menu in its own modal, so a leaked
+      // one keeps the focus trap and swallows the {Escape} that a later step
+      // sends to a different Select.
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => {
+        expect(selectElement).toHaveAttribute('aria-expanded', 'false');
+      });
     });
 
     await step('Handle long text gracefully', async () => {
@@ -895,13 +912,18 @@ export const EdgeCases: Story = {
       const selectElement = longTextSelect.querySelector('[role="combobox"]') as HTMLElement;
 
       for (let i = 0; i < 3; i++) {
+        // Assert BOTH edges. Checking only the closed state would still pass if
+        // the click had stopped opening the menu at all, which is exactly the
+        // failure "stability under stress" is meant to catch.
         await userEvent.click(selectElement);
-        await userEvent.keyboard('{Escape}');
-        // Small delay to ensure state change
         await waitFor(() => {
-  // TODO: Add assertion or condition
-  expect(true).toBe(true);
-});
+          expect(selectElement).toHaveAttribute('aria-expanded', 'true');
+        });
+
+        await userEvent.keyboard('{Escape}');
+        await waitFor(() => {
+          expect(selectElement).toHaveAttribute('aria-expanded', 'false');
+        });
       }
 
       // Select should still be functional
