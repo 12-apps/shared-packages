@@ -126,7 +126,26 @@ export interface CustomerFieldIssue {
   required: boolean;
 }
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const WHITESPACE = /\s/;
+
+/**
+ * Shape check only — exactly one `@`, no whitespace, and a domain carrying a
+ * dot with something either side. Deliberately not one regex: the natural
+ * `/^[^\s@]+@[^\s@]+\.[^\s@]+$/` is quadratic, because `[^\s@]` also matches
+ * `.` and so the class either side of the literal dot can claim the same
+ * characters. On a non-matching input like `!@` followed by many `!.` the
+ * engine walks every split (CodeQL js/polynomial-redos). Scanning for the
+ * separators directly is linear and says the same thing.
+ */
+function hasEmailShape(value: string): boolean {
+  if (WHITESPACE.test(value)) return false;
+  const at = value.indexOf('@');
+  // exactly one `@`, with a non-empty local part
+  if (at <= 0 || value.indexOf('@', at + 1) !== -1) return false;
+  const domain = value.slice(at + 1);
+  const dot = domain.indexOf('.');
+  return dot > 0 && dot < domain.length - 1;
+}
 
 /** The standard CPF verifier digit: weighted sum mod 11, 10/11 read as 0. */
 function cpfDigit(digits: string, length: number): number {
@@ -202,7 +221,7 @@ function isValidBrMobile(value: string): boolean {
 
 const VALIDATORS: Record<CustomerFieldType, (value: string) => boolean> = {
   NAME: (value) => value.trim().length > 0,
-  EMAIL: (value) => EMAIL_PATTERN.test(value.trim()),
+  EMAIL: (value) => hasEmailShape(value.trim()),
   PHONE: isValidBrPhone,
   MOBILE: isValidBrMobile,
   CPF: isValidTaxId,
