@@ -76,25 +76,39 @@ function exportPairs(exports) {
   return subpaths.length === keys.length ? Object.entries(exports) : [[".", exports]];
 }
 
+const escapeRegExp = (literal) => literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
  * What `*` stands for, read off the files the package actually ships.
  *
  * Node expands a wildcard against the filesystem, so a subpath pattern only
  * exists for the files that are there — which makes this the same question as
  * "did the tarball include them".
+ *
+ * A target may carry more than one `*`, and Node substitutes the SAME matched
+ * value into all of them ("./dist/*\/*.js" is dist/<x>/<x>.js, not two
+ * independent wildcards). So the first star captures and the rest backreference
+ * it — a fresh `(.+)` each time would accept files Node never resolves.
+ *
+ * Splitting on `*` before escaping is also what keeps a second star out of the
+ * regex as a quantifier: escaping the whole pattern and then substituting one
+ * star left every later star raw, which is what CodeQL flagged.
  */
 function starValues(pattern, files) {
-  const escaped = pattern.replace(/^\.\//, "").replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-  const matcher = new RegExp(`^${escaped.replace("*", "(.+)")}$`);
+  const [head, ...tail] = pattern.replace(/^\.\//, "").split("*");
+  if (tail.length === 0) return [];
+  const body = `${escapeRegExp(head)}(.+)${tail.map(escapeRegExp).join("\\1")}`;
+  const matcher = new RegExp(`^${body}$`);
   return files.flatMap((file) => matcher.exec(file)?.slice(1, 2) ?? []);
 }
 
 function wildcardEntries(subpath, value, files) {
   const [first] = targetsOf(value);
   if (first === undefined) return [];
+  // replaceAll, per the same rule: every `*` takes the matched value.
   return starValues(first, files).map((star) => ({
-    subpath: subpath.replace("*", star),
-    targets: targetsOf(value).map((target) => target.replace("*", star)),
+    subpath: subpath.replaceAll("*", star),
+    targets: targetsOf(value).map((target) => target.replaceAll("*", star)),
   }));
 }
 
