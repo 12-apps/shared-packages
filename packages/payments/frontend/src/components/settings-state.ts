@@ -126,6 +126,11 @@ export function useSetupConfirmation(
  * BEFORE the loading and error returns — the guide hook depends on them — and
  * that is exactly the position where a component accumulates the branches that
  * make it unreadable.
+ *
+ * `selected` may be the provider's NAME or its `urlSlug` — a controlled host
+ * stores the selection in a path segment, and the segment is the adapter's URL
+ * spelling. The raw name stays a working alias so a link built before the
+ * adapter declared a slug does not 404.
  */
 export function useOpenProvider(
   view: MerchantSettingsView | null,
@@ -135,7 +140,7 @@ export function useOpenProvider(
   // providers, not one arbitrary provider's configuration.
   const active = useMemo(() => {
     if (!view || !selected) return null;
-    return view.providers.find((p) => p.name === selected) ?? null;
+    return view.providers.find((p) => p.name === selected || p.urlSlug === selected) ?? null;
   }, [view, selected]);
 
   // A stored connection is what makes the manual walkthrough steps redundant —
@@ -146,6 +151,44 @@ export function useOpenProvider(
   }, [view, active]);
 
   return { active, activeConfig };
+}
+
+/**
+ * How a host is asked to move its selection. `options.replace` marks a
+ * CORRECTION rather than a navigation: the host should rewrite its current
+ * history entry (react-router's `replace`), so Voltar never revisits the
+ * spelling being corrected.
+ */
+export type ProviderChangeHandler = (
+  provider: string | null,
+  options?: { replace?: boolean },
+) => void;
+
+/**
+ * Ask the HOST to respell its path segment once the catalog can (FUT-557).
+ *
+ * The OAuth callback hands the host a raw provider NAME (`?connected=`), and a
+ * controlled host writes it into the URL verbatim — it holds no slug map, on
+ * purpose. The alias already resolves, so the SCREEN is right either way; what
+ * stays wrong is the ADDRESS BAR, which is exactly what a reload or a shared
+ * link uses. Once the view knows the provider's declared spelling, hand the
+ * canonical slug back — with `replace`, so the alias spelling never becomes a
+ * history entry of its own.
+ *
+ * Controlled hosts only: with internal selection there is no URL to fix, and
+ * `controlled === undefined` is the one test for that (see
+ * {@link useSelectedProvider}).
+ */
+export function useCanonicalProviderSegment(
+  controlled: string | null | undefined,
+  active: ProviderDescriptor | null,
+  onProviderChange: ProviderChangeHandler | undefined,
+): void {
+  useEffect(() => {
+    if (controlled === undefined || controlled === null) return;
+    if (!active?.urlSlug || active.urlSlug === controlled) return;
+    onProviderChange?.(active.urlSlug, { replace: true });
+  }, [controlled, active, onProviderChange]);
 }
 
 export function useSettingsState(client: PaymentsSettingsClient) {
@@ -187,7 +230,7 @@ export function useSettingsState(client: PaymentsSettingsClient) {
 export function useSelectedProvider(
   initialProvider: string | null,
   controlled: string | null | undefined,
-  onProviderChange: ((provider: string | null) => void) | undefined,
+  onProviderChange: ProviderChangeHandler | undefined,
 ) {
   const isControlled = controlled !== undefined;
   const [internal, setInternal] = useState<string | null>(initialProvider);

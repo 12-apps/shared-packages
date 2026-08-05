@@ -7,6 +7,7 @@ import type {
 } from '../core/types';
 import {
   createCheckoutLink,
+  customerSchema,
   handleOf,
   paymentCheck,
   NAME,
@@ -28,12 +29,8 @@ import {
  */
 export { STUB_OUTCOME_FIELD } from './infinitepay-stub';
 import { checkSnapshot, isPaidCheck } from './infinitepay-shared';
-import { parseInfinitePayEvent, verifyInfinitePayWebhook } from './infinitepay-webhook';
-import {
-  stubCharge,
-  stubChargeId,
-  stubPendingSnapshot,
-} from './shared';
+import { infinitePayDeliveryReference, parseInfinitePayEvent, verifyInfinitePayWebhook } from './infinitepay-webhook';
+import { stubCharge, stubChargeId, stubPendingSnapshot } from './shared';
 
 /**
  * InfinitePay adapter — live against the Checkout Integrado API.
@@ -55,7 +52,6 @@ import {
  * confirm is rejected. That is the whole security model here, and it is why
  * `verify` makes a network call where other adapters do a hash comparison.
  */
-
 
 /**
  * InfinitePay prices in cents, one line per item.
@@ -275,10 +271,75 @@ const createCharge: PaymentProviderAdapter['createCharge'] = async (input, crede
   };
 };
 
+// ONE field. `webhookSecret` was offered here and it was a trap: InfinitePay
+// sends no headers a merchant can configure, so a stored secret caused the
+// verify step to reject every GENUINE delivery — a production store had one
+// set, and no notification InfinitePay sent it ever got through. The verify
+// step now ignores any stored value; the real control is `payment_check`.
+const credentialSchema: PaymentProviderAdapter['credentialSchema'] = [
+  {
+    key: 'handle',
+    label: 'InfiniteTag ($usuario)',
+    secret: false,
+    required: true,
+    // The two flags exist for THIS field: it is short, unchecksummed, and
+    // decides which account is paid. Monospace so `0` and `O` are told
+    // apart by eye; confirmed on save so the value is read back once more
+    // before it starts receiving the store's money.
+    mono: true,
+    confirmOnSave: true,
+    placeholder: '$suatag',
+    pattern: '^\\$[a-zA-Z0-9][a-zA-Z0-9._-]{2,}$',
+    helperText:
+      'Confira caractere por caractere. Mostramos a tag em fonte monoespaçada para você distinguir 0 de O e l de 1.',
+  },
+];
+
+/**
+ * The identity a host used to keep in name-keyed tables, declared by the
+ * adapter that owns the facts (FUT-557).
+ */
+const identity = {
+  // Two words to a human, so two words in a URL: the host's per-provider
+  // settings page and the checkout return URL both spell it this way. The
+  // raw name keeps working as an alias (see the registry), so links minted
+  // before this was declared still resolve.
+  urlSlug: 'infinite-pay',
+  /**
+   * The smallest total InfinitePay will mint a link for. Its documentation
+   * states no minimum at all, so the API's own refusal is the specification:
+   *
+   *     422 {"success":false,"message":"Invalid checkout link params",
+   *          "errors":{"items":["Total price must be greater than 1"]}}
+   *
+   * It took two attempts to read, both on screen (the whole reason FUT-463
+   * shows the raw provider exchange): the first took that "1" as one CENT and
+   * sent two, and the API answered with the identical sentence — which
+   * settles it. `price` goes UP in cents, the floor is compared in REAIS, and
+   * "greater than 1" is strict, so R$ 1,00 is not enough either. Hence 101 —
+   * more than a token, so hosts must name the real figure wherever the
+   * activation charge appears rather than promise a cent.
+   */
+  minimumChargeCents: 101,
+  /**
+   * This adapter's webhook `verify` IS `payment_check`: deliveries arrive
+   * unsigned, so the only way to authenticate one is to re-ask InfinitePay
+   * whether the money it announces actually moved. A delivery the host has
+   * verified and processed is therefore durable proof of payment — which is
+   * exactly what reconciliation reads this flag for. Signature-verified
+   * providers must not copy it: their verify proves the sender, not the
+   * payment.
+   */
+  verifyConfirmsPayment: true,
+  // The delivery's `order_nsu` — WHICH charge a processed delivery proves (FUT-726).
+  referenceOfDelivery: infinitePayDeliveryReference,
+} satisfies Partial<PaymentProviderAdapter>;
+
 export function infinitePayProvider(): PaymentProviderAdapter {
   return {
     name: NAME,
     displayName: 'InfinitePay',
+    ...identity,
     authMode: 'credentials',
     capabilities: {
       methods: ['PIX', 'CARD'],
@@ -295,29 +356,8 @@ export function infinitePayProvider(): PaymentProviderAdapter {
       // `payment_check` confirms — a different protocol, the same proof.
       activationCharge: true,
     },
-    // ONE field. `webhookSecret` was offered here and it was a trap: InfinitePay
-    // sends no headers a merchant can configure, so a stored secret caused the
-    // verify step to reject every GENUINE delivery — a production store had one
-    // set, and no notification InfinitePay sent it ever got through. The verify
-    // step now ignores any stored value; the real control is `payment_check`.
-    credentialSchema: [
-      {
-        key: 'handle',
-        label: 'InfiniteTag ($usuario)',
-        secret: false,
-        required: true,
-        // The two flags exist for THIS field: it is short, unchecksummed, and
-        // decides which account is paid. Monospace so `0` and `O` are told
-        // apart by eye; confirmed on save so the value is read back once more
-        // before it starts receiving the store's money.
-        mono: true,
-        confirmOnSave: true,
-        placeholder: '$suatag',
-        pattern: '^\\$[a-zA-Z0-9][a-zA-Z0-9._-]{2,}$',
-        helperText:
-          'Confira caractere por caractere. Mostramos a tag em fonte monoespaçada para você distinguir 0 de O e l de 1.',
-      },
-    ],
+    credentialSchema,
+    customerSchema,
 
     verifyCredentials,
     createCharge,

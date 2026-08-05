@@ -3,6 +3,7 @@ import type {
   ChargeSnapshot,
   ClientTokenization,
   CredentialFieldSpec,
+  CustomerSchema,
   NormalizedWebhookEvent,
   ProviderCapabilities,
   OAuthAuthorizeRequest,
@@ -45,6 +46,61 @@ export interface PaymentProviderAdapter {
   readonly name: ProviderName;
   /** Human-facing label for config UIs ("Stone", "InfinitePay", ...). */
   readonly displayName: string;
+  /**
+   * The provider's URL spelling — how its name travels in a path segment
+   * (the host's per-provider settings page, a hosted checkout's return URL).
+   * Most names are one word and go unchanged; a provider whose name reads as
+   * two words declares the hyphenated form here, because that is what someone
+   * typing or reading the link expects. Defaults to `name`.
+   *
+   * Hosts resolve it through the registry (`urlSlugOf` / `providerForUrlSlug`),
+   * which also keeps the raw name working as an alias so links built before an
+   * adapter declared a slug do not 404.
+   */
+  readonly urlSlug?: string;
+  /**
+   * The smallest total this provider will actually create a charge for, in
+   * minor units. Omitted means one cent. This is a fact about the provider's
+   * own API — typically learned from its refusals — so it is declared by the
+   * adapter rather than kept in a host-side table; the host's activation
+   * charge raises its one-cent proof to this floor.
+   */
+  readonly minimumChargeCents?: number;
+  /**
+   * True when this adapter's `webhook.verify` step confirms THE PAYMENT with
+   * the provider itself, not merely the sender of the delivery (the case for
+   * an unsigned-webhook provider whose verify re-asks the provider's own
+   * payment-check API). For such a provider, a delivery the host has verified
+   * and processed is durable proof that money moved, and reconciliation may
+   * settle state from it. Signature-verified providers must leave this unset:
+   * their verify proves who sent the body, never that anything was paid.
+   */
+  readonly verifyConfirmsPayment?: boolean;
+  /**
+   * The host-side reference THIS provider's delivery payload names — the
+   * `reference` `createCharge` sent, read back out of a raw webhook body — or
+   * null when the payload names none (FUT-726).
+   *
+   * The correlation key is a fact about the provider's payload shape (for
+   * InfinitePay it is `order_nsu`), so the adapter declares how to read it
+   * rather than any host parsing one vendor's field: that parse would break
+   * silently the day a second provider declared `verifyConfirmsPayment`.
+   * Reconciliation needs BOTH declarations to settle from a processed
+   * delivery — the flag says a PROCESSED row proves payment, this hook says
+   * WHICH charge it proves. Takes the raw stored payload string because that
+   * is what an inbox durably holds; a body that does not parse answers null.
+   */
+  readonly referenceOfDelivery?: (payload: string) => string | null;
+  /**
+   * Historical per-merchant webhook PATH this provider's merchants registered
+   * in its dashboard before the host's generic payments webhook route existed.
+   * Declared per adapter because it is a fact about that provider's install
+   * base: the URL lives in dashboards the platform cannot edit, so the host
+   * must keep announcing (and serving) this exact path — byte-identical,
+   * forever. Adapters without a legacy path omit it and land on the host's
+   * generic route.
+   */
+  readonly webhookPath?: (tenantSlug: string) => string;
   readonly capabilities: ProviderCapabilities;
   /**
    * How merchants connect this provider. Defaults to `credentials` (paste
@@ -55,6 +111,22 @@ export interface PaymentProviderAdapter {
   readonly authMode?: ProviderAuthMode;
   /** What the host must collect/store to connect a merchant account. */
   readonly credentialSchema: readonly CredentialFieldSpec[];
+  /**
+   * What this provider asks OF THE BUYER, per field and per method (FUT-595) —
+   * `credentialSchema`'s sibling for the checkout form. Three states: a spec
+   * with `required: true`, a spec with `required: false`, or no spec at all
+   * (not asked — never validated, never blocks a charge). Published to the
+   * browser via the gateway's client config, so the checkout renders the buyer
+   * form from the declaration and asks for nothing else; enforced server-side
+   * by the charge walk before `createCharge` is ever called.
+   *
+   * Omitted means "asks the buyer for nothing" — same as `[]`. A REDIRECT
+   * adapter should still declare what its own hosted page will demand (e.g.
+   * InfinitePay's phone): the walk does not block on it, because the
+   * provider's page is the collector, but the host may collect ahead to
+   * pre-fill. See `core/customer-schema.ts` for the shape and the rules.
+   */
+  readonly customerSchema?: CustomerSchema;
 
   /**
    * Cheap authenticated call proving the credentials work (the "Verificar"

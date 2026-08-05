@@ -10,6 +10,7 @@ import {
 } from './charge-attempt';
 import { AmbiguousChargeError, CredentialsError, NoProviderSucceededError } from './errors';
 import type { StoredCharge } from './ports';
+import { isTerminal } from './status';
 import type { ChargeInput, MerchantRef, ProviderName } from './types';
 
 /**
@@ -74,12 +75,26 @@ async function loadHistory(
   // whole design exists to prevent. If we cannot read what was already tried,
   // we cannot prove anything is safe, so the charge fails and can be retried.
   const rows = await deps.attempts.listByIdempotencyKey(merchant, key);
+  // A row describing ANOTHER attempt's charge establishes nothing about this
+  // one — not what was tried, and not what is unfinished (FUT-727).
+  const foreign = await Promise.all(rows.map((row) => namesAnotherAttemptsCharge(deps, key, row)));
   const tried = new Set<ProviderName>();
   let lastAttemptNo = 0;
   let stopped: ProviderName | null = null;
   let unfinished: History['unfinished'] = null;
-  for (const row of rows) {
-    tried.add(row.provider);
+  for (const [index, row] of rows.entries()) {
+    if (foreign[index]) continue;
+    // A SKIPPED row is NOT "tried": by construction nothing was ever sent to
+    // the provider (the resolve/customer-gate/breaker/instrument skips all
+    // record before any request leaves), and the blocking condition is caller
+    // input or transient state that legitimately changes between calls with
+    // the SAME key. The customer-requirements gate (FUT-595) is the acute
+    // case: hosts reuse the key while no charge was stored, so counting its
+    // skip as tried made the buyer's fix — retrying WITH the missing field —
+    // permanently impossible, the exact recovery `CustomerRequirementsError`
+    // documents. Every other outcome reached the provider (or proved a stop)
+    // and stays in the tried set.
+    if (row.outcome !== 'SKIPPED') tried.add(row.provider);
     lastAttemptNo = Math.max(lastAttemptNo, row.attemptNo);
     if (row.outcome === 'STOPPED') stopped = row.provider;
     // Reaching this function at all means the charge store had no row for
@@ -90,6 +105,45 @@ async function loadHistory(
     }
   }
   return { tried, lastAttemptNo, stopped, unfinished };
+}
+
+/**
+ * Is the charge this ledger row names already PERSISTED under a different
+ * idempotency key? Then the row is not this key's history (FUT-727).
+ *
+ * "Unfinished" is an inference — no charge row under this key, so the provider
+ * must hold a charge our write lost — and it is sound only while the ledger
+ * row's `providerChargeId` belongs to the key it is filed under. FUT-669 broke
+ * that for every order that was alive when it shipped: the reference was the
+ * bare order id on EVERY attempt, so a pre-fix attempt 1 ledgered attempt 0's
+ * charge id. Recovering from such a row re-reads a charge another attempt owns,
+ * the store answers `create` with that attempt's row, and the caller's identity
+ * guard refuses it — correctly, since writing this order's bookkeeping from
+ * another attempt's charge is the FUT-378 double-settlement bug.
+ *
+ * The refusal is right and the arrival is wrong. Nothing about it decays: the
+ * inference is re-derived from a durable row on every retry, so the order is
+ * unpayable permanently rather than transiently. Dropping the row here sends
+ * the walk down the ordinary path, which mints a charge under THIS attempt's
+ * reference — the per-attempt reference that already keeps new orders out of
+ * this state.
+ *
+ * A SETTLED charge is deliberately left alone. Then the earlier attempt took
+ * the buyer's money, and creating a second payable charge is the one outcome
+ * worse than refusing: the walk keeps today's behaviour and the caller still
+ * refuses, which is a safe stop an operator can reconcile.
+ */
+async function namesAnotherAttemptsCharge(
+  deps: ChargeWalkDeps,
+  key: string,
+  row: { provider: ProviderName; providerChargeId?: string | null },
+): Promise<boolean> {
+  // Only a row that NAMES a charge can name the wrong one. Everything else —
+  // a failover, a stop — is this key's own history and is left alone.
+  if (!row.providerChargeId) return false;
+  const existing = await deps.charges.findByProviderChargeId(row.provider, row.providerChargeId);
+  if (!existing || existing.idempotencyKey === key) return false;
+  return !isTerminal(existing.snapshot.status);
 }
 
 /**

@@ -343,4 +343,25 @@ describe('createPaymentsGateway', () => {
     expect(declined.snapshot.status).toBe('DECLINED');
     expect(declined.snapshot.declineReason).toBe('CARD_DECLINED');
   });
+
+  describe('clientConfig — methods by capability (FUT-698)', () => {
+    it('stamps the adapter-declared methods onto the client config', async () => {
+      // From the CAPABILITY table, the same source refund gating reads — a
+      // second per-adapter copy inside clientConfig would be the one to drift,
+      // in the direction of a checkout offering a method the walk refuses.
+      const world = setupGatewayWorld();
+      const config = await world.gateway.clientConfig(TENANT);
+      expect(config?.methods).toEqual(['PIX', 'CARD', 'BOLETO']);
+    });
+
+    it('stamps methods onto every entry of the chain config', async () => {
+      const world = setupGatewayWorld();
+      world.credentials.set(TENANT, 'infinitepay', STUB_CREDS);
+      const chain = await world.gateway.clientConfigChain(TENANT);
+      expect(chain.map((entry) => [entry.provider, entry.methods])).toEqual([
+        ['stone', ['PIX', 'CARD', 'BOLETO']],
+        ['infinitepay', ['PIX', 'CARD']],
+      ]);
+    });
+  });
 });

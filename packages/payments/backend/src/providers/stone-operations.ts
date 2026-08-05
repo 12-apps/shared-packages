@@ -1,6 +1,7 @@
 import { ProviderRequestError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { ResolvedCredentials } from '../core/types';
+import { unreachableOutcome } from './probe-shared';
 import { stubCharge, stubPendingSnapshot, stubRefund } from './shared';
 import { NAME, stoneRequest } from './stone-http';
 import {
@@ -29,9 +30,13 @@ export const verifyCredentials: PaymentProviderAdapter['verifyCredentials'] = as
     await stoneRequest('/orders?size=1', credentials, { method: 'GET' });
     return { ok: true };
   } catch (error) {
+    // Transport first: without the UNREACHABLE fault, a network blip during
+    // "Testar conexão" persisted FAILED over a good key (FUT-695).
+    const unreachable = unreachableOutcome(error, 'a Stone/Pagar.me');
+    if (unreachable) return unreachable;
     const status = error instanceof ProviderRequestError ? error.options.httpStatus : undefined;
     if (status === 401 || status === 403) {
-      return { ok: false, message: 'Chave recusada pela Stone/Pagar.me.' };
+      return { ok: false, fault: 'REFUSED', message: 'Chave recusada pela Stone/Pagar.me.' };
     }
     return { ok: false, message: error instanceof Error ? error.message : String(error) };
   }

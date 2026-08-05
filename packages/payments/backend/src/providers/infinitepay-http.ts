@@ -1,4 +1,4 @@
-import type { ResolvedCredentials } from '../core/types';
+import type { CustomerSchema, ResolvedCredentials } from '../core/types';
 import { providerFetch } from './http';
 
 /**
@@ -17,6 +17,31 @@ import { providerFetch } from './http';
  */
 
 export const NAME = 'infinitepay';
+
+/**
+ * What InfinitePay asks of the buyer (FUT-595). Its checkout page demands a
+ * mobile number; name and e-mail it takes as optional pre-fill. There is
+ * deliberately NO `taxId` entry: the link payload has no tax-id field, so a
+ * CPF must never be asked for an InfinitePay charge, let alone block one.
+ *
+ * The phone is REQUIRED even though `POST /links` accepts a payload without
+ * it, because the declaration describes what the BUYER must ultimately
+ * provide: what we send is a pre-fill for the page that will insist on it.
+ * The charge walk knows a REDIRECT provider's own page is the collector and
+ * does not block on this (`gateCustomerRequirements`), but a host that
+ * collects ahead spares the buyer typing it twice.
+ *
+ * The type is `MOBILE`, not `PHONE`: the page insists on a MOBILE, so a
+ * landline pre-filled here is accepted by us and then rejected there — the
+ * buyer types the phone twice, the one outcome collecting ahead exists to
+ * prevent. `PHONE` (landline-or-mobile) stays the right rule for PagBank,
+ * whose splitter forwards both; see the `CustomerFieldType` doc.
+ */
+export const customerSchema: CustomerSchema = [
+  { key: 'name', type: 'NAME', required: false },
+  { key: 'email', type: 'EMAIL', required: false },
+  { key: 'phone', type: 'MOBILE', required: true },
+];
 
 const API_BASE = 'https://api.checkout.infinitepay.io';
 

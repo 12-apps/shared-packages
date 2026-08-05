@@ -1,0 +1,290 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import {
+  healStrandedActivation,
+  reconcileActivationCharges,
+  type ActivationReconcileContext,
+  type OutstandingActivation,
+} from '../activation/reconcile';
+import { defineProviders } from '../core/registry';
+import type { StoredCharge } from '../core/ports';
+import type { MerchantRef } from '../core/types';
+import { infinitePayProvider } from '../providers/infinitepay';
+import { pagbankProvider } from '../providers/pagbank';
+import { connectedConfig } from './activation-fixtures';
+
+/**
+ * The machine that stamps a paid activation nothing else will (FUT-463).
+ *
+ * A config still holding `pending_verification` while its activation payment
+ * is already confirmed is a settlement that half-landed — and the webhook
+ * inbox remembers that delivery as settled, so redelivery is dedup-skipped
+ * forever. These tests pin down which durable records count as proof (a PAID
+ * charge; a PROCESSED InfinitePay delivery naming the reference) and which
+ * never do. The REAL adapters answer for themselves: `verifyConfirmsPayment`
+ * and the FUT-726 correlation hook are their declarations, not the host's.
+ */
+
+const TENANT_ID = '10ac8ef3-5b10-456d-ab97-74ba046180aa';
+
+const db = {
+  outstanding: [] as OutstandingActivation[],
+  charges: new Map<string, StoredCharge>(),
+  deliveries: [] as Array<{ merchantId: string; provider: string; payload: string }>,
+  proven: new Set<string>(),
+  applied: [] as Array<{ merchant: MerchantRef; provider: string; passed: boolean }>,
+};
+
+// Real adapters, so the gating reads their own declarations.
+const providers = defineProviders({
+  pagbank: pagbankProvider(),
+  infinitepay: infinitePayProvider(),
+});
+
+function context(): ActivationReconcileContext {
+  return {
+    providers,
+    settings: {
+      applyChargeVerification: async (merchant, provider, passed) => {
+        // Driven by the id rather than a flag, so no test has to reach in
+        // and mutate shared state to describe a failure.
+        if (merchant.id === 'broken-tenant') throw new Error('database blip');
+        db.applied.push({ merchant, provider, passed });
+        return {} as never;
+      },
+    },
+    config: {
+      get: async (merchant, provider) =>
+        connectedConfig({
+          provider,
+          ...(db.proven.has(`${merchant.id}:${provider}`)
+            ? { chargeVerifiedAt: new Date('2026-07-31T00:00:00Z') }
+            : {}),
+        }),
+    },
+    charges: {
+      findByProviderChargeId: async (provider, providerChargeId) =>
+        db.charges.get(`${provider}:${providerChargeId}`) ?? null,
+    },
+    proofs: {
+      listOutstanding: async () => db.outstanding,
+      findProcessedDeliveryPayload: async (merchant, provider, reference) =>
+        db.deliveries.find(
+          (row) =>
+            row.merchantId === merchant.id &&
+            row.provider === provider &&
+            row.payload.includes(reference),
+        )?.payload ?? null,
+    },
+  };
+}
+
+function referenceOf(provider = 'infinitepay', merchantId = TENANT_ID): string {
+  return `verify-${provider}-${merchantId}`;
+}
+
+function stranded(provider = 'infinitepay', merchantId = TENANT_ID): OutstandingActivation {
+  return {
+    merchant: { kind: 'TENANT', id: merchantId },
+    provider,
+    reference: referenceOf(provider, merchantId),
+  };
+}
+
+function paidCharge(provider = 'infinitepay', merchantId = TENANT_ID, status = 'PAID'): void {
+  db.charges.set(`${provider}:${referenceOf(provider, merchantId)}`, {
+    merchant: { kind: 'TENANT', id: merchantId },
+    snapshot: { status },
+  } as StoredCharge);
+}
+
+/** A PROCESSED delivery whose payload names the activation reference. */
+function processedDelivery(provider = 'infinitepay', merchantId = TENANT_ID): void {
+  db.deliveries.push({
+    merchantId,
+    provider,
+    payload: JSON.stringify({
+      order_nsu: referenceOf(provider, merchantId),
+      transaction_nsu: 'f736add8-0000-0000-0000-000000000000',
+      amount: 101,
+    }),
+  });
+}
+
+beforeEach(() => {
+  // Emptied in place: the context closures captured these containers, so
+  // reassigning would leave them reading the prior test's data.
+  db.outstanding.length = 0;
+  db.charges.clear();
+  db.deliveries.length = 0;
+  db.proven.clear();
+  db.applied.length = 0;
+});
+
+describe('reconcileActivationCharges', () => {
+  it('stamps a config whose activation charge is recorded PAID', async () => {
+    db.outstanding.push(stranded());
+    paidCharge();
+
+    const report = await reconcileActivationCharges(context());
+
+    expect(report).toEqual({ checked: 1, stamped: 1 });
+    expect(db.applied[0]).toEqual({
+      merchant: { kind: 'TENANT', id: TENANT_ID },
+      provider: 'infinitepay',
+      passed: true,
+    });
+  });
+
+  /**
+   * The proof an activation usually leaves: the charge is raised through the
+   * adapter directly, so there is no charge row for the delivery to update —
+   * only the PROCESSED inbox row, which InfinitePay's own `payment_check`
+   * confirmed before it settled.
+   */
+  it('stamps from a PROCESSED InfinitePay delivery when no charge row exists', async () => {
+    db.outstanding.push(stranded());
+    processedDelivery();
+
+    const report = await reconcileActivationCharges(context());
+
+    expect(report).toEqual({ checked: 1, stamped: 1 });
+  });
+
+  /** A signature-verified provider's inbox row proves the sender, not payment. */
+  it("does not take another provider's inbox row as proof of payment", async () => {
+    db.outstanding.push(stranded('pagbank'));
+    processedDelivery('pagbank');
+
+    const report = await reconcileActivationCharges(context());
+
+    expect(report).toEqual({ checked: 1, stamped: 0 });
+  });
+
+  /** FUT-726: the ADAPTER reads its correlation key out of the payload. */
+  it("requires the reference to be the delivery's own correlation key", async () => {
+    db.outstanding.push(stranded());
+    db.deliveries.push({
+      merchantId: TENANT_ID,
+      provider: 'infinitepay',
+      // The reference appears in the body, but as somebody else's field.
+      payload: JSON.stringify({ order_nsu: 'order-123', note: referenceOf() }),
+    });
+
+    const report = await reconcileActivationCharges(context());
+
+    expect(report.stamped).toBe(0);
+  });
+
+  it('leaves a config alone while its charge is still unpaid', async () => {
+    db.outstanding.push(stranded());
+    paidCharge('infinitepay', TENANT_ID, 'PENDING');
+
+    const report = await reconcileActivationCharges(context());
+
+    expect(report).toEqual({ checked: 1, stamped: 0 });
+    expect(db.applied).toHaveLength(0);
+  });
+
+  /**
+   * The pending row's reference must be the one this config's own identity
+   * derives — a row carrying someone else's reference proves nothing here.
+   */
+  it("skips a pending row whose reference is not this config's own", async () => {
+    db.outstanding.push({
+      merchant: { kind: 'TENANT', id: TENANT_ID },
+      provider: 'infinitepay',
+      reference: 'verify-infinitepay-another-store',
+    });
+    paidCharge();
+
+    const report = await reconcileActivationCharges(context());
+
+    expect(report.checked).toBe(0);
+    expect(db.applied).toHaveLength(0);
+  });
+
+  /** Charge identity never crosses merchants — same rule as the webhook upsert. */
+  it('refuses a charge that belongs to a different merchant', async () => {
+    db.outstanding.push(stranded());
+    db.charges.set(`infinitepay:${referenceOf()}`, {
+      merchant: { kind: 'TENANT', id: 'someone-else' },
+      snapshot: { status: 'PAID' },
+    } as StoredCharge);
+
+    const report = await reconcileActivationCharges(context());
+
+    expect(report.stamped).toBe(0);
+  });
+
+  it('one failing row does not stop the rest from stamping', async () => {
+    db.outstanding.push(stranded('infinitepay', 'broken-tenant'), stranded());
+    paidCharge('infinitepay', 'broken-tenant');
+    paidCharge();
+
+    const report = await reconcileActivationCharges(context());
+
+    expect(report).toEqual({ checked: 2, stamped: 1 });
+    expect(db.applied).toHaveLength(1);
+  });
+});
+
+describe('healStrandedActivation', () => {
+  it('stamps immediately when the settings screen finds a settled charge', async () => {
+    db.outstanding.push(stranded());
+    processedDelivery();
+
+    const healed = await healStrandedActivation(
+      context(),
+      { kind: 'TENANT', id: TENANT_ID },
+      'infinitepay',
+      referenceOf(),
+    );
+
+    expect(healed).toBe(true);
+    expect(db.applied).toHaveLength(1);
+  });
+
+  it('answers false when nothing durable proves the payment', async () => {
+    db.outstanding.push(stranded());
+
+    expect(
+      await healStrandedActivation(
+        context(),
+        { kind: 'TENANT', id: TENANT_ID },
+        'infinitepay',
+        referenceOf(),
+      ),
+    ).toBe(false);
+    expect(db.applied).toHaveLength(0);
+  });
+
+  /** Healing must never switch a paused-but-proven provider back on. */
+  it('leaves an already-proven config alone', async () => {
+    db.proven.add(`${TENANT_ID}:infinitepay`);
+    processedDelivery();
+
+    expect(
+      await healStrandedActivation(
+        context(),
+        { kind: 'TENANT', id: TENANT_ID },
+        'infinitepay',
+        referenceOf(),
+      ),
+    ).toBe(false);
+    expect(db.applied).toHaveLength(0);
+  });
+
+  it("refuses a pending reference that is not this config's own", async () => {
+    processedDelivery();
+
+    const healed = await healStrandedActivation(
+      context(),
+      { kind: 'TENANT', id: TENANT_ID },
+      'infinitepay',
+      'verify-infinitepay-another-store',
+    );
+
+    expect(healed).toBe(false);
+  });
+});

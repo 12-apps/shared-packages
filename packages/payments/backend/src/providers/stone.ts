@@ -145,6 +145,18 @@ export function stoneProvider(): PaymentProviderAdapter {
       { key: 'webhookUser', label: 'Usuário do webhook', secret: false, required: true },
       { key: 'webhookPassword', label: 'Senha do webhook', secret: true, required: true },
     ],
+    /**
+     * What Stone asks of the buyer (FUT-595) — the honest reading of what
+     * `customerPayload` sends: name, e-mail and the CPF/CNPJ (`document`) all
+     * travel when present and are omitted when not, and no phone is sent at
+     * all. Nothing is declared required until a live refusal proves it, the
+     * same evidence standard `minimumChargeCents` set (FUT-557).
+     */
+    customerSchema: [
+      { key: 'name', type: 'NAME', required: false },
+      { key: 'email', type: 'EMAIL', required: false },
+      { key: 'taxId', type: 'CPF', required: false },
+    ],
 
     verifyCredentials,
     createCharge,

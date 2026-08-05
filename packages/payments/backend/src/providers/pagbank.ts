@@ -2,8 +2,15 @@ import type { PaymentProviderAdapter } from '../core/provider';
 import { ProviderRequestError } from '../core/errors';
 import type { ChargeInput, ChargeSnapshot, ResolvedCredentials } from '../core/types';
 import { pagbankDecline, type PagBankPaymentRawData } from './pagbank-declines';
-import { customerPayload, NAME, notificationUrls, pagbankRequest } from './pagbank-http';
+import {
+  customerPayload,
+  customerSchema,
+  NAME,
+  notificationUrls,
+  pagbankRequest,
+} from './pagbank-http';
 import { pagbankOAuth } from './pagbank-oauth';
+import { verifyPagbankCredentials } from './pagbank-probe';
 import { postTransactionEvents } from './pagbank-webhook';
 import {
   capturedAmountCents,
@@ -213,25 +220,6 @@ function mapCard(res: PagBankCardResponse, input: ChargeInput): ChargeSnapshot {
   };
 }
 
-
-const verifyCredentials: PaymentProviderAdapter['verifyCredentials'] = async (credentials) => {
-  if (credentials.stub) return { ok: true, message: 'stub mode' };
-  if (!credentials.fields['token']) return { ok: false, message: 'Token não configurado.' };
-  try {
-    // Cheapest authenticated probe: a bogus order id returns 401/403 when the
-    // token is wrong and 404 when it is right.
-    await pagbankRequest('/orders/verify-credentials-probe', credentials, { method: 'GET' });
-    return { ok: true };
-  } catch (error) {
-    const status = error instanceof ProviderRequestError ? error.options.httpStatus : undefined;
-    if (status === 404) return { ok: true };
-    if (status === 401 || status === 403) {
-      return { ok: false, message: 'Token recusado pelo PagBank.' };
-    }
-    return { ok: false, message: error instanceof Error ? error.message : String(error) };
-  }
-};
-
 /**
  * Reconciliation probe. PagBank indexes orders by the `reference_id` we set
  * at creation, so an order created moments before a timeout is findable
@@ -324,10 +312,22 @@ const webhook: PaymentProviderAdapter['webhook'] = {
   },
 };
 
+/**
+ * The historical per-store webhook path this integration has always used —
+ * store owners registered it in their PagBank dashboards, which the platform
+ * cannot edit, so it must stay BYTE-IDENTICAL forever. Declared on the
+ * adapter rather than special-cased in a host (FUT-557): it is a fact about
+ * this provider's install base, and every adapter without such history simply
+ * omits the override and lands on the host's generic webhook route.
+ */
+const webhookPath = (tenantSlug: string): string =>
+  `/api/webhooks/pagseguro/${tenantSlug}/notifications`;
+
 export function pagbankProvider(): PaymentProviderAdapter {
   return {
     name: NAME,
     displayName: 'PagBank',
+    webhookPath,
     // Connect is the happy path; the credential form below stays as the
     // fallback for stores connected before Connect, and for deployments with
     // no registered PagBank application.
@@ -347,8 +347,9 @@ export function pagbankProvider(): PaymentProviderAdapter {
       { key: 'publicKey', label: 'Chave pública (cartão)', secret: false, required: false },
       { key: 'webhookToken', label: 'Token de webhook', secret: true, required: true },
     ],
+    customerSchema,
 
-    verifyCredentials,
+    verifyCredentials: verifyPagbankCredentials,
     createCharge,
     oauth: pagbankOAuth,
 

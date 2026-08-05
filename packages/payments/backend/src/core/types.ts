@@ -1,3 +1,4 @@
+import type { CustomerInfo } from './customer-schema';
 import type { SettlementHints } from './settlement-hints';
 
 export type { SettlementHints };
@@ -79,15 +80,6 @@ export interface MerchantRef {
   kind: 'PLATFORM' | 'TENANT';
   /** Platform id (any stable constant) or the tenant/client id. */
   id: string;
-}
-
-/** Buyer identity an adapter forwards to the provider. */
-export interface CustomerInfo {
-  name: string;
-  email: string;
-  /** CPF/CNPJ digits (Brazilian providers require it); optional elsewhere. */
-  taxId?: string;
-  phone?: string;
 }
 
 /**
@@ -349,6 +341,13 @@ export interface OAuthTokens {
   fields: Record<string, string>;
   expiresAt?: Date | null;
 }
+
+// The buyer's identity and the BUYER-REQUIREMENTS descriptors (FUT-595) live
+// in their own module; re-exported so consumers keep importing from here.
+export type {
+  CustomerFieldIssue, CustomerFieldKey, CustomerFieldSpec, CustomerFieldType,
+  CustomerInfo, CustomerSchema,
+} from './customer-schema';
 
 /**
  * The provider ONBOARDING descriptors — how a merchant connects an account,

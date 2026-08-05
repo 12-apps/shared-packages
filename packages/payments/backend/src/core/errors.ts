@@ -1,3 +1,4 @@
+import type { CustomerFieldIssue } from './customer-schema';
 import type { DeclineReason, ProviderName } from './types';
 
 /**
@@ -56,6 +57,28 @@ export class CredentialsError extends PaymentsError {
     message: string,
   ) {
     super('CredentialsError', message);
+  }
+}
+
+/**
+ * A PINNED charge named a provider whose declared buyer requirements the
+ * charge does not meet (FUT-595) — a required `customerSchema` field is
+ * missing or malformed. Thrown BEFORE the adapter is called, so nothing was
+ * sent anywhere: this is a refusal the host can fix by asking the buyer for
+ * the named fields, not a provider failure. An unpinned walk never throws
+ * this; it skips the provider (with a SKIPPED ledger row) and advances,
+ * exactly like capability gating, so a chain member's requirement can never
+ * strand a charge another member would accept.
+ */
+export class CustomerRequirementsError extends PaymentsError {
+  constructor(
+    readonly provider: ProviderName,
+    readonly issues: readonly CustomerFieldIssue[],
+  ) {
+    super('CustomerRequirementsError',
+      `Provider ${provider} requires buyer fields this charge does not carry: ` +
+        issues.map((issue) => `${issue.field} (${issue.reason})`).join(', '),
+    );
   }
 }
 

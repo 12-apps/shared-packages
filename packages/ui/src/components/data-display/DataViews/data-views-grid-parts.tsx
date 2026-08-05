@@ -22,7 +22,8 @@ import {
   useDataViewsLayout,
   type DataViewsLayout,
 } from "./data-views-layout-context";
-import { FilterDialog, GridFilterPanel, InlineFilterBar } from "./data-views-filter-panel";
+import { FilterDialog, GridFilterPanel } from "./data-views-filter-panel";
+import { InlineFilterBar } from "./data-views-inline-bar";
 import { GridToolbar } from "./data-views-toolbar";
 import { DataViewsPagination } from "./data-views-pagination";
 import { togglePillValues } from "./data-views-grid-helpers";
@@ -269,7 +270,9 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   const showInline = inlineFilters && wide;
   const useModal = inlineFilters && !wide;
   const inlineVisible =
-    showInline && !filtersHidden && (alwaysShowSearch || fields.length > 0 || state.search !== "");
+    showInline &&
+    !filtersHidden &&
+    (alwaysShowSearch || fields.length > 0 || rangeFields.length > 0 || state.search !== "");
   const filterProps: FilterSurfaceProps<T> = {
     testIdPrefix,
     search: state.search,

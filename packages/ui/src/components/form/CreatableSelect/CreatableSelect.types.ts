@@ -2,6 +2,14 @@
 export interface CreatableSelectOption {
   value: string;
   label: string;
+  /**
+   * Nesting level for a hierarchical list (0 = top level), rendered as INDENT on
+   * the dropdown row only. Callers used to bake the indent into `label`
+   * ("— Chocolate"), which then travelled everywhere the label goes: the closed
+   * field, the search text, and whatever else reads the selected option's label.
+   * Keeping it a separate number leaves `label` the category's actual name.
+   */
+  depth?: number;
 }
 
 export interface CreatableSelectProps {

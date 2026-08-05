@@ -46,6 +46,20 @@ export interface PresignUploadParams {
   acl?: "private" | "public-read";
 }
 
+/** Parameters for {@link putObjectToStorage}. */
+export interface PutObjectParams {
+  /** Object key to write (e.g. `products/<uuid>.png`). */
+  key: string;
+  /** The bytes to store. */
+  body: Uint8Array;
+  /** MIME type stored with the object, and served back on GET. */
+  contentType: string;
+  /** Bucket override; defaults to `S3_BUCKET`. */
+  bucket?: string;
+  /** Canned ACL; `"public-read"` so an `<img>` can load it without a policy. */
+  acl?: "private" | "public-read";
+}
+
 /** Result of a presigned upload request. */
 export interface PresignedUpload {
   /** Presigned PUT URL the browser uploads to directly. */
@@ -97,8 +111,51 @@ function getS3Client(): S3Client {
     ...(accessKeyId && secretAccessKey
       ? { credentials: { accessKeyId, secretAccessKey } }
       : {}),
+    // Do NOT compute an integrity checksum unless the operation requires one.
+    //
+    // Since v3.729 the SDK adds a CRC32 by default, and for a PRESIGNED PUT it
+    // computes that checksum over the command's body — which is empty at
+    // signing time — then hoists it into the URL as
+    // `x-amz-checksum-crc32=AAAAAA==` (the CRC32 of zero bytes). The browser
+    // then PUTs the real file, and a store that validates the header rejects
+    // the upload for a digest mismatch on bytes the signer never saw.
+    // DigitalOcean Spaces happens to ignore the parameter, so the bug is
+    // invisible on `spaces` and waits for whoever points `s3` at real AWS.
+    requestChecksumCalculation: "WHEN_REQUIRED",
   });
   return cachedS3Client;
+}
+
+/**
+ * Upload bytes to the bucket from the SERVER, returning once stored.
+ *
+ * The counterpart to {@link createPresignedUploadUrl}: same bucket, same canned
+ * ACL, but the app process holds the credentials and the bytes, so the browser
+ * never talks to object storage. That is what makes the upload immune to the
+ * bucket's CORS configuration — see `app/api/uploads/object` in `apps/web`.
+ *
+ * `acl` is sent as a real request header here (the SDK signs it), which is the
+ * only way the canned ACL actually applies: passing `x-amz-acl` as a presigned
+ * QUERY parameter is accepted and then silently ignored, leaving a private
+ * object behind a public URL.
+ *
+ * @throws if no bucket is configured (param or `S3_BUCKET`).
+ */
+export async function putObjectToStorage(params: PutObjectParams): Promise<void> {
+  const bucket = params.bucket ?? process.env.S3_BUCKET;
+  if (!bucket) {
+    throw new Error('S3 bucket is not configured (set S3_BUCKET).');
+  }
+
+  await getS3Client().send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: params.key,
+      Body: params.body,
+      ContentType: params.contentType,
+      ...(params.acl ? { ACL: params.acl } : {}),
+    }),
+  );
 }
 
 /**

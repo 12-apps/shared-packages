@@ -1,6 +1,6 @@
 import { ProviderRequestError } from '../core/errors';
-import { isTransportError } from '../core/failover';
 import type { ProbeOutcome } from '../core/types';
+import { noAnswerArrived } from './probe-shared';
 
 /**
  * Reading InfinitePay's refusal of a credential probe.
@@ -10,32 +10,6 @@ import type { ProbeOutcome } from '../core/types';
  * five verdicts that each send the owner somewhere different — and one of them
  * sends them nowhere on purpose.
  */
-
-/**
- * Was there no answer to read, as opposed to an answer we did not like?
- *
- * The one question in this file that is not about a status code, and the one
- * the rest is worthless without. Two shapes count:
- *
- *   - a recognized transport `cause.code` — the network failed, and
- *   - a `ProviderRequestError` carrying no status, which is how an adapter
- *     reports a response it could not read at all.
- *
- * Deliberately NOT "the error has no HTTP status". That was the old test, and
- * it is true of every throw that never came from the HTTP layer — a `TypeError`
- * in this package, a parse failure, any bug of ours. See {@link probeFailure}
- * for what treating those as an outage actually did.
- *
- * The class cannot decide it either: `providerFetch` wraps a RESPONSE in
- * `ProviderRequestError`, so a genuine network failure arrives as the bare
- * `TypeError: fetch failed` undici threw — the same class our own bugs wear.
- * The `cause.code` undici attaches, and our bugs do not carry, is the only
- * place the two actually differ.
- */
-function noAnswerArrived(error: unknown, refusal: ProviderRequestError | null): boolean {
-  if (isTransportError(error)) return true;
-  return refusal !== null && refusal.options.httpStatus === undefined;
-}
 
 /**
  * What a probe failure MEANS, in the terms the screen acts on.
@@ -88,7 +62,7 @@ export function probeFailure(error: unknown): ProbeOutcome {
   }
   // Nothing was learned about the tag, so the screen must not send the owner to
   // re-read it — it is already saved, and asking again in a moment is the fix.
-  if (noAnswerArrived(error, refusal)) {
+  if (noAnswerArrived(error)) {
     return {
       ok: false,
       fault: 'UNREACHABLE',

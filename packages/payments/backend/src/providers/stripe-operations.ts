@@ -15,6 +15,7 @@ import {
   type StripeErrorBody,
   type StripePaymentIntent,
 } from './stripe-charges';
+import { unreachableOutcome } from './probe-shared';
 import { NAME, stripeRequest } from './stripe-http';
 
 /**
@@ -73,7 +74,7 @@ export const createCharge: PaymentProviderAdapter['createCharge'] = async (input
   try {
     const intent = await stripeRequest<StripePaymentIntent>('/v1/payment_intents', credentials, {
       method: 'POST',
-      body: intentPayload(input),
+      body: intentPayload(input, credentials),
       idempotencyKey: input.idempotencyKey ?? input.reference,
     });
     return intentSnapshot(intent, {
@@ -97,9 +98,15 @@ export const verifyCredentials: PaymentProviderAdapter['verifyCredentials'] = as
     await stripeRequest<unknown>('/v1/balance', credentials, { method: 'GET' });
     return { ok: true };
   } catch (error) {
+    // Transport first: an unanswered probe learned NOTHING about the key, and
+    // reporting it without the fault is what let a DNS blip persist FAILED
+    // over good credentials (FUT-695) — `runVerify` skips the store only for
+    // an explicit UNREACHABLE.
+    const unreachable = unreachableOutcome(error, 'a Stripe');
+    if (unreachable) return unreachable;
     const status = error instanceof ProviderRequestError ? error.options.httpStatus : undefined;
     if (status === 401 || status === 403) {
-      return { ok: false, message: 'Credenciais recusadas pela Stripe.' };
+      return { ok: false, fault: 'REFUSED', message: 'Credenciais recusadas pela Stripe.' };
     }
     return { ok: false, message: error instanceof Error ? error.message : String(error) };
   }

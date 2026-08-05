@@ -36,8 +36,8 @@ function viewOf(configs: MaskedProviderConfig[]): MerchantSettingsView {
   const chain = configs.filter((c) => c.enabled).map((c) => c.provider);
   return {
     providers: [
-      { name: 'stone', displayName: 'Stone', authMode: 'credentials', capabilities: CAPS, credentialSchema: [] },
-      { name: 'stripe', displayName: 'Stripe', authMode: 'oauth', capabilities: CAPS, credentialSchema: [] },
+      { name: 'stone', displayName: 'Stone', urlSlug: 'stone', authMode: 'credentials', capabilities: CAPS, credentialSchema: [] },
+      { name: 'stripe', displayName: 'Stripe', urlSlug: 'stripe', authMode: 'oauth', capabilities: CAPS, credentialSchema: [] },
     ],
     configs,
     providerChain: chain,

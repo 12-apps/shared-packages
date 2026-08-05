@@ -50,7 +50,7 @@ const RESYNC = 'pnpm --filter @12-apps/payments-backend prisma:sync';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // Workspace-relative host paths; adopting repos change these two lines.
-const HOST_SCHEMA_LINK = join(HERE, '../../../shared-helpers/prisma/schema/payments.prisma');
+const HOST_SCHEMA_LINK = join(HERE, '../../../prisma/prisma/schema/payments.prisma');
 const HOST_SCHEMA_TARGET = '../../../payments/backend/prisma/payments.prisma';
 
 function safeLstat(path) {

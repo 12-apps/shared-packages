@@ -5,6 +5,7 @@ import type {
   StoredProviderConfig,
 } from './config/types';
 import { PaymentsError } from './core/errors';
+import { mergeRefreshedSnapshot } from './core/snapshot-merge';
 import { isForwardTransition } from './core/status';
 import type {
   AttemptLedger,
@@ -144,7 +145,9 @@ export function createMemoryChargeStore(): MemoryChargeStore {
       // this update — misattributed webhooks mutate nothing.
       if (merchantKey(row.merchant) !== merchantKey(merchant)) return null;
       if (!isForwardTransition(row.snapshot.status, snapshot.status)) return row;
-      row.snapshot = snapshot;
+      // Merged, not replaced — same rule as the Prisma store, so "refresh" means
+      // the same thing in a test as in production.
+      row.snapshot = mergeRefreshedSnapshot(row.snapshot, snapshot);
       row.updatedAt = new Date();
       return row;
     },

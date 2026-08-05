@@ -21,6 +21,7 @@
     "./user-avatar": "./src/user-avatar.tsx",
     "./utils": "./src/utils/index.ts",
     "./mui/Box": "./src/mui/Box.ts",
+    "./mui/Link": "./src/mui/Link.ts",
     "./mui/Stack": "./src/mui/Stack.ts",
     "./mui/AppBar": "./src/mui/AppBar.ts",
     "./mui/Toolbar": "./src/mui/Toolbar.ts",

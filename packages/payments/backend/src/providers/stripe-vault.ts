@@ -54,7 +54,7 @@ interface StripeSetupIntent {
  * one chargeable under a customer nothing points at any more.
  */
 async function customerFor(
-  input: { reference: string; customer: { name: string; email: string } },
+  input: { reference: string; customer: { name?: string; email?: string } },
   existing: string | undefined,
   credentials: Parameters<typeof stripeRequest>[1],
 ): Promise<string> {

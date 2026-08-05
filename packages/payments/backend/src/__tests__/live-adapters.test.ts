@@ -189,6 +189,64 @@ describe('stripe live mode', () => {
   });
 
   /**
+   * 3-D Secure (FUT-698). Confirmed server-side with no `return_url`, an
+   * intent that needs authentication parks at `requires_action` with a
+   * `use_stripe_sdk` action nothing in the host can drive — the buyer polls a
+   * PENDING order forever. The `redirectUrl` the host already stamps on
+   * tenant credentials (`withMerchantRedirectUrl`, FUT-556) is where the
+   * issuer page must send the buyer back.
+   */
+  it('confirms a card with the merchant return_url so 3DS can redirect', async () => {
+    const calls = stubFetch([{ body: { id: 'pi_3ds', status: 'succeeded' } }]);
+
+    await stripeProvider().createCharge(cardInput(), {
+      ...creds,
+      fields: { ...creds.fields, redirectUrl: 'https://host/acme/menu/checkout' },
+    });
+
+    const body = formOf(calls[0]!.init);
+    expect(body['return_url']).toBe('https://host/acme/menu/checkout');
+  });
+
+  it('omits return_url for an off-session charge — nobody is there to redirect', async () => {
+    const calls = stubFetch([{ body: { id: 'pi_off2', status: 'succeeded' } }]);
+
+    await stripeProvider().createCharge(
+      {
+        ...cardInput('sub-cycle-2'),
+        card: { savedCardToken: 'pm_saved', customerRef: 'cus_1', merchantInitiated: true },
+      },
+      { ...creds, fields: { ...creds.fields, redirectUrl: 'https://host/acme/menu/checkout' } },
+    );
+
+    expect(formOf(calls[0]!.init)['return_url']).toBeUndefined();
+  });
+
+  it('maps a 3DS challenge to a PENDING snapshot carrying the challenge page', async () => {
+    // Given a Stripe store, when the buyer pays with a card that exige 3DS,
+    // the create answers `requires_action` + `redirect_to_url` — the same
+    // hosted-checkout shape as far as the host is concerned, so the checkout
+    // hands the buyer over and the webhook/poll settles the order.
+    stubFetch([
+      {
+        body: {
+          id: 'pi_challenge',
+          status: 'requires_action',
+          amount: 12_50,
+          currency: 'brl',
+          payment_method_types: ['card'],
+          next_action: { redirect_to_url: { url: 'https://hooks.stripe.com/3ds/x' } },
+        },
+      },
+    ]);
+
+    const snapshot = await stripeProvider().createCharge(cardInput(), creds);
+
+    expect(snapshot).toMatchObject({ status: 'PENDING', method: 'CARD' });
+    expect(snapshot.hostedCheckoutUrl).toBe('https://hooks.stripe.com/3ds/x');
+  });
+
+  /**
    * Card VAULTING (FUT-340) — a SetupIntent, not a zero-amount charge.
    * Stripe models "authorise this card for future use" as its own object, and
    * it is the only flow that records the stored-credential agreement a later

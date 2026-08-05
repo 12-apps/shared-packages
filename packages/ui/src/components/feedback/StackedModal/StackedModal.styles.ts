@@ -182,4 +182,12 @@ export const loadingOverlayStyles = (theme: Theme): CSSObject => ({
 
 export const modalContentStyles = (theme: Theme): CSSObject => ({
   padding: theme.spacing(3),
+  // MUI's DialogContent defaults to `overflow-y: auto`, but inside a panel it is
+  // NOT the element that scrolls — ModalBody above it is, and this box always
+  // ends up exactly as tall as its own content. A scroll container that never
+  // scrolls is still the containing block for every `position: sticky`
+  // descendant, so a sticky header anchored here gets zero travel and rides the
+  // content out of view: sticky, and pinned to nothing. Handing the overflow
+  // back to ModalBody makes the panel's own scroller the anchor.
+  overflowY: 'visible',
 });

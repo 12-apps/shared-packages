@@ -1,5 +1,6 @@
 import { PaymentsError } from '../core/errors';
 import type { ChargeStore, StoredCharge } from '../core/ports';
+import { mergeRefreshedSnapshot } from '../core/snapshot-merge';
 import { isForwardTransition } from '../core/status';
 import type { ChargeSnapshot, MerchantRef } from '../core/types';
 
@@ -49,7 +50,7 @@ export interface ChargeDelegate {
   create(args: { data: Omit<ChargeRow, 'id' | 'createdAt' | 'updatedAt'> & { status: string; method: string; amountCents: number; currency: string } }): Promise<ChargeRow>;
   update(args: {
     where: { id: string };
-    data: { snapshot: unknown; status: string };
+    data: { snapshot: unknown; status: string; amountCents: number; method: string };
   }): Promise<ChargeRow>;
 }
 
@@ -64,6 +65,29 @@ function rowToStoredCharge(row: ChargeRow): StoredCharge {
     snapshot: row.snapshot as ChargeSnapshot,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+  };
+}
+
+/**
+ * The columns a REFRESH writes — MERGED over the stored snapshot, never
+ * replacing it, because a re-read answers what happened to the charge and must
+ * not erase what creating it established ({@link mergeRefreshedSnapshot}).
+ *
+ * `amountCents` and `method` are rewritten alongside the snapshot deliberately:
+ * they are what every lookup filters on, so leaving them behind lets a row
+ * disagree with itself and hides a settled charge's real captured amount from
+ * every query that reads it.
+ */
+function refreshedRow(
+  stored: ChargeSnapshot,
+  refreshed: ChargeSnapshot,
+): { snapshot: unknown; status: string; amountCents: number; method: string } {
+  const merged = mergeRefreshedSnapshot(stored, refreshed);
+  return {
+    snapshot: merged,
+    status: merged.status,
+    amountCents: merged.amount.amountCents,
+    method: merged.method,
   };
 }
 
@@ -143,7 +167,7 @@ export function createPrismaChargeStore(delegate: ChargeDelegate): ChargeStore {
       if (!isForwardTransition(existing.snapshot.status, snapshot.status)) return existing;
       const row = await delegate.update({
         where: { id: existing.id },
-        data: { snapshot, status: snapshot.status },
+        data: refreshedRow(existing.snapshot, snapshot),
       });
       return rowToStoredCharge(row);
     },

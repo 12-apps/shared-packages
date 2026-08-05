@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 
 import { ProviderRequestError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
+import type { CustomerSchema } from '../core/customer-schema';
 import type {
   NormalizedWebhookEvent,
   ResolvedCredentials,
@@ -130,6 +131,32 @@ function parseStripeEvent(delivery: WebhookDelivery): NormalizedWebhookEvent[] {
   ];
 }
 
+/**
+ * What Stripe asks of the buyer (FUT-595). Card and PIX need nothing —
+ * `billing_details` and `receipt_email` are optional pre-fill — which is
+ * why name and e-mail are optional there. The real demands are per
+ * METHOD: boleto refuses without a CPF/CNPJ (`boleto.tax_id`, see
+ * `boletoIntent`) AND without `billing_details` name + e-mail, so those
+ * three are required for BOLETO only.
+ *
+ * KNOWN GAP the schema cannot yet express: Stripe's boleto additionally
+ * demands a full billing address (line1/city/state/postal_code/country —
+ * `boletoIntent`'s own comment: "Stripe requires a CPF/CNPJ and a full
+ * billing address for boleto"), but `CustomerInfo` has no address block,
+ * so `boletoIntent` sends none and a boleto charge still 400s at Stripe
+ * even with every declared field present. Extending `CustomerInfo` (and
+ * the FUT-596 schema-driven form) with the address is the prerequisite
+ * for actually offering boleto; until then the declaration below is the
+ * closest truth the type can state.
+ */
+const customerSchema: CustomerSchema = [
+  { key: 'name', type: 'NAME', required: false, methods: ['PIX', 'CARD'] },
+  { key: 'email', type: 'EMAIL', required: false, methods: ['PIX', 'CARD'] },
+  { key: 'name', type: 'NAME', required: true, methods: ['BOLETO'] },
+  { key: 'email', type: 'EMAIL', required: true, methods: ['BOLETO'] },
+  { key: 'taxId', type: 'CPF', required: true, methods: ['BOLETO'] },
+];
+
 /** Connect OAuth: authorize → exchange → refresh → deauthorize. */
 const oauth: NonNullable<PaymentProviderAdapter['oauth']> = {
   async buildAuthorizeUrl(appCredentials, ctx) {
@@ -202,6 +229,7 @@ export function stripeProvider(): PaymentProviderAdapter {
         required: false,
       },
     ],
+    customerSchema,
 
     verifyCredentials,
     createCharge,

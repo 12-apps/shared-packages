@@ -26,6 +26,13 @@ export interface SortParam {
 }
 
 /**
+ * A Prisma `orderBy`: one key, or an ARRAY of keys applied in order. The array
+ * form is how a list adds a unique tiebreak to a non-unique sort — see
+ * {@link EntitySearchConfig.orderByFor}.
+ */
+export type OrderBy = Record<string, unknown> | Record<string, unknown>[];
+
+/**
  * The per-entity search contract: which columns are searchable (the `q` box),
  * filterable (structured pills/ranges), and sortable, plus the default sort.
  * Validated by {@link defineSearchConfig} at module load.
@@ -48,8 +55,13 @@ export interface EntitySearchConfig {
    * when a sortable field maps to a RELATION (e.g. stock → `{ inventory:
    * { quantity } }`, category → `{ category: { name } }`) that the flat form
    * can't express. `sortableFields` still gates which fields are accepted.
+   *
+   * May return an ARRAY, which Prisma reads as ordered keys — the way to add a
+   * unique tiebreak. Any sort whose key is not unique needs one: equal keys make
+   * each `LIMIT/OFFSET` page an independent pass over an unordered tie group, so
+   * rows repeat on one page and vanish from another while `total` says otherwise.
    */
-  orderByFor?: (sort: SortParam) => Record<string, unknown>;
+  orderByFor?: (sort: SortParam) => OrderBy;
 }
 
 /**
@@ -60,8 +72,9 @@ export interface EntitySearchConfig {
 export interface SearchableModel {
   findMany(args?: {
     where?: Record<string, unknown>;
-    // Flat (`{ field: dir }`) or a nested relation orderBy (`orderByFor`).
-    orderBy?: Record<string, unknown>;
+    // Flat (`{ field: dir }`), a nested relation orderBy, or an ordered array
+    // of either — all three shapes come from `orderByFor`.
+    orderBy?: OrderBy;
     skip?: number;
     take?: number;
   }): Promise<unknown[]>;

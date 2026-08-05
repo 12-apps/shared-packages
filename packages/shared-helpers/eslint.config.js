@@ -24,7 +24,11 @@ export default [
     files: ['**/*.ts'],
     rules: {
       // Allow console.error for logging in the library
-      'no-console': ['error', { allow: ['error', 'warn'] }],
+      // No exception for `error`/`warn` (FUT-724): those were the two that
+      // mattered, and allowing them is what let a silent failure look handled.
+      // Where the console genuinely is right, disable at the call site with a
+      // reason.
+      'no-console': 'error',
     },
   },
 ];
