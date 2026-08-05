@@ -6,7 +6,6 @@ packages/ui/src/components/data-display/Carousel/Carousel.tsx
 packages/ui/src/components/data-display/HoverCard/HoverCard.tsx
 packages/ui/src/components/data-display/Progress/Progress.test.stories.tsx
 packages/ui/src/components/data-display/Sheet/Sheet.test.stories.tsx
-packages/ui/src/components/data-display/Sheet/Sheet.tsx
 packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.test.stories.tsx
 packages/ui/src/components/feedback/Dialog/Dialog.test.stories.tsx
 packages/ui/src/components/feedback/Modal/Modal.test.stories.tsx
