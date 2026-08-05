@@ -31,6 +31,42 @@ const generateItems = (start: number, count: number): TestItem[] =>
     description: `Description ${start + i + 1}`,
   }));
 
+/**
+ * A page load the STORY completes, rather than one that completes after a fixed
+ * delay. `loadMore` parks here, so `loading` is observable for exactly as long
+ * as a test needs it to be and the page lands the moment the test releases it —
+ * no timing assumption in either direction.
+ *
+ * This replaces a 100ms sleep. The codemod had swapped that sleep for
+ * `await waitFor(() => expect(true).toBe(true))`, whose callback never throws:
+ * it resolves on the first tick, so `loadMore` became effectively synchronous,
+ * `loading` was never rendered, and nothing waited for — or checked — the page.
+ */
+interface PageGate {
+  wait: () => Promise<void>;
+  release: () => void;
+}
+
+const createPageGate = (): PageGate => {
+  // A container's property rather than a closed-over `let`: reassigning a
+  // captured binding from inside a callback is what no-global-state-mutation
+  // flags, and the container names the single owner of the pending resolver.
+  const pending: { resolve?: () => void } = {};
+  return {
+    wait: () =>
+      new Promise<void>((resolve) => {
+        pending.resolve = resolve;
+      }),
+    release: () => pending.resolve?.(),
+  };
+};
+
+type TestContainer = HTMLElement & {
+  _testTrigger?: () => void;
+  _loadMore?: () => Promise<void>;
+  _releasePage?: () => void;
+};
+
 const createTestComponent = (useTestMode = false) => {
   const TestComponent = () => {
     const [items, setItems] = useState<TestItem[]>(generateItems(0, 5));
@@ -40,15 +76,13 @@ const createTestComponent = (useTestMode = false) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const loadMoreRef = useRef<(() => Promise<void>) | undefined>(undefined);
     const loadingRef = useRef(false);
+    const gateRef = useRef<PageGate>(createPageGate());
 
     const loadMore = useCallback(async () => {
       if (loadingRef.current) return; // Already loading
       loadingRef.current = true;
       setLoading(true);
-      await waitFor(() => {
-  // TODO: Add assertion or condition
-  expect(true).toBe(true);
-});
+      await gateRef.current.wait();
       const newItems = generateItems(items.length, 3);
       setItems([...items, ...newItems]);
       setHasMore(items.length + 3 < 12);
@@ -60,8 +94,10 @@ const createTestComponent = (useTestMode = false) => {
     React.useEffect(() => {
       loadMoreRef.current = loadMore;
       if (useTestMode && containerRef.current) {
-        (containerRef.current as HTMLElement & { _testTrigger?: () => void; _loadMore?: () => Promise<void> })._testTrigger = triggerRef.current || loadMore;
-        (containerRef.current as HTMLElement & { _testTrigger?: () => void; _loadMore?: () => Promise<void> })._loadMore = loadMore;
+        const container = containerRef.current as TestContainer;
+        container._testTrigger = triggerRef.current || loadMore;
+        container._loadMore = loadMore;
+        container._releasePage = () => gateRef.current.release();
       }
     });
 
@@ -119,6 +155,69 @@ export const BasicInteraction: Story = {
       // Verify container is scrollable
       const container = canvas.getByTestId('scroll-container');
       await expect(container).toBeInTheDocument();
+    });
+  },
+};
+
+export const LoadMore: Story = {
+  name: '📥 Load More Test',
+  render: () => {
+    // Test mode replaces the IntersectionObserver with a trigger the story can
+    // call, so the next page is requested deterministically instead of by
+    // arranging a scroll that happens to cross the sentinel.
+    const TestComponent = createTestComponent(true);
+    return <TestComponent />;
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    // The container publishes its test hooks from an effect, so they land a tick
+    // after first paint — later than `play` starts. Wait for one instead of
+    // optional-calling it: `hook?.()` on an unset hook does nothing at all, and
+    // the failure then surfaces somewhere unrelated, as a loader that never came.
+    const hook = <K extends '_loadMore' | '_releasePage'>(name: K) =>
+      waitFor(() => {
+        const container = canvas.getByTestId('scroll-container') as TestContainer;
+        const fn = container[name];
+        expect(fn).toBeInstanceOf(Function);
+        return fn as NonNullable<TestContainer[K]>;
+      });
+
+    await step('Request the next page', async () => {
+      await expect(canvas.getByTestId('item-4')).toBeInTheDocument();
+      await waitFor(() => expect(canvas.queryByTestId('item-5')).not.toBeInTheDocument());
+
+      // Deliberately not awaited: the page stays in flight until the gate is
+      // released below, which is what makes the loading state observable.
+      const loadMore = await hook('_loadMore');
+      void loadMore();
+
+      // The sentinel gives way to the loader while a page is in flight.
+      await waitFor(() => {
+        expect(canvas.getByRole('progressbar')).toBeInTheDocument();
+      });
+      await waitFor(() =>
+        expect(canvas.queryByTestId('infinite-scroll-sentinel')).not.toBeInTheDocument(),
+      );
+    });
+
+    await step('The next page of items appears', async () => {
+      const releasePage = await hook('_releasePage');
+      releasePage();
+
+      // The real post-condition the 100ms sleep stood in for: three more items,
+      // appended after the five already there.
+      await waitFor(() => {
+        expect(canvas.getByTestId('item-5')).toBeInTheDocument();
+      });
+      await expect(canvas.getByTestId('item-6')).toBeInTheDocument();
+      await expect(canvas.getByTestId('item-7')).toBeInTheDocument();
+      await expect(canvas.getByTestId('item-7')).toHaveTextContent('Item 8');
+
+      // ...and the loader gives the sentinel back, ready for the page after it.
+      await waitFor(() => {
+        expect(canvas.getByTestId('infinite-scroll-sentinel')).toBeInTheDocument();
+      });
     });
   },
 };
