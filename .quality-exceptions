@@ -26,7 +26,6 @@ packages/ui/src/components/form/RadioGroup/RadioGroup.tsx
 packages/ui/src/components/form/Slider/Slider.tsx
 packages/ui/src/components/form/Switch/Switch.tsx
 packages/ui/src/components/form/ToggleGroup/ToggleGroup.test.stories.tsx
-packages/ui/src/components/layout/Card/Card.tsx
 packages/ui/src/components/layout/Resizable/Resizable.test.stories.tsx
 packages/ui/src/components/layout/ScrollArea/ScrollArea.test.stories.tsx
 packages/ui/src/components/layout/Spacer/Spacer.test.stories.tsx
@@ -36,4 +35,3 @@ packages/ui/src/components/typography/Heading/Heading.tsx
 packages/ui/src/components/typography/Text/Text.test.stories.tsx
 packages/ui/src/components/utility/AnimatedIcon/AnimatedIcon.tsx
 packages/ui/src/components/utility/Portal/Portal.test.stories.tsx
-packages/ui/src/components/utility/WorkflowStep/WorkflowStep.tsx
