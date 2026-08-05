@@ -12,6 +12,35 @@ concurrency:
 permissions:
   contents: read
 
+# Every publishable package, in topological order (dependencies first).
+# Paths rather than names because payments is a nested workspace.
+#
+# Workflow-level so the release job and the consumer-verification job read ONE
+# list. Duplicating it per job is how a package ends up published but never
+# verified — or verified but never published.
+env:
+  PUBLISH_DIRS: >-
+    packages/eslint-config
+    packages/typescript-config
+    packages/auth
+    packages/entitlements
+    packages/entity-lifecycle
+    packages/forms-core
+    packages/jobs
+    packages/payments/backend
+    packages/product-research
+    packages/rbac
+    packages/realtime
+    packages/shift
+    packages/stock-domain
+    packages/payments/frontend
+    packages/ui
+    packages/onboarding
+    packages/product-research-ui
+    packages/report-builder
+    packages/mcp
+    packages/shared-helpers
+
 jobs:
   lint:
     name: Lint
@@ -121,6 +150,44 @@ jobs:
       run-affected-e2e: false
       install-playwright: false
 
+  # The only gate that sees what a CONSUMER sees. Every other job above runs
+  # inside the pnpm workspace, where a sibling import resolves whether or not the
+  # manifest declares it and every file is on disk whether or not `files` would
+  # ship it — so a packaging bug is invisible to all of them. Four reached the
+  # registry that way (an empty tarball, undeclared plugins, a missing export, a
+  # dependency hidden in devDependencies), each found by hand in an app that had
+  # already installed it. This packs the tarballs and installs them outside the
+  # workspace. See scripts/verify-package-consumers.mjs.
+  consumers:
+    name: Consumer Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      # shared-helpers publishes ./dist, so the tarball is only complete after a
+      # build — exactly as in the release job below.
+      - name: Build packages
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee build.log
+      - name: Verify the published packages from a consumer's side
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/verify-package-consumers.mjs 2>&1 | tee consumers.log
+
   # Tokenless publish to npm via OIDC Trusted Publishing. Only on push to main,
   # after the gates pass. No NPM_TOKEN: npm exchanges the GitHub OIDC id-token
   # for a short-lived credential (requires a one-time Trusted Publisher on npm
@@ -130,7 +197,7 @@ jobs:
   # ahead of it, which is the only place a token is ever used.
   release:
     name: Release
-    needs: [lint, type-check, build, unit-tests, quality]
+    needs: [lint, type-check, build, unit-tests, quality, consumers]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -138,30 +205,6 @@ jobs:
       issues: write # semantic-release release comments
       pull-requests: write
       id-token: write # OIDC trusted publishing — no token
-    env:
-      # Every publishable package, in topological order (dependencies first).
-      # Paths rather than names because payments is a nested workspace.
-      PUBLISH_DIRS: >-
-        packages/eslint-config
-        packages/typescript-config
-        packages/auth
-        packages/entitlements
-        packages/entity-lifecycle
-        packages/forms-core
-        packages/jobs
-        packages/payments/backend
-        packages/product-research
-        packages/rbac
-        packages/realtime
-        packages/shift
-        packages/stock-domain
-        packages/payments/frontend
-        packages/ui
-        packages/onboarding
-        packages/product-research-ui
-        packages/report-builder
-        packages/mcp
-        packages/shared-helpers
     steps:
       - uses: actions/checkout@v4
         with:
@@ -240,7 +283,7 @@ jobs:
     name: CI Success
     runs-on: ubuntu-latest
     if: always()
-    needs: [lint, type-check, build, unit-tests, quality]
+    needs: [lint, type-check, build, unit-tests, quality, consumers]
     steps:
       - name: Verify all required jobs passed
         shell: bash

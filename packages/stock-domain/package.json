@@ -2,7 +2,7 @@
   "name": "@12-apps/stock-domain",
   "version": "1.0.0",
   "type": "module",
-  "description": "The stock-movement domain vocabulary \u2014 the closed value sets the reason taxonomy is built on, owned in one place.",
+  "description": "The stock-movement domain vocabulary — the closed value sets the reason taxonomy is built on, owned in one place.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -40,6 +40,14 @@
     "prisma",
     "*.js",
     "*.mjs",
-    "*.md"
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*",
+    "!**/*.stories.*",
+    "!**/*.test-story.*",
+    "!**/test-helpers.*"
   ]
 }

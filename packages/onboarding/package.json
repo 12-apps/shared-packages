@@ -37,6 +37,14 @@
     "prisma",
     "*.js",
     "*.mjs",
-    "*.md"
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*",
+    "!**/*.stories.*",
+    "!**/*.test-story.*",
+    "!**/test-helpers.*"
   ]
 }
