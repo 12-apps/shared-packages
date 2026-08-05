@@ -25,59 +25,63 @@ function binPath(bin) {
 
 function exists(p) {
   if (!pathCache.has(p)) {
-    try { 
-      fs.accessSync(p, fs.constants.X_OK); 
+    try {
+      fs.accessSync(p, fs.constants.X_OK);
       pathCache.set(p, true);
-    } catch { 
+    } catch {
       pathCache.set(p, false);
     }
   }
   return pathCache.get(p);
 }
 
-// Get stories that match a specific tag by parsing the stories
-function getStoriesWithTags(tags) {
-  const storiesDir = path.join(process.cwd(), 'src');
-  const storyFiles = [];
-  
-  function findStories(dir) {
-    const files = fs.readdirSync(dir);
-    for (const file of files) {
-      const fullPath = path.join(dir, file);
-      const stat = fs.statSync(fullPath);
-      
-      if (stat.isDirectory() && !file.startsWith('.') && file !== 'node_modules') {
-        findStories(fullPath);
-      } else if (file.endsWith('.stories.tsx') || file.endsWith('.stories.ts') || file.endsWith('.stories.jsx') || file.endsWith('.stories.js')) {
-        // Read file and check for the tag
-        const content = fs.readFileSync(fullPath, 'utf8');
-        // Look for tags in the default export or meta object - AND logic (all tags must match)
-        let canInclude = true;
-        for (const tag of tags) {
-          if (!content.includes(`'${tag}'`) && !content.includes(`"${tag}"`) && !content.includes(`\`${tag}\``)) {
-            canInclude = false;
-            break;
-          }
-        }
-        if (canInclude) {
-          storyFiles.push(fullPath);
-        }
+const STORY_FILE = /\.stories\.(tsx|ts|jsx|js)$/;
+
+/**
+ * Whether every tag appears in the file's source, in any of the three quote
+ * styles it could have been written with. AND logic: one miss disqualifies it.
+ *
+ * This is a text search rather than a parse, so a tag named in a comment counts
+ * — which is why it only ever narrows an already-tag-filtered run.
+ */
+function hasAllTags(content, tags) {
+  return tags.every(
+    (tag) =>
+      content.includes(`'${tag}'`) || content.includes(`"${tag}"`) || content.includes(`\`${tag}\``),
+  );
+}
+
+/** Every story file under `dir`, recursively, skipping dotfiles and node_modules. */
+function collectStoryFiles(dir, tags, found) {
+  for (const file of fs.readdirSync(dir)) {
+    const fullPath = path.join(dir, file);
+
+    if (fs.statSync(fullPath).isDirectory()) {
+      if (!file.startsWith('.') && file !== 'node_modules') {
+        collectStoryFiles(fullPath, tags, found);
       }
+    } else if (STORY_FILE.test(file) && hasAllTags(fs.readFileSync(fullPath, 'utf8'), tags)) {
+      found.push(fullPath);
     }
   }
-  
+}
+
+// Get stories that match a specific tag by parsing the stories
+function getStoriesWithTags(tags) {
+  const found = [];
+
   try {
-    findStories(storiesDir);
+    collectStoryFiles(path.join(process.cwd(), 'src'), tags, found);
   } catch (e) {
     console.error('Error finding stories:', e);
   }
-  
-  return storyFiles;
+
+  return found;
 }
 
 export async function pingStorybook(url) {
   if (process.env.SKIP_STORYBOOK_PING === 'true') return;
-  
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
@@ -99,100 +103,85 @@ export async function pingStorybook(url) {
 
 function run(command, args, env = {}) {
   console.error(`\n> Running: ${[command, ...args].join(' ')}\n`);
-  const res = spawnSync(command, args, { 
-    stdio: 'inherit', 
-    env: { ...process.env, ...env }
+  const res = spawnSync(command, args, {
+    stdio: 'inherit',
+    env: { ...process.env, ...env },
   });
   return res.status ?? 1;
 }
 
-export function runStorybookTestsFailFast(url, tag, watchMode = false) {
-  const testStorybookBin = binPath('test-storybook');
-  const storybookBin = binPath('storybook');
-  
-  const watchArgs = watchMode ? ['--watch'] : [];
+/** Runs a command and exits the process with its status if it failed. */
+function runOrExit(bin, args, label) {
+  const code = run(bin, args);
+  if (code !== 0) {
+    console.error(`\n❌ ${label} failed. See logs above.`);
+    process.exit(code);
+  }
+}
 
-  if (exists(testStorybookBin)) {
-    const args = ['--url', url, ...watchArgs];
-    
-    // If we have a tag, try to optimize by passing specific files
-    if (tag && !watchMode) {
-      const taggedStories = getStoriesWithTags(tag);
-      
-      if (taggedStories.length === 0) {
-        console.error(`No stories found with tags: ${tag.join(', ')}`);
-        process.exit(0);
-      }
+/**
+ * The CI-only flags, which are all read from the environment. Watch mode takes
+ * none of them: they are about a single reproducible run.
+ */
+function ciArgs() {
+  const args = ['--ci', '--maxWorkers', process.env.MAX_WORKERS || '4'];
 
-      console.error(`Found ${taggedStories.length} story file(s) with tags: ${tag.join(', ')}`);
-      
-      // IMPORTANT: test-storybook passes extra args to Jest
-      // We can pass the file paths directly as positional arguments
-      // This tells Jest to only run these specific test files
-      args.push(...taggedStories);
-      
-      // Still include the tag filter to ensure only tagged stories run within those files
-      args.push('--includeTags', String(tag));
-    } else if (tag) {
-      args.push('--includeTags', String(tag));
+  if (process.env.TEST_TIMEOUT) args.push('--testTimeout', process.env.TEST_TIMEOUT);
+  if (process.env.COVERAGE === 'true') args.push('--coverage');
+  if (process.env.SHARD) args.push('--shard', process.env.SHARD);
+
+  return args;
+}
+
+/**
+ * Arguments for @storybook/test-runner.
+ *
+ * With a tag and no watch, the matching files are passed as positional
+ * arguments — test-storybook forwards extra args to Jest, so this narrows the
+ * run to those files. The tag filter is still passed, since a matched file can
+ * hold untagged stories too.
+ */
+function testRunnerArgs(url, tag, watchMode) {
+  const args = ['--url', url, ...(watchMode ? ['--watch'] : [])];
+
+  if (tag && !watchMode) {
+    const taggedStories = getStoriesWithTags(tag);
+
+    if (taggedStories.length === 0) {
+      console.error(`No stories found with tags: ${tag.join(', ')}`);
+      process.exit(0);
     }
-    
-    if (!watchMode) {
-      args.push('--ci');
-      const maxWorkers = process.env.MAX_WORKERS || '4';
-      args.push('--maxWorkers', maxWorkers);
-      
-      if (process.env.TEST_TIMEOUT) {
-        args.push('--testTimeout', process.env.TEST_TIMEOUT);
-      }
-      
-      if (process.env.COVERAGE === 'true') {
-        args.push('--coverage');
-      }
-      
-      if (process.env.SHARD) {
-        args.push('--shard', process.env.SHARD);
-      }
-    }
-    
-    const code = run(testStorybookBin, args);
-    if (code !== 0) {
-      console.error('\n❌ test-storybook failed. See logs above.');
-      process.exit(code);
-    }
-    return;
+
+    console.error(`Found ${taggedStories.length} story file(s) with tags: ${tag.join(', ')}`);
+    args.push(...taggedStories, '--includeTags', String(tag));
+  } else if (tag) {
+    args.push('--includeTags', String(tag));
   }
 
-  // Fallback for storybook CLI
-  if (exists(storybookBin)) {
-    const args = ['test', '--url', url];
-    
-    if (!watchMode && process.env.COVERAGE !== 'true') {
-      args.push('--coverage=false');
-    }
-    
-    if (tag && String(tag).trim()) {
-      args.push('--includeTags', String(tag));
-    }
-    
-    args.push(...watchArgs);
-    
-    const code = run(storybookBin, args);
-    if (code !== 0) {
-      console.error('\n❌ storybook test failed. See logs above.');
-      process.exit(code);
-    }
-    return;
-  }
+  if (!watchMode) args.push(...ciArgs());
 
-  // Error handling
-  const bins = (() => {
-    try {
-      return fs.readdirSync(path.join(process.cwd(), 'node_modules', '.bin')).sort().join('\n  ');
-    } catch {
-      return '(node_modules/.bin not found — did you run pnpm install?)';
-    }
-  })();
+  return args;
+}
+
+/** Arguments for the storybook CLI's own `test` command, used as a fallback. */
+function storybookCliArgs(url, tag, watchMode) {
+  const args = ['test', '--url', url];
+
+  if (!watchMode && process.env.COVERAGE !== 'true') args.push('--coverage=false');
+  if (tag && String(tag).trim()) args.push('--includeTags', String(tag));
+  if (watchMode) args.push('--watch');
+
+  return args;
+}
+
+/** Neither runner is installed — say what is missing and what is there instead. */
+function reportNoRunner(testStorybookBin) {
+  let bins;
+  try {
+    bins = fs.readdirSync(path.join(process.cwd(), 'node_modules', '.bin')).sort().join('\n  ');
+  } catch {
+    bins = '(node_modules/.bin not found — did you run pnpm install?)';
+  }
 
   console.error(
     [
@@ -206,7 +195,24 @@ export function runStorybookTestsFailFast(url, tag, watchMode = false) {
       '',
       'Current node_modules/.bin contents:',
       `  ${bins}`,
-    ].join('\n')
+    ].join('\n'),
   );
   process.exit(1);
+}
+
+export function runStorybookTestsFailFast(url, tag, watchMode = false) {
+  const testStorybookBin = binPath('test-storybook');
+  const storybookBin = binPath('storybook');
+
+  if (exists(testStorybookBin)) {
+    runOrExit(testStorybookBin, testRunnerArgs(url, tag, watchMode), 'test-storybook');
+    return;
+  }
+
+  if (exists(storybookBin)) {
+    runOrExit(storybookBin, storybookCliArgs(url, tag, watchMode), 'storybook test');
+    return;
+  }
+
+  reportNoRunner(testStorybookBin);
 }
