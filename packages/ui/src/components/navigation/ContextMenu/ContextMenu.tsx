@@ -7,6 +7,7 @@ import {
   MenuItem,
   Typography,
 } from '@mui/material';
+import type { CSSObject, Theme } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React, { cloneElement, isValidElement,useState } from 'react';
 
@@ -58,6 +59,22 @@ const StyledMenu = styled(Menu, {
   },
 }));
 
+// `color` names a palette key (`success`, `warning`, …) that MUI's Theme type does
+// not index, so it is read structurally and falls back to primary.
+const paletteColor = (theme: Theme, color: string): string =>
+  (theme.palette as unknown as Record<string, { main?: string }>)[color]?.main ||
+  theme.palette.primary.main;
+
+const accentStyles = (theme: Theme, color: string): CSSObject => {
+  const main = paletteColor(theme, color);
+
+  return {
+    color: main,
+    '& .MuiListItemIcon-root': { color: main },
+    '&:hover': { backgroundColor: alpha(main, 0.08) },
+  };
+};
+
 const StyledMenuItem = styled(MenuItem, {
   shouldForwardProp: (prop) => !['color', 'dangerous'].includes(prop as string),
 })<{ color?: string; dangerous?: boolean }>(({ theme, color, dangerous }) => ({
@@ -76,25 +93,7 @@ const StyledMenuItem = styled(MenuItem, {
     },
   }),
 
-  ...(color &&
-    color !== 'default' &&
-    !dangerous && {
-      color:
-        (theme.palette as unknown as Record<string, { main?: string }>)[color]?.main ||
-        theme.palette.primary.main,
-      '& .MuiListItemIcon-root': {
-        color:
-          (theme.palette as unknown as Record<string, { main?: string }>)[color]?.main ||
-          theme.palette.primary.main,
-      },
-      '&:hover': {
-        backgroundColor: alpha(
-          (theme.palette as unknown as Record<string, { main?: string }>)[color]?.main ||
-            theme.palette.primary.main,
-          0.08,
-        ),
-      },
-    }),
+  ...(color && color !== 'default' && !dangerous ? accentStyles(theme, color) : {}),
 }));
 
 const MenuHeader = styled(Typography)(({ theme }) => ({
@@ -145,6 +144,53 @@ const renderMenuItem = (
   );
 };
 
+interface TriggerOptions {
+  disabled: boolean;
+  triggerClassName?: string;
+  triggerStyle?: React.CSSProperties;
+}
+
+// The trigger is whatever the caller passed as children. A single element is
+// cloned, so the handler and cursor land on the caller's own node; anything else
+// gets wrapped in a div that can carry them.
+const buildTrigger = (
+  children: React.ReactNode,
+  onContextMenu: (event: React.MouseEvent) => void,
+  { disabled, triggerClassName, triggerStyle }: TriggerOptions,
+) => {
+  const cursor = disabled ? 'default' : 'context-menu';
+
+  if (!isValidElement(children)) {
+    return (
+      <div
+        onContextMenu={onContextMenu}
+        className={triggerClassName}
+        style={{ ...triggerStyle, cursor }}
+      >
+        {children}
+      </div>
+    );
+  }
+
+  const element = children as React.ReactElement<{
+    onContextMenu?: (event: React.MouseEvent) => void;
+    className?: string;
+    style?: React.CSSProperties;
+  }>;
+
+  return cloneElement(element, {
+    onContextMenu,
+    className: [
+      element.props.className,
+      triggerClassName,
+      !disabled ? 'context-menu-trigger' : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+    style: { ...element.props.style, ...triggerStyle, cursor },
+  });
+};
+
 export const ContextMenu = React.forwardRef<HTMLDivElement, ContextMenuProps>(
   (
     {
@@ -193,41 +239,11 @@ export const ContextMenu = React.forwardRef<HTMLDivElement, ContextMenuProps>(
       handleClose();
     };
 
-    const triggerElement = isValidElement(children) ? (
-      cloneElement(
-        children as React.ReactElement<{
-          onContextMenu?: (event: React.MouseEvent) => void;
-          className?: string;
-          style?: React.CSSProperties;
-        }>,
-        {
-          onContextMenu: handleContextMenu,
-          className: [
-            (children as React.ReactElement<{ className?: string }>).props.className,
-            triggerClassName,
-            !disabled ? 'context-menu-trigger' : '',
-          ]
-            .filter(Boolean)
-            .join(' '),
-          style: {
-            ...(children as React.ReactElement<{ style?: React.CSSProperties }>).props.style,
-            ...triggerStyle,
-            cursor: disabled ? 'default' : 'context-menu',
-          },
-        }
-      )
-    ) : (
-      <div
-        onContextMenu={handleContextMenu}
-        className={triggerClassName}
-        style={{
-          ...triggerStyle,
-          cursor: disabled ? 'default' : 'context-menu',
-        }}
-      >
-        {children}
-      </div>
-    );
+    const triggerElement = buildTrigger(children, handleContextMenu, {
+      disabled,
+      triggerClassName,
+      triggerStyle,
+    });
 
     return (
       <>
