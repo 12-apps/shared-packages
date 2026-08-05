@@ -70,7 +70,7 @@ function declinedSnapshot(error: unknown, input: ChargeInput): ChargeSnapshot | 
 }
 
 export const createCharge: PaymentProviderAdapter['createCharge'] = async (input, credentials) => {
-  if (credentials.stub) return stubCharge(NAME, input);
+  if (credentials.stub) return stubCharge(NAME, input, credentials);
   try {
     const intent = await stripeRequest<StripePaymentIntent>('/v1/payment_intents', credentials, {
       method: 'POST',

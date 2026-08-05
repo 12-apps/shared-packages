@@ -12,19 +12,37 @@ import { tokenizerFor, type CardTokenizationConfig } from "../../card";
 import type { CheckoutProviderConfig, PaymentMethod } from "./types";
 
 /**
- * Whether the ACTIVE provider gives this browser a card path (FUT-697):
- * a scheme {@link tokenizerFor} knows, with a key (or PagBank's on-demand
- * refresh); a hosted page (`REDIRECT` — the provider's own site takes the
- * card); or server-granted stub mode. `null` config (still loading / fetch
- * blip) fails OPEN for the UI — the tokenizer itself still fails CLOSED.
+ * Whether the store's CHAIN gives this browser a card path (FUT-697/563).
+ *
+ * Asked of the whole chain, for the same reason the server's
+ * `usesHostedCheckout` is: the head no longer decides which surface the buyer
+ * gets. A store where nobody tokenizes in the browser hands the buyer over at
+ * order creation and the card is typed on the provider's own page — a card
+ * path, so CARD stays offered. A store where somebody DOES tokenize gets our
+ * form instead, and then the question is whether this browser can actually
+ * mint for one of those entries: a scheme {@link tokenizerFor} knows, with a
+ * key (or PagBank's on-demand refresh), or server-granted stub mode.
+ *
+ * Answering "yes, it is REDIRECT" off the head alone is what let the picker
+ * offer a card the submit could never tokenize.
+ *
+ * `null` config (still loading / fetch blip) fails OPEN for the UI — the
+ * tokenizer itself still fails CLOSED.
  */
 export function cardPathAvailable(config: CheckoutProviderConfig | null): boolean {
   if (!config) return true;
-  if (config.mockTokenization) return true;
-  if (config.tokenization === "REDIRECT") return true;
-  const scheme = config.provider ? tokenizerFor(config.provider) : null;
+  const chain = cardChain(config);
+  if (!chain.some((link) => link.mintable)) return true;
+  return chain.some(canMintFor);
+}
+
+/** Whether this browser can really produce an instrument for ONE chain entry. */
+function canMintFor(link: CardChainLink): boolean {
+  if (!link.mintable) return false;
+  if (link.mockTokenization) return true;
+  const scheme = link.provider ? tokenizerFor(link.provider) : null;
   if (!scheme) return false;
-  return config.publicKey !== null || scheme === "pagbank-sdk";
+  return link.publicKey !== null || scheme === "pagbank-sdk";
 }
 
 /**
@@ -36,6 +54,62 @@ export function cardPathAvailable(config: CheckoutProviderConfig | null): boolea
 export function cardTokenization(config: CheckoutProviderConfig | null): CardTokenizationConfig {
   if (config) return config;
   return { provider: "pagbank", publicKey: null, mockTokenization: false };
+}
+
+/**
+ * Tokenization schemes that give the BROWSER something to mint (FUT-563).
+ * A `REDIRECT` provider's own page takes the card and a `NONE` one asks for no
+ * instrument at all — asking either for a token would produce a fake one under
+ * stub mode and an error everywhere else.
+ */
+const MINTABLE: ReadonlySet<string> = new Set(["PUBLIC_KEY", "SDK"]);
+
+/**
+ * ONE entry of the store's chain as the card path sees it (FUT-563): how to
+ * mint an instrument for it, plus whether this browser is asked to mint at all.
+ */
+export interface CardChainLink extends CardTokenizationConfig {
+  /**
+   * The entry declares an in-browser scheme (`PUBLIC_KEY` / `SDK`).
+   *
+   * `false` entries are NOT dropped from the list, and that is the point: the
+   * charge still WALKS them, and how many providers the walk may reach is what
+   * decides whether the card charge has to carry `tokensByProvider` at all. A
+   * chain counted by "how many instruments the browser happened to mint" hides
+   * a hosted-page provider from the server, which then reads the bare token as
+   * the head's and skips the one entry that needed no instrument.
+   */
+  mintable: boolean;
+}
+
+/**
+ * The store's chain as one tokenization config per entry, in the merchant's
+ * order (FUT-563) — what the card path mints `tokensByProvider` from.
+ *
+ * A card instrument is bound to whoever minted it, so a charge can only fail
+ * over onto a provider the browser also tokenized for. Entries with no
+ * in-browser scheme are carried but marked {@link CardChainLink.mintable}
+ * false rather than mocked: they need no instrument, and the gateway passes an
+ * unattributed charge straight to them.
+ *
+ * Falls back to the HEAD triple when the host served no chain, which is exactly
+ * the pre-FUT-563 behaviour — one instrument, for the active provider.
+ */
+export function cardChain(config: CheckoutProviderConfig | null): CardChainLink[] {
+  if (!config) return [];
+  const chain = config.chain;
+  if (!chain || chain.length === 0) {
+    // No `tokenization` served either (an older host) ⇒ assume the head mints,
+    // which is what this checkout did before there was a chain to read.
+    const mintable = config.tokenization === null || MINTABLE.has(config.tokenization);
+    return [{ ...cardTokenization(config), mintable }];
+  }
+  return chain.map((link) => ({
+    provider: link.provider,
+    publicKey: link.publicKey,
+    mockTokenization: link.mockTokenization,
+    mintable: MINTABLE.has(link.tokenization),
+  }));
 }
 
 /**
