@@ -1,7 +1,0 @@
-packages/ui/src/components/data-display/Progress/Progress.test.stories.tsx
-packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.test.stories.tsx
-packages/ui/src/components/feedback/Sonner/Sonner.test.stories.tsx
-packages/ui/src/components/feedback/Toast/Toast.test.stories.tsx
-packages/ui/src/components/layout/ScrollArea/ScrollArea.test.stories.tsx
-packages/ui/src/components/navigation/Pagination/Pagination.test.stories.tsx
-packages/ui/src/components/utility/Portal/Portal.test.stories.tsx
