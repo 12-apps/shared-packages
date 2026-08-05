@@ -245,7 +245,7 @@ const findChargeByReference: NonNullable<
 };
 
 const createCharge: PaymentProviderAdapter['createCharge'] = async (input, credentials) => {
-  if (credentials.stub) return stubCharge(NAME, input);
+  if (credentials.stub) return stubCharge(NAME, input, credentials);
   // The provider-side idempotency key: a retried create is deduped by PagBank
   // itself, on top of the gateway's own guarantees.
   const idempotencyKey = input.idempotencyKey ?? input.reference;

@@ -1,5 +1,6 @@
 import type { CustomerFieldIssue } from './customer-schema';
 import type { DeclineReason, ProviderName } from './types';
+import type { WalkFailure } from './walk-failure';
 
 /**
  * Error taxonomy. Hosts catch on these classes (or on `PaymentsError` for a
@@ -261,7 +262,7 @@ export class ChargeNotPersistedError extends PaymentsError {
  * rather than a bare "payment failed".
  */
 export class NoProviderSucceededError extends PaymentsError {
-  constructor(readonly failures: readonly { provider: ProviderName; message: string }[]) {
+  constructor(readonly failures: readonly WalkFailure[]) {
     super('NoProviderSucceededError',
       failures.length === 0
         ? 'No payment provider is available for this merchant'

@@ -12,6 +12,7 @@ import { AmbiguousChargeError, CredentialsError, NoProviderSucceededError } from
 import type { StoredCharge } from './ports';
 import { isTerminal } from './status';
 import type { ChargeInput, MerchantRef, ProviderName } from './types';
+import type { WalkFailure } from './walk-failure';
 
 /**
  * THE FAILOVER WALK.
@@ -285,7 +286,7 @@ interface RunContext {
 
 /** Try each remaining provider in order until one produces a charge. */
 async function runChain(deps: ChargeWalkDeps, run: RunContext): Promise<StoredCharge> {
-  const failures: { provider: ProviderName; message: string }[] = [];
+  const failures: WalkFailure[] = [];
   for (const provider of run.chain) {
     if (run.history.tried.has(provider)) continue;
     run.cursor.attemptNo += 1;

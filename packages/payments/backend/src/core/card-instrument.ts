@@ -1,4 +1,4 @@
-import type { ChargeInput, ProviderName } from './types';
+import type { ChargeInput, ClientTokenization, ProviderName } from './types';
 
 /**
  * CARD INSTRUMENTS ARE PROVIDER-BOUND.
@@ -58,10 +58,19 @@ function ownerOf(
   return card.token ? chainHead : undefined;
 }
 
+/** Schemes that ask the BROWSER for an instrument. The others need none. */
+const NEEDS_INSTRUMENT: ReadonlySet<ClientTokenization> = new Set(['PUBLIC_KEY', 'SDK']);
+
 export function chargeInputFor(
   input: ChargeInput,
   provider: ProviderName,
   chainHead: ProviderName | undefined,
+  /**
+   * What this provider DECLARES about client tokenization. Optional only so a
+   * caller with no adapter in hand still gets the ownership rules; `step()`
+   * has already resolved the adapter and always passes it.
+   */
+  tokenization?: ClientTokenization,
 ): ChargeInput | NoInstrument {
   const card = input.method === 'CARD' ? input.card : undefined;
   if (!card) return input;
@@ -74,15 +83,53 @@ export function chargeInputFor(
   }
 
   const owner = ownerOf(card, chainHead);
-  // Unattributed: either no instrument at all (a REDIRECT provider needs
-  // none) or a vault token whose owner nobody recorded. Both pass through so
-  // the adapter decides — the true owner accepts it, others reject it as
-  // validation and the walk moves on. That is worse than knowing, but it
-  // never skips the one provider that can actually charge the card.
-  if (!owner) return input;
-
+  // The instrument we hold is THIS provider's own — send it, whatever the
+  // provider declares. Checked before the capability rule below so a vaulted
+  // card is never dropped from the charge that names its vault.
   if (owner === provider) return input;
 
+  // DECIDED BY WHAT THE PROVIDER ASKS FOR, not by who owns the blob we hold.
+  // A REDIRECT page takes the card on its own site and a NONE provider wants
+  // no instrument at all, so neither can be "holding someone else's" — they
+  // are attempted, with the card block dropped, because there is nothing here
+  // either of them could read.
+  if (tokenization && !NEEDS_INSTRUMENT.has(tokenization)) {
+    return { ...input, card: undefined };
+  }
+
+  return byOwnership(input, card, provider, owner);
+}
+
+/**
+ * The provider needs an instrument and none was minted FOR it — so whose is
+ * the one we hold, and does that leave anything worth sending?
+ */
+function byOwnership(
+  input: ChargeInput,
+  card: NonNullable<ChargeInput['card']>,
+  provider: ProviderName,
+  owner: ProviderName | undefined,
+): ChargeInput | NoInstrument {
+  if (owner) return noInstrument(provider, owner);
+
+  // Unattributed, and this provider DOES need an instrument. Which of the two
+  // unattributed shapes it is decides the answer:
+  //
+  //  - a minted MAP is a complete statement (one entry per provider the
+  //    browser could mint for), so a provider missing from it has none. It is
+  //    SKIPPED. Attempting it sends an EMPTY token to a provider that requires
+  //    one: a guaranteed rejection filed as a provider failure, which then
+  //    denies the buyer the named-field answer a gated chain owes them, and on
+  //    a timeout can strand the order before the provider that could have paid.
+  //  - a bare vault token says nothing about its owner: it passes through so
+  //    the adapter decides, rather than skip the one provider that can charge.
+  const minted = card.tokensByProvider;
+  if (minted && Object.keys(minted).length > 0) return noInstrument(provider, undefined);
+  return input;
+}
+
+/** Why `provider` cannot be attempted with what we hold. */
+function noInstrument(provider: ProviderName, owner: ProviderName | undefined): NoInstrument {
   return {
     reason:
       `no card instrument minted for ${provider} ` +

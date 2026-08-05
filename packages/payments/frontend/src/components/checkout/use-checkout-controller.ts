@@ -160,6 +160,33 @@ function usePaidPort(settled: OrderStatus | null, onPaid: (() => void) | undefin
 }
 
 /**
+ * The create-order refusal the steps render: what to say, which field to
+ * highlight, and the machine CODE that decides how it is presented — an
+ * unresolved charge is not a failed one, and the Pagamento step must not offer
+ * it a "Tentar novamente" (FUT-563). One hook so the three always move
+ * together; they were three `useState`s that could be cleared apart.
+ */
+function useCreateFailure() {
+  const [message, setMessage] = useState<string | null>(null);
+  const [field, setField] = useState<BuyerField | null>(null);
+  const [code, setCode] = useState<string | null>(null);
+  const clear = useCallback(() => {
+    setMessage(null);
+    setField(null);
+    setCode(null);
+  }, []);
+  const fail = useCallback(
+    (next: { message: string; field?: BuyerField | null; code?: string }) => {
+      setMessage(next.message);
+      setField(next.field ?? null);
+      setCode(next.code ?? null);
+    },
+    [],
+  );
+  return { message, field, code, clear, fail };
+}
+
+/**
  * All checkout state + handlers, so the checkout flow stays presentational.
  * - `setMethod` drops any order raised for the previous method (no stale QR/form).
  * - `back` is step-aware: Pagamento → Dados, else to the menu. With a CPF on
@@ -195,10 +222,9 @@ export function useCheckoutController(
   const [order, setOrder] = useState<CheckoutOrder | null>(resume.order);
   const [finalStatus, setFinalStatus] = useState<OrderStatus | null>(null);
   const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [errorField, setErrorField] = useState<BuyerField | null>(null);
+  const failure = useCreateFailure();
 
-  const clearError = useCallback(() => { setCreateError(null); setErrorField(null); }, []);
+  const clearError = failure.clear;
   const setBuyer = useCallback((next: BuyerInfo) => { setBuyerState(next); clearError(); }, [clearError]);
   const { back, editBuyer } = useCheckoutNav(taxIdOnFile, onExitToMenu, setStep);
   const setMethod = useCallback((next: PaymentMethod) => {
@@ -207,7 +233,7 @@ export function useCheckoutController(
   const goToPayment = useCallback(() => {
     clearError();
     const cpfError = cpfGateError(buyer.taxId?.trim() ?? "", taxIdOnFile);
-    if (cpfError) { setCreateError(cpfError); setErrorField("cpf"); return; }
+    if (cpfError) { failure.fail({ message: cpfError, field: "cpf" }); return; }
     // Persist the buyer's details HERE, on "Continuar" — not when a payment is
     // raised. Everything after this step can fail (no provider configured, a
     // declined card, an abandoned PIX, a closed tab) and the details must
@@ -225,7 +251,7 @@ export function useCheckoutController(
     setCreating(true);
     const result = await createOrder({ method: chosen, buyer: override ?? buyer, saveProfile });
     setCreating(false);
-    if (!result.ok) { setCreateError(result.error.message); setErrorField(result.error.field); return; }
+    if (!result.ok) { failure.fail(result.error); return; }
     if (handOverToProvider(result.data)) return;
     setOrder(result.data);
     setFinalStatus(null);
@@ -245,7 +271,8 @@ export function useCheckoutController(
 
   return {
     step, setStep, method, setMethod, buyer, setBuyer, saveProfile, setSaveProfile,
-    order, finalStatus: finalStatus ?? resume.status, creating, createError, errorField,
+    order, finalStatus: finalStatus ?? resume.status, creating,
+    createError: failure.message, errorField: failure.field, errorCode: failure.code,
     goToMenu: onExitToMenu, back, editBuyer,
     goToPayment, startPayment, payWithEmail, handleResolved, retry, completed,
   };

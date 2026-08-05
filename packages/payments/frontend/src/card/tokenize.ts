@@ -157,6 +157,8 @@ async function tokenizeWithPagarme(
   publicKey: string,
   brand: string,
   last4: string,
+  /** Deadline for the round trip; an abort reads as "could not contact". */
+  signal?: AbortSignal,
 ): Promise<Result<CardToken>> {
   const match = /^(\d{2})\/(\d{2})$/.exec(card.expiry.trim());
   if (!match) return err("Validade inválida ou expirada.");
@@ -166,6 +168,7 @@ async function tokenizeWithPagarme(
     response = await fetch(`${PAGARME_TOKENS_URL}?appId=${encodeURIComponent(publicKey)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal,
       body: JSON.stringify({
         type: "card",
         card: {
@@ -203,6 +206,11 @@ export async function tokenizeCard(
   card: CardDetails,
   publicKey: string | null | undefined,
   tokenizer: CardTokenizer = "pagbank-sdk",
+  /**
+   * Bounds the network schemes (Pagar.me / Stripe). The PagBank one encrypts
+   * locally and has no request to abort.
+   */
+  signal?: AbortSignal,
 ): Promise<Result<CardToken>> {
   const validationError = validateCardInput(card);
   if (validationError) return err(validationError);
@@ -219,10 +227,10 @@ export async function tokenizeCard(
   const last4 = pan.slice(-4);
 
   if (tokenizer === "pagarme-token") {
-    return tokenizeWithPagarme(card, pan, publicKey, brand, last4);
+    return tokenizeWithPagarme(card, pan, publicKey, brand, last4, signal);
   }
   if (tokenizer === "stripe-pm") {
-    return tokenizeWithStripe(card, pan, publicKey, brand, last4);
+    return tokenizeWithStripe(card, pan, publicKey, brand, last4, signal);
   }
 
   if (!(await ensurePagBankSdk())) {
@@ -274,9 +282,15 @@ const CARD_PATH_UNAVAILABLE =
 export async function tokenizeForCheckout(
   card: CardDetails,
   config: CardTokenizationConfig,
+  /**
+   * Optional deadline for a provider that mints over the network. The chain
+   * path passes one so a backup acquirer nobody can reach cannot hold the
+   * buyer's Pagar button (FUT-563).
+   */
+  signal?: AbortSignal,
 ): Promise<Result<CardToken>> {
   const scheme = config.provider ? tokenizerFor(config.provider) : null;
-  if (scheme && config.publicKey) return tokenizeCard(card, config.publicKey, scheme);
+  if (scheme && config.publicKey) return tokenizeCard(card, config.publicKey, scheme, signal);
 
   if (!config.mockTokenization) return err(CARD_PATH_UNAVAILABLE);
 

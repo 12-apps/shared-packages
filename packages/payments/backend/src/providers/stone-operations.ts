@@ -43,7 +43,7 @@ export const verifyCredentials: PaymentProviderAdapter['verifyCredentials'] = as
 };
 
 export const createCharge: PaymentProviderAdapter['createCharge'] = async (input, credentials) => {
-  if (credentials.stub) return stubCharge(NAME, input);
+  if (credentials.stub) return stubCharge(NAME, input, credentials);
   const order = await stoneRequest<StoneOrder>('/orders', credentials, {
     method: 'POST',
     body: orderPayload(input),

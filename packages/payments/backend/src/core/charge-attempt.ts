@@ -20,10 +20,12 @@ import {
 import { type ProbeResult, classifyFailure, describeFailure } from './failover';
 import type { StoredCharge } from './ports';
 import { isOutageSignal } from './provider-health';
+import type { WalkFailure } from './walk-failure';
 import type { PaymentProviderAdapter } from './provider';
 import type {
   ChargeInput,
   ChargeSnapshot,
+  ClientTokenization,
   DeclineReason,
   MerchantRef,
   ProviderName,
@@ -64,7 +66,7 @@ const LIVE_STATUSES: ReadonlySet<ChargeSnapshot['status']> = new Set([
 /** One provider's turn, reduced to what the walk needs to decide next. */
 type StepResult =
   | { kind: 'DONE'; charge: StoredCharge }
-  | { kind: 'ADVANCE'; failure: { provider: ProviderName; message: string } };
+  | { kind: 'ADVANCE'; failure: WalkFailure };
 
 /** Why a provider could not even be attempted. */
 type SkipReason = 'UNKNOWN_PROVIDER' | 'UNSUPPORTED_METHOD' | 'NOT_CONNECTED';
@@ -136,7 +138,7 @@ async function handleDecline(
     error: message,
   });
   if (policy === 'TECHNICAL_AND_DECLINE') {
-    return { kind: 'ADVANCE', failure: { provider, message } };
+    return { kind: 'ADVANCE', failure: { provider, message, kind: 'FAILURE' } };
   }
   if (snapshot) return { kind: 'DONE', charge: await persist(deps, ctx, snapshot) };
   // The adapter threw rather than returning a DECLINED snapshot, so there is
@@ -213,7 +215,7 @@ async function afterAmbiguous(
       probeResult: 'NOT_CHARGED',
       error: message,
     });
-    return { kind: 'ADVANCE', failure: { provider, message } };
+    return { kind: 'ADVANCE', failure: { provider, message, kind: 'FAILURE' } };
   }
 
   if (outcome.result === 'CHARGE_FOUND' && outcome.snapshot) {
@@ -286,10 +288,42 @@ async function stepFailed(
       failureBucket: bucket,
       error: message,
     });
-    return { kind: 'ADVANCE', failure: { provider, message } };
+    return { kind: 'ADVANCE', failure: { provider, message, kind: 'FAILURE' } };
   }
 
   return afterAmbiguous(deps, ctx, provider, policy, adapter, creds, error, message);
+}
+
+/**
+ * The charge input to send THIS provider, or the failure that skips it.
+ *
+ * A card instrument belongs to the provider that minted it. Sending this
+ * provider someone else's token is not a degraded attempt, it is a guaranteed
+ * validation error that would classify as DEFINITELY_NOT_CHARGED and burn the
+ * rest of the chain on the same unusable token.
+ *
+ * `SKIP`, not `FAILURE`: nothing went out, so a host answering an exhausted
+ * chain must not read this as a provider outage — see `walk-failure.ts`. The
+ * ADAPTER decides whether an instrument was asked for at all: a hosted page
+ * takes the card on its own site and must be attempted, not refused.
+ */
+async function instrumentFor(
+  deps: ChargeWalkDeps,
+  ctx: AttemptContext,
+  provider: ProviderName,
+  pinned: boolean,
+  chainHead: ProviderName | undefined,
+  tokenization: ClientTokenization,
+): Promise<ChargeInput | WalkFailure> {
+  const forProvider = chargeInputFor(ctx.input, provider, chainHead, tokenization);
+  if (hasInstrument(forProvider)) return forProvider;
+  await recordAttempt(deps, ctx, provider, {
+    outcome: 'SKIPPED',
+    failureBucket: 'DEFINITELY_NOT_CHARGED',
+    error: forProvider.reason,
+  });
+  if (pinned) throw new UnsupportedOperationError(provider, forProvider.reason);
+  return { provider, message: forProvider.reason, kind: 'SKIP' };
 }
 
 /** One provider's full turn: charge, classify, probe, decide. */
@@ -309,7 +343,7 @@ export async function step(
       error: resolved.skip,
     });
     if (pinned) throw skipError(provider, resolved, ctx.input.method);
-    return { kind: 'ADVANCE', failure: { provider, message: resolved.skip } };
+    return { kind: 'ADVANCE', failure: { provider, message: resolved.skip, kind: 'SKIP' } };
   }
   const { adapter, creds } = resolved;
 
@@ -327,23 +361,12 @@ export async function step(
       failureBucket: 'DEFINITELY_NOT_CHARGED',
       error: message,
     });
-    return { kind: 'ADVANCE', failure: { provider, message } };
+    return { kind: 'ADVANCE', failure: { provider, message, kind: 'SKIP' } };
   }
 
-  // A card instrument belongs to the provider that minted it. Sending this
-  // provider someone else's token is not a degraded attempt, it is a
-  // guaranteed validation error that would classify as DEFINITELY_NOT_CHARGED
-  // and burn the rest of the chain on the same unusable token.
-  const forProvider = chargeInputFor(ctx.input, provider, chainHead);
-  if (!hasInstrument(forProvider)) {
-    await recordAttempt(deps, ctx, provider, {
-      outcome: 'SKIPPED',
-      failureBucket: 'DEFINITELY_NOT_CHARGED',
-      error: forProvider.reason,
-    });
-    if (pinned) throw new UnsupportedOperationError(provider, forProvider.reason);
-    return { kind: 'ADVANCE', failure: { provider, message: forProvider.reason } };
-  }
+  const scheme = adapter.capabilities.tokenization;
+  const forProvider = await instrumentFor(deps, ctx, provider, pinned, chainHead, scheme);
+  if ('kind' in forProvider) return { kind: 'ADVANCE', failure: forProvider };
 
   let snapshot: ChargeSnapshot;
   try {

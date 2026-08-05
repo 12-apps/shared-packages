@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  customerRequirementsMessage,
-  parseCustomerRequirements,
-} from '../core/customer-gate';
-import {
   customerFieldsFor,
   unionCustomerFields,
   validateCustomer,
@@ -20,6 +16,7 @@ import {
   createMemoryCredentialStore,
 } from '../memory';
 import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
+import { gateIssuesOf, nothingWasAttempted } from '../core/walk-failure';
 import { allProviderAdapters } from '../providers/catalog';
 import { infinitePayProvider } from '../providers/infinitepay';
 import { pagbankProvider } from '../providers/pagbank';
@@ -442,8 +439,19 @@ describe('charge-walk enforcement (server-side, before the adapter is called)', 
   });
 });
 
-describe('the refusal a host reads back off an unpinned walk', () => {
-  it('round-trips the gate message a failed walk carries — field and reason intact', async () => {
+/**
+ * The refusal a host reads off an unpinned walk (FUT-595, retyped by FUT-563).
+ *
+ * It used to be a STRING the host parsed back with a regex. That failed in the
+ * ordinary two-provider case — one recognisable failure beside one that was
+ * not, and the host gave up and answered a blanket 5xx — and the regex
+ * hardcoded the field names, so the first new field would have silently
+ * reverted every such refusal to a 5xx too. The channel is typed now:
+ * `kind` says whether anybody was actually asked, and `issues` carries the
+ * fields without a format to drift.
+ */
+describe('the refusal a host reads off an unpinned walk', () => {
+  it('carries the gate kind and its typed issues, not a sentence to parse', async () => {
     const world = customerWorld('pagbank');
     const error = await world.gateway
       .charge(TENANT, { ...pixInput('order-3'), customer: { name: 'Ana' } })
@@ -452,31 +460,51 @@ describe('the refusal a host reads back off an unpinned walk', () => {
 
     expect(error).toBeInstanceOf(NoProviderSucceededError);
     const failures = (error as NoProviderSucceededError).failures;
-    // The unpinned walk's failure channel is STRINGS, so this parse is the only
-    // way a host can tell "the buyer is missing a field" from "the provider
-    // broke" — without it a missing CPF reaches the buyer as a 5xx.
-    expect(failures.map((failure) => parseCustomerRequirements(failure.message))).toEqual([
-      [{ field: 'taxId', reason: 'MISSING', required: true }],
+    expect(failures.map((failure) => failure.kind)).toEqual(['GATE']);
+    expect(failures.flatMap((failure) => [...(failure.issues ?? [])])).toEqual([
+      { field: 'taxId', reason: 'MISSING', required: true },
     ]);
   });
 
-  it('reads back every issue the formatter wrote, and refuses anything else', () => {
-    const issues = [
-      { field: 'name', reason: 'MISSING', required: true },
+  it('says NOTHING WAS ATTEMPTED for a chain of gates and skips alike', async () => {
+    // The case the string parser got wrong: a gated head beside a tail skipped
+    // for its own, unrelated reason. Nothing went out either way, so the buyer
+    // is owed the field — not a payment-outage message.
+    const failures = [
+      { provider: 'pagbank', message: 'x', kind: 'GATE' as const, issues: [] },
+      { provider: 'stone', message: 'y', kind: 'SKIP' as const },
+    ];
+    expect(nothingWasAttempted(failures)).toBe(true);
+    expect(
+      nothingWasAttempted([...failures, { provider: 'stripe', message: 'z', kind: 'FAILURE' }]),
+    ).toBe(false);
+  });
+
+  it('unions the blocking fields across the chain, INVALID beating MISSING', async () => {
+    // The buyer cannot be asked to guess which provider will take the charge,
+    // so every field that blocked ANY of them has to be named at once.
+    expect(
+      gateIssuesOf([
+        {
+          provider: 'pagbank',
+          message: 'x',
+          kind: 'GATE',
+          issues: [{ field: 'taxId', reason: 'MISSING', required: true }],
+        },
+        {
+          provider: 'stone',
+          message: 'y',
+          kind: 'GATE',
+          issues: [
+            { field: 'taxId', reason: 'INVALID', required: true },
+            { field: 'phone', reason: 'MISSING', required: true },
+          ],
+        },
+      ]),
+    ).toEqual([
       { field: 'taxId', reason: 'INVALID', required: true },
-    ] as const;
-    expect(parseCustomerRequirements(customerRequirementsMessage('stripe', issues))).toEqual([
-      ...issues,
+      { field: 'phone', reason: 'MISSING', required: true },
     ]);
-    // A genuine provider failure must NOT be mistaken for a buyer-field one:
-    // answering "informe seu CPF" to an outage sends the buyer to fix nothing.
-    for (const message of [
-      'PagBank 500 Internal Server Error',
-      'provider pagbank requires buyer fields: address (MISSING)',
-      'provider pagbank requires buyer fields: ',
-    ]) {
-      expect(parseCustomerRequirements(message), message).toBeNull();
-    }
   });
 });
 

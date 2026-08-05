@@ -11,7 +11,12 @@ import { classifyFailure } from '../core/failover';
 import { createPaymentsGateway } from '../core/gateway';
 import type { PaymentProviderAdapter } from '../core/provider';
 import { defineProviders } from '../core/registry';
-import type { ChargeInput, ChargeSnapshot, PaymentMethodKind } from '../core/types';
+import type {
+  ChargeInput,
+  ChargeSnapshot,
+  ClientTokenization,
+  PaymentMethodKind,
+} from '../core/types';
 import type { AttemptLedger } from '../core/ports';
 import {
   createMemoryAttemptLedger,
@@ -39,6 +44,8 @@ interface Script {
   /** What the reconciliation probe answers. Omit to make it UNSUPPORTED. */
   probe?: (reference: string) => Promise<ChargeSnapshot | null>;
   methods?: PaymentMethodKind[];
+  /** What this provider asks the BROWSER for. Defaults to a card acquirer. */
+  tokenization?: ClientTokenization;
 }
 
 interface Spy {
@@ -69,7 +76,10 @@ function scripted(name: string, script: Script = {}): { adapter: PaymentProvider
       partialRefunds: false,
       splits: false,
       webhooks: true,
-      tokenization: 'NONE',
+      // A card ACQUIRER by default: these worlds charge `card.token`, and the
+      // ownership rules only apply to a provider that asks for an instrument.
+      // `script.tokenization` opts one entry out — a hosted page needs none.
+      tokenization: script.tokenization ?? 'PUBLIC_KEY',
     },
     credentialSchema: [],
     verifyCredentials: async () => ({ ok: true }),
@@ -80,7 +90,7 @@ function scripted(name: string, script: Script = {}): { adapter: PaymentProvider
     },
     getCharge: async (id) => snapshotOf(name, pixInput(), { providerChargeId: id }),
     webhook: { verify: async () => true, parse: async () => [] },
-    clientConfig: () => ({ provider: name, tokenization: 'NONE' }),
+    clientConfig: () => ({ provider: name, tokenization: script.tokenization ?? 'PUBLIC_KEY' }),
   };
   if (script.probe) {
     adapter.findChargeByReference = async (reference) => {
@@ -467,6 +477,92 @@ describe('card instruments are provider-bound', () => {
 
     expect(seen['alpha']).toBe('tok_alpha');
     expect(seen['beta']).toBe('tok_beta');
+  });
+
+  it('attempts a provider that asks for NO instrument, with no card block', async () => {
+    // Decided by what the provider DECLARES, not by who owns the blob we hold.
+    // A hosted page takes the card on its own site, so it can never be
+    // "holding someone else's instrument" — and it is handed none, because
+    // there is nothing here it could read.
+    const seen: Record<string, ChargeInput['card']> = {};
+    const first = scripted('alpha', {
+      charge: async () => {
+        throw preSendFailure();
+      },
+    });
+    const hosted = scripted('beta', {
+      tokenization: 'REDIRECT',
+      charge: async (input) => {
+        seen['beta'] = input.card;
+        return snapshotOf('beta', input);
+      },
+    });
+    const w = world([first, hosted]);
+
+    const charge = await w.gateway.charge(
+      TENANT,
+      cardFor({ tokensByProvider: { alpha: 'tok_alpha' } }),
+    );
+
+    expect(charge.provider).toBe('beta');
+    expect(seen['beta']).toBeUndefined();
+  });
+
+  it('still sends a provider ITS OWN instrument when it asks for none', async () => {
+    // The capability rule must not outrank explicit ownership: a vault token
+    // that NAMES this provider is its own, and dropping it would break a
+    // charge that works — the "needs no instrument" branch is about the blob
+    // belonging to somebody else.
+    const seen: Record<string, string | undefined> = {};
+    const hosted = scripted('alpha', {
+      tokenization: 'REDIRECT',
+      charge: async (input) => {
+        seen['alpha'] = input.card?.savedCardToken;
+        return snapshotOf('alpha', input);
+      },
+    });
+    const w = world([hosted, scripted('beta')]);
+
+    await w.gateway.charge(TENANT, {
+      ...pixInput(),
+      method: 'CARD',
+      card: { savedCardToken: 'vault_tok', tokenProvider: 'alpha' },
+    });
+
+    expect(seen['alpha']).toBe('vault_tok');
+  });
+
+  it('SKIPS a card provider the browser minted no instrument for', async () => {
+    // A minted map is a COMPLETE statement — one entry per provider the
+    // browser could mint for — so a hole in it means we hold nothing for that
+    // provider. Charging it anyway sends an EMPTY token to a provider that
+    // requires one: a guaranteed rejection, filed as a provider FAILURE, which
+    // then denies the buyer the named-field answer a gated chain owes them and
+    // on a timeout can strand the order before the provider that could pay.
+    const seen: Record<string, string | undefined> = {};
+    const first = scripted('alpha', {
+      charge: async () => {
+        throw preSendFailure();
+      },
+    });
+    const second = scripted('beta', {
+      charge: async (input) => {
+        seen['beta'] = input.card?.token ?? 'EMPTY';
+        return snapshotOf('beta', input);
+      },
+    });
+    const third = scripted('gamma');
+    const w = world([first, second, third]);
+
+    const charge = await w.gateway.charge(
+      TENANT,
+      // The wire shape a chained checkout sends: the map only, no bare token.
+      cardFor({ token: undefined, tokensByProvider: { alpha: 'tok_alpha', gamma: 'tok_gamma' } }),
+    );
+
+    expect(charge.provider).toBe('gamma');
+    expect(seen['beta']).toBeUndefined();
+    expect(w.attempts.all().find((a) => a.provider === 'beta')?.outcome).toBe('SKIPPED');
   });
 
   it('honours an explicit tokenProvider over the chain head', async () => {

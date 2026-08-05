@@ -31,6 +31,23 @@ import type {
 interface ApiEnvelope<T> {
   data?: T;
   error?: string;
+  /**
+   * Stable machine code for the failure (`checkoutErrorResponse` always sends
+   * one). Carried through so a surface can PRESENT a refusal for what it is —
+   * an unresolved charge is not a decline, and rendering it under "não foi
+   * possível pagar" with a live pay button invites the second payment its own
+   * text forbids.
+   */
+  code?: string;
+}
+
+/**
+ * A non-2xx envelope as a {@link Result} failure, carrying its machine CODE.
+ * The message is what the buyer reads; the code is what a surface uses to
+ * decide how to PRESENT it, which a message cannot be parsed for.
+ */
+function refused<T>(json: ApiEnvelope<T> | null): Result<T> {
+  return err(json?.error ?? "Não foi possível concluir a operação. Tente novamente.", json?.code);
 }
 
 /** Call an API route and normalize the response into a {@link Result}. */
@@ -41,9 +58,7 @@ async function requestResult<T>(input: string, init?: RequestInit): Promise<Resu
       headers: { "Content-Type": "application/json", ...init?.headers },
     });
     const json = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
-    if (!res.ok) {
-      return err(json?.error ?? "Não foi possível concluir a operação. Tente novamente.");
-    }
+    if (!res.ok) return refused(json);
     if (!json || json.data === undefined) {
       return err(json?.error ?? "Resposta inválida do servidor.");
     }
@@ -137,6 +152,9 @@ export async function chargeCard(input: ChargeCardInput): Promise<Result<ChargeO
     body: JSON.stringify({
       orderId: input.orderId,
       token: input.token,
+      // One instrument per provider (FUT-563) — the server hands each provider
+      // in the chain its own, which is what lets a card charge fail over.
+      ...(input.tokensByProvider ? { tokensByProvider: input.tokensByProvider } : {}),
       saveCard: input.saveCard,
       cardMeta: input.cardMeta,
       taxId: input.taxId,
