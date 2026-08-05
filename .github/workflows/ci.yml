@@ -188,6 +188,64 @@ jobs:
           set -o pipefail
           node scripts/verify-package-consumers.mjs 2>&1 | tee consumers.log
 
+  # Layer 2 of the same idea: Consumer Verification proves the packages RESOLVE
+  # from a tarball; this proves they still WORK once a browser runs them. It
+  # renders the published payments adapters through the published settings page
+  # — the pairing future-pay is currently failing on, which neither repo's CI
+  # covers: this one tests each package against its workspace siblings, and
+  # future-pay finds out at e2e time, a release too late.
+  frontend-harness:
+    name: Frontend Harness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      - name: Build packages
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee build.log
+      # Packs every package and installs the tarballs into harness/frontend,
+      # which sits outside pnpm-workspace.yaml's globs so nothing links back to
+      # packages/. Its package.json is generated here, not committed.
+      - name: Install the harness against the published tarballs
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/harness-install.mjs 2>&1 | tee harness-install.log
+      - name: Install Chromium
+        working-directory: harness/frontend
+        run: npx playwright install --with-deps chromium
+      - name: Build the harness app
+        working-directory: harness/frontend
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee harness-build.log
+      - name: Render the published packages in a browser
+        working-directory: harness/frontend
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee harness-test.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: frontend-harness-report
+          path: harness/frontend/playwright-report
+          retention-days: 7
+
   # Tokenless publish to npm via OIDC Trusted Publishing. Only on push to main,
   # after the gates pass. No NPM_TOKEN: npm exchanges the GitHub OIDC id-token
   # for a short-lived credential (requires a one-time Trusted Publisher on npm
@@ -197,7 +255,7 @@ jobs:
   # ahead of it, which is the only place a token is ever used.
   release:
     name: Release
-    needs: [lint, type-check, build, unit-tests, quality, consumers]
+    needs: [lint, type-check, build, unit-tests, quality, consumers, frontend-harness]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -283,7 +341,7 @@ jobs:
     name: CI Success
     runs-on: ubuntu-latest
     if: always()
-    needs: [lint, type-check, build, unit-tests, quality, consumers]
+    needs: [lint, type-check, build, unit-tests, quality, consumers, frontend-harness]
     steps:
       - name: Verify all required jobs passed
         shell: bash
