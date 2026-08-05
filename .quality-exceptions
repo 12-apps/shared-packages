@@ -16,7 +16,6 @@ packages/ui/src/components/form/InputOTP/InputOTP.tsx
 packages/ui/src/components/form/Label/Label.test.stories.tsx
 packages/ui/src/components/form/Label/Label.tsx
 packages/ui/src/components/form/Menubar/Menubar.tsx
-packages/ui/src/components/form/RadioGroup/RadioGroup.tsx
 packages/ui/src/components/form/Slider/Slider.tsx
 packages/ui/src/components/form/Switch/Switch.tsx
 packages/ui/src/components/form/ToggleGroup/ToggleGroup.test.stories.tsx
