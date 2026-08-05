@@ -55,3 +55,4 @@ harness/*/package.json
 harness/*/dist
 harness/*/test-results
 harness/*/playwright-report
+harness/*/package-lock.json
