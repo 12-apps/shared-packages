@@ -1,4 +1,3 @@
-packages/ui/scripts/storybook.js
 packages/ui/src/components/data-display/AlertDialog/AlertDialog.test.stories.tsx
 packages/ui/src/components/data-display/Banner/Banner.test.stories.tsx
 packages/ui/src/components/data-display/Carousel/Carousel.test.stories.tsx
