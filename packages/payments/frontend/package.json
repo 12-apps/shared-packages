@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@12-apps/payments-backend": "workspace:*",
     "react-qr-code": "^2.2.0"
   },
   "peerDependencies": {
@@ -29,7 +30,6 @@
     "@emotion/styled": "^11.14.0",
     "@mui/material": "^6.5.0",
     "@12-apps/eslint-config": "workspace:*",
-    "@12-apps/payments-backend": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@testing-library/react": "^16.1.0",
     "@types/react": "19.2.2",
