@@ -167,8 +167,24 @@ export const FLAKY_E2E = {
 
 // Files listed in `.quality-exceptions` pre-date the gate. Their findings are
 // downgraded to WARNINGS (still visible, don't block) so the gate ships without
-// a mass refactor; any file NOT listed stays a hard error. Burn the list down
-// over time.
+// a mass refactor; any file NOT listed stays a hard error.
+//
+// The list is now BURNED DOWN and the file is deleted, so this returns []
+// and every file is a hard error. It began at 33 entries: 13 source files
+// carrying 84 complexity findings and 20 test-story files carrying 272
+// flakiness findings.
+//
+// The file is deleted rather than left empty on purpose. The CI ratchet reads
+// it with `listed_now="$(grep -vE '^\s*(#|$)' .quality-exceptions | ...)"`
+// under `set -e -o pipefail` and no `|| true`, so a file holding only comments
+// makes grep match nothing, exit 1, and take the whole step down with no error
+// message. A missing file is a state that step handles explicitly and cleanly
+// ("No .quality-exceptions file — nothing to enforce", exit 0).
+//
+// Re-adding the file to grandfather something would be a regression. Prefer
+// fixing the finding; where a flagged construct is genuinely the subject under
+// test, an inline disable carrying its reason is narrower than a whole-file
+// exemption.
 export function loadExceptions() {
   const here = dirname(fileURLToPath(import.meta.url));
   try {
