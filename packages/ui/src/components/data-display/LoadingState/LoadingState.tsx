@@ -3,100 +3,130 @@ import React from 'react';
 
 import { Skeleton } from '../../layout/Skeleton/Skeleton';
 
+import {
+  makeTestIds,
+  resolveLoadingStateProps,
+  SIZE_MAP,
+  SKELETON_ROW_HEIGHT,
+} from './LoadingState.helpers';
 import type { LoadingStateProps, LoadingStateSize } from './LoadingState.types';
 
-const sizeMap: Record<LoadingStateSize, { spinner: number; text: 'body2' | 'body1' | 'h6' }> = {
-  sm: { spinner: 24, text: 'body2' },
-  md: { spinner: 40, text: 'body1' },
-  lg: { spinner: 56, text: 'h6' },
+interface ViewProps {
+  message?: string;
+  size: LoadingStateSize;
+  skeletonRows: number;
+  className?: string;
+  testIds: ReturnType<typeof makeTestIds>;
+}
+
+const LoadingMessage: React.FC<{
+  message?: string;
+  size: LoadingStateSize;
+  testIds: ViewProps['testIds'];
+  sx?: object;
+}> = ({ message, size, testIds, sx }) =>
+  message ? (
+    <Typography
+      variant={SIZE_MAP[size].text}
+      color="text.secondary"
+      sx={sx}
+      data-testid={testIds.named('message')}
+    >
+      {message}
+    </Typography>
+  ) : null;
+
+const SkeletonView: React.FC<ViewProps> = ({
+  message,
+  size,
+  skeletonRows,
+  className,
+  testIds,
+}) => {
+  const theme = useTheme();
+
+  return (
+    <Box
+      role="status"
+      aria-busy="true"
+      aria-label={message || 'Loading content'}
+      className={className}
+      data-testid={testIds.base}
+      sx={{
+        width: '100%',
+        padding: theme.spacing(3),
+      }}
+    >
+      <Stack spacing={2}>
+        {Array.from({ length: skeletonRows }).map((_, index) => (
+          <Skeleton
+            key={`skeleton-row-${index}`}
+            variant="rectangular"
+            animation="wave"
+            height={SKELETON_ROW_HEIGHT[size]}
+            // The last row is short, so the block reads as a paragraph of text.
+            width={index === skeletonRows - 1 ? '60%' : '100%'}
+            borderRadius={4}
+            data-testid={testIds.optional(`skeleton-${index}`)}
+          />
+        ))}
+      </Stack>
+      <LoadingMessage
+        message={message}
+        size={size}
+        testIds={testIds}
+        sx={{ mt: 2, textAlign: 'center' }}
+      />
+    </Box>
+  );
 };
 
-export const LoadingState: React.FC<LoadingStateProps> = React.memo(
-  ({
-    variant = 'spinner',
+const SpinnerView: React.FC<ViewProps> = ({ message, size, className, testIds }) => {
+  const theme = useTheme();
+
+  return (
+    <Box
+      role="status"
+      aria-busy="true"
+      aria-label={message || 'Loading'}
+      className={className}
+      data-testid={testIds.base}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: theme.spacing(6),
+        minHeight: 200,
+        gap: theme.spacing(2),
+      }}
+    >
+      <CircularProgress
+        size={SIZE_MAP[size].spinner}
+        data-testid={testIds.named('spinner')}
+      />
+      <LoadingMessage message={message} size={size} testIds={testIds} />
+    </Box>
+  );
+};
+
+export const LoadingState: React.FC<LoadingStateProps> = React.memo((rawProps) => {
+  const { variant, message, size, skeletonRows, className, dataTestId } =
+    resolveLoadingStateProps(rawProps);
+  const viewProps: ViewProps = {
     message,
-    size = 'md',
-    skeletonRows = 3,
+    size,
+    skeletonRows,
     className,
-    dataTestId,
-  }) => {
-    const theme = useTheme();
-    const sizeConfig = sizeMap[size];
+    testIds: makeTestIds(dataTestId),
+  };
 
-    if (variant === 'skeleton') {
-      return (
-        <Box
-          role="status"
-          aria-busy="true"
-          aria-label={message || 'Loading content'}
-          className={className}
-          data-testid={dataTestId || 'loading-state'}
-          sx={{
-            width: '100%',
-            padding: theme.spacing(3),
-          }}
-        >
-          <Stack spacing={2}>
-            {Array.from({ length: skeletonRows }).map((_, index) => (
-              <Skeleton
-                key={`skeleton-row-${index}`}
-                variant="rectangular"
-                animation="wave"
-                height={size === 'sm' ? 20 : size === 'md' ? 28 : 36}
-                width={index === skeletonRows - 1 ? '60%' : '100%'}
-                borderRadius={4}
-                data-testid={dataTestId ? `${dataTestId}-skeleton-${index}` : undefined}
-              />
-            ))}
-          </Stack>
-          {message && (
-            <Typography
-              variant={sizeConfig.text}
-              color="text.secondary"
-              sx={{ mt: 2, textAlign: 'center' }}
-              data-testid={dataTestId ? `${dataTestId}-message` : 'loading-state-message'}
-            >
-              {message}
-            </Typography>
-          )}
-        </Box>
-      );
-    }
-
-    return (
-      <Box
-        role="status"
-        aria-busy="true"
-        aria-label={message || 'Loading'}
-        className={className}
-        data-testid={dataTestId || 'loading-state'}
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: theme.spacing(6),
-          minHeight: 200,
-          gap: theme.spacing(2),
-        }}
-      >
-        <CircularProgress
-          size={sizeConfig.spinner}
-          data-testid={dataTestId ? `${dataTestId}-spinner` : 'loading-state-spinner'}
-        />
-        {message && (
-          <Typography
-            variant={sizeConfig.text}
-            color="text.secondary"
-            data-testid={dataTestId ? `${dataTestId}-message` : 'loading-state-message'}
-          >
-            {message}
-          </Typography>
-        )}
-      </Box>
-    );
-  },
-);
+  return variant === 'skeleton' ? (
+    <SkeletonView {...viewProps} />
+  ) : (
+    <SpinnerView {...viewProps} />
+  );
+});
 
 LoadingState.displayName = 'LoadingState';
 

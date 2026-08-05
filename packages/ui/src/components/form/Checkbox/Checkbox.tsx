@@ -8,6 +8,7 @@ import {
   styled} from '@mui/material';
 import React from 'react';
 
+import { makeTestId, resolveCheckboxProps } from './Checkbox.helpers';
 import type { CheckboxProps } from './Checkbox.types';
 
 const pulse = keyframes`
@@ -99,21 +100,23 @@ const StyledFormHelperText = styled(FormHelperText)(({ theme }) => ({
 }));
 
 export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
-  ({ 
-    variant = 'default', 
-    label, 
-    error, 
-    helperText, 
-    loading, 
-    ripple = true,
-    glow = false,
-    pulse = false,
-    disabled,
-    'data-testid': dataTestId,
-    ...props 
-  }, ref) => {
+  (rawProps, ref) => {
+    const {
+      variant,
+      label,
+      error,
+      helperText,
+      loading,
+      ripple,
+      glow,
+      pulse,
+      disabled,
+      'data-testid': dataTestId,
+      ...props
+    } = resolveCheckboxProps(rawProps);
     const isDisabled = disabled || loading;
-    
+    const testId = makeTestId(dataTestId);
+
     const checkbox = (
       <div style={{ position: 'relative', display: 'inline-flex' }}>
         <StyledCheckbox
@@ -144,7 +147,7 @@ export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
     
     if (label) {
       return (
-        <div data-testid={dataTestId ? `${dataTestId}-container` : 'checkbox-container'}>
+        <div data-testid={testId('container')}>
           <StyledFormControlLabel
             control={checkbox}
             label={label}
@@ -154,7 +157,7 @@ export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
           {helperText && (
             <StyledFormHelperText 
               error={error}
-              data-testid={dataTestId ? `${dataTestId}-helper` : 'checkbox-helper'}
+              data-testid={testId('helper')}
             >
               {helperText}
             </StyledFormHelperText>

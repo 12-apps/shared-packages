@@ -16,6 +16,13 @@ export interface WithBatchSizeOptions<I, O> {
   onBatchEnd?: (batch: readonly I[], batchIndex: number, globalOffset: number, produced: readonly O[] | undefined, elapsedMs: number) => void | Promise<void>;
 }
 
+// A handler may return one item, many, or nothing at all. Normalising that here
+// keeps the loop below about batching rather than about return-value shapes.
+const producedFrom = <O>(result: readonly O[] | O | void): readonly O[] | undefined => {
+  if (result === undefined) return undefined;
+  return Array.isArray(result) ? (result as readonly O[]) : [result as O];
+};
+
 export async function withBatchSize<I, O = unknown>(
   items: readonly I[],
   batchSize: number,
@@ -34,16 +41,8 @@ export async function withBatchSize<I, O = unknown>(
     const start = Date.now();
     if (onBatchStart) await onBatchStart(batch, batchIndex, offset);
 
-    let produced: readonly O[] | undefined;
-    const result = await handler(batch, batchIndex, offset);
-    if (result !== undefined) {
-      if (Array.isArray(result)) {
-        produced = result as readonly O[];
-      } else {
-        produced = [result as O];
-      }
-      if (collect && produced.length) out.push(...produced as O[]);
-    }
+    const produced = producedFrom<O>(await handler(batch, batchIndex, offset));
+    if (collect && produced) out.push(...produced as O[]);
 
     const elapsed = Date.now() - start;
     if (onBatchEnd) await onBatchEnd(batch, batchIndex, offset, produced, elapsed);

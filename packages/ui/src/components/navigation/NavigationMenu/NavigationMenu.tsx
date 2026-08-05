@@ -1,15 +1,13 @@
 import {
   Box,
-  Paper,
-} from '@mui/material';
+  Paper } from '@mui/material';
 import React, { useState } from 'react';
 
 import { NavigationMegaSection } from './NavigationMegaSection';
 import { NavigationStandardBody } from './NavigationStandardBody';
 import {
   LogoBar,
-  NavigationShell,
-} from './NavigationMenu.shell';
+  NavigationShell } from './NavigationMenu.shell';
 import type { NavigationMenuItem,NavigationMenuProps } from './NavigationMenu.types';
 
 
@@ -35,6 +33,7 @@ const MegaMenuLayout = React.forwardRef<HTMLDivElement, MegaMenuLayoutProps>(
       items,
       size,
       minimal,
+      dataTestId: _dataTestId,
       className,
       maxWidth,
       style,
@@ -56,8 +55,7 @@ const MegaMenuLayout = React.forwardRef<HTMLDivElement, MegaMenuLayoutProps>(
         sx={{
           width: '100%',
           overflow: 'hidden',
-          background: minimal ? 'transparent' : undefined,
-        }}
+          background: minimal ? 'transparent' : undefined }}
       >
         {logo && <LogoBar>{logo}</LogoBar>}
         <Box
@@ -65,8 +63,7 @@ const MegaMenuLayout = React.forwardRef<HTMLDivElement, MegaMenuLayoutProps>(
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
             gap: 3,
-            p: 3,
-          }}
+            p: 3 }}
         >
           {items.map((section, sectionIndex) => (
             <NavigationMegaSection
@@ -97,8 +94,7 @@ const NAVIGATION_DEFAULTS: Pick<NavigationMenuProps, NavigationDefaultedKeys> = 
   size: 'md',
   minimal: false,
   collapsible: false,
-  showDividers: false,
-};
+  showDividers: false };
 
 // Strips explicitly-undefined props before the merge, so `prop={undefined}` still
 // falls back to the default exactly as a destructuring default would. Applied as
@@ -109,8 +105,7 @@ const resolveProps = (props: NavigationMenuProps): ResolvedNavigationProps =>
     ...NAVIGATION_DEFAULTS,
     ...(Object.fromEntries(
       Object.entries(props).filter(([, value]) => value !== undefined),
-    ) as Partial<NavigationMenuProps>),
-  }) as ResolvedNavigationProps;
+    ) as Partial<NavigationMenuProps>) }) as ResolvedNavigationProps;
 
 export const NavigationMenu = React.forwardRef<HTMLDivElement, NavigationMenuProps>(
   (componentProps, ref) => {

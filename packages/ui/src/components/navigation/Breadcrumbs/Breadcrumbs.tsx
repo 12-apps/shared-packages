@@ -1,29 +1,58 @@
+import ArrowForwardIos from '@mui/icons-material/ArrowForwardIos';
+import ChevronRight from '@mui/icons-material/ChevronRight';
+import NavigateNext from '@mui/icons-material/NavigateNext';
 import {
+  Box,
   Breadcrumbs as MuiBreadcrumbs,
   useMediaQuery,
-  useTheme,
-} from '@mui/material';
+  useTheme } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React from 'react';
 
 import {
   breadcrumbsBarStyles,
-  sizeIconMap,
-} from './Breadcrumbs.styles';
+  sizeIconMap } from './Breadcrumbs.styles';
 import { BreadcrumbEntry } from './BreadcrumbEntry';
 import type { BreadcrumbItem,BreadcrumbsProps } from './Breadcrumbs.types';
 
 // Animation keyframes
 const StyledBreadcrumbs = styled(MuiBreadcrumbs, {
   shouldForwardProp: (prop) =>
-    prop !== 'size' && prop !== 'color' && prop !== 'visualStyle' && prop !== 'elevation',
-})<{ size?: string; color?: string; visualStyle?: string; elevation?: number }>(
+    prop !== 'size' && prop !== 'color' && prop !== 'visualStyle' && prop !== 'elevation' })<{ size?: string; color?: string; visualStyle?: string; elevation?: number }>(
   ({ theme, size, color, visualStyle, elevation = 0 }) => ({
-    ...breadcrumbsBarStyles({ theme, size, color, visualStyle, elevation }),
-  }),
+    ...breadcrumbsBarStyles({ theme, size, color, visualStyle, elevation }) }),
 );
 
+const AnimatedSeparator = styled(Box)(() => ({
+  display: 'flex',
+  alignItems: 'center',
+  opacity: 0.6,
+  transition: 'all 0.2s ease',
 
+  '&:hover': {
+    opacity: 1,
+    transform: 'scale(1.1)' } }));
+
+const getSeparator = (separatorType: string) => {
+  const separatorContent = (() => {
+    switch (separatorType) {
+      case 'slash':
+        return '/';
+      case 'arrow':
+        return <NavigateNext fontSize="small" />;
+      case 'chevron':
+        return <ChevronRight fontSize="small" />;
+      case 'dot':
+        return '•';
+      case 'pipe':
+        return '|';
+      default:
+        return <ArrowForwardIos sx={{ fontSize: 12 }} />;
+    }
+  })();
+
+  return <AnimatedSeparator>{separatorContent}</AnimatedSeparator>;
+};
 
 type DisplayItem = BreadcrumbItem & { isEllipsis?: boolean };
 
@@ -32,8 +61,7 @@ type DisplayItem = BreadcrumbItem & { isEllipsis?: boolean };
 const collapseItems = ({
   items,
   effectiveMaxItems,
-  collapseBehavior,
-}: {
+  collapseBehavior }: {
   items: BreadcrumbItem[];
   effectiveMaxItems: number;
   collapseBehavior: string;
@@ -48,8 +76,7 @@ const collapseItems = ({
 
     return {
       displayItems: firstItem ? [firstItem, ...tail] : tail,
-      collapsedItems: items.slice(1, -(effectiveMaxItems - 2)),
-    };
+      collapsedItems: items.slice(1, -(effectiveMaxItems - 2)) };
   }
 
   if (collapseBehavior === 'ellipsis') {
@@ -61,8 +88,7 @@ const collapseItems = ({
         { label: '...', href: '#', isEllipsis: true },
         ...items.slice(-half),
       ],
-      collapsedItems: [],
-    };
+      collapsedItems: [] };
   }
 
   return { displayItems: items, collapsedItems: [] };
@@ -91,8 +117,7 @@ const BREADCRUMBS_DEFAULTS: Pick<BreadcrumbsProps, BreadcrumbsDefaultedKeys> = {
   color: 'default',
   elevation: 1,
   collapseBehavior: 'menu',
-  mobileMaxItems: 3,
-};
+  mobileMaxItems: 3 };
 
 // Strips explicitly-undefined props before the merge, so `prop={undefined}` still
 // falls back to the default exactly as a destructuring default would. Applied as
@@ -103,13 +128,13 @@ const resolveProps = (props: BreadcrumbsProps): ResolvedBreadcrumbsProps =>
     ...BREADCRUMBS_DEFAULTS,
     ...(Object.fromEntries(
       Object.entries(props).filter(([, value]) => value !== undefined),
-    ) as Partial<BreadcrumbsProps>),
-  }) as ResolvedBreadcrumbsProps;
+    ) as Partial<BreadcrumbsProps>) }) as ResolvedBreadcrumbsProps;
 
 export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
   (componentProps, ref) => {
     const {
       variant,
+      separatorType,
       items,
       separator,
       maxItems,
@@ -124,8 +149,12 @@ export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
       ...props
     } = resolveProps(componentProps);
     const theme = useTheme();
+    // separatorType picks a built-in separator; an explicit `separator` wins.
+    // This was computed before but never passed on, so separatorType had no
+    // effect on what rendered.
+    const finalSeparator = separator || getSeparator(separatorType);
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-        const iconSize = sizeIconMap[size];
+    const iconSize = sizeIconMap[size];
 
     // Handle mobile collapsing
     const effectiveMaxItems = isMobile ? mobileMaxItems : maxItems;
@@ -134,13 +163,12 @@ export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
     const { displayItems, collapsedItems } = collapseItems({
       items,
       effectiveMaxItems,
-      collapseBehavior,
-    });
+      collapseBehavior });
 
     return (
       <StyledBreadcrumbs
         ref={ref}
-        separator={separator}
+        separator={finalSeparator}
         maxItems={shouldCollapse ? undefined : effectiveMaxItems}
         size={size}
         color={color}
@@ -159,7 +187,7 @@ export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
             itemCount={displayItems.length}
             collapsedItems={collapsedItems}
             collapseBehavior={collapseBehavior}
-            separator={separator}
+            separator={finalSeparator}
             showHomeIcon={showHomeIcon}
             iconSize={iconSize}
             size={size}

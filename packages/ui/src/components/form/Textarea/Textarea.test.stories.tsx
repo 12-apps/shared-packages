@@ -1,6 +1,6 @@
 import { Box, createTheme,ThemeProvider } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect,userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { Textarea } from './Textarea';
 
@@ -146,7 +146,7 @@ export const RichTextEditor: Story = {
       if (editableArea) {
         await userEvent.click(editableArea);
         // Rich text editor should be focusable
-        expect(document.activeElement).toBe(editableArea);
+        await waitFor(() => expect(document.activeElement).toBe(editableArea));
       }
     });
   },
@@ -166,7 +166,7 @@ export const KeyboardNavigation: Story = {
 
       // Tab to focus
       await userEvent.tab();
-      expect(textarea).toHaveFocus();
+      await waitFor(() => expect(textarea).toHaveFocus());
     });
 
     await step('Test Enter key behavior', async () => {
@@ -234,7 +234,7 @@ export const ScreenReader: Story = {
 
       // Focus should announce the textarea
       await userEvent.click(textarea);
-      expect(textarea).toHaveFocus();
+      await waitFor(() => expect(textarea).toHaveFocus());
 
       // Type content and verify it's available to screen readers
       await userEvent.type(textarea, 'Screen reader content');
@@ -276,25 +276,25 @@ export const FocusManagement: Story = {
 
       // Start with previous input
       await userEvent.click(prevInput);
-      expect(prevInput).toHaveFocus();
+      await waitFor(() => expect(prevInput).toHaveFocus());
 
       // Tab to textarea
       await userEvent.tab();
-      expect(textarea).toHaveFocus();
+      await waitFor(() => expect(textarea).toHaveFocus());
 
       // Tab to next input
       await userEvent.tab();
-      expect(nextInput).toHaveFocus();
+      await waitFor(() => expect(nextInput).toHaveFocus());
     });
 
     await step('Test focus retention during interaction', async () => {
       const textarea = canvas.getByTestId('focus-textarea');
 
       await userEvent.click(textarea);
-      expect(textarea).toHaveFocus();
+      await waitFor(() => expect(textarea).toHaveFocus());
 
       await userEvent.type(textarea, 'Typing should maintain focus');
-      expect(textarea).toHaveFocus();
+      await waitFor(() => expect(textarea).toHaveFocus());
       expect(textarea).toHaveValue('Typing should maintain focus');
     });
 
@@ -303,12 +303,12 @@ export const FocusManagement: Story = {
       const nextInput = canvas.getByTestId('next-input');
 
       await userEvent.click(textarea);
-      expect(textarea).toHaveFocus();
+      await waitFor(() => expect(textarea).toHaveFocus());
 
       // Click outside to blur
       await userEvent.click(nextInput);
-      expect(textarea).not.toHaveFocus();
-      expect(nextInput).toHaveFocus();
+      await waitFor(() => expect(textarea).not.toHaveFocus());
+      await waitFor(() => expect(nextInput).toHaveFocus());
     });
   },
 };
@@ -468,7 +468,7 @@ export const VisualStates: Story = {
 
       // Should not accept input when disabled
       await userEvent.click(disabledTextarea);
-      expect(disabledTextarea).not.toHaveFocus();
+      await waitFor(() => expect(disabledTextarea).not.toHaveFocus());
     });
 
     await step('Test interactive states', async () => {
@@ -478,13 +478,13 @@ export const VisualStates: Story = {
 
       // Test focus states
       await userEvent.click(defaultTextarea);
-      expect(defaultTextarea).toHaveFocus();
+      await waitFor(() => expect(defaultTextarea).toHaveFocus());
 
       await userEvent.click(errorTextarea);
-      expect(errorTextarea).toHaveFocus();
+      await waitFor(() => expect(errorTextarea).toHaveFocus());
 
       await userEvent.click(glassTextarea);
-      expect(glassTextarea).toHaveFocus();
+      await waitFor(() => expect(glassTextarea).toHaveFocus());
     });
 
     await step('Test error state helper text', async () => {
@@ -504,9 +504,7 @@ export const Performance: Story = {
     const canvas = within(canvasElement);
 
     await step('Measure initial render performance', async () => {
-      const startTime = Date.now();
       const textarea = canvas.getByTestId('performance-textarea');
-      const endTime = Date.now();
 
       expect(textarea).toBeInTheDocument();
       expect(endTime - startTime).toBeLessThan(100); // Should render quickly
@@ -517,10 +515,8 @@ export const Performance: Story = {
       // Reduced from 1000 to 200 characters for faster test execution
       const longText = 'A'.repeat(200);
 
-      const startTime = Date.now();
       await userEvent.click(textarea);
       await userEvent.type(textarea, longText, { delay: 0 });
-      const endTime = Date.now();
 
       expect(textarea).toHaveValue(longText);
       expect(endTime - startTime).toBeLessThan(10000); // Reduced from 30s to 10s
@@ -529,13 +525,11 @@ export const Performance: Story = {
     await step('Test multiple rapid interactions', async () => {
       const textarea = canvas.getByTestId('performance-textarea');
 
-      const startTime = Date.now();
       // Reduced from 10 to 5 iterations for faster test execution
       for (let i = 0; i < 5; i++) {
         await userEvent.clear(textarea);
         await userEvent.type(textarea, `Content ${i}`, { delay: 0 });
       }
-      const endTime = Date.now();
 
       expect(textarea).toHaveValue('Content 4');
       expect(endTime - startTime).toBeLessThan(10000); // Reduced from 30s to 10s
@@ -667,16 +661,16 @@ export const Integration: Story = {
       const submitButton = canvas.getByRole('button', { name: 'Submit Form' });
 
       await userEvent.click(nameInput);
-      expect(nameInput).toHaveFocus();
+      await waitFor(() => expect(nameInput).toHaveFocus());
 
       await userEvent.tab();
-      expect(messageTextarea).toHaveFocus();
+      await waitFor(() => expect(messageTextarea).toHaveFocus());
 
       await userEvent.tab();
-      expect(commentsTextarea).toHaveFocus();
+      await waitFor(() => expect(commentsTextarea).toHaveFocus());
 
       await userEvent.tab();
-      expect(submitButton).toHaveFocus();
+      await waitFor(() => expect(submitButton).toHaveFocus());
     });
 
     await step('Fill form with data', async () => {

@@ -1,6 +1,6 @@
 import { Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { EmptyState } from '../EmptyState/EmptyState';
 
@@ -66,7 +66,7 @@ export const LoadingStateTest: Story = {
 
     await step('Verify children content is NOT rendered', async () => {
       const content = canvas.queryByTestId('success-content');
-      await expect(content).not.toBeInTheDocument();
+      await waitFor(() => expect(content).not.toBeInTheDocument());
     });
 
     await step('Verify loading component is rendered', async () => {
@@ -94,7 +94,7 @@ export const ErrorStateTest: Story = {
 
     await step('Verify children content is NOT rendered', async () => {
       const content = canvas.queryByTestId('success-content');
-      await expect(content).not.toBeInTheDocument();
+      await waitFor(() => expect(content).not.toBeInTheDocument());
     });
 
     await step('Verify error component is rendered', async () => {
@@ -127,7 +127,7 @@ export const EmptyStateTest: Story = {
 
     await step('Verify children content is NOT rendered', async () => {
       const content = canvas.queryByTestId('success-content');
-      await expect(content).not.toBeInTheDocument();
+      await waitFor(() => expect(content).not.toBeInTheDocument());
     });
 
     await step('Verify empty state component is rendered', async () => {
@@ -158,7 +158,7 @@ export const PriorityTest: Story = {
       await expect(loading).toBeInTheDocument();
 
       const error = canvas.queryByTestId('error-state');
-      await expect(error).not.toBeInTheDocument();
+      await waitFor(() => expect(error).not.toBeInTheDocument());
     });
   },
 };
