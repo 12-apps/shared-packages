@@ -39,7 +39,7 @@ const RESYNC = 'pnpm --filter @12-apps/report-builder prisma:sync';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // Workspace-relative host paths; adopting repos change these two lines.
-const HOST_SCHEMA_LINK = join(HERE, '../../shared-helpers/prisma/schema/report-builder.prisma');
+const HOST_SCHEMA_LINK = join(HERE, '../../prisma/prisma/schema/report-builder.prisma');
 const HOST_SCHEMA_TARGET = '../../../report-builder/prisma/report-builder.prisma';
 
 function safeLstat(path) {

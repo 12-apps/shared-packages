@@ -60,21 +60,53 @@ function matchesPills<T extends Record<string, unknown>>(
  */
 function isRangeActive(range: RangeValue | undefined): range is RangeValue {
   if (!range || (range.min == null && range.max == null)) return false;
-  if (range.min != null && range.max != null && range.max < range.min) return false;
+  if (range.min != null && range.max != null) {
+    const order = compareBounds(range.max, range.min);
+    if (order !== null && order < 0) return false;
+  }
   return true;
 }
 
-/** Does one value satisfy a single (possibly one-sided) numeric range? */
-function rangeAllows(range: RangeValue | undefined, value: number | null | undefined): boolean {
+/**
+ * Order two bounds of the SAME range. A field's bounds are always one kind —
+ * both numbers, or both `AAAA-MM-DD` days, which sort correctly as strings.
+ * Mixed kinds are not comparable and return null, which every caller reads as
+ * "this bound constrains nothing" rather than silently ordering them wrong.
+ */
+function compareBounds(a: number | string, b: number | string): number | null {
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  if (typeof a === "string" && typeof b === "string") return a < b ? -1 : a > b ? 1 : 0;
+  return null;
+}
+
+/**
+ * Is `value` on the allowed side of ONE bound? `direction` is +1 for a lower
+ * bound (value must be at or above it) and -1 for an upper one. An absent bound
+ * constrains nothing; an incomparable pair excludes the row rather than
+ * quietly admitting it.
+ */
+function withinBound(
+  value: number | string,
+  bound: number | string | undefined,
+  direction: 1 | -1,
+): boolean {
+  if (bound == null) return true;
+  const order = compareBounds(value, bound);
+  return order !== null && order * direction >= 0;
+}
+
+/** Does one value satisfy a single (possibly one-sided) range? */
+function rangeAllows(
+  range: RangeValue | undefined,
+  value: number | string | null | undefined,
+): boolean {
   if (!isRangeActive(range)) return true;
-  // A row without a comparable number can't satisfy a bounded range.
-  if (value == null || Number.isNaN(value)) return false;
-  if (range.min != null && value < range.min) return false;
-  if (range.max != null && value > range.max) return false;
-  return true;
+  // A row without a comparable value can't satisfy a bounded range.
+  if (value == null || (typeof value === "number" && Number.isNaN(value))) return false;
+  return withinBound(value, range.min, 1) && withinBound(value, range.max, -1);
 }
 
-/** Does the row fall within every bounded numeric range? */
+/** Does the row fall within every bounded range? */
 function matchesRanges<T extends Record<string, unknown>>(
   row: T,
   rangeFields: RangeFieldConfig<T>[],

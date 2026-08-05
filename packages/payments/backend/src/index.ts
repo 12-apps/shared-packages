@@ -47,6 +47,7 @@ export type { WebhookReplayOptions, WebhookReplayReport } from './core/webhook-r
 export {
   classifyFailure,
   isPreSendNetworkError,
+  isTransportError,
   type AttemptOutcome,
   type FailureBucket,
   type ProbeResult,
@@ -74,12 +75,31 @@ export {
   toClientChargeView,
   isSettled,
   type ClientChargeView,
+  type ClientProviderConfig,
 } from './core/client-view';
+/**
+ * Buyer-requirements helpers (FUT-595): resolve an adapter's `customerSchema`
+ * per method, validate collected values against it, and union a chain's
+ * requirements for an up-front form. The types travel via `core/types`.
+ */
+export {
+  customerFieldsFor,
+  unionCustomerFields,
+  validateCustomer,
+} from './core/customer-schema';
+/**
+ * Read a gate refusal back off an UNPINNED walk's failure list. Exported
+ * because `NoProviderSucceededError` carries its failures as strings: without
+ * this the host cannot tell "the buyer is missing a field" from "the provider
+ * broke", and answers buyer input with a 5xx. See the function's own doc.
+ */
+export { parseCustomerRequirements } from './core/customer-gate';
 export {
   AmbiguousChargeError,
   ChargeDeclinedError,
   ChargeNotPersistedError,
   CredentialsError,
+  CustomerRequirementsError,
   NoProviderSucceededError,
   PaymentsError,
   ProviderRequestError,
@@ -96,7 +116,12 @@ export type {
   ChargeStatus,
   ClientTokenization,
   CredentialFieldSpec,
+  CustomerFieldIssue,
+  CustomerFieldKey,
+  CustomerFieldSpec,
+  CustomerFieldType,
   CustomerInfo,
+  CustomerSchema,
   DeclineReason,
   ProbeFault,
   ProbeOutcome,
@@ -166,6 +191,19 @@ export {
 } from './http/handlers';
 
 export {
+  mountPayments,
+  type MountedPaymentsRoutes,
+  type MountPaymentsOptions,
+  type PaymentsIntentKind,
+  type PaymentsRouteContext,
+  type PaymentsRouteExtension,
+  type PaymentsRouteExtensionArgs,
+  type PaymentsRouteIntent,
+  type PaymentsRouteMethod,
+  type PaymentsRouteParams,
+} from './http/router';
+
+export {
   createPrismaAttemptLedger,
   type ChargeAttemptDelegate,
 } from './prisma/attempt-ledger';
@@ -195,3 +233,53 @@ export {
   createMemoryWebhookInbox,
   type MemoryWebhookInbox,
 } from './memory-webhook-inbox';
+
+// ---- Activation & verification (FUT-558) ---------------------------------
+// The "prove a real charge actually moved" flow (FUT-463): probe amounts,
+// the card and redirect verification charges, the pending-verification
+// lifecycle, webhook settlement and the stranded-proof reconcile sweep.
+// Hosts keep their routes and persistence and wire an ActivationContext.
+export type { ActivationContext } from './activation/context';
+export {
+  ownsVerificationReference,
+  parseVerificationReference,
+  verificationAmountCents,
+  verificationAttemptId,
+  verificationReference,
+} from './activation/reference';
+export {
+  failureFor,
+  unreachableReason,
+  type PollFlags,
+  type PollOutcome,
+  type VerificationFailure,
+  type VerifyChargeResult,
+} from './activation/failure';
+export {
+  credentialsForVerification,
+  verificationCardPublicKey,
+  verifyProviderCharge,
+  type VerifyChargeInput,
+} from './activation/verify-charge';
+export {
+  discardPendingVerification,
+  getPendingVerification,
+  pollRedirectVerification,
+  startRedirectVerification,
+  type RedirectStart,
+} from './activation/verify-redirect';
+export {
+  healStrandedActivation,
+  reconcileActivationCharges,
+  type ActivationLogger,
+  type ActivationProofStore,
+  type ActivationReconcileContext,
+  type ActivationReport,
+  type OutstandingActivation,
+} from './activation/reconcile';
+export { settleActivationCharge } from './activation/webhook';
+// Public-API seam for the FRONTEND half of FUT-558: `<ProviderActivation>`
+// will pick the CARD-vs-REDIRECT branch from capabilities through this,
+// retiring the admin's provider-name table (`tokenizerFor`). No host consumer
+// yet, on purpose — pinned by `activation-contract.test.ts` until it lands.
+export { activationFlowOf } from './activation/flow';

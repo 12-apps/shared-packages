@@ -1,5 +1,6 @@
 import { cancelChargeAt } from './charge-cancel';
 import { type ChargeWalkDeps, type FailoverPolicy, walkChargeChain } from './charge-walk';
+import { type ClientProviderConfig, toClientProviderConfig } from './client-view';
 import {
   CredentialsError,
   UnsupportedOperationError,
@@ -183,10 +184,14 @@ export interface PaymentsGateway<P extends string = string> {
    * can no longer honour.
    */
   forgetVault(merchant: MerchantRef, provider: P, input: VaultForgetInput): Promise<void>;
-  /** Client-safe tokenization config for the merchant's active provider. */
-  clientConfig(merchant: MerchantRef): Promise<ReturnType<PaymentProviderAdapter['clientConfig']> | null>;
   /**
-   * Tokenization config for EVERY provider in the chain, in failover order.
+   * Client-safe config for the merchant's active provider: tokenization plus
+   * the adapter's declared buyer requirements (`customerSchema`, FUT-595) —
+   * what the checkout renders the buyer form from.
+   */
+  clientConfig(merchant: MerchantRef): Promise<ClientProviderConfig | null>;
+  /**
+   * Client config for EVERY provider in the chain, in failover order.
    *
    * This is what makes card failover possible. A card instrument is bound to
    * the provider that minted it, so a checkout that only tokenizes for the
@@ -194,10 +199,13 @@ export interface PaymentsGateway<P extends string = string> {
    * read — and the gateway will skip them rather than send it. A checkout
    * that wants a card charge to survive its first provider failing mints one
    * instrument per entry here and submits them as `card.tokensByProvider`.
+   *
+   * It also carries each member's `customerSchema`, so a checkout can collect
+   * the UNION of the chain's buyer requirements up front (`unionCustomerFields`)
+   * — the documented answer to "failover must not strand a charge for want of
+   * a field nobody collected".
    */
-  clientConfigChain(
-    merchant: MerchantRef,
-  ): Promise<ReturnType<PaymentProviderAdapter['clientConfig']>[]>;
+  clientConfigChain(merchant: MerchantRef): Promise<ClientProviderConfig[]>;
   /**
    * Full inbound-webhook pipeline for a delivery already attributed to a
    * merchant (hosts attribute via the webhook URL, e.g. a per-merchant
@@ -332,12 +340,12 @@ export function createPaymentsGateway<P extends string>(
       if (!name) return null;
       const creds = await config.credentials.getCredentials(merchant, name);
       if (!creds) return null;
-      return config.providers.get(name).clientConfig(creds);
+      return toClientProviderConfig(config.providers.get(name), creds);
     },
 
     async clientConfigChain(merchant) {
       const chain = await config.credentials.providerChain(merchant);
-      const configs = [];
+      const configs: ClientProviderConfig[] = [];
       for (const name of chain) {
         if (!config.providers.has(name)) continue;
         // A provider whose credentials cannot be resolved is simply absent
@@ -347,7 +355,7 @@ export function createPaymentsGateway<P extends string>(
           .getCredentials(merchant, name)
           .catch(() => null);
         if (!creds) continue;
-        configs.push(config.providers.get(name).clientConfig(creds));
+        configs.push(toClientProviderConfig(config.providers.get(name), creds));
       }
       return configs;
     },

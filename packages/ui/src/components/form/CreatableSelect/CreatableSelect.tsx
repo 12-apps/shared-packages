@@ -21,6 +21,9 @@ const CREATE_PREFIX = ' create:';
 
 const filterOptions = createFilterOptions<InternalOption>();
 
+/** How far one nesting level indents a dropdown row, in px. */
+const INDENT_STEP = 16;
+
 /** `sm`/`md` → MUI's own scale, the same mapping {@link Input} uses. */
 const MUI_SIZE = { sm: 'small', md: 'medium' } as const;
 
@@ -61,6 +64,26 @@ function buildFilter(
   };
 }
 
+/**
+ * A nested option is indented on its ROW; the label itself stays the bare name,
+ * so the closed field never shows the tree drawing (see `depth`).
+ */
+function renderIndentedOption(
+  props: React.HTMLAttributes<HTMLLIElement>,
+  option: InternalOption,
+): React.JSX.Element {
+  const { key, ...rest } = props as typeof props & { key?: string };
+  return (
+    <li
+      key={key ?? option.value}
+      {...rest}
+      style={{ paddingLeft: INDENT_STEP * (1 + (option.depth ?? 0)) }}
+    >
+      {option.label}
+    </li>
+  );
+}
+
 /** The text field Autocomplete renders, with the library's border + a loading adornment. */
 function renderField(
   params: AutocompleteRenderInputParams,
@@ -98,6 +121,46 @@ function renderField(
 }
 
 /**
+ * The option list, plus the selected OBJECT MUI wants, from the controlled value.
+ * `depth` is carried through: it is what {@link renderIndentedOption} draws.
+ */
+function useInternalOptions(
+  options: CreatableSelectOption[],
+  value: string | null,
+): { items: InternalOption[]; selected: InternalOption | null } {
+  const items = useMemo<InternalOption[]>(
+    () => options.map(({ value: optionValue, label, depth }) => ({
+      value: optionValue,
+      label,
+      depth,
+    })),
+    [options],
+  );
+  const selected = useMemo<InternalOption | null>(
+    () => items.find((option) => option.value === value) ?? null,
+    [items, value],
+  );
+  return { items, selected };
+}
+
+/** Route a picked row: cleared, the synthetic create row, or a real option. */
+function handlePick(
+  next: InternalOption | null,
+  onChange: CreatableSelectProps['onChange'],
+  onCreate: CreatableSelectProps['onCreate'],
+): void {
+  if (!next) {
+    onChange(null);
+    return;
+  }
+  if (next.isCreate) {
+    void onCreate?.(next.value.slice(CREATE_PREFIX.length));
+    return;
+  }
+  onChange(next.value);
+}
+
+/**
  * A single-select, searchable combobox that can create a new option on the fly.
  *
  * Type to filter {@link CreatableSelectProps.options}; when the typed text matches
@@ -127,17 +190,7 @@ export function CreatableSelect({
   dataTestId = 'creatable-select',
 }: CreatableSelectProps): React.JSX.Element {
   const inputId = useId();
-
-  const items = useMemo<InternalOption[]>(
-    () => options.map((option) => ({ value: option.value, label: option.label })),
-    [options],
-  );
-
-  // MUI holds the selected *option object*; derive it from the controlled value.
-  const selected = useMemo<InternalOption | null>(
-    () => items.find((option) => option.value === value) ?? null,
-    [items, value],
-  );
+  const { items, selected } = useInternalOptions(options, value);
 
   return (
     <FormControl fullWidth={fullWidth} error={Boolean(error)}>
@@ -164,18 +217,9 @@ export function CreatableSelect({
         slotProps={{ popper: { sx: { zIndex: (theme) => theme.zIndex.modal + 100 } } }}
         getOptionLabel={(option) => (typeof option === 'string' ? option : option.label)}
         isOptionEqualToValue={(option, current) => option.value === current.value}
+        renderOption={renderIndentedOption}
         filterOptions={buildFilter(onCreate, createOptionLabel)}
-        onChange={(_event, next) => {
-          if (!next) {
-            onChange(null);
-            return;
-          }
-          if (next.isCreate) {
-            void onCreate?.(next.value.slice(CREATE_PREFIX.length));
-            return;
-          }
-          onChange(next.value);
-        }}
+        onChange={(_event, next) => handlePick(next, onChange, onCreate)}
         renderInput={(params) =>
           renderField(params, { inputId, placeholder, error, loading, size, dataTestId })
         }
