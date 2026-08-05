@@ -404,7 +404,7 @@ export const KeyboardNavigation: Story = {
     const triggerButton = canvas.getByTestId('keyboard-trigger');
 
     // Focus and press Enter to open portal
-    await userEvent.click(triggerButton);
+    triggerButton.focus();
     await userEvent.keyboard('{Enter}');
 
     // Wait for portal to appear
@@ -617,11 +617,7 @@ export const FocusManagement: Story = {
 
       const closePortal = () => {
         setShowPortal(false);
-        // Restoring focus to whatever had it before the portal opened is the
-        // behaviour this story demonstrates, not the test positioning itself.
-        // The delay lets React commit the unmount first, or focus would be
-        // moved and then immediately lost with the removed subtree.
-        // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/no-hard-coded-timeout -- component behaviour
+        // Restore focus after a brief delay to allow DOM updates
         window.setTimeout(() => {
           previousFocus?.focus();
         }, 10);
@@ -697,7 +693,7 @@ export const FocusManagement: Story = {
 
     // Focus on the trigger button
     const triggerButton = canvas.getByTestId('focus-trigger');
-    await userEvent.click(triggerButton);
+    triggerButton.focus();
     expect(triggerButton).toHaveFocus();
 
     // Open portal

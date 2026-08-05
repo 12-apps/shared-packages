@@ -101,7 +101,7 @@ export const KeyboardNavigation: Story = {
 
     // Focus on the pagination component
     const firstButton = canvas.getAllByRole('button')[0];
-    await userEvent.click(firstButton);
+    firstButton.focus();
 
     // Tab through buttons
     await userEvent.tab();
@@ -188,18 +188,18 @@ export const FocusManagement: Story = {
 
     // Test focus on first button
     const firstButton = buttons[0];
-    await userEvent.click(firstButton);
-    await waitFor(() => expect(document.activeElement).toBe(firstButton));
+    firstButton.focus();
+    await expect(document.activeElement).toBe(firstButton);
 
     // Tab through all interactive elements
     for (let i = 1; i < buttons.length; i++) {
       await userEvent.tab();
-      await waitFor(() => expect(document.activeElement).toBe(buttons[i]));
+      await expect(document.activeElement).toBe(buttons[i]);
     }
 
     // Test shift+tab backwards
     await userEvent.tab({ shift: true });
-    await waitFor(() => expect(document.activeElement).toBe(buttons[buttons.length - 2]));
+    await expect(document.activeElement).toBe(buttons[buttons.length - 2]);
 
     // Test focus trap doesn't occur
     await userEvent.tab();

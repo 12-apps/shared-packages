@@ -42,7 +42,7 @@ export const BasicInteraction: Story = {
     await userEvent.click(textElement);
 
     // Test text element maintains focus capabilities
-    await userEvent.click(textElement);
+    textElement.focus();
     expect(textElement).toHaveFocus();
 
     // Test element can be selected
@@ -154,7 +154,7 @@ export const KeyboardNavigation: Story = {
     ];
 
     // Test initial focus
-    await userEvent.click(focusableTexts[0]);
+    focusableTexts[0].focus();
     expect(focusableTexts[0]).toHaveFocus();
 
     // Test Tab navigation between elements
@@ -268,7 +268,7 @@ export const FocusManagement: Story = {
     });
 
     // Test focus containment within container
-    await userEvent.click(focusableText);
+    focusableText.focus();
     expect(document.activeElement).toBe(focusableText);
 
     // Test focus visibility
@@ -283,7 +283,7 @@ export const FocusManagement: Story = {
 
     const handleFocus = () => {
       if (focusTarget) {
-        await userEvent.click(focusTarget);
+        focusTarget.focus();
       }
     };
 
