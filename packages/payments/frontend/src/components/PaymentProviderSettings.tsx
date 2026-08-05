@@ -1,7 +1,7 @@
 'use client';
 
 import { Alert, Box, Button, CircularProgress } from '@mui/material';
-import type { ReactNode } from 'react';
+import { useCallback, type ReactNode } from 'react';
 
 import type { MaskedProviderConfig } from '@12-apps/payments-backend';
 
@@ -12,11 +12,13 @@ import { ActivePanel, type ActivePanelProps, type PrepareConnect } from './Provi
 import {
   guideAwaitsConfirmation,
   progressKeyOf,
+  useCanonicalProviderSegment,
   useOpenProvider,
   useSelectedProvider,
   useSettingsState,
   useSetupConfirmation,
   useSetupGuide,
+  type ProviderChangeHandler,
 } from './settings-state';
 import { openSection, SetupGuideSection } from './SetupGuideSection';
 
@@ -66,6 +68,12 @@ export interface PaymentProviderSettingsProps {
    * because the host's value is now the single source of truth. Leave it
    * `undefined` and nothing changes: selection stays internal, as every
    * existing caller expects.
+   *
+   * The value may be the provider's NAME or its `urlSlug` — a host that keeps
+   * the selection in a path segment passes the segment verbatim, and the raw
+   * name stays a working alias so old links do not 404. Which spelling each
+   * provider uses is the adapter's own declaration, carried in the catalog;
+   * the host holds no map.
    */
   selectedProvider?: string | null;
   /**
@@ -74,8 +82,15 @@ export interface PaymentProviderSettingsProps {
    * Independent of `selectedProvider`: an uncontrolled host can use this purely
    * to observe, while a controlled host uses it to write the new selection
    * wherever it keeps it.
+   *
+   * Reports the provider's `urlSlug` — its name, unless the adapter re-spells
+   * it — so a controlled host writes the value straight into its URL. It is
+   * also how a segment gets CORRECTED: handed an alias (the OAuth callback's
+   * `?connected=` carries the raw name), this fires once with the canonical
+   * slug and `{ replace: true }`, asking the host to rewrite — not extend —
+   * its history ({@link ProviderChangeHandler}).
    */
-  onProviderChange?: (provider: string | null) => void;
+  onProviderChange?: ProviderChangeHandler;
   /**
    * The activation step, rendered under the connection card.
    *
@@ -216,8 +231,19 @@ export function PaymentProviderSettings({
     selectedProvider,
     onProviderChange,
   );
+  // What leaves this component (and what it stores) is the adapter's URL
+  // spelling, so a controlled host writes it into its path segment verbatim —
+  // `useOpenProvider` resolves names and slugs alike, so either survives.
+  const openProvider = useCallback(
+    (name: string | null) =>
+      setSelected(name ? (view?.providers.find((p) => p.name === name)?.urlSlug ?? name) : null),
+    [view, setSelected],
+  );
   // Resolved above the early returns, because the guide hook depends on both.
   const { active, activeConfig } = useOpenProvider(view, selected);
+  // A controlled segment that resolved through the alias gets respelled to the
+  // adapter's canonical slug — the address bar is part of the contract.
+  useCanonicalProviderSegment(selectedProvider, active, onProviderChange);
   const { guide, loaded } = useSetupGuide(client, active?.name ?? null, progressKeyOf(activeConfig));
   const ack = useSetupConfirmation(client, active, activeConfig);
 
@@ -225,7 +251,7 @@ export function PaymentProviderSettings({
   if (!view) return <CircularProgress data-testid="payments-settings-loading" />;
 
   if (!active) {
-    return <ProviderList view={view} client={client} reload={reload} onSelect={setSelected} />;
+    return <ProviderList view={view} client={client} reload={reload} onSelect={openProvider} />;
   }
 
   return (
@@ -236,7 +262,7 @@ export function PaymentProviderSettings({
       onChanged={onChanged}
       reload={() => void reload()}
       prepareConnect={prepareConnect}
-      onBack={() => setSelected(null)}
+      onBack={() => openProvider(null)}
       // A new credential may name a DIFFERENT InfinitePay account, and the
       // owner's "Checkout Integrado is on" was said about the old one. The
       // server already drops its own verdict and its proof on any credential

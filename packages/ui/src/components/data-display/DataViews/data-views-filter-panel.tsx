@@ -1,13 +1,12 @@
 "use client";
 
-import SearchIcon from '@mui/icons-material/Search';
-import { Box, Button, Chip, InputAdornment, Link, TextField, Typography } from "@mui/material";
-import { useRef, useState } from "react";
+import { Box, Link } from "@mui/material";
 
 import { StackedModal, StackedModalContent } from "../../feedback/StackedModal";
 import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 import { TableFilter } from "../../layout/TableFilter";
 
+import { PanelRangeField } from "./data-views-range-pill";
 import type {
   FilterFieldConfig,
   RangeFieldConfig,
@@ -16,7 +15,7 @@ import type {
 
 /* ── Filter panel ────────────────────────────────────────────────────────── */
 
-interface GridFilterPanelProps<T extends Record<string, unknown>> {
+export interface GridFilterPanelProps<T extends Record<string, unknown>> {
   testIdPrefix: string;
   search: string;
   fields: FilterFieldConfig<T>[];
@@ -110,11 +109,9 @@ function FilterControls<T extends Record<string, unknown>>({
             />
           ))}
           {rangeFields.map((field) => (
-            <TableFilter.RangeField
+            <PanelRangeField
               key={field.id}
-              label={field.label}
-              unit={field.unit}
-              step={field.step}
+              field={field}
               value={ranges[field.id] ?? {}}
               onChange={(range) => onChangeRange(field.id, range)}
               testId={`${testIdPrefix}-range-${field.id}`}
@@ -183,148 +180,5 @@ export function FilterDialog<T extends Record<string, unknown>>({
         </Box>
       </StackedModalContent>
     </StackedModal>
-  );
-}
-
-/* ── Inline (second-line) filter bar ─────────────────────────────────────── */
-
-/** Compact keyword box for the inline bar: commits on Enter/blur (like the panel). */
-function InlineKeyword({
-  value,
-  onChange,
-  testId,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  testId?: string;
-}): React.JSX.Element {
-  const [draft, setDraft] = useState(value);
-  const prev = useRef(value);
-  if (prev.current !== value) {
-    prev.current = value;
-    if (draft !== value) setDraft(value);
-  }
-  const commit = (): void => {
-    if (draft !== value) onChange(draft);
-  };
-  return (
-    <TextField
-      size="small"
-      value={draft}
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={commit}
-      onKeyDown={(event) => {
-        if (event.key !== "Enter") return;
-        event.preventDefault();
-        commit();
-      }}
-      placeholder="Buscar…"
-      inputProps={{ "aria-label": "Buscar em todas as colunas", "data-testid": testId }}
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <SearchIcon sx={{ fontSize: 16, color: "text.secondary" }} />
-          </InputAdornment>
-        ),
-      }}
-      sx={{ minWidth: 220 }}
-    />
-  );
-}
-
-/** Props the inline bar needs (a subset of the slide-in panel's — no ranges). */
-type InlineFilterBarProps<T extends Record<string, unknown>> = Pick<
-  GridFilterPanelProps<T>,
-  "testIdPrefix" | "search" | "fields" | "pills" | "onSearchChange" | "onTogglePill" | "onClearField" | "onClearAll"
->;
-
-/** One removable active-filter chip: a search term or a selected pill value. */
-interface ActiveChip {
-  key: string;
-  label: string;
-  onDelete: () => void;
-}
-
-/**
- * A horizontal filter bar (used instead of the slide-in {@link GridFilterPanel} on
- * wide screens): the compact keyword search, each field as a rounded pill dropdown,
- * and — when anything is applied — a row of removable "active filter" chips. Range
- * filters are not shown here (the slide-in panel keeps those).
- */
-export function InlineFilterBar<T extends Record<string, unknown>>({
-  testIdPrefix,
-  search,
-  fields,
-  pills,
-  onSearchChange,
-  onTogglePill,
-  onClearField,
-  onClearAll,
-}: InlineFilterBarProps<T>): React.JSX.Element {
-  // Flatten every applied filter into a removable chip (flatMap + map avoids a
-  // nested loop). A chip's delete clears just that value; the search chip clears `q`.
-  const pillChips: ActiveChip[] = fields.flatMap((field) =>
-    (pills[field.id] ?? []).map((value) => ({
-      key: `${field.id}:${value}`,
-      label: `${field.label}: ${field.options.find((option) => option.value === value)?.label ?? value}`,
-      onDelete: () => onTogglePill(field.id, value, false),
-    })),
-  );
-  const chips: ActiveChip[] = [
-    ...(search.trim() !== "" ? [{ key: "__search", label: `Busca: ${search}`, onDelete: () => onSearchChange("") }] : []),
-    ...pillChips,
-  ];
-  return (
-    <Box
-      data-testid={`${testIdPrefix}-inline-filters`}
-      sx={{ display: "flex", flexDirection: "column", gap: 1.5, py: 1.5 }}
-    >
-      <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5 }}>
-        <InlineKeyword value={search} onChange={onSearchChange} testId={`${testIdPrefix}-search-all`} />
-        {fields.map((field) => (
-          <MultiSelectDropdown
-            key={field.id}
-            label={field.label}
-            options={field.options}
-            selected={new Set(pills[field.id] ?? [])}
-            onToggle={(value, checked) => onTogglePill(field.id, value, checked)}
-            onClear={() => onClearField(field.id)}
-            allLabel="Todas"
-            searchable={field.searchEnabled ? true : undefined}
-            searchPlaceholder="Buscar…"
-            noResultsLabel="Nenhum resultado"
-            layout="pill"
-            data-testid={`${testIdPrefix}-filter-${field.id}`}
-          />
-        ))}
-      </Box>
-      {chips.length > 0 && (
-        <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}>
-          <Typography component="span" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
-            Filtros ativos:
-          </Typography>
-          {chips.map((chip) => (
-            <Chip
-              key={chip.key}
-              label={chip.label}
-              size="small"
-              variant="outlined"
-              onDelete={chip.onDelete}
-              data-testid={`${testIdPrefix}-active-${chip.key}`}
-            />
-          ))}
-          <Button
-            variant="text"
-            size="small"
-            color="inherit"
-            onClick={onClearAll}
-            data-testid={`${testIdPrefix}-clear-filters`}
-            sx={{ fontSize: "0.75rem", color: "text.secondary", textTransform: "none" }}
-          >
-            Limpar
-          </Button>
-        </Box>
-      )}
-    </Box>
   );
 }

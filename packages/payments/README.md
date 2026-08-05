@@ -8,7 +8,7 @@ deliberately shaped so it can later become a standalone application
 | package                   | contents |
 | ------------------------- | -------- |
 | `@12-apps/payments-backend`  | normalized charge/refund/webhook domain, per-provider adapters (Stone, InfinitePay, Stripe), the gateway, merchant-scoped credential settings (masking, verify, single active provider), fetch-native HTTP handlers, storage ports with in-memory + Prisma implementations, and the OWNED Prisma schema fragment + migration |
-| `@12-apps/payments-frontend` | plug-and-play MUI components for the two payment surfaces — `PaymentProviderSettings` (per-provider config page) and `CheckoutPayment` (buyer payment step) — plus the headless hooks/clients they build on |
+| `@12-apps/payments-frontend` | plug-and-play MUI components for the payment surfaces — `PaymentProviderSettings` (per-provider config page), `CheckoutPayment` (buyer payment step) and `CheckoutFlow` (the FULL three-step buyer checkout, host-composed through ports + design-system slots; see `ADOPTING.md` §3) — plus the headless hooks/clients they build on |
 
 Everything payment-related lives here: code, HTTP surface, UI, database
 schema, and migration. Hosts mount it; they don't re-implement any of it.

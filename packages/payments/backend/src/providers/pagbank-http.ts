@@ -1,6 +1,6 @@
 import { ProviderRequestError, type ProviderRequestSnapshot } from '../core/errors';
 import { isPreSendNetworkError } from '../core/failover';
-import type { CustomerInfo, ResolvedCredentials } from '../core/types';
+import type { CustomerInfo, CustomerSchema, ResolvedCredentials } from '../core/types';
 
 /**
  * PagBank Orders API transport — the bits every call shares, kept apart from
@@ -91,6 +91,23 @@ export function customerPayload(customer: CustomerInfo) {
     phones: customerPhones(customer.phone),
   };
 }
+
+/**
+ * What PagBank asks of the buyer (FUT-595), straight from the
+ * `reference/criar-pedido` schema: `customer.tax_id` is the ONLY required
+ * customer field. `phones` is optional — and conditional when present (all
+ * three parts or nothing, see {@link customerPhones}) — and name/e-mail are
+ * optional pre-fill, not demands. Declaring name/e-mail required here is
+ * exactly the bug this schema replaces: buyers were asked for fields no
+ * provider needs while the CPF PagBank refuses without stayed "optional".
+ * Lives beside {@link customerPayload}, whose wire behaviour it describes.
+ */
+export const customerSchema: CustomerSchema = [
+  { key: 'name', type: 'NAME', required: false },
+  { key: 'email', type: 'EMAIL', required: false },
+  { key: 'taxId', type: 'CPF', required: true },
+  { key: 'phone', type: 'PHONE', required: false },
+];
 
 /**
  * PagBank caps `notification_urls` at 150 chars, so no shared secret goes in

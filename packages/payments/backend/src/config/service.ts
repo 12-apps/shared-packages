@@ -174,6 +174,7 @@ function descriptorOf(providers: ProviderRegistry, name: string): ProviderDescri
   return {
     name: adapter.name,
     displayName: adapter.displayName,
+    urlSlug: providers.urlSlugOf(adapter.name),
     capabilities: adapter.capabilities,
     authMode: adapter.authMode ?? 'credentials',
     credentialSchema: adapter.credentialSchema,

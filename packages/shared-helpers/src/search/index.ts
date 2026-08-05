@@ -12,6 +12,7 @@ export {
   type EntitySearchConfig,
   type FilterFieldDef,
   type FilterOperator,
+  type OrderBy,
   type PaginatedResult,
   type PaginationMeta,
   type ParsedSearchInput,

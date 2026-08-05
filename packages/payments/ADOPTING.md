@@ -44,26 +44,51 @@ Two constructor arguments are security-critical:
   local dev and demo tenants. Even when on it applies only to SANDBOX
   configs; PRODUCTION can never run stub charges.
 
-Mount the handlers behind the host's auth. Suggested Next.js layout:
+Mount the surface with ONE call instead of a route file per handler
+(FUT-559). `mountPayments` carries the canonical layout as data and returns
+`{ GET, POST, PUT }` for a single catch-all segment route:
 
-| route | handler | merchant attribution |
-| ----- | ------- | -------------------- |
-| `GET  /api/payments/config` | `getClientConfig` | tenant in scope (buyer session) |
-| `POST /api/payments/charges` | `createCharge` | tenant in scope |
-| `GET  /api/payments/charges/[provider]/[id]` | `getCharge` | tenant in scope |
-| `POST /api/payments/webhooks/[provider]/[connectKey]` | `handleWebhook` | connect key → merchant (same pattern as the PagBank webhook route); pass the RAW body |
-| `GET  /api/payments/settings` | `getSettings` | admin session → their tenant |
-| `PUT  /api/payments/settings/providers/[provider]` | `saveCredentials` | admin session |
-| `PUT  /api/payments/settings/providers/[provider]/enabled` | `setEnabled` | admin session |
-| `POST /api/payments/settings/providers/[provider]/verify` | `verify` | admin session |
-| `GET  /api/payments/settings/providers/[provider]/setup-guide` | `getSetupGuide` | admin session (host supplies `setupContextFor` with per-merchant webhook URLs) |
-| `POST /api/payments/settings/providers/[provider]/oauth/begin` | `beginOAuth` | admin session; host mints + persists the CSRF `state` first |
-| `POST /api/payments/settings/providers/[provider]/oauth/complete` | `completeOAuth` | admin session; call from your callback route AFTER validating `state` |
-| `POST /api/payments/settings/providers/[provider]/oauth/disconnect` | `disconnectOAuth` | admin session |
+```ts
+// app/api/payments/[[...segments]]/route.ts (or any mount point)
+import { mountPayments } from '@12-apps/payments-backend';
+
+export const { GET, POST, PUT } = mountPayments({
+  gateway: paymentsHttp, // createPaymentsHttp's result, or a lazy getter
+  // Runs BEFORE any handler, with the PARSED intent ({ kind, method,
+  // provider, segments, params }). Return a Response to refuse; anything
+  // else is your auth context. Gate per intent — e.g. bill a plan quota
+  // only on `setEnabled`, checkout intents on the buyer session, settings
+  // intents on the admin session.
+  requireAuth: async (request, intent) => authorize(request, intent),
+  // Merchant attribution from that context — tenant checkout, admin
+  // settings, or `{ kind: 'PLATFORM', id: 'platform' }` for
+  // platform-charges-tenants billing.
+  resolveMerchant: (auth) => ({ kind: 'TENANT', id: auth.tenantId }),
+});
+```
+
+The canonical layout it serves (relative to the mount): `config`, `charges`,
+`charges/:provider/:chargeId`, `webhooks/:provider`, `settings`,
+`settings/priorities`, `settings/failover-policy`, `settings/guides/:provider`,
+and the credential lifecycle under `settings/providers/:provider`
+(`""`/`enabled`/`verify`/`oauth/begin|complete|disconnect`). Shape the mount
+with:
+
+- `prefix` — mount a SUBTREE: a catch-all at `.../settings/providers/*`
+  passes `['settings', 'providers']` and the table matches the remainder
+  (this repo's admin mount does exactly that).
+- `exclude` — built-ins this mount must not serve. Exclude `completeOAuth`
+  whenever your OAuth callback validates the CSRF `state` elsewhere: code
+  spending must not be reachable as a plain authed endpoint.
+- `extensions` — host-only intents (a verification-charge screen, a
+  CSRF-state mint) dispatched through the same parse → auth path.
+- `notFound` / `methodNotAllowed` — match your app's 404/405 house bodies.
 
 OAuth-mode providers need three more host pieces — the CSRF state, the
 callback route, and a refresh sweep over `expires_at`. See `OAUTH.md`, which
-also lists the per-vendor documentation to consult.
+also lists the per-vendor documentation to consult. Webhooks may also stay on
+their own dedicated routes (this repo keeps `/api/webhooks/**` as permanent
+aliases); `handleWebhook` needs the RAW body either way.
 
 For platform-charges-tenants billing, mount the same handlers under a
 platform-admin route with `{ merchant: { kind: 'PLATFORM', id: 'platform' } }`.
@@ -76,10 +101,91 @@ Domain reactions (mark order paid, notifications, rollups, audit) live in
 - Settings page: render `<PaymentProviderSettings client={...} />` where the
   provider config screen lives today. It renders every registered provider
   from its credential schema — adding a vendor changes NOTHING here.
-- Checkout page: render `<CheckoutPayment ... />` inside a
+- Payment step only: render `<CheckoutPayment ... />` inside a
   `<PaymentsProvider>`. Inject `tokenizeCard` per the active provider's
   `tokenization` (`SDK` → load the provider's JS SDK; `PUBLIC_KEY` → encrypt
   with `config.publicKey`; `REDIRECT`/PIX flows need no tokenizer).
+
+### The buyer checkout surface (`<CheckoutFlow>`, FUT-564)
+
+The full three-step buyer flow — Dados (CPF + LGPD "salvar meus dados") →
+Pagamento (method picker, PIX QR + polling, card form + tokenization, saved
+cards, hosted-checkout redirect + return resume) → Confirmação — mounts in
+one line:
+
+```tsx
+<CheckoutFlow
+  cart={{ empty, totalLabel, totalItems }}   // display facts, never money math
+  createOrder={(input) => ...}               // REQUIRED — see ports below
+  onExitToMenu={() => ...}                   // REQUIRED — leave for your catalog
+/>
+```
+
+It talks to the host-mounted `/api/checkout*` surface (`/api/checkout/status`,
+`/config`, `/charge`, `/cards`, `/refresh-key`) and speaks the store's ACTIVE
+provider protocol end to end — PagBank (PIX + SDK-encrypted card), Stone
+(Pagar.me token), InfinitePay (hosted redirect, resumed on return) — with no
+provider branching in host code.
+
+**The ports (host domain stays in the host).** Cart, catalog, comanda and
+order CREATION never enter the package; they arrive as explicit props:
+
+| port | required | what the host does with it |
+| ---- | -------- | -------------------------- |
+| `cart` | yes | `{ empty, totalLabel, totalItems, discountLines? }` — read from YOUR cart; `discountLines` is your own rendered discount itemization |
+| `createOrder(input)` | yes | raise the order from your cart/comanda; close over tenant + comanda scope; answer `CreateOrderResult` (`{ok:true,data:CheckoutOrder}` or a structured `CheckoutError`) |
+| `onExitToMenu()` | yes | navigate to your catalog |
+| `saveBuyerContact(contact)` | no | persist name/phone/CPF on "Continuar" (LGPD-gated by the flow); the WIRE rules — e.g. a blank CPF must be omitted, never sent as `""` — are yours |
+| `onPaid()` | no | the order settled PAID — re-read your server-emptied cart |
+| `comanda` | no | `{ scope, totalLabel, totalItems }` when settling a comanda instead of the cart |
+| `taxIdOnFile` | no | `true` skips Dados (FUT-465) — the payer block offers the way back |
+| `providerConfig` | no | the `GET /api/checkout/config` answer (`fetchCheckoutConfig` is exported); `null` while loading degrades safely |
+| `tenantSlug` | no | scopes the saved-card list to the store being paid |
+| `confirmationExtra` | no | host content on the PAID confirmation (this repo's PWA install invite) |
+
+**The design-system contract (decision: option 3 — slot injection).** The
+package ships behavior + structure and renders its pixels through a
+`components` prop of primitive slots; unfilled slots fall back to raw MUI, so
+the package's peers stay `@mui/material` + `@emotion/*` and NOTHING else. A
+host with a design system fills the slots once; a host without one mounts the
+flow bare and gets a plain, working checkout — that is what makes "used on
+another app" real, since another app will not share `@12-apps/ui` either.
+
+```tsx
+<CheckoutFlow components={{ Button: MyButton, Input: MyInput }} ... />
+// or, for subtrees (the admin's card-verification form does this):
+<CheckoutComponentsProvider components={mySlots}>...</CheckoutComponentsProvider>
+```
+
+The slots, each with a deliberately narrow prop contract (`Checkout*Props`
+types are exported; the props are the subset the checkout actually uses, so
+any design system satisfies them with a thin — often identity — mapping):
+
+| slot | contract highlights |
+| ---- | ------------------- |
+| `Text` | semantic `variant`/`size`/`weight`/`color`, `as`, `data-testid` |
+| `Button` | `variant` solid/outline/text, `color`, `size`, `fullWidth`, `loading`, `icon`, `dataTestId` **on the button element** |
+| `Input` | `label`, `error`+`helperText`, `endAdornment`, `data-testid` **on the `<input>` itself** (e2e fills it) |
+| `Checkbox` | `checked`, `onChange(event, checked)`, `label` |
+| `Alert` | `variant` info/warning/danger, `title`, `description`, `showIcon` |
+| `LoadingState` | spinner + `message` |
+| `Stepper` | `steps[{id,label}]`, `activeId`, `completed` |
+| `RadioGroup` | `options[{value,label,description}]` (the saved-cards list) |
+| `ActionBar` | the bottom CTA bar — host chrome (this repo's storefront passes its `StickyActionBar`) |
+
+Layout stays raw MUI `Box` INSIDE the package (MUI is already a peer), so
+slot implementations never receive layout responsibilities; test ids are
+identical through every slot implementation — they are the same hooks the
+storefront journeys click.
+
+This repo's `@12-apps/ui` binding lives in `@12-apps/spa-shared/payments-ui`
+(`checkoutUiComponents`); the storefront spreads it plus its `ActionBar`, and
+`@12-apps/spa-shared/card` re-exports the card form pre-wired with it for the
+admin's activation charge. The second-host proof is the package's own
+`src/components/checkout/__tests__/second-host.test.tsx`: the full flow walks
+Dados → Pagamento → card form with NO `@12-apps/ui` present (it is not even
+resolvable from the package), rendering entirely through the raw-MUI default
+slots.
 
 ## 4. Migrating the existing PagBank integration
 
