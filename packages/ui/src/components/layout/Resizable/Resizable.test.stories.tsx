@@ -209,16 +209,16 @@ export const KeyboardNavigation: Story = {
 
     await step('Content is focusable', async () => {
       const focusTarget = canvas.getByTestId('focus-target');
-      focusTarget.focus();
-      await expect(focusTarget).toHaveFocus();
+      await userEvent.click(focusTarget);
+      await waitFor(() => expect(focusTarget).toHaveFocus());
     });
 
     await step('Tab navigation works', async () => {
       const focusTarget = canvas.getByTestId('focus-target');
-      focusTarget.focus();
+      await userEvent.click(focusTarget);
       await userEvent.tab();
       // Tab should move focus away from the button
-      await expect(focusTarget).not.toHaveFocus();
+      await waitFor(() => expect(focusTarget).not.toHaveFocus());
     });
 
     await step('Container has proper ARIA attributes', async () => {
@@ -324,9 +324,11 @@ export const ResponsiveDesign: Story = {
       const content = canvas.getByTestId('responsive-content');
       await expect(content).toBeInTheDocument();
 
-      // Verify the component adapts to smaller screen
+      // The container is positioned so the resize handles can sit against its
+      // edges. That holds at every width — the old `window.innerWidth <= 768`
+      // guard meant this assertion simply did not run on a normal screen.
       const container = content.closest('[data-testid]')?.parentElement;
-      if (container && window.innerWidth <= 768) {
+      if (container) {
         const computedStyle = window.getComputedStyle(container);
         await expect(computedStyle.position).toBe('relative');
       }
@@ -415,7 +417,9 @@ const PerformanceTestComponent: React.FC = () => {
   React.useEffect(() => {
     const startTime = window.performance.now();
 
-    // Use requestAnimationFrame for reliable timing after render
+    // The demo measures itself to display a number; nothing asserts on it, so a
+    // slow frame cannot fail anything.
+    // eslint-disable-next-line test-flakiness/no-animation-wait -- demo self-measurement, not an assertion
     const frameId = window.requestAnimationFrame(() => {
       const endTime = window.performance.now();
       setRenderTime(endTime - startTime);

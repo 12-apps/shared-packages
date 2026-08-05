@@ -2,7 +2,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import { Box, Stack,TextField } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import { expect, fireEvent, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { Label } from './Label';
 
@@ -247,23 +247,23 @@ export const KeyboardNavigation: Story = {
       const firstInput = firstInputContainer.querySelector('input');
 
       // Focus first label
-      firstLabel.focus();
-      await expect(firstLabel).toHaveFocus();
+      await userEvent.click(firstLabel);
+      await waitFor(() => expect(firstLabel).toHaveFocus());
 
       // Tab to input
       await userEvent.tab();
-      await expect(firstInput).toHaveFocus();
+      await waitFor(() => expect(firstInput).toHaveFocus());
     });
 
     await step('Tab navigation backward', async () => {
       await userEvent.tab({ shift: true });
       const firstLabel = canvas.getByTestId('first-label');
-      await expect(firstLabel).toHaveFocus();
+      await waitFor(() => expect(firstLabel).toHaveFocus());
     });
 
     await step('Enter key activation on clickable label', async () => {
       const firstLabel = canvas.getByTestId('first-label');
-      firstLabel.focus();
+      await userEvent.click(firstLabel);
       await userEvent.keyboard('{Enter}');
       // Verify click handler would be called
     });
@@ -641,14 +641,20 @@ export const PerformanceTest: Story = {
     await step('Test scroll performance', async () => {
       const scrollContainer = canvas.getByTestId('scroll-container');
 
-      // Simulate rapid scrolling
-      for (let i = 0; i < 10; i++) {
-        scrollContainer.scrollTop = i * 40;
-        await new Promise((resolve) => window.setTimeout(resolve, 50));
-      }
+      // Scrolling is the one thing this story is about, so it has to move the
+      // container; what it must not do is assert a pixel offset, which depends
+      // on the viewport the story happens to render in.
+      // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject under test is scrolling itself
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      fireEvent.scroll(scrollContainer);
 
-      // Verify no janky behavior
-      await expect(scrollContainer).toBeInTheDocument();
+      // The labels are not virtualised, so scrolling must leave every one of
+      // them mounted — which is what the old toBeInTheDocument() on the
+      // container itself could never have caught, since the container was
+      // already there before the loop ran.
+      await waitFor(() => {
+        expect(canvas.getAllByTestId(/^label-\d+$/)).toHaveLength(100);
+      });
     });
   },
 };

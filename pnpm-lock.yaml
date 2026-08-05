@@ -775,6 +775,9 @@ importers:
       eslint-plugin-storybook:
         specifier: 9.1.10
         version: 9.1.10(eslint@9.39.5(jiti@2.7.0))(storybook@10.5.2(@types/react@19.2.2)(prettier@3.9.5)(react@19.2.0))(typescript@5.9.2)
+      eslint-plugin-test-flakiness:
+        specifier: ^1.4.0
+        version: 1.8.0(eslint@9.39.5(jiti@2.7.0))
       glob:
         specifier: ^13.0.0
         version: 13.0.6
