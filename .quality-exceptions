@@ -18,5 +18,4 @@ packages/ui/src/components/layout/Spacer/Spacer.test.stories.tsx
 packages/ui/src/components/navigation/Pagination/Pagination.test.stories.tsx
 packages/ui/src/components/typography/Blockquote/Blockquote.test.stories.tsx
 packages/ui/src/components/typography/Text/Text.test.stories.tsx
-packages/ui/src/components/utility/AnimatedIcon/AnimatedIcon.tsx
 packages/ui/src/components/utility/Portal/Portal.test.stories.tsx
