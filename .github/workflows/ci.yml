@@ -126,6 +126,8 @@ jobs:
   # for a short-lived credential (requires a one-time Trusted Publisher on npm
   # pointing at this repo + ci.yml). semantic-release versions/tags/releases each
   # package (npmPublish:false); the actual upload is the OIDC npm publish below.
+  # The one thing OIDC cannot do is a package's first publish — see the step
+  # ahead of it, which is the only place a token is ever used.
   release:
     name: Release
     needs: [lint, type-check, build, unit-tests, quality]
@@ -203,6 +205,23 @@ jobs:
       # OIDC trusted publishing needs npm >= 11.5.1 (Node 24 ships an older npm).
       - name: Upgrade npm for OIDC
         run: npm install -g npm@latest
+      # A package's FIRST publish cannot go through OIDC — a Trusted Publisher is
+      # configured on a package that does not exist yet — so it is the one thing
+      # the tokenless loop below can never do. This step does exactly that much
+      # and no more: it publishes names the registry does not have and skips
+      # every package it does. Without an NPM_TOKEN secret it is a no-op.
+      - name: First publish for packages not yet on the registry
+        shell: bash
+        env:
+          # setup-node's npmrc reads this variable, so the bootstrap publish is
+          # token-authenticated. The tokenless step below does not set it, and
+          # deletes that npmrc line anyway before publishing over OIDC.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -o pipefail
+          # npm cannot resolve workspace:* — rewrite interdeps to concrete versions.
+          node scripts/prepare-publish.mjs
+          node scripts/first-publish.mjs 2>&1 | tee first-publish.log
       - name: Publish to npm (OIDC, tokenless)
         shell: bash
         run: |
@@ -216,7 +235,7 @@ jobs:
           for dir in $PUBLISH_DIRS; do
             pkg="$(basename "$dir")"
             echo "::group::npm publish $pkg"
-            if ( cd "$dir" && npm publish --access restricted ) 2>&1 | tee -a publish.log; then
+            if ( cd "$dir" && npm publish --access public ) 2>&1 | tee -a publish.log; then
               echo "published $pkg"
             else
               grep -q "cannot publish over the previously published versions" publish.log \
