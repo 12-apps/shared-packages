@@ -1,36 +1,13 @@
-import ChevronRight from '@mui/icons-material/ChevronRight';
-import ExpandMore from '@mui/icons-material/ExpandMore';
-import MenuIcon from '@mui/icons-material/Menu';
 import {
-  alpha,
   Box,
-  Collapse,
-  Divider,
-  Fade,
-  Grow,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Paper,
-  Popover,
-  Typography,
-} from '@mui/material';
-import { keyframes,styled } from '@mui/material/styles';
+  Paper } from '@mui/material';
 import React, { useState } from 'react';
 
 import { NavigationMegaSection } from './NavigationMegaSection';
 import { NavigationStandardBody } from './NavigationStandardBody';
-import { slideIn } from './NavigationMenu.styles';
 import {
-  CollapseToggle,
   LogoBar,
-  MegaSection,
-  MenuList,
-  NavigationShell,
-} from './NavigationMenu.shell';
-import { renderMenuItem } from './NavigationMenuItem';
+  NavigationShell } from './NavigationMenu.shell';
 import type { NavigationMenuItem,NavigationMenuProps } from './NavigationMenu.types';
 
 
@@ -52,13 +29,11 @@ const MegaMenuLayout = React.forwardRef<HTMLDivElement, MegaMenuLayoutProps>(
   (
     {
       variant,
-      collapsed,
       logo,
       items,
       size,
       minimal,
-      onItemClick,
-      dataTestId,
+      dataTestId: _dataTestId,
       className,
       maxWidth,
       style,
@@ -80,8 +55,7 @@ const MegaMenuLayout = React.forwardRef<HTMLDivElement, MegaMenuLayoutProps>(
         sx={{
           width: '100%',
           overflow: 'hidden',
-          background: minimal ? 'transparent' : undefined,
-        }}
+          background: minimal ? 'transparent' : undefined }}
       >
         {logo && <LogoBar>{logo}</LogoBar>}
         <Box
@@ -89,8 +63,7 @@ const MegaMenuLayout = React.forwardRef<HTMLDivElement, MegaMenuLayoutProps>(
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
             gap: 3,
-            p: 3,
-          }}
+            p: 3 }}
         >
           {items.map((section, sectionIndex) => (
             <NavigationMegaSection
@@ -121,8 +94,7 @@ const NAVIGATION_DEFAULTS: Pick<NavigationMenuProps, NavigationDefaultedKeys> = 
   size: 'md',
   minimal: false,
   collapsible: false,
-  showDividers: false,
-};
+  showDividers: false };
 
 // Strips explicitly-undefined props before the merge, so `prop={undefined}` still
 // falls back to the default exactly as a destructuring default would. Applied as
@@ -133,8 +105,7 @@ const resolveProps = (props: NavigationMenuProps): ResolvedNavigationProps =>
     ...NAVIGATION_DEFAULTS,
     ...(Object.fromEntries(
       Object.entries(props).filter(([, value]) => value !== undefined),
-    ) as Partial<NavigationMenuProps>),
-  }) as ResolvedNavigationProps;
+    ) as Partial<NavigationMenuProps>) }) as ResolvedNavigationProps;
 
 export const NavigationMenu = React.forwardRef<HTMLDivElement, NavigationMenuProps>(
   (componentProps, ref) => {

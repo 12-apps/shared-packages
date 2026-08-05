@@ -3,12 +3,9 @@ import {
   alpha,
   Badge,
   Box,
-  CircularProgress,
   Divider,
-  Fade,
   Tab as MuiTab,
-  Tabs as MuiTabs,
-} from '@mui/material';
+  Tabs as MuiTabs } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React from 'react';
 
@@ -17,28 +14,10 @@ import { tabsRootStyles } from './Tabs.styles';
 import type { TabItem, TabsProps } from './Tabs.types';
 
 const StyledTabs = styled(MuiTabs, {
-  shouldForwardProp: (prop) => !['customVariant', 'size', 'showDividers'].includes(prop as string),
-})<{ customVariant?: string; size?: string; showDividers?: boolean }>(
+  shouldForwardProp: (prop) => !['customVariant', 'size', 'showDividers'].includes(prop as string) })<{ customVariant?: string; size?: string; showDividers?: boolean }>(
   ({ theme, customVariant, size, showDividers }) => ({
-    ...tabsRootStyles({ theme, customVariant, size, showDividers }),
-  }),
+    ...tabsRootStyles({ theme, customVariant, size, showDividers }) }),
 );
-
-const TabPanel = styled(Box, {
-  shouldForwardProp: (prop) => !['animate', 'persist'].includes(prop as string),
-})<{ animate?: boolean; persist?: boolean }>(({ animate, persist }) => ({
-  width: '100%',
-
-  ...(animate && {
-    transition: 'all 0.3s ease-in-out',
-  }),
-
-  ...(persist && {
-    '&[hidden]': {
-      display: 'none !important',
-    },
-  }),
-}));
 
 const CloseButton = styled(Box)(({ theme }) => ({
   marginLeft: theme.spacing(0.5),
@@ -53,9 +32,7 @@ const CloseButton = styled(Box)(({ theme }) => ({
   color: theme.palette.action.active,
   '&:hover': {
     backgroundColor: alpha(theme.palette.error.main, 0.1),
-    color: theme.palette.error.main,
-  },
-}));
+    color: theme.palette.error.main } }));
 
 const BadgeWrapper = styled(Badge)(() => ({
   '& .MuiBadge-badge': {
@@ -64,9 +41,7 @@ const BadgeWrapper = styled(Badge)(() => ({
     fontSize: '0.75rem',
     minWidth: 16,
     height: 16,
-    padding: 0,
-  },
-}));
+    padding: 0 } }));
 
 const TABS_DEFAULTS: Partial<TabsProps> = {
   variant: 'default',
@@ -84,8 +59,7 @@ const TABS_DEFAULTS: Partial<TabsProps> = {
   animationDuration: 300,
   persistContent: false,
   disabled: false,
-  loading: false,
-};
+  loading: false };
 
 // Strips explicitly-undefined props before the merge, so `prop={undefined}`
 // still falls back to the default as a destructuring default would.
@@ -107,8 +81,7 @@ const buildTabsSx = ({
   sticky,
   stickyOffset,
   indicatorColor,
-  disabled,
-}: {
+  disabled }: {
   fullWidth?: boolean;
   sticky?: boolean;
   stickyOffset?: number;
@@ -124,13 +97,10 @@ const buildTabsSx = ({
     zIndex: 2,
     backgroundColor: 'background.default',
     borderBottom: 1,
-    borderColor: 'divider',
-  }),
+    borderColor: 'divider' }),
   ...(indicatorColor && {
-    '& .MuiTabs-indicator': { backgroundColor: indicatorColor },
-  }),
-  ...(disabled && { opacity: 0.6, pointerEvents: 'none' }),
-});
+    '& .MuiTabs-indicator': { backgroundColor: indicatorColor } }),
+  ...(disabled && { opacity: 0.6, pointerEvents: 'none' }) });
 
 // A tab's label: icon, text, optional close affordance, optionally badged.
 const TabLabel: React.FC<{
@@ -200,8 +170,7 @@ const TabsBar: React.FC<
       sticky: p.sticky,
       stickyOffset: p.stickyOffset,
       indicatorColor: p.indicatorColor,
-      disabled: p.disabled,
-    })}
+      disabled: p.disabled })}
   >
     {items.map((item, index) => (
       <MuiTab
@@ -229,8 +198,7 @@ const TabsPanels: React.FC<ResolvedTabs> = ({
   loading,
   loadingComponent,
   tabPanelProps,
-  dataTestId,
-}) => (
+  dataTestId }) => (
   <Box sx={{ mt: variant === 'enclosed' ? 0 : 2 }}>
     {items.map((item, index) => (
       <CustomTabPanel
@@ -256,7 +224,7 @@ export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
   (tabsProps, ref) => {
     const resolved = { ...TABS_DEFAULTS, ...definedProps(tabsProps) } as TabsProps;
     const {
-      value,
+      value: _value,
       onChange,
       onTabClose,
       className,

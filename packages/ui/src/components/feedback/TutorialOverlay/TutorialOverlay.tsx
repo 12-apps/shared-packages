@@ -1,26 +1,17 @@
-import CompleteIcon from '@mui/icons-material/CheckCircle';
-import CloseIcon from '@mui/icons-material/Close';
-import PrevIcon from '@mui/icons-material/NavigateBefore';
-import NextIcon from '@mui/icons-material/NavigateNext';
-import RestartIcon from '@mui/icons-material/Refresh';
 import {
   alpha,
   Box,
-  Button,
   Fade,
-  IconButton,
   keyframes,
   LinearProgress,
   Paper,
   Portal,
-  Stack,
-  styled,
-  Typography,
-} from '@mui/material';
+  styled } from '@mui/material';
 import type { FC} from 'react';
-import React, { useCallback,useEffect, useRef, useState } from 'react';
+import React, {  } from 'react';
 
 import { useTutorialOverlay } from './TutorialOverlay.hooks';
+import { TutorialStepBody } from './TutorialStepBody';
 import type { TutorialOverlayProps } from './TutorialOverlay.types';
 
 // Animation keyframes
@@ -47,8 +38,7 @@ const floatAnimation = keyframes`
 
 // Styled components
 const Overlay = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'allowClickThrough',
-})<{ allowClickThrough?: boolean }>(({ theme, allowClickThrough }) => ({
+  shouldForwardProp: (prop) => prop !== 'allowClickThrough' })<{ allowClickThrough?: boolean }>(({ theme, allowClickThrough }) => ({
   position: 'fixed',
   top: 0,
   left: 0,
@@ -56,8 +46,7 @@ const Overlay = styled(Box, {
   bottom: 0,
   zIndex: theme.zIndex.modal + 100,
   pointerEvents: allowClickThrough ? 'none' : 'auto',
-  transition: 'opacity 0.3s ease',
-}));
+  transition: 'opacity 0.3s ease' }));
 
 const Backdrop = styled(Box)(() => ({
   position: 'absolute',
@@ -66,12 +55,10 @@ const Backdrop = styled(Box)(() => ({
   right: 0,
   bottom: 0,
   background: alpha('#000', 0.7),
-  backdropFilter: 'blur(2px)',
-}));
+  backdropFilter: 'blur(2px)' }));
 
 const Spotlight = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'bounds' && prop !== 'padding',
-})<{ bounds: globalThis.DOMRect; padding: number }>(({ bounds, padding }) => ({
+  shouldForwardProp: (prop) => prop !== 'bounds' && prop !== 'padding' })<{ bounds: globalThis.DOMRect; padding: number }>(({ bounds, padding }) => ({
   position: 'absolute',
   top: bounds.top - padding,
   left: bounds.left - padding,
@@ -87,13 +74,10 @@ const Spotlight = styled(Box, {
     inset: -2,
     borderRadius: 8,
     background: 'transparent',
-    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
-  },
-}));
+    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)' } }));
 
 const TooltipContainer = styled(Paper, {
-  shouldForwardProp: (prop) => prop !== 'placement',
-})<{ placement: string }>(({ theme, placement }) => ({
+  shouldForwardProp: (prop) => prop !== 'placement' })<{ placement: string }>(({ theme, placement }) => ({
   position: 'absolute',
   maxWidth: 360,
   padding: theme.spacing(3),
@@ -118,31 +102,25 @@ const TooltipContainer = styled(Paper, {
       left: '50%',
       marginLeft: -6,
       borderTop: 'none',
-      borderLeft: 'none',
-    }),
+      borderLeft: 'none' }),
     ...(placement === 'bottom' && {
       top: -7,
       left: '50%',
       marginLeft: -6,
       borderBottom: 'none',
-      borderRight: 'none',
-    }),
+      borderRight: 'none' }),
     ...(placement === 'left' && {
       right: -7,
       top: '50%',
       marginTop: -6,
       borderLeft: 'none',
-      borderBottom: 'none',
-    }),
+      borderBottom: 'none' }),
     ...(placement === 'right' && {
       left: -7,
       top: '50%',
       marginTop: -6,
       borderRight: 'none',
-      borderTop: 'none',
-    }),
-  },
-}));
+      borderTop: 'none' }) } }));
 
 const ProgressBar = styled(LinearProgress)(({ theme }) => ({
   position: 'fixed',
@@ -152,237 +130,137 @@ const ProgressBar = styled(LinearProgress)(({ theme }) => ({
   height: 4,
   zIndex: theme.zIndex.modal + 102,
   '& .MuiLinearProgress-bar': {
-    background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-  },
-}));
+    background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)` } }));
 
-const StepIndicator = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  gap: theme.spacing(1),
-  marginTop: theme.spacing(2),
-  marginBottom: theme.spacing(2),
-}));
+type TutorialDefaultedKeys =
+  | 'initialStep'
+  | 'active'
+  | 'showProgress'
+  | 'allowKeyboardNavigation'
+  | 'allowClickThrough'
+  | 'variant'
+  | 'allowSkip'
+  | 'animated';
 
-const StepDot = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'active' && prop !== 'completed',
-})<{ active?: boolean; completed?: boolean }>(({ theme, active, completed }) => ({
-  width: 8,
-  height: 8,
-  borderRadius: '50%',
-  background: completed
-    ? theme.palette.success.main
-    : active
-      ? theme.palette.primary.main
-      : alpha(theme.palette.text.primary, 0.3),
-  transition: 'all 0.3s ease',
-  ...(active && {
-    transform: 'scale(1.5)',
-  }),
-}));
+type ResolvedTutorialProps = TutorialOverlayProps &
+  Required<Pick<TutorialOverlayProps, TutorialDefaultedKeys>>;
 
-// Title, body copy, the step dots and the navigation row.
-const TutorialStepBody: React.FC<{
-  step: TutorialOverlayProps['steps'][number];
-  currentStep: number;
-  stepCount: number;
-  progress: number;
-  isLastStep: boolean;
+const TUTORIAL_DEFAULTS: Pick<TutorialOverlayProps, TutorialDefaultedKeys> = {
+  initialStep: 0,
+  active: true,
+  showProgress: true,
+  allowKeyboardNavigation: true,
+  allowClickThrough: false,
+  variant: 'tooltip',
+  allowSkip: false,
+  animated: true };
+
+// Strips explicitly-undefined props before the merge, so `prop={undefined}` still
+// falls back to the default exactly as a destructuring default would. Applied as
+// a merge rather than destructuring defaults, which would otherwise put eight
+// branches into the component's own complexity budget.
+const resolveProps = (props: TutorialOverlayProps): ResolvedTutorialProps =>
+  ({
+    ...TUTORIAL_DEFAULTS,
+    ...(Object.fromEntries(
+      Object.entries(props).filter(([, value]) => value !== undefined),
+    ) as Partial<TutorialOverlayProps>) }) as ResolvedTutorialProps;
+
+// The dimming layer and the cut-out over the highlighted element. Local because
+// Backdrop and Spotlight cannot cross a module boundary (TS2742).
+const TutorialLayers: React.FC<{
+  variant: string;
+  targetBounds: globalThis.DOMRect | null;
+  isVisible: boolean;
+  spotlightPadding?: number;
+}> = ({ variant, targetBounds, isVisible, spotlightPadding }) => {
+  const isSpotlight = variant === 'spotlight' || variant === 'highlight';
+  const dimmed = variant === 'modal' || isSpotlight;
+
+  return (
+    <>
+      {dimmed && <Backdrop />}
+      {targetBounds && isVisible && isSpotlight && (
+        <Spotlight
+          bounds={targetBounds}
+          padding={spotlightPadding || 8}
+          data-testid="tutorial-highlight"
+        />
+      )}
+    </>
+  );
+};
+
+// The positioned card. Local because TooltipContainer cannot cross a module
+// boundary (TS2742).
+const TutorialTooltip: React.FC<{
+  tutorial: ReturnType<typeof useTutorialOverlay> & {
+    currentStepData: TutorialOverlayProps['steps'][number];
+  };
+  steps: TutorialOverlayProps['steps'];
   allowSkip: boolean;
   showProgress: boolean;
-  requiresActionBeforeNext?: boolean;
-  onNext: () => void;
-  onPrev: () => void;
-  onSkip: () => void;
-  onRestart: () => void;
-}> = ({
-  step,
-  currentStep,
-  stepCount,
-  progress,
-  isLastStep,
-  allowSkip,
-  showProgress,
-  requiresActionBeforeNext,
-  onNext,
-  onPrev,
-  onSkip,
-  onRestart,
-}) => (
-      <Stack spacing={2}>
-        <Box
-          sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
-        >
-          <Typography
-            id={`tutorial-title-${currentStep}`}
-            variant="h6"
-            fontWeight="bold"
-            sx={{ flex: 1 }}
-            data-testid="tutorial-step-title"
+  animated: boolean;
+  requiresActionBeforeNext: boolean;
+}> = ({ tutorial, steps, allowSkip, showProgress, animated, requiresActionBeforeNext }) => (
+        <Fade in={tutorial.isVisible} timeout={300}>
+          <TooltipContainer
+            ref={tutorial.tooltipRef}
+            placement={tutorial.actualPlacement}
+            elevation={12}
+            style={{
+              top: tutorial.tooltipPosition.top,
+              left: tutorial.tooltipPosition.left,
+              animation: animated ? undefined : 'none' }}
+            role="dialog"
+            aria-labelledby={`tutorial-title-${tutorial.currentStep}`}
+            aria-describedby={`tutorial-content-${tutorial.currentStep}`}
+            data-testid={`tutorial-step-${tutorial.currentStep}`}
           >
-            {step.title}
-          </Typography>
-          {allowSkip && (
-            <IconButton
-              size="small"
-              onClick={onSkip}
-              sx={{ ml: 1, mt: -1, mr: -1 }}
-              data-testid="tutorial-close-button"
-            >
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          )}
-        </Box>
-
-        <Typography
-          id={`tutorial-content-${currentStep}`}
-          variant="body2"
-          color="text.secondary"
-          data-testid="tutorial-step-content"
-        >
-          {step.content}
-        </Typography>
-
-        {showProgress && (
-          <Typography variant="caption" color="text.secondary" align="center">
-            {currentStep + 1} of {stepCount}
-          </Typography>
-        )}
-
-        {step.action && (
-          <Button
-            variant="contained"
-            size="small"
-            onClick={step.action.onClick}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-            }}
-          >
-            {step.action.label}
-          </Button>
-        )}
-
-        <StepIndicator data-testid="tutorial-step-indicators">
-          {Array.from({ length: stepCount }).map((_, index) => (
-            <StepDot
-              key={index}
-              active={index === currentStep}
-              completed={index < currentStep}
-              data-testid={`tutorial-indicator-${index}`}
+            <TutorialStepBody
+              step={tutorial.currentStepData}
+              currentStep={tutorial.currentStep}
+              stepCount={steps.length}
+              progress={tutorial.progress}
+              isLastStep={tutorial.isLastStep}
+              allowSkip={allowSkip}
+              showProgress={showProgress}
+              requiresActionBeforeNext={requiresActionBeforeNext}
+              onNext={tutorial.handleNext}
+              onPrev={tutorial.handlePrev}
+              onSkip={tutorial.handleSkip}
+              onRestart={tutorial.handleRestart}
             />
-          ))}
-        </StepIndicator>
-
-        <Stack
-          direction="row"
-          spacing={1}
-          justifyContent="space-between"
-          data-testid="tutorial-navigation"
-        >
-          <Stack direction="row" spacing={1}>
-            {allowSkip && (
-              <Button size="small" onClick={onSkip} variant="text">
-                Skip
-              </Button>
-            )}
-            {stepCount > 1 && (
-              <IconButton
-                size="small"
-                onClick={onRestart}
-                disabled={currentStep === 0}
-                title="Restart"
-              >
-                <RestartIcon fontSize="small" />
-              </IconButton>
-            )}
-          </Stack>
-
-          <Stack direction="row" spacing={1}>
-            {stepCount > 1 && currentStep > 0 && (
-              <Button
-                size="small"
-                startIcon={<PrevIcon />}
-                onClick={onPrev}
-                disabled={currentStep === 0}
-                data-testid="tutorial-prev-button"
-              >
-                Previous
-              </Button>
-            )}
-
-            {!isLastStep ? (
-              <Button
-                variant="contained"
-                size="small"
-                endIcon={<NextIcon />}
-                onClick={onNext}
-                disabled={requiresActionBeforeNext}
-                title={requiresActionBeforeNext ? 'Complete the required action first' : ''}
-                data-testid="tutorial-next-button"
-              >
-                Next
-              </Button>
-            ) : (
-              <Button
-                variant="contained"
-                size="small"
-                endIcon={<CompleteIcon />}
-                onClick={onNext}
-                sx={{
-                  background: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)',
-                }}
-                data-testid="tutorial-finish-button"
-              >
-                {stepCount === 1 ? 'Complete' : 'Finish'}
-              </Button>
-            )}
-          </Stack>
-        </Stack>
-      </Stack>
+          </TooltipContainer>
+        </Fade>
 );
 
-// Main component
-export const TutorialOverlay: FC<TutorialOverlayProps> = ({
-  steps,
-  onComplete,
-  onSkip,
-  onStepComplete,
-  initialStep = 0,
-  active = true,
-  showProgress = true,
-  allowKeyboardNavigation = true,
-  allowClickThrough = false,
-  variant = 'tooltip',
-  allowSkip = false,
-  animated = true,
-}) => {
+export const TutorialOverlay: FC<TutorialOverlayProps> = (componentProps) => {
   const {
-    currentStep,
-    currentStepData,
-    isLastStep,
-    isVisible,
-    targetBounds,
-    tooltipRef,
-    tooltipPosition,
-    actualPlacement,
-    progress,
-    handleNext,
-    handlePrev,
-    handleSkip,
-    handleRestart,
-  } = useTutorialOverlay({
+    steps,
+    onComplete,
+    onSkip,
+    onStepComplete,
+    initialStep,
+    active,
+    showProgress,
+    allowKeyboardNavigation,
+    allowClickThrough,
+    variant,
+    allowSkip,
+    animated } = resolveProps(componentProps);
+
+  const tutorial = useTutorialOverlay({
     steps,
     initialStep,
     active,
     allowKeyboardNavigation,
     onComplete,
     onSkip,
-    onStepComplete,
-  });
+    onStepComplete });
+  const { currentStepData, isLastStep, isVisible, targetBounds, progress } = tutorial;
 
-  const isModal = variant === 'modal';
-  const isSpotlight = variant === 'spotlight' || variant === 'highlight';
-  const requiresActionBeforeNext = currentStepData?.requiresAction && !isLastStep;
+  const requiresActionBeforeNext = Boolean(currentStepData?.requiresAction) && !isLastStep;
 
   if (!active || !currentStepData) return null;
 
@@ -394,47 +272,21 @@ export const TutorialOverlay: FC<TutorialOverlayProps> = ({
       <Overlay allowClickThrough={allowClickThrough} data-testid="tutorial-overlay">
         {showProgress && <ProgressBar variant="determinate" value={progress} />}
 
-        {(isModal || isSpotlight) && <Backdrop />}
+        <TutorialLayers
+          variant={variant}
+          targetBounds={targetBounds}
+          isVisible={isVisible}
+          spotlightPadding={currentStepData.spotlightPadding}
+        />
 
-        {targetBounds && isVisible && isSpotlight && (
-          <Spotlight
-            bounds={targetBounds}
-            padding={currentStepData.spotlightPadding || 8}
-            data-testid="tutorial-highlight"
-          />
-        )}
-
-        <Fade in={isVisible} timeout={300}>
-          <TooltipContainer
-            ref={tooltipRef}
-            placement={actualPlacement}
-            elevation={12}
-            style={{
-              top: tooltipPosition.top,
-              left: tooltipPosition.left,
-              animation: animated ? undefined : 'none',
-            }}
-            role="dialog"
-            aria-labelledby={`tutorial-title-${currentStep}`}
-            aria-describedby={`tutorial-content-${currentStep}`}
-            data-testid={`tutorial-step-${currentStep}`}
-          >
-            <TutorialStepBody
-              step={currentStepData}
-              currentStep={currentStep}
-              stepCount={steps.length}
-              progress={progress}
-              isLastStep={isLastStep}
-              allowSkip={allowSkip}
-              showProgress={showProgress}
-              requiresActionBeforeNext={requiresActionBeforeNext}
-              onNext={handleNext}
-              onPrev={handlePrev}
-              onSkip={handleSkip}
-              onRestart={handleRestart}
-            />
-          </TooltipContainer>
-        </Fade>
+        <TutorialTooltip
+          tutorial={{ ...tutorial, currentStepData }}
+          steps={steps}
+          allowSkip={allowSkip}
+          showProgress={showProgress}
+          animated={animated}
+          requiresActionBeforeNext={requiresActionBeforeNext}
+        />
       </Overlay>
     </Portal>
   );

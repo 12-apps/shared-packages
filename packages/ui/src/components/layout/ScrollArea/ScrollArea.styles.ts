@@ -11,10 +11,10 @@ const SCROLLBAR_SIZES: Record<string, number> = {
 const DEFAULT_SCROLLBAR_SIZE = 12;
 
 // thin/thick are the named ends of the scale; anything else takes the default.
-export const getScrollbarSize = (scrollbarSize?: string): number =>
+const getScrollbarSize = (scrollbarSize?: string): number =>
   scrollbarSize ? (SCROLLBAR_SIZES[scrollbarSize] ?? DEFAULT_SCROLLBAR_SIZE) : DEFAULT_SCROLLBAR_SIZE;
 
-export const getScrollbarColors = ({
+const getScrollbarColors = ({
   theme,
   variant,
   scrollbarColor,

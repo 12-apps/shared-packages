@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { ErrorState } from './ErrorState';
 
@@ -122,7 +122,7 @@ export const KeyboardNavigation: Story = {
     await step('Focus retry button via Tab', async () => {
       await userEvent.tab();
       const retryButton = canvas.getByTestId('error-state-retry-button');
-      await expect(retryButton).toHaveFocus();
+      await waitFor(() => expect(retryButton).toHaveFocus());
     });
 
     await step('Activate button with Enter key', async () => {

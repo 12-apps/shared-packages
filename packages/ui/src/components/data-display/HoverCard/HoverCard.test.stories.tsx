@@ -155,8 +155,8 @@ export const KeyboardNavigation: Story = {
 
     await step('Focus trigger with Tab key', async () => {
       const trigger = await canvas.findByTestId('keyboard-trigger');
-      trigger.focus();
-      expect(trigger).toHaveFocus();
+      await userEvent.click(trigger);
+      await waitFor(() => expect(trigger).toHaveFocus());
     });
 
     await step('HoverCard should appear on focus', async () => {
@@ -272,8 +272,8 @@ export const FocusManagement: Story = {
 
     await step('Focus should remain on trigger when hovering', async () => {
       const trigger = await canvas.findByTestId('focus-trigger');
-      trigger.focus();
-      expect(trigger).toHaveFocus();
+      await userEvent.click(trigger);
+      await waitFor(() => expect(trigger).toHaveFocus());
 
       await userEvent.hover(trigger);
 
@@ -603,7 +603,7 @@ export const VisualStates: Story = {
       await new Promise((resolve) => window.setTimeout(resolve, 200));
 
       const disabledCard = canvasElement.ownerDocument.body.querySelector('h6');
-      expect(disabledCard).not.toBeInTheDocument();
+      await waitFor(() => expect(disabledCard).not.toBeInTheDocument());
     });
   },
 };

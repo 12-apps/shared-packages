@@ -46,6 +46,96 @@ function decodeHTMLEntities(text: string): string {
  * @param options - Configuration options
  * @returns Plain text with HTML removed and entities decoded
  */
+// Removes every <tag>…</tag> span, case-insensitively, by scanning rather than
+// by regex. A regex here is wrong three ways: /<\/script>/ misses `</script >`,
+// a single pass can leave a partial `<script` behind when spans overlap, and
+// `<style[^>]*>` backtracks polynomially on input full of `<style`.
+const removeSpans = (text: string, tag: string): string => {
+  const lower = text.toLowerCase();
+  const open = `<${tag}`;
+  let out = '';
+  let cursor = 0;
+
+  for (;;) {
+    const start = lower.indexOf(open, cursor);
+    if (start === -1) return out + text.slice(cursor);
+
+    out += text.slice(cursor, start);
+
+    const close = lower.indexOf(`</${tag}`, start);
+    // Unterminated: the rest of the document is inside the element.
+    if (close === -1) return out;
+
+    const end = text.indexOf('>', close);
+    if (end === -1) return out;
+    cursor = end + 1;
+  }
+};
+
+const removeComments = (text: string): string => {
+  let out = '';
+  let cursor = 0;
+
+  for (;;) {
+    const start = text.indexOf('<!--', cursor);
+    if (start === -1) return out + text.slice(cursor);
+
+    out += text.slice(cursor, start);
+
+    const end = text.indexOf('-->', start);
+    if (end === -1) return out;
+    cursor = end + 3;
+  }
+};
+
+// Style, script and comment blocks go entirely — their contents are not text.
+const removeNonTextBlocks = (text: string): string =>
+  removeComments(removeSpans(removeSpans(text, 'style'), 'script'));
+
+// Turn the block-level tags into the breaks they imply, before all tags go.
+const tagsToLineBreaks = (text: string): string =>
+  text
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n');
+
+// Removes every <…> run in one left-to-right pass. A regex is wrong twice here:
+// /<[^>]*>/g rescans from every '<' on input that has no '>', which is
+// quadratic, and one pass of it can splice neighbours into a fresh tag
+// ("<<a>script>"). Scanning drops every '<' and everything through its '>', so
+// nothing survives to be reassembled and an unterminated tag takes the rest of
+// the string with it.
+const stripTags = (text: string): string => {
+  let out = '';
+  let inTag = false;
+
+  for (const char of text) {
+    if (char === '<') {
+      inTag = true;
+    } else if (char === '>') {
+      inTag = false;
+    } else if (!inTag) {
+      out += char;
+    }
+  }
+
+  return out;
+};
+
+const truncate = (text: string, maxLength?: number): string =>
+  maxLength && text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+
+const collapseWhitespace = (text: string, preserveLineBreaks: boolean): string =>
+  preserveLineBreaks
+    ? text
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n\s*\n\s*\n/g, '\n\n')
+        .trim()
+    : text
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
 export function stripHTML(
   html: string | null | undefined,
   options?: {
@@ -58,50 +148,17 @@ export function stripHTML(
     return options?.fallback ?? '';
   }
 
-  let text = html;
+  const preserveLineBreaks = Boolean(options?.preserveLineBreaks);
+  let text = removeNonTextBlocks(html);
 
-  // Remove <style> tags and their contents
-  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-
-  // Remove <script> tags and their contents
-  text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-
-  // Remove HTML comments
-  text = text.replace(/<!--[\s\S]*?-->/g, '');
-
-  // Optionally preserve line breaks before stripping tags
-  if (options?.preserveLineBreaks) {
-    text = text.replace(/<br\s*\/?>/gi, '\n');
-    text = text.replace(/<\/p>/gi, '\n\n');
-    text = text.replace(/<\/div>/gi, '\n');
+  if (preserveLineBreaks) {
+    text = tagsToLineBreaks(text);
   }
 
-  // Strip all HTML tags
-  text = text.replace(/<[^>]*>/g, '');
+  text = decodeHTMLEntities(stripTags(text));
+  text = collapseWhitespace(text, preserveLineBreaks);
 
-  // Decode HTML entities
-  text = decodeHTMLEntities(text);
+  text = truncate(text, options?.maxLength);
 
-  // Clean up whitespace
-  if (options?.preserveLineBreaks) {
-    // Preserve line breaks but clean up excessive spacing
-    text = text
-      .replace(/[ \t]+/g, ' ')        // Multiple spaces/tabs to single space
-      .replace(/\n\s*\n\s*\n/g, '\n\n') // Max 2 consecutive line breaks
-      .trim();
-  } else {
-    // Replace all whitespace (including line breaks) with single spaces
-    text = text
-      .replace(/[\r\n\t]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  // Truncate if needed
-  if (options?.maxLength && text.length > options.maxLength) {
-    text = `${text.substring(0, options.maxLength)}...`;
-  }
-
-  // Return fallback if text is empty after cleaning
   return text || options?.fallback || '';
 }

@@ -4,48 +4,28 @@ import NavigateBefore from '@mui/icons-material/NavigateBefore';
 import NavigateNext from '@mui/icons-material/NavigateNext';
 import type { PaginationRenderItemParams } from '@mui/material';
 import {
-  alpha,
   Box,
-  FormControl,
-  MenuItem,
   Pagination as MuiPagination,
-  PaginationItem,
-  Select,
-  Typography,
-} from '@mui/material';
+  PaginationItem } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React from 'react';
 
+import type { ResolvedPaginationProps } from './Pagination.helpers';
+import { makeTestId, muiSizeFor, resolvePaginationProps } from './Pagination.helpers';
 import { paginationStyles } from './Pagination.styles';
 import type { PaginationProps } from './Pagination.types';
+import { ItemsPerPageSelect, PageInfo } from './PaginationParts';
 
 const StyledPagination = styled(MuiPagination, {
-  shouldForwardProp: (prop) => !['customVariant', 'customSize'].includes(prop as string),
-})<{ customVariant?: string; customSize?: string }>(({ theme, customVariant, customSize }) => ({
-  ...paginationStyles({ theme, customVariant, customSize }),
-}));
-
-const PageInfoContainer = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: theme.spacing(2),
-  marginLeft: theme.spacing(2),
-}));
-
-const ItemsPerPageContainer = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: theme.spacing(1),
-  marginRight: theme.spacing(2),
-}));
+  shouldForwardProp: (prop) => !['customVariant', 'customSize'].includes(prop as string) })<{ customVariant?: string; customSize?: string }>(({ theme, customVariant, customSize }) => ({
+  ...paginationStyles({ theme, customVariant, customSize }) }));
 
 const PaginationContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   flexWrap: 'wrap',
-  gap: theme.spacing(1),
-}));
+  gap: theme.spacing(1) }));
 
 // Arrow items get a short suffix, pages carry their number. This was two
 // parallel switch statements that differed only in whether the prefix came from
@@ -54,8 +34,7 @@ const ITEM_TEST_SUFFIX: Record<string, string> = {
   first: 'first',
   last: 'last',
   previous: 'prev',
-  next: 'next',
-};
+  next: 'next' };
 
 const paginationItemTestId = (
   base: string | undefined,
@@ -74,10 +53,9 @@ const paginationItemTestId = (
 const renderPaginationItem = ({
   item,
   variant,
-  size,
+  size: _size,
   dataTestId,
-  icons,
-}: {
+  icons }: {
   item: PaginationRenderItemParams;
   variant: string;
   size: string;
@@ -103,9 +81,7 @@ const renderPaginationItem = ({
               '&.MuiPaginationItem-page': {
                 fontSize: 0,
                 overflow: 'hidden',
-                textIndent: '-9999px',
-              },
-            }}
+                textIndent: '-9999px' } }}
           />
         );
       }
@@ -117,8 +93,7 @@ const renderPaginationItem = ({
       first: firstIcon as React.ReactElement,
       last: lastIcon as React.ReactElement,
       previous: previousIcon as React.ReactElement,
-      next: nextIcon as React.ReactElement,
-    };
+      next: nextIcon as React.ReactElement };
 
     return (
       <PaginationItem
@@ -128,48 +103,82 @@ const renderPaginationItem = ({
           first: () => iconMap.first || <FirstPage />,
           last: () => iconMap.last || <LastPage />,
           previous: () => iconMap.previous || <NavigateBefore />,
-          next: () => iconMap.next || <NavigateNext />,
-        }}
+          next: () => iconMap.next || <NavigateNext /> }}
       />
     );
   
 };
 
+// The control itself. Local because StyledPagination cannot cross a module
+// boundary (TS2742).
+const PaginationControl: React.FC<
+  ResolvedPaginationProps & {
+    innerRef: React.Ref<HTMLElement>;
+    renderItem: (item: PaginationRenderItemParams) => React.ReactNode;
+    rest: Record<string, unknown>;
+  }
+> = ({ innerRef, renderItem, rest, ...p }) => {
+  // The dots variant is a position indicator, not a control: no page numbers
+  // around the current one, and no step buttons.
+  const isDots = p.variant === 'dots';
+
+  return (
+    <StyledPagination
+      ref={innerRef}
+      page={p.page}
+      count={p.count}
+      onChange={p.onChange}
+      customVariant={p.variant}
+      customSize={p.size}
+      variant="outlined"
+      size={muiSizeFor(p.size)}
+      boundaryCount={isDots ? 0 : p.boundaryCount}
+      siblingCount={isDots ? 0 : p.siblingCount}
+      hideNextButton={p.hideNextButton || isDots}
+      hidePrevButton={p.hidePrevButton || isDots}
+      showFirstButton={p.showFirstButton && !isDots}
+      showLastButton={p.showLastButton && !isDots}
+      disabled={p.disabled}
+      color={p.color}
+      renderItem={renderItem}
+      {...rest}
+    />
+  );
+};
+
 export const Pagination = React.forwardRef<HTMLElement, PaginationProps>(
-  (
-    {
-      variant = 'default',
-      size = 'md',
+  (componentProps, ref) => {
+    const resolved = resolvePaginationProps(componentProps);
+    const {
+      variant,
+      size,
       page,
       count,
-      onChange,
-      boundaryCount = 1,
-      siblingCount = 1,
-      hideNextButton = false,
-      hidePrevButton = false,
-      showFirstButton = false,
-      showLastButton = false,
-      firstIcon = <FirstPage />,
-      lastIcon = <LastPage />,
-      previousIcon = <NavigateBefore />,
-      nextIcon = <NavigateNext />,
-      disabled = false,
-      color = 'primary',
-      showPageInfo = false,
-      pageInfoFormat = (page, count) => `Page ${page} of ${count}`,
-      showItemsPerPage = false,
-      itemsPerPageOptions = [10, 25, 50, 100],
-      itemsPerPage = 10,
+      onChange: _onChange,
+      boundaryCount: _boundaryCount,
+      siblingCount: _siblingCount,
+      hideNextButton: _hideNextButton,
+      hidePrevButton: _hidePrevButton,
+      showFirstButton: _showFirstButton,
+      showLastButton: _showLastButton,
+      firstIcon,
+      lastIcon,
+      previousIcon,
+      nextIcon,
+      disabled,
+      color: _color,
+      showPageInfo,
+      pageInfoFormat,
+      showItemsPerPage,
+      itemsPerPageOptions,
+      itemsPerPage,
       onItemsPerPageChange,
       className,
       dataTestId,
       ...props
-    },
-    ref,
-  ) => {
-    // For dots variant, we show fewer pages
-    const adjustedBoundaryCount = variant === 'dots' ? 0 : boundaryCount;
-    const adjustedSiblingCount = variant === 'dots' ? 0 : siblingCount;
+    } = resolved;
+
+    const testId = makeTestId(dataTestId);
 
     const renderItem = (item: PaginationRenderItemParams) =>
       renderPaginationItem({
@@ -177,71 +186,32 @@ export const Pagination = React.forwardRef<HTMLElement, PaginationProps>(
         variant,
         size,
         dataTestId,
-        icons: { firstIcon, lastIcon, previousIcon, nextIcon },
-      });
+        icons: { firstIcon, lastIcon, previousIcon, nextIcon } });
 
     return (
       <PaginationContainer className={className} data-testid={dataTestId || 'pagination'}>
         {showItemsPerPage && onItemsPerPageChange && (
-          <ItemsPerPageContainer>
-            <Typography variant="body2" color="text.secondary">
-              Show:
-            </Typography>
-            <FormControl size="small" sx={{ minWidth: 80 }}>
-              <Select
-                value={itemsPerPage}
-                onChange={(e) => onItemsPerPageChange(e.target.value as number)}
-                disabled={disabled}
-                data-testid={dataTestId ? `${dataTestId}-items-per-page` : 'pagination-items-per-page'}
-                sx={{
-                  '& .MuiSelect-select': {
-                    fontSize: size === 'sm' ? '0.875rem' : size === 'lg' ? '1.125rem' : '1rem',
-                    py: size === 'sm' ? 0.5 : size === 'lg' ? 1.5 : 1,
-                  },
-                }}
-              >
-                {itemsPerPageOptions.map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </ItemsPerPageContainer>
+          <ItemsPerPageSelect
+            value={itemsPerPage}
+            options={itemsPerPageOptions}
+            size={size}
+            disabled={disabled}
+            testId={testId('items-per-page')}
+            onChange={onItemsPerPageChange}
+          />
         )}
 
-        <StyledPagination
-          ref={ref}
-          page={page}
-          count={count}
-          onChange={onChange}
-          customVariant={variant}
-          customSize={size}
-          variant="outlined"
-          size={size === 'sm' ? 'small' : size === 'lg' ? 'large' : 'medium'}
-          boundaryCount={adjustedBoundaryCount}
-          siblingCount={adjustedSiblingCount}
-          hideNextButton={hideNextButton || variant === 'dots'}
-          hidePrevButton={hidePrevButton || variant === 'dots'}
-          showFirstButton={showFirstButton && variant !== 'dots'}
-          showLastButton={showLastButton && variant !== 'dots'}
-          disabled={disabled}
-          color={color}
+        <PaginationControl
+          {...resolved}
+          innerRef={ref}
           renderItem={renderItem}
-          {...props}
+          rest={props as unknown as Record<string, unknown>}
         />
 
         {showPageInfo && (
-          <PageInfoContainer>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              fontSize={size === 'sm' ? '0.75rem' : size === 'lg' ? '1rem' : '0.875rem'}
-              data-testid={dataTestId ? `${dataTestId}-info` : 'pagination-info'}
-            >
-              {pageInfoFormat(page, count)}
-            </Typography>
-          </PageInfoContainer>
+          <PageInfo size={size} testId={testId('info')}>
+            {pageInfoFormat(page, count)}
+          </PageInfo>
         )}
       </PaginationContainer>
     );

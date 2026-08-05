@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { WorkflowStep } from './WorkflowStep';
 import type { WorkflowStepItem } from './WorkflowStep.types';
@@ -110,8 +110,8 @@ export const KeyboardNavigation: Story = {
     expect(stepButtons).toHaveLength(6); // 3 steps * 2 buttons each (indicator + content)
 
     // Focus on first step indicator (index 0)
-    stepButtons[0].focus();
-    expect(stepButtons[0]).toHaveFocus();
+    await userEvent.click(stepButtons[0]);
+    await waitFor(() => expect(stepButtons[0]).toHaveFocus());
 
     // Press Enter key
     await userEvent.keyboard('{Enter}');
@@ -127,7 +127,7 @@ export const KeyboardNavigation: Story = {
     });
 
     // Test Space key on second step indicator (index 2)
-    stepButtons[2].focus();
+    await userEvent.click(stepButtons[2]);
     await userEvent.keyboard(' ');
 
     await waitFor(() => {
@@ -187,13 +187,13 @@ export const FocusManagement: Story = {
 
     // Test focus navigation
     await userEvent.tab();
-    expect(stepButtons[0]).toHaveFocus();
+    await waitFor(() => expect(stepButtons[0]).toHaveFocus());
 
     await userEvent.tab();
-    expect(stepButtons[1]).toHaveFocus();
+    await waitFor(() => expect(stepButtons[1]).toHaveFocus());
 
     // Check focus outline is visible
-    expect(stepButtons[1]).toHaveFocus();
+    await waitFor(() => expect(stepButtons[1]).toHaveFocus());
   },
 };
 

@@ -1,6 +1,7 @@
 {
   "name": "@12-apps/eslint-config",
   "version": "1.0.1",
+  "license": "MIT",
   "type": "module",
   "exports": {
     "./base": "./base.js",
@@ -22,7 +23,7 @@
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
-    "access": "restricted"
+    "access": "public"
   },
   "repository": {
     "type": "git",

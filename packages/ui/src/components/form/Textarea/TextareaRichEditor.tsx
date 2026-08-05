@@ -11,7 +11,7 @@ import Link from '@mui/icons-material/Link';
 import { alpha, Box, Divider, IconButton, Tooltip } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
 import { styled } from '@mui/material/styles';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { floatAnimation, getColorFromTheme } from './Textarea.styles';
 
@@ -24,17 +24,13 @@ const RichToolbar = styled(Box)<{ glass?: boolean }>(({ theme, glass }) => ({
   borderBottom: `1px solid ${theme.palette.divider}`,
   background: glass ? alpha(theme.palette.background.paper, 0.1) : theme.palette.background.paper,
   ...(glass && {
-    backdropFilter: 'blur(15px)',
-  }),
+    backdropFilter: 'blur(15px)' }),
   '& .MuiDivider-root': {
     height: 24,
-    margin: `0 ${theme.spacing(1)}`,
-  },
-}));
+    margin: `0 ${theme.spacing(1)}` } }));
 
 const ToolbarButton = styled(IconButton, {
-  shouldForwardProp: (prop) => prop !== 'active',
-})<{ active?: boolean }>(({ theme, active }) => ({
+  shouldForwardProp: (prop) => prop !== 'active' })<{ active?: boolean }>(({ theme, active }) => ({
   padding: theme.spacing(0.75),
   borderRadius: theme.spacing(0.5),
   color: active ? theme.palette.primary.main : theme.palette.text.secondary,
@@ -53,8 +49,7 @@ const ToolbarButton = styled(IconButton, {
     borderRadius: '50%',
     backgroundColor: alpha(theme.palette.primary.main, 0.3),
     transform: 'translate(-50%, -50%)',
-    transition: 'width 0.3s, height 0.3s',
-  },
+    transition: 'width 0.3s, height 0.3s' },
 
   '&:hover': {
     color: theme.palette.primary.main,
@@ -64,14 +59,10 @@ const ToolbarButton = styled(IconButton, {
 
     '&::before': {
       width: '100%',
-      height: '100%',
-    },
-  },
+      height: '100%' } },
 
   '&:active': {
-    transform: 'scale(0.95)',
-  },
-}));
+    transform: 'scale(0.95)' } }));
 
 const CharacterCount = styled(Box)<{ limit?: number; count: number }>(({ theme, limit, count }) => {
   const isWarning = limit && count > limit * 0.8;
@@ -91,8 +82,7 @@ const CharacterCount = styled(Box)<{ limit?: number; count: number }>(({ theme, 
     borderRadius: theme.spacing(0.5),
     backgroundColor: alpha(theme.palette.background.paper, 0.8),
     backdropFilter: 'blur(10px)',
-    transition: 'all 0.3s ease',
-  };
+    transition: 'all 0.3s ease' };
 });
 
 const ContentEditableDiv = styled('div')<{
@@ -124,30 +114,24 @@ const ContentEditableDiv = styled('div')<{
     cursor: 'text',
 
     ...(glass && {
-      backdropFilter: 'blur(20px)',
-    }),
+      backdropFilter: 'blur(20px)' }),
 
     '&:hover': {
       backgroundColor: glass
         ? alpha(theme.palette.background.paper, 0.15)
-        : alpha(theme.palette.background.paper, 0.9),
-    },
+        : alpha(theme.palette.background.paper, 0.9) },
 
     '&:focus': {
       borderColor: error ? errorColor.main : colorPalette.main,
-      boxShadow: `0 0 0 3px ${alpha(error ? errorColor.main : colorPalette.main, 0.1)}`,
-    },
+      boxShadow: `0 0 0 3px ${alpha(error ? errorColor.main : colorPalette.main, 0.1)}` },
 
     '& > *': {
-      margin: '0.5em 0',
-    },
+      margin: '0.5em 0' },
 
     '&[contenteditable="true"]:empty::before': {
       content: 'attr(data-placeholder)',
       color: theme.palette.text.secondary,
-      opacity: 0.6,
-    },
-  };
+      opacity: 0.6 } };
 });
 
 // Rich text formatting functions
@@ -159,8 +143,7 @@ const formatText = (command: string, value?: string) => {
 // caret. Kept apart from the markup below.
 const useRichEditorState = ({
   value,
-  onChange,
-}: {
+  onChange }: {
   value?: string;
   onChange?: (html: string) => void;
 }) => {
@@ -173,8 +156,7 @@ const useRichEditorState = ({
     list: false,
     orderedList: false,
     quote: false,
-    code: false,
-  });
+    code: false });
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -203,8 +185,7 @@ const useRichEditorState = ({
       list: document.queryCommandState('insertUnorderedList'),
       orderedList: document.queryCommandState('insertOrderedList'),
       quote: false,
-      code: false,
-    });
+      code: false });
   };
 
   const handleFormat = (command: string, value?: string) => {
@@ -221,8 +202,7 @@ const useRichEditorState = ({
     contentRef,
     handleInput,
     handleFormat,
-    updateActiveFormats,
-  };
+    updateActiveFormats };
 };
 
 const InlineFormatButtons: React.FC<{
@@ -362,8 +342,7 @@ export const TextareaRichEditor: React.FC<{
     contentRef,
     handleInput,
     handleFormat,
-    updateActiveFormats,
-  } = useRichEditorState({ value, onChange });
+    updateActiveFormats } = useRichEditorState({ value, onChange });
 
   return (
     <Box sx={{ position: 'relative' }}>

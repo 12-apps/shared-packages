@@ -1,23 +1,15 @@
-import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
 import {
   Box,
   Checkbox,
-  CircularProgress,
-  Collapse,
-  IconButton,
-  Skeleton,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
-  TableSortLabel,
-  Typography,
-} from '@mui/material';
-import React, { useCallback, useMemo, useState } from 'react';
+  TableSortLabel } from '@mui/material';
+import React, { useCallback } from 'react';
 
-import { getDensityConfig } from './Table.styles';
 import { useVirtualScrolling } from './Table.hooks';
+import { useTableRowRenderer } from './TableParts.hooks';
 import type { ColumnConfig, TableBodyProps, TableHeaderProps } from './Table.types';
 
 // Mirrors the visible sort indicator for assistive technology; undefined when
@@ -74,8 +66,7 @@ export const EnhancedTableHeader: React.FC<TableHeaderProps> = React.memo(({
   onSortChange,
   selectable,
   selectedRows = [],
-  onSelectAll,
-}) => {
+  onSelectAll }) => {
   const handleSort = useCallback(
     (columnKey: string) => {
       if (!sortable || !onSortChange) return;
@@ -126,7 +117,7 @@ EnhancedTableHeader.displayName = 'EnhancedTableHeader';
 
 // One data row. Split out of the memoised renderTableRow callback so the
 // callback stays a short dispatch and the row markup is readable on its own.
-const TableDataRow: React.FC<{
+export const TableDataRow: React.FC<{
   rowData: Record<string, unknown>;
   rowKey: string | number;
   index: number;
@@ -155,8 +146,7 @@ const TableDataRow: React.FC<{
   onRowBlur,
   onSelect,
   virtualScrolling,
-  renderCell,
-}) => (
+  renderCell }) => (
 
       <TableRow
         key={String(rowKey)}
@@ -171,8 +161,7 @@ const TableDataRow: React.FC<{
           top: 0,
           left: 0,
           right: 0,
-          height: rowHeight,
-        } : undefined}
+          height: rowHeight } : undefined}
       >
         {selectable && (
           <TableCell padding="checkbox">
@@ -224,14 +213,12 @@ const VirtualisedBody: React.FC<{
       style={{
         height: containerHeight,
         overflow: 'auto',
-        position: 'relative',
-      }}
+        position: 'relative' }}
     >
       <TableBody
         style={{
           height: visibleItems.totalHeight,
-          position: 'relative',
-        }}
+          position: 'relative' }}
       >
         {visibleItems.items.map((rowData, index) => 
           renderTableRow(rowData, visibleItems.startIndex + index, visibleItems.offsetY + index * rowHeight)
@@ -267,71 +254,20 @@ export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo(({
   virtualScrolling,
   containerHeight,
   rowHeight,
-  overscan = 5,
-}) => {
-  const getRowKey = useCallback(
-    (rowData: Record<string, unknown>, index: number): string | number => rowKeyExtractor ? rowKeyExtractor(rowData, index) : (rowData.id as string | number) || index,
-    [rowKeyExtractor]
-  );
-
-  const isRowSelected = useCallback(
-    (rowKey: string | number) => selectedRows.includes(rowKey),
-    [selectedRows]
-  );
-
-  const handleRowSelection = useCallback(
-    (event: React.MouseEvent | React.ChangeEvent, rowKey: string | number) => {
-      // Stop propagation to prevent row click conflict
-      event.stopPropagation();
-      if (!onSelectionChange) return;
-      const isSelected = selectedRows.includes(rowKey);
-      onSelectionChange(rowKey, !isSelected);
-    },
-    [onSelectionChange, selectedRows]
-  );
-
-  const renderTableRow = useCallback(
-    (rowData: Record<string, unknown>, index: number, offsetY: number = 0) => {
-      const rowKey = getRowKey(rowData, index);
-      const selected = isRowSelected(rowKey);
-
-      if (renderRow) return renderRow(rowData, index, selected);
-
-      return (
-        <TableDataRow
-          key={rowKey}
-          rowData={rowData}
-          rowKey={rowKey}
-          index={index}
-          offsetY={offsetY}
-          columns={columns}
-          selected={selected}
-          selectable={selectable}
-          rowHeight={rowHeight}
-          onRowClick={onRowClick}
-          onRowFocus={onRowFocus}
-          onRowBlur={onRowBlur}
-          onSelect={handleRowSelection}
-          virtualScrolling={virtualScrolling}
-          renderCell={renderCell}
-        />
-      );
-    },
-    [
-      columns,
-      getRowKey,
-      isRowSelected,
-      handleRowSelection,
-      onRowClick,
-      onRowFocus,
-      onRowBlur,
-      renderRow,
-      renderCell,
-      rowHeight,
-      selectable,
-      virtualScrolling,
-    ],
-  );
+  overscan = 5 }) => {
+  const renderTableRow = useTableRowRenderer({
+    columns,
+    selectedRows,
+    onRowClick,
+    onRowFocus,
+    onRowBlur,
+    onSelectionChange,
+    rowKeyExtractor,
+    selectable,
+    renderRow,
+    renderCell,
+    virtualScrolling,
+    rowHeight });
 
   const { visibleItems, handleScroll } = useVirtualScrolling(
     data, 

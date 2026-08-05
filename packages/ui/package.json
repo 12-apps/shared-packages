@@ -1,6 +1,7 @@
 {
   "name": "@12-apps/ui",
   "version": "1.0.0",
+  "license": "MIT",
   "packageManager": "pnpm@9.0.0",
   "type": "module",
   "engines": {
@@ -242,7 +243,7 @@
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
-    "access": "restricted"
+    "access": "public"
   },
   "repository": {
     "type": "git",

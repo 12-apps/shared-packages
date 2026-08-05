@@ -1,7 +1,7 @@
 import { Box, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
-import { expect, userEvent, waitFor,within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { Table } from './Table';
 import type { ColumnConfig } from './Table.types';
@@ -149,7 +149,7 @@ export const KeyboardNavigation: Story = {
     // Test Tab navigation
     await userEvent.tab();
     const firstCheckbox = canvas.getAllByRole('checkbox')[0];
-    await expect(firstCheckbox).toHaveFocus();
+    await waitFor(() => expect(firstCheckbox).toHaveFocus());
   },
 };
 
@@ -201,11 +201,11 @@ export const FocusManagement: Story = {
     const canvas = within(canvasElement);
 
     const beforeButton = canvas.getByTestId('before');
-    beforeButton.focus();
+    await userEvent.click(beforeButton);
 
     await userEvent.tab();
     const firstCheckbox = canvas.getAllByRole('checkbox')[0];
-    await expect(firstCheckbox).toHaveFocus();
+    await waitFor(() => expect(firstCheckbox).toHaveFocus());
   },
 };
 

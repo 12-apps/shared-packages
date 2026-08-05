@@ -1,34 +1,16 @@
-import Code from '@mui/icons-material/Code';
-import FormatBold from '@mui/icons-material/FormatBold';
-import FormatColorFill from '@mui/icons-material/FormatColorFill';
-import FormatColorText from '@mui/icons-material/FormatColorText';
-import FormatItalic from '@mui/icons-material/FormatItalic';
-import FormatListBulleted from '@mui/icons-material/FormatListBulleted';
-import FormatListNumbered from '@mui/icons-material/FormatListNumbered';
-import FormatQuote from '@mui/icons-material/FormatQuote';
-import FormatUnderlined from '@mui/icons-material/FormatUnderlined';
-import Link from '@mui/icons-material/Link';
 import {
   alpha,
   Box,
-  Divider,
   FormHelperText,
-  IconButton,
   InputLabel,
-  keyframes,
-  TextareaAutosize,
-  Tooltip,
-} from '@mui/material';
+  TextareaAutosize } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
 import { styled } from '@mui/material/styles';
-import React, { useEffect,useRef, useState } from 'react';
+import React, { useState } from 'react';
 
 import {
-  floatAnimation,
   getColorFromTheme,
-  glowAnimation,
-  textareaEmphasisStyles,
-} from './Textarea.styles';
+  textareaEmphasisStyles } from './Textarea.styles';
 import { TextareaRichEditor } from './TextareaRichEditor';
 import type { TextareaProps } from './Textarea.types';
 
@@ -49,8 +31,7 @@ const StyledTextarea = styled(TextareaAutosize, {
   shouldForwardProp: (prop) =>
     !['customVariant', 'customColor', 'customSize', 'glow', 'glass', 'gradient', 'error'].includes(
       prop as string,
-    ),
-})<StyledTextareaProps>(({
+    ) })<StyledTextareaProps>(({
   theme,
   customVariant,
   customColor = 'primary',
@@ -58,8 +39,7 @@ const StyledTextarea = styled(TextareaAutosize, {
   glow,
   glass,
   gradient,
-  error,
-}) => {
+  error }) => {
   if (!theme) return {};
   const colorPalette = getColorFromTheme(theme, customColor);
   const errorColor = theme.palette.error;
@@ -69,8 +49,7 @@ const StyledTextarea = styled(TextareaAutosize, {
     sm: { padding: '8px 10px', fontSize: '0.875rem', minHeight: '80px' },
     md: { padding: '10px 12px', fontSize: '1rem', minHeight: '100px' },
     lg: { padding: '12px 14px', fontSize: '1.125rem', minHeight: '120px' },
-    xl: { padding: '14px 16px', fontSize: '1.25rem', minHeight: '140px' },
-  };
+    xl: { padding: '14px 16px', fontSize: '1.25rem', minHeight: '140px' } };
 
   const baseStyles = {
     width: '100%',
@@ -86,31 +65,25 @@ const StyledTextarea = styled(TextareaAutosize, {
 
     '&::placeholder': {
       color: theme.palette.text.secondary,
-      opacity: 0.7,
-    },
+      opacity: 0.7 },
 
     '&:hover': {
       borderColor: error ? errorColor.dark : colorPalette.main,
-      backgroundColor: alpha(theme.palette.background.paper, 0.8),
-    },
+      backgroundColor: alpha(theme.palette.background.paper, 0.8) },
 
     '&:focus': {
       borderColor: error ? errorColor.main : colorPalette.main,
       backgroundColor: theme.palette.background.paper,
-      boxShadow: `0 0 0 3px ${alpha(error ? errorColor.main : colorPalette.main, 0.1)}`,
-    },
-  };
+      boxShadow: `0 0 0 3px ${alpha(error ? errorColor.main : colorPalette.main, 0.1)}` } };
 
   // Glass morphism effect
   return {
     ...baseStyles,
-    ...textareaEmphasisStyles({ theme, colorPalette, glass, gradient, glow }),
-  };
+    ...textareaEmphasisStyles({ theme, colorPalette, glass, gradient, glow }) };
 });
 
 const StyledLabel = styled(InputLabel, {
-  shouldForwardProp: (prop) => !['glass', 'error'].includes(prop as string),
-})<{ glass?: boolean; error?: boolean }>(({ theme, glass, error }) => ({
+  shouldForwardProp: (prop) => !['glass', 'error'].includes(prop as string) })<{ glass?: boolean; error?: boolean }>(({ theme, glass, error }) => ({
   marginBottom: theme.spacing(1),
   fontWeight: 500,
   color: error ? theme.palette.error.main : theme.palette.text.primary,
@@ -120,9 +93,7 @@ const StyledLabel = styled(InputLabel, {
     padding: '4px 8px',
     borderRadius: '4px',
     border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-    display: 'inline-block',
-  }),
-}));
+    display: 'inline-block' }) }));
 
 // IconWrapper - replaced with inline Box component for better TypeScript compatibility
 // const IconWrapper = styled(Box)<{ position: 'start' | 'end' }>(({ theme, position }) => {
@@ -151,8 +122,7 @@ const TEXTAREA_DEFAULTS = {
   glass: false,
   gradient: false,
   iconPosition: 'start',
-  minRows: 3,
-} satisfies Partial<TextareaProps>;
+  minRows: 3 } satisfies Partial<TextareaProps>;
 
 // Strips explicitly-undefined props before the merge, so `prop={undefined}`
 // still falls back to the default as a destructuring default would.
@@ -202,8 +172,7 @@ const TextareaIcon: React.FC<{
       ...(iconPosition === 'start' ? { left: '12px' } : { right: '12px' }),
       color: 'text.secondary',
       pointerEvents: 'none',
-      zIndex: 1,
-    }}
+      zIndex: 1 }}
   >
     {icon}
   </Box>
@@ -241,9 +210,7 @@ export const Textarea: React.FC<TextareaProps> = (textareaProps) => {
     // version had `iconPosition === 'start' ? '40px' : '40px'`, a ternary whose
     // two branches were identical.
     ...(hasIcon && {
-      [iconPosition === 'start' ? 'paddingLeft' : 'paddingRight']: ICON_GUTTER,
-    }),
-  };
+      [iconPosition === 'start' ? 'paddingLeft' : 'paddingRight']: ICON_GUTTER }) };
 
   // If rich text variant, use the rich text editor
   if (variant === 'rich') {

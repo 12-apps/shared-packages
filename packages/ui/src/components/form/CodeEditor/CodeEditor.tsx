@@ -1,27 +1,18 @@
-import type { Monaco } from '@monaco-editor/react';
 import Editor from '@monaco-editor/react';
-import CodeIcon from '@mui/icons-material/Code';
-import CopyIcon from '@mui/icons-material/ContentCopy';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import ExitFullscreenIcon from '@mui/icons-material/FullscreenExit';
-import WrapIcon from '@mui/icons-material/WrapText';
 import {
   alpha,
   Box,
-  IconButton,
   Paper,
-  Stack,
   styled,
-  Tooltip,
-  Typography,
-  useTheme,
-} from '@mui/material';
+  Typography } from '@mui/material';
 import type { editor } from 'monaco-editor';
 import type { FC} from 'react';
-import React, { useEffect,useRef } from 'react';
+import React, {  } from 'react';
 
-import { EditorToolbar } from './CodeEditorToolbar';
+import { makeTestId, resolveCodeEditorProps } from './CodeEditor.helpers';
+import { useCodeEditor } from './CodeEditor.hooks';
 import type { CodeEditorProps } from './CodeEditor.types';
+import { EditorToolbar } from './CodeEditorToolbar';
 
 // Styled components
 const EditorContainer = styled(Paper)(({ theme }) => ({
@@ -32,12 +23,10 @@ const EditorContainer = styled(Paper)(({ theme }) => ({
   WebkitBackdropFilter: 'blur(10px)',
   border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
   borderRadius: theme.shape.borderRadius * 2,
-  overflow: 'hidden',
-}));
+  overflow: 'hidden' }));
 
 const EditorWrapper = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'fullscreen',
-})<{ fullscreen: boolean }>(({ theme, fullscreen }) => ({
+  shouldForwardProp: (prop) => prop !== 'fullscreen' })<{ fullscreen: boolean }>(({ theme, fullscreen }) => ({
   position: 'relative',
   flex: 1,
   minHeight: 200,
@@ -48,9 +37,7 @@ const EditorWrapper = styled(Box, {
     right: 0,
     bottom: 0,
     zIndex: theme.zIndex.modal,
-    background: theme.palette.background.paper,
-  }),
-}));
+    background: theme.palette.background.paper }) }));
 
 const PlaceholderOverlay = styled(Box)(({ theme }) => ({
   position: 'absolute',
@@ -60,124 +47,28 @@ const PlaceholderOverlay = styled(Box)(({ theme }) => ({
   fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
   fontSize: '0.875rem',
   pointerEvents: 'none',
-  userSelect: 'none',
-}));
+  userSelect: 'none' }));
 
 // Monaco editor themes
-const customLightTheme = {
-  base: 'vs' as const,
-  inherit: true,
-  rules: [
-    { token: 'comment', foreground: '6A737D', fontStyle: 'italic' },
-    { token: 'keyword', foreground: 'D73A49' },
-    { token: 'string', foreground: '032F62' },
-    { token: 'number', foreground: '005CC5' },
-  ],
-  colors: {
-    'editor.background': '#FFFFFF',
-    'editor.foreground': '#24292E',
-    'editor.lineHighlightBackground': '#F6F8FA',
-    'editorLineNumber.foreground': '#959DA5',
-    'editorIndentGuide.background': '#D1D5DA',
-    'editor.selectionBackground': '#C8E1FF',
-  },
-};
+const EditorLoading: FC = () => (
+  <Box
+    sx={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100%',
+      color: 'text.secondary' }}
+  >
+    <Typography variant="body2">Loading editor...</Typography>
+  </Box>
+);
 
-const customDarkTheme = {
-  base: 'vs-dark' as const,
-  inherit: true,
-  rules: [
-    { token: 'comment', foreground: '6A737D', fontStyle: 'italic' },
-    { token: 'keyword', foreground: 'F97583' },
-    { token: 'string', foreground: '9ECBFF' },
-    { token: 'number', foreground: '79B8FF' },
-  ],
-  colors: {
-    'editor.background': '#0D1117',
-    'editor.foreground': '#C9D1D9',
-    'editor.lineHighlightBackground': '#161B22',
-    'editorLineNumber.foreground': '#8B949E',
-    'editorIndentGuide.background': '#21262D',
-    'editor.selectionBackground': '#3392FF44',
-  },
-};
-
-// Main component
-const AUTO_FORMAT_DELAY_MS = 100;
-const COPIED_FEEDBACK_MS = 2000;
-
-const registerEditorThemes = (monaco: Monaco) => {
-  monaco.editor.defineTheme('custom-light', customLightTheme);
-  monaco.editor.defineTheme('custom-dark', customDarkTheme);
-};
-
-// Best-effort: a Monaco build without the TypeScript worker (as in jsdom) throws
-// here, and the editor is still usable without it.
-const configureTypeScriptDefaults = (monaco: Monaco) => {
-  try {
-    const tsLanguage = monaco.languages
-      .getLanguages()
-      .find((language) => language.id === 'typescript');
-
-    if (!tsLanguage) return;
-
-    monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-      target: monaco.languages.typescript.ScriptTarget.ES2020,
-      allowNonTsExtensions: true,
-      moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-      module: monaco.languages.typescript.ModuleKind.CommonJS,
-      noEmit: true,
-      esModuleInterop: true,
-      jsx: monaco.languages.typescript.JsxEmit.React,
-      reactNamespace: 'React',
-      allowJs: true,
-      typeRoots: ['node_modules/@types'],
-    });
-
-    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
-      noSemanticValidation: false,
-      noSyntaxValidation: false,
-      noSuggestionDiagnostics: true,
-    });
-  } catch {
-    // Silently handle any TypeScript configuration errors in test environments
-  }
-};
-
-const scheduleAutoFormat = (mountedEditor: editor.IStandaloneCodeEditor, enabled: boolean) => {
-  if (!enabled) return;
-
-  window.setTimeout(() => {
-    mountedEditor.getAction('editor.action.formatDocument')?.run();
-  }, AUTO_FORMAT_DELAY_MS);
-};
-
-const registerSaveShortcut = (
-  mountedEditor: editor.IStandaloneCodeEditor,
-  monaco: Monaco,
-  onSave?: (value: string) => void,
-) => {
-  mountedEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-    onSave?.(mountedEditor.getValue());
-  });
-};
-
-// 'auto' follows the MUI palette; otherwise the caller's choice wins.
-const resolveEditorTheme = (themeProp: string, paletteMode: string) => {
-  const wantsDark = themeProp === 'auto' ? paletteMode === 'dark' : themeProp === 'dark';
-
-  return wantsDark ? 'custom-dark' : 'custom-light';
-};
-
-// Monaco's options object. Only the first five entries vary with our props; the
-// rest are fixed editor preferences.
 const buildEditorOptions = ({
   minimap,
   fontSize,
   isWrapped,
   lineNumbers,
-  readOnly,
-}: {
+  readOnly }: {
   minimap?: boolean;
   fontSize: number;
   isWrapped: boolean;
@@ -207,102 +98,35 @@ const buildEditorOptions = ({
     roundedSelection: true,
     padding: { top: 16, bottom: 16 },
     fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
-    fontLigatures: true,
-});
+    fontLigatures: true });
 
-export const CodeEditor: FC<CodeEditorProps> = ({
-  language,
-  height = '400px',
-  theme: themeProp = 'auto',
-  value,
-  onChange,
-  readOnly = false,
-  lineNumbers = true,
-  minimap = false,
-  fontSize = 14,
-  wordWrap = false,
-  showToolbar = true,
-  autoFormat = false,
-  placeholder,
-  onSave,
-  dataTestId,
-}) => {
-  const theme = useTheme();
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<Monaco | null>(null);
-  const [isFullscreen, setIsFullscreen] = React.useState(false);
-  const [isWrapped, setIsWrapped] = React.useState(wordWrap);
-  const [isCopied, setIsCopied] = React.useState(false);
+export const CodeEditor: FC<CodeEditorProps> = (componentProps) => {
+  const {
+    language,
+    height,
+    theme: themeProp,
+    value,
+    onChange,
+    readOnly,
+    lineNumbers,
+    minimap,
+    fontSize,
+    wordWrap,
+    showToolbar,
+    autoFormat,
+    placeholder,
+    onSave,
+    dataTestId } = resolveCodeEditorProps(componentProps);
 
-  // Determine theme
-  const editorTheme = React.useMemo(
-    () => resolveEditorTheme(themeProp, theme.palette.mode),
-    [themeProp, theme.palette.mode],
-  );
+  const testId = makeTestId(dataTestId);
+  const editor = useCodeEditor({ themeProp, wordWrap, autoFormat, readOnly, onSave });
 
-  const handleEditorDidMount = (
-    mountedEditor: editor.IStandaloneCodeEditor,
-    monaco: Monaco,
-  ) => {
-    editorRef.current = mountedEditor;
-    monacoRef.current = monaco;
-
-    registerEditorThemes(monaco);
-    configureTypeScriptDefaults(monaco);
-    scheduleAutoFormat(mountedEditor, autoFormat && !readOnly);
-    registerSaveShortcut(mountedEditor, monaco, onSave);
-  };
-
-  // Handle copy to clipboard
-  // No-ops where the clipboard API is unavailable, as in jsdom.
-  const handleCopy = async () => {
-    if (!editorRef.current || !navigator.clipboard?.writeText) return;
-
-    try {
-      await navigator.clipboard.writeText(editorRef.current.getValue());
-      setIsCopied(true);
-      window.setTimeout(() => setIsCopied(false), COPIED_FEEDBACK_MS);
-    } catch {
-      // Silently handle clipboard errors in test environments
-    }
-  };
-
-  // Handle fullscreen toggle
-  const handleFullscreenToggle = () => {
-    setIsFullscreen(!isFullscreen);
-  };
-
-  // Handle word wrap toggle
-  const handleWrapToggle = () => {
-    setIsWrapped(!isWrapped);
-    if (editorRef.current) {
-      editorRef.current.updateOptions({
-        wordWrap: !isWrapped ? 'on' : 'off',
-      });
-    }
-  };
-
-  // Handle format document
-  const handleFormat = () => {
-    if (editorRef.current && !readOnly) {
-      editorRef.current.getAction('editor.action.formatDocument')?.run();
-    }
-  };
-
-  // Handle ESC key in fullscreen
-  useEffect(() => {
-    if (isFullscreen) {
-      const handleEsc = (e: globalThis.KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          setIsFullscreen(false);
-        }
-      };
-      window.addEventListener('keydown', handleEsc);
-      return () => window.removeEventListener('keydown', handleEsc);
-    }
-  }, [isFullscreen]);
-
-  const editorOptions = buildEditorOptions({ minimap, fontSize, isWrapped, lineNumbers, readOnly });
+  const editorOptions = buildEditorOptions({
+    minimap,
+    fontSize,
+    isWrapped: editor.isWrapped,
+    lineNumbers,
+    readOnly });
 
   return (
     <EditorContainer elevation={2} data-testid={dataTestId || 'code-editor'}>
@@ -310,55 +134,33 @@ export const CodeEditor: FC<CodeEditorProps> = ({
         <EditorToolbar
           language={language}
           readOnly={readOnly}
-          isWrapped={isWrapped}
-          isCopied={isCopied}
-          isFullscreen={isFullscreen}
+          isWrapped={editor.isWrapped}
+          isCopied={editor.isCopied}
+          isFullscreen={editor.isFullscreen}
           dataTestId={dataTestId}
-          onFormat={handleFormat}
-          onCopy={handleCopy}
-          onWrapToggle={handleWrapToggle}
-          onFullscreenToggle={handleFullscreenToggle}
+          onFormat={editor.handleFormat}
+          onCopy={editor.handleCopy}
+          onWrapToggle={editor.handleWrapToggle}
+          onFullscreenToggle={editor.handleFullscreenToggle}
         />
       )}
 
-      <EditorWrapper
-        fullscreen={isFullscreen}
-        data-testid={dataTestId ? `${dataTestId}-editor-wrapper` : 'code-editor-editor-wrapper'}
-      >
+      <EditorWrapper fullscreen={editor.isFullscreen} data-testid={testId('editor-wrapper')}>
         {placeholder && !value && (
-          <PlaceholderOverlay
-            data-testid={dataTestId ? `${dataTestId}-placeholder` : 'code-editor-placeholder'}
-          >
-            {placeholder}
-          </PlaceholderOverlay>
+          <PlaceholderOverlay data-testid={testId('placeholder')}>{placeholder}</PlaceholderOverlay>
         )}
 
         <Editor
-          height={isFullscreen ? '100vh' : height}
+          height={editor.isFullscreen ? '100vh' : height}
           language={language}
           value={value}
           onChange={(newValue) => onChange?.(newValue || '')}
-          theme={editorTheme}
+          theme={editor.editorTheme}
           options={editorOptions}
-          onMount={handleEditorDidMount}
-          loading={
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: 'text.secondary',
-              }}
-            >
-              <Typography variant="body2">Loading editor...</Typography>
-            </Box>
-          }
+          onMount={editor.handleEditorDidMount}
+          loading={<EditorLoading />}
         />
       </EditorWrapper>
     </EditorContainer>
   );
 };
-
-// Export default
-export default CodeEditor;

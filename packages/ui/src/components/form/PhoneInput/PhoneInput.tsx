@@ -11,12 +11,9 @@ import {
   styled,
   TextField,
   Typography,
-  useTheme,
-} from '@mui/material';
-import type { CountryCode } from 'libphonenumber-js';
-import { parsePhoneNumber } from 'libphonenumber-js';
+  useTheme } from '@mui/material';
 import type { FC} from 'react';
-import React, { useEffect, useRef,useState } from 'react';
+import React, {  } from 'react';
 
 import { countries } from './countries';
 import { usePhoneInput } from './PhoneInput.hooks';
@@ -34,22 +31,15 @@ const GlassTextField = styled(TextField)(({ theme }) => ({
     transition: theme.transitions.create(['border-color', 'box-shadow', 'background']),
     '&:hover': {
       background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,
-      borderColor: theme.palette.primary.main,
-    },
+      borderColor: theme.palette.primary.main },
     '&.Mui-focused': {
       background: theme.palette.background.paper,
-      boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.25)}`,
-    },
+      boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.25)}` },
     '& fieldset': {
-      border: 'none',
-    },
-  },
+      border: 'none' } },
   '& .MuiInputLabel-root': {
     '&.Mui-focused': {
-      color: theme.palette.primary.main,
-    },
-  },
-}));
+      color: theme.palette.primary.main } } }));
 
 const CountrySelector = styled(Box)(({ theme }) => ({
   display: 'flex',
@@ -59,9 +49,7 @@ const CountrySelector = styled(Box)(({ theme }) => ({
   cursor: 'pointer',
   transition: theme.transitions.create(['background-color']),
   '&:hover': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.08),
-  },
-}));
+    backgroundColor: alpha(theme.palette.primary.main, 0.08) } }));
 
 const CountryMenu = styled(Menu)(({ theme }) => ({
   '& .MuiPaper-root': {
@@ -69,9 +57,7 @@ const CountryMenu = styled(Menu)(({ theme }) => ({
     backdropFilter: 'blur(20px)',
     WebkitBackdropFilter: 'blur(20px)',
     border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
-    maxHeight: 400,
-  },
-}));
+    maxHeight: 400 } }));
 
 // Helper functions with enhanced validation
 // The text field itself with its two adornments. Split out so PhoneInput is
@@ -113,8 +99,7 @@ const PhoneField: React.FC<{
   onFocus,
   onBlur,
   onCountryOpen,
-  onCountryOpenViaKeyboard,
-}) => (
+  onCountryOpenViaKeyboard }) => (
       <TextFieldComponent
         variant={variant === 'glass' ? 'outlined' : variant}
         label={label}
@@ -139,13 +124,10 @@ const PhoneField: React.FC<{
               onOpenViaKeyboard={onCountryOpenViaKeyboard}
             />
           ),
-          endAdornment: <ValidityAdornment icon={icon} isValid={isValid} />,
-        }}
+          endAdornment: <ValidityAdornment icon={icon} isValid={isValid} /> }}
         sx={{
           '& input': {
-            letterSpacing: '0.5px',
-          },
-        }}
+            letterSpacing: '0.5px' } }}
       />
 );
 
@@ -160,8 +142,7 @@ const PHONE_INPUT_DEFAULTS = {
   error: false,
   disabled: false,
   required: false,
-  fullWidth: true,
-} satisfies Partial<PhoneInputProps>;
+  fullWidth: true } satisfies Partial<PhoneInputProps>;
 
 // Drops explicitly-undefined props before the merge, so `prop={undefined}` falls
 // back to the default exactly as a destructuring default would. Eleven separate
@@ -210,8 +191,7 @@ const CountryAdornment: React.FC<{
 // The trailing icon turns green once the number validates.
 const ValidityAdornment: React.FC<{ icon?: React.ReactNode; isValid: boolean }> = ({
   icon,
-  isValid,
-}) => {
+  isValid }) => {
   const theme = useTheme();
 
   if (!icon) return null;
@@ -221,8 +201,7 @@ const ValidityAdornment: React.FC<{ icon?: React.ReactNode; isValid: boolean }> 
       <Box
         sx={{
           color: isValid ? theme.palette.success.main : theme.palette.text.secondary,
-          transition: 'color 0.3s ease',
-        }}
+          transition: 'color 0.3s ease' }}
         data-testid="phone-input-icon"
       >
         {icon}
@@ -246,12 +225,10 @@ const CountryPicker: React.FC<{
           onClose={onClose}
           anchorOrigin={{
             vertical: 'bottom',
-            horizontal: 'left',
-          }}
+            horizontal: 'left' }}
           transformOrigin={{
             vertical: 'top',
-            horizontal: 'left',
-          }}
+            horizontal: 'left' }}
           data-testid="country-menu"
         >
           {countries.map((country) => (
@@ -262,9 +239,7 @@ const CountryPicker: React.FC<{
               data-testid={`country-option-${country.code}`}
               sx={{
                 '&:hover': {
-                  background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-                },
-              }}
+                  background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)` } }}
             >
               <ListItemIcon sx={{ minWidth: 36 }}>
                 <Typography variant="h5" component="span">
@@ -292,8 +267,7 @@ const resolveValidation = ({
   value,
   isFocused,
   helper,
-  countryName,
-}: {
+  countryName }: {
   error: boolean;
   errorMessage?: string;
   isValid: boolean;
@@ -308,8 +282,7 @@ const resolveValidation = ({
     hasError: error || looksInvalid,
     helperText:
       errorMessage ||
-      (looksInvalid ? `Invalid phone number for ${countryName || 'selected country'}` : helper),
-  };
+      (looksInvalid ? `Invalid phone number for ${countryName || 'selected country'}` : helper) };
 };
 
 export const PhoneInput: FC<PhoneInputProps> = (props) => {
@@ -327,9 +300,7 @@ export const PhoneInput: FC<PhoneInputProps> = (props) => {
     errorMessage,
     disabled,
     required,
-    fullWidth,
-  } = { ...PHONE_INPUT_DEFAULTS, ...definedProps(props) };
-  const theme = useTheme();
+    fullWidth } = { ...PHONE_INPUT_DEFAULTS, ...definedProps(props) };
   const {
     value,
     selectedCountry,
@@ -342,8 +313,7 @@ export const PhoneInput: FC<PhoneInputProps> = (props) => {
     handleCountryClose,
     handleCountrySelect,
     handleChange,
-    handleBlur,
-  } = usePhoneInput({ defaultValue, initialCountryCode, onChange });
+    handleBlur } = usePhoneInput({ defaultValue, initialCountryCode, onChange });
 
   const validation = resolveValidation({
     error,
@@ -352,8 +322,7 @@ export const PhoneInput: FC<PhoneInputProps> = (props) => {
     value,
     isFocused,
     helper,
-    countryName: selectedCountry?.name,
-  });
+    countryName: selectedCountry?.name });
 
   const TextFieldComponent = variant === 'glass' ? GlassTextField : TextField;
 

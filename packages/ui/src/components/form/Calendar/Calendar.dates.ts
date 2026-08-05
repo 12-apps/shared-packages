@@ -44,7 +44,7 @@ export const startOfWeek = (date: Date, firstDayOfWeek = 0): Date => {
 };
 
 // Day 0 of the next month is the last day of this one.
-export const endOfMonth = (date: Date): Date =>
+const endOfMonth = (date: Date): Date =>
   new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
 const dayKey = (date: Date): string =>
