@@ -168,7 +168,7 @@ export const KeyboardNavigation: Story = {
 
     // Focus the scroll area
     if (scrollContainer) {
-      scrollContainer.focus();
+      await userEvent.click(scrollContainer);
       expect(document.activeElement).toBe(scrollContainer);
 
       // Test that keyboard events are handled (simulate the effect manually since browsers don't scroll in test environment)
@@ -262,7 +262,7 @@ export const FocusManagement: Story = {
     const btn2 = await canvas.findByTestId('btn-2');
 
     // Focus first button
-    btn1.focus();
+    await userEvent.click(btn1);
     expect(document.activeElement).toBe(btn1);
 
     // Tab to scroll container
@@ -275,7 +275,7 @@ export const FocusManagement: Story = {
       expect(activeEl === scrollContainer || activeEl === btn2).toBe(true);
 
       // Focus scroll container directly
-      scrollContainer.focus();
+      await userEvent.click(scrollContainer);
       expect(document.activeElement).toBe(scrollContainer);
 
       // Verify focus visible styles are applied

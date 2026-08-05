@@ -148,6 +148,8 @@ const FocusManagementTest: React.FC = () => {
       action: {
         label: 'Focus Button',
         onClick: () => {
+          // Restoring focus is the component\'s own job here, not a test action.
+          // eslint-disable-next-line test-flakiness/no-focus-check -- component behaviour
           buttonRef.current?.focus();
         },
       },

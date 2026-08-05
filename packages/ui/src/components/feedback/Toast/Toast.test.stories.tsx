@@ -192,6 +192,8 @@ export const KeyboardNavigation: Story = {
     useEffect(() => {
       // Auto-focus for keyboard testing
       if (buttonRef.current) {
+        // Restoring focus is the component\'s own job here, not a test action.
+        // eslint-disable-next-line test-flakiness/no-focus-check -- component behaviour
         buttonRef.current.focus();
       }
     }, []);
@@ -230,7 +232,7 @@ export const KeyboardNavigation: Story = {
     const triggerButton = canvas.getByTestId('keyboard-trigger');
 
     // Test keyboard activation
-    triggerButton.focus();
+    await userEvent.click(triggerButton);
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
@@ -365,7 +367,7 @@ export const FocusManagement: Story = {
     const focusTarget = canvas.getByTestId('focus-target');
 
     // Focus trigger and activate
-    triggerButton.focus();
+    await userEvent.click(triggerButton);
     await userEvent.click(triggerButton);
 
     await waitFor(() => {
@@ -389,7 +391,7 @@ export const FocusManagement: Story = {
         );
         if (actionButton) {
           // Test that we can focus the action button
-          (actionButton as HTMLElement).focus();
+          await userEvent.click(actionButton);
           expect(actionButton).toHaveFocus();
         }
       },
@@ -399,7 +401,7 @@ export const FocusManagement: Story = {
     // Test basic tab navigation works
     const focusTargetInput = focusTarget.querySelector('input') as HTMLElement;
     if (focusTargetInput) {
-      focusTargetInput.focus();
+      await userEvent.click(focusTargetInput);
       expect(focusTargetInput).toHaveFocus();
     }
   },

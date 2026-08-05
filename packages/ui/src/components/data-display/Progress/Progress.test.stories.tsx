@@ -365,16 +365,16 @@ export const KeyboardNavigation: Story = {
       const afterButton = canvas.getByTestId('after-progress');
 
       // Start from before button
-      beforeButton.focus();
-      await expect(beforeButton).toHaveFocus();
+      await userEvent.click(beforeButton);
+      await waitFor(() => expect(beforeButton).toHaveFocus());
 
       // Tab to after button (progress should be skipped as it's not interactive)
       await userEvent.tab();
-      await expect(afterButton).toHaveFocus();
+      await waitFor(() => expect(afterButton).toHaveFocus());
 
       // Tab backward
       await userEvent.tab({ shift: true });
-      await expect(beforeButton).toHaveFocus();
+      await waitFor(() => expect(beforeButton).toHaveFocus());
     });
 
     await step('Screen reader compatibility', async () => {
@@ -600,8 +600,8 @@ export const FocusManagement: Story = {
 
     await step('Progress appearance and focus', async () => {
       const triggerButton = canvas.getByTestId('trigger-button');
-      triggerButton.focus();
-      await expect(triggerButton).toHaveFocus();
+      await userEvent.click(triggerButton);
+      await waitFor(() => expect(triggerButton).toHaveFocus());
 
       await userEvent.click(triggerButton);
 

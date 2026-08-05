@@ -116,7 +116,7 @@ export const KeyboardNavigation: Story = {
 
     // Focus the banner
     const banner = canvas.getByRole('status');
-    banner.focus();
+    await userEvent.click(banner);
     expect(banner).toHaveFocus();
 
     // Tab to first action button
@@ -135,12 +135,12 @@ export const KeyboardNavigation: Story = {
     expect(dismissButton).toHaveFocus();
 
     // Test Enter key on action button
-    action1.focus();
+    await userEvent.click(action1);
     await userEvent.keyboard('{Enter}');
     expect(args.actions![0].onClick).toHaveBeenCalledTimes(1);
 
     // Test Space key on dismiss button
-    dismissButton.focus();
+    await userEvent.click(dismissButton);
     await userEvent.keyboard(' ');
 
     // Verify onDismiss was called
@@ -198,7 +198,7 @@ export const FocusManagement: Story = {
     expect(banner).toHaveAttribute('tabIndex', '0');
 
     // Test focus visibility
-    banner.focus();
+    await userEvent.click(banner);
     expect(banner).toHaveFocus();
 
     // Test that focus moves properly through interactive elements

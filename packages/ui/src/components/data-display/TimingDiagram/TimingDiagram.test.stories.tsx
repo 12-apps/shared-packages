@@ -463,7 +463,7 @@ export const KeyboardNavigationTest: Story = {
     await expect(container).toBeInTheDocument();
 
     // Focus on the container
-    container.focus();
+    await userEvent.click(container);
     await waitFor(() => expect(document.activeElement).toBe(container));
 
     // Tab through interactive elements
@@ -559,7 +559,7 @@ export const FocusManagementTest: Story = {
     await expect(container).toBeInTheDocument();
 
     // Check container can receive focus
-    container.focus();
+    await userEvent.click(container);
     await waitFor(() => expect(document.activeElement).toBe(container));
 
     // Verify segments have hover states (visual feedback)
