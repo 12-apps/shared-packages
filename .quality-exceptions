@@ -1,4 +1,3 @@
-packages/ui/src/components/data-display/Banner/Banner.test.stories.tsx
 packages/ui/src/components/data-display/Progress/Progress.test.stories.tsx
 packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.test.stories.tsx
 packages/ui/src/components/feedback/Sonner/Sonner.test.stories.tsx
