@@ -1,357 +1,91 @@
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import {
-  alpha,
   AppBar,
   Box,
   Button,
-  Chip,
-  CircularProgress,
   Divider,
   ListItemIcon,
   ListItemText,
   Menu,
   MenuItem,
-  Toolbar,
   Typography,
   useTheme,
 } from '@mui/material';
-import React, { useRef,useState } from 'react';
+import React, { useState } from 'react';
 
+import { withDefaults } from '../../../utils/withDefaults';
+
+import { useMenubarMenus } from './Menubar.hooks';
+import { barStyles } from './Menubar.styles';
+import { MenubarToolbar } from './Menubar.toolbar';
 import type {
   MenubarGroupProps,
   MenubarItem,
   MenubarProps,
-  MenubarSeparatorProps,
 } from './Menubar.types';
 
-export const Menubar: React.FC<MenubarProps> = ({
-  items,
-  variant = 'default',
-  size = 'md',
-  color = 'default',
-  orientation = 'horizontal',
-  glow = false,
-  pulse = false,
-  glass = false,
-  gradient = false,
-  loading = false,
-  disabled = false,
-  className,
-  style,
-  logo,
-  endContent,
-  sticky = false,
-  transparent = false,
-  blur = false,
-  elevation = 4,
-  fullWidth = true,
-  onClick,
-  onFocus,
-  onBlur,
-  'data-testid': dataTestId,
-}) => {
+const DEFAULTS = {
+  variant: 'default',
+  size: 'md',
+  color: 'default',
+  orientation: 'horizontal',
+  glow: false,
+  pulse: false,
+  glass: false,
+  gradient: false,
+  loading: false,
+  disabled: false,
+  sticky: false,
+  transparent: false,
+  blur: false,
+  elevation: 4,
+  fullWidth: true,
+} satisfies Partial<MenubarProps>;
+
+type ResolvedProps = MenubarProps & Required<Pick<MenubarProps, keyof typeof DEFAULTS>>;
+
+export const Menubar: React.FC<MenubarProps> = (props) => {
+  const {
+    items, variant, size, color, orientation, glow, pulse, glass, gradient,
+    loading, disabled, className, style, logo, endContent, sticky, transparent,
+    blur, elevation, fullWidth, onClick, onFocus, onBlur,
+    'data-testid': dataTestId,
+  } = withDefaults(props, DEFAULTS) as ResolvedProps;
+
   const theme = useTheme();
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const menuRefs = useRef<{ [key: string]: HTMLElement | null }>({});
+  const { activeMenu, menuRefs, handleMenuOpen, handleMenuClose, handleItemClick } =
+    useMenubarMenus(onClick);
 
-  const handleMenuOpen = (itemId: string, anchorEl: HTMLElement) => {
-    setActiveMenu(itemId);
-    menuRefs.current[itemId] = anchorEl;
-  };
+  const isVertical = orientation === 'vertical';
 
-  const handleMenuClose = () => {
-    const previousMenu = activeMenu;
-    setActiveMenu(null);
-    // Return focus to the button that opened the menu
-    if (previousMenu && menuRefs.current[previousMenu]) {
-      menuRefs.current[previousMenu].focus();
-    }
-  };
-
-  const handleItemClick = (item: MenubarItem) => {
-    if (item.action) {
-      item.action();
-    }
-    onClick?.(item);
-    handleMenuClose();
-  };
-
-  const getSizeStyles = () => {
-    switch (size) {
-      case 'xs':
-        return {
-          minHeight: 40,
-          fontSize: '0.75rem',
-          padding: theme.spacing(0.5, 1),
-        };
-      case 'sm':
-        return {
-          minHeight: 48,
-          fontSize: '0.875rem',
-          padding: theme.spacing(0.75, 1.5),
-        };
-      case 'md':
-        return {
-          minHeight: 56,
-          fontSize: '1rem',
-          padding: theme.spacing(1, 2),
-        };
-      case 'lg':
-        return {
-          minHeight: 64,
-          fontSize: '1.125rem',
-          padding: theme.spacing(1.25, 2.5),
-        };
-      case 'xl':
-        return {
-          minHeight: 72,
-          fontSize: '1.25rem',
-          padding: theme.spacing(1.5, 3),
-        };
-      default:
-        return {
-          minHeight: 56,
-          fontSize: '1rem',
-          padding: theme.spacing(1, 2),
-        };
-    }
-  };
-
-  const getColorStyles = () => {
-    if (color === 'default') {
-      return {
-        backgroundColor: transparent ? 'transparent' : theme.palette.background.paper,
-        color: theme.palette.text.primary,
-      };
-    }
-    return {
-      backgroundColor: transparent ? 'transparent' : theme.palette[color].main,
-      color: theme.palette[color].contrastText,
-    };
-  };
-
-  const getVariantStyles = () => {
-    const baseStyles = {
-      transition: theme.transitions.create(['all'], {
-        duration: theme.transitions.duration.standard,
-      }),
-      ...getSizeStyles(),
-      ...getColorStyles(),
-    };
-
-    const glowStyles = glow
-      ? {
-          boxShadow: `0 0 20px ${alpha(
-            color === 'default' ? theme.palette.primary.main : theme.palette[color].main,
-            0.4,
-          )}`,
-        }
-      : {};
-
-    const pulseStyles = pulse
-      ? {
-          animation: 'pulse 2s infinite',
-          '@keyframes pulse': {
-            '0%': { opacity: 1 },
-            '50%': { opacity: 0.8 },
-            '100%': { opacity: 1 },
-          },
-        }
-      : {};
-
-    const blurStyles = blur
-      ? {
-          backdropFilter: 'blur(10px)',
-        }
-      : {};
-
-    switch (variant) {
-      case 'glass':
-        return {
-          ...baseStyles,
-          ...glowStyles,
-          ...pulseStyles,
-          backgroundColor: alpha(theme.palette.background.paper, glass ? 0.1 : 0.8),
-          backdropFilter: 'blur(20px)',
-          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-        };
-
-      case 'gradient': {
-        const gradientColor = color === 'default' ? 'primary' : color;
-        return {
-          ...baseStyles,
-          ...glowStyles,
-          ...pulseStyles,
-          background: gradient
-            ? `linear-gradient(135deg, ${theme.palette[gradientColor].light}, ${theme.palette[gradientColor].dark})`
-            : theme.palette[gradientColor].main,
-          color: theme.palette[gradientColor].contrastText,
-        };
-      }
-
-      case 'elevated':
-        return {
-          ...baseStyles,
-          ...glowStyles,
-          ...pulseStyles,
-          ...blurStyles,
-          boxShadow: theme.shadows[elevation],
-        };
-
-      case 'minimal':
-        return {
-          ...baseStyles,
-          ...glowStyles,
-          ...pulseStyles,
-          ...blurStyles,
-          boxShadow: 'none',
-          borderBottom: 'none',
-        };
-
-      case 'bordered':
-        return {
-          ...baseStyles,
-          ...glowStyles,
-          ...pulseStyles,
-          ...blurStyles,
-          borderBottom: `2px solid ${
-            color === 'default' ? theme.palette.divider : theme.palette[color].main
-          }`,
-        };
-
-      default:
-        return {
-          ...baseStyles,
-          ...glowStyles,
-          ...pulseStyles,
-          ...blurStyles,
-        };
-    }
-  };
-
-  const renderMenubarItem = (item: MenubarItem) => {
-    if (item.divider) {
-      return <MenubarSeparator key={item.id} orientation={orientation} />;
-    }
-
-    const hasChildren = item.children && item.children.length > 0;
-
-    return (
-      <Box key={item.id}>
-        <Button
-          data-testid={`menubar-button-${item.id}`}
-          onClick={(e) => {
-            if (hasChildren) {
-              handleMenuOpen(item.id, e.currentTarget);
-            } else {
-              handleItemClick(item);
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              if (hasChildren) {
-                handleMenuOpen(item.id, e.currentTarget);
-              } else {
-                handleItemClick(item);
-              }
-            }
-          }}
-          onMouseDown={(e) => {
-            // Prevent default to maintain focus
-            e.preventDefault();
-          }}
-          onFocus={onFocus}
-          onBlur={onBlur}
-          disabled={item.disabled || disabled}
-          startIcon={item.icon}
-          endIcon={hasChildren ? <KeyboardArrowDownIcon /> : null}
-          aria-haspopup={hasChildren ? 'menu' : undefined}
-          aria-expanded={hasChildren ? activeMenu === item.id : undefined}
-          sx={{
-            color: 'inherit',
-            textTransform: 'none',
-            ...getSizeStyles(),
-          }}
-        >
-          {item.label}
-        </Button>
-
-        {hasChildren && (
-          <Menu
-            anchorEl={menuRefs.current[item.id]}
-            open={activeMenu === item.id}
-            onClose={handleMenuClose}
-            autoFocus
-            PaperProps={{
-              sx: {
-                minWidth: 200,
-                mt: 1,
-              },
-            }}
-          >
-            {item.children?.map((child) =>
-              child.divider ? (
-                <Divider key={child.id} />
-              ) : (
-                <MenuItem
-                  key={child.id}
-                  onClick={() => handleItemClick(child)}
-                  disabled={child.disabled}
-                >
-                  {child.icon && <ListItemIcon>{child.icon}</ListItemIcon>}
-                  <ListItemText>{child.label}</ListItemText>
-                  {child.shortcut && (
-                    <Chip
-                      label={child.shortcut}
-                      size="small"
-                      variant="outlined"
-                      sx={{ ml: 2, height: 20, fontSize: '0.7rem' }}
-                    />
-                  )}
-                </MenuItem>
-              ),
-            )}
-          </Menu>
-        )}
-      </Box>
-    );
-  };
+  const barSx = barStyles(theme, {
+    variant, size, color, glow, pulse, glass, gradient, blur, transparent, elevation,
+  });
 
   const content = (
-    <Toolbar
-      role="toolbar"
-      aria-label="Main navigation"
-      sx={{
-        ...getVariantStyles(),
-        width: fullWidth ? '100%' : 'auto',
-        flexDirection: orientation === 'vertical' ? 'column' : 'row',
-        alignItems: orientation === 'vertical' ? 'flex-start' : 'center',
-        gap: 1,
-      }}
-    >
-      {logo && <Box sx={{ mr: 2, display: 'flex', alignItems: 'center' }}>{logo}</Box>}
-
-      {loading ? (
-        <CircularProgress size={20} color="inherit" />
-      ) : (
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: orientation === 'vertical' ? 'column' : 'row',
-            gap: orientation === 'vertical' ? 0.5 : 1,
-            flex: 1,
-          }}
-        >
-          {items.map(renderMenubarItem)}
-        </Box>
-      )}
-
-      {endContent && <Box sx={{ ml: 'auto' }}>{endContent}</Box>}
-    </Toolbar>
+    <MenubarToolbar
+      barSx={barSx}
+      items={items}
+      size={size}
+      orientation={orientation}
+      disabled={disabled}
+      loading={loading}
+      logo={logo}
+      endContent={endContent}
+      fullWidth={fullWidth}
+      activeMenu={activeMenu}
+      menuRefs={menuRefs}
+      onOpen={handleMenuOpen}
+      onActivate={handleItemClick}
+      onClose={handleMenuClose}
+      onFocus={onFocus}
+      onBlur={onBlur}
+    />
   );
 
-  if (orientation === 'vertical') {
+  // A vertical bar is not an app bar: AppBar's fixed/sticky positioning assumes
+  // a horizontal strip at the top of the page.
+  if (isVertical) {
     return (
       <Box
         className={className}
@@ -372,10 +106,7 @@ export const Menubar: React.FC<MenubarProps> = ({
       position={sticky ? 'sticky' : 'static'}
       className={className}
       data-testid={dataTestId}
-      sx={{
-        ...getVariantStyles(),
-        ...style,
-      }}
+      sx={{ ...barSx, ...style }}
       elevation={0}
       component="header"
     >
@@ -383,6 +114,7 @@ export const Menubar: React.FC<MenubarProps> = ({
     </AppBar>
   );
 };
+
 
 export const MenubarGroup: React.FC<MenubarGroupProps> = ({
   label,
@@ -449,19 +181,4 @@ export const MenubarGroup: React.FC<MenubarGroupProps> = ({
   );
 };
 
-export const MenubarSeparator: React.FC<MenubarSeparatorProps> = ({
-  orientation = 'horizontal',
-  className,
-  style,
-}) => (
-    <Divider
-      orientation={orientation === 'horizontal' ? 'vertical' : 'horizontal'}
-      flexItem
-      className={className}
-      sx={{
-        mx: orientation === 'horizontal' ? 1 : 0,
-        my: orientation === 'vertical' ? 1 : 0,
-        ...style,
-      }}
-    />
-  );
+export { MenubarSeparator } from './Menubar.separator';
