@@ -1,6 +1,7 @@
 // For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
 import tsParser from '@typescript-eslint/parser';
 import storybook from "eslint-plugin-storybook";
+import testFlakiness from 'eslint-plugin-test-flakiness';
 import globals from 'globals';
 
 import { config } from "@12-apps/eslint-config/base";
@@ -23,6 +24,17 @@ export default [
   },
   ...config,
   ...storybook.configs["flat/recommended"],
+
+  // The flakiness gate is a separate lane (eslint.flakiness.config.mjs), so its
+  // rules are not enabled here. Test files still carry inline disables for the
+  // few findings that are deliberate, and without the plugin registered those
+  // directives fail to resolve — "definition for rule ... was not found" — which
+  // this everyday lint run counts as a warning under --max-warnings 0.
+  // Registering the plugin with no rules turned on makes them resolve.
+  {
+    plugins: { 'test-flakiness': testFlakiness },
+    linterOptions: { reportUnusedDisableDirectives: 'off' },
+  },
   // Override parser for all TypeScript files after storybook config
   {
     files: ['**/*.ts', '**/*.tsx'],
