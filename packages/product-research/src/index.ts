@@ -55,6 +55,7 @@ export {
   VTEX_APP_KEY_FIELD,
   VTEX_APP_TOKEN_FIELD,
   VTEX_CREDENTIAL_FIELDS,
+  vtexAuthInit,
 } from './connectors/vtex-auth';
 export type { VtexAppCredentials } from './connectors/vtex-auth';
 export { createSerpConnector, parseSerpResponse } from './connectors/serp';
