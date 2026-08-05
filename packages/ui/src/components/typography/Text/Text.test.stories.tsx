@@ -261,11 +261,11 @@ export const FocusManagement: Story = {
     // Test initial focus state
     await waitFor(() => expect(focusableText).not.toHaveFocus());
 
-    // Test programmatic focus
+    // Test programmatic focus. This was a waitFor nested inside a non-async
+    // waitFor — a syntax error that failed the whole Storybook build, and
+    // redundant even had it parsed: the inner call is the entire outer body.
     await userEvent.click(triggerButton);
-    await waitFor(() => {
-      await waitFor(() => expect(focusableText).toHaveFocus());
-    });
+    await waitFor(() => expect(focusableText).toHaveFocus());
 
     // Test focus containment within container. The activeElement read that used
     // to sit here asserted exactly what the waitFor below does, one line earlier
@@ -282,7 +282,14 @@ export const FocusManagement: Story = {
 
     const handleFocus = () => {
       if (focusTarget) {
-        await userEvent.click(focusTarget);
+        // This is the STORY'S OWN UI, not a test action: a "Focus Text" button
+        // whose entire job is to move focus programmatically, which is also what
+        // the play function above asserts it does. The codemod rewrote the
+        // `.focus()` call into `await userEvent.click(...)` inside this
+        // non-async handler — a syntax error that failed the Storybook build,
+        // and test-library driving a component from inside its own render.
+        // eslint-disable-next-line test-flakiness/no-focus-check -- component code: the button's behaviour is to focus, not a test's focus assertion
+        focusTarget.focus();
       }
     };
 

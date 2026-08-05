@@ -131,12 +131,23 @@ export const FormInteraction: Story = {
     height: '250px',
     autoFormat: true,
   },
-  play: async () => {
-    // Minimal test - just wait and pass
-    await waitFor(() => {
-  // TODO: Add assertion or condition
-  expect(true).toBe(true);
-});
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // An empty editor shows its placeholder overlay, and drops it as soon as it
+    // has a value — that `placeholder && !value` branch is the only thing this
+    // story's args exercise, so it is what the wait is for.
+    await waitFor(
+      () => {
+        expect(canvas.getByTestId('code-editor-placeholder')).toHaveTextContent(
+          'Enter TypeScript code here...',
+        );
+      },
+      { timeout: 8000 },
+    );
+
+    // The toolbar reports the language the editor was configured with.
+    await expect(canvas.getByTestId('code-editor-language-badge')).toHaveTextContent(/typescript/i);
   },
 };
 
@@ -498,16 +509,31 @@ export const EdgeCases: Story = {
   },
 };
 
+// How long the "Saved" status stays up after a save. The story exists to show
+// that the status flashes and then reverts on its own, so the play function
+// asserts both edges of that transition.
+const SAVED_FLASH_MS = 2000;
+
 export const Integration: Story = {
   render: () => {
     const [code, setCode] = React.useState('// Integration test');
     const [isSaved, setIsSaved] = React.useState(false);
 
-    const handleSave = async (value: string) => {
+    const handleSave = (value: string) => {
       setCode(value);
       setIsSaved(true);
-      await waitFor(async () => setIsSaved(false), { timeout: 2000 });
     };
+
+    // The flash is cleared by a timer this story owns. It used to be
+    // `await waitFor(async () => setIsSaved(false), { timeout: 2000 })` — a
+    // waitFor callback that never throws, which resolves on the FIRST tick. So
+    // the status was cleared immediately and never once rendered "Saved", and
+    // the story demonstrated nothing.
+    React.useEffect(() => {
+      if (!isSaved) return undefined;
+      const timer = window.setTimeout(() => setIsSaved(false), SAVED_FLASH_MS);
+      return () => window.clearTimeout(timer);
+    }, [isSaved]);
 
     return (
       <Stack spacing={2}>
@@ -556,19 +582,28 @@ export const Integration: Story = {
     // Try to trigger save with keyboard shortcut
     await userEvent.keyboard('{Control>}s{/Control}');
 
-    // Wait a moment for save processing
-    await waitFor(() => {
-  // TODO: Add assertion or condition
-  expect(true).toBe(true);
-});
+    // The save handler flips the external state, and the status renders "Saved".
+    // This is the assertion the story turns on: while the flash was cleared on
+    // the first tick, "Saved" was never painted and this timed out.
+    await waitFor(
+      () => {
+        expect(within(canvasElement).getByTestId('save-status')).toHaveTextContent(
+          'Status: Saved',
+        );
+      },
+      { timeout: 5000 },
+    );
 
-    // Verify editor still works and content is preserved
-    await waitFor(() => {
-      const statusBox = canvasElement.querySelector('[data-testid="save-status"]');
-      // Just verify the status element exists, don't require specific text
-      return expect(statusBox).toBeInTheDocument();
-    });
-
-    // Test completed successfully
+    // ...and the flash expires on its own, restoring the idle status. Waiting on
+    // the transition rather than on a fixed delay means this also fails if the
+    // status simply sticks on "Saved".
+    await waitFor(
+      () => {
+        expect(within(canvasElement).getByTestId('save-status')).toHaveTextContent(
+          'Status: Not saved',
+        );
+      },
+      { timeout: SAVED_FLASH_MS + 5000 },
+    );
   },
 };

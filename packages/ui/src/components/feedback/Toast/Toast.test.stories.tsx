@@ -381,20 +381,16 @@ export const FocusManagement: Story = {
       expect(actionButton).toBeInTheDocument();
     });
 
-    // Simplified focus test - just verify action button is focusable
-    await waitFor(
-      () => {
-        const actionButton = document.querySelector(
-          '[role="alert"] button:not([aria-label="close"])',
-        );
-        if (actionButton) {
-          // Test that we can focus the action button
-          await userEvent.click(actionButton as HTMLElement);
-          await waitFor(() => expect(actionButton).toHaveFocus());
-        }
-      },
-      { timeout: 1000 },
-    );
+    // Verify the action button is focusable. Three things were wrong: `await`
+    // inside a non-async arrow (a syntax error that failed the Storybook build);
+    // a click inside a waitFor, which a retrying callback would repeat; and an
+    // `if (actionButton)` that let the whole check be skipped silently, even
+    // though the step above has already asserted the button is present.
+    const actionButton = document.querySelector(
+      '[role="alert"] button:not([aria-label="close"])',
+    ) as HTMLElement;
+    await userEvent.click(actionButton);
+    await waitFor(() => expect(actionButton).toHaveFocus());
 
     // Test basic tab navigation works
     const focusTargetInput = focusTarget.querySelector('input') as HTMLElement;

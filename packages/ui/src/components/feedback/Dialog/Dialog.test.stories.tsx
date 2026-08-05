@@ -357,12 +357,21 @@ export const FocusManagement: Story = {
         await expect(dialog).toBeInTheDocument();
       });
 
-      // Focus should move to the first focusable element in the dialog
-      // In MUI Dialog, focus typically goes to the dialog container or first interactive element
+      // Opening the dialog moves focus off the page behind it and into the
+      // modal. MUI parks that initial focus on `.MuiDialog-container`, which
+      // wraps — and so is OUTSIDE — the `[role="dialog"]` paper, hence the
+      // assertion is on the modal root.
+      //
+      // Two things were wrong here: the callback was a non-async arrow
+      // containing `await`, a syntax error that failed the whole Storybook
+      // build; and `expect(document.activeElement).toBeTruthy()` asserted
+      // nothing, since activeElement falls back to <body> and is never null.
       await waitFor(() => {
-        const firstElement = within(document.body).getByTestId('first-modal-element');
-        await userEvent.click(firstElement);
-        expect(document.activeElement).toBeTruthy();
+        expect(within(document.body).getByTestId('first-modal-element')).toBeInTheDocument();
+        const modal = document.querySelector('.MuiModal-root');
+        expect(modal).toBeInTheDocument();
+        expect(modal?.contains(document.activeElement)).toBe(true);
+        expect(canvas.getByTestId('open-dialog-button')).not.toHaveFocus();
       });
     });
 

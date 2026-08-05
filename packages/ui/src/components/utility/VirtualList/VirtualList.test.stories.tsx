@@ -10,7 +10,8 @@ import {
   Typography,
 } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fireEvent,fn, userEvent, waitFor, within } from 'storybook/test';
+import React from 'react';
+import { expect, fireEvent, userEvent, waitFor, within } from 'storybook/test';
 
 import { VirtualGrid,VirtualList } from './VirtualList';
 import type { VirtualListItem } from './VirtualList.types';
@@ -56,18 +57,60 @@ const generateVariableItems = (count: number): VirtualListItem[] => Array.from({
 // A virtual list's job is to swap which items are mounted as the container
 // scrolls, so these tests assert on the rendered window. The raw scrollTop they
 // checked before depends on the viewport and says nothing about virtualisation.
-const renderedIndices = (root: HTMLElement): number[] =>
-  Array.from(root.querySelectorAll('[data-testid^="virtual-item-"]')).map((element) =>
-    Number((element.getAttribute('data-testid') ?? '').replace('virtual-item-', '')),
+//
+// Each helper takes the testid PREFIX its story's renderer emits, and THROWS
+// when nothing matches. Both parts matter: the prefix was hardcoded to
+// `virtual-item-`, which only one renderer in this file emits, and "nothing
+// matched" returned -1. Together that turned every window assertion in the
+// other stories into a claim about the sentinel — `-1 > 0` is false and
+// `-1 === 0` is false, so they failed for a reason that has nothing to do with
+// virtualisation, and would have kept failing had the component been fixed.
+const renderedIndices = (root: HTMLElement, prefix: string): number[] => {
+  const mounted = Array.from(root.querySelectorAll<HTMLElement>(`[data-testid^="${prefix}"]`));
+  const indices = mounted.map((element) =>
+    Number((element.getAttribute('data-testid') ?? '').slice(prefix.length)),
   );
 
-const firstRenderedIndex = (root: HTMLElement): number => {
-  const indices = renderedIndices(root);
-  return indices.length > 0 ? Math.min(...indices) : -1;
+  if (indices.length === 0) {
+    throw new Error(
+      `No items matching [data-testid^="${prefix}"] are mounted under ` +
+        `[data-testid="${root.getAttribute('data-testid')}"]. A list that has mounted ` +
+        `nothing cannot be asked which window is visible — assert the window only ` +
+        `once items exist.`,
+    );
+  }
+
+  return indices.sort((a, b) => a - b);
 };
 
-// Larger than any fixture's total height, so the container lands at its end.
-const SCROLL_TO_END = 50_000;
+// Safe without a sentinel: renderedIndices throws rather than returning [].
+const firstRenderedIndex = (root: HTMLElement, prefix: string): number =>
+  Math.min(...renderedIndices(root, prefix));
+
+/**
+ * The two properties that together mean "this list is virtualised, and the
+ * window followed the scroll": the mounted window starts past index 0, and it
+ * is a small slice of the dataset rather than the whole of it. Asserting only
+ * the first half would still pass for a list that mounts all `total` items.
+ */
+const expectScrolledWindow = (root: HTMLElement, prefix: string, total: number): void => {
+  const indices = renderedIndices(root, prefix);
+  expect(Math.min(...indices)).toBeGreaterThan(0);
+  expect(indices.length).toBeLessThan(total);
+};
+
+// Every fixture leaves `overscan` at its default of 5 unless it says otherwise,
+// and `fixedRange` starts the window at `floor(scrollTop / itemHeight) - overscan`.
+// So a scroll only moves the window off index 0 once it clears `overscan` whole
+// items — the reason the old 200px scrolls asserted `> 0` against a window that
+// arithmetically still began at 0.
+const SCROLL_PAST_OVERSCAN = 1200;
+
+// The ScrollInteraction fixture is 1000 x 50px inside a 300px viewport, so this
+// is exactly its maximum scrollTop. Overshooting is NOT equivalent: a browser
+// clamps a too-large scrollTop to this value, but jsdom stores whatever it is
+// given, which pushes the computed window past the last item and mounts nothing.
+const SCROLL_TO_END = 50_000 - 300;
 
 const SimpleItemRenderer = ({
   item,
@@ -127,7 +170,6 @@ const GridItemRenderer = ({
 export const BasicInteraction: Story = {
   render: () => {
     const items = generateItems(100);
-    const onScrollSpy = fn();
 
     return (
       <Paper sx={{ width: 400, height: 300 }}>
@@ -136,7 +178,6 @@ export const BasicInteraction: Story = {
           variant="fixed"
           height={300}
           itemHeight={60}
-          onScroll={onScrollSpy}
           renderItem={SimpleItemRenderer}
           data-testid="virtual-list"
         />
@@ -150,29 +191,31 @@ export const BasicInteraction: Story = {
     // Test that virtual list renders
     await expect(virtualList).toBeInTheDocument();
 
-    // Test that items are rendered
-    const firstItem = canvas.getByTestId('virtual-item-0');
-    await expect(firstItem).toBeInTheDocument();
+    // Only a window of the 100 items is mounted, and it starts at the top.
+    await expect(canvas.getByTestId('virtual-item-0')).toBeInTheDocument();
+    expect(renderedIndices(virtualList, 'virtual-item-').length).toBeLessThan(100);
 
-    // Test scrolling
+    // A short scroll extends the window without leaving the top: 200px is three
+    // 60px items, which the 5-item overscan still covers, so item 0 stays mounted.
     fireEvent.scroll(virtualList, { target: { scrollTop: 200 } });
     await waitFor(() => {
-      // After scrolling, different items should be visible
-      const newVisibleItem = canvas.queryByTestId('virtual-item-5');
-      expect(newVisibleItem).toBeInTheDocument();
+      expect(canvas.getByTestId('virtual-item-5')).toBeInTheDocument();
     });
+    await expect(canvas.getByTestId('virtual-item-0')).toBeInTheDocument();
 
-    // Test that scroll callback is called
+    // Scrolling clear of the overscan margin moves the window: the items that
+    // were mounted at the top are unmounted, and later ones take their place.
+    fireEvent.scroll(virtualList, { target: { scrollTop: SCROLL_PAST_OVERSCAN } });
     await waitFor(() => {
-      expect(firstRenderedIndex(virtualList)).toBeGreaterThan(0);
+      expect(canvas.queryByTestId('virtual-item-0')).not.toBeInTheDocument();
     });
+    expectScrolledWindow(virtualList, 'virtual-item-', 100);
   },
 };
 
 export const GridInteraction: Story = {
   render: () => {
     const items = generateItems(100);
-    const onScrollSpy = fn();
 
     return (
       <Paper sx={{ width: 600, height: 400 }}>
@@ -183,7 +226,6 @@ export const GridInteraction: Story = {
           columnCount={3}
           rowHeight={150}
           gap={8}
-          onScroll={onScrollSpy}
           renderItem={GridItemRenderer}
           data-testid="virtual-grid"
         />
@@ -207,11 +249,14 @@ export const GridInteraction: Story = {
     await expect(secondItem).toBeInTheDocument();
     await expect(thirdItem).toBeInTheDocument();
 
-    // Test scrolling in grid
-    fireEvent.scroll(virtualGrid, { target: { scrollTop: 300 } });
+    // Rows are 150px on a 158px pitch and the overscan is 5 rows, so the window
+    // only leaves the first row after ~950px. Scrolling ten rows down unmounts
+    // the whole first row and mounts a later block of the 100 items.
+    fireEvent.scroll(virtualGrid, { target: { scrollTop: 1580 } });
     await waitFor(() => {
-      expect(firstRenderedIndex(virtualGrid)).toBeGreaterThan(0);
+      expect(canvas.queryByTestId('grid-item-0')).not.toBeInTheDocument();
     });
+    expectScrolledWindow(virtualGrid, 'grid-item-', 100);
   },
 };
 
@@ -249,28 +294,35 @@ export const ScrollInteraction: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const scrollableList = canvas.getByTestId('scrollable-list');
+    const readout = canvas.getByTestId('scroll-info');
 
     // Test initial state
     await expect(scrollableList).toBeInTheDocument();
-    expect(firstRenderedIndex(scrollableList)).toBe(0);
+    expect(firstRenderedIndex(scrollableList, 'virtual-item-')).toBe(0);
+    await expect(readout).toHaveTextContent('Scroll Position: 0px');
 
-    // Test scroll to middle
+    // Scroll to middle. The read-out is the point of this story, so assert it:
+    // it is fed by onScroll through component state, and the bug it replaced —
+    // a plain `let` mutated from the callback — left it reading 0px forever.
     fireEvent.scroll(scrollableList, { target: { scrollTop: 500 } });
     await waitFor(() => {
-      expect(firstRenderedIndex(scrollableList)).toBeGreaterThan(0);
+      expect(readout).toHaveTextContent('Scroll Position: 500px');
     });
+    expectScrolledWindow(scrollableList, 'virtual-item-', 1000);
 
     // Test scroll to bottom
     fireEvent.scroll(scrollableList, { target: { scrollTop: SCROLL_TO_END } });
     await waitFor(() => {
-      expect(firstRenderedIndex(scrollableList)).toBeGreaterThan(0);
+      expect(readout).toHaveTextContent(`Scroll Position: ${SCROLL_TO_END}px`);
     });
+    expectScrolledWindow(scrollableList, 'virtual-item-', 1000);
 
     // Test scroll back to top
     fireEvent.scroll(scrollableList, { target: { scrollTop: 0 } });
     await waitFor(() => {
-      expect(firstRenderedIndex(scrollableList)).toBe(0);
+      expect(firstRenderedIndex(scrollableList, 'virtual-item-')).toBe(0);
     });
+    await expect(readout).toHaveTextContent('Scroll Position: 0px');
   },
 };
 
@@ -329,21 +381,22 @@ export const KeyboardNavigation: Story = {
       expect(secondItem).toHaveFocus();
     });
 
-    // Test scroll behavior using direct scroll event
-    fireEvent.scroll(list, { target: { scrollTop: 200 } });
+    // Scrolling clear of the overscan margin swaps the mounted window, so the
+    // items that held focus a moment ago are no longer in the DOM.
+    fireEvent.scroll(list, { target: { scrollTop: SCROLL_PAST_OVERSCAN } });
     await waitFor(
       () => {
-        // Check the scroll position was applied
-        expect(firstRenderedIndex(list)).toBeGreaterThan(0);
+        expect(canvas.queryByTestId('keyboard-item-0')).not.toBeInTheDocument();
       },
       { timeout: 2000 },
     );
+    expectScrolledWindow(list, 'keyboard-item-', 100);
 
     // Test scroll back to top
     fireEvent.scroll(list, { target: { scrollTop: 0 } });
     await waitFor(
       () => {
-        expect(firstRenderedIndex(list)).toBe(0);
+        expect(firstRenderedIndex(list, 'keyboard-item-')).toBe(0);
       },
       { timeout: 1000 },
     );
@@ -796,7 +849,7 @@ export const Performance: Story = {
             const computedValue = Math.sin(index) * 100;
 
             return (
-              <Box key={item.id} style={style}>
+              <Box key={item.id} style={style} data-testid={`perf-item-${index}`}>
                 <ListItem>
                   <ListItemAvatar>
                     <Avatar>{index + 1}</Avatar>
@@ -821,30 +874,37 @@ export const Performance: Story = {
     // Test that performance list renders correctly
     await expect(performanceList).toBeInTheDocument();
 
-    // Test rapid scrolling performance
-    // Perform scrolling with proper event simulation
-    fireEvent.scroll(performanceList, { target: { scrollTop: 500 } });
+    // The whole point of this fixture is that 10,000 items never all mount.
+    // This story sets overscan={10} on 50px items, so the window clears index 0
+    // beyond 500px.
+    expect(renderedIndices(performanceList, 'perf-item-').length).toBeLessThan(100);
+
+    fireEvent.scroll(performanceList, { target: { scrollTop: 2000 } });
     await waitFor(
       () => {
-        expect(firstRenderedIndex(performanceList)).toBeGreaterThan(0);
+        expect(canvas.queryByTestId('perf-item-0')).not.toBeInTheDocument();
       },
       { timeout: 2000 },
     );
+    expectScrolledWindow(performanceList, 'perf-item-', 10000);
 
-    // Test multiple scroll events
-    for (let i = 1; i <= 3; i++) {
-      fireEvent.scroll(performanceList, { target: { scrollTop: i * 200 } });
-      await waitFor(() => expect(performanceList).toBeInTheDocument());
+    // Each further jump must move the window again, not merely leave the
+    // container mounted — the previous version's `expect(list).toBeInTheDocument()`
+    // held no matter what the scroll did.
+    for (const scrollTop of [4000, 6000, 8000]) {
+      const before = firstRenderedIndex(performanceList, 'perf-item-');
+      fireEvent.scroll(performanceList, { target: { scrollTop } });
+      await waitFor(
+        () => {
+          expect(firstRenderedIndex(performanceList, 'perf-item-')).toBeGreaterThan(before);
+        },
+        { timeout: 2000 },
+      );
     }
 
-    // Verify list is still responsive
+    // Verify list is still responsive after the rapid scrolling
     await expect(performanceList).toBeInTheDocument();
-    await waitFor(
-      () => {
-        expect(firstRenderedIndex(performanceList)).toBeGreaterThan(0);
-      },
-      { timeout: 1000 },
-    );
+    expectScrolledWindow(performanceList, 'perf-item-', 10000);
   },
 };
 
@@ -882,8 +942,8 @@ export const EdgeCases: Story = {
             variant="variable"
             height={120}
             estimatedItemHeight={80}
-            renderItem={({ item, style }) => (
-              <Box key={item.id} style={style}>
+            renderItem={({ item, index, style }) => (
+              <Box key={item.id} style={style} data-testid={`variable-item-${index}`}>
                 <ListItem sx={{ alignItems: 'flex-start' }}>
                   <ListItemAvatar>
                     <Avatar src={item.data.avatar} />
@@ -940,11 +1000,14 @@ export const EdgeCases: Story = {
       { timeout: 2000 },
     );
 
-    // Test scrolling with variable heights
-    fireEvent.scroll(variableHeightList, { target: { scrollTop: 100 } });
+    // Test scrolling with variable heights. Heights cycle 60/95/130/165, so the
+    // first six items occupy 605px; scrolling to 700px puts the viewport's top
+    // edge inside item 6, which with the 5-item overscan starts the window at 1.
+    // (The old 100px scroll sat inside item 1, so the window still began at 0.)
+    fireEvent.scroll(variableHeightList, { target: { scrollTop: 700 } });
     await waitFor(
       () => {
-        expect(firstRenderedIndex(variableHeightList)).toBeGreaterThan(0);
+        expect(firstRenderedIndex(variableHeightList, 'variable-item-')).toBeGreaterThan(0);
       },
       { timeout: 1000 },
     );
@@ -978,7 +1041,7 @@ export const Integration: Story = {
             height={350}
             itemHeight={60}
             renderItem={({ item, index, style }) => (
-              <Box key={item.id} style={style}>
+              <Box key={item.id} style={style} data-testid={`integration-item-${index}`}>
                 <ListItem
                   button
                   onClick={() => {
@@ -1006,10 +1069,11 @@ export const Integration: Story = {
             columnCount={3}
             rowHeight={100}
             gap={8}
-            renderItem={({ item, style }) => (
+            renderItem={({ item, index, style }) => (
               <Box
                 key={item.id}
                 style={style}
+                data-testid={`integration-grid-item-${index}`}
                 sx={{
                   bgcolor: 'primary.light',
                   borderRadius: 2,
@@ -1073,13 +1137,17 @@ export const Integration: Story = {
       await userEvent.click(firstGridItem);
     }
 
-    // Test that both components work independently
-    fireEvent.scroll(integrationList, { target: { scrollTop: 200 } });
-    fireEvent.scroll(integrationGrid, { target: { scrollTop: 200 } });
+    // Test that both components work independently. Both need a scroll past
+    // their own overscan margin — 60px items for the list, a 108px row pitch for
+    // the grid — before either window leaves index 0.
+    fireEvent.scroll(integrationList, { target: { scrollTop: SCROLL_PAST_OVERSCAN } });
+    fireEvent.scroll(integrationGrid, { target: { scrollTop: SCROLL_PAST_OVERSCAN } });
 
     await waitFor(() => {
-      expect(firstRenderedIndex(integrationList)).toBeGreaterThan(0);
-      expect(firstRenderedIndex(integrationGrid)).toBeGreaterThan(0);
+      expect(firstRenderedIndex(integrationList, 'integration-item-')).toBeGreaterThan(0);
+      expect(firstRenderedIndex(integrationGrid, 'integration-grid-item-')).toBeGreaterThan(0);
     });
+    expectScrolledWindow(integrationList, 'integration-item-', 100);
+    expectScrolledWindow(integrationGrid, 'integration-grid-item-', 50);
   },
 };
