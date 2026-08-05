@@ -12,11 +12,7 @@
     "directory": "packages/typescript-config"
   },
   "files": [
-    "src",
-    "dist",
-    "prisma",
-    "*.js",
-    "*.mjs",
+    "*.json",
     "*.md"
   ]
 }
