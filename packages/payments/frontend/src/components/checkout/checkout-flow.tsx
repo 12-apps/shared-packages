@@ -161,6 +161,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
           creating={c.creating}
           createError={c.createError}
           errorField={c.errorField}
+          errorCode={c.errorCode}
           onGenerate={(chosen) => void c.startPayment(chosen)}
           onUseEmail={c.payWithEmail}
           // Set only for a skipped-Dados flow (the controller decides); the

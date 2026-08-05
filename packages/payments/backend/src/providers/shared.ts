@@ -10,8 +10,11 @@ import type {
   ProviderName,
   RefundInput,
   RefundSnapshot,
+  ResolvedCredentials,
   WebhookDelivery,
 } from '../core/types';
+
+import { applyStubChargeFault } from './stub-fault';
 
 /**
  * Internal helpers shared by the provider adapters.
@@ -71,8 +74,17 @@ export function capturedAmountCents(
  * the token carries the magic suffix `-declined` (lets tests and demo flows
  * exercise the failure path); PIX/boleto start PENDING, awaiting a (stub)
  * webhook.
+ *
+ * `credentials` is optional and only ever read to run a SCRIPTED failure — see
+ * `stub-fault.ts`. Passing it is what lets a fixture make the head of a chain
+ * fail in a specific, classifiable way; omitting it keeps the plain stub.
  */
-export function stubCharge(provider: ProviderName, input: ChargeInput): ChargeSnapshot {
+export function stubCharge(
+  provider: ProviderName,
+  input: ChargeInput,
+  credentials?: ResolvedCredentials,
+): ChargeSnapshot {
+  applyStubChargeFault(provider, credentials);
   const providerChargeId = stubChargeId(provider, input.reference);
   const base: ChargeSnapshot = {
     provider,

@@ -88,12 +88,15 @@ export {
   validateCustomer,
 } from './core/customer-schema';
 /**
- * Read a gate refusal back off an UNPINNED walk's failure list. Exported
- * because `NoProviderSucceededError` carries its failures as strings: without
- * this the host cannot tell "the buyer is missing a field" from "the provider
- * broke", and answers buyer input with a 5xx. See the function's own doc.
+ * The walk's TYPED failure channel (FUT-563). A host answering an exhausted
+ * chain has to tell "nobody was even asked — the buyer is missing a field"
+ * from "a provider was asked and refused", and those are opposite answers:
+ * a fixable 4xx naming the field versus one honest payment-outage message.
+ * The discriminant is what makes that decidable; it used to be a sentence the
+ * host parsed back, which gave up on the first failure it did not recognise.
  */
-export { parseCustomerRequirements } from './core/customer-gate';
+export { gateIssuesOf, nothingWasAttempted } from './core/walk-failure';
+export type { WalkFailure, WalkFailureKind } from './core/walk-failure';
 export {
   AmbiguousChargeError,
   ChargeDeclinedError,

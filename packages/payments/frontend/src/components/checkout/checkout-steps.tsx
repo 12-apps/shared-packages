@@ -1,16 +1,18 @@
 import { Box } from "@mui/material";
-import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
+import { useEffect, useRef, type JSX, type ReactNode } from "react";
 
 import { BuyerInfoForm } from "./buyer-info-form";
 import { CardView } from "./card-view";
 import { LockOutlinedIcon } from "./icons";
 import {
+  cardChain,
   cardPathAvailable,
   cardTokenization,
   offeredMethods,
   usePreselectSoleMethod,
 } from "./method-capability";
 import { MethodPicker } from "./method-picker";
+import { PaymentErrorPanel } from "./payment-error-panel";
 import { PayerSummary } from "./payer-summary";
 import { PixView } from "./pix-view";
 import type {
@@ -74,6 +76,9 @@ function PaymentBody({
         order={order}
         buyer={buyer}
         providerConfig={cardTokenization(providerConfig)}
+        // The whole chain (FUT-563): one instrument is minted per provider so
+        // the charge survives the first one failing, with nothing re-typed.
+        providerChain={cardChain(providerConfig)}
         tenantSlug={tenantSlug}
         onResolved={onResolved}
         pollIntervalMs={pollIntervalMs}
@@ -229,6 +234,11 @@ interface PaymentStepProps {
   creating: boolean;
   createError: string | null;
   errorField: BuyerField | null;
+  /**
+   * The refusal's machine code (FUT-563). An UNRESOLVED charge is not a failed
+   * one — the panel below must not offer to raise a second.
+   */
+  errorCode?: string | null;
   onGenerate: (method: PaymentMethod) => void;
   onUseEmail: (email: string) => void;
   /**
@@ -262,6 +272,7 @@ export function PaymentStep({
   creating,
   createError,
   errorField,
+  errorCode,
   onGenerate,
   onUseEmail,
   onEditBuyer,
@@ -304,63 +315,11 @@ export function PaymentStep({
         <PaymentErrorPanel
           message={createError}
           emailFlagged={errorField === "email"}
+          code={errorCode}
           onUseEmail={onUseEmail}
           onRetry={() => onGenerate(method)}
         />
       ) : null}
-    </Box>
-  );
-}
-
-/**
- * Order-creation failure (non-field) shown inline on Pagamento with a retry — the
- * buyer never leaves the step. When the buyer e-mail was rejected (owner testing
- * with the store's own e-mail) it offers a different e-mail to pay with.
- */
-function PaymentErrorPanel({
-  message,
-  emailFlagged,
-  onUseEmail,
-  onRetry,
-}: {
-  message: string;
-  emailFlagged: boolean;
-  onUseEmail: (email: string) => void;
-  onRetry: () => void;
-}): JSX.Element {
-  const { Alert, Button, Input } = useCheckoutComponents();
-  const [altEmail, setAltEmail] = useState("");
-
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-      <Alert variant="danger" title="Não foi possível continuar" description={message} showIcon data-testid="checkout-error" />
-      {emailFlagged ? (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-          <Input
-            label="E-mail para o pagamento"
-            type="email"
-            variant="outlined"
-            size="md"
-            fullWidth
-            autoComplete="email"
-            placeholder="use um e-mail diferente do da loja"
-            value={altEmail}
-            onChange={(event) => setAltEmail(event.target.value)}
-            data-testid="checkout-alt-email"
-          />
-          <Box>
-            <Button variant="solid" color="primary" size="md" disabled={!altEmail.trim()} onClick={() => onUseEmail(altEmail.trim())} dataTestId="checkout-use-alt-email">
-              Usar este e-mail e continuar
-            </Button>
-          </Box>
-        </Box>
-      ) : (
-        <Box>
-          <Button variant="solid" color="primary" size="md" onClick={onRetry} dataTestId="checkout-retry-payment">
-            Tentar novamente
-          </Button>
-        </Box>
-      )}
     </Box>
   );
 }
