@@ -20,6 +20,7 @@ import {
   createMemoryCredentialStore,
 } from '../memory';
 import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
+import { allProviderAdapters } from '../providers/catalog';
 import { infinitePayProvider } from '../providers/infinitepay';
 import { pagbankProvider } from '../providers/pagbank';
 import { stoneProvider } from '../providers/stone';
@@ -35,12 +36,17 @@ import { STUB_CREDS, TENANT, pixInput } from './fixtures';
  * ever called.
  */
 
-const LIVE_ADAPTERS: PaymentProviderAdapter[] = [
-  pagbankProvider(),
-  infinitePayProvider(),
-  stoneProvider(),
-  stripeProvider(),
-];
+/**
+ * Every adapter the package ships, enumerated from the canonical catalog
+ * (`providers/catalog.ts`) instead of retyped here.
+ *
+ * The sweeps below are invariants over ALL adapters, so a hardcoded list
+ * defeats them: it keeps passing while the adapter added after it was written
+ * — the one nobody has read these invariants for — goes unswept. The catalog is
+ * itself pinned against the package's `exports` map by
+ * `provider-catalog.test.ts`, so a new adapter reaches this list on its own.
+ */
+const LIVE_ADAPTERS: PaymentProviderAdapter[] = allProviderAdapters();
 
 /** A CPF/CNPJ pair that satisfy their check digits, and ones that do not. */
 const VALID_CPF = '123.456.789-09';
