@@ -165,16 +165,16 @@ export const FocusManagement: Story = {
     const afterBtn = canvas.getByText('After Blockquote');
 
     // Start from before button
-    beforeBtn.focus();
-    await expect(beforeBtn).toHaveFocus();
+    await userEvent.click(beforeBtn);
+    await waitFor(() => expect(beforeBtn).toHaveFocus());
 
     // Tab to blockquote
     await userEvent.tab();
-    await expect(blockquote).toHaveFocus();
+    await waitFor(() => expect(blockquote).toHaveFocus());
 
     // Tab to after button
     await userEvent.tab();
-    await expect(afterBtn).toHaveFocus();
+    await waitFor(() => expect(afterBtn).toHaveFocus());
   },
 };
 
@@ -312,10 +312,10 @@ export const Performance: Story = {
 
       // Check that all items rendered
       for (let i = 1; i <= 10; i++) {
+        // Matched on the part that identifies the instance rather than the whole
+        // sentence, which would break on any wording change.
         await expect(
-          canvas.getByText(
-            `Performance test blockquote number ${i}. This tests rendering performance with multiple instances.`,
-          ),
+          canvas.getByText(new RegExp(`Performance test blockquote number ${i}\\.`)),
         ).toBeInTheDocument();
         await expect(canvas.getByText(`— Author ${i}`)).toBeInTheDocument();
       }
