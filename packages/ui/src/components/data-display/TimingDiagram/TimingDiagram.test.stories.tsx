@@ -87,12 +87,10 @@ export const BasicInteraction: Story = {
     const responseLabel = Array.from(labels).find((el) => el.textContent === '380ms');
     await expect(responseLabel).toBeInTheDocument();
 
-    await waitFor(() => {
-      const status = document.createElement('div');
-      status.setAttribute('aria-label', 'Status of the test run');
-      status.textContent = 'PASS';
-      canvasElement.appendChild(status);
-    });
+    const status = document.createElement('div');
+    status.setAttribute('aria-label', 'Status of the test run');
+    status.textContent = 'PASS';
+    canvasElement.appendChild(status);
   },
 };
 
@@ -125,6 +123,7 @@ export const StateChangeTest: Story = {
     for (const segment of allSegments) {
       const segmentElement = segment as HTMLElement;
       const actualWidth = parseFloat(segmentElement.style.width?.replace('%', '') || '0');
+      // eslint-disable-next-line test-flakiness/no-global-state-mutation -- function-scoped accumulator
       calculatedTotal += actualWidth;
     }
 
@@ -139,12 +138,10 @@ export const StateChangeTest: Story = {
       )?.textContent;
     await expect(totalTimeText).toContain('750ms');
 
-    await waitFor(() => {
-      const status = document.createElement('div');
-      status.setAttribute('aria-label', 'Status of the test run');
-      status.textContent = 'PASS';
-      canvasElement.appendChild(status);
-    });
+    const status = document.createElement('div');
+    status.setAttribute('aria-label', 'Status of the test run');
+    status.textContent = 'PASS';
+    canvasElement.appendChild(status);
   },
 };
 
@@ -210,12 +207,10 @@ export const VisualStatesTest: Story = {
     );
     await expect(totalTimeElement?.textContent).toContain('750ms');
 
-    await waitFor(() => {
-      const status = document.createElement('div');
-      status.setAttribute('aria-label', 'Status of the test run');
-      status.textContent = 'PASS';
-      canvasElement.appendChild(status);
-    });
+    const status = document.createElement('div');
+    status.setAttribute('aria-label', 'Status of the test run');
+    status.textContent = 'PASS';
+    canvasElement.appendChild(status);
   },
 };
 
@@ -244,12 +239,10 @@ export const ResponsiveDesignTest: Story = {
     const computedStyle = window.getComputedStyle(container);
     await expect(computedStyle.width).toBeDefined();
 
-    await waitFor(() => {
-      const status = document.createElement('div');
-      status.setAttribute('aria-label', 'Status of the test run');
-      status.textContent = 'PASS';
-      canvasElement.appendChild(status);
-    });
+    const status = document.createElement('div');
+    status.setAttribute('aria-label', 'Status of the test run');
+    status.textContent = 'PASS';
+    canvasElement.appendChild(status);
   },
 };
 
@@ -270,16 +263,13 @@ export const PerformanceTest: Story = {
     animated: true,
   },
   play: async ({ canvasElement }) => {
-    const startTime = Date.now();
     const canvas = within(canvasElement);
 
-    // Verify rendering with large data
+    // Verify rendering with large data. The 1000ms budget that used to bracket
+    // this query measured the machine the story runs on — the region being
+    // present is the assertion.
     const container = canvas.getByRole('region', { name: /timing diagram/i });
     await expect(container).toBeInTheDocument();
-
-    const renderTime = Date.now() - startTime;
-    // Should render within reasonable time
-    await expect(renderTime).toBeLessThan(1000);
 
     // Verify large values are formatted correctly (seconds instead of ms)
     const totalTimeDisplay = Array.from(container.querySelectorAll('.MuiTypography-caption')).find(
@@ -312,12 +302,10 @@ export const PerformanceTest: Story = {
     await expect(labelTexts.some((text) => text === '600ms')).toBe(true); // ssl (24.69%)
     // DNS (6.17%) and request (3.29%) won't show labels due to <10% threshold
 
-    await waitFor(() => {
-      const status = document.createElement('div');
-      status.setAttribute('aria-label', 'Status of the test run');
-      status.textContent = 'PASS';
-      canvasElement.appendChild(status);
-    });
+    const status = document.createElement('div');
+    status.setAttribute('aria-label', 'Status of the test run');
+    status.textContent = 'PASS';
+    canvasElement.appendChild(status);
   },
 };
 
@@ -346,13 +334,16 @@ export const EdgeCasesTest: Story = {
     const segments = container.querySelectorAll('[data-testid^="timing-segment"]');
     await expect(segments.length).toBe(2); // Only request and response
 
-    // DNS segment should not exist (zero value)
+    // These two were never rendered — their values are zero and undefined — so
+    // there is no prior presence for the rule to key on. The segment count
+    // asserted just above is what establishes the diagram rendered at all.
+    /* eslint-disable test-flakiness/no-element-removal-check -- never-rendered segments, count asserted above */
     const dnsSegment = container.querySelector('[data-testid="timing-segment-dns"]');
     await expect(dnsSegment).not.toBeInTheDocument();
 
-    // Connect segment should not exist (undefined)
     const connectSegment = container.querySelector('[data-testid="timing-segment-connect"]');
     await expect(connectSegment).not.toBeInTheDocument();
+    /* eslint-enable test-flakiness/no-element-removal-check */
 
     // Request segment should exist with correct width
     const requestSegment = container.querySelector(
@@ -387,12 +378,10 @@ export const EdgeCasesTest: Story = {
     await expect(timeMarkers).toContain('100ms'); // Half of 200ms
     await expect(timeMarkers).toContain('200ms'); // Total
 
-    await waitFor(() => {
-      const status = document.createElement('div');
-      status.setAttribute('aria-label', 'Status of the test run');
-      status.textContent = 'PASS';
-      canvasElement.appendChild(status);
-    });
+    const status = document.createElement('div');
+    status.setAttribute('aria-label', 'Status of the test run');
+    status.textContent = 'PASS';
+    canvasElement.appendChild(status);
   },
 };
 
@@ -438,12 +427,10 @@ export const AccessibilityTest: Story = {
     );
     await expect(hasLegendLabels).toBe(true);
 
-    await waitFor(() => {
-      const status = document.createElement('div');
-      status.setAttribute('aria-label', 'Status of the test run');
-      status.textContent = 'PASS';
-      canvasElement.appendChild(status);
-    });
+    const status = document.createElement('div');
+    status.setAttribute('aria-label', 'Status of the test run');
+    status.textContent = 'PASS';
+    canvasElement.appendChild(status);
   },
 };
 
@@ -463,7 +450,7 @@ export const KeyboardNavigationTest: Story = {
     await expect(container).toBeInTheDocument();
 
     // Focus on the container
-    container.focus();
+    await userEvent.click(container);
     await waitFor(() => expect(document.activeElement).toBe(container));
 
     // Tab through interactive elements
@@ -475,19 +462,17 @@ export const KeyboardNavigationTest: Story = {
       const firstSegment = segments[0] as HTMLElement;
 
       // Simulate keyboard focus
-      firstSegment.focus?.();
+      await userEvent.click(firstSegment);
 
       // Verify segment can receive focus for tooltip
       const hasAriaDescribedBy = firstSegment.closest('[aria-describedby]');
       await expect(hasAriaDescribedBy || firstSegment).toBeTruthy();
     }
 
-    await waitFor(() => {
-      const status = document.createElement('div');
-      status.setAttribute('aria-label', 'Status of the test run');
-      status.textContent = 'PASS';
-      canvasElement.appendChild(status);
-    });
+    const status = document.createElement('div');
+    status.setAttribute('aria-label', 'Status of the test run');
+    status.textContent = 'PASS';
+    canvasElement.appendChild(status);
   },
 };
 
@@ -534,12 +519,10 @@ export const ScreenReaderTest: Story = {
       await expect(legendLabels.length).toBeGreaterThan(0);
     }
 
-    await waitFor(() => {
-      const status = document.createElement('div');
-      status.setAttribute('aria-label', 'Status of the test run');
-      status.textContent = 'PASS';
-      canvasElement.appendChild(status);
-    });
+    const status = document.createElement('div');
+    status.setAttribute('aria-label', 'Status of the test run');
+    status.textContent = 'PASS';
+    canvasElement.appendChild(status);
   },
 };
 
@@ -559,7 +542,7 @@ export const FocusManagementTest: Story = {
     await expect(container).toBeInTheDocument();
 
     // Check container can receive focus
-    container.focus();
+    await userEvent.click(container);
     await waitFor(() => expect(document.activeElement).toBe(container));
 
     // Verify segments have hover states (visual feedback)
@@ -581,12 +564,10 @@ export const FocusManagementTest: Story = {
       await userEvent.unhover(segment);
     }
 
-    await waitFor(() => {
-      const status = document.createElement('div');
-      status.setAttribute('aria-label', 'Status of the test run');
-      status.textContent = 'PASS';
-      canvasElement.appendChild(status);
-    });
+    const status = document.createElement('div');
+    status.setAttribute('aria-label', 'Status of the test run');
+    status.textContent = 'PASS';
+    canvasElement.appendChild(status);
   },
 };
 
@@ -639,12 +620,10 @@ export const ThemeVariationsTest: Story = {
     // Verify component renders properly in theme
     await expect(container).toHaveAttribute('role', 'region');
 
-    await waitFor(() => {
-      const status = document.createElement('div');
-      status.setAttribute('aria-label', 'Status of the test run');
-      status.textContent = 'PASS';
-      canvasElement.appendChild(status);
-    });
+    const status = document.createElement('div');
+    status.setAttribute('aria-label', 'Status of the test run');
+    status.textContent = 'PASS';
+    canvasElement.appendChild(status);
   },
 };
 
@@ -690,6 +669,7 @@ export const IntegrationTest: Story = {
     if (dnsSegment) {
       const dnsOffset = parseFloat(dnsSegment.style.left || '0');
       await expect(dnsOffset).toBe(0); // First segment starts at 0
+      // eslint-disable-next-line test-flakiness/no-global-state-mutation -- function-scoped accumulator
       cumulativeOffset += parseFloat(dnsSegment.style.width || '0');
     }
 
@@ -699,6 +679,7 @@ export const IntegrationTest: Story = {
     if (connectSegment) {
       const connectOffset = parseFloat(connectSegment.style.left || '0');
       await expect(Math.abs(connectOffset - cumulativeOffset)).toBeLessThan(0.1);
+      // eslint-disable-next-line test-flakiness/no-global-state-mutation -- function-scoped accumulator
       cumulativeOffset += parseFloat(connectSegment.style.width || '0');
     }
 
@@ -706,6 +687,7 @@ export const IntegrationTest: Story = {
     if (sslSegment) {
       const sslOffset = parseFloat(sslSegment.style.left || '0');
       await expect(Math.abs(sslOffset - cumulativeOffset)).toBeLessThan(0.1);
+      // eslint-disable-next-line test-flakiness/no-global-state-mutation -- function-scoped accumulator
       cumulativeOffset += parseFloat(sslSegment.style.width || '0');
     }
 
@@ -724,11 +706,9 @@ export const IntegrationTest: Story = {
     const animatedSegments = container.querySelectorAll('[data-animated="true"]');
     await expect(animatedSegments.length).toBeGreaterThan(0);
 
-    await waitFor(() => {
-      const status = document.createElement('div');
-      status.setAttribute('aria-label', 'Status of the test run');
-      status.textContent = 'PASS';
-      canvasElement.appendChild(status);
-    });
+    const status = document.createElement('div');
+    status.setAttribute('aria-label', 'Status of the test run');
+    status.textContent = 'PASS';
+    canvasElement.appendChild(status);
   },
 };

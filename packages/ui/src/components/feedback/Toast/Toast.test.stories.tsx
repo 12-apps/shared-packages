@@ -160,11 +160,10 @@ export const FormInteraction: Story = {
     // Type message to enable button
     await userEvent.type(messageInput, 'Test form message');
 
-    // Wait a bit for React state to update
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Button should now be enabled
-    expect(submitButton).not.toBeDisabled();
+    // The button becoming enabled IS the state update, so waiting for it is
+    // both the signal and the assertion — the fixed 100ms sleep that used to
+    // sit here was guessing at React's schedule.
+    await waitFor(() => expect(submitButton).not.toBeDisabled());
 
     // Click to submit
     await userEvent.click(submitButton);
@@ -190,10 +189,9 @@ export const KeyboardNavigation: Story = {
     const buttonRef = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
-      // Auto-focus for keyboard testing
-      if (buttonRef.current) {
-        buttonRef.current.focus();
-      }
+      // Auto-focus on mount is this demo component's own behaviour.
+      /* eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- component effect */
+      buttonRef.current?.focus();
     }, []);
 
     return (
@@ -229,7 +227,9 @@ export const KeyboardNavigation: Story = {
     const canvas = within(canvasElement);
     const triggerButton = canvas.getByTestId('keyboard-trigger');
 
-    // Test keyboard activation
+    // Focused rather than clicked: a click would open the toast on its own, and
+    // opening via Enter is exactly what this step asserts.
+    // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- clicking would perform the action under test
     triggerButton.focus();
     await userEvent.keyboard('{Enter}');
 
@@ -242,7 +242,7 @@ export const KeyboardNavigation: Story = {
     await userEvent.keyboard('{Tab}');
     const closeButton = document.querySelector('[aria-label="close"]');
     if (closeButton) {
-      expect(closeButton).toHaveFocus();
+      await waitFor(() => expect(closeButton).toHaveFocus());
       await userEvent.keyboard('{Enter}');
 
       await waitFor(
@@ -364,8 +364,8 @@ export const FocusManagement: Story = {
     const triggerButton = canvas.getByTestId('focus-trigger');
     const focusTarget = canvas.getByTestId('focus-target');
 
-    // Focus trigger and activate
-    triggerButton.focus();
+    // Focus trigger and activate. The click both focuses and activates, so the
+    // separate focus() that used to precede it was redundant.
     await userEvent.click(triggerButton);
 
     await waitFor(() => {
@@ -389,8 +389,8 @@ export const FocusManagement: Story = {
         );
         if (actionButton) {
           // Test that we can focus the action button
-          (actionButton as HTMLElement).focus();
-          expect(actionButton).toHaveFocus();
+          await userEvent.click(actionButton as HTMLElement);
+          await waitFor(() => expect(actionButton).toHaveFocus());
         }
       },
       { timeout: 1000 },
@@ -399,8 +399,8 @@ export const FocusManagement: Story = {
     // Test basic tab navigation works
     const focusTargetInput = focusTarget.querySelector('input') as HTMLElement;
     if (focusTargetInput) {
-      focusTargetInput.focus();
-      expect(focusTargetInput).toHaveFocus();
+      await userEvent.click(focusTargetInput);
+      await waitFor(() => expect(focusTargetInput).toHaveFocus());
     }
   },
 };
@@ -472,6 +472,9 @@ export const ThemeVariations: Story = {
           data-testid="theme-toast"
           onClick={() => {
             addToast({ message: 'Default theme toast', variant: 'default' });
+            // Staggered so the two variants are visible as separate toasts
+            // rather than landing on the same frame.
+            // eslint-disable-next-line test-flakiness/no-unconditional-wait -- demo staging
             window.setTimeout(
               () => addToast({ message: 'Glass effect toast', variant: 'success', glass: true }),
               500,
@@ -521,6 +524,9 @@ export const VisualStates: Story = {
           onClick={() => {
             const variants = ['default', 'success', 'error', 'warning', 'info'] as const;
             variants.forEach((variant, index) => {
+              // Staged so the five variants appear in sequence, which is what
+              // the story is showing.
+              // eslint-disable-next-line test-flakiness/no-unconditional-wait -- demo staging
               window.setTimeout(() => {
                 addToast({
                   message: `${variant.charAt(0).toUpperCase() + variant.slice(1)} toast message`,
@@ -600,6 +606,8 @@ export const Performance: Story = {
       const endTime = window.performance.now();
       const duration = endTime - startTime;
 
+      // Lets the burst of stress toasts settle before the summary lands on top.
+      /* eslint-disable test-flakiness/no-unconditional-wait, test-flakiness/no-hard-coded-timeout -- demo staging */
       window.setTimeout(() => {
         addToast({
           message: `Stress test completed in ${duration.toFixed(2)}ms`,
@@ -608,6 +616,7 @@ export const Performance: Story = {
         });
         setIsStressing(false);
       }, 1000);
+      /* eslint-enable test-flakiness/no-unconditional-wait, test-flakiness/no-hard-coded-timeout */
     };
 
     return (
@@ -674,11 +683,16 @@ export const EdgeCases: Story = {
 
     const testPromiseRace = async () => {
       // Test multiple promises at once
+      // Three promises that deliberately settle at different times — that
+      // spread IS the race this story demonstrates, so the durations are the
+      // fixture rather than a test waiting on something.
+      /* eslint-disable test-flakiness/no-hard-coded-timeout -- staggered durations are the fixture */
       const promises = [
         new Promise((resolve) => window.setTimeout(() => resolve('First'), 1000)),
         new Promise((resolve) => window.setTimeout(() => resolve('Second'), 1500)),
         new Promise((_, reject) => window.setTimeout(() => reject('Third failed'), 2000)),
       ];
+      /* eslint-enable test-flakiness/no-hard-coded-timeout */
 
       promises.forEach((p, i) => {
         promise(p, {
@@ -776,6 +790,9 @@ export const Integration: Story = {
               // Simulate a complete user workflow
               addToast({ message: 'Step 1: Initializing...', variant: 'info' });
 
+              // A scripted three-step workflow. The delays pace what a viewer
+              // sees; no assertion depends on when each step lands.
+              /* eslint-disable test-flakiness/no-unconditional-wait, test-flakiness/no-hard-coded-timeout -- scripted demo timeline */
               window.setTimeout(() => {
                 addToast({
                   message: 'Step 2: Processing data...',
@@ -795,6 +812,7 @@ export const Integration: Story = {
                   duration: 8000,
                 });
               }, 2000);
+              /* eslint-enable test-flakiness/no-unconditional-wait, test-flakiness/no-hard-coded-timeout */
             }}
           >
             Run Integration Test
