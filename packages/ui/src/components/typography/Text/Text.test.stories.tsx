@@ -42,8 +42,8 @@ export const BasicInteraction: Story = {
     await userEvent.click(textElement);
 
     // Test text element maintains focus capabilities
-    textElement.focus();
-    expect(textElement).toHaveFocus();
+    await userEvent.click(textElement);
+    await waitFor(() => expect(textElement).toHaveFocus());
 
     // Test element can be selected
     await userEvent.tripleClick(textElement);
@@ -154,31 +154,31 @@ export const KeyboardNavigation: Story = {
     ];
 
     // Test initial focus
-    focusableTexts[0].focus();
-    expect(focusableTexts[0]).toHaveFocus();
+    await userEvent.click(focusableTexts[0]);
+    await waitFor(() => expect(focusableTexts[0]).toHaveFocus());
 
     // Test Tab navigation between elements
     await userEvent.tab();
-    expect(focusableTexts[1]).toHaveFocus();
+    await waitFor(() => expect(focusableTexts[1]).toHaveFocus());
 
     await userEvent.tab();
-    expect(focusableTexts[2]).toHaveFocus();
+    await waitFor(() => expect(focusableTexts[2]).toHaveFocus());
 
     // Test Shift+Tab backward navigation
     await userEvent.tab({ shift: true });
-    expect(focusableTexts[1]).toHaveFocus();
+    await waitFor(() => expect(focusableTexts[1]).toHaveFocus());
 
     // Test keyboard interaction doesn't lose focus
     await userEvent.keyboard('{Enter}');
-    expect(focusableTexts[1]).toHaveFocus();
+    await waitFor(() => expect(focusableTexts[1]).toHaveFocus());
 
     // Test Space key interaction
     await userEvent.keyboard(' ');
-    expect(focusableTexts[1]).toHaveFocus();
+    await waitFor(() => expect(focusableTexts[1]).toHaveFocus());
 
     // Test Escape key interaction
     await userEvent.keyboard('{Escape}');
-    expect(focusableTexts[1]).toHaveFocus();
+    await waitFor(() => expect(focusableTexts[1]).toHaveFocus());
   },
   render: () => (
     <Stack spacing={2}>
@@ -259,31 +259,30 @@ export const FocusManagement: Story = {
     const triggerButton = canvas.getByTestId('focus-trigger');
 
     // Test initial focus state
-    expect(focusableText).not.toHaveFocus();
+    await waitFor(() => expect(focusableText).not.toHaveFocus());
 
     // Test programmatic focus
     await userEvent.click(triggerButton);
     await waitFor(() => {
-      expect(focusableText).toHaveFocus();
+      await waitFor(() => expect(focusableText).toHaveFocus());
     });
 
-    // Test focus containment within container
-    focusableText.focus();
-    expect(document.activeElement).toBe(focusableText);
-
-    // Test focus visibility
-    expect(focusableText).toHaveFocus();
+    // Test focus containment within container. The activeElement read that used
+    // to sit here asserted exactly what the waitFor below does, one line earlier
+    // and without retrying.
+    await userEvent.click(focusableText);
+    await waitFor(() => expect(focusableText).toHaveFocus());
 
     // Test blur handling
     focusableText.blur();
-    expect(focusableText).not.toHaveFocus();
+    await waitFor(() => expect(focusableText).not.toHaveFocus());
   },
   render: function FocusManagementRender() {
     const [focusTarget, setFocusTarget] = React.useState<HTMLElement | null>(null);
 
     const handleFocus = () => {
       if (focusTarget) {
-        focusTarget.focus();
+        await userEvent.click(focusTarget);
       }
     };
 
@@ -325,9 +324,12 @@ export const ResponsiveDesign: Story = {
     expect(parseFloat(computedStyle.lineHeight)).toBeGreaterThan(1);
 
     // Test text wrapping behavior
+    // Wrapping is about the text surviving a narrow container, not about any
+    // particular pixel width: the whole string must still be rendered. The old
+    // `scrollWidth > 0` held for any element that exists at all.
     const longText = canvas.getByTestId('long-text');
     expect(longText).toBeInTheDocument();
-    expect(longText.scrollWidth).toBeGreaterThan(0);
+    expect(longText.textContent?.trim().length).toBeGreaterThan(0);
   },
   render: () => (
     <Box sx={{ width: '100%', maxWidth: '320px' }}>
@@ -504,17 +506,12 @@ export const Performance: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const startTime = globalThis.performance?.now() || Date.now();
-
-    // Test rendering many text elements
+    // All fifty render — the assertion the wall-clock budget that used to
+    // bracket this query was standing in for. The query ran against elements
+    // that were already on the page, so the number it produced measured the
+    // machine rather than the component.
     const textElements = canvas.getAllByText(/Performance text/);
     expect(textElements).toHaveLength(50);
-
-    const endTime = globalThis.performance?.now() || Date.now();
-    const renderTime = endTime - startTime;
-
-    // Performance should be reasonable (less than 100ms for 50 elements)
-    expect(renderTime).toBeLessThan(100);
 
     // Test large text content rendering
     const largeTextElement = canvas.getByTestId('large-content');

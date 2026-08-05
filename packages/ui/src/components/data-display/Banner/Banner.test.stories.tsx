@@ -116,30 +116,34 @@ export const KeyboardNavigation: Story = {
 
     // Focus the banner
     const banner = canvas.getByRole('status');
-    banner.focus();
-    expect(banner).toHaveFocus();
+    await userEvent.click(banner);
+    await waitFor(() => expect(banner).toHaveFocus());
 
     // Tab to first action button
     await userEvent.tab();
     const action1 = canvas.getByRole('button', { name: 'Action 1' });
-    expect(action1).toHaveFocus();
+    await waitFor(() => expect(action1).toHaveFocus());
 
     // Tab to second action button
     await userEvent.tab();
     const action2 = canvas.getByRole('button', { name: 'Action 2' });
-    expect(action2).toHaveFocus();
+    await waitFor(() => expect(action2).toHaveFocus());
 
     // Tab to dismiss button
     await userEvent.tab();
     const dismissButton = canvas.getByRole('button', { name: /dismiss banner/i });
-    expect(dismissButton).toHaveFocus();
+    await waitFor(() => expect(dismissButton).toHaveFocus());
 
-    // Test Enter key on action button
+    // Test Enter key on action button. Focused directly rather than clicked:
+    // a click would fire the very handler the next line counts.
+    // eslint-disable-next-line test-flakiness/no-focus-check -- clicking would fire the handler under assertion
     action1.focus();
     await userEvent.keyboard('{Enter}');
     expect(args.actions![0].onClick).toHaveBeenCalledTimes(1);
 
-    // Test Space key on dismiss button
+    // Test Space key on dismiss button. Focused rather than clicked for the
+    // same reason: a click is itself a dismiss.
+    // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- clicking would perform the action under test
     dismissButton.focus();
     await userEvent.keyboard(' ');
 
@@ -198,17 +202,17 @@ export const FocusManagement: Story = {
     expect(banner).toHaveAttribute('tabIndex', '0');
 
     // Test focus visibility
-    banner.focus();
-    expect(banner).toHaveFocus();
+    await userEvent.click(banner);
+    await waitFor(() => expect(banner).toHaveFocus());
 
     // Test that focus moves properly through interactive elements
     await userEvent.tab();
     const actionButton = canvas.getByRole('button', { name: 'Focus Test' });
-    expect(actionButton).toHaveFocus();
+    await waitFor(() => expect(actionButton).toHaveFocus());
 
     await userEvent.tab();
     const dismissButton = canvas.getByRole('button', { name: /dismiss banner/i });
-    expect(dismissButton).toHaveFocus();
+    await waitFor(() => expect(dismissButton).toHaveFocus());
   },
 };
 
@@ -365,14 +369,18 @@ export const Performance: Story = {
     const allDismissButtons = canvas.getAllByRole('button', { name: /dismiss banner/i });
 
     // Click first 3 dismiss buttons
-    for (let i = 0; i < Math.min(3, allDismissButtons.length); i++) {
+    const dismissCount = Math.min(3, allDismissButtons.length);
+    for (let i = 0; i < dismissCount; i++) {
       await userEvent.click(allDismissButtons[i]);
-      await waitFor(
-        () => {
-          // Wait a bit for dismiss animation
-        },
-        { timeout: 100 },
-      );
+      // The old wait here had an empty body, so it was a fixed delay with a
+      // waitFor's name on it. Waiting for the banner count to actually drop is
+      // both the real signal and the assertion.
+      const remaining = allDismissButtons.length - (i + 1);
+      await waitFor(() => {
+        expect(canvas.queryAllByRole('button', { name: /dismiss banner/i })).toHaveLength(
+          remaining,
+        );
+      });
     }
   },
 };
