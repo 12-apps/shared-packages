@@ -689,6 +689,13 @@ General-purpose utility components.
 **Location**: `src/components/utility/InfiniteScroll`
 **Docs**: `src/components/utility/InfiniteScroll/InfiniteScroll.md`
 
+### InstallPrompt
+**Purpose**: Invite the user to install the app as a PWA
+**Use Cases**: Storefronts, customer-facing apps, anything installable to a home screen
+**Features**: Captures `beforeinstallprompt`, iOS Add to Home Screen fallback, dismissal memory, headless `usePwaInstall` hook
+**Location**: `src/components/utility/InstallPrompt`
+**Docs**: `src/components/utility/InstallPrompt/InstallPrompt.md`
+
 ### Portal
 **Purpose**: Render children outside parent DOM hierarchy
 **Use Cases**: Modals, popovers, tooltips
