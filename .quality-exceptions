@@ -8,9 +8,7 @@ packages/ui/src/components/data-display/Carousel/Carousel.test.stories.tsx
 packages/ui/src/components/data-display/Carousel/Carousel.tsx
 packages/ui/src/components/data-display/Chip/Chip.tsx
 packages/ui/src/components/data-display/HoverCard/HoverCard.tsx
-packages/ui/src/components/data-display/LazyImage/LazyImage.tsx
 packages/ui/src/components/data-display/Progress/Progress.test.stories.tsx
-packages/ui/src/components/data-display/Progress/Progress.tsx
 packages/ui/src/components/data-display/Sheet/Sheet.test.stories.tsx
 packages/ui/src/components/data-display/Sheet/Sheet.tsx
 packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.test.stories.tsx
@@ -21,8 +19,6 @@ packages/ui/src/components/feedback/Sonner/Sonner.test.stories.tsx
 packages/ui/src/components/feedback/StackedModal/StackedModal.test.stories.tsx
 packages/ui/src/components/feedback/Toast/Toast.test.stories.tsx
 packages/ui/src/components/form/Button/Button.tsx
-packages/ui/src/components/form/Command/Command.tsx
-packages/ui/src/components/form/Input/Input.tsx
 packages/ui/src/components/form/InputOTP/InputOTP.tsx
 packages/ui/src/components/form/Label/Label.test.stories.tsx
 packages/ui/src/components/form/Label/Label.tsx
@@ -33,7 +29,6 @@ packages/ui/src/components/form/Switch/Switch.tsx
 packages/ui/src/components/form/ToggleGroup/ToggleGroup.test.stories.tsx
 packages/ui/src/components/layout/Card/Card.tsx
 packages/ui/src/components/layout/Resizable/Resizable.test.stories.tsx
-packages/ui/src/components/layout/Resizable/Resizable.tsx
 packages/ui/src/components/layout/ScrollArea/ScrollArea.test.stories.tsx
 packages/ui/src/components/layout/Spacer/Spacer.test.stories.tsx
 packages/ui/src/components/navigation/Pagination/Pagination.test.stories.tsx
