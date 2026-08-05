@@ -209,7 +209,11 @@ export const Autoplay: Story = {
     if (carousel) {
       await userEvent.hover(carousel);
 
-      // Wait a bit to ensure it doesn't advance
+      // This assertion is that nothing happens, which no query can await: a
+      // findBy would resolve on the slide already showing, and waitFor passes
+      // the instant its condition holds. Proving the timer is paused needs more
+      // than one autoplay interval to actually elapse.
+      // eslint-disable-next-line test-flakiness/no-hard-coded-timeout -- negative assertion over elapsed time
       await new Promise((resolve) => window.setTimeout(resolve, 1500));
 
       // Should still be on slide 2
@@ -252,7 +256,7 @@ export const KeyboardNavigation: Story = {
     // Focus on the carousel container
     const carousel = canvasElement.querySelector('[class*="MuiBox-root"]');
     if (carousel) {
-      carousel.focus();
+      await userEvent.click(carousel);
 
       // Press right arrow key
       await userEvent.keyboard('{ArrowRight}');
@@ -330,7 +334,7 @@ export const FocusManagement: Story = {
     // Focus on carousel container
     const carousel = canvasElement.querySelector('[class*="MuiBox-root"]');
     if (carousel instanceof HTMLElement) {
-      carousel.focus();
+      await userEvent.click(carousel);
 
       // Tab through interactive elements
       await userEvent.tab();
@@ -385,8 +389,14 @@ export const ResponsiveDesign: Story = {
       const styles = window.getComputedStyle(carousel);
       expect(styles.width).toBeTruthy();
 
-      // Verify responsive behavior
-      expect(carousel.clientWidth).toBeLessThanOrEqual(window.innerWidth);
+      // Responsive here means the carousel fills the box it is given, whatever
+      // that box is — comparing it to the viewport would hold on any screen and
+      // so would pass even if the carousel ignored its container entirely.
+      const parent = carousel.parentElement;
+      expect(carousel.clientWidth).toBeGreaterThan(0);
+      if (parent) {
+        expect(carousel.clientWidth).toBeLessThanOrEqual(parent.clientWidth);
+      }
     }
   },
 };
