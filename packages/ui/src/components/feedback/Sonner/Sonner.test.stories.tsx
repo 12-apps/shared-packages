@@ -105,7 +105,11 @@ const KeyboardNavigationTest: React.FC = () => {
       }
     };
 
+    // A keydown listener owned by this demo component and torn down with it —
+    // React's own pattern, not a test reaching for globals.
+    // eslint-disable-next-line test-flakiness/no-global-state-mutation -- component effect with cleanup
     window.addEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line test-flakiness/no-global-state-mutation -- the matching cleanup
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toast, dismiss]);
 
@@ -148,6 +152,8 @@ const FocusManagementTest: React.FC = () => {
       action: {
         label: 'Focus Button',
         onClick: () => {
+          // Moving focus is what this toast action exists to demonstrate.
+          // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- component behaviour
           buttonRef.current?.focus();
         },
       },
@@ -253,11 +259,17 @@ const PerformanceTest: React.FC = () => {
   const { toast, dismiss } = useSonner();
 
   const handleManyToasts = () => {
+    // The demo timing itself for display. Nothing asserts on the number — the
+    // play function queries it with queryByText, which tolerates its absence —
+    // so a slow machine cannot fail anything here.
+    // eslint-disable-next-line test-flakiness/no-random-data -- demo self-measurement
     const startTime = Date.now();
     for (let i = 0; i < 10; i++) {
       toast(`Toast ${i + 1}`);
     }
+    // eslint-disable-next-line test-flakiness/no-random-data -- demo self-measurement
     const endTime = Date.now();
+    // eslint-disable-next-line test-flakiness/no-unconditional-wait -- lets the ten toasts mount before the summary
     window.setTimeout(() => {
       toast(`Created 10 toasts in ${endTime - startTime}ms`);
     }, 100);
@@ -293,6 +305,9 @@ const EdgeCasesTest: React.FC = () => {
 
   const handlePromiseToast = () => {
     const testPromise = new Promise((resolve) => {
+      // The slow promise IS the demo: it is what gives the loading state
+      // something to show.
+      // eslint-disable-next-line test-flakiness/no-hard-coded-timeout -- simulated async work the story exists to show
       window.setTimeout(() => resolve('Success!'), 2000);
     });
 
@@ -329,6 +344,9 @@ const IntegrationTest: React.FC = () => {
     setStep(1);
     toast('Step 1: Starting integration test');
 
+    // A scripted four-step demo. The delays are the script — they pace what a
+    // viewer sees, and no assertion depends on when each step lands.
+    /* eslint-disable test-flakiness/no-unconditional-wait, test-flakiness/no-hard-coded-timeout -- scripted demo timeline */
     window.setTimeout(() => {
       setStep(2);
       success('Step 2: First action completed');
@@ -345,6 +363,7 @@ const IntegrationTest: React.FC = () => {
       success('Step 4: Integration test completed');
       setStep(0);
     }, 3000);
+    /* eslint-enable test-flakiness/no-unconditional-wait, test-flakiness/no-hard-coded-timeout */
   };
 
   return (
@@ -711,7 +730,11 @@ export const VisualStates: Story = {
     });
 
     await step('Verify persistent toast remains visible', async () => {
-      // Wait to verify persistent toast is still there after 2 seconds (reduced from 5 seconds)
+      // This asserts that the toast does NOT disappear, which no query can
+      // await: findBy would resolve on the toast already showing, and waitFor
+      // passes the instant its condition holds. Proving it persists needs longer
+      // than the auto-dismiss window to actually elapse.
+      // eslint-disable-next-line test-flakiness/no-hard-coded-timeout -- negative assertion over elapsed time
       await new Promise((resolve) => window.setTimeout(resolve, 2000));
       expect(canvas.getByText('Persistent toast')).toBeInTheDocument();
     });

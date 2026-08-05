@@ -62,7 +62,12 @@ export const BasicInteraction: Story = {
     const canvas = within(canvasElement);
     const toggleButton = canvas.getByTestId('toggle-portal');
 
-    // Initially, portal content should not exist
+    // The trigger being present is what makes the absence below meaningful:
+    // without it, "no portal content" would also hold if nothing rendered. The
+    // portal content has never existed at this point — that is the initial state
+    // being asserted, so there is no prior presence for the rule to find.
+    expect(toggleButton).toBeInTheDocument();
+    // eslint-disable-next-line test-flakiness/no-element-removal-check -- initial state, presence of the trigger established above
     expect(canvas.queryByTestId('portal-content')).not.toBeInTheDocument();
 
     // Click to show portal
@@ -287,21 +292,21 @@ export const StateChange: Story = {
     // Switch to disabled mode
     await userEvent.click(canvas.getByTestId('mode-disabled'));
     await waitFor(() => {
-      content = canvas.queryByTestId('portal-state-content');
-      expect(content).toBeInTheDocument();
-      expect(content?.textContent).toBe('Mode: disabled');
+      expect(canvas.queryByTestId('portal-state-content')).toHaveTextContent('Mode: disabled');
     });
+    content = canvas.queryByTestId('portal-state-content');
 
     // Switch to custom container mode
     await userEvent.click(canvas.getByTestId('mode-custom'));
     await waitFor(() => {
-      content = document.querySelector('[data-testid="portal-state-content"]');
-      expect(content?.textContent).toBe('Mode: custom');
-
-      // Verify it's in the custom container
-      const customContainer = canvas.getByTestId('custom-container');
-      expect(customContainer).toContainElement(content);
+      expect(document.querySelector('[data-testid="portal-state-content"]')?.textContent).toBe(
+        'Mode: custom',
+      );
     });
+    content = document.querySelector('[data-testid="portal-state-content"]');
+
+    // Verify it's in the custom container
+    expect(canvas.getByTestId('custom-container')).toContainElement(content);
 
     // Test content toggle
     await userEvent.click(canvas.getByTestId('toggle-content'));
@@ -403,7 +408,9 @@ export const KeyboardNavigation: Story = {
     const canvas = within(canvasElement);
     const triggerButton = canvas.getByTestId('keyboard-trigger');
 
-    // Focus and press Enter to open portal
+    // Focused rather than clicked: a click would open the portal on its own,
+    // and opening via Enter is exactly what this step asserts.
+    // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- clicking would perform the action under test
     triggerButton.focus();
     await userEvent.keyboard('{Enter}');
 
@@ -415,15 +422,15 @@ export const KeyboardNavigation: Story = {
     // Test Tab navigation within portal
     await userEvent.keyboard('{Tab}');
     const firstButton = document.querySelector('[data-testid="first-button"]') as HTMLButtonElement;
-    expect(firstButton).toHaveFocus();
+    await waitFor(() => expect(firstButton).toHaveFocus());
 
     await userEvent.keyboard('{Tab}');
     const secondButton = document.querySelector('[data-testid="second-button"]') as HTMLButtonElement;
-    expect(secondButton).toHaveFocus();
+    await waitFor(() => expect(secondButton).toHaveFocus());
 
     await userEvent.keyboard('{Tab}');
     const closeButton = document.querySelector('[data-testid="close-button"]') as HTMLButtonElement;
-    expect(closeButton).toHaveFocus();
+    await waitFor(() => expect(closeButton).toHaveFocus());
 
     // Test Escape key to close
     await userEvent.keyboard('{Escape}');
@@ -617,10 +624,15 @@ export const FocusManagement: Story = {
 
       const closePortal = () => {
         setShowPortal(false);
-        // Restore focus after a brief delay to allow DOM updates
+        // Restoring focus to whatever held it before the portal opened is this
+        // component's own behaviour. The delay lets React commit the unmount
+        // first — otherwise focus moves and is immediately lost with the
+        // removed subtree.
+        /* eslint-disable test-flakiness/no-unconditional-wait, test-flakiness/no-focus-check -- component behaviour */
         window.setTimeout(() => {
           previousFocus?.focus();
         }, 10);
+        /* eslint-enable test-flakiness/no-unconditional-wait, test-flakiness/no-focus-check */
       };
 
       return (
@@ -693,8 +705,8 @@ export const FocusManagement: Story = {
 
     // Focus on the trigger button
     const triggerButton = canvas.getByTestId('focus-trigger');
-    triggerButton.focus();
-    expect(triggerButton).toHaveFocus();
+    await userEvent.click(triggerButton);
+    await waitFor(() => expect(triggerButton).toHaveFocus());
 
     // Open portal
     await userEvent.click(triggerButton);
@@ -709,7 +721,7 @@ export const FocusManagement: Story = {
       const firstInput = document.querySelector(
         '[data-testid="first-portal-input"] input',
       ) as HTMLInputElement;
-      expect(firstInput).toHaveFocus();
+      await waitFor(() => expect(firstInput).toHaveFocus());
     });
 
     // Test tab navigation within portal
@@ -717,17 +729,17 @@ export const FocusManagement: Story = {
     const secondInput = document.querySelector(
       '[data-testid="second-portal-input"] input',
     ) as HTMLInputElement;
-    expect(secondInput).toHaveFocus();
+    await waitFor(() => expect(secondInput).toHaveFocus());
 
     await userEvent.keyboard('{Tab}');
     const cancelButton = document.querySelector(
       '[data-testid="focus-cancel"]',
     ) as HTMLButtonElement;
-    expect(cancelButton).toHaveFocus();
+    await waitFor(() => expect(cancelButton).toHaveFocus());
 
     await userEvent.keyboard('{Tab}');
     const saveButton = document.querySelector('[data-testid="focus-save"]') as HTMLButtonElement;
-    expect(saveButton).toHaveFocus();
+    await waitFor(() => expect(saveButton).toHaveFocus());
 
     // Close portal and verify focus returns to trigger
     await userEvent.click(saveButton);
@@ -739,7 +751,7 @@ export const FocusManagement: Story = {
     // Verify focus returned to trigger button
     await waitFor(
       () => {
-        expect(triggerButton).toHaveFocus();
+        await waitFor(() => expect(triggerButton).toHaveFocus());
       },
       { timeout: 200 },
     );
@@ -1237,7 +1249,8 @@ export const Performance: Story = {
         const startTime = window.performance.now();
         setShowPortals(!showPortals);
 
-        // Use requestAnimationFrame to measure after render
+        // The demo measuring itself to display a number; nothing asserts on it.
+        // eslint-disable-next-line test-flakiness/no-animation-wait -- demo self-measurement, not an assertion
         window.requestAnimationFrame(() => {
           const endTime = window.performance.now();
           setRenderTime(endTime - startTime);
@@ -1407,6 +1420,9 @@ export const EdgeCases: Story = {
       const [testCase, setTestCase] = useState<string>('null-container');
       const [customContainer, setCustomContainer] = useState<HTMLElement | null>(null);
       const [showPortal, setShowPortal] = useState(false);
+      // Counts toggles so the portal label is distinct per toggle without
+      // reading the clock, which would make the rendered text differ every run.
+      const [toggleCount, setToggleCount] = useState(0);
       const [showContainer, setShowContainer] = useState(true);
       const [,] = useState<React.ReactNode>('Default content');
 
@@ -1550,7 +1566,7 @@ export const EdgeCases: Story = {
                     borderRadius: 1,
                   }}
                 >
-                  Rapid toggle test - {Date.now()}
+                  Rapid toggle test - {toggleCount}
                 </Box>
               </Portal>
             );
@@ -1619,6 +1635,11 @@ export const EdgeCases: Story = {
                   // Rapidly toggle portal 10 times
                   for (let i = 0; i < 10; i++) {
                     setShowPortal((prev) => !prev);
+                    setToggleCount((prev) => prev + 1);
+                    // Pacing the toggles is the point of this stress case: back
+                    // to back setState calls would batch into one render and
+                    // never exercise the mount/unmount churn being tested.
+                    // eslint-disable-next-line test-flakiness/no-unconditional-wait -- the churn being stress-tested
                     await new Promise((resolve) => window.setTimeout(resolve, 50));
                   }
                 }}
@@ -1692,12 +1713,12 @@ export const EdgeCases: Story = {
     // Remove the container and verify portal handles it gracefully
     await userEvent.click(canvas.getByTestId('remove-container'));
 
-    // Portal should still exist and handle the missing container
+    // Portal should still exist and handle the missing container. The old body
+    // here queried an element and then discarded the result, so the wait
+    // asserted nothing at all. What this story actually claims is that losing
+    // the container does not take the surrounding tree down with it.
     await waitFor(() => {
-      // The portal content might still exist or be moved to body
-      const _portalContent = document.querySelector('[data-testid="edge-portal-content"]');
-      // We don't expect it to crash, content may or may not still be visible
-      void _portalContent; // Acknowledge the unused variable
+      expect(canvas.getByTestId('remove-container')).toBeInTheDocument();
     });
 
     await userEvent.click(canvas.getByTestId('toggle-edge-portal')); // Hide
@@ -1765,9 +1786,13 @@ export const Integration: Story = {
 
       const addNotification = (message: string) => {
         setNotifications((prev) => [...prev, message]);
+        // Auto-dismiss after three seconds is what this notification demo is
+        // demonstrating, not a test waiting for something.
+        /* eslint-disable test-flakiness/no-unconditional-wait, test-flakiness/no-hard-coded-timeout -- demo auto-dismiss behaviour */
         window.setTimeout(() => {
           setNotifications((prev) => prev.slice(1));
         }, 3000);
+        /* eslint-enable test-flakiness/no-unconditional-wait, test-flakiness/no-hard-coded-timeout */
       };
 
       return (
@@ -1811,7 +1836,7 @@ export const Integration: Story = {
             <Button
               data-testid="add-notification"
               variant="text"
-              onClick={() => addNotification(`Notification ${Date.now()}`)}
+              onClick={() => addNotification(`Notification ${notifications.length + 1}`)}
             >
               Add Notification
             </Button>
