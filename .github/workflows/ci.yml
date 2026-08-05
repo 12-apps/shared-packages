@@ -232,17 +232,7 @@ jobs:
           # OIDC (forcing anonymous auth -> 404). Remove it so npm uses the OIDC
           # id-token for trusted publishing.
           npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
-          for dir in $PUBLISH_DIRS; do
-            pkg="$(basename "$dir")"
-            echo "::group::npm publish $pkg"
-            if ( cd "$dir" && npm publish --access public ) 2>&1 | tee -a publish.log; then
-              echo "published $pkg"
-            else
-              grep -q "cannot publish over the previously published versions" publish.log \
-                && echo "skip $pkg (version already published)" || exit 1
-            fi
-            echo "::endgroup::"
-          done
+          node scripts/publish.mjs
 
   # Required-checks aggregation: one status that branch protection can gate on,
   # green only when every prerequisite job succeeded.
