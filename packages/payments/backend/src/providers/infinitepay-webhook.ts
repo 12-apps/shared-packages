@@ -123,3 +123,21 @@ export async function parseInfinitePayEvent(
     },
   ];
 }
+
+/**
+ * The delivery's own correlation key (FUT-726). InfinitePay echoes the
+ * reference `createCharge` sent as `order_nsu` on every callback, so that
+ * field — and only that field — says which charge a stored delivery names.
+ * Declared on the adapter beside `verifyConfirmsPayment` because
+ * reconciliation needs the pair: the flag says a PROCESSED row proves
+ * payment, this says WHOSE. Takes the raw stored payload string (what an
+ * inbox durably holds); a body that does not parse answers null.
+ */
+export function infinitePayDeliveryReference(payload: string): string | null {
+  try {
+    const body = JSON.parse(payload) as { order_nsu?: unknown };
+    return typeof body.order_nsu === 'string' ? body.order_nsu : null;
+  } catch {
+    return null;
+  }
+}

@@ -21,6 +21,21 @@ export interface ProviderRegistry<P extends string = string> {
   /** Throws {@link UnknownProviderError} for names outside the registry. */
   get(name: string): PaymentProviderAdapter;
   has(name: string): name is P;
+  /**
+   * The provider's URL spelling — the adapter's `urlSlug`, or its name when
+   * none is declared. Unknown names pass through unchanged, so callers that
+   * hold a placeholder never crash building a link.
+   */
+  urlSlugOf(name: string): string;
+  /**
+   * The provider a URL segment names. A registered adapter's `urlSlug` wins;
+   * anything else — a provider's raw name, an unknown segment typed by hand —
+   * comes back unchanged. The raw name deliberately stays a working alias so
+   * links built before an adapter declared a slug do not 404, and unknown
+   * segments are the caller's decision to make (a settings screen already has
+   * to handle a provider the backend does not offer).
+   */
+  providerForUrlSlug(slug: string): string;
 }
 
 export function defineProviders<const M extends Record<string, PaymentProviderAdapter>>(
@@ -39,6 +54,16 @@ export function defineProviders<const M extends Record<string, PaymentProviderAd
     },
     has(name): name is P {
       return byName.has(name);
+    },
+    urlSlugOf(name) {
+      const adapter = byName.get(name);
+      return adapter ? (adapter.urlSlug ?? adapter.name) : name;
+    },
+    providerForUrlSlug(slug) {
+      for (const [name, adapter] of byName) {
+        if ((adapter.urlSlug ?? adapter.name) === slug) return name;
+      }
+      return slug;
     },
   };
 }

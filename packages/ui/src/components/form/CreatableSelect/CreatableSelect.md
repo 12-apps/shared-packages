@@ -15,7 +15,7 @@ Type to filter the options; when the typed text matches nothing, an optional
 
 ## Props Documentation
 
-- **options** (`CreatableSelectOption[]`): available options, each `{ value, label }`.
+- **options** (`CreatableSelectOption[]`): available options, each `{ value, label, depth? }`. `depth` (0 = top level) indents the option ROW for a hierarchical list; `label` stays the bare name, so the closed field and anything else reading the selected option never shows the tree drawing.
 - **value** (`string | null`): the selected option's `value` (`null`/`""` = none).
 - **onChange** (`(value: string | null) => void`): fired with the chosen `value`, or `null` when cleared.
 - **onCreate** (`(label: string) => void | Promise<void>`): enables create-on-Enter. When the typed text matches no option, a create row appears; choosing it calls `onCreate` with the raw text. The parent persists it and feeds the new option back through `options`/`value`. Omit to make the field a plain searchable select.

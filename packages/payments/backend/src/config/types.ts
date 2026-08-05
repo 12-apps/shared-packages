@@ -228,6 +228,13 @@ export interface MaskedProviderConfig {
 export interface ProviderDescriptor {
   name: ProviderName;
   displayName: string;
+  /**
+   * The provider's URL spelling — the adapter's declared `urlSlug`, resolved
+   * to `name` when none is. Carried in the catalog so a host whose settings
+   * screen puts each provider on its own page can build and parse those paths
+   * from the adapter's own knowledge rather than a hardcoded map.
+   */
+  urlSlug: string;
   capabilities: ProviderCapabilities;
   /** Drives the settings UI: credential form vs. connect button. */
   authMode: ProviderAuthMode;

@@ -9,6 +9,7 @@ import {
   persistCreated,
   recordAttempt,
 } from './charge-context';
+import { gateCustomerRequirements } from './customer-gate';
 import {
   AmbiguousChargeError,
   ChargeDeclinedError,
@@ -311,6 +312,10 @@ export async function step(
     return { kind: 'ADVANCE', failure: { provider, message: resolved.skip } };
   }
   const { adapter, creds } = resolved;
+
+  // Buyer requirements the charge does not meet (FUT-595) — `customer-gate.ts`.
+  const unmet = await gateCustomerRequirements(deps, ctx, provider, adapter, pinned);
+  if (unmet) return { kind: 'ADVANCE', failure: unmet };
 
   // The outage breaker. This skip is what stops one dead provider ending every
   // walk that starts at it: nothing is sent, so nothing can have been charged,

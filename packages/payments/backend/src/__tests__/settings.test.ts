@@ -264,6 +264,18 @@ describe('createSettingsService', () => {
     expect(stone?.capabilities.methods).toContain('PIX');
   });
 
+  /**
+   * The catalog carries each provider's URL spelling RESOLVED (FUT-557), so a
+   * host routing per-provider pages reads it off the descriptor — an adapter
+   * that declares nothing is spelled by its own name.
+   */
+  it('resolves each descriptor urlSlug, defaulting to the name', () => {
+    const { settings } = setup();
+    for (const descriptor of settings.listProviders()) {
+      expect(descriptor.urlSlug).toBe(descriptor.name);
+    }
+  });
+
   it('masks secrets as tail hints and echoes non-secrets in full', async () => {
     const { settings } = setup();
     const masked = await settings.saveCredentials(TENANT, 'stone', {

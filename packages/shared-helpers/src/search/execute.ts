@@ -1,4 +1,10 @@
-import type { EntitySearchConfig, PaginatedResult, ParsedSearchInput, SearchableModel } from "./types";
+import type {
+  EntitySearchConfig,
+  OrderBy,
+  PaginatedResult,
+  ParsedSearchInput,
+  SearchableModel,
+} from "./types";
 import { buildPrismaArgs } from "./query-builder";
 import { buildPaginationMeta } from "./pagination";
 
@@ -39,7 +45,7 @@ function mergeExtraWhere(
  */
 async function fetchPageSkipTotalCount<T>(
   modelDelegate: SearchableModel,
-  args: { where?: Record<string, unknown>; orderBy: Record<string, unknown>; skip: number; take: number },
+  args: { where?: Record<string, unknown>; orderBy: OrderBy; skip: number; take: number },
   page: number,
   pageSize: number,
 ): Promise<PaginatedResult<T>> {

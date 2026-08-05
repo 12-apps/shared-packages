@@ -49,6 +49,7 @@
     "@maxmind/geoip2-node": "^6.3.4",
     "@prisma/adapter-pg": "7.8.0",
     "@prisma/client": "7.8.0",
+    "@sentry/node": "^10.69.0",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "dotenv": "^16.4.7",
@@ -58,6 +59,7 @@
     "pglite-prisma-adapter": "0.7.2",
     "undici": "^6.21.3",
     "winston": "^3.17.0",
+    "winston-transport": "^4.9.0",
     "xlsx": "^0.18.5",
     "zod": "^4.3.5"
   },

@@ -1,9 +1,12 @@
-import type { EntitySearchConfig, FilterOperator, ParsedSearchInput } from "./types";
+import type { EntitySearchConfig, FilterOperator, OrderBy, ParsedSearchInput } from "./types";
 
 export interface PrismaSearchArgs {
   where?: Record<string, unknown>;
-  /** Flat (`{ field: dir }`) by default, or a nested relation orderBy via `orderByFor`. */
-  orderBy: Record<string, unknown>;
+  /**
+   * Flat (`{ field: dir }`) by default, or whatever `orderByFor` returns — a
+   * nested relation key, or an ARRAY of keys when the sort needs a tiebreak.
+   */
+  orderBy: OrderBy;
   skip: number;
   take: number;
 }

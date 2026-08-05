@@ -3,6 +3,7 @@ import type {
   ChargeSnapshot,
   ChargeStatus,
   DeclineReason,
+  ResolvedCredentials,
 } from '../core/types';
 import { capturedAmountCents } from './shared';
 import { NAME } from './stripe-http';
@@ -345,8 +346,36 @@ const BY_METHOD = {
   BOLETO: boletoIntent,
 } as const;
 
+/**
+ * Where a card confirm may send the buyer for 3-D Secure (FUT-698).
+ *
+ * Confirmed server-side with no `return_url`, an intent that needs
+ * authentication parks at `requires_action` with a `use_stripe_sdk` action
+ * nothing in this host can drive — the buyer polls a PENDING order forever.
+ * With one, Stripe answers `redirect_to_url` instead, which {@link
+ * redirectFields} already maps to `hostedCheckoutUrl` — the exact shape the
+ * host's hosted-return machinery settles.
+ *
+ * The URL is the merchant's `redirectUrl` credential field — the same host-
+ * stamped "send the buyer back here" address the InfinitePay handoff uses
+ * (`withMerchantRedirectUrl`). CUSTOMER-PRESENT charges only: an off-session
+ * subscription charge has nobody to redirect, and Stripe's `off_session` flag
+ * already declares that no authentication can happen.
+ */
+function cardReturnUrl(
+  input: ChargeInput,
+  credentials: ResolvedCredentials | undefined,
+): Record<string, unknown> {
+  if (input.method !== 'CARD' || input.card?.merchantInitiated) return {};
+  const url = credentials?.fields['redirectUrl'];
+  return url ? { return_url: url } : {};
+}
+
 /** The full `POST /v1/payment_intents` body for one charge. */
-export function intentPayload(input: ChargeInput): Record<string, unknown> {
+export function intentPayload(
+  input: ChargeInput,
+  credentials?: ResolvedCredentials,
+): Record<string, unknown> {
   return {
     amount: input.amount.amountCents,
     currency: currencyOf(input),
@@ -358,5 +387,6 @@ export function intentPayload(input: ChargeInput): Record<string, unknown> {
     // Expanded so the created intent already carries brand/last4.
     expand: ['latest_charge'],
     ...BY_METHOD[input.method](input),
+    ...cardReturnUrl(input, credentials),
   };
 }
