@@ -126,7 +126,7 @@ function packOne(dir, destination) {
 }
 
 /** Tarballs for every given directory, keyed by package name. */
-function packAll(dirs, destination) {
+export function packAll(dirs, destination) {
   return withPublishManifests(() => new Map(dirs.map((dir) => Object.values(packOne(dir, destination)))));
 }
 

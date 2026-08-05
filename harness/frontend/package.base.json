@@ -1,0 +1,22 @@
+{
+  "name": "@12-apps/frontend-harness",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Consumer harness: a real app built against the PUBLISHED tarballs, never against the workspace. scripts/harness-install.mjs turns this into package.json by adding the @12-apps dependencies as file: tarballs — which is why the @12-apps names are absent here rather than pinned to a version nobody would remember to bump.",
+  "scripts": {
+    "build": "vite build",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^6.5.0",
+    "@mui/material": "^6.5.0",
+    "@playwright/test": "^1.49.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "vite": "^8.2.0"
+  }
+}
