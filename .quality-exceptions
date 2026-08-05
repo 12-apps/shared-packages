@@ -6,7 +6,6 @@ packages/ui/src/components/data-display/AlertDialog/AlertDialog.test.stories.tsx
 packages/ui/src/components/data-display/Banner/Banner.test.stories.tsx
 packages/ui/src/components/data-display/Carousel/Carousel.test.stories.tsx
 packages/ui/src/components/data-display/Carousel/Carousel.tsx
-packages/ui/src/components/data-display/Chip/Chip.tsx
 packages/ui/src/components/data-display/HoverCard/HoverCard.tsx
 packages/ui/src/components/data-display/Progress/Progress.test.stories.tsx
 packages/ui/src/components/data-display/Sheet/Sheet.test.stories.tsx
@@ -36,6 +35,5 @@ packages/ui/src/components/typography/Blockquote/Blockquote.test.stories.tsx
 packages/ui/src/components/typography/Heading/Heading.tsx
 packages/ui/src/components/typography/Text/Text.test.stories.tsx
 packages/ui/src/components/utility/AnimatedIcon/AnimatedIcon.tsx
-packages/ui/src/components/utility/InfiniteScroll/InfiniteScroll.tsx
 packages/ui/src/components/utility/Portal/Portal.test.stories.tsx
 packages/ui/src/components/utility/WorkflowStep/WorkflowStep.tsx
