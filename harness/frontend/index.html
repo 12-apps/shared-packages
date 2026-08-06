@@ -1,5 +1,38 @@
 <!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8" /><title>shared-packages frontend harness</title></head>
+  <head>
+    <meta charset="utf-8" /><title>shared-packages frontend harness</title>
+    <!--
+      The host half of @12-apps/ui's install prompt, wired the way a real app
+      must wire it (FUT-640 follow-up).
+
+      Chromium fires `beforeinstallprompt` ONCE, during initial page load, and
+      will not reissue it on request. A React effect cannot be early enough —
+      the module bundle below is deferred, and in a code-split app the chunk
+      holding the component may not be fetched until a later route. So the
+      capture has to be a classic inline script, and it has to be here.
+
+      This is not harness scaffolding: it is the snippet the package's docs
+      tell consumers to paste, executing in a real browser so that the spec in
+      tests/pwa-install-prompt.spec.ts proves the published package works when
+      the event arrives before the app exists — the only ordering that happens
+      in production, and the one no jsdom test can express.
+    -->
+    <script>
+      (function () {
+        var stash = (window.__pwaInstall = { event: null, firedAt: null, installedAt: null });
+        window.addEventListener('beforeinstallprompt', function (event) {
+          event.preventDefault();
+          stash.event = event;
+          stash.firedAt = Date.now();
+          window.dispatchEvent(new Event('pwa-install-available'));
+        });
+        window.addEventListener('appinstalled', function () {
+          stash.installedAt = Date.now();
+          stash.event = null;
+        });
+      })();
+    </script>
+  </head>
   <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
 </html>
