@@ -235,9 +235,15 @@ describe("DataViews board layout", () => {
     expect(screen.getByLabelText("Selecionar Bruno")).not.toBeChecked();
   });
 
-  it("shows the zoom slider on the board, since the board reuses the card", async () => {
+  /**
+   * The zoom slider is GONE from the toolbar: card size is density, density
+   * lives in the Exibir panel's "Exibição" tab, and a second control for the
+   * same thing loose on the toolbar was the toolbar restating a preference.
+   */
+  it("offers no zoom slider on the toolbar — sizing lives in Exibir", async () => {
     renderGrid({ board, server: harness().server });
     await switchLayout("board");
-    await waitFor(() => expect(screen.getByTestId("pagamentos-card-zoom")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("pagamentos-board")).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId("pagamentos-card-zoom")).toBeNull());
   });
 });

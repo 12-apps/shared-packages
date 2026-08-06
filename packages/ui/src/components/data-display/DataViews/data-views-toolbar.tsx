@@ -1,5 +1,7 @@
 "use client";
 
+import { Divider } from "@mui/material";
+
 import {
   ContentToolbar,
   FilterTrigger,
@@ -9,7 +11,6 @@ import {
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
-import { DataViewsZoomSlider } from "./data-views-layout-context";
 import { DataViewsDisplayPanel, type DisplayPanelView } from "./data-views-display-panel";
 import { DataViewsExportMenu, type DataViewExport } from "./data-views-export";
 import { renderBulkActions } from "./data-views-grid-helpers";
@@ -76,11 +77,18 @@ function ToolbarRightControls<T extends Record<string, unknown>>(props: GridTool
           data-testid={`${testIdPrefix}-counter`}
           sx={{ whiteSpace: "nowrap" }}
         >
-          Exibindo {matchedCount} de {totalCount}
+          {matchedCount} de {totalCount}
         </Box>
       </Text>
+      {/* Divides the READING of the list from the controls that change it —
+          the counter states what is on screen, everything right of here acts
+          on it. */}
+      <Divider
+        orientation="vertical"
+        flexItem
+        sx={{ height: 20, alignSelf: "center", mx: 0.5 }}
+      />
       {props.toolbarRightSlot}
-      <DataViewsZoomSlider testIdPrefix={testIdPrefix} />
       {/* Sort + columns + format, in ONE control — see DataViewsDisplayPanel. */}
       <DataViewsDisplayPanel
         c={props.c}

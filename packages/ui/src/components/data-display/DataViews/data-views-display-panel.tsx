@@ -12,6 +12,14 @@ import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
 import { ColumnsTab } from "./data-views-columns-tab";
+import {
+  ViewActions,
+  ViewFooter,
+  ViewHeader,
+  ViewsList,
+  type ViewNavHandlers,
+} from "./data-views-view-nav";
+import type { SavedViewSummary } from "./data-views-types";
 import { DisplayTab, SortTab } from "./data-views-display-tabs";
 import type { DataViewsController } from "./use-data-views-state";
 
@@ -51,11 +59,12 @@ export interface DisplayPanelView {
   /** Persist the live state as a NEW view. */
   onSaveAs: () => void;
   /**
-   * The saved-views dropdown itself, rendered in the panel's VISÃO header. The
-   * panel stays data-free: the host owns the menu and its mutations, this only
-   * decides where it sits — inside Exibir rather than loose on the toolbar.
+   * The saved views themselves, rendered INLINE in this panel's body when the
+   * VISÃO header is opened — not as a dropdown of their own. The panel stays
+   * data-free: the host owns the views and every mutation, this only decides
+   * where they appear.
    */
-  selector?: React.ReactNode;
+  nav?: ViewNavHandlers;
 }
 
 interface DisplayPanelProps<T extends Record<string, unknown>> {
@@ -110,96 +119,6 @@ function PanelTabs({
   );
 }
 
-/** The view's name + unsaved dot, pinned above the tabs. */
-function ViewHeader({ view, testIdPrefix }: { view: DisplayPanelView; testIdPrefix: string }): React.JSX.Element {
-  return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 1, borderBottom: 1, borderColor: "divider" }}>
-      <Text variant="caption" as="span">
-        <Box component="span" sx={{ textTransform: "uppercase", letterSpacing: 0.5, color: "text.disabled" }}>
-          Visão
-        </Box>
-      </Text>
-      <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
-        {/* The dropdown when the host supplies one, otherwise the plain name —
-            a panel with no menu still has to say which view is applied. */}
-        {view.selector ?? (
-          <Text variant="caption" as="span">
-            <Box component="span" sx={{ fontWeight: 600 }} data-testid={`${testIdPrefix}-display-view-name`}>
-              {view.activeViewName ?? "Visão principal"}
-            </Box>
-          </Text>
-        )}
-        {view.dirty && (
-          <Box
-            component="span"
-            aria-label="Alterações não salvas"
-            data-testid={`${testIdPrefix}-display-dirty`}
-            sx={{ height: 6, width: 6, borderRadius: "50%", bgcolor: "primary.main" }}
-          />
-        )}
-      </Box>
-    </Box>
-  );
-}
-
-/** Redefinir / Salvar como nova / Atualizar, pinned below the tabs. */
-function ViewFooter({
-  view,
-  onDone,
-  testIdPrefix,
-}: {
-  view: DisplayPanelView;
-  onDone: () => void;
-  testIdPrefix: string;
-}): React.JSX.Element {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 1,
-        px: 1.5,
-        py: 1,
-        borderTop: 1,
-        borderColor: "divider",
-        bgcolor: "action.hover",
-      }}
-    >
-      <Button
-        variant="text"
-        size="sm"
-        color="neutral"
-        disabled={!view.dirty}
-        startIcon={<RestartAltRoundedIcon fontSize="small" />}
-        onClick={view.onReset}
-        dataTestId={`${testIdPrefix}-display-reset`}
-      >
-        Redefinir
-      </Button>
-      {/* ONE save, not two. "Salvar como nova" alongside it made the primary
-          action ambiguous at a glance; which of the two this is depends on
-          whether a view is applied, which the label already says. */}
-      {/* Enabled only when something in Ordenar / Colunas / Exibição (or the
-          filters the view also stores) actually differs from the applied view:
-          the filled button is a STATE — "there is something to save" — not a
-          permanent fixture. */}
-      <Button
-        size="sm"
-        disabled={!view.dirty}
-        startIcon={<SaveOutlinedIcon fontSize="small" />}
-        onClick={() => {
-          (view.onUpdate ?? view.onSaveAs)();
-          onDone();
-        }}
-        dataTestId={`${testIdPrefix}-display-save`}
-      >
-        {view.onUpdate ? "Atualizar visão" : "Salvar visão"}
-      </Button>
-    </Box>
-  );
-}
-
 /** The active tab's body. */
 function PanelBody<T extends Record<string, unknown>>({
   tab,
@@ -242,6 +161,81 @@ function PanelBody<T extends Record<string, unknown>>({
   return <DisplayTab testIdPrefix={testIdPrefix} />;
 }
 
+/** Everything inside the popover: VISÃO header, tabs, body, save footer. */
+function PanelSurface<T extends Record<string, unknown>>({
+  c, view, nav, tab, onTab, viewsOpen, onToggleViews, actionsFor, onOpenActions,
+  onBack, sortKinds, onDone, testIdPrefix,
+}: {
+  c: DataViewsController<T>;
+  view?: DisplayPanelView;
+  nav?: ViewNavHandlers;
+  tab: DisplayTabKey;
+  onTab: (tab: DisplayTabKey) => void;
+  viewsOpen: boolean;
+  onToggleViews: () => void;
+  actionsFor: SavedViewSummary | null;
+  onOpenActions: (view: SavedViewSummary) => void;
+  onBack: () => void;
+  sortKinds?: Record<string, string>;
+  onDone: () => void;
+  testIdPrefix: string;
+}): React.JSX.Element {
+  return (
+    <Box data-testid={`${testIdPrefix}-display-panel`}>
+          {view && (
+            <ViewHeader
+              view={view}
+              open={viewsOpen}
+              onToggle={onToggleViews}
+              testIdPrefix={testIdPrefix}
+            />
+          )}
+          <PanelTabs
+            tab={tab}
+            onChange={onTab}
+            testIdPrefix={testIdPrefix}
+          />
+          {/* Constrained + scrolled: the columns list is unbounded, and a panel
+              taller than the viewport puts its own save button off screen. */}
+          <Box sx={{ maxHeight: 320, minHeight: 220, overflowY: "auto" }}>
+            {nav ? (
+              <ViewsBody
+                nav={nav}
+                actionsFor={actionsFor}
+                onOpenActions={onOpenActions}
+                onBack={onBack}
+                testIdPrefix={testIdPrefix}
+              />
+            ) : (
+              <PanelBody tab={tab} c={c} sortKinds={sortKinds} testIdPrefix={testIdPrefix} />
+            )}
+          </Box>
+          {view && <ViewFooter view={view} onDone={onDone} testIdPrefix={testIdPrefix} />}
+    </Box>
+  );
+}
+
+
+/** The views as the panel's body: the list, or one view's actions. */
+function ViewsBody({
+  nav,
+  actionsFor,
+  onOpenActions,
+  onBack,
+  testIdPrefix,
+}: {
+  nav: ViewNavHandlers;
+  actionsFor: SavedViewSummary | null;
+  onOpenActions: (view: SavedViewSummary) => void;
+  onBack: () => void;
+  testIdPrefix: string;
+}): React.JSX.Element {
+  if (actionsFor) {
+    return <ViewActions view={actionsFor} handlers={nav} onBack={onBack} testIdPrefix={testIdPrefix} />;
+  }
+  return <ViewsList handlers={nav} onOpenActions={onOpenActions} testIdPrefix={testIdPrefix} />;
+}
+
 /**
  * The toolbar's "Exibir" control: one button, one popover, three tabs, and the
  * view bracketing all of it.
@@ -255,7 +249,18 @@ export function DataViewsDisplayPanel<T extends Record<string, unknown>>({
 }: DisplayPanelProps<T>): React.JSX.Element {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [tab, setTab] = useState<DisplayTabKey>("columns");
+  // The views REPLACE the tab body rather than opening over it — see
+  // `data-views-view-nav`. `actionsFor` is the second level of that drill-down.
+  const [viewsOpen, setViewsOpen] = useState(false);
+  const [actionsFor, setActionsFor] = useState<SavedViewSummary | null>(null);
+  // Non-null only while the views are the body — the one place that decides
+  // whether this panel is showing tabs or views.
+  const nav = viewsOpen ? view?.nav : undefined;
   const close = (): void => setAnchor(null);
+  const leaveViews = (): void => {
+    setViewsOpen(false);
+    setActionsFor(null);
+  };
   return (
     <>
       <Button
@@ -288,16 +293,27 @@ export function DataViewsDisplayPanel<T extends Record<string, unknown>>({
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{ paper: { sx: { width: 320, maxWidth: "calc(100vw - 32px)" } } }}
       >
-        <Box data-testid={`${testIdPrefix}-display-panel`}>
-          {view && <ViewHeader view={view} testIdPrefix={testIdPrefix} />}
-          <PanelTabs tab={tab} onChange={setTab} testIdPrefix={testIdPrefix} />
-          {/* Constrained + scrolled: the columns list is unbounded, and a panel
-              taller than the viewport puts its own save button off screen. */}
-          <Box sx={{ maxHeight: 320, minHeight: 220, overflowY: "auto" }}>
-            <PanelBody tab={tab} c={c} sortKinds={sortKinds} testIdPrefix={testIdPrefix} />
-          </Box>
-          {view && <ViewFooter view={view} onDone={close} testIdPrefix={testIdPrefix} />}
-        </Box>
+        <PanelSurface
+          c={c}
+          view={view}
+          nav={nav}
+          tab={tab}
+          onTab={(next) => {
+            setTab(next);
+            leaveViews();
+          }}
+          viewsOpen={viewsOpen}
+          onToggleViews={() => {
+            setViewsOpen((prev) => !prev);
+            setActionsFor(null);
+          }}
+          actionsFor={actionsFor}
+          onOpenActions={setActionsFor}
+          onBack={() => setActionsFor(null)}
+          sortKinds={sortKinds}
+          onDone={close}
+          testIdPrefix={testIdPrefix}
+        />
       </Popover>
     </>
   );

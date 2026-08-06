@@ -8,7 +8,7 @@ import type { DisplayPanelView } from "./data-views-display-panel";
 import type { BoardConfig } from "./DataViewsBoard";
 import type { DataViewExport } from "./data-views-export";
 import type { ScopeConfig } from "./data-views-scopes";
-import { ViewDialogs, ViewMutationErrorAlert, ViewsMenuSlot } from "./data-views-table-parts";
+import { ViewDialogs, ViewMutationErrorAlert } from "./data-views-table-parts";
 import {
   useSavedViewsController,
   type SavedViewsController,
@@ -142,29 +142,44 @@ function resolveInitialView(
 }
 
 /**
- * The saved-views dropdown wired to the controller — the toolbar's right slot.
- * Extracted so the {@link DataViewsTable} render stays within the size budget.
+ * The Exibir panel's view chrome, assembled from the saved-views controller.
+ * Extracted so {@link DataViewsTableBase} stays inside its size budget.
  */
-function ViewsMenu(props: {
-  views: SavedViewSummary[];
+function buildDisplayView({
+  ctl,
+  views,
+  activeView,
+  dirty,
+}: {
   ctl: SavedViewsController;
-  testIdPrefix: string;
-}): React.JSX.Element {
-  const { views, ctl, testIdPrefix } = props;
-  return (
-    <ViewsMenuSlot
-      views={views}
-      activeViewName={ctl.activeViewName}
-      applyView={ctl.applyView}
-      selectMain={ctl.selectMain}
-      openCreate={ctl.openCreate}
-      openEdit={ctl.openEdit}
-      handleDelete={ctl.handleDelete}
-      patchView={ctl.patchView}
-      onManageAll={() => ctl.setManageOpen(true)}
-      testIdPrefix={testIdPrefix}
-    />
-  );
+  views: SavedViewSummary[];
+  activeView: SavedViewSummary | undefined;
+  dirty: boolean;
+}): DisplayPanelView {
+  return {
+    activeViewName: ctl.activeViewName,
+    dirty,
+    onReset: () => (activeView ? ctl.applyView(activeView) : ctl.selectMain()),
+    // Only offer "Atualizar" when there IS a view to update — otherwise the
+    // single footer button is a plain "Salvar visão".
+    onUpdate: activeView ? () => ctl.openEdit(activeView) : undefined,
+    onSaveAs: ctl.openCreate,
+    // The views themselves, not a dropdown: the panel renders them in its own
+    // body (see `data-views-view-nav`), so there is no second popover to clip
+    // the row actions.
+    nav: {
+      views,
+      activeViewId: activeView?.id ?? null,
+      onSelectView: (id) => {
+        const next = id === null ? null : views.find((view) => view.id === id);
+        if (next) ctl.applyView(next);
+        else ctl.selectMain();
+      },
+      onEditView: ctl.openEdit,
+      onPatchView: (view, changes) => void ctl.patchView(view, changes),
+      onDeleteView: (view) => void ctl.handleDelete(view),
+    },
+  };
 }
 
 /**
@@ -216,16 +231,7 @@ export function DataViewsTableBase<T extends Record<string, unknown>>(
   // The view the panel's "Redefinir" restores: the applied one, or the built-in
   // "Visão principal" when none is.
   const activeView = views.find((view) => view.name === ctl.activeViewName);
-  const displayView: DisplayPanelView = {
-    activeViewName: ctl.activeViewName,
-    dirty,
-    onReset: () => (activeView ? ctl.applyView(activeView) : ctl.selectMain()),
-    // Only offer "Atualizar" when there IS a view to update — otherwise the
-    // single footer button is a plain "Salvar visão".
-    onUpdate: activeView ? () => ctl.openEdit(activeView) : undefined,
-    onSaveAs: ctl.openCreate,
-    selector: <ViewsMenu views={views} ctl={ctl} testIdPrefix={testIdPrefix} />,
-  };
+  const displayView = buildDisplayView({ ctl, views, activeView, dirty });
   // Server-mode lists re-apply URL-derived controls on back/forward (not just the mount seed).
   const syncState = useUrlSyncState(server, initialState);
 
