@@ -73,11 +73,16 @@ describe("InlineFilterControls — range pills", () => {
     expect(screen.getByTestId("grid-range-total")).toHaveTextContent("Valor");
   });
 
+  // A day bound is TYPED as `dd/mm/aaaa` and STORED as `AAAA-MM-DD`. The two
+  // cases below are the originals; only the text ENTERED changed, because the
+  // field stopped being a native date input (which took the wire format
+  // straight) and became the masked one. What each asserts — the bound the pill
+  // reports — is untouched.
   it("opens a popover with both bounds and reports each edit", () => {
     const { onChangeRange } = renderBar();
     fireEvent.click(screen.getByTestId("grid-range-period"));
     fireEvent.change(screen.getByTestId("grid-range-period-min"), {
-      target: { value: "2026-07-01" },
+      target: { value: "01/07/2026" },
     });
     expect(onChangeRange).toHaveBeenCalledWith("period", { min: "2026-07-01" });
   });
@@ -86,7 +91,7 @@ describe("InlineFilterControls — range pills", () => {
     const { onChangeRange } = renderBar({ ranges: { period: { min: "2026-07-01" } } });
     fireEvent.click(screen.getByTestId("grid-range-period"));
     fireEvent.change(screen.getByTestId("grid-range-period-max"), {
-      target: { value: "2026-07-31" },
+      target: { value: "31/07/2026" },
     });
     expect(onChangeRange).toHaveBeenCalledWith("period", {
       min: "2026-07-01",
@@ -158,8 +163,12 @@ describe("rangeChipLabel", () => {
     );
   });
 
+  // The cents are new (FUT-744) and the claim is not: money is written to the
+  // precision its own `step` declares, so the chip matches the field it was
+  // typed into. What this case is about — a one-sided window reading as the
+  // inequality it is, rather than an en-dash with a blank end — is untouched.
   it("reads a one-sided window as the inequality it is, not a blank end", () => {
-    expect(rangeChipLabel(TOTAL, { min: 20 })).toBe("Valor: ≥ R$ 20");
-    expect(rangeChipLabel(TOTAL, { max: 50 })).toBe("Valor: ≤ R$ 50");
+    expect(rangeChipLabel(TOTAL, { min: 20 })).toBe("Valor: ≥ R$ 20,00");
+    expect(rangeChipLabel(TOTAL, { max: 50 })).toBe("Valor: ≤ R$ 50,00");
   });
 });
