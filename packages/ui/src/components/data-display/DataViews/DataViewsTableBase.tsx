@@ -51,6 +51,12 @@ export interface DataViewsTableBaseProps<T extends Record<string, unknown>> {
   headerActions?: React.ReactNode;
   /** Sort options for the toolbar's "Sort By" dropdown (defaults to sortable columns). */
   sortFields?: SortFieldDefinition[];
+  /**
+   * Per-sort-field VALUE KIND (`"currency" | "number" | "date" | "text"`), so the
+   * Exibir panel phrases the direction in that column's own terms. "Crescente"
+   * on a currency column is a puzzle; "Menor → maior" is not. Defaults to text.
+   */
+  sortKinds?: Record<string, string>;
   /** Notified with the currently-visible (filtered) rows, so Export matches the view. */
   onVisibleRowsChange?: (rows: T[]) => void;
   /** Reusable row actions driving both the row "⋮" kebab and the bulk menu. */
@@ -179,6 +185,7 @@ export function DataViewsTableBase<T extends Record<string, unknown>>({
   title,
   headerActions,
   sortFields,
+  sortKinds,
   onVisibleRowsChange,
   rowActions,
   rowActionsLeading,
@@ -217,6 +224,7 @@ export function DataViewsTableBase<T extends Record<string, unknown>>({
         title={title}
         headerActions={headerActions}
         sortFields={sortFields}
+        sortKinds={sortKinds}
         rowActions={rowActions}
         rowActionsLeading={rowActionsLeading}
         bulkActions={bulkActions}

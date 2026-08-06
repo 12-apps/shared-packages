@@ -93,15 +93,35 @@ export function useColumnsWithActions<T extends Record<string, unknown>>(
   return { columnsWithActions, allColumnIds };
 }
 
-/** What the grid actually renders: visibility applied, plus the show/hide menu's list. */
+/**
+ * Apply a stored column ORDER, tolerantly.
+ *
+ * A stored list goes stale in both directions and neither may lose a column: an
+ * id the table no longer declares is dropped, and a column the table declares
+ * but the list never mentioned (added since the view was saved) falls in AFTER
+ * the ordered ones rather than vanishing. Absent order ⇒ declaration order.
+ */
+function applyOrder<T extends Record<string, unknown>>(
+  columns: DataViewColumn<T>[],
+  order: string[] | undefined,
+): DataViewColumn<T>[] {
+  if (!order || order.length === 0) return columns;
+  const byId = new Map(columns.map((column) => [column.id, column]));
+  const ordered = order.map((id) => byId.get(id)).filter((c): c is DataViewColumn<T> => Boolean(c));
+  const seen = new Set(ordered.map((column) => column.id));
+  return [...ordered, ...columns.filter((column) => !seen.has(column.id))];
+}
+
+/** What the grid actually renders: order + visibility applied, plus the menu's list. */
 export function useRenderedColumns<T extends Record<string, unknown>>(
   columnsWithActions: DataViewColumn<T>[],
   visibleColumns: string[],
   onRowClick: ((row: T) => void) | undefined,
+  order?: string[],
 ): { gridColumns: GridColumn<T>[]; hideableColumns: HideableColumn[] } {
   const gridColumns = useMemo(
-    () => buildGridColumns(columnsWithActions, visibleColumns, onRowClick),
-    [columnsWithActions, onRowClick, visibleColumns],
+    () => buildGridColumns(applyOrder(columnsWithActions, order), visibleColumns, onRowClick),
+    [columnsWithActions, onRowClick, visibleColumns, order],
   );
   const hideableColumns = useMemo(() => computeHideableColumns(columnsWithActions), [columnsWithActions]);
   return { gridColumns, hideableColumns };

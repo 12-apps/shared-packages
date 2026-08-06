@@ -5,19 +5,19 @@ import ExpandIcon from '@mui/icons-material/ExpandMore';
 import { IconButton, Tooltip } from "@mui/material";
 
 import {
-  ColumnsMenu,
   ContentToolbar,
   FilterTrigger,
-  SortByDropdown,
   type ColumnVisibilityOption,
   type SortFieldDefinition,
 } from "../../layout/ContentToolbar";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
-import { DataViewsLayoutToggle, DataViewsZoomSlider } from "./data-views-layout-context";
+import { DataViewsZoomSlider } from "./data-views-layout-context";
+import { DataViewsDisplayPanel, type DisplayPanelView } from "./data-views-display-panel";
 import { renderBulkActions } from "./data-views-grid-helpers";
 import type { RowAction } from "./data-views-types";
+import type { DataViewsController } from "./use-data-views-state";
 
 export interface GridToolbarProps<T extends Record<string, unknown>> {
   testIdPrefix: string;
@@ -46,23 +46,19 @@ export interface GridToolbarProps<T extends Record<string, unknown>> {
   filtersHidden?: boolean;
   /** Toggle the inline filter row's visibility. */
   onToggleFilters?: () => void;
+  /** The controller, so "Exibir" can drive sort, columns, order and format. */
+  c: DataViewsController<T>;
+  /** Per-sort-field value kind, so directions read in the column's own terms. */
+  sortKinds?: Record<string, string>;
+  /** The saved-view chrome bracketing the Exibir panel, when the host has views. */
+  displayView?: DisplayPanelView;
 }
 
 /** The right-aligned toolbar controls: Sort By, the counter, zoom/layout/columns, filters. */
 function ToolbarRightControls<T extends Record<string, unknown>>(props: GridToolbarProps<T>): React.JSX.Element {
-  const { testIdPrefix, sortFields, matchedCount, totalCount, filterOpen, setFilterOpen } = props;
+  const { testIdPrefix, matchedCount, totalCount, filterOpen, setFilterOpen } = props;
   return (
     <>
-      {sortFields.length > 0 && (
-        <SortByDropdown
-          fields={sortFields}
-          activeField={props.activeSortField}
-          activeOrder={props.activeSortOrder}
-          onFieldChange={(field) => props.onChangeSort(field, "asc")}
-          onOrderChange={(order) => props.onChangeSort(props.activeSortField, order === "desc" ? "desc" : "asc")}
-          data-testid={`${testIdPrefix}-sort-trigger`}
-        />
-      )}
       <Text variant="caption" as="span">
         {/* The "N de N" counter is hidden on mobile to keep the toolbar one line. */}
         <Box
@@ -75,16 +71,13 @@ function ToolbarRightControls<T extends Record<string, unknown>>(props: GridTool
       </Text>
       {props.toolbarRightSlot}
       <DataViewsZoomSlider testIdPrefix={testIdPrefix} />
-      <DataViewsLayoutToggle testIdPrefix={testIdPrefix} />
-      {props.columnOptions.length > 0 && (
-        <ColumnsMenu
-          columns={props.columnOptions}
-          onToggle={props.onToggleColumn}
-          title="Colunas"
-          ariaLabel="Exibir colunas"
-          data-testid={`${testIdPrefix}-columns-toggle`}
-        />
-      )}
+      {/* Sort + columns + format, in ONE control — see DataViewsDisplayPanel. */}
+      <DataViewsDisplayPanel
+        c={props.c}
+        testIdPrefix={testIdPrefix}
+        sortKinds={props.sortKinds}
+        view={props.displayView}
+      />
       {props.showFilterTrigger !== false && (
         <FilterTrigger
           open={filterOpen}

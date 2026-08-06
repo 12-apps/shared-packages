@@ -91,9 +91,11 @@ function renderScreen(
   );
 }
 
-async function switchLayout(prefix: string, label: string): Promise<void> {
-  fireEvent.click(screen.getByTestId(`${prefix}-layout-toggle`));
-  fireEvent.click(await screen.findByText(new RegExp(`^${label}`)));
+/** Open "Exibir", go to the Exibição tab, and pick a format tile. */
+async function switchLayout(prefix: string, layout: string): Promise<void> {
+  fireEvent.click(screen.getByTestId(`${prefix}-display-trigger`));
+  fireEvent.click(await screen.findByTestId(`${prefix}-display-tab-display`));
+  fireEvent.click(await screen.findByTestId(`${prefix}-layout-${layout}`));
 }
 
 beforeEach(() => window.localStorage.clear());
@@ -108,14 +110,14 @@ describe("the remembered layout preference", () => {
 
   it("stores the choice when the operator picks a layout", async () => {
     renderScreen("produtos");
-    await switchLayout("produtos", "Grade");
+    await switchLayout("produtos", "cards");
     await waitFor(() => expect(screen.getByTestId("produtos-cards")).toBeInTheDocument());
     expect(window.localStorage.getItem(STORAGE_KEY)).toBe("cards");
   });
 
   it("opens a DIFFERENT screen in the remembered layout", async () => {
     const first = renderScreen("produtos");
-    await switchLayout("produtos", "Grade");
+    await switchLayout("produtos", "cards");
     await waitFor(() => expect(screen.getByTestId("produtos-cards")).toBeInTheDocument());
     first.unmount();
 
@@ -126,7 +128,7 @@ describe("the remembered layout preference", () => {
 
   it("offers Lista only when a renderListRow is supplied, and remembers it", async () => {
     const first = renderScreen("pedidos", { renderListRow });
-    await switchLayout("pedidos", "Lista");
+    await switchLayout("pedidos", "list");
 
     await waitFor(() => expect(screen.getByTestId("pedidos-list")).toBeInTheDocument());
     expect(window.localStorage.getItem(STORAGE_KEY)).toBe("list");
@@ -147,14 +149,15 @@ describe("the remembered layout preference", () => {
 
   it("does not offer Lista to a table that declares no row renderer", async () => {
     renderScreen("produtos");
-    fireEvent.click(screen.getByTestId("produtos-layout-toggle"));
-    expect(await screen.findByText(/^Grade/)).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByText(/^Lista/)).not.toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("produtos-display-trigger"));
+    fireEvent.click(await screen.findByTestId("produtos-display-tab-display"));
+    expect(await screen.findByTestId("produtos-layout-cards")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId("produtos-layout-list")).not.toBeInTheDocument());
   });
 
   it("remembers the board too", async () => {
     const first = renderScreen("pagamentos", { board });
-    await switchLayout("pagamentos", "Quadro");
+    await switchLayout("pagamentos", "board");
     await waitFor(() => expect(screen.getByTestId("pagamentos-board")).toBeInTheDocument());
     expect(window.localStorage.getItem(STORAGE_KEY)).toBe("board");
     first.unmount();

@@ -5,8 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { type GridColumn } from "../DataGrid";
 import { type SortFieldDefinition } from "../../layout/ContentToolbar";
 
-export type { HideableColumn };
-
 import { filterRows } from "./data-views-filter";
 import {
   useColumnsWithActions,
@@ -28,6 +26,8 @@ import {
   type RangeValue,
   type RowAction,
 } from "./data-views-types";
+
+export type { HideableColumn };
 
 /** Inputs the hook needs to own the view state + derived data. */
 interface UseDataViewsStateArgs<T extends Record<string, unknown>> {
@@ -77,6 +77,8 @@ export interface DataViewsController<T extends Record<string, unknown>> {
   gridColumns: GridColumn<T>[];
   /** Columns eligible for the show/hide menu (hideable, with a text header). */
   hideableColumns: HideableColumn[];
+  /** Every column id in reading order — what the Colunas tab reorders. */
+  columnOrder: string[];
   /** Toggle one column's visibility in the current view state. */
   toggleColumn: (id: string, visible: boolean) => void;
   selectedIds: Set<string | number>;
@@ -229,6 +231,18 @@ function makeSetScope(
   };
 }
 
+/**
+ * The declared column ids in the stored reading order — the same tolerance
+ * `applyOrder` uses, so the Colunas tab lists exactly what the grid renders.
+ */
+function orderedColumnIds(allColumnIds: string[], order: string[] | undefined): string[] {
+  if (!order || order.length === 0) return allColumnIds;
+  const declared = new Set(allColumnIds);
+  const kept = order.filter((id) => declared.has(id));
+  const seen = new Set(kept);
+  return [...kept, ...allColumnIds.filter((id) => !seen.has(id))];
+}
+
 /** The toolbar's active sort, read off the state's FIRST sort entry. */
 function activeSortOf(
   state: DataViewState,
@@ -294,6 +308,7 @@ export function useDataViewsState<T extends Record<string, unknown>>({
     columnsWithActions,
     state.visibleColumns,
     onRowClick,
+    state.order,
   );
   const toggleColumn = (id: string, visible: boolean): void =>
     setState((prev) => ({ ...prev, visibleColumns: nextVisibleColumns(prev.visibleColumns, id, visible) }));
@@ -307,6 +322,7 @@ export function useDataViewsState<T extends Record<string, unknown>>({
     matched,
     gridColumns,
     hideableColumns,
+    columnOrder: orderedColumnIds(allColumnIds, state.order),
     toggleColumn,
     ...selection,
     filterOpen,

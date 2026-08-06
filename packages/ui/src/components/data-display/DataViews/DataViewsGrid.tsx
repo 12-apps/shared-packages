@@ -60,6 +60,12 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
    */
   sortFields?: SortFieldDefinition[];
   /**
+   * Per-sort-field VALUE KIND (`"currency" | "number" | "date" | "text"`), so the
+   * Exibir panel phrases the direction in that column's own terms. "Crescente"
+   * on a currency column is a puzzle; "Menor → maior" is not. Defaults to text.
+   */
+  sortKinds?: Record<string, string>;
+  /**
    * A single, reusable list of row actions that drives BOTH the per-row "⋮"
    * kebab AND the bulk-actions menu (tabwoah model). When provided, the grid
    * appends a kebab actions column automatically (unless the page already
@@ -151,82 +157,14 @@ function useVisibleRowsNotifier<T>(matched: T[], onVisibleRowsChange?: (rows: T[
  * {@link useDataViewsState}; the render lives in `GridShell`. This component just
  * connects the two. Reused across every admin list page.
  */
-export function DataViewsGrid<T extends Record<string, unknown>>({
-  rows,
-  columns,
-  fields,
-  rangeFields = [],
-  getRowId,
-  onRowClick,
-  emptyState,
-  dataTestId,
-  testIdPrefix = "table",
-  appliedState,
-  syncState,
-  onStateChange,
-  onVisibleRowsChange,
-  toolbarRightSlot,
-  title,
-  headerActions,
-  sortFields,
-  rowActions,
-  rowActionsLeading,
-  bulkActions,
-  renderRowMenu,
-  renderCard,
-  board,
-  renderListRow,
-  scopes,
-  scopeFieldId,
-  defaultLayout,
-  inlineFilters,
-  alwaysShowSearch,
-  server,
-}: DataViewsGridProps<T>): React.JSX.Element {
-  const controller = useDataViewsState({
-    rows,
-    columns,
-    fields,
-    rangeFields,
-    getRowId,
-    onRowClick,
-    appliedState,
-    syncState,
-    onStateChange,
-    testIdPrefix,
-    sortFields,
-    rowActions,
-    rowActionsLeading,
-    renderRowMenu,
-    server,
-    scopes,
-    scopeFieldId,
-  });
-
-  useVisibleRowsNotifier(controller.matched, onVisibleRowsChange);
-
-  return (
-    <GridShell
-      c={controller}
-      rows={rows}
-      fields={fields}
-      rangeFields={rangeFields}
-      getRowId={getRowId}
-      testIdPrefix={testIdPrefix}
-      dataTestId={dataTestId}
-      emptyState={emptyState}
-      toolbarRightSlot={toolbarRightSlot}
-      title={title}
-      headerActions={headerActions}
-      rowActions={rowActions}
-      bulkActions={bulkActions}
-      renderCard={renderCard}
-      board={board}
-      renderListRow={renderListRow}
-      scopes={scopes}
-      defaultLayout={defaultLayout}
-      inlineFilters={inlineFilters}
-      alwaysShowSearch={alwaysShowSearch}
-    />
-  );
+export function DataViewsGrid<T extends Record<string, unknown>>(
+  props: DataViewsGridProps<T>,
+): React.JSX.Element {
+  // Forwarded as a whole rather than restated name-by-name twice: this component
+  // only ADDS the controller, and a 25-name destructure repeated in the JSX is
+  // where a newly added prop silently stops being passed on.
+  const { rangeFields = [], testIdPrefix = "table" } = props;
+  const controller = useDataViewsState({ ...props, rangeFields, testIdPrefix });
+  useVisibleRowsNotifier(controller.matched, props.onVisibleRowsChange);
+  return <GridShell {...props} c={controller} rangeFields={rangeFields} testIdPrefix={testIdPrefix} />;
 }
