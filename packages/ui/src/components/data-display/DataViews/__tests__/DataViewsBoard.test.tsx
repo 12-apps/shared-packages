@@ -94,11 +94,11 @@ function renderGrid(props: Partial<React.ComponentProps<typeof DataViewsGrid<Pay
   );
 }
 
-/** Open the layout dropdown and pick an option by its menu label. */
-async function switchLayout(label: string): Promise<void> {
-  fireEvent.click(screen.getByTestId("pagamentos-layout-toggle"));
-  const option = await screen.findByText(new RegExp(`^${label}`));
-  fireEvent.click(option);
+/** Open "Exibir", go to the Exibição tab, and pick a format tile. */
+async function switchLayout(layout: string): Promise<void> {
+  fireEvent.click(screen.getByTestId("pagamentos-display-trigger"));
+  fireEvent.click(await screen.findByTestId("pagamentos-display-tab-display"));
+  fireEvent.click(await screen.findByTestId(`pagamentos-layout-${layout}`));
 }
 
 const column = (value: string): HTMLElement =>
@@ -132,27 +132,29 @@ describe("groupRows", () => {
 describe("DataViews board layout", () => {
   it("is not offered when no board config is supplied", async () => {
     renderGrid();
-    fireEvent.click(screen.getByTestId("pagamentos-layout-toggle"));
-    // The menu opened and offers Grade — so "no Quadro" is a real absence,
-    // not a not-yet-rendered menu.
-    expect(await screen.findByText(/^Grade/)).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByText(/^Quadro/)).not.toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("pagamentos-display-trigger"));
+    fireEvent.click(await screen.findByTestId("pagamentos-display-tab-display"));
+    // The panel opened and offers Grade — so "no Quadro" is a real absence,
+    // not a not-yet-rendered panel.
+    expect(await screen.findByTestId("pagamentos-layout-cards")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId("pagamentos-layout-board")).not.toBeInTheDocument());
   });
 
   it("is not offered — and throws nothing — when a board config has no renderCard", async () => {
     renderGrid({ board, renderCard: undefined });
-    expect(screen.getByTestId("pagamentos-container")).toBeInTheDocument();
-    // With neither cards nor board available there is no toggle at all.
-    await waitFor(() =>
-      expect(screen.queryByTestId("pagamentos-layout-toggle")).not.toBeInTheDocument(),
-    );
+    fireEvent.click(screen.getByTestId("pagamentos-display-trigger"));
+    fireEvent.click(await screen.findByTestId("pagamentos-display-tab-display"));
+    // Only the table is renderable, so it is the only format offered.
+    expect(await screen.findByTestId("pagamentos-layout-table")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId("pagamentos-layout-board")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId("pagamentos-layout-cards")).not.toBeInTheDocument());
   });
 
   it("distributes the loaded page into columns and emits NO query", async () => {
     const { queries, server } = harness();
     renderGrid({ board, server });
 
-    await switchLayout("Quadro");
+    await switchLayout("board");
 
     await waitFor(() => expect(screen.getByTestId("pagamentos-board")).toBeInTheDocument());
     expect(within(column("pago")).getByTestId("card-1")).toBeInTheDocument();
@@ -166,7 +168,7 @@ describe("DataViews board layout", () => {
     const { server } = harness();
     renderGrid({ board, server });
 
-    await switchLayout("Quadro");
+    await switchLayout("board");
 
     await waitFor(() => expect(screen.getByTestId("pagamentos-board")).toBeInTheDocument());
     expect(screen.getByTestId("pagamentos-board-column-pago-count")).toHaveTextContent("2 nesta página");
@@ -178,7 +180,7 @@ describe("DataViews board layout", () => {
 
   it("renders an empty declared column, in position, saying it is empty", async () => {
     renderGrid({ board, server: harness().server });
-    await switchLayout("Quadro");
+    await switchLayout("board");
 
     await waitFor(() => expect(screen.getByTestId("pagamentos-board")).toBeInTheDocument());
     expect(screen.getByTestId("pagamentos-board-column-autorizado-count")).toHaveTextContent("0 nesta página");
@@ -187,7 +189,7 @@ describe("DataViews board layout", () => {
 
   it("sums each column over its loaded rows, with the page's own formatter", async () => {
     renderGrid({ board, server: harness().server });
-    await switchLayout("Quadro");
+    await switchLayout("board");
 
     await waitFor(() => expect(screen.getByTestId("pagamentos-board")).toBeInTheDocument());
     expect(screen.getByTestId("pagamentos-board-column-pago-sum")).toHaveTextContent("R$ 35.00");
@@ -198,7 +200,7 @@ describe("DataViews board layout", () => {
     const contested: Payment = { id: "9", cliente: "Davi", estado: "contestado", amountCents: 100 };
     renderGrid({ board, rows: [...payments, contested], server: harness().server });
 
-    await switchLayout("Quadro");
+    await switchLayout("board");
 
     await waitFor(() => expect(screen.getByTestId("pagamentos-board")).toBeInTheDocument());
     const extra = screen.getByTestId("pagamentos-board-column-__extra__");
@@ -211,13 +213,13 @@ describe("DataViews board layout", () => {
 
   it("shares one selection with the table and the cards", async () => {
     renderGrid({ board, server: harness().server });
-    await switchLayout("Quadro");
+    await switchLayout("board");
     await waitFor(() => expect(screen.getByTestId("pagamentos-board")).toBeInTheDocument());
 
     fireEvent.click(within(column("pago")).getByLabelText("Selecionar Ana"));
     await waitFor(() => expect(screen.getByTestId("pagamentos-clear-all")).toBeInTheDocument());
 
-    await switchLayout("Grade");
+    await switchLayout("cards");
 
     await waitFor(() => expect(screen.getByTestId("pagamentos-cards")).toBeInTheDocument());
     expect(screen.getByLabelText("Selecionar Ana")).toBeChecked();
@@ -226,7 +228,7 @@ describe("DataViews board layout", () => {
 
   it("shows the zoom slider on the board, since the board reuses the card", async () => {
     renderGrid({ board, server: harness().server });
-    await switchLayout("Quadro");
+    await switchLayout("board");
     await waitFor(() => expect(screen.getByTestId("pagamentos-card-zoom")).toBeInTheDocument());
   });
 });

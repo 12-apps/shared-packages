@@ -184,6 +184,17 @@ export interface DataViewState {
   /** Column ids kept visible; a hideable column not listed here is hidden. */
   visibleColumns: string[];
   /**
+   * Column ids in READING ORDER. Absent ⇒ the order the table declared them in.
+   *
+   * Order is view state for the same reason visibility is: reordering columns is
+   * an operator deciding what to read FIRST, and a saved view that restored the
+   * columns but not their order would restore half a decision. Ids the table no
+   * longer declares are ignored at render, and ids missing from a stale list
+   * fall in after it — so a column added since the view was saved appears rather
+   * than disappearing.
+   */
+  order?: string[];
+  /**
    * The active SCOPE id — the page-level partition the scope tabs select (see
    * `ScopeConfig`). Optional, so a table that declares no scopes is untouched
    * and no view persisted before scopes existed breaks.
@@ -294,6 +305,7 @@ export function coerceViewState(raw: unknown, allColumnIds: string[]): DataViewS
     ranges: asRecord<RangeValue>(value.ranges),
     sortBy: Array.isArray(value.sortBy) ? value.sortBy : [],
     visibleColumns: Array.isArray(value.visibleColumns) ? value.visibleColumns : allColumnIds,
+    order: Array.isArray(value.order) ? value.order : undefined,
     // Carried through UNVALIDATED against the declared scopes on purpose: a view
     // written before scopes existed has none (⇒ undefined ⇒ the first declared
     // scope at render), and one naming a since-removed scope keeps its stored id

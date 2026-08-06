@@ -3,7 +3,13 @@
 import { DataGrid, type GridColumn, type GridSort } from "../DataGrid";
 import { Box } from "../../../mui/Box";
 
-import { cardMinWidthForZoom, cardScaleForZoom, useDataViewsLayout } from "./data-views-layout-context";
+import {
+  cardMinWidthForZoom,
+  cardScaleForZoom,
+  DENSITY_CARD_COLUMNS,
+  DENSITY_ROW_PADDING,
+  useDataViewsLayout,
+} from "./data-views-layout-context";
 import { DataViewsBoard, type BoardConfig } from "./DataViewsBoard";
 import type { DataViewCardSelection } from "./data-views-types";
 import type { DataViewsController } from "./use-data-views-state";
@@ -20,6 +26,8 @@ interface GridBodyProps<T extends Record<string, unknown>> {
   onChangeSortBy: (next: GridSort[]) => void;
   /** "server" defers ordering to the backend (rows render as-is); "client" sorts in-grid. */
   sortMode: "client" | "server";
+  /** Vertical cell padding, from the density preference. */
+  rowPadding: number;
   dataTestId?: string;
   emptyState?: React.ReactNode;
 }
@@ -34,6 +42,7 @@ function GridBody<T extends Record<string, unknown>>({
   sortBy,
   onChangeSortBy,
   sortMode,
+  rowPadding,
   dataTestId,
   emptyState,
 }: GridBodyProps<T>): React.JSX.Element {
@@ -44,8 +53,9 @@ function GridBody<T extends Record<string, unknown>>({
         overflowX: "auto",
         mt: 1.5,
         // Tabwoah-style dense rows: MUI's default TableCell padding keeps rows
-        // tall regardless of rowHeight, so trim it here.
-        "& .MuiTableCell-root": { py: 0.25, fontSize: "0.8125rem" },
+        // tall regardless of rowHeight, so the DENSITY preference is applied
+        // here rather than through `rowHeight`, which it would fight.
+        "& .MuiTableCell-root": { py: rowPadding, fontSize: "0.8125rem" },
         "& .MuiTableCell-head": { py: 0.5, fontSize: "0.75rem" },
       }}
     >
@@ -75,6 +85,8 @@ interface CardBodyProps<T extends Record<string, unknown>> {
   selectedIds: Set<string | number>;
   onToggleId: (id: string | number) => void;
   minCardWidth: number;
+  /** Cap on cards per row, from the density preference. */
+  maxColumns: number;
   /** Content scale (padding + type) handed to each card, from the zoom slider. */
   cardScale: number;
   dataTestId?: string;
@@ -95,6 +107,7 @@ function CardBody<T extends Record<string, unknown>>({
   selectedIds,
   onToggleId,
   minCardWidth,
+  maxColumns,
   cardScale,
   dataTestId,
   emptyState,
@@ -110,7 +123,12 @@ function CardBody<T extends Record<string, unknown>>({
         // Fixed inter-card gap — deliberately NOT scaled by the zoom slider, so
         // only the cards grow while the space between them stays constant.
         gap: 1.5,
-        gridTemplateColumns: `repeat(auto-fill, minmax(${minCardWidth}px, 1fr))`,
+        // `auto-fill` still decides how many FIT; density caps how many are
+        // ALLOWED, so "Poucos" reads as bigger cards rather than more of them.
+        gridTemplateColumns: {
+          xs: "1fr",
+          sm: `repeat(auto-fill, minmax(max(${minCardWidth}px, calc((100% - ${(maxColumns - 1) * 12}px) / ${maxColumns})), 1fr))`,
+        },
       }}
       data-testid={dataTestId ? `${dataTestId}-cards` : "data-views-cards"}
     >
@@ -138,6 +156,8 @@ interface ListBodyProps<T extends Record<string, unknown>> {
   getRowId: (row: T) => string | number;
   selectedIds: Set<string | number>;
   onToggleId: (id: string | number) => void;
+  /** Gap between rows, from the density preference. */
+  rowGap: number;
   dataTestId?: string;
   emptyState?: React.ReactNode;
 }
@@ -163,6 +183,7 @@ function ListBody<T extends Record<string, unknown>>({
   getRowId,
   selectedIds,
   onToggleId,
+  rowGap,
   dataTestId,
   emptyState,
 }: ListBodyProps<T>): React.JSX.Element {
@@ -171,7 +192,7 @@ function ListBody<T extends Record<string, unknown>>({
   }
   return (
     <Box
-      sx={{ mt: 1.5, display: "flex", flexDirection: "column", gap: 0.75 }}
+      sx={{ mt: 1.5, display: "flex", flexDirection: "column", gap: rowGap }}
       data-testid={dataTestId ? `${dataTestId}-list` : "data-views-list"}
     >
       {rows.map((row) => {
@@ -214,7 +235,7 @@ export function GridMain<T extends Record<string, unknown>>({
   dataTestId,
   emptyState,
 }: GridMainProps<T>): React.JSX.Element {
-  const { layout, zoom } = useDataViewsLayout();
+  const { layout, zoom, density } = useDataViewsLayout();
   if (layout === "list" && renderListRow) {
     return (
       <ListBody
@@ -223,6 +244,7 @@ export function GridMain<T extends Record<string, unknown>>({
         getRowId={getRowId}
         selectedIds={c.selectedIds}
         onToggleId={c.toggleId}
+        rowGap={DENSITY_ROW_PADDING[density]}
         dataTestId={dataTestId}
         emptyState={emptyState}
       />
@@ -251,6 +273,7 @@ export function GridMain<T extends Record<string, unknown>>({
         selectedIds={c.selectedIds}
         onToggleId={c.toggleId}
         minCardWidth={cardMinWidthForZoom(zoom)}
+        maxColumns={DENSITY_CARD_COLUMNS[density]}
         cardScale={cardScaleForZoom(zoom)}
         dataTestId={dataTestId}
         emptyState={emptyState}
@@ -267,6 +290,7 @@ export function GridMain<T extends Record<string, unknown>>({
       sortBy={c.state.sortBy}
       onChangeSortBy={(next: GridSort[]) => c.patch({ sortBy: next })}
       sortMode={c.serverMode ? "server" : "client"}
+      rowPadding={DENSITY_ROW_PADDING[density]}
       dataTestId={dataTestId}
       emptyState={emptyState}
     />

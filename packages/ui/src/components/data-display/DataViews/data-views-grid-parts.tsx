@@ -20,6 +20,7 @@ import { FilterDialog, GridFilterPanel } from "./data-views-filter-panel";
 import { GridMain } from "./data-views-grid-bodies";
 import { InlineFilterBar } from "./data-views-inline-bar";
 import { GridToolbar } from "./data-views-toolbar";
+import type { DisplayPanelView } from "./data-views-display-panel";
 import { DataViewsPagination } from "./data-views-pagination";
 import type { BoardConfig } from "./DataViewsBoard";
 import { DataViewsScopeTabs, type ScopeConfig } from "./data-views-scopes";
@@ -213,6 +214,10 @@ interface GridShellProps<T extends Record<string, unknown>> {
   renderListRow?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
   /** The page-level partition rendered as tabs above the toolbar. */
   scopes?: ScopeConfig[];
+  /** Per-sort-field value kind, so directions read in the column's own terms. */
+  sortKinds?: Record<string, string>;
+  /** The saved-view chrome bracketing the Exibir panel. */
+  displayView?: DisplayPanelView;
   /** Page title in the grid's own header row, above the scopes + toolbar. */
   title?: string;
   /** Primary page actions rendered at the header row's right. */
@@ -249,10 +254,14 @@ function ShellToolbar<T extends Record<string, unknown>>({
   showInline,
   filtersHidden,
   toggleFilters,
+  sortKinds,
+  displayView,
 }: {
   c: DataViewsController<T>;
   rows: T[];
   testIdPrefix: string;
+  sortKinds?: Record<string, string>;
+  displayView?: DisplayPanelView;
   rowActions?: RowAction<T>[];
   bulkActions?: (selectedRows: T[], clearSelection: () => void) => React.ReactNode;
   toolbarRightSlot?: React.ReactNode;
@@ -267,6 +276,9 @@ function ShellToolbar<T extends Record<string, unknown>>({
   }));
   return (
     <GridToolbar
+      c={c}
+      sortKinds={sortKinds}
+      displayView={displayView}
       testIdPrefix={testIdPrefix}
       selectedRows={c.selectedRows}
       selectAll={c.selectAll}
@@ -310,15 +322,17 @@ export function GridShell<T extends Record<string, unknown>>({
   board,
   renderListRow,
   scopes = [],
+  sortKinds,
+  displayView,
   title,
   headerActions,
   defaultLayout,
   inlineFilters = false,
   alwaysShowSearch = false,
 }: GridShellProps<T>): React.JSX.Element {
-  const { state } = c;
   const { showInline, useModal, inlineVisible, filtersHidden, toggleFilters, filterProps } =
     useGridShellFilters({ c, inlineFilters, fields, rangeFields, testIdPrefix, alwaysShowSearch });
+  const bodyProps = { c, getRowId, renderCard, renderListRow, board, dataTestId, emptyState };
   return (
     <DataViewsLayoutProvider
       canUseCards={Boolean(renderCard)}
@@ -327,7 +341,7 @@ export function GridShell<T extends Record<string, unknown>>({
       // `renderCard` offers no board rather than throwing.
       canUseBoard={Boolean(board && renderCard)}
       defaultLayout={defaultLayout}
-      viewLayout={state.layout}
+      viewLayout={c.state.layout}
     >
     <LayoutStateSync c={c} />
     <TableFilter open={c.filterOpen} onOpenChange={c.setFilterOpen} hasActiveFilters={c.activeFilterCount > 0}>
@@ -344,6 +358,8 @@ export function GridShell<T extends Record<string, unknown>>({
         <ShellToolbar
           c={c}
           rows={rows}
+          sortKinds={sortKinds}
+          displayView={displayView}
           testIdPrefix={testIdPrefix}
           rowActions={rowActions}
           bulkActions={bulkActions}
@@ -355,18 +371,10 @@ export function GridShell<T extends Record<string, unknown>>({
         {inlineVisible && <InlineFilterBar {...filterProps} />}
         <TableFilter.Layout>
           <TableFilter.Main>
-            <GridMain
-              c={c}
-              getRowId={getRowId}
-              renderCard={renderCard}
-              renderListRow={renderListRow}
-              board={board}
-              dataTestId={dataTestId}
-              emptyState={emptyState}
-            />
+            <GridMain {...bodyProps} />
             <DataViewsPagination c={c} testIdPrefix={testIdPrefix} />
           </TableFilter.Main>
-          {!inlineFilters && <GridFilterPanel {...filterProps} />}
+          {inlineFilters ? null : <GridFilterPanel {...filterProps} />}
         </TableFilter.Layout>
         {useModal && <FilterDialog open={c.filterOpen} onClose={() => c.setFilterOpen(false)} {...filterProps} />}
       </Stack>

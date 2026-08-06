@@ -3,15 +3,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import GridViewOutlinedIcon from "@mui/icons-material/GridViewOutlined";
-import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import ViewKanbanOutlinedIcon from "@mui/icons-material/ViewKanbanOutlined";
-import ViewListOutlinedIcon from "@mui/icons-material/ViewListOutlined";
-import ViewStreamOutlinedIcon from "@mui/icons-material/ViewStreamOutlined";
 
-import { Button } from "../../form/Button";
 import { Slider } from "../../form/Slider";
 import { Box } from "../../../mui/Box";
-import { DropdownMenu } from "../../navigation/DropdownMenu";
 
 import { DATA_VIEWS_LAYOUTS, type DataViewsLayout } from "./data-views-types";
 
@@ -28,6 +22,9 @@ export type { DataViewsLayout };
 interface DataViewsLayoutValue {
   layout: DataViewsLayout;
   setLayout: (layout: DataViewsLayout) => void;
+  /** How much air each record gets — see {@link DataViewsDensity}. */
+  density: DataViewsDensity;
+  setDensity: (density: DataViewsDensity) => void;
   /** Whether the cards layout is available (a `renderCard` was supplied). */
   canUseCards: boolean;
   /** Whether the list layout is available (a `renderListRow` was supplied). */
@@ -58,6 +55,40 @@ const CARD_SCALE_RANGE = { min: 0.75, max: 2 } as const;
 const LAYOUT_STORAGE_KEY = "dataviews:layout";
 
 /**
+ * The density preference, remembered app-wide for the same reason as the layout:
+ * an operator who wants tight rows wants them on every list, not on one.
+ */
+const DENSITY_STORAGE_KEY = "dataviews:density";
+
+/**
+ * How much room each record gets. It means different things per layout, and
+ * that is the point — one control, phrased in the terms of what is on screen:
+ *
+ * - table / list → row height ("Baixa / Média / Alta")
+ * - cards        → how many fit per row ("Muitos / Médio / Poucos")
+ *
+ * The board is unaffected: its cards are already sized by the zoom slider.
+ */
+export type DataViewsDensity = "compact" | "cozy" | "comfortable";
+
+/** Every density this build knows — the guard's single source. */
+const DENSITIES: readonly DataViewsDensity[] = ["compact", "cozy", "comfortable"];
+
+/** Vertical padding (theme spacing units) per density, for a table or list row. */
+export const DENSITY_ROW_PADDING: Record<DataViewsDensity, number> = {
+  compact: 0.25,
+  cozy: 0.75,
+  comfortable: 1.5,
+};
+
+/** Card grid columns per density — how many cards land on one row. */
+export const DENSITY_CARD_COLUMNS: Record<DataViewsDensity, number> = {
+  compact: 5,
+  cozy: 4,
+  comfortable: 3,
+};
+
+/**
  * Map the 0–100 zoom to the card SIZE multiplier. This is the single knob: the
  * card's width is {@link BASE_CARD_WIDTH} × scale and its padding + typography
  * scale by the same factor, so the whole card grows together (scale 2 → twice
@@ -84,6 +115,22 @@ interface LayoutAvailability {
 /** Is this a layout string this build knows? Guards whatever is in storage. */
 function isLayout(value: unknown): value is DataViewsLayout {
   return DATA_VIEWS_LAYOUTS.includes(value as DataViewsLayout);
+}
+
+/** Is this a density this build knows? Guards whatever is in storage. */
+function isDensity(value: unknown): value is DataViewsDensity {
+  return DENSITIES.includes(value as DataViewsDensity);
+}
+
+/** The remembered density, or undefined (no window, no value, junk). */
+function readStoredDensity(): DataViewsDensity | undefined {
+  try {
+    if (typeof window === "undefined") return undefined;
+    const stored = window.localStorage.getItem(DENSITY_STORAGE_KEY);
+    return isDensity(stored) ? stored : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -113,11 +160,11 @@ function readStoredLayout(): DataViewsLayout | undefined {
   }
 }
 
-/** Remember the preference for every other screen. A failed write is not an error. */
-function writeStoredLayout(layout: DataViewsLayout): void {
+/** Remember a preference for every other screen. A failed write is not an error. */
+function writeStored(key: string, value: string): void {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
+    window.localStorage.setItem(key, value);
   } catch {
     // Private mode / quota / disabled storage: the preference simply does not
     // survive the session. Nothing about the current view depends on it.
@@ -154,6 +201,7 @@ export function DataViewsLayoutProvider({
   const [layout, setLayoutState] = useState<DataViewsLayout>(() =>
     pinLayout(viewLayout ?? readStoredLayout() ?? defaultLayout, availability),
   );
+  const [density, setDensityState] = useState<DataViewsDensity>(() => readStoredDensity() ?? "cozy");
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   // A newly applied view carrying a layout switches to it (its reference-change
   // is the signal, exactly as `appliedState` works for the filters).
@@ -173,7 +221,12 @@ export function DataViewsLayoutProvider({
         const pinned = pinLayout(next, availability);
         setLayoutState(pinned);
         // Remember the user's own choice across every screen — see LAYOUT_STORAGE_KEY.
-        writeStoredLayout(pinned);
+        writeStored(LAYOUT_STORAGE_KEY, pinned);
+      },
+      density,
+      setDensity: (next: DataViewsDensity) => {
+        setDensityState(next);
+        writeStored(DENSITY_STORAGE_KEY, next);
       },
       canUseCards,
       canUseList,
@@ -181,7 +234,7 @@ export function DataViewsLayoutProvider({
       zoom,
       setZoom,
     }),
-    [effective, canUseCards, canUseList, canUseBoard, zoom],
+    [effective, density, canUseCards, canUseList, canUseBoard, zoom],
   );
   return <DataViewsLayoutContext.Provider value={value}>{children}</DataViewsLayoutContext.Provider>;
 }
@@ -193,82 +246,6 @@ export function useDataViewsLayout(): DataViewsLayoutValue {
     throw new Error("useDataViewsLayout must be used within a DataViewsLayoutProvider");
   }
   return ctx;
-}
-
-/** One entry in the layout dropdown. */
-interface LayoutOption {
-  value: DataViewsLayout;
-  label: string;
-  Icon: typeof ViewListOutlinedIcon;
-}
-
-/** The layout options, in menu order. */
-const GRADE_OPTION: LayoutOption = { value: "cards", label: "Grade", Icon: GridViewOutlinedIcon };
-const LISTA_OPTION: LayoutOption = { value: "list", label: "Lista", Icon: ViewStreamOutlinedIcon };
-const QUADRO_OPTION: LayoutOption = { value: "board", label: "Quadro", Icon: ViewKanbanOutlinedIcon };
-const TABELA_OPTION: LayoutOption = { value: "table", label: "Tabela", Icon: ViewListOutlinedIcon };
-
-/** Only the layouts this table can actually render, in menu order. */
-function layoutOptions({ canUseCards, canUseList, canUseBoard }: LayoutAvailability): LayoutOption[] {
-  return [
-    ...(canUseCards ? [GRADE_OPTION] : []),
-    ...(canUseList ? [LISTA_OPTION] : []),
-    ...(canUseBoard ? [QUADRO_OPTION] : []),
-    TABELA_OPTION,
-  ];
-}
-
-/** The option matching a layout, for the trigger's icon + label. */
-function activeOption(layout: DataViewsLayout): LayoutOption {
-  if (layout === "cards") return GRADE_OPTION;
-  if (layout === "list") return LISTA_OPTION;
-  if (layout === "board") return QUADRO_OPTION;
-  return TABELA_OPTION;
-}
-
-/**
- * The layout selector for the toolbar — a muted dropdown icon-button showing the
- * active view's icon + a chevron, opening a menu of the AVAILABLE layouts with a
- * check on the active one. Mirrors the other toolbar dropdowns (Columns / Sort
- * By) rather than a pair of buttons. Renders nothing when the table offers only
- * the table layout, so pages without a `renderCard` are unaffected.
- */
-export function DataViewsLayoutToggle({ testIdPrefix }: { testIdPrefix: string }): React.JSX.Element | null {
-  const { layout, setLayout, canUseCards, canUseList, canUseBoard } = useDataViewsLayout();
-  if (!canUseCards && !canUseList && !canUseBoard) return null;
-
-  const active = activeOption(layout);
-  const ActiveIcon = active.Icon;
-
-  return (
-    <DropdownMenu
-      size="sm"
-      items={layoutOptions({ canUseCards, canUseList, canUseBoard }).map((option) => ({
-        id: option.value,
-        // A check on the active option; the icon stays leading. `color` highlights
-        // the active row. NOTE: DropdownMenu drops onClick for items with a custom
-        // `component`, so keep to label/icon/onClick here.
-        label: option.value === layout ? `${option.label}  ✓` : option.label,
-        icon: <option.Icon fontSize="small" />,
-        color: option.value === layout ? ("primary" as const) : undefined,
-        onClick: () => setLayout(option.value),
-      }))}
-      trigger={
-        <Button
-          variant="text"
-          size="sm"
-          color="secondary"
-          aria-label={`Exibição: ${active.label}`}
-          dataTestId={`${testIdPrefix}-layout-toggle`}
-        >
-          <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.25 }}>
-            <ActiveIcon fontSize="small" />
-            <KeyboardArrowDownRoundedIcon fontSize="small" />
-          </Box>
-        </Button>
-      }
-    />
-  );
 }
 
 /**
