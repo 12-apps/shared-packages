@@ -1,6 +1,5 @@
 "use client";
 
-import { useMediaQuery, useTheme } from "@mui/material";
 import { useEffect, useState } from "react";
 
 import { TableFilter } from "../../layout/TableFilter";
@@ -165,14 +164,18 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   // it can keep, and the TOOLBAR needs the same answer to drop its labels.
   // Measuring twice would let the two disagree at the crossover width.
   const split = useFilterOverflow(toOverflowFields(fields, rangeFields), state.pills, c.ranges);
-  // Read the theme explicitly (falls back to the default when there's no
-  // ThemeProvider) so the query never dereferences a null theme. `noSsr`
-  // evaluates on the client only (no hydration mismatch).
-  const theme = useTheme();
-  const wide = useMediaQuery(theme.breakpoints.up("lg"), { noSsr: true });
   const [filtersHidden, setFiltersHidden] = useState(false);
-  const showInline = inlineFilters && wide;
-  const useModal = inlineFilters && !wide;
+  // THE BAR RENDERS AT EVERY WIDTH. It used to be swapped for a full-screen
+  // filter MODAL below `lg`, which was the responsive strategy before the
+  // measured ladder existed — and the two now do the same job, badly together:
+  // the modal took the bar away at 1199px, and with it the very degradation
+  // (labels off, search collapsed, filters into "Mais") that exists to make a
+  // narrow bar work. So a 900px window got no bar and no ladder, and the
+  // operator lost the search entirely rather than gaining a compact one.
+  //
+  // The ladder is measured, so it already covers every width the modal did.
+  const showInline = inlineFilters;
+  const useModal = false;
   const inlineVisible =
     showInline &&
     !filtersHidden &&
