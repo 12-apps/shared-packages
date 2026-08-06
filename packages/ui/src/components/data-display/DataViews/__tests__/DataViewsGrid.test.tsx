@@ -185,7 +185,7 @@ describe("DataViewsGrid", () => {
     // No selection: no count indicator, no bulk action.
     await waitFor(() => expect(screen.queryByTestId("selected-count-indicator")).not.toBeInTheDocument());
 
-    fireEvent.click(screen.getByTestId("people-select-all"));
+    fireEvent.click(screen.getByLabelText("Select all rows"));
     await waitFor(() =>
       expect(screen.getByTestId("selected-count-indicator")).toHaveTextContent("3 items selected"),
     );
@@ -220,7 +220,7 @@ describe("DataViewsGrid", () => {
     expect(onEdit).toHaveBeenCalledWith(1);
 
     // Select all → the bulk "Ações" menu shows only the bulk-eligible action.
-    fireEvent.click(screen.getByTestId("people-select-all"));
+    fireEvent.click(screen.getByLabelText("Select all rows"));
     await waitFor(() => expect(screen.getByTestId("people-bulk-actions")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("people-bulk-actions"));
     await waitFor(() => expect(screen.getByText("Arquivar")).toBeInTheDocument());

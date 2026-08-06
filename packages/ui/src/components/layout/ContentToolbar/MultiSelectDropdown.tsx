@@ -67,6 +67,7 @@ export function MultiSelectDropdown<TValue extends string = string>({
   noResultsLabel = 'No results',
   layout = 'inline',
   'data-testid': testId,
+  onOpenChange,
 }: MultiSelectDropdownProps<TValue>): React.JSX.Element {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [query, setQuery] = useState('');
@@ -76,6 +77,7 @@ export function MultiSelectDropdown<TValue extends string = string>({
   const close = (): void => {
     setAnchorEl(null);
     setQuery('');
+    onOpenChange?.(false);
   };
   const triggerLabel = buildTriggerLabel(selected, options, allLabel);
   // Auto-enable search for long lists (e.g. many categories) unless overridden.
@@ -83,7 +85,10 @@ export function MultiSelectDropdown<TValue extends string = string>({
   const anyExtraChecked = extraOptions?.some((option) => option.checked) ?? false;
   const clearDisabled = selected.size === 0 && !anyExtraChecked;
 
-  const openMenu = (event: React.MouseEvent<HTMLElement>): void => setAnchorEl(event.currentTarget);
+  const openMenu = (event: React.MouseEvent<HTMLElement>): void => {
+    setAnchorEl(event.currentTarget);
+    onOpenChange?.(true);
+  };
   const triggerProps = { triggerLabel, open, onOpen: openMenu, testId };
 
   const renderTrigger = (): React.JSX.Element => {

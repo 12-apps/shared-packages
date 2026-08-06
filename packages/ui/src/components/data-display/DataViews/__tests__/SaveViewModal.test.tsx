@@ -24,7 +24,8 @@ const currentState: DataViewState = {
   search: "",
   pills: { status: ["ACTIVE"] },
   sortBy: [],
-  visibleColumns: ["name", "status"],
+  // "status" hidden, so the summary has a change to report for columns.
+  visibleColumns: ["name"],
 };
 
 function renderModal(onSave = vi.fn()) {
@@ -45,12 +46,15 @@ function renderModal(onSave = vi.fn()) {
 }
 
 describe("SaveViewModal", () => {
-  it("previews the current filters and columns", () => {
+  it("summarises what the view CHANGES — its filters and the columns it hides", () => {
     renderModal();
     const filters = screen.getByTestId("views-preview-filters");
     expect(within(filters).getByText("Status: Ativo")).toBeInTheDocument();
+    // The columns row names what is HIDDEN, not the eight that are not.
     const cols = screen.getByTestId("views-preview-columns");
-    expect(within(cols).getByText("Nome")).toBeInTheDocument();
+    expect(within(cols).getByText("Status")).toBeInTheDocument();
+    // Not a removal — "Nome" is visible and simply never listed as hidden.
+    expect(within(cols).getByText("Status")).not.toHaveTextContent("Nome");
   });
 
   it("requires a name before saving", () => {

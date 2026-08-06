@@ -1,23 +1,21 @@
 "use client";
 
-import CollapseIcon from '@mui/icons-material/ExpandLess';
-import ExpandIcon from '@mui/icons-material/ExpandMore';
-import { IconButton, Tooltip } from "@mui/material";
+import { Divider } from "@mui/material";
 
 import {
-  ColumnsMenu,
   ContentToolbar,
   FilterTrigger,
-  SortByDropdown,
   type ColumnVisibilityOption,
   type SortFieldDefinition,
 } from "../../layout/ContentToolbar";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
-import { DataViewsLayoutToggle, DataViewsZoomSlider } from "./data-views-layout-context";
+import { DataViewsDisplayPanel, type DisplayPanelView } from "./data-views-display-panel";
+import { DataViewsExportMenu, type DataViewExport } from "./data-views-export";
 import { renderBulkActions } from "./data-views-grid-helpers";
 import type { RowAction } from "./data-views-types";
+import type { DataViewsController } from "./use-data-views-state";
 
 export interface GridToolbarProps<T extends Record<string, unknown>> {
   testIdPrefix: string;
@@ -40,49 +38,74 @@ export interface GridToolbarProps<T extends Record<string, unknown>> {
   activeFilterCount: number;
   /** Hide the "Filtros" slide-in trigger (compact layout shows filters inline). */
   showFilterTrigger?: boolean;
-  /** Show the ∧/∨ toggle that collapses/expands the inline filter row. */
-  showFiltersToggle?: boolean;
-  /** Whether the inline filter row is currently hidden. */
-  filtersHidden?: boolean;
-  /** Toggle the inline filter row's visibility. */
-  onToggleFilters?: () => void;
+  /**
+   * Search + filter controls, rendered ON the toolbar line rather than on a row
+   * beneath it. Absent ⇒ the toolbar keeps its plain two-cluster shape.
+   */
+  filterControls?: React.ReactNode;
+  /** Measures the toolbar ROW for the filter overflow — see `useFilterOverflow`. */
+  barRef?: React.Ref<HTMLDivElement>;
+  /** The controller, so "Exibir" can drive sort, columns, order and format. */
+  c: DataViewsController<T>;
+  /** Per-sort-field value kind, so directions read in the column's own terms. */
+  sortKinds?: Record<string, string>;
+  /** The saved-view chrome bracketing the Exibir panel, when the host has views. */
+  displayView?: DisplayPanelView;
+  /** Injected export. Absent ⇒ no Exportar control. */
+  exportConfig?: DataViewExport;
+  /**
+   * Step 2 of the degradation ladder: Exibir/Exportar as icons only.
+   * MEASURED upstream (see `useFilterOverflow`) rather than switched at a
+   * breakpoint, so a two-filter page keeps its labels where a five-filter one
+   * has already given them up.
+   */
+  compactControls?: boolean;
 }
 
 /** The right-aligned toolbar controls: Sort By, the counter, zoom/layout/columns, filters. */
 function ToolbarRightControls<T extends Record<string, unknown>>(props: GridToolbarProps<T>): React.JSX.Element {
-  const { testIdPrefix, sortFields, matchedCount, totalCount, filterOpen, setFilterOpen } = props;
+  const { testIdPrefix, matchedCount, totalCount, filterOpen, setFilterOpen } = props;
   return (
     <>
-      {sortFields.length > 0 && (
-        <SortByDropdown
-          fields={sortFields}
-          activeField={props.activeSortField}
-          activeOrder={props.activeSortOrder}
-          onFieldChange={(field) => props.onChangeSort(field, "asc")}
-          onOrderChange={(order) => props.onChangeSort(props.activeSortField, order === "desc" ? "desc" : "asc")}
-          data-testid={`${testIdPrefix}-sort-trigger`}
-        />
-      )}
       <Text variant="caption" as="span">
-        {/* The "N de N" counter is hidden on mobile to keep the toolbar one line. */}
+        {/* Always rendered, never breakpointed: `RESERVED.counter` already
+            prices it into the collapse ladder, so hiding it at `md` was the
+            ladder and a breakpoint disagreeing about the same pixels — which
+            is what broke the row at exactly 900px. */}
         <Box
           component="span"
           data-testid={`${testIdPrefix}-counter`}
-          sx={{ whiteSpace: "nowrap", display: { xs: "none", md: "inline" } }}
+          sx={{ whiteSpace: "nowrap" }}
         >
-          Exibindo {matchedCount} de {totalCount}
+          {matchedCount} de {totalCount}
         </Box>
       </Text>
+      {/* Divides the READING of the list from the controls that change it —
+          the counter states what is on screen, everything right of here acts
+          on it. */}
+      <Divider
+        orientation="vertical"
+        flexItem
+        sx={{ height: 20, alignSelf: "center", mx: 0.5 }}
+      />
       {props.toolbarRightSlot}
-      <DataViewsZoomSlider testIdPrefix={testIdPrefix} />
-      <DataViewsLayoutToggle testIdPrefix={testIdPrefix} />
-      {props.columnOptions.length > 0 && (
-        <ColumnsMenu
-          columns={props.columnOptions}
-          onToggle={props.onToggleColumn}
-          title="Colunas"
-          ariaLabel="Exibir colunas"
-          data-testid={`${testIdPrefix}-columns-toggle`}
+      {/* Sort + columns + format, in ONE control — see DataViewsDisplayPanel. */}
+      <DataViewsDisplayPanel
+        c={props.c}
+        testIdPrefix={testIdPrefix}
+        sortKinds={props.sortKinds}
+        view={props.displayView}
+        compact={props.compactControls}
+      />
+      {props.exportConfig && (
+        <DataViewsExportMenu
+          config={props.exportConfig}
+          query={props.c.currentQuery}
+          totalCount={props.totalCount}
+          selectedIds={[...props.c.selectedIds]}
+          columns={props.columnOptions.filter((col) => col.visible).map((col) => ({ id: col.id, label: col.label }))}
+          testIdPrefix={testIdPrefix}
+          compact={props.compactControls}
         />
       )}
       {props.showFilterTrigger !== false && (
@@ -92,19 +115,6 @@ function ToolbarRightControls<T extends Record<string, unknown>>(props: GridTool
           activeCount={props.activeFilterCount}
           data-testid={`${testIdPrefix}-filters-toggle`}
         />
-      )}
-      {props.showFiltersToggle && (
-        <Tooltip title={props.filtersHidden ? "Mostrar filtros" : "Ocultar filtros"}>
-          <IconButton
-            size="small"
-            onClick={props.onToggleFilters}
-            aria-label={props.filtersHidden ? "Mostrar filtros" : "Ocultar filtros"}
-            aria-expanded={!props.filtersHidden}
-            data-testid={`${testIdPrefix}-filters-collapse`}
-          >
-            {props.filtersHidden ? <ExpandIcon fontSize="small" /> : <CollapseIcon fontSize="small" />}
-          </IconButton>
-        </Tooltip>
       )}
     </>
   );
@@ -119,6 +129,7 @@ export function GridToolbar<T extends Record<string, unknown>>(props: GridToolba
   const { testIdPrefix, selectedRows } = props;
   return (
     <Box
+      ref={props.barRef}
       sx={{
         borderTop: 1,
         borderBottom: 1,
@@ -142,6 +153,10 @@ export function GridToolbar<T extends Record<string, unknown>>(props: GridToolba
           clearSelection: props.clearSelection,
           testIdPrefix,
         })}
+        leadingControls={props.filterControls}
+        // Selection takes the whole line: no Select All while browsing, and no
+        // search/filters/Exibir/Exportar once a row is ticked.
+        exclusiveSelection
         rightControls={<ToolbarRightControls {...props} />}
       />
     </Box>

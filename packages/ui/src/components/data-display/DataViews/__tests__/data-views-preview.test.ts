@@ -20,34 +20,46 @@ const fields: FilterFieldConfig<Row>[] = [
 ];
 
 describe("describeViewState", () => {
-  it("summarizes search, pills, visible columns, and sort with labels", () => {
+  it("summarizes search, pills, HIDDEN columns, and sort with labels", () => {
     const state: DataViewState = {
       search: "burg",
       pills: { status: ["ACTIVE"] },
       sortBy: [{ id: "name", dir: "asc" }],
+      // Everything hideable is visible, so this view hides nothing.
       visibleColumns: ["name", "status"],
     };
 
     const result = describeViewState(state, fields, columns);
 
     expect(result.filters).toEqual(['Busca: "burg"', "Status: Ativo"]);
-    expect(result.columns).toEqual(["Nome", "Status"]);
+    expect(result.columns).toEqual([]);
     expect(result.sort).toEqual(["Nome (crescente)"]);
   });
 
-  it("returns empty sections for a pristine state", () => {
-    const state: DataViewState = { search: "", pills: {}, sortBy: [], visibleColumns: [] };
-    const result = describeViewState(state, fields, columns);
-    expect(result).toEqual({ filters: [], columns: [], sort: [] });
+  it("returns empty sections when a view changes nothing", () => {
+    // Every hideable column visible: no filters, no hiding, no sort.
+    const state: DataViewState = {
+      search: "",
+      pills: {},
+      sortBy: [],
+      visibleColumns: ["name", "status"],
+    };
+    expect(describeViewState(state, fields, columns)).toEqual({ filters: [], columns: [], sort: [] });
   });
 
-  it("omits the actions column (non-hideable) from the columns summary", () => {
+  it("names the columns a view HIDES, since that is what it changed", () => {
+    const state: DataViewState = { search: "", pills: {}, sortBy: [], visibleColumns: ["name"] };
+    expect(describeViewState(state, fields, columns).columns).toEqual(["Status"]);
+  });
+
+  it("omits the actions column (non-hideable) — it cannot be hidden, so it is never news", () => {
     const state: DataViewState = {
       search: "",
       pills: {},
       sortBy: [],
       visibleColumns: ["name", "actions"],
     };
-    expect(describeViewState(state, fields, columns).columns).toEqual(["Nome"]);
+    // "status" is hidden and reported; "actions" is absent but not hideable.
+    expect(describeViewState(state, fields, columns).columns).toEqual(["Status"]);
   });
 });

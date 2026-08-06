@@ -99,6 +99,58 @@ function SelectionCluster({
 }
 
 /**
+ * The BROWSING half of the toolbar: search + filters on the left, the page's
+ * own controls on the right. Split out of {@link ContentToolbar} so that
+ * function stays inside the complexity gate — it is layout only, and the
+ * decision of whether to show it at all is made by the caller.
+ */
+function BrowsingClusters({
+  leadingControls,
+  rightControls,
+  hasSelection,
+  edgeAlign,
+}: {
+  leadingControls?: React.ReactNode;
+  rightControls: React.ReactNode;
+  hasSelection: boolean;
+  edgeAlign: boolean;
+}): React.JSX.Element {
+  return (
+    <>
+      {/* minWidth:0 lets this cluster be the one that gives up width as the row
+       * tightens, which is what the filter overflow measures against. */}
+      {leadingControls !== undefined && (
+        <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, minWidth: 0 }}>
+          {leadingControls}
+        </Box>
+      )}
+      {/* ml:auto keeps the controls right-aligned even when the cluster wraps to
+       * its own row (where justify-content:space-between would otherwise snap a
+       * lone item to the left); it's a no-op on a shared row. */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          // Same single-line rule as the row itself: this cluster wrapping
+          // INTERNALLY buys a second line just as surely as the row wrapping
+          // does. It bit at exactly 900px, the `md` breakpoint where the "N de
+          // N" counter appears and pushes Exibir/Exportar over the edge.
+          flexWrap: leadingControls === undefined ? 'wrap' : 'nowrap',
+          // Tight (5px) when browsing so the controls fit one line beside the
+          // checkbox; roomier (14px) in selection mode where they get their own row.
+          gap: hasSelection ? '14px' : '5px',
+          ml: 'auto',
+          mr: edgeAlign ? -1.5 : 0,
+          '& > *': { flexShrink: 0 },
+        }}
+      >
+        {rightControls}
+      </Box>
+    </>
+  );
+}
+
+/**
  * Shared toolbar for content pages (Favorites, Personal Space, Recents, …). The
  * left cluster owns selection chrome — **Select All**, and once items are
  * selected, **Clear All** + an "N items selected" count + an optional `actions`
@@ -133,52 +185,56 @@ export function ContentToolbar({
   selectAll,
   clearSelection,
   rightControls,
+  leadingControls,
   actions,
   selectAllTestId,
   clearAllTestId,
   edgeAlign = false,
+  exclusiveSelection = false,
 }: ContentToolbarProps): React.JSX.Element {
+  // Under `exclusiveSelection` the two states are alternatives, not neighbours:
+  // browsing shows the controls and no checkbox, selecting shows the checkbox
+  // and no controls. Anything else double-books the row.
+  const showSelection = !exclusiveSelection || hasSelection;
+  const showControls = !exclusiveSelection || !hasSelection;
   return (
-    // Wrap the two clusters onto separate rows when they can't share one line
-    // (narrow screens / phones) instead of letting the controls collide.
+    // Two clusters on one line. They may wrap onto separate rows ONLY for a
+    // toolbar without `leadingControls` — one carrying search + filters is
+    // driven by a measured collapse ladder (see `useFilterOverflow`), and a
+    // wrap there is the ladder having failed: it would silently buy a second
+    // row instead of shedding a control into "Mais", which is the one outcome
+    // the ladder exists to prevent.
     <Box
       sx={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 2,
-        flexWrap: 'wrap',
+        flexWrap: leadingControls === undefined ? 'wrap' : 'nowrap',
         rowGap: 1,
       }}
     >
-      <SelectionCluster
-        hasSelection={hasSelection}
-        selectedCount={selectedCount}
-        selectAll={selectAll}
-        clearSelection={clearSelection}
-        actions={actions}
-        selectAllTestId={selectAllTestId}
-        clearAllTestId={clearAllTestId}
-        edgeAlign={edgeAlign}
-      />
+      {showSelection && (
+        <SelectionCluster
+          hasSelection={hasSelection}
+          selectedCount={selectedCount}
+          selectAll={selectAll}
+          clearSelection={clearSelection}
+          actions={actions}
+          selectAllTestId={selectAllTestId}
+          clearAllTestId={clearAllTestId}
+          edgeAlign={edgeAlign}
+        />
+      )}
 
-      {/* ml:auto keeps the controls right-aligned even when the cluster wraps to
-       * its own row (where justify-content:space-between would otherwise snap a
-       * lone item to the left); it's a no-op on a shared row. */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          // Tight (5px) when browsing so the controls fit one line beside the
-          // checkbox; roomier (14px) in selection mode where they get their own row.
-          gap: hasSelection ? '14px' : '5px',
-          ml: 'auto',
-          mr: edgeAlign ? -1.5 : 0,
-        }}
-      >
-        {rightControls}
-      </Box>
+      {showControls && (
+        <BrowsingClusters
+          leadingControls={leadingControls}
+          rightControls={rightControls}
+          hasSelection={hasSelection}
+          edgeAlign={edgeAlign}
+        />
+      )}
     </Box>
   );
 }

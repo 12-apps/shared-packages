@@ -127,7 +127,12 @@ export function ViewDialogs<T extends Record<string, unknown>>({
 }: ViewDialogsProps<T>): React.JSX.Element {
   return (
     <>
+      {/* Keyed by the view being edited: the form seeds its fields with
+          `useState`, which only runs on MOUNT, so a modal that stayed mounted
+          from a previous open reused those values — "Renomear e editar" opened
+          with an empty Nome once "Salvar visão" had been opened first. */}
       <SaveViewModal<T>
+        key={editing ? `edit-${editing.id}` : "create"}
         open={saveOpen}
         onClose={onCloseSave}
         currentState={currentState}

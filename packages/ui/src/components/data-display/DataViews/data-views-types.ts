@@ -164,6 +164,14 @@ export interface DataViewColumn<T extends Record<string, unknown>> extends GridC
   hideable?: boolean;
 }
 
+/**
+ * The DataViews layout (view type): the dense "Tabela" grid, the "Grade" of
+ * cards, the "Lista" of full-width rows, or the "Quadro" board of state columns.
+ * Lives with the state types rather than with the toggle because a saved view
+ * CAPTURES it — see {@link DataViewState.layout}.
+ */
+export type DataViewsLayout = "cards" | "list" | "board" | "table";
+
 /** The full, serializable state a view captures. */
 export interface DataViewState {
   /** Free text matched across every `searchable` column. */
@@ -175,6 +183,36 @@ export interface DataViewState {
   sortBy: GridSort[];
   /** Column ids kept visible; a hideable column not listed here is hidden. */
   visibleColumns: string[];
+  /**
+   * Column ids in READING ORDER. Absent ⇒ the order the table declared them in.
+   *
+   * Order is view state for the same reason visibility is: reordering columns is
+   * an operator deciding what to read FIRST, and a saved view that restored the
+   * columns but not their order would restore half a decision. Ids the table no
+   * longer declares are ignored at render, and ids missing from a stale list
+   * fall in after it — so a column added since the view was saved appears rather
+   * than disappearing.
+   */
+  order?: string[];
+  /**
+   * The active SCOPE id — the page-level partition the scope tabs select (see
+   * `ScopeConfig`). Optional, so a table that declares no scopes is untouched
+   * and no view persisted before scopes existed breaks.
+   *
+   * Stored raw and RESOLVED at read time: the declared scopes change underneath
+   * a saved view, and a view naming a scope that has since been removed must
+   * fall back at render rather than break.
+   */
+  scope?: string;
+  /**
+   * The layout the view was saved in. Optional — absent means "whatever the user
+   * is currently using", which is the pre-existing behaviour.
+   *
+   * A LAYOUT FALLBACK IS NOT A LAYOUT CHANGE: a table rendered as stacked rows
+   * on a phone still has `"table"` stored here, so the view round-trips the
+   * stored layout regardless of the device that opened it.
+   */
+  layout?: DataViewsLayout;
 }
 
 /** A pristine view state showing every given column and no filters/sort. */
@@ -190,7 +228,10 @@ export function emptyViewState(visibleColumns: string[]): DataViewState {
  * over the current state so a user's show/hide column choices are preserved —
  * unlike `appliedState`, which fully replaces the state to apply a saved view.
  */
-export type DataViewSyncState = Pick<DataViewState, "search" | "pills" | "ranges" | "sortBy">;
+export type DataViewSyncState = Pick<
+  DataViewState,
+  "search" | "pills" | "ranges" | "sortBy" | "scope"
+>;
 
 /**
  * The query a SERVER-mode table emits whenever its filter/sort/page changes
@@ -204,6 +245,16 @@ export interface DataViewQuery {
   pills: Record<string, string[]>;
   ranges: Record<string, RangeValue>;
   sortBy: GridSort[];
+  /**
+   * The RESOLVED active scope (see `resolveScope`), when the table declares
+   * scopes. The KEY IS ABSENT for a table that declares none — not present-and-
+   * undefined — so a host that never opted in sees a byte-identical query.
+   *
+   * It carries the resolved id, never the stored one: a deep link or a saved
+   * view naming a scope the table no longer declares must not put that id on the
+   * wire, where the backend would reject it and replace the page with an error.
+   */
+  scope?: string;
   page: number;
   pageSize: number;
 }
@@ -225,6 +276,20 @@ export interface DataViewServer {
   pageSize: number;
   /** Fired when the effective query changes; the host re-fetches the page. */
   onQueryChange: (query: DataViewQuery) => void;
+  /**
+   * Per-scope totals for the scope tabs: `scopeId → count`. THE ONLY PIECE OF
+   * THIS CONTRACT THAT CANNOT BE DONE CLIENT-SIDE — a count computed from the
+   * loaded page is wrong the moment there is a second page, which is the
+   * concrete bug scopes exist to fix.
+   *
+   * Compute it over search + pills + ranges while IGNORING the active scope.
+   * Computed WITH the scope applied, every inactive tab reads zero, which is
+   * worse than no counts at all.
+   *
+   * Omit it and the tabs render with no numbers. Nothing is ever invented from
+   * the loaded rows to fill the gap.
+   */
+  scopeCounts?: Record<string, number>;
 }
 
 /**
@@ -236,17 +301,31 @@ export function coerceViewState(raw: unknown, allColumnIds: string[]): DataViewS
   const value = (raw ?? {}) as Partial<DataViewState>;
   return {
     search: typeof value.search === "string" ? value.search : "",
-    pills:
-      value.pills && typeof value.pills === "object"
-        ? (value.pills as Record<string, string[]>)
-        : {},
-    ranges:
-      value.ranges && typeof value.ranges === "object"
-        ? (value.ranges as Record<string, RangeValue>)
-        : {},
+    pills: asRecord<string[]>(value.pills),
+    ranges: asRecord<RangeValue>(value.ranges),
     sortBy: Array.isArray(value.sortBy) ? value.sortBy : [],
     visibleColumns: Array.isArray(value.visibleColumns) ? value.visibleColumns : allColumnIds,
+    order: Array.isArray(value.order) ? value.order : undefined,
+    // Carried through UNVALIDATED against the declared scopes on purpose: a view
+    // written before scopes existed has none (⇒ undefined ⇒ the first declared
+    // scope at render), and one naming a since-removed scope keeps its stored id
+    // here and falls back at READ time. Resolving here would rewrite the view.
+    scope: typeof value.scope === "string" ? value.scope : undefined,
+    layout: isLayout(value.layout) ? value.layout : undefined,
   };
+}
+
+/** Every layout this build knows how to render — the guard's single source. */
+export const DATA_VIEWS_LAYOUTS: readonly DataViewsLayout[] = ["cards", "list", "board", "table"];
+
+/** Is this a layout this build knows how to render? Guards persisted JSON. */
+function isLayout(value: unknown): value is DataViewsLayout {
+  return DATA_VIEWS_LAYOUTS.includes(value as DataViewsLayout);
+}
+
+/** A persisted map, or an empty one — persisted JSON can hold anything. */
+function asRecord<V>(value: unknown): Record<string, V> {
+  return value !== null && typeof value === "object" ? (value as Record<string, V>) : {};
 }
 
 /** A saved view as consumed by the DataViews UI (FUT-89), with ownership flag. */

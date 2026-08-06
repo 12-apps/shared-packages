@@ -7,12 +7,14 @@ import { type SortFieldDefinition } from "../../layout/ContentToolbar";
 
 import { filterRows } from "./data-views-filter";
 import {
-  buildGridColumns,
-  buildRowActionsColumn,
-  computeActiveFilterCount,
-  defaultSortFields,
-  isActionsColumn,
-} from "./data-views-grid-helpers";
+  useColumnsWithActions,
+  useRenderedColumns,
+  type HideableColumn,
+} from "./data-views-columns";
+import { computeActiveFilterCount, defaultSortFields } from "./data-views-grid-helpers";
+import { resolveScope, useScopeConfigChecks, type ScopeConfig } from "./data-views-scopes";
+import { serverDerived, useServerQuery } from "./data-views-server-query";
+import { useSelection } from "./data-views-selection";
 import {
   emptyViewState,
   type DataViewColumn,
@@ -21,9 +23,12 @@ import {
   type DataViewSyncState,
   type FilterFieldConfig,
   type RangeFieldConfig,
+  type DataViewQuery,
   type RangeValue,
   type RowAction,
 } from "./data-views-types";
+
+export type { HideableColumn };
 
 /** Inputs the hook needs to own the view state + derived data. */
 interface UseDataViewsStateArgs<T extends Record<string, unknown>> {
@@ -52,12 +57,16 @@ interface UseDataViewsStateArgs<T extends Record<string, unknown>> {
    * `server.onQueryChange`. Omit for the legacy client-side behaviour.
    */
   server?: DataViewServer;
-}
-
-/** A column the user may show/hide via the toolbar's ColumnsMenu. */
-export interface HideableColumn {
-  id: string;
-  label: string;
+  /**
+   * The page-level partition rendered as tabs above the toolbar. Requires server
+   * mode: a scope is applied at the BACKEND, never in the browser.
+   */
+  scopes?: ScopeConfig[];
+  /**
+   * The row field the scopes partition by, when the host knows it — used only to
+   * reject the pill/scope clash at setup. See `assertNoScopePillOverlap`.
+   */
+  scopeFieldId?: string;
 }
 
 /** Everything the DataViewsGrid render needs; keeps the component itself thin. */
@@ -69,10 +78,18 @@ export interface DataViewsController<T extends Record<string, unknown>> {
   gridColumns: GridColumn<T>[];
   /** Columns eligible for the show/hide menu (hideable, with a text header). */
   hideableColumns: HideableColumn[];
+  /** Every column id in reading order — what the Colunas tab reorders. */
+  columnOrder: string[];
   /** Toggle one column's visibility in the current view state. */
   toggleColumn: (id: string, visible: boolean) => void;
   selectedIds: Set<string | number>;
   setSelectedIds: (ids: Set<string | number>) => void;
+  /**
+   * Add/remove ONE id from the selection. The card and board bodies both need
+   * it, so it lives here rather than being written out twice at the call sites —
+   * one selection model, one toggle, identical in every layout.
+   */
+  toggleId: (id: string | number) => void;
   selectedRows: T[];
   clearSelection: () => void;
   selectAll: () => void;
@@ -92,72 +109,26 @@ export interface DataViewsController<T extends Record<string, unknown>> {
   serverTotalCount: number;
   /** Server-mode: request a specific 1-based page (re-fetches via onQueryChange). */
   changePage: (page: number) => void;
-}
-
-/**
- * The columns the user may show/hide: explicitly hideable (not `hideable:false`,
- * which marks structural columns like the image thumbnail or actions kebab) and
- * carrying a text header to label the checkbox.
- */
-function computeHideableColumns<T extends Record<string, unknown>>(
-  columns: DataViewColumn<T>[],
-): HideableColumn[] {
-  return columns
-    .filter((col) => col.hideable !== false && typeof col.header === "string" && col.header !== "")
-    .map((col) => ({ id: col.id, label: col.header as string }));
-}
-
-/**
- * Server-mode wiring extracted from {@link useDataViewsState} (keeps it within
- * the size/complexity budget): re-fetch on every effective-query change (page
- * resets to 1) and expose `changePage` for the pagination control. Read the
- * latest `state`/`server` at fire time so an inline `server` object per render
- * doesn't loop the effect.
- */
-function useServerQuery(server: DataViewServer | undefined, state: DataViewState): {
-  changePage: (page: number) => void;
-} {
-  const emit = (page: number): void => {
-    if (!server) return;
-    server.onQueryChange({
-      search: state.search,
-      pills: state.pills,
-      ranges: state.ranges ?? {},
-      sortBy: state.sortBy,
-      page,
-      pageSize: server.pageSize,
-    });
-  };
-  const queryKey = server
-    ? JSON.stringify({ q: state.search, pills: state.pills, ranges: state.ranges ?? {}, sort: state.sortBy })
-    : "";
-  const firstQuery = useRef(true);
-  useEffect(() => {
-    if (!server) return;
-    if (firstQuery.current) {
-      firstQuery.current = false;
-      return;
-    }
-    emit(1);
-    // Emit only when the query key changes; `emit` reads fresh state at fire time.
-  }, [queryKey]);
-  return { changePage: (page: number) => emit(page) };
-}
-
-/** The controller's server-mode derived fields (or client-mode defaults). */
-function serverDerived(
-  server: DataViewServer | undefined,
-  fallbackCount: number,
-): { serverMode: boolean; serverPage: number; serverPageCount: number; serverTotalCount: number } {
-  if (!server) {
-    return { serverMode: false, serverPage: 1, serverPageCount: 1, serverTotalCount: fallbackCount };
-  }
-  return {
-    serverMode: true,
-    serverPage: server.page,
-    serverPageCount: Math.max(1, Math.ceil(server.totalCount / server.pageSize)),
-    serverTotalCount: server.totalCount,
-  };
+  /**
+   * The active scope id, RESOLVED against the declared scopes (see
+   * `resolveScope`). `undefined` when the table declares none — which is what
+   * keeps `scope` out of the emitted query for every table that never opted in.
+   */
+  scope: string | undefined;
+  /** Select a scope: re-fetches from page 1 and drops the selection. */
+  setScope: (id: string) => void;
+  /**
+   * The query the grid is currently showing. Read by Export, which hands it
+   * back to the host UNPAGINATED — so an export follows the filters rather
+   * than the 25 rows that happen to be loaded.
+   */
+  currentQuery: DataViewQuery;
+  /**
+   * Server-supplied per-scope totals, passed through verbatim, or `undefined`
+   * when the server omits them. NEVER falls back to counting `matched`: a count
+   * off the loaded page is wrong under pagination, which is the bug scopes fix.
+   */
+  scopeCounts?: Record<string, number>;
 }
 
 /**
@@ -236,32 +207,83 @@ function useStateSyncEffects(
 }
 
 /**
- * Append the auto kebab actions column unless the page already defines one. The
- * column is added when there are `rowActions` OR a bespoke `renderRowMenu` (an
- * entity's self-contained menu that owns its own popups).
+ * The seed view state: a saved view (`appliedState`) or a pristine all-columns
+ * one, with the URL-driven controls (`syncState`) merged over it so a deep-linked
+ * filter or scope is reflected on the FIRST render. Column visibility is never
+ * URL-carried, so the merge cannot wipe it.
  */
-function appendActionsColumn<T extends Record<string, unknown>>(
-  columns: DataViewColumn<T>[],
-  opts: {
-    rowActions?: RowAction<T>[];
-    rowActionsLeading?: (row: T) => React.ReactNode;
-    renderRowMenu?: (row: T) => React.ReactNode;
-    testIdPrefix: string;
-    getRowId: (row: T) => string | number;
-  },
-): DataViewColumn<T>[] {
-  const { rowActions, rowActionsLeading, renderRowMenu, testIdPrefix, getRowId } = opts;
-  if ((!rowActions && !renderRowMenu) || columns.some(isActionsColumn)) return columns;
-  return [
-    ...columns,
-    buildRowActionsColumn({
-      rowActions: rowActions ?? [],
-      leading: rowActionsLeading,
-      testIdPrefix,
-      getRowId,
-      renderRowMenu,
-    }),
-  ];
+function seedState(
+  appliedState: DataViewState | undefined,
+  syncState: DataViewSyncState | undefined,
+  allColumnIds: string[],
+): DataViewState {
+  const seed = appliedState ?? emptyViewState(allColumnIds);
+  return syncState ? { ...seed, ...syncState } : seed;
+}
+
+/**
+ * Selecting a scope: record it, then DROP the selection.
+ *
+ * A scope change renders a different result set. A selection that survived it
+ * would let a bulk action run against rows the user can no longer see — the
+ * same reason changing any other part of the query clears it.
+ */
+function makeSetScope(
+  patch: (next: Partial<DataViewState>) => void,
+  clearSelection: () => void,
+): (id: string) => void {
+  return (id) => {
+    patch({ scope: id });
+    clearSelection();
+  };
+}
+
+/**
+ * The declared column ids in the stored reading order — the same tolerance
+ * `applyOrder` uses, so the Colunas tab lists exactly what the grid renders.
+ */
+function orderedColumnIds(allColumnIds: string[], order: string[] | undefined): string[] {
+  if (!order || order.length === 0) return allColumnIds;
+  const declared = new Set(allColumnIds);
+  const kept = order.filter((id) => declared.has(id));
+  const seen = new Set(kept);
+  return [...kept, ...allColumnIds.filter((id) => !seen.has(id))];
+}
+
+/**
+ * The query the grid is currently SHOWING — the same shape `onQueryChange`
+ * emits, kept as a value so a host control (Exportar) can re-run it against the
+ * backend rather than reading the loaded rows.
+ */
+function liveQuery(
+  state: DataViewState,
+  scope: string | undefined,
+  server: DataViewServer | undefined,
+  matchedCount: number,
+): DataViewQuery {
+  return {
+    search: state.search,
+    pills: state.pills,
+    ranges: state.ranges ?? {},
+    sortBy: state.sortBy,
+    // Absent, not undefined, when the table declares no scopes.
+    ...(scope !== undefined ? { scope } : {}),
+    page: server?.page ?? 1,
+    // Client mode has one page, and it is everything that matched.
+    pageSize: server?.pageSize ?? matchedCount,
+  };
+}
+
+/** The toolbar's active sort, read off the state's FIRST sort entry. */
+function activeSortOf(
+  state: DataViewState,
+  resolvedSortFields: SortFieldDefinition[],
+): { activeSortField: string; activeSortOrder: "asc" | "desc" } {
+  const active = state.sortBy?.[0];
+  return {
+    activeSortField: active?.id ?? resolvedSortFields[0]?.value ?? "",
+    activeSortOrder: active?.dir === "desc" ? "desc" : "asc",
+  };
 }
 
 /**
@@ -286,43 +308,43 @@ export function useDataViewsState<T extends Record<string, unknown>>({
   rowActionsLeading,
   renderRowMenu,
   server,
+  scopes = [],
+  scopeFieldId,
 }: UseDataViewsStateArgs<T>): DataViewsController<T> {
-  // Append the auto kebab column unless the page defines one (see helper).
-  const columnsWithActions = useMemo(
-    () =>
-      appendActionsColumn(columns, { rowActions, rowActionsLeading, renderRowMenu, testIdPrefix, getRowId }),
-    [columns, rowActions, rowActionsLeading, renderRowMenu, testIdPrefix, getRowId],
-  );
-  const allColumnIds = useMemo(() => columnsWithActions.map((col) => col.id), [columnsWithActions]);
-  // Seed once: a saved view (`appliedState`) or a pristine all-columns state, with
-  // the URL-driven controls (`syncState`) merged over it so a deep-linked filter
-  // is reflected on first render. Column visibility is never URL-carried.
-  const [state, setState] = useState<DataViewState>(() => {
-    const seed = appliedState ?? emptyViewState(allColumnIds);
-    return syncState ? { ...seed, ...syncState } : seed;
+  useScopeConfigChecks(scopes, fields.map((field) => field.id), scopeFieldId, server !== undefined);
+  const { columnsWithActions, allColumnIds } = useColumnsWithActions(columns, {
+    rowActions,
+    rowActionsLeading,
+    renderRowMenu,
+    testIdPrefix,
+    getRowId,
   });
-  const [selectedIds, setSelectedIdsState] = useState<Set<string | number>>(new Set());
+  // Seed once — see {@link seedState}.
+  const [state, setState] = useState<DataViewState>(() =>
+    seedState(appliedState, syncState, allColumnIds),
+  );
   const [filterOpen, setFilterOpen] = useState(false);
 
   useStateSyncEffects(appliedState, syncState, state, onStateChange, setState);
 
   const patch = (next: Partial<DataViewState>): void => setState((prev) => ({ ...prev, ...next }));
   const matched = useMatchedRows(server, rows, columns, fields, rangeFields, state);
+  // Resolved at READ time, every render: a stale deep link or a saved view naming
+  // a scope that has since been removed falls back to the first declared scope
+  // instead of putting an id the backend rejects on the wire.
+  const scope = resolveScope(scopes, state.scope);
   // Server mode: re-fetch on query change (page resets to 1) + drive pagination.
-  const { changePage } = useServerQuery(server, state);
-  const gridColumns = useMemo(
-    () => buildGridColumns(columnsWithActions, state.visibleColumns, onRowClick),
-    [columnsWithActions, onRowClick, state.visibleColumns],
+  const { changePage } = useServerQuery(server, state, scope);
+  const { gridColumns, hideableColumns } = useRenderedColumns(
+    columnsWithActions,
+    state.visibleColumns,
+    onRowClick,
+    state.order,
   );
-  const hideableColumns = useMemo(() => computeHideableColumns(columnsWithActions), [columnsWithActions]);
   const toggleColumn = (id: string, visible: boolean): void =>
     setState((prev) => ({ ...prev, visibleColumns: nextVisibleColumns(prev.visibleColumns, id, visible) }));
-  const selectedRows = useMemo(
-    () => matched.filter((row) => selectedIds.has(getRowId(row))),
-    [matched, selectedIds, getRowId],
-  );
+  const selection = useSelection(matched, getRowId);
   const resolvedSortFields = sortFields ?? defaultSortFields(columns);
-  const activeSort = state.sortBy?.[0];
 
   return {
     state,
@@ -331,19 +353,21 @@ export function useDataViewsState<T extends Record<string, unknown>>({
     matched,
     gridColumns,
     hideableColumns,
+    columnOrder: orderedColumnIds(allColumnIds, state.order),
     toggleColumn,
-    selectedIds,
-    setSelectedIds: setSelectedIdsState,
-    selectedRows,
-    clearSelection: () => setSelectedIdsState(new Set()),
-    selectAll: () => setSelectedIdsState(new Set(matched.map((row) => getRowId(row)))),
+    ...selection,
     filterOpen,
     setFilterOpen,
     resolvedSortFields,
-    activeSortField: activeSort?.id ?? resolvedSortFields[0]?.value ?? "",
-    activeSortOrder: activeSort?.dir === "desc" ? "desc" : "asc",
+    ...activeSortOf(state, resolvedSortFields),
     activeFilterCount: computeActiveFilterCount(state, fields, rangeFields),
     ...serverDerived(server, matched.length),
     changePage,
+    scope,
+    setScope: makeSetScope(patch, selection.clearSelection),
+    currentQuery: liveQuery(state, scope, server, matched.length),
+    // Verbatim, or absent. See DataViewServer.scopeCounts for why there is no
+    // client-side fallback.
+    scopeCounts: server?.scopeCounts,
   };
 }
