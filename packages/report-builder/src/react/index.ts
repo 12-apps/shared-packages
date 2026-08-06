@@ -38,6 +38,14 @@ export { ReportCardList } from './report-card-list';
  * has no opinion about where the templates came from.
  */
 export { BlockTemplatePicker } from './block-template-picker';
+/**
+ * Unsaved-changes state (FUT-391). Exported because a host embedding its own
+ * editor needs the same guard, and because the browser half — ⌘S and
+ * `beforeunload` — is unreachable from this package's node test environment,
+ * so the consumer harness is the only place it can be proven wired.
+ */
+export { useUnsavedChanges } from './lib/use-unsaved-changes';
+export { isDirty } from './lib/dirty-state';
 export {
   filterReports,
   REPORT_SCOPE_LABELS,

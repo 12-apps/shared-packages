@@ -3,6 +3,7 @@ import type { ComponentType } from 'react';
 import { BlockTemplatePickerPage } from './block-template-picker';
 import { PaymentsProviderSettingsPage } from './payments-provider-settings';
 import { ReportBuilderPage } from './report-builder';
+import { UnsavedChangesPage } from './unsaved-changes';
 import { ReportCardListPage } from './report-card-list';
 import { ReportRenderPage } from './report-render';
 
@@ -58,5 +59,11 @@ export const PAGES: readonly HarnessPage[] = [
     title: 'Chart + table fallback',
     pkg: '@12-apps/report-builder/react',
     Component: ReportRenderPage,
+  },
+  {
+    slug: 'unsaved-changes',
+    title: 'Unsaved changes',
+    pkg: '@12-apps/report-builder',
+    Component: UnsavedChangesPage,
   },
 ];
