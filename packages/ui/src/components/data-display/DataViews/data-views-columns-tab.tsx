@@ -54,6 +54,10 @@ export function ColumnsTab({
   const [dragId, setDragId] = useState<string | null>(null);
   const byId = new Map(columns.map((column) => [column.id, column]));
   const ordered = order.map((id) => byId.get(id)).filter((column): column is HideableColumn => Boolean(column));
+  // Counted against `columns`, which is the HIDEABLE set — `visibleColumns`
+  // also carries the locked ones (a `hideable: false` id like the row's
+  // identifier), and counting it whole reads "9 de 8 visíveis".
+  const visibleHideableCount = visibleColumns.filter((id) => byId.has(id)).length;
 
   const dropOn = (id: string): void => {
     if (!dragId || dragId === id) return;
@@ -68,7 +72,7 @@ export function ColumnsTab({
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 1.5, py: 1 }}>
         <Text variant="caption" as="span">
           <Box component="span" sx={{ color: "text.secondary" }} data-testid={`${testIdPrefix}-columns-count`}>
-            <strong>{visibleColumns.length}</strong> de {columns.length} visíveis
+            <strong>{visibleHideableCount}</strong> de {columns.length} visíveis
           </Box>
         </Text>
         <Box sx={{ display: "flex", gap: 1 }}>

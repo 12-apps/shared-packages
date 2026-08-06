@@ -9,8 +9,13 @@ import { Breadcrumbs } from "../../navigation/Breadcrumbs";
 import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 
+import { BaseCard } from "./base-card";
 import { DataViewsTableBase } from "./DataViewsTableBase";
+import type { BoardConfig } from "./DataViewsBoard";
+import type { DataViewExport } from "./data-views-export";
+import type { ScopeConfig } from "./data-views-scopes";
 import type {
+  DataViewCardSelection,
   DataViewColumn,
   DataViewPersistence,
   DataViewRouter,
@@ -208,6 +213,99 @@ const rowActions: RowAction<PedidoRow>[] = [
   },
 ];
 
+/**
+ * ONE state-machine definition drives both the scope tabs and the board
+ * columns, so the two can never drift into disagreeing about what states exist.
+ */
+const SITUACOES = [
+  { value: "Em aberto", label: "Em aberto" },
+  { value: "Cancelado", label: "Cancelado" },
+] as const;
+
+/**
+ * A scope PARTITIONS the page and is exclusive; a pill NARROWS inside it and is
+ * multi-select. That is why these tabs are not just another
+ * `FilterFieldConfig`, and why their counts have to come off the response —
+ * under pagination no client can compute a whole-query count.
+ */
+const scopes: ScopeConfig[] = [
+  { id: "todos", label: "Todos" },
+  ...SITUACOES.map((s) => ({ id: s.value, label: s.label, predicate: { situacao: s.value } })),
+];
+
+/**
+ * Counts for every scope, computed over search + pills + ranges but IGNORING
+ * the active scope — otherwise selecting "Cancelado" would zero every other tab
+ * and the strip would tell the user their other buckets had emptied.
+ *
+ * Whole-query counts, not page counts: `totalCount` is 34 while the page holds
+ * 20, so these are what the server reports, not what the browser can see.
+ */
+const scopeCounts: Record<string, number> = { todos: TOTAL_COUNT, "Em aberto": 12, Cancelado: 22 };
+
+/** The board groups by the same field the scopes partition by. */
+const board: BoardConfig<PedidoRow> = {
+  groupBy: "situacao",
+  groups: SITUACOES.map((s) => ({ value: s.value, label: s.label })),
+  sumBy: "valor",
+  // The page's own formatter, so the board prints money in the store's
+  // currency rather than inventing a second convention.
+  formatSum: (total) => `R$ ${total.toFixed(2).replace(".", ",")}`,
+  // A row whose state the front end does not declare is COLLECTED here, never
+  // dropped — a pedido must not vanish because the backend grew a new state.
+  extraLabel: "Sem situação",
+};
+
+/** The entity's own card, shared by the Cards and Quadro layouts. */
+function renderPedidoCard(row: PedidoRow, selection: DataViewCardSelection): React.JSX.Element {
+  return (
+    <BaseCard
+      title={row.pedido}
+      subtitle={`${row.cliente} · ${row.total}`}
+      selected={selection.selected}
+      onToggleSelect={selection.toggle}
+      imageFallback={<Box sx={{ fontSize: "1.5rem" }}>🧾</Box>}
+    >
+      <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 0.5 }}>
+        <Chip label={row.pagamento} size="small" variant="outlined" color={PAGAMENTO_COLOR[row.pagamento]} />
+        <Chip label={row.metodo} size="small" variant="outlined" />
+      </Box>
+    </BaseCard>
+  );
+}
+
+/** Lista is one full-width row per pedido — denser than a card, richer than a cell. */
+function renderPedidoListRow(row: PedidoRow, selection: DataViewCardSelection): React.JSX.Element {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 2,
+        px: 2,
+        py: 1.25,
+        borderBottom: 1,
+        borderColor: "divider",
+        bgcolor: selection.selected ? "action.selected" : undefined,
+      }}
+    >
+      <Box sx={{ fontWeight: 600, minWidth: 96 }}>{row.pedido}</Box>
+      <Box sx={{ color: "text.secondary", minWidth: 150 }}>{row.data}</Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>{row.itens}</Box>
+      <Box sx={{ minWidth: 90, textAlign: "right" }}>{row.total}</Box>
+      <Chip label={row.situacao} size="small" variant="outlined" color={SITUACAO_COLOR[row.situacao]} />
+    </Box>
+  );
+}
+
+/**
+ * Exportar. The grid hands back the live query with `page: 1` and `pageSize`
+ * widened to the whole matched total — "everything this filter selects", not
+ * the loaded page — plus the visible columns in the operator's current order.
+ * The host re-queries and writes the file; the grid never fetches.
+ */
+const exportConfig: DataViewExport = { onExport: fn() };
+
 /** Inert stubs: a story owns no backend and no router. */
 const persistence: DataViewPersistence = {
   create: () => Promise.resolve({ ok: true }),
@@ -283,6 +381,7 @@ const base = {
   rowActions,
   persistence,
   router,
+  exportConfig,
   getRowId: (row: PedidoRow) => row.pedido,
   testIdPrefix: "pedidos",
   // Explicit spies, not left to preview.tsx's `^on[A-Z].*` argTypesRegex —
@@ -329,6 +428,72 @@ export const ServerMode: Story = {
       onQueryChange: fn(),
     },
   },
+  render: screen,
+};
+
+/**
+ * The full screen: scope tabs above the toolbar, and every format the Exibir
+ * panel offers — Tabela, Lista, Cards and Quadro — plus row height.
+ *
+ * Scopes are server mode only, because their counts are whole-query counts the
+ * browser cannot compute under pagination. Switching format or row height is
+ * presentation and emits NO query; switching scope does.
+ */
+export const ScopesAndBoard: Story = {
+  args: {
+    ...base,
+    alwaysShowSearch: true,
+    inlineFilters: true,
+    scopes,
+    scopeFieldId: "situacao",
+    board,
+    renderCard: renderPedidoCard,
+    renderListRow: renderPedidoListRow,
+    server: {
+      totalCount: TOTAL_COUNT,
+      page: 1,
+      pageSize: ROWS.length,
+      scopeCounts,
+      onQueryChange: fn(),
+    },
+  },
+  render: screen,
+};
+
+/**
+ * The Quadro (board) layout: the loaded page as columns of the entity's card.
+ *
+ * Its counts are the PAGE's, not the query's — the header says "Nesta página"
+ * precisely so a column reading 8 is not mistaken for a total of 8 when the
+ * server holds 34.
+ */
+export const Board: Story = {
+  args: { ...ScopesAndBoard.args, defaultLayout: "board" },
+  render: screen,
+};
+
+/** The Lista layout: one full-width, entity-rendered row per pedido. */
+export const List: Story = {
+  args: { ...ScopesAndBoard.args, defaultLayout: "list" },
+  render: screen,
+};
+
+/**
+ * The Cards layout: the entity's own tile, and the one format whose density
+ * control counts cards per line rather than row height.
+ */
+export const Cards: Story = {
+  args: { ...ScopesAndBoard.args, defaultLayout: "cards" },
+  render: screen,
+};
+
+/**
+ * The Tabela layout, stated explicitly rather than relied on as the default —
+ * all four formats then have a story, and a regression in the default cannot
+ * hide behind one of them.
+ */
+export const Table: Story = {
+  args: { ...ScopesAndBoard.args, defaultLayout: "table" },
   render: screen,
 };
 
