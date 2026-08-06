@@ -3,6 +3,7 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
+import { useState } from "react";
 
 import { Chip } from "../Chip";
 import { Breadcrumbs } from "../../navigation/Breadcrumbs";
@@ -306,12 +307,7 @@ function renderPedidoListRow(row: PedidoRow, selection: DataViewCardSelection): 
  */
 const exportConfig: DataViewExport = { onExport: fn() };
 
-/** Inert stubs: a story owns no backend and no router. */
-const persistence: DataViewPersistence = {
-  create: () => Promise.resolve({ ok: true }),
-  update: () => Promise.resolve({ ok: true }),
-  remove: () => Promise.resolve({ ok: true }),
-};
+/** A story owns no router. */
 const router: DataViewRouter = { syncViewParam: () => {}, refresh: () => {} };
 
 /**
@@ -379,7 +375,6 @@ const base = {
   rangeFields,
   views,
   rowActions,
-  persistence,
   router,
   exportConfig,
   getRowId: (row: PedidoRow) => row.pedido,
@@ -406,15 +401,57 @@ const base = {
   onVisibleRowsChange: fn(),
 } satisfies Partial<React.ComponentProps<typeof DataViewsTableBase<PedidoRow>>>;
 
-function screen(args: React.ComponentProps<typeof DataViewsTableBase<PedidoRow>>): React.JSX.Element {
+/**
+ * The views live in STATE, and `persistence` writes to that state.
+ *
+ * Stubs that resolve `{ ok: true }` over a frozen `const views` look wired but
+ * are not: "Definir como padrão", "Fixar", "Compartilhar" and "Excluir visão"
+ * all call through correctly and then nothing on screen can change, because
+ * there is nothing for them to change. A story that ships those controls has
+ * to own the list they act on, or it is demonstrating dead buttons.
+ */
+function PedidosScreen(
+  args: React.ComponentProps<typeof DataViewsTableBase<PedidoRow>>,
+): React.JSX.Element {
+  const [liveViews, setLiveViews] = useState<SavedViewSummary[]>(args.views);
+
+  const persistence: DataViewPersistence = {
+    create: (payload) => {
+      const id = `v${liveViews.length + 1}-${payload.name.toLowerCase().replace(/\W+/g, "-")}`;
+      setLiveViews((prev) => [
+        // Only one view can be the default, so setting it clears the others.
+        ...prev.map((view) => (payload.isDefault ? { ...view, isDefault: false } : view)),
+        { ...payload, id, description: payload.description ?? null, isOwner: true },
+      ]);
+      return Promise.resolve({ ok: true });
+    },
+    update: (id, changes) => {
+      setLiveViews((prev) =>
+        prev.map((view) => {
+          if (view.id === id) return { ...view, ...changes };
+          return changes.isDefault ? { ...view, isDefault: false } : view;
+        }),
+      );
+      return Promise.resolve({ ok: true });
+    },
+    remove: (id) => {
+      setLiveViews((prev) => prev.filter((view) => view.id !== id));
+      return Promise.resolve({ ok: true });
+    },
+  };
+
   return (
     <Box>
       <PedidosHeader />
       <Box sx={{ px: 3, pb: 3 }}>
-        <DataViewsTableBase<PedidoRow> {...args} />
+        <DataViewsTableBase<PedidoRow> {...args} views={liveViews} persistence={persistence} />
       </Box>
     </Box>
   );
+}
+
+function screen(args: React.ComponentProps<typeof DataViewsTableBase<PedidoRow>>): React.JSX.Element {
+  return <PedidosScreen {...args} />;
 }
 
 /** The screen as it loads: no view applied, filtering in the browser. */

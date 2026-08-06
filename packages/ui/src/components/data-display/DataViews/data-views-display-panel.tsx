@@ -234,8 +234,12 @@ function ViewsBody({
   onBack: () => void;
   testIdPrefix: string;
 }): React.JSX.Element {
-  if (actionsFor) {
-    return <ViewActions view={actionsFor} handlers={nav} onBack={onBack} testIdPrefix={testIdPrefix} />;
+  // Resolve against the LIVE list, not the object captured when the kebab was
+  // clicked: toggling "Fixar" or "Compartilhar" replaces the view in `views`,
+  // and a held snapshot would keep showing the state from before the click.
+  const live = actionsFor ? nav.views.find((view) => view.id === actionsFor.id) : undefined;
+  if (live) {
+    return <ViewActions view={live} handlers={nav} onBack={onBack} testIdPrefix={testIdPrefix} />;
   }
   return <ViewsList handlers={nav} onOpenActions={onOpenActions} testIdPrefix={testIdPrefix} />;
 }

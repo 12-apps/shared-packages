@@ -17,7 +17,8 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
-import StarOutlineRoundedIcon from "@mui/icons-material/StarOutlineRounded";
+import StarOutlineRoundedIcon from "@mui/icons-material/StarOutlined";
+import StarOutlineRoundedIcon2 from "@mui/icons-material/StarOutlineRounded";
 import { IconButton } from "@mui/material";
 
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
@@ -104,6 +105,17 @@ export function ViewsList({
               <Box component="span" sx={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {view.name}
               </Box>
+              {/* What the row-menu toggles DID, readable without opening it:
+                  a view set as default, pinned or shared says so here. */}
+              {view.isDefault && (
+                <StarOutlineRoundedIcon fontSize="small" sx={{ color: "warning.main" }} titleAccess="Padrão" />
+              )}
+              {view.pinned && (
+                <PushPinOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} titleAccess="Fixada" />
+              )}
+              {view.shared && (
+                <GroupOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} titleAccess="Compartilhada" />
+              )}
               {active && <CheckRoundedIcon fontSize="small" />}
             </Box>
             <IconButton
@@ -144,7 +156,7 @@ export function ViewActions({
   const { onEditView, onPatchView, onDeleteView } = handlers;
   const action = (
     key: string,
-    Icon: typeof StarOutlineRoundedIcon,
+    Icon: typeof StarOutlineRoundedIcon2,
     label: string,
     onClick: () => void,
     opts: { on?: boolean; danger?: boolean } = {},
@@ -184,7 +196,7 @@ export function ViewActions({
       </Box>
       <Box sx={{ my: 0.5, borderTop: 1, borderColor: "divider" }} />
       {action("edit", EditOutlinedIcon, "Renomear e editar", () => onEditView(view))}
-      {action("default", StarOutlineRoundedIcon, "Definir como padrão", () => onPatchView(view, { isDefault: !view.isDefault }), { on: view.isDefault })}
+      {action("default", StarOutlineRoundedIcon2, "Definir como padrão", () => onPatchView(view, { isDefault: !view.isDefault }), { on: view.isDefault })}
       {action("pin", PushPinOutlinedIcon, "Fixar na barra lateral", () => onPatchView(view, { pinned: !view.pinned }), { on: view.pinned })}
       {action("share", GroupOutlinedIcon, "Compartilhar com a equipe", () => onPatchView(view, { shared: !view.shared }), { on: view.shared })}
       <Box sx={{ my: 0.5, borderTop: 1, borderColor: "divider" }} />
