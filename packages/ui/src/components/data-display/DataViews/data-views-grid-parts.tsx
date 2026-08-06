@@ -22,7 +22,8 @@ import type { DataViewExport } from "./data-views-export";
 import { DataViewsEmpty } from "./data-views-empty";
 import { DataViewsPagination } from "./data-views-pagination";
 import type { BoardConfig } from "./DataViewsBoard";
-import { DataViewsScopeTabs, type ScopeConfig } from "./data-views-scopes";
+import { type ScopeConfig } from "./data-views-scopes";
+import { ScopeTabsSlot } from "./data-views-scope-tabs";
 import { togglePillValues } from "./data-views-grid-helpers";
 import type {
   DataViewCardSelection,
@@ -235,6 +236,11 @@ interface GridShellProps<T extends Record<string, unknown>> {
   renderListRow?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
   /** The page-level partition rendered as tabs above the toolbar. */
   scopes?: ScopeConfig[];
+  /**
+   * The row field the scopes partition by. Compared against the board's
+   * `groupBy` so the two are not shown as the same partition twice.
+   */
+  scopeFieldId?: string;
   /** Per-sort-field value kind, so directions read in the column's own terms. */
   sortKinds?: Record<string, string>;
   /** The saved-view chrome bracketing the Exibir panel. */
@@ -289,14 +295,6 @@ function ShellStack<T extends Record<string, unknown>>({
     <TableFilter open={c.filterOpen} onOpenChange={c.setFilterOpen} hasActiveFilters={c.activeFilterCount > 0}>
       <Stack spacing={0} data-testid={dataTestId ? `${dataTestId}-container` : undefined}>
         <GridHeaderRow title={props.title} headerActions={props.headerActions} testIdPrefix={testIdPrefix} />
-        {/* Renders nothing (and reserves nothing) for an empty scope list. */}
-        <DataViewsScopeTabs
-          scopes={scopes}
-          value={c.scope}
-          onChange={c.setScope}
-          counts={c.scopeCounts}
-          testIdPrefix={testIdPrefix}
-        />
         <ShellToolbar
           c={c}
           rows={props.rows}
@@ -320,6 +318,15 @@ function ShellStack<T extends Record<string, unknown>>({
           compactControls={showInline && split.compactControls}
           counterHidden={showInline && split.counterHidden}
           showInline={showInline}
+        />
+        <ScopeTabsSlot
+          scopes={scopes}
+          scopeFieldId={props.scopeFieldId}
+          board={props.board}
+          value={c.scope}
+          onChange={c.setScope}
+          counts={c.scopeCounts}
+          testIdPrefix={testIdPrefix}
         />
         <TableFilter.Layout>
           <TableFilter.Main>
