@@ -46,6 +46,7 @@ const NO_COLLAPSE = {
   counterHidden: false,
   searchCollapsed: false,
   clearAllHidden: false,
+  searchTakeover: false,
   barRef: { current: null },
 };
 

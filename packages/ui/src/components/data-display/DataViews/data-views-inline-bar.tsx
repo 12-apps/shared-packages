@@ -15,13 +15,12 @@
  * the panel is a column of stacked fields, this is a row of pills, and the only
  * thing they share is the prop shape they are both driven by.
  */
-import FilterAltOffRoundedIcon from "@mui/icons-material/FilterAltOffRounded";
-import { Box, Tooltip } from "@mui/material";
+import { Box } from "@mui/material";
 import { useState } from "react";
 
-import { Button } from "../../form/Button";
 import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 
+import { ClearAllControl, CloseSearchControl } from "./data-views-bar-controls";
 import type { GridFilterPanelProps } from "./data-views-filter-panel";
 import { MoreFilters } from "./data-views-more-filters";
 import type { OverflowField, OverflowSplit } from "./data-views-overflow";
@@ -39,6 +38,7 @@ function SearchSlot({
   onSearchChange,
   collapsed,
   expanded,
+  fill,
   onOpen,
   onEscape,
   testIdPrefix,
@@ -47,6 +47,8 @@ function SearchSlot({
   onSearchChange: (value: string) => void;
   collapsed: boolean;
   expanded: boolean;
+  /** The box owns the cluster alone, so it may shrink below its usual floor. */
+  fill: boolean;
   onOpen: () => void;
   onEscape: () => void;
   testIdPrefix: string;
@@ -63,6 +65,7 @@ function SearchSlot({
       testId={`${testIdPrefix}-search-all`}
       autoFocus={expanded}
       onEscape={onEscape}
+      fill={fill}
     />
   );
 }
@@ -144,43 +147,43 @@ function InlineControl<T extends Record<string, unknown>>({
 }
 
 /**
- * "Limpar" — one gesture back to the unfiltered list.
+ * WHICH OF THE SEARCH'S THREE STATES THE BAR IS IN.
  *
- * Present ONLY while something is applied, and last in the cluster, because it
- * is destructive and must never be where a filter control was a moment ago.
- * Each pill already carries its own ✕; this is the other job — six applied
- * filters is six ✕ hunts, and the operator who wants "show me everything
- * again" has no way to say it.
+ * Resting, expanded-and-sharing, or expanded-and-owning-the-cluster. They were
+ * one boolean until a phone showed why they are not:
  *
- * Loses its label on the same rung Exibir/Exportar lose theirs, and keeps a
- * tooltip when it does: it is one of the two controls (with the search) whose
- * icon has to carry the whole meaning on a phone.
+ * - `fill` — an expanded box drops its usual 200px floor and takes whatever the
+ *   cluster has. That floor is right for a box that lives on the row; it is
+ *   wrong for one expanded into a cluster the ladder sized for an icon, where
+ *   insisting on it made the row scroll sideways (154px of overhang at 320px,
+ *   84px at 390px, 42px at 500px).
+ * - `takesOver` — the narrower case, where shrinking has run out of road and
+ *   what is left would be too small to read. Only then do the filters stand
+ *   down. A large phone has room to share, and evicting them there cost the
+ *   operator their filters for nothing.
+ *
+ * Once CLICKED the box stays open until Escape or its ✕, so typing is never
+ * interrupted by a re-measure.
  */
-function ClearAllControl({
-  onClearAll,
-  compact,
-  testIdPrefix,
-}: {
-  onClearAll: () => void;
-  compact: boolean;
-  testIdPrefix: string;
-}): React.JSX.Element {
-  const button = (
-    <Button
-      variant="outline"
-      size="sm"
-      color="neutral"
-      onClick={onClearAll}
-      dataTestId={`${testIdPrefix}-clear-all`}
-      aria-label="Limpar filtros"
-    >
-      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
-        <FilterAltOffRoundedIcon fontSize="small" />
-        {!compact && <Box component="span">Limpar</Box>}
-      </Box>
-    </Button>
-  );
-  return compact ? <Tooltip title="Limpar filtros">{button}</Tooltip> : button;
+function useSearchMode<T extends Record<string, unknown>>(
+  split: OverflowSplit<T>,
+): {
+  showBox: boolean;
+  expanded: boolean;
+  fill: boolean;
+  takesOver: boolean;
+  open: () => void;
+  close: () => void;
+} {
+  const [searchOpen, setSearchOpen] = useState(false);
+  return {
+    showBox: !split.searchCollapsed || searchOpen,
+    expanded: searchOpen,
+    fill: split.searchCollapsed && searchOpen,
+    takesOver: searchOpen && split.searchTakeover,
+    open: () => setSearchOpen(true),
+    close: () => setSearchOpen(false),
+  };
 }
 
 /**
@@ -216,11 +219,8 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
   // `RESERVED` prices the counter and Exibir/Exportar, so measuring only the
   // controls would charge for that furniture a second time and collapse the
   // ladder while the row still had hundreds of free pixels.
-  const { inline, overflow, searchCollapsed, compactControls, clearAllHidden } = split;
-  // Expanded by the operator: a collapsed search that was CLICKED stays open
-  // until Escape, so typing is never interrupted by a re-measure.
-  const [searchOpen, setSearchOpen] = useState(false);
-  const showBox = !searchCollapsed || searchOpen;
+  const { inline, overflow, compactControls, clearAllHidden } = split;
+  const { showBox, expanded, fill, takesOver, open, close } = useSearchMode(split);
   return (
     <Box
       data-testid={`${testIdPrefix}-inline-filters`}
@@ -239,11 +239,14 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
         search={search}
         onSearchChange={onSearchChange}
         collapsed={!showBox}
-        expanded={searchOpen}
-        onOpen={() => setSearchOpen(true)}
-        onEscape={() => setSearchOpen(false)}
+        expanded={expanded}
+        fill={fill}
+        onOpen={open}
+        onEscape={close}
         testIdPrefix={testIdPrefix}
       />
+      {takesOver && <CloseSearchControl onClose={close} testIdPrefix={testIdPrefix} />}
+      {!takesOver && (
       <FilterSlots
         inline={inline}
         overflow={overflow}
@@ -259,6 +262,7 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
         clearAllHidden={clearAllHidden}
         testIdPrefix={testIdPrefix}
       />
+      )}
     </Box>
   );
 }

@@ -143,7 +143,7 @@ function OverflowRange<T extends Record<string, unknown>>({
         onChange={onChange}
         testId={`${testIdPrefix}-more-${field.id}`}
       />
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
         {(["min", "max"] as const).map((bound, index) => (
           <Box key={bound} sx={{ display: "contents" }}>
             {index === 1 && <Box component="span" sx={{ color: "text.disabled" }}>–</Box>}
@@ -156,7 +156,13 @@ function OverflowRange<T extends Record<string, unknown>>({
               value={value[bound] ?? ""}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => set(bound, event.target.value)}
               sx={{
-                width: "100%",
+                // `flex:1` + `minWidth:0` rather than `width:100%`. A native
+                // date input reports a wide intrinsic minimum (its dd/mm/aaaa
+                // mask plus the picker glyph), and a flex child defaults to
+                // min-width:auto — so two of them plus the dash refused to
+                // shrink and the whole panel scrolled sideways.
+                flex: "1 1 0",
+                minWidth: 0,
                 px: 1,
                 py: 0.75,
                 border: 1,

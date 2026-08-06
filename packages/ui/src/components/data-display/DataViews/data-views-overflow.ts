@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { estimateWidth, GAP, isRangeSet, pillText, RESERVED } from "./data-views-overflow-costs";
 import type { FilterFieldConfig, RangeFieldConfig, RangeValue } from "./data-views-types";
 
 /**
@@ -73,47 +74,16 @@ export interface OverflowSplit<T extends Record<string, unknown>> {
    * "Mais", neither of which has anywhere else to be.
    */
   clearAllHidden: boolean;
+  /**
+   * Expanding the magnifier must take the whole cluster, filters and all.
+   *
+   * Only on the rungs where what is left over would be too narrow to read —
+   * on a large phone the box simply shrinks and the filters stay, which is why
+   * this is its own answer rather than `searchCollapsed` reused.
+   */
+  searchTakeover: boolean;
   /** Attach to the toolbar row being measured. */
   barRef: React.RefObject<HTMLDivElement | null>;
-}
-
-/**
- * Rough rendered width of a control, in px.
- *
- * An ESTIMATE from the label text rather than a real measurement, deliberately:
- * measuring the true width needs every control mounted first, and mounting them
- * to decide whether to mount them is the layout thrash this hook exists to
- * avoid. The estimate only has to rank controls and find the cut point — being
- * a few px out moves the cut by at most one control, and the overflow catches it.
- */
-function estimateWidth(text: string, extra: number): number {
-  /**
-   * ~7.6px per character at the toolbar's font size, plus 76px of chrome:
-   * horizontal padding, the border, and the dropdown chevron. The chrome used
-   * to be 52, which under-priced every control by roughly a chevron's width —
-   * six of them then "fitted" a row they overflowed, and because they are flex
-   * children the row paid for it by squeezing labels to "D…" and "V…" rather
-   * than by shedding a control into the overflow.
-   *
-   * Deliberately generous: over-pricing sheds one control too early, which the
-   * "Mais" button absorbs invisibly. Under-pricing breaks the line.
-   */
-  return Math.round(text.length * 7.6) + 76 + extra;
-}
-
-/** Is a range bounded at either end? */
-function isRangeSet(range: RangeValue | undefined): boolean {
-  return Boolean(range && (range.min !== undefined || range.max !== undefined));
-}
-
-/** The label a pill actually renders, which is what decides its width. */
-function pillText<T extends Record<string, unknown>>(field: OverflowField<T>, values: string[]): string {
-  if (values.length === 0) return field.label;
-  if (values.length === 1) {
-    const option = field.pill?.options.find((entry) => entry.value === values[0]);
-    return `${field.label}: ${option?.label ?? values[0]}`;
-  }
-  return `${field.label}: ${values.length}`;
 }
 
 /** Every declared control, pills first, in the order the bar renders them. */
@@ -127,41 +97,6 @@ export function toOverflowFields<T extends Record<string, unknown>>(
   ];
 }
 
-/** Fixed toolbar furniture the filters have to fit around, in px. */
-const RESERVED = {
-  /** The search box never shrinks below this. */
-  search: 200,
-  /** The "N de N" counter. */
-  counter: 96,
-  /** Exibir + Exportar WITH their text labels. */
-  right: 216,
-  /**
-   * The same two controls as icons only — step 2 of the ladder.
-   *
-   * MEASURED at 133px for the pair (66 each: a Button's minimum tap target is
-   * a good deal wider than the 20px glyph inside it), so the old 96 under-priced
-   * them by a third and the row went on believing it had room it did not.
-   */
-  rightCompact: 140,
-  /** What step 4 leaves behind: the search as a bare magnifier. */
-  searchIcon: 44,
-  /** The "Mais" button, only charged when there IS an overflow. */
-  overflowButton: 104,
-  /**
-   * "Limpar", only charged when there IS something to clear.
-   *
-   * It appears exactly when the row is at its widest — every applied filter
-   * has a longer label than the idle one it replaced — so leaving it unpriced
-   * would break the line at the one moment the operator most needs it.
-   * Measured at 64 as an icon; 72 with slack.
-   */
-  clearAll: 72,
-  /** Gaps + the row's own padding. */
-  chrome: 64,
-} as const;
-
-/** The gap between two controls. */
-const GAP = 8;
 
 /** Observe the bar's width. Returns 0 until the first measurement lands. */
 function useBarWidth(): { barRef: React.RefObject<HTMLDivElement | null>; width: number } {
@@ -227,11 +162,6 @@ function splitFilters<T extends Record<string, unknown>>(
   const active = all.filter((field) => isActiveField(field, pills, ranges));
   const idle = all.filter((field) => !isActiveField(field, pills, ranges));
 
-  // AN APPLIED FILTER NEVER HIDES — it is not merely ranked first, it is
-  // exempt. Applying a value LENGTHENS a control ("Método: Pix"), so ranking
-  // alone still loses the one filter the operator just set whenever it no
-  // longer fits on its own. The bar wraps; a filter you cannot see does not
-  // announce itself at all.
   // "Limpar" rides the end of the cluster whenever anything is applied.
   const clearCost = active.length > 0 ? RESERVED.clearAll + GAP : 0;
   let available =
@@ -304,6 +234,7 @@ function computeSplit<T extends Record<string, unknown>>(
       counterHidden: false,
       searchCollapsed: false,
       clearAllHidden: false,
+      searchTakeover: false,
     };
   }
   const { inline, overflow, used } = splitFilters(all, pills, ranges, width);
@@ -327,8 +258,26 @@ function computeSplit<T extends Record<string, unknown>>(
   // on there BEING an overflow, because with no panel the footer does not
   // exist and dropping this would strand the operator.
   const clearAllHidden = counterHidden && overflow.length > 0;
+  // What the keyword box would get if the operator expanded the magnifier and
+  // everything else stayed put. `searchCollapsed` is a different question — it
+  // asks whether the box fits at its PREFERRED 200px, and is deliberately
+  // pessimistic — so reusing it to decide the takeover evicted the filters on
+  // screens where the box had plenty of room to simply shrink.
+  const searchBoxRoom = base - (counterHidden ? 0 : RESERVED.counter) - rightCost;
+  // Below this a box is too narrow to read what you typed into it, and shrinking
+  // further buys nothing; that is the only point at which taking the whole
+  // cluster is worth losing the filters.
+  const searchTakeover = searchCollapsed && searchBoxRoom < RESERVED.usableSearch;
 
-  return { inline, overflow, compactControls, counterHidden, searchCollapsed, clearAllHidden };
+  return {
+    inline,
+    overflow,
+    compactControls,
+    counterHidden,
+    searchCollapsed,
+    clearAllHidden,
+    searchTakeover,
+  };
 }
 
 /**

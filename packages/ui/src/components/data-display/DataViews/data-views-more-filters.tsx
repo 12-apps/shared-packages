@@ -233,7 +233,11 @@ export function MoreFilters<T extends Record<string, unknown>>({
       >
         <Box data-testid={`${rest.testIdPrefix}-more-panel`}>
           <MoreHeading />
-          <Box sx={{ maxHeight: 320, overflowY: "auto", p: 1.5 }}>
+          {/* overflowX hidden, not auto: this panel is a fixed 300px and its
+              contents are told to shrink into it. A horizontal scrollbar here
+              means something refused to, which is a bug to fix rather than a
+              scrollbar to live with. */}
+          <Box sx={{ maxHeight: 320, overflowY: "auto", overflowX: "hidden", p: 1.5, minWidth: 0 }}>
             {fields.map((field) => (
               <MoreGroup key={field.id} field={field} {...rest} />
             ))}
