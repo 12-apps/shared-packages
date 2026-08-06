@@ -12,7 +12,11 @@ import { expect, test } from '@playwright/test';
 const PROVIDERS = ['pagbank', 'stone', 'infinitepay', 'stripe'] as const;
 
 test('the published adapters render as cards in the published settings page', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('#/payments-provider-settings');
+
+  // The shell renders a page per published surface; addressing it by slug means
+  // this spec does not move when the nav grows.
+  await expect(page.getByTestId('harness-page')).toHaveAttribute('data-page', 'payments-provider-settings');
 
   await expect(page.getByTestId('payments-provider-settings')).toBeVisible();
 
