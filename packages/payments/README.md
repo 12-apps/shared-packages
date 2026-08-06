@@ -128,7 +128,10 @@ creates/repairs the links; `prisma:sync:check` is the CI drift gate.
 - Webhook idempotency: inbox dedup on `(merchant, provider, eventId)`.
 - Forward-only status: no regressions, no contradictory terminal overwrites.
 - Fail-closed webhooks: live merchants without a webhook secret reject every
-  delivery; only stub mode may skip verification.
+  delivery. The one branch that skips verification is stub mode, and every
+  adapter reaches it through the same `stubDeliveryTrusted` predicate — a
+  SANDBOX credential on a deployment that explicitly granted stub mode, and
+  nothing else.
 - Charge identity never crosses merchants (create conflicts throw; upserts
   are ownership-scoped).
 - **Money is server-authoritative**: the browser sends a draft carrying a
@@ -137,8 +140,13 @@ creates/repairs the links; `prisma:sync:check` is the CI drift gate.
   tampered client cannot underpay or attach a payment to another order.
 - **Stub mode can never reach production**: it is a construction-time option
   (`allowStubMode`, default off), applies only to SANDBOX configs, is absent
-  from the settings payload type, and is stripped again on the credential
-  read path. A PRODUCTION merchant cannot be made to report fake payments.
+  from the settings payload type, and is re-decided on every credential
+  read — the stored `stub` column is never trusted on its own, so a row
+  written by a dev deployment cannot fake payments on a live one. Resolve
+  the option with `resolveStubMode(process.env)`: it demands an explicit
+  `PAYMENTS_STUB=1` and THROWS in `NODE_ENV=production`. Do not infer it
+  from an unrelated variable — inferring it is what let an unsigned webhook
+  authenticate itself (FUT-696).
 - **One active provider, enforced end to end**: `ProviderConfigStore`
   requires an atomic `setActiveProvider` (no sequential fallback exists),
   the Prisma adapter implements it in a transaction, and a partial unique

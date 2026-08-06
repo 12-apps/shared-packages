@@ -1,5 +1,6 @@
 import type { PaymentProviderAdapter } from '../core/provider';
 import { ProviderRequestError } from '../core/errors';
+import { stubDeliveryTrusted } from '../core/stub-mode';
 import type { ChargeInput, ChargeSnapshot, ResolvedCredentials } from '../core/types';
 import { pagbankDecline, type PagBankPaymentRawData } from './pagbank-declines';
 import {
@@ -276,7 +277,7 @@ const createCharge: PaymentProviderAdapter['createCharge'] = async (input, crede
 const webhook: PaymentProviderAdapter['webhook'] = {
   async verify(delivery, credentials) {
     const secret = credentials.fields['webhookToken'];
-    if (!secret) return credentials.stub === true;
+    if (!secret) return stubDeliveryTrusted(credentials);
     const presented = delivery.headers['x-authenticity-token'];
     if (!presented) return false;
     return secureEquals(presented, sha256Hex(`${secret}-${delivery.rawBody}`));

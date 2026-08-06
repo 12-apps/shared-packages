@@ -39,6 +39,17 @@ export interface ActivationContext {
    */
   returnUrl?: MerchantWebhookUrlResolver;
   /**
+   * Whether this deployment may run adapters in stub mode — from
+   * `resolveStubMode(process.env)`, never inferred. Defaults to OFF.
+   *
+   * A stubbed verification charge answers PAID without asking an acquirer
+   * anything, and a pass is what stamps `chargeVerifiedAt` and lets the
+   * provider be switched on. On a deployment that takes real money, a
+   * left-over `stub=true` row would otherwise activate a connection nothing
+   * was ever charged through — see `credentialsForVerification`.
+   */
+  allowStubMode?: boolean;
+  /**
    * Mint a card-encryption public key with the merchant's OWN credentials
    * when none is stored — the PagBank lazy backfill (an OAuth-connected store
    * never pastes a key). Host-provided because the fetch and the caching are
