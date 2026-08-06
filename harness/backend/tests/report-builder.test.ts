@@ -36,7 +36,9 @@ const adapter = createMemoryDataSource({
   orders: [
     { id: 'o1', createdAt: '2026-07-01T10:00:00Z', method: 'PIX', totalCents: 1000 },
     { id: 'o2', createdAt: '2026-07-01T22:30:00Z', method: 'CARD', totalCents: 2000 },
-    { id: 'o3', createdAt: '2026-07-02T03:00:00Z', method: 'PIX', totalCents: 3000 },
+    // 02:00Z is 23:00 the PREVIOUS day in America/Sao_Paulo — the late-night
+    // sale that moves between days if buckets are computed in UTC.
+    { id: 'o3', createdAt: '2026-07-02T02:00:00Z', method: 'PIX', totalCents: 3000 },
   ],
 });
 
@@ -63,8 +65,6 @@ describe('the published report-builder runs a spec end to end', () => {
   });
 
   it('buckets dates on the tenant clock, not UTC', async () => {
-    // 2026-07-02T03:00Z is 2026-07-01 in America/Sao_Paulo (UTC-3), so a
-    // UTC-bucketing regression moves this order into the next day.
     const result = await runReport(
       {
         entity: 'orders',
@@ -74,10 +74,15 @@ describe('the published report-builder runs a spec end to end', () => {
       options,
     );
 
+    // A grained dimension is aliased `<field>_<grain>`, so this also pins the
+    // alias the published package emits — a consumer reads rows by that key.
     const byDay = Object.fromEntries(
-      result.rows.map((row) => [row.createdAt, row.sum_totalCents]),
+      result.rows.map((row) => [row.createdAt_day, row.sum_totalCents]),
     );
-    expect(byDay['2026-07-01']).toBe(6000);
+
+    // All three sales are 2026-07-01 in São Paulo. Bucketing in UTC would put
+    // o3 (02:00Z) on 07-02 and leave this at 3000.
+    expect(byDay).toEqual({ '2026-07-01': 6000 });
   });
 });
 

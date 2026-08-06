@@ -41,7 +41,9 @@ const catalog = defineCatalog({
 const ROWS = [
   { id: 'o1', createdAt: '2026-07-01T10:00:00Z', method: 'PIX', totalCents: 1000 },
   { id: 'o2', createdAt: '2026-07-01T22:30:00Z', method: 'CARD', totalCents: 2000 },
-  { id: 'o3', createdAt: '2026-07-02T03:00:00Z', method: 'PIX', totalCents: 3000 },
+  // 23:00 the previous day in São Paulo — the same late-night sale the backend
+  // harness buckets, so the two halves describe one dataset.
+  { id: 'o3', createdAt: '2026-07-02T02:00:00Z', method: 'PIX', totalCents: 3000 },
 ];
 
 /** Two blocks, so the page shows the sentence varying with the spec. */
