@@ -47,7 +47,7 @@ export interface BoardConfig<T extends Record<string, unknown>> {
 }
 
 /** The default header for the catch-all column (see {@link groupRows}). */
-const DEFAULT_EXTRA_LABEL = "Outros";
+const DEFAULT_EXTRA_LABEL = "Sem etapa";
 
 /** One resolved column: a declared group (or the catch-all) plus its loaded rows. */
 interface ResolvedColumn<T> {
@@ -220,7 +220,7 @@ function BoardColumn<T extends Record<string, unknown>>({
       {column.rows.length === 0 ? (
         <Text variant="caption" as="p">
           <Box component="span" data-testid={`${testId}-empty`} sx={{ color: "text.disabled" }}>
-            Nenhum item nesta página
+            Nada nesta etapa
           </Box>
         </Text>
       ) : (

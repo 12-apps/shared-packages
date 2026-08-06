@@ -11,6 +11,7 @@ import {
   useDataViewsLayout,
 } from "./data-views-layout-context";
 import { DataViewsBoard, type BoardConfig } from "./DataViewsBoard";
+import { SelectAllStrip } from "./data-views-select-all-strip";
 import type { DataViewCardSelection } from "./data-views-types";
 import type { DataViewsController } from "./use-data-views-state";
 
@@ -223,6 +224,39 @@ interface GridMainProps<T extends Record<string, unknown>> {
   board?: BoardConfig<T>;
   dataTestId?: string;
   emptyState?: React.ReactNode;
+  testIdPrefix: string;
+}
+
+/**
+ * The headerless layouts, each preceded by its own select-all.
+ *
+ * The strip is rendered HERE rather than inside each body so all three agree on
+ * where it sits and what it says — and so the table, which already has one in
+ * its `<thead>`, never gets a second.
+ */
+function Headerless<T extends Record<string, unknown>>({
+  c,
+  getRowId,
+  testIdPrefix,
+  children,
+}: {
+  c: DataViewsController<T>;
+  getRowId: (row: T) => string | number;
+  testIdPrefix: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <>
+      <SelectAllStrip
+        rows={c.matched}
+        getRowId={getRowId}
+        selectedIds={c.selectedIds}
+        onChange={(next) => c.setSelectedIds(next)}
+        testIdPrefix={testIdPrefix}
+      />
+      {children}
+    </>
+  );
 }
 
 /** Picks the body from the layout context: board, list, cards, or the dense grid. */
@@ -234,50 +268,57 @@ export function GridMain<T extends Record<string, unknown>>({
   board,
   dataTestId,
   emptyState,
+  testIdPrefix,
 }: GridMainProps<T>): React.JSX.Element {
   const { layout, zoom, density } = useDataViewsLayout();
   if (layout === "list" && renderListRow) {
     return (
-      <ListBody
-        rows={c.matched}
-        renderListRow={renderListRow}
-        getRowId={getRowId}
-        selectedIds={c.selectedIds}
-        onToggleId={c.toggleId}
-        rowGap={DENSITY_ROW_PADDING[density]}
-        dataTestId={dataTestId}
-        emptyState={emptyState}
-      />
+      <Headerless c={c} getRowId={getRowId} testIdPrefix={testIdPrefix}>
+        <ListBody
+          rows={c.matched}
+          renderListRow={renderListRow}
+          getRowId={getRowId}
+          selectedIds={c.selectedIds}
+          onToggleId={c.toggleId}
+          rowGap={DENSITY_ROW_PADDING[density]}
+          dataTestId={dataTestId}
+          emptyState={emptyState}
+        />
+      </Headerless>
     );
   }
   if (layout === "board" && board && renderCard) {
     return (
-      <DataViewsBoard
-        rows={c.matched}
-        board={board}
-        getRowId={getRowId}
-        renderCard={renderCard}
-        selectedIds={c.selectedIds}
-        onToggleId={c.toggleId}
-        cardScale={cardScaleForZoom(zoom)}
-        dataTestId={dataTestId}
-      />
+      <Headerless c={c} getRowId={getRowId} testIdPrefix={testIdPrefix}>
+        <DataViewsBoard
+          rows={c.matched}
+          board={board}
+          getRowId={getRowId}
+          renderCard={renderCard}
+          selectedIds={c.selectedIds}
+          onToggleId={c.toggleId}
+          cardScale={cardScaleForZoom(zoom)}
+          dataTestId={dataTestId}
+        />
+      </Headerless>
     );
   }
   if (layout === "cards" && renderCard) {
     return (
-      <CardBody
-        rows={c.matched}
-        renderCard={renderCard}
-        getRowId={getRowId}
-        selectedIds={c.selectedIds}
-        onToggleId={c.toggleId}
-        minCardWidth={cardMinWidthForZoom(zoom)}
-        maxColumns={DENSITY_CARD_COLUMNS[density]}
-        cardScale={cardScaleForZoom(zoom)}
-        dataTestId={dataTestId}
-        emptyState={emptyState}
-      />
+      <Headerless c={c} getRowId={getRowId} testIdPrefix={testIdPrefix}>
+        <CardBody
+          rows={c.matched}
+          renderCard={renderCard}
+          getRowId={getRowId}
+          selectedIds={c.selectedIds}
+          onToggleId={c.toggleId}
+          minCardWidth={cardMinWidthForZoom(zoom)}
+          maxColumns={DENSITY_CARD_COLUMNS[density]}
+          cardScale={cardScaleForZoom(zoom)}
+          dataTestId={dataTestId}
+          emptyState={emptyState}
+        />
+      </Headerless>
     );
   }
   return (

@@ -209,6 +209,41 @@ describe("the filter bar's progressive collapse", () => {
     await waitFor(() => expect(inlineIds()).toContain(target));
   });
 
+  it("drops the Exibir/Exportar labels before it touches the search", async () => {
+    // Step 2 of the ladder, and ONLY step 2: wide enough for the icons plus a
+    // full-width search box, not wide enough for the labelled controls too.
+    stubResizeObserver(620);
+    renderBar({ exportConfig: { onExport: vi.fn() } });
+
+    await waitFor(() => expect(screen.getByTestId("lista-display-trigger")).toHaveAttribute("title", "Exibir"));
+    expect(screen.getByTestId("lista-export-trigger")).toHaveAttribute("title", "Exportar");
+    // …and the search is still a box, because step 4 was not needed.
+    expect(screen.getByTestId("lista-search-all")).toBeInTheDocument();
+  });
+
+  it("collapses the search to an icon only as the LAST step, and flags an applied one", async () => {
+    stubResizeObserver(420);
+    renderBar({ appliedState: { search: "CHAR_7", pills: {}, ranges: {}, sortBy: [], visibleColumns: ["nome", "status"] } });
+
+    const trigger = await screen.findByTestId("lista-search-all-collapsed");
+    expect(trigger).toHaveAttribute("aria-label", "Buscar");
+    // A collapsed control that is STILL FILTERING has to say so.
+    expect(trigger.querySelector("span")).toBeInTheDocument();
+
+    // It expands on click, and comes back with the term intact.
+    fireEvent.click(trigger);
+    await waitFor(() => expect(screen.getByTestId("lista-search-all")).toHaveValue("CHAR_7"));
+  });
+
+  it("keeps the labels and the search box when there is room for both", async () => {
+    stubResizeObserver(2400);
+    renderBar({ exportConfig: { onExport: vi.fn() } });
+
+    await waitFor(() => expect(screen.getByTestId("lista-search-all")).toBeInTheDocument());
+    expect(screen.getByTestId("lista-display-trigger")).not.toHaveAttribute("title");
+    expect(screen.getByTestId("lista-export-trigger")).not.toHaveAttribute("title");
+  });
+
   it("re-splits when the bar is resized, without emitting a query", async () => {
     const queries: DataViewQuery[] = [];
     const server: DataViewServer = {

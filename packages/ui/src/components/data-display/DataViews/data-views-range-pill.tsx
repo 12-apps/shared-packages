@@ -11,6 +11,7 @@
  * and a page wanting one had to hang its own inputs outside the grid, outside
  * `DataViewState`, and outside the grid's "Limpar filtros" (FUT-668).
  */
+import CloseIcon from '@mui/icons-material/Close';
 import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { Box, Button, Popover, TextField, Typography } from '@mui/material';
 import React, { useState } from 'react';
@@ -107,6 +108,17 @@ function BoundField<T extends Record<string, unknown>>({
 }
 
 /**
+ * Is the window INVERTED — a `de` after its `até`?
+ *
+ * Not an error the merchant must clear before the list responds: it simply
+ * matches nothing. But an empty grid with no explanation reads as "there is no
+ * data", so the control says which of the two it is.
+ */
+export function isRangeInverted(value: RangeValue): boolean {
+  return value.min != null && value.max != null && value.min > value.max;
+}
+
+/**
  * The `De`/`Até` pair for a range — shared by the pill's popover and the
  * slide-in panel's day fields, so the two surfaces cannot drift on what a bound
  * accepts or how it clears.
@@ -122,22 +134,46 @@ export function RangeBounds<T extends Record<string, unknown>>({
   onChange: (range: RangeValue) => void;
   testId: string;
 }): React.JSX.Element {
+  const inverted = isRangeInverted(value);
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }} data-testid={`${testId}-panel`}>
-      <BoundField
-        field={field}
-        label="De"
-        value={value.min}
-        onChange={(min) => onChange({ ...value, min })}
-        testId={`${testId}-min`}
-      />
-      <BoundField
-        field={field}
-        label="Até"
-        value={value.max}
-        onChange={(max) => onChange({ ...value, max })}
-        testId={`${testId}-max`}
-      />
+    <Box data-testid={`${testId}-panel`}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <BoundField
+          field={field}
+          label="De"
+          value={value.min}
+          onChange={(min) => onChange({ ...value, min })}
+          testId={`${testId}-min`}
+        />
+        <BoundField
+          field={field}
+          label="Até"
+          value={value.max}
+          onChange={(max) => onChange({ ...value, max })}
+          testId={`${testId}-max`}
+        />
+      </Box>
+      {inverted && (
+        <Typography
+          component="p"
+          data-testid={`${testId}-inverted`}
+          sx={{ mt: 0.75, fontSize: '0.75rem', color: 'error.main' }}
+        >
+          O início precisa ser menor que o fim.
+        </Typography>
+      )}
+      {/* BOTH days are in the result. Saying so is FUT-668's other half: the
+          bounds compare as ISO strings precisely so `até` keeps its whole day,
+          and nothing on screen would otherwise tell the merchant that. */}
+      {field.kind === 'day' && !inverted && (
+        <Typography
+          component="p"
+          data-testid={`${testId}-inclusive`}
+          sx={{ mt: 0.75, fontSize: '0.75rem', color: 'text.disabled' }}
+        >
+          Ambas as datas entram no resultado.
+        </Typography>
+      )}
     </Box>
   );
 }
@@ -147,6 +183,104 @@ export function RangeBounds<T extends Record<string, unknown>>({
  * each edit is a query) and the popover stays open, which is what lets a
  * merchant set "de" and then "até" without re-opening it.
  */
+/** An applied range clears from the pill itself — re-opening to empty two fields is three gestures for one intent. */
+function ClearAffordance({
+  label,
+  onClear,
+  testId,
+}: {
+  label: string;
+  onClear: () => void;
+  testId: string;
+}): React.JSX.Element {
+  const clear = (event: React.SyntheticEvent): void => {
+    event.stopPropagation();
+    onClear();
+  };
+  return (
+    <Box
+      component="span"
+      role="button"
+      tabIndex={0}
+      aria-label={`Limpar ${label}`}
+      data-testid={testId}
+      onClick={clear}
+      onKeyDown={(event: React.KeyboardEvent) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        clear(event);
+      }}
+      sx={{ display: 'inline-flex', borderRadius: 999, p: 0.125, '&:hover': { bgcolor: 'action.selected' } }}
+    >
+      <CloseIcon sx={{ fontSize: 14 }} />
+    </Box>
+  );
+}
+
+/** The pill button: its label carries the applied window, and its tone the state. */
+function RangeTrigger<T extends Record<string, unknown>>({
+  field,
+  value,
+  onChange,
+  onOpen,
+  open,
+  testId,
+}: {
+  field: RangeFieldConfig<T>;
+  value: RangeValue;
+  onChange: (range: RangeValue) => void;
+  onOpen: (anchor: HTMLElement) => void;
+  open: boolean;
+  testId: string;
+}): React.JSX.Element {
+  const active = isRangeSet(value);
+  const inverted = isRangeInverted(value);
+  // An INVERTED window gets its own tone rather than the ordinary "applied"
+  // one: it is applied, and it matches nothing, and those are different states.
+  const tone = inverted ? 'error.main' : active ? 'primary.main' : 'divider';
+  return (
+    <Button
+      variant="outlined"
+      color="inherit"
+      size="small"
+      data-testid={testId}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      onClick={(event) => onOpen(event.currentTarget)}
+      endIcon={
+        active ? (
+          <ClearAffordance label={field.label} onClear={() => onChange({})} testId={`${testId}-clear-inline`} />
+        ) : (
+          <ChevronDownIcon sx={{ fontSize: 16 }} />
+        )
+      }
+      sx={{
+        borderRadius: 999,
+        height: 34,
+        px: 1.5,
+        maxWidth: 280,
+        color: inverted ? 'error.main' : 'text.primary',
+        fontWeight: 600,
+        fontSize: '0.8125rem',
+        textTransform: 'none',
+        whiteSpace: 'nowrap',
+        borderColor: tone,
+        bgcolor: active ? 'action.selected' : 'background.paper',
+        '&:hover': {
+          borderColor: active ? tone : 'text.primary',
+          bgcolor: active ? 'action.selected' : 'action.hover',
+        },
+      }}
+    >
+      {/* The applied bounds, in the label — a pill reading only "Valor" hides
+          the very thing that is narrowing the list. */}
+      <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {active ? rangeChipLabel(field, value) : field.label}
+      </Box>
+    </Button>
+  );
+}
+
 export function RangePill<T extends Record<string, unknown>>({
   field,
   value,
@@ -163,33 +297,14 @@ export function RangePill<T extends Record<string, unknown>>({
   const testId = `${testIdPrefix}-range-${field.id}`;
   return (
     <>
-      <Button
-        variant="outlined"
-        color="inherit"
-        size="small"
-        data-testid={testId}
-        aria-haspopup="dialog"
-        aria-expanded={Boolean(anchor)}
-        onClick={(event) => setAnchor(event.currentTarget)}
-        endIcon={<ChevronDownIcon sx={{ fontSize: 16 }} />}
-        sx={{
-          borderRadius: 999,
-          height: 34,
-          px: 1.5,
-          color: 'text.primary',
-          fontWeight: 600,
-          fontSize: '0.8125rem',
-          textTransform: 'none',
-          borderColor: active ? 'primary.main' : 'divider',
-          bgcolor: active ? 'action.selected' : 'background.paper',
-          '&:hover': {
-            borderColor: active ? 'primary.main' : 'text.primary',
-            bgcolor: active ? 'action.selected' : 'action.hover',
-          },
-        }}
-      >
-        {field.label}
-      </Button>
+      <RangeTrigger
+        field={field}
+        value={value}
+        onChange={onChange}
+        onOpen={setAnchor}
+        open={Boolean(anchor)}
+        testId={testId}
+      />
       <Popover
         open={Boolean(anchor)}
         anchorEl={anchor}
