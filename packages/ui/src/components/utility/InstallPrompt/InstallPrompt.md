@@ -85,6 +85,54 @@ raised from a timer or an effect.
 All copy defaults to English and every string is a prop — this package is
 locale-neutral and the consuming app supplies its own wording.
 
+## Wiring the capture
+
+**Required on Chromium.** Without it this component can never offer an install,
+and it will fail silently — no error, no warning, just an affordance that never
+appears.
+
+Chromium fires `beforeinstallprompt` once, during page load, as soon as it has a
+manifest and a registered worker. That is before hydration, and in a code-split
+app it can be before the chunk holding this component has been downloaded at
+all. No React hook can attach a listener in time, and the event is not reissued
+on request. So the capture has to run outside React, and first.
+
+Paste this into `<head>`, above the app bundle. A classic inline script is the
+only thing guaranteed to beat a deferred module:
+
+```html
+<script>
+  (function () {
+    var stash = (window.__pwaInstall = { event: null, firedAt: null, installedAt: null });
+    window.addEventListener('beforeinstallprompt', function (event) {
+      event.preventDefault();
+      stash.event = event;
+      stash.firedAt = Date.now();
+      window.dispatchEvent(new Event('pwa-install-available'));
+    });
+    window.addEventListener('appinstalled', function () {
+      stash.installedAt = Date.now();
+      stash.event = null;
+    });
+  })();
+</script>
+```
+
+Or call `capturePwaInstallEvent()` as the first statement of your entry module,
+before `createRoot`. Simpler to wire, but a module is still deferred, so a very
+early event can outrun it. Doing both is safe — the capture is idempotent.
+
+```ts
+import { capturePwaInstallEvent } from '@12-apps/ui/utility/InstallPrompt';
+
+capturePwaInstallEvent();
+```
+
+`readPwaInstallStash()` exposes what was captured (`event`, `firedAt`,
+`installedAt`), which is worth logging when the prompt does not appear:
+`firedAt` set with no visible affordance means something downstream suppressed
+it, whereas an absent stash means the wiring above is missing.
+
 ## Hook API
 
 `usePwaInstall(options)` returns:
@@ -107,7 +155,7 @@ locale-neutral and the consuming app supplies its own wording.
 - **Storage failures are swallowed.** `localStorage` throws rather than returning
   `null` in Safari private mode and wherever cookies are blocked; an uncaught throw
   would break the page on exactly the browsers this component serves.
-- **A missed first event recovers on its own.** The listener attaches on mount,
-  which can be after a cold-load event. Chromium re-fires on navigation and on
-  re-evaluation of the criteria. A host that needs the very first one can capture
-  it in its HTML entry point and re-dispatch it once the app has mounted.
+- **A missed event does NOT recover.** Chromium fires `beforeinstallprompt` once
+  and will not reissue it on request, so a listener that attaches on mount has
+  already lost. This is why "Wiring the capture" above is a requirement rather
+  than an optimisation.
