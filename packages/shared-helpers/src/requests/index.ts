@@ -10,3 +10,10 @@ export * from './lib/mapWithConcurrencyAndRetry';
 // reuse them directly.
 export * from './lib/rateLimiter';
 export * from './lib/retry';
+// `createFetcherFactory` above returns a fetcher whose `getSuccessRateStats()`
+// yields a `SuccessRateStats`, and which throws `SuccessRateTripError` once the
+// failure threshold trips — so both names have to be reachable, or a caller can
+// neither type the result nor catch the error by class. Same for the timeout
+// options `withAbortController` takes.
+export * from './lib/abortController';
+export * from './lib/successRateMetrics';

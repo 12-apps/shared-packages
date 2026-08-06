@@ -1,18 +1,9 @@
 {
   "files": [],
-  "exports": [
-    "packages/shared-helpers/src/requests/lib/successRateMetrics.ts#SuccessRateTripError",
-    "packages/shared-helpers/src/requests/lib/successRateMetrics.ts#applySuccessRateGuard"
-  ],
-  "types": [
-    "packages/shared-helpers/src/requests/lib/abortController.ts#IWithAbortController",
-    "packages/shared-helpers/src/requests/lib/successRateMetrics.ts#SuccessRateOptions"
-  ],
+  "exports": [],
+  "types": [],
   "dependencies": [],
-  "devDependencies": [
-    "package.json#prettier",
-    "package.json#prisma"
-  ],
+  "devDependencies": [],
   "unlisted": [],
   "unresolved": []
 }

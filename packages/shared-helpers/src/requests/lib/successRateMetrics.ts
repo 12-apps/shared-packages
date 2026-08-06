@@ -157,11 +157,3 @@ export function withSuccessRateMetrics<Args extends any[], R>(
     resetSuccessRateStats: () => void;
   };
 }
-
-// Convenience wrapper for fetcher factories: apply after constructing the fetcher.
-export function applySuccessRateGuard<T extends string | number, V>(
-  fetcher: (key: T) => Promise<V>,
-  opts?: SuccessRateOptions,
-) {
-  return withSuccessRateMetrics(fetcher, { ...opts, name: opts?.name || 'fetcher' });
-}
