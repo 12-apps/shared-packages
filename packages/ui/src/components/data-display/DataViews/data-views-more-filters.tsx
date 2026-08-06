@@ -11,7 +11,7 @@ import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
 import type { OverflowField } from "./data-views-overflow";
-import { isRangeSet } from "./data-views-range-pill";
+import { isRangeSet } from "./data-views-range-values";
 import type { RangeValue } from "./data-views-types";
 
 /**

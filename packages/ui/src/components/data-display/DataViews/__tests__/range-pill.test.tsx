@@ -10,7 +10,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { InlineFilterChips, InlineFilterControls } from "../data-views-inline-bar";
-import { rangeChipLabel } from "../data-views-range-pill";
+import { rangeChipLabel } from "../data-views-range-values";
 import type { RangeFieldConfig } from "../data-views-types";
 
 interface Row extends Record<string, unknown> {

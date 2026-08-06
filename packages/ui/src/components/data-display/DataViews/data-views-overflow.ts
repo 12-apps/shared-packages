@@ -276,11 +276,26 @@ export function useFilterOverflow<T extends Record<string, unknown>>(
   all: OverflowField<T>[],
   pills: Record<string, string[]>,
   ranges: Record<string, RangeValue>,
+  /**
+   * A filter control is open — hold the current answer until it closes.
+   *
+   * Applying a filter changes that control's LABEL ("Valor" becomes "Valor: ≥
+   * R$ 1"), which changes its measured width, which re-runs the whole split
+   * while its popover is open on top of it. Measured: setting a minimum moved
+   * the trigger 192px left, took the popover with it, and pushed two other
+   * controls into a newly-appeared "Mais 2" — so reaching for the second bound
+   * meant chasing the control across the row. Nobody sets a range that way.
+   *
+   * Frozen only for the duration: closing re-measures against the new labels,
+   * so the row still ends up correct, it just does not rearrange under a hand
+   * that is mid-edit.
+   */
+  frozen = false,
 ): OverflowSplit<T> {
   const { barRef, width } = useBarWidth();
   const signature = JSON.stringify({ ids: all.map((field) => field.id), pills, ranges, width });
   const cache = useRef<{ signature: string; split: ReturnType<typeof computeSplit<T>> } | null>(null);
-  if (cache.current?.signature !== signature) {
+  if (cache.current === null || (!frozen && cache.current.signature !== signature)) {
     cache.current = { signature, split: computeSplit(all, pills, ranges, width) };
   }
   return { ...cache.current.split, barRef };

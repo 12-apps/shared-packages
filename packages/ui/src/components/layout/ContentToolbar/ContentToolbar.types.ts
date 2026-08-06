@@ -150,6 +150,15 @@ export interface MultiSelectDropdownProps<TValue extends string = string> {
    */
   layout?: 'inline' | 'stacked' | 'pill';
   'data-testid'?: string;
+  /**
+   * Notified when the menu opens and closes.
+   *
+   * For a toolbar whose LAYOUT is measured: applying a filter changes this
+   * control's label and therefore its width, and re-measuring mid-interaction
+   * moves the row under the operator's cursor. A caller that measures uses this
+   * to hold still while the menu is open.
+   */
+  onOpenChange?: (open: boolean) => void;
 }
 
 /* ── FilterTrigger ───────────────────────────────────────────────────────── */

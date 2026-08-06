@@ -19,7 +19,8 @@ import type { GridFilterPanelProps } from "./data-views-filter-panel";
 import { MoreFilters } from "./data-views-more-filters";
 import type { OverflowField, OverflowSplit } from "./data-views-overflow";
 import { CollapsedSearch, InlineKeyword } from "./data-views-search";
-import { isRangeSet, RangePill, rangeChipLabel } from "./data-views-range-pill";
+import { RangePill } from "./data-views-range-pill";
+import { isRangeSet, rangeChipLabel } from "./data-views-range-values";
 import type { RangeValue } from "./data-views-types";
 
 
@@ -156,9 +157,11 @@ function InlineControl<T extends Record<string, unknown>>({
   onTogglePill,
   onChangeRange,
   onClearField,
+  onOpenChange,
   testIdPrefix,
 }: {
   field: OverflowField<T>;
+  onOpenChange?: (open: boolean) => void;
   pills: Record<string, string[]>;
   ranges: Record<string, RangeValue>;
   onTogglePill: (fieldId: string, value: string, checked: boolean) => void;
@@ -179,6 +182,7 @@ function InlineControl<T extends Record<string, unknown>>({
         searchPlaceholder="Buscar…"
         noResultsLabel="Nenhum resultado"
         layout="pill"
+        onOpenChange={onOpenChange}
         data-testid={`${testIdPrefix}-filter-${field.id}`}
       />
     );
@@ -189,6 +193,7 @@ function InlineControl<T extends Record<string, unknown>>({
         field={field.range}
         value={ranges[field.id] ?? {}}
         onChange={(range) => onChangeRange(field.id, range)}
+        onOpenChange={onOpenChange}
         testIdPrefix={testIdPrefix}
       />
     );
@@ -214,7 +219,11 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
   onChangeRange,
   onClearField,
   split,
-}: Omit<InlineFilterBarProps<T>, "fields" | "rangeFields" | "onClearAll">): React.JSX.Element {
+  onControlOpenChange,
+}: Omit<InlineFilterBarProps<T>, "fields" | "rangeFields" | "onClearAll"> & {
+  /** Reports a control opening/closing so the shell can freeze the measurement. */
+  onControlOpenChange?: (open: boolean) => void;
+}): React.JSX.Element {
   // MEASURED, not breakpointed — and measured ONCE, in the shell, because the
   // toolbar around it needs the same answer to drop its labels. The measured
   // element is the whole toolbar ROW (see `GridToolbar`), not this cluster:
@@ -253,6 +262,7 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
         <InlineControl
           key={field.id}
           field={field}
+          onOpenChange={onControlOpenChange}
           pills={pills}
           ranges={ranges}
           onTogglePill={onTogglePill}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { TableFilter } from "../../layout/TableFilter";
 import { Text } from "../../typography/Text";
@@ -156,12 +156,21 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   inlineVisible: boolean;
   filterProps: FilterSurfaceProps<T>;
   split: OverflowSplit<T>;
+  onControlOpenChange: (open: boolean) => void;
 } {
   const { state } = c;
+  // How many filter controls are open. A COUNT, not a flag: closing one popover
+  // by opening another overlaps, and a boolean would unfreeze mid-handover.
+  const [openControls, setOpenControls] = useState(0);
   // ONE measurement for the whole shell: the filter row decides which controls
   // it can keep, and the TOOLBAR needs the same answer to drop its labels.
   // Measuring twice would let the two disagree at the crossover width.
-  const split = useFilterOverflow(toOverflowFields(fields, rangeFields), state.pills, c.ranges);
+  const split = useFilterOverflow(
+    toOverflowFields(fields, rangeFields),
+    state.pills,
+    c.ranges,
+    openControls > 0,
+  );
   // THE BAR RENDERS AT EVERY WIDTH. It used to be swapped for a full-screen
   // filter MODAL below `lg`, which was the responsive strategy before the
   // measured ladder existed — and the two now do the same job, badly together:
@@ -190,7 +199,15 @@ function useGridShellFilters<T extends Record<string, unknown>>({
     onClearField: (fieldId) => c.patch({ pills: { ...state.pills, [fieldId]: [] } }),
     onClearAll: () => c.patch({ search: "", pills: {}, ranges: {} }),
   };
-  return { showInline, useModal, inlineVisible, filterProps, split };
+  return {
+    showInline,
+    useModal,
+    inlineVisible,
+    filterProps,
+    split,
+    onControlOpenChange: (open) =>
+      setOpenControls((count) => Math.max(0, count + (open ? 1 : -1))),
+  };
 }
 
 interface GridShellProps<T extends Record<string, unknown>> {
@@ -257,7 +274,7 @@ function ShellStack<T extends Record<string, unknown>>({
   filters: ReturnType<typeof useGridShellFilters<T>>;
 }): React.JSX.Element {
   const { c, testIdPrefix, dataTestId, scopes = [], emptyState, inlineFilters = false } = props;
-  const { showInline, useModal, inlineVisible, filterProps, split } = filters;
+  const { showInline, useModal, inlineVisible, filterProps, split, onControlOpenChange } = filters;
   // The grid renders the FILTERED empty state itself — it is the only party
   // that knows a filter is applied. See {@link DataViewsEmpty}.
   const body = (
@@ -287,7 +304,13 @@ function ShellStack<T extends Record<string, unknown>>({
           displayView={props.displayView}
           exportConfig={props.exportConfig}
           filterControls={
-            inlineVisible ? <InlineFilterControls {...filterProps} split={split} /> : undefined
+            inlineVisible ? (
+              <InlineFilterControls
+                {...filterProps}
+                split={split}
+                onControlOpenChange={onControlOpenChange}
+              />
+            ) : undefined
           }
           barRef={split.barRef}
           testIdPrefix={testIdPrefix}
