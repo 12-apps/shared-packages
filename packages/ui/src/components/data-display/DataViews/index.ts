@@ -8,8 +8,15 @@
 export { BaseCard } from "./base-card";
 export { DataViewsGrid } from "./DataViewsGrid";
 export { DataViewsTableBase, type DataViewsTableBaseProps } from "./DataViewsTableBase";
-export { toSavedViewSummary, CARD_ASPECT_RATIOS } from "./data-views-types";
+export { toSavedViewSummary, CARD_ASPECT_RATIOS, DATA_VIEWS_LAYOUTS } from "./data-views-types";
 export { cardScaleForZoom, cardMinWidthForZoom } from "./data-views-layout-context";
+export { DataViewsBoard, type BoardConfig, type BoardGroup } from "./DataViewsBoard";
+export {
+  DataViewsScopeTabs,
+  resolveScope,
+  assertNoScopePillOverlap,
+  type ScopeConfig,
+} from "./data-views-scopes";
 export type {
   RowAction,
   DataViewCardSelection,
@@ -17,6 +24,7 @@ export type {
   SavedViewSummary,
   DataViewState,
   DataViewSyncState,
+  DataViewsLayout,
   DataViewColumn,
   FilterFieldConfig,
   RangeFieldConfig,
