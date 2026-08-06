@@ -99,15 +99,20 @@ function toChartSpec(
   const firstFormat = query.measures[0]?.format ?? 'decimal';
   return {
     type: presentation.chartType,
-    xAxis: {
-      key: dimension.alias,
-      label: dimensionLabel(entity.fields[dimension.field], dimension.alias, dimension.timeGrain),
-    },
+    // NO axis title (FUT-391). It rendered ON TOP of the tick labels, and the
+    // block's spec sentence already says what the axis is — "…por data (dia)"
+    // states it better than a word wedged under the ticks ever did.
+    xAxis: { key: dimension.alias },
     series: query.measures.map((measure) => ({
       key: measure.alias,
       label: measureLabel(entity.fields[measure.field], measure),
     })),
     stacked: presentation.stacked,
+    // Straight segments, always (FUT-391). A smoothed line between two points
+    // draws a curve through values nobody measured: the shape reads as data
+    // and is not. Charts are read by store owners, not by people who know to
+    // discount the interpolation.
+    curved: false,
     numberFormat: chartNumberFormat(presentation, firstFormat),
   };
 }

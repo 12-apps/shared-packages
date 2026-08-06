@@ -80,12 +80,56 @@ describe('runReport', () => {
     if (result.render.kind === 'chart') {
       expect(result.render.chartSpec).toMatchObject({
         type: 'area',
-        xAxis: { key: 'createdAt_day', label: 'Data (dia)' },
+        xAxis: { key: 'createdAt_day' },
         series: [{ key: 'revenue', label: 'Receita' }],
         numberFormat: 'brl',
       });
       // The whole render model must survive JSON serialization (persistence + MCP).
       expect(JSON.parse(JSON.stringify(result.render)).chartSpec.type).toBe('area');
+    }
+  });
+
+  /**
+   * FUT-391 CHANGED the assertion above: the x axis used to carry
+   * `label: 'Data (dia)'`. Its removal is deliberate — the title rendered ON
+   * TOP of the tick labels, and the block's spec sentence now states what the
+   * axis is. These two cases make the removal a stated guarantee rather than a
+   * detail someone re-adds while fixing something else.
+   */
+  it('emits no axis title — the spec sentence says what the axis is', async () => {
+    const result = await runReport(
+      {
+        entity: 'orders',
+        dimensions: [{ field: 'method' }],
+        measures: [{ field: 'totalCents' }],
+        presentation: { kind: 'chart', chartType: 'bar' },
+      },
+      options,
+    );
+
+    if (result.render.kind !== 'chart') throw new Error('expected a chart render');
+    expect(result.render.chartSpec.xAxis.label).toBeUndefined();
+    // The SERIES keeps its label — that one names the measure, and a legend of
+    // unnamed series is unreadable.
+    expect(result.render.chartSpec.series[0]?.label).toBe('Receita');
+  });
+
+  it('never smooths a line, whatever the point count', async () => {
+    // A curve between two points draws through values nobody measured, and two
+    // points is exactly what a short period produces.
+    for (const chartType of ['line', 'area'] as const) {
+      const result = await runReport(
+        {
+          entity: 'orders',
+          dimensions: [{ field: 'createdAt', timeGrain: 'month' }],
+          measures: [{ field: 'totalCents' }],
+          presentation: { kind: 'chart', chartType },
+        },
+        options,
+      );
+
+      if (result.render.kind !== 'chart') throw new Error('expected a chart render');
+      expect(result.render.chartSpec.curved).toBe(false);
     }
   });
 

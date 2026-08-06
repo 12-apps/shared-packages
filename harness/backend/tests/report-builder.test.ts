@@ -137,6 +137,31 @@ describe('the spec sentence', () => {
   });
 });
 
+describe('the chart spec the published package emits', () => {
+  it('carries no axis title and never smooths the line', async () => {
+    const result = await runReport(
+      {
+        entity: 'orders',
+        dimensions: [{ field: 'createdAt', timeGrain: 'day' }],
+        measures: [{ field: 'totalCents' }],
+        presentation: { kind: 'chart', chartType: 'line' },
+      },
+      options,
+    );
+
+    if (result.render.kind !== 'chart') throw new Error('expected a chart render');
+
+    // The title rendered on top of the tick labels; the spec sentence says
+    // what the axis is instead.
+    expect(result.render.chartSpec.xAxis.label).toBeUndefined();
+    // A curve between two points draws through values nobody measured.
+    expect(result.render.chartSpec.curved).toBe(false);
+    // The SERIES keeps its name — a legend of unnamed series is unreadable.
+    expect(result.render.chartSpec.series[0]?.label).toBe('Receita');
+  });
+
+});
+
 describe('the catalog tells a builder how a field may be filtered', () => {
   it('ships labelled values and resolved operators to the client', () => {
     const fields = listCatalogFields(catalog).entities[0]?.fields ?? [];
