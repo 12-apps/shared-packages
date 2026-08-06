@@ -101,6 +101,12 @@ export function isSuppressed(value: ReportCellValue | undefined): value is Suppr
   return value === SUPPRESSED;
 }
 
+/** One selectable value of a closed-set field: stored `value`, shown `label`. */
+export interface FieldValueOption {
+  value: string;
+  label: string;
+}
+
 export interface FieldDef {
   /** Human label surfaced to builders and LLMs. */
   label: string;
@@ -113,6 +119,26 @@ export interface FieldDef {
   format?: ReportValueFormat;
   /** Optional description surfaced through field listings (LLM authoring). */
   description?: string;
+  /**
+   * The field's CLOSED set of values, labelled (FUT-391). A field that declares
+   * these is filtered by PICKING — the builder offers "Pago", not a text box the
+   * author has to type `PAID` into, which is the single largest source of
+   * silently-empty blocks: a typo produces a valid spec that matches no rows.
+   *
+   * The label is display-only. Filters always carry the `value`, so renaming a
+   * label never rewrites a stored spec.
+   *
+   * Absent means the field is open-ended (a name, a free-text note) and the
+   * builder falls back to a text input, which is correct for those.
+   */
+  values?: readonly FieldValueOption[];
+  /**
+   * The filter operators this field accepts (FUT-391). Defaults per
+   * {@link FieldType} — see `operatorsFor` — so a catalog only names these to
+   * NARROW them. An enum offering `gte` invites "status a partir de Pago",
+   * which compiles and means nothing.
+   */
+  ops?: readonly FilterOperator[];
   /**
    * Marks a DIMENSION as identifying an individual person (FUT-454). Grouping
    * by it forces EVERY measure of the spec to declare `minSample >= this`, so

@@ -22,6 +22,19 @@ export interface ReportField {
   format?: string;
   description?: string;
   /**
+   * The field's closed set of values, labelled (FUT-391). Present means the
+   * filter row shows a picker of "Pago" / "Cancelado" instead of a text box —
+   * the author never types the stored code, so a typo cannot silently produce
+   * a block that matches nothing.
+   */
+  values?: Array<{ value: string; label: string }>;
+  /**
+   * The operators this field accepts, resolved SERVER-SIDE. Optional only
+   * because a cached response predating this field would omit it; the builder
+   * falls back to the full set, which is the pre-FUT-391 behaviour.
+   */
+  ops?: string[];
+  /**
    * Identity dimension (FUT-454): grouping by it requires every measure to
    * declare `minSample` of at least this value; the server rejects the spec
    * otherwise. The builder cannot author `minSample` yet, so a field carrying

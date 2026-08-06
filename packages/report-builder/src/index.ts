@@ -41,6 +41,12 @@ export { DEFAULT_ROW_LIMIT, compileReport, type CompileOptions } from './compile
 export { autoTitle, specSentence } from './describe';
 export { ReportBuilderError } from './errors';
 export {
+  defaultValueFor,
+  isClosedSet,
+  isMultiValue,
+  operatorsFor,
+} from './filters';
+export {
   formatDurationSeconds,
   formatKpiFigure,
   formatReportValue,
