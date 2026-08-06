@@ -8,17 +8,21 @@ import {
   PaymentsError,
   ProviderRequestError,
   UnknownProviderError,
+  UnprovenProviderError,
   UnsupportedOperationError,
   WebhookVerificationError,
 } from '../core/errors';
 
 /**
- * What a failure looks like on the wire, and the two DIFFERENT audiences that
- * question has (see `guardedWebhook`).
+ * What every handler ANSWERS with: the JSON envelope, and the one place a
+ * `PaymentsError` becomes a status code.
  *
- * Split out of `handlers.ts` so the handler file stays a list of endpoints:
- * the mapping is a policy of its own, and the reasoning it carries is longer
- * than most of the handlers it wraps.
+ * Lifted out of `handlers.ts` because the two audiences it serves — a human
+ * operator reading an admin screen, and a provider's delivery robot deciding
+ * whether to re-send — disagree about what a refusal should look like, and
+ * that disagreement is the whole content of this file. Reading it next to the
+ * handlers it wraps is what makes `guarded` vs `guardedWebhook` a choice
+ * rather than a coin flip.
  */
 
 export function json(body: unknown, status = 200): Response {
@@ -28,39 +32,42 @@ export function json(body: unknown, status = 200): Response {
   });
 }
 
-/** The caller sent something wrong, or asked for something not allowed. */
-function callerErrorStatus(error: PaymentsError): number | null {
-  // Refused before anything was stored — see the class for why this must not
-  // share `CredentialsError`'s 409.
+/**
+ * The 409s, as one group, because they are one rule: each is a REFUSAL rather
+ * than a failure, and none may look retryable.
+ *
+ * For the two charge errors that is about money — retrying a charge whose
+ * outcome we could not determine, or one that exists at the provider with only
+ * our copy missing, is exactly what bills the buyer twice. For the two
+ * configuration errors it is about the answer being actionable: a provider that
+ * is not connected, or that has not completed its verification charge, stays
+ * refused until the owner does something about it, and a 500 said the opposite —
+ * "the server broke, try again" — burying the one instruction that resolves it.
+ */
+const REFUSALS = [
+  AmbiguousChargeError,
+  ChargeNotPersistedError,
+  CredentialsError,
+  UnprovenProviderError,
+];
+
+/** Uniform error→HTTP mapping, so hosts get consistent statuses everywhere. */
+function errorStatus(error: PaymentsError): number {
+  // Refused BEFORE anything was stored, so it is the caller's body that is
+  // wrong — not the connection's state. It must not share `CredentialsError`'s
+  // 409 below: 409 tells the owner to go fix the provider connection, when the
+  // thing to fix is the field they just typed (FUT-694).
   if (error instanceof InvalidCredentialsInputError) return 400;
   if (error instanceof UnknownProviderError) return 404;
   if (error instanceof UnsupportedOperationError) return 422;
   if (error instanceof ChargeDeclinedError) return 402;
   if (error instanceof WebhookVerificationError) return 401;
-  return null;
-}
-
-/** Nothing is wrong with the request; the state or the provider is. */
-function stateErrorStatus(error: PaymentsError): number | null {
-  // 409, deliberately NOT a 5xx: a charge whose outcome we could not
-  // determine must not look retryable to a client or a proxy. Retrying is
-  // exactly what would double-charge the buyer; this needs reconciliation.
-  if (error instanceof AmbiguousChargeError) return 409;
-  // The charge EXISTS at the provider; only our copy is missing. Same rule as
-  // above — it must not look retryable, because a retry is what creates the
-  // duplicate.
-  if (error instanceof ChargeNotPersistedError) return 409;
-  if (error instanceof CredentialsError) return 409;
+  if (REFUSALS.some((refusal) => error instanceof refusal)) return 409;
   // Every provider in the chain failed — an upstream problem, not the
   // caller's, and safe to retry once something upstream recovers.
   if (error instanceof NoProviderSucceededError) return 502;
   if (error instanceof ProviderRequestError) return 502;
-  return null;
-}
-
-/** Uniform error→HTTP mapping, so hosts get consistent statuses everywhere. */
-function errorStatus(error: PaymentsError): number {
-  return callerErrorStatus(error) ?? stateErrorStatus(error) ?? 500;
+  return 500;
 }
 
 /**

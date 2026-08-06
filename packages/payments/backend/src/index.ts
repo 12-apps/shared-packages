@@ -108,10 +108,26 @@ export {
   PaymentsError,
   ProviderRequestError,
   UnknownProviderError,
+  UnprovenProviderError,
   UnsupportedOperationError,
   WebhookVerificationError,
 } from './core/errors';
 export type { ProviderRequestSnapshot } from './core/errors';
+
+/**
+ * The deployment's stub-mode decision. A host resolves it ONCE at startup
+ * from an explicit `PAYMENTS_STUB`, and passes the answer to
+ * `createSettingsService`, `credentialStoreFrom` and the activation context.
+ * Inferring it from some unrelated variable is what let an unsigned webhook
+ * authenticate itself and settle real orders — see `core/stub-mode.ts`.
+ */
+export {
+  resolveStubMode,
+  stubDeliveryTrusted,
+  StubModeRefusedError,
+  STUB_MODE_ENV_VAR,
+  type StubModeEnv,
+} from './core/stub-mode';
 
 export type {
   CardDetails,

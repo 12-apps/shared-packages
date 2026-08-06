@@ -536,6 +536,84 @@ describe('createSettingsService', () => {
     );
   });
 
+  /**
+   * Reordering ranks the chain; it must not GRANT membership to it (FUT-693).
+   *
+   * The rewrite writes `enabled: true` for every name it is handed, so before
+   * this a drag — or a bare PUT of the list — went around both gates the enable
+   * switch applies: the verification charge, and the plan's provider quota. The
+   * three tests below are the ticket's scenarios.
+   */
+  it('given a configured but disabled provider, when the chain is reordered including it, then it stays disabled', async () => {
+    const { settings } = setup();
+    await settings.applyChargeVerification(TENANT, 'stone', true);
+    // Connected, never switched on. Stripe cannot run an activation charge, so
+    // the ONLY thing standing between it and the chain is the owner's switch —
+    // and the plan slot that switch spends.
+    await settings.saveCredentials(TENANT, 'stripe', { environment: 'SANDBOX', fields: {} });
+
+    await expect(settings.setPriorities(TENANT, ['stone', 'stripe'])).rejects.toThrow(
+      /stripe is not enabled/,
+    );
+
+    const view = await settings.getSettings(TENANT);
+    expect(view.providerChain).toEqual(['stone']);
+    expect(view.configs.find((c) => c.provider === 'stripe')?.enabled).toBe(false);
+  });
+
+  it('given an unproven provider, when the chain names it, then it is refused as UnprovenProviderError', async () => {
+    const { settings } = setup();
+    await settings.applyChargeVerification(TENANT, 'stripe', true);
+    // Stone CAN run the activation charge and has not — the exact state
+    // `setEnabled` refuses, reached through the reorder endpoint instead.
+    await settings.saveCredentials(TENANT, 'stone', { environment: 'SANDBOX', fields: {} });
+
+    await expect(settings.setPriorities(TENANT, ['stone', 'stripe'])).rejects.toThrow(
+      UnprovenProviderError,
+    );
+    expect((await settings.getSettings(TENANT)).providerChain).toEqual(['stripe']);
+  });
+
+  /**
+   * The quota half, expressed as the property that makes it hold: the enable
+   * endpoint spends a `payments.providers` slot, this one has no idea what the
+   * plan allows, and it does not need one as long as it can only ever hand back
+   * a subset of what is already enabled.
+   */
+  it('given a full chain, when it is reordered, then the enabled count never grows', async () => {
+    const { settings, store } = setup();
+    await settings.applyChargeVerification(TENANT, 'stone', true);
+    await settings.saveCredentials(TENANT, 'stripe', { environment: 'SANDBOX', fields: {} });
+    const enabledCount = async () => (await store.list(TENANT)).filter((c) => c.enabled).length;
+
+    const before = await enabledCount();
+    await expect(settings.setPriorities(TENANT, ['stripe', 'stone'])).rejects.toThrow();
+    expect(await enabledCount()).toBe(before);
+
+    // And a reorder that only shrinks is still free — pulling an acquirer out
+    // of rotation can never be gated.
+    await settings.setPriorities(TENANT, []);
+    expect(await enabledCount()).toBe(0);
+  });
+
+  /**
+   * The counterweight, and the reason the gate reads `config.enabled` first: a
+   * row enabled before the proof rule existed is grandfathered in, so demanding
+   * proof to RE-RANK it would pin it wherever it sits — at the head of the
+   * chain, in the case that matters. Disabling it stays the way out, exactly as
+   * `setEnabled` promises.
+   */
+  it('given a grandfathered enabled row with no proof, when the chain is reordered, then it may still be demoted', async () => {
+    const { settings, store } = setup();
+    await settings.applyChargeVerification(TENANT, 'stripe', true);
+    await settings.saveCredentials(TENANT, 'stone', { environment: 'SANDBOX', fields: {} });
+    const stone = await store.get(TENANT, 'stone');
+    await store.save(TENANT, { ...stone!, enabled: true, priority: 0, chargeVerifiedAt: null });
+
+    const view = await settings.setPriorities(TENANT, ['stripe', 'stone']);
+    expect(view.providerChain).toEqual(['stripe', 'stone']);
+  });
+
   it('verify persists the probe outcome and stub mode verifies ok', async () => {
     const { settings } = setup();
     await settings.saveCredentials(TENANT, 'stone', {
@@ -563,7 +641,7 @@ describe('createSettingsService', () => {
 
   it('bridges into the gateway CredentialStore (enabled provider only)', async () => {
     const { settings, store } = setup();
-    const credentials = credentialStoreFrom(store);
+    const credentials = credentialStoreFrom(store, { allowStubMode: true });
     expect(await credentials.defaultProvider(TENANT)).toBeNull();
     await settings.saveCredentials(TENANT, 'stone', {
       environment: 'SANDBOX',

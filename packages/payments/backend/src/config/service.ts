@@ -24,6 +24,7 @@ import type {
 import { assertSaveCredentialsInput } from './credential-input';
 import {
   applyProof,
+  assertRankable,
   pendingVerificationMethods,
   requireProven,
   resolvedFrom,
@@ -89,6 +90,12 @@ export interface SettingsService {
   /**
    * Replace the whole chain in one atomic write — what drag-to-reorder calls.
    * `ordered` is the complete enabled set; anything omitted is disabled.
+   *
+   * It RANKS, it never grants. Naming a provider that is not already in the
+   * chain is REFUSED — {@link UnprovenProviderError} when it has never charged,
+   * `CredentialsError` when it is merely switched off — because enabling is
+   * `setEnabled`'s job, and only that path is behind the plan's provider quota.
+   * See `assertRankable`.
    */
   setPriorities(merchant: MerchantRef, ordered: readonly ProviderName[]): Promise<MerchantSettingsView>;
   /**
@@ -183,12 +190,14 @@ function descriptorOf(providers: ProviderRegistry, name: string): ProviderDescri
 }
 
 /**
- * Reject a chain we cannot rank BEFORE the atomic rewrite runs. The store
- * would refuse it too, but only after the transaction has begun — and the
- * error it raises names the store, not the request, which is useless to the
- * admin who just dragged an unconfigured provider into the list.
+ * Reject a chain we cannot rank BEFORE the atomic rewrite runs. The store would
+ * refuse an unconfigured name too, but only after the transaction has begun —
+ * and the error it raises names the store, not the request, which is useless to
+ * the admin who just dragged the wrong provider into the list. `assertRankable`
+ * owns the per-provider verdict, including the rule that a rewrite may reorder
+ * the chain but never join it.
  */
-async function assertRankable(
+async function assertReorderOnly(
   providers: ProviderRegistry,
   store: ProviderConfigStore,
   merchant: MerchantRef,
@@ -196,9 +205,7 @@ async function assertRankable(
 ): Promise<void> {
   for (const name of ordered) {
     if (!providers.has(name)) throw new UnknownProviderError(name);
-    if (!(await store.get(merchant, name))) {
-      throw new CredentialsError(name, `Provider ${name} is not configured for this merchant`);
-    }
+    assertRankable(providers.get(name), name, await store.get(merchant, name));
   }
 }
 
@@ -253,6 +260,9 @@ export interface SettingsServiceOptions {
    * (deterministic fakes, no network). Stub card charges report `PAID`
    * without money moving, so this is a deployment decision for local dev
    * and demo tenants: default OFF, and refused for PRODUCTION even when on.
+   *
+   * Take it from `resolveStubMode(process.env)` rather than inferring it from
+   * whatever else happens to be in the environment — see `core/stub-mode.ts`.
    */
   allowStubMode?: boolean;
 }
@@ -309,7 +319,7 @@ export function createSettingsService(
     },
 
     async setPriorities(merchant, ordered) {
-      await assertRankable(providers, store, merchant, ordered);
+      await assertReorderOnly(providers, store, merchant, ordered);
       await store.setProviderPriorities(merchant, ordered);
       return this.getSettings(merchant);
     },
@@ -330,8 +340,17 @@ export function createSettingsService(
  * Bridge a `ProviderConfigStore` into the gateway's read-only
  * `CredentialStore` port, so one storage implementation powers both the
  * settings page and the charge/webhook paths.
+ *
+ * It takes the SAME `allowStubMode` the settings service takes, and defaults
+ * it to off: the write path deciding "no new stub rows" is not enough on its
+ * own, because the rows already in the table are what the webhook path reads.
  */
-export function credentialStoreFrom(store: ProviderConfigStore): CredentialStore {
+export function credentialStoreFrom(
+  store: ProviderConfigStore,
+  options: SettingsServiceOptions = {},
+): CredentialStore {
+  const allowStubMode = options.allowStubMode ?? false;
+
   async function chain(merchant: MerchantRef): Promise<ProviderName[]> {
     const configs = await store.list(merchant);
     return configs
@@ -358,12 +377,12 @@ export function credentialStoreFrom(store: ProviderConfigStore): CredentialStore
         if (!config) return null;
         throw new CredentialsError(provider, `Provider ${provider} is configured but not enabled`);
       }
-      return resolvedFrom(config);
+      return resolvedFrom(config, allowStubMode);
     },
     async getConnectedCredentials(merchant, provider) {
       // No enablement check — listening is not routing (see the port).
       const config = await store.get(merchant, provider);
-      return config ? resolvedFrom(config) : null;
+      return config ? resolvedFrom(config, allowStubMode) : null;
     },
   };
 }
