@@ -23,13 +23,30 @@ import { ReportBlockBody, ReportBlockFrame, ReportGrid, ReportGridItem } from ".
 import { exportColumnsFor } from "./report-render";
 import { viewBlocks } from "./report-model";
 
-/** One block on the viewer's canvas: title, result, and its own CSV export. */
+/**
+ * One block on the viewer's canvas: title, what it asks for, result, and its
+ * own CSV export.
+ *
+ * A NAMED block shows its name with the spec sentence beneath — the two say
+ * different things, and "Receita do mês" does not tell you it is filtered to
+ * PIX. An UNNAMED block is titled by the sentence itself and shows no
+ * subtitle, because repeating one string as both heading and caption is noise
+ * rather than information.
+ */
 function ViewBlock({ block }: { block: DashboardBlockRender }): JSX.Element {
   const testId = `report-block-${block.id}`;
+  const named = (block.title ?? "").trim() !== "";
+  const sentence = block.sentence ?? "";
+  const heading = named
+    ? block.title!
+    : sentence === ""
+      ? ""
+      : sentence.charAt(0).toLocaleUpperCase("pt-BR") + sentence.slice(1);
   return (
     <ReportGridItem span={block.span}>
       <ReportBlockFrame
-        title={block.title ?? ""}
+        title={heading}
+        description={named && sentence !== "" ? sentence : undefined}
         dataTestId={testId}
         actions={
           block.status === "ok" ? (

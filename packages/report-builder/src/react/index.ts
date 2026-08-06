@@ -1,56 +1,33 @@
 /**
- * `@12-apps/report-builder/react` — the plug-and-play reports UI (payments-
- * frontend doctrine), each page taking only `tenantSlug` from the host:
+ * `@12-apps/report-builder/react` — the reports feature as ONE thing.
  *
- *   - {@link ReportsPage}      the Relatórios area: pick an authored report,
- *                              read it, edit or archive it (FUT-391);
- *   - {@link ReportEditorPage} the same canvas, inline-editable;
- *   - {@link SystemReportPage} one built-in report, reached from the host's
- *                              lateral menu under the area it analyses;
- *   - {@link SystemDashboardPage} a whole SECTION's built-ins on one canvas
- *                              under one period.
+ * A frontend host writes one line:
  *
- * The host mounts the built-in DASHBOARDS in its menu from
- * {@link SYSTEM_DASHBOARDS} — one row per section, gated by the entry's own
- * permission; {@link SYSTEM_REPORT_NAV} still describes the individual reports
- * those dashboards are composed from, which stay reachable by deep link.
+ *   const { ReportBuilder } = createReportBuilder({ tenantSlug });
  *
- * Routing (react-router) and data fetching (same-origin `/api/admin/...`) are
- * self-contained; the host owns auth. See ADOPTING.md.
+ * Everything the feature is — the list, the viewer, the editor, the config
+ * panel, the filter rows, the pickers, the templates, and the ROUTES between
+ * them — lives inside this package. The host supplies only what is genuinely
+ * its own: which tenant, and how to reach the API.
+ *
+ * This entry deliberately does NOT export the screens individually. It used
+ * to, and the cost showed up immediately: hosts hand-wrote the route table, so
+ * each had to rediscover that `reports/new` must precede `reports/:id` or the
+ * static segment is read as an id — a rule of this surface leaking into every
+ * consumer. Exploring components one at a time is Storybook's job, and belongs
+ * in this package rather than in a consumer's route file.
+ *
+ * The host still owns auth: the default transport rides the browser's cookies
+ * against its own `/api/admin/...` endpoints. See ADOPTING.md.
  */
-export { ReportsPage } from './reports-page';
-export { ReportEditorPage } from './report-editor';
-export { SystemReportPage } from './system-report';
-export { SystemDashboardPage } from './system-dashboard';
-export { ReportRenderView } from './report-render';
-export { ReportGrid, ReportGridItem, ReportBlockFrame } from './report-grid';
+export { createReportBuilder, type ReportBuilderConfig } from './create-report-builder';
+export { httpTransport, type ReportBuilderTransport } from './transport';
+
 /**
- * The list, separately from the page that fetches for it. `ReportsPage` needs a
- * router and a query client; this takes reports as a prop, so a host that
- * already has the summaries — or the consumer harness, which has no API at all
- * — can render the real list rather than a lookalike. `filterReports` is the
- * rule the list applies, exported so it can be asserted without a DOM.
+ * The built-in dashboards a host mounts in its OWN lateral menu — the one
+ * genuine integration point beyond the surface itself, because only the host
+ * knows where its menu lives and which permission gates a row.
  */
-export { ReportCardList } from './report-card-list';
-/**
- * The "Adicionar bloco" picker. Takes its groups as a prop rather than
- * importing them, so a host can narrow what it offers — and so the component
- * has no opinion about where the templates came from.
- */
-export { BlockTemplatePicker } from './block-template-picker';
-/**
- * Unsaved-changes state (FUT-391). Exported because a host embedding its own
- * editor needs the same guard, and because the browser half — ⌘S and
- * `beforeunload` — is unreachable from this package's node test environment,
- * so the consumer harness is the only place it can be proven wired.
- */
-export { useUnsavedChanges } from './lib/use-unsaved-changes';
-export { isDirty } from '../dirty-state';
-export {
-  filterReports,
-  REPORT_SCOPE_LABELS,
-  type ReportScope,
-} from './report-list-filters';
 export {
   SYSTEM_DASHBOARDS,
   SYSTEM_REPORT_KEYS,
@@ -59,6 +36,11 @@ export {
   type SystemReportNavEntry,
   type SystemReportSection,
 } from '../server/presets';
+
+/**
+ * Wire types, for a host that persists or proxies these payloads. Types only —
+ * no behaviour crosses this boundary.
+ */
 export type { ReportRender, ReportRow, ReportTableColumn, SystemReportSummary } from './reports-api';
 export type {
   DashboardBlockWire,
@@ -71,4 +53,3 @@ export type {
   SavedReportSummary,
   SavedReportView,
 } from './custom-reports-api';
-export type { ReportBlockDraft, ReportDraft } from './report-model';

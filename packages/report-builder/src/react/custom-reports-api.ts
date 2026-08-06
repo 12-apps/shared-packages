@@ -6,7 +6,7 @@
  */
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
-import { apiFetch } from "./lib/api";
+import { useTransport } from "./transport-context";
 
 import { restResult, type Result } from "./lib/rest-result";
 import type { ReportGrain, ReportRange, ReportRender } from "./reports-api";
@@ -80,8 +80,12 @@ export interface ReportSpecWire {
     operator: string;
     value?: string | number | boolean;
     values?: Array<string | number | boolean>;
-    from?: string | number;
-    to?: string | number;
+    // Mirrors the core spec exactly, booleans included. A `between` on a
+    // boolean is meaningless, but that is a question for the core schema's
+    // validation — this type's job is to MIRROR it, and a mirror that
+    // disagrees makes a legal template unassignable to a draft.
+    from?: string | number | boolean;
+    to?: string | number | boolean;
   }>;
   sort: Array<{ by: string; direction: "asc" | "desc" }>;
   limit?: number;
@@ -144,8 +148,28 @@ interface SingleReportView extends SavedReportViewBase {
 
 /** One rendered dashboard block: its result, or an inline actionable error. */
 export type DashboardBlockRender =
-  | { id: string; title?: string; span: number; status: "ok"; render: ReportRender }
-  | { id: string; title?: string; span: number; status: "error"; error: string };
+  | {
+      id: string;
+      title?: string;
+      span: number;
+      /**
+       * What this block asks for, in Portuguese — computed server-side by
+       * `specSentence` so the viewer, the editor and an export cannot drift.
+       * Optional because a cached response predating it would omit it.
+       */
+      sentence?: string;
+      status: "ok";
+      render: ReportRender;
+    }
+  | {
+      id: string;
+      title?: string;
+      span: number;
+      /** Present on a FAILED block too — that is when a reader most needs it. */
+      sentence?: string;
+      status: "error";
+      error: string;
+    };
 
 export interface DashboardView extends SavedReportViewBase {
   type: "dashboard";
@@ -160,23 +184,25 @@ interface RunResult {
   render: ReportRender;
 }
 
-interface ApiEnvelope<T> {
-  data: T;
-}
-
 function adminPath(tenantSlug: string, path: string): string {
   return `/api/admin/${encodeURIComponent(tenantSlug)}${path}`;
 }
 
-async function adminFetch<T>(path: string): Promise<T> {
-  const { data } = await apiFetch<ApiEnvelope<T>>(path);
-  return data;
+/**
+ * Reads go through the transport in scope (FUT-391), so a host — or a consumer
+ * harness with no server at all — can substitute the whole backend. The
+ * default transport is the same-origin fetch this used to call directly.
+ */
+function useAdminFetch(): <T>(path: string) => Promise<T> {
+  const transport = useTransport();
+  return <T,>(path: string) => transport.get<T>(path);
 }
 
 /** The entities/fields this actor may query (server-narrowed by permission). */
 export function useReportFields(
   tenantSlug: string,
 ): UseQueryResult<{ entities: ReportEntityFields[] }> {
+  const adminFetch = useAdminFetch();
   return useQuery({
     queryKey: ["admin", tenantSlug, "reports", "fields"],
     queryFn: () =>
@@ -188,6 +214,7 @@ export function useReportFields(
 export function useSavedReports(
   tenantSlug: string,
 ): UseQueryResult<{ reports: SavedReportSummary[] }> {
+  const adminFetch = useAdminFetch();
   return useQuery({
     queryKey: ["admin", tenantSlug, "reports", "custom"],
     queryFn: () =>
@@ -202,6 +229,7 @@ export function useSavedReport(
   id: string,
   range: ReportRange,
 ): UseQueryResult<SavedReportView> {
+  const adminFetch = useAdminFetch();
   return useQuery({
     queryKey: ["admin", tenantSlug, "reports", "custom", id, range],
     queryFn: () =>
@@ -229,12 +257,16 @@ export function useTenantRoles(
   tenantSlug: string,
   enabled: boolean,
 ): UseQueryResult<TenantRoleOption[]> {
+  const transport = useTransport();
   return useQuery({
     queryKey: ["admin", tenantSlug, "roles", "picker"],
     queryFn: async () => {
       const roles: TenantRoleOption[] = [];
       for (let page = 1; page <= 20; page += 1) {
-        const result = await apiFetch<{
+        // The roles endpoint answers with a paginated envelope rather than
+        // the `{ data }` one every reports endpoint uses, so this asks the
+        // transport for the page itself and reads both halves.
+        const result = await transport.getRaw<{
           data: TenantRoleOption[];
           pagination: { hasNextPage: boolean };
         }>(adminPath(tenantSlug, `/roles?page=${page}&pageSize=100`));

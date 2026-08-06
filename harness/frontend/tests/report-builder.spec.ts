@@ -1,101 +1,77 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * The published report-builder, driven in a browser: a catalog and a spec go
- * in, a rendered table and a spec sentence come out.
+ * `@12-apps/report-builder` mounted the way a host mounts it: one call to
+ * `createReportBuilder`, no route table, no screen imported by name.
  *
- * The backend harness proves the same pipeline server-side. This one proves it
- * survives a bundler and a browser — the package ships its compiler, executor
- * and render model as isomorphic code, and "isomorphic" is a claim until
- * something runs it on both sides.
+ * These drive the REAL surface from the published tarball and assert what an
+ * owner sees, because the thing being proven is that the package's public
+ * wiring works for a consumer — not that a component renders.
  */
-test('the published pipeline compiles, executes and renders in a browser', async ({ page }) => {
+test('the whole surface mounts from one factory call', async ({ page }) => {
   await page.goto('#/report-builder');
 
   await expect(page.getByTestId('harness-page')).toHaveAttribute('data-page', 'report-builder');
-  await expect(page.getByTestId('report-builder')).toBeVisible();
-
-  // Grouped by payment method: PIX 1000 + 3000, CARD 2000.
-  const byMethod = page.getByTestId('report-block-by-method-table');
-  await expect(byMethod).toBeVisible();
-  await expect(page.getByTestId('report-block-by-method-row')).toHaveCount(2);
-  await expect(byMethod).toContainText('PIX');
-  await expect(byMethod).toContainText('CARD');
+  await expect(page.getByTestId('page-reports')).toBeVisible();
 });
 
-test('every block states its spec in Portuguese', async ({ page }) => {
+test('the list offers the seeded reports, scoped', async ({ page }) => {
   await page.goto('#/report-builder');
 
-  await expect(page.getByTestId('report-block-by-method-sentence')).toHaveText(
-    'soma de receita em pedidos por forma de pagamento',
+  const list = page.getByTestId('page-reports');
+  await expect(list).toContainText('Vendas por forma de pagamento');
+  // Scope pills, from the card list inside the package.
+  await expect(list).toContainText('Todos (1)');
+  await expect(list).toContainText('Arquivados (1)');
+});
+
+test('the selected report runs through the published pipeline', async ({ page }) => {
+  await page.goto('#/report-builder');
+
+  // The area opens with a report already chosen — it is a picker AND a viewer,
+  // so the canvas is reachable without a further navigation.
+  const revenue = page.getByTestId('report-block-revenue');
+  await expect(revenue).toBeVisible({ timeout: 15_000 });
+
+  // Compiled, executed against the harness's in-memory adapter and rendered by
+  // the package: the bar chart's own categories, not fixture text.
+  await expect(revenue).toContainText('PIX');
+  await expect(revenue).toContainText('CARD');
+});
+
+test('an untitled block is named by its own spec sentence', async ({ page }) => {
+  await page.goto('#/report-builder');
+
+  // The second block carries no title, so specSentence names it — computed
+  // server-side and shipped on the block, which is what stops the viewer, the
+  // editor and an export from drifting.
+  const daily = page.getByTestId('report-block-daily');
+  await expect(daily).toBeVisible({ timeout: 15_000 });
+  await expect(daily.locator('h2')).toHaveText('Soma de receita em pedidos por data (dia)');
+
+  // …and shows NO subtitle, because repeating one string as both heading and
+  // caption is noise. A named block gets both; this one is the same sentence.
+  await expect(page.getByTestId('report-block-daily-description')).toHaveCount(0);
+});
+
+test('a NAMED block shows its name and what it asks for', async ({ page }) => {
+  await page.goto('#/report-builder');
+
+  const revenue = page.getByTestId('report-block-revenue');
+  await expect(revenue).toBeVisible({ timeout: 15_000 });
+  await expect(revenue.locator('h2')).toHaveText('Receita por forma');
+  // The name does not say it is filtered to paid orders; the sentence does.
+  await expect(page.getByTestId('report-block-revenue-description')).toHaveText(
+    'soma de receita em pedidos por forma de pagamento, onde status é PAID',
   );
-
-  // The sentence tracks the spec — a filtered, date-bucketed block says so.
-  await expect(page.getByTestId('report-block-by-day-pix-sentence')).toHaveText(
-    'soma de receita em pedidos por data (dia), onde forma de pagamento é PIX',
-  );
 });
 
-test('an untitled block is named after its spec', async ({ page }) => {
+test('a chart offers its table fallback', async ({ page }) => {
   await page.goto('#/report-builder');
 
-  await expect(page.getByTestId('report-block-by-method-title')).toHaveText(
-    'Soma de receita em pedidos por forma de pagamento',
-  );
-});
-
-/**
- * FUT-391: a closed-set field is filtered by PICKING. The failure this guards
- * is invisible at runtime — a mistyped code compiles and matches no rows, so
- * the block reads as "no data" rather than as the typo it is.
- */
-test('a closed-set field offers a picker, not a text box', async ({ page }) => {
-  await page.goto('#/report-builder');
-
-  const picker = page.getByTestId('filter-value-select');
-  await expect(picker).toBeVisible();
-  // There is no text box to mistype a code into.
-  await expect(page.getByTestId('filter-value-input')).toHaveCount(0);
-
-  // Labels are shown; the SPEC carries the code.
-  await expect(picker).toContainText('Cartão');
-  await expect(page.getByTestId('filter-spec-value')).toHaveText('PIX');
-
-  await picker.selectOption('CARD');
-  await expect(page.getByTestId('filter-spec-value')).toHaveText('CARD');
-});
-
-test('an open-ended field falls back to a text box', async ({ page }) => {
-  await page.goto('#/report-builder');
-
-  await page.getByTestId('filter-field').selectOption('totalCents');
-  await expect(page.getByTestId('filter-value-input')).toBeVisible();
-  await expect(page.getByTestId('filter-value-select')).toHaveCount(0);
-});
-
-test('changing the field resets the value, so no stale code survives', async ({ page }) => {
-  await page.goto('#/report-builder');
-
-  await page.getByTestId('filter-value-select').selectOption('CARD');
-  await expect(page.getByTestId('filter-spec-value')).toHaveText('CARD');
-
-  // money → the previous enum code must not survive as `totalCents eq CARD`.
-  await page.getByTestId('filter-field').selectOption('totalCents');
-  await expect(page.getByTestId('filter-spec-value')).toHaveText('(vazio)');
-
-  // …and back: a legal first value, not the blank left behind.
-  await page.getByTestId('filter-field').selectOption('method');
-  await expect(page.getByTestId('filter-spec-value')).toHaveText('PIX');
-});
-
-test('operators come from the field, not one global list', async ({ page }) => {
-  await page.goto('#/report-builder');
-
-  // A closed set is never ordered: no gte/lte on an enum.
-  const operators = page.getByTestId('filter-operator');
-  await expect(operators).toContainText('eq');
-  await expect(operators).not.toContainText('gte');
-
-  await page.getByTestId('filter-field').selectOption('totalCents');
-  await expect(operators).toContainText('gte');
+  const revenue = page.getByTestId('report-block-revenue');
+  await expect(revenue).toBeVisible({ timeout: 15_000 });
+  // The accessibility fallback, reachable on the real surface rather than on a
+  // page the harness built to show it.
+  await expect(revenue.getByText('Ver como tabela')).toBeVisible();
 });

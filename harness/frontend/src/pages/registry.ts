@@ -1,11 +1,7 @@
 import type { ComponentType } from 'react';
 
-import { BlockTemplatePickerPage } from './block-template-picker';
 import { PaymentsProviderSettingsPage } from './payments-provider-settings';
 import { ReportBuilderPage } from './report-builder';
-import { UnsavedChangesPage } from './unsaved-changes';
-import { ReportCardListPage } from './report-card-list';
-import { ReportRenderPage } from './report-render';
 
 /**
  * One page per published surface, and the ONLY place a new one is registered.
@@ -15,6 +11,12 @@ import { ReportRenderPage } from './report-render';
  * The shell builds its nav from this list, so nothing else has to change — and
  * a spec addresses a page by slug (`#/<slug>`), so specs do not move when the
  * nav grows.
+ *
+ * ONE ENTRY PER PACKAGE. This is a consumer harness, not a component gallery:
+ * a page proves the package's PUBLIC wiring works for a host, so a package
+ * that needs several screens exposes them behind its own entry point and the
+ * harness still wires it once. Exploring components individually is
+ * Storybook's job, and belongs in the package that owns them.
  *
  * `pkg` is the package the page exercises, shown in the nav. It is not derived
  * from the imports on purpose: a page may compose several packages (the
@@ -41,29 +43,5 @@ export const PAGES: readonly HarnessPage[] = [
     title: 'Report builder',
     pkg: '@12-apps/report-builder',
     Component: ReportBuilderPage,
-  },
-  {
-    slug: 'report-card-list',
-    title: 'Report list',
-    pkg: '@12-apps/report-builder/react',
-    Component: ReportCardListPage,
-  },
-  {
-    slug: 'block-template-picker',
-    title: 'Block template picker',
-    pkg: '@12-apps/report-builder/react',
-    Component: BlockTemplatePickerPage,
-  },
-  {
-    slug: 'report-render',
-    title: 'Chart + table fallback',
-    pkg: '@12-apps/report-builder/react',
-    Component: ReportRenderPage,
-  },
-  {
-    slug: 'unsaved-changes',
-    title: 'Unsaved changes',
-    pkg: '@12-apps/report-builder',
-    Component: UnsavedChangesPage,
   },
 ];

@@ -7,13 +7,15 @@
  * on block B puts A in B's slot on the canvas, so what the author drags is what
  * the reader gets.
  */
-import type { JSX } from "react";
+import { useState, type JSX } from "react";
 
 import { Card } from "@12-apps/ui/layout/Card";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { REPORT_GRID_COLUMNS } from "../layout";
+import { blockTemplateGroups, type BlockTemplate } from "../server/block-templates";
+import { BlockTemplatePicker } from "./block-template-picker";
 import type { ReportEntityFields } from "./custom-reports-api";
 import { PlusIcon } from "./lib/block-icons";
 import { useDragReorder } from "./lib/drag-reorder";
@@ -91,6 +93,7 @@ export function EditorCanvas({
   range: ReportRange;
   onChange: (next: (draft: ReportDraft) => ReportDraft) => void;
 }): JSX.Element {
+  const [picking, setPicking] = useState(false);
   const dnd = useDragReorder((sourceId, targetId) =>
     onChange((current) => reorderBlock(current, sourceId, targetId)),
   );
@@ -115,11 +118,25 @@ export function EditorCanvas({
           onRemove={() => onChange((current) => removeBlock(current, block.id))}
         />
       ))}
-      <AddBlockRow
-        disabled={full || !first}
-        onAdd={() => {
+      <AddBlockRow disabled={full || !first} onAdd={() => setPicking(true)} />
+      {/* "Adicionar bloco" opens the templates rather than dropping an empty
+       * block on the canvas. An empty block asks the author to know their data
+       * model before they have seen a number; a template shows one first and
+       * lets them adjust it. The BLANK template is still in the picker, so
+       * someone who knows exactly what they want is not forced through it. */}
+      <BlockTemplatePicker
+        open={picking}
+        groups={blockTemplateGroups()}
+        onClose={() => setPicking(false)}
+        onSelect={(template: BlockTemplate) => {
+          setPicking(false);
           if (!first) return;
-          onChange((current) => addBlock(current, starterBlockSpec(first), first.label));
+          // A template carries a ready spec; the blank one carries null and
+          // falls back to the entity's starter, which is the smart default the
+          // add button used to produce unconditionally.
+          const spec = template.spec ?? starterBlockSpec(first);
+          const title = template.spec ? template.title : first.label;
+          onChange((current) => addBlock(current, spec, title));
         }}
       />
     </ReportGrid>
