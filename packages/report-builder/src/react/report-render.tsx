@@ -68,12 +68,21 @@ export function exportColumnsFor(render: ReportRender): ExportColumn<ReportRow>[
 interface ReportRenderViewProps {
   render: ReportRender;
   dataTestId?: string;
+  /**
+   * Offered by the empty state as "Ver 30 dias" (FUT-391). An empty block is
+   * ambiguous — "nothing happened" and "your window is too small" look
+   * identical — and the common cause is the window, so the state that reports
+   * the emptiness also offers the fix. Omitted at the widest period, where the
+   * offer could not be taken.
+   */
+  onWidenRange?: { label: string; onClick: () => void };
 }
 
 /** The report body: KPI tile, chart, table, or an empty state without rows. */
 export function ReportRenderView({
   render,
   dataTestId = "report-render",
+  onWidenRange,
 }: ReportRenderViewProps): JSX.Element {
   if (render.kind === "kpi") {
     // A KPI over an empty period renders the tile with "—", not EmptyState —
@@ -94,6 +103,7 @@ export function ReportRenderView({
         variant="minimal"
         title="Sem dados no período"
         description="Nenhum registro encontrado para o período selecionado."
+        primaryAction={onWidenRange}
         dataTestId={dataTestId}
       />
     );
