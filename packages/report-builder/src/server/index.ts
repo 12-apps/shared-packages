@@ -23,6 +23,18 @@ export {
   type SystemReportSection,
 } from './presets';
 export { REPORT_ENTITY_PERMISSION, REPORT_RUN_MAX_ROWS } from './policy';
+/**
+ * The "Adicionar bloco" picker's contents (FUT-391). Server-side because every
+ * template's spec IS a starter, and the starters are compile-validated against
+ * the live catalog here — a client-side copy would carry no such guarantee.
+ */
+export {
+  BLANK_BLOCK_TEMPLATE,
+  blockTemplateGroups,
+  findBlockTemplate,
+  type BlockTemplate,
+  type BlockTemplateGroup,
+} from './block-templates';
 export { REPORT_ENTITY_STARTERS } from './starters';
 export {
   canViewSavedReport,

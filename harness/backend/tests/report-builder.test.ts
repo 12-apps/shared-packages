@@ -1,5 +1,6 @@
 import {
   autoTitle,
+  compileReport,
   createMemoryDataSource,
   defaultValueFor,
   defineCatalog,
@@ -10,6 +11,11 @@ import {
   runReport,
   specSentence,
 } from '@12-apps/report-builder';
+import {
+  BLANK_BLOCK_TEMPLATE,
+  blockTemplateGroups,
+  reportCatalog,
+} from '@12-apps/report-builder/server';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -96,6 +102,30 @@ describe('the published report-builder runs a spec end to end', () => {
     // All three sales are 2026-07-01 in São Paulo. Bucketing in UTC would put
     // o3 (02:00Z) on 07-02 and leave this at 3000.
     expect(byDay).toEqual({ '2026-07-01': 6000 });
+  });
+});
+
+describe('the block templates the picker offers', () => {
+  it('ships groups whose every template carries a runnable spec', async () => {
+    const groups = blockTemplateGroups();
+    expect(groups.length).toBeGreaterThan(1);
+
+    const templates = groups.flatMap((group) => group.templates);
+    const runnable = templates.filter((template) => template.spec !== null);
+    expect(runnable.length).toBeGreaterThan(4);
+
+    // Every non-blank template compiles against the PUBLISHED catalog. A picker
+    // entry that yields a spec the compiler rejects is worse than no picker:
+    // the owner made a reasonable choice and got an error they cannot act on.
+    for (const template of runnable) {
+      expect(() => compileReport(template.spec, reportCatalog)).not.toThrow();
+    }
+  });
+
+  it('always offers the blank escape hatch, last', () => {
+    const last = blockTemplateGroups().at(-1);
+    expect(last?.templates).toEqual([BLANK_BLOCK_TEMPLATE]);
+    expect(BLANK_BLOCK_TEMPLATE.spec).toBeNull();
   });
 });
 
