@@ -26,14 +26,25 @@ const catalog = defineCatalog({
   },
 });
 
-/** Twelve products, revenue descending: P01 = 1200 … P12 = 100. */
-const ROWS = Array.from({ length: 12 }, (_, index) => ({
-  product: `P${String(index + 1).padStart(2, '0')}`,
-  method: index % 2 === 0 ? 'PIX' : 'CARD',
-  cents: (12 - index) * 100,
-}));
+/**
+ * Twelve products, revenue descending: P01 = 1200 … P12 = 100.
+ *
+ * A FACTORY rather than a shared constant: the executor folds groups, and a
+ * fixture shared across cases is how a fold that mutated its input would pass
+ * here and fail in whichever test happened to run second.
+ */
+function salesRows() {
+  return Array.from({ length: 12 }, (_, index) => ({
+    product: `P${String(index + 1).padStart(2, '0')}`,
+    method: index % 2 === 0 ? 'PIX' : 'CARD',
+    cents: (12 - index) * 100,
+  }));
+}
 
-function run(input: ReportSpecInput, rows = ROWS) {
+/** 1200 + 1100 + … + 100. */
+const TOTAL_CENTS = 7800;
+
+function run(input: ReportSpecInput, rows = salesRows()) {
   const query = compileReport(reportSpecSchema.parse(input), catalog);
   return executeCompiledQuery(rows, query);
 }
@@ -56,8 +67,7 @@ describe('top-N with an "Outros" bucket', () => {
   it('keeps the total intact — that is the whole point', () => {
     const rows = run(TOP_5);
     const shown = rows.reduce((total, row) => total + Number(row.sum_cents), 0);
-    const actual = ROWS.reduce((total, row) => total + row.cents, 0);
-    expect(shown).toBe(actual);
+    expect(shown).toBe(TOTAL_CENTS);
   });
 
   it('folds the TAIL of the requested ordering, not of insertion order', () => {
@@ -173,7 +183,7 @@ describe('the bucket is exact, not a blend of finished values', () => {
 
 describe('the memory data source honours it too', () => {
   it('folds through the published adapter seam', async () => {
-    const source = createMemoryDataSource({ sales: ROWS });
+    const source = createMemoryDataSource({ sales: salesRows() });
     const rows = await source.execute(compileReport(reportSpecSchema.parse(TOP_5), catalog));
     expect(rows).toHaveLength(6);
     expect(rows.at(-1)?.product).toBe(OTHERS_BUCKET_LABEL);
@@ -191,20 +201,20 @@ describe('the bucket survives the whole pipeline', () => {
   it('reaches the caller through runReport, not just the executor', async () => {
     const result = await runReport(TOP_5, {
       catalog,
-      adapter: createMemoryDataSource({ sales: ROWS }),
+      adapter: createMemoryDataSource({ sales: salesRows() }),
     });
 
     expect(result.rows).toHaveLength(6);
     expect(result.rows.at(-1)?.product).toBe(OTHERS_BUCKET_LABEL);
 
     const shown = result.rows.reduce((total, row) => total + Number(row.sum_cents), 0);
-    expect(shown).toBe(ROWS.reduce((total, row) => total + row.cents, 0));
+    expect(shown).toBe(TOTAL_CENTS);
   });
 
   it('is present in the rendered table model too', async () => {
     const result = await runReport(
       { ...TOP_5, presentation: { kind: 'table' } },
-      { catalog, adapter: createMemoryDataSource({ sales: ROWS }) },
+      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }) },
     );
 
     if (result.render.kind !== 'table') throw new Error('expected a table render');
