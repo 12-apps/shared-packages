@@ -283,9 +283,27 @@ kill_pidfile() { # file
   rm -f "$f"
 }
 
+# SIGTERM only ASKS. Returning before the port is actually free is a trap for
+# the very next `up`: it finds :$port still listening, decides a server is
+# already there and skips starting one — then the dying process releases the
+# port and the tunnel is left pointing at nothing, which reads as "the relay is
+# broken" rather than "down hadn't finished".
+wait_port_free() { # port
+  local port="$1" n
+  for n in $(seq 1 40); do
+    port_listening "$port" || return 0
+    sleep 0.25
+  done
+  warn ":$port is still held after 10s — something is ignoring SIGTERM"
+  return 1
+}
+
 cmd_down() {
+  local port="$PORT"
+  [ -f "$STATE" ] && port="$(sed -n 's/.*"port":"\([^"]*\)".*/\1/p' "$STATE")"
   kill_pidfile "$WORK_DIR/frpc.pid"
   kill_pidfile "$WORK_DIR/storybook.pid"
+  wait_port_free "$port" || true
   rm -f "$STATE" "$WORK_DIR/url"
   ok "stopped"
 }
