@@ -1,3 +1,12 @@
+export {
+  createReportBuilder,
+  documentShape,
+  type ReportActor,
+  type ReportBuilderServerConfig,
+  type ReportRequest,
+  type ReportResponse,
+  type ReportRoute,
+} from './create-report-builder';
 /**
  * `@12-apps/report-builder/server` — the host-mounted backend surface
  * (plug-and-play, payments-backend doctrine): the domain field catalog and
