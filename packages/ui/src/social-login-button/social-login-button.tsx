@@ -2,11 +2,11 @@
 
 import * as React from 'react';
 import { Box, Stack } from '@mui/material';
-import { Button } from './components/form/Button';
-import { Card, CardContent } from './components/layout/Card';
-import { Heading } from './components/typography/Heading';
-import { Text } from './components/typography/Text';
-import { Separator } from './components/layout/Separator';
+import { Button } from '../components/form/Button';
+import { Card, CardContent } from '../components/layout/Card';
+import { Heading } from '../components/typography/Heading';
+import { Text } from '../components/typography/Text';
+import { Separator } from '../components/layout/Separator';
 
 export type SocialProvider = 'google' | 'facebook' | 'apple';
 
