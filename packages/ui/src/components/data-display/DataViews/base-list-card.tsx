@@ -2,12 +2,22 @@
 
 import { type ReactNode } from "react";
 
-import type { SxProps, Theme } from "@mui/material/styles";
+
+
+import { useTheme } from "@mui/material/styles";
 
 import { Checkbox } from "../../form/Checkbox";
 import { Card } from "../../layout/Card";
 import { DescriptionItem, type DescriptionItemProps } from "../DescriptionItem";
 import { DragHandle, useDragItem } from "./data-views-drag";
+import { DENSITY_ROW_PADDING, type DataViewsDensity } from "./data-views-layout-context";
+import {
+  cardSurfaceStyles,
+  isSelectable,
+  surfaceScale,
+  type CardSurfaceProps,
+} from "./card-surface";
+import { listCardSx, META_BREAK, STACK_BREAK } from "./base-list-card-style";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
@@ -28,7 +38,7 @@ import { Text } from "../../typography/Text";
  * widths at one viewport size. A media query is wrong for at least two of them.
  */
 
-export interface BaseListCardProps {
+export interface BaseListCardProps extends CardSurfaceProps {
   /** A marker: avatar, thumbnail or icon, pinned to the start of the row. */
   leading?: ReactNode;
   /** First-class title. */
@@ -75,25 +85,34 @@ export interface BaseListCardProps {
   menu?: ReactNode;
   /** Extra content below the main row (chips, a progress bar, a nested list). */
   children?: ReactNode;
-  /** Whether this row is in the grid's selection. */
-  selected?: boolean;
   /** Toggle this row's selection. Omit to hide the checkbox (non-selectable). */
   onToggleSelect?: () => void;
-  /** Row click (e.g. open/edit). The checkbox and menu stop propagation. */
-  onClick?: () => void;
-  /** Visually de-emphasise (e.g. a disabled/cancelled entity). */
-  dimmed?: boolean;
+  /**
+   * How much air the row gets — the SAME three values the Exibição panel
+   * offers, so a list answers the operator's density preference directly
+   * instead of the host translating it into a number.
+   *
+   * It drives the vertical padding, which is what density means on a full-width
+   * row: the row cannot get narrower, so height is the only thing left to
+   * spend. Defaults to `cozy`.
+   */
+  density?: DataViewsDensity;
   /**
    * Padding multiplier, 1 = base — the same knob {@link BaseCard} takes, so a
-   * list and a grade of the same records answer the density preference in step.
+   * list and a grade of the same records scale in step.
+   *
+   * Orthogonal to `density`: this is how big everything is, density is how
+   * tightly the rows stack. Both apply.
    */
   scale?: number;
   /**
-   * Flush list style: a bottom rule instead of an outline.
+   * Flush list style: a bottom rule instead of an outline — a row-only
+   * variant, which is why it is a flag here rather than a `CardSurfaceVariant`
+   * a tile would have no use for.
    *
-   * Default OUTLINED, because `ListBody` stacks these with a density gap
-   * between them and a bottom rule floating in that gap belongs to neither row.
-   * Pass this only when the host is drawing its own gapless list.
+   * `ListBody` stacks these with a density gap between them, and a bottom rule
+   * floating in that gap belongs to neither row, so the default stays outlined.
+   * Pass this only when the host draws its own gapless list.
    */
   divider?: boolean;
   /**
@@ -105,61 +124,7 @@ export interface BaseListCardProps {
    * nothing is worse than no grip.
    */
   dragId?: string | number;
-  dataTestId?: string;
   checkboxTestId?: string;
-}
-
-/** Below this the row is too narrow to carry its middle columns. */
-const META_BREAK = 520;
-/** …and below this the value/status wrap under the title rather than squeeze it. */
-const STACK_BREAK = 360;
-
-/** Flush-list style: a bottom rule instead of the outline. */
-const DIVIDER_SX = {
-  border: 0,
-  borderRadius: 0,
-  borderBottom: 1,
-  borderBottomStyle: "solid",
-  borderBottomColor: "divider",
-} as const;
-
-/** Whole-card dragging: the cursor, and no touch-scroll stealing the gesture. */
-const GRAB_SX = { touchAction: "none", "&:active": { cursor: "grabbing" } } as const;
-
-/** Which cursor the row shows, in priority order. */
-function rowCursor(draggable: boolean, interactive: boolean): string | undefined {
-  if (draggable) return "grab";
-  return interactive ? "pointer" : undefined;
-}
-
-/** The row shell: outlined tile or flush divider, plus the interactive states. */
-function listCardSx(opts: {
-  pad: number;
-  interactive: boolean;
-  dimmed: boolean;
-  selected: boolean;
-  divider: boolean;
-  draggable: boolean;
-}): SxProps<Theme> {
-  const { pad, interactive, dimmed, selected, divider, draggable } = opts;
-  return {
-    // The card answers its OWN width — see the note at the top of this file.
-    containerType: "inline-size",
-    position: "relative",
-    display: "block",
-    width: "100%",
-    px: pad,
-    py: pad * 0.75,
-    transition: "border-color 120ms, box-shadow 120ms, background-color 120ms",
-    cursor: rowCursor(draggable, interactive),
-    opacity: dimmed ? 0.6 : 1,
-    borderColor: selected ? "primary.main" : undefined,
-    boxShadow: selected ? (theme) => `inset 0 0 0 1px ${theme.palette.primary.main}` : undefined,
-    backgroundColor: selected ? "action.selected" : undefined,
-    ...(interactive && !selected ? { "&:hover": { backgroundColor: "action.hover" } } : {}),
-    ...(draggable ? GRAB_SX : {}),
-    ...(divider ? DIVIDER_SX : {}),
-  };
 }
 
 /** Title over subtitle, both ellipsised — the block that absorbs spare width. */
@@ -303,11 +268,13 @@ function ListCardCheckbox({
 function ListCardRow({
   scale,
   selected,
+  selectable,
   drag,
   ...props
 }: BaseListCardProps & {
   scale: number;
   selected: boolean;
+  selectable: boolean;
   drag: ReturnType<typeof useDragItem>;
 }): React.JSX.Element {
   return (
@@ -335,7 +302,7 @@ function ListCardRow({
       )}
       <ListCardCheckbox
         selected={selected}
-        onToggleSelect={props.onToggleSelect}
+        onToggleSelect={selectable ? props.onToggleSelect ?? (() => {}) : undefined}
         checkboxTestId={props.checkboxTestId}
       />
       {props.leading != null && (
@@ -363,10 +330,16 @@ function ListCardRow({
  * in the app and compose this envelope rather than re-deriving the layout.
  */
 export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
-  const { scale = 1, selected = false, dimmed = false, divider = false } = props;
-  const { onClick, dataTestId } = props;
+  const { selected = false, divider = false, density = "cozy", onClick, dataTestId } = props;
+  const selectable = isSelectable(props);
+  const theme = useTheme();
+  const scale = surfaceScale(props.size, props.scale);
+  const drag = useDragItem(props.draggable === false ? undefined : props.dragId);
   const pad = 1.5 * scale;
-  const drag = useDragItem(props.dragId);
+  // Vertical only. A full-width row cannot get narrower, so height is the one
+  // thing density has left to spend — and the horizontal padding still has to
+  // line the row's contents up with the toolbar above it at every setting.
+  const padY = DENSITY_ROW_PADDING[density] * scale;
 
   return (
     <Card
@@ -374,19 +347,43 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
       borderRadius="lg"
       onClick={onClick}
       dataTestId={dataTestId}
+      className={props.className}
+      aria-label={props["aria-label"]}
+      aria-live={props["aria-live"]}
+      aria-atomic={props["aria-atomic"]}
       {...drag.itemProps}
-      sx={listCardSx({
-        pad,
-        interactive: onClick != null,
-        // A row mid-drag is a ghost of itself; the drop target is what the eye
-        // should be on.
-        dimmed: dimmed || drag.dragging,
-        selected,
-        divider,
-        draggable: drag.draggable && drag.handleProps === undefined,
-      })}
+      // A PLAIN OBJECT, not a function. `Card` merges by spreading
+      // (`sx={{ ...defaults, ...sx }}`), and spreading a function yields
+      // nothing at all — the styles vanish silently, which is exactly how the
+      // first version of this shipped with no variants and no effects.
+      sx={{
+        // The shared half — variant, colour, selection, effects — so a Grade and
+        // a Lista of the same records are dressed by one set of rules…
+        ...cardSurfaceStyles({
+          ...props,
+          selectable,
+          // A row mid-drag is a ghost of itself; the drop target is what the eye
+          // should be on.
+          dimmed: props.dimmed === true || drag.dragging,
+        }, theme),
+        // …and the row's own geometry on top, so `divider` still wins over the
+        // outline it replaces.
+        ...listCardSx({
+          pad,
+          padY,
+          interactive: onClick != null,
+          divider,
+          draggable: drag.draggable && drag.handleProps === undefined,
+        }),
+      }}
     >
-      <ListCardRow {...props} scale={scale} selected={selected} drag={drag} />
+      <ListCardRow
+        {...props}
+        scale={scale}
+        selected={selected}
+        selectable={selectable}
+        drag={drag}
+      />
       {props.children != null && <Box sx={{ mt: pad * 0.5, minWidth: 0 }}>{props.children}</Box>}
     </Card>
   );

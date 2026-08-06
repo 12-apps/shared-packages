@@ -2,7 +2,10 @@
 
 import { type ReactNode } from "react";
 
-import type { SxProps, Theme } from "@mui/material/styles";
+import { useTheme, type CSSObject } from "@mui/material/styles";
+
+/** See the note on `CardSx` in `card-surface` — these fragments get merged. */
+type CardSx = CSSObject | Record<string, unknown>;
 
 import { Checkbox } from "../../form/Checkbox";
 import { Card } from "../../layout/Card";
@@ -10,9 +13,15 @@ import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
 import { DragHandle, useDragItem } from "./data-views-drag";
+import {
+  cardSurfaceStyles,
+  isSelectable,
+  surfaceScale,
+  type CardSurfaceProps,
+} from "./card-surface";
 import { CARD_ASPECT_RATIOS, type CardAspectRatio } from "./data-views-types";
 
-interface BaseCardProps {
+export interface BaseCardProps extends CardSurfaceProps {
   /** Extra body content below the caption (chips, meta). Optional. */
   children?: ReactNode;
   /** Tile proportion. Defaults to "4:3". */
@@ -34,14 +43,8 @@ interface BaseCardProps {
   subtitle?: ReactNode;
   /** The 3-dots menu (or any action node) pinned to the top-right corner. */
   menu?: ReactNode;
-  /** Whether this card is in the grid's selection. */
-  selected?: boolean;
   /** Toggle this card's selection. Omit to hide the checkbox (non-selectable). */
   onToggleSelect?: () => void;
-  /** Card click (e.g. open/edit). The checkbox/menu stop propagation. */
-  onClick?: () => void;
-  /** Visually de-emphasise (e.g. a disabled/hidden entity). */
-  dimmed?: boolean;
   /**
    * This card's id for drag purposes.
    *
@@ -51,7 +54,6 @@ interface BaseCardProps {
    * inert and no grip appears.
    */
   dragId?: string | number;
-  dataTestId?: string;
   checkboxTestId?: string;
 }
 
@@ -60,11 +62,9 @@ function cardSx(opts: {
   aspectRatio: CardAspectRatio;
   pad: number;
   interactive: boolean;
-  dimmed: boolean;
-  selected: boolean;
   draggable: boolean;
-}): SxProps<Theme> {
-  const { aspectRatio, pad, interactive, dimmed, selected, draggable } = opts;
+}): CardSx {
+  const { aspectRatio, pad, interactive, draggable } = opts;
   return {
     position: "relative",
     aspectRatio: String(CARD_ASPECT_RATIOS[aspectRatio]),
@@ -72,13 +72,8 @@ function cardSx(opts: {
     flexDirection: "column",
     overflow: "hidden",
     p: pad,
-    transition: "border-color 120ms, box-shadow 120ms, background-color 120ms",
     cursor: draggable ? "grab" : interactive ? "pointer" : undefined,
     ...(draggable ? { touchAction: "none", "&:active": { cursor: "grabbing" } } : {}),
-    opacity: dimmed ? 0.6 : 1,
-    borderColor: selected ? "primary.main" : undefined,
-    boxShadow: selected ? (theme) => `inset 0 0 0 1px ${theme.palette.primary.main}` : undefined,
-    backgroundColor: selected ? "action.selected" : undefined,
   };
 }
 
@@ -257,10 +252,14 @@ function CardContents({
  * tile. Reads no context, so it renders standalone as well as inside the grid.
  */
 export function BaseCard(props: BaseCardProps): React.JSX.Element {
-  const { aspectRatio = "4:3", scale = 1, selected = false, dimmed = false } = props;
+  const { aspectRatio = "4:3", selected = false } = props;
   const { menu, onToggleSelect, onClick, dataTestId, checkboxTestId } = props;
+  const selectable = isSelectable(props);
+  const theme = useTheme();
+  const scale = surfaceScale(props.size, props.scale);
+  // The card's own veto over the container's decision — see `CardSurfaceProps`.
+  const drag = useDragItem(props.draggable === false ? undefined : props.dragId);
   const pad = 1.5 * scale;
-  const drag = useDragItem(props.dragId);
 
   return (
     <Card
@@ -268,17 +267,34 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
       borderRadius="lg"
       onClick={onClick}
       dataTestId={dataTestId}
+      className={props.className}
+      aria-label={props["aria-label"]}
+      aria-live={props["aria-live"]}
+      aria-atomic={props["aria-atomic"]}
       {...drag.itemProps}
-      sx={cardSx({
-        aspectRatio,
-        pad,
-        interactive: onClick != null,
-        // A card mid-drag is a ghost of itself; the drop target is what the eye
-        // should be on.
-        dimmed: dimmed || drag.dragging,
-        selected,
-        draggable: drag.draggable && drag.handleProps === undefined,
-      })}
+      // A PLAIN OBJECT, not a function. `Card` merges by spreading
+      // (`sx={{ ...defaults, ...sx }}`), and spreading a function yields
+      // nothing at all — the styles vanish silently, which is exactly how the
+      // first version of this shipped with no variants and no effects.
+      sx={{
+        // The shared half — variant, colour, selection, effects — identical to
+        // the one BaseListCard uses, so a Grade and a Lista of the same records
+        // are dressed by one set of rules.
+        ...cardSurfaceStyles({
+          ...props,
+          selectable,
+          // A card mid-drag is a ghost of itself; the drop target is what the
+          // eye should be on.
+          dimmed: props.dimmed === true || drag.dragging,
+        }, theme),
+        // …and the tile's own geometry on top.
+        ...cardSx({
+          aspectRatio,
+          pad,
+          interactive: onClick != null,
+          draggable: drag.draggable && drag.handleProps === undefined,
+        }),
+      }}
     >
       {/* Bottom-left, opposite the menu and clear of the checkbox — a grip in
           the same corner as a control that toggles selection means every drag
@@ -294,7 +310,7 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
       )}
       <CardOverlays
         selected={selected}
-        onToggleSelect={onToggleSelect}
+        onToggleSelect={selectable ? onToggleSelect ?? (() => {}) : undefined}
         checkboxTestId={checkboxTestId}
         menu={menu}
       />

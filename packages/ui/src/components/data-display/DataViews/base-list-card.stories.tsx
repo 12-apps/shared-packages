@@ -26,6 +26,21 @@ const meta: Meta<typeof BaseListCard> = {
   parameters: { layout: "padded" },
   tags: ["autodocs"],
   argTypes: {
+    variant: { control: "inline-radio", options: ["outline", "ghost", "text"] },
+    size: { control: "inline-radio", options: ["sm", "md", "lg"] },
+    color: {
+      control: "select",
+      options: ["primary", "secondary", "success", "warning", "error", "info"],
+    },
+    density: { control: "inline-radio", options: ["compact", "cozy", "comfortable"] },
+    selectable: { control: "boolean" },
+    draggable: { control: "boolean" },
+    glow: { control: "boolean" },
+    pulse: { control: "boolean" },
+    animate: { control: "boolean" },
+    shimmer: { control: "boolean" },
+    bounce: { control: "boolean" },
+    glass: { control: "boolean" },
     scale: { control: { type: "range", min: 0.9, max: 1.6, step: 0.05 } },
     divider: { control: "boolean" },
     selected: { control: "boolean" },
@@ -271,6 +286,127 @@ export const Variants: Story = {
           <BaseListCard key={id} divider leading={marker} title={id} value="R$ 13,90" onToggleSelect={() => {}} />
         ))}
       </Box>
+    </Box>
+  ),
+};
+
+/**
+ * DENSITY — the same three values the Exibição panel offers, so a list answers
+ * the operator's preference directly instead of the host translating it into a
+ * number.
+ *
+ * Vertical only: a full-width row cannot get narrower, so height is the one
+ * thing density has left to spend — and the horizontal padding has to keep the
+ * row's contents lined up with the toolbar above it at every setting.
+ */
+export const Density: Story = {
+  render: () => (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 900 }}>
+      {(["compact", "cozy", "comfortable"] as const).map((density) => (
+        <Box key={density}>
+          <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{density}</Box>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {["B75A6858", "1D970689", "0112CF89"].map((id) => (
+              <BaseListCard
+                key={id}
+                density={density}
+                dataTestId={`row-${density}`}
+                leading={marker}
+                title={id}
+                subtitle="Luiz Gustavo"
+                meta={[{ label: "Data", value: "05/08/2026, 13:45" }]}
+                value="R$ 13,90"
+                status={<Chip label="Em aberto" size="small" variant="outlined" color="info" />}
+                menu={kebab}
+                onToggleSelect={() => {}}
+              />
+            ))}
+          </Box>
+        </Box>
+      ))}
+    </Box>
+  ),
+};
+
+/**
+ * VARIANTS — Button's vocabulary, not Chip's. A chip is a token in a sentence
+ * and has only filled/outlined to say; a card is a surface in a stack, and the
+ * question is how much chrome it claims.
+ */
+export const Variant: Story = {
+  render: () => (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 900 }}>
+      {(["outline", "ghost", "text"] as const).map((variant) => (
+        <Box key={variant}>
+          <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{variant}</Box>
+          <BaseListCard
+            variant={variant}
+            leading={marker}
+            title="B75A6858"
+            subtitle="Luiz Gustavo"
+            value="R$ 13,90"
+            status={<Chip label="Em aberto" size="small" variant="outlined" color="info" />}
+            menu={kebab}
+            onToggleSelect={() => {}}
+          />
+        </Box>
+      ))}
+    </Box>
+  ),
+};
+
+/**
+ * SELECTABLE is the capability, separate from the handler: it puts the checkbox
+ * there AND turns on the selected treatment. `selectable={false}` has neither,
+ * however `selected` is set — so a stale flag arriving with the data cannot
+ * make a read-only row look picked.
+ */
+export const Selectable: Story = {
+  render: () => (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 900 }}>
+      <BaseListCard title="selectable, selected" selected onToggleSelect={() => {}} value="R$ 13,90" />
+      <BaseListCard title="selectable, not selected" onToggleSelect={() => {}} value="R$ 2,98" />
+      <BaseListCard
+        title="selectable={false} — and `selected` is ignored"
+        selectable={false}
+        selected
+        onToggleSelect={() => {}}
+        value="R$ 5,90"
+      />
+    </Box>
+  ),
+};
+
+/**
+ * EFFECTS, borrowed from Button so a glowing card and a glowing button are the
+ * same feature. `pulse` throws its ring from a pseudo-element BEHIND the card:
+ * a card that grew and shrank would reflow every neighbour on each beat.
+ */
+export const Effects: Story = {
+  render: () => (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 900, p: 2 }}>
+      {(
+        [
+          ["glow", { glow: true }],
+          ["pulse", { pulse: true }],
+          ["shimmer", { shimmer: true }],
+          ["bounce", { bounce: true }],
+          ["animate", { animate: true }],
+          ["glass", { glass: true }],
+        ] as const
+      ).map(([name, effect]) => (
+        <Box key={name}>
+          <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{name}</Box>
+          <BaseListCard
+            {...effect}
+            color="primary"
+            leading={marker}
+            title="B75A6858"
+            value="R$ 13,90"
+            onToggleSelect={() => {}}
+          />
+        </Box>
+      ))}
     </Box>
   ),
 };
