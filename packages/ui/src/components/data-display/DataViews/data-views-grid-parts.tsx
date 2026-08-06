@@ -3,9 +3,6 @@
 import { useMediaQuery, useTheme } from "@mui/material";
 import { useEffect, useState } from "react";
 
-import {
-  type ColumnVisibilityOption,
-} from "../../layout/ContentToolbar";
 import { TableFilter } from "../../layout/TableFilter";
 import { Text } from "../../typography/Text";
 import { Box } from "../../../mui/Box";
