@@ -4,6 +4,7 @@ import {
   createMemoryDataSource,
   defaultValueFor,
   defineCatalog,
+  isDirty,
   isClosedSet,
   listCatalogFields,
   operatorsFor,
@@ -319,5 +320,48 @@ describe('a dashboard isolates its blocks and describes every one', () => {
       'soma de receita em pedidos por forma de pagamento',
     );
     expect(broken.sentence).toBe('contagem de ghostfield em pedidos');
+  });
+});
+
+/**
+ * FUT-391 unsaved-changes: the comparison half, from the PUBLISHED core.
+ *
+ * The browser harness proves ⌘S and the beforeunload guard are wired. This
+ * proves the rule they are built on survives publication — and it belongs here
+ * rather than only in the browser because `isDirty` is pure structural
+ * equality, reachable by a host validating a draft server-side.
+ */
+describe('a draft knows whether it has unsaved changes', () => {
+  const saved = {
+    name: 'Vendas',
+    blocks: [
+      { id: 'b1', span: 6, spec: { entity: 'orders', measures: [{ field: 'totalCents' }] } },
+      { id: 'b2', span: 6, spec: { entity: 'payments', measures: [{ field: 'amountCents' }] } },
+    ],
+  };
+
+  it('is clean after a rebuild that changed nothing', () => {
+    // Every setter produces a new object with the same content — the case a
+    // setDirty(true)-per-edit implementation gets wrong.
+    expect(isDirty(saved, JSON.parse(JSON.stringify(saved)))).toBe(false);
+  });
+
+  it('is clean when a block is dropped back where it started', () => {
+    expect(isDirty(saved, { ...saved, blocks: [saved.blocks[0], saved.blocks[1]] })).toBe(false);
+  });
+
+  it('is clean when the keys arrive in a different order', () => {
+    // The trap JSON.stringify comparison falls into.
+    expect(isDirty(saved, { blocks: saved.blocks, name: saved.name })).toBe(false);
+  });
+
+  it('is dirty when a block genuinely moves', () => {
+    expect(isDirty(saved, { ...saved, blocks: [saved.blocks[1], saved.blocks[0]] })).toBe(true);
+  });
+
+  it('is dirty when a nested spec changes', () => {
+    const edited = JSON.parse(JSON.stringify(saved));
+    edited.blocks[0].spec.measures[0].field = 'itemCount';
+    expect(isDirty(saved, edited)).toBe(true);
   });
 });

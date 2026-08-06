@@ -39,6 +39,12 @@ export {
 } from './aggregates';
 export { DEFAULT_ROW_LIMIT, compileReport, type CompileOptions } from './compile';
 export { autoTitle, specSentence } from './describe';
+/**
+ * Unsaved-changes comparison (FUT-391). Core, not react/: it is pure structural
+ * equality with no React dependency, and a host validating a draft server-side
+ * — or a consumer harness with no DOM — has the same question to answer.
+ */
+export { deepEqual, isDirty } from './dirty-state';
 export { ReportBuilderError } from './errors';
 export {
   defaultValueFor,

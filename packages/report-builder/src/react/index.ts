@@ -45,7 +45,7 @@ export { BlockTemplatePicker } from './block-template-picker';
  * so the consumer harness is the only place it can be proven wired.
  */
 export { useUnsavedChanges } from './lib/use-unsaved-changes';
-export { isDirty } from './lib/dirty-state';
+export { isDirty } from '../dirty-state';
 export {
   filterReports,
   REPORT_SCOPE_LABELS,

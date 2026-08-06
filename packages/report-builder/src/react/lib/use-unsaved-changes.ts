@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { isDirty } from "./dirty-state";
+import { isDirty } from "../../dirty-state";
 
 /**
  * Unsaved-changes state for the report editor (FUT-391): a dirty flag derived

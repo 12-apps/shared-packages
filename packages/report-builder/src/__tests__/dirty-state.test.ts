@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { deepEqual, isDirty } from '../lib/dirty-state';
+import { deepEqual, isDirty } from '../dirty-state';
 
 /**
  * FUT-391's acceptance: "dragging a block and dropping it in place leaves the
