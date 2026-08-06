@@ -14,7 +14,7 @@ import {
 } from "./data-views-layout-context";
 import { FilterDialog, GridFilterPanel } from "./data-views-filter-panel";
 import { GridMain } from "./data-views-grid-bodies";
-import { InlineFilterChips, InlineFilterControls } from "./data-views-inline-bar";
+import { InlineFilterControls } from "./data-views-inline-bar";
 import { toOverflowFields, useFilterOverflow, type OverflowSplit } from "./data-views-overflow";
 import { ShellToolbar } from "./data-views-shell-toolbar";
 import type { DisplayPanelView } from "./data-views-display-panel";
@@ -320,9 +320,6 @@ function ShellStack<T extends Record<string, unknown>>({
           compactControls={showInline && split.compactControls}
           showInline={showInline}
         />
-        {/* Only the applied-filter chips live under the toolbar now — the
-            controls themselves ride on the toolbar line above. */}
-        {inlineVisible && <InlineFilterChips {...filterProps} />}
         <TableFilter.Layout>
           <TableFilter.Main>
             <GridMain

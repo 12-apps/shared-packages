@@ -3,14 +3,19 @@
 /**
  * The INLINE filter bar — the horizontal row of controls a grid renders instead
  * of the slide-in panel on a wide screen (`inlineFilters`): the compact keyword
- * box, one pill per facet, one pill per range, and the "Filtros ativos" chips
- * underneath.
+ * box, one pill per facet, one pill per range, and "Mais N" for whatever had no
+ * room.
+ *
+ * There is no "Filtros ativos" row beneath it. Listing every applied filter a
+ * second time, under the controls already showing them, was the same
+ * information twice — and put the ✕ that removes a filter somewhere other than
+ * the control that applied it. Each pill carries its own.
  *
  * Split from `data-views-filter-panel` because they are two surfaces, not one:
  * the panel is a column of stacked fields, this is a row of pills, and the only
  * thing they share is the prop shape they are both driven by.
  */
-import { Box, Button, Chip, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 import { useState } from "react";
 
 import { MultiSelectDropdown } from "../../layout/ContentToolbar";
@@ -20,7 +25,6 @@ import { MoreFilters } from "./data-views-more-filters";
 import type { OverflowField, OverflowSplit } from "./data-views-overflow";
 import { CollapsedSearch, InlineKeyword } from "./data-views-search";
 import { RangePill } from "./data-views-range-pill";
-import { isRangeSet, rangeChipLabel } from "./data-views-range-values";
 import type { RangeValue } from "./data-views-types";
 
 
@@ -80,70 +84,6 @@ type InlineFilterBarProps<T extends Record<string, unknown>> = Pick<
   split: OverflowSplit<T>;
 };
 
-/** One removable active-filter chip: a search term, a pill value or a window. */
-interface ActiveChip {
-  key: string;
-  label: string;
-  onDelete: () => void;
-}
-
-/**
- * Every applied filter flattened into removable chips. A pill contributes one
- * chip per selected value (deleting one leaves the rest), while a RANGE
- * contributes a single chip for the whole window — "remove the period" means
- * both ends, not an arbitrary one.
- */
-function activeChips<T extends Record<string, unknown>>({
-  search,
-  fields,
-  rangeFields,
-  pills,
-  ranges,
-  onSearchChange,
-  onTogglePill,
-  onChangeRange,
-}: Pick<
-  GridFilterPanelProps<T>,
-  | "search"
-  | "fields"
-  | "rangeFields"
-  | "pills"
-  | "ranges"
-  | "onSearchChange"
-  | "onTogglePill"
-  | "onChangeRange"
->): ActiveChip[] {
-  const searchChip: ActiveChip[] =
-    search.trim() === ""
-      ? []
-      : [{ key: "__search", label: `Busca: ${search}`, onDelete: () => onSearchChange("") }];
-  const pillChips: ActiveChip[] = fields.flatMap((field) =>
-    (pills[field.id] ?? []).map((value) => ({
-      key: `${field.id}:${value}`,
-      label: `${field.label}: ${field.options.find((option) => option.value === value)?.label ?? value}`,
-      onDelete: () => onTogglePill(field.id, value, false),
-    })),
-  );
-  const rangeChips: ActiveChip[] = rangeFields.flatMap((field) => {
-    const range = ranges[field.id];
-    if (!range || !isRangeSet(range)) return [];
-    return [
-      {
-        key: `range:${field.id}`,
-        label: rangeChipLabel(field, range),
-        onDelete: () => onChangeRange(field.id, {}),
-      },
-    ];
-  });
-  return [...searchChip, ...pillChips, ...rangeChips];
-}
-
-/**
- * A horizontal filter bar (used instead of the slide-in {@link GridFilterPanel} on
- * wide screens): the compact keyword search, each field as a rounded pill dropdown,
- * and — when anything is applied — a row of removable "active filter" chips. Range
- * filters are not shown here (the slide-in panel keeps those).
- */
 /**
  * One filter control on the bar: a multi-select pill or a min/max range. The
  * two are the same thing from the bar's point of view — a labelled control that
@@ -283,81 +223,3 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
   );
 }
 
-/**
- * The applied-filter chips, on their own line under the toolbar. Split from the
- * controls because the two no longer share a row: the controls sit on the
- * toolbar, and this renders nothing at all until something is applied.
- */
-export function InlineFilterChips<T extends Record<string, unknown>>({
-  testIdPrefix,
-  search,
-  fields,
-  rangeFields,
-  pills,
-  ranges,
-  onSearchChange,
-  onTogglePill,
-  onChangeRange,
-  onClearAll,
-}: Omit<InlineFilterBarProps<T>, "split" | "onClearField">): React.JSX.Element | null {
-  const chips = activeChips({
-    search,
-    fields,
-    rangeFields,
-    pills,
-    ranges,
-    onSearchChange,
-    onTogglePill,
-    onChangeRange,
-  });
-  if (chips.length === 0) return null;
-  return (
-    <Box sx={{ py: 1.5 }}>
-      <ActiveChipRow chips={chips} testIdPrefix={testIdPrefix} onClearAll={onClearAll} />
-    </Box>
-  );
-}
-
-/**
- * The "Filtros ativos:" row — one removable chip per applied filter plus the
- * single "Limpar" that drops them all. Renders nothing when nothing is applied,
- * so the bar collapses to its controls.
- */
-function ActiveChipRow({
-  chips,
-  testIdPrefix,
-  onClearAll,
-}: {
-  chips: ActiveChip[];
-  testIdPrefix: string;
-  onClearAll: () => void;
-}): React.JSX.Element | null {
-  if (chips.length === 0) return null;
-  return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}>
-      <Typography component="span" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
-        Filtros ativos:
-      </Typography>
-      {chips.map((chip) => (
-        <Chip
-          key={chip.key}
-          label={chip.label}
-          size="small"
-          variant="outlined"
-          onDelete={chip.onDelete}
-          data-testid={`${testIdPrefix}-active-${chip.key}`}
-        />
-      ))}
-      <Button
-        variant="text"
-        size="small"
-        color="inherit"
-        onClick={onClearAll}
-        data-testid={`${testIdPrefix}-clear-filters`}
-        sx={{ fontSize: "0.75rem", color: "text.secondary", textTransform: "none" }}
-      >
-        Limpar
-      </Button>
-    </Box>
-  );
-}
