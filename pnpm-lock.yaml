@@ -8,9 +8,6 @@ importers:
 
   .:
     devDependencies:
-      '@electric-sql/pglite':
-        specifier: 0.2.17
-        version: 0.2.17
       '@types/node':
         specifier: ^22.15.3
         version: 22.20.1
@@ -47,12 +44,6 @@ importers:
       knip:
         specifier: ^5.66.0
         version: 5.88.1(@types/node@22.20.1)(typescript@5.9.2)
-      prettier:
-        specifier: ^3.7.4
-        version: 3.9.5
-      prisma:
-        specifier: 7.8.0
-        version: 7.8.0(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(magicast@0.3.5)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)
       turbo:
         specifier: ^2.7.2
         version: 2.10.5
@@ -12930,7 +12921,8 @@ snapshots:
 
   prelude-ls@1.2.1: {}
 
-  prettier@3.9.5: {}
+  prettier@3.9.5:
+    optional: true
 
   pretty-format@27.5.1:
     dependencies:
