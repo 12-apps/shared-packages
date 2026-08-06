@@ -1,6 +1,22 @@
 import type { StorybookConfig } from '@storybook/react-vite';
 import { mergeConfig } from 'vite';
 
+// Storybook answers 403 "Invalid host" to any Host header it was not told
+// about, which is every host a tunnel puts in front of it (scripts/tunnel.sh).
+// This one value covers both checks: core-server's own middleware reads it, and
+// builder-vite forwards it to Vite's server.allowedHosts.
+//
+// STORYBOOK_ALLOWED_HOSTS: 'all', or a comma-separated host list. Unset keeps
+// the default — local and network addresses only.
+function allowedHosts(): true | string[] {
+  const raw = process.env.STORYBOOK_ALLOWED_HOSTS?.trim() ?? '';
+  if (raw === 'all') return true;
+  return raw
+    .split(',')
+    .map((host) => host.trim())
+    .filter(Boolean);
+}
+
 const config: StorybookConfig = {
   stories: [
     '../src/**/*.stories.@(js|jsx|mjs|ts|tsx)',
@@ -9,6 +25,10 @@ const config: StorybookConfig = {
     '../../product-research-ui/src/**/*.stories.@(ts|tsx)',
   ],
   addons: ['@storybook/addon-links', '@storybook/addon-docs'],
+
+  core: {
+    allowedHosts: allowedHosts(),
+  },
 
   framework: {
     name: '@storybook/react-vite',
