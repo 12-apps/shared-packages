@@ -301,4 +301,32 @@ describe("the filter bar's progressive collapse", () => {
     // Collapsing is PRESENTATION: no control was cleared, so nothing re-queried.
     expect(queries).toHaveLength(0);
   });
+  /**
+   * "Limpar" — the one gesture back to the unfiltered list.
+   *
+   * Each pill carries its own ✕, which answers "undo this one". Six applied
+   * filters is six ✕ hunts, and the operator who means "show me everything
+   * again" had no way to say it at all.
+   */
+  it("shows Limpar only once something is applied, and clears everything at once", async () => {
+    stubResizeObserver(2400);
+    renderBar();
+
+    // Nothing applied ⇒ nothing to clear, and a dead button is worse than none.
+    await waitFor(() => {
+      expect(inlineIds()).toHaveLength(4);
+      expect(screen.queryByTestId("lista-clear-all")).toBeNull();
+    });
+
+    fireEvent.click(screen.getByTestId("lista-filter-status"));
+    const pago = await screen.findByRole("menuitem", { name: /Pago/ });
+    fireEvent.click(pago);
+    fireEvent.keyDown(pago, { key: "Escape", code: "Escape" });
+
+    const clear = await screen.findByTestId("lista-clear-all");
+    fireEvent.click(clear);
+
+    // Back to unfiltered — so the affordance removes itself with the state.
+    await waitFor(() => expect(screen.queryByTestId("lista-clear-all")).toBeNull());
+  });
 });

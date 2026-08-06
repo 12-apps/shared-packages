@@ -306,6 +306,7 @@ function ShellStack<T extends Record<string, unknown>>({
               <InlineFilterControls
                 {...filterProps}
                 split={split}
+                activeFilterCount={c.activeFilterCount}
                 onControlOpenChange={onControlOpenChange}
               />
             ) : undefined

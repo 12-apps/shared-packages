@@ -45,6 +45,7 @@ const NO_COLLAPSE = {
   compactControls: false,
   counterHidden: false,
   searchCollapsed: false,
+  clearAllHidden: false,
   barRef: { current: null },
 };
 
@@ -61,6 +62,8 @@ function renderBar(overrides: Partial<Parameters<typeof InlineFilterControls<Row
       onTogglePill={vi.fn()}
       onChangeRange={onChangeRange}
       onClearField={vi.fn()}
+      onClearAll={vi.fn()}
+      activeFilterCount={0}
       {...overrides}
     />,
   );

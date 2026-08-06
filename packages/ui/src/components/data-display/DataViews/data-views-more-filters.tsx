@@ -2,194 +2,58 @@
 
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
-import { Checkbox, Popover } from "@mui/material";
+import { Popover } from "@mui/material";
 import { useState } from "react";
 
-import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
+import { fieldClearing, MoreGroup, type MoreFieldProps } from "./data-views-more-fields";
 import type { OverflowField } from "./data-views-overflow";
-import { RangePresets } from "./data-views-preset-chips";
-import { presetsFor } from "./data-views-range-presets";
-import { isRangeSet } from "./data-views-range-values";
-import type { RangeValue } from "./data-views-types";
 
 /**
- * "MAIS" — the filter overflow.
+ * "MAIS" — the filter overflow: its trigger, its panel and its footer. What
+ * goes INSIDE it is `data-views-more-fields`.
  *
- * It holds ONLY the fields that had no room on the toolbar, which is why its
- * badge counts hidden FIELDS rather than active filters: an applied filter
- * keeps its inline control (see `useFilterOverflow`), because a filter you
- * cannot see is a filter you forget you set, and then the list is "wrong" for
- * a reason nothing on screen explains.
- *
- * A field with one or two options renders FLAT — inside a panel there is no
- * space to win back, and two labelled checkboxes are faster than a dropdown
- * needing a second click. Past that it becomes a {@link MultiSelectDropdown}:
- * see `INLINE_OPTION_LIMIT`.
+ * It holds the fields that had no room on the toolbar. An applied filter is
+ * ranked ahead of an idle one for the visible slots but is NOT exempt (see
+ * `useFilterOverflow`), so an applied filter can be in here — on a phone, most
+ * of them are. That is why the trigger changes tone and counts the applied
+ * ones: a filter you cannot see is a filter you forget you set, and the badge
+ * is what stops that.
  */
 
-interface MoreFiltersProps<T extends Record<string, unknown>> {
+interface MoreFiltersProps<T extends Record<string, unknown>> extends MoreFieldProps {
   fields: OverflowField<T>[];
-  pills: Record<string, string[]>;
-  ranges: Record<string, RangeValue>;
-  onTogglePill: (fieldId: string, value: string, checked: boolean) => void;
-  onChangeRange: (fieldId: string, range: RangeValue) => void;
-  testIdPrefix: string;
 }
 
 /**
- * Above this many options a field is a DROPDOWN rather than a flat row of
- * checkboxes. Two options cost two lines and read faster laid out; a "Cliente"
- * with a dozen turns the panel into a scrolling wall and buries every field
- * under it, which is exactly what the overflow was meant to avoid.
+ * The trigger, badged with how many fields had no room on the bar — and told
+ * apart when some of them are APPLIED.
+ *
+ * An applied filter can land in here now (it is ranked first, not exempt), so
+ * this button is the only thing on screen still saying it exists. A neutral
+ * badge reading "3" would make "three filters you have not used" and "three
+ * filters narrowing this list" look identical, which is the whole failure the
+ * old exemption was written to avoid. So an overflow holding applied filters
+ * takes the applied tone and counts them in its own badge.
  */
-const INLINE_OPTION_LIMIT = 2;
-
-/** One overflowed pill: its options as checkboxes, all visible at once. */
-function OverflowPill<T extends Record<string, unknown>>({
-  field,
-  values,
-  onToggle,
-  onClear,
-  testIdPrefix,
-}: {
-  field: OverflowField<T>;
-  values: string[];
-  onToggle: (value: string, checked: boolean) => void;
-  onClear: () => void;
-  testIdPrefix: string;
-}): React.JSX.Element {
-  const options = field.pill?.options ?? [];
-  if (options.length > INLINE_OPTION_LIMIT) {
-    return (
-      <MultiSelectDropdown
-        label={field.pill?.label ?? field.label}
-        options={options}
-        selected={new Set(values)}
-        onToggle={onToggle}
-        onClear={onClear}
-        allLabel="Todas"
-        searchable={options.length > 6 ? true : undefined}
-        searchPlaceholder="Buscar…"
-        noResultsLabel="Nenhum resultado"
-        layout="pill"
-        data-testid={`${testIdPrefix}-more-${field.id}`}
-      />
-    );
-  }
-  return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
-      {(field.pill?.options ?? []).map((option) => {
-        const checked = values.includes(option.value);
-        return (
-          <Box
-            key={option.value}
-            component="label"
-            data-testid={`${testIdPrefix}-more-${field.id}-${option.value}`}
-            sx={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 0.25,
-              pr: 1,
-              border: 1,
-              borderStyle: "solid",
-              borderColor: checked ? "primary.main" : "divider",
-              bgcolor: checked ? "action.selected" : "transparent",
-              borderRadius: 5,
-              cursor: "pointer",
-              fontSize: "0.8125rem",
-              color: checked ? "primary.main" : "text.secondary",
-            }}
-          >
-            <Checkbox
-              size="small"
-              checked={checked}
-              onChange={(event) => onToggle(option.value, event.target.checked)}
-              inputProps={{ "aria-label": `${field.label}: ${option.label}` }}
-            />
-            {option.label}
-          </Box>
-        );
-      })}
-    </Box>
-  );
-}
-
-/** One overflowed range: its two bounds, as the same inputs the pill uses. */
-function OverflowRange<T extends Record<string, unknown>>({
-  field,
-  value,
-  onChange,
-  testIdPrefix,
-}: {
-  field: OverflowField<T>;
-  value: RangeValue;
-  onChange: (range: RangeValue) => void;
-  testIdPrefix: string;
-}): React.JSX.Element {
-  const day = field.range?.kind === "day";
-  const set = (bound: "min" | "max", raw: string): void => {
-    const next: RangeValue = { ...value };
-    if (raw === "") delete next[bound];
-    else next[bound] = day ? raw : Number(raw);
-    onChange(next);
-  };
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      {/* The overflow offers the same one-click windows the pill does. A field
-          in here is one that had no room on the bar, not one with fewer
-          controls — otherwise "Data" gains and loses its presets as the window
-          is resized. */}
-      <RangePresets
-        presets={field.range ? presetsFor(field.range) : []}
-        value={value}
-        onChange={onChange}
-        testId={`${testIdPrefix}-more-${field.id}`}
-      />
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        {(["min", "max"] as const).map((bound, index) => (
-          <Box key={bound} sx={{ display: "contents" }}>
-            {index === 1 && <Box component="span" sx={{ color: "text.disabled" }}>–</Box>}
-            <Box
-              component="input"
-              type={day ? "date" : "number"}
-              placeholder={bound === "min" ? "de" : "até"}
-              aria-label={`${field.label} ${bound === "min" ? "de" : "até"}`}
-              data-testid={`${testIdPrefix}-more-${field.id}-${bound}`}
-              value={value[bound] ?? ""}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) => set(bound, event.target.value)}
-              sx={{
-                width: "100%",
-                px: 1,
-                py: 0.75,
-                border: 1,
-                borderStyle: "solid",
-                borderColor: "divider",
-                borderRadius: 1,
-                font: "inherit",
-                fontSize: "0.8125rem",
-              }}
-            />
-          </Box>
-        ))}
-      </Box>
-    </Box>
-  );
-}
-
-/** The trigger, badged with how many fields had no room on the bar. */
 function MoreTrigger({
   count,
+  appliedCount,
+  compact,
   onOpen,
   testIdPrefix,
 }: {
   count: number;
+  appliedCount: number;
+  /** Icon only — the same rung that strips Exibir/Exportar. */
+  compact: boolean;
   onOpen: (anchor: HTMLElement) => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const applied = appliedCount > 0;
   return (
     <Button
       variant="outline"
@@ -197,119 +61,44 @@ function MoreTrigger({
       color="neutral"
       onClick={(event) => onOpen(event.currentTarget as HTMLElement)}
       dataTestId={`${testIdPrefix}-more-filters`}
-      aria-label={`Mais filtros: ${count} sem espaço na barra`}
+      aria-label={
+        applied
+          ? `Mais filtros: ${count} sem espaço na barra, ${appliedCount} aplicado(s)`
+          : `Mais filtros: ${count} sem espaço na barra`
+      }
     >
-      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+      <Box
+        component="span"
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 0.5,
+          color: applied ? "primary.main" : undefined,
+        }}
+      >
         <TuneRoundedIcon fontSize="small" />
-        <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-          Mais
-        </Box>
-        <Box
-          component="span"
-          sx={{ px: 0.75, borderRadius: 5, bgcolor: "action.selected", fontSize: "0.6875rem" }}
-        >
-          {count}
-        </Box>
-        <KeyboardArrowDownRoundedIcon fontSize="small" />
-      </Box>
-    </Button>
-  );
-}
-
-/**
- * Whether a field has anything applied, and how to unapply it — the two shapes
- * (a pill's selected values, a range's bounds) answered in one place so the
- * group that renders them stays a renderer.
- */
-function fieldClearing<T extends Record<string, unknown>>({
-  field,
-  pills,
-  ranges,
-  onTogglePill,
-  onChangeRange,
-}: {
-  field: OverflowField<T>;
-} & Pick<MoreFiltersProps<T>, "pills" | "ranges" | "onTogglePill" | "onChangeRange">): {
-  applied: boolean;
-  clear: () => void;
-} {
-  if (field.group === "range") {
-    return {
-      applied: isRangeSet(ranges[field.id] ?? {}),
-      clear: () => onChangeRange(field.id, {}),
-    };
-  }
-  const values = pills[field.id] ?? [];
-  return {
-    applied: values.length > 0,
-    clear: () => values.forEach((value) => onTogglePill(field.id, value, false)),
-  };
-}
-
-/** One labelled group in the panel: the field's name, then its control. */
-function MoreGroup<T extends Record<string, unknown>>({
-  field,
-  pills,
-  ranges,
-  onTogglePill,
-  onChangeRange,
-  testIdPrefix,
-}: {
-  field: OverflowField<T>;
-} & Omit<MoreFiltersProps<T>, "fields">): React.JSX.Element {
-  const { applied, clear } = fieldClearing({ field, pills, ranges, onTogglePill, onChangeRange });
-  return (
-    <Box sx={{ mb: 1.5, "&:last-of-type": { mb: 0 } }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-        <Text variant="caption" as="span">
-          <Box component="span" sx={{ color: "text.secondary" }}>
-            {field.label}
-            {field.group === "range" && isRangeSet(ranges[field.id] ?? {}) ? " •" : ""}
-          </Box>
-        </Text>
-        {/* The panel's equivalent of the pill's ✕. Without it a field applied
-            in here could only be cleared by finding it again on the bar —
-            which is where it goes the moment it becomes active, so the
-            operator has to close this panel to undo what they just did. */}
-        {applied && (
-          <Box
-            component="button"
-            type="button"
-            onClick={clear}
-            data-testid={`${testIdPrefix}-more-${field.id}-clear`}
-            sx={{
-              ml: "auto",
-              border: 0,
-              p: 0,
-              bgcolor: "transparent",
-              cursor: "pointer",
-              font: "inherit",
-              fontSize: "0.75rem",
-              color: "primary.main",
-              "&:hover": { textDecoration: "underline" },
-            }}
-          >
-            Limpar
+        {!compact && (
+          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+            Mais
           </Box>
         )}
+        <Box
+          component="span"
+          data-testid={`${testIdPrefix}-more-badge`}
+          sx={{
+            px: 0.75,
+            borderRadius: 5,
+            bgcolor: applied ? "primary.main" : "action.selected",
+            color: applied ? "primary.contrastText" : undefined,
+            fontSize: "0.6875rem",
+            fontWeight: applied ? 700 : undefined,
+          }}
+        >
+          {applied ? appliedCount : count}
+        </Box>
+        {!compact && <KeyboardArrowDownRoundedIcon fontSize="small" />}
       </Box>
-      {field.group === "pill" ? (
-        <OverflowPill
-          field={field}
-          values={pills[field.id] ?? []}
-          onToggle={(value, checked) => onTogglePill(field.id, value, checked)}
-          onClear={() => (pills[field.id] ?? []).forEach((v) => onTogglePill(field.id, v, false))}
-          testIdPrefix={testIdPrefix}
-        />
-      ) : (
-        <OverflowRange
-          field={field}
-          value={ranges[field.id] ?? {}}
-          onChange={(range) => onChangeRange(field.id, range)}
-          testIdPrefix={testIdPrefix}
-        />
-      )}
-    </Box>
+    </Button>
   );
 }
 
@@ -341,12 +130,62 @@ function MoreHeading(): React.JSX.Element {
   );
 }
 
+/**
+ * The panel's own way back to the unfiltered list.
+ *
+ * The bar's "Limpar" is the primary one, but it is a control like any other
+ * and the ladder can take its label — and on the narrowest rungs this panel is
+ * where most of the fields ended up anyway. Clearing everything from inside it
+ * saves closing it to reach a button three pixels wide.
+ */
+function MoreFooter({
+  onClearAll,
+  testIdPrefix,
+}: {
+  onClearAll: () => void;
+  testIdPrefix: string;
+}): React.JSX.Element {
+  return (
+    <Box sx={{ px: 1.5, py: 1, borderTop: 1, borderColor: "divider" }}>
+      <Box
+        component="button"
+        type="button"
+        onClick={onClearAll}
+        data-testid={`${testIdPrefix}-more-clear-all`}
+        sx={{
+          width: "100%",
+          border: 0,
+          p: 0,
+          bgcolor: "transparent",
+          cursor: "pointer",
+          font: "inherit",
+          fontSize: "0.8125rem",
+          textAlign: "left",
+          color: "primary.main",
+          "&:hover": { textDecoration: "underline" },
+        }}
+      >
+        Limpar todos os filtros
+      </Box>
+    </Box>
+  );
+}
+
 /** The overflow trigger + panel. Renders nothing when everything fits. */
 export function MoreFilters<T extends Record<string, unknown>>({
   fields,
   onOpenChange,
+  onClearAll,
+  anyApplied,
+  compact = false,
   ...rest
 }: MoreFiltersProps<T> & {
+  /** Icon only — the same rung that strips Exibir/Exportar. */
+  compact?: boolean;
+  /** Clears every filter, not just the ones in here. */
+  onClearAll: () => void;
+  /** Whether anything is applied anywhere — the footer is pointless otherwise. */
+  anyApplied: boolean;
   /**
    * So the shell can FREEZE the measured split while this panel is open.
    *
@@ -363,6 +202,19 @@ export function MoreFilters<T extends Record<string, unknown>>({
     <>
       <MoreTrigger
         count={fields.length}
+        appliedCount={
+          fields.filter(
+            (field) =>
+              fieldClearing({
+                field,
+                pills: rest.pills,
+                ranges: rest.ranges,
+                onTogglePill: rest.onTogglePill,
+                onChangeRange: rest.onChangeRange,
+              }).applied,
+          ).length
+        }
+        compact={compact}
         onOpen={(element) => {
           setAnchor(element);
           onOpenChange?.(true);
@@ -386,6 +238,9 @@ export function MoreFilters<T extends Record<string, unknown>>({
               <MoreGroup key={field.id} field={field} {...rest} />
             ))}
           </Box>
+          {anyApplied && (
+            <MoreFooter onClearAll={onClearAll} testIdPrefix={rest.testIdPrefix} />
+          )}
         </Box>
       </Popover>
     </>

@@ -15,9 +15,11 @@
  * the panel is a column of stacked fields, this is a row of pills, and the only
  * thing they share is the prop shape they are both driven by.
  */
-import { Box } from "@mui/material";
+import FilterAltOffRoundedIcon from "@mui/icons-material/FilterAltOffRounded";
+import { Box, Tooltip } from "@mui/material";
 import { useState } from "react";
 
+import { Button } from "../../form/Button";
 import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 
 import type { GridFilterPanelProps } from "./data-views-filter-panel";
@@ -142,6 +144,46 @@ function InlineControl<T extends Record<string, unknown>>({
 }
 
 /**
+ * "Limpar" — one gesture back to the unfiltered list.
+ *
+ * Present ONLY while something is applied, and last in the cluster, because it
+ * is destructive and must never be where a filter control was a moment ago.
+ * Each pill already carries its own ✕; this is the other job — six applied
+ * filters is six ✕ hunts, and the operator who wants "show me everything
+ * again" has no way to say it.
+ *
+ * Loses its label on the same rung Exibir/Exportar lose theirs, and keeps a
+ * tooltip when it does: it is one of the two controls (with the search) whose
+ * icon has to carry the whole meaning on a phone.
+ */
+function ClearAllControl({
+  onClearAll,
+  compact,
+  testIdPrefix,
+}: {
+  onClearAll: () => void;
+  compact: boolean;
+  testIdPrefix: string;
+}): React.JSX.Element {
+  const button = (
+    <Button
+      variant="outline"
+      size="sm"
+      color="neutral"
+      onClick={onClearAll}
+      dataTestId={`${testIdPrefix}-clear-all`}
+      aria-label="Limpar filtros"
+    >
+      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+        <FilterAltOffRoundedIcon fontSize="small" />
+        {!compact && <Box component="span">Limpar</Box>}
+      </Box>
+    </Button>
+  );
+  return compact ? <Tooltip title="Limpar filtros">{button}</Tooltip> : button;
+}
+
+/**
  * The filter CONTROLS alone — search, the fields that fit, and "Mais N" for the
  * ones that don't — with no row chrome of its own, because it is rendered ON
  * the toolbar line rather than under it (`ContentToolbar`'s `leadingControls`).
@@ -159,8 +201,12 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
   onChangeRange,
   onClearField,
   split,
+  onClearAll,
+  activeFilterCount,
   onControlOpenChange,
-}: Omit<InlineFilterBarProps<T>, "fields" | "rangeFields" | "onClearAll"> & {
+}: Omit<InlineFilterBarProps<T>, "fields" | "rangeFields"> & {
+  /** How many filters are applied — decides whether "Limpar" is on the bar at all. */
+  activeFilterCount: number;
   /** Reports a control opening/closing so the shell can freeze the measurement. */
   onControlOpenChange?: (open: boolean) => void;
 }): React.JSX.Element {
@@ -170,7 +216,7 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
   // `RESERVED` prices the counter and Exibir/Exportar, so measuring only the
   // controls would charge for that furniture a second time and collapse the
   // ladder while the row still had hundreds of free pixels.
-  const { inline, overflow, searchCollapsed } = split;
+  const { inline, overflow, searchCollapsed, compactControls, clearAllHidden } = split;
   // Expanded by the operator: a collapsed search that was CLICKED stays open
   // until Escape, so typing is never interrupted by a re-measure.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -198,6 +244,62 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
         onEscape={() => setSearchOpen(false)}
         testIdPrefix={testIdPrefix}
       />
+      <FilterSlots
+        inline={inline}
+        overflow={overflow}
+        pills={pills}
+        ranges={ranges}
+        onTogglePill={onTogglePill}
+        onChangeRange={onChangeRange}
+        onClearField={onClearField}
+        onClearAll={onClearAll}
+        onControlOpenChange={onControlOpenChange}
+        activeFilterCount={activeFilterCount}
+        compactControls={compactControls}
+        clearAllHidden={clearAllHidden}
+        testIdPrefix={testIdPrefix}
+      />
+    </Box>
+  );
+}
+
+/**
+ * Everything to the right of the search: the fields that fit, "Mais N" for the
+ * ones that don't, and "Limpar". Split out of `InlineFilterControls` only to
+ * keep that function inside the size gate — the three are one cluster and the
+ * order they render in is the order they shed in.
+ */
+function FilterSlots<T extends Record<string, unknown>>({
+  inline,
+  overflow,
+  pills,
+  ranges,
+  onTogglePill,
+  onChangeRange,
+  onClearField,
+  onClearAll,
+  onControlOpenChange,
+  activeFilterCount,
+  compactControls,
+  clearAllHidden,
+  testIdPrefix,
+}: {
+  inline: OverflowField<T>[];
+  overflow: OverflowField<T>[];
+  pills: Record<string, string[]>;
+  ranges: Record<string, RangeValue>;
+  onTogglePill: (fieldId: string, value: string, checked: boolean) => void;
+  onChangeRange: (fieldId: string, range: RangeValue) => void;
+  onClearField: (fieldId: string) => void;
+  onClearAll: () => void;
+  onControlOpenChange?: (open: boolean) => void;
+  activeFilterCount: number;
+  compactControls: boolean;
+  clearAllHidden: boolean;
+  testIdPrefix: string;
+}): React.JSX.Element {
+  return (
+    <>
       {inline.map((field) => (
         <InlineControl
           key={field.id}
@@ -213,6 +315,9 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
       ))}
       <MoreFilters
         onOpenChange={onControlOpenChange}
+        onClearAll={onClearAll}
+        anyApplied={activeFilterCount > 0}
+        compact={compactControls}
         fields={overflow}
         pills={pills}
         ranges={ranges}
@@ -220,7 +325,14 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
         onChangeRange={onChangeRange}
         testIdPrefix={testIdPrefix}
       />
-    </Box>
+      {activeFilterCount > 0 && !clearAllHidden && (
+        <ClearAllControl
+          onClearAll={onClearAll}
+          compact={compactControls}
+          testIdPrefix={testIdPrefix}
+        />
+      )}
+    </>
   );
 }
 

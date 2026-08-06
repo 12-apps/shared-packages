@@ -12,10 +12,14 @@ import type { FilterFieldConfig, RangeFieldConfig, RangeValue } from "./data-vie
  * 1. Controls shed ONE AT A TIME into an overflow, never all at once. With four
  *    filters and room for three, hiding all four throws away the room that was
  *    there.
- * 2. An APPLIED filter never hides. Applied controls take the visible slots
- *    first, so the overflow badge counts hidden FIELDS and never active
- *    filters — a filter you cannot see is a filter you forget you set, and then
- *    the list is "wrong" for reasons nothing on screen explains.
+ * 2. An APPLIED filter is ranked first, not exempt. Applied controls take the
+ *    visible slots ahead of idle ones, and go into "Mais" like anything else
+ *    when even those slots run out. Exempting them outright — the earlier rule
+ *    — meant four applied filters on a phone claimed more width than the row
+ *    had, and the bar painted past its own edge: the pills were reachable only
+ *    by scrolling the toolbar sideways. Hiding one is safe because "Mais" says
+ *    how many applied filters are behind it; scrolling one off-screen says
+ *    nothing at all.
  *
  * It MEASURES rather than picking a breakpoint, which is what
  * `FILTERS-CONTRACT.md` asks for: pages declare different numbers of filters
@@ -61,6 +65,14 @@ export interface OverflowSplit<T extends Record<string, unknown>> {
    * control on the bar that cannot be guessed from an icon's position.
    */
   searchCollapsed: boolean;
+  /**
+   * Step 6, below even the counter — "Limpar" leaves the bar.
+   *
+   * The one control here with a second home: the overflow panel's footer
+   * carries "Limpar todos os filtros". So it goes before the search icon or
+   * "Mais", neither of which has anywhere else to be.
+   */
+  clearAllHidden: boolean;
   /** Attach to the toolbar row being measured. */
   barRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -123,12 +135,27 @@ const RESERVED = {
   counter: 96,
   /** Exibir + Exportar WITH their text labels. */
   right: 216,
-  /** The same two controls as icons only — step 2 of the ladder. */
-  rightCompact: 96,
+  /**
+   * The same two controls as icons only — step 2 of the ladder.
+   *
+   * MEASURED at 133px for the pair (66 each: a Button's minimum tap target is
+   * a good deal wider than the 20px glyph inside it), so the old 96 under-priced
+   * them by a third and the row went on believing it had room it did not.
+   */
+  rightCompact: 140,
   /** What step 4 leaves behind: the search as a bare magnifier. */
   searchIcon: 44,
   /** The "Mais" button, only charged when there IS an overflow. */
   overflowButton: 104,
+  /**
+   * "Limpar", only charged when there IS something to clear.
+   *
+   * It appears exactly when the row is at its widest — every applied filter
+   * has a longer label than the idle one it replaced — so leaving it unpriced
+   * would break the line at the one moment the operator most needs it.
+   * Measured at 64 as an icon; 72 with slack.
+   */
+  clearAll: 72,
   /** Gaps + the row's own padding. */
   chrome: 64,
 } as const;
@@ -205,18 +232,32 @@ function splitFilters<T extends Record<string, unknown>>(
   // alone still loses the one filter the operator just set whenever it no
   // longer fits on its own. The bar wraps; a filter you cannot see does not
   // announce itself at all.
+  // "Limpar" rides the end of the cluster whenever anything is applied.
+  const clearCost = active.length > 0 ? RESERVED.clearAll + GAP : 0;
   let available =
-    width - RESERVED.search - RESERVED.counter - RESERVED.right - RESERVED.chrome - cost(active);
-  if (idle.length === 0 || cost(idle) <= available) {
-    return { inline: all, overflow: none, used: cost(all) };
+    width - RESERVED.search - RESERVED.counter - RESERVED.right - RESERVED.chrome - clearCost;
+  if (cost(all) <= available) {
+    return { inline: all, overflow: none, used: cost(all) + clearCost };
   }
 
   // There IS an overflow, so its button now costs room too.
   available -= RESERVED.overflowButton;
-  const keep = new Set(active.map((field) => field.id));
-  for (const field of idle) {
+  // APPLIED FIRST, BUT NOT EXEMPT.
+  //
+  // Applied controls take the visible slots ahead of idle ones — that part was
+  // always right. Exempting them from the overflow entirely was not: applying
+  // a value LENGTHENS a control ("Pagamento (1)"), so on a phone four applied
+  // filters claimed more width than the row had and the bar simply painted
+  // past its own edge, leaving pills reachable only by scrolling sideways.
+  //
+  // An applied filter hidden in "Mais" is not lost the way it would be if it
+  // vanished silently: the trigger goes to the applied tone and says how many
+  // are in there (see `MoreTrigger`), which is the same signal the pill itself
+  // was carrying. A control you scroll off-screen carries no signal at all.
+  const keep = new Set<string>();
+  for (const field of [...active, ...idle]) {
     const next = widthOf(field) + GAP;
-    if (next > available) break;
+    if (next > available) continue;
     available -= next;
     keep.add(field.id);
   }
@@ -227,7 +268,7 @@ function splitFilters<T extends Record<string, unknown>>(
   return {
     inline,
     overflow: all.filter((field) => !keep.has(field.id)),
-    used: cost(inline) + RESERVED.overflowButton,
+    used: cost(inline) + RESERVED.overflowButton + clearCost,
   };
 }
 
@@ -262,6 +303,7 @@ function computeSplit<T extends Record<string, unknown>>(
       compactControls: false,
       counterHidden: false,
       searchCollapsed: false,
+      clearAllHidden: false,
     };
   }
   const { inline, overflow, used } = splitFilters(all, pills, ranges, width);
@@ -278,8 +320,15 @@ function computeSplit<T extends Record<string, unknown>>(
   // outside the toolbar, which is what a narrow phone was doing.
   const counterHidden =
     searchCollapsed && base - RESERVED.counter - rightCost < RESERVED.searchIcon;
+  // Step 6 — below even that, "Limpar" leaves the bar. It is the ONLY control
+  // here with a second home: the overflow panel's footer carries "Limpar todos
+  // os filtros", so nothing is lost, which is exactly why it goes before the
+  // search icon or "Mais" (neither of which has anywhere else to be). Guarded
+  // on there BEING an overflow, because with no panel the footer does not
+  // exist and dropping this would strand the operator.
+  const clearAllHidden = counterHidden && overflow.length > 0;
 
-  return { inline, overflow, compactControls, counterHidden, searchCollapsed };
+  return { inline, overflow, compactControls, counterHidden, searchCollapsed, clearAllHidden };
 }
 
 /**
