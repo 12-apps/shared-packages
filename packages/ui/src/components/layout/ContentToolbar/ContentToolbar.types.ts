@@ -15,6 +15,22 @@ export interface ContentToolbarProps {
   /** Page-specific right-aligned controls (ViewSelector, SortByDropdown, …). */
   rightControls: ReactNode;
   /**
+   * Controls that share the toolbar's own line, left-aligned after the
+   * selection cluster — the search box and the filter controls, which belong on
+   * the toolbar rather than on a row of their own. Left unset the toolbar keeps
+   * its two-cluster shape.
+   */
+  leadingControls?: ReactNode;
+  /**
+   * Selection OWNS the toolbar line instead of sharing it. Nothing selected ⇒
+   * no Select All at all (the row is search + filters + controls); something
+   * selected ⇒ those give way entirely and only the selection cluster remains.
+   *
+   * Off by default: a toolbar that already shows Select All permanently keeps
+   * doing so, so this cannot move a control on a consumer that did not ask.
+   */
+  exclusiveSelection?: boolean;
+  /**
    * Selection actions slot, rendered after the count when items are selected
    * (e.g. a "Delete" / "Send email" control). Kept generic — the consumer owns
    * what the action does.

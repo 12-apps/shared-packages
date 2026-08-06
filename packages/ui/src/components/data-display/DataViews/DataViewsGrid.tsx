@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { type SortFieldDefinition } from "../../layout/ContentToolbar";
 
 import { GridShell } from "./data-views-grid-parts";
+import type { DisplayPanelView } from "./data-views-display-panel";
 import type { BoardConfig } from "./DataViewsBoard";
 import type { DataViewExport } from "./data-views-export";
 import type { ScopeConfig } from "./data-views-scopes";
@@ -51,6 +52,12 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
   onVisibleRowsChange?: (rows: T[]) => void;
   /** Saved-views UI injected into the toolbar (FUT-89). */
   toolbarRightSlot?: React.ReactNode;
+  /**
+   * The saved-view chrome for the Exibir panel: its VISÃO header (with the
+   * views dropdown) and its Redefinir / Salvar visão footer. Supplied by
+   * `DataViewsTableBase`; without it the panel is tabs only.
+   */
+  displayView?: DisplayPanelView;
   /** Big page title in the header row (next to the funnel + gear). */
   title?: string;
   /** Primary page actions rendered at the header's right. */

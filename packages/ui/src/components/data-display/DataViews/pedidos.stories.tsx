@@ -384,6 +384,21 @@ const base = {
   exportConfig,
   getRowId: (row: PedidoRow) => row.pedido,
   testIdPrefix: "pedidos",
+  // The Exibir panel only offers a format the table can actually render, so
+  // these three are what put Lista, Grade and Quadro in it at all
+  // (`data-views-layout-context.tsx`: renderCard → grade, renderListRow →
+  // lista, board + renderCard → quadro). They belong on the shared base rather
+  // than on one story: without them every other story silently degrades to a
+  // Tabela-only panel, which reads as "the formats are missing" rather than
+  // "this story did not opt in".
+  board,
+  renderCard: renderPedidoCard,
+  renderListRow: renderPedidoListRow,
+  // Filters on one line with the search box, which is the screen's real
+  // toolbar. `false` hides them behind the slide-in panel — covered by the
+  // FilterPanel story rather than left as the default nobody asked for.
+  inlineFilters: true,
+  alwaysShowSearch: true,
   // Explicit spies, not left to preview.tsx's `^on[A-Z].*` argTypesRegex —
   // Storybook 9 throws ImplicitActionsDuringRendering when a story renders an
   // action arg it inferred rather than one that was passed.
@@ -442,13 +457,8 @@ export const ServerMode: Story = {
 export const ScopesAndBoard: Story = {
   args: {
     ...base,
-    alwaysShowSearch: true,
-    inlineFilters: true,
     scopes,
     scopeFieldId: "situacao",
-    board,
-    renderCard: renderPedidoCard,
-    renderListRow: renderPedidoListRow,
     server: {
       totalCount: TOTAL_COUNT,
       page: 1,
@@ -504,12 +514,23 @@ export const SavedViewApplied: Story = {
 };
 
 /**
- * The responsive filter UX: filters collapse into a row (and a modal on small
- * screens) instead of the slide-in panel. Collapsing is presentation only — it
- * never drops a filter or changes the rendered rows.
+ * The responsive filter UX, stated explicitly rather than relied on as the
+ * default: filters sit in a row beside the search box (and collapse into a
+ * modal on small screens). Collapsing is presentation only — it never drops a
+ * filter or changes the rendered rows.
  */
 export const InlineFilters: Story = {
-  args: { ...base, inlineFilters: true, alwaysShowSearch: true },
+  args: { ...base, inlineFilters: true },
+  render: screen,
+};
+
+/**
+ * The other half of that switch: `inlineFilters: false` puts the filters back
+ * behind the "Filtros" slide-in panel. Kept as its own story because the base
+ * now runs inline, and the panel is still what a narrow screen falls back to.
+ */
+export const FilterPanel: Story = {
+  args: { ...base, inlineFilters: false },
   render: screen,
 };
 

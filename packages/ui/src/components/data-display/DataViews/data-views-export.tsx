@@ -101,7 +101,7 @@ function ExportTrigger({
     <Button
       variant="outline"
       size="sm"
-      color="secondary"
+      color="neutral"
       disabled={busy}
       onClick={(event) => onOpen(event.currentTarget as HTMLElement)}
       dataTestId={`${testIdPrefix}-export-trigger`}

@@ -24,12 +24,11 @@ export function ShellToolbar<T extends Record<string, unknown>>({
   bulkActions,
   toolbarRightSlot,
   showInline,
-  filtersHidden,
-  toggleFilters,
   compactControls,
   sortKinds,
   displayView,
   exportConfig,
+  filterControls,
 }: {
   c: DataViewsController<T>;
   rows: T[];
@@ -40,9 +39,9 @@ export function ShellToolbar<T extends Record<string, unknown>>({
   rowActions?: RowAction<T>[];
   bulkActions?: (selectedRows: T[], clearSelection: () => void) => React.ReactNode;
   toolbarRightSlot?: React.ReactNode;
+  /** Search + filters, rendered on the toolbar line (see `GridToolbar`). */
+  filterControls?: React.ReactNode;
   showInline: boolean;
-  filtersHidden: boolean;
-  toggleFilters: () => void;
   /** Step 2 of the ladder: Exibir/Exportar as icons only. */
   compactControls?: boolean;
 }): React.JSX.Element {
@@ -57,6 +56,7 @@ export function ShellToolbar<T extends Record<string, unknown>>({
       sortKinds={sortKinds}
       displayView={displayView}
       exportConfig={exportConfig}
+      filterControls={filterControls}
       compactControls={compactControls}
       testIdPrefix={testIdPrefix}
       selectedRows={c.selectedRows}
@@ -77,9 +77,6 @@ export function ShellToolbar<T extends Record<string, unknown>>({
       setFilterOpen={c.setFilterOpen}
       activeFilterCount={c.activeFilterCount}
       showFilterTrigger={!showInline}
-      showFiltersToggle={showInline}
-      filtersHidden={filtersHidden}
-      onToggleFilters={toggleFilters}
     />
   );
 }

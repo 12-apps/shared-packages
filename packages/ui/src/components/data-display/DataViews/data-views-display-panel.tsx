@@ -1,6 +1,8 @@
 "use client";
 
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
+import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import { Popover } from "@mui/material";
 import { useState } from "react";
@@ -48,6 +50,12 @@ export interface DisplayPanelView {
   onUpdate?: () => void;
   /** Persist the live state as a NEW view. */
   onSaveAs: () => void;
+  /**
+   * The saved-views dropdown itself, rendered in the panel's VISÃO header. The
+   * panel stays data-free: the host owns the menu and its mutations, this only
+   * decides where it sits — inside Exibir rather than loose on the toolbar.
+   */
+  selector?: React.ReactNode;
 }
 
 interface DisplayPanelProps<T extends Record<string, unknown>> {
@@ -112,11 +120,15 @@ function ViewHeader({ view, testIdPrefix }: { view: DisplayPanelView; testIdPref
         </Box>
       </Text>
       <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
-        <Text variant="caption" as="span">
-          <Box component="span" sx={{ fontWeight: 600 }} data-testid={`${testIdPrefix}-display-view-name`}>
-            {view.activeViewName ?? "Visão principal"}
-          </Box>
-        </Text>
+        {/* The dropdown when the host supplies one, otherwise the plain name —
+            a panel with no menu still has to say which view is applied. */}
+        {view.selector ?? (
+          <Text variant="caption" as="span">
+            <Box component="span" sx={{ fontWeight: 600 }} data-testid={`${testIdPrefix}-display-view-name`}>
+              {view.activeViewName ?? "Visão principal"}
+            </Box>
+          </Text>
+        )}
         {view.dirty && (
           <Box
             component="span"
@@ -157,38 +169,28 @@ function ViewFooter({
       <Button
         variant="text"
         size="sm"
-        color="secondary"
+        color="neutral"
         disabled={!view.dirty}
+        startIcon={<RestartAltRoundedIcon fontSize="small" />}
         onClick={view.onReset}
         dataTestId={`${testIdPrefix}-display-reset`}
       >
         Redefinir
       </Button>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <Button
-          variant="text"
-          size="sm"
-          color="secondary"
-          onClick={() => {
-            view.onSaveAs();
-            onDone();
-          }}
-          dataTestId={`${testIdPrefix}-display-save-as`}
-        >
-          Salvar como nova
-        </Button>
-        <Button
-          size="sm"
-          disabled={!view.dirty}
-          onClick={() => {
-            (view.onUpdate ?? view.onSaveAs)();
-            onDone();
-          }}
-          dataTestId={`${testIdPrefix}-display-save`}
-        >
-          {view.onUpdate ? "Atualizar visão" : "Salvar visão"}
-        </Button>
-      </Box>
+      {/* ONE save, not two. "Salvar como nova" alongside it made the primary
+          action ambiguous at a glance; which of the two this is depends on
+          whether a view is applied, which the label already says. */}
+      <Button
+        size="sm"
+        startIcon={<SaveOutlinedIcon fontSize="small" />}
+        onClick={() => {
+          (view.onUpdate ?? view.onSaveAs)();
+          onDone();
+        }}
+        dataTestId={`${testIdPrefix}-display-save`}
+      >
+        {view.onUpdate ? "Atualizar visão" : "Salvar visão"}
+      </Button>
     </Box>
   );
 }
@@ -254,7 +256,7 @@ export function DataViewsDisplayPanel<T extends Record<string, unknown>>({
       <Button
         variant="outline"
         size="sm"
-        color="secondary"
+        color="neutral"
         onClick={(event) => setAnchor(event.currentTarget as HTMLElement)}
         dataTestId={`${testIdPrefix}-display-trigger`}
         aria-label="Exibir"

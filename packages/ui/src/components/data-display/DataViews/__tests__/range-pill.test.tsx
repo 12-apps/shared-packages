@@ -9,7 +9,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { InlineFilterBar } from "../data-views-inline-bar";
+import { InlineFilterChips, InlineFilterControls } from "../data-views-inline-bar";
 import { rangeChipLabel } from "../data-views-range-pill";
 import type { RangeFieldConfig } from "../data-views-types";
 
@@ -47,29 +47,26 @@ const NO_COLLAPSE = {
   barRef: { current: null },
 };
 
-function renderBar(overrides: Partial<Parameters<typeof InlineFilterBar<Row>>[0]> = {}) {
+function renderBar(overrides: Partial<Parameters<typeof InlineFilterControls<Row>>[0]> = {}) {
   const onChangeRange = vi.fn();
   render(
-    <InlineFilterBar<Row>
+    <InlineFilterControls<Row>
       split={NO_COLLAPSE}
       testIdPrefix="grid"
       search=""
-      fields={[]}
-      rangeFields={[PERIOD, TOTAL]}
       pills={{}}
       ranges={{}}
       onSearchChange={vi.fn()}
       onTogglePill={vi.fn()}
       onChangeRange={onChangeRange}
       onClearField={vi.fn()}
-      onClearAll={vi.fn()}
       {...overrides}
     />,
   );
   return { onChangeRange };
 }
 
-describe("InlineFilterBar — range pills", () => {
+describe("InlineFilterControls — range pills", () => {
   it("renders one pill per range field, in the filter row", () => {
     renderBar();
     expect(screen.getByTestId("grid-range-period")).toHaveTextContent("Data");
@@ -105,9 +102,24 @@ describe("InlineFilterBar — range pills", () => {
   });
 
   it("shows an applied window as ONE removable chip that drops both ends", () => {
-    const { onChangeRange } = renderBar({
-      ranges: { period: { min: "2026-07-01", max: "2026-07-31" } },
-    });
+    // The chips moved OFF the controls and onto their own row under the
+    // toolbar, so they are rendered — and asserted — through their own
+    // component rather than through the bar.
+    const onChangeRange = vi.fn();
+    render(
+      <InlineFilterChips<Row>
+        testIdPrefix="grid"
+        search=""
+        fields={[]}
+        rangeFields={[PERIOD, TOTAL]}
+        pills={{}}
+        ranges={{ period: { min: "2026-07-01", max: "2026-07-31" } }}
+        onSearchChange={vi.fn()}
+        onTogglePill={vi.fn()}
+        onChangeRange={onChangeRange}
+        onClearAll={vi.fn()}
+      />,
+    );
     // The window now reads in TWO places — the pill itself and the active-chip
     // row — so the chip is addressed through its row rather than by its text.
     const chip = within(screen.getByTestId("grid-active-range:period")).getByText("Data: 01/07–31/07");

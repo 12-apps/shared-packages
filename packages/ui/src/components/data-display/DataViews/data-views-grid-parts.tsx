@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { TableFilter } from "../../layout/TableFilter";
 import { Text } from "../../typography/Text";
@@ -14,7 +14,7 @@ import {
 } from "./data-views-layout-context";
 import { FilterDialog, GridFilterPanel } from "./data-views-filter-panel";
 import { GridMain } from "./data-views-grid-bodies";
-import { InlineFilterBar } from "./data-views-inline-bar";
+import { InlineFilterChips, InlineFilterControls } from "./data-views-inline-bar";
 import { toOverflowFields, useFilterOverflow, type OverflowSplit } from "./data-views-overflow";
 import { ShellToolbar } from "./data-views-shell-toolbar";
 import type { DisplayPanelView } from "./data-views-display-panel";
@@ -154,8 +154,6 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   showInline: boolean;
   useModal: boolean;
   inlineVisible: boolean;
-  filtersHidden: boolean;
-  toggleFilters: () => void;
   filterProps: FilterSurfaceProps<T>;
   split: OverflowSplit<T>;
 } {
@@ -164,7 +162,6 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   // it can keep, and the TOOLBAR needs the same answer to drop its labels.
   // Measuring twice would let the two disagree at the crossover width.
   const split = useFilterOverflow(toOverflowFields(fields, rangeFields), state.pills, c.ranges);
-  const [filtersHidden, setFiltersHidden] = useState(false);
   // THE BAR RENDERS AT EVERY WIDTH. It used to be swapped for a full-screen
   // filter MODAL below `lg`, which was the responsive strategy before the
   // measured ladder existed — and the two now do the same job, badly together:
@@ -178,7 +175,6 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   const useModal = false;
   const inlineVisible =
     showInline &&
-    !filtersHidden &&
     (alwaysShowSearch || fields.length > 0 || rangeFields.length > 0 || state.search !== "");
   const filterProps: FilterSurfaceProps<T> = {
     testIdPrefix,
@@ -194,7 +190,7 @@ function useGridShellFilters<T extends Record<string, unknown>>({
     onClearField: (fieldId) => c.patch({ pills: { ...state.pills, [fieldId]: [] } }),
     onClearAll: () => c.patch({ search: "", pills: {}, ranges: {} }),
   };
-  return { showInline, useModal, inlineVisible, filtersHidden, toggleFilters: () => setFiltersHidden((v) => !v), filterProps, split };
+  return { showInline, useModal, inlineVisible, filterProps, split };
 }
 
 interface GridShellProps<T extends Record<string, unknown>> {
@@ -259,7 +255,7 @@ function ShellStack<T extends Record<string, unknown>>({
   filters: ReturnType<typeof useGridShellFilters<T>>;
 }): React.JSX.Element {
   const { c, testIdPrefix, dataTestId, scopes = [], emptyState, inlineFilters = false } = props;
-  const { showInline, useModal, inlineVisible, filtersHidden, toggleFilters, filterProps, split } = filters;
+  const { showInline, useModal, inlineVisible, filterProps, split } = filters;
   // The grid renders the FILTERED empty state itself — it is the only party
   // that knows a filter is applied. See {@link DataViewsEmpty}.
   const body = (
@@ -288,16 +284,19 @@ function ShellStack<T extends Record<string, unknown>>({
           sortKinds={props.sortKinds}
           displayView={props.displayView}
           exportConfig={props.exportConfig}
+          filterControls={
+            inlineVisible ? <InlineFilterControls {...filterProps} split={split} /> : undefined
+          }
           testIdPrefix={testIdPrefix}
           rowActions={props.rowActions}
           bulkActions={props.bulkActions}
           toolbarRightSlot={props.toolbarRightSlot}
           compactControls={showInline && split.compactControls}
           showInline={showInline}
-          filtersHidden={filtersHidden}
-          toggleFilters={toggleFilters}
         />
-        {inlineVisible && <InlineFilterBar {...filterProps} split={split} />}
+        {/* Only the applied-filter chips live under the toolbar now — the
+            controls themselves ride on the toolbar line above. */}
+        {inlineVisible && <InlineFilterChips {...filterProps} />}
         <TableFilter.Layout>
           <TableFilter.Main>
             <GridMain

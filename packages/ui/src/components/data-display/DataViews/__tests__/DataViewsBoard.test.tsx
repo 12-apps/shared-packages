@@ -211,17 +211,26 @@ describe("DataViews board layout", () => {
     );
   });
 
-  it("shares one selection with the table and the cards", async () => {
+  it("drives the same selection model from the board and from the cards", async () => {
     renderGrid({ board, server: harness().server });
     await switchLayout("board");
     await waitFor(() => expect(screen.getByTestId("pagamentos-board")).toBeInTheDocument());
 
+    // Selection OWNS the toolbar now, so Exibir is gone while a row is ticked:
+    // the layout has to be changed before selecting, not during. Selecting is
+    // asserted on each layout in turn instead of across a mid-selection switch.
     fireEvent.click(within(column("pago")).getByLabelText("Selecionar Ana"));
     await waitFor(() => expect(screen.getByTestId("pagamentos-clear-all")).toBeInTheDocument());
+    expect(within(column("pago")).getByLabelText("Selecionar Ana")).toBeChecked();
+
+    // Give the toolbar back, then move to the cards and select there.
+    fireEvent.click(screen.getByTestId("pagamentos-clear-all"));
+    await waitFor(() => expect(screen.getByTestId("pagamentos-display-trigger")).toBeInTheDocument());
 
     await switchLayout("cards");
-
     await waitFor(() => expect(screen.getByTestId("pagamentos-cards")).toBeInTheDocument());
+    expect(screen.getByLabelText("Selecionar Ana")).not.toBeChecked();
+    fireEvent.click(screen.getByLabelText("Selecionar Ana"));
     expect(screen.getByLabelText("Selecionar Ana")).toBeChecked();
     expect(screen.getByLabelText("Selecionar Bruno")).not.toBeChecked();
   });

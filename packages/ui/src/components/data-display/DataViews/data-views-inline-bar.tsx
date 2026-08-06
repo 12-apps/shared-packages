@@ -196,7 +196,79 @@ function InlineControl<T extends Record<string, unknown>>({
   return null;
 }
 
-export function InlineFilterBar<T extends Record<string, unknown>>({
+/**
+ * The filter CONTROLS alone — search, the fields that fit, and "Mais N" for the
+ * ones that don't — with no row chrome of its own, because it is rendered ON
+ * the toolbar line rather than under it (`ContentToolbar`'s `leadingControls`).
+ *
+ * `barRef` still measures THIS element, so the progressive collapse in
+ * `useFilterOverflow` now measures the space the controls actually have beside
+ * the counter and Exibir/Exportar, which is the width that decides how many
+ * fields fit.
+ */
+export function InlineFilterControls<T extends Record<string, unknown>>({
+  testIdPrefix,
+  pills,
+  ranges,
+  search,
+  onSearchChange,
+  onTogglePill,
+  onChangeRange,
+  onClearField,
+  split,
+}: Omit<InlineFilterBarProps<T>, "fields" | "rangeFields" | "onClearAll">): React.JSX.Element {
+  // MEASURED, not breakpointed — and measured ONCE, in the shell, because the
+  // toolbar around it needs the same answer to drop its labels. See `useFilterOverflow`.
+  const { inline, overflow, searchCollapsed, barRef } = split;
+  // Expanded by the operator: a collapsed search that was CLICKED stays open
+  // until Escape, so typing is never interrupted by a re-measure.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const showBox = !searchCollapsed || searchOpen;
+  return (
+    <Box
+      ref={barRef}
+      data-testid={`${testIdPrefix}-inline-filters`}
+      sx={{ display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 1, minWidth: 0 }}
+    >
+      <SearchSlot
+        search={search}
+        onSearchChange={onSearchChange}
+        collapsed={!showBox}
+        expanded={searchOpen}
+        onOpen={() => setSearchOpen(true)}
+        onEscape={() => setSearchOpen(false)}
+        testIdPrefix={testIdPrefix}
+      />
+      {inline.map((field) => (
+        <InlineControl
+          key={field.id}
+          field={field}
+          pills={pills}
+          ranges={ranges}
+          onTogglePill={onTogglePill}
+          onChangeRange={onChangeRange}
+          onClearField={onClearField}
+          testIdPrefix={testIdPrefix}
+        />
+      ))}
+      <MoreFilters
+        fields={overflow}
+        pills={pills}
+        ranges={ranges}
+        onTogglePill={onTogglePill}
+        onChangeRange={onChangeRange}
+        testIdPrefix={testIdPrefix}
+      />
+    </Box>
+  );
+}
+
+/**
+ * The applied-filter chips, on their own line under the toolbar. Split from the
+ * controls because the two no longer share a row: the controls sit on the
+ * toolbar, and this renders nothing at all until something is applied.
+ */
+export function InlineFilterChips<T extends Record<string, unknown>>({
   testIdPrefix,
   search,
   fields,
@@ -206,10 +278,8 @@ export function InlineFilterBar<T extends Record<string, unknown>>({
   onSearchChange,
   onTogglePill,
   onChangeRange,
-  onClearField,
   onClearAll,
-  split,
-}: InlineFilterBarProps<T>): React.JSX.Element {
+}: Omit<InlineFilterBarProps<T>, "split" | "onClearField">): React.JSX.Element | null {
   const chips = activeChips({
     search,
     fields,
@@ -220,55 +290,10 @@ export function InlineFilterBar<T extends Record<string, unknown>>({
     onTogglePill,
     onChangeRange,
   });
-  // MEASURED, not breakpointed — and measured ONCE, in the shell, because the
-  // toolbar above needs the same answer to drop its labels. See `useFilterOverflow`.
-  const { inline, overflow, searchCollapsed, barRef } = split;
-  // Expanded by the operator: a collapsed search that was CLICKED stays open
-  // until Escape, so typing is never interrupted by a re-measure.
-  const [searchOpen, setSearchOpen] = useState(false);
-  const showBox = !searchCollapsed || searchOpen;
-  const renderControl = (field: OverflowField<T>): React.JSX.Element | null => (
-    <InlineControl
-      key={field.id}
-      field={field}
-      pills={pills}
-      ranges={ranges}
-      onTogglePill={onTogglePill}
-      onChangeRange={onChangeRange}
-      onClearField={onClearField}
-      testIdPrefix={testIdPrefix}
-    />
-  );
+  if (chips.length === 0) return null;
   return (
-    <Box
-      data-testid={`${testIdPrefix}-inline-filters`}
-      sx={{ display: "flex", flexDirection: "column", gap: 1.5, py: 1.5 }}
-    >
-      <Box ref={barRef} sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5 }}>
-        <SearchSlot
-          search={search}
-          onSearchChange={onSearchChange}
-          collapsed={!showBox}
-          expanded={searchOpen}
-          onOpen={() => setSearchOpen(true)}
-          onEscape={() => setSearchOpen(false)}
-          testIdPrefix={testIdPrefix}
-        />
-        {inline.map(renderControl)}
-        <MoreFilters
-          fields={overflow}
-          pills={pills}
-          ranges={ranges}
-          onTogglePill={onTogglePill}
-          onChangeRange={onChangeRange}
-          testIdPrefix={testIdPrefix}
-        />
-      </Box>
-      <ActiveChipRow
-        chips={chips}
-        testIdPrefix={testIdPrefix}
-        onClearAll={onClearAll}
-      />
+    <Box sx={{ py: 1.5 }}>
+      <ActiveChipRow chips={chips} testIdPrefix={testIdPrefix} onClearAll={onClearAll} />
     </Box>
   );
 }

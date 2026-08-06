@@ -1,9 +1,5 @@
 "use client";
 
-import CollapseIcon from '@mui/icons-material/ExpandLess';
-import ExpandIcon from '@mui/icons-material/ExpandMore';
-import { IconButton, Tooltip } from "@mui/material";
-
 import {
   ContentToolbar,
   FilterTrigger,
@@ -41,12 +37,11 @@ export interface GridToolbarProps<T extends Record<string, unknown>> {
   activeFilterCount: number;
   /** Hide the "Filtros" slide-in trigger (compact layout shows filters inline). */
   showFilterTrigger?: boolean;
-  /** Show the ∧/∨ toggle that collapses/expands the inline filter row. */
-  showFiltersToggle?: boolean;
-  /** Whether the inline filter row is currently hidden. */
-  filtersHidden?: boolean;
-  /** Toggle the inline filter row's visibility. */
-  onToggleFilters?: () => void;
+  /**
+   * Search + filter controls, rendered ON the toolbar line rather than on a row
+   * beneath it. Absent ⇒ the toolbar keeps its plain two-cluster shape.
+   */
+  filterControls?: React.ReactNode;
   /** The controller, so "Exibir" can drive sort, columns, order and format. */
   c: DataViewsController<T>;
   /** Per-sort-field value kind, so directions read in the column's own terms. */
@@ -108,19 +103,6 @@ function ToolbarRightControls<T extends Record<string, unknown>>(props: GridTool
           data-testid={`${testIdPrefix}-filters-toggle`}
         />
       )}
-      {props.showFiltersToggle && (
-        <Tooltip title={props.filtersHidden ? "Mostrar filtros" : "Ocultar filtros"}>
-          <IconButton
-            size="small"
-            onClick={props.onToggleFilters}
-            aria-label={props.filtersHidden ? "Mostrar filtros" : "Ocultar filtros"}
-            aria-expanded={!props.filtersHidden}
-            data-testid={`${testIdPrefix}-filters-collapse`}
-          >
-            {props.filtersHidden ? <ExpandIcon fontSize="small" /> : <CollapseIcon fontSize="small" />}
-          </IconButton>
-        </Tooltip>
-      )}
     </>
   );
 }
@@ -157,6 +139,10 @@ export function GridToolbar<T extends Record<string, unknown>>(props: GridToolba
           clearSelection: props.clearSelection,
           testIdPrefix,
         })}
+        leadingControls={props.filterControls}
+        // Selection takes the whole line: no Select All while browsing, and no
+        // search/filters/Exibir/Exportar once a row is ticked.
+        exclusiveSelection
         rightControls={<ToolbarRightControls {...props} />}
       />
     </Box>

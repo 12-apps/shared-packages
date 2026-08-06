@@ -133,11 +133,18 @@ export function ContentToolbar({
   selectAll,
   clearSelection,
   rightControls,
+  leadingControls,
   actions,
   selectAllTestId,
   clearAllTestId,
   edgeAlign = false,
+  exclusiveSelection = false,
 }: ContentToolbarProps): React.JSX.Element {
+  // Under `exclusiveSelection` the two states are alternatives, not neighbours:
+  // browsing shows the controls and no checkbox, selecting shows the checkbox
+  // and no controls. Anything else double-books the row.
+  const showSelection = !exclusiveSelection || hasSelection;
+  const showControls = !exclusiveSelection || !hasSelection;
   return (
     // Wrap the two clusters onto separate rows when they can't share one line
     // (narrow screens / phones) instead of letting the controls collide.
@@ -151,34 +158,47 @@ export function ContentToolbar({
         rowGap: 1,
       }}
     >
-      <SelectionCluster
-        hasSelection={hasSelection}
-        selectedCount={selectedCount}
-        selectAll={selectAll}
-        clearSelection={clearSelection}
-        actions={actions}
-        selectAllTestId={selectAllTestId}
-        clearAllTestId={clearAllTestId}
-        edgeAlign={edgeAlign}
-      />
+      {showSelection && (
+        <SelectionCluster
+          hasSelection={hasSelection}
+          selectedCount={selectedCount}
+          selectAll={selectAll}
+          clearSelection={clearSelection}
+          actions={actions}
+          selectAllTestId={selectAllTestId}
+          clearAllTestId={clearAllTestId}
+          edgeAlign={edgeAlign}
+        />
+      )}
+
+      {/* Search + filters, on the toolbar's own line. minWidth:0 lets this
+       * cluster be the one that gives up width as the row tightens, which is
+       * what the filter overflow measures against. */}
+      {showControls && leadingControls !== undefined && (
+        <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, minWidth: 0 }}>
+          {leadingControls}
+        </Box>
+      )}
 
       {/* ml:auto keeps the controls right-aligned even when the cluster wraps to
        * its own row (where justify-content:space-between would otherwise snap a
        * lone item to the left); it's a no-op on a shared row. */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          // Tight (5px) when browsing so the controls fit one line beside the
-          // checkbox; roomier (14px) in selection mode where they get their own row.
-          gap: hasSelection ? '14px' : '5px',
-          ml: 'auto',
-          mr: edgeAlign ? -1.5 : 0,
-        }}
-      >
-        {rightControls}
-      </Box>
+      {showControls && (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            // Tight (5px) when browsing so the controls fit one line beside the
+            // checkbox; roomier (14px) in selection mode where they get their own row.
+            gap: hasSelection ? '14px' : '5px',
+            ml: 'auto',
+            mr: edgeAlign ? -1.5 : 0,
+          }}
+        >
+          {rightControls}
+        </Box>
+      )}
     </Box>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
 import type { SortFieldDefinition } from "../../layout/ContentToolbar";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { DataViewsGrid } from "./DataViewsGrid";
+import type { DisplayPanelView } from "./data-views-display-panel";
 import type { BoardConfig } from "./DataViewsBoard";
 import type { DataViewExport } from "./data-views-export";
 import type { ScopeConfig } from "./data-views-scopes";
@@ -196,6 +197,24 @@ export function DataViewsTableBase<T extends Record<string, unknown>>(
   const initialView = resolveInitialView(views, initialViewId);
   const columnIds = columns.map((col) => col.id);
   const ctl = useSavedViewsController(persistence, router, columnIds, views, initialView, initialState);
+  // Unsaved-changes flag for the Exibir panel. Set from `onStateChange` rather
+  // than derived in render because the live state lives in a REF (the grid owns
+  // it); the equality bail-out in `setDirty` is what stops the update loop.
+  const [dirty, setDirty] = useState(false);
+  const appliedKey = JSON.stringify(ctl.applied ?? null);
+  // The view the panel's "Redefinir" restores: the applied one, or the built-in
+  // "Visão principal" when none is.
+  const activeView = views.find((view) => view.name === ctl.activeViewName);
+  const displayView: DisplayPanelView = {
+    activeViewName: ctl.activeViewName,
+    dirty,
+    onReset: () => (activeView ? ctl.applyView(activeView) : ctl.selectMain()),
+    // Only offer "Atualizar" when there IS a view to update — otherwise the
+    // single footer button is a plain "Salvar visão".
+    onUpdate: activeView ? () => ctl.openEdit(activeView) : undefined,
+    onSaveAs: ctl.openCreate,
+    selector: <ViewsMenu views={views} ctl={ctl} testIdPrefix={testIdPrefix} />,
+  };
   // Server-mode lists re-apply URL-derived controls on back/forward (not just the mount seed).
   const syncState = useUrlSyncState(server, initialState);
 
@@ -207,8 +226,14 @@ export function DataViewsTableBase<T extends Record<string, unknown>>(
         testIdPrefix={testIdPrefix}
         appliedState={ctl.applied}
         syncState={syncState}
-        onStateChange={(state) => (ctl.currentRef.current = state)}
-        toolbarRightSlot={<ViewsMenu views={views} ctl={ctl} testIdPrefix={testIdPrefix} />}
+        onStateChange={(state) => {
+          ctl.currentRef.current = state;
+          const next = JSON.stringify(state) !== appliedKey;
+          setDirty((prev) => (prev === next ? prev : next));
+        }}
+        // The saved-views menu is NOT a toolbar control any more: it lives in
+        // the Exibir panel's VISÃO header, passed through `displayView`.
+        displayView={displayView}
       />
       {renderViewDialogs(ctl, fields, columns, views, testIdPrefix)}
     </>

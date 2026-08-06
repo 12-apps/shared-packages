@@ -179,22 +179,24 @@ describe("the Exportar control", () => {
     expect(scope.textContent).toContain("214 itens filtrados");
   });
 
-  it("narrows to the selection, and says so, once rows are selected", async () => {
-    const onExport = vi.fn();
-    renderGrid(onExport);
+  /**
+   * Selection now OWNS the toolbar: ticking a row replaces the browsing
+   * controls with the selection cluster, so Exportar is not on screen to be
+   * opened. Export-of-a-selection is therefore a HOST concern now — it belongs
+   * in the "Ações" bulk menu, not in this component's toolbar.
+   *
+   * The export request still carries `selectedIds` for a host that drives the
+   * menu itself; what changed is that the built-in trigger is unreachable while
+   * a selection is active.
+   */
+  it("yields the toolbar — Exportar included — the moment a row is selected", () => {
+    renderGrid(vi.fn());
 
-    fireEvent.click(screen.getByTestId("lista-select-all"));
+    expect(screen.getByTestId("lista-export-trigger")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Select all rows"));
 
-    fireEvent.click(screen.getByTestId("lista-export-trigger"));
-    const scope = await screen.findByTestId("lista-export-scope");
-    expect(scope.textContent).toContain("2 itens selecionados");
-
-    fireEvent.click(await screen.findByTestId("lista-export-json"));
-    await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1));
-    const request = requestOf(onExport);
-    expect(request.selectedIds).toEqual(["1", "2"]);
-    // Still the whole filtered query — the host intersects it with the ids.
-    expect(request.query.pageSize).toBe(214);
+    expect(screen.queryByTestId("lista-export-trigger")).toBeNull();
+    expect(screen.getByTestId("lista-clear-all")).toBeInTheDocument();
   });
 
   it("sends the visible columns in the operator's current order", async () => {

@@ -151,7 +151,7 @@ function MoreTrigger({
     <Button
       variant="outline"
       size="sm"
-      color="secondary"
+      color="neutral"
       onClick={(event) => onOpen(event.currentTarget as HTMLElement)}
       dataTestId={`${testIdPrefix}-more-filters`}
       aria-label={`Mais filtros: ${count} sem espaço na barra`}
