@@ -287,7 +287,12 @@ function runRoute(config: ReportBuilderServerConfig): ReportRoute {
     path: '/reports/run',
     async handle({ body }) {
       try {
-        const result = await runReport((body as { spec?: unknown }).spec, runOptions(config));
+        // `body` is undefined when the request carried none or it failed to
+        // parse. Reading `.spec` off that throws a TypeError, which is not a
+        // ReportBuilderError and would escape as a 500 — turning the caller's
+        // malformed request into our server fault.
+        const spec = (body as { spec?: unknown } | undefined)?.spec;
+        const result = await runReport(spec, runOptions(config));
         return ok({ render: result.render });
       } catch (error) {
         return foldSpecError(error);
