@@ -9,6 +9,7 @@ import { Card } from "../../layout/Card";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
+import { DragHandle, useDragItem } from "./data-views-drag";
 import { CARD_ASPECT_RATIOS, type CardAspectRatio } from "./data-views-types";
 
 interface BaseCardProps {
@@ -41,6 +42,15 @@ interface BaseCardProps {
   onClick?: () => void;
   /** Visually de-emphasise (e.g. a disabled/hidden entity). */
   dimmed?: boolean;
+  /**
+   * This card's id for drag purposes.
+   *
+   * Draggable ONLY inside a {@link DragContainerProvider} — see
+   * `data-views-drag`. On the board that is how a card moves between columns;
+   * in a grade it is how the operator reorders. Outside a container this is
+   * inert and no grip appears.
+   */
+  dragId?: string | number;
   dataTestId?: string;
   checkboxTestId?: string;
 }
@@ -52,8 +62,9 @@ function cardSx(opts: {
   interactive: boolean;
   dimmed: boolean;
   selected: boolean;
+  draggable: boolean;
 }): SxProps<Theme> {
-  const { aspectRatio, pad, interactive, dimmed, selected } = opts;
+  const { aspectRatio, pad, interactive, dimmed, selected, draggable } = opts;
   return {
     position: "relative",
     aspectRatio: String(CARD_ASPECT_RATIOS[aspectRatio]),
@@ -62,7 +73,8 @@ function cardSx(opts: {
     overflow: "hidden",
     p: pad,
     transition: "border-color 120ms, box-shadow 120ms, background-color 120ms",
-    cursor: interactive ? "pointer" : undefined,
+    cursor: draggable ? "grab" : interactive ? "pointer" : undefined,
+    ...(draggable ? { touchAction: "none", "&:active": { cursor: "grabbing" } } : {}),
     opacity: dimmed ? 0.6 : 1,
     borderColor: selected ? "primary.main" : undefined,
     boxShadow: selected ? (theme) => `inset 0 0 0 1px ${theme.palette.primary.main}` : undefined,
@@ -248,6 +260,7 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
   const { aspectRatio = "4:3", scale = 1, selected = false, dimmed = false } = props;
   const { menu, onToggleSelect, onClick, dataTestId, checkboxTestId } = props;
   const pad = 1.5 * scale;
+  const drag = useDragItem(props.dragId);
 
   return (
     <Card
@@ -255,8 +268,30 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
       borderRadius="lg"
       onClick={onClick}
       dataTestId={dataTestId}
-      sx={cardSx({ aspectRatio, pad, interactive: onClick != null, dimmed, selected })}
+      {...drag.itemProps}
+      sx={cardSx({
+        aspectRatio,
+        pad,
+        interactive: onClick != null,
+        // A card mid-drag is a ghost of itself; the drop target is what the eye
+        // should be on.
+        dimmed: dimmed || drag.dragging,
+        selected,
+        draggable: drag.draggable && drag.handleProps === undefined,
+      })}
     >
+      {/* Bottom-left, opposite the menu and clear of the checkbox — a grip in
+          the same corner as a control that toggles selection means every drag
+          starts with a near-miss on it. */}
+      {drag.draggable && (
+        <Box sx={{ position: "absolute", bottom: 4, left: 4, zIndex: 2 }}>
+          <DragHandle
+            handleProps={drag.handleProps}
+            gated={drag.handleProps !== undefined}
+            testId={dataTestId ? `${dataTestId}-drag` : undefined}
+          />
+        </Box>
+      )}
       <CardOverlays
         selected={selected}
         onToggleSelect={onToggleSelect}
