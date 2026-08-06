@@ -1,5 +1,28 @@
-import { UnknownProviderError } from './errors';
+import { AdapterContractError, UnknownProviderError } from './errors';
 import type { PaymentProviderAdapter } from './provider';
+
+/**
+ * Refuse an adapter whose payment-proof declaration is half-written (FUT-726).
+ *
+ * `verifyConfirmsPayment` says a PROCESSED delivery of this provider proves
+ * money moved; `referenceOfDelivery` says WHICH charge it proves. With only the
+ * first, reconciliation can never correlate a delivery, so every stranded
+ * activation of that provider's merchants stops healing — and stops silently,
+ * because "no proof found" is also what a genuinely unpaid charge looks like.
+ * The type union rules the shape out at compile time; this is the same rule for
+ * the shapes that reach a running host anyway (a JS caller, an `as` cast),
+ * stated once at registration, where it costs a failed boot instead of months
+ * of unnoticed non-healing.
+ */
+function assertPaymentProofPaired(name: string, adapter: PaymentProviderAdapter): void {
+  if (adapter.verifyConfirmsPayment && !adapter.referenceOfDelivery) {
+    throw new AdapterContractError(
+      name,
+      'declares verifyConfirmsPayment without referenceOfDelivery, so a processed ' +
+        'delivery could never be correlated to the charge it proves',
+    );
+  }
+}
 
 /**
  * Provider registry. Mirrors `@12-apps/entitlements`' `defineFeatures` /
@@ -44,6 +67,7 @@ export function defineProviders<const M extends Record<string, PaymentProviderAd
   type P = keyof M & string;
   const names = Object.keys(adapters) as P[];
   const byName = new Map<string, PaymentProviderAdapter>(Object.entries(adapters));
+  for (const [name, adapter] of byName) assertPaymentProofPaired(name, adapter);
 
   return {
     names,

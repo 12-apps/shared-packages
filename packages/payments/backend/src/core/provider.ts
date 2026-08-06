@@ -28,6 +28,57 @@ import type {
 } from './vault-types';
 
 /**
+ * How a provider's webhook deliveries can serve as PROOF OF PAYMENT — one
+ * indivisible declaration, never two independent flags (FUT-726).
+ *
+ * Reconciliation settles a stranded activation charge from a PROCESSED inbox
+ * row, and that takes two facts about the SAME provider: that a verified
+ * delivery means money moved, and which host reference that delivery names.
+ * As separate optional fields they can be half-written — an adapter that
+ * declares the flag and forgets the reader typechecks, registers and serves
+ * traffic, while every stranded activation of its merchants quietly stops
+ * healing, with nothing thrown, nothing logged and no test red. That silent
+ * half is the failure this pairing removes: the union has no member with one
+ * without the other, so the day a second provider declares the flag the
+ * compiler asks it for the reader too.
+ */
+export type DeliveryPaymentProof =
+  | {
+      /**
+       * True when this adapter's `webhook.verify` step confirms THE PAYMENT
+       * with the provider itself, not merely the sender of the delivery (the
+       * case for an unsigned-webhook provider whose verify re-asks the
+       * provider's own payment-check API). For such a provider, a delivery the
+       * host has verified and processed is durable proof that money moved, and
+       * reconciliation may settle state from it.
+       */
+      readonly verifyConfirmsPayment: true;
+      /**
+       * The host-side reference THIS provider's delivery payload names — the
+       * `reference` `createCharge` sent, read back out of a raw webhook body —
+       * or null when the payload names none.
+       *
+       * The correlation key is a fact about the provider's payload shape (for
+       * InfinitePay it is `order_nsu`), so the adapter declares how to read it
+       * rather than any caller parsing one vendor's field: such a parse would
+       * answer confidently — and wrongly — for the second provider to arrive.
+       * The flag says a PROCESSED row proves payment; this says WHICH charge it
+       * proves. Takes the raw stored payload string, because that is what an
+       * inbox durably holds; a body that does not parse answers null.
+       */
+      readonly referenceOfDelivery: (payload: string) => string | null;
+    }
+  | {
+      /**
+       * Signature-verified providers leave both unset: their verify proves who
+       * sent the body, never that anything was paid, so their PROCESSED rows
+       * are not proof and there is nothing to correlate.
+       */
+      readonly verifyConfirmsPayment?: false;
+      readonly referenceOfDelivery?: never;
+    };
+
+/**
  * The adapter contract — the ONE seam every provider integration implements.
  * Adding a vendor means writing one object of this shape and registering it;
  * nothing in the core, the storage ports, or the host's UI changes.
@@ -41,8 +92,13 @@ import type {
  *     PagBank integration's stub mode).
  *   - Be stateless. Credentials arrive per call; adapters never cache them,
  *     so one adapter instance safely serves every merchant and environment.
+ *
+ * An adapter is this shape PLUS a {@link DeliveryPaymentProof} declaration —
+ * kept a separate union because those two members must move together.
  */
-export interface PaymentProviderAdapter {
+export type PaymentProviderAdapter = PaymentProviderAdapterBase & DeliveryPaymentProof;
+
+export interface PaymentProviderAdapterBase {
   readonly name: ProviderName;
   /** Human-facing label for config UIs ("Stone", "InfinitePay", ...). */
   readonly displayName: string;
@@ -66,31 +122,6 @@ export interface PaymentProviderAdapter {
    * charge raises its one-cent proof to this floor.
    */
   readonly minimumChargeCents?: number;
-  /**
-   * True when this adapter's `webhook.verify` step confirms THE PAYMENT with
-   * the provider itself, not merely the sender of the delivery (the case for
-   * an unsigned-webhook provider whose verify re-asks the provider's own
-   * payment-check API). For such a provider, a delivery the host has verified
-   * and processed is durable proof that money moved, and reconciliation may
-   * settle state from it. Signature-verified providers must leave this unset:
-   * their verify proves who sent the body, never that anything was paid.
-   */
-  readonly verifyConfirmsPayment?: boolean;
-  /**
-   * The host-side reference THIS provider's delivery payload names — the
-   * `reference` `createCharge` sent, read back out of a raw webhook body — or
-   * null when the payload names none (FUT-726).
-   *
-   * The correlation key is a fact about the provider's payload shape (for
-   * InfinitePay it is `order_nsu`), so the adapter declares how to read it
-   * rather than any host parsing one vendor's field: that parse would break
-   * silently the day a second provider declared `verifyConfirmsPayment`.
-   * Reconciliation needs BOTH declarations to settle from a processed
-   * delivery — the flag says a PROCESSED row proves payment, this hook says
-   * WHICH charge it proves. Takes the raw stored payload string because that
-   * is what an inbox durably holds; a body that does not parse answers null.
-   */
-  readonly referenceOfDelivery?: (payload: string) => string | null;
   /**
    * Historical per-merchant webhook PATH this provider's merchants registered
    * in its dashboard before the host's generic payments webhook route existed.

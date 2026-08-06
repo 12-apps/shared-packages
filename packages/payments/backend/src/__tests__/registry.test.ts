@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { UnknownProviderError } from '../core/errors';
+import { AdapterContractError, UnknownProviderError } from '../core/errors';
+import type { PaymentProviderAdapter } from '../core/provider';
 import { defineProviders } from '../core/registry';
 import { infinitePayProvider } from '../providers/infinitepay';
 import { stoneProvider } from '../providers/stone';
 import { stripeProvider } from '../providers/stripe';
+import { activationAdapter } from './activation-fixtures';
 
 describe('defineProviders', () => {
   const providers = defineProviders({
@@ -55,6 +57,52 @@ describe('defineProviders', () => {
 
   it('keeps the raw name as a working url alias, so old links do not 404', () => {
     expect(slugRegistry().providerForUrlSlug('infinitepay')).toBe('infinitepay');
+  });
+
+  /**
+   * FUT-726 — the two halves of the payment-proof declaration must arrive
+   * together, and the registry is where a host finds that out.
+   *
+   * An adapter that says its PROCESSED deliveries prove payment but cannot say
+   * WHICH charge they prove is not merely incomplete: reconciliation asks it
+   * for a correlation key, gets nothing, and reports "unproven" — the same
+   * answer a genuinely unpaid activation gives. Every stranded activation of
+   * that provider's merchants would stop healing with no error, no log and no
+   * failing test. Refusing it at registration turns months of invisible
+   * non-healing into a boot that fails while someone is looking.
+   */
+  it('refuses an adapter that declares verifyConfirmsPayment with no way to correlate', () => {
+    // The cast IS the scenario: the union makes this shape unwritable in
+    // TypeScript, so what reaches a running host is a JS caller or a cast.
+    const halfDeclared = {
+      ...activationAdapter('halfpay'),
+      verifyConfirmsPayment: true,
+    } as unknown as PaymentProviderAdapter;
+
+    expect(() => defineProviders({ halfpay: halfDeclared })).toThrow(AdapterContractError);
+    expect(() => defineProviders({ halfpay: halfDeclared })).toThrow(/referenceOfDelivery/);
+  });
+
+  it('accepts the pair declared together', () => {
+    const paying = activationAdapter('paypay', {}, {
+      verifyConfirmsPayment: true,
+      referenceOfDelivery: () => 'ref-1',
+    });
+
+    expect(defineProviders({ paypay: paying }).names).toEqual(['paypay']);
+  });
+
+  it('is a compile error to declare the flag without the reader', () => {
+    // Not a runtime assertion — the assertion is that `tsc` rejects the line
+    // below. Delete the pairing from the contract and this file stops
+    // typechecking, because the suppression has nothing left to suppress.
+    const halfDeclared = {
+      ...activationAdapter('halfpay'),
+      verifyConfirmsPayment: true,
+      // @ts-expect-error — verifyConfirmsPayment: true demands referenceOfDelivery (FUT-726).
+    } satisfies PaymentProviderAdapter;
+
+    expect(halfDeclared.name).toBe('halfpay');
   });
 
   it('passes unknown names and url segments through unchanged', () => {

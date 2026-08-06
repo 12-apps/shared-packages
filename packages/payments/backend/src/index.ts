@@ -58,7 +58,11 @@ export {
   type BreakerOptions,
   type ProviderHealth,
 } from './core/provider-health';
-export type { PaymentProviderAdapter } from './core/provider';
+export type {
+  DeliveryPaymentProof,
+  PaymentProviderAdapter,
+  PaymentProviderAdapterBase,
+} from './core/provider';
 export type {
   AttemptLedger,
   ChargeAttemptRecord,
@@ -98,6 +102,7 @@ export {
 export { gateIssuesOf, nothingWasAttempted } from './core/walk-failure';
 export type { WalkFailure, WalkFailureKind } from './core/walk-failure';
 export {
+  AdapterContractError,
   AmbiguousChargeError,
   ChargeDeclinedError,
   ChargeNotPersistedError,
