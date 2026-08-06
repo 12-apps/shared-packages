@@ -37,6 +37,25 @@ export class UnknownProviderError extends PaymentsError {
 }
 
 /**
+ * An adapter breaks an invariant of the adapter contract itself — thrown by
+ * `defineProviders`, so a host that registers it fails at BOOT rather than
+ * behaving subtly wrong under traffic (FUT-726).
+ *
+ * The type system already refuses these shapes; this catches the ones that get
+ * past it — a JavaScript host, an `as` cast, an adapter assembled at runtime —
+ * because the failures it guards are silent ones, and a payments bug nobody
+ * can see is worse than a server that will not start.
+ */
+export class AdapterContractError extends PaymentsError {
+  constructor(
+    readonly provider: string,
+    readonly problem: string,
+  ) {
+    super('AdapterContractError', `Adapter ${provider} is not a valid adapter: ${problem}`);
+  }
+}
+
+/**
  * The operation is valid in general but THIS provider can't do it (method
  * not in capabilities, refunds unsupported, ...). Thrown by the gateway
  * before the adapter is ever called, so the message is uniform across

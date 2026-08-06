@@ -1,6 +1,10 @@
 import type { ActivationContext } from '../activation/context';
 import type { PendingVerification, StoredProviderConfig } from '../config/types';
-import type { PaymentProviderAdapter } from '../core/provider';
+import type {
+  DeliveryPaymentProof,
+  PaymentProviderAdapter,
+  PaymentProviderAdapterBase,
+} from '../core/provider';
 import type { ProviderRegistry } from '../core/registry';
 import { defineProviders } from '../core/registry';
 import type { MerchantRef } from '../core/types';
@@ -12,12 +16,21 @@ import type { MerchantRef } from '../core/types';
  * whatever each case scripts and the stores are plain maps.
  */
 
-/** A full adapter whose behaviour each test overrides per case. */
+/**
+ * A full adapter whose behaviour each test overrides per case.
+ *
+ * The payment-proof pair is a THIRD argument rather than two more overrides:
+ * it is one declaration on the contract (FUT-726), and a fake that could set
+ * `verifyConfirmsPayment` on its own would be a shape no real adapter is
+ * allowed to have — the case it fakes could never happen in production.
+ */
 export function activationAdapter(
   name: string,
-  overrides: Partial<PaymentProviderAdapter> = {},
+  overrides: Partial<PaymentProviderAdapterBase> = {},
+  proof: DeliveryPaymentProof = {},
 ): PaymentProviderAdapter {
   return {
+    ...proof,
     name,
     displayName: overrides.displayName ?? 'Fake',
     capabilities: {
