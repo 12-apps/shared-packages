@@ -17,6 +17,7 @@ import { Box, Button, Popover, TextField, Typography } from '@mui/material';
 import React, { useState } from 'react';
 
 import { TableFilter } from '../../layout/TableFilter';
+import { DayBoundInput } from './data-views-day-input';
 import {
   isRangeInverted,
   isRangeSet,
@@ -34,8 +35,10 @@ function inputValue(bound: number | string | undefined): string {
 
 /**
  * One end of the range. A day keeps its `AAAA-MM-DD` string verbatim (the form
- * both the native picker and the backend speak); a number parses, and an
- * unparseable/blank entry CLEARS the bound rather than writing `NaN`.
+ * both the field and the backend speak) and is typed through the masked
+ * `dd/mm/aaaa` field rather than a native date input — see
+ * {@link DayBoundInput} for why. A number parses, and an unparseable/blank
+ * entry CLEARS the bound rather than writing `NaN`.
  */
 function BoundField<T extends Record<string, unknown>>({
   field,
@@ -50,30 +53,34 @@ function BoundField<T extends Record<string, unknown>>({
   onChange: (bound: number | string | undefined) => void;
   testId: string;
 }): React.JSX.Element {
-  const isDay = field.kind === 'day';
+  if (field.kind === 'day') {
+    return (
+      <DayBoundInput
+        label={label}
+        value={value == null ? undefined : String(value)}
+        onChange={onChange}
+        testId={testId}
+      />
+    );
+  }
   return (
     <TextField
       size="small"
-      type={isDay ? 'date' : 'number'}
+      type="number"
       label={label}
       value={inputValue(value)}
       onChange={(event) => {
         const raw = event.target.value;
         if (raw === '') return onChange(undefined);
-        if (isDay) return onChange(raw);
         const amount = Number(raw);
         return onChange(Number.isNaN(amount) ? undefined : amount);
       }}
-      // A native date input ALWAYS paints its `dd/mm/aaaa` placeholder, and a
-      // start adornment occupies the same space — so a label left to MUI's
-      // default (shrink only once filled) renders ON TOP of it.
+      // A start adornment occupies the space an un-shrunk label would render
+      // into, so the label is pinned up rather than left to MUI's default.
       InputLabelProps={{ shrink: true }}
-      inputProps={{
-        'data-testid': testId,
-        ...(isDay ? {} : { step: field.step ?? 1, min: 0 }),
-      }}
-      InputProps={!isDay && field.unit ? { startAdornment: <Box component="span" sx={{ mr: 0.5, color: 'text.secondary' }}>{field.unit}</Box> } : undefined}
-      sx={{ width: isDay ? 165 : 140 }}
+      inputProps={{ 'data-testid': testId, step: field.step ?? 1, min: 0 }}
+      InputProps={field.unit ? { startAdornment: <Box component="span" sx={{ mr: 0.5, color: 'text.secondary' }}>{field.unit}</Box> } : undefined}
+      sx={{ width: 140 }}
     />
   );
 }
