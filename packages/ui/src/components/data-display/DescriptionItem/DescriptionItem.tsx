@@ -22,6 +22,21 @@ export interface DescriptionItemProps {
   orientation?: 'vertical' | 'horizontal';
 
   /**
+   * Which edge the label and value line up on.
+   *
+   * - `start` (default): both flush left, the reading order for a form or a
+   *   description list.
+   * - `center`: both centred over each other — for a pair sitting in a column
+   *   of its own, where a left-flush label over a shorter value looks unhinged
+   *   from it.
+   * - `end`: both flush right, which is what a numeric column wants so its
+   *   digits line up with the value above and below.
+   *
+   * Applies to `vertical`; a `horizontal` pair is already a single line.
+   */
+  align?: 'start' | 'center' | 'end';
+
+  /**
    * Optional CSS class name
    */
   className?: string;
@@ -54,13 +69,20 @@ export interface DescriptionItemProps {
  * />
  * ```
  */
+/** `align` in the terms flexbox and CSS each want it. */
+const FLEX_ALIGN = { start: 'flex-start', center: 'center', end: 'flex-end' } as const;
+
 // Vertical stacks the label above the value; horizontal sets them side by side
 // with the label sized to its content.
-const containerSx = (isHorizontal: boolean) => ({
+const containerSx = (isHorizontal: boolean, align: 'start' | 'center' | 'end') => ({
   display: 'flex',
   flexDirection: isHorizontal ? ('row' as const) : ('column' as const),
-  alignItems: isHorizontal ? 'center' : 'flex-start',
+  alignItems: isHorizontal ? 'center' : FLEX_ALIGN[align],
   gap: isHorizontal ? 1 : 0,
+  // `alignItems` places the two boxes; `textAlign` handles a label or value
+  // that WRAPS, whose second line would otherwise fall back to flush-left
+  // inside a box the alignment had already centred.
+  textAlign: align,
 });
 
 const labelStyle = (isHorizontal: boolean) => ({
@@ -79,6 +101,7 @@ export const DescriptionItem: React.FC<DescriptionItemProps> = ({
   label,
   value,
   orientation = 'vertical',
+  align = 'start',
   className,
   'data-testid': dataTestId,
 }) => {
@@ -88,7 +111,7 @@ export const DescriptionItem: React.FC<DescriptionItemProps> = ({
   return (
     <Box
       className={className}
-      sx={containerSx(isHorizontal)}
+      sx={containerSx(isHorizontal, align)}
       data-testid={dataTestId || 'description-item'}
     >
       <Text

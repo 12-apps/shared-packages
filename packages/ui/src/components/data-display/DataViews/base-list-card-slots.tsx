@@ -133,7 +133,11 @@ export function ListCardMeta({
               |
             </Box>
           )}
-          <DescriptionItem orientation="vertical" {...item} />
+          {/* Centred: a stacked pair sitting in its own column reads as one
+              unit only when the label is over the value rather than flush left
+              of a value shorter than it — `MÉTODO` above `PIX` was visibly
+              unhinged from it. Overridable per item. */}
+          <DescriptionItem orientation="vertical" align="center" {...item} />
         </Box>
       ))}
       {metaSlot}
