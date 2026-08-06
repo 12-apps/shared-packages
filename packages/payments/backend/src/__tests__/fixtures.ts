@@ -76,6 +76,16 @@ function fakeAdapter(name = 'stone'): PaymentProviderAdapter {
   };
 }
 
+/**
+ * A fake that CAN run an activation charge — the only kind `requireProven`
+ * actually gates, since an adapter with no browser tokenization could never
+ * produce the proof and gating it would brick it instead of protecting it.
+ */
+function unprovenAdapter(name = 'unproven'): PaymentProviderAdapter {
+  const base = fakeAdapter(name);
+  return { ...base, capabilities: { ...base.capabilities, activationCharge: true } };
+}
+
 export const TENANT: MerchantRef = { kind: 'TENANT', id: 'tenant-1' };
 export const OTHER_TENANT: MerchantRef = { kind: 'TENANT', id: 'tenant-2' };
 
@@ -293,7 +303,14 @@ export async function setupHttpWorld(): Promise<{
   charges: MemoryChargeStore;
 }> {
   const configStore = createMemoryProviderConfigStore();
-  const providers = defineProviders({ stone: fakeAdapter() } as const);
+  const providers = defineProviders({
+    stone: fakeAdapter(),
+    // Connected, never proven, deliberately left OUT of the chain: the state a
+    // chain rewrite used to activate silently (FUT-693). It carries
+    // `activationCharge` because the proof gate binds only where the proof is
+    // obtainable, so `stone` — which does not — cannot stand in for it.
+    unproven: unprovenAdapter(),
+  } as const);
   const settings = createSettingsService(providers, configStore, { allowStubMode: true });
   const charges = createMemoryChargeStore();
   const gateway = createPaymentsGateway({
@@ -324,6 +341,9 @@ export async function setupHttpWorld(): Promise<{
     fields: {},
   });
   await settings.applyChargeVerification(TENANT, 'stone', true);
+  // Configured but never proven and never enabled — so a chain naming it is a
+  // request to ENABLE, which is what the settings surface must refuse.
+  await settings.saveCredentials(TENANT, 'unproven', { environment: 'SANDBOX', fields: {} });
   return { http, charges };
 }
 
