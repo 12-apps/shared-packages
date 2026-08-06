@@ -1,6 +1,22 @@
 import type { StorybookConfig } from '@storybook/react-vite';
 import { mergeConfig } from 'vite';
 
+// Storybook answers 403 "Invalid host" to any Host header it was not told
+// about, which is every host a tunnel puts in front of it (scripts/tunnel.sh).
+// This one value covers both checks: core-server's own middleware reads it, and
+// builder-vite forwards it to Vite's server.allowedHosts.
+//
+// STORYBOOK_ALLOWED_HOSTS: 'all', or a comma-separated host list. Unset keeps
+// the default — local and network addresses only.
+function allowedHosts(): true | string[] {
+  const raw = process.env.STORYBOOK_ALLOWED_HOSTS?.trim() ?? '';
+  if (raw === 'all') return true;
+  return raw
+    .split(',')
+    .map((host) => host.trim())
+    .filter(Boolean);
+}
+
 const config: StorybookConfig = {
   stories: [
     '../src/**/*.stories.@(js|jsx|mjs|ts|tsx)',
@@ -9,6 +25,10 @@ const config: StorybookConfig = {
     '../../product-research-ui/src/**/*.stories.@(ts|tsx)',
   ],
   addons: ['@storybook/addon-links', '@storybook/addon-docs'],
+
+  core: {
+    allowedHosts: allowedHosts(),
+  },
 
   framework: {
     name: '@storybook/react-vite',
@@ -42,6 +62,20 @@ const config: StorybookConfig = {
           forceBuildInstrument: true,
         }),
       ],
+      optimizeDeps: {
+        // Pre-bundle the docs renderer's own React dependency. builder-vite's
+        // candidate list does not name it, and under pnpm it is reachable only
+        // through @storybook/addon-docs — so without this Vite first meets it
+        // when a docs page loads, re-optimizes, and reloads mid-render:
+        //
+        //   [vite] new dependencies optimized: @mdx-js/react
+        //   [vite] optimized dependencies changed. reloading
+        //
+        // The page is then holding two optimizer generations, so React and MDX
+        // resolve to different copies and every docs page dies on
+        // "Cannot read properties of null (reading 'useContext')".
+        include: ['@storybook/addon-docs > @mdx-js/react'],
+      },
     });
   },
 };
