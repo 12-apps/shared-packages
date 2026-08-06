@@ -6,7 +6,7 @@
  * keystrokes (`01072026`): the native field ends EMPTY with no filter applied,
  * the masked one reads `01/07/2026` and applies it in a single request.
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DayBoundInput, brToIso, isoToBr, maskBrDate } from "../data-views-day-input";
@@ -75,20 +75,20 @@ describe("brToIso", () => {
 });
 
 describe("DayBoundInput", () => {
-  it("accepts the whole date as one continuous run of digits", () => {
+  it("accepts the whole date as one continuous run of digits", async () => {
     const { input } = renderInput();
     typeSequentially(input, "06082026");
-    expect(input).toHaveValue("06/08/2026");
+    await waitFor(() => expect(input).toHaveValue("06/08/2026"));
   });
 
-  it("writes the bound ONCE, when the date is complete", () => {
+  it("writes the bound ONCE, when the date is complete", async () => {
     const { onChange, input } = renderInput();
     typeSequentially(input, "06082026");
     // The seven partial states before it — including `0002`, `0020` and `0202`,
     // each a real day — must not have reached the grid. Committing on every
     // keystroke would make one date cost four fetches, three for years nobody
     // typed on purpose.
-    expect(onChange).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
     expect(onChange).toHaveBeenCalledWith("2026-08-06");
   });
 
@@ -105,10 +105,10 @@ describe("DayBoundInput", () => {
     expect(onChange).toHaveBeenCalledWith(undefined);
   });
 
-  it("does not write an impossible day", () => {
+  it("does not write an impossible day", async () => {
     const { onChange, input } = renderInput();
     typeSequentially(input, "31022026");
-    expect(input).toHaveValue("31/02/2026");
+    await waitFor(() => expect(input).toHaveValue("31/02/2026"));
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -134,7 +134,7 @@ describe("DayBoundInput", () => {
     expect(screen.getByTestId("day")).toHaveValue("");
   });
 
-  it("does NOT reset the caret by echoing the field's own write back at it", () => {
+  it("does NOT reset the caret by echoing the field's own write back at it", async () => {
     // The applied bound arriving back as this controlled input's value is what
     // made the native field wipe itself mid-edit. Typing a complete date and
     // receiving it back must leave the text exactly as typed.
@@ -145,6 +145,6 @@ describe("DayBoundInput", () => {
     const input = screen.getByTestId("day") as HTMLInputElement;
     typeSequentially(input, "06082026");
     rerender(<DayBoundInput label="De" value="2026-08-06" onChange={onChange} testId="day" />);
-    expect(screen.getByTestId("day")).toHaveValue("06/08/2026");
+    await waitFor(() => expect(screen.getByTestId("day")).toHaveValue("06/08/2026"));
   });
 });
