@@ -1,4 +1,4 @@
-import { UnprovenProviderError } from '../core/errors';
+import { CredentialsError, UnprovenProviderError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { MerchantRef, PaymentEnvironment, ProviderName } from '../core/types';
 
@@ -7,10 +7,11 @@ import type { PendingVerification, ProviderConfigStore, StoredProviderConfig } f
 /**
  * Everything that decides whether a provider is IN the failover chain.
  *
- * Lifted out of `service.ts` as one piece because the three functions here are
- * a single rule with three moving parts — what may be enabled, how the chain is
- * rewritten, and which door does the writing — and reading any of them alone
- * invites reintroducing the hole they close (FUT-463).
+ * Lifted out of `service.ts` as one piece because the functions here are a
+ * single rule with several moving parts — what may be enabled, what may merely
+ * be re-ranked, how the chain is rewritten, and which door does the writing —
+ * and reading any of them alone invites reintroducing the hole they close
+ * (FUT-463, and the reorder-shaped way back into it, FUT-693).
  */
 
 /**
@@ -29,6 +30,51 @@ export function requireProven(
 ): void {
   if (adapter.capabilities.activationCharge !== true) return;
   if (!config.chargeVerifiedAt) throw new UnprovenProviderError(config.provider);
+}
+
+/**
+ * Why this ONE provider may not be RANKED, or nothing.
+ *
+ * The second half is the load-bearing one. The store writes `enabled: true` for
+ * every name a chain rewrite is handed, so listing a switched-off provider used
+ * to ACTIVATE it — through the one settings endpoint that applies neither gate
+ * the enable switch does: the verification charge above, and the plan's
+ * `payments.providers` quota the host spends on `setEnabled` (FUT-328). A drag,
+ * or a bare PUT of the list, could put an unproven acquirer in front of every
+ * buyer and take a store past the provider count its plan was sold with.
+ *
+ * So reordering RANKS; it never grants. That is not a new promise — the tool
+ * that drives it has always told callers it "can only reference providers the
+ * owner has already connected and enabled" — this is the first time the code
+ * keeps it. A chain can therefore only shrink here, which is why no quota check
+ * belongs on that path: the set being ranked is one the enable switch already
+ * spent a slot on.
+ *
+ * The two refusals are both 409s and are still named apart, because they ask
+ * the owner for different things — one for a verification charge, the other for
+ * a deliberate enable that costs a plan slot. A single "not enabled" would send
+ * an owner to the switch that is about to refuse them for a reason it never
+ * mentioned.
+ *
+ * A provider already IN the chain passes untouched, proven or not. This gate is
+ * on the TRANSITION, not on membership: a row enabled before `requireProven`
+ * existed has to stay demotable, and demanding proof to re-rank it would pin it
+ * exactly where it sits — at the head of the chain, if that is where it sits.
+ */
+export function assertRankable(
+  adapter: PaymentProviderAdapter,
+  name: ProviderName,
+  config: StoredProviderConfig | null,
+): void {
+  if (!config) {
+    throw new CredentialsError(name, `Provider ${name} is not configured for this merchant`);
+  }
+  if (config.enabled) return;
+  requireProven(adapter, config);
+  throw new CredentialsError(
+    name,
+    `Provider ${name} is not enabled; reordering ranks the chain and cannot enable it`,
+  );
 }
 
 /**

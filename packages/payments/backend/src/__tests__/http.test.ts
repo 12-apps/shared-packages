@@ -9,6 +9,10 @@ function post(body: unknown): Request {
   return new Request('http://payments.test/', { method: 'POST', body: JSON.stringify(body) });
 }
 
+function put(body: unknown): Request {
+  return new Request('http://payments.test/', { method: 'PUT', body: JSON.stringify(body) });
+}
+
 const CHARGE_BODY = {
   reference: 'order-1',
   amount: { amountCents: 12_50, currency: 'BRL' },
@@ -117,5 +121,24 @@ describe('createPaymentsHttp', () => {
 
     const unknown = await http.verify(ctx, 'pagseguro');
     expect(unknown.status).toBe(404);
+  });
+
+  /**
+   * The reorder endpoint answering an ENABLE attempt (FUT-693).
+   *
+   * 409 and not 500: the request is refused, not broken, and the difference is
+   * what a client — and every proxy in between — reads as "do not retry, do
+   * this instead". The error NAME is what the admin screen branches on to say
+   * which of the two things the owner still owes: a verification charge, or a
+   * deliberate enable that spends a plan slot.
+   */
+  it('refuses a chain that would enable an unproven provider, naming it, and changes nothing', async () => {
+    const { http } = await setupHttp();
+    const res = await http.setPriorities(put({ providers: ['stone', 'unproven'] }), ctx);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: 'UnprovenProviderError' });
+
+    const after = (await (await http.getSettings(ctx)).json()) as { providerChain: string[] };
+    expect(after.providerChain).toEqual(['stone']);
   });
 });
