@@ -1,15 +1,12 @@
 "use client";
 
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
-import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import { Popover } from "@mui/material";
 import { useState } from "react";
 
 import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
-import { Text } from "../../typography/Text";
 
 import { ColumnsTab } from "./data-views-columns-tab";
 import {
