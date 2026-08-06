@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 /** The multi-select model, identical in every layout (table, cards, board). */
-export interface DataViewsSelection<T> {
+interface DataViewsSelection<T> {
   selectedIds: Set<string | number>;
   setSelectedIds: (ids: Set<string | number>) => void;
   /** Add/remove ONE id — what a card's or board card's checkbox calls. */
