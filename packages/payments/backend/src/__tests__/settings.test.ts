@@ -559,7 +559,7 @@ describe('createSettingsService', () => {
 
   it('bridges into the gateway CredentialStore (enabled provider only)', async () => {
     const { settings, store } = setup();
-    const credentials = credentialStoreFrom(store);
+    const credentials = credentialStoreFrom(store, { allowStubMode: true });
     expect(await credentials.defaultProvider(TENANT)).toBeNull();
     await settings.saveCredentials(TENANT, 'stone', {
       environment: 'SANDBOX',

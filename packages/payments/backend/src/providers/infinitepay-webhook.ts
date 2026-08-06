@@ -1,4 +1,5 @@
 import type { ChargeSnapshot, NormalizedWebhookEvent, ResolvedCredentials, WebhookDelivery } from '../core/types';
+import { stubDeliveryTrusted } from '../core/stub-mode';
 import { NAME, paymentCheck } from './infinitepay-http';
 import { checkSnapshot, type InfinitePayWebhookBody } from './infinitepay-shared';
 import { sha256Hex } from './shared';
@@ -38,7 +39,7 @@ export async function verifyInfinitePayWebhook(
   delivery: WebhookDelivery,
   credentials: ResolvedCredentials,
 ): Promise<boolean> {
-  if (credentials.stub) return true;
+  if (stubDeliveryTrusted(credentials)) return true;
 
   let body: InfinitePayWebhookBody;
   try {
@@ -84,7 +85,7 @@ async function settledSnapshot(
   // Stub mode makes no network call anywhere in this adapter (local dev / CI
   // parity), so the body IS the fixture there — but a stub body still may not
   // invent an amount it never carried.
-  if (credentials.stub) {
+  if (stubDeliveryTrusted(credentials)) {
     return checkSnapshot({ ...body, success: true, order_nsu: reference }, {
       reference,
       currency: 'BRL',

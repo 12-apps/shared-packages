@@ -41,8 +41,14 @@ Two constructor arguments are security-critical:
   reject the charge. This is the single control that stops a tampered
   client from underpaying.
 - **`allowStubMode` (default false)** — leave it off everywhere except
-  local dev and demo tenants. Even when on it applies only to SANDBOX
-  configs; PRODUCTION can never run stub charges.
+  local dev and demo tenants. Take it from `resolveStubMode(process.env)`,
+  which requires an explicit `PAYMENTS_STUB=1` and throws outright in
+  `NODE_ENV=production`; never infer it from whether some other credential
+  happens to be set. Pass the SAME answer to `createSettingsService`,
+  `credentialStoreFrom` and the activation context — the write path alone
+  does not govern the rows already in the table, and in stub mode a webhook
+  delivery authenticates with no signature at all. Even when on it applies
+  only to SANDBOX configs; PRODUCTION can never run stub charges.
 
 Mount the surface with ONE call instead of a route file per handler
 (FUT-559). `mountPayments` carries the canonical layout as data and returns

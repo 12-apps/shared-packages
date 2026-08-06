@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 
 import { ProviderRequestError } from '../core/errors';
+import { stubDeliveryTrusted } from '../core/stub-mode';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { CustomerSchema } from '../core/customer-schema';
 import type {
@@ -80,7 +81,7 @@ async function verifyStripeSignature(
   const secret = credentials.fields['webhookSecret'];
   // Stub deliveries with no secret pass so stub charges can settle; LIVE
   // deliveries without a secret always fail closed.
-  if (!secret) return credentials.stub === true;
+  if (!secret) return stubDeliveryTrusted(credentials);
   const header = delivery.headers['stripe-signature'];
   if (!header) return false;
   const parts = new Map(

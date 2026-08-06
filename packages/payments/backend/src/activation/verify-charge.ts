@@ -61,10 +61,12 @@ export async function credentialsForVerification(
   return {
     environment,
     fields,
-    // Never let a stub flag fake a PRODUCTION verification: a fake pass here
-    // would activate a merchant that cannot charge, which is the whole failure
-    // this exists to prevent.
-    stub: stored.stub === true && environment === 'SANDBOX',
+    // Never let a stub flag fake a verification: a fake pass here would
+    // activate a merchant that cannot charge, which is the whole failure this
+    // exists to prevent. So the row's flag counts only on a deployment that
+    // said yes to stub mode (`ctx.allowStubMode`, default off) and only for
+    // SANDBOX — a stale row on a production deploy proves nothing.
+    stub: ctx.allowStubMode === true && stored.stub === true && environment === 'SANDBOX',
   };
 }
 

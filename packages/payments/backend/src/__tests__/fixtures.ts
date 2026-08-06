@@ -298,7 +298,9 @@ export async function setupHttpWorld(): Promise<{
   const charges = createMemoryChargeStore();
   const gateway = createPaymentsGateway({
     providers,
-    credentials: credentialStoreFrom(configStore),
+    // Same answer the settings service above was given: this world models a
+    // DEV deployment, which is the only kind stub mode exists for.
+    credentials: credentialStoreFrom(configStore, { allowStubMode: true }),
     charges,
     webhooks: createMemoryWebhookInbox(),
     attempts: createMemoryAttemptLedger(),

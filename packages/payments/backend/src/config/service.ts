@@ -252,6 +252,9 @@ export interface SettingsServiceOptions {
    * (deterministic fakes, no network). Stub card charges report `PAID`
    * without money moving, so this is a deployment decision for local dev
    * and demo tenants: default OFF, and refused for PRODUCTION even when on.
+   *
+   * Take it from `resolveStubMode(process.env)` rather than inferring it from
+   * whatever else happens to be in the environment — see `core/stub-mode.ts`.
    */
   allowStubMode?: boolean;
 }
@@ -323,8 +326,17 @@ export function createSettingsService(
  * Bridge a `ProviderConfigStore` into the gateway's read-only
  * `CredentialStore` port, so one storage implementation powers both the
  * settings page and the charge/webhook paths.
+ *
+ * It takes the SAME `allowStubMode` the settings service takes, and defaults
+ * it to off: the write path deciding "no new stub rows" is not enough on its
+ * own, because the rows already in the table are what the webhook path reads.
  */
-export function credentialStoreFrom(store: ProviderConfigStore): CredentialStore {
+export function credentialStoreFrom(
+  store: ProviderConfigStore,
+  options: SettingsServiceOptions = {},
+): CredentialStore {
+  const allowStubMode = options.allowStubMode ?? false;
+
   async function chain(merchant: MerchantRef): Promise<ProviderName[]> {
     const configs = await store.list(merchant);
     return configs
@@ -351,12 +363,12 @@ export function credentialStoreFrom(store: ProviderConfigStore): CredentialStore
         if (!config) return null;
         throw new CredentialsError(provider, `Provider ${provider} is configured but not enabled`);
       }
-      return resolvedFrom(config);
+      return resolvedFrom(config, allowStubMode);
     },
     async getConnectedCredentials(merchant, provider) {
       // No enablement check — listening is not routing (see the port).
       const config = await store.get(merchant, provider);
-      return config ? resolvedFrom(config) : null;
+      return config ? resolvedFrom(config, allowStubMode) : null;
     },
   };
 }

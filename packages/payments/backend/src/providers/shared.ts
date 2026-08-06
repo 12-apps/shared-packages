@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 
 import { ProviderRequestError } from '../core/errors';
+import { stubDeliveryTrusted } from '../core/stub-mode';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type {
   ChargeInput,
@@ -144,7 +145,7 @@ export function sharedSecretWebhook(provider: ProviderName): PaymentProviderAdap
   return {
     async verify(delivery, credentials) {
       const secret = credentials.fields['webhookSecret'];
-      if (!secret) return credentials.stub === true;
+      if (!secret) return stubDeliveryTrusted(credentials);
       const presented = delivery.headers['x-webhook-secret'] ?? '';
       return secureEquals(presented, secret);
     },

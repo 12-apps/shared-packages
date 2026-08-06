@@ -123,14 +123,21 @@ export function pendingVerificationMethods(
 
 /**
  * The active environment's decrypted fields, for whichever question asked.
- * `stub` is defence in depth: a row that somehow carries stub=true can never
- * run fake charges against PRODUCTION credentials.
+ *
+ * `stub` is DECIDED here, not read: the column says what the row was written
+ * with, and a row outlives the deployment that wrote it. A dev dump restored
+ * into staging, a demo tenant seeded on a shared database, or a host whose
+ * stub inference flipped when an unrelated credential appeared all leave
+ * `stub=true` rows behind — and on the read path that flag is what makes an
+ * unsigned webhook delivery authenticate. So the deployment's own answer
+ * (`allowStubMode`, from `resolveStubMode`) is required on every resolve, and
+ * PRODUCTION credentials are excluded even when the answer is yes.
  */
-export function resolvedFrom(config: StoredProviderConfig) {
+export function resolvedFrom(config: StoredProviderConfig, allowStubMode: boolean) {
   const environment: PaymentEnvironment = config.environment;
   return {
     environment,
     fields: config.environments[environment],
-    stub: config.stub && environment === 'SANDBOX',
+    stub: allowStubMode && config.stub && environment === 'SANDBOX',
   };
 }
