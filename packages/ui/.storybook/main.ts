@@ -62,6 +62,20 @@ const config: StorybookConfig = {
           forceBuildInstrument: true,
         }),
       ],
+      optimizeDeps: {
+        // Pre-bundle the docs renderer's own React dependency. builder-vite's
+        // candidate list does not name it, and under pnpm it is reachable only
+        // through @storybook/addon-docs — so without this Vite first meets it
+        // when a docs page loads, re-optimizes, and reloads mid-render:
+        //
+        //   [vite] new dependencies optimized: @mdx-js/react
+        //   [vite] optimized dependencies changed. reloading
+        //
+        // The page is then holding two optimizer generations, so React and MDX
+        // resolve to different copies and every docs page dies on
+        // "Cannot read properties of null (reading 'useContext')".
+        include: ['@storybook/addon-docs > @mdx-js/react'],
+      },
     });
   },
 };
