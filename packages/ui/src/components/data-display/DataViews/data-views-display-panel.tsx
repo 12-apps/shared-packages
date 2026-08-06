@@ -78,22 +78,27 @@ interface DisplayPanelProps<T extends Record<string, unknown>> {
 function PanelTabs({
   tab,
   onChange,
+  muted,
   testIdPrefix,
 }: {
   tab: DisplayTabKey;
   onChange: (tab: DisplayTabKey) => void;
+  /** The views own the body — no tab is showing, so none reads as selected. */
+  muted?: boolean;
   testIdPrefix: string;
 }): React.JSX.Element {
   return (
     <Box sx={{ display: "flex", gap: 0.5, p: 0.75, bgcolor: "action.hover", borderBottom: 1, borderColor: "divider" }}>
-      {TABS.map((entry) => (
+      {TABS.map((entry) => {
+        const active = tab === entry.key && !muted;
+        return (
         <Box
           key={entry.key}
           component="button"
           type="button"
           onClick={() => onChange(entry.key)}
           data-testid={`${testIdPrefix}-display-tab-${entry.key}`}
-          aria-current={tab === entry.key}
+          aria-current={active}
           sx={{
             flex: 1,
             px: 1,
@@ -103,15 +108,16 @@ function PanelTabs({
             cursor: "pointer",
             font: "inherit",
             fontSize: "0.8125rem",
-            bgcolor: tab === entry.key ? "background.paper" : "transparent",
-            boxShadow: tab === entry.key ? 1 : 0,
-            fontWeight: tab === entry.key ? 600 : 400,
-            color: tab === entry.key ? "text.primary" : "text.secondary",
+            bgcolor: active ? "background.paper" : "transparent",
+            boxShadow: active ? 1 : 0,
+            fontWeight: active ? 600 : 400,
+            color: active ? "text.primary" : "text.secondary",
           }}
         >
           {entry.label}
         </Box>
-      ))}
+        );
+      })}
     </Box>
   );
 }
@@ -190,6 +196,7 @@ function PanelSurface<T extends Record<string, unknown>>({
           <PanelTabs
             tab={tab}
             onChange={onTab}
+            muted={Boolean(nav)}
             testIdPrefix={testIdPrefix}
           />
           {/* Constrained + scrolled: the columns list is unbounded, and a panel
