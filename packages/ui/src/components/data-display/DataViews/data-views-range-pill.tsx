@@ -13,11 +13,12 @@
  */
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import { Box, Button, Popover, TextField, Typography } from '@mui/material';
+import { Box, Button, Popover, Typography } from '@mui/material';
 import React, { useState } from 'react';
 
 import { TableFilter } from '../../layout/TableFilter';
 import { DayBoundInput } from './data-views-day-input';
+import { NumberBoundInput } from './data-views-number-input';
 import {
   isRangeInverted,
   isRangeSet,
@@ -27,11 +28,6 @@ import {
 import type { RangeFieldConfig, RangeValue } from './data-views-types';
 
 
-
-/** A bound as the input's string value ('' when unset). */
-function inputValue(bound: number | string | undefined): string {
-  return bound == null ? '' : String(bound);
-}
 
 /**
  * One end of the range. A day keeps its `AAAA-MM-DD` string verbatim (the form
@@ -64,23 +60,12 @@ function BoundField<T extends Record<string, unknown>>({
     );
   }
   return (
-    <TextField
-      size="small"
-      type="number"
+    <NumberBoundInput
       label={label}
-      value={inputValue(value)}
-      onChange={(event) => {
-        const raw = event.target.value;
-        if (raw === '') return onChange(undefined);
-        const amount = Number(raw);
-        return onChange(Number.isNaN(amount) ? undefined : amount);
-      }}
-      // A start adornment occupies the space an un-shrunk label would render
-      // into, so the label is pinned up rather than left to MUI's default.
-      InputLabelProps={{ shrink: true }}
-      inputProps={{ 'data-testid': testId, step: field.step ?? 1, min: 0 }}
-      InputProps={field.unit ? { startAdornment: <Box component="span" sx={{ mr: 0.5, color: 'text.secondary' }}>{field.unit}</Box> } : undefined}
-      sx={{ width: 140 }}
+      value={value}
+      unit={field.unit}
+      onChange={onChange}
+      testId={testId}
     />
   );
 }

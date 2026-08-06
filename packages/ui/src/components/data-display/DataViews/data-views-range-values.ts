@@ -18,13 +18,21 @@ function shortDay(day: string): string {
   const [, month, date] = day.split('-');
   return month && date ? `${date}/${month}` : day;
 }
-/** One bound, rendered for the chip: money in reais, a day as `DD/MM`. */
+/**
+ * One bound, rendered for the chip: money in reais, a day as `DD/MM`.
+ *
+ * A number takes the DECIMAL COMMA, matching the field it was typed into.
+ * `String(17.5)` reads `R$ 17.5`, which is a decimal point in a currency that
+ * has none — and the chip is the only place the applied window is stated, so it
+ * is the one place that must not disagree with what was entered.
+ */
 function boundLabel<T extends Record<string, unknown>>(
   field: RangeFieldConfig<T>,
   bound: number | string,
 ): string {
   if (field.kind === 'day') return shortDay(String(bound));
-  return field.unit ? `${field.unit} ${bound}` : String(bound);
+  const text = String(bound).replace('.', ',');
+  return field.unit ? `${field.unit} ${text}` : text;
 }
 /**
  * The chip text for an applied range: "Data: 01/07–31/07" when both ends are

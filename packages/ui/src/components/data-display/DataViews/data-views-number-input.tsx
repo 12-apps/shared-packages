@@ -1,0 +1,143 @@
+'use client';
+
+/**
+ * A numeric bound typed the way Brazilians write numbers, replacing
+ * `<input type="number">`.
+ *
+ * The native control parses in the BROWSER's locale, and it does not fail
+ * loudly when the text does not match — it drops what it cannot read and keeps
+ * the rest. Typing `50,00` into it, measured in Chromium:
+ *
+ *     digitado "50,00"  ->  campo "5000"   ->  filtro R$ 5.000
+ *     digitado "17,50"  ->  campo "1750"   ->  filtro R$ 1.750
+ *     digitado "50.00"  ->  campo "500"    ->  filtro R$ 500
+ *
+ * The comma is deleted and the digits close ranks, so the merchant asks for
+ * fifty reais and gets a filter a HUNDRED times larger. The list empties, the
+ * chip reads `Valor: ≥ R$ 5000`, and nothing on screen connects that to the
+ * `50,00` they typed. It reads as "the value filter is broken", which is how it
+ * was reported.
+ *
+ * So the field parses pt-BR itself: `,` is the decimal separator and `.` groups
+ * thousands, which is what `R$ 1.234,56` means to the person reading it. A
+ * plain `50` still works, and so does `50.00` — a dot with exactly two digits
+ * after it is far more likely to be a decimal typed on a numeric keypad than a
+ * thousands group, and reading it as `5000` is the very failure this replaces.
+ */
+import { Box, TextField } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+
+/** Everything this field lets through: digits and the two separators. */
+const ALLOWED = /[^\d.,]/g;
+
+/**
+ * pt-BR text → number, or `undefined` when it is not one (yet).
+ *
+ * `.` is a thousands group and `,` is the decimal point, EXCEPT when a lone dot
+ * is followed by one or two digits and no comma is present — `50.00` and `1.5`
+ * are decimals somebody typed, while `1.234` is a thousand.
+ */
+export function parsePtBrNumber(text: string): number | undefined {
+  const cleaned = text.replace(ALLOWED, '');
+  if (cleaned === '') return undefined;
+  const hasComma = cleaned.includes(',');
+  const dots = cleaned.split('.').length - 1;
+  const lastDot = cleaned.lastIndexOf('.');
+  const dotIsDecimal =
+    !hasComma && dots === 1 && cleaned.length - lastDot - 1 > 0 && cleaned.length - lastDot - 1 <= 2;
+  const normalized = dotIsDecimal
+    ? cleaned
+    : cleaned.replace(/\./g, '').replace(',', '.');
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : undefined;
+}
+
+/**
+ * A stored bound → the text the merchant reads, with a comma for the decimal
+ * point.
+ *
+ * It takes a STRING too, and that is not defensive typing: a range restored
+ * from the URL arrives as one (`?totalCents_gte=5000`). Narrowing to `number`
+ * and dropping the rest emptied the field on every reload — and then the next
+ * keystroke wrote a bound built from nothing.
+ */
+export function formatPtBrNumber(amount: number | string | undefined): string {
+  if (amount == null || amount === '') return '';
+  return String(amount).replace('.', ',');
+}
+
+/** The same, as a number — `undefined` when the bound is unset or unusable. */
+function boundAsNumber(amount: number | string | undefined): number | undefined {
+  if (amount == null || amount === '') return undefined;
+  const parsed = typeof amount === 'number' ? amount : Number(amount);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/**
+ * One end of a numeric range. The BOUND stays a plain `number` — nothing
+ * downstream learns that the typing surface changed.
+ */
+export function NumberBoundInput({
+  label,
+  value,
+  unit,
+  onChange,
+  testId,
+}: {
+  label: string;
+  /** The applied bound. A range restored from the URL hands this over as a string. */
+  value: number | string | undefined;
+  /** Rendered as a start adornment ("R$"), not parsed out of the text. */
+  unit?: string;
+  onChange: (bound: number | undefined) => void;
+  testId: string;
+}): React.JSX.Element {
+  const applied = boundAsNumber(value);
+  const [text, setText] = useState(() => formatPtBrNumber(value));
+
+  // Re-sync only when the applied bound moved somewhere the text does not
+  // already mean — a "Limpar", a saved view. Comparing through the PARSE rather
+  // than the string keeps `50,` and `50,00` from being rewritten mid-edit.
+  useEffect(() => {
+    setText((current) => (parsePtBrNumber(current) === applied ? current : formatPtBrNumber(applied)));
+  }, [applied]);
+
+  return (
+    <TextField
+      size="small"
+      type="text"
+      label={label}
+      // Not `numeric`: that keypad has no comma on iOS, which is the separator
+      // this field exists to accept.
+      inputMode="decimal"
+      value={text}
+      onChange={(event) => {
+        // Reject the characters rather than silently dropping them AFTER
+        // parsing — a letter should not move the number.
+        const next = event.target.value.replace(ALLOWED, '');
+        setText(next);
+        const amount = parsePtBrNumber(next);
+        // A bare separator (`50,`) parses to nothing yet; leave the applied
+        // bound alone rather than clearing it half-way through a decimal.
+        if (next === '') return onChange(undefined);
+        if (amount !== undefined) onChange(amount);
+      }}
+      // A half-typed number would show a filter the list is not using.
+      onBlur={() => setText(formatPtBrNumber(applied))}
+      InputLabelProps={{ shrink: true }}
+      inputProps={{ 'data-testid': testId }}
+      InputProps={
+        unit
+          ? {
+              startAdornment: (
+                <Box component="span" sx={{ mr: 0.5, color: 'text.secondary' }}>
+                  {unit}
+                </Box>
+              ),
+            }
+          : undefined
+      }
+      sx={{ width: 140 }}
+    />
+  );
+}
