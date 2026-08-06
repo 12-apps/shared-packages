@@ -11,7 +11,7 @@ import type { StoredCharge } from '../core/ports';
 import type { MerchantRef } from '../core/types';
 import { infinitePayProvider } from '../providers/infinitepay';
 import { pagbankProvider } from '../providers/pagbank';
-import { connectedConfig } from './activation-fixtures';
+import { activationAdapter, connectedConfig } from './activation-fixtures';
 
 /**
  * The machine that stamps a paid activation nothing else will (FUT-463).
@@ -35,10 +35,30 @@ const db = {
   applied: [] as Array<{ merchant: MerchantRef; provider: string; passed: boolean }>,
 };
 
+/**
+ * A SECOND provider whose deliveries count as proof — the case FUT-726 exists
+ * for. Its payload spells the correlation key `external_reference`, nothing
+ * like InfinitePay's `order_nsu`, so any correlation done outside the adapter
+ * would read this body and confidently find nothing.
+ */
+const linkPayProvider = (): ReturnType<typeof activationAdapter> =>
+  activationAdapter(
+    'linkpay',
+    {},
+    {
+      verifyConfirmsPayment: true,
+      referenceOfDelivery: (payload) => {
+        const body = JSON.parse(payload) as { external_reference?: unknown };
+        return typeof body.external_reference === 'string' ? body.external_reference : null;
+      },
+    },
+  );
+
 // Real adapters, so the gating reads their own declarations.
 const providers = defineProviders({
   pagbank: pagbankProvider(),
   infinitepay: infinitePayProvider(),
+  linkpay: linkPayProvider(),
 });
 
 function context(): ActivationReconcileContext {
@@ -159,6 +179,26 @@ describe('reconcileActivationCharges', () => {
     const report = await reconcileActivationCharges(context());
 
     expect(report).toEqual({ checked: 1, stamped: 0 });
+  });
+
+  /**
+   * FUT-726 — a SECOND proof-carrying provider settles through ITS OWN key.
+   *
+   * The delivery below carries no `order_nsu` at all. Correlation that lived
+   * out here would have one vendor's field name compiled into it and would
+   * leave this store stranded forever; asking the adapter, it settles.
+   */
+  it("correlates another proof-carrying provider by that adapter's own key", async () => {
+    db.outstanding.push(stranded('linkpay'));
+    db.deliveries.push({
+      merchantId: TENANT_ID,
+      provider: 'linkpay',
+      payload: JSON.stringify({ external_reference: referenceOf('linkpay'), status: 'paid' }),
+    });
+
+    const report = await reconcileActivationCharges(context());
+
+    expect(report).toEqual({ checked: 1, stamped: 1 });
   });
 
   /** FUT-726: the ADAPTER reads its correlation key out of the payload. */
