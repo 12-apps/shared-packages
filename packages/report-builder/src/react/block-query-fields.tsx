@@ -13,8 +13,9 @@ import type { JSX } from "react";
 import { Select } from "@12-apps/ui/form/Select";
 import { Stack } from "@12-apps/ui/mui/Stack";
 
-import { spanOptionsFor } from "../layout";
 
+
+import { BlockWidthPicker } from "./block-width-picker";
 import { specFromDraft, switchEntityDraft, type BuilderDraft } from "./builder-model";
 import {
   FiltersSection,
@@ -27,22 +28,6 @@ import type { ReportEntityFields, ReportField } from "./custom-reports-api";
 
 export function fieldMapOf(entity: ReportEntityFields | undefined): Map<string, ReportField> {
   return new Map((entity?.fields ?? []).map((field) => [field.field, field]));
-}
-
-/** Width labels: twelfths of the canvas, with the familiar fractions called out. */
-const SPAN_LABELS: Record<number, string> = {
-  2: "1/6",
-  3: "1/4",
-  4: "1/3",
-  6: "1/2",
-  8: "2/3",
-  9: "3/4",
-  12: "Inteira",
-};
-
-function spanLabel(span: number): string {
-  const fraction = SPAN_LABELS[span];
-  return fraction ? `${span}/12 · ${fraction}` : `${span}/12`;
 }
 
 export function BlockQueryFields({
@@ -83,15 +68,11 @@ export function BlockQueryFields({
       <MeasuresSection draft={draft} fields={fields} update={update} />
       <FiltersSection draft={draft} fields={fields} update={update} />
       <PresentationSection draft={draft} fields={fields} update={update} />
-      <Select
-        size="small"
-        label="Largura"
-        options={spanOptionsFor(specFromDraft(draft, fieldMapOf(entity)).presentation).map(
-          (option) => ({ value: String(option), label: spanLabel(option) }),
-        )}
-        value={String(span)}
-        onChange={(event) => onSpanChange(Number(event.target.value))}
-        data-testid={`${testId}-span`}
+      <BlockWidthPicker
+        span={span}
+        presentation={specFromDraft(draft, fieldMapOf(entity)).presentation}
+        onChange={onSpanChange}
+        testId={`${testId}-span`}
       />
     </Stack>
   );
