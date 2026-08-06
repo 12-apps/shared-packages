@@ -24,6 +24,19 @@ export { SystemReportPage } from './system-report';
 export { SystemDashboardPage } from './system-dashboard';
 export { ReportRenderView } from './report-render';
 export { ReportGrid, ReportGridItem, ReportBlockFrame } from './report-grid';
+/**
+ * The list, separately from the page that fetches for it. `ReportsPage` needs a
+ * router and a query client; this takes reports as a prop, so a host that
+ * already has the summaries — or the consumer harness, which has no API at all
+ * — can render the real list rather than a lookalike. `filterReports` is the
+ * rule the list applies, exported so it can be asserted without a DOM.
+ */
+export { ReportCardList } from './report-card-list';
+export {
+  filterReports,
+  REPORT_SCOPE_LABELS,
+  type ReportScope,
+} from './report-list-filters';
 export {
   SYSTEM_DASHBOARDS,
   SYSTEM_REPORT_KEYS,
