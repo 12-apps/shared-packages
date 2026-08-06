@@ -107,6 +107,7 @@ export {
   PaymentsError,
   ProviderRequestError,
   UnknownProviderError,
+  UnprovenProviderError,
   UnsupportedOperationError,
   WebhookVerificationError,
 } from './core/errors';
