@@ -28,7 +28,7 @@ export interface HideableColumn {
  * which marks structural columns like the image thumbnail or actions kebab) and
  * carrying a text header to label the checkbox.
  */
-export function computeHideableColumns<T extends Record<string, unknown>>(
+function computeHideableColumns<T extends Record<string, unknown>>(
   columns: DataViewColumn<T>[],
 ): HideableColumn[] {
   return columns
