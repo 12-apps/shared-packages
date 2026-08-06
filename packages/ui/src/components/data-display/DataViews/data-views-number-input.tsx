@@ -27,8 +27,6 @@
 import { Box, TextField } from '@mui/material';
 import React, { useEffect, useState } from 'react';
 
-import { formatBoundNumber } from './data-views-range-values';
-
 /** Everything this field lets through: digits and the two separators. */
 const ALLOWED = /[^\d.,]/g;
 
@@ -83,7 +81,6 @@ export function NumberBoundInput({
   label,
   value,
   unit,
-  step,
   onChange,
   testId,
 }: {
@@ -92,8 +89,6 @@ export function NumberBoundInput({
   value: number | string | undefined;
   /** Rendered as a start adornment ("R$"), not parsed out of the text. */
   unit?: string;
-  /** The field's precision, which decides how a settled bound is written. */
-  step?: number;
   onChange: (bound: number | undefined) => void;
   testId: string;
 }): React.JSX.Element {
@@ -127,10 +122,22 @@ export function NumberBoundInput({
         if (next === '') return onChange(undefined);
         if (amount !== undefined) onChange(amount);
       }}
-      // A half-typed number would show a filter the list is not using. Settling
-      // to the SAME text the chip carries (`R$ 17,50`, not `17,5`) is the point
-      // of routing this through the shared formatter rather than `String`.
-      onBlur={() => setText(applied == null ? '' : formatBoundNumber(applied, step))}
+      // Blur TIDIES, it does not rewrite. Text that already means the applied
+      // bound is left exactly as typed — `20`, `17,50` and `1.234,56` all stay
+      // — and only something that does not (`50,,`) snaps back.
+      //
+      // Padding the field to the chip's precision was tried and is worse than
+      // the mismatch it closed: settling `20` to `20,00` means the next edit
+      // starts from text the merchant did not write, so appending a digit to
+      // make it 200 produces `20,000`, which parses back to 20. The filter then
+      // ignores the keystroke, which is exactly the "não funciona" this whole
+      // control exists to end. An input must hold what was typed into it; the
+      // CHIP is where the applied window gets written in full.
+      onBlur={() =>
+        setText((current) =>
+          parsePtBrNumber(current) === applied ? current : formatPtBrNumber(applied),
+        )
+      }
       InputLabelProps={{ shrink: true }}
       inputProps={{ 'data-testid': testId }}
       InputProps={
