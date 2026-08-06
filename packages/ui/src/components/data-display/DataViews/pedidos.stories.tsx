@@ -11,6 +11,7 @@ import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 
 import { BaseCard } from "./base-card";
+import { queryPedidos, type ServerPage, type ServerRow } from "./pedidos.server";
 import { DataViewsTableBase } from "./DataViewsTableBase";
 import type { BoardConfig } from "./DataViewsBoard";
 import type { DataViewExport } from "./data-views-export";
@@ -18,6 +19,7 @@ import type { ScopeConfig } from "./data-views-scopes";
 import type {
   DataViewCardSelection,
   DataViewColumn,
+  DataViewQuery,
   DataViewPersistence,
   DataViewRouter,
   FilterFieldConfig,
@@ -414,6 +416,11 @@ function PedidosScreen(
   args: React.ComponentProps<typeof DataViewsTableBase<PedidoRow>>,
 ): React.JSX.Element {
   const [liveViews, setLiveViews] = useState<SavedViewSummary[]>(args.views);
+  // SERVER MODE ANSWERS. The grid does not filter in server mode — it emits the
+  // query and renders the page it is handed. Wired to a spy, the pills apply,
+  // the counter never moves and every row stays: the controls work and there is
+  // simply nobody on the other end. `queryPedidos` is that other end.
+  const [page, setPage] = useState<ServerPage<PedidoRow> | null>(null);
 
   const persistence: DataViewPersistence = {
     create: (payload) => {
@@ -440,11 +447,29 @@ function PedidosScreen(
     },
   };
 
+  const server = args.server
+    ? {
+        ...args.server,
+        totalCount: page?.totalCount ?? args.server.totalCount,
+        scopeCounts: page?.scopeCounts ?? args.server.scopeCounts,
+        onQueryChange: (query: DataViewQuery) => {
+          args.server?.onQueryChange(query);
+          setPage(queryPedidos(ROWS as ServerRow[], query) as ServerPage<PedidoRow>);
+        },
+      }
+    : undefined;
+
   return (
     <Box>
       <PedidosHeader />
       <Box sx={{ px: 3, pb: 3 }}>
-        <DataViewsTableBase<PedidoRow> {...args} views={liveViews} persistence={persistence} />
+        <DataViewsTableBase<PedidoRow>
+          {...args}
+          views={liveViews}
+          persistence={persistence}
+          server={server}
+          rows={page?.data ?? args.rows}
+        />
       </Box>
     </Box>
   );

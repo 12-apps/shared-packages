@@ -208,13 +208,16 @@ function RangeTrigger<T extends Record<string, unknown>>({
       aria-haspopup="dialog"
       aria-expanded={open}
       onClick={(event) => onOpen(event.currentTarget)}
-      endIcon={
+      // ✕ FIRST, chevron LAST — the same shape as every other pill. It used to
+      // replace the chevron at the end, so a range pill and a multi-select pill
+      // put the clear in different places, and an applied range lost the
+      // affordance that says it opens.
+      startIcon={
         active ? (
           <ClearAffordance label={field.label} onClear={() => onChange({})} testId={`${testId}-clear-inline`} />
-        ) : (
-          <ChevronDownIcon sx={{ fontSize: 16 }} />
-        )
+        ) : undefined
       }
+      endIcon={<ChevronDownIcon sx={{ fontSize: 16 }} />}
       sx={{
         borderRadius: 999,
         height: 34,
