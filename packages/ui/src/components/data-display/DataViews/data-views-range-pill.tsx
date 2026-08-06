@@ -17,6 +17,8 @@ import { Box, Button, Popover, TextField, Typography } from '@mui/material';
 import React, { useState } from 'react';
 
 import { TableFilter } from '../../layout/TableFilter';
+import { RangePresets } from './data-views-preset-chips';
+import { presetsFor } from './data-views-range-presets';
 import {
   isRangeInverted,
   isRangeSet,
@@ -98,6 +100,11 @@ export function RangeBounds<T extends Record<string, unknown>>({
   const inverted = isRangeInverted(value);
   return (
     <Box data-testid={`${testId}-panel`}>
+      {/* Above the inputs, not below: the presets are the answer for most
+          merchants, and the two date pickers are the escape hatch. */}
+      <Box sx={{ '&:not(:empty)': { mb: 1.5 } }}>
+        <RangePresets presets={presetsFor(field)} value={value} onChange={onChange} testId={testId} />
+      </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <BoundField
           field={field}
@@ -338,13 +345,19 @@ export function PanelRangeField<T extends Record<string, unknown>>({
     );
   }
   return (
-    <TableFilter.RangeField
-      label={field.label}
-      unit={field.unit}
-      step={field.step}
-      value={numericRange(value)}
-      onChange={(range) => onChange(range)}
-      testId={testId}
-    />
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      <TableFilter.RangeField
+        label={field.label}
+        unit={field.unit}
+        step={field.step}
+        value={numericRange(value)}
+        onChange={(range) => onChange(range)}
+        testId={testId}
+      />
+      {/* Below the numeric control here, unlike the pill's popover: this one
+          renders its own label, and chips above it would separate the label
+          from the field it names. */}
+      <RangePresets presets={presetsFor(field)} value={value} onChange={onChange} testId={testId} />
+    </Box>
   );
 }

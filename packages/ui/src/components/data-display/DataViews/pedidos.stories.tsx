@@ -140,8 +140,32 @@ const rangeFields: RangeFieldConfig<PedidoRow>[] = [
   // into an instant lands on that day's midnight and drops the final day
   // whole (FUT-668). The accessor hands back the ISO day for a lexicographic
   // compare.
+  // No `presets` — a day field falls back to the calendar windows (Hoje /
+  // Ontem / Esta semana / Este mês / Este ano), which are the same for every
+  // date filter that has ever shipped.
   { id: "data", label: "Data", kind: "day", accessor: (row) => row.dataIso },
-  { id: "valor", label: "Valor", kind: "number", unit: "R$", step: 0.01, accessor: (row) => row.valor },
+  {
+    id: "valor",
+    label: "Valor",
+    kind: "number",
+    unit: "R$",
+    step: 0.01,
+    accessor: (row) => row.valor,
+    // A number range has no universal set: what counts as a big order is the
+    // host's business, so the brackets are declared here rather than guessed by
+    // the component. Literals, not functions — unlike "Hoje", "acima de R$ 10"
+    // means the same thing whenever it is clicked.
+    //
+    // Scaled to THIS list, which is a convenience store: tickets run from R$ 3
+    // to R$ 24, so R$ 5 and R$ 10 are where it actually splits. Brackets a host
+    // copies from a different catalogue give three chips that all return
+    // everything or nothing, which reads as a broken control.
+    presets: [
+      { id: "ate-5", label: "Até R$ 5", range: { max: 5 } },
+      { id: "5-10", label: "R$ 5–10", range: { min: 5, max: 10 } },
+      { id: "acima-10", label: "Acima de R$ 10", range: { min: 10 } },
+    ],
+  },
 ];
 
 /**
@@ -509,8 +533,12 @@ export const ServerMode: Story = {
 };
 
 /**
- * The full screen: scope tabs above the toolbar, and every format the Exibir
+ * The full screen: scope tabs under the toolbar, and every format the Exibir
  * panel offers — Tabela, Lista, Cards and Quadro — plus row height.
+ *
+ * `scopeFieldId` names the field the tabs partition by. On "Quadro" — grouped
+ * by that same `situacao` — the strip disappears, because a column per situação
+ * and a tab per situação are the same partition offered twice.
  *
  * Scopes are server mode only, because their counts are whole-query counts the
  * browser cannot compute under pagination. Switching format or row height is

@@ -11,6 +11,8 @@ import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
 import type { OverflowField } from "./data-views-overflow";
+import { RangePresets } from "./data-views-preset-chips";
+import { presetsFor } from "./data-views-range-presets";
 import { isRangeSet } from "./data-views-range-values";
 import type { RangeValue } from "./data-views-types";
 
@@ -136,32 +138,44 @@ function OverflowRange<T extends Record<string, unknown>>({
     onChange(next);
   };
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-      {(["min", "max"] as const).map((bound, index) => (
-        <Box key={bound} sx={{ display: "contents" }}>
-          {index === 1 && <Box component="span" sx={{ color: "text.disabled" }}>–</Box>}
-          <Box
-            component="input"
-            type={day ? "date" : "number"}
-            placeholder={bound === "min" ? "de" : "até"}
-            aria-label={`${field.label} ${bound === "min" ? "de" : "até"}`}
-            data-testid={`${testIdPrefix}-more-${field.id}-${bound}`}
-            value={value[bound] ?? ""}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => set(bound, event.target.value)}
-            sx={{
-              width: "100%",
-              px: 1,
-              py: 0.75,
-              border: 1,
-              borderStyle: "solid",
-              borderColor: "divider",
-              borderRadius: 1,
-              font: "inherit",
-              fontSize: "0.8125rem",
-            }}
-          />
-        </Box>
-      ))}
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      {/* The overflow offers the same one-click windows the pill does. A field
+          in here is one that had no room on the bar, not one with fewer
+          controls — otherwise "Data" gains and loses its presets as the window
+          is resized. */}
+      <RangePresets
+        presets={field.range ? presetsFor(field.range) : []}
+        value={value}
+        onChange={onChange}
+        testId={`${testIdPrefix}-more-${field.id}`}
+      />
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        {(["min", "max"] as const).map((bound, index) => (
+          <Box key={bound} sx={{ display: "contents" }}>
+            {index === 1 && <Box component="span" sx={{ color: "text.disabled" }}>–</Box>}
+            <Box
+              component="input"
+              type={day ? "date" : "number"}
+              placeholder={bound === "min" ? "de" : "até"}
+              aria-label={`${field.label} ${bound === "min" ? "de" : "até"}`}
+              data-testid={`${testIdPrefix}-more-${field.id}-${bound}`}
+              value={value[bound] ?? ""}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => set(bound, event.target.value)}
+              sx={{
+                width: "100%",
+                px: 1,
+                py: 0.75,
+                border: 1,
+                borderStyle: "solid",
+                borderColor: "divider",
+                borderRadius: 1,
+                font: "inherit",
+                fontSize: "0.8125rem",
+              }}
+            />
+          </Box>
+        ))}
+      </Box>
     </Box>
   );
 }

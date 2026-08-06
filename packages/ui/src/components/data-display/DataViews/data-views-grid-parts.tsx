@@ -234,7 +234,7 @@ interface GridShellProps<T extends Record<string, unknown>> {
   board?: BoardConfig<T>;
   /** Opt-in "Lista" layout: one full-width, entity-rendered row per record. */
   renderListRow?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
-  /** The page-level partition rendered as tabs above the toolbar. */
+  /** The page-level partition rendered as tabs under the toolbar. */
   scopes?: ScopeConfig[];
   /**
    * The row field the scopes partition by. Compared against the board's

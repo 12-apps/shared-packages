@@ -1,5 +1,8 @@
 import type { GridColumn, GridSort } from "../DataGrid";
 import type { DropdownMenuItem } from "../../navigation/DropdownMenu";
+// A re-export does not bring the name into local scope, and the state/query
+// types below are written in terms of it.
+import type { RangeValue } from "./data-views-range-types";
 
 /**
  * Shared types for the reusable admin "DataViews" table (FUT-88): a filter bar
@@ -106,54 +109,18 @@ export interface FilterFieldConfig<T extends Record<string, unknown>> {
 }
 
 /**
- * A selected range for a range filter (either bound optional). Numbers for a
- * `number` field; `AAAA-MM-DD` day strings for a `day` one — which compare
- * correctly with `<`/`>` precisely because ISO days sort lexicographically.
+ * The range types live in `data-views-range-types` (this file outgrew the
+ * size gate); they are re-exported here so `data-views-types` stays the one
+ * name every consumer imports the model from.
  */
-export interface RangeValue {
-  min?: number | string;
-  max?: number | string;
-}
-
-/** What a range field measures — the input it renders and the bound it stores. */
-export type RangeFieldKind = "number" | "day";
-
-interface RangeFieldBase {
-  /** Stable id; the key under `DataViewState.ranges`. */
-  id: string;
-  label: string;
-}
-
-/** "Filter by amount": price, stock, margin, order total. */
-export interface NumberRangeFieldConfig<T extends Record<string, unknown>> extends RangeFieldBase {
-  kind?: "number";
-  /** Reads the row's numeric value for this range. */
-  accessor: (row: T) => number | null | undefined;
-  /** Optional unit suffix shown next to the inputs (e.g. "R$", "un"). */
-  unit?: string;
-  /** Numeric input step. Defaults to 1. */
-  step?: number;
-}
-
-/**
- * "Filter by period": a pair of INCLUSIVE calendar days, rendered as two native
- * date inputs. Inclusive is the reason a day range is its own kind rather than a
- * number over timestamps — coercing an `até` of `2026-07-15` to a instant lands
- * on that day's midnight and drops the whole final day (FUT-668).
- */
-export interface DayRangeFieldConfig<T extends Record<string, unknown>> extends RangeFieldBase {
-  kind: "day";
-  /** Reads the row's `AAAA-MM-DD` day for this range. */
-  accessor: (row: T) => string | null | undefined;
-}
-
-/**
- * A min/max range filter's configuration. Complements the multi-select pills.
- * A row with a null/undefined value never matches a bounded range.
- */
-export type RangeFieldConfig<T extends Record<string, unknown>> =
-  | NumberRangeFieldConfig<T>
-  | DayRangeFieldConfig<T>;
+export type {
+  DayRangeFieldConfig,
+  NumberRangeFieldConfig,
+  RangeFieldConfig,
+  RangeFieldKind,
+  RangePreset,
+  RangeValue,
+} from "./data-views-range-types";
 
 /** A grid column that can join the search scan and the column-visibility menu. */
 export interface DataViewColumn<T extends Record<string, unknown>> extends GridColumn<T> {
