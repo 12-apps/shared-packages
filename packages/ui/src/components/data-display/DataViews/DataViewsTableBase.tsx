@@ -5,6 +5,7 @@ import { useMemo } from "react";
 
 import { DataViewsGrid } from "./DataViewsGrid";
 import type { BoardConfig } from "./DataViewsBoard";
+import type { DataViewExport } from "./data-views-export";
 import type { ScopeConfig } from "./data-views-scopes";
 import { ViewDialogs, ViewMutationErrorAlert, ViewsMenuSlot } from "./data-views-table-parts";
 import {
@@ -57,6 +58,12 @@ export interface DataViewsTableBaseProps<T extends Record<string, unknown>> {
    * on a currency column is a puzzle; "Menor → maior" is not. Defaults to text.
    */
   sortKinds?: Record<string, string>;
+  /**
+   * Opt-in "Exportar" control. The grid hands the host the current query,
+   * UNPAGINATED, and the host re-queries — the grid never fetches, and an
+   * export therefore follows the filters rather than the loaded page.
+   */
+  exportConfig?: DataViewExport;
   /** Notified with the currently-visible (filtered) rows, so Export matches the view. */
   onVisibleRowsChange?: (rows: T[]) => void;
   /** Reusable row actions driving both the row "⋮" kebab and the bulk menu. */
@@ -168,40 +175,24 @@ function ViewsMenu(props: {
  * a view restores its filters + columns + sort. Each table supplies its own columns
  * + filter fields; everything else is shared.
  */
-export function DataViewsTableBase<T extends Record<string, unknown>>({
-  initialViewId = null,
-  persistence,
-  router,
-  rows,
-  columns,
-  fields,
-  rangeFields,
-  getRowId,
-  onRowClick,
-  emptyState,
-  dataTestId,
-  testIdPrefix = "table",
-  views,
-  title,
-  headerActions,
-  sortFields,
-  sortKinds,
-  onVisibleRowsChange,
-  rowActions,
-  rowActionsLeading,
-  bulkActions,
-  renderRowMenu,
-  renderCard,
-  board,
-  renderListRow,
-  scopes,
-  scopeFieldId,
-  defaultLayout,
-  inlineFilters,
-  alwaysShowSearch,
-  server,
-  initialState,
-}: DataViewsTableBaseProps<T>): React.JSX.Element {
+export function DataViewsTableBase<T extends Record<string, unknown>>(
+  props: DataViewsTableBaseProps<T>,
+): React.JSX.Element {
+  // Forwarded as a whole rather than restated name-by-name twice (as in
+  // DataViewsGrid): this component only ADDS the saved-views chrome, and a
+  // 30-name destructure repeated in the JSX is exactly where a newly added prop
+  // silently stops being passed on.
+  const {
+    initialViewId = null,
+    persistence,
+    router,
+    columns,
+    fields,
+    testIdPrefix = "table",
+    views,
+    server,
+    initialState,
+  } = props;
   const initialView = resolveInitialView(views, initialViewId);
   const columnIds = columns.map((col) => col.id);
   const ctl = useSavedViewsController(persistence, router, columnIds, views, initialView, initialState);
@@ -212,36 +203,11 @@ export function DataViewsTableBase<T extends Record<string, unknown>>({
     <>
       <ViewMutationErrorAlert error={ctl.mutationError} onClose={ctl.clearMutationError} testIdPrefix={testIdPrefix} />
       <DataViewsGrid<T>
-        rows={rows}
-        columns={columns}
-        fields={fields}
-        rangeFields={rangeFields}
-        getRowId={getRowId}
-        onRowClick={onRowClick}
-        emptyState={emptyState}
-        dataTestId={dataTestId}
+        {...props}
         testIdPrefix={testIdPrefix}
-        title={title}
-        headerActions={headerActions}
-        sortFields={sortFields}
-        sortKinds={sortKinds}
-        rowActions={rowActions}
-        rowActionsLeading={rowActionsLeading}
-        bulkActions={bulkActions}
-        renderRowMenu={renderRowMenu}
-        renderCard={renderCard}
-        board={board}
-        renderListRow={renderListRow}
-        scopes={scopes}
-        scopeFieldId={scopeFieldId}
-        defaultLayout={defaultLayout}
-        inlineFilters={inlineFilters}
-        alwaysShowSearch={alwaysShowSearch}
-        server={server}
         appliedState={ctl.applied}
         syncState={syncState}
         onStateChange={(state) => (ctl.currentRef.current = state)}
-        onVisibleRowsChange={onVisibleRowsChange}
         toolbarRightSlot={<ViewsMenu views={views} ctl={ctl} testIdPrefix={testIdPrefix} />}
       />
       {renderViewDialogs(ctl, fields, columns, views, testIdPrefix)}

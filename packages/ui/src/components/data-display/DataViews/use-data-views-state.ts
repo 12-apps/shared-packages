@@ -23,6 +23,7 @@ import {
   type DataViewSyncState,
   type FilterFieldConfig,
   type RangeFieldConfig,
+  type DataViewQuery,
   type RangeValue,
   type RowAction,
 } from "./data-views-types";
@@ -116,6 +117,12 @@ export interface DataViewsController<T extends Record<string, unknown>> {
   scope: string | undefined;
   /** Select a scope: re-fetches from page 1 and drops the selection. */
   setScope: (id: string) => void;
+  /**
+   * The query the grid is currently showing. Read by Export, which hands it
+   * back to the host UNPAGINATED — so an export follows the filters rather
+   * than the 25 rows that happen to be loaded.
+   */
+  currentQuery: DataViewQuery;
   /**
    * Server-supplied per-scope totals, passed through verbatim, or `undefined`
    * when the server omits them. NEVER falls back to counting `matched`: a count
@@ -243,6 +250,30 @@ function orderedColumnIds(allColumnIds: string[], order: string[] | undefined): 
   return [...kept, ...allColumnIds.filter((id) => !seen.has(id))];
 }
 
+/**
+ * The query the grid is currently SHOWING — the same shape `onQueryChange`
+ * emits, kept as a value so a host control (Exportar) can re-run it against the
+ * backend rather than reading the loaded rows.
+ */
+function liveQuery(
+  state: DataViewState,
+  scope: string | undefined,
+  server: DataViewServer | undefined,
+  matchedCount: number,
+): DataViewQuery {
+  return {
+    search: state.search,
+    pills: state.pills,
+    ranges: state.ranges ?? {},
+    sortBy: state.sortBy,
+    // Absent, not undefined, when the table declares no scopes.
+    ...(scope !== undefined ? { scope } : {}),
+    page: server?.page ?? 1,
+    // Client mode has one page, and it is everything that matched.
+    pageSize: server?.pageSize ?? matchedCount,
+  };
+}
+
 /** The toolbar's active sort, read off the state's FIRST sort entry. */
 function activeSortOf(
   state: DataViewState,
@@ -334,6 +365,7 @@ export function useDataViewsState<T extends Record<string, unknown>>({
     changePage,
     scope,
     setScope: makeSetScope(patch, selection.clearSelection),
+    currentQuery: liveQuery(state, scope, server, matched.length),
     // Verbatim, or absent. See DataViewServer.scopeCounts for why there is no
     // client-side fallback.
     scopeCounts: server?.scopeCounts,

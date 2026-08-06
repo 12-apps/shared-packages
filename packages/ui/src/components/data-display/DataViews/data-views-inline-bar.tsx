@@ -17,7 +17,10 @@ import { useRef, useState } from "react";
 import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 
 import type { GridFilterPanelProps } from "./data-views-filter-panel";
+import { MoreFilters } from "./data-views-more-filters";
+import { toOverflowFields, useFilterOverflow, type OverflowField } from "./data-views-overflow";
 import { isRangeSet, RangePill, rangeChipLabel } from "./data-views-range-pill";
+import type { RangeValue } from "./data-views-types";
 
 
 
@@ -147,6 +150,59 @@ function activeChips<T extends Record<string, unknown>>({
  * and — when anything is applied — a row of removable "active filter" chips. Range
  * filters are not shown here (the slide-in panel keeps those).
  */
+/**
+ * One filter control on the bar: a multi-select pill or a min/max range. The
+ * two are the same thing from the bar's point of view — a labelled control that
+ * writes into the view state — so which one to build is decided here rather
+ * than in the bar's own render.
+ */
+function InlineControl<T extends Record<string, unknown>>({
+  field,
+  pills,
+  ranges,
+  onTogglePill,
+  onChangeRange,
+  onClearField,
+  testIdPrefix,
+}: {
+  field: OverflowField<T>;
+  pills: Record<string, string[]>;
+  ranges: Record<string, RangeValue>;
+  onTogglePill: (fieldId: string, value: string, checked: boolean) => void;
+  onChangeRange: (fieldId: string, range: RangeValue) => void;
+  onClearField: (fieldId: string) => void;
+  testIdPrefix: string;
+}): React.JSX.Element | null {
+  if (field.group === "pill" && field.pill) {
+    return (
+      <MultiSelectDropdown
+        label={field.pill.label}
+        options={field.pill.options}
+        selected={new Set(pills[field.id] ?? [])}
+        onToggle={(value, checked) => onTogglePill(field.id, value, checked)}
+        onClear={() => onClearField(field.id)}
+        allLabel="Todas"
+        searchable={field.pill.searchEnabled ? true : undefined}
+        searchPlaceholder="Buscar…"
+        noResultsLabel="Nenhum resultado"
+        layout="pill"
+        data-testid={`${testIdPrefix}-filter-${field.id}`}
+      />
+    );
+  }
+  if (field.group === "range" && field.range) {
+    return (
+      <RangePill
+        field={field.range}
+        value={ranges[field.id] ?? {}}
+        onChange={(range) => onChangeRange(field.id, range)}
+        testIdPrefix={testIdPrefix}
+      />
+    );
+  }
+  return null;
+}
+
 export function InlineFilterBar<T extends Record<string, unknown>>({
   testIdPrefix,
   search,
@@ -170,38 +226,38 @@ export function InlineFilterBar<T extends Record<string, unknown>>({
     onTogglePill,
     onChangeRange,
   });
+  // MEASURED, not breakpointed: which controls fit depends on how many this
+  // page declares and how long their labels are. See `useFilterOverflow`.
+  const declared = toOverflowFields(fields, rangeFields);
+  const { inline, overflow, barRef } = useFilterOverflow(declared, pills, ranges);
+  const renderControl = (field: OverflowField<T>): React.JSX.Element | null => (
+    <InlineControl
+      key={field.id}
+      field={field}
+      pills={pills}
+      ranges={ranges}
+      onTogglePill={onTogglePill}
+      onChangeRange={onChangeRange}
+      onClearField={onClearField}
+      testIdPrefix={testIdPrefix}
+    />
+  );
   return (
     <Box
       data-testid={`${testIdPrefix}-inline-filters`}
       sx={{ display: "flex", flexDirection: "column", gap: 1.5, py: 1.5 }}
     >
-      <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5 }}>
+      <Box ref={barRef} sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5 }}>
         <InlineKeyword value={search} onChange={onSearchChange} testId={`${testIdPrefix}-search-all`} />
-        {fields.map((field) => (
-          <MultiSelectDropdown
-            key={field.id}
-            label={field.label}
-            options={field.options}
-            selected={new Set(pills[field.id] ?? [])}
-            onToggle={(value, checked) => onTogglePill(field.id, value, checked)}
-            onClear={() => onClearField(field.id)}
-            allLabel="Todas"
-            searchable={field.searchEnabled ? true : undefined}
-            searchPlaceholder="Buscar…"
-            noResultsLabel="Nenhum resultado"
-            layout="pill"
-            data-testid={`${testIdPrefix}-filter-${field.id}`}
-          />
-        ))}
-        {rangeFields.map((field) => (
-          <RangePill
-            key={field.id}
-            field={field}
-            value={ranges[field.id] ?? {}}
-            onChange={(range) => onChangeRange(field.id, range)}
-            testIdPrefix={testIdPrefix}
-          />
-        ))}
+        {inline.map(renderControl)}
+        <MoreFilters
+          fields={overflow}
+          pills={pills}
+          ranges={ranges}
+          onTogglePill={onTogglePill}
+          onChangeRange={onChangeRange}
+          testIdPrefix={testIdPrefix}
+        />
       </Box>
       <ActiveChipRow
         chips={chips}

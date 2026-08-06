@@ -21,6 +21,7 @@ import { GridMain } from "./data-views-grid-bodies";
 import { InlineFilterBar } from "./data-views-inline-bar";
 import { GridToolbar } from "./data-views-toolbar";
 import type { DisplayPanelView } from "./data-views-display-panel";
+import type { DataViewExport } from "./data-views-export";
 import { DataViewsPagination } from "./data-views-pagination";
 import type { BoardConfig } from "./DataViewsBoard";
 import { DataViewsScopeTabs, type ScopeConfig } from "./data-views-scopes";
@@ -218,6 +219,8 @@ interface GridShellProps<T extends Record<string, unknown>> {
   sortKinds?: Record<string, string>;
   /** The saved-view chrome bracketing the Exibir panel. */
   displayView?: DisplayPanelView;
+  /** Injected export — the host re-queries; the grid never fetches. */
+  exportConfig?: DataViewExport;
   /** Page title in the grid's own header row, above the scopes + toolbar. */
   title?: string;
   /** Primary page actions rendered at the header row's right. */
@@ -256,12 +259,14 @@ function ShellToolbar<T extends Record<string, unknown>>({
   toggleFilters,
   sortKinds,
   displayView,
+  exportConfig,
 }: {
   c: DataViewsController<T>;
   rows: T[];
   testIdPrefix: string;
   sortKinds?: Record<string, string>;
   displayView?: DisplayPanelView;
+  exportConfig?: DataViewExport;
   rowActions?: RowAction<T>[];
   bulkActions?: (selectedRows: T[], clearSelection: () => void) => React.ReactNode;
   toolbarRightSlot?: React.ReactNode;
@@ -279,6 +284,7 @@ function ShellToolbar<T extends Record<string, unknown>>({
       c={c}
       sortKinds={sortKinds}
       displayView={displayView}
+      exportConfig={exportConfig}
       testIdPrefix={testIdPrefix}
       selectedRows={c.selectedRows}
       selectAll={c.selectAll}
@@ -324,6 +330,7 @@ export function GridShell<T extends Record<string, unknown>>({
   scopes = [],
   sortKinds,
   displayView,
+  exportConfig,
   title,
   headerActions,
   defaultLayout,
@@ -360,6 +367,7 @@ export function GridShell<T extends Record<string, unknown>>({
           rows={rows}
           sortKinds={sortKinds}
           displayView={displayView}
+          exportConfig={exportConfig}
           testIdPrefix={testIdPrefix}
           rowActions={rowActions}
           bulkActions={bulkActions}

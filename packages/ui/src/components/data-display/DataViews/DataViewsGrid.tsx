@@ -6,6 +6,7 @@ import { type SortFieldDefinition } from "../../layout/ContentToolbar";
 
 import { GridShell } from "./data-views-grid-parts";
 import type { BoardConfig } from "./DataViewsBoard";
+import type { DataViewExport } from "./data-views-export";
 import type { ScopeConfig } from "./data-views-scopes";
 import type { DataViewCardSelection } from "./data-views-types";
 import {
@@ -65,6 +66,12 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
    * on a currency column is a puzzle; "Menor → maior" is not. Defaults to text.
    */
   sortKinds?: Record<string, string>;
+  /**
+   * Opt-in "Exportar" control. The grid hands the host the current query,
+   * UNPAGINATED, and the host re-queries — the grid never fetches, and an
+   * export therefore follows the filters rather than the loaded page.
+   */
+  exportConfig?: DataViewExport;
   /**
    * A single, reusable list of row actions that drives BOTH the per-row "⋮"
    * kebab AND the bulk-actions menu (tabwoah model). When provided, the grid
