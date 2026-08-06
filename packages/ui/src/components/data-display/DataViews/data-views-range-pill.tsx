@@ -64,6 +64,7 @@ function BoundField<T extends Record<string, unknown>>({
       label={label}
       value={value}
       unit={field.unit}
+      step={field.step}
       onChange={onChange}
       testId={testId}
     />

@@ -27,6 +27,8 @@
 import { Box, TextField } from '@mui/material';
 import React, { useEffect, useState } from 'react';
 
+import { formatBoundNumber } from './data-views-range-values';
+
 /** Everything this field lets through: digits and the two separators. */
 const ALLOWED = /[^\d.,]/g;
 
@@ -81,6 +83,7 @@ export function NumberBoundInput({
   label,
   value,
   unit,
+  step,
   onChange,
   testId,
 }: {
@@ -89,6 +92,8 @@ export function NumberBoundInput({
   value: number | string | undefined;
   /** Rendered as a start adornment ("R$"), not parsed out of the text. */
   unit?: string;
+  /** The field's precision, which decides how a settled bound is written. */
+  step?: number;
   onChange: (bound: number | undefined) => void;
   testId: string;
 }): React.JSX.Element {
@@ -122,8 +127,10 @@ export function NumberBoundInput({
         if (next === '') return onChange(undefined);
         if (amount !== undefined) onChange(amount);
       }}
-      // A half-typed number would show a filter the list is not using.
-      onBlur={() => setText(formatPtBrNumber(applied))}
+      // A half-typed number would show a filter the list is not using. Settling
+      // to the SAME text the chip carries (`R$ 17,50`, not `17,5`) is the point
+      // of routing this through the shared formatter rather than `String`.
+      onBlur={() => setText(applied == null ? '' : formatBoundNumber(applied, step))}
       InputLabelProps={{ shrink: true }}
       inputProps={{ 'data-testid': testId }}
       InputProps={

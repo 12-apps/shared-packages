@@ -16,10 +16,17 @@ import {
   parsePtBrNumber,
 } from "../data-views-number-input";
 
-function renderInput(value?: number, unit?: string) {
+function renderInput(value?: number, unit?: string, step?: number) {
   const onChange = vi.fn();
   render(
-    <NumberBoundInput label="De" value={value} unit={unit} onChange={onChange} testId="amount" />,
+    <NumberBoundInput
+      label="De"
+      value={value}
+      unit={unit}
+      step={step}
+      onChange={onChange}
+      testId="amount"
+    />,
   );
   return { onChange, input: screen.getByTestId("amount") as HTMLInputElement };
 }
@@ -118,6 +125,27 @@ describe("NumberBoundInput", () => {
     fireEvent.change(input, { target: { value: "50,," } });
     fireEvent.blur(input);
     expect(input).toHaveValue("50");
+  });
+
+  it("settles to the field's own precision, so it reads like the chip", () => {
+    // `step: 0.01` is money declaring two decimals. Without this the field
+    // rested on `17,5` while the chip said `R$ 17,50` — the same number written
+    // two ways, on one screen.
+    const { input } = renderInput(17.5, "R$", 0.01);
+    fireEvent.blur(input);
+    expect(input).toHaveValue("17,50");
+  });
+
+  it("groups thousands on settling, the same way it accepts them", () => {
+    const { input } = renderInput(1234.56, "R$", 0.01);
+    fireEvent.blur(input);
+    expect(input).toHaveValue("1.234,56");
+  });
+
+  it("does not pad a field with no fractional step", () => {
+    const { input } = renderInput(12, undefined, 1);
+    fireEvent.blur(input);
+    expect(input).toHaveValue("12");
   });
 
   it("shows a bound that arrives as a STRING, the way a restored URL hands it over", () => {

@@ -163,8 +163,12 @@ describe("rangeChipLabel", () => {
     );
   });
 
+  // The cents are new (FUT-744) and the claim is not: money is written to the
+  // precision its own `step` declares, so the chip matches the field it was
+  // typed into. What this case is about — a one-sided window reading as the
+  // inequality it is, rather than an en-dash with a blank end — is untouched.
   it("reads a one-sided window as the inequality it is, not a blank end", () => {
-    expect(rangeChipLabel(TOTAL, { min: 20 })).toBe("Valor: ≥ R$ 20");
-    expect(rangeChipLabel(TOTAL, { max: 50 })).toBe("Valor: ≤ R$ 50");
+    expect(rangeChipLabel(TOTAL, { min: 20 })).toBe("Valor: ≥ R$ 20,00");
+    expect(rangeChipLabel(TOTAL, { max: 50 })).toBe("Valor: ≤ R$ 50,00");
   });
 });

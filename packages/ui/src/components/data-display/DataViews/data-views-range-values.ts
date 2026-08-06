@@ -19,19 +19,42 @@ function shortDay(day: string): string {
   return month && date ? `${date}/${month}` : day;
 }
 /**
- * One bound, rendered for the chip: money in reais, a day as `DD/MM`.
+ * How many decimals a bound is WRITTEN with, taken from the field's own `step`.
  *
- * A number takes the DECIMAL COMMA, matching the field it was typed into.
- * `String(17.5)` reads `R$ 17.5`, which is a decimal point in a currency that
- * has none — and the chip is the only place the applied window is stated, so it
- * is the one place that must not disagree with what was entered.
+ * `step` is already the field's statement about its precision — money declares
+ * `0.01` — so nothing new has to be configured for a chip to know that R$ 17,50
+ * has two decimals and a quantity has none.
  */
+function decimalsFor(step: number | undefined): number {
+  if (!step || Number.isInteger(step)) return 0;
+  return String(step).split('.')[1]?.length ?? 0;
+}
+
+/**
+ * A numeric bound as the merchant writes it: decimal COMMA, thousands grouped.
+ *
+ * `String(17.5)` reads `17.5` — a decimal point in a currency that has none —
+ * and padding it to the field's own precision is what makes `R$ 17,50` instead
+ * of `R$ 17,5`. Shared with the input's blur so the chip and the field it was
+ * typed into can never disagree, which matters because the chip is the ONLY
+ * place the applied window is stated once the popover closes.
+ */
+export function formatBoundNumber(amount: number, step?: number): string {
+  const decimals = decimalsFor(step);
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: Math.max(decimals, 2),
+  }).format(amount);
+}
+
+/** One bound, rendered for the chip: money in reais, a day as `DD/MM`. */
 function boundLabel<T extends Record<string, unknown>>(
   field: RangeFieldConfig<T>,
   bound: number | string,
 ): string {
   if (field.kind === 'day') return shortDay(String(bound));
-  const text = String(bound).replace('.', ',');
+  const amount = typeof bound === 'number' ? bound : Number(bound);
+  const text = Number.isFinite(amount) ? formatBoundNumber(amount, field.step) : String(bound);
   return field.unit ? `${field.unit} ${text}` : text;
 }
 /**
