@@ -318,6 +318,7 @@ function ShellStack<T extends Record<string, unknown>>({
           bulkActions={props.bulkActions}
           toolbarRightSlot={props.toolbarRightSlot}
           compactControls={showInline && split.compactControls}
+          counterHidden={showInline && split.counterHidden}
           showInline={showInline}
         />
         <TableFilter.Layout>

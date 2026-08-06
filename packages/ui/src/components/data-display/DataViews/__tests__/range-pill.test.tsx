@@ -43,6 +43,7 @@ const NO_COLLAPSE = {
   ],
   overflow: [],
   compactControls: false,
+  counterHidden: false,
   searchCollapsed: false,
   barRef: { current: null },
 };

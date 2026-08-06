@@ -47,6 +47,15 @@ export interface OverflowSplit<T extends Record<string, unknown>> {
    */
   compactControls: boolean;
   /**
+   * Step 5, and the LAST resort — the "N de N" counter is dropped.
+   *
+   * Only once every control has already collapsed and the row STILL does not
+   * fit, which on a six-filter table is below about 400px. The counter goes
+   * last because it is the only thing left that reports rather than does: an
+   * operator can act without knowing the total, but not without the search.
+   */
+  counterHidden: boolean;
+  /**
    * Step 4 — the search collapses to a magnifier that expands on click.
    * The most expensive step, so it is taken last: the search is the one
    * control on the bar that cannot be guessed from an icon's position.
@@ -116,6 +125,8 @@ const RESERVED = {
   right: 216,
   /** The same two controls as icons only — step 2 of the ladder. */
   rightCompact: 96,
+  /** What step 4 leaves behind: the search as a bare magnifier. */
+  searchIcon: 44,
   /** The "Mais" button, only charged when there IS an overflow. */
   overflowButton: 104,
   /** Gaps + the row's own padding. */
@@ -249,6 +260,7 @@ function computeSplit<T extends Record<string, unknown>>(
       inline: all,
       overflow: [],
       compactControls: false,
+      counterHidden: false,
       searchCollapsed: false,
     };
   }
@@ -260,8 +272,14 @@ function computeSplit<T extends Record<string, unknown>>(
   const rightCost = compactControls ? RESERVED.rightCompact : RESERVED.right;
   // …and with them off?
   const searchCollapsed = base - RESERVED.counter - rightCost < RESERVED.search;
+  // Everything has collapsed and the row STILL overflows. The controls cannot
+  // shrink further — they are `flexShrink: 0` precisely so an over-packed row
+  // sheds rather than squeezes — so without this last rung they simply paint
+  // outside the toolbar, which is what a narrow phone was doing.
+  const counterHidden =
+    searchCollapsed && base - RESERVED.counter - rightCost < RESERVED.searchIcon;
 
-  return { inline, overflow, compactControls, searchCollapsed };
+  return { inline, overflow, compactControls, counterHidden, searchCollapsed };
 }
 
 /**
