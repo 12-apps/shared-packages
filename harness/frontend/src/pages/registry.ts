@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 
 import { PaymentsProviderSettingsPage } from './payments-provider-settings';
+import { ReportBuilderPage } from './report-builder';
 
 /**
  * One page per published surface, and the ONLY place a new one is registered.
@@ -30,5 +31,11 @@ export const PAGES: readonly HarnessPage[] = [
     title: 'Provider settings',
     pkg: '@12-apps/payments-frontend',
     Component: PaymentsProviderSettingsPage,
+  },
+  {
+    slug: 'report-builder',
+    title: 'Report builder',
+    pkg: '@12-apps/report-builder',
+    Component: ReportBuilderPage,
   },
 ];

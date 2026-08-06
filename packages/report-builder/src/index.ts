@@ -38,6 +38,7 @@ export {
   type MeasureAccumulator,
 } from './aggregates';
 export { DEFAULT_ROW_LIMIT, compileReport, type CompileOptions } from './compile';
+export { autoTitle, specSentence } from './describe';
 export { ReportBuilderError } from './errors';
 export {
   formatDurationSeconds,

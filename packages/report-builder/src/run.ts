@@ -1,4 +1,5 @@
 import { compileReport } from './compile';
+import { specSentence } from './describe';
 import { invalidSpecError, ReportBuilderError } from './errors';
 import { renderReport, type ReportRenderModel } from './render';
 import {
@@ -74,6 +75,13 @@ export interface DashboardBlockSuccess {
   id: string;
   title?: string;
   span: number;
+  /**
+   * The block's spec in Portuguese ({@link specSentence}) — computed HERE, on
+   * the server, so the viewer, the editor and an export all render the same
+   * words. Deriving it per surface would let three copies drift, and only the
+   * server holds the catalog the labels come from.
+   */
+  sentence: string;
   status: 'ok';
   spec: ReportSpec;
   query: CompiledQuery;
@@ -85,6 +93,12 @@ export interface DashboardBlockFailure {
   id: string;
   title?: string;
   span: number;
+  /**
+   * Present on a FAILED block too: a block whose spec no longer compiles is
+   * exactly when a reader needs to know what it was asking for. `specSentence`
+   * never throws, so this is always available.
+   */
+  sentence: string;
   status: 'error';
   /** The report-builder error message (actionable, same text a 400 carries). */
   error: string;
@@ -114,7 +128,12 @@ export async function runDashboard(
   }
   const blocks = await Promise.all(
     doc.blocks.map(async (block): Promise<DashboardBlockResult> => {
-      const base = { id: block.id, title: block.title, span: block.span };
+      const base = {
+        id: block.id,
+        title: block.title,
+        span: block.span,
+        sentence: specSentence(block.spec, options.catalog),
+      };
       try {
         const result = await runReport(block.spec, options);
         return { ...base, status: 'ok', ...result };
