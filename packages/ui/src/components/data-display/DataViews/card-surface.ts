@@ -38,20 +38,15 @@ const pulseRing = keyframes`
  * decorative effects and the ARIA plumbing — is declared once here and spread
  * into both. Anything specific to being a tile or being a row stays on the
  * component that has it.
- *
- * The variants are NOT Chip's. A chip is a token in a sentence, so filled and
- * outlined is the whole of it; a card is a surface in a stack, and what it needs
- * to say is how far off the page it sits. Hence `elevated` and `ghost`, which a
- * chip has no use for.
  */
 
 /**
  * How far off the page the card sits.
  *
- * The same vocabulary {@link Button} uses — `solid` / `outline` / `ghost` /
- * `text` — rather than a set invented here. A card and a button are both
- * surfaces the operator can press, and having one call it `outline` while the
- * other calls it `outlined` is a tax on everybody who writes both.
+ * Button's vocabulary, spelled Button's way, rather than a set invented here —
+ * the three of its six that mean anything on a card. A card and a button are
+ * both surfaces the operator can press, and having one call it `outline` while
+ * the other calls it `outlined` is a tax on everybody who writes both.
  *
  * Chip's `filled | outlined` was the wrong model to copy: a chip is a token in
  * a sentence and has only those two things to say. Button's scale is about how
