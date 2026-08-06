@@ -11,6 +11,7 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import type { ReportField } from "./custom-reports-api";
+import { dimensionAt, withDimension } from "./builder-dimensions";
 import { editFilterRow, operatorOptionsFor, valueOptionsFor } from "./builder-filters";
 import { AGGREGATION_LABELS, aggregationOptions, editMeasureRow } from "./builder-measures";
 import {
@@ -38,48 +39,65 @@ function fieldOptions(fields: ReportField[], role?: ReportField["role"]): Array<
     .map((field) => ({ value: field.field, label: field.label }));
 }
 
-export function DimensionsSection({ draft, fields, update }: SectionProps): JSX.Element {
+/** The X axis, plus its granularity when the field is a date. */
+export function GroupBySection({ draft, fields, update }: SectionProps): JSX.Element {
   const byName = new Map(fields.map((field) => [field.field, field]));
-  const setDimension = (index: number, field: string, timeGrain: ReportGrain): void => {
-    const next = [...draft.dimensions];
-    next[index] = { field, timeGrain };
-    update({ dimensions: next.filter((dimension) => dimension.field !== "") });
-  };
-  const rows: Array<{ field: string; timeGrain: ReportGrain }> =
-    draft.dimensions.length < 2
-      ? [...draft.dimensions, { field: "", timeGrain: "day" as ReportGrain }]
-      : draft.dimensions;
+  const dimension = dimensionAt(draft, 0);
   return (
     <Stack spacing={1}>
       <Text variant="heading" size="xs" as="h3">
         Agrupar por
       </Text>
-      {rows.map((dimension, index) => (
-        <Stack key={index} direction="row" spacing={1}>
+      <Stack direction="row" spacing={1}>
+        <Select
+          size="small"
+          label="Eixo X"
+          options={[NONE, ...fieldOptions(fields, "dimension")]}
+          value={dimension.field}
+          onChange={(event) => update(withDimension(draft, 0, { field: event.target.value as string }))}
+          data-testid="builder-dimension-0"
+        />
+        {byName.get(dimension.field)?.type === "date" ? (
           <Select
             size="small"
-            aria-label={`Dimensão ${index + 1}`}
-            options={[NONE, ...fieldOptions(fields, "dimension")]}
-            value={dimension.field}
+            label="Por"
+            options={Object.entries(GRAIN_LABELS).map(([value, label]) => ({ value, label }))}
+            value={dimension.timeGrain}
             onChange={(event) =>
-              setDimension(index, event.target.value as string, dimension.timeGrain)
+              update(withDimension(draft, 0, { timeGrain: event.target.value as ReportGrain }))
             }
-            data-testid={`builder-dimension-${index}`}
+            data-testid="builder-grain-0"
           />
-          {byName.get(dimension.field)?.type === "date" ? (
-            <Select
-              size="small"
-              aria-label="Granularidade"
-              options={Object.entries(GRAIN_LABELS).map(([value, label]) => ({ value, label }))}
-              value={dimension.timeGrain}
-              onChange={(event) =>
-                setDimension(index, dimension.field, event.target.value as ReportGrain)
-              }
-              data-testid={`builder-grain-${index}`}
-            />
-          ) : null}
-        </Stack>
-      ))}
+        ) : null}
+      </Stack>
+    </Stack>
+  );
+}
+
+/**
+ * The series split — its own section because it changes the SHAPE of the
+ * result (one series per value), not just how rows are bucketed. Sitting it
+ * beside the axis in one row said the two were the same kind of choice.
+ */
+export function SplitBySection({ draft, fields, update }: SectionProps): JSX.Element {
+  const axis = dimensionAt(draft, 0);
+  return (
+    <Stack spacing={1}>
+      <Text variant="heading" size="xs" as="h3">
+        Separar em séries
+      </Text>
+      <Select
+        size="small"
+        label="Uma série por"
+        // Splitting without grouping has nothing to split, so the control is
+        // disabled with the reason rather than silently producing nothing.
+        disabled={axis.field === ""}
+        helperText={axis.field === "" ? "Escolha um agrupamento primeiro." : undefined}
+        options={[NONE, ...fieldOptions(fields, "dimension")]}
+        value={dimensionAt(draft, 1).field}
+        onChange={(event) => update(withDimension(draft, 1, { field: event.target.value as string }))}
+        data-testid="builder-dimension-1"
+      />
     </Stack>
   );
 }

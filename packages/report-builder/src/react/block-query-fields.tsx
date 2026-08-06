@@ -17,10 +17,11 @@ import { spanOptionsFor } from "../layout";
 
 import { specFromDraft, switchEntityDraft, type BuilderDraft } from "./builder-model";
 import {
-  DimensionsSection,
   FiltersSection,
+  GroupBySection,
   MeasuresSection,
   PresentationSection,
+  SplitBySection,
 } from "./builder-sections";
 import type { ReportEntityFields, ReportField } from "./custom-reports-api";
 
@@ -77,7 +78,8 @@ export function BlockQueryFields({
         }
         data-testid={`${testId}-entity`}
       />
-      <DimensionsSection draft={draft} fields={fields} update={update} />
+      <GroupBySection draft={draft} fields={fields} update={update} />
+      <SplitBySection draft={draft} fields={fields} update={update} />
       <MeasuresSection draft={draft} fields={fields} update={update} />
       <FiltersSection draft={draft} fields={fields} update={update} />
       <PresentationSection draft={draft} fields={fields} update={update} />
