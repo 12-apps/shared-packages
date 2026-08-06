@@ -16,6 +16,25 @@ export interface BeforeInstallPromptEvent extends Event {
 }
 
 /**
+ * What the pre-React capture left on `window` for the hook to pick up.
+ *
+ * This is the handoff between code that runs before the app exists and code
+ * that runs inside it. Written either by `capturePwaInstallEvent()` or by the
+ * equivalent inline snippet in the host's HTML, and read on mount — the event
+ * has almost always fired long before any component is alive to hear it.
+ */
+export interface PwaInstallStash {
+  /** The held event, or `null` if none has fired or it was already spent. */
+  event: BeforeInstallPromptEvent | null;
+  /** When it was captured. Diagnostic: proves the capture ran and the browser offered. */
+  firedAt: number | null;
+  /** When `appinstalled` was seen, if it arrived before the app mounted. */
+  installedAt: number | null;
+  /** Guards against a host wiring both the inline snippet and the function. */
+  capturing?: boolean;
+}
+
+/**
  * How — or whether — this browser can install the app.
  *
  * `ios` exists as its own case because iOS Safari can install but refuses to be

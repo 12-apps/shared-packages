@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { PWA_INSTALL_AVAILABLE_EVENT, readPwaInstallStash } from './InstallPrompt.earlyCapture';
 import {
   DEFAULT_DISMISS_DAYS,
   DEFAULT_STORAGE_KEY,
@@ -50,7 +51,9 @@ const useInstalledState = (onInstalled?: () => void) => {
   }, [onInstalled]);
 
   useEffect(() => {
-    setIsInstalled(isStandaloneDisplay());
+    // `appinstalled` can also land before the app mounts, so the stash is
+    // consulted for the same reason the deferred event is.
+    setIsInstalled(isStandaloneDisplay() || readPwaInstallStash()?.installedAt != null);
 
     const markInstalled = () => {
       setIsInstalled(true);
@@ -65,29 +68,54 @@ const useInstalledState = (onInstalled?: () => void) => {
 };
 
 /**
- * Captures and holds the deferred `beforeinstallprompt` event.
+ * Holds the deferred `beforeinstallprompt` event.
  *
- * The listener is attached on mount, which is normally AFTER the browser would
- * have fired the event on a cold load. Chromium re-fires it on navigation and
- * on re-evaluation of the install criteria, so a missed first event resolves
- * itself; a host that needs the very first one can attach an early capture in
- * its HTML entry point and re-dispatch it.
+ * The stash written by `capturePwaInstallEvent` is the PRIMARY source, not a
+ * fallback. Chromium fires the event once, during initial page load; a
+ * listener attached in an effect runs after hydration and, when the component
+ * is code-split, after a download that may not happen until a later route. In
+ * a real browser it essentially never catches the event, and the event is not
+ * reissued on request — so a hook that relies on its own listener reports
+ * "cannot install" forever on the one platform that can.
+ *
+ * The live listeners below therefore cover only the narrow case they can
+ * actually serve: a browser re-evaluating installability while the app is
+ * already running, and a host that never wired the capture at all.
  */
 const useDeferredPrompt = () => {
   const deferredRef = useRef<BeforeInstallPromptEvent | null>(null);
   const [promptReady, setPromptReady] = useState(false);
 
   useEffect(() => {
-    const capture = (event: Event) => {
-      // Without preventDefault the browser owns the event and the handle dies
-      // with it — this is the line that makes an in-page install button possible.
-      event.preventDefault();
-      deferredRef.current = event as BeforeInstallPromptEvent;
+    const hold = (event: BeforeInstallPromptEvent) => {
+      deferredRef.current = event;
       setPromptReady(true);
     };
 
+    // Whatever fired before this component existed.
+    const held = readPwaInstallStash()?.event;
+    if (held) hold(held);
+
+    // The capture rang the bell after mount: adopt what it is holding.
+    const adopt = () => {
+      const fresh = readPwaInstallStash()?.event;
+      if (fresh) hold(fresh);
+    };
+
+    const capture = (event: Event) => {
+      // Without preventDefault the browser owns the event and the handle dies
+      // with it. The capture has normally done this already; repeating it is
+      // harmless and keeps the hook correct on a host that skipped wiring.
+      event.preventDefault();
+      hold(event as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener(PWA_INSTALL_AVAILABLE_EVENT, adopt);
     window.addEventListener('beforeinstallprompt', capture);
-    return () => window.removeEventListener('beforeinstallprompt', capture);
+    return () => {
+      window.removeEventListener(PWA_INSTALL_AVAILABLE_EVENT, adopt);
+      window.removeEventListener('beforeinstallprompt', capture);
+    };
   }, []);
 
   const clearPrompt = useCallback(() => {
