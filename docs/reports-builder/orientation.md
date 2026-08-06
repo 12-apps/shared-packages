@@ -167,14 +167,50 @@ Against `packages/ui`. Imports are subpath-style, as the report-builder already 
 | `.toast` + undo | `feedback/Toast` / `feedback/Sonner` | **use existing** — confirm the action-button + `aria-live` path before relying on it |
 | Charts | `data-display/Chart` + `SpecChart` (already consumed via ChartSpec) | **existing lib** |
 
-**In our design system, unused by the prototype, that we should use anyway:**
+All sixteen rows were confirmed against the prototype's own stylesheet — every one is a real element,
+none is a leftover.
 
-- `data-display/AsyncStateContainer`, `EmptyState`, `ErrorState`, `LoadingState`, `layout/Skeleton` —
-  these are Phase 4's "per-block loading, empty and error states" commit, nearly for free.
-- `data-display/StatCard` — the KPI presentation already has a home.
-- `data-display/DataViews` / `DataGrid` / `Table` — the "ver como tabela" a11y fallback (`notes.md`
-  §2) and the reports list both have existing hosts.
-- `layout/ContentToolbar` — the editor toolbar.
+### 3.1 Elements the §3 table omits
+
+`porting.md` §3 lists sixteen rows; the prototype defines ~90 classes. These carry real decisions and
+need inventory rows of their own before the ports start:
+
+| Prototype | Existing component | Decision |
+|---|---|---|
+| `.kpi` / `.kpi-value` / `.kpi-delta` | `data-display/StatCard` | **use as-is** — the compare delta is already a StatCard concern |
+| `.empty` | `data-display/EmptyState` | **use as-is** |
+| `.skel` | `layout/Skeleton` (or `AsyncStateContainer`) | **use as-is** — this is most of Phase 4's states commit |
+| `.sentence` + `.mono` | `typography/Text` + a mono token | **extend** — the `describe()` output surface; the mono face is deliberate (`porting.md` §4) |
+| `.search` | `form/Input` | **use as-is** |
+| `.toolbar` / `.topbar` | `layout/ContentToolbar` | **use as-is** |
+| `.card-menu` (`[data-menu]`) | `navigation/DropdownMenu` | **use as-is** |
+| `.icon-btn` | `form/Button` icon variant / `form/HeaderButton` | **use as-is** |
+| `.radio` | `form/RadioGroup` | **use as-is** |
+| `.tag` (the `R$` / `#` type tags) | `data-display/Chip` small, or `Badge` | **use as-is** — Phase 2 wants these in measure option labels |
+| `.warn` / `.note` / `.hint` | `data-display/Alert` / `Banner` | **use as-is** |
+| `.tbl-scroll` | `layout/ScrollArea` | **use as-is** — the mobile sticky-column table (`notes.md` §1) |
+| `.danger-zone` | `layout/Card` + `feedback/ConfirmAction` | **extend** |
+| `.legend` | part of `data-display/Chart` | **existing lib** — legend must carry the category name (`notes.md` §2) |
+| `.scrim`, `.sheet-grip` | owned by `feedback/Modal` / `data-display/Sheet` | **use as-is** — don't rebuild |
+| sparkline on list cards | `data-display/Chart` | **use as-is**, small variant |
+| `.drop-ind`, `.drag-ghost`, `.resize`, `.size-badge`, `.drag` | — | **build new** — the drag/resize affordances of `porting.md` §2 |
+| `.sr` + `#live` | — | **build new**, tiny — the visually-hidden `aria-live` region every announcement writes to |
+| `.unsaved` | — | **build new**, tiny — the dirty indicator |
+| `.add-block` / `.add-line` | `layout/Card` dashed variant | **extend** |
+
+**Correction to an earlier draft of this file:** `EmptyState`, `Skeleton` and `StatCard` were listed
+as "in our design system, unused by the prototype." That was wrong — `.empty`, `.skel` and `.kpi` are
+all in the prototype. They are omissions from `porting.md`'s table, not additions we'd be making.
+
+Genuinely in our design system and unused by the prototype: `data-display/DataViews` / `DataGrid` /
+`Table`, which is where the "ver como tabela" a11y fallback (`notes.md` §2) should land rather than a
+hand-rolled `<table>`.
+
+> Verified by rendering `prototype.html` in headless Chromium at 1440px and 390px. The list screen
+> renders from static markup; the view and editor screens are built by `renderEdit()`/`renderView()`
+> at runtime, so screenshotting them needs a real driver (Playwright), not a one-shot renderer. The
+> table above is derived from the prototype's stylesheet and markup, which is the stronger source
+> for a component mapping anyway.
 
 ---
 
