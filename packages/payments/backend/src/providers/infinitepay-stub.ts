@@ -141,17 +141,48 @@ export function stubCreateFault(outcome: StubOutcome): null {
 }
 
 /**
+ * An activation reference naming no attempt — `verify-<provider>-<merchant>`
+ * with nothing after it.
+ *
+ * Both mint paths append one (`verificationReference(..., attemptId)`, in the
+ * card flow and the redirect flow alike), so a charge under the bare base was
+ * never created and cannot be found. An order reference is not an activation
+ * reference at all and is left alone.
+ */
+function namesNoAttempt(reference: string): boolean {
+  return reference.startsWith('verify-') && !reference.includes('--');
+}
+
+/**
  * The scripted answer to `payment_check`.
  *
  * `undefined` means "not scripted — fall through to the plain stub", which is
  * distinct from the `null` that means "no such payment, keep waiting". The two
  * were one value once and the unpaid answer swallowed the unscripted one.
+ *
+ * ## Why a reference that names no attempt is refused (FUT-684)
+ *
+ * The script used to answer for ANY reference, and that is how a caller asking
+ * about the WRONG charge became invisible. The poll asked InfinitePay about the
+ * bare `verify-<provider>-<merchant>` while `start` had minted
+ * `verify-<provider>-<merchant>--<attempt>`; live, `payment_check` answers the
+ * same `{"success":false}` it gives nonsense, so the browser could never
+ * confirm a paid activation and every settlement silently depended on a webhook
+ * reaching a public URL. On a tunnel or a preview box that never happens.
+ *
+ * The stub said PAID regardless, so the whole defect sat under 25 green
+ * end-to-end scenarios for a release. A stub that answers questions the real
+ * provider refuses is not a convenience — it is a hole in every test above it.
  */
 export function stubFindCharge(
   outcome: StubOutcome,
   reference: string,
 ): ChargeSnapshot | null | undefined {
   if (outcome === 'unreachable') throw unreachable();
+  // `null`, not `undefined`: this IS the scripted answer — "no such payment" —
+  // and falling through to the plain stub would hand back the PENDING snapshot
+  // that hid the bug in the first place.
+  if (namesNoAttempt(reference)) return null;
   const base = {
     provider: NAME,
     providerChargeId: reference,
