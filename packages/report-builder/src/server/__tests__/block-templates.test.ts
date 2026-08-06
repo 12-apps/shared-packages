@@ -12,7 +12,13 @@ import { reportCatalog } from '../catalog';
  * a reasonable choice and got an error they cannot act on.
  */
 
-const everyTemplate = blockTemplateGroups().flatMap((group) => group.templates);
+/**
+ * A function, not a module-level const: a shared binding across tests is a
+ * test-order dependency waiting to happen, and the flakiness gate rejects one.
+ */
+function everyTemplate() {
+  return blockTemplateGroups().flatMap((group) => group.templates);
+}
 
 describe('blockTemplateGroups', () => {
   it('offers a blank template, last', () => {
@@ -35,12 +41,12 @@ describe('blockTemplateGroups', () => {
   });
 
   it('gives every template a distinct id', () => {
-    const ids = everyTemplate.map((template) => template.id);
+    const ids = everyTemplate().map((template) => template.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('describes each template in the owner\'s words, not the schema\'s', () => {
-    for (const template of everyTemplate) {
+    for (const template of everyTemplate()) {
       expect(template.title.length).toBeGreaterThan(0);
       expect(template.description.length).toBeGreaterThan(0);
       // A description that just repeats the entity id helps nobody.
@@ -49,16 +55,19 @@ describe('blockTemplateGroups', () => {
   });
 });
 
-describe('every template compiles against the live catalog', () => {
-  const runnable = everyTemplate.filter((template) => template.spec !== null);
+/** Templates carrying a spec — `it.each` needs these at collection time. */
+function runnableTemplates() {
+  return everyTemplate().filter((template) => template.spec !== null);
+}
 
+describe('every template compiles against the live catalog', () => {
   it('has templates to check', () => {
-    // Guards the loop below from passing vacuously if the definitions are
+    // Guards the cases below from passing vacuously if the definitions are
     // dropped or every starter goes missing at once.
-    expect(runnable.length).toBeGreaterThan(4);
+    expect(runnableTemplates().length).toBeGreaterThan(4);
   });
 
-  it.each(runnable.map((template) => [template.id, template] as const))(
+  it.each(runnableTemplates().map((template) => [template.id, template] as const))(
     'compiles %s',
     (_id, template) => {
       expect(() => compileReport(template.spec!, reportCatalog)).not.toThrow();

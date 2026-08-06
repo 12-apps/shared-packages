@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 
+import { BlockTemplatePickerPage } from './block-template-picker';
 import { PaymentsProviderSettingsPage } from './payments-provider-settings';
 import { ReportBuilderPage } from './report-builder';
 import { ReportCardListPage } from './report-card-list';
@@ -45,6 +46,12 @@ export const PAGES: readonly HarnessPage[] = [
     title: 'Report list',
     pkg: '@12-apps/report-builder/react',
     Component: ReportCardListPage,
+  },
+  {
+    slug: 'block-template-picker',
+    title: 'Block template picker',
+    pkg: '@12-apps/report-builder/react',
+    Component: BlockTemplatePickerPage,
   },
   {
     slug: 'report-render',

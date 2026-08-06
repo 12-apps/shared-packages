@@ -32,6 +32,12 @@ export { ReportGrid, ReportGridItem, ReportBlockFrame } from './report-grid';
  * rule the list applies, exported so it can be asserted without a DOM.
  */
 export { ReportCardList } from './report-card-list';
+/**
+ * The "Adicionar bloco" picker. Takes its groups as a prop rather than
+ * importing them, so a host can narrow what it offers — and so the component
+ * has no opinion about where the templates came from.
+ */
+export { BlockTemplatePicker } from './block-template-picker';
 export {
   filterReports,
   REPORT_SCOPE_LABELS,
