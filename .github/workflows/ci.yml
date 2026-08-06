@@ -246,6 +246,45 @@ jobs:
           path: harness/frontend/playwright-report
           retention-days: 7
 
+  # The server half of the same question. The frontend harness proves the
+  # published UI renders whatever descriptors it is handed; this proves the
+  # published backend produces four of them through its own HTTP handler, and
+  # that the prisma schema partial and six migrations it ships actually apply to
+  # a real Postgres — assets no other job in this repo ever opens.
+  backend-harness:
+    name: Backend Harness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      - name: Build packages
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee build.log
+      - name: Install the harness against the published tarballs
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/harness-install.mjs 2>&1 | tee harness-install.log
+      - name: Exercise the published backend
+        working-directory: harness/backend
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee harness-test.log
+
   # Tokenless publish to npm via OIDC Trusted Publishing. Only on push to main,
   # after the gates pass. No NPM_TOKEN: npm exchanges the GitHub OIDC id-token
   # for a short-lived credential (requires a one-time Trusted Publisher on npm
@@ -255,7 +294,7 @@ jobs:
   # ahead of it, which is the only place a token is ever used.
   release:
     name: Release
-    needs: [lint, type-check, build, unit-tests, quality, consumers, frontend-harness]
+    needs: [lint, type-check, build, unit-tests, quality, consumers, frontend-harness, backend-harness]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -341,7 +380,7 @@ jobs:
     name: CI Success
     runs-on: ubuntu-latest
     if: always()
-    needs: [lint, type-check, build, unit-tests, quality, consumers, frontend-harness]
+    needs: [lint, type-check, build, unit-tests, quality, consumers, frontend-harness, backend-harness]
     steps:
       - name: Verify all required jobs passed
         shell: bash

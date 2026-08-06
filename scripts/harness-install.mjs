@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { packAll, publishableDirs } from "./lib/pack-workspace.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const HARNESSES = ["harness/frontend"];
+const HARNESSES = ["harness/frontend", "harness/backend"];
 
 function run(cmd, args, cwd) {
   execFileSync(cmd, args, { cwd, stdio: "inherit" });

@@ -10,7 +10,6 @@
   ],
   "dependencies": [],
   "devDependencies": [
-    "package.json#@electric-sql/pglite",
     "package.json#prettier",
     "package.json#prisma"
   ],
