@@ -12,6 +12,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 
 import type { ReportField } from "./custom-reports-api";
 import { dimensionAt, withDimension } from "./builder-dimensions";
+import { VizPicker } from "./viz-picker";
 import { editFilterRow, operatorOptionsFor, valueOptionsFor } from "./builder-filters";
 import { AGGREGATION_LABELS, aggregationOptions, editMeasureRow } from "./builder-measures";
 import {
@@ -19,7 +20,6 @@ import {
   GRAIN_LABELS,
   OPERATOR_LABELS,
   type BuilderDraft,
-  type ChartKind,
 } from "./builder-model";
 import type { ReportGrain } from "./reports-api";
 
@@ -268,45 +268,30 @@ export function FiltersSection({ draft, fields, update }: SectionProps): JSX.Ele
 
 export function PresentationSection({ draft, fields, update }: SectionProps): JSX.Element {
   // The picker offers only what the compiler accepts for the current form
-  // shape (FUT-308); unavailable charts stay visible but disabled. The hint
-  // explains the SELECTED option's blocking rule only — a valid selection
-  // shows no hint (reasons for other options would just mislead).
+  // shape (FUT-308). Blocked options now state their REASON rather than going
+  // grey (FUT-391): grey says "no" without saying why, leaving the author to
+  // guess which of their choices caused it when the compiler already knows.
   const options = chartOptions(draft, new Map(fields.map((field) => [field.field, field])));
-  const blockedHint =
-    options.find((option) => option.value === draft.chartType)?.disabledReason ?? null;
   return (
     <Stack spacing={1}>
       <Text variant="heading" size="xs" as="h3">
         Visualização
       </Text>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-        <Select
-          size="small"
-          aria-label="Tipo de visualização"
-          options={options.map((option) => ({
-            value: option.value,
-            label: option.label,
-            disabled: option.disabledReason !== null,
-          }))}
-          value={draft.chartType}
-          onChange={(event) => update({ chartType: event.target.value as ChartKind })}
-          data-testid="builder-chart-type"
-        />
-        {draft.chartType === "bar" || draft.chartType === "area" ? (
-          <Button
-            variant={draft.stacked ? "solid" : "outline"}
-            size="sm"
-            onClick={() => update({ stacked: !draft.stacked })}
-            aria-pressed={draft.stacked}
-          >
-            Empilhado
-          </Button>
-        ) : null}
-      </Stack>
-      {blockedHint ? (
-        <Text variant="body" size="xs" color="secondary">
-          {blockedHint}
-        </Text>
+      <VizPicker
+        options={options}
+        value={draft.chartType}
+        onChange={(chartType) => update({ chartType })}
+      />
+      {draft.chartType === "bar" || draft.chartType === "area" ? (
+        <Button
+          variant={draft.stacked ? "solid" : "outline"}
+          size="sm"
+          onClick={() => update({ stacked: !draft.stacked })}
+          aria-pressed={draft.stacked}
+          data-testid="builder-chart-stacked"
+        >
+          Empilhado
+        </Button>
       ) : null}
     </Stack>
   );
