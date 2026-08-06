@@ -29,6 +29,7 @@ export function ShellToolbar<T extends Record<string, unknown>>({
   displayView,
   exportConfig,
   filterControls,
+  barRef,
 }: {
   c: DataViewsController<T>;
   rows: T[];
@@ -41,6 +42,7 @@ export function ShellToolbar<T extends Record<string, unknown>>({
   toolbarRightSlot?: React.ReactNode;
   /** Search + filters, rendered on the toolbar line (see `GridToolbar`). */
   filterControls?: React.ReactNode;
+  barRef?: React.Ref<HTMLDivElement>;
   showInline: boolean;
   /** Step 2 of the ladder: Exibir/Exportar as icons only. */
   compactControls?: boolean;
@@ -57,6 +59,7 @@ export function ShellToolbar<T extends Record<string, unknown>>({
       displayView={displayView}
       exportConfig={exportConfig}
       filterControls={filterControls}
+      barRef={barRef}
       compactControls={compactControls}
       testIdPrefix={testIdPrefix}
       selectedRows={c.selectedRows}

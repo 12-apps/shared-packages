@@ -287,6 +287,7 @@ function ShellStack<T extends Record<string, unknown>>({
           filterControls={
             inlineVisible ? <InlineFilterControls {...filterProps} split={split} /> : undefined
           }
+          barRef={split.barRef}
           testIdPrefix={testIdPrefix}
           rowActions={props.rowActions}
           bulkActions={props.bulkActions}

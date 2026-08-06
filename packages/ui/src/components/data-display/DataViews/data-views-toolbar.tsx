@@ -42,6 +42,8 @@ export interface GridToolbarProps<T extends Record<string, unknown>> {
    * beneath it. Absent ⇒ the toolbar keeps its plain two-cluster shape.
    */
   filterControls?: React.ReactNode;
+  /** Measures the toolbar ROW for the filter overflow — see `useFilterOverflow`. */
+  barRef?: React.Ref<HTMLDivElement>;
   /** The controller, so "Exibir" can drive sort, columns, order and format. */
   c: DataViewsController<T>;
   /** Per-sort-field value kind, so directions read in the column's own terms. */
@@ -116,6 +118,7 @@ export function GridToolbar<T extends Record<string, unknown>>(props: GridToolba
   const { testIdPrefix, selectedRows } = props;
   return (
     <Box
+      ref={props.barRef}
       sx={{
         borderTop: 1,
         borderBottom: 1,

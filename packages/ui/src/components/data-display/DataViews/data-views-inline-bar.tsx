@@ -201,10 +201,8 @@ function InlineControl<T extends Record<string, unknown>>({
  * ones that don't — with no row chrome of its own, because it is rendered ON
  * the toolbar line rather than under it (`ContentToolbar`'s `leadingControls`).
  *
- * `barRef` still measures THIS element, so the progressive collapse in
- * `useFilterOverflow` now measures the space the controls actually have beside
- * the counter and Exibir/Exportar, which is the width that decides how many
- * fields fit.
+ * The measurement driving the collapse lives on the toolbar ROW, not here —
+ * see the note on `split` below.
  */
 export function InlineFilterControls<T extends Record<string, unknown>>({
   testIdPrefix,
@@ -218,15 +216,18 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
   split,
 }: Omit<InlineFilterBarProps<T>, "fields" | "rangeFields" | "onClearAll">): React.JSX.Element {
   // MEASURED, not breakpointed — and measured ONCE, in the shell, because the
-  // toolbar around it needs the same answer to drop its labels. See `useFilterOverflow`.
-  const { inline, overflow, searchCollapsed, barRef } = split;
+  // toolbar around it needs the same answer to drop its labels. The measured
+  // element is the whole toolbar ROW (see `GridToolbar`), not this cluster:
+  // `RESERVED` prices the counter and Exibir/Exportar, so measuring only the
+  // controls would charge for that furniture a second time and collapse the
+  // ladder while the row still had hundreds of free pixels.
+  const { inline, overflow, searchCollapsed } = split;
   // Expanded by the operator: a collapsed search that was CLICKED stays open
   // until Escape, so typing is never interrupted by a re-measure.
   const [searchOpen, setSearchOpen] = useState(false);
   const showBox = !searchCollapsed || searchOpen;
   return (
     <Box
-      ref={barRef}
       data-testid={`${testIdPrefix}-inline-filters`}
       sx={{ display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 1, minWidth: 0 }}
     >
