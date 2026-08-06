@@ -56,6 +56,8 @@ interface DisplayPanelProps<T extends Record<string, unknown>> {
   /** Per-sort-field value kind, so directions read in the column's own terms. */
   sortKinds?: Record<string, string>;
   view?: DisplayPanelView;
+  /** Icon only — step 2 of the toolbar's measured degradation ladder. */
+  compact?: boolean;
 }
 
 /** The tab strip inside the panel. */
@@ -242,6 +244,7 @@ export function DataViewsDisplayPanel<T extends Record<string, unknown>>({
   testIdPrefix,
   sortKinds,
   view,
+  compact,
 }: DisplayPanelProps<T>): React.JSX.Element {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [tab, setTab] = useState<DisplayTabKey>("columns");
@@ -255,12 +258,15 @@ export function DataViewsDisplayPanel<T extends Record<string, unknown>>({
         onClick={(event) => setAnchor(event.currentTarget as HTMLElement)}
         dataTestId={`${testIdPrefix}-display-trigger`}
         aria-label="Exibir"
+        title={compact ? "Exibir" : undefined}
       >
         <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
           <TuneRoundedIcon fontSize="small" />
-          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-            Exibir
-          </Box>
+          {!compact && (
+            <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+              Exibir
+            </Box>
+          )}
           {view?.dirty && (
             <Box component="span" sx={{ height: 6, width: 6, borderRadius: "50%", bgcolor: "primary.main" }} />
           )}

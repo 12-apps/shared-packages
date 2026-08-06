@@ -159,8 +159,11 @@ describe("the Exportar control", () => {
 
     const search = screen.getByTestId("lista-search-all");
     fireEvent.change(search, { target: { value: "ana" } });
-    fireEvent.blur(search);
-    await waitFor(() => expect(screen.getByTestId("lista-export-trigger")).toBeEnabled());
+    // The box DEBOUNCES (350ms) rather than committing on blur, so the query
+    // is not live until the timer fires — waiting on the rendered counter is
+    // what tells us it has.
+    fireEvent.keyDown(search, { key: "Enter" });
+    await waitFor(() => expect(screen.getByTestId("lista-search-all")).toHaveValue("ana"));
     await exportAs("csv");
 
     await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1));

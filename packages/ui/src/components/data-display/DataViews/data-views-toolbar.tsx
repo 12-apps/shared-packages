@@ -55,6 +55,13 @@ export interface GridToolbarProps<T extends Record<string, unknown>> {
   displayView?: DisplayPanelView;
   /** Injected export. Absent ⇒ no Exportar control. */
   exportConfig?: DataViewExport;
+  /**
+   * Step 2 of the degradation ladder: Exibir/Exportar as icons only.
+   * MEASURED upstream (see `useFilterOverflow`) rather than switched at a
+   * breakpoint, so a two-filter page keeps its labels where a five-filter one
+   * has already given them up.
+   */
+  compactControls?: boolean;
 }
 
 /** The right-aligned toolbar controls: Sort By, the counter, zoom/layout/columns, filters. */
@@ -80,6 +87,7 @@ function ToolbarRightControls<T extends Record<string, unknown>>(props: GridTool
         testIdPrefix={testIdPrefix}
         sortKinds={props.sortKinds}
         view={props.displayView}
+        compact={props.compactControls}
       />
       {props.exportConfig && (
         <DataViewsExportMenu
@@ -89,6 +97,7 @@ function ToolbarRightControls<T extends Record<string, unknown>>(props: GridTool
           selectedIds={[...props.c.selectedIds]}
           columns={props.columnOptions.filter((col) => col.visible).map((col) => ({ id: col.id, label: col.label }))}
           testIdPrefix={testIdPrefix}
+          compact={props.compactControls}
         />
       )}
       {props.showFilterTrigger !== false && (

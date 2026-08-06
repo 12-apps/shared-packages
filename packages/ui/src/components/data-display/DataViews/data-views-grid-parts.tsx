@@ -19,9 +19,11 @@ import {
 import { FilterDialog, GridFilterPanel } from "./data-views-filter-panel";
 import { GridMain } from "./data-views-grid-bodies";
 import { InlineFilterBar } from "./data-views-inline-bar";
-import { GridToolbar } from "./data-views-toolbar";
+import { toOverflowFields, useFilterOverflow, type OverflowSplit } from "./data-views-overflow";
+import { ShellToolbar } from "./data-views-shell-toolbar";
 import type { DisplayPanelView } from "./data-views-display-panel";
 import type { DataViewExport } from "./data-views-export";
+import { DataViewsEmpty } from "./data-views-empty";
 import { DataViewsPagination } from "./data-views-pagination";
 import type { BoardConfig } from "./DataViewsBoard";
 import { DataViewsScopeTabs, type ScopeConfig } from "./data-views-scopes";
@@ -159,8 +161,13 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   filtersHidden: boolean;
   toggleFilters: () => void;
   filterProps: FilterSurfaceProps<T>;
+  split: OverflowSplit<T>;
 } {
   const { state } = c;
+  // ONE measurement for the whole shell: the filter row decides which controls
+  // it can keep, and the TOOLBAR needs the same answer to drop its labels.
+  // Measuring twice would let the two disagree at the crossover width.
+  const split = useFilterOverflow(toOverflowFields(fields, rangeFields), state.pills, c.ranges);
   // Read the theme explicitly (falls back to the default when there's no
   // ThemeProvider) so the query never dereferences a null theme. `noSsr`
   // evaluates on the client only (no hydration mismatch).
@@ -187,7 +194,7 @@ function useGridShellFilters<T extends Record<string, unknown>>({
     onClearField: (fieldId) => c.patch({ pills: { ...state.pills, [fieldId]: [] } }),
     onClearAll: () => c.patch({ search: "", pills: {}, ranges: {} }),
   };
-  return { showInline, useModal, inlineVisible, filtersHidden, toggleFilters: () => setFiltersHidden((v) => !v), filterProps };
+  return { showInline, useModal, inlineVisible, filtersHidden, toggleFilters: () => setFiltersHidden((v) => !v), filterProps, split };
 }
 
 interface GridShellProps<T extends Record<string, unknown>> {
@@ -243,103 +250,90 @@ interface GridShellProps<T extends Record<string, unknown>> {
   alwaysShowSearch?: boolean;
 }
 
-/**
- * The toolbar band, fed from the controller. Split out of `GridShell` for that
- * function's size budget — it is ~25 props of pure forwarding and nothing else.
- */
-function ShellToolbar<T extends Record<string, unknown>>({
-  c,
-  rows,
-  testIdPrefix,
-  rowActions,
-  bulkActions,
-  toolbarRightSlot,
-  showInline,
-  filtersHidden,
-  toggleFilters,
-  sortKinds,
-  displayView,
-  exportConfig,
+/** The scrollable content region: scope tabs, toolbar, filter bar, body, pager. */
+function ShellStack<T extends Record<string, unknown>>({
+  props,
+  filters,
 }: {
-  c: DataViewsController<T>;
-  rows: T[];
-  testIdPrefix: string;
-  sortKinds?: Record<string, string>;
-  displayView?: DisplayPanelView;
-  exportConfig?: DataViewExport;
-  rowActions?: RowAction<T>[];
-  bulkActions?: (selectedRows: T[], clearSelection: () => void) => React.ReactNode;
-  toolbarRightSlot?: React.ReactNode;
-  showInline: boolean;
-  filtersHidden: boolean;
-  toggleFilters: () => void;
+  props: GridShellProps<T>;
+  filters: ReturnType<typeof useGridShellFilters<T>>;
 }): React.JSX.Element {
-  const columnOptions: ColumnVisibilityOption[] = c.hideableColumns.map((col) => ({
-    id: col.id,
-    label: col.label,
-    visible: c.state.visibleColumns.includes(col.id),
-  }));
-  return (
-    <GridToolbar
-      c={c}
-      sortKinds={sortKinds}
-      displayView={displayView}
-      exportConfig={exportConfig}
+  const { c, testIdPrefix, dataTestId, scopes = [], emptyState, inlineFilters = false } = props;
+  const { showInline, useModal, inlineVisible, filtersHidden, toggleFilters, filterProps, split } = filters;
+  // The grid renders the FILTERED empty state itself — it is the only party
+  // that knows a filter is applied. See {@link DataViewsEmpty}.
+  const body = (
+    <DataViewsEmpty
+      filtered={c.activeFilterCount > 0 || c.state.search !== ""}
+      onClearFilters={() => c.patch({ search: "", pills: {}, ranges: {} })}
+      emptyState={emptyState}
       testIdPrefix={testIdPrefix}
-      selectedRows={c.selectedRows}
-      selectAll={c.selectAll}
-      clearSelection={c.clearSelection}
-      rowActions={rowActions}
-      bulkActions={bulkActions}
-      sortFields={c.resolvedSortFields}
-      activeSortField={c.activeSortField}
-      activeSortOrder={c.activeSortOrder}
-      onChangeSort={(field, order) => c.patch({ sortBy: [{ id: field, dir: order }] })}
-      matchedCount={c.matched.length}
-      totalCount={c.serverMode ? c.serverTotalCount : rows.length}
-      toolbarRightSlot={toolbarRightSlot}
-      columnOptions={columnOptions}
-      onToggleColumn={c.toggleColumn}
-      filterOpen={c.filterOpen}
-      setFilterOpen={c.setFilterOpen}
-      activeFilterCount={c.activeFilterCount}
-      showFilterTrigger={!showInline}
-      showFiltersToggle={showInline}
-      filtersHidden={filtersHidden}
-      onToggleFilters={toggleFilters}
     />
+  );
+  return (
+    <TableFilter open={c.filterOpen} onOpenChange={c.setFilterOpen} hasActiveFilters={c.activeFilterCount > 0}>
+      <Stack spacing={0} data-testid={dataTestId ? `${dataTestId}-container` : undefined}>
+        <GridHeaderRow title={props.title} headerActions={props.headerActions} testIdPrefix={testIdPrefix} />
+        {/* Renders nothing (and reserves nothing) for an empty scope list. */}
+        <DataViewsScopeTabs
+          scopes={scopes}
+          value={c.scope}
+          onChange={c.setScope}
+          counts={c.scopeCounts}
+          testIdPrefix={testIdPrefix}
+        />
+        <ShellToolbar
+          c={c}
+          rows={props.rows}
+          sortKinds={props.sortKinds}
+          displayView={props.displayView}
+          exportConfig={props.exportConfig}
+          testIdPrefix={testIdPrefix}
+          rowActions={props.rowActions}
+          bulkActions={props.bulkActions}
+          toolbarRightSlot={props.toolbarRightSlot}
+          compactControls={showInline && split.compactControls}
+          showInline={showInline}
+          filtersHidden={filtersHidden}
+          toggleFilters={toggleFilters}
+        />
+        {inlineVisible && <InlineFilterBar {...filterProps} split={split} />}
+        <TableFilter.Layout>
+          <TableFilter.Main>
+            <GridMain
+              c={c}
+              getRowId={props.getRowId}
+              renderCard={props.renderCard}
+              renderListRow={props.renderListRow}
+              board={props.board}
+              dataTestId={dataTestId}
+              testIdPrefix={testIdPrefix}
+              emptyState={body}
+            />
+            <DataViewsPagination c={c} testIdPrefix={testIdPrefix} />
+          </TableFilter.Main>
+          {inlineFilters ? null : <GridFilterPanel {...filterProps} />}
+        </TableFilter.Layout>
+        {useModal && <FilterDialog open={c.filterOpen} onClose={() => c.setFilterOpen(false)} {...filterProps} />}
+      </Stack>
+    </TableFilter>
   );
 }
 
-/** Wires the controller into the shared toolbar + filter panel + grid/cards body. */
-export function GridShell<T extends Record<string, unknown>>({
-  c,
-  rows,
-  fields,
-  rangeFields,
-  getRowId,
-  testIdPrefix,
-  dataTestId,
-  emptyState,
-  toolbarRightSlot,
-  rowActions,
-  bulkActions,
-  renderCard,
-  board,
-  renderListRow,
-  scopes = [],
-  sortKinds,
-  displayView,
-  exportConfig,
-  title,
-  headerActions,
-  defaultLayout,
-  inlineFilters = false,
-  alwaysShowSearch = false,
-}: GridShellProps<T>): React.JSX.Element {
-  const { showInline, useModal, inlineVisible, filtersHidden, toggleFilters, filterProps } =
-    useGridShellFilters({ c, inlineFilters, fields, rangeFields, testIdPrefix, alwaysShowSearch });
-  const bodyProps = { c, getRowId, renderCard, renderListRow, board, dataTestId, emptyState };
+export function GridShell<T extends Record<string, unknown>>(props: GridShellProps<T>): React.JSX.Element {
+  const {
+    c,
+    fields,
+    rangeFields,
+    testIdPrefix,
+    renderCard,
+    renderListRow,
+    board,
+    defaultLayout,
+    inlineFilters = false,
+    alwaysShowSearch = false,
+  } = props;
+  const filters = useGridShellFilters({ c, inlineFilters, fields, rangeFields, testIdPrefix, alwaysShowSearch });
   return (
     <DataViewsLayoutProvider
       canUseCards={Boolean(renderCard)}
@@ -351,42 +345,7 @@ export function GridShell<T extends Record<string, unknown>>({
       viewLayout={c.state.layout}
     >
     <LayoutStateSync c={c} />
-    <TableFilter open={c.filterOpen} onOpenChange={c.setFilterOpen} hasActiveFilters={c.activeFilterCount > 0}>
-      <Stack spacing={0} data-testid={dataTestId ? `${dataTestId}-container` : undefined}>
-        <GridHeaderRow title={title} headerActions={headerActions} testIdPrefix={testIdPrefix} />
-        {/* Renders nothing (and reserves nothing) for an empty scope list. */}
-        <DataViewsScopeTabs
-          scopes={scopes}
-          value={c.scope}
-          onChange={c.setScope}
-          counts={c.scopeCounts}
-          testIdPrefix={testIdPrefix}
-        />
-        <ShellToolbar
-          c={c}
-          rows={rows}
-          sortKinds={sortKinds}
-          displayView={displayView}
-          exportConfig={exportConfig}
-          testIdPrefix={testIdPrefix}
-          rowActions={rowActions}
-          bulkActions={bulkActions}
-          toolbarRightSlot={toolbarRightSlot}
-          showInline={showInline}
-          filtersHidden={filtersHidden}
-          toggleFilters={toggleFilters}
-        />
-        {inlineVisible && <InlineFilterBar {...filterProps} />}
-        <TableFilter.Layout>
-          <TableFilter.Main>
-            <GridMain {...bodyProps} />
-            <DataViewsPagination c={c} testIdPrefix={testIdPrefix} />
-          </TableFilter.Main>
-          {inlineFilters ? null : <GridFilterPanel {...filterProps} />}
-        </TableFilter.Layout>
-        {useModal && <FilterDialog open={c.filterOpen} onClose={() => c.setFilterOpen(false)} {...filterProps} />}
-      </Stack>
-    </TableFilter>
+    <ShellStack props={props} filters={filters} />
     </DataViewsLayoutProvider>
   );
 }

@@ -72,6 +72,8 @@ interface ExportMenuProps {
   selectedIds: Array<string | number>;
   columns: { id: string; label: string }[];
   testIdPrefix: string;
+  /** Render icon-only (measured upstream). */
+  compact?: boolean;
 }
 
 /** "Exportando 214 itens filtrados" / "3 itens selecionados" — never a guess. */
@@ -87,10 +89,13 @@ function ExportTrigger({
   busy,
   onOpen,
   testIdPrefix,
+  compact,
 }: {
   busy: boolean;
   onOpen: (anchor: HTMLElement) => void;
   testIdPrefix: string;
+  /** Icon only — step 2 of the toolbar's degradation ladder. */
+  compact?: boolean;
 }): React.JSX.Element {
   return (
     <Button
@@ -101,12 +106,16 @@ function ExportTrigger({
       onClick={(event) => onOpen(event.currentTarget as HTMLElement)}
       dataTestId={`${testIdPrefix}-export-trigger`}
       aria-label="Exportar"
+      // The label is gone, so the tooltip is the only thing naming the control.
+      title={compact ? "Exportar" : undefined}
     >
       <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
         {busy ? <CircularProgress size={14} /> : <DownloadRoundedIcon fontSize="small" />}
-        <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-          Exportar
-        </Box>
+        {!compact && (
+          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+            Exportar
+          </Box>
+        )}
         <KeyboardArrowDownRoundedIcon fontSize="small" />
       </Box>
     </Button>
@@ -204,6 +213,7 @@ export function DataViewsExportMenu({
   selectedIds,
   columns,
   testIdPrefix,
+  compact,
 }: ExportMenuProps): React.JSX.Element {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [busy, setBusy] = useState(false);
@@ -227,7 +237,7 @@ export function DataViewsExportMenu({
 
   return (
     <>
-      <ExportTrigger busy={busy} onOpen={setAnchor} testIdPrefix={testIdPrefix} />
+      <ExportTrigger busy={busy} onOpen={setAnchor} testIdPrefix={testIdPrefix} compact={compact} />
       <Popover
         open={Boolean(anchor)}
         anchorEl={anchor}

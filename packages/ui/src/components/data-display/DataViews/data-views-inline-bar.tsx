@@ -10,15 +10,15 @@
  * the panel is a column of stacked fields, this is a row of pills, and the only
  * thing they share is the prop shape they are both driven by.
  */
-import SearchIcon from '@mui/icons-material/Search';
-import { Box, Button, Chip, InputAdornment, TextField, Typography } from "@mui/material";
-import { useRef, useState } from "react";
+import { Box, Button, Chip, Typography } from "@mui/material";
+import { useState } from "react";
 
 import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 
 import type { GridFilterPanelProps } from "./data-views-filter-panel";
 import { MoreFilters } from "./data-views-more-filters";
-import { toOverflowFields, useFilterOverflow, type OverflowField } from "./data-views-overflow";
+import type { OverflowField, OverflowSplit } from "./data-views-overflow";
+import { CollapsedSearch, InlineKeyword } from "./data-views-search";
 import { isRangeSet, RangePill, rangeChipLabel } from "./data-views-range-pill";
 import type { RangeValue } from "./data-views-types";
 
@@ -26,46 +26,36 @@ import type { RangeValue } from "./data-views-types";
 
 /* ── Inline (second-line) filter bar ─────────────────────────────────────── */
 
-/** Compact keyword box for the inline bar: commits on Enter/blur (like the panel). */
-function InlineKeyword({
-  value,
-  onChange,
-  testId,
+/** The search, in whichever of its two forms the measurement asked for. */
+function SearchSlot({
+  search,
+  onSearchChange,
+  collapsed,
+  expanded,
+  onOpen,
+  onEscape,
+  testIdPrefix,
 }: {
-  value: string;
-  onChange: (value: string) => void;
-  testId?: string;
+  search: string;
+  onSearchChange: (value: string) => void;
+  collapsed: boolean;
+  expanded: boolean;
+  onOpen: () => void;
+  onEscape: () => void;
+  testIdPrefix: string;
 }): React.JSX.Element {
-  const [draft, setDraft] = useState(value);
-  const prev = useRef(value);
-  if (prev.current !== value) {
-    prev.current = value;
-    if (draft !== value) setDraft(value);
+  if (collapsed) {
+    return (
+      <CollapsedSearch active={search !== ""} onOpen={onOpen} testId={`${testIdPrefix}-search-all`} />
+    );
   }
-  const commit = (): void => {
-    if (draft !== value) onChange(draft);
-  };
   return (
-    <TextField
-      size="small"
-      value={draft}
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={commit}
-      onKeyDown={(event) => {
-        if (event.key !== "Enter") return;
-        event.preventDefault();
-        commit();
-      }}
-      placeholder="Buscar…"
-      inputProps={{ "aria-label": "Buscar em todas as colunas", "data-testid": testId }}
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <SearchIcon sx={{ fontSize: 16, color: "text.secondary" }} />
-          </InputAdornment>
-        ),
-      }}
-      sx={{ minWidth: 220 }}
+    <InlineKeyword
+      value={search}
+      onChange={onSearchChange}
+      testId={`${testIdPrefix}-search-all`}
+      autoFocus={expanded}
+      onEscape={onEscape}
     />
   );
 }
@@ -84,7 +74,10 @@ type InlineFilterBarProps<T extends Record<string, unknown>> = Pick<
   | "onChangeRange"
   | "onClearField"
   | "onClearAll"
->;
+> & {
+  /** The measured degradation state, computed once in `GridShell`. */
+  split: OverflowSplit<T>;
+};
 
 /** One removable active-filter chip: a search term, a pill value or a window. */
 interface ActiveChip {
@@ -215,6 +208,7 @@ export function InlineFilterBar<T extends Record<string, unknown>>({
   onChangeRange,
   onClearField,
   onClearAll,
+  split,
 }: InlineFilterBarProps<T>): React.JSX.Element {
   const chips = activeChips({
     search,
@@ -226,10 +220,13 @@ export function InlineFilterBar<T extends Record<string, unknown>>({
     onTogglePill,
     onChangeRange,
   });
-  // MEASURED, not breakpointed: which controls fit depends on how many this
-  // page declares and how long their labels are. See `useFilterOverflow`.
-  const declared = toOverflowFields(fields, rangeFields);
-  const { inline, overflow, barRef } = useFilterOverflow(declared, pills, ranges);
+  // MEASURED, not breakpointed — and measured ONCE, in the shell, because the
+  // toolbar above needs the same answer to drop its labels. See `useFilterOverflow`.
+  const { inline, overflow, searchCollapsed, barRef } = split;
+  // Expanded by the operator: a collapsed search that was CLICKED stays open
+  // until Escape, so typing is never interrupted by a re-measure.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const showBox = !searchCollapsed || searchOpen;
   const renderControl = (field: OverflowField<T>): React.JSX.Element | null => (
     <InlineControl
       key={field.id}
@@ -248,7 +245,15 @@ export function InlineFilterBar<T extends Record<string, unknown>>({
       sx={{ display: "flex", flexDirection: "column", gap: 1.5, py: 1.5 }}
     >
       <Box ref={barRef} sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5 }}>
-        <InlineKeyword value={search} onChange={onSearchChange} testId={`${testIdPrefix}-search-all`} />
+        <SearchSlot
+          search={search}
+          onSearchChange={onSearchChange}
+          collapsed={!showBox}
+          expanded={searchOpen}
+          onOpen={() => setSearchOpen(true)}
+          onEscape={() => setSearchOpen(false)}
+          testIdPrefix={testIdPrefix}
+        />
         {inline.map(renderControl)}
         <MoreFilters
           fields={overflow}

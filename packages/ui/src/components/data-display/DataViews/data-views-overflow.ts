@@ -38,9 +38,20 @@ export interface OverflowField<T extends Record<string, unknown>> {
 }
 
 /** What the caller renders inline, and what goes behind "Mais". */
-interface OverflowSplit<T extends Record<string, unknown>> {
+export interface OverflowSplit<T extends Record<string, unknown>> {
   inline: OverflowField<T>[];
   overflow: OverflowField<T>[];
+  /**
+   * Step 2 — Exibir/Exportar drop their text labels and become icons.
+   * Cheap: both keep their icon, their tooltip and their position.
+   */
+  compactControls: boolean;
+  /**
+   * Step 4 — the search collapses to a magnifier that expands on click.
+   * The most expensive step, so it is taken last: the search is the one
+   * control on the bar that cannot be guessed from an icon's position.
+   */
+  searchCollapsed: boolean;
   /** Attach to the toolbar row being measured. */
   barRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -91,8 +102,10 @@ const RESERVED = {
   search: 200,
   /** The "N de N" counter. */
   counter: 96,
-  /** The right-hand controls (Exibir, Exportar). */
+  /** Exibir + Exportar WITH their text labels. */
   right: 216,
+  /** The same two controls as icons only — step 2 of the ladder. */
+  rightCompact: 96,
   /** The "Mais" button, only charged when there IS an overflow. */
   overflowButton: 104,
   /** Gaps + the row's own padding. */
@@ -144,22 +157,27 @@ function fieldWidth<T extends Record<string, unknown>>(
   return estimateWidth(field.label, isRangeSet(ranges[field.id]) ? 100 : 0);
 }
 
-/** The measured split. Pure, so the hook below is only caching + measurement. */
-function computeSplit<T extends Record<string, unknown>>(
+/** What one split costs on the bar, so the ladder below can price the next step. */
+type Split<T extends Record<string, unknown>> = {
+  inline: OverflowField<T>[];
+  overflow: OverflowField<T>[];
+  /** Width the surviving inline controls occupy, incl. the "Mais" button. */
+  used: number;
+};
+
+/** Step 1 — shed filter controls into the overflow. Pure. */
+function splitFilters<T extends Record<string, unknown>>(
   all: OverflowField<T>[],
   pills: Record<string, string[]>,
   ranges: Record<string, RangeValue>,
   width: number,
-): { inline: OverflowField<T>[]; overflow: OverflowField<T>[] } {
+): Split<T> {
   const none: OverflowField<T>[] = [];
-  // Unmeasured (SSR, or jsdom without a ResizeObserver) ⇒ hide nothing.
-  if (width === 0) return { inline: all, overflow: none };
-
   const widthOf = (field: OverflowField<T>): number => fieldWidth(field, pills, ranges);
-  const active = all.filter((field) => isActiveField(field, pills, ranges));
-  const idle = all.filter((field) => !isActiveField(field, pills, ranges));
   const cost = (fields: OverflowField<T>[]): number =>
     fields.reduce((sum, field) => sum + widthOf(field) + GAP, 0);
+  const active = all.filter((field) => isActiveField(field, pills, ranges));
+  const idle = all.filter((field) => !isActiveField(field, pills, ranges));
 
   // AN APPLIED FILTER NEVER HIDES — it is not merely ranked first, it is
   // exempt. Applying a value LENGTHENS a control ("Método: Pix"), so ranking
@@ -168,7 +186,9 @@ function computeSplit<T extends Record<string, unknown>>(
   // announce itself at all.
   let available =
     width - RESERVED.search - RESERVED.counter - RESERVED.right - RESERVED.chrome - cost(active);
-  if (idle.length === 0 || cost(idle) <= available) return { inline: all, overflow: none };
+  if (idle.length === 0 || cost(idle) <= available) {
+    return { inline: all, overflow: none, used: cost(all) };
+  }
 
   // There IS an overflow, so its button now costs room too.
   available -= RESERVED.overflowButton;
@@ -179,13 +199,54 @@ function computeSplit<T extends Record<string, unknown>>(
     available -= next;
     keep.add(field.id);
   }
+  // Rendered in the DECLARED order, not the applied-first one: which controls
+  // are visible may change with the width, but the ones that stay must not
+  // reshuffle under the operator's cursor.
+  const inline = all.filter((field) => keep.has(field.id));
   return {
-    // Rendered in the DECLARED order, not the applied-first one: which controls
-    // are visible may change with the width, but the ones that stay must not
-    // reshuffle under the operator's cursor.
-    inline: all.filter((field) => keep.has(field.id)),
+    inline,
     overflow: all.filter((field) => !keep.has(field.id)),
+    used: cost(inline) + RESERVED.overflowButton,
   };
+}
+
+/**
+ * THE DEGRADATION LADDER — cheapest loss first, and each rung taken only if
+ * the one before it did not free enough:
+ *
+ *   1. filter controls move into the "Mais" overflow   (`splitFilters`)
+ *   2. Exibir / Exportar drop their text labels        (`compactControls`)
+ *   3. the search shrinks toward its minimum           (CSS: it is `flex: 1`)
+ *   4. the search itself collapses to an icon          (`searchCollapsed`)
+ *
+ * Step 3 needs no flag — the search is a flex child, so it gives up width on
+ * its own until it hits `RESERVED.search`. The flags mark the two steps that
+ * change what is RENDERED rather than how wide it is.
+ *
+ * Measured against what is CURRENTLY on the bar, never a breakpoint: a
+ * two-filter page and a five-filter page would otherwise collapse at the same
+ * width, and only one of them would be right.
+ */
+function computeSplit<T extends Record<string, unknown>>(
+  all: OverflowField<T>[],
+  pills: Record<string, string[]>,
+  ranges: Record<string, RangeValue>,
+  width: number,
+): Omit<OverflowSplit<T>, "barRef"> {
+  // Unmeasured (SSR, or jsdom without a ResizeObserver) ⇒ degrade nothing.
+  if (width === 0) {
+    return { inline: all, overflow: [], compactControls: false, searchCollapsed: false };
+  }
+  const { inline, overflow, used } = splitFilters(all, pills, ranges, width);
+  const rest = width - used - RESERVED.counter - RESERVED.chrome;
+
+  // Would the search still make its minimum with the labels on?
+  const compactControls = rest - RESERVED.right < RESERVED.search;
+  const rightCost = compactControls ? RESERVED.rightCompact : RESERVED.right;
+  // …and with them off?
+  const searchCollapsed = rest - rightCost < RESERVED.search;
+
+  return { inline, overflow, compactControls, searchCollapsed };
 }
 
 /**
