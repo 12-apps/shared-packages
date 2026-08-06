@@ -43,3 +43,59 @@ test('an untitled block is named after its spec', async ({ page }) => {
     'Soma de receita em pedidos por forma de pagamento',
   );
 });
+
+/**
+ * FUT-391: a closed-set field is filtered by PICKING. The failure this guards
+ * is invisible at runtime — a mistyped code compiles and matches no rows, so
+ * the block reads as "no data" rather than as the typo it is.
+ */
+test('a closed-set field offers a picker, not a text box', async ({ page }) => {
+  await page.goto('#/report-builder');
+
+  const picker = page.getByTestId('filter-value-select');
+  await expect(picker).toBeVisible();
+  // There is no text box to mistype a code into.
+  await expect(page.getByTestId('filter-value-input')).toHaveCount(0);
+
+  // Labels are shown; the SPEC carries the code.
+  await expect(picker).toContainText('Cartão');
+  await expect(page.getByTestId('filter-spec-value')).toHaveText('PIX');
+
+  await picker.selectOption('CARD');
+  await expect(page.getByTestId('filter-spec-value')).toHaveText('CARD');
+});
+
+test('an open-ended field falls back to a text box', async ({ page }) => {
+  await page.goto('#/report-builder');
+
+  await page.getByTestId('filter-field').selectOption('totalCents');
+  await expect(page.getByTestId('filter-value-input')).toBeVisible();
+  await expect(page.getByTestId('filter-value-select')).toHaveCount(0);
+});
+
+test('changing the field resets the value, so no stale code survives', async ({ page }) => {
+  await page.goto('#/report-builder');
+
+  await page.getByTestId('filter-value-select').selectOption('CARD');
+  await expect(page.getByTestId('filter-spec-value')).toHaveText('CARD');
+
+  // money → the previous enum code must not survive as `totalCents eq CARD`.
+  await page.getByTestId('filter-field').selectOption('totalCents');
+  await expect(page.getByTestId('filter-spec-value')).toHaveText('(vazio)');
+
+  // …and back: a legal first value, not the blank left behind.
+  await page.getByTestId('filter-field').selectOption('method');
+  await expect(page.getByTestId('filter-spec-value')).toHaveText('PIX');
+});
+
+test('operators come from the field, not one global list', async ({ page }) => {
+  await page.goto('#/report-builder');
+
+  // A closed set is never ordered: no gte/lte on an enum.
+  const operators = page.getByTestId('filter-operator');
+  await expect(operators).toContainText('eq');
+  await expect(operators).not.toContainText('gte');
+
+  await page.getByTestId('filter-field').selectOption('totalCents');
+  await expect(operators).toContainText('gte');
+});

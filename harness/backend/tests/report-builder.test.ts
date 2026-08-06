@@ -1,7 +1,11 @@
 import {
   autoTitle,
   createMemoryDataSource,
+  defaultValueFor,
   defineCatalog,
+  isClosedSet,
+  listCatalogFields,
+  operatorsFor,
   runDashboard,
   runReport,
   specSentence,
@@ -25,7 +29,16 @@ const catalog = defineCatalog({
       fields: {
         id: { label: 'Pedido', type: 'string', role: 'dimension' },
         createdAt: { label: 'Data', type: 'date', role: 'dimension' },
-        method: { label: 'Forma de pagamento', type: 'string', role: 'dimension' },
+        // A closed set, so a filter on it is picked rather than typed.
+        method: {
+          label: 'Forma de pagamento',
+          type: 'string',
+          role: 'dimension',
+          values: [
+            { value: 'PIX', label: 'PIX' },
+            { value: 'CARD', label: 'Cartão' },
+          ],
+        },
         totalCents: { label: 'Receita', type: 'money', role: 'measure' },
       },
     },
@@ -121,6 +134,56 @@ describe('the spec sentence', () => {
         catalog,
       ),
     ).toBe('Soma de receita em pedidos');
+  });
+});
+
+describe('the catalog tells a builder how a field may be filtered', () => {
+  it('ships labelled values and resolved operators to the client', () => {
+    const fields = listCatalogFields(catalog).entities[0]?.fields ?? [];
+    const method = fields.find((entry) => entry.field === 'method');
+    const total = fields.find((entry) => entry.field === 'totalCents');
+
+    // A closed set is PICKED: the builder shows "Cartão", the spec stores CARD.
+    expect(method?.values).toEqual([
+      { value: 'PIX', label: 'PIX' },
+      { value: 'CARD', label: 'Cartão' },
+    ]);
+    // Ordering enum codes is meaningless, so no gte/lte on a closed set.
+    expect(method?.ops).toEqual(['eq', 'neq', 'in']);
+
+    // Resolved for EVERY field, not only the ones that declare it — that is
+    // what stops a client keeping its own copy of the defaults and drifting.
+    expect(total?.values).toBeUndefined();
+    expect(total?.ops).toEqual(['eq', 'neq', 'gte', 'lte', 'between']);
+  });
+
+  it('picks a legal first value for a closed set, and blank for a typed field', () => {
+    const method = catalog.entities.orders.fields.method;
+    const total = catalog.entities.orders.fields.totalCents;
+
+    expect(isClosedSet(method)).toBe(true);
+    expect(defaultValueFor(method)).toBe('PIX');
+    expect(operatorsFor(method)).toEqual(['eq', 'neq', 'in']);
+
+    expect(isClosedSet(total)).toBe(false);
+    expect(defaultValueFor(total)).toBe('');
+  });
+
+  it('runs a spec built from a picked value', async () => {
+    // The end the picker exists for: the value came off the catalog, so it
+    // cannot be a typo, and the block is not silently empty.
+    const result = await runReport(
+      {
+        entity: 'orders',
+        measures: [{ field: 'totalCents' }],
+        filters: [
+          { field: 'method', operator: 'eq', value: defaultValueFor(catalog.entities.orders.fields.method) },
+        ],
+      },
+      options,
+    );
+
+    expect(result.rows[0]?.sum_totalCents).toBe(4000);
   });
 });
 

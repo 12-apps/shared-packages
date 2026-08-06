@@ -1,8 +1,13 @@
+import { useState } from 'react';
+
 import {
   autoTitle,
   compileReport,
+  defaultValueFor,
   defineCatalog,
   executeCompiledQuery,
+  isClosedSet,
+  operatorsFor,
   renderReport,
   specSentence,
   type ReportSpec,
@@ -31,7 +36,16 @@ const catalog = defineCatalog({
       fields: {
         id: { label: 'Pedido', type: 'string', role: 'dimension' },
         createdAt: { label: 'Data', type: 'date', role: 'dimension' },
-        method: { label: 'Forma de pagamento', type: 'string', role: 'dimension' },
+        // A closed set: filtering by it is PICKED, never typed.
+        method: {
+          label: 'Forma de pagamento',
+          type: 'string',
+          role: 'dimension',
+          values: [
+            { value: 'PIX', label: 'PIX' },
+            { value: 'CARD', label: 'Cartão' },
+          ],
+        },
         totalCents: { label: 'Receita', type: 'money', role: 'measure' },
       },
     },
@@ -131,6 +145,83 @@ function Block({ id, spec }: { id: string; spec: ReportSpec }): JSX.Element {
   );
 }
 
+const FILTERABLE = ['method', 'totalCents'] as const;
+
+/**
+ * A filter row driven entirely by the published catalog (FUT-391): which
+ * operators the field offers, and whether its value is picked or typed.
+ *
+ * This is the contract the real builder's filter row is built on. Proving it in
+ * a browser matters because the failure it prevents is invisible: typing `PIX`
+ * as `PIXX` produces a spec that is valid, compiles, and matches no rows — a
+ * block that reads as "no data" instead of as a typo.
+ */
+function FilterRow(): JSX.Element {
+  const [fieldName, setFieldName] = useState<string>('method');
+  const field = catalog.entities.orders.fields[fieldName]!;
+  const [value, setValue] = useState<string>(() => defaultValueFor(field));
+
+  const onFieldChange = (next: string): void => {
+    setFieldName(next);
+    // Reset with the field: keeping the old value gives `method eq 1500` —
+    // valid, compiles, matches nothing.
+    setValue(defaultValueFor(catalog.entities.orders.fields[next]!));
+  };
+
+  return (
+    <section data-testid="filter-row" style={{ marginBottom: 32 }}>
+      <h3 style={{ margin: '0 0 12px' }}>Filtro</h3>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select
+          aria-label="Campo"
+          data-testid="filter-field"
+          value={fieldName}
+          onChange={(event) => onFieldChange(event.target.value)}
+        >
+          {FILTERABLE.map((name) => (
+            <option key={name} value={name}>
+              {catalog.entities.orders.fields[name]!.label}
+            </option>
+          ))}
+        </select>
+
+        <select aria-label="Condição" data-testid="filter-operator">
+          {operatorsFor(field).map((operator) => (
+            <option key={operator} value={operator}>
+              {operator}
+            </option>
+          ))}
+        </select>
+
+        {isClosedSet(field) ? (
+          <select
+            aria-label="Valor"
+            data-testid="filter-value-select"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+          >
+            {field.values!.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            aria-label="Valor"
+            data-testid="filter-value-input"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+          />
+        )}
+      </div>
+      <p style={{ fontSize: 13, color: '#666' }}>
+        Spec: <code data-testid="filter-spec-value">{value || '(vazio)'}</code>
+      </p>
+    </section>
+  );
+}
+
 export function ReportBuilderPage(): JSX.Element {
   return (
     <div data-testid="report-builder">
@@ -138,6 +229,7 @@ export function ReportBuilderPage(): JSX.Element {
       {SPECS.map((entry) => (
         <Block key={entry.id} id={entry.id} spec={entry.spec} />
       ))}
+      <FilterRow />
     </div>
   );
 }

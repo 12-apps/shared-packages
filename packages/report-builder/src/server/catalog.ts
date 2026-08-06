@@ -1,5 +1,11 @@
 import { defineCatalog } from "../index";
 import { KITCHEN_CHEF_MIN_SAMPLE } from "./adapter-kitchen-source";
+import {
+  ORDER_METHOD_VALUES,
+  ORDER_STATUS_VALUES,
+  PAYMENT_METHOD_VALUES,
+  PAYMENT_STATUS_VALUES,
+} from "./catalog-values";
 
 /**
  * Future Pay's report field catalog (FUT-133/FUT-138): the semantic model
@@ -39,29 +45,18 @@ export const reportCatalog = defineCatalog({
           description: "Dia local (America/Sao_Paulo), '1-seg' a '7-dom'.",
         },
         // Closed sets, so a filter on either is PICKED rather than typed
-        // (FUT-391). The values mirror the DB CHECK constraints on `orders`, so
-        // adding a status to the schema means adding it here too. Labels are
-        // display-only — a stored spec always carries the code.
+        // (FUT-391) — see catalog-values.ts for how they track the migration.
         status: {
           label: "Status",
           type: "string",
           role: "dimension",
-          values: [
-            { value: "PAID", label: "Pago" },
-            { value: "AWAITING_PAYMENT", label: "Aguardando pagamento" },
-            { value: "FAILED", label: "Falhou" },
-            { value: "EXPIRED", label: "Expirado" },
-          ],
+          values: ORDER_STATUS_VALUES,
         },
         method: {
           label: "Forma de pagamento",
           type: "string",
           role: "dimension",
-          values: [
-            { value: "PIX", label: "PIX" },
-            { value: "CARD", label: "Cartão" },
-            { value: "WAITER", label: "Com o garçom" },
-          ],
+          values: ORDER_METHOD_VALUES,
         },
         revenueCents: { label: "Receita", type: "money", role: "measure" },
       },
@@ -86,27 +81,19 @@ export const reportCatalog = defineCatalog({
         id: { label: "Pagamento", type: "string", role: "dimension" },
         createdAt: { label: "Data", type: "date", role: "dimension" },
         // A payment's sets are NOT the order's: no WAITER method (a charge is
-        // only ever online) and a four-state lifecycle of its own. Sharing one
-        // list between the two would offer filters that match nothing.
+        // only ever online) and a lifecycle of its own. Sharing one list
+        // between the two would offer filters that match nothing.
         method: {
           label: "Forma de pagamento",
           type: "string",
           role: "dimension",
-          values: [
-            { value: "PIX", label: "PIX" },
-            { value: "CARD", label: "Cartão" },
-          ],
+          values: PAYMENT_METHOD_VALUES,
         },
         status: {
           label: "Status",
           type: "string",
           role: "dimension",
-          values: [
-            { value: "PAID", label: "Pago" },
-            { value: "AUTHORIZED", label: "Autorizado" },
-            { value: "PENDING", label: "Pendente" },
-            { value: "DECLINED", label: "Recusado" },
-          ],
+          values: PAYMENT_STATUS_VALUES,
         },
         amountCents: { label: "Valor", type: "money", role: "measure" },
       },
