@@ -1,70 +1,42 @@
-import type { CSSObject, Theme } from "@mui/material/styles";
+import { alpha, keyframes, type CSSObject, type Theme } from "@mui/material";
+
+import { fadeInScaleAnimation } from "../Badge/Badge.animations";
 
 /**
  * A plain style object, not MUI's `SxProps`.
  *
- * `SxProps` is a union that includes arrays and functions, so a value typed as
- * one cannot be spread — and these fragments exist precisely to be merged with
- * each other. `CSSObject` plus theme-token strings is what they actually are.
+ * `SxProps` is a union including arrays and functions, so a value typed as one
+ * cannot be spread — and these fragments exist precisely to be merged. Note also
+ * that `Card` merges by SPREADING (`sx={{ ...defaults, ...sx }}`), so handing it
+ * a function yields nothing at all: resolve the theme with `useTheme` first.
  */
 type CardSx = CSSObject | Record<string, unknown>;
 
-
-import { alpha, keyframes } from "@mui/material";
-
-import { bounceAnimation, fadeInScaleAnimation, shimmerAnimation } from "../Badge/Badge.animations";
-
-/**
- * The ring Button's `pulse` throws off — copied here rather than imported
- * because Button keeps it module-private. Same shape, so a pulsing card and a
- * pulsing button beat in time instead of looking like two different features.
- */
+/** The ring, as scale + opacity so it never leaves the compositor. */
 const pulseRing = keyframes`
-  0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
-  70% { box-shadow: 0 0 0 15px currentColor; opacity: 0; }
-  100% { box-shadow: 0 0 0 0 currentColor; opacity: 0; }
+  0% { transform: scale(1); opacity: 0.9; }
+  70% { transform: scale(1.04); opacity: 0; }
+  100% { transform: scale(1.04); opacity: 0; }
 `;
 
 /**
  * THE CONTRACT BOTH CARDS IMPLEMENT.
  *
- * `BaseCard` (a tile) and `BaseListCard` (a row) are the same object seen from
- * two angles, and until now they agreed on nothing but `selected` — one took
- * `divider`, neither took a colour, and only one could be dragged. A host that
- * lets the operator switch between Grade and Lista had to learn two vocabularies
- * for one decision.
- *
- * So the surface — variant, size, colour, selectability, draggability, the
- * decorative effects and the ARIA plumbing — is declared once here and spread
- * into both. Anything specific to being a tile or being a row stays on the
- * component that has it.
+ * `BaseCard` (a tile) and `BaseListCard` (a row) are one object seen from two
+ * angles, so the surface — variant, colour, selectability, draggability,
+ * emphasis and state — is declared once and spread into both.
  */
 
 /**
- * How far off the page the card sits.
- *
- * Button's vocabulary, spelled Button's way, rather than a set invented here —
- * the three of its six that mean anything on a card. A card and a button are
- * both surfaces the operator can press, and having one call it `outline` while
- * the other calls it `outlined` is a tax on everybody who writes both.
- *
- * Chip's `filled | outlined` was the wrong model to copy: a chip is a token in
- * a sentence and has only those two things to say. Button's scale is about how
- * much chrome the surface claims, which is exactly the question a card in a
- * stack has to answer.
+ * How much chrome the surface claims. Button's vocabulary, spelled Button's
+ * way: a card and a button are both surfaces the operator presses, and having
+ * one say `outline` while the other says `outlined` taxes everyone who writes
+ * both. Chip's `filled | outlined` was the wrong model — a chip is a token in a
+ * sentence and has only those two things to say.
  */
-export type CardSurfaceVariant =
-  /** A hairline border, no fill. The default: legible on any background. */
-  | "outline"
-  /** No border; a faint tint that only appears on hover. Quiet in a dense list. */
-  | "ghost"
-  /** No chrome at all. Structure only, for a host drawing its own container. */
-  | "text";
+export type CardSurfaceVariant = "outline" | "ghost" | "text" | "glass";
 
-/** Card size. Multiplies padding and type; `scale` is the fine-grained form. */
-export type CardSurfaceSize = "sm" | "md" | "lg";
-
-/** The theme colour a card's selection, fill and glow are drawn in. */
+/** The theme colour a card's selection and emphasis are drawn in. */
 export type CardSurfaceColor =
   | "primary"
   | "secondary"
@@ -73,20 +45,46 @@ export type CardSurfaceColor =
   | "error"
   | "info";
 
+/**
+ * Why this card is asking to be noticed.
+ *
+ * ONE union, not six booleans. `glow`/`pulse`/`animate`/`bounce`/`shimmer`
+ * combined into 32 states of which about three meant anything —
+ * `pulse + shimmer + bounce` is not a thing anyone wants, and every one of
+ * those combinations was a state somebody could reach by accident.
+ */
+export type CardEmphasis =
+  /** Nothing. The overwhelming default. */
+  | "none"
+  /** Look here now: an accent bar, and a ring that beats six times and settles. */
+  | "attention"
+  /** This just arrived: an accent bar and one fade-in. */
+  | "new";
+
+/** A row and a tile carry emphasis differently — see `emphasisSx`. */
+type CardShape = "row" | "tile";
+
+/**
+ * What this record IS, as opposed to how it looks.
+ *
+ * `dimmed` only greyed pixels, which left a cancelled row's buttons live and
+ * clickable. This carries the meaning, so the card can also stop offering
+ * actions on something that cannot be acted on.
+ */
+export type CardState = "default" | "cancelled" | "disabled";
+
 export interface CardSurfaceProps {
-  /** How far off the page the card sits. Defaults to `outline`. */
+  /** How much chrome the surface claims. Defaults to `outline`. */
   variant?: CardSurfaceVariant;
-  /** Size step. Defaults to `md`. Multiplied by `scale` when both are given. */
-  size?: CardSurfaceSize;
-  /** Theme colour token for selection, fill and glow. Defaults to `primary`. */
+  /** Theme colour for selection and emphasis. Defaults to `primary`. */
   color?: CardSurfaceColor;
   /**
    * Can this card be selected — and does it show it?
    *
-   * The capability, separate from the handler. A card that is `selectable` gets
-   * the checkbox AND the selected treatment (ring, tint) when `selected`;
-   * `selectable={false}` has neither, however `selected` is set. Defaults to
-   * whether an `onToggleSelect` was supplied, so existing callers are unchanged.
+   * The capability, separate from the handler. `selectable` gets the checkbox
+   * AND the selected treatment; `selectable={false}` has neither, however
+   * `selected` is set, so a stale flag arriving with the data cannot make a
+   * read-only row render as picked. Defaults to whether `onToggleSelect` exists.
    */
   selectable?: boolean;
   /** Whether this card is currently in the selection. */
@@ -95,153 +93,205 @@ export interface CardSurfaceProps {
    * Opt OUT of dragging even inside a drag container.
    *
    * Draggability is the container's decision (see `data-views-drag`); this is
-   * the card's veto — a pinned row, a summary line, a record the operator may
-   * not reorder. Defaults to true, so a container's decision stands unless a
-   * card objects.
+   * the card's veto — a pinned row, a summary line, a record that may not move.
    */
   draggable?: boolean;
-  /** Card click (e.g. open/edit). Selection and menu clicks never reach it. */
+  /**
+   * Where this card leads.
+   *
+   * PREFER THIS TO `onClick`. A clickable `<div>` cannot be cmd-clicked,
+   * middle-clicked or "copy link address"'d, and wrapping interactive children
+   * in a click handler is the a11y violation it looks like. With `href` the
+   * title is a real `<a>` stretched over the card by a pseudo-element: one
+   * whole-row target, correct tab order, every browser affordance intact, and
+   * the buttons inside stay ordinary buttons.
+   */
+  href?: string;
+  /** Anchor target, when `href` is set. */
+  target?: string;
+  /** Card click, for a card that does not navigate. See `href` first. */
   onClick?: () => void;
-  /** Visually de-emphasise (e.g. a disabled/cancelled entity). */
-  dimmed?: boolean;
+  /** What this record is. `cancelled`/`disabled` also suppress the actions. */
+  state?: CardState;
+  /** Why this card is asking to be noticed. Defaults to `none`. */
+  emphasis?: CardEmphasis;
   className?: string;
-  dataTestId?: string;
-  /** A soft halo in `color` — draws the eye to one card in a full grid. */
-  glow?: boolean;
-  /** Breathe, for a card that wants attention now (a live/urgent record). */
-  pulse?: boolean;
-  /** Fade+scale in on mount. Defaults to false: a whole page of cards animating in is noise. */
-  animate?: boolean;
-  /** A sweep across the surface — for a card whose data is still arriving. */
-  shimmer?: boolean;
-  /** A single hop on mount, for a card that just appeared in a live list. */
-  bounce?: boolean;
-  /** Translucent + blurred, for a card over an image or a map. */
-  glass?: boolean;
+  /**
+   * One id; the parts derive from it (`${testId}-checkbox`, `-drag`, `-menu`,
+   * `-value`). A prop per slot would have been `checkboxTestId`,
+   * `menuTestId`, `valueTestId`… one for every part anybody ever tested.
+   */
+  testId?: string;
   "aria-label"?: string;
-  "aria-live"?: "off" | "polite" | "assertive";
-  "aria-atomic"?: boolean;
 }
 
-/** Padding/type multiplier per size step. */
-const SIZE_SCALE: Record<CardSurfaceSize, number> = { sm: 0.85, md: 1, lg: 1.25 };
-
-/** The resolved multiplier: the size step, times any explicit `scale`. */
-export function surfaceScale(size: CardSurfaceSize | undefined, scale: number | undefined): number {
-  return SIZE_SCALE[size ?? "md"] * (scale ?? 1);
+/** Every slot's test id, derived from the card's one. */
+export function slotTestIds(testId: string | undefined): (slot: string) => string | undefined {
+  return (slot) => (testId ? `${testId}-${slot}` : undefined);
 }
 
 /** Is this card selectable? Explicit wins; otherwise a handler implies it. */
-export function isSelectable(props: Pick<CardSurfaceProps, "selectable"> & { onToggleSelect?: () => void }): boolean {
+export function isSelectable(
+  props: Pick<CardSurfaceProps, "selectable"> & { onToggleSelect?: () => void },
+): boolean {
   return props.selectable ?? props.onToggleSelect != null;
 }
 
-/** Variant styling. Both non-default variants drop the border. */
+/** Can this record be acted on at all? */
+export function isActionable(state: CardState | undefined): boolean {
+  return state !== "disabled" && state !== "cancelled";
+}
+
+/**
+ * Variant styling. Everything but `outline` drops the border.
+ *
+ * `ghost` keeps a faint SURFACE where `text` has none — without that the two
+ * were pixel-identical at rest and the union carried a distinction it did not
+ * draw. Ghost is "a surface, quietly"; text is "no surface at all", which is
+ * what a host wants when it is drawing the container itself.
+ */
 function variantSx(variant: CardSurfaceVariant): CardSx {
   if (variant === "ghost") {
     return {
       border: 0,
-      backgroundColor: "transparent",
-      "&:hover": { backgroundColor: "action.hover" },
+      backgroundColor: "action.hover",
+      "&:hover": { backgroundColor: "action.selected" },
     };
   }
-  if (variant === "text") return { border: 0, backgroundColor: "transparent", boxShadow: "none" };
+  if (variant === "text") {
+    return { border: 0, backgroundColor: "transparent", boxShadow: "none" };
+  }
+  if (variant === "glass") {
+    return {
+      backgroundColor: "rgba(255,255,255,0.55)",
+      backdropFilter: "blur(8px)",
+      borderColor: "rgba(255,255,255,0.35)",
+    };
+  }
   return {};
 }
 
 /**
- * The decorative effects, as one sx fragment.
+ * MOTION IS OPT-IN, ALWAYS.
  *
- * `--glow-color` is the channel triple the Badge keyframes read; without it the
- * halo renders black, which reads as a shadow rather than a highlight.
+ * Everything animated here is wrapped in this. Fifty rows breathing in unison
+ * is a vestibular trigger, and honouring the OS setting is not a polish item —
+ * it is the difference between a list somebody can look at and one they cannot.
  */
-function effectsSx(props: CardSurfaceProps, theme: Theme): CardSx {
-  const { glow, pulse, shimmer, bounce, animate, glass, color = "primary" } = props;
-  const main = theme.palette[color].main;
-  const animations = [
-    bounce ? `${bounceAnimation} 1s ease` : "",
-    animate ? `${fadeInScaleAnimation} 240ms ease-out` : "",
-  ].filter(Boolean);
+const MOTION_OK = "@media (prefers-reduced-motion: no-preference)";
+
+/**
+ * THE ROW'S ATTENTION SIGNAL IS A BAR, NOT A HALO.
+ *
+ * A glow is a weak signal in a list: full-width rows stacked tight means the
+ * halo bleeds 15px into the neighbours above and below and reads as a rendering
+ * artifact, and stacked with a `selected` ring and the browser's focus ring it
+ * becomes three concentric halos on one row. Five rows needing attention at
+ * once turns the page into a smear.
+ *
+ * A 3px accent on the leading edge is stronger, costs no motion at all, works
+ * under reduced-motion, cannot bleed into a neighbour, and stacks cleanly
+ * however many rows raise their hand. It is where operational tables land.
+ */
+function accentBar(main: string): CardSx {
   return {
-    ...(animations.length > 0 ? { animation: animations.join(", ") } : {}),
-    // Button's glow, to the letter: a double halo plus a lift on hover.
-    ...(glow
-      ? {
-          boxShadow: `0 0 20px 5px ${alpha(main, 0.6)}, 0 0 40px 10px ${alpha(main, 0.3)}`,
-          filter: "brightness(1.05)",
-          "&:hover": {
-            boxShadow: `0 0 25px 8px ${alpha(main, 0.7)}, 0 0 50px 15px ${alpha(main, 0.4)}`,
-            filter: "brightness(1.1)",
-          },
-        }
-      : {}),
-    // …and Button's pulse: a ring thrown by a pseudo-element BEHIND the card,
-    // so it never moves the card itself. A grid of cards that grew and shrank
-    // would reflow its neighbours on every beat.
-    ...(pulse
-      ? {
-          position: "relative",
-          overflow: "visible",
-          "&::after": {
-            content: '""',
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            width: "100%",
-            height: "100%",
-            borderRadius: "inherit",
-            transform: "translate(-50%, -50%)",
-            backgroundColor: main,
-            opacity: 0.3,
-            animation: `${pulseRing} 2s infinite`,
-            pointerEvents: "none",
-            zIndex: -1,
-          },
-        }
-      : {}),
-    ...(glass
-      ? {
-          backgroundColor: "rgba(255,255,255,0.55)",
-          backdropFilter: "blur(8px)",
-          borderColor: "rgba(255,255,255,0.35)",
-        }
-      : {}),
-    ...(shimmer
-      ? {
-          backgroundImage:
-            "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.45) 50%, transparent 100%)",
-          backgroundSize: "1000px 100%",
-          backgroundRepeat: "no-repeat",
-          animation: `${shimmerAnimation} 2s linear infinite`,
-        }
-      : {}),
+    "&::before": {
+      content: '""',
+      position: "absolute",
+      insetInlineStart: 0,
+      insetBlock: 0,
+      width: 3,
+      borderStartStartRadius: "inherit",
+      borderEndStartRadius: "inherit",
+      backgroundColor: main,
+      pointerEvents: "none",
+    },
   };
 }
 
 /**
- * The shared half of a card's styling: variant, colour, selection and effects.
- * Each component adds its own geometry (a tile's aspect ratio, a row's padding).
+ * The tile's halo. Button's glow, kept for `BaseCard` — a grid of tiles has gaps
+ * around each card, so the spread has somewhere to go that a row does not.
+ */
+function glowSx(main: string): CardSx {
+  return {
+    boxShadow: `0 0 20px 5px ${alpha(main, 0.6)}, 0 0 40px 10px ${alpha(main, 0.3)}`,
+    filter: "brightness(1.05)",
+  };
+}
+
+/**
+ * A breath that STOPS.
+ *
+ * Six iterations, not `infinite`. A restaurant admin has this open for a whole
+ * shift, and something pulsing in the periphery forever is fatigue rather than
+ * urgency — worse, once two or three rows are doing it the signal means
+ * nothing. It settles, and the accent bar carries the state from then on.
+ *
+ * Animating `transform`/`opacity` on a pseudo-element, never `box-shadow`: a
+ * box-shadow keyframe repaints every frame, and fifty of them drop frames on
+ * exactly the tablet a restaurant floor uses. This one is compositor-only.
+ */
+function pulseSx(main: string): CardSx {
+  return {
+    [MOTION_OK]: {
+      "&::after": {
+        content: '""',
+        position: "absolute",
+        inset: 0,
+        borderRadius: "inherit",
+        border: `2px solid ${main}`,
+        animation: `${pulseRing} 1.6s ease-out 6`,
+        pointerEvents: "none",
+      },
+    },
+  };
+}
+
+/** The emphasis treatments, in the terms the shape can actually carry. */
+function emphasisSx(emphasis: CardEmphasis, main: string, shape: CardShape): CardSx {
+  if (emphasis === "attention") {
+    // The bar on both; the halo only where there is room for it to spread.
+    return {
+      ...accentBar(main),
+      ...(shape === "tile" ? glowSx(main) : {}),
+      ...pulseSx(main),
+    };
+  }
+  if (emphasis === "new") {
+    return {
+      ...accentBar(main),
+      [MOTION_OK]: { animation: `${fadeInScaleAnimation} 240ms ease-out` },
+    };
+  }
+  return {};
+}
+
+/**
+ * The shared half of a card's styling. Each component adds its own geometry —
+ * a tile's aspect ratio, a row's rails.
  */
 export function cardSurfaceStyles(
-  props: CardSurfaceProps & { selectable: boolean },
+  props: CardSurfaceProps & { selectable: boolean; shape: CardShape },
   theme: Theme,
 ): CardSx {
-  const { variant = "outline", color = "primary", selected = false, selectable, dimmed } = props;
-  // Selection styling is gated on the CAPABILITY, not just the flag: a card that
-  // cannot be selected must not render as selected because a stale `selected`
-  // came down with its data.
+  const { variant = "outline", color = "primary", selected = false, selectable } = props;
+  const { state = "default", emphasis = "none" } = props;
+  const main = theme.palette[color].main;
+  // Selection styling is gated on the CAPABILITY: a card that cannot be
+  // selected must not render as selected because a stale flag came with its data.
   const showSelected = selectable && selected;
   return {
     transition: "border-color 120ms, box-shadow 120ms, background-color 120ms",
-    opacity: dimmed ? 0.6 : 1,
+    opacity: state === "default" ? 1 : 0.6,
     ...variantSx(variant),
     ...(showSelected
       ? {
           borderColor: `${color}.main`,
-          boxShadow: `inset 0 0 0 1px ${theme.palette[color].main}`,
+          boxShadow: `inset 0 0 0 1px ${main}`,
           backgroundColor: "action.selected",
         }
       : {}),
-    ...effectsSx(props, theme),
+    ...emphasisSx(emphasis, main, props.shape),
   };
 }

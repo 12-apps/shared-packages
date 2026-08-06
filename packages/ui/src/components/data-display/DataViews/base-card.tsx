@@ -15,8 +15,9 @@ import { Text } from "../../typography/Text";
 import { DragHandle, useDragItem } from "./data-views-drag";
 import {
   cardSurfaceStyles,
+  isActionable,
   isSelectable,
-  surfaceScale,
+  slotTestIds,
   type CardSurfaceProps,
 } from "./card-surface";
 import { CARD_ASPECT_RATIOS, type CardAspectRatio } from "./data-views-types";
@@ -251,14 +252,29 @@ function CardContents({
  * per-slot helpers above; this shell just assembles them within a fixed-ratio
  * tile. Reads no context, so it renders standalone as well as inside the grid.
  */
+/**
+ * Everything the tile derives from its props before it can render — pulled out
+ * so `BaseCard` itself stays inside the complexity budget.
+ */
+function useCardShell(props: BaseCardProps) {
+  const actionable = isActionable(props.state);
+  return {
+    selectable: isSelectable(props),
+    actionable,
+    theme: useTheme(),
+    slot: slotTestIds(props.testId),
+    scale: props.scale ?? 1,
+    // The card's own veto over the container's decision — see `CardSurfaceProps`.
+    drag: useDragItem(props.draggable === false || !actionable ? undefined : props.dragId),
+  };
+}
+
 export function BaseCard(props: BaseCardProps): React.JSX.Element {
   const { aspectRatio = "4:3", selected = false } = props;
-  const { menu, onToggleSelect, onClick, dataTestId, checkboxTestId } = props;
-  const selectable = isSelectable(props);
-  const theme = useTheme();
-  const scale = surfaceScale(props.size, props.scale);
-  // The card's own veto over the container's decision — see `CardSurfaceProps`.
-  const drag = useDragItem(props.draggable === false ? undefined : props.dragId);
+  const { menu, onToggleSelect, onClick } = props;
+  const { selectable, actionable, theme, slot, scale, drag } = useCardShell(props);
+  const dataTestId = props.testId;
+  const checkboxTestId = slot("checkbox");
   const pad = 1.5 * scale;
 
   return (
@@ -269,8 +285,7 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
       dataTestId={dataTestId}
       className={props.className}
       aria-label={props["aria-label"]}
-      aria-live={props["aria-live"]}
-      aria-atomic={props["aria-atomic"]}
+      aria-disabled={actionable ? undefined : true}
       {...drag.itemProps}
       // A PLAIN OBJECT, not a function. `Card` merges by spreading
       // (`sx={{ ...defaults, ...sx }}`), and spreading a function yields
@@ -280,13 +295,17 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
         // The shared half — variant, colour, selection, effects — identical to
         // the one BaseListCard uses, so a Grade and a Lista of the same records
         // are dressed by one set of rules.
-        ...cardSurfaceStyles({
-          ...props,
-          selectable,
-          // A card mid-drag is a ghost of itself; the drop target is what the
-          // eye should be on.
-          dimmed: props.dimmed === true || drag.dragging,
-        }, theme),
+        ...cardSurfaceStyles(
+          {
+            ...props,
+            selectable,
+            shape: "tile",
+            // A card mid-drag is a ghost of itself; the drop target is what the
+            // eye should be on.
+            state: drag.dragging ? "disabled" : props.state,
+          },
+          theme,
+        ),
         // …and the tile's own geometry on top.
         ...cardSx({
           aspectRatio,
@@ -304,7 +323,7 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
           <DragHandle
             handleProps={drag.handleProps}
             gated={drag.handleProps !== undefined}
-            testId={dataTestId ? `${dataTestId}-drag` : undefined}
+            testId={slot("drag")}
           />
         </Box>
       )}

@@ -9,6 +9,7 @@ import { Box } from "../../../mui/Box";
 
 import { BaseListCard } from "./base-list-card";
 import { DragContainerProvider } from "./data-views-drag";
+import { ListCardGroup } from "./list-card-rails";
 
 /**
  * BaseListCard is BaseCard's horizontal sibling: the full-width row the "Lista"
@@ -26,8 +27,9 @@ const meta: Meta<typeof BaseListCard> = {
   parameters: { layout: "padded" },
   tags: ["autodocs"],
   argTypes: {
-    variant: { control: "inline-radio", options: ["outline", "ghost", "text"] },
-    size: { control: "inline-radio", options: ["sm", "md", "lg"] },
+    variant: { control: "inline-radio", options: ["outline", "ghost", "text", "glass"] },
+    emphasis: { control: "inline-radio", options: ["none", "attention", "new"] },
+    state: { control: "inline-radio", options: ["default", "cancelled", "disabled"] },
     color: {
       control: "select",
       options: ["primary", "secondary", "success", "warning", "error", "info"],
@@ -35,16 +37,9 @@ const meta: Meta<typeof BaseListCard> = {
     density: { control: "inline-radio", options: ["compact", "cozy", "comfortable"] },
     selectable: { control: "boolean" },
     draggable: { control: "boolean" },
-    glow: { control: "boolean" },
-    pulse: { control: "boolean" },
-    animate: { control: "boolean" },
-    shimmer: { control: "boolean" },
-    bounce: { control: "boolean" },
-    glass: { control: "boolean" },
     scale: { control: { type: "range", min: 0.9, max: 1.6, step: 0.05 } },
     divider: { control: "boolean" },
     selected: { control: "boolean" },
-    dimmed: { control: "boolean" },
   },
 };
 export default meta;
@@ -83,7 +78,7 @@ export const Pedido: Story = {
     menu: kebab,
     onToggleSelect: () => {},
     onClick: () => {},
-    dataTestId: "pedido-row",
+    testId: "pedido-row",
   },
 };
 
@@ -114,7 +109,7 @@ export const Selection: Story = {
             value="R$ 13,90"
             selected={picked.has(id)}
             onToggleSelect={() => toggle(id)}
-            checkboxTestId={`pick-${id}`}
+            testId={`pick-${id}`}
           />
         ))}
         <Box sx={{ fontSize: "0.8125rem", color: "text.secondary" }}>
@@ -271,7 +266,7 @@ export const RespondsToItsOwnWidth: Story = {
 };
 
 /** Outlined (default) vs `divider`, for a host drawing its own gapless list. */
-export const Variants: Story = {
+export const Divider: Story = {
   render: () => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 4, maxWidth: 900 }}>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
@@ -310,7 +305,7 @@ export const Density: Story = {
               <BaseListCard
                 key={id}
                 density={density}
-                dataTestId={`row-${density}`}
+                testId={`row-${density}`}
                 leading={marker}
                 title={id}
                 subtitle="Luiz Gustavo"
@@ -333,10 +328,10 @@ export const Density: Story = {
  * and has only filled/outlined to say; a card is a surface in a stack, and the
  * question is how much chrome it claims.
  */
-export const Variant: Story = {
+export const Variants: Story = {
   render: () => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 900 }}>
-      {(["outline", "ghost", "text"] as const).map((variant) => (
+      {(["outline", "ghost", "text", "glass"] as const).map((variant) => (
         <Box key={variant}>
           <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{variant}</Box>
           <BaseListCard
@@ -382,17 +377,15 @@ export const Selectable: Story = {
  * same feature. `pulse` throws its ring from a pseudo-element BEHIND the card:
  * a card that grew and shrank would reflow every neighbour on each beat.
  */
-export const Effects: Story = {
+export const EmphasisAndState: Story = {
   render: () => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 900, p: 2 }}>
       {(
         [
-          ["glow", { glow: true }],
-          ["pulse", { pulse: true }],
-          ["shimmer", { shimmer: true }],
-          ["bounce", { bounce: true }],
-          ["animate", { animate: true }],
-          ["glass", { glass: true }],
+          ["emphasis: attention", { emphasis: "attention" }],
+          ["emphasis: new", { emphasis: "new" }],
+          ["variant: glass", { variant: "glass" }],
+          ["state: cancelled", { state: "cancelled" }],
         ] as const
       ).map(([name, effect]) => (
         <Box key={name}>
@@ -411,12 +404,85 @@ export const Effects: Story = {
   ),
 };
 
+/**
+ * THE LIST OWNS THE COLUMNS.
+ *
+ * Inside a {@link ListCardGroup} every row is `grid-template-columns: subgrid`
+ * over one shared set of rails, so the value sits on a fixed edge and the status
+ * chip has a slot of its own. Note the amounts: they line up down the page even
+ * though `Em aberto`, `Pago` and `Cancelado` are three different widths — which
+ * is exactly what the old per-row flex could not do, since a wider chip shoved
+ * the money left on that row alone.
+ *
+ * `tabular-nums` on the value and the meta figures is the other half: digits of
+ * equal width are what make a column of money scannable rather than merely
+ * aligned at one edge.
+ */
+export const SharedRails: Story = {
+  render: () => (
+    <ListCardGroup density="cozy" dataTestId="rails-group">
+      {[
+        ["B75A6858", "R$ 13,90", "Em aberto", "info"],
+        ["1D970689", "R$ 2,98", "Pago", "success"],
+        ["0112CF89", "R$ 1.250,00", "Cancelado", "error"],
+        ["89E40634", "R$ 8,90", "Pago", "success"],
+      ].map(([id, amount, label, tone]) => (
+        <BaseListCard
+          key={id}
+          testId={`rail-${id}`}
+          leading={marker}
+          title={id}
+          subtitle="Luiz Gustavo"
+          meta={[
+            { label: "Data", value: "05/08/2026, 13:45" },
+            { label: "Método", value: "PIX" },
+          ]}
+          value={amount}
+          status={
+            <Chip
+              label={label}
+              size="small"
+              variant="outlined"
+              color={tone as "info" | "success" | "error"}
+            />
+          }
+          menu={kebab}
+          onToggleSelect={() => {}}
+        />
+      ))}
+    </ListCardGroup>
+  ),
+};
+
+/**
+ * `href` rather than `onClick`.
+ *
+ * The title is a real `<a>` stretched over the row by a pseudo-element, so the
+ * whole row is the target while remaining cmd-clickable, middle-clickable and
+ * "copy link address"-able — and the checkbox and menu stay ordinary buttons
+ * rather than interactive elements nested inside a clickable div.
+ */
+export const LinkedRow: Story = {
+  args: {
+    href: "https://example.com/pedidos/B75A6858",
+    target: "_blank",
+    testId: "linked-row",
+    leading: marker,
+    title: "B75A6858",
+    subtitle: "cmd-click / middle-click me",
+    value: "R$ 13,90",
+    status: <Chip label="Em aberto" size="small" variant="outlined" color="info" />,
+    menu: kebab,
+    onToggleSelect: () => {},
+  },
+};
+
 /** Selected, dimmed, and a row with no controls at all. */
 export const States: Story = {
   render: () => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 900 }}>
       <BaseListCard title="Selecionada" value="R$ 13,90" selected onToggleSelect={() => {}} />
-      <BaseListCard title="Cancelada" value="R$ 8,90" dimmed onToggleSelect={() => {}} />
+      <BaseListCard title="Cancelada" value="R$ 8,90" state="cancelled" onToggleSelect={() => {}} />
       <BaseListCard title="Somente leitura" subtitle="sem checkbox, sem menu" value="R$ 5,90" />
     </Box>
   ),
