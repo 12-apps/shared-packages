@@ -5,9 +5,13 @@ import { useEffect, useRef } from "react";
 import { type SortFieldDefinition } from "../../layout/ContentToolbar";
 
 import { GridShell } from "./data-views-grid-parts";
+import type { BoardConfig } from "./DataViewsBoard";
+import type { DataViewExport } from "./data-views-export";
+import type { ScopeConfig } from "./data-views-scopes";
 import type { DataViewCardSelection } from "./data-views-types";
 import {
   type DataViewColumn,
+  type DataViewsLayout,
   type DataViewServer,
   type DataViewState,
   type DataViewSyncState,
@@ -57,6 +61,18 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
    */
   sortFields?: SortFieldDefinition[];
   /**
+   * Per-sort-field VALUE KIND (`"currency" | "number" | "date" | "text"`), so the
+   * Exibir panel phrases the direction in that column's own terms. "Crescente"
+   * on a currency column is a puzzle; "Menor → maior" is not. Defaults to text.
+   */
+  sortKinds?: Record<string, string>;
+  /**
+   * Opt-in "Exportar" control. The grid hands the host the current query,
+   * UNPAGINATED, and the host re-queries — the grid never fetches, and an
+   * export therefore follows the filters rather than the loaded page.
+   */
+  exportConfig?: DataViewExport;
+  /**
    * A single, reusable list of row actions that drives BOTH the per-row "⋮"
    * kebab AND the bulk-actions menu (tabwoah model). When provided, the grid
    * appends a kebab actions column automatically (unless the page already
@@ -86,8 +102,30 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
    * (reusing the same search/filter/sort). Omit ⇒ table only (unchanged).
    */
   renderCard?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
-  /** Which layout to show first when cards are available (default "table"). */
-  defaultLayout?: "cards" | "table";
+  /**
+   * Opt-in "Quadro" (board) layout: the loaded page laid out as columns of one
+   * grouping field. Reuses `renderCard`, so supplying a board WITHOUT one simply
+   * offers no board. Best when the groups are states in a state machine — derive
+   * these groups and `scopes` from ONE definition so the two cannot drift.
+   */
+  board?: BoardConfig<T>;
+  /**
+   * Opt-in "Lista" layout (FUT-733): one FULL-WIDTH row per record, rendered by
+   * the entity — a marker, a title, a subtitle and a value on the right. Sits
+   * between the table (compare columns) and the cards (browse); omit ⇒ not
+   * offered, exactly as `renderCard` gates the cards.
+   */
+  renderListRow?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
+  /**
+   * The page-level partition rendered as an exclusive tab strip above the
+   * toolbar, with server-supplied counts. Requires `server`: a scope is applied
+   * at the backend, never in the browser.
+   */
+  scopes?: ScopeConfig[];
+  /** The row field the scopes partition by — used only to reject a pill over the same field. */
+  scopeFieldId?: string;
+  /** Which layout to show first when the user has expressed no preference (default "table"). */
+  defaultLayout?: DataViewsLayout;
   /**
    * Opt into the responsive inline filter UX (collapsible filter row on wide
    * screens, modal on narrow). Default `false` keeps the classic slide-in panel.
@@ -100,63 +138,17 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
 }
 
 /**
- * The reusable admin DataViews table (FUT-88): the shared ContentToolbar +
- * TableFilter panel over `@12-apps/ui` DataGrid. State + derived data live in
- * {@link useDataViewsState}; the render lives in `GridShell`. This component just
- * connects the two. Reused across every admin list page.
+ * Surface the visible (filtered) rows so a page-level Export matches the view.
+ *
+ * Pages pass inline column/field arrays, so `matched` is a fresh reference on
+ * every render even when its contents are unchanged. The guard is a signature
+ * over the rows' *contents* (not just their ids), so the callback — and the
+ * parent `useState` it usually drives — fires only when the visible data
+ * actually changes. Ids alone are not enough: a server refresh can change a
+ * visible row's values while keeping its id, and the export must reflect them.
+ * Content-equal renders keep the same signature, so this never loops.
  */
-export function DataViewsGrid<T extends Record<string, unknown>>({
-  rows,
-  columns,
-  fields,
-  rangeFields = [],
-  getRowId,
-  onRowClick,
-  emptyState,
-  dataTestId,
-  testIdPrefix = "table",
-  appliedState,
-  syncState,
-  onStateChange,
-  onVisibleRowsChange,
-  toolbarRightSlot,
-  sortFields,
-  rowActions,
-  rowActionsLeading,
-  bulkActions,
-  renderRowMenu,
-  renderCard,
-  defaultLayout,
-  inlineFilters,
-  alwaysShowSearch,
-  server,
-}: DataViewsGridProps<T>): React.JSX.Element {
-  const controller = useDataViewsState({
-    rows,
-    columns,
-    fields,
-    rangeFields,
-    getRowId,
-    onRowClick,
-    appliedState,
-    syncState,
-    onStateChange,
-    testIdPrefix,
-    sortFields,
-    rowActions,
-    rowActionsLeading,
-    renderRowMenu,
-    server,
-  });
-
-  // Surface the visible (filtered) rows so a page-level Export matches the view. Pages pass
-  // inline column/field arrays, so `matched` is a fresh reference on every render even when
-  // its contents are unchanged. Guard on a signature over the rows' *contents* (not just ids)
-  // so we only notify — and trigger the parent's setState — when the visible data actually
-  // changes. Ids alone are not enough: a server refresh can change a visible row's values
-  // while keeping its id, and the export must reflect those new values. Content-equal renders
-  // keep the same signature, so the effect + a parent `useState` never loop.
-  const { matched } = controller;
+function useVisibleRowsNotifier<T>(matched: T[], onVisibleRowsChange?: (rows: T[]) => void): void {
   const visibleSignature = JSON.stringify(matched);
   const lastSignature = useRef<string | null>(null);
   useEffect(() => {
@@ -164,24 +156,22 @@ export function DataViewsGrid<T extends Record<string, unknown>>({
     lastSignature.current = visibleSignature;
     onVisibleRowsChange?.(matched);
   }, [visibleSignature, matched, onVisibleRowsChange]);
+}
 
-  return (
-    <GridShell
-      c={controller}
-      rows={rows}
-      fields={fields}
-      rangeFields={rangeFields}
-      getRowId={getRowId}
-      testIdPrefix={testIdPrefix}
-      dataTestId={dataTestId}
-      emptyState={emptyState}
-      toolbarRightSlot={toolbarRightSlot}
-      rowActions={rowActions}
-      bulkActions={bulkActions}
-      renderCard={renderCard}
-      defaultLayout={defaultLayout}
-      inlineFilters={inlineFilters}
-      alwaysShowSearch={alwaysShowSearch}
-    />
-  );
+/**
+ * The reusable admin DataViews table (FUT-88): the shared ContentToolbar +
+ * TableFilter panel over `@12-apps/ui` DataGrid. State + derived data live in
+ * {@link useDataViewsState}; the render lives in `GridShell`. This component just
+ * connects the two. Reused across every admin list page.
+ */
+export function DataViewsGrid<T extends Record<string, unknown>>(
+  props: DataViewsGridProps<T>,
+): React.JSX.Element {
+  // Forwarded as a whole rather than restated name-by-name twice: this component
+  // only ADDS the controller, and a 25-name destructure repeated in the JSX is
+  // where a newly added prop silently stops being passed on.
+  const { rangeFields = [], testIdPrefix = "table" } = props;
+  const controller = useDataViewsState({ ...props, rangeFields, testIdPrefix });
+  useVisibleRowsNotifier(controller.matched, props.onVisibleRowsChange);
+  return <GridShell {...props} c={controller} rangeFields={rangeFields} testIdPrefix={testIdPrefix} />;
 }
