@@ -15,6 +15,7 @@ import { Text } from "../../typography/Text";
 
 import { DataViewsZoomSlider } from "./data-views-layout-context";
 import { DataViewsDisplayPanel, type DisplayPanelView } from "./data-views-display-panel";
+import { DataViewsExportMenu, type DataViewExport } from "./data-views-export";
 import { renderBulkActions } from "./data-views-grid-helpers";
 import type { RowAction } from "./data-views-types";
 import type { DataViewsController } from "./use-data-views-state";
@@ -52,6 +53,8 @@ export interface GridToolbarProps<T extends Record<string, unknown>> {
   sortKinds?: Record<string, string>;
   /** The saved-view chrome bracketing the Exibir panel, when the host has views. */
   displayView?: DisplayPanelView;
+  /** Injected export. Absent ⇒ no Exportar control. */
+  exportConfig?: DataViewExport;
 }
 
 /** The right-aligned toolbar controls: Sort By, the counter, zoom/layout/columns, filters. */
@@ -78,6 +81,16 @@ function ToolbarRightControls<T extends Record<string, unknown>>(props: GridTool
         sortKinds={props.sortKinds}
         view={props.displayView}
       />
+      {props.exportConfig && (
+        <DataViewsExportMenu
+          config={props.exportConfig}
+          query={props.c.currentQuery}
+          totalCount={props.totalCount}
+          selectedIds={[...props.c.selectedIds]}
+          columns={props.columnOptions.filter((col) => col.visible).map((col) => ({ id: col.id, label: col.label }))}
+          testIdPrefix={testIdPrefix}
+        />
+      )}
       {props.showFilterTrigger !== false && (
         <FilterTrigger
           open={filterOpen}

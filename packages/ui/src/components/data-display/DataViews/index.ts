@@ -11,6 +11,11 @@ export { DataViewsTableBase, type DataViewsTableBaseProps } from "./DataViewsTab
 export { toSavedViewSummary, CARD_ASPECT_RATIOS, DATA_VIEWS_LAYOUTS } from "./data-views-types";
 export { cardScaleForZoom, cardMinWidthForZoom } from "./data-views-layout-context";
 export { DataViewsBoard, type BoardConfig, type BoardGroup } from "./DataViewsBoard";
+export type {
+  DataViewExport,
+  DataViewExportFormat,
+  DataViewExportRequest,
+} from "./data-views-export";
 export {
   DataViewsScopeTabs,
   resolveScope,
