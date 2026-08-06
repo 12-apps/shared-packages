@@ -2,10 +2,10 @@
 
 import * as React from 'react';
 import { Box, Stack } from '@mui/material';
-import { Avatar } from './components/data-display/Avatar';
-import { Button } from './components/form/Button';
-import { Text } from './components/typography/Text';
-import { Card } from './components/layout/Card';
+import { Avatar } from '../components/data-display/Avatar';
+import { Button } from '../components/form/Button';
+import { Text } from '../components/typography/Text';
+import { Card } from '../components/layout/Card';
 
 /**
  * Generate initials from a name

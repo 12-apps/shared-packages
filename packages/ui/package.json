@@ -15,10 +15,10 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./button": "./src/button.tsx",
+    "./button": "./src/button/index.ts",
     "./charts": "./src/charts/index.ts",
-    "./social-login-button": "./src/social-login-button.tsx",
-    "./user-avatar": "./src/user-avatar.tsx",
+    "./social-login-button": "./src/social-login-button/index.ts",
+    "./user-avatar": "./src/user-avatar/index.ts",
     "./utils": "./src/utils/index.ts",
     "./mui/Box": "./src/mui/Box.ts",
     "./mui/Link": "./src/mui/Link.ts",
