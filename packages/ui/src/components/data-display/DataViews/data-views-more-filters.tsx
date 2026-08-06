@@ -202,6 +202,36 @@ function MoreTrigger({
   );
 }
 
+/**
+ * Whether a field has anything applied, and how to unapply it — the two shapes
+ * (a pill's selected values, a range's bounds) answered in one place so the
+ * group that renders them stays a renderer.
+ */
+function fieldClearing<T extends Record<string, unknown>>({
+  field,
+  pills,
+  ranges,
+  onTogglePill,
+  onChangeRange,
+}: {
+  field: OverflowField<T>;
+} & Pick<MoreFiltersProps<T>, "pills" | "ranges" | "onTogglePill" | "onChangeRange">): {
+  applied: boolean;
+  clear: () => void;
+} {
+  if (field.group === "range") {
+    return {
+      applied: isRangeSet(ranges[field.id] ?? {}),
+      clear: () => onChangeRange(field.id, {}),
+    };
+  }
+  const values = pills[field.id] ?? [];
+  return {
+    applied: values.length > 0,
+    clear: () => values.forEach((value) => onTogglePill(field.id, value, false)),
+  };
+}
+
 /** One labelled group in the panel: the field's name, then its control. */
 function MoreGroup<T extends Record<string, unknown>>({
   field,
@@ -213,14 +243,42 @@ function MoreGroup<T extends Record<string, unknown>>({
 }: {
   field: OverflowField<T>;
 } & Omit<MoreFiltersProps<T>, "fields">): React.JSX.Element {
+  const { applied, clear } = fieldClearing({ field, pills, ranges, onTogglePill, onChangeRange });
   return (
     <Box sx={{ mb: 1.5, "&:last-of-type": { mb: 0 } }}>
-      <Text variant="caption" as="p">
-        <Box component="span" sx={{ display: "block", mb: 0.5, color: "text.secondary" }}>
-          {field.label}
-          {field.group === "range" && isRangeSet(ranges[field.id] ?? {}) ? " •" : ""}
-        </Box>
-      </Text>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+        <Text variant="caption" as="span">
+          <Box component="span" sx={{ color: "text.secondary" }}>
+            {field.label}
+            {field.group === "range" && isRangeSet(ranges[field.id] ?? {}) ? " •" : ""}
+          </Box>
+        </Text>
+        {/* The panel's equivalent of the pill's ✕. Without it a field applied
+            in here could only be cleared by finding it again on the bar —
+            which is where it goes the moment it becomes active, so the
+            operator has to close this panel to undo what they just did. */}
+        {applied && (
+          <Box
+            component="button"
+            type="button"
+            onClick={clear}
+            data-testid={`${testIdPrefix}-more-${field.id}-clear`}
+            sx={{
+              ml: "auto",
+              border: 0,
+              p: 0,
+              bgcolor: "transparent",
+              cursor: "pointer",
+              font: "inherit",
+              fontSize: "0.75rem",
+              color: "primary.main",
+              "&:hover": { textDecoration: "underline" },
+            }}
+          >
+            Limpar
+          </Box>
+        )}
+      </Box>
       {field.group === "pill" ? (
         <OverflowPill
           field={field}
@@ -272,17 +330,38 @@ function MoreHeading(): React.JSX.Element {
 /** The overflow trigger + panel. Renders nothing when everything fits. */
 export function MoreFilters<T extends Record<string, unknown>>({
   fields,
+  onOpenChange,
   ...rest
-}: MoreFiltersProps<T>): React.JSX.Element | null {
+}: MoreFiltersProps<T> & {
+  /**
+   * So the shell can FREEZE the measured split while this panel is open.
+   *
+   * Applying a filter in here makes its field active, and an active field
+   * takes an inline slot first — so the field being edited was promoted OUT of
+   * this panel mid-keystroke, taking the focused input with it. Typing "12"
+   * got as far as "1" and then had nowhere to go.
+   */
+  onOpenChange?: (open: boolean) => void;
+}): React.JSX.Element | null {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   if (fields.length === 0) return null;
   return (
     <>
-      <MoreTrigger count={fields.length} onOpen={setAnchor} testIdPrefix={rest.testIdPrefix} />
+      <MoreTrigger
+        count={fields.length}
+        onOpen={(element) => {
+          setAnchor(element);
+          onOpenChange?.(true);
+        }}
+        testIdPrefix={rest.testIdPrefix}
+      />
       <Popover
         open={Boolean(anchor)}
         anchorEl={anchor}
-        onClose={() => setAnchor(null)}
+        onClose={() => {
+          setAnchor(null);
+          onOpenChange?.(false);
+        }}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
         slotProps={{ paper: { sx: { width: 300, maxWidth: "calc(100vw - 32px)" } } }}
       >

@@ -212,6 +212,7 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
         />
       ))}
       <MoreFilters
+        onOpenChange={onControlOpenChange}
         fields={overflow}
         pills={pills}
         ranges={ranges}
