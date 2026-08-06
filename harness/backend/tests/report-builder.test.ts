@@ -137,6 +137,43 @@ describe('the spec sentence', () => {
   });
 });
 
+describe('top-N folds the remainder rather than dropping it', () => {
+  it('returns the leaders plus "Outros", and the total still balances', async () => {
+    const result = await runReport(
+      {
+        entity: 'orders',
+        dimensions: [{ field: 'method' }],
+        measures: [{ field: 'totalCents' }],
+        sort: [{ by: 'sum_totalCents', direction: 'desc' }],
+        limit: 1,
+      },
+      options,
+    );
+
+    // PIX 4000 leads; CARD 2000 folds into the bucket.
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows[1]?.method).toBe('Outros');
+
+    const shown = result.rows.reduce((total, row) => total + Number(row.sum_totalCents), 0);
+    expect(shown).toBe(6000);
+  });
+
+  it('leaves a spec with no limit untouched', async () => {
+    // The host row cap is a safety bound, not a top-N — folding its remainder
+    // would claim a total the report never computed.
+    const result = await runReport(
+      {
+        entity: 'orders',
+        dimensions: [{ field: 'method' }],
+        measures: [{ field: 'totalCents' }],
+      },
+      options,
+    );
+
+    expect(result.rows.map((row) => row.method)).not.toContain('Outros');
+  });
+});
+
 describe('the chart spec the published package emits', () => {
   it('carries no axis title and never smooths the line', async () => {
     const result = await runReport(

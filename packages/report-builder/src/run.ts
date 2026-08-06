@@ -51,7 +51,12 @@ export async function runReport(input: unknown, options: RunReportOptions): Prom
     maxRows: options.maxRows,
     timeZone: options.timeZone,
   });
-  const rows = (await options.adapter.execute(query)).slice(0, query.limit);
+  // The cap here guards against an adapter returning more than it was asked
+  // for. It must allow for the "Outros" bucket (FUT-391): a top-N result is
+  // topN + 1 rows, and capping at `limit` — which EQUALS topN — would chop off
+  // the very row that keeps the totals balancing.
+  const cap = query.topN !== undefined ? query.topN + 1 : query.limit;
+  const rows = (await options.adapter.execute(query)).slice(0, cap);
   const render = renderReport(query, spec.presentation, options.catalog, rows);
   return { spec, query, rows, render };
 }
