@@ -23,7 +23,23 @@ export interface ReportTableColumn {
 
 export type ReportRenderModel =
   | { kind: 'table'; columns: ReportTableColumn[]; rows: ReportRow[] }
-  | { kind: 'chart'; chartSpec: ChartSpec; rows: ReportRow[] }
+  | {
+      kind: 'chart';
+      chartSpec: ChartSpec;
+      /**
+       * The same columns the TABLE presentation would produce, carried so a
+       * chart can be read as a table ("Ver como tabela", FUT-391) and exported
+       * without re-deriving anything.
+       *
+       * It cannot be derived from `chartSpec`: the x-axis carries no title (it
+       * rendered on top of the tick labels), so a derivation falls back to the
+       * raw alias and the column reads `createdAt_day`. The label lives here,
+       * built by the code the table branch already uses, so two views of one
+       * query can never disagree about what a column is called.
+       */
+      tableColumns: ReportTableColumn[];
+      rows: ReportRow[];
+    }
   | {
       kind: 'kpi';
       /** Tile caption (spec label, else the measure's catalog label). */
@@ -174,14 +190,24 @@ export function renderReport(
     return {
       kind: 'chart',
       chartSpec: toChartSpec(query, presentation, catalog),
+      tableColumns: tableColumnsFor(query, catalog),
       rows: withoutSuppressedCells(rows),
     };
   }
   if (presentation.kind === 'kpi') {
     return toKpiModel(query, presentation, catalog, rows);
   }
+  return { kind: 'table', columns: tableColumnsFor(query, catalog), rows };
+}
+
+/**
+ * A query's columns: its dimensions, then its measures, in the order the query
+ * asks for them. Shared by the table presentation and by a chart's table
+ * fallback so the two can never name the same column differently.
+ */
+function tableColumnsFor(query: CompiledQuery, catalog: FieldCatalog): ReportTableColumn[] {
   const entity = requireEntityForRender(catalog, query.entity);
-  const columns: ReportTableColumn[] = [
+  return [
     ...query.dimensions.map((dimension) => ({
       key: dimension.alias,
       label: dimensionLabel(entity.fields[dimension.field], dimension.alias, dimension.timeGrain),
@@ -193,5 +219,4 @@ export function renderReport(
       format: measure.format,
     })),
   ];
-  return { kind: 'table', columns, rows };
 }

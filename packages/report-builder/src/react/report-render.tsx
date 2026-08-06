@@ -10,15 +10,18 @@
  * API's own metadata all render a duration, a percent or a SUPPRESSED cell
  * identically.
  */
-import type { JSX } from "react";
+import { useState, type JSX } from "react";
 
 import { SpecChart, type ChartDataPoint } from "@12-apps/ui/charts";
 import { EmptyState } from "@12-apps/ui/data-display/EmptyState";
 import { StatCard } from "@12-apps/ui/data-display/StatCard";
 import { Table } from "@12-apps/ui/data-display/Table";
+import { Button } from "@12-apps/ui/form/Button";
 
 import { formatKpiFigure, formatReportValue } from "../format";
+import { chartColumnsOf } from "./chart-as-table";
 import type { ExportColumn } from "./lib/export-rows";
+import { NO_PRINT_CLASS } from "./lib/print-export";
 import type { ReportRender, ReportRow, ReportTableColumn } from "./reports-api";
 
 /** Format one cell for display/export; `brl` values are integer centavos. */
@@ -48,21 +51,12 @@ export function exportColumnsFor(render: ReportRender): ExportColumn<ReportRow>[
   if (render.kind === "kpi") {
     return [{ header: render.label, value: () => formatKpiValue(render.value, render.format) }];
   }
-  const charted = render.chartSpec.numberFormat;
-  // `compact` is a chart-axis affordance, not an export format — a downloaded
-  // "1,5 mil" is not a number anyone can pivot on, so it exports as a decimal.
-  const numberFormat: ReportTableColumn["format"] =
-    charted === "brl" || charted === "percent" || charted === "integer" ? charted : "decimal";
-  return [
-    {
-      header: render.chartSpec.xAxis.label ?? render.chartSpec.xAxis.key,
-      value: (row) => formatReportCell(row[render.chartSpec.xAxis.key] ?? null, "text"),
-    },
-    ...render.chartSpec.series.map((series) => ({
-      header: series.label ?? series.key,
-      value: (row: ReportRow) => formatReportCell(row[series.key] ?? null, numberFormat),
-    })),
-  ];
+  // The SAME derivation "Ver como tabela" uses, so a column can never appear on
+  // screen and be missing from the download.
+  return chartColumnsOf(render).map((column) => ({
+    header: column.label,
+    value: (row: ReportRow) => formatReportCell(row[column.key] ?? null, column.format),
+  }));
 }
 
 interface ReportRenderViewProps {
@@ -76,6 +70,67 @@ interface ReportRenderViewProps {
    * offer could not be taken.
    */
   onWidenRange?: { label: string; onClick: () => void };
+}
+
+/**
+ * A chart, with the same numbers one keystroke away as a table.
+ *
+ * This is the real accessibility fallback for a chart (FUT-391): an aria-label
+ * summarising a twelve-point series is a sentence nobody can hold in their
+ * head, while the same numbers as a table are navigable cell by cell. It is
+ * also simply useful — reading an exact value off a chart is guesswork, and
+ * this is the values the chart was drawn from rather than a paraphrase.
+ *
+ * The toggle is per block and NOT persisted: it is how someone wants to read
+ * this block right now, not a property of the report. Saving it would change
+ * what every other viewer sees.
+ */
+function ChartOrTable({
+  render,
+  dataTestId,
+}: {
+  render: Extract<ReportRender, { kind: "chart" }>;
+  dataTestId: string;
+}): JSX.Element {
+  const [asTable, setAsTable] = useState(false);
+  const columns = chartColumnsOf(render);
+
+  return (
+    <div data-testid={dataTestId}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setAsTable((current) => !current)}
+        aria-pressed={asTable}
+        data-testid={`${dataTestId}-as-table`}
+        className={NO_PRINT_CLASS}
+      >
+        {asTable ? "Ver como gráfico" : "Ver como tabela"}
+      </Button>
+      {asTable ? (
+        <Table
+          variant="striped"
+          size="small"
+          columns={columns.map((column) => ({
+            key: column.key,
+            label: column.label,
+            align: column.format === "text" ? ("left" as const) : ("right" as const),
+            render: (value: unknown) =>
+              formatReportCell((value ?? null) as ReportRow[string], column.format),
+          }))}
+          data={render.rows}
+          data-testid={`${dataTestId}-table`}
+        />
+      ) : (
+        <SpecChart
+          spec={render.chartSpec}
+          data={render.rows as unknown as ChartDataPoint[]}
+          size="sm"
+          data-testid={`${dataTestId}-chart`}
+        />
+      )}
+    </div>
+  );
 }
 
 /** The report body: KPI tile, chart, table, or an empty state without rows. */
@@ -109,16 +164,7 @@ export function ReportRenderView({
     );
   }
   if (render.kind === "chart") {
-    return (
-      <div data-testid={dataTestId}>
-        <SpecChart
-          spec={render.chartSpec}
-          data={render.rows as unknown as ChartDataPoint[]}
-          size="sm"
-          data-testid={`${dataTestId}-chart`}
-        />
-      </div>
-    );
+    return <ChartOrTable render={render} dataTestId={dataTestId} />;
   }
   return (
     <div data-testid={dataTestId}>
