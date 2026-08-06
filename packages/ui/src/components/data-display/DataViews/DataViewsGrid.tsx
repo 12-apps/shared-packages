@@ -134,6 +134,12 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
   /** Which layout to show first when the user has expressed no preference (default "table"). */
   defaultLayout?: DataViewsLayout;
   /**
+   * Ignore the remembered cross-screen layout preference and pin to
+   * `defaultLayout`. For tables that exist to SHOW a layout — stories, docs,
+   * screenshots — not for real screens.
+   */
+  ignoreStoredLayout?: boolean;
+  /**
    * Opt into the responsive inline filter UX (collapsible filter row on wide
    * screens, modal on narrow). Default `false` keeps the classic slide-in panel.
    */

@@ -515,13 +515,13 @@ export const ScopesAndBoard: Story = {
  * server holds 34.
  */
 export const Board: Story = {
-  args: { ...ScopesAndBoard.args, defaultLayout: "board" },
+  args: { ...ScopesAndBoard.args, defaultLayout: "board", ignoreStoredLayout: true },
   render: screen,
 };
 
 /** The Lista layout: one full-width, entity-rendered row per pedido. */
 export const List: Story = {
-  args: { ...ScopesAndBoard.args, defaultLayout: "list" },
+  args: { ...ScopesAndBoard.args, defaultLayout: "list", ignoreStoredLayout: true },
   render: screen,
 };
 
@@ -530,7 +530,7 @@ export const List: Story = {
  * control counts cards per line rather than row height.
  */
 export const Cards: Story = {
-  args: { ...ScopesAndBoard.args, defaultLayout: "cards" },
+  args: { ...ScopesAndBoard.args, defaultLayout: "cards", ignoreStoredLayout: true },
   render: screen,
 };
 
@@ -540,7 +540,7 @@ export const Cards: Story = {
  * hide behind one of them.
  */
 export const Table: Story = {
-  args: { ...ScopesAndBoard.args, defaultLayout: "table" },
+  args: { ...ScopesAndBoard.args, defaultLayout: "table", ignoreStoredLayout: true },
   render: screen,
 };
 

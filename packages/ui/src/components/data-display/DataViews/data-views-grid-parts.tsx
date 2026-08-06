@@ -230,6 +230,8 @@ interface GridShellProps<T extends Record<string, unknown>> {
   headerActions?: React.ReactNode;
   /** Which layout to show first when the user has expressed no preference (default "table"). */
   defaultLayout?: DataViewsLayout;
+  /** Pin to `defaultLayout`, ignoring the remembered preference (stories/docs). */
+  ignoreStoredLayout?: boolean;
   /**
    * Opt into the responsive inline filter UX: a collapsible filter row below the
    * toolbar on wide screens and a modal on narrow ones. When false (default),
@@ -330,6 +332,7 @@ export function GridShell<T extends Record<string, unknown>>(props: GridShellPro
     renderListRow,
     board,
     defaultLayout,
+    ignoreStoredLayout,
     inlineFilters = false,
     alwaysShowSearch = false,
   } = props;
@@ -342,6 +345,7 @@ export function GridShell<T extends Record<string, unknown>>(props: GridShellPro
       // `renderCard` offers no board rather than throwing.
       canUseBoard={Boolean(board && renderCard)}
       defaultLayout={defaultLayout}
+      ignoreStoredLayout={ignoreStoredLayout}
       viewLayout={c.state.layout}
     >
     <LayoutStateSync c={c} />

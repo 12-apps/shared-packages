@@ -181,6 +181,21 @@ interface LayoutProviderProps extends Partial<LayoutAvailability> {
    * only the toggle does that, because only the toggle is the user saying so.
    */
   viewLayout?: DataViewsLayout;
+  /**
+   * Ignore — and stop writing — the remembered cross-screen preference, making
+   * `defaultLayout` authoritative for this table.
+   *
+   * For a table that exists to SHOW a particular layout rather than to be
+   * browsed: a Storybook story called "Board", a docs example, a screenshot
+   * harness. Without it the remembered preference wins, so opening "Board"
+   * after having clicked Tabela anywhere renders a table — the demonstration
+   * silently showing the wrong thing, and a shared link doing it for everyone
+   * whose preference differs.
+   *
+   * A real screen leaves this off: remembering how someone likes to read
+   * lists is the point.
+   */
+  ignoreStoredLayout?: boolean;
   children: ReactNode;
 }
 
@@ -195,13 +210,19 @@ export function DataViewsLayoutProvider({
   canUseBoard = false,
   defaultLayout = "table",
   viewLayout,
+  ignoreStoredLayout = false,
   children,
 }: LayoutProviderProps): React.JSX.Element {
   const availability = { canUseCards, canUseList, canUseBoard };
   const [layout, setLayoutState] = useState<DataViewsLayout>(() =>
-    pinLayout(viewLayout ?? readStoredLayout() ?? defaultLayout, availability),
+    pinLayout(
+      viewLayout ?? (ignoreStoredLayout ? undefined : readStoredLayout()) ?? defaultLayout,
+      availability,
+    ),
   );
-  const [density, setDensityState] = useState<DataViewsDensity>(() => readStoredDensity() ?? "cozy");
+  const [density, setDensityState] = useState<DataViewsDensity>(
+    () => (ignoreStoredLayout ? undefined : readStoredDensity()) ?? "cozy",
+  );
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   // A newly applied view carrying a layout switches to it (its reference-change
   // is the signal, exactly as `appliedState` works for the filters).
@@ -221,12 +242,14 @@ export function DataViewsLayoutProvider({
         const pinned = pinLayout(next, availability);
         setLayoutState(pinned);
         // Remember the user's own choice across every screen — see LAYOUT_STORAGE_KEY.
-        writeStored(LAYOUT_STORAGE_KEY, pinned);
+        // A table pinned to a layout does not write: it would teach the
+        // preference a value the operator never chose.
+        if (!ignoreStoredLayout) writeStored(LAYOUT_STORAGE_KEY, pinned);
       },
       density,
       setDensity: (next: DataViewsDensity) => {
         setDensityState(next);
-        writeStored(DENSITY_STORAGE_KEY, next);
+        if (!ignoreStoredLayout) writeStored(DENSITY_STORAGE_KEY, next);
       },
       canUseCards,
       canUseList,

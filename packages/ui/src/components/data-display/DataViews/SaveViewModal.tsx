@@ -43,29 +43,6 @@ interface SaveViewModalProps<T extends Record<string, unknown>> {
   testIdPrefix?: string;
 }
 
-function PreviewList({ title, items, testId }: { title: string; items: string[]; testId: string }): React.JSX.Element {
-  return (
-    <Box data-testid={testId}>
-      <Text variant="caption" as="span" weight="semibold">
-        {title}
-      </Text>
-      {items.length === 0 ? (
-        <Text variant="caption" as="p" color="secondary">
-          —
-        </Text>
-      ) : (
-        <Stack component="ul" spacing={0.25} sx={{ m: 0, pl: 2 }}>
-          {items.map((item) => (
-            <Text key={item} variant="caption" as="li">
-              {item}
-            </Text>
-          ))}
-        </Stack>
-      )}
-    </Box>
-  );
-}
-
 interface FlagsSwitchesProps {
   pinned: boolean;
   shared: boolean;
