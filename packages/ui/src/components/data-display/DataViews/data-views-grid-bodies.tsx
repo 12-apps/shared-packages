@@ -6,6 +6,7 @@ import { Box } from "../../../mui/Box";
 import {
   cardMinWidthForZoom,
   cardScaleForZoom,
+  DENSITY_BOARD_SCALE,
   DENSITY_CARD_COLUMNS,
   DENSITY_ROW_PADDING,
   useDataViewsLayout,
@@ -297,7 +298,10 @@ export function GridMain<T extends Record<string, unknown>>({
           renderCard={renderCard}
           selectedIds={c.selectedIds}
           onToggleId={c.toggleId}
-          cardScale={cardScaleForZoom(zoom)}
+          // DENSITY, not zoom: the board's own knob in the Exibição tab is how
+          // wide its columns are, and it is the only sizing control the board
+          // has since the zoom slider was removed.
+          cardScale={DENSITY_BOARD_SCALE[density]}
           dataTestId={dataTestId}
         />
       </Headerless>
