@@ -21,6 +21,7 @@ import type {
   StoredProviderConfig,
 } from './types';
 
+import { assertSaveCredentialsInput } from './credential-input';
 import {
   applyProof,
   pendingVerificationMethods,
@@ -276,9 +277,15 @@ export function createSettingsService(
     getSettings: (merchant) => buildSettingsView(providers, store, merchant),
 
     async saveCredentials(merchant, provider, input) {
+      const adapter = providers.get(provider);
+      // Before the load, so a malformed body cannot even cost a store read —
+      // and before `applySaveCredentials`, which INVALIDATES on any change it
+      // is handed: a write it should never have accepted would take the
+      // connection to UNVERIFIED and out of the chain on its way to failing.
+      assertSaveCredentialsInput(adapter, input);
       const config = applySaveCredentials(await load(merchant, provider), input, allowStubMode);
       await store.save(merchant, config);
-      return toMasked(providers.get(provider), config);
+      return toMasked(adapter, config);
     },
 
     async setEnabled(merchant, provider, enabled) {

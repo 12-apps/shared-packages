@@ -62,6 +62,28 @@ export class CredentialsError extends PaymentsError {
 }
 
 /**
+ * A credential WRITE was refused before anything was stored (FUT-694).
+ *
+ * Its own class, and 400 rather than `CredentialsError`'s 409, because the two
+ * say opposite things to the admin in front of the form: `CredentialsError`
+ * means the stored connection cannot be used, this means the request was not a
+ * legal credential update and the stored connection was never touched. A 409
+ * sends them to inspect a connection that is fine.
+ *
+ * `field` names the offending key when exactly one is to blame, so a settings
+ * page can point at the input rather than banner the whole form.
+ */
+export class InvalidCredentialsInputError extends PaymentsError {
+  constructor(
+    readonly provider: ProviderName,
+    message: string,
+    readonly field?: string,
+  ) {
+    super('InvalidCredentialsInputError', message);
+  }
+}
+
+/**
  * A PINNED charge named a provider whose declared buyer requirements the
  * charge does not meet (FUT-595) — a required `customerSchema` field is
  * missing or malformed. Thrown BEFORE the adapter is called, so nothing was

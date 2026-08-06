@@ -21,6 +21,7 @@ import {
 import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
 import type { PaymentProviderAdapter } from '../core/provider';
 import { infinitePayProvider } from '../providers/infinitepay';
+import { pagbankProvider } from '../providers/pagbank';
 import {
   sharedSecretWebhook,
   stubCharge,
@@ -285,6 +286,45 @@ export function setupStrictSettings() {
   const store = createMemoryProviderConfigStore();
   const providers = defineProviders({ stone: stoneProvider(), stripe: stripeProvider() } as const);
   return { store, providers, settings: createSettingsService(providers, store) };
+}
+
+/**
+ * The settings surface mounted over the REAL vendor adapters.
+ *
+ * `setupHttpWorld` runs on the purpose-built fake, which is right for gateway
+ * rules and wrong here: what a credential write is allowed to say IS each
+ * shipped adapter's own `credentialSchema` — the InfiniteTag's `pattern`, the
+ * four keys Stone declares — and a fake's invented schema would let this pass
+ * while the thing a store actually talks to still accepted anything.
+ */
+export function setupCredentialsHttpWorld(): {
+  http: PaymentsHttpHandlers;
+  store: ReturnType<typeof createMemoryProviderConfigStore>;
+} {
+  const store = createMemoryProviderConfigStore();
+  const providers = defineProviders({
+    infinitepay: infinitePayProvider(),
+    pagbank: pagbankProvider(),
+    stone: stoneProvider(),
+    stripe: stripeProvider(),
+  } as const);
+  const charges = createMemoryChargeStore();
+  const http = createPaymentsHttp({
+    gateway: createPaymentsGateway({
+      providers,
+      credentials: credentialStoreFrom(store),
+      charges,
+      webhooks: createMemoryWebhookInbox(),
+      attempts: createMemoryAttemptLedger(),
+    }),
+    settings: createSettingsService(providers, store, { allowStubMode: true }),
+    charges,
+    // Never reached: this world exists for the settings surface only.
+    resolveChargeRequest: async () => {
+      throw new Error('setupCredentialsHttpWorld does not create charges');
+    },
+  });
+  return { http, store };
 }
 
 /** Full wired-up HTTP stack over memory stores, as a host would mount it. */
