@@ -229,7 +229,16 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
   return (
     <Box
       data-testid={`${testIdPrefix}-inline-filters`}
-      sx={{ display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 1, minWidth: 0 }}
+      sx={{
+        display: "flex",
+        flexWrap: "nowrap",
+        alignItems: "center",
+        gap: 1,
+        minWidth: 0,
+        // No squeezing: if the estimate over-packs, the row must overflow (and
+        // the next measure sheds a control), not shrink labels to an ellipsis.
+        "& > *": { flexShrink: 0 },
+      }}
     >
       <SearchSlot
         search={search}

@@ -66,8 +66,18 @@ export interface OverflowSplit<T extends Record<string, unknown>> {
  * a few px out moves the cut by at most one control, and the overflow catches it.
  */
 function estimateWidth(text: string, extra: number): number {
-  /** ~7.2px per character at the toolbar's font size, plus the chrome. */
-  return Math.round(text.length * 7.2) + 52 + extra;
+  /**
+   * ~7.6px per character at the toolbar's font size, plus 76px of chrome:
+   * horizontal padding, the border, and the dropdown chevron. The chrome used
+   * to be 52, which under-priced every control by roughly a chevron's width —
+   * six of them then "fitted" a row they overflowed, and because they are flex
+   * children the row paid for it by squeezing labels to "D…" and "V…" rather
+   * than by shedding a control into the overflow.
+   *
+   * Deliberately generous: over-pricing sheds one control too early, which the
+   * "Mais" button absorbs invisibly. Under-pricing breaks the line.
+   */
+  return Math.round(text.length * 7.6) + 76 + extra;
 }
 
 /** Is a range bounded at either end? */
@@ -235,16 +245,21 @@ function computeSplit<T extends Record<string, unknown>>(
 ): Omit<OverflowSplit<T>, "barRef"> {
   // Unmeasured (SSR, or jsdom without a ResizeObserver) ⇒ degrade nothing.
   if (width === 0) {
-    return { inline: all, overflow: [], compactControls: false, searchCollapsed: false };
+    return {
+      inline: all,
+      overflow: [],
+      compactControls: false,
+      searchCollapsed: false,
+    };
   }
   const { inline, overflow, used } = splitFilters(all, pills, ranges, width);
-  const rest = width - used - RESERVED.counter - RESERVED.chrome;
+  const base = width - used - RESERVED.chrome;
 
   // Would the search still make its minimum with the labels on?
-  const compactControls = rest - RESERVED.right < RESERVED.search;
+  const compactControls = base - RESERVED.counter - RESERVED.right < RESERVED.search;
   const rightCost = compactControls ? RESERVED.rightCompact : RESERVED.right;
   // …and with them off?
-  const searchCollapsed = rest - rightCost < RESERVED.search;
+  const searchCollapsed = base - RESERVED.counter - rightCost < RESERVED.search;
 
   return { inline, overflow, compactControls, searchCollapsed };
 }

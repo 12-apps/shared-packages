@@ -131,12 +131,17 @@ function BrowsingClusters({
         sx={{
           display: 'flex',
           alignItems: 'center',
-          flexWrap: 'wrap',
+          // Same single-line rule as the row itself: this cluster wrapping
+          // INTERNALLY buys a second line just as surely as the row wrapping
+          // does. It bit at exactly 900px, the `md` breakpoint where the "N de
+          // N" counter appears and pushes Exibir/Exportar over the edge.
+          flexWrap: leadingControls === undefined ? 'wrap' : 'nowrap',
           // Tight (5px) when browsing so the controls fit one line beside the
           // checkbox; roomier (14px) in selection mode where they get their own row.
           gap: hasSelection ? '14px' : '5px',
           ml: 'auto',
           mr: edgeAlign ? -1.5 : 0,
+          '& > *': { flexShrink: 0 },
         }}
       >
         {rightControls}
@@ -193,15 +198,19 @@ export function ContentToolbar({
   const showSelection = !exclusiveSelection || hasSelection;
   const showControls = !exclusiveSelection || !hasSelection;
   return (
-    // Wrap the two clusters onto separate rows when they can't share one line
-    // (narrow screens / phones) instead of letting the controls collide.
+    // Two clusters on one line. They may wrap onto separate rows ONLY for a
+    // toolbar without `leadingControls` — one carrying search + filters is
+    // driven by a measured collapse ladder (see `useFilterOverflow`), and a
+    // wrap there is the ladder having failed: it would silently buy a second
+    // row instead of shedding a control into "Mais", which is the one outcome
+    // the ladder exists to prevent.
     <Box
       sx={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 2,
-        flexWrap: 'wrap',
+        flexWrap: leadingControls === undefined ? 'wrap' : 'nowrap',
         rowGap: 1,
       }}
     >

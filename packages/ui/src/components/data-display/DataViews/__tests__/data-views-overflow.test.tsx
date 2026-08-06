@@ -173,7 +173,10 @@ describe("the filter bar's progressive collapse", () => {
   });
 
   it("sheds only what does not fit, badging how many went behind Mais", async () => {
-    stubResizeObserver(900);
+    // Wide enough for SOME but not all: controls are priced at their real
+    // rendered width (label + padding + chevron), so the partial-shed band
+    // sits higher than it did when the estimate under-priced every chip.
+    stubResizeObserver(1150);
     renderBar();
 
     const more = await screen.findByTestId("lista-more-filters");

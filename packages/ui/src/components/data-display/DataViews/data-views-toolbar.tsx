@@ -67,11 +67,14 @@ function ToolbarRightControls<T extends Record<string, unknown>>(props: GridTool
   return (
     <>
       <Text variant="caption" as="span">
-        {/* The "N de N" counter is hidden on mobile to keep the toolbar one line. */}
+        {/* Always rendered, never breakpointed: `RESERVED.counter` already
+            prices it into the collapse ladder, so hiding it at `md` was the
+            ladder and a breakpoint disagreeing about the same pixels — which
+            is what broke the row at exactly 900px. */}
         <Box
           component="span"
           data-testid={`${testIdPrefix}-counter`}
-          sx={{ whiteSpace: "nowrap", display: { xs: "none", md: "inline" } }}
+          sx={{ whiteSpace: "nowrap" }}
         >
           Exibindo {matchedCount} de {totalCount}
         </Box>
