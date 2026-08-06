@@ -5,6 +5,7 @@ import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import { Checkbox, Popover } from "@mui/material";
 import { useState } from "react";
 
+import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
@@ -22,10 +23,10 @@ import type { RangeValue } from "./data-views-types";
  * cannot see is a filter you forget you set, and then the list is "wrong" for
  * a reason nothing on screen explains.
  *
- * The fields render as flat controls rather than as the pills they'd be on the
- * bar — inside a panel there is no space to win back, and a stack of labelled
- * groups is faster to read than a wrapped row of dropdowns each needing a
- * second click.
+ * A field with one or two options renders FLAT — inside a panel there is no
+ * space to win back, and two labelled checkboxes are faster than a dropdown
+ * needing a second click. Past that it becomes a {@link MultiSelectDropdown}:
+ * see `INLINE_OPTION_LIMIT`.
  */
 
 interface MoreFiltersProps<T extends Record<string, unknown>> {
@@ -37,18 +38,46 @@ interface MoreFiltersProps<T extends Record<string, unknown>> {
   testIdPrefix: string;
 }
 
+/**
+ * Above this many options a field is a DROPDOWN rather than a flat row of
+ * checkboxes. Two options cost two lines and read faster laid out; a "Cliente"
+ * with a dozen turns the panel into a scrolling wall and buries every field
+ * under it, which is exactly what the overflow was meant to avoid.
+ */
+const INLINE_OPTION_LIMIT = 2;
+
 /** One overflowed pill: its options as checkboxes, all visible at once. */
 function OverflowPill<T extends Record<string, unknown>>({
   field,
   values,
   onToggle,
+  onClear,
   testIdPrefix,
 }: {
   field: OverflowField<T>;
   values: string[];
   onToggle: (value: string, checked: boolean) => void;
+  onClear: () => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const options = field.pill?.options ?? [];
+  if (options.length > INLINE_OPTION_LIMIT) {
+    return (
+      <MultiSelectDropdown
+        label={field.pill?.label ?? field.label}
+        options={options}
+        selected={new Set(values)}
+        onToggle={onToggle}
+        onClear={onClear}
+        allLabel="Todas"
+        searchable={options.length > 6 ? true : undefined}
+        searchPlaceholder="Buscar…"
+        noResultsLabel="Nenhum resultado"
+        layout="pill"
+        data-testid={`${testIdPrefix}-more-${field.id}`}
+      />
+    );
+  }
   return (
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
       {(field.pill?.options ?? []).map((option) => {
@@ -197,6 +226,7 @@ function MoreGroup<T extends Record<string, unknown>>({
           field={field}
           values={pills[field.id] ?? []}
           onToggle={(value, checked) => onTogglePill(field.id, value, checked)}
+          onClear={() => (pills[field.id] ?? []).forEach((v) => onTogglePill(field.id, v, false))}
           testIdPrefix={testIdPrefix}
         />
       ) : (

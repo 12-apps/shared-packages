@@ -180,8 +180,13 @@ function ViewFooter({
       {/* ONE save, not two. "Salvar como nova" alongside it made the primary
           action ambiguous at a glance; which of the two this is depends on
           whether a view is applied, which the label already says. */}
+      {/* Enabled only when something in Ordenar / Colunas / Exibição (or the
+          filters the view also stores) actually differs from the applied view:
+          the filled button is a STATE — "there is something to save" — not a
+          permanent fixture. */}
       <Button
         size="sm"
+        disabled={!view.dirty}
         startIcon={<SaveOutlinedIcon fontSize="small" />}
         onClick={() => {
           (view.onUpdate ?? view.onSaveAs)();

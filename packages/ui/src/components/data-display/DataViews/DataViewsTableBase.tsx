@@ -1,7 +1,7 @@
 "use client";
 
 import type { SortFieldDefinition } from "../../layout/ContentToolbar";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { DataViewsGrid } from "./DataViewsGrid";
 import type { DisplayPanelView } from "./data-views-display-panel";
@@ -202,6 +202,17 @@ export function DataViewsTableBase<T extends Record<string, unknown>>(
   // it); the equality bail-out in `setDirty` is what stops the update loop.
   const [dirty, setDirty] = useState(false);
   const appliedKey = JSON.stringify(ctl.applied ?? null);
+  // Compared against the FIRST state the grid emits for this view, not against
+  // `applied` itself. The grid normalises what it is handed — it resolves the
+  // visible columns, fills in the layout and the density — so a live state is
+  // never byte-identical to the view that produced it, and comparing the two
+  // directly reports "unsaved changes" on a view nobody has touched.
+  const baseline = useRef<string | null>(null);
+  useEffect(() => {
+    // A newly applied view re-baselines: its own state is the clean one now.
+    baseline.current = null;
+    setDirty(false);
+  }, [appliedKey]);
   // The view the panel's "Redefinir" restores: the applied one, or the built-in
   // "Visão principal" when none is.
   const activeView = views.find((view) => view.name === ctl.activeViewName);
@@ -228,7 +239,13 @@ export function DataViewsTableBase<T extends Record<string, unknown>>(
         syncState={syncState}
         onStateChange={(state) => {
           ctl.currentRef.current = state;
-          const next = JSON.stringify(state) !== appliedKey;
+          const key = JSON.stringify(state);
+          if (baseline.current === null) {
+            baseline.current = key;
+            setDirty(false);
+            return;
+          }
+          const next = key !== baseline.current;
           setDirty((prev) => (prev === next ? prev : next));
         }}
         // The saved-views menu is NOT a toolbar control any more: it lives in

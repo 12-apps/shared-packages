@@ -189,13 +189,14 @@ describe("the Exportar control", () => {
    * menu itself; what changed is that the built-in trigger is unreachable while
    * a selection is active.
    */
-  it("yields the toolbar — Exportar included — the moment a row is selected", () => {
+  it("yields the toolbar — Exportar included — the moment a row is selected", async () => {
     renderGrid(vi.fn());
 
     expect(screen.getByTestId("lista-export-trigger")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("Select all rows"));
 
-    expect(screen.queryByTestId("lista-export-trigger")).toBeNull();
+    // The trigger is REMOVED by the click, so its absence has to be awaited.
+    await waitFor(() => expect(screen.queryByTestId("lista-export-trigger")).toBeNull());
     expect(screen.getByTestId("lista-clear-all")).toBeInTheDocument();
   });
 

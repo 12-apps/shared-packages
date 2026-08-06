@@ -99,6 +99,53 @@ function SelectionCluster({
 }
 
 /**
+ * The BROWSING half of the toolbar: search + filters on the left, the page's
+ * own controls on the right. Split out of {@link ContentToolbar} so that
+ * function stays inside the complexity gate — it is layout only, and the
+ * decision of whether to show it at all is made by the caller.
+ */
+function BrowsingClusters({
+  leadingControls,
+  rightControls,
+  hasSelection,
+  edgeAlign,
+}: {
+  leadingControls?: React.ReactNode;
+  rightControls: React.ReactNode;
+  hasSelection: boolean;
+  edgeAlign: boolean;
+}): React.JSX.Element {
+  return (
+    <>
+      {/* minWidth:0 lets this cluster be the one that gives up width as the row
+       * tightens, which is what the filter overflow measures against. */}
+      {leadingControls !== undefined && (
+        <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, minWidth: 0 }}>
+          {leadingControls}
+        </Box>
+      )}
+      {/* ml:auto keeps the controls right-aligned even when the cluster wraps to
+       * its own row (where justify-content:space-between would otherwise snap a
+       * lone item to the left); it's a no-op on a shared row. */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          // Tight (5px) when browsing so the controls fit one line beside the
+          // checkbox; roomier (14px) in selection mode where they get their own row.
+          gap: hasSelection ? '14px' : '5px',
+          ml: 'auto',
+          mr: edgeAlign ? -1.5 : 0,
+        }}
+      >
+        {rightControls}
+      </Box>
+    </>
+  );
+}
+
+/**
  * Shared toolbar for content pages (Favorites, Personal Space, Recents, …). The
  * left cluster owns selection chrome — **Select All**, and once items are
  * selected, **Clear All** + an "N items selected" count + an optional `actions`
@@ -171,33 +218,13 @@ export function ContentToolbar({
         />
       )}
 
-      {/* Search + filters, on the toolbar's own line. minWidth:0 lets this
-       * cluster be the one that gives up width as the row tightens, which is
-       * what the filter overflow measures against. */}
-      {showControls && leadingControls !== undefined && (
-        <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, minWidth: 0 }}>
-          {leadingControls}
-        </Box>
-      )}
-
-      {/* ml:auto keeps the controls right-aligned even when the cluster wraps to
-       * its own row (where justify-content:space-between would otherwise snap a
-       * lone item to the left); it's a no-op on a shared row. */}
       {showControls && (
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            // Tight (5px) when browsing so the controls fit one line beside the
-            // checkbox; roomier (14px) in selection mode where they get their own row.
-            gap: hasSelection ? '14px' : '5px',
-            ml: 'auto',
-            mr: edgeAlign ? -1.5 : 0,
-          }}
-        >
-          {rightControls}
-        </Box>
+        <BrowsingClusters
+          leadingControls={leadingControls}
+          rightControls={rightControls}
+          hasSelection={hasSelection}
+          edgeAlign={edgeAlign}
+        />
       )}
     </Box>
   );
