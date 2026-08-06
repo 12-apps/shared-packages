@@ -1,5 +1,8 @@
 "use client";
 
+import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
+import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
+import StarOutlineRoundedIcon from "@mui/icons-material/StarOutlineRounded";
 import { useState } from "react";
 
 import { Dialog, DialogContent } from "../../feedback/Dialog";
@@ -40,29 +43,6 @@ interface SaveViewModalProps<T extends Record<string, unknown>> {
   testIdPrefix?: string;
 }
 
-function PreviewList({ title, items, testId }: { title: string; items: string[]; testId: string }): React.JSX.Element {
-  return (
-    <Box data-testid={testId}>
-      <Text variant="caption" as="span" weight="semibold">
-        {title}
-      </Text>
-      {items.length === 0 ? (
-        <Text variant="caption" as="p" color="secondary">
-          —
-        </Text>
-      ) : (
-        <Stack component="ul" spacing={0.25} sx={{ m: 0, pl: 2 }}>
-          {items.map((item) => (
-            <Text key={item} variant="caption" as="li">
-              {item}
-            </Text>
-          ))}
-        </Stack>
-      )}
-    </Box>
-  );
-}
-
 interface FlagsSwitchesProps {
   pinned: boolean;
   shared: boolean;
@@ -71,6 +51,63 @@ interface FlagsSwitchesProps {
   setShared: (value: boolean) => void;
   setIsDefault: (value: boolean) => void;
   testIdPrefix: string;
+}
+
+/**
+ * One flag: what it is, and what it DOES. A bare "Fixar na barra lateral"
+ * beside a switch asks the operator to guess where it appears and to whom —
+ * the sentence is the difference between a labelled toggle and an explained one.
+ */
+function FlagRow({
+  icon,
+  title,
+  description,
+  checked,
+  onChange,
+  testId,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  testId: string;
+}): React.JSX.Element {
+  return (
+    <Box
+      component="label"
+      sx={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 1.5,
+        px: 1,
+        py: 1,
+        borderRadius: 1,
+        cursor: "pointer",
+        "&:hover": { bgcolor: "action.hover" },
+      }}
+    >
+      <Box sx={{ mt: 0.25, color: "text.disabled", display: "flex" }}>{icon}</Box>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Text variant="body" as="span">
+          <Box component="span" sx={{ display: "block", fontSize: "0.875rem" }}>
+            {title}
+          </Box>
+        </Text>
+        <Text variant="caption" as="span">
+          <Box component="span" sx={{ display: "block", color: "text.secondary", lineHeight: 1.5 }}>
+            {description}
+          </Box>
+        </Text>
+      </Box>
+      <Switch
+        size="sm"
+        checked={checked}
+        onChange={(_event, value) => onChange(value)}
+        dataTestId={testId}
+      />
+    </Box>
+  );
 }
 
 function FlagsSwitches({
@@ -83,27 +120,30 @@ function FlagsSwitches({
   testIdPrefix,
 }: FlagsSwitchesProps): React.JSX.Element {
   return (
-    <Stack spacing={0.5}>
-      <Switch
-        size="sm"
-        label="Fixar na barra lateral"
+    <Stack spacing={0}>
+      <FlagRow
+        icon={<PushPinOutlinedIcon fontSize="small" />}
+        title="Fixar na barra lateral"
+        description="Aparece como atalho no menu, abaixo desta tela."
         checked={pinned}
-        onChange={(_event, value) => setPinned(value)}
-        dataTestId={`${testIdPrefix}-save-pinned`}
+        onChange={setPinned}
+        testId={`${testIdPrefix}-save-pinned`}
       />
-      <Switch
-        size="sm"
-        label="Compartilhar com a equipe"
+      <FlagRow
+        icon={<GroupOutlinedIcon fontSize="small" />}
+        title="Compartilhar com a equipe"
+        description="Qualquer pessoa da loja poderá abrir e usar esta visão."
         checked={shared}
-        onChange={(_event, value) => setShared(value)}
-        dataTestId={`${testIdPrefix}-save-shared`}
+        onChange={setShared}
+        testId={`${testIdPrefix}-save-shared`}
       />
-      <Switch
-        size="sm"
-        label="Definir como padrão"
+      <FlagRow
+        icon={<StarOutlineRoundedIcon fontSize="small" />}
+        title="Definir como padrão"
+        description="Esta tela abre nesta visão em vez da Visão principal."
         checked={isDefault}
-        onChange={(_event, value) => setIsDefault(value)}
-        dataTestId={`${testIdPrefix}-save-default`}
+        onChange={setIsDefault}
+        testId={`${testIdPrefix}-save-default`}
       />
     </Stack>
   );
@@ -114,17 +154,61 @@ interface PreviewBoxProps {
   testIdPrefix: string;
 }
 
-function PreviewBox({ preview, testIdPrefix }: PreviewBoxProps): React.JSX.Element {
+/** One "label — value" line of the summary. */
+function SummaryRow({
+  label,
+  items,
+  testId,
+}: {
+  label: string;
+  items: string[];
+  testId: string;
+}): React.JSX.Element | null {
+  if (items.length === 0) return null;
   return (
-    <Box sx={{ p: 1.5, borderRadius: 1, border: (theme) => `1px solid ${theme.palette.divider}` }}>
-      <Text variant="caption" as="p" weight="semibold">
-        Prévia
+    <Box sx={{ display: "flex", gap: 1.5 }} data-testid={testId}>
+      <Text variant="caption" as="span">
+        <Box component="span" sx={{ width: 116, flexShrink: 0, color: "text.secondary" }}>
+          {label}
+        </Box>
       </Text>
-      <Stack spacing={1} sx={{ mt: 0.5 }}>
-        <PreviewList title="Filtros" items={preview.filters} testId={`${testIdPrefix}-preview-filters`} />
-        <PreviewList title="Colunas" items={preview.columns} testId={`${testIdPrefix}-preview-columns`} />
-        <PreviewList title="Ordenação" items={preview.sort} testId={`${testIdPrefix}-preview-sort`} />
-      </Stack>
+      <Text variant="caption" as="span">
+        <Box component="span" sx={{ minWidth: 0, flex: 1 }}>
+          {items.join(", ")}
+        </Box>
+      </Text>
+    </Box>
+  );
+}
+
+function PreviewBox({ preview, testIdPrefix }: PreviewBoxProps): React.JSX.Element {
+  const empty =
+    preview.filters.length === 0 && preview.columns.length === 0 && preview.sort.length === 0;
+  return (
+    <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: "action.hover", border: (theme) => `1px solid ${theme.palette.divider}` }}>
+      <Text variant="caption" as="p">
+        <Box
+          component="span"
+          sx={{ display: "block", mb: 1, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 600, color: "text.disabled" }}
+        >
+          O que esta visão guarda
+        </Box>
+      </Text>
+      {empty ? (
+        // Saving is still allowed — an operator may be naming the default on
+        // purpose — but it should not be a surprise afterwards.
+        <Text variant="caption" as="p">
+          <Box component="span" sx={{ color: "warning.main", lineHeight: 1.6 }} data-testid={`${testIdPrefix}-preview-empty`}>
+            Nada foi alterado — esta visão ficará igual à Visão principal.
+          </Box>
+        </Text>
+      ) : (
+        <Stack spacing={0.75}>
+          <SummaryRow label="Filtros" items={preview.filters} testId={`${testIdPrefix}-preview-filters`} />
+          <SummaryRow label="Colunas ocultas" items={preview.columns} testId={`${testIdPrefix}-preview-columns`} />
+          <SummaryRow label="Ordenação" items={preview.sort} testId={`${testIdPrefix}-preview-sort`} />
+        </Stack>
+      )}
     </Box>
   );
 }
@@ -239,6 +323,7 @@ export function SaveViewModal<T extends Record<string, unknown>>({
             size="sm"
             fullWidth
             label="Nome"
+            placeholder="Ex.: Recusados no PIX desta semana"
             value={form.name}
             onChange={(event) => form.setName(event.target.value)}
             data-testid={`${testIdPrefix}-save-name`}
@@ -246,7 +331,8 @@ export function SaveViewModal<T extends Record<string, unknown>>({
           <Input
             size="sm"
             fullWidth
-            label="Descrição (opcional)"
+            label="Descrição — opcional"
+            placeholder="Para que serve esta visão"
             value={form.description}
             onChange={(event) => form.setDescription(event.target.value)}
             data-testid={`${testIdPrefix}-save-description`}
@@ -270,16 +356,18 @@ export function SaveViewModal<T extends Record<string, unknown>>({
             </Text>
           )}
 
-          <Stack direction="row" spacing={2}>
+          {/* Cancel first, primary last: the confirming action sits where the
+              eye lands at the end of the dialog, not before the way out. */}
+          <Stack direction="row" spacing={1.5} sx={{ justifyContent: "flex-end" }}>
+            <Button variant="text" color="neutral" onClick={onClose} dataTestId={`${testIdPrefix}-save-cancel`}>
+              Cancelar
+            </Button>
             <Button
               onClick={() => void form.submit()}
               disabled={!form.canSave}
               dataTestId={`${testIdPrefix}-save-submit`}
             >
               {editing ? "Salvar alterações" : "Salvar visão"}
-            </Button>
-            <Button variant="text" onClick={onClose} dataTestId={`${testIdPrefix}-save-cancel`}>
-              Cancelar
             </Button>
           </Stack>
         </Stack>

@@ -11,6 +11,14 @@ import type {
  */
 interface ViewStateDescription {
   filters: string[];
+  /**
+   * The columns this view HIDES, not the ones it shows.
+   *
+   * A view that hides three of eleven columns listed eight names, which is a
+   * wall of text stating the default. What the operator needs to check before
+   * saving is what this view CHANGES — and for columns, the change is the
+   * hiding.
+   */
   columns: string[];
   sort: string[];
 }
@@ -41,13 +49,13 @@ export function describeViewState<T extends Record<string, unknown>>(
   }
 
   const hideable = columns.filter((col) => col.hideable !== false);
-  const columnsShown = hideable
-    .filter((col) => state.visibleColumns.includes(col.id))
+  const columnsHidden = hideable
+    .filter((col) => !state.visibleColumns.includes(col.id))
     .map((col) => columnLabel(columns, col.id));
 
   const sort = state.sortBy
     .filter((entry) => entry.dir)
     .map((entry) => `${columnLabel(columns, entry.id)} (${entry.dir === "asc" ? "crescente" : "decrescente"})`);
 
-  return { filters, columns: columnsShown, sort };
+  return { filters, columns: columnsHidden, sort };
 }

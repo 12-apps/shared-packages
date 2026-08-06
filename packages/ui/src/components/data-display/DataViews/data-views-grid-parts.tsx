@@ -1,31 +1,28 @@
 "use client";
 
-import { useMediaQuery, useTheme } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import {
-  DataGrid,
-  type GridColumn,
-  type GridSort,
-} from "../DataGrid";
-import {
-  type ColumnVisibilityOption,
-} from "../../layout/ContentToolbar";
 import { TableFilter } from "../../layout/TableFilter";
+import { Text } from "../../typography/Text";
 import { Box } from "../../../mui/Box";
 import { Stack } from "../../../mui/Stack";
 
 import {
-  cardMinWidthForZoom,
-  cardScaleForZoom,
   DataViewsLayoutProvider,
   useDataViewsLayout,
   type DataViewsLayout,
 } from "./data-views-layout-context";
 import { FilterDialog, GridFilterPanel } from "./data-views-filter-panel";
-import { InlineFilterBar } from "./data-views-inline-bar";
-import { GridToolbar } from "./data-views-toolbar";
+import { GridMain } from "./data-views-grid-bodies";
+import { InlineFilterChips, InlineFilterControls } from "./data-views-inline-bar";
+import { toOverflowFields, useFilterOverflow, type OverflowSplit } from "./data-views-overflow";
+import { ShellToolbar } from "./data-views-shell-toolbar";
+import type { DisplayPanelView } from "./data-views-display-panel";
+import type { DataViewExport } from "./data-views-export";
+import { DataViewsEmpty } from "./data-views-empty";
 import { DataViewsPagination } from "./data-views-pagination";
+import type { BoardConfig } from "./DataViewsBoard";
+import { DataViewsScopeTabs, type ScopeConfig } from "./data-views-scopes";
 import { togglePillValues } from "./data-views-grid-helpers";
 import type {
   DataViewCardSelection,
@@ -36,181 +33,82 @@ import type {
 } from "./data-views-types";
 import type { DataViewsController } from "./use-data-views-state";
 
-/* ── Body (grid) ─────────────────────────────────────────────────────────── */
-
-interface GridBodyProps<T extends Record<string, unknown>> {
-  rows: T[];
-  columns: GridColumn<T>[];
-  getRowId: (row: T) => string | number;
-  selectedIds: Array<string | number>;
-  onChangeSelected: (ids: Array<string | number>) => void;
-  sortBy: GridSort[];
-  onChangeSortBy: (next: GridSort[]) => void;
-  /** "server" defers ordering to the backend (rows render as-is); "client" sorts in-grid. */
-  sortMode: "client" | "server";
-  dataTestId?: string;
-  emptyState?: React.ReactNode;
-}
-
-/** The dense DataGrid with multi-select, wrapped in the scrollable table region. */
-function GridBody<T extends Record<string, unknown>>({
-  rows,
-  columns,
-  getRowId,
-  selectedIds,
-  onChangeSelected,
-  sortBy,
-  onChangeSortBy,
-  sortMode,
-  dataTestId,
-  emptyState,
-}: GridBodyProps<T>): React.JSX.Element {
-  return (
-    <Box
-      sx={{
-        width: "100%",
-        overflowX: "auto",
-        mt: 1.5,
-        // Tabwoah-style dense rows: MUI's default TableCell padding keeps rows
-        // tall regardless of rowHeight, so trim it here.
-        "& .MuiTableCell-root": { py: 0.25, fontSize: "0.8125rem" },
-        "& .MuiTableCell-head": { py: 0.5, fontSize: "0.75rem" },
-      }}
-    >
-      <DataGrid<T>
-        rows={rows}
-        columns={columns}
-        getRowId={(row) => getRowId(row)}
-        virtualizeRows={false}
-        density="compact"
-        rowHeight={36}
-        headerHeight={36}
-        selection={{ mode: "multi", selectedRowIds: selectedIds, onChangeSelected }}
-        sorting={{ mode: sortMode, sortBy, onChangeSortBy }}
-        data-testid={dataTestId}
-        emptyState={emptyState}
-      />
-    </Box>
-  );
-}
-
-/* ── Body (cards) ────────────────────────────────────────────────────────── */
-
-interface CardBodyProps<T extends Record<string, unknown>> {
-  rows: T[];
-  renderCard: (row: T, selection: DataViewCardSelection) => React.ReactNode;
-  getRowId: (row: T) => string | number;
-  selectedIds: Set<string | number>;
-  onToggleId: (id: string | number) => void;
-  minCardWidth: number;
-  /** Content scale (padding + type) handed to each card, from the zoom slider. */
-  cardScale: number;
-  dataTestId?: string;
-  emptyState?: React.ReactNode;
-}
+/* ── Header row ──────────────────────────────────────────────────────────── */
 
 /**
- * The "Grade" layout: the filtered/sorted rows rendered as an auto-filling grid
- * of entity-supplied cards. Reuses `rows` (= `c.matched`), so search/filter/sort
- * apply; the column width comes from the zoom slider, and each card is handed its
- * selection state so it can drive its own checkbox (BaseCard) — the same
- * selection model as the table.
+ * The grid's own header row: the page title on the left, the primary page
+ * actions on the right.
+ *
+ * `title` and `headerActions` were DECLARED on `DataViewsGridProps` and
+ * `DataViewsTableBaseProps` but never destructured or forwarded — dead props
+ * whose types lied to every caller that set them. Wired here rather than
+ * deleted: a table that carries its own title keeps the title, the scope tabs
+ * and the toolbar as one block, instead of the page having to space them.
+ *
+ * Renders NOTHING when neither is supplied, so no existing table gains a row.
  */
-function CardBody<T extends Record<string, unknown>>({
-  rows,
-  renderCard,
-  getRowId,
-  selectedIds,
-  onToggleId,
-  minCardWidth,
-  cardScale,
-  dataTestId,
-  emptyState,
-}: CardBodyProps<T>): React.JSX.Element {
-  if (rows.length === 0) {
-    return <Box sx={{ mt: 1.5 }}>{emptyState}</Box>;
-  }
+function GridHeaderRow({
+  title,
+  headerActions,
+  testIdPrefix,
+}: {
+  title?: string;
+  headerActions?: React.ReactNode;
+  testIdPrefix: string;
+}): React.JSX.Element | null {
+  if (!title && !headerActions) return null;
   return (
     <Box
+      data-testid={`${testIdPrefix}-header`}
       sx={{
-        mt: 1.5,
-        display: "grid",
-        // Fixed inter-card gap — deliberately NOT scaled by the zoom slider, so
-        // only the cards grow while the space between them stays constant.
-        gap: 1.5,
-        gridTemplateColumns: `repeat(auto-fill, minmax(${minCardWidth}px, 1fr))`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 2,
+        flexWrap: "wrap",
+        pb: 1.5,
       }}
-      data-testid={dataTestId ? `${dataTestId}-cards` : "data-views-cards"}
     >
-      {rows.map((row) => {
-        const id = getRowId(row);
-        return (
-          <Box key={id}>
-            {renderCard(row, {
-              selected: selectedIds.has(id),
-              onToggleSelect: () => onToggleId(id),
-              scale: cardScale,
-            })}
-          </Box>
-        );
-      })}
+      {title ? (
+        <Text variant="heading" size="lg" as="h2">
+          {title}
+        </Text>
+      ) : (
+        <Box />
+      )}
+      {headerActions && <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>{headerActions}</Box>}
     </Box>
   );
 }
 
-/* ── Body selector (cards vs table, from context) ────────────────────────── */
+/* ── Layout ⇄ view-state mirror ──────────────────────────────────────────── */
 
-interface GridMainProps<T extends Record<string, unknown>> {
-  c: DataViewsController<T>;
-  getRowId: (row: T) => string | number;
-  renderCard?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
-  dataTestId?: string;
-  emptyState?: React.ReactNode;
-}
-
-/** Picks the body to render from the layout context: cards or the dense grid. */
-function GridMain<T extends Record<string, unknown>>({
+/**
+ * Mirrors the LIVE layout back into the view state, so saving a view captures
+ * the layout the user is actually looking at.
+ *
+ * A component rather than a callback prop because only something INSIDE the
+ * provider can read the layout, and only the controller can write the state.
+ * The `stored !== layout` guard is what makes it idempotent: `c` is rebuilt on
+ * every render, so an unguarded effect here would patch → re-render → patch.
+ *
+ * It re-fires when `stored` changes too, which is the case that matters after
+ * applying a saved view: `appliedState` REPLACES the state, so a view saved
+ * before layouts were captured clears `state.layout`, and the mirror puts the
+ * current one back rather than leaving the next save with nothing to store.
+ */
+function LayoutStateSync<T extends Record<string, unknown>>({
   c,
-  getRowId,
-  renderCard,
-  dataTestId,
-  emptyState,
-}: GridMainProps<T>): React.JSX.Element {
-  const { layout, zoom } = useDataViewsLayout();
-  if (layout === "cards" && renderCard) {
-    return (
-      <CardBody
-        rows={c.matched}
-        renderCard={renderCard}
-        getRowId={getRowId}
-        selectedIds={c.selectedIds}
-        onToggleId={(id) => {
-          const next = new Set(c.selectedIds);
-          if (next.has(id)) next.delete(id);
-          else next.add(id);
-          c.setSelectedIds(next);
-        }}
-        minCardWidth={cardMinWidthForZoom(zoom)}
-        cardScale={cardScaleForZoom(zoom)}
-        dataTestId={dataTestId}
-        emptyState={emptyState}
-      />
-    );
-  }
-  return (
-    <GridBody
-      rows={c.matched}
-      columns={c.gridColumns}
-      getRowId={getRowId}
-      selectedIds={[...c.selectedIds]}
-      onChangeSelected={(ids) => c.setSelectedIds(new Set(ids))}
-      sortBy={c.state.sortBy}
-      onChangeSortBy={(next: GridSort[]) => c.patch({ sortBy: next })}
-      sortMode={c.serverMode ? "server" : "client"}
-      dataTestId={dataTestId}
-      emptyState={emptyState}
-    />
-  );
+}: {
+  c: DataViewsController<T>;
+}): null {
+  const { layout } = useDataViewsLayout();
+  const stored = c.state.layout;
+  useEffect(() => {
+    if (stored !== layout) c.patch({ layout });
+    // `c` is intentionally out of the deps — see the guard above.
+  }, [layout, stored]);
+  return null;
 }
 
 /* ── Shell (composes toolbar + body + panel) ─────────────────────────────── */
@@ -256,22 +154,36 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   showInline: boolean;
   useModal: boolean;
   inlineVisible: boolean;
-  filtersHidden: boolean;
-  toggleFilters: () => void;
   filterProps: FilterSurfaceProps<T>;
+  split: OverflowSplit<T>;
+  onControlOpenChange: (open: boolean) => void;
 } {
   const { state } = c;
-  // Read the theme explicitly (falls back to the default when there's no
-  // ThemeProvider) so the query never dereferences a null theme. `noSsr`
-  // evaluates on the client only (no hydration mismatch).
-  const theme = useTheme();
-  const wide = useMediaQuery(theme.breakpoints.up("lg"), { noSsr: true });
-  const [filtersHidden, setFiltersHidden] = useState(false);
-  const showInline = inlineFilters && wide;
-  const useModal = inlineFilters && !wide;
+  // How many filter controls are open. A COUNT, not a flag: closing one popover
+  // by opening another overlaps, and a boolean would unfreeze mid-handover.
+  const [openControls, setOpenControls] = useState(0);
+  // ONE measurement for the whole shell: the filter row decides which controls
+  // it can keep, and the TOOLBAR needs the same answer to drop its labels.
+  // Measuring twice would let the two disagree at the crossover width.
+  const split = useFilterOverflow(
+    toOverflowFields(fields, rangeFields),
+    state.pills,
+    c.ranges,
+    openControls > 0,
+  );
+  // THE BAR RENDERS AT EVERY WIDTH. It used to be swapped for a full-screen
+  // filter MODAL below `lg`, which was the responsive strategy before the
+  // measured ladder existed — and the two now do the same job, badly together:
+  // the modal took the bar away at 1199px, and with it the very degradation
+  // (labels off, search collapsed, filters into "Mais") that exists to make a
+  // narrow bar work. So a 900px window got no bar and no ladder, and the
+  // operator lost the search entirely rather than gaining a compact one.
+  //
+  // The ladder is measured, so it already covers every width the modal did.
+  const showInline = inlineFilters;
+  const useModal = false;
   const inlineVisible =
     showInline &&
-    !filtersHidden &&
     (alwaysShowSearch || fields.length > 0 || rangeFields.length > 0 || state.search !== "");
   const filterProps: FilterSurfaceProps<T> = {
     testIdPrefix,
@@ -287,7 +199,15 @@ function useGridShellFilters<T extends Record<string, unknown>>({
     onClearField: (fieldId) => c.patch({ pills: { ...state.pills, [fieldId]: [] } }),
     onClearAll: () => c.patch({ search: "", pills: {}, ranges: {} }),
   };
-  return { showInline, useModal, inlineVisible, filtersHidden, toggleFilters: () => setFiltersHidden((v) => !v), filterProps };
+  return {
+    showInline,
+    useModal,
+    inlineVisible,
+    filterProps,
+    split,
+    onControlOpenChange: (open) =>
+      setOpenControls((count) => Math.max(0, count + (open ? 1 : -1))),
+  };
 }
 
 interface GridShellProps<T extends Record<string, unknown>> {
@@ -305,8 +225,30 @@ interface GridShellProps<T extends Record<string, unknown>> {
   /** Opt-in "Grade" (cards) layout: renders each row as an entity-supplied card.
    *  Omit ⇒ table only (no layout toggle). */
   renderCard?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
-  /** Which layout to show first when cards are available (default "table"). */
+  /**
+   * Opt-in "Quadro" (board) layout. Needs `renderCard` too — the board reuses
+   * the entity's card, so a board config without one simply offers no board
+   * rather than failing: that is a config gap, not a runtime error.
+   */
+  board?: BoardConfig<T>;
+  /** Opt-in "Lista" layout: one full-width, entity-rendered row per record. */
+  renderListRow?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
+  /** The page-level partition rendered as tabs above the toolbar. */
+  scopes?: ScopeConfig[];
+  /** Per-sort-field value kind, so directions read in the column's own terms. */
+  sortKinds?: Record<string, string>;
+  /** The saved-view chrome bracketing the Exibir panel. */
+  displayView?: DisplayPanelView;
+  /** Injected export — the host re-queries; the grid never fetches. */
+  exportConfig?: DataViewExport;
+  /** Page title in the grid's own header row, above the scopes + toolbar. */
+  title?: string;
+  /** Primary page actions rendered at the header row's right. */
+  headerActions?: React.ReactNode;
+  /** Which layout to show first when the user has expressed no preference (default "table"). */
   defaultLayout?: DataViewsLayout;
+  /** Pin to `defaultLayout`, ignoring the remembered preference (stories/docs). */
+  ignoreStoredLayout?: boolean;
   /**
    * Opt into the responsive inline filter UX: a collapsible filter row below the
    * toolbar on wide screens and a modal on narrow ones. When false (default),
@@ -323,78 +265,114 @@ interface GridShellProps<T extends Record<string, unknown>> {
   alwaysShowSearch?: boolean;
 }
 
-/** Wires the controller into the shared toolbar + filter panel + grid/cards body. */
-export function GridShell<T extends Record<string, unknown>>({
-  c,
-  rows,
-  fields,
-  rangeFields,
-  getRowId,
-  testIdPrefix,
-  dataTestId,
-  emptyState,
-  toolbarRightSlot,
-  rowActions,
-  bulkActions,
-  renderCard,
-  defaultLayout,
-  inlineFilters = false,
-  alwaysShowSearch = false,
-}: GridShellProps<T>): React.JSX.Element {
-  const { state } = c;
-  const { showInline, useModal, inlineVisible, filtersHidden, toggleFilters, filterProps } = useGridShellFilters(
-    { c, inlineFilters, fields, rangeFields, testIdPrefix, alwaysShowSearch },
+/** The scrollable content region: scope tabs, toolbar, filter bar, body, pager. */
+function ShellStack<T extends Record<string, unknown>>({
+  props,
+  filters,
+}: {
+  props: GridShellProps<T>;
+  filters: ReturnType<typeof useGridShellFilters<T>>;
+}): React.JSX.Element {
+  const { c, testIdPrefix, dataTestId, scopes = [], emptyState, inlineFilters = false } = props;
+  const { showInline, useModal, inlineVisible, filterProps, split, onControlOpenChange } = filters;
+  // The grid renders the FILTERED empty state itself — it is the only party
+  // that knows a filter is applied. See {@link DataViewsEmpty}.
+  const body = (
+    <DataViewsEmpty
+      filtered={c.activeFilterCount > 0 || c.state.search !== ""}
+      onClearFilters={() => c.patch({ search: "", pills: {}, ranges: {} })}
+      emptyState={emptyState}
+      testIdPrefix={testIdPrefix}
+    />
   );
-  const columnOptions: ColumnVisibilityOption[] = c.hideableColumns.map((col) => ({
-    id: col.id,
-    label: col.label,
-    visible: state.visibleColumns.includes(col.id),
-  }));
   return (
-    <DataViewsLayoutProvider canUseCards={Boolean(renderCard)} defaultLayout={defaultLayout}>
     <TableFilter open={c.filterOpen} onOpenChange={c.setFilterOpen} hasActiveFilters={c.activeFilterCount > 0}>
       <Stack spacing={0} data-testid={dataTestId ? `${dataTestId}-container` : undefined}>
-        <GridToolbar
+        <GridHeaderRow title={props.title} headerActions={props.headerActions} testIdPrefix={testIdPrefix} />
+        {/* Renders nothing (and reserves nothing) for an empty scope list. */}
+        <DataViewsScopeTabs
+          scopes={scopes}
+          value={c.scope}
+          onChange={c.setScope}
+          counts={c.scopeCounts}
           testIdPrefix={testIdPrefix}
-          selectedRows={c.selectedRows}
-          selectAll={c.selectAll}
-          clearSelection={c.clearSelection}
-          rowActions={rowActions}
-          bulkActions={bulkActions}
-          sortFields={c.resolvedSortFields}
-          activeSortField={c.activeSortField}
-          activeSortOrder={c.activeSortOrder}
-          onChangeSort={(field, order) => c.patch({ sortBy: [{ id: field, dir: order }] })}
-          matchedCount={c.matched.length}
-          totalCount={c.serverMode ? c.serverTotalCount : rows.length}
-          toolbarRightSlot={toolbarRightSlot}
-          columnOptions={columnOptions}
-          onToggleColumn={c.toggleColumn}
-          filterOpen={c.filterOpen}
-          setFilterOpen={c.setFilterOpen}
-          activeFilterCount={c.activeFilterCount}
-          showFilterTrigger={!showInline}
-          showFiltersToggle={showInline}
-          filtersHidden={filtersHidden}
-          onToggleFilters={toggleFilters}
         />
-        {inlineVisible && <InlineFilterBar {...filterProps} />}
+        <ShellToolbar
+          c={c}
+          rows={props.rows}
+          sortKinds={props.sortKinds}
+          displayView={props.displayView}
+          exportConfig={props.exportConfig}
+          filterControls={
+            inlineVisible ? (
+              <InlineFilterControls
+                {...filterProps}
+                split={split}
+                onControlOpenChange={onControlOpenChange}
+              />
+            ) : undefined
+          }
+          barRef={split.barRef}
+          testIdPrefix={testIdPrefix}
+          rowActions={props.rowActions}
+          bulkActions={props.bulkActions}
+          toolbarRightSlot={props.toolbarRightSlot}
+          compactControls={showInline && split.compactControls}
+          showInline={showInline}
+        />
+        {/* Only the applied-filter chips live under the toolbar now — the
+            controls themselves ride on the toolbar line above. */}
+        {inlineVisible && <InlineFilterChips {...filterProps} />}
         <TableFilter.Layout>
           <TableFilter.Main>
             <GridMain
               c={c}
-              getRowId={getRowId}
-              renderCard={renderCard}
+              getRowId={props.getRowId}
+              renderCard={props.renderCard}
+              renderListRow={props.renderListRow}
+              board={props.board}
               dataTestId={dataTestId}
-              emptyState={emptyState}
+              testIdPrefix={testIdPrefix}
+              emptyState={body}
             />
             <DataViewsPagination c={c} testIdPrefix={testIdPrefix} />
           </TableFilter.Main>
-          {!inlineFilters && <GridFilterPanel {...filterProps} />}
+          {inlineFilters ? null : <GridFilterPanel {...filterProps} />}
         </TableFilter.Layout>
         {useModal && <FilterDialog open={c.filterOpen} onClose={() => c.setFilterOpen(false)} {...filterProps} />}
       </Stack>
     </TableFilter>
+  );
+}
+
+export function GridShell<T extends Record<string, unknown>>(props: GridShellProps<T>): React.JSX.Element {
+  const {
+    c,
+    fields,
+    rangeFields,
+    testIdPrefix,
+    renderCard,
+    renderListRow,
+    board,
+    defaultLayout,
+    ignoreStoredLayout,
+    inlineFilters = false,
+    alwaysShowSearch = false,
+  } = props;
+  const filters = useGridShellFilters({ c, inlineFilters, fields, rangeFields, testIdPrefix, alwaysShowSearch });
+  return (
+    <DataViewsLayoutProvider
+      canUseCards={Boolean(renderCard)}
+      canUseList={Boolean(renderListRow)}
+      // The board reuses the entity's card, so it needs BOTH — a `board` with no
+      // `renderCard` offers no board rather than throwing.
+      canUseBoard={Boolean(board && renderCard)}
+      defaultLayout={defaultLayout}
+      ignoreStoredLayout={ignoreStoredLayout}
+      viewLayout={c.state.layout}
+    >
+    <LayoutStateSync c={c} />
+    <ShellStack props={props} filters={filters} />
     </DataViewsLayoutProvider>
   );
 }
