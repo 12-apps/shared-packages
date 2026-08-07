@@ -37,7 +37,7 @@ export function HostedLinkScreen({ method }: ProviderCheckoutScreenProps): JSX.E
 
   return (
     <Box
-      data-testid="checkout-hosted-handoff"
+      data-testid="checkout-handoff-pending"
       sx={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center", py: 4 }}
     >
       <LoadingState variant="spinner" message="Preparando o pagamento" size="md" />

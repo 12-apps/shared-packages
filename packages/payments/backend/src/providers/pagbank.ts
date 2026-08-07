@@ -1,7 +1,6 @@
 import type { PaymentProviderAdapter } from '../core/provider';
-import { ProviderRequestError } from '../core/errors';
 import { stubDeliveryTrusted } from '../core/stub-mode';
-import type { ChargeInput, ChargeSnapshot, ResolvedCredentials } from '../core/types';
+import type { ChargeInput, ResolvedCredentials } from '../core/types';
 import {
   customerPayload,
   customerSchema,
@@ -94,7 +93,6 @@ function cardPayload(input: ChargeInput, credentials: ResolvedCredentials) {
   };
 }
 
-/** The QR payload, wherever this response shape happens to carry it. */
 /**
  * Reconciliation probe. PagBank indexes orders by the `reference_id` we set
  * at creation, so an order created moments before a timeout is findable

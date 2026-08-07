@@ -130,14 +130,14 @@ describe("the screens do not know about each other (AC2)", () => {
       />,
     );
     expect(screen.getByTestId("stub-pix-view")).toBeTruthy();
-    expect(screen.queryByTestId("checkout-hosted-handoff")).toBeNull();
+    expect(screen.queryAllByTestId("checkout-handoff-pending")).toHaveLength(0);
   });
 
   it("hosted-link renders the hand-off and never a card or PIX pane", () => {
     render(<HostedLinkScreen {...props({ config: storeWith("hosted-link"), method: "CARD" })} />);
-    expect(screen.getByTestId("checkout-hosted-handoff")).toBeTruthy();
-    expect(screen.queryByTestId("stub-card-view")).toBeNull();
-    expect(screen.queryByTestId("stub-pix-view")).toBeNull();
+    expect(screen.getByTestId("checkout-handoff-pending")).toBeTruthy();
+    expect(screen.queryAllByTestId("stub-card-view")).toHaveLength(0);
+    expect(screen.queryAllByTestId("stub-pix-view")).toHaveLength(0);
   });
 
   it("hosted-link stays out of the way until a method is chosen", () => {
@@ -181,7 +181,7 @@ describe("the capability default picks the shape from what the store can do", ()
       ],
     };
     render(<CapabilityDefaultScreen {...props({ config: hosted, method: "CARD" })} />);
-    expect(screen.getByTestId("checkout-hosted-handoff")).toBeTruthy();
+    expect(screen.getByTestId("checkout-handoff-pending")).toBeTruthy();
   });
 
   it("does NOT read a PIX-only store as hosted (the FUT-747 correction)", () => {
@@ -216,7 +216,7 @@ describe("the capability default picks the shape from what the store can do", ()
       />,
     );
     expect(screen.getByTestId("stub-pix-view")).toBeTruthy();
-    expect(screen.queryByTestId("checkout-hosted-handoff")).toBeNull();
+    expect(screen.queryAllByTestId("checkout-handoff-pending")).toHaveLength(0);
   });
 
   it("renders the on-page screen while the config is still loading", () => {
@@ -224,6 +224,6 @@ describe("the capability default picks the shape from what the store can do", ()
     render(<CapabilityDefaultScreen {...props({ config: null, method: null })} />);
     // No order and no method yet ⇒ the pane is legitimately empty, but it is
     // the on-page screen that decided so, not a missing component.
-    expect(screen.queryByTestId("checkout-hosted-handoff")).toBeNull();
+    expect(screen.queryAllByTestId("checkout-handoff-pending")).toHaveLength(0);
   });
 });

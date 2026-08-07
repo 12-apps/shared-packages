@@ -9,6 +9,7 @@ import { PaymentsCheckoutHeadlessPage } from './payments-checkout-headless';
 import { PaymentsCheckoutMethodGatePage } from './payments-checkout-method-gate';
 import { PaymentsCheckoutNoProviderPage } from './payments-checkout-no-provider';
 import { PaymentsCheckoutPixPage } from './payments-checkout-pix';
+import { PaymentsCheckoutProviderScreensPage } from './payments-checkout-provider-screens';
 import { PaymentsCheckoutRedirectPage } from './payments-checkout-redirect';
 import { PaymentsCheckoutSavedCardsPage } from './payments-checkout-saved-cards';
 import { PaymentsCheckoutSlotsPage } from './payments-checkout-slots';
@@ -89,6 +90,12 @@ export const PAGES: readonly HarnessPage[] = [
     title: 'Checkout · provider chain',
     pkg: PAYMENTS_FRONTEND,
     Component: PaymentsCheckoutChainFailoverPage,
+  },
+  {
+    slug: 'payments-checkout-provider-screens',
+    title: 'Checkout · provider screens',
+    pkg: PAYMENTS_FRONTEND,
+    Component: PaymentsCheckoutProviderScreensPage,
   },
   {
     slug: 'payments-checkout-method-gate',
