@@ -2,6 +2,7 @@ import {
   accumulate,
   compareValues,
   finalize,
+  mergeAccumulator,
   newAccumulator,
   normalize,
   type Comparable,
@@ -111,26 +112,73 @@ function sortableValue(value: ReportRow[string] | undefined): Comparable | null 
   return value;
 }
 
-function sortRows(rows: ReportRow[], query: CompiledQuery): ReportRow[] {
+/** The row ordering a query asks for, defaulting to the dimensions ascending. */
+function rowComparator(query: CompiledQuery): (a: ReportRow, b: ReportRow) => number {
   const orderings =
     query.sort.length > 0
       ? query.sort
       : query.dimensions.map((dimension) => ({ alias: dimension.alias, direction: 'asc' as const }));
-  return [...rows].sort((a, b) => {
+  return (a, b) => {
     for (const { alias, direction } of orderings) {
       const cmp = compareValues(sortableValue(a[alias]), sortableValue(b[alias]));
       if (cmp !== 0) return direction === 'asc' ? cmp : -cmp;
     }
     return 0;
-  });
+  };
+}
+
+/** The label the folded remainder carries on the grouping dimension. */
+export const OTHERS_BUCKET_LABEL = 'Outros';
+
+/**
+ * Fold every group past `topN` into ONE, labelled "Outros" (FUT-391).
+ *
+ * Without it a top-5 over twelve products silently discarded seven, so the
+ * chart stopped adding up to the report's own total and nothing said why. The
+ * remainder is merged at the ACCUMULATOR level, which keeps the bucket exact
+ * for every aggregation — see {@link mergeAccumulator}.
+ *
+ * Single-dimension queries only. With a split, groups are per PAIR, so one
+ * "Outros" row would have to answer "which series?" and any answer is a guess;
+ * those keep the plain truncation until top-N is defined for a split.
+ */
+function foldOthers(ordered: Group[], query: CompiledQuery): Group[] | null {
+  const topN = query.topN;
+  if (topN === undefined || query.dimensions.length !== 1 || ordered.length <= topN) return null;
+
+  const bucket: Group = {
+    key: [OTHERS_BUCKET_LABEL],
+    accumulators: query.measures.map(() => newAccumulator()),
+  };
+  for (const group of ordered.slice(topN)) {
+    group.accumulators.forEach((accumulator, index) => {
+      const target = bucket.accumulators[index];
+      if (target && accumulator) mergeAccumulator(target, accumulator);
+    });
+  }
+  return [...ordered.slice(0, topN), bucket];
 }
 
 /** Execute a compiled query over in-memory rows (exported for host adapters
  * that fetch raw rows and fold in process). */
 export function executeCompiledQuery(rows: SourceRow[], query: CompiledQuery): ReportRow[] {
   const filtered = rows.filter((row) => query.filters.every((filter) => matchesFilter(row, filter)));
-  const grouped = groupRows(filtered, query).map((group) => toReportRow(group, query));
-  return sortRows(grouped, query).slice(0, query.limit);
+  const compare = rowComparator(query);
+  // Groups are sorted by the row they PRODUCE — the author's ordering is
+  // expressed over aliases — and folded afterwards, so "Outros" is the tail of
+  // that ordering rather than of insertion order.
+  const ordered = groupRows(filtered, query)
+    .map((group) => ({ group, row: toReportRow(group, query) }))
+    .sort((a, b) => compare(a.row, b.row))
+    .map((entry) => entry.group);
+
+  // The safety cap does NOT apply to a folded result: `limit` equals the
+  // author's top-N, so slicing to it would chop off the very bucket the fold
+  // just created and put the numbers back out of balance. A fold is already
+  // bounded at topN + 1.
+  const folded = foldOthers(ordered, query);
+  const output = (folded ?? ordered).map((group) => toReportRow(group, query));
+  return folded ? output : output.slice(0, query.limit);
 }
 
 /** Build a DataSource over plain per-entity row arrays. */

@@ -367,6 +367,10 @@ export function compileReport(
     filters,
     sort,
     limit: Math.min(spec.limit ?? maxRows, maxRows),
+    // Only a spec-declared limit is a top-N. Hitting the safety cap is
+    // truncation, and folding THAT remainder into "Outros" would claim a
+    // total the report never computed.
+    ...(spec.limit !== undefined ? { topN: Math.min(spec.limit, maxRows) } : {}),
     timeZone: resolveTimeZone(spec, options),
   };
 }

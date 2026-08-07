@@ -14,6 +14,7 @@ import { PaymentsCheckoutSavedCardsPage } from './payments-checkout-saved-cards'
 import { PaymentsCheckoutSlotsPage } from './payments-checkout-slots';
 import { PaymentsProviderSettingsPage } from './payments-provider-settings';
 import { PwaInstallPromptPage } from './pwa-install-prompt';
+import { ReportBuilderPage } from './report-builder';
 
 /**
  * One page per published surface, and the ONLY place a new one is registered.
@@ -23,6 +24,12 @@ import { PwaInstallPromptPage } from './pwa-install-prompt';
  * The shell builds its nav from this list, so nothing else has to change — and
  * a spec addresses a page by slug (`#/<slug>`), so specs do not move when the
  * nav grows.
+ *
+ * ONE ENTRY PER PACKAGE. This is a consumer harness, not a component gallery:
+ * a page proves the package's PUBLIC wiring works for a host, so a package
+ * that needs several screens exposes them behind its own entry point and the
+ * harness still wires it once. Exploring components individually is
+ * Storybook's job, and belongs in the package that owns them.
  *
  * `pkg` is the package the page exercises, shown in the nav. It is not derived
  * from the imports on purpose: a page may compose several packages (the
@@ -124,5 +131,11 @@ export const PAGES: readonly HarnessPage[] = [
     title: 'Install prompt',
     pkg: '@12-apps/ui',
     Component: PwaInstallPromptPage,
+  },
+  {
+    slug: 'report-builder',
+    title: 'Report builder',
+    pkg: '@12-apps/report-builder',
+    Component: ReportBuilderPage,
   },
 ];
