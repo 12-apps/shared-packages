@@ -9,7 +9,7 @@ import { useEffect } from "react";
 
 import { tokenizerFor, type CardTokenizationConfig } from "../../card";
 
-import type { CheckoutProviderConfig, PaymentMethod } from "./types";
+import type { CheckoutChainLink, CheckoutProviderConfig, PaymentMethod } from "./types";
 
 /**
  * Whether the store's CHAIN gives this browser a card path (FUT-697/563).
@@ -26,14 +26,37 @@ import type { CheckoutProviderConfig, PaymentMethod } from "./types";
  * Answering "yes, it is REDIRECT" off the head alone is what let the picker
  * offer a card the submit could never tokenize.
  *
+ * Asked only of the entries that DECLARE `CARD` (FUT-747), for the same reason
+ * the server's predicate is: tokenization is a card fact, so a PIX-only entry
+ * has nothing to say about the card path and must not be read as "this store
+ * hands the buyer over". A store with no card-capable entry at all has no card
+ * path — `offeredMethods` is already not offering one, and saying so here is
+ * what lets {@link usePreselectSoleMethod} pick the store's only method.
+ *
  * `null` config (still loading / fetch blip) fails OPEN for the UI — the
  * tokenizer itself still fails CLOSED.
  */
 export function cardPathAvailable(config: CheckoutProviderConfig | null): boolean {
   if (!config) return true;
-  const chain = cardChain(config);
+  const chain = cardCapableChain(config);
+  if (chain.length === 0) return false;
   if (!chain.some((link) => link.mintable)) return true;
   return chain.some(canMintFor);
+}
+
+/**
+ * The published chain narrowed to the entries that declare `CARD` — the same
+ * subset the server's walk will attempt, since it skips a provider whose
+ * capabilities exclude the method.
+ *
+ * A store that served NO chain (an older host, or a mocked config) has no
+ * per-entry `methods` to narrow on, so it degrades to {@link cardChain}'s head
+ * triple and behaves exactly as it did before.
+ */
+function cardCapableChain(config: CheckoutProviderConfig): CardChainLink[] {
+  const chain = config.chain;
+  if (!chain || chain.length === 0) return cardChain(config);
+  return chain.filter((link) => link.methods.includes("CARD")).map(toCardLink);
 }
 
 /** Whether this browser can really produce an instrument for ONE chain entry. */
@@ -104,12 +127,17 @@ export function cardChain(config: CheckoutProviderConfig | null): CardChainLink[
     const mintable = config.tokenization === null || MINTABLE.has(config.tokenization);
     return [{ ...cardTokenization(config), mintable }];
   }
-  return chain.map((link) => ({
+  return chain.map(toCardLink);
+}
+
+/** ONE published chain entry, as the card path sees it. */
+function toCardLink(link: CheckoutChainLink): CardChainLink {
+  return {
     provider: link.provider,
     publicKey: link.publicKey,
     mockTokenization: link.mockTokenization,
     mintable: MINTABLE.has(link.tokenization),
-  }));
+  };
 }
 
 /**
