@@ -13,9 +13,11 @@ import {
   type ChargeInput,
   type ChargeSnapshot,
   type CheckoutCopy,
+  type ClientTokenization,
   type MerchantRef,
   type Money,
   type Payable,
+  type PaymentMethodKind,
   type PaymentProviderAdapter,
 } from '@12-apps/payments-backend';
 import { describe, expect, it } from 'vitest';
@@ -44,22 +46,28 @@ interface AdapterOptions {
   refuses?: boolean;
   /** Collects every `ChargeInput` the gateway handed this adapter. */
   seen?: ChargeInput[];
+  /** What this adapter declares it can charge. Defaults to both. */
+  methods?: readonly PaymentMethodKind[];
+  /** Overrides the hosted/in-browser default — a PIX-only provider has `NONE`. */
+  tokenization?: ClientTokenization;
 }
 
 /** The smallest adapter the gateway will accept. No vendor anywhere in it. */
 function harnessAdapter(name: string, options: AdapterOptions = {}): PaymentProviderAdapter {
   const chargeId = (reference: string): string => `stub_${name}_${reference}`;
+  const tokenization: ClientTokenization =
+    options.tokenization ?? (options.hosted ? 'REDIRECT' : 'PUBLIC_KEY');
   return {
     name,
     displayName: name,
     capabilities: {
-      methods: ['PIX', 'CARD'],
+      methods: options.methods ?? ['PIX', 'CARD'],
       savedCards: false,
       refunds: false,
       partialRefunds: false,
       splits: false,
       webhooks: true,
-      tokenization: options.hosted ? 'REDIRECT' : 'PUBLIC_KEY',
+      tokenization,
     },
     credentialSchema: [{ key: 'secretKey', label: 'Secret', secret: true, required: true }],
     async verifyCredentials() {
@@ -99,10 +107,7 @@ function harnessAdapter(name: string, options: AdapterOptions = {}): PaymentProv
         return { provider: name, eventId: 'evt', type: 'UNKNOWN' };
       },
     },
-    clientConfig: () => ({
-      provider: name,
-      tokenization: options.hosted ? 'REDIRECT' : 'PUBLIC_KEY',
-    }),
+    clientConfig: () => ({ provider: name, tokenization }),
   };
 }
 
@@ -226,6 +231,58 @@ describe('@12-apps/payments-backend — the published buyer-checkout mount', () 
     expect(stored?.snapshot.amount).toEqual(BRL(7500));
     expect(stored?.reference).toBe(REF);
     expect(stored?.idempotencyKey).toBe(`${REF}:0`);
+  });
+
+  it('takes PIX at a store whose only provider tokenizes NOTHING', async () => {
+    // FUT-747 — the simplest store there is: one PIX-only provider, honestly
+    // declaring `NONE` because PIX is a QR and there is no PAN to encrypt.
+    // Read chain-wide, that declaration meant "this checkout is hosted", the
+    // create was routed into hosted-CARD handling, and the store could take no
+    // PIX at all. Proven through the consumer's door because the whole point of
+    // adopting this mount is that a host stops writing this branch itself.
+    const { routes, charges: store, written } = setup([
+      harnessAdapter('alpha', { methods: ['PIX'], tokenization: 'NONE' }),
+    ]);
+
+    const created = await call(routes, 'POST', '/', {});
+
+    expect(created.status).toBe(200);
+    const data = created.body.data as Record<string, unknown>;
+    // Nowhere to hand the buyer to, and nothing pretending there is.
+    expect(data.hostedCheckoutUrl).toBeUndefined();
+    expect(store.all()[0]?.snapshot.pix?.qrText).toBe(`qr:stub_alpha_${REF}`);
+    // Attached as the payable's live charge, so a webhook or a poll can settle
+    // it — the whole reason a QR is worth minting.
+    expect(written.pending).toBe(1);
+  });
+
+  it('publishes that store as PIX-only, tokenizing nothing', async () => {
+    const { routes } = setup([harnessAdapter('alpha', { methods: ['PIX'], tokenization: 'NONE' })]);
+
+    const { body } = await call(routes, 'GET', '/config');
+    const data = body.data as { methods: string[]; chain: { tokenization: string }[] };
+
+    // The browser is told the truth and offers one tile; nothing here asks it
+    // to mint an instrument that does not exist.
+    expect(data.methods).toEqual(['PIX']);
+    expect(data.chain.map((entry) => entry.tokenization)).toEqual(['NONE']);
+  });
+
+  it('still shows a card form when a LATER provider tokenizes in the browser', async () => {
+    // The other half of the same question, unchanged: a hosted head with an
+    // acquirer behind it raises nothing at create — the browser mints one
+    // instrument per entry and posts `/charge`, which is what lets the walk
+    // reach the acquirer at all.
+    const { routes, charges: store } = setup(
+      [harnessAdapter('alpha', { hosted: true }), harnessAdapter('beta')],
+      'CARD',
+    );
+
+    const created = await call(routes, 'POST', '/', {});
+
+    expect(created.status).toBe(200);
+    expect((created.body.data as Record<string, unknown>).hostedCheckoutUrl).toBeUndefined();
+    expect(store.all()).toHaveLength(0);
   });
 
   it('commits the walk when a REDIRECT provider mints a link, across requests', async () => {
