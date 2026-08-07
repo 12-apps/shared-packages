@@ -17,6 +17,7 @@ import {
   type AiHostGuide,
 } from "../guide";
 import { AiLanding } from "./ai-landing";
+import type { DisconnectHandler } from "./ai-status-board";
 import {
   buildFlowSteps,
   connectedSummary,
@@ -57,6 +58,14 @@ export interface AiIntegrationOnboardingProps {
    * `window.location.reload()`.
    */
   onRetest?: () => void;
+  /**
+   * Revoke a connected assistant's access, from the completed status board. The
+   * host ID is the board's card, NOT the connection — `claude` and
+   * `claude-desktop` share one provider, so the app resolves which stored
+   * connection it owns (`providerForHostId`) and revokes that. Omitted → the
+   * board stays read-only, which is the pre-existing behavior.
+   */
+  onDisconnect?: DisconnectHandler;
 }
 
 /** Resolved (defaults-applied) props threaded to the in-provider flow body. */
@@ -68,6 +77,7 @@ interface FlowProps {
   permissionModel: string;
   connectPrompt: string;
   onRetest: () => void;
+  onDisconnect: DisconnectHandler | undefined;
   devReset: boolean;
 }
 
@@ -78,8 +88,17 @@ interface FlowProps {
  * Escolher → Copiar URL → Configurar → Conectar → Confirmar flow.
  */
 function AiOnboardingFlow(props: FlowProps): React.JSX.Element {
-  const { endpointUrl, connections, hosts, capabilities, permissionModel, connectPrompt, onRetest, devReset } =
-    props;
+  const {
+    endpointUrl,
+    connections,
+    hosts,
+    capabilities,
+    permissionModel,
+    connectPrompt,
+    onRetest,
+    onDisconnect,
+    devReset,
+  } = props;
   const { state } = useOnboarding();
   const selectedHost = hosts.find((h) => h.id === state.data.selectedHost) ?? hosts[0]!;
 
@@ -97,7 +116,9 @@ function AiOnboardingFlow(props: FlowProps): React.JSX.Element {
       configuredTitle={connectedTitle(connections, hosts, connectedHostId)}
       configuredSummary={connectedSummary(connections)}
       editLabel="Conectar IA"
-      completedContent={(nav) => <StatusBoard nav={nav} connections={connections} hosts={hosts} />}
+      completedContent={(nav) => (
+        <StatusBoard nav={nav} connections={connections} hosts={hosts} onDisconnect={onDisconnect} />
+      )}
       devReset={devReset}
       dataTestId="ai-onboarding"
     />
@@ -129,6 +150,7 @@ export function AiIntegrationOnboarding({
   onRetest = () => {
     if (typeof window !== "undefined") window.location.reload();
   },
+  onDisconnect,
 }: AiIntegrationOnboardingProps): React.JSX.Element {
   return (
     <OnboardingProvider featureKey={featureKey} store={store} initialState={initialState}>
@@ -140,6 +162,7 @@ export function AiIntegrationOnboarding({
         permissionModel={permissionModel}
         connectPrompt={connectPrompt}
         onRetest={onRetest}
+        onDisconnect={onDisconnect}
         devReset={devReset}
       />
     </OnboardingProvider>
