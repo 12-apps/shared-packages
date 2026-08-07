@@ -148,7 +148,7 @@ const meta: Meta<typeof BaseListCard> = {
     // but lose their useless widgets, and the plumbing leaves the table.
     ...category("Layout", {
       density: { control: "inline-radio", options: ["compact", "cozy", "comfortable"] },
-      scale: { control: { type: "range", min: 0.9, max: 1.6, step: 0.05 } },
+      scale: { control: { type: "range", min: 0.5, max: 1.6, step: 0.05 } },
       divider: { control: "boolean" },
       selectable: { control: "boolean" },
       selected: { control: "boolean" },
@@ -168,6 +168,7 @@ const meta: Meta<typeof BaseListCard> = {
       value: { control: "text" },
     }),
     ...category("Behaviour", {
+      draggable: { control: "boolean" },
       href: { control: "text" },
       target: { control: "text" },
       onClick: { control: false },
@@ -197,9 +198,6 @@ const meta: Meta<typeof BaseListCard> = {
       "dragId",
       "onContextMenu",
       "actionsAlwaysVisible",
-      // A VETO, not a switch: dragging is the container's decision, so outside a
-      // `DragContainerProvider` this changes nothing. It has a story of its own.
-      "draggable",
     ),
   },
 };
@@ -217,7 +215,35 @@ type Story = StoryObj<typeof BaseListCard>;
  * note on `meta.args`.
  */
 export const Pedido: Story = {
+  /**
+   * A REAL container, so `draggable` is a real switch.
+   *
+   * The grip is not the card's to conjure: `useDragItem` returns the inert
+   * answer with no container above it, deliberately, because a handle that
+   * cannot drag anything is worse than no handle at all. So rather than fake
+   * one for the control's benefit, this story provides the seam — the same
+   * native HTML5 wiring `DraggableInsideAContainer` uses — and the toggle then
+   * exercises what `draggable` actually means: the CARD'S VETO over a decision
+   * the container has already made.
+   */
+  decorators: [
+    (Story) => (
+      <DragContainerProvider
+        value={{
+          handleProps: (id) => ({
+            draggable: true,
+            onDragStart: (event: React.DragEvent) =>
+              event.dataTransfer.setData("text/plain", String(id)),
+          }),
+          itemProps: () => ({ onDragOver: (event: React.DragEvent) => event.preventDefault() }),
+        }}
+      >
+        <Story />
+      </DragContainerProvider>
+    ),
+  ],
   args: {
+    dragId: "B75A6858",
     title: "B75A6858",
     subtitle: "Luiz Gustavo",
     value: "R$ 13,90",
