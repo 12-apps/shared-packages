@@ -1,0 +1,166 @@
+/**
+ * The saved-report list as CARDS (FUT-391).
+ *
+ * It replaced a `<select>`, which gave a name and nothing else — no
+ * description, no last-edited date, no sense of whether a report was a single
+ * chart or a twelve-block dashboard — and then repeated that name as the page
+ * heading. Picking between "Vendas" and "Vendas 2" meant opening both.
+ *
+ * "Mostrar arquivados" was a floating checkbox beside it, which made archiving
+ * read as a display toggle rather than as one of the list's states; it becomes
+ * a scope pill next to the search.
+ */
+import type { JSX } from "react";
+
+import { Button } from "@12-apps/ui/form/Button";
+import { Input } from "@12-apps/ui/form/Input";
+import { Card } from "@12-apps/ui/layout/Card";
+import { Box } from "@12-apps/ui/mui/Box";
+import { Stack } from "@12-apps/ui/mui/Stack";
+import { Text } from "@12-apps/ui/typography/Text";
+
+import type { SavedReportSummary } from "./custom-reports-api";
+import {
+  REPORT_SCOPE_LABELS,
+  filterReports,
+  scopeCounts,
+  type ReportScope,
+} from "./report-list-filters";
+
+const SCOPES: ReportScope[] = ["active", "archived"];
+
+/** A draft or archived report says so; a published one needs no badge. */
+function statusNote(report: SavedReportSummary): string | null {
+  if (report.status === "archived") return "Arquivado";
+  if (report.status === "draft") return "Rascunho";
+  return null;
+}
+
+/** "Painel · 3 coleções" — what the name alone never said. */
+function shapeNote(report: SavedReportSummary): string {
+  const kind = report.type === "dashboard" ? "Painel" : "Relatório";
+  const count = report.entities.length;
+  return count > 1 ? `${kind} · ${count} coleções` : kind;
+}
+
+function ReportCard({
+  report,
+  selected,
+  onSelect,
+}: {
+  report: SavedReportSummary;
+  selected: boolean;
+  onSelect: () => void;
+}): JSX.Element {
+  const note = statusNote(report);
+  return (
+    <Card
+      variant="outlined"
+      sx={{
+        p: 2,
+        cursor: "pointer",
+        ...(selected ? { outline: "2px solid", outlineColor: "primary.main" } : {}),
+      }}
+      onClick={onSelect}
+      data-testid={`reports-card-${report.id}`}
+    >
+      {/* A real button inside the card, not a click handler alone: the card is
+          reachable by keyboard and announced as the control it is. */}
+      <Stack spacing={0.5}>
+        <Button
+          variant="text"
+          size="sm"
+          onClick={onSelect}
+          aria-current={selected ? "true" : undefined}
+          data-testid={`reports-card-${report.id}-open`}
+        >
+          {report.name}
+        </Button>
+        {report.description ? (
+          <Text variant="body" size="sm" color="secondary">
+            {report.description}
+          </Text>
+        ) : null}
+        <Text variant="body" size="xs" color="secondary">
+          {shapeNote(report)}
+          {note ? ` · ${note}` : ""}
+        </Text>
+      </Stack>
+    </Card>
+  );
+}
+
+export function ReportCardList({
+  reports,
+  selectedId,
+  scope,
+  search,
+  onScopeChange,
+  onSearchChange,
+  onSelect,
+  onCreate,
+}: {
+  reports: readonly SavedReportSummary[];
+  selectedId: string;
+  scope: ReportScope;
+  search: string;
+  onScopeChange: (scope: ReportScope) => void;
+  onSearchChange: (search: string) => void;
+  onSelect: (id: string) => void;
+  onCreate: () => void;
+}): JSX.Element {
+  const counts = scopeCounts(reports);
+  // The selected report is kept whatever the filters say — losing the thing
+  // you are looking at because you typed in a search box is a worse surprise
+  // than an out-of-scope card.
+  const visible = filterReports(reports, { scope, search, keepId: selectedId });
+
+  return (
+    <Stack spacing={2}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
+        {SCOPES.map((option) => (
+          <Button
+            key={option}
+            variant={option === scope ? "solid" : "outline"}
+            size="sm"
+            aria-pressed={option === scope}
+            onClick={() => onScopeChange(option)}
+            data-testid={`reports-scope-${option}`}
+          >
+            {REPORT_SCOPE_LABELS[option]} ({counts[option]})
+          </Button>
+        ))}
+        <Box sx={{ minWidth: 220 }}>
+          <Input
+            size="sm"
+            aria-label="Buscar relatórios"
+            placeholder="Buscar…"
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            data-testid="reports-search"
+          />
+        </Box>
+        <Button variant="solid" size="sm" onClick={onCreate} data-testid="reports-new">
+          Novo relatório
+        </Button>
+      </Stack>
+
+      {visible.length === 0 ? (
+        <Text variant="body" size="sm" color="secondary" data-testid="reports-none-match">
+          Nenhum relatório encontrado.
+        </Text>
+      ) : (
+        <Stack spacing={1} data-testid="reports-card-list">
+          {visible.map((report) => (
+            <ReportCard
+              key={report.id}
+              report={report}
+              selected={report.id === selectedId}
+              onSelect={() => onSelect(report.id)}
+            />
+          ))}
+        </Stack>
+      )}
+    </Stack>
+  );
+}

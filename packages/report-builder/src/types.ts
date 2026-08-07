@@ -101,6 +101,12 @@ export function isSuppressed(value: ReportCellValue | undefined): value is Suppr
   return value === SUPPRESSED;
 }
 
+/** One selectable value of a closed-set field: stored `value`, shown `label`. */
+export interface FieldValueOption {
+  value: string;
+  label: string;
+}
+
 export interface FieldDef {
   /** Human label surfaced to builders and LLMs. */
   label: string;
@@ -113,6 +119,26 @@ export interface FieldDef {
   format?: ReportValueFormat;
   /** Optional description surfaced through field listings (LLM authoring). */
   description?: string;
+  /**
+   * The field's CLOSED set of values, labelled (FUT-391). A field that declares
+   * these is filtered by PICKING — the builder offers "Pago", not a text box the
+   * author has to type `PAID` into, which is the single largest source of
+   * silently-empty blocks: a typo produces a valid spec that matches no rows.
+   *
+   * The label is display-only. Filters always carry the `value`, so renaming a
+   * label never rewrites a stored spec.
+   *
+   * Absent means the field is open-ended (a name, a free-text note) and the
+   * builder falls back to a text input, which is correct for those.
+   */
+  values?: readonly FieldValueOption[];
+  /**
+   * The filter operators this field accepts (FUT-391). Defaults per
+   * {@link FieldType} — see `operatorsFor` — so a catalog only names these to
+   * NARROW them. An enum offering `gte` invites "status a partir de Pago",
+   * which compiles and means nothing.
+   */
+  ops?: readonly FilterOperator[];
   /**
    * Marks a DIMENSION as identifying an individual person (FUT-454). Grouping
    * by it forces EVERY measure of the spec to declare `minSample >= this`, so
@@ -220,7 +246,20 @@ export interface CompiledQuery {
   measures: CompiledMeasure[];
   filters: CompiledFilter[];
   sort: Array<{ alias: string; direction: 'asc' | 'desc' }>;
+  /**
+   * The hard row cap. This is a SAFETY bound — the host's `maxRows`, or the
+   * spec's own limit when it asks for less — and rows beyond it are dropped.
+   */
   limit: number;
+  /**
+   * The author's top-N, present only when the SPEC asked for one (FUT-391).
+   *
+   * Deliberately separate from {@link limit}, which the two used to share: a
+   * query truncated at the 1000-row safety cap is not a top-N, and treating it
+   * as one would staple an "Outros" bucket onto every large report. Only this
+   * field means "show the leaders and fold the rest".
+   */
+  topN?: number;
   /**
    * The tenant's IANA zone, resolved at compile time (FUT-454). Date buckets
    * are computed on THIS clock, so a 02:00Z sale lands on the previous day in
