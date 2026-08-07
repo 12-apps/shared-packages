@@ -20,6 +20,7 @@ import { Text } from "../../typography/Text";
 
 import type { OverflowField } from "./data-views-overflow";
 import { RangePresets } from "./data-views-preset-chips";
+import { RangeBounds } from "./data-views-range-pill";
 import { presetsFor } from "./data-views-range-presets";
 import { isRangeSet } from "./data-views-range-values";
 import type { RangeValue } from "./data-views-types";
@@ -112,7 +113,22 @@ function OverflowPill<T extends Record<string, unknown>>({
 }
 
 
-/** One overflowed range: its two bounds, as the same inputs the pill uses. */
+/**
+ * One overflowed range: its two bounds, as the same inputs the pill uses.
+ *
+ * The bounds DELEGATE to {@link RangeBounds} rather than being built here,
+ * which is the whole point — this panel used to render a raw
+ * `<input type="date">`, so the masked `dd/mm/aaaa` field existed only while
+ * the filter FITTED on the bar. The moment "Data" overflowed it reverted to the
+ * native control the mask replaced, and a merchant on a narrow screen never saw
+ * the fix at all (FUT-744). `Valor` had the twin bug: a bare `type="number"`
+ * plus `Number(raw)` dropped the decimal comma this panel is meant to accept.
+ *
+ * That also retires the intrinsic-width workaround this pair used to need — a
+ * native date input reports a wide minimum (its own mask plus the picker
+ * glyph), which is what made two of them refuse to shrink and scrolled the
+ * panel sideways. A text input has no such minimum.
+ */
 function OverflowRange<T extends Record<string, unknown>>({
   field,
   value,
@@ -123,14 +139,10 @@ function OverflowRange<T extends Record<string, unknown>>({
   value: RangeValue;
   onChange: (range: RangeValue) => void;
   testIdPrefix: string;
-}): React.JSX.Element {
-  const day = field.range?.kind === "day";
-  const set = (bound: "min" | "max", raw: string): void => {
-    const next: RangeValue = { ...value };
-    if (raw === "") delete next[bound];
-    else next[bound] = day ? raw : Number(raw);
-    onChange(next);
-  };
+}): React.JSX.Element | null {
+  // `group === "range"` is what selects this component, so `range` is always
+  // set; the guard is for the type, not for a state the caller can reach.
+  if (!field.range) return null;
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
       {/* The overflow offers the same one-click windows the pill does. A field
@@ -138,44 +150,17 @@ function OverflowRange<T extends Record<string, unknown>>({
           controls — otherwise "Data" gains and loses its presets as the window
           is resized. */}
       <RangePresets
-        presets={field.range ? presetsFor(field.range) : []}
+        presets={presetsFor(field.range)}
         value={value}
         onChange={onChange}
         testId={`${testIdPrefix}-more-${field.id}`}
       />
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
-        {(["min", "max"] as const).map((bound, index) => (
-          <Box key={bound} sx={{ display: "contents" }}>
-            {index === 1 && <Box component="span" sx={{ color: "text.disabled" }}>–</Box>}
-            <Box
-              component="input"
-              type={day ? "date" : "number"}
-              placeholder={bound === "min" ? "de" : "até"}
-              aria-label={`${field.label} ${bound === "min" ? "de" : "até"}`}
-              data-testid={`${testIdPrefix}-more-${field.id}-${bound}`}
-              value={value[bound] ?? ""}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) => set(bound, event.target.value)}
-              sx={{
-                // `flex:1` + `minWidth:0` rather than `width:100%`. A native
-                // date input reports a wide intrinsic minimum (its dd/mm/aaaa
-                // mask plus the picker glyph), and a flex child defaults to
-                // min-width:auto — so two of them plus the dash refused to
-                // shrink and the whole panel scrolled sideways.
-                flex: "1 1 0",
-                minWidth: 0,
-                px: 1,
-                py: 0.75,
-                border: 1,
-                borderStyle: "solid",
-                borderColor: "divider",
-                borderRadius: 1,
-                font: "inherit",
-                fontSize: "0.8125rem",
-              }}
-            />
-          </Box>
-        ))}
-      </Box>
+      <RangeBounds
+        field={field.range}
+        value={value}
+        onChange={onChange}
+        testId={`${testIdPrefix}-more-${field.id}`}
+      />
     </Box>
   );
 }
