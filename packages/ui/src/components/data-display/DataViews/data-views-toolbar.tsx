@@ -60,6 +60,12 @@ export interface GridToolbarProps<T extends Record<string, unknown>> {
    * has already given them up.
    */
   compactControls?: boolean;
+  /**
+   * Step 5 of the ladder, and its floor: on a screen too narrow for even the
+   * fully-collapsed row, the counter is dropped so the controls still fit one
+   * line instead of spilling outside the toolbar.
+   */
+  counterHidden?: boolean;
 }
 
 /** The right-aligned toolbar controls: Sort By, the counter, zoom/layout/columns, filters. */
@@ -67,27 +73,31 @@ function ToolbarRightControls<T extends Record<string, unknown>>(props: GridTool
   const { testIdPrefix, matchedCount, totalCount, filterOpen, setFilterOpen } = props;
   return (
     <>
-      <Text variant="caption" as="span">
-        {/* Always rendered, never breakpointed: `RESERVED.counter` already
-            prices it into the collapse ladder, so hiding it at `md` was the
-            ladder and a breakpoint disagreeing about the same pixels — which
-            is what broke the row at exactly 900px. */}
-        <Box
-          component="span"
-          data-testid={`${testIdPrefix}-counter`}
-          sx={{ whiteSpace: "nowrap" }}
-        >
-          {matchedCount} de {totalCount}
-        </Box>
-      </Text>
-      {/* Divides the READING of the list from the controls that change it —
-          the counter states what is on screen, everything right of here acts
-          on it. */}
-      <Divider
-        orientation="vertical"
-        flexItem
-        sx={{ height: 20, alignSelf: "center", mx: 0.5 }}
-      />
+      {/* MEASURED, never breakpointed: `RESERVED.counter` prices it into the
+          ladder, so hiding it at `md` was the ladder and a breakpoint
+          disagreeing about the same pixels — which broke the row at exactly
+          900px. It is dropped only as the ladder's last rung. */}
+      {!props.counterHidden && (
+        <>
+          <Text variant="caption" as="span">
+            <Box
+              component="span"
+              data-testid={`${testIdPrefix}-counter`}
+              sx={{ whiteSpace: "nowrap" }}
+            >
+              {matchedCount} de {totalCount}
+            </Box>
+          </Text>
+          {/* Divides the READING of the list from the controls that change it —
+              the counter states what is on screen, everything right of here
+              acts on it. */}
+          <Divider
+            orientation="vertical"
+            flexItem
+            sx={{ height: 20, alignSelf: "center", mx: 0.5 }}
+          />
+        </>
+      )}
       {props.toolbarRightSlot}
       {/* Sort + columns + format, in ONE control — see DataViewsDisplayPanel. */}
       <DataViewsDisplayPanel

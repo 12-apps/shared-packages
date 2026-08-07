@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { estimateWidth, GAP, isRangeSet, pillText, RESERVED } from "./data-views-overflow-costs";
 import type { FilterFieldConfig, RangeFieldConfig, RangeValue } from "./data-views-types";
 
 /**
@@ -12,10 +13,14 @@ import type { FilterFieldConfig, RangeFieldConfig, RangeValue } from "./data-vie
  * 1. Controls shed ONE AT A TIME into an overflow, never all at once. With four
  *    filters and room for three, hiding all four throws away the room that was
  *    there.
- * 2. An APPLIED filter never hides. Applied controls take the visible slots
- *    first, so the overflow badge counts hidden FIELDS and never active
- *    filters — a filter you cannot see is a filter you forget you set, and then
- *    the list is "wrong" for reasons nothing on screen explains.
+ * 2. An APPLIED filter is ranked first, not exempt. Applied controls take the
+ *    visible slots ahead of idle ones, and go into "Mais" like anything else
+ *    when even those slots run out. Exempting them outright — the earlier rule
+ *    — meant four applied filters on a phone claimed more width than the row
+ *    had, and the bar painted past its own edge: the pills were reachable only
+ *    by scrolling the toolbar sideways. Hiding one is safe because "Mais" says
+ *    how many applied filters are behind it; scrolling one off-screen says
+ *    nothing at all.
  *
  * It MEASURES rather than picking a breakpoint, which is what
  * `FILTERS-CONTRACT.md` asks for: pages declare different numbers of filters
@@ -47,52 +52,38 @@ export interface OverflowSplit<T extends Record<string, unknown>> {
    */
   compactControls: boolean;
   /**
+   * Step 5, and the LAST resort — the "N de N" counter is dropped.
+   *
+   * Only once every control has already collapsed and the row STILL does not
+   * fit, which on a six-filter table is below about 400px. The counter goes
+   * last because it is the only thing left that reports rather than does: an
+   * operator can act without knowing the total, but not without the search.
+   */
+  counterHidden: boolean;
+  /**
    * Step 4 — the search collapses to a magnifier that expands on click.
    * The most expensive step, so it is taken last: the search is the one
    * control on the bar that cannot be guessed from an icon's position.
    */
   searchCollapsed: boolean;
+  /**
+   * Step 6, below even the counter — "Limpar" leaves the bar.
+   *
+   * The one control here with a second home: the overflow panel's footer
+   * carries "Limpar todos os filtros". So it goes before the search icon or
+   * "Mais", neither of which has anywhere else to be.
+   */
+  clearAllHidden: boolean;
+  /**
+   * Expanding the magnifier must take the whole cluster, filters and all.
+   *
+   * Only on the rungs where what is left over would be too narrow to read —
+   * on a large phone the box simply shrinks and the filters stay, which is why
+   * this is its own answer rather than `searchCollapsed` reused.
+   */
+  searchTakeover: boolean;
   /** Attach to the toolbar row being measured. */
   barRef: React.RefObject<HTMLDivElement | null>;
-}
-
-/**
- * Rough rendered width of a control, in px.
- *
- * An ESTIMATE from the label text rather than a real measurement, deliberately:
- * measuring the true width needs every control mounted first, and mounting them
- * to decide whether to mount them is the layout thrash this hook exists to
- * avoid. The estimate only has to rank controls and find the cut point — being
- * a few px out moves the cut by at most one control, and the overflow catches it.
- */
-function estimateWidth(text: string, extra: number): number {
-  /**
-   * ~7.6px per character at the toolbar's font size, plus 76px of chrome:
-   * horizontal padding, the border, and the dropdown chevron. The chrome used
-   * to be 52, which under-priced every control by roughly a chevron's width —
-   * six of them then "fitted" a row they overflowed, and because they are flex
-   * children the row paid for it by squeezing labels to "D…" and "V…" rather
-   * than by shedding a control into the overflow.
-   *
-   * Deliberately generous: over-pricing sheds one control too early, which the
-   * "Mais" button absorbs invisibly. Under-pricing breaks the line.
-   */
-  return Math.round(text.length * 7.6) + 76 + extra;
-}
-
-/** Is a range bounded at either end? */
-function isRangeSet(range: RangeValue | undefined): boolean {
-  return Boolean(range && (range.min !== undefined || range.max !== undefined));
-}
-
-/** The label a pill actually renders, which is what decides its width. */
-function pillText<T extends Record<string, unknown>>(field: OverflowField<T>, values: string[]): string {
-  if (values.length === 0) return field.label;
-  if (values.length === 1) {
-    const option = field.pill?.options.find((entry) => entry.value === values[0]);
-    return `${field.label}: ${option?.label ?? values[0]}`;
-  }
-  return `${field.label}: ${values.length}`;
 }
 
 /** Every declared control, pills first, in the order the bar renders them. */
@@ -106,24 +97,6 @@ export function toOverflowFields<T extends Record<string, unknown>>(
   ];
 }
 
-/** Fixed toolbar furniture the filters have to fit around, in px. */
-const RESERVED = {
-  /** The search box never shrinks below this. */
-  search: 200,
-  /** The "N de N" counter. */
-  counter: 96,
-  /** Exibir + Exportar WITH their text labels. */
-  right: 216,
-  /** The same two controls as icons only — step 2 of the ladder. */
-  rightCompact: 96,
-  /** The "Mais" button, only charged when there IS an overflow. */
-  overflowButton: 104,
-  /** Gaps + the row's own padding. */
-  chrome: 64,
-} as const;
-
-/** The gap between two controls. */
-const GAP = 8;
 
 /** Observe the bar's width. Returns 0 until the first measurement lands. */
 function useBarWidth(): { barRef: React.RefObject<HTMLDivElement | null>; width: number } {
@@ -189,23 +162,32 @@ function splitFilters<T extends Record<string, unknown>>(
   const active = all.filter((field) => isActiveField(field, pills, ranges));
   const idle = all.filter((field) => !isActiveField(field, pills, ranges));
 
-  // AN APPLIED FILTER NEVER HIDES — it is not merely ranked first, it is
-  // exempt. Applying a value LENGTHENS a control ("Método: Pix"), so ranking
-  // alone still loses the one filter the operator just set whenever it no
-  // longer fits on its own. The bar wraps; a filter you cannot see does not
-  // announce itself at all.
+  // "Limpar" rides the end of the cluster whenever anything is applied.
+  const clearCost = active.length > 0 ? RESERVED.clearAll + GAP : 0;
   let available =
-    width - RESERVED.search - RESERVED.counter - RESERVED.right - RESERVED.chrome - cost(active);
-  if (idle.length === 0 || cost(idle) <= available) {
-    return { inline: all, overflow: none, used: cost(all) };
+    width - RESERVED.search - RESERVED.counter - RESERVED.right - RESERVED.chrome - clearCost;
+  if (cost(all) <= available) {
+    return { inline: all, overflow: none, used: cost(all) + clearCost };
   }
 
   // There IS an overflow, so its button now costs room too.
   available -= RESERVED.overflowButton;
-  const keep = new Set(active.map((field) => field.id));
-  for (const field of idle) {
+  // APPLIED FIRST, BUT NOT EXEMPT.
+  //
+  // Applied controls take the visible slots ahead of idle ones — that part was
+  // always right. Exempting them from the overflow entirely was not: applying
+  // a value LENGTHENS a control ("Pagamento (1)"), so on a phone four applied
+  // filters claimed more width than the row had and the bar simply painted
+  // past its own edge, leaving pills reachable only by scrolling sideways.
+  //
+  // An applied filter hidden in "Mais" is not lost the way it would be if it
+  // vanished silently: the trigger goes to the applied tone and says how many
+  // are in there (see `MoreTrigger`), which is the same signal the pill itself
+  // was carrying. A control you scroll off-screen carries no signal at all.
+  const keep = new Set<string>();
+  for (const field of [...active, ...idle]) {
     const next = widthOf(field) + GAP;
-    if (next > available) break;
+    if (next > available) continue;
     available -= next;
     keep.add(field.id);
   }
@@ -216,7 +198,7 @@ function splitFilters<T extends Record<string, unknown>>(
   return {
     inline,
     overflow: all.filter((field) => !keep.has(field.id)),
-    used: cost(inline) + RESERVED.overflowButton,
+    used: cost(inline) + RESERVED.overflowButton + clearCost,
   };
 }
 
@@ -249,7 +231,10 @@ function computeSplit<T extends Record<string, unknown>>(
       inline: all,
       overflow: [],
       compactControls: false,
+      counterHidden: false,
       searchCollapsed: false,
+      clearAllHidden: false,
+      searchTakeover: false,
     };
   }
   const { inline, overflow, used } = splitFilters(all, pills, ranges, width);
@@ -260,8 +245,39 @@ function computeSplit<T extends Record<string, unknown>>(
   const rightCost = compactControls ? RESERVED.rightCompact : RESERVED.right;
   // …and with them off?
   const searchCollapsed = base - RESERVED.counter - rightCost < RESERVED.search;
+  // Everything has collapsed and the row STILL overflows. The controls cannot
+  // shrink further — they are `flexShrink: 0` precisely so an over-packed row
+  // sheds rather than squeezes — so without this last rung they simply paint
+  // outside the toolbar, which is what a narrow phone was doing.
+  const counterHidden =
+    searchCollapsed && base - RESERVED.counter - rightCost < RESERVED.searchIcon;
+  // Step 6 — below even that, "Limpar" leaves the bar. It is the ONLY control
+  // here with a second home: the overflow panel's footer carries "Limpar todos
+  // os filtros", so nothing is lost, which is exactly why it goes before the
+  // search icon or "Mais" (neither of which has anywhere else to be). Guarded
+  // on there BEING an overflow, because with no panel the footer does not
+  // exist and dropping this would strand the operator.
+  const clearAllHidden = counterHidden && overflow.length > 0;
+  // What the keyword box would get if the operator expanded the magnifier and
+  // everything else stayed put. `searchCollapsed` is a different question — it
+  // asks whether the box fits at its PREFERRED 200px, and is deliberately
+  // pessimistic — so reusing it to decide the takeover evicted the filters on
+  // screens where the box had plenty of room to simply shrink.
+  const searchBoxRoom = base - (counterHidden ? 0 : RESERVED.counter) - rightCost;
+  // Below this a box is too narrow to read what you typed into it, and shrinking
+  // further buys nothing; that is the only point at which taking the whole
+  // cluster is worth losing the filters.
+  const searchTakeover = searchCollapsed && searchBoxRoom < RESERVED.usableSearch;
 
-  return { inline, overflow, compactControls, searchCollapsed };
+  return {
+    inline,
+    overflow,
+    compactControls,
+    counterHidden,
+    searchCollapsed,
+    clearAllHidden,
+    searchTakeover,
+  };
 }
 
 /**

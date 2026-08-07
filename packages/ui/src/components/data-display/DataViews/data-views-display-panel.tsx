@@ -244,6 +244,48 @@ function ViewsBody({
   return <ViewsList handlers={nav} onOpenActions={onOpenActions} testIdPrefix={testIdPrefix} />;
 }
 
+/** The "Exibir" button, with the dot that says the view has unsaved changes. */
+function DisplayTrigger({
+  dirty,
+  compact,
+  onOpen,
+  testIdPrefix,
+}: {
+  dirty: boolean;
+  compact: boolean;
+  onOpen: (anchor: HTMLElement) => void;
+  testIdPrefix: string;
+}): React.JSX.Element {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      color="neutral"
+      onClick={(event) => onOpen(event.currentTarget as HTMLElement)}
+      dataTestId={`${testIdPrefix}-display-trigger`}
+      aria-label="Exibir"
+      title={compact ? "Exibir" : undefined}
+    >
+      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+        <TuneRoundedIcon fontSize="small" />
+        {!compact && (
+          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+            Exibir
+          </Box>
+        )}
+        {dirty && (
+          <Box component="span" sx={{ height: 6, width: 6, borderRadius: "50%", bgcolor: "primary.main" }} />
+        )}
+        {/* The chevron goes with the label. Once the control is a bare icon it
+            is already unmistakably a button, and on the rung where that happens
+            the ~24px it costs is the difference between a row that fits and one
+            that scrolls. */}
+        {!compact && <KeyboardArrowDownRoundedIcon fontSize="small" />}
+      </Box>
+    </Button>
+  );
+}
+
 /**
  * The toolbar's "Exibir" control: one button, one popover, three tabs, and the
  * view bracketing all of it.
@@ -271,28 +313,12 @@ export function DataViewsDisplayPanel<T extends Record<string, unknown>>({
   };
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        color="neutral"
-        onClick={(event) => setAnchor(event.currentTarget as HTMLElement)}
-        dataTestId={`${testIdPrefix}-display-trigger`}
-        aria-label="Exibir"
-        title={compact ? "Exibir" : undefined}
-      >
-        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
-          <TuneRoundedIcon fontSize="small" />
-          {!compact && (
-            <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-              Exibir
-            </Box>
-          )}
-          {view?.dirty && (
-            <Box component="span" sx={{ height: 6, width: 6, borderRadius: "50%", bgcolor: "primary.main" }} />
-          )}
-          <KeyboardArrowDownRoundedIcon fontSize="small" />
-        </Box>
-      </Button>
+      <DisplayTrigger
+        dirty={Boolean(view?.dirty)}
+        compact={Boolean(compact)}
+        onOpen={setAnchor}
+        testIdPrefix={testIdPrefix}
+      />
       <Popover
         open={Boolean(anchor)}
         anchorEl={anchor}

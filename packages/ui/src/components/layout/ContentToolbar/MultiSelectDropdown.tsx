@@ -93,7 +93,15 @@ export function MultiSelectDropdown<TValue extends string = string>({
 
   const renderTrigger = (): React.JSX.Element => {
     if (stacked) return <StackedTrigger label={label} {...triggerProps} />;
-    if (layout === 'pill') return <PillTrigger label={label} selectedCount={selected.size} {...triggerProps} />;
+    if (layout === 'pill')
+      return (
+        <PillTrigger
+          label={label}
+          selectedCount={selected.size}
+          onClear={onClear}
+          {...triggerProps}
+        />
+      );
     return <InlineTrigger label={label} {...triggerProps} />;
   };
 
