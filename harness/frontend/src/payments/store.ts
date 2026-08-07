@@ -30,19 +30,17 @@ import {
   type PaymentFlowsBE,
   type MemoryCredentialStore,
   type MemoryProviderConfigStore,
-  type Payable,
   type PaymentMethodKind,
 } from '@12-apps/payments-backend';
 
 import {
-  BRL,
   MERCHANT,
-  brlLabel,
   harnessAdapter,
   harnessCopy,
   type HarnessProvider,
   type SeenCharge,
 } from './adapter';
+import { correlationPort, payablesPort, seedPayables, type HarnessView } from './payables';
 
 /** The whole store a harness page is set in. */
 export interface HarnessStoreSpec {
@@ -72,15 +70,6 @@ export interface WireRequest {
   path: string;
   /** The parsed JSON body, or null for a GET. */
   body: Record<string, unknown> | null;
-}
-
-/** The host's own body for a payable — echoed verbatim, never read by the library. */
-interface HarnessView {
-  invoice: string;
-  total: number;
-  totalLabel: string;
-  pix?: { copyPaste: string; expiresAt: string };
-  hostedCheckoutUrl?: string;
 }
 
 /** What a page gets back: the transport to hand the factory, plus the truth. */
@@ -151,50 +140,6 @@ function seedConnections(
 }
 
 /**
- * The host's payable.
- *
- * `create` reads the METHOD and the BUYER off its own request body — the CPF in
- * particular, which the payable has no column for and which can therefore only
- * arrive with the request that raises it. That is FUT-740's third critical,
- * stated as a host contract rather than as a library rule.
- */
-function payablesPort(world: { payable: Payable }, charges: MemoryChargeStore) {
-  return {
-    load: async (_caller: unknown, ref: string) =>
-      ref === world.payable.ref ? world.payable : null,
-    create: async (_caller: unknown, body: unknown) => {
-      const draft = body as {
-        method?: PaymentMethodKind;
-        buyer?: { name?: string; email?: string; taxId?: string; phone?: string };
-      };
-      world.payable = {
-        ...world.payable,
-        method: draft.method ?? 'PIX',
-        customer: { ...world.payable.customer, ...draft.buyer },
-      };
-      return { payable: world.payable, view: viewOf(world.payable, charges) };
-    },
-    view: async () => viewOf(world.payable, charges),
-    stateToken: (payable: Payable) => (payable.state === 'OPEN' ? 'AWAITING_PAYMENT' : 'PAID'),
-  };
-}
-
-/** The host's own settlement writes. A container is moved, never a binding. */
-function correlationPort(world: { payable: Payable }) {
-  return {
-    attachPending: async () => undefined,
-    recordCardOutcome: async ({ approved }: { approved: boolean }) => {
-      world.payable = { ...world.payable, state: approved ? 'SETTLED' : 'CLOSED' };
-      return approved ? 'PAID' : 'FAILED';
-    },
-    settle: async () => {
-      world.payable = { ...world.payable, state: 'SETTLED' };
-      return 'PAID';
-    },
-  };
-}
-
-/**
  * The host's vault.
  *
  * `resolve` answers three different things on purpose: a token, an id the
@@ -224,29 +169,6 @@ function instrumentsPort(spec: HarnessStoreSpec, world: HarnessWorld, changed: (
   };
 }
 
-/** The host's view, including the PIX payload (or hosted URL) just raised. */
-function viewOf(payable: Payable, charges: MemoryChargeStore): HarnessView {
-  const raised = charges
-    .all()
-    .filter((stored) => stored.snapshot.reference?.startsWith(payable.ref))
-    .at(-1);
-  const snapshot = raised?.snapshot;
-  return {
-    invoice: payable.ref,
-    total: payable.amount.amountCents,
-    totalLabel: brlLabel(payable.amount.amountCents),
-    ...(snapshot?.pix?.qrText
-      ? {
-          pix: {
-            copyPaste: snapshot.pix.qrText,
-            expiresAt: snapshot.pix.expiresAt ?? new Date(Date.now() + 15 * 60_000).toISOString(),
-          },
-        }
-      : {}),
-    ...(snapshot?.hostedCheckoutUrl ? { hostedCheckoutUrl: snapshot.hostedCheckoutUrl } : {}),
-  };
-}
-
 /** A minimal listener set — the probe re-renders off this, not off a timer. */
 function notifier(): { fire: () => void; subscribe: HarnessWorld['subscribe'] } {
   const listeners = new Set<() => void>();
@@ -271,27 +193,6 @@ function harnessGateway(chain: readonly HarnessProvider[], seen: SeenCharge[], c
     attempts: createMemoryAttemptLedger(),
     onWebhookEvent: async () => undefined,
   });
-}
-
-/**
- * The host's payable, before anything has happened to it.
- *
- * An INVOICE, deliberately: nothing order-shaped reaches the mount, which is
- * the falsifiable half of the FUT-740 design. A payable already SETTLED is the
- * store a buyer comes back to from a hosted provider — the webhook landed while
- * they were away.
- */
-function seedPayable(spec: HarnessStoreSpec): { payable: Payable } {
-  return {
-    payable: {
-      ref: 'inv_harness_0043',
-      merchant: MERCHANT,
-      amount: BRL(spec.amountCents ?? 7500),
-      method: 'PIX',
-      customer: spec.customer ?? { name: 'Ana Compradora', email: 'ana@exemplo.com' },
-      state: spec.settled ? 'SETTLED' : 'OPEN',
-    } satisfies Payable as Payable,
-  };
 }
 
 /**
@@ -341,7 +242,7 @@ export function createHarnessStore(spec: HarnessStoreSpec = {}): HarnessWorld {
   const connections = createMemoryProviderConfigStore();
   const { fire, subscribe } = notifier();
   seedConnections(chain, credentials, connections);
-  const world = seedPayable(spec);
+  const book = seedPayables(spec);
 
   const out: HarnessWorld = {
     fetchImpl: (() => undefined) as unknown as typeof fetch,
@@ -368,8 +269,8 @@ export function createHarnessStore(spec: HarnessStoreSpec = {}): HarnessWorld {
       // A connection that can mint a key ON DEMAND — the case that exercises
       // "PUBLIC_KEY with a null key" needs this to answer.
       Promise.resolve(chain.find((entry) => entry.name === provider)?.publicKey ?? null),
-    payables: payablesPort(world, charges),
-    correlation: correlationPort(world),
+    payables: payablesPort(book, charges),
+    correlation: correlationPort(book),
     instruments: instrumentsPort(spec, out, fire),
     copy: harnessCopy,
     logger: { warn: () => undefined, error: () => undefined, providerFailure: () => undefined },

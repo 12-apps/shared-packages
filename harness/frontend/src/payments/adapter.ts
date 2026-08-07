@@ -114,6 +114,29 @@ function pixPayload(reference: string): { qrText: string; expiresAt: string } {
   };
 }
 
+/**
+ * What one declared provider answers a CARD charge with.
+ *
+ * NO INSTRUMENT IS REFUSED, FIRST. A card request with nothing to charge is not
+ * something an acquirer can evaluate, so it does not approve one — and a stub
+ * that approved it anyway is what hid FUT-740's second critical: a mount that
+ * stopped reading the flat body's `token` sent exactly this charge, and the
+ * buyer still reached `payment-paid`, with `(no-instrument)` printed in a probe
+ * nobody was asserting on. The provider refusing is what makes that a red run.
+ */
+function cardAnswer(
+  spec: HarnessProvider,
+  input: ChargeInput,
+  base: ChargeSnapshot,
+): ChargeSnapshot {
+  const card = input.card;
+  if (!card?.token && !card?.savedCardToken) {
+    return { ...base, status: 'DECLINED', declineReason: 'INVALID_CARD', declineRetriable: false };
+  }
+  if (spec.declines) return { ...base, status: 'DECLINED', declineReason: 'CARD_DECLINED' };
+  return { ...base, card: { last4: '4242', vaultToken: `vault_${card.token ?? 'none'}` } };
+}
+
 /** What one declared provider answers a charge with. */
 function chargeAnswer(spec: HarnessProvider, input: ChargeInput): ChargeSnapshot {
   if (spec.unreachable) {
@@ -142,8 +165,7 @@ function chargeAnswer(spec: HarnessProvider, input: ChargeInput): ChargeSnapshot
     };
   }
   if (input.method === 'PIX') return { ...base, status: 'PENDING', pix: pixPayload(input.reference) };
-  if (spec.declines) return { ...base, status: 'DECLINED', declineReason: 'CARD_DECLINED' };
-  return { ...base, card: { last4: '4242', vaultToken: `vault_${input.card?.token ?? 'none'}` } };
+  return cardAnswer(spec, input, base);
 }
 
 /**

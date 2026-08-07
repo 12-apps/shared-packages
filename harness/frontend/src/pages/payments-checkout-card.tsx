@@ -8,12 +8,15 @@
  *     (`{ orderId, token, tokensByProvider?, saveCard, cardMeta, taxId }`).
  *     A mount that only read a nested `card` block received `card: undefined`
  *     from every deployed browser, charged nothing, and told the buyer their
- *     card was declined. The wire probe below prints the body's own keys, so a
- *     re-nesting is a failing string comparison rather than a support ticket.
+ *     card was declined. The probe prints the body's own keys AND the charge
+ *     each provider received, and the second half is the load-bearing one: the
+ *     keys are recorded on the way OUT of the published client, so they move
+ *     only when the CLIENT does. A mount that stops READING that body shows up
+ *     on the provider's line instead, as `(no-instrument)`.
  *   - The buyer's CPF has no column on a payable, so it can only travel with
- *     the request that RAISES one. The probe prints the taxId each provider
- *     actually received; a CPF that never got there is visible here before it
- *     is visible as a 400 after the buyer has finished the form.
+ *     the request that RAISES one. The same line carries the taxId each
+ *     provider actually received; a CPF that never got there is visible here
+ *     before it is visible as a 400 after the buyer has finished the form.
  *
  * The store declares CARD only, so the sole method is preselected and the form
  * is reached with no picker tap.

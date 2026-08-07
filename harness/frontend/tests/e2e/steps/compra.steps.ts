@@ -171,8 +171,15 @@ Then('nenhum pedido chegou a ser criado', async ({ page }) => {
   await expect(page.getByTestId('wire-paths')).toHaveText('GET /api/checkout/config');
 });
 
-Then('a cobrança enviada ao provedor carrega o CPF dela', async ({ page }) => {
-  await expect(page.getByTestId('provider-charges')).toContainText('529.982.247-25');
+Then('a cobrança enviada ao provedor carrega o cartão e o CPF dela', async ({ page }) => {
+  // What the PROVIDER received, not what the client recorded sending. The wire
+  // facts below are written on the way OUT of the published client, so they can
+  // only fail if the CLIENT changes; this line is the one that fails if the
+  // MOUNT stops reading the flat body — the instrument then reads
+  // `(no-instrument)` and the charge was never payable at all.
+  await expect(page.getByTestId('provider-charges')).toContainText(
+    'aurora:CARD:529.982.247-25:tok:',
+  );
 });
 
 Then('o corpo da cobrança é o formato plano que o cliente publicado envia', async ({ page }) => {

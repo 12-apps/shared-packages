@@ -6,6 +6,7 @@ import { PaymentsCheckoutCardPage } from './payments-checkout-card';
 import { PaymentsCheckoutChainFailoverPage } from './payments-checkout-chain-failover';
 import { PaymentsCheckoutFailuresPage } from './payments-checkout-failures';
 import { PaymentsCheckoutHeadlessPage } from './payments-checkout-headless';
+import { PaymentsCheckoutMethodGatePage } from './payments-checkout-method-gate';
 import { PaymentsCheckoutNoProviderPage } from './payments-checkout-no-provider';
 import { PaymentsCheckoutPixPage } from './payments-checkout-pix';
 import { PaymentsCheckoutRedirectPage } from './payments-checkout-redirect';
@@ -81,6 +82,12 @@ export const PAGES: readonly HarnessPage[] = [
     title: 'Checkout · provider chain',
     pkg: PAYMENTS_FRONTEND,
     Component: PaymentsCheckoutChainFailoverPage,
+  },
+  {
+    slug: 'payments-checkout-method-gate',
+    title: 'Checkout · method gate',
+    pkg: PAYMENTS_FRONTEND,
+    Component: PaymentsCheckoutMethodGatePage,
   },
   {
     slug: 'payments-checkout-buyer-fields',

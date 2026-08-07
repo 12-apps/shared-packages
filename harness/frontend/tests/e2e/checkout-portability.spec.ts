@@ -62,5 +62,8 @@ test('the flat exports still compose a working checkout with no factory', async 
   await expect(keys).toContainText('orderId');
   await expect(keys).toContainText('token');
   await expect(keys).toContainText('taxId');
-  await expect(page.getByTestId('provider-charges')).toContainText('529.982.247-25');
+  // …and what the provider RECEIVED, instrument included. The keys above are
+  // the client's own record of what it sent; only this line fails if the mount
+  // stops reading the flat body it sent them in.
+  await expect(page.getByTestId('provider-charges')).toContainText('aurora:CARD:529.982.247-25:tok:');
 });
