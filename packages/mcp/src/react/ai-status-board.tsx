@@ -3,6 +3,7 @@
 import AddLinkOutlinedIcon from "@mui/icons-material/AddLinkOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import LinkOffOutlinedIcon from "@mui/icons-material/LinkOffOutlined";
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 
 import { ConfirmButton } from "@12-apps/ui/feedback/ConfirmAction";
 import { Button } from "@12-apps/ui/form/Button";
@@ -29,19 +30,36 @@ export interface HostStatus {
 }
 
 /**
- * The right-hand side of a CONNECTED box: the green pill, plus the way back out
- * when the app supplies one. Without `onDisconnect` this is the pill alone — a
- * board with no revoke path must not offer a button that does nothing.
+ * The right-hand side of a CONNECTED box: the green pill, then the two things
+ * the pill alone left the owner unable to do.
+ *
+ * "Instruções" exists because the setup steps were reachable ONLY from a RED
+ * card's "Conectar" — so on an all-green board there was no way to re-read how
+ * any of them was connected, which is exactly when someone re-doing the setup on
+ * a second machine needs them. It re-enters the same flow that button does.
+ *
+ * "Desconectar" is only drawn when the app supplies a revoke path: a board with
+ * nowhere to send the revoke must not offer a button that does nothing.
  */
 function ConnectedControls({
   host,
+  onConnect,
   onDisconnect,
 }: {
   host: AiHostGuide;
+  onConnect: (hostId: string) => void;
   onDisconnect?: DisconnectHandler;
 }): React.JSX.Element {
   return (
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+    <Stack
+      direction="row"
+      spacing={1}
+      alignItems="center"
+      justifyContent="flex-end"
+      // Wraps rather than squeezing: three controls do not fit a half-width
+      // card at every breakpoint.
+      sx={{ flexShrink: 0, flexWrap: "wrap", rowGap: 0.5 }}
+    >
       <Box
         sx={{
           px: 1,
@@ -55,6 +73,15 @@ function ConnectedControls({
           Conectado
         </Text>
       </Box>
+      <Button
+        variant="text"
+        size="sm"
+        onClick={() => onConnect(host.id)}
+        data-testid={`ai-status-instructions-${host.id}`}
+      >
+        <MenuBookOutlinedIcon sx={{ fontSize: 16, mr: 0.5 }} />
+        Instruções
+      </Button>
       {onDisconnect ? (
         <ConfirmButton
           variant="outline"
@@ -118,7 +145,7 @@ function StatusBox({
         </Text>
       </Box>
       {connected ? (
-        <ConnectedControls host={host} onDisconnect={onDisconnect} />
+        <ConnectedControls host={host} onConnect={onConnect} onDisconnect={onDisconnect} />
       ) : (
         <Button
           variant="outline"
@@ -141,10 +168,11 @@ function StatusBox({
  * attributed to its provider (derived from the OAuth client + confirmed by
  * `announceAiConnection`), so several assistants can show connected at once.
  *
- * A connected box also carries the reverse action when the app passes
- * `onDisconnect`: revoking is the only way out of a finished connection, and
- * the board is the one place that names which assistants hold access — so
- * without it an owner who wants to cut a host off has nowhere to click.
+ * A connected box carries two more controls, because the pill it used to show
+ * alone was a dead end in both directions: "Instruções" re-enters the host's
+ * setup steps (previously reachable only from a RED card, so an all-green board
+ * hid them entirely), and "Desconectar" — when the app passes `onDisconnect` —
+ * revokes access, which nothing in the UI could do at all.
  */
 export function AiStatusBoard({
   statuses,

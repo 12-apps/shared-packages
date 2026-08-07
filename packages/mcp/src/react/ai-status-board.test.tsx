@@ -8,9 +8,10 @@ import { AiStatusBoard, type HostStatus } from "./ai-status-board";
 
 /**
  * The status board is the only surface that names which assistants hold access
- * to a store, so it is where revoking one has to live: a connection can be
- * created from the wizard but, before `onDisconnect`, could never be ended from
- * anywhere in the UI.
+ * to a store, so it is where both missing controls belong: revoking one (before
+ * `onDisconnect`, a connection could be created from the wizard but never ended
+ * from anywhere in the UI) and re-reading a host's setup steps (reachable only
+ * from a RED card, so a fully connected board hid them).
  */
 
 const CLAUDE: AiHostGuide = {
@@ -55,6 +56,24 @@ describe("AiStatusBoard — disconnecting an assistant", () => {
 
     expect(screen.getByTestId("ai-status-claude")).toBeTruthy();
     expect(screen.queryAllByTestId("ai-status-disconnect-claude")).toHaveLength(0);
+  });
+
+  it("reaches a connected host's instructions, which only a red card used to offer", () => {
+    const onConnect = vi.fn();
+    // Every host connected — the state that left the setup steps unreachable.
+    render(
+      <AiStatusBoard
+        statuses={statuses([{}, { connected: true, detail: "ativo agora" }])}
+        onConnect={onConnect}
+        onDisconnect={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryAllByTestId("ai-status-connect-chatgpt")).toHaveLength(0);
+    fireEvent.click(screen.getByTestId("ai-status-instructions-chatgpt"));
+
+    // Same navigation the red card's "Conectar" performs.
+    expect(onConnect).toHaveBeenCalledWith("chatgpt");
   });
 
   it("confirms before revoking, and reports the host that was revoked", async () => {
