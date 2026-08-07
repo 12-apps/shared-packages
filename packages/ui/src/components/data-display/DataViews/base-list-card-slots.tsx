@@ -42,14 +42,12 @@ export function ListCardCaption({
   subtitle,
   href,
   target,
-  scale,
   testId,
 }: {
   title?: ReactNode;
   subtitle?: ReactNode;
   href?: string;
   target?: string;
-  scale: number;
   testId?: string;
 }): React.JSX.Element {
   return (
@@ -62,7 +60,7 @@ export function ListCardCaption({
             sx={{
               display: "block",
               lineHeight: 1.2,
-              fontSize: `${0.9 * scale}rem`,
+              fontSize: "0.9rem",
               color: "inherit",
               textDecoration: "none",
               ...CLAMP,
@@ -107,6 +105,9 @@ function MetaRule(): React.JSX.Element {
         opacity: 0.5,
         userSelect: "none",
         fontSize: "0.875rem",
+        // A cancelled row strikes the whole meta cluster, and a struck `|` is a
+        // dagger. The rule is punctuation, not data — nothing to void.
+        textDecoration: "none",
       }}
     >
       |
@@ -213,12 +214,12 @@ const VALUE_FLUSH = {
 } as const;
 
 /** The value, on its own rail, never truncated and never shunted by the chip. */
-function ListCardValue({ value, scale }: { value: ReactNode; scale: number }): React.JSX.Element {
+function ListCardValue({ value }: { value: ReactNode }): React.JSX.Element {
   return (
     <Text variant="body" size="sm" weight="medium" as="span">
       <Box
         component="span"
-        sx={{ fontSize: `${0.875 * scale}rem`, whiteSpace: "nowrap", ...TABULAR }}
+        sx={{ fontSize: "0.875rem", whiteSpace: "nowrap", ...TABULAR }}
       >
         {value}
       </Box>
@@ -290,7 +291,6 @@ export function ListCardTail({
   actions,
   actionsAlwaysVisible,
   menu,
-  scale,
   testId,
 }: {
   value?: ReactNode;
@@ -300,7 +300,6 @@ export function ListCardTail({
   actions?: ReactNode;
   actionsAlwaysVisible?: boolean;
   menu?: ReactNode;
-  scale: number;
   testId: (slot: string) => string | undefined;
 }): React.JSX.Element {
   return (
@@ -313,7 +312,7 @@ export function ListCardTail({
         }}
         data-testid={testId("value")}
       >
-        {value != null && <ListCardValue value={value} scale={scale} />}
+        {value != null && <ListCardValue value={value} />}
       </Box>
       <Box
         data-slot="status"

@@ -90,7 +90,13 @@ export interface BaseListCardProps extends CardSurfaceProps {
   onToggleSelect?: (event?: React.MouseEvent) => void;
   /** How much air the row gets. Vertical only — a full-width row cannot narrow. */
   density?: DataViewsDensity;
-  /** Fine-grained size multiplier on top of `density`. */
+  /**
+   * Fine-grained size multiplier on top of `density` (1 = base).
+   *
+   * Applied as `zoom`, so it scales EVERYTHING the row draws — type, gutters,
+   * gaps, padding, the checkbox, the grip, the chip and the menu — not just the
+   * handful of font sizes it once multiplied.
+   */
   scale?: number;
   /** Flush style: a bottom rule instead of an outline. Row-only. */
   divider?: boolean;
@@ -119,22 +125,41 @@ function clickKeys(onClick: () => void) {
   };
 }
 
-/** Geometry: the rails, the density padding, the two-line collapse. */
+/**
+ * Geometry: the rails, the density padding, the two-line collapse.
+ *
+ * SCALE IS `zoom`, NOT A SET OF MULTIPLIED FONT SIZES.
+ *
+ * It used to be the latter, on exactly three values — title, value, row padding
+ * — so the slider left the subtitle, the meta labels, the rules, the checkbox,
+ * the grip, the chip and the menu at their fixed sizes, and the row came apart
+ * as you dragged it. Multiplying the rest is not a fix: the checkbox and the
+ * chip are MUI internals sized in their own px, and no prop we pass reaches
+ * them.
+ *
+ * `zoom` scales the used value of every length in the subtree — ours and theirs
+ * — and unlike `transform: scale` it REFLOWS, so the row still occupies the
+ * space it draws and the rails still resolve. Verified against the group: at
+ * 1.4 all four rows keep identical rail edges, because subgrid tracks and the
+ * zoom that reads them are the same for every row.
+ */
 function rowSx(opts: {
   inGroup: boolean;
   gutters: { drag: boolean; select: boolean };
   metaColumns: number;
   pad: number;
   padY: number;
+  scale: number;
   divider: boolean;
   interactive: boolean;
   draggable: boolean;
 }): Record<string, unknown> {
-  const { inGroup, gutters, metaColumns, pad, padY, divider, interactive, draggable } = opts;
+  const { inGroup, gutters, metaColumns, pad, padY, scale, divider, interactive, draggable } = opts;
   return {
     position: "relative",
     borderRadius: CARD_RADIUS,
     display: "grid",
+    zoom: scale,
     // SUBGRID AND `container-type` CANNOT COEXIST on one element: containment
     // makes the box size independently of its parent, so the browser drops the
     // subgrid and every slot stacks into one column. (Observed exactly that —
@@ -249,8 +274,11 @@ function useRowShell(props: BaseListCardProps) {
     // 1, not 1.5. The row's contents still have to line up with the toolbar
     // above them, but 12px of card padding stacked on the checkbox's own 9px
     // and an empty drag gutter's 24px read as a row indented for no reason.
-    pad: 1 * scale,
-    padY: DENSITY_ROW_PADDING[group?.density ?? props.density ?? "cozy"] * scale,
+    //
+    // Not multiplied by `scale` — the row's `zoom` already scales it, and doing
+    // both would square the factor on padding alone.
+    pad: 1,
+    padY: DENSITY_ROW_PADDING[group?.density ?? props.density ?? "cozy"],
     // A card that navigates does so with a real anchor, so it takes no click
     // handler of its own — the stretched link IS the target.
     acts: props.onClick != null && props.href == null && actionable,
@@ -275,7 +303,7 @@ function rowStyles(
   props: BaseListCardProps,
   shell: ReturnType<typeof useRowShell>,
 ): Record<string, unknown> {
-  const { group, theme, selectable, drag, reserve, pad, padY, acts } = shell;
+  const { group, theme, selectable, drag, reserve, pad, padY, scale, acts } = shell;
   return {
     ...cardSurfaceStyles(
       {
@@ -292,6 +320,7 @@ function rowStyles(
       metaColumns: metaShape(props).columns,
       pad,
       padY,
+      scale,
       divider: props.divider ?? false,
       interactive: acts || props.href != null,
       draggable: drag.draggable && drag.handleProps === undefined,
@@ -302,7 +331,7 @@ function rowStyles(
 export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
   const { selected = false, href, onClick } = props;
   const shell = useRowShell(props);
-  const { actionable, scale, selectable, slot, drag, reserve, pad, acts } = shell;
+  const { actionable, selectable, slot, drag, reserve, pad, acts } = shell;
   const meta = metaShape(props);
 
   return (
@@ -334,7 +363,6 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
         subtitle={props.subtitle}
         href={href}
         target={props.target}
-        scale={scale}
         testId={slot("title")}
       />
       <ListCardMeta
@@ -349,7 +377,6 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
         actions={actionable ? props.actions : undefined}
         actionsAlwaysVisible={props.actionsAlwaysVisible}
         menu={props.menu}
-        scale={scale}
         testId={slot}
       />
       {props.children != null && (

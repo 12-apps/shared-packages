@@ -1,5 +1,6 @@
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import TableRestaurantOutlinedIcon from "@mui/icons-material/TableRestaurantOutlined";
+import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { InputType } from "storybook/internal/types";
 
@@ -9,6 +10,7 @@ import { DropdownMenu } from "../../navigation/DropdownMenu";
 import { Box } from "../../../mui/Box";
 
 import { BaseCard } from "./base-card";
+import { DragContainerProvider } from "./data-views-drag";
 import { CARD_ASPECT_RATIOS, type CardAspectRatio } from "./data-views-types";
 
 /**
@@ -96,7 +98,6 @@ const meta: Meta<typeof BaseCard> = {
       subtitle: { control: "text" },
     }),
     ...category("Behaviour", {
-      draggable: { control: "boolean" },
       href: { control: "text" },
       target: { control: "text" },
       onClick: { control: false },
@@ -110,7 +111,11 @@ const meta: Meta<typeof BaseCard> = {
       imageFallback: { control: false },
       children: { control: "text" },
     }),
-    ...hidden("className", "aria-label", "testId", "checkboxTestId", "dragId"),
+    // `draggable` is a VETO, not a switch: `useDragItem` is inert without a
+    // DragContainerProvider AND a `dragId`, so on a standalone tile the toggle
+    // could only ever render nothing — flip it to True and no grip appears.
+    // Same call as the row's. `Draggable Inside A Container` is where it shows.
+    ...hidden("className", "aria-label", "testId", "checkboxTestId", "dragId", "draggable"),
   },
 };
 export default meta;
@@ -206,4 +211,64 @@ export const States: Story = {
       </Box>
     </Box>
   ),
+};
+
+/**
+ * THE GRIP, which no toggle on a standalone tile can produce.
+ *
+ * `draggable` only ever vetoes: a tile needs a `dragId` AND an enclosing
+ * DragContainerProvider before `useDragItem` returns anything, because a handle
+ * that does nothing is worse than no handle at all. Here both exist, so the grip
+ * renders — bottom-left, opposite the menu and clear of the checkbox.
+ */
+export const DraggableInsideAContainer: Story = {
+  render: () => {
+    const [order, setOrder] = useState(["Mesa 12", "Mesa 14", "Mesa 16"]);
+    const [active, setActive] = useState<string | number | null>(null);
+    const move = (from: string, to: string): void =>
+      setOrder((prev) => {
+        const next = prev.filter((id) => id !== from);
+        next.splice(prev.indexOf(to), 0, from);
+        return next;
+      });
+    return (
+      <DragContainerProvider
+        value={{
+          activeId: active,
+          handleProps: (id) => ({
+            draggable: true,
+            onDragStart: (event: React.DragEvent) => {
+              event.dataTransfer.setData("text/plain", String(id));
+              setActive(id);
+            },
+            onDragEnd: () => setActive(null),
+          }),
+          itemProps: (id) => ({
+            onDragOver: (event: React.DragEvent) => event.preventDefault(),
+            onDrop: (event: React.DragEvent) => {
+              event.preventDefault();
+              move(event.dataTransfer.getData("text/plain"), String(id));
+              setActive(null);
+            },
+          }),
+        }}
+      >
+        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          {order.map((id) => (
+            <Box key={id} sx={{ width: 180 }}>
+              <BaseCard
+                dragId={id}
+                aspectRatio="4:3"
+                title={id}
+                subtitle="4 lugares"
+                imageFallback={<TableRestaurantOutlinedIcon sx={{ fontSize: 40, color: "text.disabled" }} />}
+                menu={kebab}
+                onToggleSelect={() => {}}
+              />
+            </Box>
+          ))}
+        </Box>
+      </DragContainerProvider>
+    );
+  },
 };

@@ -240,13 +240,28 @@ function accentBar(main: string): CardSx {
 }
 
 /**
- * The tile's halo. Button's glow, kept for `BaseCard` — a grid of tiles has gaps
- * around each card, so the spread has somewhere to go that a row does not.
+ * The tile's lift — a card that has been RAISED, not one that is lit from within.
+ *
+ * This was Button's glow: a 20px bloom at 0.6 over a 40px bloom at 0.3, plus
+ * `brightness(1.05)`. On a button, which is small and pressed and gone, that
+ * reads as energy. On a tile it read as a neon sign — 40px of saturated colour
+ * bleeding into the gaps of a grid whose whole job is to let the eye compare
+ * cards, and the brightness filter washing the image and the caption with it.
+ *
+ * Three shadows doing three jobs instead: a hairline ring that tints the card's
+ * own edge in the accent colour, a tight contact shadow, and one soft shadow
+ * offset DOWNWARD. Offset is what separates elevation from emission — a glow is
+ * symmetrical because its source is the object; a shadow falls because the
+ * light is somewhere else. It stays legible on a dark canvas, where the old
+ * bloom was the brightest thing on the screen.
  */
-function glowSx(main: string): CardSx {
+function liftSx(main: string): CardSx {
   return {
-    boxShadow: `0 0 20px 5px ${alpha(main, 0.6)}, 0 0 40px 10px ${alpha(main, 0.3)}`,
-    filter: "brightness(1.05)",
+    boxShadow: [
+      `0 0 0 1px ${alpha(main, 0.45)}`,
+      `0 1px 2px ${alpha(main, 0.12)}`,
+      `0 8px 20px -6px ${alpha(main, 0.3)}`,
+    ].join(", "),
   };
 }
 
@@ -281,10 +296,10 @@ function pulseSx(main: string): CardSx {
 /** The emphasis treatments, in the terms the shape can actually carry. */
 function emphasisSx(emphasis: CardEmphasis, main: string, shape: CardShape): CardSx {
   if (emphasis === "attention") {
-    // The bar on both; the halo only where there is room for it to spread.
+    // The bar on both; the lift only where there is room for it to spread.
     return {
       ...accentBar(main),
-      ...(shape === "tile" ? glowSx(main) : {}),
+      ...(shape === "tile" ? liftSx(main) : {}),
       ...pulseSx(main),
     };
   }
@@ -321,7 +336,14 @@ function stateSx(state: CardState): CardSx {
   if (state === "cancelled") {
     return {
       opacity: 0.65,
-      '& [data-slot="value"], & [data-slot="caption"]': { textDecoration: "line-through" },
+      // The META CLUSTER is struck too. It was left out, so a voided row kept a
+      // crisp `05/08/2026, 13:45` and `PIX` between a struck title and a struck
+      // total — the middle of the row reading as live data on a record the two
+      // ends call void. Both lines of each pair go, as both lines of the caption
+      // already do: on a cancelled record the label is as void as the value.
+      '& [data-slot="value"], & [data-slot="caption"], & [data-slot="meta"]': {
+        textDecoration: "line-through",
+      },
     };
   }
   if (state === "disabled") {
