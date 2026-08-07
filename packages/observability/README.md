@@ -1,35 +1,72 @@
-# `@12-apps/observability`
+# Observability (`packages/observability/*`)
 
-Browser error reporting for a React SPA, on Sentry. Deferred init behind a
-served DSN, the noise rules that keep a deploy from filing one issue per open
-tab, a PII scrub, the route error boundary, and a self-check page that proves
-the whole chain is live in the bundle production is actually serving.
+Error reporting on Sentry for a full-stack app: reading what production
+actually said, on both sides of the wire. Self-contained in this folder and
+split along the server/browser boundary into two workspace packages, which
+never import each other:
 
-Host-agnostic: no fetch wrapper, no router assumptions, no product copy, no
-tenant vocabulary. Everything the package cannot know — what a routine API
+| package | contents |
+| --- | --- |
+| `@12-apps/observability-backend` | a Winston transport that forwards `error`/`warn` on `@sentry/node`, a PII scrub that redacts by key at any depth, and a flush for a deliberate exit |
+| `@12-apps/observability-frontend` | deferred init behind a **served** DSN on `@sentry/react`, the noise rules that keep a deploy from filing one issue per open tab, a stricter PII scrub, a route error boundary, a self-check page, and the Vite source-map upload plugin |
+
+They are independent — either runs without the other — but they deliberately
+share `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE`, so a browser event and the 500
+behind it land in the same environment under the same build.
+
+**Why two packages and not one.** Nothing is shared but the environment
+variables: one side is `@sentry/node` plus `winston-transport`, the other is
+`@sentry/react` plus React. A single package would put a Winston transport in
+every SPA bundle's dependency tree and React in every server's, for entry points
+neither will ever import.
+
+Both are host-agnostic: no fetch wrapper, no router assumptions, no product
+copy, no tenant vocabulary. Everything they cannot know — what a routine API
 error looks like, what a crashed page should render, where the config lives —
 arrives through a named seam the host fills in. See [the seams](#the-seams).
 
-It was extracted from a working application rather than designed in the
-abstract, so the reasoning below cites the failures it came from. What stays in
-the consuming repo is deployment fact rather than library behaviour: which
+They were extracted from a working application rather than designed in the
+abstract, so the reasoning below cites the failures they came from. What stays
+in the consuming repo is deployment fact rather than library behaviour: which
 Sentry project each app reports to, and how the upload token reaches
 `docker build`.
 
-## Entry points
+## The server half
+
+Reporting hangs off the **logger**, not off individual call sites:
+
+```ts
+import { sentryTransport, flushReporter, scrub } from "@12-apps/observability-backend";
+```
+
+`sentryTransport()` returns a `winston-transport` to install beside the console
+one, or `null` when no `SENTRY_DSN` is set. Attach it once and a new module is
+covered the moment it logs, with nothing to remember — the alternative, a
+`captureException` beside every `throw`, is a rule that decays the first time
+someone forgets it.
+
+`flushReporter()` before a deliberate `process.exit`: the SDK batches and sends
+asynchronously, so exiting straight after `log.error(…)` tears the process down
+with the event still in memory — losing precisely the report worth having most.
+
+Note the trap this design implies: **`console.error` does not reach the
+reporter.** Winston is the funnel; anything written past it reaches a
+container's stdout and nowhere else.
+
+## The browser half — entry points
 
 | import | what it is | pulls in |
 |---|---|---|
-| `@12-apps/observability` | init, the pre-init buffer, context tags, `beforeSend`, `reportRouteCrash` / `reportWarning` | `@sentry/react` |
-| `@12-apps/observability/frontend` | `createRouteErrorBoundary`, `createObservabilityPage` | + React, `react-router-dom` |
-| `@12-apps/observability/self-check` | the self-check page itself | + `@12-apps/ui` |
-| `@12-apps/observability/vite` | the source-map upload plugin | `@sentry/vite-plugin` (build only) |
+| `@12-apps/observability-frontend` | init, the pre-init buffer, context tags, `beforeSend`, `reportRouteCrash` / `reportWarning` | `@sentry/react` |
+| `@12-apps/observability-frontend/react` | `createRouteErrorBoundary`, `createObservabilityPage` | + React, `react-router-dom` |
+| `@12-apps/observability-frontend/self-check` | the self-check page itself | + `@12-apps/ui` |
+| `@12-apps/observability-frontend/vite` | the source-map upload plugin | `@sentry/vite-plugin` (build only) |
 
-The split is not cosmetic. The root entry is framework-free, so a worker or a
-non-React host can report without React arriving through a barrel it did not
-ask for. And the page is reachable only through its own subpath or the dynamic
-`import()` inside the route factory — naming it in the `frontend` barrel would
-pull a diagnostic nobody opens into every app's entry chunk.
+That split is not cosmetic either. The root entry is framework-free, so a worker
+or a non-React host can report without React arriving through a barrel it did
+not ask for. And the page is reachable only through its own subpath or the
+dynamic `import()` inside the route factory — naming it in the `react` barrel
+would pull a diagnostic nobody opens into every app's entry chunk.
 
 ## Wiring an app
 
@@ -37,7 +74,7 @@ pull a diagnostic nobody opens into every app's entry chunk.
 
 ```ts
 // main.tsx
-import { startObservability } from "@12-apps/observability";
+import { startObservability } from "@12-apps/observability-frontend";
 
 void startObservability("storefront");
 ```
@@ -54,7 +91,7 @@ SDK is up, or is dropped if reporting turns out to be off.
 
 ```tsx
 // route-error-boundary.tsx
-import { createRouteErrorBoundary } from "@12-apps/observability/frontend";
+import { createRouteErrorBoundary } from "@12-apps/observability-frontend/react";
 
 export const RouteErrorBoundary = createRouteErrorBoundary({
   fallback: ({ error, reload }) => (
@@ -94,7 +131,7 @@ re-rendering the same tree cannot fetch a file that is gone.
 ### 3. Mount the self-check route
 
 ```tsx
-import { createObservabilityPage } from "@12-apps/observability/frontend";
+import { createObservabilityPage } from "@12-apps/observability-frontend/react";
 
 const observabilityRoute = createObservabilityPage({
   boundary: (children) => (
@@ -118,7 +155,7 @@ it; a boundary the package supplied would test the package.
 
 ```ts
 // vite.config.ts
-import { sentrySourcemaps } from "@12-apps/observability/vite";
+import { sentrySourcemaps } from "@12-apps/observability-frontend/vite";
 
 plugins: [react(), sentrySourcemaps({ project: "my-frontend" })],
 ```
@@ -251,7 +288,7 @@ overwrite the earlier one in an order neither controls.
 ## Tests
 
 ```bash
-pnpm --filter @12-apps/observability test
+pnpm --filter "@12-apps/observability-*" test
 ```
 
 They run on jsdom with `@sentry/react` mocked, so nothing reaches the network.

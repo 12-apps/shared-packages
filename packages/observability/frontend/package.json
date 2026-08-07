@@ -1,12 +1,12 @@
 {
-  "name": "@12-apps/observability",
+  "name": "@12-apps/observability-frontend",
   "version": "1.0.0",
   "type": "module",
-  "description": "Browser error reporting for a React SPA, on Sentry: deferred init behind a served DSN, the noise rules that keep a deploy from filing one issue per open tab, a PII scrub, a route error boundary and a self-check page that proves the chain is live in the deployed bundle. Host-agnostic — what an app-specific error looks like, what a crashed page renders and where the config lives all arrive through named seams.",
+  "description": "Browser error reporting for a React SPA, on Sentry: deferred init behind a served DSN, the noise rules that keep a deploy from filing one issue per open tab, a PII scrub, a route error boundary and a self-check page that proves the chain is live in the deployed bundle. Host-agnostic \u2014 what an app-specific error looks like, what a crashed page renders and where the config lives all arrive through named seams.",
   "exports": {
     ".": "./src/index.ts",
-    "./frontend": "./src/frontend/index.ts",
-    "./self-check": "./src/frontend/self-check.tsx",
+    "./react": "./src/react/index.ts",
+    "./self-check": "./src/react/self-check.tsx",
     "./vite": {
       "types": "./dist/vite/sentry-sourcemaps.d.ts",
       "default": "./dist/vite/sentry-sourcemaps.js"
@@ -15,7 +15,7 @@
   "scripts": {
     "clean": "rm -rf node_modules coverage dist",
     "build": "tsup",
-    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test": "node ../../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest watch",
     "lint": "eslint src --max-warnings 0",
     "check-types": "tsc --noEmit",
@@ -67,7 +67,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/12-apps/shared-packages.git",
-    "directory": "packages/observability"
+    "directory": "packages/observability/frontend"
   },
   "files": [
     "src",

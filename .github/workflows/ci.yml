@@ -22,6 +22,7 @@ env:
   PUBLISH_DIRS: >-
     packages/eslint-config
     packages/typescript-config
+    packages/observability/backend
     packages/auth
     packages/entitlements
     packages/entity-lifecycle
@@ -35,7 +36,7 @@ env:
     packages/stock-domain
     packages/payments/frontend
     packages/ui
-    packages/observability
+    packages/observability/frontend
     packages/onboarding
     packages/product-research-ui
     packages/report-builder

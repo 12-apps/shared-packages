@@ -1,0 +1,65 @@
+{
+  "name": "@12-apps/observability-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "description": "Server-side error reporting on Sentry, attached to the logger rather than to call sites: a Winston transport that forwards error/warn, a PII scrub that redacts by key at any depth, and a flush for a deliberate exit. Off unless SENTRY_DSN is set, so dev, CI and tests stay offline.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage dist",
+    "build": "tsup",
+    "test": "node ../../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sentry/node": "^10.69.0",
+    "winston-transport": "^4.9.0"
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/observability/backend"
+  },
+  "files": [
+    "src",
+    "dist",
+    "*.js",
+    "*.mjs",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*",
+    "!tsup.config.ts"
+  ]
+}

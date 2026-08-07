@@ -29,7 +29,7 @@ vi.mock("@sentry/react", () => sentry);
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
-import { ObservabilitySelfCheck } from "../frontend/self-check";
+import { ObservabilitySelfCheck } from "../react/self-check";
 import { reportRouteCrash } from "../index";
 
 /**

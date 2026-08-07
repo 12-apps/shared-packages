@@ -1,7 +1,7 @@
 /**
- * The browser-facing half of `@12-apps/observability` — the pieces that are React.
+ * The React layer of `@12-apps/observability-frontend`.
  *
- * The root entry (`@12-apps/observability`) is framework-free: init, the pre-init
+ * The root entry (`@12-apps/observability-frontend`) is framework-free: init, the pre-init
  * buffer, the noise rules, the PII scrub, `reportRouteCrash`/`reportWarning`.
  * Everything that needs React or a router is here instead, so a consumer that
  * only wants the reporter — a worker, a non-React host, the Vite plugin — never

@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createRouteErrorBoundary,
   type RouteCrashFallbackProps,
-} from "../frontend/error-boundary";
+} from "../react/error-boundary";
 
 /** A page that renders — the healthy case. */
 function GoodPage(): JSX.Element {
