@@ -25,6 +25,7 @@ export function ShellToolbar<T extends Record<string, unknown>>({
   toolbarRightSlot,
   showInline,
   compactControls,
+  counterHidden,
   sortKinds,
   displayView,
   exportConfig,
@@ -46,6 +47,8 @@ export function ShellToolbar<T extends Record<string, unknown>>({
   showInline: boolean;
   /** Step 2 of the ladder: Exibir/Exportar as icons only. */
   compactControls?: boolean;
+  /** Step 5, last resort: drop the counter so the row still fits one line. */
+  counterHidden?: boolean;
 }): React.JSX.Element {
   const columnOptions: ColumnVisibilityOption[] = c.hideableColumns.map((col) => ({
     id: col.id,
@@ -61,6 +64,7 @@ export function ShellToolbar<T extends Record<string, unknown>>({
       filterControls={filterControls}
       barRef={barRef}
       compactControls={compactControls}
+      counterHidden={counterHidden}
       testIdPrefix={testIdPrefix}
       selectedRows={c.selectedRows}
       selectAll={c.selectAll}

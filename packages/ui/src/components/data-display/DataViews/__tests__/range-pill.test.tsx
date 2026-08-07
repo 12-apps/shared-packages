@@ -6,10 +6,10 @@
  * screen. A range filter was therefore invisible on exactly the screens that
  * use it, which is what pushed Pedidos to hang its own inputs outside the grid.
  */
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { InlineFilterChips, InlineFilterControls } from "../data-views-inline-bar";
+import { InlineFilterControls } from "../data-views-inline-bar";
 import { rangeChipLabel } from "../data-views-range-values";
 import type { RangeFieldConfig } from "../data-views-types";
 
@@ -43,7 +43,10 @@ const NO_COLLAPSE = {
   ],
   overflow: [],
   compactControls: false,
+  counterHidden: false,
   searchCollapsed: false,
+  clearAllHidden: false,
+  searchTakeover: false,
   barRef: { current: null },
 };
 
@@ -60,6 +63,8 @@ function renderBar(overrides: Partial<Parameters<typeof InlineFilterControls<Row
       onTogglePill={vi.fn()}
       onChangeRange={onChangeRange}
       onClearField={vi.fn()}
+      onClearAll={vi.fn()}
+      activeFilterCount={0}
       {...overrides}
     />,
   );
@@ -106,34 +111,12 @@ describe("InlineFilterControls — range pills", () => {
     expect(onChangeRange).toHaveBeenCalledWith("total", { min: undefined });
   });
 
-  it("shows an applied window as ONE removable chip that drops both ends", () => {
-    // The chips moved OFF the controls and onto their own row under the
-    // toolbar, so they are rendered — and asserted — through their own
-    // component rather than through the bar.
-    const onChangeRange = vi.fn();
-    render(
-      <InlineFilterChips<Row>
-        testIdPrefix="grid"
-        search=""
-        fields={[]}
-        rangeFields={[PERIOD, TOTAL]}
-        pills={{}}
-        ranges={{ period: { min: "2026-07-01", max: "2026-07-31" } }}
-        onSearchChange={vi.fn()}
-        onTogglePill={vi.fn()}
-        onChangeRange={onChangeRange}
-        onClearAll={vi.fn()}
-      />,
-    );
-    // The window now reads in TWO places — the pill itself and the active-chip
-    // row — so the chip is addressed through its row rather than by its text.
-    const chip = within(screen.getByTestId("grid-active-range:period")).getByText("Data: 01/07–31/07");
-    expect(chip).toBeInTheDocument();
-    // The chip's delete is its sibling ✕ — clearing the window, not one end.
-    fireEvent.click(chip.parentElement?.querySelector("svg") as Element);
-    expect(onChangeRange).toHaveBeenCalledWith("period", {});
-  });
-
+  /**
+   * The "Filtros ativos" row is gone: an applied filter is removed from the
+   * control that applied it (the pill's own ✕), not from a second list of the
+   * same filters somewhere else on the page. The window still reads ON the
+   * pill — see the test below.
+   */
   it("also shows the window ON the pill, so the bar states what it is filtering", () => {
     renderBar({ ranges: { period: { min: "2026-07-01", max: "2026-07-31" } } });
     expect(screen.getByTestId("grid-range-period")).toHaveTextContent("Data: 01/07–31/07");

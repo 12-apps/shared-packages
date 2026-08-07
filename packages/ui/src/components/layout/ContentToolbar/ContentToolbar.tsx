@@ -120,7 +120,22 @@ function BrowsingClusters({
       {/* minWidth:0 lets this cluster be the one that gives up width as the row
        * tightens, which is what the filter overflow measures against. */}
       {leadingControls !== undefined && (
-        <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, minWidth: 0 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            flexGrow: 1,
+            minWidth: 0,
+            // The collapse ladder has a FLOOR — below roughly 400px even the
+            // fully-collapsed row does not fit, and its controls cannot shrink
+            // (they are flexShrink:0 so an over-packed row sheds instead of
+            // squeezing). Past that point this scrolls rather than letting them
+            // paint outside the toolbar, which is what a narrow phone did.
+            overflowX: 'auto',
+            // No scrollbar gutter stealing height on the common case.
+            scrollbarWidth: 'thin',
+          }}
+        >
           {leadingControls}
         </Box>
       )}

@@ -89,6 +89,27 @@ export const DENSITY_CARD_COLUMNS: Record<DataViewsDensity, number> = {
 };
 
 /**
+ * The BOARD's column-width multiplier per density.
+ *
+ * Density means "how much air a record gets", and on a board that is the column
+ * width — narrow columns fit more etapas on screen, wide ones give each card
+ * room to be read. Without this the board was the one layout the Exibição tab
+ * offered nothing for: the format tile switched to Quadro and the whole density
+ * section vanished, which reads as a control that broke rather than one that
+ * does not apply.
+ *
+ * The spread is deliberately narrower than the card grid's. A board column has
+ * a hard floor (`MIN_COLUMN_WIDTH` — a card below it stops being readable), so
+ * a multiplier that undershoots it buys nothing and makes "Estreita" a tile
+ * that does nothing on a phone.
+ */
+export const DENSITY_BOARD_SCALE: Record<DataViewsDensity, number> = {
+  compact: 0.95,
+  cozy: 1,
+  comfortable: 1.25,
+};
+
+/**
  * Map the 0–100 zoom to the card SIZE multiplier. This is the single knob: the
  * card's width is {@link BASE_CARD_WIDTH} × scale and its padding + typography
  * scale by the same factor, so the whole card grows together (scale 2 → twice

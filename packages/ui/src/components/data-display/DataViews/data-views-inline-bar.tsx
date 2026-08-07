@@ -3,24 +3,29 @@
 /**
  * The INLINE filter bar — the horizontal row of controls a grid renders instead
  * of the slide-in panel on a wide screen (`inlineFilters`): the compact keyword
- * box, one pill per facet, one pill per range, and the "Filtros ativos" chips
- * underneath.
+ * box, one pill per facet, one pill per range, and "Mais N" for whatever had no
+ * room.
+ *
+ * There is no "Filtros ativos" row beneath it. Listing every applied filter a
+ * second time, under the controls already showing them, was the same
+ * information twice — and put the ✕ that removes a filter somewhere other than
+ * the control that applied it. Each pill carries its own.
  *
  * Split from `data-views-filter-panel` because they are two surfaces, not one:
  * the panel is a column of stacked fields, this is a row of pills, and the only
  * thing they share is the prop shape they are both driven by.
  */
-import { Box, Button, Chip, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 import { useState } from "react";
 
 import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 
+import { ClearAllControl, CloseSearchControl } from "./data-views-bar-controls";
 import type { GridFilterPanelProps } from "./data-views-filter-panel";
 import { MoreFilters } from "./data-views-more-filters";
 import type { OverflowField, OverflowSplit } from "./data-views-overflow";
 import { CollapsedSearch, InlineKeyword } from "./data-views-search";
 import { RangePill } from "./data-views-range-pill";
-import { isRangeSet, rangeChipLabel } from "./data-views-range-values";
 import type { RangeValue } from "./data-views-types";
 
 
@@ -33,6 +38,7 @@ function SearchSlot({
   onSearchChange,
   collapsed,
   expanded,
+  fill,
   onOpen,
   onEscape,
   testIdPrefix,
@@ -41,6 +47,8 @@ function SearchSlot({
   onSearchChange: (value: string) => void;
   collapsed: boolean;
   expanded: boolean;
+  /** The box owns the cluster alone, so it may shrink below its usual floor. */
+  fill: boolean;
   onOpen: () => void;
   onEscape: () => void;
   testIdPrefix: string;
@@ -57,6 +65,7 @@ function SearchSlot({
       testId={`${testIdPrefix}-search-all`}
       autoFocus={expanded}
       onEscape={onEscape}
+      fill={fill}
     />
   );
 }
@@ -80,70 +89,6 @@ type InlineFilterBarProps<T extends Record<string, unknown>> = Pick<
   split: OverflowSplit<T>;
 };
 
-/** One removable active-filter chip: a search term, a pill value or a window. */
-interface ActiveChip {
-  key: string;
-  label: string;
-  onDelete: () => void;
-}
-
-/**
- * Every applied filter flattened into removable chips. A pill contributes one
- * chip per selected value (deleting one leaves the rest), while a RANGE
- * contributes a single chip for the whole window — "remove the period" means
- * both ends, not an arbitrary one.
- */
-function activeChips<T extends Record<string, unknown>>({
-  search,
-  fields,
-  rangeFields,
-  pills,
-  ranges,
-  onSearchChange,
-  onTogglePill,
-  onChangeRange,
-}: Pick<
-  GridFilterPanelProps<T>,
-  | "search"
-  | "fields"
-  | "rangeFields"
-  | "pills"
-  | "ranges"
-  | "onSearchChange"
-  | "onTogglePill"
-  | "onChangeRange"
->): ActiveChip[] {
-  const searchChip: ActiveChip[] =
-    search.trim() === ""
-      ? []
-      : [{ key: "__search", label: `Busca: ${search}`, onDelete: () => onSearchChange("") }];
-  const pillChips: ActiveChip[] = fields.flatMap((field) =>
-    (pills[field.id] ?? []).map((value) => ({
-      key: `${field.id}:${value}`,
-      label: `${field.label}: ${field.options.find((option) => option.value === value)?.label ?? value}`,
-      onDelete: () => onTogglePill(field.id, value, false),
-    })),
-  );
-  const rangeChips: ActiveChip[] = rangeFields.flatMap((field) => {
-    const range = ranges[field.id];
-    if (!range || !isRangeSet(range)) return [];
-    return [
-      {
-        key: `range:${field.id}`,
-        label: rangeChipLabel(field, range),
-        onDelete: () => onChangeRange(field.id, {}),
-      },
-    ];
-  });
-  return [...searchChip, ...pillChips, ...rangeChips];
-}
-
-/**
- * A horizontal filter bar (used instead of the slide-in {@link GridFilterPanel} on
- * wide screens): the compact keyword search, each field as a rounded pill dropdown,
- * and — when anything is applied — a row of removable "active filter" chips. Range
- * filters are not shown here (the slide-in panel keeps those).
- */
 /**
  * One filter control on the bar: a multi-select pill or a min/max range. The
  * two are the same thing from the bar's point of view — a labelled control that
@@ -202,6 +147,46 @@ function InlineControl<T extends Record<string, unknown>>({
 }
 
 /**
+ * WHICH OF THE SEARCH'S THREE STATES THE BAR IS IN.
+ *
+ * Resting, expanded-and-sharing, or expanded-and-owning-the-cluster. They were
+ * one boolean until a phone showed why they are not:
+ *
+ * - `fill` — an expanded box drops its usual 200px floor and takes whatever the
+ *   cluster has. That floor is right for a box that lives on the row; it is
+ *   wrong for one expanded into a cluster the ladder sized for an icon, where
+ *   insisting on it made the row scroll sideways (154px of overhang at 320px,
+ *   84px at 390px, 42px at 500px).
+ * - `takesOver` — the narrower case, where shrinking has run out of road and
+ *   what is left would be too small to read. Only then do the filters stand
+ *   down. A large phone has room to share, and evicting them there cost the
+ *   operator their filters for nothing.
+ *
+ * Once CLICKED the box stays open until Escape or its ✕, so typing is never
+ * interrupted by a re-measure.
+ */
+function useSearchMode<T extends Record<string, unknown>>(
+  split: OverflowSplit<T>,
+): {
+  showBox: boolean;
+  expanded: boolean;
+  fill: boolean;
+  takesOver: boolean;
+  open: () => void;
+  close: () => void;
+} {
+  const [searchOpen, setSearchOpen] = useState(false);
+  return {
+    showBox: !split.searchCollapsed || searchOpen,
+    expanded: searchOpen,
+    fill: split.searchCollapsed && searchOpen,
+    takesOver: searchOpen && split.searchTakeover,
+    open: () => setSearchOpen(true),
+    close: () => setSearchOpen(false),
+  };
+}
+
+/**
  * The filter CONTROLS alone — search, the fields that fit, and "Mais N" for the
  * ones that don't — with no row chrome of its own, because it is rendered ON
  * the toolbar line rather than under it (`ContentToolbar`'s `leadingControls`).
@@ -219,8 +204,12 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
   onChangeRange,
   onClearField,
   split,
+  onClearAll,
+  activeFilterCount,
   onControlOpenChange,
-}: Omit<InlineFilterBarProps<T>, "fields" | "rangeFields" | "onClearAll"> & {
+}: Omit<InlineFilterBarProps<T>, "fields" | "rangeFields"> & {
+  /** How many filters are applied — decides whether "Limpar" is on the bar at all. */
+  activeFilterCount: number;
   /** Reports a control opening/closing so the shell can freeze the measurement. */
   onControlOpenChange?: (open: boolean) => void;
 }): React.JSX.Element {
@@ -230,11 +219,8 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
   // `RESERVED` prices the counter and Exibir/Exportar, so measuring only the
   // controls would charge for that furniture a second time and collapse the
   // ladder while the row still had hundreds of free pixels.
-  const { inline, overflow, searchCollapsed } = split;
-  // Expanded by the operator: a collapsed search that was CLICKED stays open
-  // until Escape, so typing is never interrupted by a re-measure.
-  const [searchOpen, setSearchOpen] = useState(false);
-  const showBox = !searchCollapsed || searchOpen;
+  const { inline, overflow, compactControls, clearAllHidden } = split;
+  const { showBox, expanded, fill, takesOver, open, close } = useSearchMode(split);
   return (
     <Box
       data-testid={`${testIdPrefix}-inline-filters`}
@@ -253,11 +239,71 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
         search={search}
         onSearchChange={onSearchChange}
         collapsed={!showBox}
-        expanded={searchOpen}
-        onOpen={() => setSearchOpen(true)}
-        onEscape={() => setSearchOpen(false)}
+        expanded={expanded}
+        fill={fill}
+        onOpen={open}
+        onEscape={close}
         testIdPrefix={testIdPrefix}
       />
+      {takesOver && <CloseSearchControl onClose={close} testIdPrefix={testIdPrefix} />}
+      {!takesOver && (
+      <FilterSlots
+        inline={inline}
+        overflow={overflow}
+        pills={pills}
+        ranges={ranges}
+        onTogglePill={onTogglePill}
+        onChangeRange={onChangeRange}
+        onClearField={onClearField}
+        onClearAll={onClearAll}
+        onControlOpenChange={onControlOpenChange}
+        activeFilterCount={activeFilterCount}
+        compactControls={compactControls}
+        clearAllHidden={clearAllHidden}
+        testIdPrefix={testIdPrefix}
+      />
+      )}
+    </Box>
+  );
+}
+
+/**
+ * Everything to the right of the search: the fields that fit, "Mais N" for the
+ * ones that don't, and "Limpar". Split out of `InlineFilterControls` only to
+ * keep that function inside the size gate — the three are one cluster and the
+ * order they render in is the order they shed in.
+ */
+function FilterSlots<T extends Record<string, unknown>>({
+  inline,
+  overflow,
+  pills,
+  ranges,
+  onTogglePill,
+  onChangeRange,
+  onClearField,
+  onClearAll,
+  onControlOpenChange,
+  activeFilterCount,
+  compactControls,
+  clearAllHidden,
+  testIdPrefix,
+}: {
+  inline: OverflowField<T>[];
+  overflow: OverflowField<T>[];
+  pills: Record<string, string[]>;
+  ranges: Record<string, RangeValue>;
+  onTogglePill: (fieldId: string, value: string, checked: boolean) => void;
+  onChangeRange: (fieldId: string, range: RangeValue) => void;
+  onClearField: (fieldId: string) => void;
+  onClearAll: () => void;
+  onControlOpenChange?: (open: boolean) => void;
+  activeFilterCount: number;
+  compactControls: boolean;
+  clearAllHidden: boolean;
+  testIdPrefix: string;
+}): React.JSX.Element {
+  return (
+    <>
       {inline.map((field) => (
         <InlineControl
           key={field.id}
@@ -272,6 +318,10 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
         />
       ))}
       <MoreFilters
+        onOpenChange={onControlOpenChange}
+        onClearAll={onClearAll}
+        anyApplied={activeFilterCount > 0}
+        compact={compactControls}
         fields={overflow}
         pills={pills}
         ranges={ranges}
@@ -279,85 +329,14 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
         onChangeRange={onChangeRange}
         testIdPrefix={testIdPrefix}
       />
-    </Box>
-  );
-}
-
-/**
- * The applied-filter chips, on their own line under the toolbar. Split from the
- * controls because the two no longer share a row: the controls sit on the
- * toolbar, and this renders nothing at all until something is applied.
- */
-export function InlineFilterChips<T extends Record<string, unknown>>({
-  testIdPrefix,
-  search,
-  fields,
-  rangeFields,
-  pills,
-  ranges,
-  onSearchChange,
-  onTogglePill,
-  onChangeRange,
-  onClearAll,
-}: Omit<InlineFilterBarProps<T>, "split" | "onClearField">): React.JSX.Element | null {
-  const chips = activeChips({
-    search,
-    fields,
-    rangeFields,
-    pills,
-    ranges,
-    onSearchChange,
-    onTogglePill,
-    onChangeRange,
-  });
-  if (chips.length === 0) return null;
-  return (
-    <Box sx={{ py: 1.5 }}>
-      <ActiveChipRow chips={chips} testIdPrefix={testIdPrefix} onClearAll={onClearAll} />
-    </Box>
-  );
-}
-
-/**
- * The "Filtros ativos:" row — one removable chip per applied filter plus the
- * single "Limpar" that drops them all. Renders nothing when nothing is applied,
- * so the bar collapses to its controls.
- */
-function ActiveChipRow({
-  chips,
-  testIdPrefix,
-  onClearAll,
-}: {
-  chips: ActiveChip[];
-  testIdPrefix: string;
-  onClearAll: () => void;
-}): React.JSX.Element | null {
-  if (chips.length === 0) return null;
-  return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}>
-      <Typography component="span" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
-        Filtros ativos:
-      </Typography>
-      {chips.map((chip) => (
-        <Chip
-          key={chip.key}
-          label={chip.label}
-          size="small"
-          variant="outlined"
-          onDelete={chip.onDelete}
-          data-testid={`${testIdPrefix}-active-${chip.key}`}
+      {activeFilterCount > 0 && !clearAllHidden && (
+        <ClearAllControl
+          onClearAll={onClearAll}
+          compact={compactControls}
+          testIdPrefix={testIdPrefix}
         />
-      ))}
-      <Button
-        variant="text"
-        size="small"
-        color="inherit"
-        onClick={onClearAll}
-        data-testid={`${testIdPrefix}-clear-filters`}
-        sx={{ fontSize: "0.75rem", color: "text.secondary", textTransform: "none" }}
-      >
-        Limpar
-      </Button>
-    </Box>
+      )}
+    </>
   );
 }
+

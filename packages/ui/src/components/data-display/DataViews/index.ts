@@ -35,6 +35,7 @@ export type {
   RangeFieldConfig,
   RangeFieldKind,
   RangeValue,
+  RangePreset,
   NumberRangeFieldConfig,
   DayRangeFieldConfig,
   DataViewPersistence,

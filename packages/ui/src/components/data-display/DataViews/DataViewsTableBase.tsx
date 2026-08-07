@@ -83,7 +83,7 @@ export interface DataViewsTableBaseProps<T extends Record<string, unknown>> {
   board?: BoardConfig<T>;
   /** Opt-in "Lista" layout — one full-width, entity-rendered row per record (FUT-733). */
   renderListRow?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
-  /** The page-level partition rendered as tabs above the toolbar (server mode only). */
+  /** The page-level partition rendered as tabs under the toolbar (server mode only). */
   scopes?: ScopeConfig[];
   /** The row field the scopes partition by — used only to reject a pill over the same field. */
   scopeFieldId?: string;

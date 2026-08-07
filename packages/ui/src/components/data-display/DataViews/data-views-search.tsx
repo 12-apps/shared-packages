@@ -16,6 +16,21 @@ import { Box } from "../../../mui/Box";
 const SEARCH_DEBOUNCE_MS = 350;
 
 /**
+ * How wide the keyword box is allowed to be.
+ *
+ * The 200px floor is right while the box shares the row: a search you cannot
+ * read six characters in is not a search. It is WRONG once the box has been
+ * expanded out of its collapsed state on a narrow screen, where the cluster was
+ * sized for a magnifier — the floor cannot be met there, so the row scrolled
+ * sideways instead (154px of overhang at 320px). In that mode the box shrinks,
+ * and if what is left would still be unreadable the bar hands it the whole
+ * cluster instead (`searchTakeover`).
+ */
+function boxWidth(fill: boolean): { flex: number; minWidth: number; maxWidth: number | "none" } {
+  return { flex: 1, minWidth: fill ? 0 : 200, maxWidth: fill ? "none" : 384 };
+}
+
+/**
  * The bar's keyword box.
  *
  * DEBOUNCED rather than committed on Enter/blur. In server mode every commit is
@@ -34,6 +49,7 @@ export function InlineKeyword({
   testId,
   autoFocus,
   onEscape,
+  fill = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -41,6 +57,8 @@ export function InlineKeyword({
   autoFocus?: boolean;
   /** Called on Escape with the box already empty — the collapsed bar closes it. */
   onEscape?: () => void;
+  /** Take whatever width there is, with no minimum — see {@link boxWidth}. */
+  fill?: boolean;
 }): React.JSX.Element {
   const [draft, setDraft] = useState(value);
   const prev = useRef(value);
@@ -98,7 +116,7 @@ export function InlineKeyword({
       }}
       // Takes the free space and gives it up first — step 3 of the ladder,
       // which needs no flag because flex does it (see `computeSplit`).
-      sx={{ flex: 1, minWidth: 200, maxWidth: 384 }}
+      sx={boxWidth(fill)}
     />
   );
 }

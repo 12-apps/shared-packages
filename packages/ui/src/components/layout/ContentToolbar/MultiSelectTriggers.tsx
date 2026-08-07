@@ -1,5 +1,6 @@
 'use client';
 
+import CloseIcon from '@mui/icons-material/Close';
 import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { Box, Button, Typography } from '@mui/material';
 import React, { useId } from 'react';
@@ -107,7 +108,8 @@ export function PillTrigger({
   onOpen,
   testId,
   selectedCount,
-}: TriggerProps & { selectedCount: number }): React.JSX.Element {
+  onClear,
+}: TriggerProps & { selectedCount: number; onClear?: () => void }): React.JSX.Element {
   const active = selectedCount > 0;
   return (
     <Button
@@ -118,6 +120,42 @@ export function PillTrigger({
       aria-haspopup="menu"
       aria-expanded={open}
       onClick={onOpen}
+      // Clearing lives ON the pill: the filter and the way to remove it are one
+      // control, so removing one does not mean finding it again in a second
+      // list somewhere else on the page.
+      startIcon={
+        active && onClear ? (
+          <Box
+            component="span"
+            role="button"
+            tabIndex={0}
+            aria-label={`Limpar ${label}`}
+            data-testid={testId ? `${testId}-clear` : undefined}
+            onClick={(event: React.MouseEvent) => {
+              // The pill's own click opens the menu; clearing must not.
+              event.stopPropagation();
+              onClear();
+            }}
+            onKeyDown={(event: React.KeyboardEvent) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              event.stopPropagation();
+              onClear();
+            }}
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              color: 'primary.main',
+              '&:hover': { bgcolor: 'primary.main', color: 'primary.contrastText' },
+            }}
+          >
+            <CloseIcon sx={{ fontSize: 14 }} />
+          </Box>
+        ) : undefined
+      }
       endIcon={<ChevronDownIcon sx={{ fontSize: 16 }} />}
       sx={{
         borderRadius: 999,

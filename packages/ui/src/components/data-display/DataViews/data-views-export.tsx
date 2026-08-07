@@ -116,7 +116,8 @@ function ExportTrigger({
             Exportar
           </Box>
         )}
-        <KeyboardArrowDownRoundedIcon fontSize="small" />
+        {/* Dropped with the label — see the note on the Exibir trigger. */}
+        {!compact && <KeyboardArrowDownRoundedIcon fontSize="small" />}
       </Box>
     </Button>
   );

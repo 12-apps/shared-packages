@@ -58,7 +58,7 @@ interface UseDataViewsStateArgs<T extends Record<string, unknown>> {
    */
   server?: DataViewServer;
   /**
-   * The page-level partition rendered as tabs above the toolbar. Requires server
+   * The page-level partition rendered as tabs under the toolbar. Requires server
    * mode: a scope is applied at the BACKEND, never in the browser.
    */
   scopes?: ScopeConfig[];

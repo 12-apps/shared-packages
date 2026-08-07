@@ -17,6 +17,29 @@ function allowedHosts(): true | string[] {
     .filter(Boolean);
 }
 
+/**
+ * Hot reload through the tunnel.
+ *
+ * Vite's HMR client derives its websocket URL from the PAGE's location, so a
+ * Storybook served at `https://<host>/` over the relay tries to open
+ * `wss://<host>:6006/` — a port the tunnel does not forward. The socket never
+ * connects, and the page silently stops updating: edits land, the dev server
+ * rebuilds, and the browser shows the build it loaded with.
+ *
+ * That failure is worse than no HMR, because nothing says it happened. It cost
+ * this project three rounds of "the fix isn't working" on a fix that was.
+ *
+ * So when a tunnel host is configured, point the client at the PUBLIC origin
+ * instead: wss on 443, which is the only thing the relay carries.
+ */
+function hmr(): { protocol: string; host: string; clientPort: number } | undefined {
+  const raw = process.env.STORYBOOK_ALLOWED_HOSTS?.trim() ?? '';
+  // 'all' names no host to connect back to, so there is nothing to point at.
+  const host = raw === 'all' ? '' : raw.split(',')[0]?.trim();
+  if (!host) return undefined;
+  return { protocol: 'wss', host, clientPort: 443 };
+}
+
 const config: StorybookConfig = {
   stories: [
     '../src/**/*.stories.@(js|jsx|mjs|ts|tsx)',
@@ -54,6 +77,7 @@ const config: StorybookConfig = {
     };
 
     return mergeConfig(config, {
+      server: { hmr: hmr() },
       plugins: [
         istanbul({
           include: ['src/**/*.{ts,tsx}'],
