@@ -77,19 +77,25 @@ test.describe('card', () => {
 
     await expect(page.getByTestId('payment-paid')).toBeVisible();
 
-    // FUT-740's second critical. The shipped client posts a FLAT body; a mount
-    // that read only a nested `card` block received `card: undefined` from
-    // every deployed browser and told the buyer their card was declined.
+    // FUT-740's second critical, half one: the shipped client posts a FLAT
+    // body. These read what the CLIENT sent, so they catch a client that stops
+    // sending that shape — and nothing else.
     const keys = page.getByTestId('wire-charge-keys');
     await expect(keys).toContainText('orderId');
     await expect(keys).toContainText('token');
     await expect(keys).toContainText('taxId');
     await expect(page.getByTestId('wire-charge-body')).not.toContainText('"card"');
 
-    // FUT-740's third critical. The payable has no column for a CPF, so it can
-    // only travel with the request that raises one — and this is where it shows
-    // up if it did not.
-    await expect(page.getByTestId('provider-charges')).toContainText(VALID_CPF);
+    // Half two, and the only line that fails when the MOUNT stops READING that
+    // body: what the provider actually RECEIVED. The instrument is printed with
+    // its kind, so a charge that lost it reads `(no-instrument)` here rather
+    // than settling — which is precisely how a re-nesting of `checkout/draft.ts`
+    // stayed green. FUT-740's third critical rides in the same line: the payable
+    // has no column for a CPF, so it can only travel with the request that
+    // raises one.
+    await expect(page.getByTestId('provider-charges')).toContainText(
+      `aurora:CARD:${VALID_CPF}:tok:`,
+    );
     await expect(page.getByTestId('provider-charge-count')).toHaveText('1');
   });
 

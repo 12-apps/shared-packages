@@ -14,7 +14,7 @@ Feature: Comprando com cartão
     Then ela vê o formulário de cartão
     When ela paga com um cartão novo
     Then o pagamento é confirmado
-    And a cobrança enviada ao provedor carrega o CPF dela
+    And a cobrança enviada ao provedor carrega o cartão e o CPF dela
     And o corpo da cobrança é o formato plano que o cliente publicado envia
 
   Scenario: Uma loja com um provedor só não envia tokensByProvider
