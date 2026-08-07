@@ -38,18 +38,40 @@ describe('withMerchantWebhookUrl', () => {
     expect(resolve).toHaveBeenCalledWith(TENANT, 'pagbank');
   });
 
-  /** A merchant's own value is their escape hatch; never silently replace it. */
-  it('leaves a stored notificationUrl alone', async () => {
-    const resolve = vi.fn().mockResolvedValue('https://host/hook');
+  /**
+   * The resolver OUT-RANKS the row (FUT-694). Stored-wins was the other way
+   * round, and it is what let a `notificationUrl` written through the
+   * pre-FUT-694 settings hole keep pointing a store's callbacks at whoever
+   * wrote it — indefinitely, since refusing new writes does nothing for the
+   * rows already through. The escape hatch that ordering protected is the
+   * resolver itself, which is the host's own code.
+   */
+  it('out-ranks a notificationUrl stored on the row', async () => {
     const store = withMerchantWebhookUrl(
-      storeWith({ token: 't', notificationUrl: 'https://merchant/own' }),
-      resolve,
+      storeWith({ token: 't', notificationUrl: 'https://collector.attacker/hook' }),
+      async () => 'https://host/hook',
     );
 
     const resolved = await store.getCredentials(TENANT, 'pagbank');
 
-    expect(resolved?.fields['notificationUrl']).toBe('https://merchant/own');
-    expect(resolve).not.toHaveBeenCalled();
+    expect(resolved?.fields['notificationUrl']).toBe('https://host/hook');
+  });
+
+  /**
+   * A stored value is the FALLBACK, and one merchant depends on it: the
+   * PLATFORM's own acquirer connection has no tenant-addressed webhook route,
+   * so the resolver's answer for it is permanently null and the URL the host
+   * stamps on save is the only address the provider will ever be given.
+   */
+  it('falls back to a stored URL for a merchant it cannot address', async () => {
+    const store = withMerchantWebhookUrl(
+      storeWith({ token: 't', notificationUrl: 'https://host/platform-billing/pagbank' }),
+      async () => null,
+    );
+
+    const resolved = await store.getCredentials(TENANT, 'pagbank');
+
+    expect(resolved?.fields['notificationUrl']).toBe('https://host/platform-billing/pagbank');
   });
 
   /**
@@ -109,14 +131,16 @@ describe('withMerchantRedirectUrl', () => {
     });
   });
 
-  it("leaves a merchant's own override alone", async () => {
-    const resolve = vi.fn();
-    const store = withMerchantRedirectUrl(storeWith({ redirectUrl: 'https://mine/obrigado' }), resolve);
+  /** Same ordering, same reason: a paid shopper goes where the HOST says. */
+  it('out-ranks a redirectUrl stored on the row', async () => {
+    const store = withMerchantRedirectUrl(
+      storeWith({ redirectUrl: 'https://collector.attacker/obrigado' }),
+      async () => 'https://host/acme/menu/checkout',
+    );
 
     const resolved = await store.getCredentials(TENANT, 'infinitepay');
 
-    expect(resolved?.fields['redirectUrl']).toBe('https://mine/obrigado');
-    expect(resolve).not.toHaveBeenCalled();
+    expect(resolved?.fields['redirectUrl']).toBe('https://host/acme/menu/checkout');
   });
 
   /**

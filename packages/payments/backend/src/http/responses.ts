@@ -3,6 +3,7 @@ import {
   ChargeDeclinedError,
   ChargeNotPersistedError,
   CredentialsError,
+  InvalidCredentialsInputError,
   NoProviderSucceededError,
   PaymentsError,
   ProviderRequestError,
@@ -52,6 +53,11 @@ const REFUSALS = [
 
 /** Uniform error→HTTP mapping, so hosts get consistent statuses everywhere. */
 function errorStatus(error: PaymentsError): number {
+  // Refused BEFORE anything was stored, so it is the caller's body that is
+  // wrong — not the connection's state. It must not share `CredentialsError`'s
+  // 409 below: 409 tells the owner to go fix the provider connection, when the
+  // thing to fix is the field they just typed (FUT-694).
+  if (error instanceof InvalidCredentialsInputError) return 400;
   if (error instanceof UnknownProviderError) return 404;
   if (error instanceof UnsupportedOperationError) return 422;
   if (error instanceof ChargeDeclinedError) return 402;
