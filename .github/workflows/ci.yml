@@ -35,6 +35,7 @@ env:
     packages/shift
     packages/stock-domain
     packages/payments/frontend
+    packages/payments/e2e
     packages/ui
     packages/pwa
     packages/observability-frontend

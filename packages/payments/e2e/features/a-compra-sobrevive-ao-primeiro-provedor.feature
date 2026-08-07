@@ -11,8 +11,6 @@ Feature: A compra sobrevive ao primeiro provedor falhar
   e é por isso que estes cenários olham para o que foi enviado e não só para a
   tela.
 
-  Background:
-    Given a compradora abre o checkout da loja "payments-checkout-chain-failover"
 
   Scenario: O primeiro provedor cai e o segundo cobra, sem redigitar nada
     Given a loja tem dois provedores que geram token no navegador
