@@ -1,3 +1,4 @@
+import { baseReference, ownsReference, suffixedReference } from '../core/reference';
 import type { ProviderRegistry } from '../core/registry';
 
 /**
@@ -41,7 +42,10 @@ export function verificationReference(
   attempt?: string,
 ): string {
   const base = `verify-${provider}-${merchantId}`;
-  return attempt ? `${base}--${attempt}` : base;
+  // Through `suffixedReference` so BOTH `--` conventions in this package share
+  // one definition of the separator (FUT-740). Every charge already on disk
+  // depends on those two bytes; a second copy is a second chance to drift.
+  return attempt ? suffixedReference(base, attempt) : base;
 }
 
 /** Unique per attempt, and opaque — it only has to differ from last time. */
@@ -64,8 +68,7 @@ export function ownsVerificationReference(
   provider: string,
   merchantId: string,
 ): boolean {
-  const base = verificationReference(provider, merchantId);
-  return reference === base || reference.startsWith(`${base}--`);
+  return ownsReference(verificationReference(provider, merchantId), reference);
 }
 
 /** The identity inside a reference, attempt suffix removed. Null when it is
@@ -77,5 +80,5 @@ export function parseVerificationReference(
   const provider = match?.[1];
   const rest = match?.[2];
   if (!provider || !rest) return null;
-  return { provider, merchantId: rest.split('--')[0] ?? rest };
+  return { provider, merchantId: baseReference(rest) };
 }

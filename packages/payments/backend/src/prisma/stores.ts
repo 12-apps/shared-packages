@@ -1,5 +1,11 @@
 import { PaymentsError } from '../core/errors';
-import type { ChargeStore, StoredCharge } from '../core/ports';
+import type {
+  ChargeQueryStore,
+  ChargeStore,
+  PayableChargeQuery,
+  StoredCharge,
+} from '../core/ports';
+import { attemptReferencePrefix } from '../core/reference';
 import { mergeRefreshedSnapshot } from '../core/snapshot-merge';
 import { isForwardTransition } from '../core/status';
 import type { ChargeSnapshot, MerchantRef } from '../core/types';
@@ -35,7 +41,29 @@ interface ChargeRow {
   updatedAt: Date;
 }
 
+/**
+ * The `where` a payable-scoped read is built from. Typed rather than `unknown`
+ * so a drifted column name fails here instead of returning zero rows — a
+ * silently empty answer would read as "no live charge" and mint a second
+ * payable QR, which is the exact defect `checkout/reuse.ts` exists to stop.
+ */
+interface ChargeWhere {
+  merchantKind: string;
+  merchantId: string;
+  /** Exact-or-`--`-suffix; see `core/reference.ts`. Never a bare prefix. */
+  OR: Array<{ reference: string } | { reference: { startsWith: string } }>;
+  status?: string;
+  method?: string;
+  amountCents?: number | { not: number };
+  currency?: string;
+}
+
 export interface ChargeDelegate {
+  count(args: { where: ChargeWhere }): Promise<number>;
+  findMany(args: {
+    where: ChargeWhere;
+    orderBy: { createdAt: 'desc' };
+  }): Promise<ChargeRow[]>;
   findUnique(args: {
     where:
       | { provider_providerChargeId: { provider: string; providerChargeId: string } }
@@ -91,14 +119,62 @@ function refreshedRow(
   };
 }
 
+/** Every attempt reference of one payable, under one merchant. */
+function referenceWhere(merchant: MerchantRef, reference: string): ChargeWhere {
+  return {
+    merchantKind: merchant.kind,
+    merchantId: merchant.id,
+    OR: [
+      { reference },
+      { reference: { startsWith: attemptReferencePrefix(reference) } },
+    ],
+  };
+}
+
+/** The payable-charge read, narrowed by whichever clauses the query carries. */
+function payableWhere(query: PayableChargeQuery): ChargeWhere {
+  const where = referenceWhere(query.merchant, query.reference);
+  where.status = 'PENDING';
+  if (query.method) where.method = query.method;
+  const money = query.amount ?? query.amountNot;
+  if (query.amount) where.amountCents = query.amount.amountCents;
+  if (query.amountNot) where.amountCents = { not: query.amountNot.amountCents };
+  // Currency rides with whichever amount clause was given: comparing cents
+  // across currencies is how a 7500-centavo charge passes for a 7500-cent one.
+  if (money) where.currency = money.currency;
+  return where;
+}
+
+/**
+ * The checkout reads. Their own factory purely so `createPrismaChargeStore`
+ * stays inside the size gate.
+ */
+function payableQueries(delegate: ChargeDelegate): ChargeQueryStore {
+  return {
+    async countByReference(merchant, reference) {
+      return delegate.count({ where: referenceWhere(merchant, reference) });
+    },
+    async listPayable(query) {
+      const rows = await delegate.findMany({
+        where: payableWhere(query),
+        orderBy: { createdAt: 'desc' },
+      });
+      return rows.map(rowToStoredCharge);
+    },
+  };
+}
+
 /**
  * Uniqueness note: `create` relies on the two UNIQUE constraints from the
  * owned migration — a cross-merchant `(provider, providerChargeId)` conflict
  * surfaces as the DB error, while an idempotency-key conflict is resolved by
  * re-reading the winning row.
  */
-export function createPrismaChargeStore(delegate: ChargeDelegate): ChargeStore {
+export function createPrismaChargeStore(
+  delegate: ChargeDelegate,
+): ChargeStore & ChargeQueryStore {
   return {
+    ...payableQueries(delegate),
     async findByProviderChargeId(provider, providerChargeId) {
       const row = await delegate.findUnique({
         where: { provider_providerChargeId: { provider, providerChargeId } },
