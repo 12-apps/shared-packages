@@ -197,7 +197,7 @@ function seedRows(): Row[] {
  * mutate rows, so one leaking into the next is exactly the order-dependence
  * that makes a suite flaky.
  */
-function setup(): {
+function setup(options: { maxRows?: number } = {}): {
   stored: () => Row[];
   routes: ReportRoute[];
   route: (method: string, path: string) => ReportRoute;
@@ -211,6 +211,7 @@ function setup(): {
     adapter,
     db: () => Promise.resolve(db),
     systemReports: HARNESS_PRESETS,
+    ...(options.maxRows === undefined ? {} : { maxRows: options.maxRows }),
   });
   return {
     stored: db.all,
@@ -491,5 +492,27 @@ describe('updating and deleting', () => {
     expect(response.status).toBe(204);
     expect(response.body).toBeUndefined();
     expect(stored()).toHaveLength(1);
+  });
+});
+
+describe('the host’s row cap is the host’s', () => {
+  it('never answers with more rows than the cap, whatever the spec asks for', async () => {
+    // This is the seam a consumer sees and the package's own tests did not:
+    // `maxRows` is a HOST setting, so nothing inside the library had ever run
+    // a spec whose limit exceeded it. When one did, the safety cap was read as
+    // an author's top-N and the answer came back with cap + 1 rows, carrying an
+    // "Outros" bucket nobody asked for. future-pay's route test found it.
+    const { route } = setup({ maxRows: 1 });
+
+    const response = await route('POST', '/reports/run').handle({
+      actor: OWNER,
+      params: {},
+      query: {},
+      body: { spec: { ...SPEC, limit: 10_000 } },
+    });
+
+    expect(response.status).toBe(200);
+    const body = response.body as { data: { render: { rows: unknown[] } } };
+    expect(body.data.render.rows).toHaveLength(1);
   });
 });
