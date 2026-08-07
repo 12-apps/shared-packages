@@ -231,6 +231,41 @@ describe('a production deployment (stub mode never granted)', () => {
       (await credentialsForVerification({ ...ctx, allowStubMode: true }, TENANT, 'stone'))?.stub,
     ).toBe(true);
   });
+
+  it('does not let a stale stub row fake "Testar conexão" either', async () => {
+    // The probe is the third credential read, and the one most easily missed:
+    // every adapter answers `{ ok: true, message: 'stub mode' }` the instant
+    // `stub` is set, so reading the persisted column alone stamped VERIFIED on
+    // a connection with nothing behind it — and for a provider that declares no
+    // `activationCharge`, `requireProven` then lets the owner switch it on off
+    // that fake pass and route real buyers to it.
+    const calls = { fetch: 0 };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls.fetch += 1;
+        return new Response('{"message":"unauthorized"}', {
+          status: 401,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    );
+    const rows = createMemoryProviderConfigStore();
+    const row = stubbedRow('stone');
+    row.environments.SANDBOX = { secretKey: 'e2e-stub-token' };
+    await rows.save(TENANT, row);
+    const registry = defineProviders({ stone: stoneProvider() } as const);
+    const strict = createSettingsService(registry, rows);
+
+    const result = await strict.verify(TENANT, 'stone');
+
+    // It asked Stone rather than believing the row, and wrote down what Stone
+    // actually said about a key Stone refuses.
+    expect(result.probe.ok).toBe(false);
+    expect(calls.fetch).toBe(1);
+    expect((await rows.get(TENANT, 'stone'))?.status).toBe('FAILED');
+    vi.unstubAllGlobals();
+  });
 });
 
 describe('a dev deployment with PAYMENTS_STUB=1', () => {
@@ -252,6 +287,31 @@ describe('a dev deployment with PAYMENTS_STUB=1', () => {
 
     expect(calls.fetch).toBe(0);
     expect(world.settled).toEqual([`verify-infinitepay-${TENANT.id}`]);
+    vi.unstubAllGlobals();
+  });
+
+  it('still lets the probe short-circuit, which is what dev runs on', async () => {
+    // The counterpart of the probe refusal above: granted the gate, "Testar
+    // conexão" passes offline exactly as it did before, so a laptop with no
+    // acquirer account keeps a working settings screen.
+    const calls = { fetch: 0 };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls.fetch += 1;
+        return new Response('{}', { status: 200 });
+      }),
+    );
+    const rows = createMemoryProviderConfigStore();
+    await rows.save(TENANT, stubbedRow('stone'));
+    const registry = defineProviders({ stone: stoneProvider() } as const);
+    const dev = createSettingsService(registry, rows, { allowStubMode: true });
+
+    const result = await dev.verify(TENANT, 'stone');
+
+    expect(result.probe.ok).toBe(true);
+    expect(calls.fetch).toBe(0);
+    expect((await rows.get(TENANT, 'stone'))?.status).toBe('VERIFIED');
     vi.unstubAllGlobals();
   });
 });

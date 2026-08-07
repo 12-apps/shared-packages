@@ -1,5 +1,6 @@
 import { CredentialsError, UnprovenProviderError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
+import { stubResolvedFor } from '../core/stub-mode';
 import type { MerchantRef, PaymentEnvironment, ProviderName } from '../core/types';
 
 import type { PendingVerification, ProviderConfigStore, StoredProviderConfig } from './types';
@@ -184,6 +185,6 @@ export function resolvedFrom(config: StoredProviderConfig, allowStubMode: boolea
   return {
     environment,
     fields: config.environments[environment],
-    stub: allowStubMode && config.stub && environment === 'SANDBOX',
+    stub: stubResolvedFor(allowStubMode, config.stub, environment),
   };
 }

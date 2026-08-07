@@ -45,10 +45,22 @@ Two constructor arguments are security-critical:
   which requires an explicit `PAYMENTS_STUB=1` and throws outright in
   `NODE_ENV=production`; never infer it from whether some other credential
   happens to be set. Pass the SAME answer to `createSettingsService`,
-  `credentialStoreFrom` and the activation context — the write path alone
-  does not govern the rows already in the table, and in stub mode a webhook
-  delivery authenticates with no signature at all. Even when on it applies
-  only to SANDBOX configs; PRODUCTION can never run stub charges.
+  `credentialStoreFrom`, the activation context and — through the settings
+  service — the verify probe: the write path alone does not govern the rows
+  already in the table, and in stub mode a webhook delivery authenticates
+  with no signature at all and a probe passes without asking the acquirer
+  anything. Even when on it applies only to SANDBOX configs; PRODUCTION can
+  never run stub charges.
+
+> **Upgrading from a version before FUT-696**: the stored `stub` column is no
+> longer believed on its own — every read now also requires the deployment's
+> answer. That option is optional and defaults to OFF, so a host that passes
+> it to only SOME seams still COMPILES and then disagrees with itself at
+> runtime, in both directions: the seams left unanswered stop honouring stub
+> rows (stub-seeded e2e fixtures start making real acquirer calls), while a
+> write path still carrying the old inference keeps MINTING stub rows for the
+> next deployment to find. Resolve it once at startup, thread that one value
+> everywhere, and run any stub-mode e2e suite before shipping the bump.
 
 Mount the surface with ONE call instead of a route file per handler
 (FUT-559). `mountPayments` carries the canonical layout as data and returns
