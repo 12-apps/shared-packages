@@ -1,4 +1,5 @@
 import { unknownEntityError } from './errors';
+import { operatorsFor } from './filters';
 import type { EntityDef, FieldCatalog } from './types';
 
 /** Identity helper that gives hosts type inference when declaring a catalog. */
@@ -21,6 +22,19 @@ export interface CatalogFieldListing {
       /** Declared render format (`duration`, `percent`…), when the field has one. */
       format?: string;
       description?: string;
+      /**
+       * The field's closed set of values, labelled (FUT-391). Present means a
+       * filter on this field is PICKED, not typed — the builder offers "Pago"
+       * and stores `PAID`.
+       */
+      values?: readonly { value: string; label: string }[];
+      /**
+       * The operators this field accepts, ALREADY RESOLVED from the catalog's
+       * declaration, the closed-set rule and the field type. Resolved here so a
+       * client never re-derives the defaults and drifts from the server's
+       * answer — the whole point of a server-owned catalog.
+       */
+      ops: readonly string[];
       /**
        * Present on an IDENTITY dimension (FUT-454): grouping by this field
        * requires every measure to declare `minSample` of at least this value,
@@ -51,6 +65,8 @@ export function listCatalogFields(catalog: FieldCatalog): CatalogFieldListing {
         aggregations: fieldDef.aggregations,
         format: fieldDef.format,
         description: fieldDef.description,
+        values: fieldDef.values,
+        ops: operatorsFor(fieldDef),
         minGroupSample: fieldDef.minGroupSample,
         identityMinSample: fieldDef.identityMinSample,
       })),

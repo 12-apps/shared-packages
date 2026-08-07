@@ -18,7 +18,7 @@ import { Input } from "@12-apps/ui/form/Input";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 
-import { BlockEditorPopover } from "./block-editor-popover";
+import { BlockEditorPanel } from "./block-editor-panel";
 import { useRunReport, type ReportEntityFields, type ReportSpecWire } from "./custom-reports-api";
 import { GripIcon, PencilIcon, TrashIcon } from "./lib/block-icons";
 import { ConfirmDialog } from "./lib/confirm-dialog";
@@ -176,11 +176,12 @@ export function EditableBlock({
         <BlockPreview tenantSlug={tenantSlug} spec={block.spec} range={range} testId={testId} />
       </ReportBlockFrame>
       {editing ? (
-        <BlockEditorPopover
+        // A panel, not a popover (FUT-391) — so it needs no anchor.
+        <BlockEditorPanel
           key={`${block.id}-editor`}
           open
-          anchorEl={penRef.current}
           onClose={() => setEditing(false)}
+          restoreFocusTo={penRef}
           entities={entities}
           spec={block.spec}
           span={block.span}

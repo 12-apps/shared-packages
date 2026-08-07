@@ -30,6 +30,7 @@ import { NO_PRINT_CLASS, PRINT_REGION_ATTR, PrintStyles } from "./lib/print-expo
 import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
 import { ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
 import { exportColumnsFor, ReportRenderView } from "./report-render";
+import { widenAction } from "./lib/widen-range";
 import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
 
 interface BlockProps {
@@ -38,6 +39,8 @@ interface BlockProps {
   span: number;
   range: ReportRange;
   grain: ReportGrain;
+  /** Widens the WHOLE canvas — an empty block's offer moves every block. */
+  onRangeChange: (range: ReportRange) => void;
 }
 
 /**
@@ -52,7 +55,14 @@ interface BlockProps {
  * time series, a donut, two rankings), so one merged file would have no honest
  * set of columns.
  */
-function DashboardBlock({ tenantSlug, reportKey, span, range, grain }: BlockProps): JSX.Element {
+function DashboardBlock({
+  tenantSlug,
+  reportKey,
+  span,
+  range,
+  grain,
+  onRangeChange,
+}: BlockProps): JSX.Element {
   const query = useSystemReport(tenantSlug, reportKey, range, grain);
   const testId = `system-dashboard-block-${reportKey}`;
   // The catalog title, so the frame is labelled while the run is still in
@@ -96,7 +106,11 @@ function DashboardBlock({ tenantSlug, reportKey, span, range, grain }: BlockProp
             Não foi possível carregar este relatório.
           </Alert>
         ) : report ? (
-          <ReportRenderView render={report.render} dataTestId={`${testId}-render`} />
+          <ReportRenderView
+            render={report.render}
+            dataTestId={`${testId}-render`}
+            onWidenRange={widenAction(range, onRangeChange)}
+          />
         ) : (
           <LoadingState dataTestId={`${testId}-loading`} />
         )}
@@ -167,6 +181,7 @@ export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX
             span={block.span}
             range={range}
             grain={grain}
+            onRangeChange={setRange}
           />
         ))}
       </ReportGrid>

@@ -7,7 +7,7 @@
  * A legacy single-spec report (one report = one query, pre-FUT-391) opens here
  * as a one-block report and is saved back as a regular multi-block document.
  */
-import { useState, type JSX } from "react";
+import { useState, type Dispatch, type JSX, type SetStateAction } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -30,6 +30,7 @@ import {
 } from "./custom-reports-api";
 import { defaultPublishDraft, PublishSection, type PublishDraft } from "./lib/publish-section";
 import { RangeToggle } from "./lib/range-toggle";
+import { useUnsavedChanges } from "./lib/use-unsaved-changes";
 import { EditorCanvas } from "./report-editor-canvas";
 import {
   documentFromDraft,
@@ -45,13 +46,13 @@ function useReportSave(
   editId: string | undefined,
   draft: ReportDraft,
   publish: PublishDraft,
-): { error: string | null; saving: boolean; onSave: () => Promise<void> } {
+): { error: string | null; saving: boolean; onSave: () => Promise<boolean> } {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  async function onSave(): Promise<void> {
+  async function onSave(): Promise<boolean> {
     setError(null);
     const invalid =
       draft.name.trim() === ""
@@ -61,7 +62,7 @@ function useReportSave(
           : publishGuardError(publish);
     if (invalid) {
       setError(invalid);
-      return;
+      return false;
     }
     setSaving(true);
     const input = {
@@ -78,10 +79,11 @@ function useReportSave(
     setSaving(false);
     if (!result.ok) {
       setError(result.error);
-      return;
+      return false;
     }
     void queryClient.invalidateQueries({ queryKey: ["admin", tenantSlug, "reports"] });
     void navigate(`/${tenantSlug}/reports/${result.data.id}`);
+    return true;
   }
 
   return { error, saving, onSave };
@@ -125,19 +127,36 @@ function EditorActions({
   range,
   onRangeChange,
   saving,
+  dirty,
   onCancel,
   onSave,
 }: {
   range: ReportRange;
   onRangeChange: (next: ReportRange) => void;
   saving: boolean;
+  /** Unsaved work exists — derived from the draft, not raised by an edit. */
+  dirty: boolean;
   onCancel: () => void;
   onSave: () => void;
 }): JSX.Element {
   return (
     <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
       <RangeToggle value={range} onChange={onRangeChange} dataTestId="report-editor-range" />
-      <Stack direction="row" spacing={1} sx={{ ml: "auto" }}>
+      <Stack direction="row" spacing={1} sx={{ ml: "auto", alignItems: "center" }}>
+        {/* Announced politely: a status that only changes colour is invisible
+            to a screen reader, and "unsaved" is the one state a person must
+            not have to look for. */}
+        {dirty ? (
+          <Text
+            variant="body"
+            size="sm"
+            color="secondary"
+            role="status"
+            data-testid="report-editor-dirty"
+          >
+            Alterações não salvas
+          </Text>
+        ) : null}
         <Button variant="outline" size="sm" onClick={onCancel} dataTestId="report-editor-cancel">
           Cancelar
         </Button>
@@ -155,6 +174,68 @@ function EditorActions({
   );
 }
 
+/**
+ * The editor's whole mutable state: the draft, the publish settings, the
+ * preview period, and the save that ties them together.
+ *
+ * Extracted so the form stays a rendering function. It also puts the
+ * unsaved-changes wiring in one place, where the rule that matters is visible:
+ * the baseline moves ONLY on a successful save.
+ */
+function useEditorState(
+  tenantSlug: string,
+  editId: string | undefined,
+  initial: ReportDraft,
+  initialPublish: PublishDraft,
+): {
+  draft: ReportDraft;
+  // The updater form, because EditorMeta patches fields off the previous draft.
+  setDraft: Dispatch<SetStateAction<ReportDraft>>;
+  publish: PublishDraft;
+  setPublish: Dispatch<SetStateAction<PublishDraft>>;
+  range: ReportRange;
+  setRange: (next: ReportRange) => void;
+  error: string | null;
+  saving: boolean;
+  dirty: boolean;
+  save: () => void;
+} {
+  const [draft, setDraft] = useState<ReportDraft>(initial);
+  const [publish, setPublish] = useState<PublishDraft>(initialPublish);
+  const [range, setRange] = useState<ReportRange>("30d");
+  const { error, saving, onSave } = useReportSave(tenantSlug, editId, draft, publish);
+
+  // Only what a save persists: `range` is a preview control, so choosing a
+  // different period must not arm the unsaved-changes guard.
+  const { dirty, markSaved } = useUnsavedChanges({
+    current: { draft, publish },
+    enabled: !saving,
+    onSave: async () => {
+      const saved = await onSave();
+      // A rejected save leaves the report dirty and the guard armed, which is
+      // exactly when it protects work.
+      if (saved) markSaved({ draft, publish });
+    },
+  });
+
+  return {
+    draft,
+    setDraft,
+    publish,
+    setPublish,
+    range,
+    setRange,
+    error,
+    saving,
+    dirty,
+    save: () => {
+      void onSave().then((saved) => {
+        if (saved) markSaved({ draft, publish });
+      });
+    },
+  };
+}
+
 function ReportEditorForm({
   tenantSlug,
   editId,
@@ -169,10 +250,9 @@ function ReportEditorForm({
   initialPublish: PublishDraft;
 }): JSX.Element {
   const navigate = useNavigate();
-  const [draft, setDraft] = useState<ReportDraft>(initial);
-  const [publish, setPublish] = useState<PublishDraft>(initialPublish);
-  const [range, setRange] = useState<ReportRange>("30d");
-  const { error, saving, onSave } = useReportSave(tenantSlug, editId, draft, publish);
+  const editor = useEditorState(tenantSlug, editId, initial, initialPublish);
+  const { draft, setDraft, publish, setPublish, range, setRange } = editor;
+  const { error, saving, dirty, save } = editor;
 
   return (
     <Stack spacing={3} data-testid="page-report-editor">
@@ -202,10 +282,11 @@ function ReportEditorForm({
         range={range}
         onRangeChange={setRange}
         saving={saving}
+        dirty={dirty}
         onCancel={() =>
           void navigate(editId ? `/${tenantSlug}/reports/${editId}` : `/${tenantSlug}/reports`)
         }
-        onSave={() => void onSave()}
+        onSave={save}
       />
 
       {error ? (

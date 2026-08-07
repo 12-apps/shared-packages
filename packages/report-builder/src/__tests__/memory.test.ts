@@ -6,8 +6,8 @@ import { reportSpecSchema, type ReportSpecInput } from '../spec';
 import { truncateDateToGrain } from '../time';
 import { orderRows, salesCatalog } from './fixtures';
 
-function run(input: ReportSpecInput) {
-  const query = compileReport(reportSpecSchema.parse(input), salesCatalog);
+function run(input: ReportSpecInput, options?: { maxRows?: number }) {
+  const query = compileReport(reportSpecSchema.parse(input), salesCatalog, options);
   return executeCompiledQuery(orderRows, query);
 }
 
@@ -84,7 +84,16 @@ describe('executeCompiledQuery', () => {
     expect(rows).toEqual([{ avgItems: 1.8, minTotal: 1000, maxTotal: 5000, methods: 2 }]);
   });
 
-  it('sorts by measures and applies the limit', () => {
+  /**
+   * FUT-391 CHANGED this. A spec-declared `limit` is now a TOP-N, so the
+   * remainder comes back as an "Outros" row instead of being dropped. The old
+   * expectation (one row, 8000) described a report whose chart no longer added
+   * up to its own total, with nothing saying why.
+   *
+   * This is a behavioural change for every SAVED report that carries a limit —
+   * each gains a row. That is the intended semantics, not a side effect.
+   */
+  it('sorts by measures and folds the remainder into "Outros"', () => {
     const rows = run({
       entity: 'orders',
       dimensions: [{ field: 'method' }],
@@ -92,6 +101,24 @@ describe('executeCompiledQuery', () => {
       sort: [{ by: 'sum_totalCents', direction: 'desc' }],
       limit: 1,
     });
+    expect(rows).toEqual([
+      { method: 'PIX', sum_totalCents: 8000 },
+      { method: 'Outros', sum_totalCents: 7000 },
+    ]);
+  });
+
+  it('still truncates at the host row cap, which is NOT a top-N', () => {
+    // maxRows is a safety bound. Folding its remainder would claim a total the
+    // report never computed, so the plain truncation stands.
+    const rows = run(
+      {
+        entity: 'orders',
+        dimensions: [{ field: 'method' }],
+        measures: [{ field: 'totalCents' }],
+        sort: [{ by: 'sum_totalCents', direction: 'desc' }],
+      },
+      { maxRows: 1 },
+    );
     expect(rows).toEqual([{ method: 'PIX', sum_totalCents: 8000 }]);
   });
 

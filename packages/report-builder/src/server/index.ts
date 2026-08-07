@@ -1,3 +1,12 @@
+export {
+  createReportBuilder,
+  documentShape,
+  type ReportActor,
+  type ReportBuilderServerConfig,
+  type ReportRequest,
+  type ReportResponse,
+  type ReportRoute,
+} from './create-report-builder';
 /**
  * `@12-apps/report-builder/server` — the host-mounted backend surface
  * (plug-and-play, payments-backend doctrine): the domain field catalog and
@@ -23,6 +32,18 @@ export {
   type SystemReportSection,
 } from './presets';
 export { REPORT_ENTITY_PERMISSION, REPORT_RUN_MAX_ROWS } from './policy';
+/**
+ * The "Adicionar bloco" picker's contents (FUT-391). Server-side because every
+ * template's spec IS a starter, and the starters are compile-validated against
+ * the live catalog here — a client-side copy would carry no such guarantee.
+ */
+export {
+  BLANK_BLOCK_TEMPLATE,
+  blockTemplateGroups,
+  findBlockTemplate,
+  type BlockTemplate,
+  type BlockTemplateGroup,
+} from './block-templates';
 export { REPORT_ENTITY_STARTERS } from './starters';
 export {
   canViewSavedReport,

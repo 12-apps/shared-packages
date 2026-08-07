@@ -52,8 +52,10 @@ export interface BuilderDraft {
 export const OPERATOR_LABELS: Record<string, string> = {
   eq: "igual a",
   neq: "diferente de",
+  in: "é um de",
   gte: "a partir de",
   lte: "até",
+  between: "entre",
 };
 
 const CHART_LABELS: Record<ChartKind, string> = {

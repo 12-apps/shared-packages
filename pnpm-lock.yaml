@@ -525,6 +525,9 @@ importers:
       eslint-plugin-test-flakiness:
         specifier: ^1.4.0
         version: 1.8.0(eslint@9.39.5(jiti@2.7.0))
+      hono:
+        specifier: ^4.6.0
+        version: 4.12.30
       react:
         specifier: 19.2.0
         version: 19.2.0

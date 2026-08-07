@@ -82,6 +82,35 @@ export function newAccumulator(): MeasureAccumulator {
   };
 }
 
+/**
+ * Fold one accumulator into another, EXACTLY (FUT-391).
+ *
+ * This is what makes an "Outros" bucket true rather than approximate. Folding
+ * finished per-group values would be wrong for most aggregations — you cannot
+ * average averages, and a p90 of p90s is not a p90 — but an accumulator still
+ * carries its raw inputs (`samples`, the `distinct` set, the extremes), so
+ * merging those reproduces exactly what accumulating the same rows into one
+ * group would have produced.
+ *
+ * Destructive on `into`, which is always a bucket the caller just created.
+ */
+export function mergeAccumulator(into: MeasureAccumulator, from: MeasureAccumulator): void {
+  into.sum += from.sum;
+  into.count += from.count;
+  into.denominatorSum += from.denominatorSum;
+  into.eligible += from.eligible;
+  if (from.min !== null && (into.min === null || compareValues(from.min, into.min) < 0)) {
+    into.min = from.min;
+  }
+  if (from.max !== null && (into.max === null || compareValues(from.max, into.max) > 0)) {
+    into.max = from.max;
+  }
+  for (const value of from.distinct) into.distinct.add(value);
+  // Percentiles come from the pooled samples, so the bucket's p90 is the p90
+  // of every folded row — not a blend of the groups' own percentiles.
+  if (from.samples.length > 0) into.samples.push(...from.samples);
+}
+
 function trackExtremes(acc: MeasureAccumulator, value: Comparable): void {
   if (acc.min === null || compareValues(value, acc.min) < 0) acc.min = value;
   if (acc.max === null || compareValues(value, acc.max) > 0) acc.max = value;

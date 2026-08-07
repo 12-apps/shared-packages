@@ -54,7 +54,20 @@ export interface ReportTableColumn {
 /** Rendered report: a table model or a `@12-apps/ui` chart spec, plus rows. */
 export type ReportRender =
   | { kind: "table"; columns: ReportTableColumn[]; rows: ReportRow[] }
-  | { kind: "chart"; chartSpec: ChartSpec; rows: ReportRow[] }
+  | {
+      kind: "chart";
+      chartSpec: ChartSpec;
+      /**
+       * The columns the same query would produce as a table — shipped by the
+       * server so "Ver como tabela" and the CSV need not re-derive them from
+       * the ChartSpec, which no longer carries an x-axis title to derive from.
+       *
+       * Optional only for a payload produced before FUT-391; the client falls
+       * back to the ChartSpec derivation, which yields raw aliases.
+       */
+      tableColumns?: ReportTableColumn[];
+      rows: ReportRow[];
+    }
   | {
       kind: "kpi";
       label: string;

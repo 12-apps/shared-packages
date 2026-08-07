@@ -15,10 +15,13 @@
     "@mui/icons-material": "^6.5.0",
     "@mui/material": "^6.5.0",
     "@playwright/test": "^1.49.0",
+    "@tanstack/react-query": "^5.62.0",
     "@vitejs/plugin-react": "^5.1.0",
     "playwright-bdd": "^9.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-router-dom": "^7.0.0",
     "vite": "^8.2.0"
-  }
+  },
+  "//peers": "react-router-dom and @tanstack/react-query are PEERS of @12-apps/report-builder, not conveniences. Its react entry re-exports pages that import them, so the barrel must resolve them at build time even when the harness renders only a component that needs neither. A real consumer of that entry has both installed — which is what this harness exists to replicate."
 }
