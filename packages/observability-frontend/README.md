@@ -1,9 +1,13 @@
-# Observability (`packages/observability/*`)
+# `@12-apps/observability-frontend`
 
-Error reporting on Sentry for a full-stack app: reading what production
-actually said, on both sides of the wire. Self-contained in this folder and
-split along the server/browser boundary into two workspace packages, which
-never import each other:
+Browser error reporting on Sentry — reading what production actually said, on
+the side of the wire nobody can attach a debugger to.
+
+It has a server-side counterpart, `@12-apps/observability-backend`. They are two
+packages rather than one because they share no code at all, only environment
+variables — one side is `@sentry/node` plus `winston-transport`, the other is
+`@sentry/react` plus React, and a single package would put a Winston transport
+in every SPA's dependency tree and React in every server's:
 
 | package | contents |
 | --- | --- |
@@ -13,12 +17,6 @@ never import each other:
 They are independent — either runs without the other — but they deliberately
 share `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE`, so a browser event and the 500
 behind it land in the same environment under the same build.
-
-**Why two packages and not one.** Nothing is shared but the environment
-variables: one side is `@sentry/node` plus `winston-transport`, the other is
-`@sentry/react` plus React. A single package would put a Winston transport in
-every SPA bundle's dependency tree and React in every server's, for entry points
-neither will ever import.
 
 Both are host-agnostic: no fetch wrapper, no router assumptions, no product
 copy, no tenant vocabulary. Everything they cannot know — what a routine API
@@ -31,29 +29,7 @@ in the consuming repo is deployment fact rather than library behaviour: which
 Sentry project each app reports to, and how the upload token reaches
 `docker build`.
 
-## The server half
-
-Reporting hangs off the **logger**, not off individual call sites:
-
-```ts
-import { sentryTransport, flushReporter, scrub } from "@12-apps/observability-backend";
-```
-
-`sentryTransport()` returns a `winston-transport` to install beside the console
-one, or `null` when no `SENTRY_DSN` is set. Attach it once and a new module is
-covered the moment it logs, with nothing to remember — the alternative, a
-`captureException` beside every `throw`, is a rule that decays the first time
-someone forgets it.
-
-`flushReporter()` before a deliberate `process.exit`: the SDK batches and sends
-asynchronously, so exiting straight after `log.error(…)` tears the process down
-with the event still in memory — losing precisely the report worth having most.
-
-Note the trap this design implies: **`console.error` does not reach the
-reporter.** Winston is the funnel; anything written past it reaches a
-container's stdout and nowhere else.
-
-## The browser half — entry points
+## Entry points
 
 | import | what it is | pulls in |
 |---|---|---|
@@ -62,7 +38,7 @@ container's stdout and nowhere else.
 | `@12-apps/observability-frontend/self-check` | the self-check page itself | + `@12-apps/ui` |
 | `@12-apps/observability-frontend/vite` | the source-map upload plugin | `@sentry/vite-plugin` (build only) |
 
-That split is not cosmetic either. The root entry is framework-free, so a worker
+That split is not cosmetic. The root entry is framework-free, so a worker
 or a non-React host can report without React arriving through a barrel it did
 not ask for. And the page is reachable only through its own subpath or the
 dynamic `import()` inside the route factory — naming it in the `react` barrel

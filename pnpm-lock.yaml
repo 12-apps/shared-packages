@@ -247,7 +247,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(@vitest/browser@3.2.7)(jiti@2.7.0)(jsdom@26.1.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  packages/observability/backend:
+  packages/observability-backend:
     dependencies:
       '@sentry/node':
         specifier: ^10.69.0
@@ -258,10 +258,10 @@ importers:
     devDependencies:
       '@12-apps/eslint-config':
         specifier: workspace:*
-        version: link:../../eslint-config
+        version: link:../eslint-config
       '@12-apps/typescript-config':
         specifier: workspace:*
-        version: link:../../typescript-config
+        version: link:../typescript-config
       eslint:
         specifier: ^9.39.1
         version: 9.39.5(jiti@2.7.0)
@@ -278,11 +278,11 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(@vitest/browser@3.2.7)(jiti@2.7.0)(jsdom@26.1.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  packages/observability/frontend:
+  packages/observability-frontend:
     dependencies:
       '@12-apps/ui':
         specifier: workspace:*
-        version: link:../../ui
+        version: link:../ui
       '@sentry/react':
         specifier: ^10.69.0
         version: 10.69.0(react@19.2.0)
@@ -292,10 +292,10 @@ importers:
     devDependencies:
       '@12-apps/eslint-config':
         specifier: workspace:*
-        version: link:../../eslint-config
+        version: link:../eslint-config
       '@12-apps/typescript-config':
         specifier: workspace:*
-        version: link:../../typescript-config
+        version: link:../typescript-config
       '@testing-library/react':
         specifier: ^16.1.0
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -634,7 +634,7 @@ importers:
     dependencies:
       '@12-apps/observability-backend':
         specifier: workspace:*
-        version: link:../observability/backend
+        version: link:../observability-backend
       '@aws-sdk/client-s3':
         specifier: ^3.693.0
         version: 3.1089.0

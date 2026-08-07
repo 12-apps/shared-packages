@@ -100,7 +100,7 @@
         "@storybook/builder-vite"
       ]
     },
-    "packages/observability/frontend": {
+    "packages/observability-frontend": {
       "entry": [
         "src/index.ts",
         "src/react/*.{ts,tsx}",
