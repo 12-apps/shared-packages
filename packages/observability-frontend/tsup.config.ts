@@ -33,7 +33,9 @@ export default defineConfig([
     dts: true,
     splitting: false,
     sourcemap: true,
-    clean: true,
+    // Cleaning is the BUILD SCRIPT's job, not either entry's — see the note at
+    // the foot of this file.
+    clean: false,
     // Both are the consumer's: `vite` supplies only the `PluginOption` type, and
     // the upload plugin must be the same instance the consumer's build resolves.
     external: ["vite", "@sentry/vite-plugin"],
@@ -47,10 +49,33 @@ export default defineConfig([
     dts: true,
     splitting: false,
     sourcemap: true,
-    // The entry above already cleaned `dist`; cleaning again would race it away.
     clean: false,
     // NOTHING external. `importScripts()` has no module resolution to fall back
     // on, so anything left unbundled is a reference the worker cannot satisfy.
     noExternal: [/.*/],
   },
 ]);
+
+/**
+ * ## Why neither entry cleans
+ *
+ * tsup runs the entries of an array config CONCURRENTLY, so "the first one
+ * cleans and the second one must not" is an ordering assumption, not a
+ * guarantee. When entry 1's clean happens to fire after entry 2 has already
+ * written, it deletes `dist/observability-sw.*` — the outputs
+ * `exports["./service-worker"]` points at.
+ *
+ * That is a race, so it loses rarely and never where you are looking. It failed
+ * `Consumer Verification` with
+ *
+ *     exports["./service-worker"] points at ./dist/observability-sw.d.ts,
+ *     which is not in the tarball
+ *
+ * on a PR that touched nothing in this package. What made that PR different was
+ * only that it changed the lockfile and so invalidated turbo's build cache: a
+ * cache HIT restores a complete `dist` and hides the bug entirely, which is why
+ * this had been green on main.
+ *
+ * The build script now removes `dist` once, before tsup starts. Ordering stops
+ * being load-bearing rather than being reordered.
+ */
