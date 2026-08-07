@@ -1,4 +1,5 @@
 import type { PaymentProviderAdapter } from '../core/provider';
+import { stubResolvedFor } from '../core/stub-mode';
 import type { PaymentEnvironment, ProbeFault } from '../core/types';
 import type { MaskedProviderConfig, ProviderConfigStore, StoredProviderConfig } from './types';
 import type { MerchantRef } from '../core/types';
@@ -52,6 +53,14 @@ export interface VerifiedProviderConfig extends MaskedProviderConfig {
  * it, but only because it also forces `enabled: false`; a test button that
  * silently repointed a live store at sandbox — still enabled — would send real
  * orders to fake credentials.
+ *
+ * `allowStubMode` is this deployment's own answer, and the probe requires it
+ * for the same reason every other credential read does: every adapter returns
+ * `{ ok: true, message: 'stub mode' }` the moment `stub` is set, without
+ * asking the acquirer anything. Reading the stored column ALONE let a
+ * left-over `stub=true` row — a restored dev dump, a demo tenant on a shared
+ * database — answer "Testar conexão" with a pass nobody earned, and persist
+ * VERIFIED over a connection holding no credentials at all.
  */
 export async function runVerify(
   adapter: PaymentProviderAdapter,
@@ -59,14 +68,15 @@ export async function runVerify(
   merchant: MerchantRef,
   config: StoredProviderConfig,
   target: PaymentEnvironment,
+  allowStubMode: boolean,
   toMasked: (adapter: PaymentProviderAdapter, config: StoredProviderConfig) => MaskedProviderConfig,
 ): Promise<VerifiedProviderConfig> {
   const result = await adapter.verifyCredentials({
     environment: target,
     fields: config.environments[target],
-    // Stub mode is a SANDBOX-only deployment affordance. Carrying it into a
-    // PRODUCTION probe would fake a pass for credentials nobody tested.
-    stub: config.stub && target === 'SANDBOX',
+    // SANDBOX-only, and only where the deployment said yes — see
+    // `stubResolvedFor`, which is the one place this is decided.
+    stub: stubResolvedFor(allowStubMode, config.stub, target),
   });
 
   // A probe that never reached the provider has learned NOTHING about the
