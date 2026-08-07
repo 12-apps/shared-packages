@@ -103,8 +103,13 @@ export interface PaymentFlowsConfig {
   ports: CheckoutPorts;
 
   polling?: { intervalMs?: number; cardMaxPolls?: number };
-  /** FUT-563's per-entry mint deadline for the failover chain. */
-  tokenization?: { mintTimeoutMs?: number };
+  // NO `tokenization: { mintTimeoutMs }` here yet, deliberately. It was
+  // declared and never threaded to the mint path, so a host could set a
+  // deadline, believe the chain honoured it, and get none — config that lies is
+  // worse than config that is absent. Landing it for real needs the answer to
+  // "what happens WHEN it fires": a timed-out mint must decide whether the walk
+  // advances to the next entry or the whole charge refuses, and that is a money
+  // rule (FUT-563), not a wire-up.
   copy?: Partial<CheckoutCopyFE>;
   /** Host content under the paid receipt (the storefront's PWA install invite). */
   confirmation?: { extra?: ReactNode };
