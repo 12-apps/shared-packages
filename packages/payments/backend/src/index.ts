@@ -66,7 +66,9 @@ export type {
 export type {
   AttemptLedger,
   ChargeAttemptRecord,
+  ChargeQueryStore,
   ChargeStore,
+  PayableChargeQuery,
   CredentialStore,
   StoredCharge,
   WebhookEventHandler,
@@ -78,6 +80,7 @@ export type { MerchantWebhookUrlResolver } from './core/webhook-url';
 export {
   toClientChargeView,
   isSettled,
+  providerCorrelationId,
   type ClientChargeView,
   type ClientProviderConfig,
 } from './core/client-view';
@@ -238,6 +241,70 @@ export {
   type PaymentsRouteMethod,
   type PaymentsRouteParams,
 } from './http/router';
+
+/**
+ * The BUYER-CHECKOUT mount (FUT-740) — `mountPayments`' counterpart for the
+ * other side of the till. See `checkout/factory.ts` for what moves into the
+ * library and why, and `checkout/types.ts` for the ports that keep "what an
+ * order is" outside it.
+ */
+export {
+  createPaymentFlowsBE,
+  type PaymentFlowsBE,
+  type PaymentFlowsBEConfig,
+} from './checkout/factory';
+export { CHECKOUT_ROUTES } from './checkout/route-table';
+export { defaultCheckoutCopyPtBR, type CheckoutCopy } from './checkout/copy';
+export {
+  buyerCheckoutConfig,
+  usesHostedCheckout,
+  type CheckoutConfigDeps,
+} from './checkout/config';
+export type {
+  AttachedCharge,
+  BrowserKeyPort,
+  BuyerCheckoutConfig,
+  BuyerProviderLink,
+  ChargeCorrelationPort,
+  CheckoutChargeDraft,
+  CheckoutErrorBody,
+  CheckoutIntentKind,
+  CheckoutLogger,
+  CheckoutPrincipal,
+  CheckoutResponder,
+  CheckoutRouteIntent,
+  CheckoutRouteSpec,
+  InstrumentScope,
+  Payable,
+  PayableLoadContext,
+  PayablePort,
+  SavedInstrumentPort,
+} from './checkout/types';
+/**
+ * The charge-body normalizer, exported so a host can assert what its OWN
+ * client's request turns into. Which two wire shapes it accepts, and which of
+ * them is canonical, is the module's own doc.
+ */
+export { chargeDraftOf } from './checkout/draft';
+/**
+ * The charge-identity guards (FUT-378) and the `--` attempt-reference
+ * convention (FUT-669). Exported because a host that has not yet moved onto the
+ * mount still needs the REAL implementations rather than its own copy — a copy
+ * that differs by one byte silently stops finding every charge already on disk.
+ */
+export {
+  ChargeIdentityError,
+  chargeIdentityMismatch,
+  chargeSnapshotMismatch,
+  hostedSnapshotMismatch,
+} from './core/charge-identity';
+export {
+  attemptReference,
+  baseReference,
+  attemptReferencePrefix,
+  ownsReference,
+  suffixedReference,
+} from './core/reference';
 
 export {
   createPrismaAttemptLedger,

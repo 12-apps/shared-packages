@@ -204,6 +204,7 @@ function mapCard(res: PagBankCardResponse, input: ChargeInput): ChargeSnapshot {
   if (!charge?.id) {
     throw new ProviderRequestError(NAME, 'PagBank card response missing charge id.');
   }
+  const card = charge.payment_method?.card;
   return {
     provider: NAME,
     providerChargeId: charge.id,
@@ -213,10 +214,9 @@ function mapCard(res: PagBankCardResponse, input: ChargeInput): ChargeSnapshot {
     ...cardOutcome(charge),
     amount: input.amount,
     method: 'CARD',
-    card: {
-      brand: charge.payment_method?.card?.brand,
-      last4: charge.payment_method?.card?.last_digits,
-    },
+    // `vaultToken` is the id PagBank mints when it agreed to STORE the card —
+    // normalized here so no host has to read this vendor payload itself.
+    card: { brand: card?.brand, last4: card?.last_digits, vaultToken: card?.id },
     raw: res,
   };
 }
