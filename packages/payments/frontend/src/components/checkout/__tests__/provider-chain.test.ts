@@ -158,4 +158,34 @@ describe("cardPathAvailable", () => {
   it("still fails OPEN while the config has not answered", async () => {
     expect(cardPathAvailable(null)).toBe(true);
   });
+
+  it("refuses CARD for a store whose chain can only PIX (FUT-747)", async () => {
+    // A PIX-only provider declares `NONE` honestly — PIX is a QR, there is no
+    // PAN to encrypt — and read chain-wide that became "nobody tokenizes here,
+    // so the buyer is handed over", offering a card at a store that takes none.
+    // Asked of the CARD-capable entries there are none, which is the answer.
+    const pixOnly = config({
+      provider: "aurora",
+      tokenization: "NONE",
+      publicKey: null,
+      methods: ["PIX"],
+      chain: [{ ...link("aurora", "NONE"), methods: ["PIX" as const] }],
+    });
+
+    expect(cardPathAvailable(pixOnly)).toBe(false);
+  });
+
+  it("keeps a card-capable NONE entry on the handover path", async () => {
+    // `NONE` on an entry that DOES declare CARD is the other shape: the
+    // provider takes an unattributed card charge, so CARD stays offered and
+    // nothing is minted for it.
+    const takesCards = config({
+      provider: "aurora",
+      tokenization: "NONE",
+      publicKey: null,
+      chain: [link("aurora", "NONE")],
+    });
+
+    expect(cardPathAvailable(takesCards)).toBe(true);
+  });
 });

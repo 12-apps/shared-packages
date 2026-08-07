@@ -1,7 +1,12 @@
 import { createPaymentsGateway } from '../../core/gateway';
 import type { PaymentProviderAdapter } from '../../core/provider';
 import { defineProviders } from '../../core/registry';
-import type { ClientTokenization, MerchantRef, Money } from '../../core/types';
+import type {
+  ClientTokenization,
+  MerchantRef,
+  Money,
+  PaymentMethodKind,
+} from '../../core/types';
 import { createMemoryWebhookInbox } from '../../memory-webhook-inbox';
 import {
   createMemoryAttemptLedger,
@@ -52,6 +57,11 @@ interface InvoiceView {
 
 interface AdapterOptions {
   tokenization?: ClientTokenization;
+  /**
+   * What this adapter declares it can charge. Defaults to both — a PIX-ONLY
+   * adapter is the shape FUT-747 is about, and no shipped vendor is one yet.
+   */
+  methods?: readonly PaymentMethodKind[];
   /** Answer every charge with a hosted-checkout link instead of a payload. */
   hosted?: boolean;
   /** Refuse every charge, provably creating nothing. */
@@ -66,7 +76,7 @@ export function testAdapter(name: string, options: AdapterOptions = {}): Payment
     name,
     displayName: name,
     capabilities: {
-      methods: ['PIX', 'CARD'],
+      methods: options.methods ?? ['PIX', 'CARD'],
       savedCards: true,
       refunds: true,
       partialRefunds: true,

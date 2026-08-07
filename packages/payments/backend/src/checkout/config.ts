@@ -134,24 +134,44 @@ export async function buyerCheckoutConfig(
 const IN_BROWSER_TOKENIZATION: ReadonlySet<string> = new Set(['PUBLIC_KEY', 'SDK']);
 
 /**
- * Whether this merchant settles on the PROVIDER'S OWN page (FUT-556 / FUT-563).
+ * Whether THIS METHOD is handed to the provider's OWN page before any charge
+ * exists (FUT-556 / FUT-563 / FUT-747).
  *
  * Asked of the adapters' declared `tokenization`, never of their names: a
  * REDIRECT provider hands back a `hostedCheckoutUrl` instead of a PIX payload or
  * a tokenizable card form, and the checkout has to know that BEFORE it decides
  * how to raise the charge.
  *
- * Asked of the WHOLE CHAIN, not the head. The question is "is there any
- * in-browser card path at this merchant at all?", and with a chain the head is
- * not entitled to answer it alone: a merchant whose head is a hosted page but
- * whose next provider tokenizes in the browser must still show the card form,
- * or the buyer is handed over before the chain has been walked and the failover
- * the merchant configured can never happen.
+ * PER METHOD, and only CARD can be answered in advance at all. TOKENIZATION IS
+ * A CARD FACT: it says how the browser turns a PAN into an instrument, and a PIX
+ * charge has no instrument to mint — it is a QR the provider returns. Asked
+ * globally over the chain, the question conflated "nobody can tokenize a card
+ * here" with "this checkout is hosted", so the simplest store there is — one
+ * PIX-only provider, honestly declaring `NONE` — was routed into hosted-CARD
+ * handling and could take no PIX at all.
  *
- * Answers false for an empty chain. A merchant with no provider has already
- * been failed closed by the caller; there is no charge path to choose between.
+ * Whether a PIX buyer ends up on a provider's page is therefore NOT a property
+ * of the config: it is a property of the charge that the walk actually raised,
+ * read off that snapshot's `hostedCheckoutUrl` (FUT-563). Answering it from the
+ * chain up front is the same mistake in the other direction.
+ *
+ * Asked of the WHOLE CHAIN, not the head, and of the entries that can take a
+ * CARD — the same subset the walk itself will attempt, since `resolveProvider`
+ * skips a provider whose capabilities exclude the method. A merchant whose head
+ * is a hosted page but whose next acquirer tokenizes in the browser must still
+ * show the card form, or the buyer is handed over before the chain has been
+ * walked and the failover the merchant configured can never happen.
+ *
+ * Answers false when no entry takes a card (an empty chain included): there is
+ * no card path to choose a surface for, and a card charge raised there is
+ * refused honestly by the exhausted walk rather than by a missing link.
  */
-export function usesHostedCheckout(config: BuyerCheckoutConfig): boolean {
-  if (config.chain.length === 0) return false;
-  return !config.chain.some((entry) => IN_BROWSER_TOKENIZATION.has(entry.tokenization));
+export function usesHostedCheckout(
+  config: BuyerCheckoutConfig,
+  method: PaymentMethodKind,
+): boolean {
+  if (method !== 'CARD') return false;
+  const acquirers = config.chain.filter((entry) => entry.methods.includes('CARD'));
+  if (acquirers.length === 0) return false;
+  return !acquirers.some((entry) => IN_BROWSER_TOKENIZATION.has(entry.tokenization));
 }

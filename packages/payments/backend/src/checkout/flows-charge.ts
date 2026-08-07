@@ -122,30 +122,39 @@ async function attachPix<C, V extends object, D>(
  * their names (FUT-556), and by the charge that ACTUALLY happened rather than by
  * whichever provider heads the chain (FUT-563):
  *
- *  - HOSTED-ONLY merchant — no provider in the chain can tokenize in the
- *    browser, so BOTH methods take the same path: raise now, answer with the
- *    link. Checked FIRST, because the PIX branch below demands a payload a
- *    redirect provider never returns.
+ *  - HOSTED CARD — no acquirer in the chain can tokenize in the browser, so
+ *    there is no card form to show: raise now and answer with the link.
  *  - PIX — raise now and answer with the payload… unless the walk had to fail
  *    over onto a hosted provider, in which case the honest answer is that
  *    provider's link.
- *  - CARD — the view alone; `chargeInstrument` charges it next, walking the
- *    chain with one instrument per provider.
+ *  - CARD with an in-browser path — the view alone; `chargeInstrument` charges
+ *    it next, walking the chain with one instrument per provider.
+ *
+ * WHICH of the two raised shapes a snapshot is answered as comes from the
+ * SNAPSHOT, never from `hostedCard` (FUT-747). `hostedCard` decides only whether
+ * a CARD charge has to be raised here at all; it is a statement about turning a
+ * PAN into an instrument, and a PIX charge has no PAN. Letting it pick the
+ * answer shape sent every PIX charge at a merchant with no in-browser card path
+ * — a PIX-only provider honestly declaring `NONE` is exactly that — into
+ * `attachHosted`, which threw on the missing link of a charge that was carrying
+ * a perfectly good QR.
  */
 async function firstChargeResponse<C, V extends object, D>(
   runtime: Runtime<C, V, D>,
   payable: Payable,
   view: V,
-  hostedOnly: boolean,
+  hostedCard: boolean,
 ): Promise<Response> {
-  if (!hostedOnly && payable.method !== 'PIX') return runtime.respond.ok(view);
+  if (!hostedCard && payable.method !== 'PIX') return runtime.respond.ok(view);
 
   const deps = { gateway: await runtime.gateway(), charges: runtime.charges, log: runtime.log };
   const snapshot = await raiseCharge(deps, payable, { method: payable.method });
-  if (hostedOnly || snapshot.hostedCheckoutUrl) {
-    return attachHosted(runtime, payable, view, snapshot);
+  if (payable.method === 'PIX' && !snapshot.hostedCheckoutUrl) {
+    return attachPix(runtime, payable, view, snapshot);
   }
-  return attachPix(runtime, payable, view, snapshot);
+  // A minted link, or a hosted-only card charge. `attachHosted` reports a
+  // snapshot with no link as the provider failure it is.
+  return attachHosted(runtime, payable, view, snapshot);
 }
 
 /**
@@ -187,7 +196,7 @@ export async function createCheckout<C, V extends object, D>(
       runtime,
       created.payable,
       created.view,
-      usesHostedCheckout(config),
+      usesHostedCheckout(config, created.payable.method),
     );
   } catch (error) {
     const context = failureContext(runtime, created.payable.ref, created.payable.method);
