@@ -12,7 +12,7 @@ import {
   CopyUrlStep,
   InstallStep,
 } from "./ai-flow-steps";
-import { AiStatusBoard, type HostStatus } from "./ai-status-board";
+import { AiStatusBoard, type DisconnectHandler, type HostStatus } from "./ai-status-board";
 import { HostSelectStep } from "./host-select-step";
 
 export type { AiConnection } from "./ai-connection-utils";
@@ -23,10 +23,12 @@ export function StatusBoard({
   nav,
   connections,
   hosts,
+  onDisconnect,
 }: {
   nav: GuidedNav;
   connections: readonly AiConnection[];
   hosts: readonly AiHostGuide[];
+  onDisconnect?: DisconnectHandler;
 }): React.JSX.Element {
   const legacyHostId = (nav.data.connectedHost ?? nav.data.selectedHost) as string | undefined;
 
@@ -53,6 +55,7 @@ export function StatusBoard({
           selectedHost: hostId,
         })
       }
+      onDisconnect={onDisconnect}
     />
   );
 }
