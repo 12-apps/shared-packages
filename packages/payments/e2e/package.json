@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "type": "module",
   "description": "The payments buyer journeys, as Gherkin a host runs against its own app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/payments/e2e"
+  },
   "files": [
     "dist",
     "features",
