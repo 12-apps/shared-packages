@@ -243,8 +243,21 @@ describe("the filter bar's progressive collapse", () => {
     );
   });
 
-  it("never hides an APPLIED filter, even when it was the one that overflowed", async () => {
-    stubResizeObserver(900);
+  /**
+   * An applied filter still takes a visible slot back — but on CLOSE, not
+   * mid-interaction.
+   *
+   * Promoting it the instant it becomes active moved the control being edited
+   * out of the panel the operator was editing it in, taking the focused input
+   * with it: typing "12" into a minimum got as far as "1" and then had nowhere
+   * to go. The measurement is frozen while the panel is open for exactly that
+   * reason, so this asserts both halves.
+   */
+  it("promotes an applied filter to the bar when the overflow panel CLOSES, not while it is open", async () => {
+    // Room for the promoted control at its APPLIED width: these fixtures have
+    // long labels, and "Status do pagamento" becomes "Status do pagamento:
+    // Pago" the moment it is applied.
+    stubResizeObserver(1250);
     renderBar();
 
     // Whatever collapsed first, apply it from inside the overflow…
@@ -261,7 +274,12 @@ describe("the filter bar's progressive collapse", () => {
     if (!option) throw new Error(`no option control for ${target}`);
     fireEvent.click(option);
 
-    // …and it takes a visible slot back.
+    // …it stays put while the panel is open, so the control keeps its focus…
+    expect(inlineIds()).not.toContain(target);
+
+    // …and takes its visible slot once the panel closes. Escape has to land on
+    // the popover itself — MUI listens there, not on the document body.
+    fireEvent.keyDown(screen.getByTestId("lista-more-panel"), { key: "Escape", code: "Escape" });
     await waitFor(() => expect(inlineIds()).toContain(target));
   });
 
@@ -335,5 +353,33 @@ describe("the filter bar's progressive collapse", () => {
     expect(inlineIds().length).toBeLessThan(4);
     // Collapsing is PRESENTATION: no control was cleared, so nothing re-queried.
     expect(queries).toHaveLength(0);
+  });
+  /**
+   * "Limpar" — the one gesture back to the unfiltered list.
+   *
+   * Each pill carries its own ✕, which answers "undo this one". Six applied
+   * filters is six ✕ hunts, and the operator who means "show me everything
+   * again" had no way to say it at all.
+   */
+  it("shows Limpar only once something is applied, and clears everything at once", async () => {
+    stubResizeObserver(2400);
+    renderBar();
+
+    // Nothing applied ⇒ nothing to clear, and a dead button is worse than none.
+    await waitFor(() => {
+      expect(inlineIds()).toHaveLength(4);
+      expect(screen.queryByTestId("lista-clear-all")).toBeNull();
+    });
+
+    fireEvent.click(screen.getByTestId("lista-filter-status"));
+    const pago = await screen.findByRole("menuitem", { name: /Pago/ });
+    fireEvent.click(pago);
+    fireEvent.keyDown(pago, { key: "Escape", code: "Escape" });
+
+    const clear = await screen.findByTestId("lista-clear-all");
+    fireEvent.click(clear);
+
+    // Back to unfiltered — so the affordance removes itself with the state.
+    await waitFor(() => expect(screen.queryByTestId("lista-clear-all")).toBeNull());
   });
 });

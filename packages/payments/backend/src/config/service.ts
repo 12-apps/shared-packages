@@ -21,9 +21,10 @@ import type {
   StoredProviderConfig,
 } from './types';
 
+import { assertSaveCredentialsInput } from './credential-input';
 import {
   applyProof,
-  assertRankable,
+  assertReorderOnly,
   pendingVerificationMethods,
   requireProven,
   resolvedFrom,
@@ -95,6 +96,13 @@ export interface SettingsService {
    * `CredentialsError` when it is merely switched off — because enabling is
    * `setEnabled`'s job, and only that path is behind the plan's provider quota.
    * See `assertRankable`.
+   *
+   * Omitting one is how a provider leaves the chain, with one exception: a row
+   * that could not be enabled again — enabled today only because it predates
+   * the proof rule — is refused rather than stranded outside, as
+   * `IrreversibleChainRemovalError`. Switching it off from `setEnabled` still
+   * works; a list that drops it by accident no longer takes checkout offline
+   * for good. See `assertDroppable`.
    */
   setPriorities(merchant: MerchantRef, ordered: readonly ProviderName[]): Promise<MerchantSettingsView>;
   /**
@@ -189,26 +197,6 @@ function descriptorOf(providers: ProviderRegistry, name: string): ProviderDescri
 }
 
 /**
- * Reject a chain we cannot rank BEFORE the atomic rewrite runs. The store would
- * refuse an unconfigured name too, but only after the transaction has begun —
- * and the error it raises names the store, not the request, which is useless to
- * the admin who just dragged the wrong provider into the list. `assertRankable`
- * owns the per-provider verdict, including the rule that a rewrite may reorder
- * the chain but never join it.
- */
-async function assertReorderOnly(
-  providers: ProviderRegistry,
-  store: ProviderConfigStore,
-  merchant: MerchantRef,
-  ordered: readonly ProviderName[],
-): Promise<void> {
-  for (const name of ordered) {
-    if (!providers.has(name)) throw new UnknownProviderError(name);
-    assertRankable(providers.get(name), name, await store.get(merchant, name));
-  }
-}
-
-/**
  * Move a provider in or out of the failover chain and report the new state.
  *
  * Its two callers differ only in how they treat the proof: `setEnabled`
@@ -286,9 +274,19 @@ export function createSettingsService(
     getSettings: (merchant) => buildSettingsView(providers, store, merchant),
 
     async saveCredentials(merchant, provider, input) {
-      const config = applySaveCredentials(await load(merchant, provider), input, allowStubMode);
+      const adapter = providers.get(provider);
+      // Before the load, so a malformed body cannot even cost a store read —
+      // and before `applySaveCredentials`, which INVALIDATES on any change it
+      // is handed: a write it should never have accepted would take the
+      // connection to UNVERIFIED and out of the chain on its way to failing.
+      //
+      // What gets WRITTEN is what came back from the check, not what came in:
+      // the values are normalized there (trimmed), and storing the raw copy
+      // would put on record a value nothing ever validated.
+      const checked = assertSaveCredentialsInput(adapter, input);
+      const config = applySaveCredentials(await load(merchant, provider), checked, allowStubMode);
       await store.save(merchant, config);
-      return toMasked(providers.get(provider), config);
+      return toMasked(adapter, config);
     },
 
     async setEnabled(merchant, provider, enabled) {
@@ -324,7 +322,15 @@ export function createSettingsService(
     async verify(merchant, provider, environment) {
       const config = await load(merchant, provider);
       const target = environment ?? config.environment;
-      return runVerify(providers.get(provider), store, merchant, config, target, toMasked);
+      return runVerify(
+        providers.get(provider),
+        store,
+        merchant,
+        config,
+        target,
+        allowStubMode,
+        toMasked,
+      );
     },
   };
 }

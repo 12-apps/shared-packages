@@ -9,6 +9,7 @@ import { Text } from "../../typography/Text";
 
 import {
   BoardGlyph,
+  ColumnsGlyph,
   GridGlyph,
   ListGlyph,
   RowsGlyph,
@@ -219,13 +220,50 @@ const LAYOUT_HINTS: Record<DataViewsLayout, string> = {
   board: "Colunas por etapa, para acompanhar o que está onde.",
 };
 
+/**
+ * What density MEANS in each layout — same three values, three different
+ * questions. A table's is how tall its rows are, a card grid's is how many fit
+ * on a line, and a board's is how wide its columns are. The heading and the
+ * tile labels change with the layout because "Alta" over a board is meaningless
+ * where "Larga" is not.
+ */
+const DENSITY_HEADINGS: Record<DataViewsLayout, string> = {
+  table: "Altura das linhas",
+  list: "Altura das linhas",
+  cards: "Cards por linha",
+  board: "Largura das colunas",
+};
+
+const DENSITY_LABELS: Record<DataViewsLayout, Record<DataViewsDensity, string>> = {
+  table: { compact: "Baixa", cozy: "Média", comfortable: "Alta" },
+  list: { compact: "Baixa", cozy: "Média", comfortable: "Alta" },
+  cards: { compact: "Muitos", cozy: "Médio", comfortable: "Poucos" },
+  board: { compact: "Estreita", cozy: "Média", comfortable: "Larga" },
+};
+
 /** The density tiles, phrased for whichever layout is on screen. */
-function densityTiles(cards: boolean): { value: DataViewsDensity; label: string; gap: number; columns: number }[] {
+function densityTiles(
+  layout: DataViewsLayout,
+): { value: DataViewsDensity; label: string; gap: number; columns: number }[] {
+  const labels = DENSITY_LABELS[layout];
   return [
-    { value: "compact", label: cards ? "Muitos" : "Baixa", gap: 2, columns: 4 },
-    { value: "cozy", label: cards ? "Médio" : "Média", gap: 5, columns: 3 },
-    { value: "comfortable", label: cards ? "Poucos" : "Alta", gap: 8, columns: 2 },
+    { value: "compact", label: labels.compact, gap: 2, columns: 4 },
+    { value: "cozy", label: labels.cozy, gap: 5, columns: 3 },
+    { value: "comfortable", label: labels.comfortable, gap: 8, columns: 2 },
   ];
+}
+
+/** The preview for one density tile, in the terms that layout's density is in. */
+function densityGlyph(
+  layout: DataViewsLayout,
+  tile: { gap: number; columns: number },
+  active: boolean,
+): React.JSX.Element {
+  if (layout === "cards") return <GridGlyph n={tile.columns} active={active} />;
+  // A wider column means FEWER of them across the same board, so the
+  // comfortable end draws two fat columns and the compact end four thin ones.
+  if (layout === "board") return <ColumnsGlyph n={tile.columns} active={active} />;
+  return <RowsGlyph gap={tile.gap} active={active} />;
 }
 
 /** The glyph for a layout tile. */
@@ -257,7 +295,6 @@ export function DisplayTab({ testIdPrefix }: { testIdPrefix: string }): React.JS
     ...(canUseCards ? (["cards"] as const) : []),
     ...(canUseBoard ? (["board"] as const) : []),
   ];
-  const cards = layout === "cards";
   return (
     <Box sx={{ p: 1 }}>
       <Text variant="caption" as="p">
@@ -290,32 +327,28 @@ export function DisplayTab({ testIdPrefix }: { testIdPrefix: string }): React.JS
           {LAYOUT_HINTS[layout]}
         </Box>
       </Text>
-      {layout !== "board" && (
-        <>
-          <Text variant="caption" as="p">
-            <Box component="span" sx={{ px: 0.5, color: "text.secondary" }}>
-              {cards ? "Cards por linha" : "Altura das linhas"}
-            </Box>
-          </Text>
-          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75, mt: 0.5 }}>
-            {densityTiles(cards).map((tile) => (
-              <Tile
-                key={tile.value}
-                active={density === tile.value}
-                label={tile.label}
-                onClick={() => setDensity(tile.value)}
-                testId={`${testIdPrefix}-density-${tile.value}`}
-              >
-                {cards ? (
-                  <GridGlyph n={tile.columns} active={density === tile.value} />
-                ) : (
-                  <RowsGlyph gap={tile.gap} active={density === tile.value} />
-                )}
-              </Tile>
-            ))}
-          </Box>
-        </>
-      )}
+      {/* Every layout gets this, the board included. It used to be hidden on
+          Quadro, which left the format tile switching to a view with no sizing
+          control at all — and the section disappearing on select reads as a
+          control that broke rather than one that does not apply. */}
+      <Text variant="caption" as="p">
+        <Box component="span" sx={{ px: 0.5, color: "text.secondary" }}>
+          {DENSITY_HEADINGS[layout]}
+        </Box>
+      </Text>
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75, mt: 0.5 }}>
+        {densityTiles(layout).map((tile) => (
+          <Tile
+            key={tile.value}
+            active={density === tile.value}
+            label={tile.label}
+            onClick={() => setDensity(tile.value)}
+            testId={`${testIdPrefix}-density-${tile.value}`}
+          >
+            {densityGlyph(layout, tile, density === tile.value)}
+          </Tile>
+        ))}
+      </Box>
       {!canUseBoard && (
         <Text variant="caption" as="p">
           <Box component="span" sx={{ px: 0.5, pt: 1.25, display: "block", color: "text.disabled" }}>

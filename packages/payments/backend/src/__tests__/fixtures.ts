@@ -3,6 +3,7 @@ import { createSettingsService, credentialStoreFrom } from '../config/service';
 import { createPaymentsGateway } from '../core/gateway';
 import { defineProviders } from '../core/registry';
 import { createPaymentsHttp, type PaymentsHttpHandlers } from '../http/handlers';
+import type { ProviderConfigStore } from '../config/types';
 import type { WebhookEventHandler, WebhookInbox } from '../core/ports';
 import type {
   ChargeInput,
@@ -21,6 +22,7 @@ import {
 import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
 import type { PaymentProviderAdapter } from '../core/provider';
 import { infinitePayProvider } from '../providers/infinitepay';
+import { pagbankProvider } from '../providers/pagbank';
 import {
   sharedSecretWebhook,
   stubCharge,
@@ -297,10 +299,55 @@ export function setupStrictSettings() {
   return { store, providers, settings: createSettingsService(providers, store) };
 }
 
+/**
+ * The settings surface mounted over the REAL vendor adapters.
+ *
+ * `setupHttpWorld` runs on the purpose-built fake, which is right for gateway
+ * rules and wrong here: what a credential write is allowed to say IS each
+ * shipped adapter's own `credentialSchema` — the InfiniteTag's `pattern`, the
+ * four keys Stone declares — and a fake's invented schema would let this pass
+ * while the thing a store actually talks to still accepted anything.
+ */
+export function setupCredentialsHttpWorld(): {
+  http: PaymentsHttpHandlers;
+  store: ReturnType<typeof createMemoryProviderConfigStore>;
+} {
+  const store = createMemoryProviderConfigStore();
+  const providers = defineProviders({
+    infinitepay: infinitePayProvider(),
+    pagbank: pagbankProvider(),
+    stone: stoneProvider(),
+    stripe: stripeProvider(),
+  } as const);
+  const charges = createMemoryChargeStore();
+  const http = createPaymentsHttp({
+    gateway: createPaymentsGateway({
+      providers,
+      credentials: credentialStoreFrom(store),
+      charges,
+      webhooks: createMemoryWebhookInbox(),
+      attempts: createMemoryAttemptLedger(),
+    }),
+    settings: createSettingsService(providers, store, { allowStubMode: true }),
+    charges,
+    // Never reached: this world exists for the settings surface only.
+    resolveChargeRequest: async () => {
+      throw new Error('setupCredentialsHttpWorld does not create charges');
+    },
+  });
+  return { http, store };
+}
+
 /** Full wired-up HTTP stack over memory stores, as a host would mount it. */
 export async function setupHttpWorld(): Promise<{
   http: PaymentsHttpHandlers;
   charges: MemoryChargeStore;
+  /**
+   * The raw config store, so a test can put a merchant in a state no endpoint
+   * can produce — a row enabled without proof is what every store looked like
+   * before FUT-463, and only a migration ever wrote one.
+   */
+  configStore: ProviderConfigStore;
 }> {
   const configStore = createMemoryProviderConfigStore();
   const providers = defineProviders({
@@ -344,7 +391,7 @@ export async function setupHttpWorld(): Promise<{
   // Configured but never proven and never enabled — so a chain naming it is a
   // request to ENABLE, which is what the settings surface must refuse.
   await settings.saveCredentials(TENANT, 'unproven', { environment: 'SANDBOX', fields: {} });
-  return { http, charges };
+  return { http, charges, configStore };
 }
 
 /** A minimal OAuth-mode adapter, for exercising the connect flow. */

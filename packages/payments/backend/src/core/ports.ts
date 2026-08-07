@@ -66,10 +66,7 @@ export interface CredentialStore {
    *
    * Optional — a host that does not implement it keeps the old behaviour.
    */
-  getConnectedCredentials?(
-    merchant: MerchantRef,
-    provider: ProviderName,
-  ): Promise<ResolvedCredentials | null>;
+  getConnectedCredentials?(merchant: MerchantRef, provider: ProviderName): Promise<ResolvedCredentials | null>;
 }
 
 /** A charge row as the host persists it. */
@@ -149,6 +146,11 @@ export interface ChargeStore {
    */
   upsertByProviderChargeId(merchant: MerchantRef, snapshot: ChargeSnapshot): Promise<StoredCharge | null>;
 }
+
+// The CHECKOUT-side charge reads (FUT-740) live in `./charge-queries.ts` so this
+// file stays inside its size gate; re-exported because `core/ports.ts` is the one
+// door every storage port has ever come through.
+export type { ChargeQueryStore, PayableChargeQuery } from './charge-queries';
 
 /**
  * A recorded delivery read back OUT of the inbox — everything a REPLAY needs

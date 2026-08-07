@@ -45,10 +45,22 @@ Two constructor arguments are security-critical:
   which requires an explicit `PAYMENTS_STUB=1` and throws outright in
   `NODE_ENV=production`; never infer it from whether some other credential
   happens to be set. Pass the SAME answer to `createSettingsService`,
-  `credentialStoreFrom` and the activation context — the write path alone
-  does not govern the rows already in the table, and in stub mode a webhook
-  delivery authenticates with no signature at all. Even when on it applies
-  only to SANDBOX configs; PRODUCTION can never run stub charges.
+  `credentialStoreFrom`, the activation context and — through the settings
+  service — the verify probe: the write path alone does not govern the rows
+  already in the table, and in stub mode a webhook delivery authenticates
+  with no signature at all and a probe passes without asking the acquirer
+  anything. Even when on it applies only to SANDBOX configs; PRODUCTION can
+  never run stub charges.
+
+> **Upgrading from a version before FUT-696**: the stored `stub` column is no
+> longer believed on its own — every read now also requires the deployment's
+> answer. That option is optional and defaults to OFF, so a host that passes
+> it to only SOME seams still COMPILES and then disagrees with itself at
+> runtime, in both directions: the seams left unanswered stop honouring stub
+> rows (stub-seeded e2e fixtures start making real acquirer calls), while a
+> write path still carrying the old inference keeps MINTING stub rows for the
+> next deployment to find. Resolve it once at startup, thread that one value
+> everywhere, and run any stub-mode e2e suite before shipping the bump.
 
 Mount the surface with ONE call instead of a route file per handler
 (FUT-559). `mountPayments` carries the canonical layout as data and returns
@@ -101,6 +113,101 @@ platform-admin route with `{ merchant: { kind: 'PLATFORM', id: 'platform' } }`.
 
 Domain reactions (mark order paid, notifications, rollups, audit) live in
 `onWebhookEvent` — the library stays domain-free.
+
+### 2b. The BUYER checkout — `createPaymentFlowsBE` (FUT-740)
+
+`mountPayments` serves the merchant-ADMIN surface. The buyer's half — create a
+checkout, charge an instrument, poll it, re-mint the browser key — is
+`createPaymentFlowsBE`, a second table on the same dispatcher:
+
+```ts
+export const { GET, POST } = createPaymentFlowsBE({ /* config below */ });
+```
+
+| kind | verb | path | principal | merchant from |
+| --- | --- | --- | --- | --- |
+| `getCheckoutConfig` | GET | `/config` | PUBLIC | `resolveMerchant` |
+| `listInstruments` | GET | `/cards` | BUYER | `resolveMerchant` |
+| `createCheckout` | POST | `/` | BUYER | `resolveMerchant` |
+| `chargeInstrument` | POST | `/charge` | BUYER | the loaded payable |
+| `getStatus` | GET | `/status` | BUYER | the loaded payable |
+| `refreshBrowserKey` | POST | `/refresh-key` | BUYER | the loaded payable |
+
+`principal` is a property of the ROW: `requireAuth` runs for BUYER rows only, so
+a host cannot make the SETTLING status poll anonymous by mis-branching. Rows
+that carry a payable take their merchant from it, which is the one attribution a
+client-supplied handle cannot forge.
+
+**What the library now owns**, and no adopter should re-implement: per-attempt
+idempotency keys, the `--` attempt reference, charge-identity fail-closed, PIX
+re-tap reuse, the REDIRECT commit-on-mint rule across requests, the
+superseded-code void, the captured-amount rule, the rule that a charge may only
+be raised for the method the payable declares, and the ORDER in which a failure
+is worded.
+
+### The charge body, and which shape is canonical
+
+`POST /charge` accepts TWO shapes and normalizes both (`chargeDraftOf`, exported
+so you can assert what your own client's body becomes):
+
+| canonical (nested) | accepted (what the shipped client posts) |
+| --- | --- |
+| `card: { token, savedCardToken, tokensByProvider }` | `token`, `tokensByProvider` |
+| `saveInstrument` | `saveCard` |
+| `instrumentDisplay` | `cardMeta` |
+| `customer: { name, email, taxId, phone }` | `taxId` |
+
+The nested shape is canonical — it names each field in the library's own
+vocabulary — and wins field by field where both are sent. The flat shape is
+accepted **permanently**, not as a deprecation shim: `@12-apps/payments-frontend`
+is already running in browsers, and a tab left open across a deploy still posts
+it. (The same reasoning `payableRefField` carries for `orderId`, applied to the
+rest of the body.)
+
+The flat `token` is "a fresh token, or a saved card's id for reuse" — one field
+for two things. The mount asks your `instruments.resolve` first and charges a
+handle the vault does not own as a fresh token, so `{ token: null, owned: false }`
+must mean "never heard of it" and `{ token: null, owned: true }` must mean "the
+buyer's card, not chargeable in this scope" (that one is the 409).
+
+`customer` is merged OVER `payable.customer`, present fields winning. That is
+how the CPF the card form collects reaches a provider whose `customerSchema`
+requires it when your own payable row has no column to keep one in.
+
+**What stays yours**, one port each:
+
+- `payables` — `load` (this IS your authorization scope; return `null` for both
+  "absent" and "not yours"), `create`, `view`, `stateToken`. A `Payable` is
+  `{ ref, merchant, amount, method, customer, state }` and nothing else: carts,
+  discounts, price snapshots and status vocabularies never enter the library.
+  `load(caller, ref, context)` is also handed what the request MEANS — the
+  parsed `intent`, the `method` about to be charged, the normalized `draft` and
+  the `Request` itself — so a host can refuse in its own terms rather than
+  smuggling any of it through `Caller`. Reading it is optional: the library
+  enforces its own rules on the payable that comes back either way.
+- `correlation` — `attachPending` / `recordCardOutcome` / `settle` / `expire`.
+  Confirming a payment is a transaction only you can compose; the library
+  decides WHEN each fires and WITH WHAT AMOUNT.
+- `instruments` — vault storage. The library owns the (merchant, provider)
+  scoping rule and the 409 that keeps a scope mismatch from becoming a decline.
+- `browserKey` — re-mint a PUBLIC key on demand. This is the only place a
+  provider NAME belongs on the checkout path, and it belongs to you.
+- `copy` — every buyer-facing sentence. `defaultCheckoutCopyPtBR` ships the
+  strings future-pay serves today.
+- `respond` / `logger` / `mapProviderError` — optional; the response envelope
+  defaults to the `{ data }` / `{ error, code, field }` shape
+  `@12-apps/payments-frontend`'s client already parses.
+
+`charges` must be a `ChargeStore & ChargeQueryStore`; both shipped stores
+(`createPrismaChargeStore`, `createMemoryChargeStore`) already are. Note the two
+reads on `ChargeQueryStore` answer different questions: `listPayable` is
+PENDING-only (it decides whether a re-tap may reuse a code), while
+`latestByReference` carries no status clause at all — the settlement poll needs
+its charge back after the charge stops being pending.
+
+If your router needs a literal file per URL — an MCP or RBAC scanner that
+resolves an advertised path to a real route file cannot follow a catch-all —
+mount `routes.handlers.<kind>` per file instead. Each is still a one-line mount.
 
 ## 3. Frontend wiring
 
@@ -217,7 +324,7 @@ as opt-in `.live.test.ts`).
 Both packages are workspace-private today; to reuse elsewhere: publish them
 to a private registry (the `exports` maps are ready), or vendor the
 `packages/payments/` folder wholesale — it has no imports from any `apps/*`
-or repo-specific package. Portability rules (enforced by review):
+or repo-specific package. Portability rules:
 
 - backend: no database/ORM/framework in core; adapters speak `fetch`; no
   provider SDKs; Prisma coupling only via duck-typed delegates. A custom
@@ -225,3 +332,40 @@ or repo-specific package. Portability rules (enforced by review):
   the interface requires it and there is no sequential fallback.
 - frontend: imports only TYPES from the backend package; talks only to the
   host's mounted HTTP surface; MUI + React as peers.
+
+### Three of them are a lint gate, not a review item (FUT-562)
+
+This list used to say "enforced by review". It is worth being blunt about what
+that bought: review is why a host storefront drifted into a PagBank-shaped
+checkout, why super-admin grew a 1,165-line fork of the settings page nobody
+noticed, and why a webhook handler was still parsing `body.order_nsu` — one
+vendor's payload field — in code whose commit message said it had removed
+provider names. Every one of those is mechanically detectable.
+
+`pnpm quality:portability` (root `eslint.payments-portability.config.mjs`, CI
+job **Payments Portability**) now errors on:
+
+| rule | what fails |
+| --- | --- |
+| `payments/no-host-imports` | anything under `packages/payments/**` importing a sibling workspace package (`@12-apps/*`, `@repo/*`), the consumer harness, or a relative path that climbs out of the folder |
+| `payments/no-provider-name-literal` | a provider's name in a string literal, template chunk, JSX attribute/text or object key ANYWHERE outside `packages/payments/**` — tests, stories, fixtures and migrations excepted |
+| `payments/frontend-types-only` | `packages/payments/frontend` importing a runtime value (rather than a `type`) from `@12-apps/payments-backend`, including default, namespace, side-effect, re-export and dynamic forms |
+
+The provider names are **derived** from `providerCatalog` in
+`backend/src/providers/catalog.ts` rather than retyped in the config, so the
+fifth adapter is covered the day it is registered; the config throws outright
+if that scrape ever comes back empty. Vendor aliases the registry cannot know
+about (`pagseguro`, PagBank's pre-2019 name, still the spelling in its API
+hosts and webhook paths) are one documented map beside it.
+
+`pnpm quality:portability:selftest` runs first, and is the reason to believe any
+of this. A scoped gate has one silent failure mode — a `files:` glob that stops
+matching keeps the gate exiting 0 while it covers nothing — so each rule ships
+with a fixture that violates it and one that does the same job correctly
+(`scripts/payments-portability-fixtures/`), linted through the real config under
+a pretend path inside the package the rule is scoped to. A violation coming back
+clean fails CI.
+
+The remaining bullets above (no ORM in core, `fetch`-only adapters, atomic
+`setActiveProvider`) are still review items — they are about what the code
+*means*, not what it names.

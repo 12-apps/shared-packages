@@ -87,6 +87,22 @@ export function GridGlyph({ n = 3, active }: { n?: number; active: boolean }): R
   );
 }
 
+/**
+ * Full-height columns, `n` of them — the board's DENSITY, where fewer, wider
+ * columns is the comfortable end. Distinct from {@link BoardGlyph}, which
+ * stands for the board format itself and shows cards stacked at differing
+ * depths; this one is about the columns' width, so the bars are solid.
+ */
+export function ColumnsGlyph({ n, active }: { n: number; active: boolean }): React.JSX.Element {
+  return (
+    <Box sx={{ ...FRAME, gap: "2px" }}>
+      {Array.from({ length: n }).map((_, column) => (
+        <Box key={column} sx={{ flex: 1, borderRadius: 0.5, bgcolor: barColor(active) }} />
+      ))}
+    </Box>
+  );
+}
+
 /** Three columns of decreasing height — the board. */
 export function BoardGlyph({ active }: { active: boolean }): React.JSX.Element {
   return (

@@ -3,6 +3,8 @@ import {
   ChargeDeclinedError,
   ChargeNotPersistedError,
   CredentialsError,
+  InvalidCredentialsInputError,
+  IrreversibleChainRemovalError,
   NoProviderSucceededError,
   PaymentsError,
   ProviderRequestError,
@@ -37,21 +39,28 @@ export function json(body: unknown, status = 200): Response {
  *
  * For the two charge errors that is about money — retrying a charge whose
  * outcome we could not determine, or one that exists at the provider with only
- * our copy missing, is exactly what bills the buyer twice. For the two
+ * our copy missing, is exactly what bills the buyer twice. For the three
  * configuration errors it is about the answer being actionable: a provider that
- * is not connected, or that has not completed its verification charge, stays
- * refused until the owner does something about it, and a 500 said the opposite —
- * "the server broke, try again" — burying the one instruction that resolves it.
+ * is not connected, that has not completed its verification charge, or that
+ * cannot be dropped from the chain without stranding it there, stays refused
+ * until the owner does something about it, and a 500 said the opposite — "the
+ * server broke, try again" — burying the one instruction that resolves it.
  */
 const REFUSALS = [
   AmbiguousChargeError,
   ChargeNotPersistedError,
   CredentialsError,
+  IrreversibleChainRemovalError,
   UnprovenProviderError,
 ];
 
 /** Uniform error→HTTP mapping, so hosts get consistent statuses everywhere. */
 function errorStatus(error: PaymentsError): number {
+  // Refused BEFORE anything was stored, so it is the caller's body that is
+  // wrong — not the connection's state. It must not share `CredentialsError`'s
+  // 409 below: 409 tells the owner to go fix the provider connection, when the
+  // thing to fix is the field they just typed (FUT-694).
+  if (error instanceof InvalidCredentialsInputError) return 400;
   if (error instanceof UnknownProviderError) return 404;
   if (error instanceof UnsupportedOperationError) return 422;
   if (error instanceof ChargeDeclinedError) return 402;
