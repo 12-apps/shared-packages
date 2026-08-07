@@ -17,13 +17,14 @@ import {
 } from "../../card";
 import { ok, type Result } from "../../result";
 
-import { resolveNewCardToken, type CardInstruments } from "./card-instruments";
 import {
-  chargeCard,
-  listSavedCards,
-  refreshCardPublicKey,
-} from "./client";
+  resolveNewCardToken,
+  type CardInstruments,
+  type RefreshBrowserKey,
+} from "./card-instruments";
+import { useCheckoutClientApi } from "./client-context";
 import { rememberHostedOrder } from "./hosted-return";
+import { useCheckoutNavigate, type CheckoutNavigate } from "./navigate-context";
 import type { CardChainLink } from "./method-capability";
 import type { BuyerInfo, CheckoutOrder, OrderStatus } from "./types";
 import { usePaymentPolling } from "./use-payment-polling";
@@ -43,10 +44,11 @@ function useSavedCards(tenantSlug: string | undefined): {
 } {
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [selection, setSelection] = useState<string>(NEW_CARD);
+  const client = useCheckoutClientApi();
 
   useEffect(() => {
     let active = true;
-    void listSavedCards(tenantSlug).then((cards) => {
+    void client.listInstruments(tenantSlug).then((cards) => {
       if (!active) return;
       setSavedCards(cards);
       const first = cards[0];
@@ -55,7 +57,7 @@ function useSavedCards(tenantSlug: string | undefined): {
     return () => {
       active = false;
     };
-  }, [tenantSlug]);
+  }, [tenantSlug, client]);
 
   return { savedCards, selection, setSelection };
 }
@@ -76,19 +78,20 @@ function useCardPublicKey(
   setPublicKey: (key: string) => void;
 } {
   const [publicKey, setPublicKey] = useState<string | null>(config.publicKey);
+  const client = useCheckoutClientApi();
   const refreshable =
     config.provider !== null && tokenizerFor(config.provider) === "pagbank-sdk";
 
   useEffect(() => {
     if (config.publicKey !== null || !refreshable) return undefined;
     let active = true;
-    void refreshCardPublicKey({ orderId }).then((result) => {
+    void client.refreshBrowserKey({ orderId }).then((result) => {
       if (active && result.ok && result.data.publicKey) setPublicKey(result.data.publicKey);
     });
     return () => {
       active = false;
     };
-  }, [orderId, config.publicKey, refreshable]);
+  }, [orderId, config.publicKey, refreshable, client]);
 
   return { publicKey, setPublicKey };
 }
@@ -151,9 +154,16 @@ const CARD_AWAITING_POLL_CAP = 36;
  * redirect provider's link takes (FUT-556): the return lands back on this
  * checkout route, where the hosted-resume machinery polls the parked order.
  */
-function handOverToChallenge(order: CheckoutOrder, url: string): void {
+function handOverToChallenge(
+  order: CheckoutOrder,
+  url: string,
+  navigate: CheckoutNavigate,
+): void {
+  // PARK FIRST. The navigation may not come back to a live SPA at all, and a
+  // return trip that finds nothing parked lands the buyer on a blank
+  // confirmation after they have paid.
   rememberHostedOrder(order);
-  window.location.assign(url);
+  navigate(url);
 }
 
 /** The buyer's card is invalid — block the submit and show which field. */
@@ -178,6 +188,8 @@ async function resolveInstruments(input: {
   config: CardTokenizationConfig;
   onKeyRefreshed: (key: string) => void;
   providerChain: readonly CardChainLink[];
+  /** The bound key-refresh call (FUT-741) — the self-heal must hit OUR mount. */
+  refreshKey: RefreshBrowserKey;
 }): Promise<Result<CardInstruments>> {
   const { form } = input;
   if (!form.usingNewCard) return ok({ token: form.selection });
@@ -188,6 +200,8 @@ async function resolveInstruments(input: {
     input.onKeyRefreshed,
     form.saveCard,
     input.providerChain,
+    undefined,
+    input.refreshKey,
   );
 }
 
@@ -212,6 +226,8 @@ function useCardSubmit(
   // The active key: resolved by the checkout config, overridden by the
   // rotated-key self-heal for the rest of the session.
   const { publicKey, setPublicKey } = useCardPublicKey(order.orderId, providerConfig);
+  const client = useCheckoutClientApi();
+  const navigate = useCheckoutNavigate();
 
   const { status, error: pollError, timedOut: pollTimedOut } = usePaymentPolling(order.orderId, {
     enabled: submitted,
@@ -235,6 +251,7 @@ function useCardSubmit(
       config: { ...providerConfig, publicKey },
       onKeyRefreshed: setPublicKey,
       providerChain,
+      refreshKey: client.refreshBrowserKey,
     });
     if (!resolved.ok) {
       setError(resolved.error);
@@ -242,7 +259,7 @@ function useCardSubmit(
       return;
     }
 
-    const charged = await chargeCard({
+    const charged = await client.charge({
       orderId: order.orderId,
       token: resolved.data.token,
       tokensByProvider: resolved.data.tokensByProvider,
@@ -261,7 +278,7 @@ function useCardSubmit(
     // 3-D Secure (FUT-698): the buyer must finish on the provider's page.
     // `submitting` stays true on purpose — the tab is navigating away.
     if (charged.data.hostedCheckoutUrl) {
-      return handOverToChallenge(order, charged.data.hostedCheckoutUrl);
+      return handOverToChallenge(order, charged.data.hostedCheckoutUrl, navigate);
     }
     // A business outcome (e.g. declined → FAILED) shows the status screen;
     // an accepted charge begins polling for the async confirmation.

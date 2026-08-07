@@ -9,6 +9,7 @@ import {
   cardPathAvailable,
   cardTokenization,
   offeredMethods,
+  selectableMethods,
   usePreselectSoleMethod,
 } from "./method-capability";
 import { MethodPicker } from "./method-picker";
@@ -18,6 +19,7 @@ import { PixView } from "./pix-view";
 import type {
   BuyerField,
   BuyerInfo,
+  CheckoutCustomerField,
   CheckoutOrder,
   CheckoutProviderConfig,
   OrderStatus,
@@ -155,6 +157,7 @@ export function DadosStep({
   errorField,
   onContinue,
   cartTotals,
+  buyerFields,
   discountLines,
   totalOverride,
 }: {
@@ -167,6 +170,8 @@ export function DadosStep({
   onContinue: () => void;
   /** The host cart's own totals — what the pay bar shows in cart mode. */
   cartTotals: { totalLabel: string; totalItems: number };
+  /** What the store's chain declares it needs (FUT-595); absent ⇒ CPF-required. */
+  buyerFields?: readonly CheckoutCustomerField[];
   /**
    * The saving, itemized under the total the buyer is about to authorize
    * (FUT-246) — RENDERED BY THE HOST from its cart (the storefront passes its
@@ -177,7 +182,7 @@ export function DadosStep({
   /** Comanda settlement (FUT-comandas): totals come from the comanda, not the cart. */
   totalOverride?: { label: string; items: number };
 }): JSX.Element {
-  const { ActionBar, Alert, Button, Checkbox, Text } = useCheckoutComponents();
+  const { Checkbox } = useCheckoutComponents();
   const { label: totalLabel, items: totalItems } = displayTotals(totalOverride, cartTotals);
 
   return (
@@ -186,6 +191,7 @@ export function DadosStep({
         <BuyerInfoForm
           value={buyer}
           onChange={onBuyerChange}
+          fields={buyerFields}
           fieldError={errorField && createError ? { field: errorField, message: createError } : null}
         />
         <Checkbox
@@ -196,32 +202,57 @@ export function DadosStep({
         />
       </Box>
 
-      <ActionBar dataTestId="checkout-pay-bar">
-        <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 1.5 }}>
-          {createError ? (
-            <Alert variant="danger" title="Não foi possível continuar" description={createError} showIcon data-testid="checkout-error" />
-          ) : null}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <PayBarTotal totalLabel={totalLabel} totalItems={totalItems}>
-              {/* Suppressed while settling a comanda: those totals come from
-                  the frozen ticket, not the cart. */}
-              {totalOverride ? null : discountLines}
-            </PayBarTotal>
-            <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5, minWidth: 0 }}>
-              <Button variant="solid" color="primary" size="lg" fullWidth onClick={onContinue} dataTestId="checkout-continue">
-                Continuar
-              </Button>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "text.secondary" }}>
-                <LockOutlinedIcon sx={{ fontSize: 13 }} />
-                <Text variant="caption" size="xs" color="secondary" as="span">
-                  Pagamento seguro
-                </Text>
-              </Box>
+      <DadosPayBar
+        totalLabel={totalLabel}
+        totalItems={totalItems}
+        createError={createError}
+        onContinue={onContinue}
+      >
+        {/* Suppressed while settling a comanda: those totals come from the
+            frozen ticket, not the cart. */}
+        {totalOverride ? null : discountLines}
+      </DadosPayBar>
+    </>
+  );
+}
+
+/** The sticky "Continuar" bar: the refusal, the money, and the one action. */
+function DadosPayBar({
+  totalLabel,
+  totalItems,
+  createError,
+  onContinue,
+  children,
+}: {
+  totalLabel: string;
+  totalItems: number;
+  createError: string | null;
+  onContinue: () => void;
+  children?: ReactNode;
+}): JSX.Element {
+  const { ActionBar, Alert, Button, Text } = useCheckoutComponents();
+  return (
+    <ActionBar dataTestId="checkout-pay-bar">
+      <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 1.5 }}>
+        {createError ? (
+          <Alert variant="danger" title="Não foi possível continuar" description={createError} showIcon data-testid="checkout-error" />
+        ) : null}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <PayBarTotal totalLabel={totalLabel} totalItems={totalItems}>{children}</PayBarTotal>
+          <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5, minWidth: 0 }}>
+            <Button variant="solid" color="primary" size="lg" fullWidth onClick={onContinue} dataTestId="checkout-continue">
+              Continuar
+            </Button>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "text.secondary" }}>
+              <LockOutlinedIcon sx={{ fontSize: 13 }} />
+              <Text variant="caption" size="xs" color="secondary" as="span">
+                Pagamento seguro
+              </Text>
             </Box>
           </Box>
         </Box>
-      </ActionBar>
-    </>
+      </Box>
+    </ActionBar>
   );
 }
 
@@ -283,8 +314,9 @@ export function PaymentStep({
 }: PaymentStepProps): JSX.Element {
   const { LoadingState } = useCheckoutComponents();
   const cardUnavailable = !cardPathAvailable(providerConfig ?? null);
+  const offered = offeredMethods(providerConfig ?? null);
   useAutoRaiseOrder(order, method, creating, createError, onGenerate);
-  usePreselectSoleMethod(cardUnavailable, method, onMethodChange);
+  usePreselectSoleMethod(selectableMethods(offered, cardUnavailable), method, onMethodChange);
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -295,7 +327,7 @@ export function PaymentStep({
         value={method}
         onChange={onMethodChange}
         cardUnavailable={cardUnavailable}
-        offered={offeredMethods(providerConfig ?? null)}
+        offered={offered}
       />
 
       <PaymentBody

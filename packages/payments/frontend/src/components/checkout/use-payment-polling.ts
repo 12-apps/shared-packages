@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { pollOrderStatus } from "./client";
+import { useCheckoutClientApi } from "./client-context";
 import { TERMINAL_STATUSES, type OrderStatus } from "./types";
 
 interface PollingOptions {
@@ -34,6 +34,10 @@ export function usePaymentPolling(
   const [status, setStatus] = useState<OrderStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
+  // Whichever mount this tree is bound to (FUT-741). Stable per provider, so it
+  // belongs in the deps below rather than being read out of a ref: a checkout
+  // re-pointed at another mount must re-poll against THAT one.
+  const client = useCheckoutClientApi();
 
   useEffect(() => {
     if (!orderId || !enabled) {
@@ -48,7 +52,7 @@ export function usePaymentPolling(
     setError(null);
 
     const tick = async (): Promise<void> => {
-      const result = await pollOrderStatus(orderId);
+      const result = await client.getStatus(orderId);
       if (cancelled) {
         return;
       }
@@ -87,7 +91,7 @@ export function usePaymentPolling(
         clearTimeout(timer);
       }
     };
-  }, [orderId, intervalMs, enabled, maxHealthyPolls]);
+  }, [orderId, intervalMs, enabled, maxHealthyPolls, client]);
 
   return { status, error, timedOut };
 }

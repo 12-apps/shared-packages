@@ -48,6 +48,39 @@ export {
   type CheckoutCartView,
   type CheckoutFlowProps,
 } from './components/checkout/checkout-flow';
+
+// ---------------------------------------------------------------------------
+// The MOUNTED buyer checkout (FUT-741) — `createPaymentFlows` returns every
+// screen pre-bound to one transport, one scope, one slot table and one set of
+// host ports. Additive: everything above and below stays exported, and the
+// hand-composing path is unchanged.
+// ---------------------------------------------------------------------------
+export { createPaymentFlows } from './flows/create-payment-flows';
+export {
+  DEFAULT_CHECKOUT_COPY_FE,
+  type CheckoutCopyFE,
+} from './flows/copy';
+export {
+  type BoundCheckoutClient,
+  type BuyerDetailsProps,
+  type CheckoutAvailability,
+  type CheckoutConfigState,
+  type CheckoutController,
+  type CheckoutPorts,
+  type CheckoutScreens,
+  type PaymentFlows,
+  type PaymentFlowsConfig,
+} from './flows/types';
+export {
+  buyerFieldsFor,
+  fieldSatisfied,
+} from './components/checkout/buyer-fields';
+export {
+  createCheckoutClient,
+  DEFAULT_CHECKOUT_BASE_URL,
+  type CheckoutClient,
+  type CheckoutTransport,
+} from './components/checkout/transport';
 export { type CheckoutHostPorts } from './components/checkout/use-checkout-controller';
 export { PaymentsUnavailable } from './components/checkout/payments-unavailable';
 export { fetchCheckoutConfig } from './components/checkout/client';
@@ -70,6 +103,8 @@ export {
   type BuyerContact,
   type BuyerField,
   type BuyerInfo,
+  type CheckoutChainLink,
+  type CheckoutCustomerField,
   type CheckoutError,
   type CheckoutOrder,
   type CheckoutProviderConfig,

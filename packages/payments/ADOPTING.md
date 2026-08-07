@@ -219,6 +219,90 @@ mount `routes.handlers.<kind>` per file instead. Each is still a one-line mount.
   `tokenization` (`SDK` → load the provider's JS SDK; `PUBLIC_KEY` → encrypt
   with `config.publicKey`; `REDIRECT`/PIX flows need no tokenizer).
 
+### The buyer checkout, mounted (`createPaymentFlows`, FUT-741)
+
+`<CheckoutFlow>` below is still exported and still works. What it asks of a
+host, though, is a prop per concern on every screen — a slot table, a
+`providerConfig` it fetched itself, a `tenantSlug`, a `taxIdOnFile` — plus its
+own fetch client and its own answer to "can this store charge?". Three hosts
+wrote that glue, and the FUT-740 review found its criticals inside it.
+
+So call this ONCE, at module scope, and MOUNT what comes back:
+
+```tsx
+// checkout-flows.ts — one module, one call
+export const checkout = createPaymentFlows({
+  useCart,                       // a HOOK: the cart as display facts
+  useScope: () => ({ tenantSlug: useParams().slug }),
+  ports: {
+    createPayable,               // same contract as today's createOrder
+    exitToCatalog: () => navigate("/menu"),
+    onPaid,
+    useAvailability,             // your own veto + the remedy you offer
+  },
+  components: myDesignSystemSlots,
+});
+
+// and in the page
+<checkout.Checkout />
+```
+
+`<checkout.Checkout />` fetches `/config` itself, decides availability itself,
+and renders the unavailable screen rather than a picker it cannot honour.
+
+**Everything in the config that reads the host is a HOOK** — `useScope`,
+`useCart`, `useBuyerDefaults`, `useComanda`, `ports.useAvailability`. They are
+invoked in a component body, never at factory time. A value-shaped config would
+freeze the slug of whichever store loaded first, and one moment's cart total,
+onto every checkout the page ever renders.
+
+**`transport`** points at the `createPaymentFlowsBE` mount. `baseUrl` defaults
+to `/api/checkout` verbatim — the paths the shipped client already posts — and
+`fetchImpl` is the seam a story, a harness page or a test uses to route
+straight into a real mount instead of mocking our own client.
+
+**`ports.useAvailability`** is OR'd with the chain, never swapped for it. An
+empty chain means the store connected no provider; your veto means the store
+CAN charge and has switched online payments off. Both must reach the
+unavailable screen, and only the host knows the second one.
+
+**Nesting individual screens.** `flows.screens.*` are all mountable on their
+own — each fetches `/config` if nothing above it did. Wrap them in
+`<flows.Provider>` to fetch it once for the subtree:
+
+```tsx
+<flows.Provider>
+  <MyLayout>
+    <flows.screens.BuyerDetails value={buyer} onChange={setBuyer} method={method} onContinue={next} />
+    <flows.screens.MethodChoice value={method} onChange={setMethod} />
+  </MyLayout>
+</flows.Provider>
+```
+
+`flows.useCheckout()` (the flow controller) and `flows.client` (the five fetch
+calls, pre-bound) are there for a host that wants neither the mount nor the
+screens. The unbound free functions stay exported too.
+
+**What the buyer is asked for** is derived from `chain[].customerSchema` ∩ the
+chosen method (FUT-595) rather than hard-coded. One rule matters more than the
+rest: a config whose `customerSchema` is ABSENT — an older host, a hand-written
+fixture — degrades to CPF-required, never to "ask nothing". Asking nothing
+produces a form the buyer completes and a 400 they meet afterwards, naming a
+field there was no input for. A schema that is present and EMPTY is a different
+claim (this chain genuinely needs nothing) and is honoured as one.
+
+**The hosted handover is two screens now.** `HostedHandoff` parks the order and
+THEN navigates, rendering an explicit link as the fallback — a blocked or slow
+navigation used to leave the buyer on a dead page. `HostedReturn` is the return
+leg, mountable at your return route. `ports.navigate` defaults to
+`window.location.assign`; override it if the departure must be logged or
+confirmed.
+
+**Storybook.** Every screen and state above has a story
+(`pnpm --filter @12-apps/payments-frontend dev`), each running a real
+`createPaymentFlowsBE` mount in the page — so a state can be reviewed without
+seeding a store or running a backend.
+
 ### The buyer checkout surface (`<CheckoutFlow>`, FUT-564)
 
 The full three-step buyer flow — Dados (CPF + LGPD "salvar meus dados") →
@@ -269,6 +353,13 @@ another app" real, since another app will not share `@12-apps/ui` either.
 // or, for subtrees (the admin's card-verification form does this):
 <CheckoutComponentsProvider components={mySlots}>...</CheckoutComponentsProvider>
 ```
+
+Nested providers **add**: an inner one fills the slots it names and inherits
+the rest from the provider above it, not from the raw-MUI defaults. So slots
+filled once at `createPaymentFlows({ components })` survive every screen
+underneath — including the `<flows.Checkout />` mount, which opens a provider
+of its own — and a subtree can narrow the look further without restating the
+whole table.
 
 The slots, each with a deliberately narrow prop contract (`Checkout*Props`
 types are exported; the props are the subset the checkout actually uses, so
