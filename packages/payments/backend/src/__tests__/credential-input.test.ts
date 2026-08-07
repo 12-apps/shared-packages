@@ -75,19 +75,44 @@ describe('saveCredentials — the body is checked against the adapter schema', (
   });
 
   /**
-   * The padded value is the one that would be STORED, so it is the one that
-   * has to pass. The browser trims before testing because it is watching
-   * someone type; a server that borrowed that leniency would accept a handle
-   * on the strength of a copy it then threw away.
+   * A handle pasted out of WhatsApp arrives padded. The browser validates
+   * `value.trim()` and submits the raw string, so judging the untrimmed copy
+   * here 400s an input the form's own validator just approved, on a screen
+   * where the padding is invisible and no field can be highlighted.
+   *
+   * So the server normalizes, and the value it validated is the value it
+   * stores — which is what the row should have held all along: the InfinitePay
+   * adapter already trims the handle before every call, so the padding never
+   * reached the provider, it only sat in the field deciding who gets paid.
    */
-  it('judges the value verbatim — a padded handle is not a valid one', async () => {
-    const { http } = setupCredentialsHttpWorld();
+  it('trims a pasted value, and stores the one it validated', async () => {
+    const { http, store } = setupCredentialsHttpWorld();
     const res = await http.saveCredentials(
       put({ environment: 'SANDBOX', fields: { handle: ' $loja-de-teste ' } }),
       ctx,
       'infinitepay',
     );
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    expect((await store.get(TENANT, 'infinitepay'))?.environments.SANDBOX).toEqual({
+      handle: '$loja-de-teste',
+    });
+  });
+
+  /** Trimmed to nothing is nothing: whitespace is not a credential. */
+  it('reads an all-whitespace value as a CLEAR, not as a value', async () => {
+    const { http, store } = setupCredentialsHttpWorld();
+    await http.saveCredentials(
+      put({ environment: 'SANDBOX', fields: { handle: '$loja-de-teste' } }),
+      ctx,
+      'infinitepay',
+    );
+    const res = await http.saveCredentials(
+      put({ environment: 'SANDBOX', fields: { handle: '   ' } }),
+      ctx,
+      'infinitepay',
+    );
+    expect(res.status).toBe(200);
+    expect((await store.get(TENANT, 'infinitepay'))?.environments.SANDBOX).toEqual({});
   });
 
   it('still lets an empty string CLEAR a patterned field — that is a disconnect', async () => {
@@ -154,18 +179,100 @@ describe('saveCredentials — the body is checked against the adapter schema', (
 
   /**
    * The HTTP surface is one door, not the door. A host that mounts its own
-   * route — several do — reaches the service directly, and the contract has to
-   * hold there or the fix is one route deep.
+   * route — several do — reaches the service directly, and the schema contract
+   * has to hold there or the fix is one route deep.
    */
-  it('refuses the same body when the service is called directly', async () => {
+  it('refuses an undeclared key when the service is called directly', async () => {
     const { settings } = setupSettingsWorld();
     await expect(
       settings.saveCredentials(TENANT, 'stone', {
         environment: 'SANDBOX',
-        fields: { notificationUrl: 'https://collector.test/hook' },
+        fields: { stubOutcome: 'PAID' },
       }),
     ).rejects.toBeInstanceOf(InvalidCredentialsInputError);
   });
+
+  /**
+   * The one key the service is WIDER on than the request body, and it has to
+   * be: the host stamps the platform's own billing callback on every platform
+   * save (`savePlatformCredentials`) because the read-time resolver answers
+   * null for a merchant with no tenant-addressed route, so a stored value is
+   * the only address that connection will ever carry. Refusing it here does not
+   * close a hole — the browser's door is shut one function up — it deletes the
+   * platform subscription webhook path and 500s every save on the superadmin
+   * billing screen.
+   */
+  it('accepts the host-stamped notificationUrl the platform save carries', async () => {
+    const { settings, store } = setupSettingsWorld();
+
+    await settings.saveCredentials(TENANT, 'stone', {
+      environment: 'SANDBOX',
+      fields: {
+        secretKey: 'sk_1',
+        publicKey: 'pk_1',
+        webhookUser: 'u',
+        webhookPassword: 'p',
+        notificationUrl: 'https://host/api/webhooks/platform-billing/stone',
+      },
+    });
+
+    expect((await store.get(TENANT, 'stone'))?.environments.SANDBOX['notificationUrl']).toBe(
+      'https://host/api/webhooks/platform-billing/stone',
+    );
+  });
+
+  /** Still a destination, so it still has to be one. */
+  it.each(['javascript:alert(1)', 'not-a-url'])(
+    'refuses `%s` as a host-stamped address',
+    async (value) => {
+      const { settings } = setupSettingsWorld();
+      await expect(
+        settings.saveCredentials(TENANT, 'stone', {
+          environment: 'SANDBOX',
+          fields: { notificationUrl: value },
+        }),
+      ).rejects.toBeInstanceOf(InvalidCredentialsInputError);
+    },
+  );
+
+  /**
+   * The rows that came through the hole BEFORE it was closed.
+   *
+   * A check that refuses a key before it reaches the clear short-circuit blocks
+   * new writes and makes the existing ones PERMANENT: `{ notificationUrl: '' }`
+   * would 400, `maskEnvironment` renders only schema keys so nothing on screen
+   * says the value is there, and the remaining remediation is SQL against the
+   * table. Clearing therefore comes first and applies to any key at all,
+   * host-owned ones included — an erase cannot introduce a destination.
+   */
+  it.each(['notificationUrl', 'stubOutcome'])(
+    'lets `%s`, already on the row, be cleared through the same door',
+    async (key) => {
+      const { http, store } = setupCredentialsHttpWorld();
+      await http.saveCredentials(
+        put({ environment: 'SANDBOX', fields: { handle: '$loja-de-teste' } }),
+        ctx,
+        'infinitepay',
+      );
+      // The pre-FUT-694 write, planted the way it used to land: straight into
+      // the stored field set, under a key no schema has ever heard of.
+      const poisoned = await store.get(TENANT, 'infinitepay');
+      if (!poisoned) throw new Error('the connection under test was not stored');
+      poisoned.environments.SANDBOX[key] = 'https://collector.attacker/hook';
+      await store.save(TENANT, poisoned);
+
+      const res = await http.saveCredentials(
+        put({ environment: 'SANDBOX', fields: { [key]: '' } }),
+        ctx,
+        'infinitepay',
+      );
+
+      expect(res.status).toBe(200);
+      expect((await store.get(TENANT, 'infinitepay'))?.environments.SANDBOX).toEqual({
+        handle: '$loja-de-teste',
+      });
+    },
+  );
 
   /**
    * Still true after the rewrite: the payload type carries no `stub`, and an

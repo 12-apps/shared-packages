@@ -292,8 +292,12 @@ export function createSettingsService(
       // and before `applySaveCredentials`, which INVALIDATES on any change it
       // is handed: a write it should never have accepted would take the
       // connection to UNVERIFIED and out of the chain on its way to failing.
-      assertSaveCredentialsInput(adapter, input);
-      const config = applySaveCredentials(await load(merchant, provider), input, allowStubMode);
+      //
+      // What gets WRITTEN is what came back from the check, not what came in:
+      // the values are normalized there (trimmed), and storing the raw copy
+      // would put on record a value nothing ever validated.
+      const checked = assertSaveCredentialsInput(adapter, input);
+      const config = applySaveCredentials(await load(merchant, provider), checked, allowStubMode);
       await store.save(merchant, config);
       return toMasked(adapter, config);
     },
