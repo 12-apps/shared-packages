@@ -367,10 +367,18 @@ export function compileReport(
     filters,
     sort,
     limit: Math.min(spec.limit ?? maxRows, maxRows),
-    // Only a spec-declared limit is a top-N. Hitting the safety cap is
-    // truncation, and folding THAT remainder into "Outros" would claim a
-    // total the report never computed.
-    ...(spec.limit !== undefined ? { topN: Math.min(spec.limit, maxRows) } : {}),
+    // Only a spec-declared limit is a top-N, and only while it is the bound
+    // that actually BINDS. Hitting the safety cap is truncation, and folding
+    // that remainder into "Outros" would claim a total the report never
+    // computed.
+    //
+    // Hence the second condition, and not `Math.min`: clamping the author's
+    // limit to `maxRows` reads a safety truncation as a top-N of exactly
+    // `maxRows`, which folds and returns `maxRows + 1` rows — one MORE than
+    // the cap the host set, carrying an "Outros" bucket nobody asked for. A
+    // spec asking for 10,000 rows on a 500-row cap wants 10,000; what it gets
+    // is 500 truncated, not "the top 500 and everything else".
+    ...(spec.limit !== undefined && spec.limit <= maxRows ? { topN: spec.limit } : {}),
     timeZone: resolveTimeZone(spec, options),
   };
 }

@@ -197,7 +197,7 @@ function seedRows(): Row[] {
  * mutate rows, so one leaking into the next is exactly the order-dependence
  * that makes a suite flaky.
  */
-function setup(): {
+function setup(options: { maxRows?: number } = {}): {
   stored: () => Row[];
   routes: ReportRoute[];
   route: (method: string, path: string) => ReportRoute;
@@ -211,6 +211,7 @@ function setup(): {
     adapter,
     db: () => Promise.resolve(db),
     systemReports: HARNESS_PRESETS,
+    ...(options.maxRows === undefined ? {} : { maxRows: options.maxRows }),
   });
   return {
     stored: db.all,
@@ -428,7 +429,11 @@ describe('permissions narrow the surface, not just the writes', () => {
     expect(response.status).toBe(403);
   });
 
-  it('hides every saved report whose entity the actor cannot query', async () => {
+  it('refuses the saved list to an actor who can query nothing', async () => {
+    // Not an empty list: an empty list says "you have no saved reports", which
+    // is the wrong thing to tell someone the feature was never granted to. The
+    // catalog and the built-ins answer the same way, so the whole area is
+    // either visible or it is not.
     const { route } = setup();
     const response = await route('GET', '/reports/custom').handle({
       actor: OUTSIDER,
@@ -436,8 +441,7 @@ describe('permissions narrow the surface, not just the writes', () => {
       query: {},
     });
 
-    const body = response.body as { data: { reports: unknown[] } };
-    expect(body.data.reports).toEqual([]);
+    expect(response.status).toBe(403);
   });
 
   it('refuses a dry run of a spec over an entity the actor cannot query', async () => {
@@ -491,5 +495,27 @@ describe('updating and deleting', () => {
     expect(response.status).toBe(204);
     expect(response.body).toBeUndefined();
     expect(stored()).toHaveLength(1);
+  });
+});
+
+describe('the host’s row cap is the host’s', () => {
+  it('never answers with more rows than the cap, whatever the spec asks for', async () => {
+    // This is the seam a consumer sees and the package's own tests did not:
+    // `maxRows` is a HOST setting, so nothing inside the library had ever run
+    // a spec whose limit exceeded it. When one did, the safety cap was read as
+    // an author's top-N and the answer came back with cap + 1 rows, carrying an
+    // "Outros" bucket nobody asked for. future-pay's route test found it.
+    const { route } = setup({ maxRows: 1 });
+
+    const response = await route('POST', '/reports/run').handle({
+      actor: OWNER,
+      params: {},
+      query: {},
+      body: { spec: { ...SPEC, limit: 10_000 } },
+    });
+
+    expect(response.status).toBe(200);
+    const body = response.body as { data: { render: { rows: unknown[] } } };
+    expect(body.data.render.rows).toHaveLength(1);
   });
 });

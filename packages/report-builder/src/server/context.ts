@@ -172,6 +172,23 @@ export function mayQueryEntity(
 }
 
 /**
+ * Whether the actor may query ANY entity of the catalog at all.
+ *
+ * This is the "can you see the reports area" question, and it answers 403
+ * rather than an empty page on every route that asks it. An empty list is a
+ * statement — "you have no saved reports" — and it is the wrong statement to
+ * make to someone who simply was not granted the feature.
+ */
+export function mayQueryAnything(
+  config: ReportBuilderServerConfig,
+  actor: ReportActor,
+): boolean {
+  return Object.keys(config.catalog.entities).some((entity) =>
+    mayQueryEntity(config, actor, entity),
+  );
+}
+
+/**
  * Whether the actor may query EVERY entity a document touches: a dashboard
  * runs all its blocks, so seeing it requires the tier of each block's entity.
  * A document naming no entity (malformed or legacy) is visible to nobody.

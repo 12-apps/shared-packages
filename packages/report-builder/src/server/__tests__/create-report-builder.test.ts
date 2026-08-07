@@ -346,6 +346,21 @@ describe('listing saved documents narrows twice', () => {
     expect(listing.reports.map((report) => report.id)).toEqual(['r1']);
   });
 
+  it('refuses outright when the actor reaches no entity at all', async () => {
+    // Not an empty list. An empty list is a STATEMENT — "you have no saved
+    // reports" — and it is the wrong statement to make to someone the feature
+    // was never granted to. `/reports/fields` and `/reports/system` both 403
+    // here, and the three routes of one area must not disagree about whether
+    // that area is visible.
+    const { call } = setup();
+
+    const response = await call('GET', '/reports/custom', {
+      actor: actor({ permissions: [] }),
+    });
+
+    expect(response.status).toBe(403);
+  });
+
   it('drops a document that names no entity at all', async () => {
     // A malformed or legacy value maps to no entity, so it is listed for
     // nobody rather than for everybody.

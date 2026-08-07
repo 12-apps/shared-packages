@@ -97,6 +97,51 @@ describe('top-N with an "Outros" bucket', () => {
     expect(rows.map((row) => row.product)).not.toContain(OTHERS_BUCKET_LABEL);
   });
 
+  it('honours the host’s row cap when the spec asks for MORE than it', async () => {
+    // The regression: a spec-declared limit was clamped to `maxRows` and then
+    // read as a top-N of exactly that, so the result folded and came back with
+    // `maxRows + 1` rows — one MORE than the cap the host set, carrying an
+    // "Outros" bucket nobody asked for. A caller asking for 10,000 rows on a
+    // 5-row cap wants 10,000; what it gets is 5 truncated.
+    //
+    // Found by a CONSUMER (future-pay's run-route test), not here: no test in
+    // this package had ever set `maxRows` below a spec's own limit.
+    const result = await runReport(
+      {
+        entity: 'sales',
+        dimensions: [{ field: 'product' }],
+        measures: [{ field: 'cents' }],
+        sort: [{ by: 'sum_cents', direction: 'desc' }],
+        limit: 10_000,
+      },
+      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }), maxRows: 5 },
+    );
+
+    expect(result.render.rows).toHaveLength(5);
+    expect(result.render.rows.map((row) => row.product)).not.toContain(OTHERS_BUCKET_LABEL);
+  });
+
+  it('treats a limit at or below the cap as the author’s top-N', async () => {
+    // The other side of the same condition, and the boundary `<=` decides: a
+    // limit that BINDS is a real top-N and must keep folding, or fixing the
+    // above would silently remove the "Outros" bucket from every report with
+    // one. The six rows here are the fold's own bound (topN + 1), not the
+    // safety cap being exceeded.
+    const result = await runReport(
+      {
+        entity: 'sales',
+        dimensions: [{ field: 'product' }],
+        measures: [{ field: 'cents' }],
+        sort: [{ by: 'sum_cents', direction: 'desc' }],
+        limit: 5,
+      },
+      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }), maxRows: 5 },
+    );
+
+    expect(result.render.rows).toHaveLength(6);
+    expect(result.render.rows.at(-1)?.product).toBe(OTHERS_BUCKET_LABEL);
+  });
+
   it('leaves a SPLIT query truncated rather than guessing a series', () => {
     // Groups are per (product, method) pair; one "Outros" row cannot say which
     // series it belongs to, so the plain cap stands until that is defined.
