@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 /**
  * `@12-apps/report-builder` mounted the way a host mounts it: one call to
- * `createReportBuilder`, no route table, no screen imported by name.
+ * `createWebReportBuilder`, no route table, no screen imported by name.
  *
  * These drive the REAL surface from the published tarball and assert what an
  * owner sees, because the thing being proven is that the package's public

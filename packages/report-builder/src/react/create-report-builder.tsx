@@ -82,11 +82,15 @@ function ReportBuilderRoutes({ tenantSlug }: { tenantSlug: string }): JSX.Elemen
 /**
  * Build the reports surface for a host.
  *
- * Returns a single component. A host mounts it and is done — there is no
- * second export to wire, and no route table to copy.
+ * Returns a single component under the name `page`, mirroring the backend
+ * half's `routes`: a host reading either call site can tell which half it is
+ * looking at and what it gets back, without opening the package.
+ *
+ * A host mounts it and is done — there is no second export to wire, and no
+ * route table to copy.
  */
-export function createReportBuilder(config: ReportBuilderConfig): {
-  ReportBuilder: () => JSX.Element;
+export function createWebReportBuilder(config: ReportBuilderConfig): {
+  page: () => JSX.Element;
 } {
   const { tenantSlug, transport, standalone = false } = config;
   const initialPath = config.initialPath ?? surfaceRoot(tenantSlug);
@@ -120,5 +124,5 @@ export function createReportBuilder(config: ReportBuilderConfig): {
     );
   }
 
-  return { ReportBuilder };
+  return { page: ReportBuilder };
 }

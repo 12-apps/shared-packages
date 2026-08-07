@@ -12,9 +12,9 @@ kind.
 | Surface | Export | What the host does |
 |---|---|---|
 | **Core engine** | `@12-apps/report-builder` | Nothing to wire — pure spec → IR → rows → render pipeline (`runReport`, `defineCatalog`, `createMemoryDataSource`). |
-| **Server** | `@12-apps/report-builder/server` | Call `createReportBuilder(config)` and mount the `routes` it returns — the eight endpoints, their parsing, their statuses and their envelope all live here. The host supplies only what is its own: a `ReportActor` (auth + tenant + permission ids), a window-scoped adapter and a lazy DB provider. Also provides the domain catalog + system presets, the entity→permission policy and the **wire (zod) contract** the host's MCP registry imports. |
+| **Server** | `@12-apps/report-builder/server` | Call `createApiReportBuilder(config)` and mount the `routes` it returns — the eight endpoints, their parsing, their statuses and their envelope all live here. The host supplies only what is its own: a `ReportActor` (auth + tenant + permission ids), a window-scoped adapter and a lazy DB provider. Also provides the domain catalog + system presets, the entity→permission policy and the **wire (zod) contract** the host's MCP registry imports. |
 | **Hono** | `@12-apps/report-builder/hono` | `app.route(prefix, reportBuilderRouter({ ...serverConfig, resolveActor }))`. A one-call mount for hosts on Hono; `hono` is an OPTIONAL peer, so importing the root or `/server` never resolves it. |
-| **React** | `@12-apps/report-builder/react` | Call `createReportBuilder({ tenantSlug })` and mount the single component it returns. Screens, flows and the routes between them are all inside; the host writes no route table. Nest the built-ins in your menu from `SYSTEM_REPORT_NAV`. |
+| **React** | `@12-apps/report-builder/react` | Call `createWebReportBuilder({ tenantSlug })` and mount the `page` it returns. Screens, flows and the routes between them are all inside; the host writes no route table. Nest the built-ins in your menu from `SYSTEM_REPORT_NAV`. |
 | **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync` once: the model + migrations reach the host's schema folder as **committed symlinks**. Never copy them. |
 
 ## Host wiring rules (the ones that bite)
@@ -87,7 +87,7 @@ app.route(
 );
 
 // frontend
-const { ReportBuilder } = createReportBuilder({ tenantSlug });
+const { page } = createWebReportBuilder({ tenantSlug });
 ```
 
 Everything else — MCP registry paths/summaries, the nav entries built from
@@ -113,7 +113,7 @@ Everything else — MCP registry paths/summaries, the nav entries built from
    `scripts/sync-report-builder-schema.mjs` if your layout differs).
 2. Declare the package as a dependency of your schema-owning package.
 3. Implement nothing: pass your Prisma client through the structural seams,
-   mount `createReportBuilder(...).routes` (or the Hono router) behind your own
+   mount `createApiReportBuilder(...).routes` (or the Hono router) behind your own
    `resolveActor`, spread the wire schemas into your MCP registry, and mount
    the React component with your tenant slug.
 4. Optional: replace `reportCatalog`/`SYSTEM_REPORTS` with your own

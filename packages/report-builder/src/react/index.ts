@@ -3,7 +3,7 @@
  *
  * A frontend host writes one line:
  *
- *   const { ReportBuilder } = createReportBuilder({ tenantSlug });
+ *   const { page } = createWebReportBuilder({ tenantSlug });
  *
  * Everything the feature is — the list, the viewer, the editor, the config
  * panel, the filter rows, the pickers, the templates, and the ROUTES between
@@ -20,7 +20,7 @@
  * The host still owns auth: the default transport rides the browser's cookies
  * against its own `/api/admin/...` endpoints. See ADOPTING.md.
  */
-export { createReportBuilder, type ReportBuilderConfig } from './create-report-builder';
+export { createWebReportBuilder, type ReportBuilderConfig } from './create-report-builder';
 export { httpTransport, type ReportBuilderTransport } from './transport';
 
 /**

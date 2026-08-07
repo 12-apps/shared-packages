@@ -4,7 +4,7 @@ import {
   type FieldCatalog,
 } from '@12-apps/report-builder';
 import {
-  createReportBuilder,
+  createApiReportBuilder,
   documentShape,
   type ReportActor,
   type ReportRoute,
@@ -203,7 +203,7 @@ function setup(options: { maxRows?: number } = {}): {
   route: (method: string, path: string) => ReportRoute;
 } {
   const db = memoryDb(seedRows());
-  const { routes } = createReportBuilder({
+  const { routes } = createApiReportBuilder({
     catalog,
     // A plain source rather than a factory: this harness's rows do not move,
     // so every window sees the same two orders. The factory form is what a
