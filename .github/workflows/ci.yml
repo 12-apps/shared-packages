@@ -36,6 +36,7 @@ env:
     packages/stock-domain
     packages/payments/frontend
     packages/ui
+    packages/pwa
     packages/observability-frontend
     packages/onboarding
     packages/product-research-ui
