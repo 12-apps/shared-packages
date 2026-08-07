@@ -103,6 +103,11 @@ function buildCheckout(
   return function Checkout(props) {
     // Its OWN provider, so the one-line mount really is one line: `/config` is
     // fetched here and every nested screen reads that answer.
+    //
+    // The design-system slots come from the `FlowsShell` inside it, and the
+    // `CheckoutComponentsProvider` that `CheckoutFlow` opens one level down
+    // INHERITS them (see `ui.tsx`) rather than resetting to raw MUI — which is
+    // why nothing here re-threads `components`.
     return (
       <FlowsProvider runtime={runtime}>
         <CheckoutBody {...props} />

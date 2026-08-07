@@ -354,6 +354,13 @@ another app" real, since another app will not share `@12-apps/ui` either.
 <CheckoutComponentsProvider components={mySlots}>...</CheckoutComponentsProvider>
 ```
 
+Nested providers **add**: an inner one fills the slots it names and inherits
+the rest from the provider above it, not from the raw-MUI defaults. So slots
+filled once at `createPaymentFlows({ components })` survive every screen
+underneath — including the `<flows.Checkout />` mount, which opens a provider
+of its own — and a subtree can narrow the look further without restating the
+whole table.
+
 The slots, each with a deliberately narrow prop contract (`Checkout*Props`
 types are exported; the props are the subset the checkout actually uses, so
 any design system satisfies them with a thin — often identity — mapping):

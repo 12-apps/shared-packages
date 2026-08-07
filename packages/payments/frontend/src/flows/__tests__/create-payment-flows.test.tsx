@@ -16,6 +16,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { CheckoutComponents } from "../../components/checkout/ui";
 import { storyFlows } from "../../stories/host";
 
 afterEach(cleanup);
@@ -59,6 +60,59 @@ describe("the transport the factory binds", () => {
     // proves the default reaches a live mount at that exact prefix.
     await spy("/api/checkout/config?tenantSlug=loja-1", { method: "GET" });
     expect(seenUrls[0]).toBe("/api/checkout/config?tenantSlug=loja-1");
+  });
+});
+
+describe("the design system the host filled at the factory", () => {
+  /**
+   * One slot, filled with markup no MUI default can produce. `data-host-slot`
+   * is the tell: present ⇒ the host's button rendered, absent ⇒ raw MUI did.
+   */
+  const hostComponents: Partial<CheckoutComponents> = {
+    Button: ({ children, onClick, disabled, dataTestId }) => (
+      <button
+        type="button"
+        data-testid={dataTestId}
+        data-host-slot="button"
+        onClick={onClick}
+        disabled={disabled}
+      >
+        {children}
+      </button>
+    ),
+  };
+
+  it("reaches the one-line <Checkout /> mount", async () => {
+    // The regression: `Checkout` renders `CheckoutFlow`, whose own slot
+    // provider merged over the DEFAULTS rather than over the context above it,
+    // so the factory's slots were silently reset to raw MUI one level in.
+    const { flows } = storyFlows({}, { components: hostComponents });
+    render(<flows.Checkout />);
+    await waitFor(() => expect(screen.getByTestId("checkout-continue")).toBeTruthy());
+    expect(screen.getByTestId("checkout-continue").getAttribute("data-host-slot")).toBe("button");
+  });
+
+  it("reaches a standalone screen from the SAME factory", async () => {
+    // Stated separately because the two paths disagreed: `screens.*` stop at
+    // `FlowsShell` and always kept the host's slots. One surface, one answer.
+    const { flows } = storyFlows({}, { components: hostComponents });
+    render(
+      <flows.screens.BuyerDetails
+        value={{ name: "", email: "", taxId: "" }}
+        onChange={vi.fn()}
+        method={null}
+        onContinue={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(screen.getByTestId("checkout-continue")).toBeTruthy());
+    expect(screen.getByTestId("checkout-continue").getAttribute("data-host-slot")).toBe("button");
+  });
+
+  it("still renders the raw-MUI defaults when the host filled nothing", async () => {
+    const { flows } = storyFlows();
+    render(<flows.Checkout />);
+    await waitFor(() => expect(screen.getByTestId("checkout-continue")).toBeTruthy());
+    expect(screen.getByTestId("checkout-continue").getAttribute("data-host-slot")).toBeNull();
   });
 });
 
