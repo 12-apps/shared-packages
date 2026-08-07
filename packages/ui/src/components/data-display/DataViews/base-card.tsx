@@ -14,6 +14,7 @@ import { Text } from "../../typography/Text";
 
 import { DragHandle, useDragItem } from "./data-views-drag";
 import {
+  CARD_RADIUS,
   cardSurfaceStyles,
   isActionable,
   isSelectable,
@@ -28,9 +29,11 @@ export interface BaseCardProps extends CardSurfaceProps {
   /** Tile proportion. Defaults to "4:3". */
   aspectRatio?: CardAspectRatio;
   /**
-   * Size multiplier from the zoom slider (1 = base). Scales the card's padding +
-   * typography in step with its width (the grid sizes the track to base × scale),
-   * so the whole card grows together — a card at scale 2 renders at ~twice the
+   * Size multiplier from the zoom slider (1 = base).
+   *
+   * Applied as `zoom`, so the whole card grows together — padding, typography,
+   * the checkbox, the menu and the media alike — in step with its width, which
+   * the grid sizes to base × scale. A card at scale 2 renders at ~twice the
    * size, its proportion preserved by `aspectRatio`. Default 1.
    */
   scale?: number;
@@ -58,16 +61,26 @@ export interface BaseCardProps extends CardSurfaceProps {
   checkboxTestId?: string;
 }
 
-/** The outlined-tile style: fixed ratio, scaled padding, selected/dimmed states. */
+/**
+ * The outlined-tile style: fixed ratio, scaled padding, selected/dimmed states.
+ *
+ * See the note on the row: `zoom` scales EVERY length in the subtree, including
+ * the MUI internals (checkbox, chip, icon button) that no prop of ours reaches.
+ * The grid still sizes the track to BASE_CARD_WIDTH x scale, so the tile fills
+ * its track physically and lays its contents out in the unscaled box behind it
+ * — which is what "the whole card grows together" was always meant to mean.
+ */
 function cardSx(opts: {
   aspectRatio: CardAspectRatio;
   pad: number;
+  scale: number;
   interactive: boolean;
   draggable: boolean;
 }): CardSx {
-  const { aspectRatio, pad, interactive, draggable } = opts;
+  const { aspectRatio, pad, scale, interactive, draggable } = opts;
   return {
     position: "relative",
+    zoom: scale,
     aspectRatio: String(CARD_ASPECT_RATIOS[aspectRatio]),
     display: "flex",
     flexDirection: "column",
@@ -76,6 +89,35 @@ function cardSx(opts: {
     cursor: draggable ? "grab" : interactive ? "pointer" : undefined,
     ...(draggable ? { touchAction: "none", "&:active": { cursor: "grabbing" } } : {}),
   };
+}
+
+/**
+ * How far the first block in flow must start below the tile's top edge to clear
+ * the absolute overlays: their 4px inset plus the checkbox's 38px hit area (20px
+ * glyph in MUI's 9px padding), which is the taller of the two corners.
+ */
+const OVERLAY_BAND_PX = 42;
+
+/**
+ * The top margin each stacked slot needs, in MUI spacing units.
+ *
+ * The overlays are absolute, so they cost the flow nothing — over MEDIA that is
+ * the whole point (a checkbox on a thumbnail reads as a checkbox on a
+ * thumbnail). Over TEXT it is a collision: a title-only tile started its first
+ * line at the padding edge, directly under the checkbox, and rendered
+ * `Selecionada` with the box sitting on the `Se`. So when nothing pictorial is
+ * there to absorb them, whichever block comes first clears the band instead.
+ */
+function contentGaps(opts: {
+  hasMedia: boolean;
+  hasBody: boolean;
+  overlays: boolean;
+  pad: number;
+}): { body: number; caption: number } {
+  const { hasMedia, hasBody, overlays, pad } = opts;
+  const gap = pad * 0.5;
+  const clear = !hasMedia && overlays ? Math.max(0, OVERLAY_BAND_PX / 8 - pad) : 0;
+  return { body: hasMedia ? gap : clear, caption: hasMedia || hasBody ? gap : clear };
 }
 
 /** The top-corner overlays: the select checkbox (left) and the menu slot (right). */
@@ -141,12 +183,10 @@ function CardMedia({ image, imageFallback }: Pick<BaseCardProps, "image" | "imag
 function CardBodyContent({
   children,
   fill,
-  scale,
   topGap,
 }: {
   children: ReactNode;
   fill: boolean;
-  scale: number;
   topGap: number;
 }): React.JSX.Element {
   return (
@@ -158,7 +198,7 @@ function CardBodyContent({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 0.75 * scale,
+        gap: 0.75,
         mt: topGap,
         overflow: "hidden",
       }}
@@ -172,12 +212,10 @@ function CardBodyContent({
 function CardCaption({
   title,
   subtitle,
-  scale,
   topGap,
 }: {
   title?: ReactNode;
   subtitle?: ReactNode;
-  scale: number;
   topGap: number;
 }): React.JSX.Element {
   return (
@@ -190,7 +228,7 @@ function CardCaption({
           as="p"
           style={{
             lineHeight: 1.15,
-            fontSize: `${0.95 * scale}rem`,
+            fontSize: "0.95rem",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -215,32 +253,25 @@ function CardContents({
   imageFallback,
   title,
   subtitle,
-  scale,
+  overlays,
   pad,
 }: Pick<BaseCardProps, "children" | "image" | "imageFallback" | "title" | "subtitle"> & {
-  scale: number;
+  overlays: boolean;
   pad: number;
 }): React.JSX.Element {
   const hasMedia = image != null || imageFallback != null;
   const hasBody = children != null;
   const hasCaption = title != null || subtitle != null;
-  const gap = pad * 0.5;
+  const top = contentGaps({ hasMedia, hasBody, overlays, pad });
   return (
     <>
       {hasMedia && <CardMedia image={image} imageFallback={imageFallback} />}
       {hasBody && (
-        <CardBodyContent fill={!hasMedia} scale={scale} topGap={hasMedia ? gap : 0}>
+        <CardBodyContent fill={!hasMedia} topGap={top.body}>
           {children}
         </CardBodyContent>
       )}
-      {hasCaption && (
-        <CardCaption
-          title={title}
-          subtitle={subtitle}
-          scale={scale}
-          topGap={hasMedia || hasBody ? gap : 0}
-        />
-      )}
+      {hasCaption && <CardCaption title={title} subtitle={subtitle} topGap={top.caption} />}
     </>
   );
 }
@@ -275,12 +306,11 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
   const { selectable, actionable, theme, slot, scale, drag } = useCardShell(props);
   const dataTestId = props.testId;
   const checkboxTestId = slot("checkbox");
-  const pad = 1.5 * scale;
+  const pad = 1.5;
 
   return (
     <Card
       variant="outlined"
-      borderRadius="lg"
       onClick={onClick}
       dataTestId={dataTestId}
       className={props.className}
@@ -292,6 +322,10 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
       // nothing at all — the styles vanish silently, which is exactly how the
       // first version of this shipped with no variants and no effects.
       sx={{
+        // The same corner the row uses: a Grade and a Lista of the same records
+        // sit beside each other, and a tile that rounds harder than the row
+        // reads as a different component.
+        borderRadius: CARD_RADIUS,
         // The shared half — variant, colour, selection, effects — identical to
         // the one BaseListCard uses, so a Grade and a Lista of the same records
         // are dressed by one set of rules.
@@ -308,8 +342,7 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
         ),
         // …and the tile's own geometry on top.
         ...cardSx({
-          aspectRatio,
-          pad,
+          aspectRatio, pad, scale,
           interactive: onClick != null,
           draggable: drag.draggable && drag.handleProps === undefined,
         }),
@@ -338,7 +371,7 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
         imageFallback={props.imageFallback}
         title={props.title}
         subtitle={props.subtitle}
-        scale={scale}
+        overlays={selectable || menu != null}
         pad={pad}
       >
         {props.children}
