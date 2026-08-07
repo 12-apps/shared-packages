@@ -47,6 +47,29 @@ export function toClientChargeView(snapshot: ChargeSnapshot): ClientChargeView {
   };
 }
 
+/**
+ * The provider's SECOND correlation id, when it has one distinct from the
+ * charge id (PagBank's `ORDE_…`), falling back to the charge id.
+ *
+ * Hosts persist it because some providers' webhooks and status reconciles key
+ * on it rather than on the charge id. It is read from `raw` — the verbatim
+ * provider payload — because the normalized model has no place for a second
+ * identifier most vendors do not have, and widening `ChargeSnapshot` for one
+ * vendor's quirk is worse than one guarded read.
+ *
+ * It lives HERE rather than in each host (FUT-740) so the guarded read exists
+ * once. Every access is checked: a provider whose payload carries no top-level
+ * `id` simply yields the charge id — no cast, no crash.
+ */
+export function providerCorrelationId(snapshot: ChargeSnapshot): string {
+  const raw: unknown = snapshot.raw;
+  if (raw && typeof raw === 'object') {
+    const id = (raw as Record<string, unknown>).id;
+    if (typeof id === 'string' && id !== '') return id;
+  }
+  return snapshot.providerChargeId;
+}
+
 /** Charge states the frontend should stop polling on. */
 export function isSettled(status: ChargeStatus): boolean {
   return status !== 'PENDING' && status !== 'AUTHORIZED';

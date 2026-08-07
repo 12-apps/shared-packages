@@ -10,10 +10,13 @@ import { isForwardTransition } from './core/status';
 import type {
   AttemptLedger,
   ChargeAttemptRecord,
+  ChargeQueryStore,
   ChargeStore,
   CredentialStore,
+  PayableChargeQuery,
   StoredCharge,
 } from './core/ports';
+import { ownsReference } from './core/reference';
 import type {
   ChargeSnapshot,
   MerchantRef,
@@ -77,19 +80,79 @@ export function createMemoryCredentialStore(): MemoryCredentialStore {
   };
 }
 
-export interface MemoryChargeStore extends ChargeStore {
+export interface MemoryChargeStore extends ChargeStore, ChargeQueryStore {
   all(): StoredCharge[];
   clear(): void;
 }
 
+/**
+ * The payable-charge narrowing, in memory. Deliberately the SAME clause set the
+ * Prisma store expresses as a `where` — a fake that filters more loosely than
+ * production turns "the reuse rule holds" into a test that proves nothing about
+ * the deployment it is standing in for.
+ */
+function matchesAmount(amount: StoredCharge['snapshot']['amount'], query: PayableChargeQuery): boolean {
+  const money = query.amount ?? query.amountNot;
+  if (!money) return true;
+  // Currency rides with whichever amount clause was given: comparing cents
+  // across currencies is how a 7500-centavo charge passes for a 7500-cent one.
+  if (amount.currency !== money.currency) return false;
+  return query.amount
+    ? amount.amountCents === money.amountCents
+    : amount.amountCents !== money.amountCents;
+}
+
+function matchesPayableQuery(row: StoredCharge, query: PayableChargeQuery): boolean {
+  return (
+    merchantKey(row.merchant) === merchantKey(query.merchant) &&
+    ownsReference(query.reference, row.reference) &&
+    row.snapshot.status === 'PENDING' &&
+    (!query.method || row.snapshot.method === query.method) &&
+    matchesAmount(row.snapshot.amount, query)
+  );
+}
+
+/**
+ * The checkout reads, over the same row list. Their own factory purely so
+ * `createMemoryChargeStore` stays inside the size gate.
+ */
+function payableQueries(rows: readonly StoredCharge[]): ChargeQueryStore {
+  /** Every attempt of one payable, in insertion order. */
+  const ofPayable = (merchant: MerchantRef, reference: string): StoredCharge[] =>
+    rows.filter(
+      (row) =>
+        merchantKey(row.merchant) === merchantKey(merchant) &&
+        ownsReference(reference, row.reference),
+    );
+
+  return {
+    async countByReference(merchant, reference) {
+      return ofPayable(merchant, reference).length;
+    },
+    async latestByReference(merchant, reference) {
+      // Insertion order for the same reason `listPayable` gives below, and NO
+      // status clause at all — that is the whole difference between the two.
+      return ofPayable(merchant, reference).at(-1) ?? null;
+    },
+    async listPayable(query) {
+      // Newest first, and by INSERTION rather than by `createdAt`: several
+      // charges of one walk are stored inside the same millisecond, and a
+      // timestamp sort would then hand back an arbitrary one of them as "the
+      // live charge". Insertion order is the only total order a fake has.
+      return rows.filter((row) => matchesPayableQuery(row, query)).reverse();
+    },
+  };
+}
+
+/** The `(provider, providerChargeId)` UNIQUE constraint, as a map key. */
+const chargeKey = (provider: ProviderName, providerChargeId: string): string =>
+  `${provider}:${providerChargeId}`;
+
 export function createMemoryChargeStore(): MemoryChargeStore {
   const rows: StoredCharge[] = [];
   const byIdempotencyKey = new Map<string, StoredCharge>();
-  let seq = 0;
-
-  const chargeKey = (provider: ProviderName, providerChargeId: string): string =>
-    `${provider}:${providerChargeId}`;
   const byChargeKey = new Map<string, StoredCharge>();
+  let seq = 0;
 
   return {
     async findByProviderChargeId(provider, providerChargeId) {
@@ -151,6 +214,7 @@ export function createMemoryChargeStore(): MemoryChargeStore {
       row.updatedAt = new Date();
       return row;
     },
+    ...payableQueries(rows),
     all() {
       return [...rows];
     },
