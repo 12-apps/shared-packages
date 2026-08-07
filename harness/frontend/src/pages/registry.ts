@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 
 import { PaymentsProviderSettingsPage } from './payments-provider-settings';
+import { PwaInstallPromptPage } from './pwa-install-prompt';
 import { ReportBuilderPage } from './report-builder';
 
 /**
@@ -37,6 +38,12 @@ export const PAGES: readonly HarnessPage[] = [
     title: 'Provider settings',
     pkg: '@12-apps/payments-frontend',
     Component: PaymentsProviderSettingsPage,
+  },
+  {
+    slug: 'pwa-install-prompt',
+    title: 'Install prompt',
+    pkg: '@12-apps/ui',
+    Component: PwaInstallPromptPage,
   },
   {
     slug: 'report-builder',

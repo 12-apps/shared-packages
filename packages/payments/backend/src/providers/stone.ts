@@ -1,4 +1,5 @@
 import type { PaymentProviderAdapter } from '../core/provider';
+import { stubDeliveryTrusted } from '../core/stub-mode';
 import type {
   NormalizedWebhookEvent,
   ResolvedCredentials,
@@ -69,7 +70,7 @@ async function verifyStoneWebhook(
 ): Promise<boolean> {
   const user = credentials.fields['webhookUser'];
   const password = credentials.fields['webhookPassword'] ?? '';
-  if (!user) return credentials.stub === true;
+  if (!user) return stubDeliveryTrusted(credentials);
   const presented = delivery.headers['authorization'] ?? '';
   return secureEquals(presented, basicAuth(user, password));
 }
