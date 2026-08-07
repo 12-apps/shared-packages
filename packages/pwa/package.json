@@ -1,0 +1,47 @@
+{
+  "name": "@12-apps/pwa",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Making a web app installable, and telling people it is. Captures beforeinstallprompt without ever firing it, detects the iOS browsers where installation is a manual share-sheet action, and ships an invite that leads with the reason rather than the instruction. Host-agnostic: every string comes from an overridable pt-BR messages layer.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react/index.ts"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage dist",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@12-apps/ui": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^19.2.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "jsdom": "^26.1.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": { "node": ">=22.0.0" },
+  "license": "MIT",
+  "publishConfig": { "registry": "https://registry.npmjs.org", "access": "public" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/pwa"
+  },
+  "files": ["src", "dist", "*.js", "*.mjs", "*.md", "!eslint.config.js", "!**/__tests__/**", "!**/*.test.*"]
+}

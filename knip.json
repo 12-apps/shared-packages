@@ -106,6 +106,12 @@
         "src/react/*.{ts,tsx}",
         "src/vite/*.ts"
       ]
+    },
+    "packages/pwa": {
+      "entry": [
+        "src/index.ts",
+        "src/react/*.{ts,tsx}"
+      ]
     }
   },
   "vitest": {
