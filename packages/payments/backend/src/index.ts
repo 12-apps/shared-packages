@@ -109,6 +109,7 @@ export {
   CredentialsError,
   CustomerRequirementsError,
   InvalidCredentialsInputError,
+  IrreversibleChainRemovalError,
   NoProviderSucceededError,
   PaymentsError,
   ProviderRequestError,
