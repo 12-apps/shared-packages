@@ -1,0 +1,90 @@
+# The consumer harness
+
+Two small applications built against the **published tarballs**, never against
+the workspace. `scripts/harness-install.mjs` packs every package and installs
+the results here, so what these apps import is what npm would upload — the only
+version of these packages a consumer ever sees.
+
+```
+harness/frontend   Vite + Playwright. A page per published surface, and per buyer flow.
+harness/backend    vitest. The published backend's own assets (schema, migrations).
+```
+
+Neither is in `pnpm-workspace.yaml`. That is the point: inside a workspace every
+sibling resolves whether or not its manifest says so, and every file is on disk
+whether or not `files` would ship it. Both are the opposite of what a consumer
+gets.
+
+## Adding a page
+
+Two steps, and no more:
+
+1. write `frontend/src/pages/<slug>.tsx`;
+2. add one line to `frontend/src/pages/registry.ts`.
+
+The shell builds its nav from that list, and specs address a page by slug
+(`#/<slug>`) — so nothing moves when the nav grows.
+
+## The payments checkout pages (FUT-743)
+
+`payments-checkout-*` is one page per BUYER FLOW, and every one of them drives
+the **real** factories: `createPaymentFlows` in the browser, against a real
+`createPaymentFlowsBE` mount in the same page, behind the `fetch` handed to
+`transport.fetchImpl`.
+
+That arrangement is the whole design, and it is a reaction to a specific
+failure. FUT-740 shipped with all fifteen CI checks green and three criticals
+live — a CARD charge that could settle a PIX payable, a `/charge` body the
+shipped client never sends, and a CPF the payable structurally could not carry.
+All three lived in the seam BETWEEN the two published halves, where neither
+side's tests look, because each side tested its own half against a body it wrote
+itself. A harness page that mocked components, or stubbed `globalThis.fetch` and
+answered `{ data: … }`, would reproduce that blindness exactly.
+
+So what is stubbed here is only what a browser genuinely cannot have:
+
+| Stubbed | Real |
+| --- | --- |
+| the merchant's stored credentials | the gateway, the failover walk, the charge-identity guards |
+| the provider at the other end of them | the reference convention, the buyer-field gate, the copy table |
+| — | the published client's own paths, bodies and polling |
+
+`src/payments/` holds that fixture:
+
+- `adapter.ts` — one local, vendor-free adapter per declared chain entry. Every
+  provider is named something no tokenizer recognises (`aurora`, `boreal`,
+  `infinito`), so the browser takes the server-granted stub path instead of
+  injecting a real acquirer's SDK. A harness page must not make a cross-origin
+  call to Pagar.me in order to render.
+- `store.ts` — the mount, the host's ports, and the `fetch` that routes into it.
+- `host.tsx` — the glue an adopter writes: cart, ports, scope, slots.
+- `probe.tsx` — **the wire probe**. What actually crossed, rendered into the
+  page behind one `data-testid` per fact: the charge body's own keys, the CPF
+  each provider received, the `tokensByProvider` keys, where a hosted handover
+  would have taken the buyer. An assertion is then a string comparison against
+  the wire rather than a screenshot of a screen.
+- `foreign-slots.tsx` — a design system that is deliberately **not** MUI, for
+  the second-host proof.
+
+Only `@12-apps/payments-backend`'s ROOT entry is imported. The adapter subpaths
+(`./providers/*`) reach for `node:crypto` and would not survive bundling.
+
+## Running it
+
+```bash
+node scripts/harness-install.mjs          # from the repo root: pack + install
+cd harness/frontend
+npm run build                             # the Playwright web server serves the build
+npm test                                  # bddgen, then both projects
+```
+
+`npm test` runs two Playwright projects:
+
+- **harness** — the hand-written specs under `tests/` and `tests/e2e/`;
+- **journeys** — the Gherkin under `tests/e2e/features/`, compiled by `bddgen`
+  into `.features-gen` (generated, gitignored: committing it lets a scenario and
+  its compiled spec drift).
+
+A sandbox with a pinned Chromium sets `PLAYWRIGHT_CHROMIUM_EXECUTABLE` rather
+than re-downloading one; CI runs `playwright install chromium` and leaves it
+unset.
