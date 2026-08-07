@@ -59,3 +59,6 @@ harness/*/dist
 harness/*/test-results
 harness/*/playwright-report
 harness/*/package-lock.json
+
+# Storybook build output
+storybook-static/

@@ -7,12 +7,14 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "clean": "rm -rf node_modules coverage",
+    "clean": "rm -rf node_modules coverage storybook-static",
     "test": "node ../../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest watch",
     "lint": "eslint src --max-warnings 0",
     "check-types": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev": "storybook dev -p 6007",
+    "storybook:build": "storybook build"
   },
   "dependencies": {
     "@12-apps/payments-backend": "workspace:*",
@@ -26,20 +28,27 @@
     "react-dom": ">=19.0.0"
   },
   "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/material": "^6.5.0",
-    "@12-apps/eslint-config": "workspace:*",
-    "@12-apps/typescript-config": "workspace:*",
+    "@storybook/addon-docs": "^9.1.10",
+    "@storybook/addon-links": "^9.1.10",
+    "@storybook/builder-vite": "^9.1.10",
+    "@storybook/react-vite": "^9.1.10",
     "@testing-library/react": "^16.1.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "eslint": "^9.39.1",
+    "eslint-plugin-storybook": "9.1.10",
     "eslint-plugin-test-flakiness": "^1.4.0",
     "jsdom": "^25.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "storybook": "^9.1.10",
     "typescript": "^5.9.2",
+    "vite": "^6.4.1",
     "vitest": "^3.2.4"
   },
   "engines": {
@@ -63,6 +72,7 @@
     "*.mjs",
     "*.md",
     "!eslint.config.js",
+    "!.storybook/**",
     "!src/stories/**",
     "!**/__tests__/**",
     "!**/tests/**",

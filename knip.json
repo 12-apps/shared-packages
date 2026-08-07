@@ -78,6 +78,18 @@
         "src/index.{ts,tsx}",
         "index.{ts,tsx}"
       ]
+    },
+    "packages/payments/frontend": {
+      "entry": [
+        "src/index.ts",
+        "// Stories are reached by .storybook/main.ts\u2019s glob, not by any",
+        "// import \u2014 same shape as packages/ui\u2019s entry list.",
+        "src/**/*.stories.{ts,tsx}",
+        ".storybook/*.{ts,tsx}"
+      ],
+      "ignoreDependencies": [
+        "@storybook/builder-vite"
+      ]
     }
   },
   "vitest": {
