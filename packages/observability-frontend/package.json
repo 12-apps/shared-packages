@@ -8,8 +8,12 @@
     "./react": "./src/react/index.ts",
     "./self-check": "./src/react/self-check.tsx",
     "./vite": {
-      "types": "./dist/vite/sentry-sourcemaps.d.ts",
-      "default": "./dist/vite/sentry-sourcemaps.js"
+      "types": "./dist/vite/index.d.ts",
+      "default": "./dist/vite/index.js"
+    },
+    "./service-worker": {
+      "types": "./dist/observability-sw.d.ts",
+      "default": "./dist/observability-sw.global.js"
     }
   },
   "scripts": {
