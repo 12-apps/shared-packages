@@ -83,6 +83,10 @@ export const GLOBAL_IGNORES = [
   // Prisma client + generated SQL/migration helpers.
   "**/generated/**",
   "**/prisma/generated/**",
+  // Gherkin compiled to Playwright specs by `bddgen` (harness/*/.features-gen).
+  // Machine-written and gitignored; linting it holds generated code to a bar
+  // its generator, not this repo, decides.
+  "**/.features-gen/**",
 ];
 
 // Test-ish globs — excluded from size/complexity, linted for flakiness instead.
