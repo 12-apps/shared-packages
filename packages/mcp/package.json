@@ -26,10 +26,13 @@
   },
   "devDependencies": {
     "@mui/material": "^6.5.0",
+    "@testing-library/react": "^16.1.0",
     "@12-apps/typescript-config": "workspace:*",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
     "eslint": "^9.39.1",
+    "jsdom": "^25.0.1",
+    "react-dom": "^19.2.0",
     "typescript": "^5.8.2",
     "vitest": "^3.2.4"
   },

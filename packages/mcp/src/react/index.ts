@@ -16,7 +16,7 @@ export {
 // Building blocks + content, exported so apps can compose or override.
 export { AiLanding } from "./ai-landing";
 export { AiCapabilities } from "./ai-capabilities";
-export { AiStatusBoard, type HostStatus } from "./ai-status-board";
+export { AiStatusBoard, type DisconnectHandler, type HostStatus } from "./ai-status-board";
 export { HostSelectStep } from "./host-select-step";
 export {
   EndpointCopyBlock,

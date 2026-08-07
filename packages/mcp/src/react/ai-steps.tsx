@@ -12,7 +12,7 @@ import {
   CopyUrlStep,
   InstallStep,
 } from "./ai-flow-steps";
-import { AiStatusBoard, type HostStatus } from "./ai-status-board";
+import { AiStatusBoard, type DisconnectHandler, type HostStatus } from "./ai-status-board";
 import { HostSelectStep } from "./host-select-step";
 
 export type { AiConnection } from "./ai-connection-utils";
@@ -23,10 +23,12 @@ export function StatusBoard({
   nav,
   connections,
   hosts,
+  onDisconnect,
 }: {
   nav: GuidedNav;
   connections: readonly AiConnection[];
   hosts: readonly AiHostGuide[];
+  onDisconnect?: DisconnectHandler;
 }): React.JSX.Element {
   const legacyHostId = (nav.data.connectedHost ?? nav.data.selectedHost) as string | undefined;
 
@@ -45,15 +47,38 @@ export function StatusBoard({
     };
   });
 
-  return (
-    <AiStatusBoard
-      statuses={statuses}
-      onConnect={(hostId) =>
-        nav.goTo(hosts.find((h) => h.id === hostId)?.pluginUrl ? "install" : "copy", {
-          selectedHost: hostId,
-        })
+  /** Re-enter this host's setup — the manual copy path, or its one-click install. */
+  const goToConnect = (hostId: string): void => {
+    nav.goTo(hosts.find((h) => h.id === hostId)?.pluginUrl ? "install" : "copy", {
+      selectedHost: hostId,
+    });
+  };
+
+  /**
+   * Disconnecting the LAST assistant leaves the section configured with nothing
+   * configured: a collapsed "IA conectada" summary hiding an all-red board, with
+   * the setup instructions two clicks away. So when the revoke empties the
+   * board, walk straight back into that host's instructions — the owner who just
+   * cut an assistant off is the likeliest person to reconnect one, and the steps
+   * are the only thing left worth showing.
+   *
+   * Cutting one of SEVERAL leaves the board meaningful, so it stays put.
+   * `statuses` is the pre-revoke picture, which is what makes "was that the last
+   * one?" answerable here without waiting for the app to re-read.
+   */
+  const disconnect: DisconnectHandler | undefined = onDisconnect
+    ? async (hostId) => {
+        await onDisconnect(hostId);
+        const revoked = providerForHostId(hostId);
+        const othersLive = statuses.some(
+          (status) => status.connected && providerForHostId(status.host.id) !== revoked,
+        );
+        if (!othersLive) goToConnect(hostId);
       }
-    />
+    : undefined;
+
+  return (
+    <AiStatusBoard statuses={statuses} onConnect={goToConnect} onDisconnect={disconnect} />
   );
 }
 
