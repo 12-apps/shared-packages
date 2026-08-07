@@ -1,7 +1,5 @@
 "use client";
 
-import { type ReactNode } from "react";
-
 import { Checkbox } from "../../form/Checkbox";
 import { Box } from "../../../mui/Box";
 

@@ -14,6 +14,7 @@ import { Text } from "../../typography/Text";
 
 import { DragHandle, useDragItem } from "./data-views-drag";
 import {
+  CARD_RADIUS,
   cardSurfaceStyles,
   isActionable,
   isSelectable,
@@ -280,7 +281,6 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
   return (
     <Card
       variant="outlined"
-      borderRadius="lg"
       onClick={onClick}
       dataTestId={dataTestId}
       className={props.className}
@@ -292,6 +292,10 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
       // nothing at all — the styles vanish silently, which is exactly how the
       // first version of this shipped with no variants and no effects.
       sx={{
+        // The same corner the row uses: a Grade and a Lista of the same records
+        // sit beside each other, and a tile that rounds harder than the row
+        // reads as a different component.
+        borderRadius: CARD_RADIUS,
         // The shared half — variant, colour, selection, effects — identical to
         // the one BaseListCard uses, so a Grade and a Lista of the same records
         // are dressed by one set of rules.

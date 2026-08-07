@@ -52,18 +52,10 @@ const kebab = (
       { id: "delete", label: "Excluir", color: "error", onClick: () => {} },
     ]}
     trigger={
-      // SQUARE, and no wider than the glyph. `Button` has no icon-only size, so
-      // it keeps MUI's 64px `minWidth` and its own 12px of side padding — three
-      // dots sitting in a 64px slab, which at the end of a row reads as a
-      // button that failed to load its label.
-      <Button
-        variant="text"
-        size="sm"
-        aria-label="Ações"
-        sx={{ minWidth: 0, px: 0.5, borderRadius: 1 }}
-      >
-        <MoreVertIcon sx={{ fontSize: 18 }} />
-      </Button>
+      // `icon` and no children, which is what makes `Button` render it square
+      // rather than in MUI's 64px slab. No local `sx` — the size is the
+      // component's now, so every overflow menu in the library matches.
+      <Button variant="text" size="sm" aria-label="Ações" icon={<MoreVertIcon sx={{ fontSize: 18 }} />} />
     }
   />
 );
