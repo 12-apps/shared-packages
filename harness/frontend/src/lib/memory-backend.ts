@@ -1,24 +1,26 @@
-import {
-  createMemoryDataSource,
-  defineCatalog,
-  listCatalogFields,
-  runDashboard,
-  runReport,
-} from '@12-apps/report-builder';
+import { createMemoryDataSource, defineCatalog } from '@12-apps/report-builder';
+import { reportBuilderRouter } from '@12-apps/report-builder/hono';
+import type { ReportActor, SavedReportDb, SystemReportDef } from '@12-apps/report-builder/server';
 import type { ReportBuilderTransport } from '@12-apps/report-builder/react';
+import { Hono } from 'hono';
 
 /**
  * The harness's stand-in for a host backend.
  *
- * This is the ONLY part of wiring the reports surface that is genuinely the
- * host's: which tenant, and how a request is answered. A real host answers
- * over HTTP from its own endpoints; the harness answers in memory because it
- * has no server.
+ * It answers with the package's OWN endpoints, mounted through its OWN Hono
+ * binding. That is the whole point: the reports client and the reports server
+ * are two halves of one contract, and for as long as this file hand-wrote the
+ * responses it was possible for them to disagree and for every suite to stay
+ * green. They did disagree — the client sent `PUT` at a server that only
+ * answered `PATCH`, and nothing could see it, because no test crossed both
+ * halves. This one does.
  *
- * It is not a mock of the package. The catalog, the compiler, the executor and
- * the renderer are all the PUBLISHED ones — only the rows and the storage are
- * local. So a screen that renders here has driven the same pipeline a real
- * deployment would.
+ * Hono is isomorphic: `router.request()` builds a `Request` and returns a
+ * `Response` with no socket involved, so the published adapter runs unchanged
+ * in the browser.
+ *
+ * What is genuinely the HOST's, and all that is left here: which tenant, who
+ * is calling, where the rows come from, and where documents are stored.
  */
 const catalog = defineCatalog({
   entities: {
@@ -62,205 +64,216 @@ const ROWS = [
   { id: 'o5', createdAt: '2026-07-04T20:00:00Z', method: 'CARD', status: 'PAID', totalCents: 4200, itemCount: 4 },
 ];
 
-const adapter = createMemoryDataSource({ orders: ROWS });
-const options = { catalog, adapter, timeZone: 'America/Sao_Paulo' };
+/** The permission tier the shipped policy assigns to `orders`. */
+const SALES = 'reports:sales:read';
 
-const RANGE = { preset: '30d', from: '2026-06-06', toExclusive: '2026-07-06' };
+/**
+ * Frozen so the fixture rows are always inside the window. A rolling preset
+ * resolved against the real clock would empty every report the moment July
+ * 2026 fell out of the last thirty days.
+ */
+const NOW = new Date('2026-07-05T12:00:00Z');
 
-interface StoredReport {
+/**
+ * A built-in defined over THIS catalog. The shipped presets are written
+ * against Future Pay's real fields, which this fixture does not have.
+ */
+const SYSTEM_REPORTS: SystemReportDef[] = [
+  {
+    key: 'receita-por-forma',
+    title: 'Receita por forma de pagamento',
+    description: 'Quanto entrou por PIX, cartão e garçom no período.',
+    permission: SALES as SystemReportDef['permission'],
+    section: 'orders',
+    supportsGrain: false,
+    presentation: 'chart',
+    build: () =>
+      ({
+        entity: 'orders',
+        dimensions: [{ field: 'method' }],
+        measures: [{ field: 'totalCents' }],
+        filters: [{ field: 'status', operator: 'eq', value: 'PAID' }],
+        presentation: { kind: 'chart', chartType: 'bar' },
+      }) as never,
+  },
+];
+
+interface StoredRow {
   id: string;
   name: string;
   description: string | null;
+  spec: unknown;
   status: string;
   visibility: string;
-  visibilityRoles: string[];
-  updatedAt: string;
-  spec: unknown;
+  visibilityRoles: unknown;
+  createdBy: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
+
+const DASHBOARD = {
+  kind: 'dashboard',
+  blocks: [
+    {
+      id: 'revenue',
+      span: 6,
+      title: 'Receita por forma',
+      spec: {
+        entity: 'orders',
+        dimensions: [{ field: 'method' }],
+        measures: [{ field: 'totalCents' }],
+        filters: [{ field: 'status', operator: 'eq', value: 'PAID' }],
+        presentation: { kind: 'chart', chartType: 'bar' },
+      },
+    },
+    {
+      id: 'daily',
+      span: 6,
+      spec: {
+        entity: 'orders',
+        dimensions: [{ field: 'createdAt', timeGrain: 'day' }],
+        measures: [{ field: 'totalCents' }],
+        presentation: { kind: 'table' },
+      },
+    },
+  ],
+};
 
 /** Storage is per-transport, so each mount starts from the same fixture. */
-function seedStore(): Map<string, StoredReport> {
-  const dashboard = {
-    kind: 'dashboard',
-    blocks: [
-      {
-        id: 'revenue',
-        span: 6,
-        title: 'Receita por forma',
-        spec: {
-          entity: 'orders',
-          dimensions: [{ field: 'method' }],
-          measures: [{ field: 'totalCents' }],
-          filters: [{ field: 'status', operator: 'eq', value: 'PAID' }],
-          presentation: { kind: 'chart', chartType: 'bar' },
-        },
+function seedRows(): StoredRow[] {
+  return [
+    {
+      id: 'r1',
+      name: 'Vendas por forma de pagamento',
+      description: 'Receita diária separada por PIX, cartão e garçom',
+      spec: DASHBOARD,
+      status: 'published',
+      visibility: 'tenant',
+      visibilityRoles: [],
+      createdBy: 'u1',
+      createdAt: new Date('2026-06-01T12:00:00Z'),
+      updatedAt: new Date('2026-08-01T12:00:00Z'),
+    },
+    {
+      id: 'r2',
+      name: 'Ticket médio',
+      description: null,
+      spec: {
+        entity: 'orders',
+        dimensions: [],
+        measures: [{ field: 'totalCents', aggregation: 'avg' }],
+        presentation: { kind: 'kpi' },
       },
-      {
-        id: 'daily',
-        span: 6,
-        spec: {
-          entity: 'orders',
-          dimensions: [{ field: 'createdAt', timeGrain: 'day' }],
-          measures: [{ field: 'totalCents' }],
-          presentation: { kind: 'table' },
-        },
-      },
-    ],
-  };
-  return new Map([
-    [
-      'r1',
-      {
-        id: 'r1',
-        name: 'Vendas por forma de pagamento',
-        description: 'Receita diária separada por PIX, cartão e garçom',
-        status: 'published',
-        visibility: 'tenant',
-        visibilityRoles: [],
-        updatedAt: '2026-08-01T12:00:00Z',
-        spec: dashboard,
-      },
-    ],
-    [
-      'r2',
-      {
-        id: 'r2',
-        name: 'Ticket médio',
-        description: null,
-        status: 'archived',
-        visibility: 'private',
-        visibilityRoles: [],
-        updatedAt: '2026-06-15T18:00:00Z',
-        spec: {
-          entity: 'orders',
-          dimensions: [],
-          measures: [{ field: 'totalCents', aggregation: 'avg' }],
-          presentation: { kind: 'kpi' },
-        },
-      },
-    ],
-  ]);
+      status: 'archived',
+      visibility: 'private',
+      visibilityRoles: [],
+      createdBy: 'u1',
+      createdAt: new Date('2026-06-01T12:00:00Z'),
+      updatedAt: new Date('2026-06-15T18:00:00Z'),
+    },
+  ];
 }
 
-function summaryOf(report: StoredReport) {
-  const spec = report.spec as { kind?: string };
+/** The structural `SavedReportDb` seam a real host fills with Prisma. */
+function memoryDb(): SavedReportDb {
+  const state = { rows: seedRows(), next: 2 };
   return {
-    id: report.id,
-    name: report.name,
-    description: report.description,
-    type: spec.kind === 'dashboard' ? ('dashboard' as const) : ('report' as const),
-    entity: 'orders',
-    entities: ['orders'],
-    status: report.status,
-    visibility: report.visibility,
-    updatedAt: report.updatedAt,
-  };
+    savedReport: {
+      findMany: () => Promise.resolve(state.rows.slice()),
+      findFirst: ({ where }: { where: { id?: string } }) =>
+        Promise.resolve(state.rows.find((row) => row.id === where.id) ?? null),
+      create: ({ data }: { data: Record<string, unknown> }) => {
+        state.next += 1;
+        const created = {
+          ...(data as unknown as StoredRow),
+          id: `r${state.next}`,
+          createdAt: NOW,
+          updatedAt: NOW,
+        };
+        state.rows = [...state.rows, created];
+        return Promise.resolve(created);
+      },
+      updateMany: ({ where, data }: { where: { id?: string }; data: Record<string, unknown> }) => {
+        const match = state.rows.find((row) => row.id === where.id);
+        state.rows = state.rows.map((row) =>
+          row.id === where.id ? ({ ...row, ...data, updatedAt: NOW } as StoredRow) : row,
+        );
+        return Promise.resolve({ count: match ? 1 : 0 });
+      },
+      deleteMany: ({ where }: { where: { id?: string } }) => {
+        const before = state.rows.length;
+        state.rows = state.rows.filter((row) => row.id !== where.id);
+        return Promise.resolve({ count: before - state.rows.length });
+      },
+    },
+  } as unknown as SavedReportDb;
 }
 
-async function viewOf(report: StoredReport): Promise<unknown> {
-  const spec = report.spec as { kind?: string };
-  const base = {
-    id: report.id,
-    name: report.name,
-    description: report.description,
-    status: report.status,
-    visibility: report.visibility,
-    visibilityRoles: report.visibilityRoles,
-    range: RANGE,
-  };
+const ACTOR: ReportActor = {
+  clientId: 'harness',
+  userId: 'u1',
+  roleIds: [],
+  isAdmin: true,
+  canAuthor: true,
+  permissions: [SALES],
+};
 
-  if (spec.kind === 'dashboard') {
-    const result = await runDashboard(report.spec, options);
-    return {
-      ...base,
-      type: 'dashboard',
-      spec: report.spec,
-      blocks: result.blocks.map((block) => ({
-        id: block.id,
-        title: block.title,
-        span: block.span,
-        sentence: block.sentence,
-        ...(block.status === 'ok'
-          ? { status: 'ok', render: block.render }
-          : { status: 'error', error: block.error }),
-      })),
-    };
-  }
-
-  const result = await runReport(report.spec, options);
-  return { ...base, type: 'report', spec: report.spec, render: result.render };
+/** Everything the package needs from a host, in one object. */
+function buildRouter(): Hono {
+  const db = memoryDb();
+  const router = new Hono();
+  router.route(
+    '/api/admin/:tenantSlug',
+    reportBuilderRouter({
+      catalog,
+      adapter: () => createMemoryDataSource({ orders: ROWS }),
+      db: () => Promise.resolve(db),
+      timeZone: 'America/Sao_Paulo',
+      now: () => NOW,
+      systemReports: SYSTEM_REPORTS,
+      resolveActor: () => ACTOR,
+    }),
+  );
+  return router;
 }
+
+/** The roles picker's endpoint, which belongs to the host, not to this package. */
+const ROLES_PAGE = { data: [], pagination: { hasNextPage: false } };
 
 export function memoryBackend(): ReportBuilderTransport {
-  const store = seedStore();
-  let nextId = 3;
+  const router = buildRouter();
+
+  async function json<T>(path: string, init?: RequestInit): Promise<{ status: number; body: T }> {
+    const response = await router.request(path, init);
+    const body = response.status === 204 ? null : ((await response.json()) as T);
+    return { status: response.status, body: body as T };
+  }
 
   return {
     async get<T>(path: string): Promise<T> {
-      if (path.includes('/reports/fields')) {
-        return listCatalogFields(catalog) as T;
-      }
-      if (path.includes('/reports/custom/')) {
-        const id = decodeURIComponent(path.split('/reports/custom/')[1]!.split('?')[0]!);
-        const report = store.get(id);
-        if (!report) throw new Error(`no such report: ${id}`);
-        return (await viewOf(report)) as T;
-      }
-      if (path.includes('/reports/custom')) {
-        return { reports: [...store.values()].map(summaryOf) } as T;
-      }
-      throw new Error(`memoryBackend: unhandled GET ${path}`);
+      const result = await json<{ data: T }>(path);
+      if (result.status >= 400) throw new Error(`HTTP ${result.status} for ${path}`);
+      return result.body.data;
     },
 
     getRaw<T>(path: string): Promise<T> {
-      // The roles picker: an empty page, which is a legitimate answer — the
-      // harness tenant has no custom roles.
-      if (path.includes('/roles')) {
-        return Promise.resolve({ data: [], pagination: { hasNextPage: false } } as T);
-      }
+      // The harness tenant has no custom roles; an empty page is a legitimate
+      // answer, and this endpoint is not the reports package's to serve.
+      if (path.includes('/roles')) return Promise.resolve(ROLES_PAGE as T);
       return Promise.reject(new Error(`memoryBackend: unhandled raw GET ${path}`));
     },
 
     async send<T>(path: string, method: string, body?: unknown) {
-      if (path.includes('/reports/run')) {
-        const input = body as { spec: unknown };
-        try {
-          const result = await runReport(input.spec, options);
-          return { ok: true as const, data: { range: RANGE, render: result.render } as T };
-        } catch (error) {
-          return {
-            ok: false as const,
-            error: error instanceof Error ? error.message : 'run failed',
-          };
-        }
+      const result = await json<{ data?: T; error?: string }>(path, {
+        method,
+        ...(body === undefined
+          ? {}
+          : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+      });
+      if (result.status >= 400) {
+        return { ok: false as const, error: result.body?.error ?? `HTTP ${result.status}` };
       }
-
-      if (path.includes('/reports/custom')) {
-        const input = body as {
-          name: string;
-          description?: string;
-          spec: unknown;
-          status: string;
-          visibility: string;
-          visibilityRoles: string[];
-        };
-        const existing = path.match(/\/reports\/custom\/([^/?]+)/)?.[1];
-        const id = existing ? decodeURIComponent(existing) : `r${(nextId += 1)}`;
-        const saved: StoredReport = {
-          id,
-          name: input.name,
-          description: input.description ?? null,
-          status: input.status,
-          visibility: input.visibility,
-          visibilityRoles: input.visibilityRoles,
-          updatedAt: '2026-08-06T00:00:00Z',
-          spec: input.spec,
-        };
-        store.set(id, saved);
-        return { ok: true as const, data: summaryOf(saved) as T };
-      }
-
-      return { ok: false as const, error: `memoryBackend: unhandled ${method} ${path}` };
+      return { ok: true as const, data: (result.body?.data ?? null) as T };
     },
   };
 }

@@ -2,11 +2,31 @@ export {
   createReportBuilder,
   documentShape,
   type ReportActor,
+  type ReportAdapterFactory,
   type ReportBuilderServerConfig,
   type ReportRequest,
   type ReportResponse,
   type ReportRoute,
 } from './create-report-builder';
+/**
+ * The period a report runs over. Exported because a host resolves the SAME
+ * window for its own non-report surfaces (a dashboard tile, an export), and
+ * two resolvers disagreeing about where a day begins is precisely the bug this
+ * math exists to prevent.
+ */
+export {
+  resolveReportRange,
+  startOfDay,
+  startOfNextDay,
+  toReportRangeView,
+  type ReportRangeInput,
+  type ReportRangePreset,
+  type ReportRangeView,
+  type ResolvedReportRange,
+} from './range';
+/** Compile-only validation of a document, the way the save routes do it. */
+export { compileDocument } from './compile-document';
+export { toSummary, type SavedReportSummary } from './summary';
 /**
  * `@12-apps/report-builder/server` — the host-mounted backend surface
  * (plug-and-play, payments-backend doctrine): the domain field catalog and

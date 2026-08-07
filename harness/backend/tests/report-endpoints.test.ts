@@ -8,6 +8,7 @@ import {
   documentShape,
   type ReportActor,
   type ReportRoute,
+  type SystemReportDef,
 } from '@12-apps/report-builder/server';
 import { describe, expect, it } from 'vitest';
 
@@ -111,12 +112,21 @@ function memoryDb(seed: Row[]) {
   };
 }
 
+/**
+ * The permission this harness grants over its one entity. It is the Future Pay
+ * tier the default `entityPermission` map already assigns to `orders`, so the
+ * actors below are narrowed by the SHIPPED policy rather than by one this test
+ * invented for itself.
+ */
+const SALES = 'reports:sales:read';
+
 const OWNER: ReportActor = {
   clientId: 'c1',
   userId: 'u1',
   roleIds: [],
   isAdmin: true,
   canAuthor: true,
+  permissions: [SALES],
 };
 
 const STAFF: ReportActor = {
@@ -125,7 +135,30 @@ const STAFF: ReportActor = {
   roleIds: [],
   isAdmin: false,
   canAuthor: false,
+  permissions: [SALES],
 };
+
+/** A staff member with no reporting grant at all. */
+const OUTSIDER: ReportActor = { ...STAFF, userId: 'u3', permissions: [] };
+
+/**
+ * A built-in defined over THIS harness's catalog. The shipped presets are
+ * written against Future Pay's real field catalog, so running one here would
+ * be testing the wrong thing; what matters is that a host can name its own and
+ * that the routes narrow, run and echo them.
+ */
+const HARNESS_PRESETS: SystemReportDef[] = [
+  {
+    key: 'formas-de-pagamento',
+    title: 'Formas de pagamento',
+    description: 'Receita por forma de pagamento.',
+    permission: SALES as SystemReportDef['permission'],
+    section: 'orders',
+    supportsGrain: false,
+    presentation: 'table',
+    build: () => SPEC as never,
+  },
+];
 
 function seedRows(): Row[] {
   return [
@@ -172,8 +205,12 @@ function setup(): {
   const db = memoryDb(seedRows());
   const { routes } = createReportBuilder({
     catalog,
+    // A plain source rather than a factory: this harness's rows do not move,
+    // so every window sees the same two orders. The factory form is what a
+    // real host passes, and `report-hono.test.ts` drives that one.
     adapter,
     db: () => Promise.resolve(db),
+    systemReports: HARNESS_PRESETS,
   });
   return {
     stored: db.all,
@@ -194,9 +231,11 @@ describe('the package ships the endpoints, not the host', () => {
       'GET /reports/custom',
       'GET /reports/custom/:id',
       'GET /reports/fields',
-      'PATCH /reports/custom/:id',
+      'GET /reports/system',
+      'GET /reports/system/:key',
       'POST /reports/custom',
       'POST /reports/run',
+      'PUT /reports/custom/:id',
     ]);
   });
 
@@ -329,5 +368,128 @@ describe('documentShape', () => {
     // listed for nobody.
     expect(documentShape(null)).toEqual({ type: 'report', entity: '', entities: [] });
     expect(documentShape('nonsense')).toEqual({ type: 'report', entity: '', entities: [] });
+  });
+});
+
+describe('the built-in reports came across too', () => {
+  it('lists the host’s own presets', async () => {
+    const { route } = setup();
+    const response = await route('GET', '/reports/system').handle({
+      actor: OWNER,
+      params: {},
+      query: {},
+    });
+
+    expect(response.status).toBe(200);
+    const body = response.body as { data: { reports: Array<{ key: string }> } };
+    expect(body.data.reports.map((report) => report.key)).toEqual(['formas-de-pagamento']);
+  });
+
+  it('runs one and echoes the window it ran over', async () => {
+    const { route } = setup();
+    const response = await route('GET', '/reports/system/:key').handle({
+      actor: OWNER,
+      params: { key: 'formas-de-pagamento' },
+      query: { preset: '7d' },
+    });
+
+    expect(response.status).toBe(200);
+    const body = response.body as {
+      data: { range: { preset: string; from: string; toExclusive: string } };
+    };
+    expect(body.data.range.preset).toBe('7d');
+    // Seven calendar days, half-open — the window the client renders as the
+    // period label, so it has to be the one the report actually ran over.
+    const span = Date.parse(body.data.range.toExclusive) - Date.parse(body.data.range.from);
+    expect(span).toBe(7 * 24 * 60 * 60 * 1000);
+  });
+
+  it('answers 404 for a key that does not exist', async () => {
+    const { route } = setup();
+    const response = await route('GET', '/reports/system/:key').handle({
+      actor: OWNER,
+      params: { key: 'inventado' },
+      query: {},
+    });
+
+    expect(response.status).toBe(404);
+  });
+});
+
+describe('permissions narrow the surface, not just the writes', () => {
+  it('refuses the field catalog to an actor with no reporting grant', async () => {
+    const { route } = setup();
+    const response = await route('GET', '/reports/fields').handle({
+      actor: OUTSIDER,
+      params: {},
+      query: {},
+    });
+
+    expect(response.status).toBe(403);
+  });
+
+  it('hides every saved report whose entity the actor cannot query', async () => {
+    const { route } = setup();
+    const response = await route('GET', '/reports/custom').handle({
+      actor: OUTSIDER,
+      params: {},
+      query: {},
+    });
+
+    const body = response.body as { data: { reports: unknown[] } };
+    expect(body.data.reports).toEqual([]);
+  });
+
+  it('refuses a dry run of a spec over an entity the actor cannot query', async () => {
+    const { route } = setup();
+    const response = await route('POST', '/reports/run').handle({
+      actor: OUTSIDER,
+      params: {},
+      query: {},
+      body: { spec: SPEC },
+    });
+
+    expect(response.status).toBe(403);
+  });
+});
+
+describe('updating and deleting', () => {
+  it('updates through PUT — the method the package’s own client sends', async () => {
+    const { route, stored } = setup();
+    const response = await route('PUT', '/reports/custom/:id').handle({
+      actor: OWNER,
+      params: { id: 'r1' },
+      query: {},
+      body: { name: 'Renomeado', spec: SPEC },
+    });
+
+    expect(response.status).toBe(200);
+    expect(stored()[0]?.name).toBe('Renomeado');
+  });
+
+  it('keeps the lifecycle fields an update left out', async () => {
+    const { route, stored } = setup();
+    await route('PUT', '/reports/custom/:id').handle({
+      actor: OWNER,
+      params: { id: 'r2' },
+      query: {},
+      body: { name: 'Ainda rascunho', spec: SPEC },
+    });
+
+    // r2 was seeded as a private draft; renaming it must not publish it.
+    expect(stored()[1]).toMatchObject({ status: 'draft', visibility: 'private' });
+  });
+
+  it('deletes with 204 and no body at all', async () => {
+    const { route, stored } = setup();
+    const response = await route('DELETE', '/reports/custom/:id').handle({
+      actor: OWNER,
+      params: { id: 'r1' },
+      query: {},
+    });
+
+    expect(response.status).toBe(204);
+    expect(response.body).toBeUndefined();
+    expect(stored()).toHaveLength(1);
   });
 });

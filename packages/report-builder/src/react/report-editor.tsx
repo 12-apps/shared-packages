@@ -39,6 +39,7 @@ import {
   type ReportDraft,
 } from "./report-model";
 import type { ReportRange } from "./reports-api";
+import { useTransport } from "./transport-context";
 
 /** Validate + persist the draft, landing on the saved report's viewer. */
 function useReportSave(
@@ -49,6 +50,7 @@ function useReportSave(
 ): { error: string | null; saving: boolean; onSave: () => Promise<boolean> } {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const transport = useTransport();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -74,8 +76,8 @@ function useReportSave(
       visibilityRoles: publish.visibility === "roles" ? publish.visibilityRoles : [],
     };
     const result = editId
-      ? await updateReportAction(tenantSlug, editId, input)
-      : await saveReportAction(tenantSlug, input);
+      ? await updateReportAction(transport, tenantSlug, editId, input)
+      : await saveReportAction(transport, tenantSlug, input);
     setSaving(false);
     if (!result.ok) {
       setError(result.error);

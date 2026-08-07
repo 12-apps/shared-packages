@@ -39,8 +39,24 @@ export interface ReportBuilderConfig {
    * standing up its own, which would silently give it a second cache.
    */
   standalone?: boolean;
-  /** Initial route when standalone. Ignored when mounting into a host router. */
+  /**
+   * Initial route when standalone. Ignored when mounting into a host router.
+   * Defaults to the surface's own root, `/<tenantSlug>/reports`.
+   */
   initialPath?: string;
+}
+
+/**
+ * Where this surface lives in a host's URL space.
+ *
+ * It is not a preference: every screen navigates to absolute
+ * `/<tenantSlug>/reports/...` paths, so a router that does not have the
+ * surface mounted there matches nothing the moment anything is clicked. A host
+ * router supplies that prefix; standalone has to supply it too, or the first
+ * navigation renders a blank page — which is exactly what it did.
+ */
+function surfaceRoot(tenantSlug: string): string {
+  return `/${tenantSlug}/reports`;
 }
 
 /** The routed surface: every reports screen and the paths between them. */
@@ -72,7 +88,8 @@ function ReportBuilderRoutes({ tenantSlug }: { tenantSlug: string }): JSX.Elemen
 export function createReportBuilder(config: ReportBuilderConfig): {
   ReportBuilder: () => JSX.Element;
 } {
-  const { tenantSlug, transport, standalone = false, initialPath = "/" } = config;
+  const { tenantSlug, transport, standalone = false } = config;
+  const initialPath = config.initialPath ?? surfaceRoot(tenantSlug);
 
   function ReportBuilder(): JSX.Element {
     // One client per mount, not per render: a client rebuilt on each render
@@ -91,7 +108,14 @@ export function createReportBuilder(config: ReportBuilderConfig): {
 
     return (
       <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={[initialPath]}>{surface}</MemoryRouter>
+        <MemoryRouter initialEntries={[initialPath]}>
+          {/* The prefix a host router would have matched, reproduced here so
+           * standalone behaves identically. Without it the surface renders
+           * once and then vanishes on the first navigation. */}
+          <Routes>
+            <Route path={`${surfaceRoot(tenantSlug)}/*`} element={surface} />
+          </Routes>
+        </MemoryRouter>
       </QueryClientProvider>
     );
   }

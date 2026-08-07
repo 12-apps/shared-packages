@@ -78,6 +78,11 @@ export function reportBuilderRouter(config: ReportBuilderHonoConfig): Hono {
         body: await readBody(c),
       });
 
+      // A handler that chose NO body means exactly that (204). Serializing
+      // `undefined` would put the four bytes `null` in a response whose status
+      // promises no content at all.
+      if (response.body === undefined) return c.body(null, response.status as 204);
+
       // The status travels with the body the handler chose; this adapter never
       // reinterprets either, or the two halves of the contract would drift
       // again — which is the whole reason the handlers moved here.
@@ -87,7 +92,7 @@ export function reportBuilderRouter(config: ReportBuilderHonoConfig): Hono {
     const path = honoPath(route);
     if (route.method === 'GET') app.get(path, handler);
     else if (route.method === 'POST') app.post(path, handler);
-    else if (route.method === 'PATCH') app.patch(path, handler);
+    else if (route.method === 'PUT') app.put(path, handler);
     else app.delete(path, handler);
   }
 

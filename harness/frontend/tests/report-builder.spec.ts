@@ -75,3 +75,52 @@ test('a chart offers its table fallback', async ({ page }) => {
   // page the harness built to show it.
   await expect(revenue.getByText('Ver como tabela')).toBeVisible();
 });
+
+/**
+ * The write half.
+ *
+ * This is the case the harness could not see before: the package's screens
+ * used to write with a direct `fetch`, bypassing the very transport their
+ * reads went through — so a host that supplied one had its reads intercepted
+ * and its writes escaping to the origin. And because nothing crossed both
+ * halves, the client's `PUT` and the server's `PATCH` disagreed for as long as
+ * both existed.
+ *
+ * Archiving is the shortest path that proves the whole chain: the viewer's own
+ * menu → the transport → the package's published Hono binding → its saved-report
+ * routes → the list re-reading what was actually stored.
+ */
+test('archiving writes through the transport and the list re-reads it', async ({ page }) => {
+  await page.goto('#/report-builder');
+
+  const list = page.getByTestId('page-reports');
+  await expect(list).toContainText('Todos (1)');
+  await expect(list).toContainText('Arquivados (1)');
+
+  await page.getByTestId('report-actions').click();
+  await page.getByText('Arquivar', { exact: true }).click();
+  await page.getByTestId('report-archive-confirm').getByText('Arquivar', { exact: true }).click();
+
+  // The counts come from a fresh read of the store, not from local state: the
+  // published PUT landed, and the published GET saw it.
+  await expect(list).toContainText('Arquivados (2)');
+  await expect(list).toContainText('Todos (0)');
+});
+
+/**
+ * Navigating WITHIN the surface — the routes the factory owns so a host never
+ * has to rediscover them.
+ *
+ * `new` is a static segment that `:reportId` would otherwise swallow, which is
+ * the ordering rule that used to be copied into every host's route table. It
+ * is asserted here, from outside, because from inside the package the order is
+ * just a line whose importance is invisible.
+ */
+test('the editor is reachable, and “new” is not read as a report id', async ({ page }) => {
+  await page.goto('#/report-builder');
+
+  await page.getByTestId('reports-new').click();
+
+  // The editor, not a viewer that failed to load a report called "new".
+  await expect(page.getByTestId('page-report-editor')).toBeVisible();
+});
