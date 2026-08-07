@@ -1,7 +1,8 @@
+import { parseSaveCredentialsBody } from '../config/credential-input';
 import type { OAuthConnectService } from '../config/oauth';
 import type { SettingsService } from '../config/service';
-import type { SaveCredentialsInput } from '../config/types';
 import { toClientChargeView } from '../core/client-view';
+import { InvalidCredentialsInputError } from '../core/errors';
 import type { PaymentsGateway } from '../core/gateway';
 import type { ChargeStore } from '../core/ports';
 import type {
@@ -136,6 +137,22 @@ type OAuthHandlers = Pick<
   'beginOAuth' | 'completeOAuth' | 'disconnectOAuth'
 >;
 
+/**
+ * The body as JSON, or a refusal the caller can act on.
+ *
+ * `request.json()` throws a bare `SyntaxError`, which is not a `PaymentsError`
+ * and so escapes `guarded` entirely — an empty or truncated body reached the
+ * host as an unhandled throw and became a 500 about our server, for a request
+ * that was simply not JSON.
+ */
+async function readJson(request: Request, provider: ProviderName): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch {
+    throw new InvalidCredentialsInputError(provider, 'Request body is not valid JSON');
+  }
+}
+
 /** Lower-cased header map of a fetch Request (adapters expect lower-case). */
 function lowerHeaders(request: Request): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -209,7 +226,7 @@ function makeSettingsHandlers(
 
     saveCredentials: (request, ctx, provider) =>
       guarded(async () => {
-        const input = (await request.json()) as SaveCredentialsInput;
+        const input = parseSaveCredentialsBody(provider, await readJson(request, provider));
         return json(await settings.saveCredentials(ctx.merchant, provider, input));
       }),
 
