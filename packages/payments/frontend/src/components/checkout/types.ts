@@ -198,6 +198,17 @@ export interface ChargeCardInput {
   taxId?: string;
 }
 
+/** A buyer field a provider asks for, as `/config` publishes it (FUT-595). */
+export interface CheckoutCustomerField {
+  key: "name" | "email" | "taxId" | "phone";
+  /** Which validation rule applies. `MOBILE` is the strictly narrower `PHONE`. */
+  type: "NAME" | "EMAIL" | "PHONE" | "MOBILE" | "CPF";
+  /** The provider refuses (or its own page stalls) without this field. */
+  required: boolean;
+  /** Methods this spec applies to; omitted means every method the adapter takes. */
+  methods?: ("PIX" | "CARD" | "BOLETO")[];
+}
+
 /**
  * ONE enabled provider of the store's chain (FUT-563), as the buyer's config
  * answers it. The same protocol facts as the head, stated per provider —
@@ -209,6 +220,22 @@ export interface CheckoutChainLink {
   publicKey: string | null;
   mockTokenization: boolean;
   methods: ("PIX" | "CARD" | "BOLETO")[];
+  /**
+   * What this provider needs to know about the buyer (FUT-595).
+   *
+   * `GET /api/checkout/config` has published this since FUT-740; this mirror
+   * type simply dropped it, so the buyer form could not be honest about what
+   * the chain requires and a missing field was only discoverable as a 400 AFTER
+   * the buyer had finished filling it in — the third FUT-740 critical, one
+   * layer up.
+   *
+   * Optional, and the DEGRADE DIRECTION IS LOAD-BEARING: absent (an older host,
+   * a hand-written config) must mean today's behaviour — CPF required — never
+   * "this chain asks for nothing". Asking for nothing produces a form the buyer
+   * completes and a charge the server then refuses for a document they were
+   * never shown a field for.
+   */
+  customerSchema?: CheckoutCustomerField[];
 }
 
 /**

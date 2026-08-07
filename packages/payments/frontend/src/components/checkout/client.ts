@@ -4,6 +4,14 @@
  * provider-protocol read, against the host-mounted `/api/checkout*` surface
  * (documented in `packages/payments/ADOPTING.md` §3).
  *
+ * Since FUT-741 these are the UNBOUND door onto `createCheckoutClient` — the
+ * same five calls, on the default `/api/checkout` prefix and the ambient
+ * `fetch`. They stay exported, and stay byte-identical on the wire, because
+ * they are what is already running in buyers' browsers and what both pinned
+ * wire suites drive. A host that needs a different mount, its own headers or an
+ * injected `fetch` reaches for `createPaymentFlows({ transport })` instead;
+ * nothing about these functions changes when it does.
+ *
  * Order CREATION and the buyer-profile save are deliberately NOT here: both
  * are host domain (the cart, the account) and reach the flow as ports
  * (`createOrder` / `saveBuyerContact` on `CheckoutFlowProps`).
@@ -14,8 +22,9 @@
  */
 
 import type { SavedCard } from "../../card";
-import { err, ok, type Result } from "../../result";
+import type { Result } from "../../result";
 
+import { createCheckoutClient } from "./transport";
 import type {
   ChargeCardInput,
   ChargeOutcome,
@@ -23,91 +32,15 @@ import type {
   OrderStatus,
 } from "./types";
 
-// ---------------------------------------------------------------------------
-// Transport
-// ---------------------------------------------------------------------------
-
-/** Envelope the API routes return: `{ data }` on success, `{ error }` on failure. */
-interface ApiEnvelope<T> {
-  data?: T;
-  error?: string;
-  /**
-   * Stable machine code for the failure (`checkoutErrorResponse` always sends
-   * one). Carried through so a surface can PRESENT a refusal for what it is —
-   * an unresolved charge is not a decline, and rendering it under "não foi
-   * possível pagar" with a live pay button invites the second payment its own
-   * text forbids.
-   */
-  code?: string;
-}
-
 /**
- * A non-2xx envelope as a {@link Result} failure, carrying its machine CODE.
- * The message is what the buyer reads; the code is what a surface uses to
- * decide how to PRESENT it, which a message cannot be parsed for.
+ * The default binding: `/api/checkout` on the ambient `fetch`. Built once, but
+ * it resolves `fetch` per call, so a suite that stubs the global still wins.
  */
-function refused<T>(json: ApiEnvelope<T> | null): Result<T> {
-  return err(json?.error ?? "Não foi possível concluir a operação. Tente novamente.", json?.code);
-}
-
-/** Call an API route and normalize the response into a {@link Result}. */
-async function requestResult<T>(input: string, init?: RequestInit): Promise<Result<T>> {
-  try {
-    const res = await fetch(input, {
-      ...init,
-      headers: { "Content-Type": "application/json", ...init?.headers },
-    });
-    const json = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
-    if (!res.ok) return refused(json);
-    if (!json || json.data === undefined) {
-      return err(json?.error ?? "Resposta inválida do servidor.");
-    }
-    return ok(json.data);
-  } catch {
-    return err("Não foi possível conectar. Verifique sua conexão e tente novamente.");
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
-/**
- * What a hosted checkout appended to the return URL when it sent the buyer
- * back, or undefined.
- *
- * InfinitePay's `payment_check` refuses to confirm without BOTH the
- * `transaction_nsu` and the invoice `slug`, and neither exists until somebody
- * has actually paid — they arrive here, on the redirect. Left in the URL: the
- * server treats them as hints, so re-sending them on later polls is harmless.
- *
- * Note the buyer has to press "Continuar" on the provider's receipt for this
- * redirect to happen at all, which is exactly why it is a hint and never the
- * mechanism: the webhook, and the server-side reconciliation behind it, are
- * what must work when they simply close the tab.
- */
-function returnedSettlement(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  const params = new URLSearchParams(window.location.search);
-  // BOTH. Measured against the live API: handle + order_nsu +
-  // transaction_nsu + slug answers {"success":true,"paid":true,…}, and the
-  // same call missing EITHER answers {"success":false}. Neither exists before
-  // the payment, and the slug is not in the link-creation response — the
-  // redirect and the webhook are the only places both appear together.
-  const transactionNsu = params.get("transaction_nsu") ?? params.get("transaction_id") ?? "";
-  const slug = params.get("slug") ?? "";
-  return {
-    ...(transactionNsu ? { transactionNsu } : {}),
-    ...(slug ? { slug } : {}),
-  };
-}
+const defaultClient = createCheckoutClient();
 
 /** Poll an order's reconciled status (async provider webhook confirmation). */
 export async function pollOrderStatus(orderId: string): Promise<Result<OrderStatus>> {
-  const params = new URLSearchParams({ orderId, ...returnedSettlement() });
-  return requestResult<OrderStatus>(`/api/checkout/status?${params.toString()}`, {
-    method: "GET",
-  });
+  return defaultClient.getStatus(orderId);
 }
 
 /**
@@ -119,10 +52,7 @@ export async function pollOrderStatus(orderId: string): Promise<Result<OrderStat
 export async function fetchCheckoutConfig(
   tenantSlug: string,
 ): Promise<Result<CheckoutProviderConfig>> {
-  return requestResult<CheckoutProviderConfig>(
-    `/api/checkout/config?tenantSlug=${encodeURIComponent(tenantSlug)}`,
-    { method: "GET" },
-  );
+  return defaultClient.getConfig(tenantSlug);
 }
 
 /**
@@ -135,10 +65,7 @@ export async function fetchCheckoutConfig(
 export async function refreshCardPublicKey(input: {
   orderId: string;
 }): Promise<Result<{ publicKey: string | null }>> {
-  return requestResult<{ publicKey: string | null }>("/api/checkout/refresh-key", {
-    method: "POST",
-    body: JSON.stringify({ orderId: input.orderId }),
-  });
+  return defaultClient.refreshBrowserKey(input);
 }
 
 /**
@@ -147,29 +74,10 @@ export async function refreshCardPublicKey(input: {
  * page (3-D Secure, FUT-698) — the caller then hands the buyer over.
  */
 export async function chargeCard(input: ChargeCardInput): Promise<Result<ChargeOutcome>> {
-  return requestResult<ChargeOutcome>("/api/checkout/charge", {
-    method: "POST",
-    body: JSON.stringify({
-      orderId: input.orderId,
-      token: input.token,
-      // One instrument per provider (FUT-563) — the server hands each provider
-      // in the chain its own, which is what lets a card charge fail over.
-      ...(input.tokensByProvider ? { tokensByProvider: input.tokensByProvider } : {}),
-      saveCard: input.saveCard,
-      cardMeta: input.cardMeta,
-      taxId: input.taxId,
-    }),
-  });
+  return defaultClient.charge(input);
 }
 
 /** List saved cards available for reuse (empty on any error — non-blocking). */
 export async function listSavedCards(tenantSlug?: string): Promise<SavedCard[]> {
-  // Scoped to the store when known (FUT-697): only cards the store's ACTIVE
-  // provider can actually charge come back — a PagBank-vaulted card is not
-  // offered for a Stone charge it would fail (or misroute).
-  const query = tenantSlug ? `?tenantSlug=${encodeURIComponent(tenantSlug)}` : "";
-  const result = await requestResult<SavedCard[]>(`/api/checkout/cards${query}`, {
-    method: "GET",
-  });
-  return result.ok ? result.data : [];
+  return defaultClient.listInstruments(tenantSlug);
 }
