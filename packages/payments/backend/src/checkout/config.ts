@@ -105,6 +105,7 @@ async function toBuyerLink(
     mockTokenization: isStub && publicKey === null,
     methods: [...entry.methods],
     customerSchema: [...entry.customerSchema],
+    checkoutScreen: entry.checkoutScreen,
   };
 }
 

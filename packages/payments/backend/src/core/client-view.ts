@@ -103,6 +103,14 @@ export interface ClientProviderConfig {
    * direction of a checkout offering a method the walk then refuses.
    */
   methods: readonly PaymentMethodKind[];
+  /**
+   * The buyer screen this provider's flow needs (FUT-596), or `null` for the
+   * capability default. Stamped here for the same reason `methods` is: the
+   * adapter's declaration is the single source, and a second copy inside each
+   * `clientConfig` is the one that drifts — here, in the direction of a
+   * provider silently losing its own screen.
+   */
+  checkoutScreen: string | null;
 }
 
 /** Build the published config for one adapter — see {@link ClientProviderConfig}. */
@@ -114,5 +122,6 @@ export function toClientProviderConfig(
     ...adapter.clientConfig(credentials),
     customerSchema: adapter.customerSchema ?? [],
     methods: adapter.capabilities.methods,
+    checkoutScreen: adapter.checkoutScreen ?? null,
   };
 }

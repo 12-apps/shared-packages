@@ -94,6 +94,18 @@ export interface HarnessProvider {
    * underneath the click.
    */
   settlesOnPoll?: boolean;
+  /**
+   * The buyer screen this provider's flow needs (FUT-596). Omitted ⇒ declares
+   * none, and the checkout falls back to the capability default.
+   *
+   * A host declares this exactly as a real adapter does, which is what the
+   * screen-resolution page exercises. Because the id names the SHAPE of the
+   * flow rather than the vendor, this harness can prove resolution end to end
+   * without a vendor name anywhere — which matters, since
+   * `payments/no-provider-name-literal` makes one a hard error outside the
+   * package, and every fixture here is already fictional for that reason.
+   */
+  checkoutScreen?: string;
 }
 
 /**
@@ -193,6 +205,9 @@ export function harnessAdapter(spec: HarnessProvider, seen: SeenCharge[]): Payme
       tokenization,
     },
     customerSchema: spec.customerSchema ?? CPF_REQUIRED,
+    // Undefined when the host declares none — the gateway normalizes that to
+    // `null` on the published chain, which is the capability-default path.
+    checkoutScreen: spec.checkoutScreen,
     credentialSchema: [{ key: 'secretKey', label: 'Secret', secret: true, required: true }],
     async verifyCredentials() {
       return { ok: true };

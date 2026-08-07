@@ -84,6 +84,18 @@ export interface StoryProvider {
   ambiguous?: boolean;
   /** Answers with a hosted page instead of a payload or a tokenizable form. */
   hosted?: boolean;
+  /**
+   * The buyer screen this provider's flow needs (FUT-596). Omitted ⇒ declares
+   * none, which is the capability-default path.
+   *
+   * This is what lets a story render a REAL provider screen without importing
+   * a vendor adapter — impossible here by design (see the header). Because the
+   * id names the shape rather than the vendor, a story's fictional `aurora`
+   * declares `'pix-and-card'` and gets exactly the component a PagBank store
+   * would. A vendor-keyed registry would have needed a story adapter literally
+   * named for the vendor, which this file refuses.
+   */
+  checkoutScreen?: string;
 }
 
 /** The PIX payload a stub provider hands back — a payload, never an image. */
@@ -112,6 +124,9 @@ export function storyAdapter(spec: StoryProvider, seen: ChargeInput[]): PaymentP
       tokenization,
     },
     customerSchema: spec.customerSchema ?? CPF_REQUIRED,
+    // Undefined when the story declares none — the gateway normalizes that to
+    // `null` on the published chain, which is the capability-default path.
+    checkoutScreen: spec.checkoutScreen,
     credentialSchema: [{ key: "secretKey", label: "Secret", secret: true, required: true }],
     async verifyCredentials() {
       return { ok: true };

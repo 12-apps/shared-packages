@@ -115,6 +115,14 @@ export interface BuyerProviderLink {
    * the form cannot be honest about what it needs.
    */
   customerSchema: CustomerSchema;
+  /**
+   * The buyer screen THIS entry needs (FUT-596), or `null` for the capability
+   * default. Per entry for the same reason `customerSchema` is: the walk may
+   * charge on any entry, so a failover to a tail provider whose flow is a
+   * different shape has to move the screen with it. Published for every entry
+   * so the client never infers the chain's screens from the head's.
+   */
+  checkoutScreen: string | null;
 }
 
 /** The client-safe protocol read. Nothing in it is secret. */
