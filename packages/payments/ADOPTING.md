@@ -415,7 +415,7 @@ as opt-in `.live.test.ts`).
 Both packages are workspace-private today; to reuse elsewhere: publish them
 to a private registry (the `exports` maps are ready), or vendor the
 `packages/payments/` folder wholesale — it has no imports from any `apps/*`
-or repo-specific package. Portability rules (enforced by review):
+or repo-specific package. Portability rules:
 
 - backend: no database/ORM/framework in core; adapters speak `fetch`; no
   provider SDKs; Prisma coupling only via duck-typed delegates. A custom
@@ -423,3 +423,40 @@ or repo-specific package. Portability rules (enforced by review):
   the interface requires it and there is no sequential fallback.
 - frontend: imports only TYPES from the backend package; talks only to the
   host's mounted HTTP surface; MUI + React as peers.
+
+### Three of them are a lint gate, not a review item (FUT-562)
+
+This list used to say "enforced by review". It is worth being blunt about what
+that bought: review is why a host storefront drifted into a PagBank-shaped
+checkout, why super-admin grew a 1,165-line fork of the settings page nobody
+noticed, and why a webhook handler was still parsing `body.order_nsu` — one
+vendor's payload field — in code whose commit message said it had removed
+provider names. Every one of those is mechanically detectable.
+
+`pnpm quality:portability` (root `eslint.payments-portability.config.mjs`, CI
+job **Payments Portability**) now errors on:
+
+| rule | what fails |
+| --- | --- |
+| `payments/no-host-imports` | anything under `packages/payments/**` importing a sibling workspace package (`@12-apps/*`, `@repo/*`), the consumer harness, or a relative path that climbs out of the folder |
+| `payments/no-provider-name-literal` | a provider's name in a string literal, template chunk, JSX attribute/text or object key ANYWHERE outside `packages/payments/**` — tests, stories, fixtures and migrations excepted |
+| `payments/frontend-types-only` | `packages/payments/frontend` importing a runtime value (rather than a `type`) from `@12-apps/payments-backend`, including default, namespace, side-effect, re-export and dynamic forms |
+
+The provider names are **derived** from `providerCatalog` in
+`backend/src/providers/catalog.ts` rather than retyped in the config, so the
+fifth adapter is covered the day it is registered; the config throws outright
+if that scrape ever comes back empty. Vendor aliases the registry cannot know
+about (`pagseguro`, PagBank's pre-2019 name, still the spelling in its API
+hosts and webhook paths) are one documented map beside it.
+
+`pnpm quality:portability:selftest` runs first, and is the reason to believe any
+of this. A scoped gate has one silent failure mode — a `files:` glob that stops
+matching keeps the gate exiting 0 while it covers nothing — so each rule ships
+with a fixture that violates it and one that does the same job correctly
+(`scripts/payments-portability-fixtures/`), linted through the real config under
+a pretend path inside the package the rule is scoped to. A violation coming back
+clean fails CI.
+
+The remaining bullets above (no ORM in core, `fetch`-only adapters, atomic
+`setActiveProvider`) are still review items — they are about what the code
+*means*, not what it names.
