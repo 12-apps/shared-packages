@@ -429,7 +429,11 @@ describe('permissions narrow the surface, not just the writes', () => {
     expect(response.status).toBe(403);
   });
 
-  it('hides every saved report whose entity the actor cannot query', async () => {
+  it('refuses the saved list to an actor who can query nothing', async () => {
+    // Not an empty list: an empty list says "you have no saved reports", which
+    // is the wrong thing to tell someone the feature was never granted to. The
+    // catalog and the built-ins answer the same way, so the whole area is
+    // either visible or it is not.
     const { route } = setup();
     const response = await route('GET', '/reports/custom').handle({
       actor: OUTSIDER,
@@ -437,8 +441,7 @@ describe('permissions narrow the surface, not just the writes', () => {
       query: {},
     });
 
-    const body = response.body as { data: { reports: unknown[] } };
-    expect(body.data.reports).toEqual([]);
+    expect(response.status).toBe(403);
   });
 
   it('refuses a dry run of a spec over an entity the actor cannot query', async () => {

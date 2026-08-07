@@ -6,6 +6,7 @@ import {
   foldSpecError,
   forbidden,
   mayQueryAll,
+  mayQueryAnything,
   NOT_FOUND,
   ok,
   runOptions,
@@ -98,6 +99,11 @@ function listRoute(config: ReportBuilderServerConfig, store: SavedReportStore): 
     method: 'GET',
     path: '/reports/custom',
     async handle({ actor }) {
+      // Reaching no entity at all is not "you have no saved reports", it is a
+      // caller the feature was never granted to — the same answer
+      // `/reports/fields` and `/reports/system` give, so the three routes of
+      // one area cannot disagree about whether it is visible.
+      if (!mayQueryAnything(config, actor)) return forbidden();
       const records = await store.list(actor.clientId);
       // Visibility is applied HERE, not in the query: `roles` needs the
       // actor's role ids, and a database-level filter would have to encode
