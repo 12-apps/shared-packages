@@ -1,5 +1,12 @@
-import { CredentialsError, UnprovenProviderError } from '../core/errors';
+import {
+  CredentialsError,
+  IrreversibleChainRemovalError,
+  UnknownProviderError,
+  UnprovenProviderError,
+} from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
+import type { ProviderRegistry } from '../core/registry';
+import { stubResolvedFor } from '../core/stub-mode';
 import type { MerchantRef, PaymentEnvironment, ProviderName } from '../core/types';
 
 import type { PendingVerification, ProviderConfigStore, StoredProviderConfig } from './types';
@@ -28,8 +35,16 @@ export function requireProven(
   adapter: PaymentProviderAdapter,
   config: StoredProviderConfig,
 ): void {
-  if (adapter.capabilities.activationCharge !== true) return;
-  if (!config.chargeVerifiedAt) throw new UnprovenProviderError(config.provider);
+  if (proofMissing(adapter, config)) throw new UnprovenProviderError(config.provider);
+}
+
+/**
+ * Whether the proof gate would refuse to (re-)enable this connection — the
+ * predicate behind {@link requireProven}, named because the answer is also what
+ * decides whether taking this provider OUT of the chain can be undone.
+ */
+function proofMissing(adapter: PaymentProviderAdapter, config: StoredProviderConfig): boolean {
+  return adapter.capabilities.activationCharge === true && !config.chargeVerifiedAt;
 }
 
 /**
@@ -60,8 +75,10 @@ export function requireProven(
  * on the TRANSITION, not on membership: a row enabled before `requireProven`
  * existed has to stay demotable, and demanding proof to re-rank it would pin it
  * exactly where it sits — at the head of the chain, if that is where it sits.
+ * That pass is only safe because the same rewrite cannot quietly drop such a
+ * row and leave it unable to come back — see {@link assertDroppable}.
  */
-export function assertRankable(
+function assertRankable(
   adapter: PaymentProviderAdapter,
   name: ProviderName,
   config: StoredProviderConfig | null,
@@ -75,6 +92,71 @@ export function assertRankable(
     name,
     `Provider ${name} is not enabled; reordering ranks the chain and cannot enable it`,
   );
+}
+
+/**
+ * Why this ONE provider may not be DROPPED from the chain BY A REWRITE — the
+ * other half of `assertRankable`, and the reason that one is safe.
+ *
+ * `assertRankable` lets a grandfathered row (enabled, never proven — the state
+ * the FUT-463 migration deliberately left every pre-existing store in) keep its
+ * place in the chain. That protection lasts exactly as long as the row stays in
+ * the chain. A rewrite that merely OMITS it disables it, and then both doors
+ * back are shut: this endpoint now refuses to re-add it, and the enable switch
+ * refuses it too, since `requireProven` is what it was grandfathered past.
+ * Checkout is offline until the owner completes an activation charge they had
+ * never been asked for.
+ *
+ * The chain rewrite is the one door where that can happen without anybody
+ * deciding it. A list is a bulk statement — an agent enumerating a partial set,
+ * or a client PUTting `[]` — so a provider nobody touched leaves rotation as a
+ * side effect. `setEnabled(…, false)` is a statement ABOUT that provider, made
+ * one at a time, in front of the owner; it stays allowed, and it is the way out
+ * this refusal points at.
+ *
+ * So a rewrite may reorder anything, and may drop anything it could put back.
+ * The one drop it will not make silently is the one it cannot undo.
+ */
+function assertDroppable(adapter: PaymentProviderAdapter, config: StoredProviderConfig): void {
+  if (!config.enabled) return;
+  if (!proofMissing(adapter, config)) return;
+  throw new IrreversibleChainRemovalError(config.provider);
+}
+
+/**
+ * The whole-chain verdict, and the only one `setPriorities` calls: reject a
+ * rewrite we cannot apply BEFORE the atomic write runs.
+ *
+ * The store would refuse an unconfigured name too, but only after the
+ * transaction has begun — and the error it raises names the store, not the
+ * request, which is useless to the admin who just dragged the wrong provider
+ * into the list.
+ *
+ * BOTH ends of the diff are checked, because a whole-chain rewrite says two
+ * things at once: which providers are in it, and — by omission — which are out.
+ * {@link assertRankable} owns the first, {@link assertDroppable} the second, and
+ * neither is sound without the other: the first lets a grandfathered row stay in
+ * the chain, which is worth nothing if the second lets the same call push it out
+ * for good. One read of the merchant's rows answers both.
+ */
+export async function assertReorderOnly(
+  providers: ProviderRegistry,
+  store: ProviderConfigStore,
+  merchant: MerchantRef,
+  ordered: readonly ProviderName[],
+): Promise<void> {
+  const stored = new Map((await store.list(merchant)).map((c) => [c.provider, c]));
+  for (const name of ordered) {
+    if (!providers.has(name)) throw new UnknownProviderError(name);
+    assertRankable(providers.get(name), name, stored.get(name) ?? null);
+  }
+  const keep = new Set<ProviderName>(ordered);
+  for (const [name, config] of stored) {
+    // A row whose adapter the registry no longer knows is already out of the
+    // chain everywhere it is read — there is nothing to strand.
+    if (keep.has(name) || !providers.has(name)) continue;
+    assertDroppable(providers.get(name), config);
+  }
 }
 
 /**
@@ -184,6 +266,6 @@ export function resolvedFrom(config: StoredProviderConfig, allowStubMode: boolea
   return {
     environment,
     fields: config.environments[environment],
-    stub: allowStubMode && config.stub && environment === 'SANDBOX',
+    stub: stubResolvedFor(allowStubMode, config.stub, environment),
   };
 }

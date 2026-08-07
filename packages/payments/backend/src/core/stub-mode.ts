@@ -1,5 +1,5 @@
 import { PaymentsError } from './errors';
-import type { ResolvedCredentials } from './types';
+import type { PaymentEnvironment, ResolvedCredentials } from './types';
 
 /**
  * Whether this deployment may run providers in STUB mode — one definition,
@@ -81,4 +81,30 @@ export function resolveStubMode(env: StubModeEnv): boolean {
  */
 export function stubDeliveryTrusted(credentials: ResolvedCredentials): boolean {
   return credentials.stub === true && credentials.environment === 'SANDBOX';
+}
+
+/**
+ * Does THIS credential read resolve as stubbed? The one place that decides.
+ *
+ * Every path that turns a stored row into credentials an adapter will act on
+ * — the charge/webhook store (`resolvedFrom`), the activation charge
+ * (`credentialsForVerification`) and the "Testar conexão" probe (`runVerify`)
+ * — asks this and nothing else. The rule was written out by hand at each site
+ * instead, and the probe's copy was missing `allowStubMode` entirely: it read
+ * the persisted column on its own, so a left-over `stub=true` row answered
+ * `ok: true` with no request to the acquirer and stamped VERIFIED on a
+ * connection holding no credentials at all.
+ *
+ * `allowStubMode` is the deployment's own answer from {@link resolveStubMode},
+ * and it is REQUIRED here — a row outlives the deployment that wrote it, so
+ * the column says what was true when it was written and never what is true
+ * now. SANDBOX-only for the same reason `stubDeliveryTrusted` is: a production
+ * connection moves real money, and nothing about it may be faked.
+ */
+export function stubResolvedFor(
+  allowStubMode: boolean | undefined,
+  storedStub: boolean | undefined,
+  environment: PaymentEnvironment,
+): boolean {
+  return allowStubMode === true && storedStub === true && environment === 'SANDBOX';
 }

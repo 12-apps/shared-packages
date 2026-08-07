@@ -81,6 +81,28 @@ export class CredentialsError extends PaymentsError {
 }
 
 /**
+ * A credential WRITE was refused before anything was stored (FUT-694).
+ *
+ * Its own class, and 400 rather than `CredentialsError`'s 409, because the two
+ * say opposite things to the admin in front of the form: `CredentialsError`
+ * means the stored connection cannot be used, this means the request was not a
+ * legal credential update and the stored connection was never touched. A 409
+ * sends them to inspect a connection that is fine.
+ *
+ * `field` names the offending key when exactly one is to blame, so a settings
+ * page can point at the input rather than banner the whole form.
+ */
+export class InvalidCredentialsInputError extends PaymentsError {
+  constructor(
+    readonly provider: ProviderName,
+    message: string,
+    readonly field?: string,
+  ) {
+    super('InvalidCredentialsInputError', message);
+  }
+}
+
+/**
  * A PINNED charge named a provider whose declared buyer requirements the
  * charge does not meet (FUT-595) — a required `customerSchema` field is
  * missing or malformed. Thrown BEFORE the adapter is called, so nothing was
@@ -116,6 +138,33 @@ export class UnprovenProviderError extends PaymentsError {
   constructor(readonly provider: ProviderName) {
     super('UnprovenProviderError',
       `Provider ${provider} has not completed a verification charge, so it cannot be enabled`,
+    );
+  }
+}
+
+/**
+ * A whole-chain rewrite would have taken a provider out of rotation that it
+ * could not put back (FUT-693).
+ *
+ * The provider is enabled and has never completed a verification charge — the
+ * state every store enabled before FUT-463 is in, since that migration
+ * deliberately backfilled nothing. Such a row is grandfathered INTO the chain
+ * and cannot re-enter it, so dropping it is one-way: checkout goes offline, and
+ * only an activation charge the owner was never asked for brings it back.
+ *
+ * Its own error, and not {@link UnprovenProviderError}, because it asks for
+ * something else. That one says "prove it before you switch it on"; this one
+ * says "this removal is permanent, so make it deliberately" — and names the
+ * switch that does. Answering both with the same name sends an owner off to
+ * complete a charge when nothing needed enabling at all.
+ */
+export class IrreversibleChainRemovalError extends PaymentsError {
+  constructor(readonly provider: ProviderName) {
+    super('IrreversibleChainRemovalError',
+      `Provider ${provider} is in the failover chain and has never completed a verification ` +
+        `charge, so it could not be put back. Reordering will not remove it — switch ${provider} ` +
+        'off from its own panel if you mean to take it out of rotation, or complete its ' +
+        'activation charge first.',
     );
   }
 }

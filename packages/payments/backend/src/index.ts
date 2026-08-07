@@ -108,6 +108,8 @@ export {
   ChargeNotPersistedError,
   CredentialsError,
   CustomerRequirementsError,
+  InvalidCredentialsInputError,
+  IrreversibleChainRemovalError,
   NoProviderSucceededError,
   PaymentsError,
   ProviderRequestError,
@@ -185,6 +187,16 @@ export {
   type SettingsServiceOptions,
 } from './config/service';
 export { type VerifiedProviderConfig } from './config/verify';
+/**
+ * The credential-write contract (FUT-694), exported so a host that mounts its
+ * own settings route — rather than `createPaymentsHttp` — refuses the same
+ * bodies this package does instead of re-deriving the rules from the schema.
+ */
+export {
+  assertFieldsMatchSchema,
+  assertSaveCredentialsInput,
+  parseSaveCredentialsBody,
+} from './config/credential-input';
 export {
   createOAuthConnectService,
   type OAuthAppCredentialsResolver,
