@@ -8,7 +8,8 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { useTransport } from "./transport-context";
 
-import { restResult, type Result } from "./lib/rest-result";
+import type { Result } from "./lib/rest-result";
+import type { ReportBuilderTransport } from "./transport";
 import type { ReportGrain, ReportRange, ReportRender } from "./reports-api";
 
 /** One catalog field as listed by `GET /reports/fields`. */
@@ -279,13 +280,21 @@ export function useTenantRoles(
   });
 }
 
-/** Dry-run a spec — the engine behind {@link useRunReport}. */
+/**
+ * Dry-run a spec — the engine behind {@link useRunReport}.
+ *
+ * Every write on this surface takes the transport explicitly, for the same
+ * reason the reads go through it: it is the package's ONLY I/O seam, and a
+ * write that reached for `fetch` directly would leave a host that supplied a
+ * transport with its reads intercepted and its writes escaping to the origin.
+ */
 function runReportAction(
+  transport: ReportBuilderTransport,
   tenantSlug: string,
   spec: ReportSpecWire,
   range: ReportRange,
 ): Promise<Result<RunResult>> {
-  return restResult<RunResult>(adminPath(tenantSlug, "/reports/run"), "POST", {
+  return transport.send<RunResult>(adminPath(tenantSlug, "/reports/run"), "POST", {
     spec,
     preset: range,
   });
@@ -307,11 +316,12 @@ export function useRunReport(
   spec: ReportSpecWire | null,
   range: ReportRange,
 ): UseQueryResult<RunResult> {
+  const transport = useTransport();
   return useQuery({
     queryKey: ["admin", tenantSlug, "reports", "run", JSON.stringify(spec), range],
     queryFn: async () => {
       if (!spec) throw new Error("Bloco sem consulta.");
-      const result = await runReportAction(tenantSlug, spec, range);
+      const result = await runReportAction(transport, tenantSlug, spec, range);
       if (!result.ok) throw new Error(result.error);
       return result.data;
     },
@@ -331,18 +341,24 @@ interface SaveReportInput {
 }
 
 export function saveReportAction(
+  transport: ReportBuilderTransport,
   tenantSlug: string,
   input: SaveReportInput,
 ): Promise<Result<SavedReportSummary>> {
-  return restResult<SavedReportSummary>(adminPath(tenantSlug, "/reports/custom"), "POST", input);
+  return transport.send<SavedReportSummary>(
+    adminPath(tenantSlug, "/reports/custom"),
+    "POST",
+    input,
+  );
 }
 
 export function updateReportAction(
+  transport: ReportBuilderTransport,
   tenantSlug: string,
   id: string,
   input: SaveReportInput,
 ): Promise<Result<SavedReportSummary>> {
-  return restResult<SavedReportSummary>(
+  return transport.send<SavedReportSummary>(
     adminPath(tenantSlug, `/reports/custom/${encodeURIComponent(id)}`),
     "PUT",
     input,
@@ -356,11 +372,12 @@ export function updateReportAction(
  * needs no second endpoint (nor a second set of permission rules).
  */
 export function setReportStatusAction(
+  transport: ReportBuilderTransport,
   tenantSlug: string,
   view: SavedReportView,
   status: ReportStatusWire,
 ): Promise<Result<SavedReportSummary>> {
-  return updateReportAction(tenantSlug, view.id, {
+  return updateReportAction(transport, tenantSlug, view.id, {
     name: view.name,
     ...(view.description ? { description: view.description } : {}),
     spec: view.spec,

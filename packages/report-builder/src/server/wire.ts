@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { dashboardSpecSchema, reportDocumentSchema, reportSpecSchema } from '../spec';
 import { SYSTEM_REPORT_KEYS } from './presets';
+import { REPORT_MAX_RANGE_DAYS, REPORT_RANGE_PRESETS } from './range';
 import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
 
 /**
@@ -11,8 +12,13 @@ import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
  * drift from runtime validation).
  */
 
-export const REPORT_RANGE_PRESETS = ['today', '7d', '30d', 'custom'] as const;
-export const REPORT_MAX_RANGE_DAYS = 366;
+/**
+ * Re-exported from `./range`, which owns the period rules now that the
+ * endpoints resolving them live here too. The names stay on this module
+ * because it is the wire contract every host imports.
+ */
+export { REPORT_MAX_RANGE_DAYS, REPORT_RANGE_PRESETS };
+
 export const REPORT_GRAINS = ['day', 'week', 'month'] as const;
 
 export const reportsParams = z.object({
@@ -210,6 +216,8 @@ export const dashboardBlockRenderSchema = z.discriminatedUnion('status', [
     id: z.string(),
     title: z.string().optional(),
     span: z.number().int(),
+    /** What the block asks for, in Portuguese — computed server-side. */
+    sentence: z.string().optional(),
     status: z.literal('ok'),
     render: reportRenderSchema,
   }),
@@ -217,6 +225,8 @@ export const dashboardBlockRenderSchema = z.discriminatedUnion('status', [
     id: z.string(),
     title: z.string().optional(),
     span: z.number().int(),
+    /** Present on a FAILED block too — that is when a reader most needs it. */
+    sentence: z.string().optional(),
     status: z.literal('error'),
     error: z.string(),
   }),
