@@ -94,6 +94,13 @@ const CASES = [
   },
   {
     rule: RULE3,
+    fixture: "violates-rule3-relative-backend.ts",
+    as: "packages/payments/frontend/src/__portability_selftest__.ts",
+    atLeast: 2,
+    why: "a relative climb into the sibling backend never spells the package name",
+  },
+  {
+    rule: RULE3,
     fixture: "clean-rule3-frontend-runtime.ts",
     as: "packages/payments/frontend/src/__portability_selftest__.ts",
     atLeast: 0,

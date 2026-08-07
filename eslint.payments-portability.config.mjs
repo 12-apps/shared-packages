@@ -58,7 +58,10 @@ const SOURCE_GLOB = "**/*.{js,mjs,cjs,jsx,ts,tsx}";
  *   ("Conectar conta PagBank") stays legal: the component itself takes title
  *   and description as props and knows nothing about any vendor — only the
  *   story's sample text names one.
- * - migrations — SQL and its wrappers describe rows that already exist.
+ * - migrations and `*.prisma` — SQL and schema describe rows that already
+ *   exist. Deliberately NOT `**​/prisma/**`: that would excuse ordinary
+ *   TypeScript living under a `prisma/` folder, which is precisely where a
+ *   provider-shaped store would be written.
  * - `harness/frontend/src/pages/payments-provider-settings.tsx` and
  *   `harness/**​/registry.ts` — the consumer harness's whole job is mounting
  *   every published adapter in a browser and proving it renders, so enumerating
@@ -69,7 +72,11 @@ const SOURCE_GLOB = "**/*.{js,mjs,cjs,jsx,ts,tsx}";
 const PROVIDER_NAME_EXEMPT_GLOBS = [
   ...TEST_GLOBS,
   "**/migrations/**",
-  "**/prisma/**",
+  // Schema files and the SQL under them describe rows that already exist. NOT
+  // `**/prisma/**`, which was the first shape of this entry: that excuses any
+  // TypeScript anyone puts in a folder called `prisma/`, which is exactly where
+  // a provider-shaped store would go.
+  "**/*.prisma",
   "harness/frontend/src/pages/payments-provider-settings.tsx",
   "harness/*/src/pages/registry.ts",
   // The gate itself. Its `VENDOR_ALIASES` map has to spell `pagseguro` for the

@@ -256,9 +256,25 @@ const noProviderNameLiteral = {
 
 const BACKEND_PKG = "@12-apps/payments-backend";
 
-const isBackendSpecifier = (specifier) =>
-  typeof specifier === "string" &&
-  (specifier === BACKEND_PKG || specifier.startsWith(`${BACKEND_PKG}/`));
+/**
+ * A backend import, by EITHER name it can arrive under.
+ *
+ * The bare specifier is the obvious one. The relative one is the hole: inside
+ * this repo `packages/payments/frontend` and `.../backend` are siblings on
+ * disk, so `../../backend/src/core/registry` pulls the same server code — and
+ * the same `node:crypto` — into a browser bundle while never spelling the
+ * package name. Judging the RESOLVED path rather than the string is what makes
+ * the rule about the harm instead of about the spelling.
+ */
+const BACKEND_DIR = `${sep}payments${sep}backend${sep}`;
+
+const isBackendSpecifier = (specifier, fromFile) => {
+  if (typeof specifier !== "string") return false;
+  if (specifier === BACKEND_PKG || specifier.startsWith(`${BACKEND_PKG}/`)) return true;
+  if (!specifier.startsWith(".")) return false;
+  const resolved = resolve(dirname(fromFile ?? ""), specifier);
+  return `${resolved}${sep}`.includes(BACKEND_DIR);
+};
 
 const RUNTIME_MESSAGE =
   `packages/payments/frontend may import only TYPES from ${BACKEND_PKG} (ADOPTING.md §6). ` +
@@ -276,7 +292,7 @@ const frontendTypesOnly = {
   create(context) {
     return {
       ImportDeclaration(node) {
-        if (!isBackendSpecifier(node.source.value)) return;
+        if (!isBackendSpecifier(node.source.value, context.filename)) return;
         if (node.importKind === "type") return;
         // A bare `import '@12-apps/payments-backend'` has no specifiers at all
         // and exists purely for its side effects — the most runtime thing there
@@ -295,7 +311,7 @@ const frontendTypesOnly = {
         }
       },
       ExportNamedDeclaration(node) {
-        if (!node.source || !isBackendSpecifier(node.source.value)) return;
+        if (!node.source || !isBackendSpecifier(node.source.value, context.filename)) return;
         if (node.exportKind === "type") return;
         for (const specifier of node.specifiers) {
           if (specifier.exportKind !== "type") {
@@ -304,12 +320,12 @@ const frontendTypesOnly = {
         }
       },
       ExportAllDeclaration(node) {
-        if (!node.source || !isBackendSpecifier(node.source.value)) return;
+        if (!node.source || !isBackendSpecifier(node.source.value, context.filename)) return;
         if (node.exportKind === "type") return;
         context.report({ node, message: RUNTIME_MESSAGE });
       },
       ImportExpression(node) {
-        if (node.source.type === "Literal" && isBackendSpecifier(node.source.value)) {
+        if (node.source.type === "Literal" && isBackendSpecifier(node.source.value, context.filename)) {
           context.report({ node, message: RUNTIME_MESSAGE });
         }
       },

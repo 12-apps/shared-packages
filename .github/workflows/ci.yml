@@ -183,16 +183,15 @@ jobs:
         run: |
           set -o pipefail
           pnpm install --frozen-lockfile 2>&1 | tee install.log
-      - name: Prove the portability rules still fire
-        shell: bash
-        run: |
-          set -o pipefail
-          pnpm quality:portability:selftest 2>&1 | tee portability-selftest.log
+      # ONE script, not its two halves rewritten here. `quality:portability` is
+      # `quality:portability:selftest && eslint --config …`; spelling those out
+      # in the workflow is how CI and the command a developer runs drift — add a
+      # third step to the script and only the local run would get it.
       - name: Payments portability gate
         shell: bash
         run: |
           set -o pipefail
-          pnpm exec eslint --config eslint.payments-portability.config.mjs . 2>&1 | tee portability.log
+          pnpm quality:portability 2>&1 | tee portability.log
 
   # The only gate that sees what a CONSUMER sees. Every other job above runs
   # inside the pnpm workspace, where a sibling import resolves whether or not the
