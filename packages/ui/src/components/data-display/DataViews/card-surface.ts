@@ -150,7 +150,7 @@ export function isActionable(state: CardState | undefined): boolean {
  * draw. Ghost is "a surface, quietly"; text is "no surface at all", which is
  * what a host wants when it is drawing the container itself.
  */
-function variantSx(variant: CardSurfaceVariant): CardSx {
+function variantSx(variant: CardSurfaceVariant, theme: Theme): CardSx {
   if (variant === "ghost") {
     return {
       border: 0,
@@ -162,10 +162,26 @@ function variantSx(variant: CardSurfaceVariant): CardSx {
     return { border: 0, backgroundColor: "transparent", boxShadow: "none" };
   }
   if (variant === "glass") {
+    // THEME-AWARE, and it keeps its edges.
+    //
+    // This was a hardcoded `rgba(255,255,255,·)` fill with a near-white border,
+    // which had two problems. On a dark palette a 55%-white pane is not frosted
+    // glass, it is a pale rectangle. And on a light one BOTH the fill and the
+    // border land on white and vanish, so `glass` rendered as `text` — the same
+    // nothing, reached by a different name.
+    //
+    // The blur is what makes it glass, and a blur is only visible over
+    // something. So the pane keeps a real hairline and a shallow shadow: over a
+    // plain surface it still reads as a raised pane rather than as absence, and
+    // over an image or a gradient the blur does the rest.
     return {
-      backgroundColor: "rgba(255,255,255,0.55)",
+      backgroundColor: alpha(theme.palette.background.paper, 0.55),
       backdropFilter: "blur(8px)",
-      borderColor: "rgba(255,255,255,0.35)",
+      // `divider` as-is. NOT `alpha(divider, …)`: MUI's `alpha` REPLACES the
+      // channel rather than scaling it, and `divider` is already a 12% black —
+      // so asking for 80% of it produced an 80% black slab of a border.
+      borderColor: theme.palette.divider,
+      boxShadow: `0 1px 3px ${alpha(theme.palette.common.black, 0.1)}`,
     };
   }
   return {};
@@ -271,6 +287,35 @@ function emphasisSx(emphasis: CardEmphasis, main: string, shape: CardShape): Car
  * The shared half of a card's styling. Each component adds its own geometry —
  * a tile's aspect ratio, a row's rails.
  */
+/**
+ * WHAT THE TWO NON-DEFAULT STATES LOOK LIKE — and why they cannot look alike.
+ *
+ * Both were `opacity: 0.6` and nothing else, so a record the business CANCELLED
+ * and a row this user merely cannot touch were pixel-identical. The type has
+ * always drawn the distinction (`CardState`); only the styling had not, which
+ * made `cancelled` a comment rather than a state.
+ *
+ * `cancelled` is a VOIDED record: still there, still worth reading, no longer
+ * counting. The figures get struck through, because a dimmed `R$ 1.250,00`
+ * still reads as money owed and a struck one cannot.
+ *
+ * `disabled` is INERT: nothing to read into, nothing to do with. It goes
+ * greyscale — which also drains the status chip's colour, the one thing on the
+ * row still shouting for attention — and says so on hover.
+ */
+function stateSx(state: CardState): CardSx {
+  if (state === "cancelled") {
+    return {
+      opacity: 0.65,
+      '& [data-slot="value"], & [data-slot="caption"]': { textDecoration: "line-through" },
+    };
+  }
+  if (state === "disabled") {
+    return { opacity: 0.45, filter: "grayscale(1)", cursor: "not-allowed" };
+  }
+  return { opacity: 1 };
+}
+
 export function cardSurfaceStyles(
   props: CardSurfaceProps & { selectable: boolean; shape: CardShape },
   theme: Theme,
@@ -283,8 +328,8 @@ export function cardSurfaceStyles(
   const showSelected = selectable && selected;
   return {
     transition: "border-color 120ms, box-shadow 120ms, background-color 120ms",
-    opacity: state === "default" ? 1 : 0.6,
-    ...variantSx(variant),
+    ...stateSx(state),
+    ...variantSx(variant, theme),
     ...(showSelected
       ? {
           borderColor: `${color}.main`,
