@@ -324,7 +324,15 @@ export function createSettingsService(
     async verify(merchant, provider, environment) {
       const config = await load(merchant, provider);
       const target = environment ?? config.environment;
-      return runVerify(providers.get(provider), store, merchant, config, target, toMasked);
+      return runVerify(
+        providers.get(provider),
+        store,
+        merchant,
+        config,
+        target,
+        allowStubMode,
+        toMasked,
+      );
     },
   };
 }
