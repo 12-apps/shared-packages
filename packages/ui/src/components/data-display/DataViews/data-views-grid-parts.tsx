@@ -14,7 +14,7 @@ import {
 } from "./data-views-layout-context";
 import { FilterDialog, GridFilterPanel } from "./data-views-filter-panel";
 import { GridMain } from "./data-views-grid-bodies";
-import { InlineFilterChips, InlineFilterControls } from "./data-views-inline-bar";
+import { InlineFilterControls } from "./data-views-inline-bar";
 import { toOverflowFields, useFilterOverflow, type OverflowSplit } from "./data-views-overflow";
 import { ShellToolbar } from "./data-views-shell-toolbar";
 import type { DisplayPanelView } from "./data-views-display-panel";
@@ -22,7 +22,8 @@ import type { DataViewExport } from "./data-views-export";
 import { DataViewsEmpty } from "./data-views-empty";
 import { DataViewsPagination } from "./data-views-pagination";
 import type { BoardConfig } from "./DataViewsBoard";
-import { DataViewsScopeTabs, type ScopeConfig } from "./data-views-scopes";
+import { type ScopeConfig } from "./data-views-scopes";
+import { ScopeTabsSlot } from "./data-views-scope-tabs";
 import { togglePillValues } from "./data-views-grid-helpers";
 import type {
   DataViewCardSelection,
@@ -233,8 +234,13 @@ interface GridShellProps<T extends Record<string, unknown>> {
   board?: BoardConfig<T>;
   /** Opt-in "Lista" layout: one full-width, entity-rendered row per record. */
   renderListRow?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
-  /** The page-level partition rendered as tabs above the toolbar. */
+  /** The page-level partition rendered as tabs under the toolbar. */
   scopes?: ScopeConfig[];
+  /**
+   * The row field the scopes partition by. Compared against the board's
+   * `groupBy` so the two are not shown as the same partition twice.
+   */
+  scopeFieldId?: string;
   /** Per-sort-field value kind, so directions read in the column's own terms. */
   sortKinds?: Record<string, string>;
   /** The saved-view chrome bracketing the Exibir panel. */
@@ -289,14 +295,6 @@ function ShellStack<T extends Record<string, unknown>>({
     <TableFilter open={c.filterOpen} onOpenChange={c.setFilterOpen} hasActiveFilters={c.activeFilterCount > 0}>
       <Stack spacing={0} data-testid={dataTestId ? `${dataTestId}-container` : undefined}>
         <GridHeaderRow title={props.title} headerActions={props.headerActions} testIdPrefix={testIdPrefix} />
-        {/* Renders nothing (and reserves nothing) for an empty scope list. */}
-        <DataViewsScopeTabs
-          scopes={scopes}
-          value={c.scope}
-          onChange={c.setScope}
-          counts={c.scopeCounts}
-          testIdPrefix={testIdPrefix}
-        />
         <ShellToolbar
           c={c}
           rows={props.rows}
@@ -308,6 +306,7 @@ function ShellStack<T extends Record<string, unknown>>({
               <InlineFilterControls
                 {...filterProps}
                 split={split}
+                activeFilterCount={c.activeFilterCount}
                 onControlOpenChange={onControlOpenChange}
               />
             ) : undefined
@@ -318,11 +317,18 @@ function ShellStack<T extends Record<string, unknown>>({
           bulkActions={props.bulkActions}
           toolbarRightSlot={props.toolbarRightSlot}
           compactControls={showInline && split.compactControls}
+          counterHidden={showInline && split.counterHidden}
           showInline={showInline}
         />
-        {/* Only the applied-filter chips live under the toolbar now — the
-            controls themselves ride on the toolbar line above. */}
-        {inlineVisible && <InlineFilterChips {...filterProps} />}
+        <ScopeTabsSlot
+          scopes={scopes}
+          scopeFieldId={props.scopeFieldId}
+          board={props.board}
+          value={c.scope}
+          onChange={c.setScope}
+          counts={c.scopeCounts}
+          testIdPrefix={testIdPrefix}
+        />
         <TableFilter.Layout>
           <TableFilter.Main>
             <GridMain

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { Box } from "../../../mui/Box";
 
 /**
- * SCOPES — a page-level partition rendered as a strip of tabs above the toolbar.
+ * SCOPES — a page-level partition rendered as a strip of tabs under the toolbar.
  *
  * A scope is not a filter. Filters NARROW within the current partition and are
  * multi-select by design; a scope PARTITIONS and is exclusive. The distinction
@@ -302,7 +302,7 @@ const STRIP_SX = {
 } as const;
 
 /**
- * The scope strip: a horizontally scrolling tab list above the toolbar.
+ * The scope strip: a horizontally scrolling tab list under the toolbar.
  *
  * It SCROLLS rather than collapsing into a select on a narrow screen, which is
  * the opposite of what the filter pills do — and deliberately. The counts are

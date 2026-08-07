@@ -19,6 +19,8 @@ import React, { useState } from 'react';
 import { TableFilter } from '../../layout/TableFilter';
 import { DayBoundInput } from './data-views-day-input';
 import { NumberBoundInput } from './data-views-number-input';
+import { RangePresets } from './data-views-preset-chips';
+import { presetsFor } from './data-views-range-presets';
 import {
   isRangeInverted,
   isRangeSet,
@@ -90,6 +92,11 @@ export function RangeBounds<T extends Record<string, unknown>>({
   const inverted = isRangeInverted(value);
   return (
     <Box data-testid={`${testId}-panel`}>
+      {/* Above the inputs, not below: the presets are the answer for most
+          merchants, and the two date pickers are the escape hatch. */}
+      <Box sx={{ '&:not(:empty)': { mb: 1.5 } }}>
+        <RangePresets presets={presetsFor(field)} value={value} onChange={onChange} testId={testId} />
+      </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <BoundField
           field={field}
@@ -200,13 +207,16 @@ function RangeTrigger<T extends Record<string, unknown>>({
       aria-haspopup="dialog"
       aria-expanded={open}
       onClick={(event) => onOpen(event.currentTarget)}
-      endIcon={
+      // ✕ FIRST, chevron LAST — the same shape as every other pill. It used to
+      // replace the chevron at the end, so a range pill and a multi-select pill
+      // put the clear in different places, and an applied range lost the
+      // affordance that says it opens.
+      startIcon={
         active ? (
           <ClearAffordance label={field.label} onClear={() => onChange({})} testId={`${testId}-clear-inline`} />
-        ) : (
-          <ChevronDownIcon sx={{ fontSize: 16 }} />
-        )
+        ) : undefined
       }
+      endIcon={<ChevronDownIcon sx={{ fontSize: 16 }} />}
       sx={{
         borderRadius: 999,
         height: 34,
@@ -327,12 +337,18 @@ export function PanelRangeField<T extends Record<string, unknown>>({
     );
   }
   return (
-    <TableFilter.RangeField
-      label={field.label}
-      unit={field.unit}
-      value={numericRange(value)}
-      onChange={(range) => onChange(range)}
-      testId={testId}
-    />
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      <TableFilter.RangeField
+        label={field.label}
+        unit={field.unit}
+        value={numericRange(value)}
+        onChange={(range) => onChange(range)}
+        testId={testId}
+      />
+      {/* Below the numeric control here, unlike the pill's popover: this one
+          renders its own label, and chips above it would separate the label
+          from the field it names. */}
+      <RangePresets presets={presetsFor(field)} value={value} onChange={onChange} testId={testId} />
+    </Box>
   );
 }
