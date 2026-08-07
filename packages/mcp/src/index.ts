@@ -48,6 +48,17 @@ export {
   serializeManifest,
   type BuildManifestOptions,
 } from "./server/manifest";
+// The advertised-version guard: a server whose `serverInfo.version` never moves
+// gives a connected host no reason to re-read `tools/list`, so a shipped tool
+// stays invisible to it. These let a consumer's generator make that bump a build
+// error instead of a comment nobody reads — see `server/surface-lock.ts`.
+export {
+  serializeSurfaceLock,
+  surfaceDigest,
+  surfaceLockProblem,
+  type SurfaceLock,
+  type SurfaceLockCheck,
+} from "./server/surface-lock";
 // OAuth discovery — both halves of the MCP auth story kept together so the
 // future `@12-apps/mcp` extraction inherits them as one surface:
 // RFC 9728 protected-resource metadata + RFC 8414 authorization-server metadata.
