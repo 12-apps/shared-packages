@@ -36,13 +36,28 @@ Sentry project each app reports to, and how the upload token reaches
 | `@12-apps/observability-frontend` | init, the pre-init buffer, context tags, `beforeSend`, `reportRouteCrash` / `reportWarning` | `@sentry/react` |
 | `@12-apps/observability-frontend/react` | `createRouteErrorBoundary`, `createObservabilityPage` | + React, `react-router-dom` |
 | `@12-apps/observability-frontend/self-check` | the self-check page itself | + `@12-apps/ui` |
-| `@12-apps/observability-frontend/vite` | the source-map upload plugin | `@sentry/vite-plugin` (build only) |
+| `@12-apps/observability-frontend/vite` | the two build plugins: source-map upload, and emitting the worker reporter | `@sentry/vite-plugin` (build only) |
+| `@12-apps/observability-frontend/service-worker` | the worker reporter, as a classic script | nothing — self-contained IIFE |
 
 That split is not cosmetic. The root entry is framework-free, so a worker
 or a non-React host can report without React arriving through a barrel it did
 not ask for. And the page is reachable only through its own subpath or the
 dynamic `import()` inside the route factory — naming it in the `react` barrel
 would pull a diagnostic nobody opens into every app's entry chunk.
+
+**Three of these ship in different formats, and none of it is preference.**
+What LOADS the code decides what the code must be:
+
+| entry | loaded by | so it ships as |
+|---|---|---|
+| `.` / `/react` / `/self-check` | the consumer's bundler | TypeScript source |
+| `/vite` | **Node** (Vite bundles a config but leaves bare specifiers external) | compiled ESM |
+| `/service-worker` | **`importScripts()`** | a classic script (IIFE) |
+
+Node refuses to strip types below `node_modules`, and `importScripts` cannot
+load an ES module at all — so both of those would fail in every consumer, on
+the first build after publishing, while working perfectly as a workspace
+sibling where pnpm's symlink puts the realpath outside `node_modules`.
 
 ## Wiring an app
 
@@ -139,6 +154,61 @@ plugins: [react(), sentrySourcemaps({ project: "my-frontend" })],
 Falsy — so Vite skips it — unless `SENTRY_AUTH_TOKEN` and `SENTRY_ORG` are both
 set, which keeps local and PR builds working with no secret. It uploads and then
 deletes the `.map` files, so the `dist` that reaches the web server has none.
+
+### 5. Report from the service worker
+
+A service worker is a separate global scope: the page's `window.onerror`, its
+`unhandledrejection` handler and its route boundary see **nothing** a worker
+throws. An app can have all of the above wired up and still be blind to the
+code that decides whether a deploy bricks an installed PWA.
+
+Two lines in the worker, one plugin in the build:
+
+```ts
+// vite.config.ts
+import { observabilityServiceWorkerAsset } from "@12-apps/observability-frontend/vite";
+
+plugins: [react(), observabilityServiceWorkerAsset()],
+```
+
+```js
+// public/sw.js — the first two lines
+importScripts("/observability-sw.js");
+observability.installWorkerReporter({ app: "storefront" });
+```
+
+The plugin emits the reporter into `dist` for production and serves the same
+path from `node_modules` in development — a worker that 404s on its first line
+is a worker nobody can debug, and `public/` is copied verbatim by the build, so
+writing it there would mean committing a build artifact.
+
+That wires two global handlers: a throw in a handler arrives as `error`, and a
+rejected promise handed to `waitUntil`/`respondWith` arrives as
+`unhandledrejection`. Failures a worker swallows ON PURPOSE reach neither — the
+`catch(() => undefined)` that stops a failed install leaving a page with no
+worker at all — so report those by hand where they matter:
+
+```js
+caches.open(SHELL_CACHE)
+  .then((cache) => cache.add(SHELL_URL))
+  .catch((error) => observability.reportWorkerError(error, { handler: "install" }));
+```
+
+Every event is tagged `source: service-worker`, because a worker failure and a
+render crash want different people looking.
+
+**What it will not report:** a failed request. Offline is a worker's normal
+weather and every caching strategy is built around `fetch` rejecting, so
+`Load failed` / `Failed to fetch` / `NetworkError…` are dropped before any I/O.
+There is also a cap of 5 events per worker INSTANCE — a handler failing in a
+loop fires hundreds of times a second — and the slot is claimed *before* the
+first `await`, since a counter incremented after the send would let every call
+in a tick past the check and cap nothing at all.
+
+**Stacks arrive as text, not frames.** A worker script is served verbatim and
+unminified, so `sw.js:118` in the raw stack is already the answer; hand-writing
+a per-browser stack parser inside the code that reports failures is a second
+surface to get wrong.
 
 ## The self-check page
 
