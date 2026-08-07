@@ -287,15 +287,19 @@ describe('createSettingsService', () => {
     expect(JSON.stringify(masked)).not.toContain('sk_live_abcd1234');
   });
 
+  // The third key used to be `webhookSecret`, which Stone's schema does not
+  // declare — it is Stripe's. Nothing noticed, because every key was written
+  // through; now that only declared keys are, the case has to be stated in
+  // Stone's own vocabulary (`webhookPassword`) to still be about Stone.
   it('preserves on undefined, clears on empty, replaces on value', async () => {
     const { settings, store } = setup();
     await settings.saveCredentials(TENANT, 'stone', {
       environment: 'SANDBOX',
-      fields: { secretKey: 'sk_1', publicKey: 'pk_1', webhookSecret: 'wh_1' },
+      fields: { secretKey: 'sk_1', publicKey: 'pk_1', webhookPassword: 'wh_1' },
     });
     await settings.saveCredentials(TENANT, 'stone', {
       environment: 'SANDBOX',
-      fields: { secretKey: undefined, publicKey: 'pk_2', webhookSecret: '' },
+      fields: { secretKey: undefined, publicKey: 'pk_2', webhookPassword: '' },
     });
     const stored = await store.get(TENANT, 'stone');
     expect(stored?.environments.SANDBOX).toEqual({ secretKey: 'sk_1', publicKey: 'pk_2' });

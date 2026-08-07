@@ -21,6 +21,7 @@ import type {
   StoredProviderConfig,
 } from './types';
 
+import { assertSaveCredentialsInput } from './credential-input';
 import {
   applyProof,
   assertReorderOnly,
@@ -273,9 +274,19 @@ export function createSettingsService(
     getSettings: (merchant) => buildSettingsView(providers, store, merchant),
 
     async saveCredentials(merchant, provider, input) {
-      const config = applySaveCredentials(await load(merchant, provider), input, allowStubMode);
+      const adapter = providers.get(provider);
+      // Before the load, so a malformed body cannot even cost a store read —
+      // and before `applySaveCredentials`, which INVALIDATES on any change it
+      // is handed: a write it should never have accepted would take the
+      // connection to UNVERIFIED and out of the chain on its way to failing.
+      //
+      // What gets WRITTEN is what came back from the check, not what came in:
+      // the values are normalized there (trimmed), and storing the raw copy
+      // would put on record a value nothing ever validated.
+      const checked = assertSaveCredentialsInput(adapter, input);
+      const config = applySaveCredentials(await load(merchant, provider), checked, allowStubMode);
       await store.save(merchant, config);
-      return toMasked(providers.get(provider), config);
+      return toMasked(adapter, config);
     },
 
     async setEnabled(merchant, provider, enabled) {
@@ -311,7 +322,15 @@ export function createSettingsService(
     async verify(merchant, provider, environment) {
       const config = await load(merchant, provider);
       const target = environment ?? config.environment;
-      return runVerify(providers.get(provider), store, merchant, config, target, toMasked);
+      return runVerify(
+        providers.get(provider),
+        store,
+        merchant,
+        config,
+        target,
+        allowStubMode,
+        toMasked,
+      );
     },
   };
 }
