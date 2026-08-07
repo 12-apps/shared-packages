@@ -1,0 +1,25 @@
+name: Commit messages
+
+# Conventional-commit gate. The contract is in CONTRIBUTING.md; the rule set and
+# the runner live in 12-apps/ci so this repo needs no devDependency or config.
+#
+# It is not cosmetic here. `.releaserc.json` runs @semantic-release/commit-analyzer,
+# which derives every package's version bump from the commit subjects that land on
+# main — so a malformed subject either mis-versions a release or publishes nothing
+# at all, silently.
+#
+# `edited` is load-bearing: this repo squash-merges with COMMIT_OR_PR_TITLE, so a
+# multi-commit PR lands its TITLE. A title fixed after the first run has to
+# re-trigger the check, or the fix never turns it green.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  commitlint:
+    uses: 12-apps/ci/.github/workflows/commitlint.yml@v1

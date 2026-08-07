@@ -200,9 +200,10 @@ they cannot function without the app's schema or its screens.
 4. **`publishConfig.access` is `"restricted"` on every package**, and `ci.yml`
    publishes with `npm publish --access restricted` — see §1, this is the second
    cost line the same decision removes.
-5. **No `README` worth the name** (one line), no `CONTRIBUTING.md`,
-   `SECURITY.md`, or issue templates. A public repo without them collects
-   low-quality issues and has no channel for vulnerability reports.
+5. **No `README` worth the name** (one line), no `SECURITY.md`, or issue
+   templates. A public repo without them collects low-quality issues and has no
+   channel for vulnerability reports. *(`CONTRIBUTING.md` — FUT-750 — closed the
+   commit-convention half of this; the rest stands.)*
 
 ### Leaks that are real but low-harm
 
