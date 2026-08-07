@@ -3,6 +3,7 @@ import {
   ChargeDeclinedError,
   ChargeNotPersistedError,
   CredentialsError,
+  IrreversibleChainRemovalError,
   NoProviderSucceededError,
   PaymentsError,
   ProviderRequestError,
@@ -37,16 +38,18 @@ export function json(body: unknown, status = 200): Response {
  *
  * For the two charge errors that is about money — retrying a charge whose
  * outcome we could not determine, or one that exists at the provider with only
- * our copy missing, is exactly what bills the buyer twice. For the two
+ * our copy missing, is exactly what bills the buyer twice. For the three
  * configuration errors it is about the answer being actionable: a provider that
- * is not connected, or that has not completed its verification charge, stays
- * refused until the owner does something about it, and a 500 said the opposite —
- * "the server broke, try again" — burying the one instruction that resolves it.
+ * is not connected, that has not completed its verification charge, or that
+ * cannot be dropped from the chain without stranding it there, stays refused
+ * until the owner does something about it, and a 500 said the opposite — "the
+ * server broke, try again" — burying the one instruction that resolves it.
  */
 const REFUSALS = [
   AmbiguousChargeError,
   ChargeNotPersistedError,
   CredentialsError,
+  IrreversibleChainRemovalError,
   UnprovenProviderError,
 ];
 
