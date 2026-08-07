@@ -98,6 +98,13 @@
       "ignoreDependencies": [
         "@storybook/builder-vite"
       ]
+    },
+    "packages/observability": {
+      "entry": [
+        "src/index.ts",
+        "src/frontend/*.{ts,tsx}",
+        "src/vite/*.ts"
+      ]
     }
   },
   "vitest": {

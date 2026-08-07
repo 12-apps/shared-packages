@@ -35,6 +35,7 @@ env:
     packages/stock-domain
     packages/payments/frontend
     packages/ui
+    packages/observability
     packages/onboarding
     packages/product-research-ui
     packages/report-builder
