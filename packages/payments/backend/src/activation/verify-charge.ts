@@ -1,3 +1,4 @@
+import { stubResolvedFor } from '../core/stub-mode';
 import type { MerchantRef, ResolvedCredentials } from '../core/types';
 import type { ActivationContext } from './context';
 import { failureFor, type VerifyChargeResult } from './failure';
@@ -66,7 +67,7 @@ export async function credentialsForVerification(
     // exists to prevent. So the row's flag counts only on a deployment that
     // said yes to stub mode (`ctx.allowStubMode`, default off) and only for
     // SANDBOX — a stale row on a production deploy proves nothing.
-    stub: ctx.allowStubMode === true && stored.stub === true && environment === 'SANDBOX',
+    stub: stubResolvedFor(ctx.allowStubMode, stored.stub, environment),
   };
 }
 
