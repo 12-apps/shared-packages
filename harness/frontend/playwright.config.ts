@@ -1,21 +1,42 @@
 import { defineConfig } from '@playwright/test';
+import { paymentsFeatures, paymentsFeaturesRoot, paymentsSteps } from '@12-apps/payments-e2e';
 import { defineBddConfig } from 'playwright-bdd';
 
 /**
- * Where the buyer journeys compile to (FUT-743).
+ * Where the buyer journeys compile to (FUT-743), and where they come FROM
+ * (FUT-561).
  *
  * The `.feature` files are the shopper's own words; `bddgen` COMPILES them into
  * ordinary Playwright specs, which is why they inherit everything below with
  * nothing special wired up — same browser, same web server, same reporters.
  * Generation is not optional and not manual: `npm test` runs `bddgen` first, so
- * a feature in this repo either executes or the run is red.
+ * a feature either executes or the run is red.
+ *
+ * The journeys themselves SHIP WITH THE LIBRARY. This app runs them by pointing
+ * at the package's own globs and implementing `PaymentsWorld` in
+ * `tests/e2e/steps/payments-world.ts` — no feature and no step file is copied
+ * here, so a scenario added upstream runs on the next version bump instead of
+ * being quietly missed. That is the integration a real consumer performs, which
+ * makes this app a test OF the contract rather than a place the contract is
+ * re-stated.
+ *
+ * Both package globs are RESOLVED by the package rather than written as
+ * `node_modules/...` paths: pnpm's store is nested, this app installs from
+ * tarballs, and a glob that matches nothing fails SILENTLY — bddgen compiles
+ * what it found, finds nothing, and the run is green with zero journeys.
  *
  * `.features-gen` is generated and gitignored. Committing it would let a
  * scenario and its compiled spec drift.
  */
 const journeys = defineBddConfig({
-  features: 'tests/e2e/features/**/*.feature',
-  steps: 'tests/e2e/steps/**/*.ts',
+  features: [paymentsFeatures],
+  // Without this the compiled specs mirror the package's node_modules path and
+  // Playwright's default testIgnore drops every one of them — bddgen reports
+  // seven features compiled and the journeys project collects nothing, green.
+  featuresRoot: paymentsFeaturesRoot,
+  // This app's own steps glob stays: it is where `definePaymentsWorld` is
+  // called, and playwright-bdd imports every step file before the first Given.
+  steps: [paymentsSteps, 'tests/e2e/steps/**/*.ts'],
   outputDir: '.features-gen',
 });
 

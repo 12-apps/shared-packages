@@ -106,6 +106,19 @@
         "src/react/*.{ts,tsx}",
         "src/vite/*.ts"
       ]
+    },
+    "packages/payments/e2e": {
+      "entry": [
+        "src/index.ts",
+        "// Step definitions are reached by playwright-bdd's `steps` GLOB, never",
+        "// by an import \u2014 the same shape as the stories entry above. A host",
+        "// points at dist/steps/**/*.js and bddgen loads each file for its",
+        "// registration side effect.",
+        "src/steps/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "playwright-bdd"
+      ]
     }
   },
   "vitest": {

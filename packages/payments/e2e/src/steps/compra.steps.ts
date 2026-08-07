@@ -1,8 +1,10 @@
 import { expect } from '@playwright/test';
 
-import { DECLINE_PAN, fillCard, payCard, reachPayment } from '../helpers/checkout';
+import { DECLINE_PAN, fillCard, payCard, reachPayment } from '../helpers/checkout.js';
 
-import { Then, When } from './fixtures';
+import { paymentsWorld } from '../world.js';
+
+import { Then, When } from './fixtures.js';
 
 /**
  * WHAT THE BUYER DOES, and what she is owed for it (FUT-743).
@@ -45,18 +47,19 @@ When('ela paga com um cartão recusado', async ({ page }) => {
 });
 
 When('a loja gera o pagamento hospedado', async ({ page }) => {
-  const panel = page.getByTestId('panel-hosted-handoff');
-  await panel.getByTestId('raise-hosted-payable').click();
-  // Wait for the interstitial, not just for the click. Parking the order is an
-  // effect of that screen mounting, and a scenario that navigates away before
-  // it has mounted is testing a trip whose outbound leg never happened.
-  await expect(panel.getByTestId('checkout-hosted-handoff')).toBeVisible();
+  // The host raises the payable however it does — a button here, a real cart
+  // elsewhere — and is responsible for waiting until the interstitial has
+  // MOUNTED, not merely until the click landed. Parking the order is an effect
+  // of that screen mounting, and a scenario that navigates away before it has
+  // is testing a trip whose outbound leg never happened.
+  await paymentsWorld().raiseHostedPayable(page);
 });
 
-When('ela volta da página do provedor', async ({ page, journey }) => {
-  // The way a hosted provider really sends her back: the same route, plus the
-  // markers it appends. The application was destroyed in between.
-  await page.goto(`/?transaction_nsu=NSU-HARNESS&slug=inv-harness#/${journey.slug}`);
+When('ela volta da página do provedor', async ({ page }) => {
+  // The way a hosted provider really sends her back: the host's own return
+  // route, plus the markers the provider appends. The application was destroyed
+  // in between, so only what was parked before leaving survives.
+  await paymentsWorld().returnFromProvider(page);
 });
 
 // ---------------------------------------------------------------------------
@@ -154,11 +157,18 @@ Then('existe um link visível para a página do provedor', async ({ page }) => {
   // blocked, another one will be too.
   const link = page.getByTestId('checkout-hosted-link');
   await expect(link).toBeVisible();
-  await expect(link).toHaveAttribute('href', /infinito\.example/);
+  // `toHaveAttribute` with a STRING demands the whole value; the host only
+  // knows a fragment of the URL its provider mints, so this stays a substring
+  // match — escaped, because the fragment is a hostname and its dots must not
+  // become wildcards.
+  await expect(link).toHaveAttribute(
+    'href',
+    new RegExp(paymentsWorld().fixtures.hostedUrlFragment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+  );
 });
 
 Then('o pagamento volta confirmado', async ({ page }) => {
-  await expect(page.getByTestId('hosted-return-status')).toHaveText('PAID');
+  await expect(paymentsWorld().hostedReturnStatus(page)).toHaveText('PAID');
 });
 
 // ---------------------------------------------------------------------------
@@ -168,7 +178,7 @@ Then('o pagamento volta confirmado', async ({ page }) => {
 Then('nenhum pedido chegou a ser criado', async ({ page }) => {
   // The config read is the only request there is. A store that cannot charge
   // must not have a payable brought into existence.
-  await expect(page.getByTestId('wire-paths')).toHaveText('GET /api/checkout/config');
+  await expect(paymentsWorld().wire.paths(page)).toHaveText('GET /api/checkout/config');
 });
 
 Then('a cobrança enviada ao provedor carrega o cartão e o CPF dela', async ({ page }) => {
@@ -177,44 +187,51 @@ Then('a cobrança enviada ao provedor carrega o cartão e o CPF dela', async ({ 
   // only fail if the CLIENT changes; this line is the one that fails if the
   // MOUNT stops reading the flat body — the instrument then reads
   // `(no-instrument)` and the charge was never payable at all.
-  await expect(page.getByTestId('provider-charges')).toContainText(
-    'aurora:CARD:529.982.247-25:tok:',
+  const { fixtures, wire } = paymentsWorld();
+  await expect(wire.providerCharges(page)).toContainText(
+    `${fixtures.headProvider}:CARD:${fixtures.taxId}:tok:`,
   );
 });
 
 Then('o corpo da cobrança é o formato plano que o cliente publicado envia', async ({ page }) => {
-  const keys = page.getByTestId('wire-charge-keys');
+  const { wire } = paymentsWorld();
+  const keys = wire.chargeKeys(page);
   await expect(keys).toContainText('orderId');
   await expect(keys).toContainText('token');
   await expect(keys).toContainText('taxId');
-  await expect(page.getByTestId('wire-charge-body')).not.toContainText('"card"');
+  await expect(wire.chargeBody(page)).not.toContainText('"card"');
 });
 
 Then('nenhum tokensByProvider é enviado', async ({ page }) => {
-  await expect(page.getByTestId('wire-tokens-by-provider')).toHaveText('(absent)');
+  await expect(paymentsWorld().wire.tokensByProvider(page)).toHaveText('(absent)');
 });
 
 Then('um instrumento foi gerado para cada provedor da cadeia', async ({ page }) => {
-  await expect(page.getByTestId('wire-tokens-by-provider')).toHaveText('aurora,boreal');
+  const { fixtures, wire } = paymentsWorld();
+  await expect(wire.tokensByProvider(page)).toHaveText(
+    `${fixtures.headProvider},${fixtures.tailProvider}`,
+  );
 });
 
 Then('os dois provedores receberam a cobrança', async ({ page }) => {
-  await expect(page.getByTestId('provider-charge-count')).toHaveText('2');
-  await expect(page.getByTestId('provider-charges')).toContainText('boreal:CARD');
-  await expect(page.getByTestId('provider-charges')).toContainText('aurora:CARD');
+  const { fixtures, wire } = paymentsWorld();
+  await expect(wire.providerChargeCount(page)).toHaveText('2');
+  await expect(wire.providerCharges(page)).toContainText(`${fixtures.tailProvider}:CARD`);
+  await expect(wire.providerCharges(page)).toContainText(`${fixtures.headProvider}:CARD`);
 });
 
 Then('o mapa de instrumentos traz só o provedor que gera token', async ({ page }) => {
   // Sent even though exactly one instrument minted, because the PUBLISHED chain
   // has two entries. Counting the map instead drops it, and the server then
   // reads the bare token as the head's and refuses the entry that needed none.
-  await expect(page.getByTestId('wire-tokens-by-provider')).toHaveText('aurora');
+  await expect(paymentsWorld().wire.tokensByProvider(page)).toHaveText(
+    paymentsWorld().fixtures.headProvider,
+  );
 });
 
 Then('a loja registrou para onde ela seria levada', async ({ page }) => {
-  await expect(
-    page.getByTestId('panel-hosted-checkout').getByTestId('host-navigated'),
-  ).toContainText('infinito.example');
+  const { fixtures, wire } = paymentsWorld();
+  await expect(wire.navigated(page)).toContainText(fixtures.hostedUrlFragment);
 });
 
 Then('o pedido foi guardado antes da navegação', async ({ page }) => {
@@ -224,5 +241,5 @@ Then('o pedido foi guardado antes da navegação', async ({ page }) => {
   const parked = await page.evaluate(() =>
     window.sessionStorage.getItem('futurepay.checkout.hostedOrder'),
   );
-  expect(parked).toContain('inv_harness_0043');
+  expect(parked).toContain(paymentsWorld().fixtures.payableRef);
 });

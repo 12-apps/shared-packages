@@ -10,8 +10,6 @@ Feature: Comprando com PIX numa loja que só aceita PIX
   a esse caminho vira uma tela de pagamento sem código nenhum, e é isso que
   estes cenários vigiam.
 
-  Background:
-    Given a compradora abre o checkout da loja "payments-checkout-pix"
 
   Scenario: O PIX já vem marcado e o código é o do provedor
     Given a loja ainda não recebeu o pagamento
