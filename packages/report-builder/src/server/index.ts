@@ -1,5 +1,5 @@
 export {
-  createReportBuilder,
+  createApiReportBuilder,
   documentShape,
   type ReportActor,
   type ReportAdapterFactory,

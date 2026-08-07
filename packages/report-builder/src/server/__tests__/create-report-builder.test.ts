@@ -4,7 +4,7 @@ import { defineCatalog } from '../../catalog';
 import { createMemoryDataSource } from '../../memory';
 import type { ReportWindow } from '../adapter-shared';
 import {
-  createReportBuilder,
+  createApiReportBuilder,
   type ReportActor,
   type ReportResponse,
   type ReportRoute,
@@ -176,7 +176,7 @@ function setup(
     },
   } as unknown as SavedReportDb;
 
-  const { routes } = createReportBuilder({
+  const { routes } = createApiReportBuilder({
     catalog: CATALOG,
     // A FACTORY, so the window each request resolves is observable: an adapter
     // that never saw the window would silently report on all of history.

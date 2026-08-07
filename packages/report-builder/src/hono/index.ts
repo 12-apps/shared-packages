@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 
 import {
-  createReportBuilder,
+  createApiReportBuilder,
   type ReportActor,
   type ReportBuilderServerConfig,
   type ReportRoute,
@@ -63,7 +63,7 @@ async function readBody(c: Context): Promise<unknown> {
 }
 
 export function reportBuilderRouter(config: ReportBuilderHonoConfig): Hono {
-  const { routes } = createReportBuilder(config);
+  const { routes } = createApiReportBuilder(config);
   const app = new Hono();
 
   for (const route of routes) {

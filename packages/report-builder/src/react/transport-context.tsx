@@ -35,7 +35,7 @@ export function TransportProvider({
  *
  * Falls back to same-origin `fetch` rather than throwing when no provider is
  * present: a host that mounts a page component directly — which is how every
- * consumer worked before `createReportBuilder` — must keep working unchanged.
+ * consumer worked before `createWebReportBuilder` — must keep working unchanged.
  * Throwing here would turn this refactor into a breaking release.
  */
 export function useTransport(): ReportBuilderTransport {
