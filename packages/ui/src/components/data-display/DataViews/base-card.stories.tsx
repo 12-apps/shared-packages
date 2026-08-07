@@ -1,5 +1,7 @@
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import TableRestaurantOutlinedIcon from "@mui/icons-material/TableRestaurantOutlined";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { InputType } from "storybook/internal/types";
 
 import { Chip } from "../Chip";
 import { Button } from "../../form/Button";
@@ -14,22 +16,25 @@ import { CARD_ASPECT_RATIOS, type CardAspectRatio } from "./data-views-types";
  * image (or fallback), a title/subtitle caption, a top-right menu slot, and a
  * top-left select checkbox. Domain "kind cards" live in the app and compose it.
  */
-const meta: Meta<typeof BaseCard> = {
-  title: "DataDisplay/DataViews/BaseCard",
-  component: BaseCard,
-  parameters: { layout: "centered" },
-  tags: ["autodocs"],
-  argTypes: {
-    aspectRatio: {
-      control: "select",
-      options: Object.keys(CARD_ASPECT_RATIOS) as CardAspectRatio[],
-    },
-    scale: { control: { type: "range", min: 0.9, max: 1.6, step: 0.05 } },
-  },
-};
-export default meta;
+/** Tag a block of controls with one table category, keeping the block's order. */
+function category(name: string, knobs: Record<string, InputType>): Record<string, InputType> {
+  return Object.fromEntries(
+    Object.entries(knobs).map(([prop, knob]) => [
+      prop,
+      { ...knob, table: { ...knob.table, category: name } },
+    ]),
+  );
+}
 
-type Story = StoryObj<typeof BaseCard>;
+/** Plumbing: real props, but nothing anybody explores a component through. */
+function hidden(...props: string[]): Record<string, InputType> {
+  return Object.fromEntries(props.map((prop) => [prop, { table: { disable: true } }]));
+}
+
+/** A `ReactNode` slot, as a choice between real nodes rather than a JSON trap. */
+function slot(mapping: Record<string, unknown>): InputType {
+  return { control: "select", options: Object.keys(mapping), mapping };
+}
 
 const kebab = (
   <DropdownMenu
@@ -39,12 +44,80 @@ const kebab = (
       { id: "delete", label: "Excluir", color: "error", onClick: () => {} },
     ]}
     trigger={
-      <Button variant="text" size="sm" aria-label="Ações">
-        ⋮
-      </Button>
+      // `icon` and no children: `Button` renders an icon-only button square,
+      // rather than putting three dots in MUI's 64px slab.
+      <Button variant="text" size="sm" aria-label="Ações" icon={<MoreVertIcon sx={{ fontSize: 18 }} />} />
     }
   />
 );
+
+const meta: Meta<typeof BaseCard> = {
+  title: "DataDisplay/DataViews/BaseCard",
+  component: BaseCard,
+  parameters: { layout: "centered" },
+  tags: ["autodocs"],
+  /**
+   * Defaults only — declared for their ORDER, not their values, exactly as in
+   * `base-list-card.stories`. Storybook opens a category's section wherever its
+   * first member lands in the merged arg list, and args merge ahead of the
+   * inferred props, so these decide the running order of the table.
+   */
+  args: {
+    aspectRatio: "4:3",
+    scale: 1,
+    variant: "outline",
+    color: "primary",
+    emphasis: "none",
+    state: "default",
+  },
+  argTypes: {
+    // The same running order the row's table uses: what reshapes the card, then
+    // how it is painted, then its text, then what it does, then its slots.
+    ...category("Layout", {
+      aspectRatio: {
+        control: "select",
+        options: Object.keys(CARD_ASPECT_RATIOS) as CardAspectRatio[],
+      },
+      scale: { control: { type: "range", min: 0.5, max: 1.6, step: 0.05 } },
+      selectable: { control: "boolean" },
+      selected: { control: "boolean" },
+    }),
+    ...category("Appearance", {
+      variant: { control: "inline-radio", options: ["outline", "ghost", "text", "glass"] },
+      color: {
+        control: "select",
+        options: ["primary", "secondary", "success", "warning", "error", "info"],
+      },
+      emphasis: { control: "inline-radio", options: ["none", "attention", "new"] },
+      state: { control: "inline-radio", options: ["default", "cancelled", "disabled"] },
+    }),
+    ...category("Content", {
+      title: { control: "text" },
+      subtitle: { control: "text" },
+    }),
+    ...category("Behaviour", {
+      draggable: { control: "boolean" },
+      href: { control: "text" },
+      target: { control: "text" },
+      onClick: { control: false },
+      onToggleSelect: { control: false },
+    }),
+    ...category("Slots", {
+      // Pick between real nodes: a `ReactNode` has no widget, and anything typed
+      // into an element blob produces something React cannot render.
+      menu: slot({ nenhum: undefined, "kebab (⋮)": kebab }),
+      image: { control: false },
+      imageFallback: { control: false },
+      children: { control: "text" },
+    }),
+    ...hidden("className", "aria-label", "testId", "checkboxTestId", "dragId"),
+  },
+};
+export default meta;
+
+type Story = StoryObj<typeof BaseCard>;
+
+
 
 /** Title-first card (no image): the fallback icon fills the media region. */
 export const TitleWithFallback: Story = {

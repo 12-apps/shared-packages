@@ -125,6 +125,20 @@ export interface CardSurfaceProps {
   "aria-label"?: string;
 }
 
+/**
+ * ONE RADIUS FOR BOTH SHAPES, off the token scale on purpose.
+ *
+ * `Card`'s own steps are 4px and 8px and its `lg` is 16px, all chosen for a
+ * surface nearly as tall as it is wide. A 56px row is not that shape — the
+ * corner runs most of the way down both ends and curves away from the square
+ * checkbox and square thumbnail inside it — and a tile that rounds harder than
+ * the row it sits beside in the same view reads as a different component.
+ *
+ * 3px takes the hard point off the corner without being seen as a curve.
+ * `divider` rows override it back to 0; a bottom rule has no corners to round.
+ */
+export const CARD_RADIUS = "3px";
+
 /** Every slot's test id, derived from the card's one. */
 export function slotTestIds(testId: string | undefined): (slot: string) => string | undefined {
   return (slot) => (testId ? `${testId}-${slot}` : undefined);

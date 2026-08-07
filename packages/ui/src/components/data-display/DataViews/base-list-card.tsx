@@ -8,6 +8,7 @@ import type { DescriptionItemProps } from "../DescriptionItem";
 import { Box } from "../../../mui/Box";
 
 import {
+  CARD_RADIUS,
   cardSurfaceStyles,
   isActionable,
   isSelectable,
@@ -97,19 +98,7 @@ export interface BaseListCardProps extends CardSurfaceProps {
   dragId?: string | number;
 }
 
-/**
- * 3px, off the token scale on purpose.
- *
- * `Card`'s smallest step is 4px and its default 8px, both chosen for a TILE —
- * a surface nearly as tall as it is wide, where a generous corner reads as
- * softness. A 56px row is not that shape: the same corner runs most of the way
- * down both ends, so the outline curves away from the square checkbox and the
- * square thumbnail sitting inside it. 3px is enough to take the hard point off
- * the corner and not enough to be seen as a curve.
- *
- * `divider` rows override it back to 0 — a bottom rule has no corners to round.
- */
-const ROW_RADIUS = "3px";
+
 
 /**
  * Whether a click was really a click, or the tail of a text selection.
@@ -144,7 +133,7 @@ function rowSx(opts: {
   const { inGroup, gutters, metaColumns, pad, padY, divider, interactive, draggable } = opts;
   return {
     position: "relative",
-    borderRadius: ROW_RADIUS,
+    borderRadius: CARD_RADIUS,
     display: "grid",
     // SUBGRID AND `container-type` CANNOT COEXIST on one element: containment
     // makes the box size independently of its parent, so the browser drops the
