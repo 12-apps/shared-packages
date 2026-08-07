@@ -63,14 +63,40 @@ export interface Payable {
   state: 'OPEN' | 'SETTLED' | 'CLOSED';
 }
 
-/** What the browser may choose. Money and identity are deliberately absent. */
+/**
+ * What the browser may choose, NORMALIZED — never the wire body itself.
+ *
+ * Money is deliberately absent (no request shape the mount accepts carries an
+ * amount). Buyer IDENTITY is not: `customer` carries the fields the payment step
+ * itself collected, which is the only place some of them exist. The CPF is the
+ * case that forced it — `@12-apps/payments-frontend` asks for it on the card
+ * form and sends it with the charge, and future-pay's `Order` row has no column
+ * for it, so a payable read back from the host's storage can never carry it.
+ *
+ * Two wire shapes produce this (see `checkout/draft.ts`), and the flat one is
+ * the shipped client's. Nothing else in the library reads a raw body.
+ */
 export interface CheckoutChargeDraft {
   /** A fresh instrument, a saved-instrument id, or per-provider instruments. */
   card?: Pick<CardDetails, 'token' | 'savedCardToken' | 'tokensByProvider'>;
+  /**
+   * `card.token` may ALSO be a saved instrument's id.
+   *
+   * True for the published flat body, which names both kinds with ONE `token`
+   * field. Only the vault can tell them apart, so the resolution asks it first
+   * and charges a handle it does not own as a fresh token.
+   */
+  ambiguousInstrument?: boolean;
   /** Opt-in: vault this instrument for reuse once it authorizes. */
   saveInstrument?: boolean;
   /** Whatever display metadata the host stores alongside a vaulted token. */
   instrumentDisplay?: unknown;
+  /**
+   * Buyer identity collected at THIS step, merged OVER the payable's own
+   * (`checkout/raise.ts`). Present fields win; absent ones never blank out what
+   * the payable already knows.
+   */
+  customer?: Partial<CustomerInfo>;
 }
 
 /** ONE enabled provider, as the buyer's checkout sees it. */
@@ -124,6 +150,35 @@ export interface AttachedCharge {
  * Bringing a payable into existence, finding one, and rendering it — the port
  * that keeps "what an order is" entirely outside this package.
  */
+/**
+ * WHAT A LOAD IS BEING ASKED FOR — the half `load(caller, ref)` was missing.
+ *
+ * The first cut of this port took a caller and a handle and nothing else, and
+ * three defects came straight out of that width: the intended payment METHOD,
+ * the card INSTRUMENT and the buyer's CPF all reached the mount and had no way
+ * through to the routes that decide on them. The alternative on offer was for
+ * hosts to smuggle each one through `Caller` — i.e. to rebuild the request
+ * inside their auth callback — which is how a boundary rots.
+ *
+ * So the request travels, PARSED. A host that ignores it keeps the old
+ * behaviour; a host that reads it can refuse in its own terms (future-pay's
+ * replaced route 404s a charge whose order is not a card order) without the
+ * library having to grow a second port for every fact a route needs.
+ */
+export interface PayableLoadContext {
+  /** The request as received, headers and all. */
+  request: Request;
+  /** Which row is running, already parsed — never re-derived from segments. */
+  intent: CheckoutRouteIntent;
+  /**
+   * The method this request means to charge with, or `null` for a pure read
+   * (`getStatus`, `refreshBrowserKey`).
+   */
+  method: PaymentMethodKind | null;
+  /** The normalized charge draft; `null` on every row but `chargeInstrument`. */
+  draft: CheckoutChargeDraft | null;
+}
+
 export interface PayablePort<Caller, View extends object> {
   /**
    * The payable this caller may pay, or null.
@@ -134,8 +189,12 @@ export interface PayablePort<Caller, View extends object> {
    * model. `null` must mean BOTH "no such payable" and "not yours" — the
    * library answers 404 either way, so the two are indistinguishable from
    * outside and nothing leaks.
+   *
+   * `context` is what the request MEANS ({@link PayableLoadContext}). Reading
+   * it is optional; the library enforces its own money rules on the payable
+   * that comes back either way.
    */
-  load(caller: Caller, ref: string): Promise<Payable | null>;
+  load(caller: Caller, ref: string, context: PayableLoadContext): Promise<Payable | null>;
   /**
    * Bring a payable into existence for THIS checkout. The library hands over
    * the raw request body untouched: carts, comandas, tables, discounts, buyer

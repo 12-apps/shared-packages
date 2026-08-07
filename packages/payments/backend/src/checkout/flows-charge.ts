@@ -2,6 +2,7 @@ import { chargeSnapshotMismatch, hostedSnapshotMismatch } from '../core/charge-i
 import type { ChargeSnapshot, PaymentMethodKind } from '../core/types';
 
 import { buyerCheckoutConfig, usesHostedCheckout } from './config';
+import { chargeDraftOf } from './draft';
 import { chargeMismatchRefusal, checkoutRefusalFor, type FailureContext } from './failure';
 import { raiseCharge } from './raise';
 import type { CheckoutCard } from './reuse';
@@ -9,12 +10,13 @@ import {
   attachedChargeOf,
   loadPayable,
   notConfigured,
+  payableNotFound,
   payableRefOf,
   readJsonBody,
   sendRefusal,
   type CheckoutRuntime,
 } from './runtime';
-import type { CheckoutChargeDraft, Payable } from './types';
+import type { CheckoutChargeDraft, CheckoutRouteIntent, Payable } from './types';
 
 /**
  * THE TWO MONEY PATHS: create a checkout and raise its first charge, and charge
@@ -201,7 +203,10 @@ async function resolveInstrument<C, V extends object, D>(
   provider: string,
   draft: CheckoutChargeDraft,
 ): Promise<{ card: CheckoutCard | undefined; vaulted: boolean } | { response: Response }> {
-  const instrumentId = draft.card?.savedCardToken;
+  // On the published flat wire the ONE `token` field is either kind, so the
+  // vault is what tells them apart — see `checkout/draft.ts`.
+  const instrumentId =
+    draft.card?.savedCardToken ?? (draft.ambiguousInstrument ? draft.card?.token : undefined);
   if (!instrumentId) return { card: draft.card, vaulted: false };
   const instruments = runtime.config.instruments;
   if (!instruments) return { card: draft.card, vaulted: false };
@@ -212,6 +217,11 @@ async function resolveInstrument<C, V extends object, D>(
     instrumentId,
   );
   if (resolved.token !== null) return { card: { savedCardToken: resolved.token }, vaulted: true };
+  // A handle the vault does not OWN, sent on the wire that conflates the two
+  // kinds, is a fresh browser-minted token — which is the only reading that
+  // leaves a first-time card payable at all. An owned one is a real scope
+  // mismatch and falls through to the refusal.
+  if (draft.ambiguousInstrument && !resolved.owned) return { card: draft.card, vaulted: false };
   // "Not yours" and "yours but not chargeable here" are answered identically,
   // for the same reason `payables.load` conflates absent and forbidden. What
   // matters is that neither becomes a DECLINE: a scope mismatch (FUT-697) told
@@ -277,20 +287,54 @@ async function maybeSaveInstrument<C, V extends object, D>(
   );
 }
 
+/**
+ * A payable this request is not allowed to charge, or null.
+ *
+ * THE METHOD IS THE GATE, and it is a money rule rather than a validation nicety
+ * (FUT-740). `/charge` raises a CARD charge; a payable whose method is PIX is
+ * one the buyer is holding a live QR for. Settling it with a card leaves that QR
+ * scannable and still pointing at a chargeable code — two payable codes for one
+ * payable, the exact double payment `checkout/reuse.ts` exists to prevent, and
+ * one the superseded-code void cannot clean up because it only ever looks at
+ * PIX charges priced at some OTHER amount.
+ *
+ * The replaced host route refused the same case with a 404 and this answers with
+ * the same one, so "absent", "not yours" and "not card-payable" stay
+ * indistinguishable from outside.
+ */
+function unchargeableBy<C, V extends object, D>(
+  runtime: Runtime<C, V, D>,
+  payable: Payable,
+  method: PaymentMethodKind,
+): Response | null {
+  if (payable.method === method) return null;
+  runtime.log.warn(
+    `[checkout] refused a ${method} charge on a ${payable.method} payable (${payable.ref})`,
+  );
+  return payableNotFound(runtime);
+}
+
 /** `POST /charge` — charge an instrument against an existing payable. */
 export async function chargeInstrument<C, V extends object, D>(
   runtime: Runtime<C, V, D>,
   request: Request,
   caller: C,
+  intent: CheckoutRouteIntent,
 ): Promise<Response> {
   const body = await readJsonBody(request);
+  // Both wire shapes normalize here, ONCE, and nothing downstream sees the raw
+  // body — including the host's `load`, which is handed the parsed draft.
+  const draft = chargeDraftOf(body);
   const loaded = await loadPayable(
     runtime,
     caller,
     payableRefOf(runtime.payableRefField, body, request.url),
+    { request, intent, method: 'CARD', draft },
   );
   if ('response' in loaded) return loaded.response;
   const { payable } = loaded;
+  const unchargeable = unchargeableBy(runtime, payable, 'CARD');
+  if (unchargeable) return unchargeable;
   if (payable.state !== 'OPEN') {
     return runtime.respond.ok({ status: runtime.config.payables.stateToken(payable) });
   }
@@ -298,7 +342,6 @@ export async function chargeInstrument<C, V extends object, D>(
   const provider = await runtime.config.credentials.defaultProvider(payable.merchant);
   if (!provider) return notConfigured(runtime);
 
-  const draft = (body ?? {}) as CheckoutChargeDraft;
   const instrument = await resolveInstrument(runtime, caller, payable, provider, draft);
   if ('response' in instrument) return instrument.response;
 
@@ -307,6 +350,9 @@ export async function chargeInstrument<C, V extends object, D>(
     const snapshot = await raiseCharge(deps, payable, {
       method: 'CARD',
       card: instrument.card,
+      // The CPF the card form asked for reaches the provider's required-field
+      // gate from HERE — the host's payable row has nowhere to keep it.
+      customer: draft.customer,
     });
     // FUT-378 — NEVER record bookkeeping from an unrecognized snapshot. A charge
     // answered out of the gateway's store rather than raised now can be another

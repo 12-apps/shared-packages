@@ -63,6 +63,8 @@ export interface ChargeDelegate {
   findMany(args: {
     where: ChargeWhere;
     orderBy: { createdAt: 'desc' };
+    /** Row cap — the "newest one" reads take 1 rather than a payable's history. */
+    take?: number;
   }): Promise<ChargeRow[]>;
   findUnique(args: {
     where:
@@ -153,6 +155,18 @@ function payableQueries(delegate: ChargeDelegate): ChargeQueryStore {
   return {
     async countByReference(merchant, reference) {
       return delegate.count({ where: referenceWhere(merchant, reference) });
+    },
+    async latestByReference(merchant, reference) {
+      // No status clause — deliberately the SAME row set `countByReference`
+      // counts, newest first. A poll asks what became of the charge, so it must
+      // still find one that has stopped being PENDING.
+      const rows = await delegate.findMany({
+        where: referenceWhere(merchant, reference),
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      });
+      const newest = rows[0];
+      return newest ? rowToStoredCharge(newest) : null;
     },
     async listPayable(query) {
       const rows = await delegate.findMany({

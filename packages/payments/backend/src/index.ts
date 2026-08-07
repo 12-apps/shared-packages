@@ -264,9 +264,16 @@ export type {
   CheckoutRouteSpec,
   InstrumentScope,
   Payable,
+  PayableLoadContext,
   PayablePort,
   SavedInstrumentPort,
 } from './checkout/types';
+/**
+ * The charge-body normalizer, exported so a host can assert what its OWN
+ * client's request turns into. Which two wire shapes it accepts, and which of
+ * them is canonical, is the module's own doc.
+ */
+export { chargeDraftOf } from './checkout/draft';
 /**
  * The charge-identity guards (FUT-378) and the `--` attempt-reference
  * convention (FUT-669). Exported because a host that has not yet moved onto the

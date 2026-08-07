@@ -10,6 +10,7 @@ import {
   createPaymentsGateway,
   defineProviders,
   ownsReference,
+  type ChargeInput,
   type ChargeSnapshot,
   type CheckoutCopy,
   type MerchantRef,
@@ -41,6 +42,8 @@ const BRL = (amountCents: number): Money => ({ amountCents, currency: 'BRL' });
 interface AdapterOptions {
   hosted?: boolean;
   refuses?: boolean;
+  /** Collects every `ChargeInput` the gateway handed this adapter. */
+  seen?: ChargeInput[];
 }
 
 /** The smallest adapter the gateway will accept. No vendor anywhere in it. */
@@ -63,6 +66,7 @@ function harnessAdapter(name: string, options: AdapterOptions = {}): PaymentProv
       return { ok: true };
     },
     async createCharge(input) {
+      options.seen?.push(input);
       if (options.refuses) {
         // Provably pre-send, so the walk is entitled to advance past it.
         throw new TypeError('fetch failed', { cause: { code: 'ECONNREFUSED' } });
@@ -271,6 +275,46 @@ describe('@12-apps/payments-backend — the published buyer-checkout mount', () 
     const { status, body } = await call(routes, 'GET', '/status?orderId=someone-elses');
     expect(status).toBe(404);
     expect(body.code).toBe('PAYABLE_NOT_FOUND');
+  });
+
+  it('reads the instrument and the CPF off the FLAT body the shipped client posts', async () => {
+    // `@12-apps/payments-frontend`'s `chargeCard` posts `{ orderId, token,
+    // tokensByProvider, saveCard, cardMeta, taxId }` and is already in
+    // browsers. A mount that only understood a nested `card` block was handed
+    // no instrument at all by every one of them.
+    const seen: ChargeInput[] = [];
+    const { routes } = setup([harnessAdapter('alpha', { seen })], 'CARD');
+
+    const charged = await call(routes, 'POST', '/charge', {
+      orderId: REF,
+      token: 'tok_from_the_browser',
+      tokensByProvider: { alpha: 'tok_alpha' },
+      saveCard: false,
+      taxId: '98765432100',
+    });
+
+    expect(charged.status).toBe(200);
+    expect(seen[0]?.card?.tokensByProvider).toEqual({ alpha: 'tok_alpha' });
+    // Collected at the payment step and merged OVER what the payable knew — a
+    // host's own row may have nowhere to keep a CPF.
+    expect(seen[0]?.customer?.taxId).toBe('98765432100');
+  });
+
+  it('refuses a card charge against a payable the buyer is paying by PIX', async () => {
+    const { routes, charges: store } = setup([harnessAdapter('alpha')], 'PIX');
+    await call(routes, 'POST', '/', {});
+
+    const charged = await call(routes, 'POST', '/charge', {
+      orderId: REF,
+      token: 'tok_from_the_browser',
+    });
+
+    // Settling the payable here would leave the live QR scannable and still
+    // chargeable — two payable codes for one payable.
+    expect(charged.status).toBe(404);
+    expect(charged.body.code).toBe('PAYABLE_NOT_FOUND');
+    expect(store.all()).toHaveLength(1);
+    expect(store.all()[0]?.snapshot.status).toBe('PENDING');
   });
 
   it('keeps attempt 0 on the bare handle, and refuses a prefix neighbour', () => {

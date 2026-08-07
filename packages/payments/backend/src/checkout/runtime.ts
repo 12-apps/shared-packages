@@ -16,6 +16,7 @@ import type {
   CheckoutResponder,
   CheckoutRouteIntent,
   Payable,
+  PayableLoadContext,
   PayablePort,
   SavedInstrumentPort,
 } from './types';
@@ -162,8 +163,13 @@ export function notConfigured(runtime: {
   );
 }
 
-/** No payable under that handle — or not this caller's. Indistinguishable. */
-function payableNotFound(runtime: {
+/**
+ * No payable under that handle — or not this caller's, or not one THIS request
+ * may charge. Deliberately one answer for all three: the replaced host route
+ * 404'd a non-card order with the same body it 404'd a stranger's order with,
+ * and telling them apart tells a prober which handles exist.
+ */
+export function payableNotFound(runtime: {
   respond: CheckoutResponder;
   copy: CheckoutCopy;
 }): Response {
@@ -207,14 +213,22 @@ export function payableRefOf(field: string, source: unknown, url: string): strin
   return new URL(url).searchParams.get(field) || null;
 }
 
-/** Load the payable a request names, or the refusal to send instead. */
+/**
+ * Load the payable a request names, or the refusal to send instead.
+ *
+ * `context` is the request as PARSED ({@link PayableLoadContext}) — the intent,
+ * the method being charged and the normalized draft. It travels because the
+ * host's `load` is the authorization scope and could not previously see what it
+ * was authorizing; see the port's own doc.
+ */
 export async function loadPayable<Caller, View extends object, Display>(
   runtime: CheckoutRuntime<Caller, View, Display>,
   caller: Caller,
   ref: string | null,
+  context: PayableLoadContext,
 ): Promise<{ payable: Payable } | { response: Response }> {
   if (!ref) return { response: payableNotFound(runtime) };
-  const payable = await runtime.config.payables.load(caller, ref);
+  const payable = await runtime.config.payables.load(caller, ref, context);
   if (!payable) return { response: payableNotFound(runtime) };
   return { payable };
 }

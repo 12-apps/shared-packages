@@ -59,4 +59,19 @@ export interface ChargeQueryStore {
    * `checkout/reuse.ts` from the snapshots this returns.
    */
   listPayable(query: PayableChargeQuery): Promise<StoredCharge[]>;
+  /**
+   * The payable's most recent charge, WHATEVER its status, or null.
+   *
+   * The read a settlement POLL needs, and the one {@link listPayable} cannot
+   * serve: that query is PENDING-only by contract, which is right for "may this
+   * re-tap reuse a code" and wrong for "what became of the charge we raised".
+   * A poll built on it lost its own charge the moment the charge stopped being
+   * pending — including when the poll's own `refreshCharge` was what moved it,
+   * since the gateway persists what it read — and then answered `unchanged`
+   * forever, on a payable the provider had already reported PAID.
+   *
+   * Matches the same reference set as `countByReference`: the base handle and
+   * every `--<attempt>` suffix under it, never a bare prefix.
+   */
+  latestByReference(merchant: MerchantRef, reference: string): Promise<StoredCharge | null>;
 }

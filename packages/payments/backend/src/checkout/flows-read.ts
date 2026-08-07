@@ -11,7 +11,7 @@ import {
   readJsonBody,
   type CheckoutRuntime,
 } from './runtime';
-import type { Payable } from './types';
+import type { CheckoutRouteIntent, Payable } from './types';
 
 /**
  * The READ side of the buyer checkout: the protocol config, the caller's saved
@@ -76,16 +76,23 @@ function definedHints(url: string): SettlementHints | undefined {
  * vendor, and a missing connection is emphatically NOT permission to declare a
  * payable settled. No charge at all means nothing was ever raised, so nothing
  * can be confirmed.
+ *
+ * `latestByReference`, NOT `listPayable`. The two answer different questions and
+ * only one of them is a poll's: `listPayable` is PENDING-only by contract,
+ * because it exists to decide whether a re-tap may reuse a code, and a code that
+ * is no longer pending is not one a buyer can pay. A POLL asks what happened to
+ * the charge — so a charge is exactly what it must keep hold of once it stops
+ * being pending. Built on the reuse query, this poll lost the charge the moment
+ * it moved: a payable whose row had gone AUTHORIZED (its own first poll's
+ * doing, since `refreshCharge` persists what it read) answered "unchanged"
+ * forever after, and the buyer's screen never settled even though the provider
+ * had said PAID.
  */
 async function latestCharge<C, V extends object, D>(
   runtime: Runtime<C, V, D>,
   payable: Payable,
 ): Promise<StoredCharge | null> {
-  const rows = await runtime.charges.listPayable({
-    merchant: payable.merchant,
-    reference: payable.ref,
-  });
-  return rows[0] ?? null;
+  return runtime.charges.latestByReference(payable.merchant, payable.ref);
 }
 
 /**
@@ -175,11 +182,14 @@ export async function getStatus<C, V extends object, D>(
   runtime: Runtime<C, V, D>,
   request: Request,
   caller: C,
+  intent: CheckoutRouteIntent,
 ): Promise<Response> {
   const loaded = await loadPayable(
     runtime,
     caller,
     payableRefOf(runtime.payableRefField, null, request.url),
+    // A pure READ: nothing is being charged, so there is no method and no draft.
+    { request, intent, method: null, draft: null },
   );
   if ('response' in loaded) return loaded.response;
   const { payable } = loaded;
@@ -210,12 +220,14 @@ export async function refreshBrowserKey<C, V extends object, D>(
   runtime: Runtime<C, V, D>,
   request: Request,
   caller: C,
+  intent: CheckoutRouteIntent,
 ): Promise<Response> {
   const body = await readJsonBody(request);
   const loaded = await loadPayable(
     runtime,
     caller,
     payableRefOf(runtime.payableRefField, body, request.url),
+    { request, intent, method: null, draft: null },
   );
   if ('response' in loaded) return loaded.response;
   const { payable } = loaded;

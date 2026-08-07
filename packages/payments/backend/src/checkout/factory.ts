@@ -147,12 +147,15 @@ export function createPaymentFlowsBE<Caller, View extends object, Display = unkn
         return createCheckout(runtime, request, caller, () =>
           merchantFor(request, intent, caller),
         );
+      // The payable-scoped rows all take the PARSED intent: it travels on to
+      // the host's `load`, which is the only port that could not previously see
+      // what it was being asked to authorize.
       case 'chargeInstrument':
-        return chargeInstrument(runtime, request, caller);
+        return chargeInstrument(runtime, request, caller, intent);
       case 'getStatus':
-        return getStatus(runtime, request, caller);
+        return getStatus(runtime, request, caller, intent);
       default:
-        return refreshBrowserKey(runtime, request, caller);
+        return refreshBrowserKey(runtime, request, caller, intent);
     }
   };
 

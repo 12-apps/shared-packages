@@ -117,13 +117,22 @@ function matchesPayableQuery(row: StoredCharge, query: PayableChargeQuery): bool
  * `createMemoryChargeStore` stays inside the size gate.
  */
 function payableQueries(rows: readonly StoredCharge[]): ChargeQueryStore {
+  /** Every attempt of one payable, in insertion order. */
+  const ofPayable = (merchant: MerchantRef, reference: string): StoredCharge[] =>
+    rows.filter(
+      (row) =>
+        merchantKey(row.merchant) === merchantKey(merchant) &&
+        ownsReference(reference, row.reference),
+    );
+
   return {
     async countByReference(merchant, reference) {
-      return rows.filter(
-        (row) =>
-          merchantKey(row.merchant) === merchantKey(merchant) &&
-          ownsReference(reference, row.reference),
-      ).length;
+      return ofPayable(merchant, reference).length;
+    },
+    async latestByReference(merchant, reference) {
+      // Insertion order for the same reason `listPayable` gives below, and NO
+      // status clause at all — that is the whole difference between the two.
+      return ofPayable(merchant, reference).at(-1) ?? null;
     },
     async listPayable(query) {
       // Newest first, and by INSERTION rather than by `createdAt`: several

@@ -2,7 +2,7 @@ import { ChargeIdentityError, chargeIdentityMismatch } from '../core/charge-iden
 import type { PaymentsGateway } from '../core/gateway';
 import type { ChargeQueryStore } from '../core/ports';
 import { attemptReference } from '../core/reference';
-import type { ChargeSnapshot, PaymentMethodKind } from '../core/types';
+import type { ChargeSnapshot, CustomerInfo, PaymentMethodKind } from '../core/types';
 
 import {
   holdsInstrumentFor,
@@ -47,6 +47,33 @@ interface RaiseChargeDeps {
 interface RaiseChargeRequest {
   method: PaymentMethodKind;
   card?: CheckoutCard;
+  /** Buyer fields this REQUEST collected, merged over the payable's own. */
+  customer?: Partial<CustomerInfo>;
+}
+
+/**
+ * The buyer identity a charge is raised with (FUT-595 / FUT-740).
+ *
+ * The payable is the base and the request is the overlay, because the two know
+ * different things and neither is complete on its own. The CPF is the case that
+ * proves it: `@12-apps/payments-frontend` asks for it on the card form and
+ * sends it with the charge, and future-pay's `Order` row has no column to keep
+ * it in — so a payable loaded back from the host's storage cannot carry it, and
+ * a charge sourced from the payable alone reaches PagBank's required-field gate
+ * with nothing. The buyer is then asked, at the moment they press Pay, for the
+ * document they typed two screens earlier.
+ *
+ * ABSENT NEVER OVERWRITES PRESENT. `chargeDraftOf` already drops empty strings,
+ * so the overlay carries only fields that were actually collected; a request
+ * that says nothing about a field leaves the payable's answer alone rather than
+ * blanking it, which would break the requirements gate the other way round.
+ */
+function chargeCustomer(
+  payable: Partial<CustomerInfo>,
+  collected: Partial<CustomerInfo> | undefined,
+): Partial<CustomerInfo> {
+  if (!collected) return payable;
+  return { ...payable, ...collected };
 }
 
 /**
@@ -117,8 +144,10 @@ export async function raiseCharge(
     // Passed through as collected — absent stays absent. Which fields are
     // REQUIRED is the adapter's declaration (`customerSchema`, FUT-595),
     // enforced by the gateway before the charge is attempted; padding absences
-    // with "" here would only disguise a missing field from it.
-    customer: payable.customer,
+    // with "" here would only disguise a missing field from it. What the
+    // REQUEST collected wins over what the payable remembers ({@link
+    // chargeCustomer}) — some fields exist nowhere else.
+    customer: chargeCustomer(payable.customer, request.customer),
     card: chargeInstrument(request.card),
     idempotencyKey,
   });

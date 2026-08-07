@@ -18,7 +18,12 @@ import {
 import type { CheckoutCopy } from '../copy';
 import { createPaymentFlowsBE } from '../factory';
 import type { PaymentFlowsBEConfig } from '../runtime';
-import type { AttachedCharge, CheckoutLogger, Payable } from '../types';
+import type {
+  AttachedCharge,
+  CheckoutLogger,
+  Payable,
+  PayableLoadContext,
+} from '../types';
 
 /**
  * A checkout world with NO vendor in it.
@@ -119,6 +124,11 @@ interface CorrelationLog {
   expiries: string[];
 }
 
+/** Every vaulting the mount asked for — the opt-in half of the charge body. */
+interface VaultLog {
+  saved: { provider: string; token: string; display: unknown }[];
+}
+
 /**
  * A copy table of MACHINE-READABLE sentinels rather than prose.
  *
@@ -150,7 +160,17 @@ interface WorldOptions {
   chain?: readonly { name: string; adapter: PaymentProviderAdapter }[];
   payable?: Partial<Payable>;
   offlineSettlement?: { afterMs: number };
-  /** Vault tokens the instrument port will resolve, by instrument id. */
+  /**
+   * The vault's contents, by instrument id:
+   *
+   *   - a STRING — the vault token this scope charges it with;
+   *   - `null`   — an id the caller OWNS that this scope cannot charge (FUT-697);
+   *   - absent   — an id the vault has never heard of.
+   *
+   * The last two are only distinguishable through `owned`, and telling them
+   * apart is what lets the published flat body — whose one `token` field is
+   * either a fresh instrument or a saved one's id — be resolved at all.
+   */
   instruments?: Record<string, string | null>;
   config?: Partial<PaymentFlowsBEConfig<TestCaller, InvoiceView>>;
 }
@@ -203,6 +223,12 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
     settlements: [],
     expiries: [],
   };
+  const vault: VaultLog = { saved: [] };
+  /**
+   * Every context `payables.load` was handed. The host's load IS the
+   * authorization scope, so what it can SEE is part of the contract.
+   */
+  const loads: PayableLoadContext[] = [];
 
   const viewOf = (): InvoiceView => ({
     invoice: world.payable.ref,
@@ -218,7 +244,10 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
     requireAuth: () => ({ id: 'caller-1' }),
     resolveMerchant: () => MERCHANT,
     payables: {
-      load: async (_caller, ref) => (ref === world.payable.ref ? world.payable : null),
+      load: async (_caller, ref, context) => {
+        loads.push(context);
+        return ref === world.payable.ref ? world.payable : null;
+      },
       create: async () => {
         world.created += 1;
         return { payable: world.payable, view: viewOf() };
@@ -249,8 +278,13 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
     instruments: {
       list: async () => [{ id: 'card_1', last4: '4242' }],
       resolve: async (_caller, _scope, instrumentId) => {
-        const token = options.instruments?.[instrumentId];
-        return token ? { token } : { token: null, owned: true };
+        const known = options.instruments ?? {};
+        const token = known[instrumentId];
+        if (token) return { token };
+        return { token: null, owned: Object.hasOwn(known, instrumentId) };
+      },
+      save: async (_caller, scope, token, display) => {
+        vault.saved.push({ provider: scope.provider, token, display });
       },
     },
     copy: testCopy,
@@ -259,7 +293,17 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
     ...options.config,
   });
 
-  return { routes, charges, credentials, connections, gateway, correlation, world };
+  return {
+    routes,
+    charges,
+    credentials,
+    connections,
+    gateway,
+    correlation,
+    vault,
+    loads,
+    world,
+  };
 }
 
 /** A request at a checkout sub-path, as the catch-all mount receives it. */
