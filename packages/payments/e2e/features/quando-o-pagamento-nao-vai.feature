@@ -10,8 +10,6 @@ Feature: Quando o pagamento não vai
   A loja destes cenários aceita PIX e cartão, então escolher o cartão é um
   passo de verdade — e no último cenário é justamente o que sobra.
 
-  Background:
-    Given a compradora abre o checkout da loja "payments-checkout-failures"
 
   Scenario: O emissor recusa e ela pode tentar de novo
     Given o provedor da loja recusa o cartão

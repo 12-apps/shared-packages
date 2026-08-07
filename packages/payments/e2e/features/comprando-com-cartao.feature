@@ -7,7 +7,7 @@ Feature: Comprando com cartão
   para o que realmente atravessou.
 
   Background:
-    Given a compradora abre o checkout da loja "payments-checkout-card"
+    Given a compradora abre o checkout da loja de cartão
 
   Scenario: O cartão é cobrado e o CPF chega ao provedor
     When ela informa o CPF e segue para o pagamento

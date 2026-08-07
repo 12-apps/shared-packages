@@ -7,8 +7,6 @@ Feature: A loja não cobra online
   sabe; a segunda só a aplicação sabe. Se a decisão passar a ser de um lado só,
   uma das duas lojas volta a oferecer um checkout que não vai honrar.
 
-  Background:
-    Given a compradora abre o checkout da loja "payments-checkout-no-provider"
 
   Scenario: Sem provedor nenhum, nada de pagamento aparece e nada é cobrado
     Given a loja não tem provedor nenhum conectado

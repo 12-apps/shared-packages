@@ -15,8 +15,6 @@ Feature: A tela que o provedor pediu
   mais novo que o navegador, coisa normal em deploy — cai na tela de capacidade
   em vez de deixar a compradora olhando para um painel vazio.
 
-  Background:
-    Given a compradora abre o checkout da loja "payments-checkout-provider-screens"
 
   Scenario: Quem cobra na nossa página mostra o formulário aqui mesmo
     Given a loja declara que cobra na própria página

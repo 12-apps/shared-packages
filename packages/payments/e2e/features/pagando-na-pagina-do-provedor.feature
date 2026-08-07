@@ -11,7 +11,7 @@ Feature: Pagando na página do provedor
   volta para uma tela em branco.
 
   Background:
-    Given a compradora abre o checkout da loja "payments-checkout-redirect"
+    Given a compradora abre o checkout de uma loja de página externa
 
   Scenario: Nenhum formulário de cartão é oferecido, e a saída fica registrada
     When ela informa o CPF e segue para o pagamento
