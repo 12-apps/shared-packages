@@ -144,6 +144,38 @@ export const RAIL_GAP = 3;
 /** …the same gap in pixels, for anything drawing INTO it. */
 export const RAIL_GAP_PX = RAIL_GAP * 8;
 
+/**
+ * AN EMPTY GUTTER COSTS ITS OWN WIDTH *AND* THE RAIL GAP BESIDE IT.
+ *
+ * A zero-width grid track still gets a `column-gap`, and no margin on the item
+ * inside it can win that back — gaps sit between TRACKS, and a track's position
+ * is settled before any item's margin is applied. (Tried it; the box simply
+ * overhangs its own track and everything after it stays put.) So a row with
+ * nothing to drag was paying 24px for a rail holding nothing, which was the
+ * single biggest contributor to the left inset the checkbox appeared to have.
+ *
+ * The only way out is for the track NOT TO EXIST: the slot renders nothing and
+ * the rail leaves the template, which is safe because grid auto-placement fills
+ * the remaining tracks in DOM order. Standalone only — inside a
+ * {@link ListCardGroup} the rails are subgrid across a shared template and the
+ * count cannot vary per row, which is also where `reserveGutters` earns its
+ * keep: a selectable list and a read-only one still line up, and turning drag
+ * mode on does not shift every row sideways.
+ */
+export function railsTemplateFor(
+  gutters: { drag: boolean; select: boolean },
+  metaColumns: number,
+): string {
+  return railsTemplate({
+    ...DEFAULT_RAILS,
+    // Standalone, the card can simply COUNT its pairs — no `metaColumns` to be
+    // told, and no guess.
+    ...contentRails(metaColumns),
+    ...(gutters.drag ? {} : { drag: null }),
+    ...(gutters.select ? {} : { select: null }),
+  });
+}
+
 /** How many rails there are — the span a card claims. */
 export const RAIL_COUNT = 8;
 

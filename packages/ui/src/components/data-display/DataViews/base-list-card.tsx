@@ -3,7 +3,6 @@
 import { useTheme } from "@mui/material/styles";
 import { type ReactNode } from "react";
 
-import { Checkbox } from "../../form/Checkbox";
 import { Card } from "../../layout/Card";
 import type { DescriptionItemProps } from "../DescriptionItem";
 import { Box } from "../../../mui/Box";
@@ -15,16 +14,10 @@ import {
   slotTestIds,
   type CardSurfaceProps,
 } from "./card-surface";
-import { DragHandle, useDragItem } from "./data-views-drag";
+import { useDragItem } from "./data-views-drag";
+import { DragSlot, SelectSlot } from "./base-list-card-gutters";
 import { DENSITY_ROW_PADDING, type DataViewsDensity } from "./data-views-layout-context";
-import {
-  contentRails,
-  DEFAULT_RAILS,
-  RAIL_COUNT,
-  RAIL_GAP,
-  railsTemplate,
-  useListRails,
-} from "./list-card-rails";
+import { RAIL_COUNT, RAIL_GAP, railsTemplateFor, useListRails } from "./list-card-rails";
 import {
   ListCardCaption,
   ListCardMeta,
@@ -119,17 +112,6 @@ export interface BaseListCardProps extends CardSurfaceProps {
 const ROW_RADIUS = "3px";
 
 /**
- * MUI's Checkbox carries 9px of hit-area padding on every side.
- *
- * Left uncancelled, a row asking for 8px of padding puts the checkbox SQUARE 17px
- * in — and with the empty drag gutter's gap ahead of it, 46px in, which is what
- * made the left edge look like a mistake. The hit area is worth keeping; the
- * optical inset is not, so the padding is cancelled with a negative margin and
- * the glyph lands where the row's own padding says it should.
- */
-const CHECKBOX_PAD = "-9px";
-
-/**
  * Whether a click was really a click, or the tail of a text selection.
  *
  * Without this, selecting an order id to copy it navigates away instead — the
@@ -146,96 +128,6 @@ function clickKeys(onClick: () => void) {
     event.preventDefault();
     onClick();
   };
-}
-
-/**
- * AN EMPTY GUTTER COSTS ITS OWN WIDTH *AND* THE RAIL GAP BESIDE IT.
- *
- * A zero-width grid track still gets a `column-gap`, and no margin on the item
- * inside it can win that back — gaps sit between TRACKS, and a track's position
- * is settled before any item's margin is applied. (Tried it; the box simply
- * overhangs its own track and everything after it stays put.) So a row with
- * nothing to drag was paying 24px for a rail holding nothing, which was the
- * single biggest contributor to the left inset the checkbox appeared to have.
- *
- * The only way out is for the track NOT TO EXIST: the slot renders nothing and
- * the rail leaves the template, which is safe because grid auto-placement fills
- * the remaining tracks in DOM order. Standalone only — inside a
- * {@link ListCardGroup} the rails are subgrid across a shared template and the
- * count cannot vary per row, which is also where `reserveGutters` earns its
- * keep: a selectable list and a read-only one still line up, and turning drag
- * mode on does not shift every row sideways.
- */
-function railsTemplateFor(
-  gutters: { drag: boolean; select: boolean },
-  metaColumns: number,
-): string {
-  return railsTemplate({
-    ...DEFAULT_RAILS,
-    // Standalone, the card can simply COUNT its pairs — no `metaColumns` to be
-    // told, and no guess.
-    ...contentRails(metaColumns),
-    ...(gutters.drag ? {} : { drag: null }),
-    ...(gutters.select ? {} : { select: null }),
-  });
-}
-
-/** The grip. Its gutter is reserved only when the list says to reserve it. */
-function DragSlot({
-  drag,
-  reserve,
-  testId,
-}: {
-  drag: ReturnType<typeof useDragItem>;
-  reserve: boolean;
-  testId?: string;
-}): React.JSX.Element | null {
-  if (!drag.draggable) return reserve ? <Box data-slot="drag" /> : null;
-  return (
-    <Box data-slot="drag" sx={{ position: "relative", zIndex: 1 }}>
-      <DragHandle
-        handleProps={drag.handleProps}
-        gated={drag.handleProps !== undefined}
-        testId={testId}
-      />
-    </Box>
-  );
-}
-
-/** The select checkbox. Its gutter is reserved only when the list says to. */
-function SelectSlot({
-  selectable,
-  selected,
-  reserve,
-  onToggleSelect,
-  testId,
-}: {
-  selectable: boolean;
-  selected: boolean;
-  reserve: boolean;
-  onToggleSelect?: (event?: React.MouseEvent) => void;
-  testId?: string;
-}): React.JSX.Element | null {
-  if (!selectable) return reserve ? <Box data-slot="select" /> : null;
-  return (
-    // z-index 1: above the stretched link, or the anchor swallows the click.
-    <Box
-      data-slot="select"
-      sx={{ position: "relative", zIndex: 1, mx: CHECKBOX_PAD, display: "flex" }}
-    >
-      <Checkbox
-        checked={selected}
-        onChange={() => onToggleSelect?.()}
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggleSelect?.(event);
-        }}
-        size="small"
-        data-testid={testId}
-        aria-label="Selecionar"
-      />
-    </Box>
-  );
 }
 
 /** Geometry: the rails, the density padding, the two-line collapse. */
@@ -322,6 +214,31 @@ function rowSx(opts: {
  * A SHELL, like {@link BaseCard}. Domain rows live in the app and compose it.
  */
 /**
+ * The id this row drags under, or nothing.
+ *
+ * `undefined` is the inert answer: `useDragItem` treats a missing id as "no
+ * drag", which is how the card's own veto (`draggable={false}`) and an
+ * unactionable record both switch dragging off without the card knowing
+ * anything about the container above it.
+ */
+function dragIdFor(
+  props: BaseListCardProps,
+  actionable: boolean,
+): string | number | undefined {
+  return props.draggable === false || !actionable ? undefined : props.dragId;
+}
+
+/**
+ * What the meta cluster amounts to — asked once, used three times: to size the
+ * rail, to close the cluster with a rule, and to decide whether the value has
+ * anything to be divided FROM.
+ */
+function metaShape(props: BaseListCardProps): { columns: number; present: boolean } {
+  const columns = props.meta?.length ?? 0;
+  return { columns, present: columns > 0 || props.metaSlot != null };
+}
+
+/**
  * Everything the row derives before it can render — extracted so the component
  * stays inside the size budget.
  */
@@ -336,7 +253,7 @@ function useRowShell(props: BaseListCardProps) {
     theme: useTheme(),
     selectable: isSelectable(props),
     slot: slotTestIds(props.testId),
-    drag: useDragItem(props.draggable === false || !actionable ? undefined : props.dragId),
+    drag: useDragItem(dragIdFor(props, actionable)),
     // Standalone holds no gutter open: there is no list beside it to line up
     // with, so a reserved-but-empty rail is pure inset.
     reserve: group?.reserveGutters ?? false,
@@ -364,10 +281,40 @@ function actionProps(onClick: (() => void) | undefined) {
   };
 }
 
+/** The surface and the geometry, merged — the row's whole `sx` in one place. */
+function rowStyles(
+  props: BaseListCardProps,
+  shell: ReturnType<typeof useRowShell>,
+): Record<string, unknown> {
+  const { group, theme, selectable, drag, reserve, pad, padY, acts } = shell;
+  return {
+    ...cardSurfaceStyles(
+      {
+        ...props,
+        selectable,
+        shape: "row",
+        state: drag.dragging ? "disabled" : props.state,
+      },
+      theme,
+    ),
+    ...rowSx({
+      inGroup: group !== null,
+      gutters: { drag: reserve || drag.draggable, select: reserve || selectable },
+      metaColumns: metaShape(props).columns,
+      pad,
+      padY,
+      divider: props.divider ?? false,
+      interactive: acts || props.href != null,
+      draggable: drag.draggable && drag.handleProps === undefined,
+    }),
+  };
+}
+
 export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
-  const { selected = false, divider = false, href, onClick } = props;
-  const { group, actionable, scale, theme, selectable, slot, drag, reserve, pad, padY, acts } =
-    useRowShell(props);
+  const { selected = false, href, onClick } = props;
+  const shell = useRowShell(props);
+  const { actionable, scale, selectable, slot, drag, reserve, pad, acts } = shell;
+  const meta = metaShape(props);
 
   return (
     <Card
@@ -380,19 +327,7 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
       {...(acts ? actionProps(onClick) : {})}
       {...drag.itemProps}
       // A PLAIN OBJECT: `Card` merges by spreading, so a function sx vanishes.
-      sx={{
-        ...cardSurfaceStyles({ ...props, selectable, shape: "row", state: drag.dragging ? "disabled" : props.state }, theme),
-        ...rowSx({
-          inGroup: group !== null,
-          gutters: { drag: reserve || drag.draggable, select: reserve || selectable },
-          metaColumns: props.meta?.length ?? 0,
-          pad,
-          padY,
-          divider,
-          interactive: acts || href != null,
-          draggable: drag.draggable && drag.handleProps === undefined,
-        }),
-      }}
+      sx={rowStyles(props, shell)}
     >
       <DragSlot drag={drag} reserve={reserve} testId={slot("drag")} />
       <SelectSlot
@@ -420,7 +355,7 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
       />
       <ListCardTail
         value={props.value}
-        separated={(props.meta?.length ?? 0) > 0 || props.metaSlot != null}
+        separated={meta.present}
         status={props.status}
         actions={actionable ? props.actions : undefined}
         actionsAlwaysVisible={props.actionsAlwaysVisible}
