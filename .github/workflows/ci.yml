@@ -150,6 +150,49 @@ jobs:
       run-affected-e2e: false
       install-playwright: false
 
+  # The payments PORTABILITY gate (FUT-562). Separate from `quality` above
+  # because that job is the org's reusable workflow (12-apps/ci) and knows
+  # nothing about this repo's payments package.
+  #
+  # `packages/payments/ADOPTING.md` §6 listed these rules and said they were
+  # "enforced by review". Review is what let a host repo grow a PagBank-shaped
+  # checkout and a 1,165-line fork of the settings page, and what let one
+  # vendor's payload field survive in code whose commit message claimed to have
+  # removed provider names.
+  #
+  # TWO steps, both required. The gate alone cannot tell "the tree is portable"
+  # apart from "my globs match nothing", and the second reports a safety it is
+  # not providing — so the self-test lints a deliberate violation of each rule
+  # through the same config and fails if any of them comes back clean.
+  portability:
+    name: Payments Portability
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      # ONE script, not its two halves rewritten here. `quality:portability` is
+      # `quality:portability:selftest && eslint --config …`; spelling those out
+      # in the workflow is how CI and the command a developer runs drift — add a
+      # third step to the script and only the local run would get it.
+      - name: Payments portability gate
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm quality:portability 2>&1 | tee portability.log
+
   # The only gate that sees what a CONSUMER sees. Every other job above runs
   # inside the pnpm workspace, where a sibling import resolves whether or not the
   # manifest declares it and every file is on disk whether or not `files` would
@@ -294,7 +337,7 @@ jobs:
   # ahead of it, which is the only place a token is ever used.
   release:
     name: Release
-    needs: [lint, type-check, build, unit-tests, quality, consumers, frontend-harness, backend-harness]
+    needs: [lint, type-check, build, unit-tests, quality, portability, consumers, frontend-harness, backend-harness]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -380,7 +423,7 @@ jobs:
     name: CI Success
     runs-on: ubuntu-latest
     if: always()
-    needs: [lint, type-check, build, unit-tests, quality, consumers, frontend-harness, backend-harness]
+    needs: [lint, type-check, build, unit-tests, quality, portability, consumers, frontend-harness, backend-harness]
     steps:
       - name: Verify all required jobs passed
         shell: bash
