@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { flushReporter, scrub, sentryEnabled, sentryTransport } from './sentry';
+import { flushReporter, scrub, sentryEnabled, sentryTransport } from '../index';
 
 /**
  * Unit (FUT-716): what the error reporter is allowed to send, and when it
