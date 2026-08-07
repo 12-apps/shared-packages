@@ -236,6 +236,22 @@ export interface CheckoutChainLink {
    * never shown a field for.
    */
   customerSchema?: CheckoutCustomerField[];
+  /**
+   * The buyer screen THIS provider's flow needs (FUT-596) — an opaque id the
+   * adapter declares and `providers/registry.ts` resolves to a component.
+   *
+   * Optional, and the DEGRADE DIRECTION IS THE OPPOSITE of `customerSchema`'s
+   * above — spelled out because a reader will otherwise assume symmetry from
+   * the neighbouring comment. Absent, `null`, or an id THIS bundle has never
+   * heard of all mean the CAPABILITY DEFAULT: the pane composed from
+   * `tokenization` + `methods`, exactly as it was before this field existed.
+   *
+   * That is the safe direction here. Treating an unknown id as "render
+   * nothing" would blank the pane for every buyer of a store whose backend is
+   * one release ahead of this bundle — and the two packages version
+   * independently, so that skew is normal, not exceptional.
+   */
+  checkoutScreen?: string | null;
 }
 
 /**
