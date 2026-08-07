@@ -1,8 +1,9 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import { DescriptionItem, type DescriptionItemProps } from "../DescriptionItem";
+import { RAIL_GAP_PX } from "./list-card-rails";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
@@ -95,19 +96,53 @@ export function ListCardCaption({
   );
 }
 
+/** One rule between two columns. Shared, so every gap gets the same mark. */
+function MetaRule(): React.JSX.Element {
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        flex: "0 0 auto",
+        color: "text.disabled",
+        opacity: 0.5,
+        userSelect: "none",
+        fontSize: "0.875rem",
+      }}
+    >
+      |
+    </Box>
+  );
+}
+
 /**
  * The middle columns: stacked label-over-value pairs, separated by a rule.
  *
  * Stacked rather than side by side because `DATA 05/08/2026` inline spends the
  * horizontal room the value rail needs, and the separator is what stops two
  * adjacent pairs reading as one four-word phrase.
+ *
+ * EVEN GAPS, NOT EVEN BOXES. The rail takes a share of the row's spare width
+ * per pair (see `metaRail`), and the obvious way to spend it — give every pair
+ * an equal-width box and centre its content — puts the separator on the BOX
+ * boundary, which is only the visual midpoint when both pairs are the same
+ * width. They never are: `05/08/2026, 13:45` reaches almost to the edge of its
+ * box while `PIX` stops well short of its own, so the rule ends up crowded
+ * against the date and adrift from the method.
+ *
+ * So the pairs are sized to their content and the SPARE space is what gets
+ * divided evenly. `space-evenly` gives every gap — including the two either
+ * side of each separator — the same width, which puts each rule exactly halfway
+ * between the two labels it separates, whatever they happen to say.
  */
 export function ListCardMeta({
   meta,
   metaSlot,
+  trailingRule,
 }: {
   meta?: DescriptionItemProps[];
   metaSlot?: ReactNode;
+  /** Close the run with a rule, dividing the last pair from the value. */
+  trailingRule?: boolean;
 }): React.JSX.Element {
   const items = meta ?? [];
   return (
@@ -116,7 +151,11 @@ export function ListCardMeta({
       sx={{
         display: "flex",
         alignItems: "center",
-        gap: 2,
+        justifyContent: "space-evenly",
+        // A FLOOR, not the spacing itself: `space-evenly` supplies the rest, and
+        // this is only what keeps a rail with no room to spare from running the
+        // date straight into the rule.
+        gap: 1,
         whiteSpace: "nowrap",
         ...TABULAR,
         // Rung 1 of the ladder.
@@ -124,26 +163,54 @@ export function ListCardMeta({
       }}
     >
       {items.map((item, index) => (
-        <Box key={`${item.label}-${index}`} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          {index > 0 && (
-            <Box
-              aria-hidden
-              sx={{ color: "text.disabled", opacity: 0.5, userSelect: "none", fontSize: "0.875rem" }}
-            >
-              |
-            </Box>
-          )}
+        <Fragment key={`${item.label}-${index}`}>
+          {/* ITS OWN ITEM, not the first child of the pair that follows it.
+              Nested inside, the rule travelled with that pair's centred content
+              and came to rest nearer one label than the other — a separator
+              visibly closer to MÉTODO than to DATA reads as belonging to it. */}
+          {index > 0 && <MetaRule />}
           {/* Centred: a stacked pair sitting in its own column reads as one
               unit only when the label is over the value rather than flush left
               of a value shorter than it — `MÉTODO` above `PIX` was visibly
               unhinged from it. Overridable per item. */}
-          <DescriptionItem orientation="vertical" align="center" {...item} />
-        </Box>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: 0,
+              // Sized to the pair, so the gaps either side of it are free space
+              // that `space-evenly` can equalise.
+              flex: "0 0 auto",
+            }}
+          >
+            <DescriptionItem orientation="vertical" align="center" {...item} />
+          </Box>
+        </Fragment>
       ))}
       {metaSlot}
+      {trailingRule && items.length > 0 && <MetaRule />}
     </Box>
   );
 }
+
+/**
+ * The value sits flush against the meta rail, with no gap of its own.
+ *
+ * Its divider is now the LAST ITEM OF THE META CLUSTER, placed by the same
+ * `space-evenly` that places the rules between the pairs — so it is equidistant
+ * from `PIX` and from `R$ 13,90` for free, which a rule centred in the rail gap
+ * could never be: the cluster's content stops well short of the rail's right
+ * edge, leaving that rule 150px from the method and 12px from the money.
+ *
+ * Cancelling this one gap is what makes the two distances equal. Below
+ * `META_BREAK` the cluster (and its rule) are gone, so the gap comes back —
+ * otherwise the value would sit straight against the title.
+ */
+const VALUE_FLUSH = {
+  marginLeft: `-${RAIL_GAP_PX}px`,
+  [`@container (max-width: ${META_BREAK}px)`]: { marginLeft: 0 },
+} as const;
 
 /** The value, on its own rail, never truncated and never shunted by the chip. */
 function ListCardValue({ value, scale }: { value: ReactNode; scale: number }): React.JSX.Element {
@@ -218,6 +285,7 @@ function ListCardActions({
 /** Value, status and actions — three rails, not one flex run. */
 export function ListCardTail({
   value,
+  separated,
   status,
   actions,
   actionsAlwaysVisible,
@@ -226,6 +294,8 @@ export function ListCardTail({
   testId,
 }: {
   value?: ReactNode;
+  /** Whether a meta cluster precedes the value and wants dividing from it. */
+  separated?: boolean;
   status?: ReactNode;
   actions?: ReactNode;
   actionsAlwaysVisible?: boolean;
@@ -235,7 +305,14 @@ export function ListCardTail({
 }): React.JSX.Element {
   return (
     <>
-      <Box data-slot="value" sx={{ textAlign: "right" }} data-testid={testId("value")}>
+      <Box
+        data-slot="value"
+        sx={{
+          textAlign: "right",
+          ...(separated && value != null ? VALUE_FLUSH : {}),
+        }}
+        data-testid={testId("value")}
+      >
         {value != null && <ListCardValue value={value} scale={scale} />}
       </Box>
       <Box

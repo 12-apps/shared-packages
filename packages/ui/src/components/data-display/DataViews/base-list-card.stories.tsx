@@ -1,6 +1,8 @@
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import type { InputType } from "storybook/internal/types";
 
 import { Chip } from "../Chip";
 import { Button } from "../../form/Button";
@@ -21,30 +23,26 @@ import { ListCardGroup } from "./list-card-rails";
  * open filter panel, which are three different widths at one viewport size.
  * Resize the Storybook canvas (or the wrappers below) to watch it collapse.
  */
-const meta: Meta<typeof BaseListCard> = {
-  title: "DataDisplay/DataViews/BaseListCard",
-  component: BaseListCard,
-  parameters: { layout: "padded" },
-  tags: ["autodocs"],
-  argTypes: {
-    variant: { control: "inline-radio", options: ["outline", "ghost", "text", "glass"] },
-    emphasis: { control: "inline-radio", options: ["none", "attention", "new"] },
-    state: { control: "inline-radio", options: ["default", "cancelled", "disabled"] },
-    color: {
-      control: "select",
-      options: ["primary", "secondary", "success", "warning", "error", "info"],
-    },
-    density: { control: "inline-radio", options: ["compact", "cozy", "comfortable"] },
-    selectable: { control: "boolean" },
-    draggable: { control: "boolean" },
-    scale: { control: { type: "range", min: 0.9, max: 1.6, step: 0.05 } },
-    divider: { control: "boolean" },
-    selected: { control: "boolean" },
-  },
-};
-export default meta;
+/**
+ * Tag a block of controls with one table category, keeping the block's own
+ * order. Categories are how the table gets a running order at all — Storybook
+ * merges the inferred prop list with these, and the inferred list is in
+ * declaration order, which is the order the props were CONVENIENT TO WRITE
+ * rather than the order anybody reads them in.
+ */
+function category(name: string, knobs: Record<string, InputType>): Record<string, InputType> {
+  return Object.fromEntries(
+    Object.entries(knobs).map(([prop, knob]) => [
+      prop,
+      { ...knob, table: { ...knob.table, category: name } },
+    ]),
+  );
+}
 
-type Story = StoryObj<typeof BaseListCard>;
+/** Plumbing: real props, but nothing anybody explores a component through. */
+function hidden(...props: string[]): Record<string, InputType> {
+  return Object.fromEntries(props.map((prop) => [prop, { table: { disable: true } }]));
+}
 
 const kebab = (
   <DropdownMenu
@@ -54,8 +52,17 @@ const kebab = (
       { id: "delete", label: "Excluir", color: "error", onClick: () => {} },
     ]}
     trigger={
-      <Button variant="text" size="sm" aria-label="Ações">
-        ⋮
+      // SQUARE, and no wider than the glyph. `Button` has no icon-only size, so
+      // it keeps MUI's 64px `minWidth` and its own 12px of side padding — three
+      // dots sitting in a 64px slab, which at the end of a row reads as a
+      // button that failed to load its label.
+      <Button
+        variant="text"
+        size="sm"
+        aria-label="Ações"
+        sx={{ minWidth: 0, px: 0.5, borderRadius: 1 }}
+      >
+        <MoreVertIcon sx={{ fontSize: 18 }} />
       </Button>
     }
   />
@@ -63,21 +70,170 @@ const kebab = (
 
 const marker = <ReceiptLongOutlinedIcon sx={{ fontSize: 22, color: "text.disabled" }} />;
 
-/** The row the Pedidos list draws, as the primitive rather than by hand. */
+/**
+ * WHAT A REACTNODE SLOT CAN OFFER A CONTROL.
+ *
+ * A `ReactNode` has no widget: Storybook's object editor shows it as
+ * `$$typeof: Symbol(react.transitional.element)` and anything typed into that
+ * blob produces an element React cannot render. So each slot names a few REAL
+ * nodes and the control picks between them — `options` for the labels, `mapping`
+ * for the values. That is an editable slot without a JSON trap in it.
+ */
+function slot(mapping: Record<string, unknown>): InputType {
+  return { control: "select", options: Object.keys(mapping), mapping };
+}
+
+const chip = (label: string, color: "info" | "success" | "error"): React.JSX.Element => (
+  <Chip label={label} size="small" variant="outlined" color={color} />
+);
+
+const LEADING = { nenhum: undefined, "ícone de recibo": marker };
+const STATUS = {
+  nenhum: undefined,
+  "Em aberto": chip("Em aberto", "info"),
+  Pago: chip("Pago", "success"),
+  Cancelado: chip("Cancelado", "error"),
+};
+const MENU = { nenhum: undefined, "kebab (⋮)": kebab };
+const ACTIONS = {
+  nenhuma: undefined,
+  Ver: <Button variant="outline" size="sm">Ver</Button>,
+  "Ver + Imprimir": (
+    <>
+      <Button variant="outline" size="sm">Ver</Button>
+      <Button variant="text" size="sm">Imprimir</Button>
+    </>
+  ),
+};
+
+const meta: Meta<typeof BaseListCard> = {
+  title: "DataDisplay/DataViews/BaseListCard",
+  component: BaseListCard,
+  parameters: { layout: "padded" },
+  tags: ["autodocs"],
+  /**
+   * EVERY VALUE HERE IS THE COMPONENT'S OWN DEFAULT, so no story renders any
+   * differently for their presence. They are declared for their ORDER.
+   *
+   * Storybook builds the table by merging the story's args over the props it
+   * inferred from the type, and a category's section is created where its FIRST
+   * member lands. Args are merged first, so these seven keys open the Layout and
+   * Appearance sections before anything inferred can open one of its own —
+   * which is the whole reason the table no longer opens on `leading`.
+   *
+   * Reordering or removing them silently reshuffles the docs. `sort` in
+   * `parameters.controls` cannot fix it: it orders rows WITHIN a section and
+   * never the sections themselves.
+   */
+  args: {
+    density: "cozy",
+    scale: 1,
+    divider: false,
+    variant: "outline",
+    color: "primary",
+    emphasis: "none",
+    state: "default",
+  },
+  argTypes: {
+    // ORDERED BY WHAT SOMEBODY WOULD ACTUALLY REACH FOR.
+    //
+    // Left alone, the table opens on `leading`, `meta`, `status` and `menu` —
+    // a React element rendered as `$$typeof: Symbol(react.transitional.element)`
+    // and an array of objects behind a raw JSON editor. Nobody tunes a row by
+    // hand-editing that blob, so the knobs that DO change what you see were
+    // below the fold, under four controls that cannot be used.
+    //
+    // So: the things that reshape the row first, then how it is painted, then
+    // its text, then what it does. Composition slots keep their documentation
+    // but lose their useless widgets, and the plumbing leaves the table.
+    ...category("Layout", {
+      density: { control: "inline-radio", options: ["compact", "cozy", "comfortable"] },
+      scale: { control: { type: "range", min: 0.9, max: 1.6, step: 0.05 } },
+      divider: { control: "boolean" },
+      selectable: { control: "boolean" },
+      selected: { control: "boolean" },
+    }),
+    ...category("Appearance", {
+      variant: { control: "inline-radio", options: ["outline", "ghost", "text", "glass"] },
+      color: {
+        control: "select",
+        options: ["primary", "secondary", "success", "warning", "error", "info"],
+      },
+      emphasis: { control: "inline-radio", options: ["none", "attention", "new"] },
+      state: { control: "inline-radio", options: ["default", "cancelled", "disabled"] },
+    }),
+    ...category("Content", {
+      title: { control: "text" },
+      subtitle: { control: "text" },
+      value: { control: "text" },
+    }),
+    ...category("Behaviour", {
+      href: { control: "text" },
+      target: { control: "text" },
+      onClick: { control: false },
+      onToggleSelect: { control: false },
+    }),
+    ...category("Slots", {
+      // Pick between real nodes rather than editing an element blob.
+      leading: slot(LEADING),
+      status: slot(STATUS),
+      menu: slot(MENU),
+      actions: slot(ACTIONS),
+      // These two ARE directly editable: an array of label/value pairs is
+      // exactly what the object editor is good at, and a bare string is a
+      // perfectly good `ReactNode`.
+      meta: { control: "object" },
+      metaSlot: { control: "text" },
+      children: { control: "text" },
+    }),
+    // `actionsAlwaysVisible` joins them: it only reveals INLINE actions, and the
+    // primary row carries an overflow menu instead — so as a control here it is
+    // a switch wired to nothing. The `Actions` story is where it has something
+    // to act on, and where its behaviour is explained.
+    ...hidden(
+      "className",
+      "aria-label",
+      "testId",
+      "dragId",
+      "onContextMenu",
+      "actionsAlwaysVisible",
+      // A VETO, not a switch: dragging is the container's decision, so outside a
+      // `DragContainerProvider` this changes nothing. It has a story of its own.
+      "draggable",
+    ),
+  },
+};
+export default meta;
+
+type Story = StoryObj<typeof BaseListCard>;
+
+
+
+/**
+ * The row the Pedidos list draws, as the primitive rather than by hand.
+ *
+ * The autodocs table is built from THIS story, so the key order below carries on
+ * where `meta.args` left off: content, then behaviour, then the slots. See the
+ * note on `meta.args`.
+ */
 export const Pedido: Story = {
   args: {
-    leading: marker,
     title: "B75A6858",
     subtitle: "Luiz Gustavo",
+    value: "R$ 13,90",
+    onClick: () => {},
+    onToggleSelect: () => {},
+    leading: marker,
     meta: [
       { label: "Data", value: "05/08/2026, 13:45" },
       { label: "Método", value: "PIX" },
     ],
-    value: "R$ 13,90",
     status: <Chip label="Em aberto" size="small" variant="outlined" color="info" />,
+    // ONE overflow, no inline buttons. A row offering `Ver` beside a kebab that
+    // also opens `Editar`/`Excluir` asks the same question twice; see the
+    // `Actions` story for the case where a host does want both (and where
+    // `actionsAlwaysVisible` has something to act on).
     menu: kebab,
-    onToggleSelect: () => {},
-    onClick: () => {},
     testId: "pedido-row",
   },
 };
