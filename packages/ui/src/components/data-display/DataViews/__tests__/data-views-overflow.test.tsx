@@ -33,11 +33,12 @@ interface Row extends Record<string, unknown> {
   metodo: string;
   origem: string;
   valor: number;
+  dataIso: string;
 }
 
 const rows: Row[] = [
-  { id: "1", nome: "Ana", status: "pago", metodo: "pix", origem: "site", valor: 10 },
-  { id: "2", nome: "Bruno", status: "recusado", metodo: "credito", origem: "app", valor: 25 },
+  { id: "1", nome: "Ana", status: "pago", metodo: "pix", origem: "site", valor: 10, dataIso: "2026-08-06" },
+  { id: "2", nome: "Bruno", status: "recusado", metodo: "credito", origem: "app", valor: 25, dataIso: "2026-08-07" },
 ];
 
 const columns: DataViewColumn<Row>[] = [
@@ -155,6 +156,58 @@ describe("toOverflowFields", () => {
     const all = toOverflowFields(fields, rangeFields);
     expect(all.map((field) => field.id)).toEqual(["status", "metodo", "origem", "valor"]);
     expect(all.map((field) => field.group)).toEqual(["pill", "pill", "pill", "range"]);
+  });
+});
+
+/**
+ * THE OVERFLOW PANEL'S RANGE BOUNDS.
+ *
+ * This panel used to build its own pair of inputs — a raw `<input type="date">`
+ * for a day, a bare `type="number"` plus `Number(raw)` for a value. So the
+ * masked `dd/mm/aaaa` field existed only while the filter FITTED on the bar:
+ * the moment "Data" overflowed it reverted to the very control the mask
+ * replaced, and a merchant on a narrow screen never saw the fix at all. The
+ * bounds now come from the same `RangeBounds` the pill uses, so the two
+ * surfaces cannot drift again (FUT-744).
+ */
+describe("the overflow panel's range bounds", () => {
+  const withDay: RangeFieldConfig<Row>[] = [
+    { id: "data", label: "Data do pedido", accessor: (row) => row.dataIso, kind: "day" },
+    ...rangeFields,
+  ];
+
+  /** Narrow enough that every range field is pushed behind "Mais". */
+  async function openOverflow(): Promise<void> {
+    stubResizeObserver(320);
+    renderBar({ rangeFields: withDay });
+    fireEvent.click(await screen.findByTestId("lista-more-filters"));
+    await screen.findByTestId("lista-more-panel");
+  }
+
+  /** Type `text` one character at a time, the way a keyboard delivers it. */
+  function typeSequentially(element: HTMLInputElement, text: string): void {
+    for (const character of text) {
+      fireEvent.change(element, { target: { value: element.value + character } });
+    }
+  }
+
+  it("takes a whole day as one run of digits, which the native input could not", async () => {
+    await openOverflow();
+    const min = (await screen.findByTestId("lista-more-data-min")) as HTMLInputElement;
+    // A native date input is three segments wearing one box; the masked one is
+    // ordinary text, and that difference is the entire bug this covers.
+    expect(min).toHaveAttribute("type", "text");
+    typeSequentially(min, "060820");
+    await waitFor(() => expect(min).toHaveValue("06/08/20"));
+  });
+
+  it("keeps the decimal comma on a value bound, rather than eating it", async () => {
+    await openOverflow();
+    const min = (await screen.findByTestId("lista-more-valor-min")) as HTMLInputElement;
+    expect(min).toHaveAttribute("type", "text");
+    // `Number("12,50")` is NaN — the old panel silently dropped the fraction.
+    typeSequentially(min, "12,50");
+    await waitFor(() => expect(min).toHaveValue("12,50"));
   });
 });
 
