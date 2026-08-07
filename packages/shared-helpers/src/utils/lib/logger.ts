@@ -1,18 +1,20 @@
 import * as util from 'util';
 import * as winston from 'winston';
 
-import { sentryTransport } from './sentry';
+import { sentryTransport } from '@12-apps/observability-backend';
 
 // Re-exported through the module the barrel already publishes, so callers reach
-// them without importing `./sentry` directly — which stays private for the
-// reason its own note gives (the transport is the only way to turn reporting on).
+// them without importing `@12-apps/observability-backend` directly — which stays
+// an implementation detail for the reason its own note gives (the transport is
+// the only way to turn reporting on). Keeping the re-export here is also what
+// makes moving the reporter into its own package invisible to every caller.
 //
 // `flushReporter`: for a caller about to `process.exit`.
 // `scrub`: for a caller that must fold a CONTEXT OBJECT into a log message. The
 // alternative — passing the object as a second argument — has Winston
 // `util.inspect` it, which is exactly how a credential or a buyer's details
 // reach a third party.
-export { flushReporter, scrub } from './sentry';
+export { flushReporter, scrub } from '@12-apps/observability-backend';
 
 const isDevelopment = () => process.env['NODE_ENV'] === 'development';
 
@@ -65,7 +67,8 @@ export const logger: ILogger = winston.createLogger({
       return `${prefix} ${formattedMessage}`;
     }),
   ),
-  // Console always; Sentry only when a DSN is configured (see `./sentry`), so
+  // Console always; Sentry only when a DSN is configured (see
+  // `@12-apps/observability-backend`), so
   // dev, CI and tests stay entirely offline and a production failure stops
   // being readable only over SSH.
   transports: [new winston.transports.Console(), ...reporterTransports()],

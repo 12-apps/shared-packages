@@ -72,7 +72,8 @@
         "@12-apps/payments-backend",
         "@12-apps/product-research",
         "@12-apps/report-builder",
-        "@12-apps/shift"
+        "@12-apps/shift",
+        "@sentry/node"
       ]
     },
     "packages/*": {
@@ -97,6 +98,13 @@
       ],
       "ignoreDependencies": [
         "@storybook/builder-vite"
+      ]
+    },
+    "packages/observability/frontend": {
+      "entry": [
+        "src/index.ts",
+        "src/react/*.{ts,tsx}",
+        "src/vite/*.ts"
       ]
     }
   },
