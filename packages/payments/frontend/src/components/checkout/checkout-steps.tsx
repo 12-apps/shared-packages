@@ -2,12 +2,9 @@ import { Box } from "@mui/material";
 import { useEffect, useRef, type JSX, type ReactNode } from "react";
 
 import { BuyerInfoForm } from "./buyer-info-form";
-import { CardView } from "./card-view";
 import { LockOutlinedIcon } from "./icons";
 import {
-  cardChain,
   cardPathAvailable,
-  cardTokenization,
   offeredMethods,
   selectableMethods,
   usePreselectSoleMethod,
@@ -15,7 +12,7 @@ import {
 import { MethodPicker } from "./method-picker";
 import { PaymentErrorPanel } from "./payment-error-panel";
 import { PayerSummary } from "./payer-summary";
-import { PixView } from "./pix-view";
+import { resolveCheckoutScreen } from "./providers/registry";
 import type {
   BuyerField,
   BuyerInfo,
@@ -53,11 +50,24 @@ function useAutoRaiseOrder(
   }, [method, order, creating, createError, onGenerate]);
 }
 
-/** The per-method payment body — PIX QR, card form, or nothing until raised. */
+/**
+ * The payment body — whichever screen the store's provider declares (FUT-596).
+ *
+ * This used to switch on `order.method` and compose the PIX and card panes
+ * itself. It now resolves a screen from the id the adapter published on the
+ * chain's head and renders it; the panes moved to `providers/`, unchanged.
+ * The shell keeps everything shared — picker, payer, totals, errors, the
+ * polling cadence — so a provider's flow differs only where it genuinely does.
+ *
+ * `resolveCheckoutScreen` always returns a component, so there is no branch
+ * here for "no screen": an undeclared or unrecognised id lands on the
+ * capability default.
+ */
 function PaymentBody({
   order,
   buyer,
   providerConfig,
+  method,
   tenantSlug,
   onResolved,
   pollIntervalMs,
@@ -65,29 +75,23 @@ function PaymentBody({
   order: CheckoutOrder | null;
   buyer: BuyerInfo;
   providerConfig: CheckoutProviderConfig | null;
+  method: PaymentMethod | null;
   tenantSlug?: string;
   onResolved: (status: OrderStatus) => void;
   pollIntervalMs?: number;
 }): JSX.Element | null {
-  if (order?.method === "PIX") {
-    return <PixView order={order} onResolved={onResolved} pollIntervalMs={pollIntervalMs} />;
-  }
-  if (order?.method === "CARD") {
-    return (
-      <CardView
-        order={order}
-        buyer={buyer}
-        providerConfig={cardTokenization(providerConfig)}
-        // The whole chain (FUT-563): one instrument is minted per provider so
-        // the charge survives the first one failing, with nothing re-typed.
-        providerChain={cardChain(providerConfig)}
-        tenantSlug={tenantSlug}
-        onResolved={onResolved}
-        pollIntervalMs={pollIntervalMs}
-      />
-    );
-  }
-  return null;
+  const Screen = resolveCheckoutScreen(providerConfig?.chain?.[0]?.checkoutScreen);
+  return (
+    <Screen
+      order={order}
+      buyer={buyer}
+      config={providerConfig}
+      method={method}
+      tenantSlug={tenantSlug}
+      onResolved={onResolved}
+      pollIntervalMs={pollIntervalMs}
+    />
+  );
 }
 
 /** Empty-cart state shown when there's nothing to check out. */
@@ -334,6 +338,7 @@ export function PaymentStep({
         order={order}
         buyer={buyer}
         providerConfig={providerConfig ?? null}
+        method={method}
         tenantSlug={tenantSlug}
         onResolved={onResolved}
         pollIntervalMs={pollIntervalMs}

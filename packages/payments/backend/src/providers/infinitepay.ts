@@ -358,6 +358,8 @@ export function infinitePayProvider(): PaymentProviderAdapter {
     },
     credentialSchema,
     customerSchema,
+    // The buyer finishes on the provider's own page — no card form, no PIX pane.
+    checkoutScreen: 'hosted-link',
 
     verifyCredentials,
     createCharge,

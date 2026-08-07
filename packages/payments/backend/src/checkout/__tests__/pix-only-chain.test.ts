@@ -51,6 +51,9 @@ function link(over: Partial<BuyerProviderLink>): BuyerProviderLink {
     mockTokenization: false,
     methods: ['PIX', 'CARD'],
     customerSchema: [],
+    // Declares no screen (FUT-596) — these cases are about the capability
+    // reads, which is exactly the path an undeclared provider takes.
+    checkoutScreen: null,
     ...over,
   };
 }

@@ -160,6 +160,26 @@ export interface PaymentProviderAdapterBase {
   readonly customerSchema?: CustomerSchema;
 
   /**
+   * The buyer CHECKOUT SCREEN this provider's flow needs (FUT-596), as an
+   * opaque id the adapter and the checkout registry agree on — the same
+   * contract as `SetupStep.action`, one layer down in the buyer's journey.
+   *
+   * It names the SHAPE OF THE FLOW, never the vendor: `'pix-and-card'` is a
+   * store that shows a PIX code and takes a card typed here, `'hosted-link'`
+   * is one that hands the buyer to the provider's own page. Two providers with
+   * the same shape declare the same id and share one screen — which is the
+   * point, and is not expressible if the id is a vendor name.
+   *
+   * Omitted means the CAPABILITY DEFAULT: the shell composes the pane from
+   * `capabilities` exactly as it did before this field existed. So a new
+   * adapter checks out on the day it is written, and an id THIS frontend has
+   * never heard of degrades to that same default rather than to a blank pane.
+   * The two packages version independently and a host may run a newer backend
+   * than bundle — the buyer must never pay for that skew.
+   */
+  readonly checkoutScreen?: string;
+
+  /**
    * Cheap authenticated call proving the credentials work (the "Verificar"
    * button). Never throws for bad credentials — that's a result, not a bug.
    */

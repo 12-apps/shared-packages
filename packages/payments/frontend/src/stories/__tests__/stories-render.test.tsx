@@ -21,6 +21,7 @@ import type { StoryObj } from "@storybook/react-vite";
 import * as checkoutStories from "../Checkout.stories";
 import * as compositionStories from "../Composition.stories";
 import * as hostedStories from "../Hosted.stories";
+import * as providerScreenStories from "../ProviderScreens.stories";
 import * as screenStories from "../Screens.stories";
 
 /** A container, so the tripwire records into a property rather than a binding. */
@@ -55,6 +56,7 @@ const MODULES: [string, Record<string, unknown>][] = [
   ["Screens", screenStories],
   ["Hosted", hostedStories],
   ["Composition", compositionStories],
+  ["ProviderScreens", providerScreenStories],
 ];
 
 describe.each(MODULES)("%s stories", (_name, module) => {
