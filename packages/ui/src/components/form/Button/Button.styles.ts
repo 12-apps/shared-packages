@@ -61,13 +61,48 @@ export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => 
   };
 };
 
-export const SIZE_MAP: Record<string, CSSObject> = {
+/** What an unrecognised size falls back to, named so indexing can never be undefined. */
+const DEFAULT_SIZE: CSSObject = { padding: '8px 16px', fontSize: '1rem' };
+
+const SIZE_MAP: Record<string, CSSObject> = {
   xs: { padding: '2px 8px', fontSize: '0.75rem' },
   sm: { padding: '6px 12px', fontSize: '0.875rem' },
-  md: { padding: '8px 16px', fontSize: '1rem' },
+  md: DEFAULT_SIZE,
   lg: { padding: '10px 20px', fontSize: '1.125rem' },
   xl: { padding: '12px 24px', fontSize: '1.25rem' },
 };
+
+/**
+ * A BUTTON THAT IS ONLY AN ICON IS SQUARE.
+ *
+ * MUI puts a 64px `min-width` on every button, which is right for a label and
+ * wrong for a glyph: three dots in a 64px slab reads as a button that failed to
+ * load its text, and at the end of a dense row it claims space the row needs.
+ * The horizontal padding goes too — a square of padding round a square glyph —
+ * and so does the gap MUI reserves beside a start/end icon, since there is
+ * nothing on the other side of it.
+ *
+ * Derived, not declared: a button with an `icon` and no children can only be an
+ * icon button, so no consumer has to opt in and none can forget to.
+ */
+const ICON_ONLY_PADDING: Record<string, string> = {
+  xs: '2px',
+  sm: '5px',
+  md: '7px',
+  lg: '9px',
+  xl: '11px',
+};
+
+const iconOnlySize = (size: string): CSSObject => ({
+  minWidth: 0,
+  padding: ICON_ONLY_PADDING[size] ?? ICON_ONLY_PADDING.md,
+  fontSize: SIZE_MAP[size]?.fontSize ?? DEFAULT_SIZE.fontSize,
+  '& .MuiButton-startIcon, & .MuiButton-endIcon': { margin: 0 },
+});
+
+/** The size styles for a button, square when it carries nothing but an icon. */
+export const buttonSize = (size: string, iconOnly: boolean): CSSObject =>
+  iconOnly ? iconOnlySize(size) : (SIZE_MAP[size] ?? DEFAULT_SIZE);
 
 /**
  * MUI centres icons with a negative margin that fights our own padding, so the

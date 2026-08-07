@@ -8,7 +8,7 @@ import {
   buttonVariantStyles,
   getColorFromTheme,
   iconAlignmentStyles,
-  SIZE_MAP,
+  buttonSize,
 } from './Button.styles';
 import type { ButtonProps } from './Button.types';
 
@@ -53,6 +53,22 @@ const muiColorFor = (color: NonNullable<ButtonProps['color']>): MuiButtonColor =
   return color === 'neutral' ? 'inherit' : color;
 };
 
+/**
+ * An icon and nothing else — the shape that should render square.
+ *
+ * A separate predicate rather than three clauses inline: the component function
+ * is already at the complexity ceiling, and "what counts as an icon button" is
+ * a rule worth naming anyway. `loading` disqualifies, because a spinner
+ * replaces the children and would otherwise make every loading button square.
+ */
+function isIconOnly({
+  loading,
+  icon,
+  children,
+}: Pick<ButtonProps, 'loading' | 'icon' | 'children'>): boolean {
+  return !loading && icon != null && children == null;
+}
+
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (rawProps, ref) => {
     const {
@@ -81,6 +97,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const iconWithTestId =
       !loading && icon ? <span data-testid={testId('icon')}>{icon}</span> : undefined;
 
+    // Only an icon, so the button is a square rather than a 64px slab.
+    const iconOnly = isIconOnly({ loading, icon, children });
+
     const mergedClassName =
       [active ? 'active' : '', props.className].filter(Boolean).join(' ') || undefined;
 
@@ -101,7 +120,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         onClick={onClick}
         onFocus={onFocus}
         onBlur={onBlur}
-        sx={SIZE_MAP[size]}
+        sx={buttonSize(size, iconOnly)}
         data-testid={dataTestId || 'button'}
         {...props}
         className={mergedClassName}

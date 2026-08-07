@@ -125,6 +125,20 @@ export interface CardSurfaceProps {
   "aria-label"?: string;
 }
 
+/**
+ * ONE RADIUS FOR BOTH SHAPES, off the token scale on purpose.
+ *
+ * `Card`'s own steps are 4px and 8px and its `lg` is 16px, all chosen for a
+ * surface nearly as tall as it is wide. A 56px row is not that shape — the
+ * corner runs most of the way down both ends and curves away from the square
+ * checkbox and square thumbnail inside it — and a tile that rounds harder than
+ * the row it sits beside in the same view reads as a different component.
+ *
+ * 3px takes the hard point off the corner without being seen as a curve.
+ * `divider` rows override it back to 0; a bottom rule has no corners to round.
+ */
+export const CARD_RADIUS = "3px";
+
 /** Every slot's test id, derived from the card's one. */
 export function slotTestIds(testId: string | undefined): (slot: string) => string | undefined {
   return (slot) => (testId ? `${testId}-${slot}` : undefined);
@@ -150,7 +164,7 @@ export function isActionable(state: CardState | undefined): boolean {
  * draw. Ghost is "a surface, quietly"; text is "no surface at all", which is
  * what a host wants when it is drawing the container itself.
  */
-function variantSx(variant: CardSurfaceVariant): CardSx {
+function variantSx(variant: CardSurfaceVariant, theme: Theme): CardSx {
   if (variant === "ghost") {
     return {
       border: 0,
@@ -162,10 +176,26 @@ function variantSx(variant: CardSurfaceVariant): CardSx {
     return { border: 0, backgroundColor: "transparent", boxShadow: "none" };
   }
   if (variant === "glass") {
+    // THEME-AWARE, and it keeps its edges.
+    //
+    // This was a hardcoded `rgba(255,255,255,·)` fill with a near-white border,
+    // which had two problems. On a dark palette a 55%-white pane is not frosted
+    // glass, it is a pale rectangle. And on a light one BOTH the fill and the
+    // border land on white and vanish, so `glass` rendered as `text` — the same
+    // nothing, reached by a different name.
+    //
+    // The blur is what makes it glass, and a blur is only visible over
+    // something. So the pane keeps a real hairline and a shallow shadow: over a
+    // plain surface it still reads as a raised pane rather than as absence, and
+    // over an image or a gradient the blur does the rest.
     return {
-      backgroundColor: "rgba(255,255,255,0.55)",
+      backgroundColor: alpha(theme.palette.background.paper, 0.55),
       backdropFilter: "blur(8px)",
-      borderColor: "rgba(255,255,255,0.35)",
+      // `divider` as-is. NOT `alpha(divider, …)`: MUI's `alpha` REPLACES the
+      // channel rather than scaling it, and `divider` is already a 12% black —
+      // so asking for 80% of it produced an 80% black slab of a border.
+      borderColor: theme.palette.divider,
+      boxShadow: `0 1px 3px ${alpha(theme.palette.common.black, 0.1)}`,
     };
   }
   return {};
@@ -210,13 +240,28 @@ function accentBar(main: string): CardSx {
 }
 
 /**
- * The tile's halo. Button's glow, kept for `BaseCard` — a grid of tiles has gaps
- * around each card, so the spread has somewhere to go that a row does not.
+ * The tile's lift — a card that has been RAISED, not one that is lit from within.
+ *
+ * This was Button's glow: a 20px bloom at 0.6 over a 40px bloom at 0.3, plus
+ * `brightness(1.05)`. On a button, which is small and pressed and gone, that
+ * reads as energy. On a tile it read as a neon sign — 40px of saturated colour
+ * bleeding into the gaps of a grid whose whole job is to let the eye compare
+ * cards, and the brightness filter washing the image and the caption with it.
+ *
+ * Three shadows doing three jobs instead: a hairline ring that tints the card's
+ * own edge in the accent colour, a tight contact shadow, and one soft shadow
+ * offset DOWNWARD. Offset is what separates elevation from emission — a glow is
+ * symmetrical because its source is the object; a shadow falls because the
+ * light is somewhere else. It stays legible on a dark canvas, where the old
+ * bloom was the brightest thing on the screen.
  */
-function glowSx(main: string): CardSx {
+function liftSx(main: string): CardSx {
   return {
-    boxShadow: `0 0 20px 5px ${alpha(main, 0.6)}, 0 0 40px 10px ${alpha(main, 0.3)}`,
-    filter: "brightness(1.05)",
+    boxShadow: [
+      `0 0 0 1px ${alpha(main, 0.45)}`,
+      `0 1px 2px ${alpha(main, 0.12)}`,
+      `0 8px 20px -6px ${alpha(main, 0.3)}`,
+    ].join(", "),
   };
 }
 
@@ -251,10 +296,10 @@ function pulseSx(main: string): CardSx {
 /** The emphasis treatments, in the terms the shape can actually carry. */
 function emphasisSx(emphasis: CardEmphasis, main: string, shape: CardShape): CardSx {
   if (emphasis === "attention") {
-    // The bar on both; the halo only where there is room for it to spread.
+    // The bar on both; the lift only where there is room for it to spread.
     return {
       ...accentBar(main),
-      ...(shape === "tile" ? glowSx(main) : {}),
+      ...(shape === "tile" ? liftSx(main) : {}),
       ...pulseSx(main),
     };
   }
@@ -271,6 +316,42 @@ function emphasisSx(emphasis: CardEmphasis, main: string, shape: CardShape): Car
  * The shared half of a card's styling. Each component adds its own geometry —
  * a tile's aspect ratio, a row's rails.
  */
+/**
+ * WHAT THE TWO NON-DEFAULT STATES LOOK LIKE — and why they cannot look alike.
+ *
+ * Both were `opacity: 0.6` and nothing else, so a record the business CANCELLED
+ * and a row this user merely cannot touch were pixel-identical. The type has
+ * always drawn the distinction (`CardState`); only the styling had not, which
+ * made `cancelled` a comment rather than a state.
+ *
+ * `cancelled` is a VOIDED record: still there, still worth reading, no longer
+ * counting. The figures get struck through, because a dimmed `R$ 1.250,00`
+ * still reads as money owed and a struck one cannot.
+ *
+ * `disabled` is INERT: nothing to read into, nothing to do with. It goes
+ * greyscale — which also drains the status chip's colour, the one thing on the
+ * row still shouting for attention — and says so on hover.
+ */
+function stateSx(state: CardState): CardSx {
+  if (state === "cancelled") {
+    return {
+      opacity: 0.65,
+      // The META CLUSTER is struck too. It was left out, so a voided row kept a
+      // crisp `05/08/2026, 13:45` and `PIX` between a struck title and a struck
+      // total — the middle of the row reading as live data on a record the two
+      // ends call void. Both lines of each pair go, as both lines of the caption
+      // already do: on a cancelled record the label is as void as the value.
+      '& [data-slot="value"], & [data-slot="caption"], & [data-slot="meta"]': {
+        textDecoration: "line-through",
+      },
+    };
+  }
+  if (state === "disabled") {
+    return { opacity: 0.45, filter: "grayscale(1)", cursor: "not-allowed" };
+  }
+  return { opacity: 1 };
+}
+
 export function cardSurfaceStyles(
   props: CardSurfaceProps & { selectable: boolean; shape: CardShape },
   theme: Theme,
@@ -283,8 +364,8 @@ export function cardSurfaceStyles(
   const showSelected = selectable && selected;
   return {
     transition: "border-color 120ms, box-shadow 120ms, background-color 120ms",
-    opacity: state === "default" ? 1 : 0.6,
-    ...variantSx(variant),
+    ...stateSx(state),
+    ...variantSx(variant, theme),
     ...(showSelected
       ? {
           borderColor: `${color}.main`,

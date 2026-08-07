@@ -3,21 +3,22 @@
 import { useTheme } from "@mui/material/styles";
 import { type ReactNode } from "react";
 
-import { Checkbox } from "../../form/Checkbox";
 import { Card } from "../../layout/Card";
 import type { DescriptionItemProps } from "../DescriptionItem";
 import { Box } from "../../../mui/Box";
 
 import {
+  CARD_RADIUS,
   cardSurfaceStyles,
   isActionable,
   isSelectable,
   slotTestIds,
   type CardSurfaceProps,
 } from "./card-surface";
-import { DragHandle, useDragItem } from "./data-views-drag";
+import { useDragItem } from "./data-views-drag";
+import { DragSlot, SelectSlot } from "./base-list-card-gutters";
 import { DENSITY_ROW_PADDING, type DataViewsDensity } from "./data-views-layout-context";
-import { RAIL_COUNT, useListRails } from "./list-card-rails";
+import { RAIL_COUNT, RAIL_GAP, railsTemplateFor, useListRails } from "./list-card-rails";
 import {
   ListCardCaption,
   ListCardMeta,
@@ -89,7 +90,13 @@ export interface BaseListCardProps extends CardSurfaceProps {
   onToggleSelect?: (event?: React.MouseEvent) => void;
   /** How much air the row gets. Vertical only — a full-width row cannot narrow. */
   density?: DataViewsDensity;
-  /** Fine-grained size multiplier on top of `density`. */
+  /**
+   * Fine-grained size multiplier on top of `density` (1 = base).
+   *
+   * Applied as `zoom`, so it scales EVERYTHING the row draws — type, gutters,
+   * gaps, padding, the checkbox, the grip, the chip and the menu — not just the
+   * handful of font sizes it once multiplied.
+   */
   scale?: number;
   /** Flush style: a bottom rule instead of an outline. Row-only. */
   divider?: boolean;
@@ -97,9 +104,7 @@ export interface BaseListCardProps extends CardSurfaceProps {
   dragId?: string | number;
 }
 
-/** The rails, for a card with no group above it. */
-const STANDALONE_RAILS =
-  "auto auto auto minmax(0, 1fr) auto max-content max-content auto";
+
 
 /**
  * Whether a click was really a click, or the tail of a text selection.
@@ -120,70 +125,41 @@ function clickKeys(onClick: () => void) {
   };
 }
 
-/** The grip. Its gutter is reserved whether or not anything drags. */
-function DragSlot({
-  drag,
-  testId,
-}: {
-  drag: ReturnType<typeof useDragItem>;
-  testId?: string;
-}): React.JSX.Element {
-  if (!drag.draggable) return <Box data-slot="drag" />;
-  return (
-    <Box data-slot="drag" sx={{ position: "relative", zIndex: 1 }}>
-      <DragHandle
-        handleProps={drag.handleProps}
-        gated={drag.handleProps !== undefined}
-        testId={testId}
-      />
-    </Box>
-  );
-}
-
-/** The select checkbox. Its gutter is reserved whether or not it is here. */
-function SelectSlot({
-  selectable,
-  selected,
-  onToggleSelect,
-  testId,
-}: {
-  selectable: boolean;
-  selected: boolean;
-  onToggleSelect?: (event?: React.MouseEvent) => void;
-  testId?: string;
-}): React.JSX.Element {
-  if (!selectable) return <Box data-slot="select" />;
-  return (
-    // z-index 1: above the stretched link, or the anchor swallows the click.
-    <Box data-slot="select" sx={{ position: "relative", zIndex: 1 }}>
-      <Checkbox
-        checked={selected}
-        onChange={() => onToggleSelect?.()}
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggleSelect?.(event);
-        }}
-        size="small"
-        data-testid={testId}
-        aria-label="Selecionar"
-      />
-    </Box>
-  );
-}
-
-/** Geometry: the rails, the density padding, the two-line collapse. */
+/**
+ * Geometry: the rails, the density padding, the two-line collapse.
+ *
+ * SCALE IS `zoom`, NOT A SET OF MULTIPLIED FONT SIZES.
+ *
+ * It used to be the latter, on exactly three values — title, value, row padding
+ * — so the slider left the subtitle, the meta labels, the rules, the checkbox,
+ * the grip, the chip and the menu at their fixed sizes, and the row came apart
+ * as you dragged it. Multiplying the rest is not a fix: the checkbox and the
+ * chip are MUI internals sized in their own px, and no prop we pass reaches
+ * them.
+ *
+ * `zoom` scales the used value of every length in the subtree — ours and theirs
+ * — and unlike `transform: scale` it REFLOWS, so the row still occupies the
+ * space it draws and the rails still resolve. Verified against the group: at
+ * 1.4 all four rows keep identical rail edges, because subgrid tracks and the
+ * zoom that reads them are the same for every row.
+ */
 function rowSx(opts: {
   inGroup: boolean;
+  gutters: { drag: boolean; select: boolean };
+  metaColumns: number;
   pad: number;
   padY: number;
+  scale: number;
   divider: boolean;
   interactive: boolean;
   draggable: boolean;
 }): Record<string, unknown> {
-  const { inGroup, pad, padY, divider, interactive, draggable } = opts;
+  const { inGroup, gutters, metaColumns, pad, padY, scale, divider, interactive, draggable } = opts;
   return {
     position: "relative",
+    borderRadius: CARD_RADIUS,
     display: "grid",
+    zoom: scale,
     // SUBGRID AND `container-type` CANNOT COEXIST on one element: containment
     // makes the box size independently of its parent, so the browser drops the
     // subgrid and every slot stacks into one column. (Observed exactly that —
@@ -193,12 +169,15 @@ function rowSx(opts: {
     // subgrid; standalone, the row is both the container and its own grid.
     ...(inGroup
       ? { gridColumn: `span ${RAIL_COUNT}`, gridTemplateColumns: "subgrid" }
-      : { containerType: "inline-size", gridTemplateColumns: STANDALONE_RAILS }),
+      : {
+          containerType: "inline-size",
+          gridTemplateColumns: railsTemplateFor(gutters, metaColumns),
+        }),
     alignItems: "center",
     // Wide enough that the meta cluster, the value and the status read as three
     // columns rather than one run of text — the complaint that started all this
     // was `MÉTODO PIX R$ 13,90` scanning as a single phrase.
-    columnGap: 3,
+    columnGap: RAIL_GAP,
     width: "100%",
     px: pad,
     py: padY,
@@ -249,6 +228,31 @@ function rowSx(opts: {
  * A SHELL, like {@link BaseCard}. Domain rows live in the app and compose it.
  */
 /**
+ * The id this row drags under, or nothing.
+ *
+ * `undefined` is the inert answer: `useDragItem` treats a missing id as "no
+ * drag", which is how the card's own veto (`draggable={false}`) and an
+ * unactionable record both switch dragging off without the card knowing
+ * anything about the container above it.
+ */
+function dragIdFor(
+  props: BaseListCardProps,
+  actionable: boolean,
+): string | number | undefined {
+  return props.draggable === false || !actionable ? undefined : props.dragId;
+}
+
+/**
+ * What the meta cluster amounts to — asked once, used three times: to size the
+ * rail, to close the cluster with a rule, and to decide whether the value has
+ * anything to be divided FROM.
+ */
+function metaShape(props: BaseListCardProps): { columns: number; present: boolean } {
+  const columns = props.meta?.length ?? 0;
+  return { columns, present: columns > 0 || props.metaSlot != null };
+}
+
+/**
  * Everything the row derives before it can render — extracted so the component
  * stays inside the size budget.
  */
@@ -263,9 +267,18 @@ function useRowShell(props: BaseListCardProps) {
     theme: useTheme(),
     selectable: isSelectable(props),
     slot: slotTestIds(props.testId),
-    drag: useDragItem(props.draggable === false || !actionable ? undefined : props.dragId),
-    pad: 1.5 * scale,
-    padY: DENSITY_ROW_PADDING[group?.density ?? props.density ?? "cozy"] * scale,
+    drag: useDragItem(dragIdFor(props, actionable)),
+    // Standalone holds no gutter open: there is no list beside it to line up
+    // with, so a reserved-but-empty rail is pure inset.
+    reserve: group?.reserveGutters ?? false,
+    // 1, not 1.5. The row's contents still have to line up with the toolbar
+    // above them, but 12px of card padding stacked on the checkbox's own 9px
+    // and an empty drag gutter's 24px read as a row indented for no reason.
+    //
+    // Not multiplied by `scale` — the row's `zoom` already scales it, and doing
+    // both would square the factor on padding alone.
+    pad: 1,
+    padY: DENSITY_ROW_PADDING[group?.density ?? props.density ?? "cozy"],
     // A card that navigates does so with a real anchor, so it takes no click
     // handler of its own — the stretched link IS the target.
     acts: props.onClick != null && props.href == null && actionable,
@@ -285,15 +298,45 @@ function actionProps(onClick: (() => void) | undefined) {
   };
 }
 
+/** The surface and the geometry, merged — the row's whole `sx` in one place. */
+function rowStyles(
+  props: BaseListCardProps,
+  shell: ReturnType<typeof useRowShell>,
+): Record<string, unknown> {
+  const { group, theme, selectable, drag, reserve, pad, padY, scale, acts } = shell;
+  return {
+    ...cardSurfaceStyles(
+      {
+        ...props,
+        selectable,
+        shape: "row",
+        state: drag.dragging ? "disabled" : props.state,
+      },
+      theme,
+    ),
+    ...rowSx({
+      inGroup: group !== null,
+      gutters: { drag: reserve || drag.draggable, select: reserve || selectable },
+      metaColumns: metaShape(props).columns,
+      pad,
+      padY,
+      scale,
+      divider: props.divider ?? false,
+      interactive: acts || props.href != null,
+      draggable: drag.draggable && drag.handleProps === undefined,
+    }),
+  };
+}
+
 export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
-  const { selected = false, divider = false, href, onClick } = props;
-  const { group, actionable, scale, theme, selectable, slot, drag, pad, padY, acts } =
-    useRowShell(props);
+  const { selected = false, href, onClick } = props;
+  const shell = useRowShell(props);
+  const { actionable, selectable, slot, drag, reserve, pad, acts } = shell;
+  const meta = metaShape(props);
 
   return (
     <Card
       variant="outlined"
-      borderRadius="lg"
       className={props.className}
       dataTestId={props.testId}
       aria-label={props["aria-label"]}
@@ -302,22 +345,13 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
       {...(acts ? actionProps(onClick) : {})}
       {...drag.itemProps}
       // A PLAIN OBJECT: `Card` merges by spreading, so a function sx vanishes.
-      sx={{
-        ...cardSurfaceStyles({ ...props, selectable, shape: "row", state: drag.dragging ? "disabled" : props.state }, theme),
-        ...rowSx({
-          inGroup: group !== null,
-          pad,
-          padY,
-          divider,
-          interactive: acts || href != null,
-          draggable: drag.draggable && drag.handleProps === undefined,
-        }),
-      }}
+      sx={rowStyles(props, shell)}
     >
-      <DragSlot drag={drag} testId={slot("drag")} />
+      <DragSlot drag={drag} reserve={reserve} testId={slot("drag")} />
       <SelectSlot
         selectable={selectable}
         selected={selected}
+        reserve={reserve}
         onToggleSelect={props.onToggleSelect}
         testId={slot("checkbox")}
       />
@@ -329,17 +363,20 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
         subtitle={props.subtitle}
         href={href}
         target={props.target}
-        scale={scale}
         testId={slot("title")}
       />
-      <ListCardMeta meta={props.meta} metaSlot={props.metaSlot} />
+      <ListCardMeta
+        meta={props.meta}
+        metaSlot={props.metaSlot}
+        trailingRule={props.value != null}
+      />
       <ListCardTail
         value={props.value}
+        separated={meta.present}
         status={props.status}
         actions={actionable ? props.actions : undefined}
         actionsAlwaysVisible={props.actionsAlwaysVisible}
         menu={props.menu}
-        scale={scale}
         testId={slot}
       />
       {props.children != null && (
