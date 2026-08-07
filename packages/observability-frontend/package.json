@@ -18,7 +18,7 @@
   },
   "scripts": {
     "clean": "rm -rf node_modules coverage dist",
-    "build": "tsup",
+    "build": "rm -rf dist && tsup",
     "test": "node ../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest watch",
     "lint": "eslint src --max-warnings 0",
