@@ -12,8 +12,9 @@ kind.
 | Surface | Export | What the host does |
 |---|---|---|
 | **Core engine** | `@12-apps/report-builder` | Nothing to wire — pure spec → IR → rows → render pipeline (`runReport`, `defineCatalog`, `createMemoryDataSource`). |
-| **Server** | `@12-apps/report-builder/server` | Mount thin route handlers: guard the request (auth is HOST-owned), resolve `tenantId`, and delegate. Provides the domain catalog + system presets, the entity→permission policy, the **duck-typed** Prisma DataSource/stores, and the **wire (zod) contract** the host's routes AND MCP registry import — schemas authored once, no drift. |
-| **React** | `@12-apps/report-builder/react` | Mount three pages under the host's tenant chrome, passing only `tenantSlug`: `ReportsPage` (the Relatórios area — pick an authored report, read it, edit or archive it), `ReportEditorPage` (the same canvas, inline-editable) and `SystemReportPage` (one built-in report). Also nest the built-ins in your menu from `SYSTEM_REPORT_NAV`. Routing (react-router peer) and same-origin fetching are self-contained. |
+| **Server** | `@12-apps/report-builder/server` | Call `createReportBuilder(config)` and mount the `routes` it returns — the eight endpoints, their parsing, their statuses and their envelope all live here. The host supplies only what is its own: a `ReportActor` (auth + tenant + permission ids), a window-scoped adapter and a lazy DB provider. Also provides the domain catalog + system presets, the entity→permission policy and the **wire (zod) contract** the host's MCP registry imports. |
+| **Hono** | `@12-apps/report-builder/hono` | `app.route(prefix, reportBuilderRouter({ ...serverConfig, resolveActor }))`. A one-call mount for hosts on Hono; `hono` is an OPTIONAL peer, so importing the root or `/server` never resolves it. |
+| **React** | `@12-apps/report-builder/react` | Call `createReportBuilder({ tenantSlug })` and mount the single component it returns. Screens, flows and the routes between them are all inside; the host writes no route table. Nest the built-ins in your menu from `SYSTEM_REPORT_NAV`. |
 | **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync` once: the model + migrations reach the host's schema folder as **committed symlinks**. Never copy them. |
 
 ## Host wiring rules (the ones that bite)
@@ -28,28 +29,69 @@ kind.
    `SavedReportDb`). The package never imports a generated client, so any
    host's client instance plugs in: pass a lazy provider
    (`() => Promise<db>`).
-3. **The host owns auth and tenant attribution.** Handlers never read
-   sessions. Routes guard first (`requireTenant*`), resolve `tenantId`, check
-   `REPORT_ENTITY_PERMISSION[entity]`, then call the package.
-4. **Wire schemas are the single source of truth.** Routes validate with and
-   the MCP registry advertises exactly the schemas exported by `./server`
+3. **The host owns auth, tenant attribution and RBAC — and nothing else.**
+   Handlers never read sessions. The host resolves a `ReportActor`
+   (`clientId`, `userId`, `roleIds`, `isAdmin`, `canAuthor`, `permissions`)
+   and the package narrows against it. `permissions` is REQUIRED and is not
+   defaulted: a host that forgot it gets an empty surface rather than the
+   whole catalog. Entitlements and quota stay the host's too — they are
+   billing questions, answered before the request reaches a descriptor.
+4. **The adapter is a FACTORY, not an instance.** `adapter` may be a plain
+   `ReportDataSource` (fixtures that do not move), but a real host passes
+   `({ actor, window }) => createTenantReportDataSource(actor.clientId, window)`.
+   The window has to reach the database, or "last 7 days" quietly reads all of
+   history and filters it in memory.
+5. **The period is the package's.** `?preset=today|7d|30d|custom&from&to` is
+   resolved by `resolveReportRange` on the tenant's clock and echoed on every
+   response. A host resolving its own window would disagree with the buckets
+   the report truncates on — that is the same-clock rule, and both ends have
+   to name it for either to matter.
+6. **Wire schemas are the single source of truth.** The handlers validate with
+   and the MCP registry advertises exactly the schemas exported by `./server`
    (`runReportBody`, `reportRangeQuery`, result schemas…). Only paths,
    operation ids and summaries are host-owned.
-5. **Specs are data, never code.** Everything is validated against the field
+7. **Specs are data, never code.** Everything is validated against the field
    catalog on every write and run; row output is capped
    (`REPORT_RUN_MAX_ROWS`).
 
-## Future-pay reference wiring
+## The endpoints
 
-- Routes: `apps/web/app/api/admin/[tenantSlug]/reports/**` (thin: guard →
-  package).
-- MCP: `apps/web/lib/mcp/registry/reports.ts` (thin: package schemas +
-  host paths/summaries).
-- DB binding: `apps/web/lib/repositories/reports/{adapter,saved}.ts`
-  (lazy `getPrismaClient()` through the structural seams).
-- UI mounts: `apps/admin/src/pages/reports/index.tsx` (one-line wrappers
-  passing `tenantSlug`) + `apps/admin/src/shell/nav-config.ts`, which nests
-  `SYSTEM_REPORT_NAV` under the section each built-in analyses.
+Mounted under whatever prefix the host chooses (future-pay uses
+`/api/admin/:tenantSlug`):
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/reports/fields` | Catalog, narrowed by permission. 403 when the actor reaches no entity. |
+| GET | `/reports/system` | Built-ins the actor may run. 403 when none. |
+| GET | `/reports/system/:key` | Runs one for the period. 404 unknown key, before any permission check. |
+| GET | `/reports/custom` | Saved documents, narrowed by lifecycle AND by entity. |
+| GET | `/reports/custom/:id` | Opens AND runs it. 404 — never 403 — when the actor may not see it. |
+| POST | `/reports/custom` | 200 with the summary; 409 on a duplicate name. |
+| PUT | `/reports/custom/:id` | Omitted lifecycle fields keep their stored values. |
+| DELETE | `/reports/custom/:id` | 204, with no body. |
+| POST | `/reports/run` | Dry run. The entity check happens before the spec reaches the adapter. |
+
+## Host wiring, end to end
+
+```ts
+// backend (Hono)
+app.route(
+  '/api/admin/:tenantSlug',
+  reportBuilderRouter({
+    catalog: reportCatalog,
+    adapter: ({ actor, window }) => createTenantReportDataSource(actor.clientId, window),
+    db: () => getSavedReportDb(),
+    timeZone: PLATFORM_TIME_ZONE,
+    resolveActor: (c) => resolveReportActor(c),   // auth + RBAC: the host's
+  }),
+);
+
+// frontend
+const { ReportBuilder } = createReportBuilder({ tenantSlug });
+```
+
+Everything else — MCP registry paths/summaries, the nav entries built from
+`SYSTEM_REPORT_NAV` — remains host-owned.
 
 ## The two kinds of report (FUT-391)
 
@@ -70,9 +112,9 @@ kind.
    your schema folder (adjust `HOST_*` in
    `scripts/sync-report-builder-schema.mjs` if your layout differs).
 2. Declare the package as a dependency of your schema-owning package.
-3. Implement nothing: pass your Prisma client to
-   `createTenantReportDataSource`/`createSavedReportStore`, mount the routes
-   with your auth guards, spread the wire schemas into your MCP registry, and
-   mount the React pages with your tenant slug.
+3. Implement nothing: pass your Prisma client through the structural seams,
+   mount `createReportBuilder(...).routes` (or the Hono router) behind your own
+   `resolveActor`, spread the wire schemas into your MCP registry, and mount
+   the React component with your tenant slug.
 4. Optional: replace `reportCatalog`/`SYSTEM_REPORTS` with your own
    `defineCatalog` model — the engine and UI are catalog-driven.

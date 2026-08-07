@@ -22,6 +22,7 @@ import { NO_PRINT_CLASS } from "./lib/print-export";
 import { ReportBlockBody, ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
 import { exportColumnsFor } from "./report-render";
 import { viewBlocks } from "./report-model";
+import { useTransport } from "./transport-context";
 
 /**
  * One block on the viewer's canvas: title, what it asks for, result, and its
@@ -123,6 +124,7 @@ export function ReportActionsMenu({
   onChanged: (status: ReportStatusWire) => void;
 }): JSX.Element {
   const navigate = useNavigate();
+  const transport = useTransport();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const archived = view.status === "archived";
@@ -131,7 +133,7 @@ export function ReportActionsMenu({
   async function onConfirm(): Promise<void> {
     const next: ReportStatusWire = archived ? "published" : "archived";
     setBusy(true);
-    const result = await setReportStatusAction(tenantSlug, view, next);
+    const result = await setReportStatusAction(transport, tenantSlug, view, next);
     setBusy(false);
     setConfirming(false);
     if (result.ok) onChanged(next);

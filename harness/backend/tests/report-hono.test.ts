@@ -30,12 +30,10 @@ const catalog = defineCatalog({
   },
 });
 
-const adapter = createMemoryDataSource({
-  orders: [
-    { id: 'o1', method: 'PIX', totalCents: 1000 },
-    { id: 'o2', method: 'CARD', totalCents: 2000 },
-  ],
-});
+const ORDERS = [
+  { id: 'o1', method: 'PIX', totalCents: 1000 },
+  { id: 'o2', method: 'CARD', totalCents: 2000 },
+];
 
 const SPEC = {
   entity: 'orders',
@@ -102,6 +100,7 @@ const OWNER: ReportActor = {
   roleIds: [],
   isAdmin: true,
   canAuthor: true,
+  permissions: ['reports:sales:read'],
 };
 
 function seedRows(): Row[] {
@@ -132,14 +131,23 @@ function setup(actor: ReportActor | null = OWNER): {
    */
   request: (path: string, init?: RequestInit) => Promise<Response>;
   stored: () => Row[];
+  /** Every window the adapter factory was handed, in request order. */
+  windows: () => Array<{ from: Date; toExclusive: Date }>;
 } {
   const db = memoryDb(seedRows());
+  const seen: Array<{ from: Date; toExclusive: Date }> = [];
   const router = new Hono();
   router.route(
     '/api/admin/:tenantSlug',
     reportBuilderRouter({
       catalog,
-      adapter,
+      // The FACTORY form, which is what a real host passes: the window has to
+      // reach the database, or a "last 7 days" report quietly reads all of
+      // history and filters it in memory.
+      adapter: ({ window }) => {
+        seen.push(window);
+        return createMemoryDataSource({ orders: ORDERS });
+      },
       db: () => Promise.resolve(db),
       resolveActor: () => actor,
     }),
@@ -147,6 +155,7 @@ function setup(actor: ReportActor | null = OWNER): {
   return {
     request: (path, init) => router.request(path, init),
     stored: db.all,
+    windows: () => seen,
   };
 }
 
@@ -200,17 +209,17 @@ describe('the adapter carries the whole request through', () => {
       }),
     });
 
-    // 201 is the handler's choice; an adapter that normalized it to 200 would
-    // quietly change the contract for every consumer.
-    expect(response.status).toBe(201);
+    // The status is the handler's choice; an adapter that reinterpreted it
+    // would quietly change the contract for every consumer.
+    expect(response.status).toBe(200);
     expect(stored()).toHaveLength(2);
   });
 
-  it('delivers a body on PATCH too', async () => {
+  it('delivers a body on PUT too', async () => {
     const { request, stored } = setup();
 
     const response = await request('/api/admin/acme/reports/custom/r1', {
-      method: 'PATCH',
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'Renomeado',
@@ -225,13 +234,31 @@ describe('the adapter carries the whole request through', () => {
     expect(stored()[0]?.name).toBe('Renomeado');
   });
 
-  it('routes DELETE and reports the removal', async () => {
+  it('routes DELETE and answers 204 with an empty body', async () => {
     const { request, stored } = setup();
 
     const response = await request('/api/admin/acme/reports/custom/r1', { method: 'DELETE' });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(204);
+    // Not the four bytes `null`: a 204 promises no content, and some clients
+    // reject a body that arrives anyway.
+    expect(await response.text()).toBe('');
     expect(stored()).toHaveLength(0);
+  });
+
+  it('carries the query string through to the window the report runs over', async () => {
+    const { request, windows } = setup();
+
+    const response = await request('/api/admin/acme/reports/custom/r1?preset=7d');
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { data: { range: { preset: string } } };
+    expect(body.data.range.preset).toBe('7d');
+    const window = windows()[0];
+    expect(window).toBeDefined();
+    expect(window && window.toExclusive.getTime() - window.from.getTime()).toBe(
+      7 * 24 * 60 * 60 * 1000,
+    );
   });
 });
 
