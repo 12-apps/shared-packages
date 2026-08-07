@@ -141,4 +141,26 @@ describe('createPaymentsHttp', () => {
     const after = (await (await http.getSettings(ctx)).json()) as { providerChain: string[] };
     expect(after.providerChain).toEqual(['stone']);
   });
+
+  /**
+   * The same endpoint answering the DROP that could not be undone (FUT-693).
+   *
+   * Also a 409, and also named apart, because the instruction differs: nothing
+   * here needs enabling, so an `UnprovenProviderError` would send the owner off
+   * to pay for an activation charge to fix a list they only wanted shortened.
+   */
+  it('refuses a chain that would strand a grandfathered provider, and changes nothing', async () => {
+    const { http, configStore } = await setupHttp();
+    const config = await configStore.get(TENANT, 'unproven');
+    // Enabled without proof: what the FUT-463 migration left behind, and a
+    // state no endpoint can reach.
+    await configStore.save(TENANT, { ...config!, enabled: true, priority: 1 });
+
+    const res = await http.setPriorities(put({ providers: ['stone'] }), ctx);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: 'IrreversibleChainRemovalError' });
+
+    const after = (await (await http.getSettings(ctx)).json()) as { providerChain: string[] };
+    expect(after.providerChain).toEqual(['stone', 'unproven']);
+  });
 });

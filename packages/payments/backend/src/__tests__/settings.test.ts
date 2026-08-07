@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { credentialStoreFrom } from '../config/service';
-import { UnprovenProviderError } from '../core/errors';
+import { IrreversibleChainRemovalError, UnprovenProviderError } from '../core/errors';
 import {
   TENANT,
   setupOAuthWorld,
@@ -590,8 +590,9 @@ describe('createSettingsService', () => {
     await expect(settings.setPriorities(TENANT, ['stripe', 'stone'])).rejects.toThrow();
     expect(await enabledCount()).toBe(before);
 
-    // And a reorder that only shrinks is still free — pulling an acquirer out
-    // of rotation can never be gated.
+    // And a reorder that only shrinks is still free — pulling a PROVEN acquirer
+    // out of rotation can never be gated, because switching it back on is one
+    // call and costs nothing.
     await settings.setPriorities(TENANT, []);
     expect(await enabledCount()).toBe(0);
   });
@@ -612,6 +613,50 @@ describe('createSettingsService', () => {
 
     const view = await settings.setPriorities(TENANT, ['stripe', 'stone']);
     expect(view.providerChain).toEqual(['stripe', 'stone']);
+  });
+
+  /**
+   * The other end of that counterweight, and what makes it worth anything: the
+   * grandfathered row is protected only while it is IN the chain, so a rewrite
+   * that merely OMITS it used to disable it — and then neither door took it
+   * back, because both ask for the proof it was grandfathered past. A store
+   * charging happily since before FUT-463 went offline on a partial list from
+   * an agent, or a bare `[]`, and stayed there until its owner completed an
+   * activation charge nobody had ever asked them for.
+   *
+   * So the rewrite refuses the drop instead, by its own name — the removal is
+   * what is being refused, not an enable — and the deliberate per-provider
+   * switch stays the way out, exactly as `setEnabled` promises.
+   */
+  it('given a grandfathered enabled row, when a rewrite omits it, then the drop is refused and the chain stands', async () => {
+    const { settings, store } = setup();
+    await settings.saveCredentials(TENANT, 'stone', { environment: 'SANDBOX', fields: {} });
+    const stone = await store.get(TENANT, 'stone');
+    await store.save(TENANT, { ...stone!, enabled: true, priority: 0, chargeVerifiedAt: null });
+
+    await expect(settings.setPriorities(TENANT, [])).rejects.toThrow(
+      IrreversibleChainRemovalError,
+    );
+    expect((await settings.getSettings(TENANT)).providerChain).toEqual(['stone']);
+
+    // And the round trip that used to brick the store now completes, because
+    // the state it depended on — grandfathered, out of the chain — is one the
+    // rewrite can no longer produce.
+    await settings.applyChargeVerification(TENANT, 'stripe', true);
+    await settings.setPriorities(TENANT, ['stripe', 'stone']);
+    expect((await settings.getSettings(TENANT)).providerChain).toEqual(['stripe', 'stone']);
+  });
+
+  it('given a grandfathered enabled row, when it is switched off deliberately, then that still works', async () => {
+    const { settings, store } = setup();
+    await settings.saveCredentials(TENANT, 'stone', { environment: 'SANDBOX', fields: {} });
+    const stone = await store.get(TENANT, 'stone');
+    await store.save(TENANT, { ...stone!, enabled: true, priority: 0, chargeVerifiedAt: null });
+
+    // Taking a provider out of rotation must never need permission — the
+    // refusal above is about the door, not about the outcome.
+    await settings.setEnabled(TENANT, 'stone', false);
+    expect((await settings.getSettings(TENANT)).providerChain).toEqual([]);
   });
 
   it('verify persists the probe outcome and stub mode verifies ok', async () => {
