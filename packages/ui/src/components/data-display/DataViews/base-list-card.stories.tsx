@@ -55,7 +55,13 @@ const kebab = (
       // `icon` and no children, which is what makes `Button` render it square
       // rather than in MUI's 64px slab. No local `sx` — the size is the
       // component's now, so every overflow menu in the library matches.
-      <Button variant="text" size="sm" aria-label="Ações" icon={<MoreVertIcon sx={{ fontSize: 18 }} />} />
+      //
+      // `lg`, not `sm`, so the row's two ends are the same control. Icon-only
+      // sizing is glyph + 2x padding: `lg` is 20px in 9px, which is exactly how
+      // MUI builds its small Checkbox (20px glyph, 9px hit padding, 38px box).
+      // At `sm` the kebab came out 28px against the checkbox's 38 — centred on
+      // the same line, but visibly the lighter of the two.
+      <Button variant="text" size="lg" aria-label="Ações" icon={<MoreVertIcon sx={{ fontSize: 20 }} />} />
     }
   />
 );

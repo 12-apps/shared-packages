@@ -36,7 +36,14 @@ export function DragSlot({
 }): React.JSX.Element | null {
   if (!drag.draggable) return reserve ? <Box data-slot="drag" /> : null;
   return (
-    <Box data-slot="drag" sx={{ position: "relative", zIndex: 1 }}>
+    // display:flex, as on the checkbox below: the grip is an inline-grid, and in
+    // a block parent an inline box sits on the text baseline — the line box adds
+    // descender leading under it (21px glyph in a 31px slot) and drops the grip
+    // 5px below the row's centre. A flex parent has no baseline to sit on.
+    <Box
+      data-slot="drag"
+      sx={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center" }}
+    >
       <DragHandle
         handleProps={drag.handleProps}
         gated={drag.handleProps !== undefined}
