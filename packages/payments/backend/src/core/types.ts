@@ -203,8 +203,13 @@ export interface ChargeSnapshot {
   pix?: { qrText: string; qrImageUrl?: string; expiresAt?: string };
   /** Present for boleto charges. */
   boleto?: { barcode?: string; documentUrl?: string; dueDate?: string };
-  /** Present for card charges. */
-  card?: { brand?: string; last4?: string; authorizationCode?: string };
+  /**
+   * Present for card charges. `vaultToken` is the REUSABLE token for a card the
+   * provider agreed to store — never the one-time blob, which providers reject
+   * on a second charge — normalized by the ADAPTER (FUT-740) so no host digs one
+   * vendor's payload out of `raw`. Absent when nothing was vaulted.
+   */
+  card?: { brand?: string; last4?: string; authorizationCode?: string; vaultToken?: string };
   /**
    * Present when the provider runs a redirect/hosted checkout (e.g.
    * InfinitePay checkout links): send the buyer here instead of rendering a
@@ -312,35 +317,16 @@ export interface ResolvedCredentials {
 }
 
 /**
- * How a merchant CONNECTS a provider:
- *
- *   credentials  the merchant pastes API keys into a form (PagBank token,
- *                Stripe secret key) — the shape `credentialSchema` describes
- *   oauth        the merchant clicks "connect" and authorizes the platform
- *                on the provider's own site (Stripe Connect, PagBank
- *                Connect); the platform holds application-level client
- *                credentials and stores per-merchant tokens that EXPIRE
- *
- * An adapter may support both — OAuth as the happy path with manual token
- * entry as a fallback. Adapters that omit `authMode` are `credentials`.
+ * The provider-CONNECTION descriptors — how a merchant authorizes an account,
+ * OAuth included. Their own module for the same reason as {@link SettlementHints}
+ * (this file's size gate), and re-exported here so every adapter and host keeps
+ * importing them from `core/types`, which is the only path any of them uses.
  */
-export type ProviderAuthMode = 'credentials' | 'oauth';
-
-/** Where to send the merchant to authorize, plus the CSRF state to echo. */
-export interface OAuthAuthorizeRequest {
-  url: string;
-  state: string;
-}
-
-/**
- * Tokens returned by an OAuth exchange or refresh. `expiresAt` is what makes
- * proactive refresh possible — it is stored in its own queryable column, not
- * buried in the encrypted blob.
- */
-export interface OAuthTokens {
-  fields: Record<string, string>;
-  expiresAt?: Date | null;
-}
+export type {
+  OAuthAuthorizeRequest,
+  OAuthTokens,
+  ProviderAuthMode,
+} from './connect-types';
 
 // The buyer's identity and the BUYER-REQUIREMENTS descriptors (FUT-595) live
 // in their own module; re-exported so consumers keep importing from here.

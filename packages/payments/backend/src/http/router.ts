@@ -1,14 +1,21 @@
 import type { MerchantRef } from '../core/types';
 import type { PaymentsHttpHandlers } from './handlers';
 import {
+  createMount,
+  type MountedHandler,
+  type MountRow,
+  type PaymentsRouteContext,
+} from './mount';
+import {
   LIBRARY_ROUTES,
-  matchPattern,
   type BuiltInRoute,
   type PaymentsIntentKind,
   type PaymentsRouteIntent,
   type PaymentsRouteMethod,
   type PaymentsRouteParams,
 } from './route-table';
+
+export type { PaymentsRouteContext } from './mount';
 
 export type {
   PaymentsIntentKind,
@@ -114,16 +121,6 @@ export interface MountPaymentsOptions<A> {
   methodNotAllowed?: (allow: readonly string[]) => Response;
 }
 
-/** The host mount context: route params, promised (Next-style) or plain. */
-export interface PaymentsRouteContext {
-  params?: PaymentsRouteParams | PromiseLike<PaymentsRouteParams>;
-}
-
-type MountedHandler = (
-  request: Request,
-  context?: PaymentsRouteContext,
-) => Promise<Response>;
-
 /** What `mountPayments` returns: handlers for a catch-all segment route. */
 export interface MountedPaymentsRoutes {
   GET: MountedHandler;
@@ -160,66 +157,9 @@ type ServableRoute<A> =
   | { source: 'library'; route: BuiltInRoute }
   | { source: 'extension'; route: PaymentsRouteExtension<A> };
 
-/** The segments below the mount, however the host's router delivered them. */
-function normalizeSegments(value: string | readonly string[] | undefined): string[] {
-  if (value === undefined) return [];
-  if (typeof value === 'string') return value.split('/');
-  return [...value];
-}
-
-function defaultNotFound(): Response {
-  return new Response(
-    JSON.stringify({ error: 'NotFound', message: 'No payments route matches this path' }),
-    { status: 404, headers: { 'content-type': 'application/json' } },
-  );
-}
-
-function defaultMethodNotAllowed(allow: readonly string[]): Response {
-  return new Response(
-    JSON.stringify({ error: 'MethodNotAllowed', message: 'Wrong method for this path' }),
-    { status: 405, headers: { 'content-type': 'application/json', allow: allow.join(', ') } },
-  );
-}
-
-/**
- * The `Allow` list for a path served at another verb, in the shape the
- * per-file modules produced: exported verbs in GET/POST/PUT order, `HEAD`
- * appended when `GET` is served, `OPTIONS` always.
- */
-function allowListFor(methods: ReadonlySet<PaymentsRouteMethod>): string[] {
-  const allow: string[] = (['GET', 'POST', 'PUT'] as const).filter((method) =>
-    methods.has(method),
-  );
-  if (methods.has('GET')) allow.push('HEAD');
-  allow.push('OPTIONS');
-  return allow;
-}
-
-async function paramsOf(context: PaymentsRouteContext | undefined): Promise<PaymentsRouteParams> {
-  if (!context?.params) return {};
-  return await context.params;
-}
-
-/** Find the spec serving (method, segments), or the verbs that DO serve it. */
-function resolveRoute<A>(
-  specs: readonly ServableRoute<A>[],
-  method: PaymentsRouteMethod,
-  segments: readonly string[],
-): {
-  matched?: { spec: ServableRoute<A>; captures: Readonly<Record<string, string>> };
-  allowed: Set<PaymentsRouteMethod>;
-} {
-  const allowed = new Set<PaymentsRouteMethod>();
-  let matched:
-    | { spec: ServableRoute<A>; captures: Readonly<Record<string, string>> }
-    | undefined;
-  for (const spec of specs) {
-    const captures = matchPattern(spec.route.pattern, segments);
-    if (!captures) continue;
-    allowed.add(spec.route.method);
-    if (spec.route.method === method && !matched) matched = { spec, captures };
-  }
-  return { matched, allowed };
+/** One dispatchable row: what `createMount` matches on, plus its spec. */
+interface ServableRow<A> extends MountRow<PaymentsRouteMethod> {
+  spec: ServableRoute<A>;
 }
 
 function intentFor(
@@ -241,8 +181,13 @@ function intentFor(
 
 /**
  * Build the catch-all handlers. See the module doc for the contract; the
- * per-request order is fixed and load-bearing: parse → `requireAuth` (which
- * may refuse) → `resolveMerchant` → the one handler the intent names.
+ * per-request order is fixed and load-bearing: parse -> `requireAuth` (which
+ * may refuse) -> `resolveMerchant` -> the one handler the intent names.
+ *
+ * The parse/404/405/OPTIONS half is `createMount` (./mount.ts), shared with the
+ * buyer-checkout mount so the two cannot answer an unresolvable path
+ * differently. What stays here is the only part that is actually about THIS
+ * surface: the auth-then-merchant order, and the built-in/extension split.
  */
 export function mountPayments<A>(options: MountPaymentsOptions<A>): MountedPaymentsRoutes {
   const excluded = new Set<string>(options.exclude ?? []);
@@ -252,70 +197,43 @@ export function mountPayments<A>(options: MountPaymentsOptions<A>): MountedPayme
     ),
     ...(options.extensions ?? []).map((route) => ({ source: 'extension', route }) as const),
   ];
-  const prefix = options.prefix ?? [];
   const getHttp = async (): Promise<PaymentsHttpHandlers> =>
     typeof options.gateway === 'function' ? options.gateway() : options.gateway;
 
-  const segmentsOf = async (context: PaymentsRouteContext | undefined): Promise<string[]> => {
-    const params = await paramsOf(context);
-    return [...prefix, ...normalizeSegments(params[options.segmentsParam ?? 'segments'])];
-  };
-
-  /** The 405 (path exists at another verb) or 404 a miss answers. */
-  const staticAnswer = (allowed: ReadonlySet<PaymentsRouteMethod>): Response =>
-    allowed.size > 0
-      ? (options.methodNotAllowed ?? defaultMethodNotAllowed)(allowListFor(allowed))
-      : (options.notFound ?? defaultNotFound)();
-
-  const handle = (method: PaymentsRouteMethod): MountedHandler => {
-    return async (request, context) => {
-      const params = await paramsOf(context);
-      const segments = [
-        ...prefix,
-        ...normalizeSegments(params[options.segmentsParam ?? 'segments']),
-      ];
-      const { matched, allowed } = resolveRoute(specs, method, segments);
-      if (!matched) return staticAnswer(allowed);
-
-      const { spec, captures } = matched;
-      const intent = intentFor(spec.route.kind, method, segments, captures, params);
-      // The host refuses BEFORE any handler runs — that is the contract.
+  const mount = createMount<PaymentsRouteMethod, ServableRow<A>>({
+    // Flattened to the row shape the dispatcher matches on, with the spec
+    // carried alongside — the dispatcher must not know what a "built-in" is.
+    rows: specs.map((spec) => ({
+      kind: spec.route.kind,
+      method: spec.route.method,
+      pattern: spec.route.pattern,
+      spec,
+    })),
+    verbs: ['GET', 'POST', 'PUT'],
+    prefix: options.prefix,
+    segmentsParam: options.segmentsParam,
+    notFound: options.notFound,
+    methodNotAllowed: options.methodNotAllowed,
+    dispatch: async ({ row, request, captures, segments, params }) => {
+      const intent = intentFor(row.kind, row.method, segments, captures, params);
+      // The host refuses BEFORE any handler runs - that is the contract.
       const auth = await options.requireAuth(request, intent);
       if (auth instanceof Response) return auth;
       const merchant = await options.resolveMerchant(auth, intent);
       const http = await getHttp();
-      if (spec.source === 'extension') {
-        return spec.route.handler({ request, intent, auth, merchant, http });
+      if (row.spec.source === 'extension') {
+        return row.spec.route.handler({ request, intent, auth, merchant, http });
       }
-      return spec.route.dispatch(http, request, { merchant }, intent);
-    };
-  };
-
-  // `resolveRoute`'s `allowed` set is method-independent; 'GET' only names a
-  // lane for the (ignored) `matched` half.
-  const allowedFor = async (
-    context: PaymentsRouteContext | undefined,
-  ): Promise<Set<PaymentsRouteMethod>> =>
-    resolveRoute(specs, 'GET', await segmentsOf(context)).allowed;
+      return row.spec.route.dispatch(http, request, { merchant }, intent);
+    },
+  });
 
   return {
-    GET: handle('GET'),
-    POST: handle('POST'),
-    PUT: handle('PUT'),
-    OPTIONS: async (_request, context) => {
-      const allowed = await allowedFor(context);
-      if (allowed.size === 0) return (options.notFound ?? defaultNotFound)();
-      // The shape Next synthesised and the per-file layout answered with: an
-      // empty 204 whose `Allow` names what THIS path serves.
-      return new Response(null, {
-        status: 204,
-        headers: { allow: allowListFor(allowed).join(', ') },
-      });
-    },
-    miss: async (_request, context) => staticAnswer(await allowedFor(context)),
-    preflight: async (method, context) => {
-      const { matched, allowed } = resolveRoute(specs, method, await segmentsOf(context));
-      return matched ? null : staticAnswer(allowed);
-    },
+    GET: mount.handler('GET'),
+    POST: mount.handler('POST'),
+    PUT: mount.handler('PUT'),
+    OPTIONS: mount.OPTIONS,
+    miss: mount.miss,
+    preflight: mount.preflight,
   };
 }
