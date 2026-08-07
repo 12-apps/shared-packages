@@ -60,5 +60,9 @@ harness/*/test-results
 harness/*/playwright-report
 harness/*/package-lock.json
 
+# Compiled Gherkin. `bddgen` rewrites it on every run of the harness suite;
+# committing it would let a scenario and its compiled spec drift apart.
+harness/*/.features-gen/
+
 # Storybook build output
 storybook-static/
