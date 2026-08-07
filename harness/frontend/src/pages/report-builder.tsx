@@ -1,4 +1,4 @@
-import { createReportBuilder } from '@12-apps/report-builder/react';
+import { createWebReportBuilder } from '@12-apps/report-builder/react';
 
 import { memoryBackend } from '../lib/memory-backend';
 
@@ -13,7 +13,7 @@ import { memoryBackend } from '../lib/memory-backend';
  * The harness supplies an in-memory backend because it has no server. A real
  * host omits `transport` entirely and gets same-origin fetch.
  */
-const { ReportBuilder } = createReportBuilder({
+const { page } = createWebReportBuilder({
   tenantSlug: 'harness',
   transport: memoryBackend(),
   // The harness has no router or query client of its own, so the surface
@@ -22,4 +22,4 @@ const { ReportBuilder } = createReportBuilder({
   standalone: true,
 });
 
-export const ReportBuilderPage = ReportBuilder;
+export const ReportBuilderPage = page;

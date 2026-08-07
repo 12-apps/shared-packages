@@ -34,7 +34,7 @@ import type { ReportBuilderServerConfig, ReportRoute } from './context';
  *    and whether the tenant may save another. Those are billing questions, and
  *    a host answers them before the request ever reaches a descriptor.
  */
-export function createReportBuilder(config: ReportBuilderServerConfig): {
+export function createApiReportBuilder(config: ReportBuilderServerConfig): {
   routes: ReportRoute[];
 } {
   const store = createSavedReportStore(config.db);
