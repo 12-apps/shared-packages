@@ -23,7 +23,7 @@ import type {
 
 import {
   applyProof,
-  assertRankable,
+  assertReorderOnly,
   pendingVerificationMethods,
   requireProven,
   resolvedFrom,
@@ -95,6 +95,13 @@ export interface SettingsService {
    * `CredentialsError` when it is merely switched off — because enabling is
    * `setEnabled`'s job, and only that path is behind the plan's provider quota.
    * See `assertRankable`.
+   *
+   * Omitting one is how a provider leaves the chain, with one exception: a row
+   * that could not be enabled again — enabled today only because it predates
+   * the proof rule — is refused rather than stranded outside, as
+   * `IrreversibleChainRemovalError`. Switching it off from `setEnabled` still
+   * works; a list that drops it by accident no longer takes checkout offline
+   * for good. See `assertDroppable`.
    */
   setPriorities(merchant: MerchantRef, ordered: readonly ProviderName[]): Promise<MerchantSettingsView>;
   /**
@@ -186,26 +193,6 @@ function descriptorOf(providers: ProviderRegistry, name: string): ProviderDescri
     authMode: adapter.authMode ?? 'credentials',
     credentialSchema: adapter.credentialSchema,
   };
-}
-
-/**
- * Reject a chain we cannot rank BEFORE the atomic rewrite runs. The store would
- * refuse an unconfigured name too, but only after the transaction has begun —
- * and the error it raises names the store, not the request, which is useless to
- * the admin who just dragged the wrong provider into the list. `assertRankable`
- * owns the per-provider verdict, including the rule that a rewrite may reorder
- * the chain but never join it.
- */
-async function assertReorderOnly(
-  providers: ProviderRegistry,
-  store: ProviderConfigStore,
-  merchant: MerchantRef,
-  ordered: readonly ProviderName[],
-): Promise<void> {
-  for (const name of ordered) {
-    if (!providers.has(name)) throw new UnknownProviderError(name);
-    assertRankable(providers.get(name), name, await store.get(merchant, name));
-  }
 }
 
 /**

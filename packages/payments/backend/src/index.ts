@@ -108,6 +108,7 @@ export {
   ChargeNotPersistedError,
   CredentialsError,
   CustomerRequirementsError,
+  IrreversibleChainRemovalError,
   NoProviderSucceededError,
   PaymentsError,
   ProviderRequestError,

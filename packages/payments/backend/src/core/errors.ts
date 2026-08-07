@@ -121,6 +121,33 @@ export class UnprovenProviderError extends PaymentsError {
 }
 
 /**
+ * A whole-chain rewrite would have taken a provider out of rotation that it
+ * could not put back (FUT-693).
+ *
+ * The provider is enabled and has never completed a verification charge — the
+ * state every store enabled before FUT-463 is in, since that migration
+ * deliberately backfilled nothing. Such a row is grandfathered INTO the chain
+ * and cannot re-enter it, so dropping it is one-way: checkout goes offline, and
+ * only an activation charge the owner was never asked for brings it back.
+ *
+ * Its own error, and not {@link UnprovenProviderError}, because it asks for
+ * something else. That one says "prove it before you switch it on"; this one
+ * says "this removal is permanent, so make it deliberately" — and names the
+ * switch that does. Answering both with the same name sends an owner off to
+ * complete a charge when nothing needed enabling at all.
+ */
+export class IrreversibleChainRemovalError extends PaymentsError {
+  constructor(readonly provider: ProviderName) {
+    super('IrreversibleChainRemovalError',
+      `Provider ${provider} is in the failover chain and has never completed a verification ` +
+        `charge, so it could not be put back. Reordering will not remove it — switch ${provider} ` +
+        'off from its own panel if you mean to take it out of rotation, or complete its ' +
+        'activation charge first.',
+    );
+  }
+}
+
+/**
  * What we SENT, kept alongside what came back (FUT-489).
  *
  * PagBank support asks for "o log completo" — request and response. Only the
