@@ -137,9 +137,18 @@ export default [
   // this package's own `chargeCard` to pin the wire from both ends (FUT-740).
   // That test is the reason the rule can be trusted at all; it must not be the
   // thing the rule forbids.
+  //
+  // `src/stories/**` is out for the SAME manifest reason, not as a courtesy:
+  // `files` carries `!src/stories/**` and `!**/*.stories.*`, so nothing under
+  // it reaches a consumer either. TEST_GLOBS alone does not cover it — that
+  // matches `*.stories.*`, while the story HELPERS (`store.ts`, `host.tsx`)
+  // are ordinary filenames in that folder. Those helpers stand up the real
+  // `createPaymentFlowsBE` behind the stories on purpose: a story driving a
+  // stubbed component would go green while the real screen was broken, which
+  // is the failure the Storybook exists to prevent (FUT-742).
   {
     files: [`packages/payments/frontend/${SOURCE_GLOB}`],
-    ignores: TEST_GLOBS,
+    ignores: [...TEST_GLOBS, "packages/payments/frontend/src/stories/**"],
     rules: { "payments/frontend-types-only": "error" },
   },
 

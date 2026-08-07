@@ -101,6 +101,12 @@ const CASES = [
   },
   {
     rule: RULE3,
+    fixture: "clean-rule3-story-helper.ts",
+    as: "packages/payments/frontend/src/stories/__portability_selftest__.ts",
+    why: "story helpers never ship — `files` carries !src/stories/**",
+  },
+  {
+    rule: RULE3,
     fixture: "clean-rule3-frontend-runtime.ts",
     as: "packages/payments/frontend/src/__portability_selftest__.ts",
     atLeast: 0,

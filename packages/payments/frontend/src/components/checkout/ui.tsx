@@ -145,7 +145,18 @@ const CheckoutComponentsContext = createContext<CheckoutComponents>(defaultCheck
 /**
  * Fills the checkout's component slots for everything rendered beneath it.
  * Partial on purpose: a host overrides only the slots its design system
- * covers and inherits the raw-MUI default for the rest.
+ * covers and inherits the rest.
+ *
+ * Inherits from the NEAREST provider above, not from the raw-MUI defaults.
+ * That distinction is the whole contract once these nest — and they do nest:
+ * `createPaymentFlows` fills the slots once at the factory, and the
+ * `CheckoutFlow` inside its mount opens a provider of its own. Merging over
+ * the defaults there re-imposed raw MUI on a host that had already stated its
+ * design system, silently, one level in. Merging over the inherited set makes
+ * a nested provider ADD to what is above it, which is what "partial" has to
+ * mean for the surface to agree with itself. The context's own default is
+ * still `defaultCheckoutComponents`, so the outermost provider is unchanged:
+ * an unfilled slot is raw MUI exactly as before.
  */
 export function CheckoutComponentsProvider({
   components,
@@ -154,9 +165,10 @@ export function CheckoutComponentsProvider({
   components?: Partial<CheckoutComponents>;
   children: ReactNode;
 }): JSX.Element {
+  const inherited = useCheckoutComponents();
   const value = useMemo<CheckoutComponents>(
-    () => ({ ...defaultCheckoutComponents, ...components }),
-    [components],
+    () => ({ ...inherited, ...components }),
+    [inherited, components],
   );
   return (
     <CheckoutComponentsContext.Provider value={value}>

@@ -150,15 +150,55 @@ jobs:
       run-affected-e2e: false
       install-playwright: false
 
+  # The stories are the deliverable that lets a human review every checkout
+  # state without seeding a store or running a backend (FUT-742) — so a story
+  # that no longer compiles has to be a red check, not something a reviewer
+  # discovers by opening Storybook. `pnpm build` never touches them: this
+  # package publishes source, so its `build` task is a no-op and the stories are
+  # reached only by .storybook/main.ts's own glob.
+  #
+  # The RENDER half is covered by unit tests (`stories-render.test.tsx`, in the
+  # Unit Tests job): every story mounts, and a tripwire on `globalThis.fetch`
+  # fails the run if any of them reaches the network.
+  storybook:
+    name: Storybook
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      - name: Build the payments checkout Storybook
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @12-apps/payments-frontend storybook:build 2>&1 | tee storybook.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: payments-storybook
+          path: packages/payments/frontend/storybook-static
+          retention-days: 7
+
   # The payments PORTABILITY gate (FUT-562). Separate from `quality` above
   # because that job is the org's reusable workflow (12-apps/ci) and knows
   # nothing about this repo's payments package.
   #
   # `packages/payments/ADOPTING.md` §6 listed these rules and said they were
   # "enforced by review". Review is what let a host repo grow a PagBank-shaped
-  # checkout and a 1,165-line fork of the settings page, and what let one
-  # vendor's payload field survive in code whose commit message claimed to have
-  # removed provider names.
+  # checkout and a 1,165-line fork of the settings page.
+  #
+  # These rules do NOT cover provider-specific PAYLOAD SHAPES — a field name
+  # like `order_nsu` names no provider, so nothing here would have caught
+  # FUT-726. Worth knowing before trusting the gate with that class.
   #
   # TWO steps, both required. The gate alone cannot tell "the tree is portable"
   # apart from "my globs match nothing", and the second reports a safety it is
@@ -337,7 +377,7 @@ jobs:
   # ahead of it, which is the only place a token is ever used.
   release:
     name: Release
-    needs: [lint, type-check, build, unit-tests, quality, portability, consumers, frontend-harness, backend-harness]
+    needs: [lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, backend-harness, portability]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -423,7 +463,7 @@ jobs:
     name: CI Success
     runs-on: ubuntu-latest
     if: always()
-    needs: [lint, type-check, build, unit-tests, quality, portability, consumers, frontend-harness, backend-harness]
+    needs: [lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, backend-harness, portability]
     steps:
       - name: Verify all required jobs passed
         shell: bash

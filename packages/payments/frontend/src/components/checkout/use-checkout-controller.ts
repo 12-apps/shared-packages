@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
-import { validateCpf } from "../../card";
+import { buyerFormComplete } from "./buyer-info-form";
 
 import { rememberHostedOrder, takeHostedOrder } from "./hosted-return";
+import { useCheckoutNavigate, type CheckoutNavigate } from "./navigate-context";
 import type {
   BuyerContact,
   BuyerField,
   BuyerInfo,
   CheckoutOrder,
   CreateOrderRequest,
+  CheckoutCustomerField,
   CreateOrderResult,
   OrderStatus,
   PaymentMethod,
@@ -18,6 +20,11 @@ import { usePaymentPolling } from "./use-payment-polling";
 type Step = "dados" | "payment" | "status";
 
 const STEP_ORDER: Step[] = ["dados", "payment", "status"];
+
+/** The pre-FUT-595 demand, and the safe reading of a chain that declared none. */
+const CPF_ONLY: readonly CheckoutCustomerField[] = [
+  { key: "taxId", type: "CPF", required: true },
+];
 
 /**
  * Everything the flow needs FROM its host, as explicit ports (FUT-564). The
@@ -81,19 +88,49 @@ function useCheckoutNav(
   return { back, editBuyer: taxIdOnFile ? openDados : undefined };
 }
 
+/** The message shown when a declared field is missing or malformed. */
+const FIELD_COMPLAINT: Record<string, string> = {
+  taxId: "CPF inválido.",
+  name: "Informe seu nome.",
+  email: "E-mail inválido.",
+  phone: "Telefone inválido.",
+};
+
+/** Which input to highlight for a declared key. */
+const FIELD_INPUT: Record<string, BuyerField> = {
+  taxId: "cpf",
+  name: "name",
+  email: "email",
+  phone: "phone",
+};
+
 /**
- * What the "Continuar" gate objects to about the CPF, or undefined to advance.
+ * What the "Continuar" gate objects to, or undefined to advance.
  *
- * A blank field is only an error when the store has NO CPF for this buyer. With
+ * The fields come from the chain's own declaration (FUT-595) — absent, they
+ * degrade to CPF-required, which is exactly what this gate has always demanded.
+ *
+ * A blank CPF is only an error when the store has NO CPF for this buyer. With
  * one on file the field starts empty by design (the client is never sent the
  * saved CPF), so demanding one here trapped a returning buyer who opened Dados
  * through "Alterar" and changed their mind: they could not reach Pagamento
  * again, and back only led out to the menu. Leaving it blank means "charge me
  * as before", which is exactly what the server's `resolveBuyerTaxId` does.
  */
-function cpfGateError(typed: string, taxIdOnFile: boolean): string | undefined {
-  if (!typed && taxIdOnFile) return undefined;
-  return validateCpf(typed);
+function buyerGateError(
+  buyer: BuyerInfo,
+  fields: readonly CheckoutCustomerField[],
+  taxIdOnFile: boolean,
+): { message: string; field: BuyerField } | undefined {
+  const effective = taxIdOnFile
+    ? fields.filter((field) => !(field.key === "taxId" && !buyer.taxId?.trim()))
+    : fields;
+  const offending = buyerFormComplete(buyer, effective);
+  if (!offending) return undefined;
+  return {
+    message: FIELD_COMPLAINT[offending.key] ?? "Campo obrigatório.",
+    field: FIELD_INPUT[offending.key] ?? "cpf",
+  };
 }
 
 /**
@@ -119,10 +156,13 @@ function initialStep(resuming: boolean, taxIdOnFile: boolean): Step {
  *
  * @returns true when the buyer is on their way and the caller must stop.
  */
-function handOverToProvider(order: CheckoutOrder): boolean {
+function handOverToProvider(order: CheckoutOrder, navigate: CheckoutNavigate): boolean {
   if (!order.hostedCheckoutUrl) return false;
+  // PARK FIRST, navigate second. The order is the only thing the return trip
+  // has to rehydrate from, and the navigation may tear this SPA down before
+  // any later write lands.
   rememberHostedOrder(order);
-  window.location.assign(order.hostedCheckoutUrl);
+  navigate(order.hostedCheckoutUrl);
   return true;
 }
 
@@ -197,20 +237,24 @@ function useCreateFailure() {
  *   being saved.
  * - `startPayment` raises the order (PIX → QR, CARD → chargeable); `payWithEmail`
  *   re-raises with a corrected e-mail for the merchant-email rejection.
+ *
+ * @param taxIdOnFile The buyer already has a CPF saved (FUT-465) ⇒ the Dados
+ *   step has nothing left to ask, so checkout opens on Pagamento and `back`
+ *   goes to the menu rather than to a form the buyer never saw. The CPF itself
+ *   is never in the client's hands — the server reads it from the encrypted
+ *   profile when the charge is raised.
+ * @param buyerFields What the store's chain declares it needs from the buyer
+ *   (FUT-595). Absent ⇒ CPF-required, which is what this gate demanded before
+ *   there was a declaration to read — never "ask nothing".
  */
 export function useCheckoutController(
   ports: CheckoutHostPorts,
   defaultBuyer?: BuyerInfo,
-  /**
-   * The buyer already has a CPF saved (FUT-465) ⇒ the Dados step has nothing
-   * left to ask, so checkout opens on Pagamento and `back` goes to the menu
-   * rather than to a form the buyer never saw. The CPF itself is never in the
-   * client's hands — the server reads it from the encrypted profile when the
-   * charge is raised.
-   */
   taxIdOnFile = false,
+  buyerFields: readonly CheckoutCustomerField[] = CPF_ONLY,
 ) {
   const { createOrder, saveBuyerContact, onExitToMenu, onPaid } = ports;
+  const navigate = useCheckoutNavigate();
   const resume = useHostedResume();
   const [step, setStep] = useState<Step>(initialStep(Boolean(resume.order), taxIdOnFile));
   // No method pre-selected: the Pagamento step shows just the picker until the
@@ -232,8 +276,8 @@ export function useCheckoutController(
   }, [clearError]);
   const goToPayment = useCallback(() => {
     clearError();
-    const cpfError = cpfGateError(buyer.taxId?.trim() ?? "", taxIdOnFile);
-    if (cpfError) { failure.fail({ message: cpfError, field: "cpf" }); return; }
+    const complaint = buyerGateError(buyer, buyerFields, taxIdOnFile);
+    if (complaint) { failure.fail(complaint); return; }
     // Persist the buyer's details HERE, on "Continuar" — not when a payment is
     // raised. Everything after this step can fail (no provider configured, a
     // declined card, an abandoned PIX, a closed tab) and the details must
@@ -245,17 +289,17 @@ export function useCheckoutController(
       saveBuyerContact?.({ name: buyer.name, phone: buyer.phone, taxId: buyer.taxId });
     }
     setStep("payment");
-  }, [buyer.name, buyer.phone, buyer.taxId, saveProfile, taxIdOnFile, clearError, saveBuyerContact]);
+  }, [buyer, buyerFields, saveProfile, taxIdOnFile, clearError, saveBuyerContact]);
   const startPayment = useCallback(async (chosen: PaymentMethod, override?: BuyerInfo) => {
     clearError();
     setCreating(true);
     const result = await createOrder({ method: chosen, buyer: override ?? buyer, saveProfile });
     setCreating(false);
     if (!result.ok) { failure.fail(result.error); return; }
-    if (handOverToProvider(result.data)) return;
+    if (handOverToProvider(result.data, navigate)) return;
     setOrder(result.data);
     setFinalStatus(null);
-  }, [buyer, saveProfile, createOrder, clearError]);
+  }, [buyer, saveProfile, createOrder, clearError, navigate]);
   const payWithEmail = useCallback((email: string) => {
     if (!method) return;
     const next = { ...buyer, email };

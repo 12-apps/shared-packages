@@ -12,6 +12,17 @@ import type { CardChainLink } from "./method-capability";
 import type { SavedCardMeta } from "./types";
 
 /**
+ * The order-scoped key refresh, as a parameter (FUT-741).
+ *
+ * The self-heal is a call to OUR OWN mount, so it has to go through whichever
+ * transport the surrounding checkout was bound to. Defaulted to the unbound
+ * module function, which is exactly what it always called.
+ */
+export type RefreshBrowserKey = (input: {
+  orderId: string;
+}) => Promise<Result<{ publicKey: string | null }>>;
+
+/**
  * TOKENIZATION for the buyer's card — one instrument per provider the charge
  * may reach (FUT-563).
  *
@@ -39,12 +50,13 @@ async function tokenizeNewCard(
   config: CardTokenizationConfig,
   orderId: string,
   onKeyRefreshed: (key: string) => void,
+  refreshKey: RefreshBrowserKey,
 ): Promise<Result<CardToken>> {
   const first = await tokenizeForCheckout(card, config);
   if (first.ok || !config.publicKey) return first;
   if (config.provider === null || tokenizerFor(config.provider) !== "pagbank-sdk") return first;
 
-  const refreshed = await refreshCardPublicKey({ orderId });
+  const refreshed = await refreshKey({ orderId });
   if (refreshed.ok && refreshed.data.publicKey && refreshed.data.publicKey !== config.publicKey) {
     onKeyRefreshed(refreshed.data.publicKey);
     return tokenizeForCheckout(card, { ...config, publicKey: refreshed.data.publicKey });
@@ -166,6 +178,46 @@ function mintingConfig(
   return mintable.some((link) => link.provider === config.provider) ? config : mintable[0]!;
 }
 
+/**
+ * Mint for the whole chain at once, and say which entry the bare token is from.
+ *
+ * Head and tail mint CONCURRENTLY. Sequentially, one unreachable backup
+ * acquirer held a healthy head's charge for as long as the network stack
+ * allowed — the failover feature blocking on the provider it exists to fall
+ * back to. The head keeps no deadline: it is the provider being paid, and its
+ * self-heal is a second round trip of our own. That self-heal also stays
+ * PagBank-only — `tokenizeNewCard` gates on the scheme — so a chain headed
+ * elsewhere cannot ask for somebody else's key.
+ */
+async function mintEveryEntry(input: {
+  card: CardDetails;
+  entries: readonly CardChainLink[];
+  config: CardTokenizationConfig;
+  orderId: string;
+  onKeyRefreshed: (key: string) => void;
+  refreshKey: RefreshBrowserKey;
+  timeoutMs: number;
+}): Promise<{ headToken: Result<CardToken>; minted: Record<string, CardToken> }> {
+  const head = mintingConfig(input.config, input.entries);
+  const rest = input.entries.filter((link) => link.provider !== head.provider);
+  const [headToken, tail] = await Promise.all([
+    tokenizeNewCard(input.card, head, input.orderId, input.onKeyRefreshed, input.refreshKey),
+    mintChainInstruments(input.card, rest, input.timeoutMs),
+  ]);
+  // A failure in the tail is not fatal: that provider is simply one the walk
+  // will skip.
+  const minted = { ...tail };
+  if (headToken.ok && head.provider) minted[head.provider] = headToken.data;
+  return { headToken, minted };
+}
+
+/** The instruments, reduced to the provider→token map the charge body carries. */
+function tokenMapOf(minted: Record<string, CardToken>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(minted).map(([provider, instrument]) => [provider, instrument.token]),
+  );
+}
+
 /** The charge token for a new card (tokenize + self-heal), plus optional save-meta. */
 export async function resolveNewCardToken(
   card: CardDetails,
@@ -176,36 +228,28 @@ export async function resolveNewCardToken(
   chain: readonly CardChainLink[],
   /** Per-entry mint deadline. Overridable so tests need not wait it out. */
   timeoutMs: number = MINT_TIMEOUT_MS,
+  /** The bound key refresh (FUT-741); defaults to the unbound module call. */
+  refreshKey: RefreshBrowserKey = refreshCardPublicKey,
 ): Promise<Result<CardInstruments>> {
   // No chain served (an older host, or a fetch blip): the active provider
   // alone, exactly the pre-FUT-563 behaviour.
   const entries = chain.length > 0 ? chain : [{ ...config, mintable: true }];
-  const head = mintingConfig(config, entries);
-  // The self-heal rides along and stays PagBank-only — `tokenizeNewCard` gates
-  // on its scheme, so a chain headed elsewhere cannot ask for someone's key.
-  // Head and tail mint CONCURRENTLY. Sequentially, one unreachable backup
-  // acquirer held a healthy head's charge for as long as the network stack
-  // allowed — the failover feature blocking on the provider it exists to fall
-  // back to. The head keeps no deadline: it is the provider being paid, and
-  // its self-heal is a second round trip of our own.
-  const rest = entries.filter((link) => link.provider !== head.provider);
-  const [headToken, tail] = await Promise.all([
-    tokenizeNewCard(card, head, orderId, onKeyRefreshed),
-    mintChainInstruments(card, rest, timeoutMs),
-  ]);
-  // A failure in the tail is not fatal: that provider is simply one the walk
-  // will skip.
-  const minted = { ...tail };
-  if (headToken.ok && head.provider) minted[head.provider] = headToken.data;
+  const { headToken, minted } = await mintEveryEntry({
+    card,
+    entries,
+    config,
+    orderId,
+    onKeyRefreshed,
+    refreshKey,
+    timeoutMs,
+  });
 
   // Refused only when NO entry could be minted for. While one still can, the
   // charge goes out and the entries we hold nothing for are skipped by name.
   const anyMinted = Object.values(minted);
   if (!headToken.ok && anyMinted.length === 0) return headToken;
   const primary = headToken.ok ? headToken.data : anyMinted[0]!;
-  const tokensByProvider = Object.fromEntries(
-    Object.entries(minted).map(([provider, instrument]) => [provider, instrument.token]),
-  );
+  const tokensByProvider = tokenMapOf(minted);
   return ok({
     token: primary.token,
     // Sent whenever the WALK has more than one provider to reach — counted on

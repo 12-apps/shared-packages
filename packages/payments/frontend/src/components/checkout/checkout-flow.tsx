@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
-import type { JSX, ReactNode } from "react";
+import { useMemo, type JSX, type ReactNode } from "react";
 
+import { buyerFieldsFor } from "./buyer-fields";
 import { DadosStep, EmptyCart, PaymentStep } from "./checkout-steps";
 import { ArrowBackIcon } from "./icons";
 import { PaymentStatus } from "./payment-status";
@@ -118,7 +119,12 @@ function ProgressHeader({ step, completed }: { step: string; completed: Set<stri
  */
 function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Element {
   const { cart, defaultBuyer, comanda, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, ...ports } = props;
-  const c = useCheckoutController(ports, defaultBuyer, taxIdOnFile);
+  // Resolved for NO method on purpose (FUT-595): the Dados step opens before
+  // the picker, and the form is filled once — so it asks for the union of what
+  // any chain member may need rather than re-opening after the choice. A chain
+  // that declares nothing degrades to CPF-required, never to "ask nothing".
+  const buyerFields = useMemo(() => buyerFieldsFor(providerConfig?.chain, null), [providerConfig]);
+  const c = useCheckoutController(ports, defaultBuyer, taxIdOnFile, buyerFields);
 
   // A comanda settlement pays already-sent kitchen items — the cart is
   // legitimately empty here, so the empty-cart guard only applies to cart mode.
@@ -147,6 +153,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
           errorField={c.errorField}
           onContinue={c.goToPayment}
           cartTotals={cart}
+          buyerFields={buyerFields}
           discountLines={cart.discountLines}
           totalOverride={comandaTotalOverride(comanda)}
         />

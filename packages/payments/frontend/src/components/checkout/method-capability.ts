@@ -128,16 +128,38 @@ export function offeredMethods(config: CheckoutProviderConfig | null): PaymentMe
 }
 
 /**
- * When the card path is unavailable, PIX is the only choice left — choose it
- * (FUT-697 review): a one-option radiogroup that still demands a tap is a
- * click that buys the buyer nothing.
+ * The methods a buyer can actually pick right now.
+ *
+ * `null` offered — still loading, or a fetch blip — fails OPEN and offers both;
+ * the server still refuses the charge closed. A CARD tile with no in-browser
+ * path is not selectable, so it does not count towards a "sole" method either.
+ */
+export function selectableMethods(
+  offered: PaymentMethod[] | null,
+  cardUnavailable: boolean,
+): PaymentMethod[] {
+  return (offered ?? ["PIX", "CARD"]).filter(
+    (method) => !(method === "CARD" && cardUnavailable),
+  );
+}
+
+/**
+ * A SOLE remaining method is not a choice — take it (FUT-697 review, widened by
+ * FUT-741).
+ *
+ * A one-option radiogroup that still demands a tap is a click that buys the
+ * buyer nothing. It used to fire only when the CARD tile was disabled, which
+ * missed the other shape entirely: a store whose chain declares PIX alone
+ * renders one tile, nothing preselects it, and the buyer sits on a picker with
+ * a single option and no payment below it.
  */
 export function usePreselectSoleMethod(
-  cardUnavailable: boolean,
+  selectable: readonly PaymentMethod[],
   method: PaymentMethod | null,
   onMethodChange: (method: PaymentMethod) => void,
 ): void {
+  const sole = selectable.length === 1 ? selectable[0] : undefined;
   useEffect(() => {
-    if (cardUnavailable && method === null) onMethodChange("PIX");
-  }, [cardUnavailable, method, onMethodChange]);
+    if (method === null && sole) onMethodChange(sole);
+  }, [sole, method, onMethodChange]);
 }
