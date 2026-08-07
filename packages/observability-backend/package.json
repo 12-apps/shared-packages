@@ -17,7 +17,7 @@
   "scripts": {
     "clean": "rm -rf node_modules coverage dist",
     "build": "tsup",
-    "test": "node ../../../scripts/vitest-with-teardown.mjs run",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest watch",
     "lint": "eslint src --max-warnings 0",
     "check-types": "tsc --noEmit",
@@ -47,7 +47,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/12-apps/shared-packages.git",
-    "directory": "packages/observability/backend"
+    "directory": "packages/observability-backend"
   },
   "files": [
     "src",
