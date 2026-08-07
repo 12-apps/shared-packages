@@ -33,10 +33,10 @@ import { ownsVerificationReference } from './reference';
  *     PROCESSED means the provider itself confirmed the payment before the
  *     row settled. Every other adapter's verify proves the SENDER, not the
  *     payment, so its inbox rows prove nothing here. WHICH charge the payload
- *     names is the adapter's own `referenceOfDelivery` (FUT-726) — the
- *     correlation key is a fact about that provider's payload shape, and a
- *     host-side parse of one vendor's field would break silently the day a
- *     second adapter declared the flag.
+ *     names is the adapter's own `referenceOfDelivery`, declared in the same
+ *     breath as the flag (FUT-726) — the correlation key is a fact about that
+ *     provider's payload shape, and a parse of one vendor's field out here
+ *     would answer confidently and wrongly for the second adapter to arrive.
  */
 
 /** Per-pass bound, so one sweep can never become an unbounded fan-out. */
@@ -147,15 +147,16 @@ async function chargeLanded(ctx: ActivationReconcileContext, stranded: Stranded)
  * The payload's correlation key is read by the ADAPTER (`referenceOfDelivery`,
  * FUT-726): the reference must be the delivery's own key, not a substring that
  * happened to appear somewhere in the body — `listOutstanding`'s `contains` is
- * only the index-friendly narrowing. An adapter that declares the flag but not
- * the hook cannot be correlated, so its rows prove nothing here either.
+ * only the index-friendly narrowing. The two declarations are a SINGLE union
+ * member on the adapter, so the flag cannot arrive alone: there is no adapter
+ * whose rows count as proof and which has no way to say what they prove.
  */
 async function confirmedDeliveryLanded(
   ctx: ActivationReconcileContext,
   stranded: Stranded,
 ): Promise<boolean> {
   const adapter = ctx.providers.has(stranded.provider) ? ctx.providers.get(stranded.provider) : null;
-  if (!adapter?.verifyConfirmsPayment || !adapter.referenceOfDelivery) return false;
+  if (!adapter?.verifyConfirmsPayment) return false;
   const payload = await ctx.proofs.findProcessedDeliveryPayload(
     stranded.merchant,
     stranded.provider,

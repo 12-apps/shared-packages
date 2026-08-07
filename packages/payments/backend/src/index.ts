@@ -58,7 +58,11 @@ export {
   type BreakerOptions,
   type ProviderHealth,
 } from './core/provider-health';
-export type { PaymentProviderAdapter } from './core/provider';
+export type {
+  DeliveryPaymentProof,
+  PaymentProviderAdapter,
+  PaymentProviderAdapterBase,
+} from './core/provider';
 export type {
   AttemptLedger,
   ChargeAttemptRecord,
@@ -98,6 +102,7 @@ export {
 export { gateIssuesOf, nothingWasAttempted } from './core/walk-failure';
 export type { WalkFailure, WalkFailureKind } from './core/walk-failure';
 export {
+  AdapterContractError,
   AmbiguousChargeError,
   ChargeDeclinedError,
   ChargeNotPersistedError,
@@ -107,10 +112,26 @@ export {
   PaymentsError,
   ProviderRequestError,
   UnknownProviderError,
+  UnprovenProviderError,
   UnsupportedOperationError,
   WebhookVerificationError,
 } from './core/errors';
 export type { ProviderRequestSnapshot } from './core/errors';
+
+/**
+ * The deployment's stub-mode decision. A host resolves it ONCE at startup
+ * from an explicit `PAYMENTS_STUB`, and passes the answer to
+ * `createSettingsService`, `credentialStoreFrom` and the activation context.
+ * Inferring it from some unrelated variable is what let an unsigned webhook
+ * authenticate itself and settle real orders — see `core/stub-mode.ts`.
+ */
+export {
+  resolveStubMode,
+  stubDeliveryTrusted,
+  StubModeRefusedError,
+  STUB_MODE_ENV_VAR,
+  type StubModeEnv,
+} from './core/stub-mode';
 
 export type {
   CardDetails,
