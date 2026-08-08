@@ -185,6 +185,7 @@ const webhook: PaymentProviderAdapter['webhook'] = {
           // PagBank's order body names no separate refund object; the charge
           // id is the only stable handle the delivery carries.
           providerRefundId: providerChargeId,
+          ...(typeof body.reference_id === 'string' ? { reference: body.reference_id } : {}),
           status: 'REFUNDED',
           amount: { amountCents: refunded, currency: 'BRL' },
           raw: body,

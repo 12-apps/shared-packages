@@ -138,6 +138,15 @@ export {
   type StubModeEnv,
 } from './core/stub-mode';
 
+// The FUT-477 legacy-notification resolver (`resolvePagbankNotification`) is
+// deliberately NOT re-exported here. This ROOT entry is value-imported by the
+// frontend package's stories, so any provider-module export placed on it
+// drags `providers/shared.ts` — and its `node:crypto` import — into a browser
+// bundle and breaks the Storybook build. It ships at its own subpath instead,
+// `@12-apps/payments-backend/pagbank-legacy-notifications` (not under
+// `./providers/*`, which the provider-catalog contract reserves for ADAPTER
+// modules), and no browser build reaches any subpath.
+
 export type {
   CardDetails,
   ChargeInput,
