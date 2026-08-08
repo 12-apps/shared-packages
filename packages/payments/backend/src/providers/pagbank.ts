@@ -10,6 +10,7 @@ import {
 } from './pagbank-http';
 import { pagbankOAuth } from './pagbank-oauth';
 import { findChargeByReference, getCharge, refund } from './pagbank-operations';
+import { activateApplePayCertificate, requestApplePayCsr } from './pagbank-wallets';
 import { verifyPagbankCredentials } from './pagbank-probe';
 import {
   mapCard,
@@ -253,11 +254,13 @@ export function pagbankProvider(): PaymentProviderAdapter {
     authMode: 'oauth',
     capabilities: {
       methods: ['PIX', 'CARD'],
-      // Google Pay rides the card charge as `card.wallet` (FUT-471). Declared
-      // here — the single capability source — so the gateway skips a wallet
-      // charge on any provider that never made this claim, and the checkout
-      // gates its buttons on the same fact.
-      wallets: ['GOOGLE_PAY'],
+      // Both wallets ride the card charge as `card.wallet` (FUT-471/472).
+      // Declared here — the single capability source — so the gateway skips a
+      // wallet charge on any provider that never made this claim, and the
+      // checkout gates its buttons on the same fact. Apple Pay additionally
+      // needs the certificate round-trip (`applePay` below) completed for the
+      // merchant account before a charge can authorize.
+      wallets: ['GOOGLE_PAY', 'APPLE_PAY'],
       savedCards: true,
       refunds: true,
       partialRefunds: false,
@@ -276,6 +279,12 @@ export function pagbankProvider(): PaymentProviderAdapter {
     verifyCredentials: verifyPagbankCredentials,
     createCharge,
     oauth: pagbankOAuth,
+
+    // Apple Pay's certificate round-trip (FUT-472) — see `pagbank-wallets.ts`.
+    applePay: {
+      requestCsr: requestApplePayCsr,
+      activateCertificate: activateApplePayCertificate,
+    },
 
     // The read/refund operations live in `pagbank-operations.ts`, which is
     // where the FUT-681 identity rule (charge id vs order id) is enforced.

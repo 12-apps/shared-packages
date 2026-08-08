@@ -53,3 +53,28 @@ export interface GooglePayClientConfig {
   gateway: string;
   gatewayMerchantId: string | null;
 }
+
+/**
+ * The answer to Apple Pay's CSR request (FUT-472, step 1 of the certificate
+ * round-trip): the provider mints a certificate signing request the merchant
+ * submits in the Apple Developer portal.
+ *
+ * `csr` is the PEM block when one could be recognized in the response, else
+ * `null` — the provider's response schema is NOT published, so the operation
+ * parses defensively and always retains `raw` for the operator who has to
+ * finish the enrolment by hand when recognition fails.
+ */
+export interface ApplePayCsr {
+  csr: string | null;
+  raw: unknown;
+}
+
+/**
+ * The answer to submitting Apple's `.cer` back to the provider (step 3):
+ * `activated` is the HTTP outcome (the response schema is unpublished, so a
+ * 2xx is the only activation signal there is), `raw` whatever body came back.
+ */
+export interface ApplePayActivation {
+  activated: boolean;
+  raw: unknown;
+}

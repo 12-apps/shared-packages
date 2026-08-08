@@ -97,7 +97,16 @@ export {
   type GooglePaymentsClient,
   type GooglePayGatewayParams,
 } from './components/checkout/google-pay-button';
-export { googlePayConfig } from './components/checkout/method-capability';
+export {
+  ApplePayButton,
+  applePaySupported,
+  APPLE_PAY_SUPPORTED_NETWORKS,
+  type ApplePayButtonProps,
+  type ApplePayPaymentRequest,
+  type ApplePaySessionClass,
+  type ApplePaySessionLike,
+} from './components/checkout/apple-pay-button';
+export { applePayDeclared, googlePayConfig } from './components/checkout/method-capability';
 export {
   CheckoutComponentsProvider,
   type CheckoutActionBarProps,

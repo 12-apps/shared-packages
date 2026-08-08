@@ -74,6 +74,13 @@ export interface CheckoutPorts {
    * some hosts must log or confirm the departure.
    */
   navigate?(url: string): void;
+  /**
+   * Apple Pay merchant validation (FUT-472): exchange the session's
+   * `validationURL` for an Apple merchant session, SERVER-SIDE — the merchant
+   * identity certificate must never reach a browser. Optional; without it the
+   * Apple Pay sheet cannot start and the card form remains the way to pay.
+   */
+  validateApplePayMerchant?(validationURL: string): Promise<unknown>;
   /** The remedy shown on the no-provider screen, AND the host's veto. */
   useAvailability?(): CheckoutAvailability;
 }
