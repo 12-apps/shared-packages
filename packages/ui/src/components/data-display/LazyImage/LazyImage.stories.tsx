@@ -5,7 +5,7 @@ import { LazyImage } from './LazyImage';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 const meta: Meta<typeof LazyImage> = {
-  title: 'DataDisplay/LazyImage',
+  title: 'Media/LazyImage',
   component: LazyImage,
   parameters: {
     layout: 'padded',

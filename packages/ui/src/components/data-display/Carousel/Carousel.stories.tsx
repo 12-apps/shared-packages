@@ -6,7 +6,7 @@ import { Carousel } from './Carousel';
 import type { CarouselItem } from './Carousel.types';
 
 const meta: Meta<typeof Carousel> = {
-  title: 'DataDisplay/Carousel',
+  title: 'Media/Carousel',
   component: Carousel,
   parameters: {
     layout: 'padded',

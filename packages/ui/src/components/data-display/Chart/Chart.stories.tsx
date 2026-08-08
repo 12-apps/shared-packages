@@ -6,7 +6,7 @@ import { Chart } from './Chart';
 import type { ChartDataPoint } from './Chart.types';
 
 const meta: Meta<typeof Chart> = {
-  title: 'DataDisplay/Chart',
+  title: 'Charts/Chart',
   component: Chart,
   parameters: {
     layout: 'padded',

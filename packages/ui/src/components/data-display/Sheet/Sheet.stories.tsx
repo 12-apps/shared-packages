@@ -33,7 +33,7 @@ import { Sheet } from './Sheet';
 import type { SheetProps } from './Sheet.types';
 
 const meta: Meta<typeof Sheet> = {
-  title: 'DataDisplay/Sheet',
+  title: 'Overlays/Sheet',
   component: Sheet,
   parameters: {
     layout: 'centered',

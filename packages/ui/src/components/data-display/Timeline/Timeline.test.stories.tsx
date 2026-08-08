@@ -9,7 +9,7 @@ import { Timeline } from './Timeline';
 import type { TimelineItem } from './Timeline.types';
 
 const meta: Meta<typeof Timeline> = {
-  title: 'Enhanced/Timeline/Tests',
+  title: 'Content/Timeline/Tests',
   component: Timeline,
   parameters: {
     layout: 'centered',

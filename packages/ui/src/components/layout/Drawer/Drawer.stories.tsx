@@ -24,7 +24,7 @@ import { useState } from 'react';
 import { Drawer, DrawerContent,DrawerHeader } from './Drawer';
 
 const meta: Meta<typeof Drawer> = {
-  title: 'Layout/Drawer',
+  title: 'Overlays/Drawer',
   component: Drawer,
   parameters: {
     layout: 'fullscreen',

@@ -8,7 +8,7 @@ import React from 'react';
 import { HoverCard } from './HoverCard';
 
 const meta: Meta<typeof HoverCard> = {
-  title: 'DataDisplay/HoverCard',
+  title: 'Cards/HoverCard',
   component: HoverCard,
   parameters: {
     layout: 'centered',

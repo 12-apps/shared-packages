@@ -54,7 +54,7 @@ const kebab = (
 );
 
 const meta: Meta<typeof BaseCard> = {
-  title: "DataDisplay/DataViews/BaseCard",
+  title: "Cards/BaseCard",
   component: BaseCard,
   parameters: { layout: "centered" },
   tags: ["autodocs"],

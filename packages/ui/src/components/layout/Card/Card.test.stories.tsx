@@ -8,7 +8,7 @@ import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 import { Card, CardActions, CardContent, CardHeader, CardMedia } from './Card';
 
 const meta: Meta<typeof Card> = {
-  title: 'Layout/Card/Tests',
+  title: 'Cards/Card/Tests',
   component: Card,
   parameters: {
     layout: 'centered',

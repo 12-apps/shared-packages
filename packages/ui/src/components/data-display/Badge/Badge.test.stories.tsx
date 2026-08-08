@@ -13,7 +13,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Badge } from './Badge';
 
 const meta: Meta<typeof Badge> = {
-  title: 'DataDisplay/Badge/Tests',
+  title: 'Indicators/Badge/Tests',
   component: Badge,
   parameters: {
     layout: 'centered',

@@ -7,7 +7,7 @@ import { expect, fireEvent, fn,userEvent, waitFor, within } from 'storybook/test
 import { Dialog, DialogActions,DialogContent, DialogHeader } from './Dialog';
 
 const meta: Meta<typeof Dialog> = {
-  title: 'Feedback/Dialog/Tests',
+  title: 'Overlays/Dialog/Tests',
   component: Dialog,
   parameters: {
     layout: 'centered',

@@ -4,7 +4,7 @@ import { expect, fn, within } from 'storybook/test';
 import { Chart } from './Chart';
 
 const meta: Meta<typeof Chart> = {
-  title: 'DataDisplay/Chart/Tests',
+  title: 'Charts/Chart/Tests',
   component: Chart,
   parameters: {
     layout: 'centered',

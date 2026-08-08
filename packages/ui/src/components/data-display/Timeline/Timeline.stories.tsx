@@ -15,7 +15,7 @@ import React from 'react';
 import { Timeline } from './Timeline';
 
 const meta: Meta<typeof Timeline> = {
-  title: 'Enhanced/Timeline',
+  title: 'Content/Timeline',
   component: Timeline,
   parameters: {
     layout: 'padded',

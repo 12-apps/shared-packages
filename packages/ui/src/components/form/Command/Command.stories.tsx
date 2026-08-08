@@ -16,7 +16,7 @@ import { Command } from './Command';
 import type { CommandItem,CommandProps } from './Command.types';
 
 const meta: Meta<typeof Command> = {
-  title: 'Form/Command',
+  title: 'Navigation/Command',
   component: Command,
   parameters: {
     layout: 'centered',

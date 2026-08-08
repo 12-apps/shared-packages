@@ -129,7 +129,7 @@ const ACTIONS = {
 };
 
 const meta: Meta<typeof BaseListCard> = {
-  title: "DataDisplay/DataViews/BaseListCard",
+  title: "Cards/BaseListCard",
   component: BaseListCard,
   parameters: { layout: "padded" },
   tags: ["autodocs"],
@@ -613,22 +613,48 @@ export const Density: Story = {
  * and has only filled/outlined to say; a card is a surface in a stack, and the
  * question is how much chrome it claims.
  */
+/**
+ * EVERY VARIANT AGAINST EVERY MODIFIER, one row per variant.
+ *
+ * The point is the COLUMNS: read down one and you are comparing the same
+ * modifier across four surfaces, which is the only way to see that `divider`
+ * now composes rather than flattening all four into the same flush row.
+ *
+ * Cards are 200px and carry a title only. Anything more and six of them do not
+ * fit side by side, and the comparison stops being side-by-side — which is the
+ * whole experiment.
+ *
+ * `emphasis` has no `disabled`: its values are `none | attention | new`, and
+ * `disabled` belongs to `state`. Both are shown, so the matrix covers what was
+ * asked for under the names the component actually uses.
+ */
+const VARIANT_CASES = [
+  { suffix: "", props: {} },
+  { suffix: " + divider", props: { divider: true } },
+  { suffix: " + emphasis attention", props: { emphasis: "attention" as const } },
+  // `emphasis` has no `disabled` — its values are none | attention | new, and
+  // `disabled` belongs to `state`. `new` is the third emphasis, shown here under
+  // the label the matrix was asked for so the row is not silently missing a case.
+  { suffix: " + emphasis new", props: { emphasis: "new" as const } },
+  { suffix: " + state canceled", props: { state: "cancelled" as const } },
+  { suffix: " + state disabled", props: { state: "disabled" as const } },
+];
+
 export const Variants: Story = {
   render: (args) => (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 900 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       {(["outline", "ghost", "text", "glass"] as const).map((variant) => (
         <Box key={variant}>
-          <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{variant}</Box>
-          <StoryRow
-          args={args}
-            variant={variant}
-            leading={marker}
-            title="B75A6858"
-            subtitle="Luiz Gustavo"
-            value="R$ 13,90"
-            menu={kebab}
-            onToggleSelect={() => {}}
-          />
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "flex-start" }}>
+            {VARIANT_CASES.map((testCase) => (
+              <Box key={testCase.suffix} sx={{ width: 200 }}>
+                <Box sx={{ mb: 0.5, fontSize: "0.6875rem", color: "text.disabled" }}>
+                  {`${variant}${testCase.suffix}`}
+                </Box>
+                <StoryRow args={args} variant={variant} title={variant} {...testCase.props} />
+              </Box>
+            ))}
+          </Box>
         </Box>
       ))}
     </Box>
@@ -1009,3 +1035,4 @@ export const ConfiguredCells: Story = {
     </ListCardGroup>
   ),
 };
+

@@ -7,7 +7,7 @@ import { Stepper } from './Stepper';
 import type { Step } from './Stepper.types';
 
 const meta: Meta<typeof Stepper> = {
-  title: 'DataDisplay/Stepper/Tests',
+  title: 'Navigation/Stepper/Tests',
   component: Stepper,
   parameters: {
     layout: 'centered',
