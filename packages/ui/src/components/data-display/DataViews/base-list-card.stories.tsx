@@ -150,6 +150,11 @@ const meta: Meta<typeof BaseListCard> = {
       divider: { control: "boolean" },
       selectable: { control: "boolean" },
       selected: { control: "boolean" },
+      // The chevron is not its own switch — it is a consequence of `children`.
+      // Clear the body and the control disappears with it, which is the rule
+      // worth being able to try from the panel rather than read about.
+      defaultExpanded: { control: "boolean" },
+      children: { control: "boolean", mapping: { true: <OrderDetail />, false: undefined } },
     }),
     ...category("Appearance", {
       variant: { control: "inline-radio", options: ["outline", "ghost", "text", "glass"] },
@@ -258,6 +263,10 @@ export const Pedido: Story = {
     // `Actions` story for the case where a host does want both (and where
     // `actionsAlwaysVisible` has something to act on).
     menu: kebab,
+    // A BODY, so the playground has a chevron. Toggle `children` off in the
+    // panel and both the control and its rail leave the row — a chevron that
+    // opens onto nothing is a promise the row cannot keep.
+    children: <OrderDetail />,
     testId: "pedido-row",
   },
 };
@@ -677,7 +686,7 @@ export const States: Story = {
  * which is the point of the slot. A different entity would put something else
  * here and the envelope would not know the difference.
  */
-function CartDetail(): React.JSX.Element {
+function OrderDetail(): React.JSX.Element {
   const items = [
     { qty: 2, name: "Picanha na chapa", total: "179,80" },
     { qty: 4, name: "Chopp pilsen 500ml", total: "95,60", note: "sem colarinho" },
@@ -753,7 +762,7 @@ export const Expandable: Story = {
       status={<Chip label="Abandonado" size="small" variant="outlined" color="warning" />}
       onToggleSelect={() => {}}
     >
-      <CartDetail />
+      <OrderDetail />
     </BaseListCard>
   ),
 };
@@ -769,7 +778,7 @@ export const ExpandedByDefault: Story = {
       defaultExpanded
       onToggleSelect={() => {}}
     >
-      <CartDetail />
+      <OrderDetail />
     </BaseListCard>
   ),
 };
@@ -791,7 +800,7 @@ export const ChevronOnlyWhenThereIsMore: Story = {
         value="R$ 312,50"
         onToggleSelect={() => {}}
       >
-        <CartDetail />
+        <OrderDetail />
       </BaseListCard>
       <BaseListCard
         leading={<ReceiptLongOutlinedIcon />}
@@ -835,7 +844,7 @@ export const ControlledAccordion: Story = {
             expanded={open === row.id}
             onExpandedChange={(next) => setOpen(next ? row.id : null)}
           >
-            <CartDetail />
+            <OrderDetail />
           </BaseListCard>
         ))}
       </ListCardGroup>
@@ -903,7 +912,7 @@ export const ConfiguredCells: Story = {
             />
           }
         >
-          <CartDetail />
+          <OrderDetail />
         </BaseListCard>
       ))}
     </ListCardGroup>
