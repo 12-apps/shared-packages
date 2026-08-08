@@ -80,7 +80,42 @@ function slot(mapping: Record<string, unknown>): InputType {
   return { control: "select", options: Object.keys(mapping), mapping };
 }
 
-const LEADING = { nenhum: undefined, "ícone de recibo": marker };
+/**
+ * `leading` takes ANY node — the slot is "a marker", not "an icon", and the row
+ * never inspects what it was given. The control offered only a receipt glyph,
+ * which made a generic slot read as a pedidos-only one, so it now names the
+ * three kinds of marker a list actually uses: an icon, an avatar with initials,
+ * and a square thumbnail.
+ */
+const avatar = (
+  <Box
+    sx={{
+      width: 28,
+      height: 28,
+      borderRadius: "50%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 12,
+      fontWeight: 700,
+      color: "primary.contrastText",
+      bgcolor: "primary.light",
+    }}
+  >
+    LG
+  </Box>
+);
+
+const thumbnail = (
+  <Box sx={{ width: 28, height: 28, borderRadius: 1, bgcolor: "action.selected" }} />
+);
+
+const LEADING = {
+  nenhum: undefined,
+  ícone: marker,
+  avatar,
+  miniatura: thumbnail,
+};
 const MENU = { nenhum: undefined, "kebab (⋮)": kebab };
 const ACTIONS = {
   nenhuma: undefined,
