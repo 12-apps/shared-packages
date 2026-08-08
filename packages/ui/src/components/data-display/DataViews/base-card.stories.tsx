@@ -272,3 +272,36 @@ export const DraggableInsideAContainer: Story = {
     );
   },
 };
+
+/**
+ * The 3:1 banner tile: a card whose subject is a name and a number.
+ *
+ * Every other ratio is picture-shaped, and a card triaged rather than browsed —
+ * a cart, an order — spends most of a 4:3 tile on an icon repeated down the
+ * whole grid. At 3:1 there is room for a caption line and a detail line and no
+ * space left to fill with a glyph, so no `imageFallback` is passed here.
+ *
+ * Contrast the two: the 4:3 beside it holds the same words in twice the height.
+ */
+export const BannerRatio: Story = {
+  render: () => (
+    <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+      <Box sx={{ width: 260 }}>
+        <BaseCard
+          aspectRatio="3:1"
+          title="Luiz Gustavo"
+          subtitle="Mesa 12 · 3 itens · R$ 89,90"
+          onToggleSelect={() => {}}
+        />
+      </Box>
+      <Box sx={{ width: 260 }}>
+        <BaseCard
+          aspectRatio="4:3"
+          title="Luiz Gustavo"
+          subtitle="Mesa 12 · 3 itens · R$ 89,90"
+          onToggleSelect={() => {}}
+        />
+      </Box>
+    </Box>
+  ),
+};

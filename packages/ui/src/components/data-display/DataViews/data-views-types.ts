@@ -63,7 +63,7 @@ export interface DataViewCardSelection {
  * ratio and grows in BOTH width and height as the zoom slider widens its grid
  * track, so a grid of cards stays visually uniform.
  */
-export type CardAspectRatio = "1:1" | "4:3" | "16:9" | "9:16" | "3:4";
+export type CardAspectRatio = "1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "3:1";
 
 /** Numeric width/height factor for each {@link CardAspectRatio} (CSS `aspect-ratio`). */
 export const CARD_ASPECT_RATIOS: Record<CardAspectRatio, number> = {
@@ -72,6 +72,15 @@ export const CARD_ASPECT_RATIOS: Record<CardAspectRatio, number> = {
   "16:9": 16 / 9,
   "9:16": 9 / 16,
   "3:4": 3 / 4,
+  /**
+   * The BANNER tile: too short for media, sized for two lines of text.
+   *
+   * Every other ratio here is picture-shaped, because they were added for cards
+   * built around a thumbnail. A card whose subject is a NAME and a NUMBER — a
+   * cart, an order, anything triaged rather than browsed — spends most of a 4:3
+   * tile on an icon that repeats down the whole grid and says nothing.
+   */
+  "3:1": 3,
 };
 
 /** One selectable value inside a filter pill. */
