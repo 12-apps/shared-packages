@@ -40,7 +40,7 @@ function adapter(name: string, seen: ChargeInput[]): PaymentProviderAdapter {
     displayName: name,
     capabilities: {
       methods: ["PIX", "CARD"],
-      wallets: ["GOOGLE_PAY"],
+      wallets: ["GOOGLE_PAY", "APPLE_PAY"],
       savedCards: true,
       refunds: false,
       partialRefunds: false,
@@ -189,6 +189,21 @@ describe("@12-apps/payments-frontend's chargeWallet against createPaymentFlowsBE
       email: "ana@example.com",
       taxId: "12345678909",
     });
+  });
+
+  it("carries an Apple Pay key through the same wire, serialized verbatim (FUT-472)", async () => {
+    const { seen, fetchShim } = mountBehindFetch();
+    vi.stubGlobal("fetch", fetchShim);
+    const paymentData = JSON.stringify({ data: "opaque", header: {}, signature: "sig" });
+
+    const charged = await chargeWallet({
+      orderId: REF,
+      wallet: { type: "APPLE_PAY", key: paymentData },
+      taxId: "12345678909",
+    });
+
+    expect(charged.ok).toBe(true);
+    expect(seen[0]?.card?.wallet).toEqual({ type: "APPLE_PAY", key: paymentData });
   });
 
   it("refuses, naming the field, when the buyer sent no CPF", async () => {
