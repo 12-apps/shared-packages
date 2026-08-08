@@ -28,6 +28,7 @@ import { createCheckoutClient } from "./transport";
 import type {
   ChargeCardInput,
   ChargeOutcome,
+  ChargeWalletInput,
   CheckoutProviderConfig,
   OrderStatus,
 } from "./types";
@@ -75,6 +76,15 @@ export async function refreshCardPublicKey(input: {
  */
 export async function chargeCard(input: ChargeCardInput): Promise<Result<ChargeOutcome>> {
   return defaultClient.charge(input);
+}
+
+/**
+ * Charge a wallet-minted instrument against an order (FUT-471/472) — the same
+ * `/charge` route as {@link chargeCard}, carrying `wallet: { type, key }` in
+ * place of a card token.
+ */
+export async function chargeWallet(input: ChargeWalletInput): Promise<Result<ChargeOutcome>> {
+  return defaultClient.chargeWallet(input);
 }
 
 /** List saved cards available for reuse (empty on any error — non-blocking). */

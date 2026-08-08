@@ -4,6 +4,7 @@ import type {
   ClientTokenization,
   CredentialFieldSpec,
   CustomerSchema,
+  GooglePayClientConfig,
   NormalizedWebhookEvent,
   ProviderCapabilities,
   OAuthAuthorizeRequest,
@@ -337,5 +338,11 @@ export interface PaymentProviderAdapterBase {
     tokenization: ClientTokenization;
     /** e.g. publishable/public key for PUBLIC_KEY and SDK flows. */
     publicKey?: string;
+    /**
+     * Google Pay's PAYMENT_GATEWAY parameters, for adapters that declare the
+     * `GOOGLE_PAY` wallet capability (FUT-471). Client-safe by construction —
+     * see {@link GooglePayClientConfig}. Omitted by every other adapter.
+     */
+    googlePay?: GooglePayClientConfig;
   };
 }

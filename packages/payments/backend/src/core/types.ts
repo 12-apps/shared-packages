@@ -1,5 +1,6 @@
 import type { CustomerInfo } from './customer-schema';
 import type { SettlementHints } from './settlement-hints';
+import type { WalletInstrument, WalletType } from './wallet-types';
 
 export type { SettlementHints };
 /** The probe verdict types, re-exported so `core/types` stays the one door. */
@@ -89,6 +90,13 @@ export interface MerchantRef {
  * SDK-minted token, or a saved-card vault token).
  */
 export interface CardDetails {
+  /**
+   * A wallet-minted instrument (FUT-471/472, see `./wallet-types`). When
+   * present it IS the instrument: adapters send it instead of
+   * `token`/`savedCardToken`, and the capability gate skips providers that
+   * never declared the wallet.
+   */
+  wallet?: WalletInstrument;
   /** One-time token or encrypted card blob minted client-side. */
   token?: string;
   /** Provider vault token of a previously saved card. */
@@ -277,6 +285,15 @@ export interface RefundSnapshot {
 export type ClientTokenization = 'NONE' | 'PUBLIC_KEY' | 'SDK' | 'REDIRECT';
 
 /**
+ * The digital-wallet descriptors (FUT-471/472) — wallet union, the wallet
+ * instrument a card charge can carry, and Google Pay's client parameters.
+ * Their own module for the same reason as {@link SettlementHints} (this
+ * file's size gate), re-exported here so consumers keep importing from
+ * `core/types`, the one door.
+ */
+export type { GooglePayClientConfig, WalletInstrument, WalletType } from './wallet-types';
+
+/**
  * What a provider adapter can actually do. The gateway consults this BEFORE
  * calling an adapter, so "provider X can't do boleto" is a typed, uniform
  * `UnsupportedOperationError` — not a provider 400 with a vendor-specific
@@ -284,6 +301,13 @@ export type ClientTokenization = 'NONE' | 'PUBLIC_KEY' | 'SDK' | 'REDIRECT';
  */
 export interface ProviderCapabilities {
   methods: readonly PaymentMethodKind[];
+  /**
+   * The digital wallets this provider's card charge accepts (FUT-471/472).
+   * Optional and defaulting to NONE at every gate — absence is never read as
+   * "probably fine". Declaring one is a claim that `createCharge` understands
+   * `card.wallet` of that type.
+   */
+  wallets?: readonly WalletType[];
   savedCards: boolean;
   refunds: boolean;
   partialRefunds: boolean;
@@ -367,34 +391,9 @@ export type {
   VaultSession,
 } from './vault-types';
 
-/** An inbound webhook delivery exactly as the HTTP layer received it. */
-export interface WebhookDelivery {
-  provider: ProviderName;
-  /** Raw body BYTES-as-string — signature checks need the unparsed body. */
-  rawBody: string;
-  /** Lower-cased header map. */
-  headers: Record<string, string>;
-}
-
-/** Normalized event an adapter extracts from a verified webhook delivery. */
-export interface NormalizedWebhookEvent {
-  provider: ProviderName;
-  /**
-   * Provider-side unique id for THIS delivery/event — the inbox dedup key. A
-   * provider that lacks one should hash the raw body.
-   */
-  eventId: string;
-  /**
-   * `DISPUTE_UPDATED` (FUT-477): a dispute the provider reported — money
-   * HELD, not yet moved, so it carries neither snapshot; either would assert
-   * an outcome the dispute has not reached. Its terminal outcomes arrive as
-   * their own events (`REFUND_UPDATED` when the merchant loses). Hosts that
-   * predate the member fall through their default branch, like `UNKNOWN`.
-   */
-  type: 'CHARGE_UPDATED' | 'REFUND_UPDATED' | 'DISPUTE_UPDATED' | 'UNKNOWN';
-  /** Present when the event carries a charge state change. */
-  charge?: ChargeSnapshot;
-  /** Present when the event carries a refund state change. */
-  refund?: RefundSnapshot;
-  raw?: unknown;
-}
+/**
+ * The webhook DELIVERY/EVENT shapes — their own module for the same reason as
+ * {@link SettlementHints} (this file's size gate), re-exported here so every
+ * adapter and host keeps importing them from `core/types`, the one door.
+ */
+export type { NormalizedWebhookEvent, WebhookDelivery } from './webhook-event-types';

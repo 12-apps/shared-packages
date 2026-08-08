@@ -21,6 +21,7 @@ import { err, ok, type Result } from "../../result";
 import type {
   ChargeCardInput,
   ChargeOutcome,
+  ChargeWalletInput,
   CheckoutProviderConfig,
   OrderStatus,
 } from "./types";
@@ -45,11 +46,13 @@ export interface CheckoutTransport {
   headers?: () => HeadersInit | Promise<HeadersInit>;
 }
 
-/** The five calls the buyer checkout makes, pre-bound to a {@link CheckoutTransport}. */
+/** The six calls the buyer checkout makes, pre-bound to a {@link CheckoutTransport}. */
 export interface CheckoutClient {
   getConfig(tenantSlug: string): Promise<Result<CheckoutProviderConfig>>;
   getStatus(ref: string): Promise<Result<OrderStatus>>;
   charge(input: ChargeCardInput): Promise<Result<ChargeOutcome>>;
+  /** A wallet instrument against the same `/charge` route (FUT-471/472). */
+  chargeWallet(input: ChargeWalletInput): Promise<Result<ChargeOutcome>>;
   listInstruments(tenantSlug?: string): Promise<SavedCard[]>;
   refreshBrowserKey(input: { orderId: string }): Promise<Result<{ publicKey: string | null }>>;
 }
@@ -113,6 +116,36 @@ function ambientFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Res
 }
 
 /**
+ * The FLAT card-charge body the shipped client has always sent. Pinned from
+ * both ends by `charge-wire.contract.test.ts`; nothing here may re-nest it.
+ */
+function flatChargeBody(input: ChargeCardInput): string {
+  return JSON.stringify({
+    orderId: input.orderId,
+    token: input.token,
+    // One instrument per provider (FUT-563) — the server hands each provider
+    // in the chain its own, which is what lets a card charge fail over.
+    ...(input.tokensByProvider ? { tokensByProvider: input.tokensByProvider } : {}),
+    saveCard: input.saveCard,
+    cardMeta: input.cardMeta,
+    taxId: input.taxId,
+  });
+}
+
+/**
+ * The same flat wire with `wallet` in place of `token` (FUT-471): the mount's
+ * draft reader takes either, and a body naming both would carry two
+ * instruments for one charge. Pinned by `wallet-wire.contract.test.ts`.
+ */
+function flatWalletBody(input: ChargeWalletInput): string {
+  return JSON.stringify({
+    orderId: input.orderId,
+    wallet: input.wallet,
+    taxId: input.taxId,
+  });
+}
+
+/**
  * The five checkout calls, bound to one transport.
  *
  * Passing no transport reproduces exactly what the free functions in
@@ -156,22 +189,10 @@ export function createCheckoutClient(transport: CheckoutTransport = {}): Checkou
       ),
 
     charge: (input) =>
-      call<ChargeOutcome>("/charge", {
-        method: "POST",
-        // The FLAT body the shipped client has always sent. Pinned from both
-        // ends by `charge-wire.contract.test.ts`; nothing here may re-nest it.
-        body: JSON.stringify({
-          orderId: input.orderId,
-          token: input.token,
-          // One instrument per provider (FUT-563) — the server hands each
-          // provider in the chain its own, which is what lets a card charge
-          // fail over.
-          ...(input.tokensByProvider ? { tokensByProvider: input.tokensByProvider } : {}),
-          saveCard: input.saveCard,
-          cardMeta: input.cardMeta,
-          taxId: input.taxId,
-        }),
-      }),
+      call<ChargeOutcome>("/charge", { method: "POST", body: flatChargeBody(input) }),
+
+    chargeWallet: (input) =>
+      call<ChargeOutcome>("/charge", { method: "POST", body: flatWalletBody(input) }),
 
     listInstruments: async (tenantSlug) => {
       // Scoped to the store when known (FUT-697): only cards the store's ACTIVE

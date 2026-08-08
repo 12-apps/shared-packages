@@ -14,6 +14,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PaymentStep } from "../checkout-steps";
+import { googlePayConfig } from "../method-capability";
 import { MethodPicker } from "../method-picker";
 import type { CheckoutProviderConfig } from "../types";
 
@@ -116,5 +117,69 @@ describe("PaymentStep — the config's methods reach the picker (FUT-698)", () =
 
     expect(screen.getByTestId("checkout-method-PIX")).toBeTruthy();
     expect(screen.getByTestId("checkout-method-CARD")).toBeTruthy();
+  });
+});
+
+describe("googlePayConfig — the wallet gate fails CLOSED (FUT-471)", () => {
+  /** A one-entry chain, widened per case. */
+  function chained(head: Record<string, unknown>): CheckoutProviderConfig {
+    return {
+      ...config(["PIX", "CARD"]),
+      chain: [
+        {
+          provider: "pagbank",
+          tokenization: "PUBLIC_KEY",
+          publicKey: "pk",
+          mockTokenization: false,
+          methods: ["PIX", "CARD"],
+          ...head,
+        },
+      ],
+    };
+  }
+
+  it("answers the head's published parameters when everything is declared", () => {
+    const head = {
+      wallets: ["GOOGLE_PAY" as const],
+      googlePay: { gateway: "pagbank", gatewayMerchantId: "MID_1" },
+    };
+    expect(googlePayConfig(chained(head))).toEqual({
+      gateway: "pagbank",
+      gatewayMerchantId: "MID_1",
+    });
+  });
+
+  it("answers null while the config is loading — the opposite of the picker's fail-open", () => {
+    // A missing button costs a tap; a button the store cannot charge sends the
+    // buyer through the wallet sheet into a guaranteed refusal.
+    expect(googlePayConfig(null)).toBeNull();
+  });
+
+  it("answers null for a chain served by an older host (no wallet fields)", () => {
+    expect(googlePayConfig(chained({}))).toBeNull();
+  });
+
+  it("answers null when the capability is declared but the merchant id is missing", () => {
+    const head = {
+      wallets: ["GOOGLE_PAY" as const],
+      googlePay: { gateway: "pagbank", gatewayMerchantId: null },
+    };
+    expect(googlePayConfig(chained(head))).toBeNull();
+  });
+
+  it("answers null when only a TAIL entry declares the wallet", () => {
+    // The wallet token is minted against the head's gatewayMerchantId; a tail
+    // declaration cannot be honoured from this browser.
+    const tail = {
+      provider: "other",
+      tokenization: "PUBLIC_KEY" as const,
+      publicKey: "pk2",
+      mockTokenization: false,
+      methods: ["CARD" as const],
+      wallets: ["GOOGLE_PAY" as const],
+      googlePay: { gateway: "other", gatewayMerchantId: "MID_2" },
+    };
+    const config_ = chained({});
+    expect(googlePayConfig({ ...config_, chain: [...(config_.chain ?? []), tail] })).toBeNull();
   });
 });
