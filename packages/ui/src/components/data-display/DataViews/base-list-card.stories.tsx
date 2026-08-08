@@ -8,7 +8,7 @@ import { Button } from "../../form/Button";
 import { DropdownMenu } from "../../navigation/DropdownMenu";
 import { Box } from "../../../mui/Box";
 
-import { BaseListCard } from "./base-list-card";
+import { BaseListCard, type BaseListCardProps } from "./base-list-card";
 import { DragContainerProvider } from "./data-views-drag";
 import { ListCardGroup } from "./list-card-rails";
 
@@ -247,6 +247,30 @@ export default meta;
 
 type Story = StoryObj<typeof BaseListCard>;
 
+/**
+ * EVERY STORY'S CARD GOES THROUGH HERE, so the controls panel drives all of
+ * them and not just the one args-driven playground.
+ *
+ * A story that writes `<StoryRow args={args} title="…" />` inside `render` ignores args
+ * completely: Storybook still shows the full control table, every knob is inert,
+ * and a reader who moves `density` and sees nothing happen concludes the
+ * COMPONENT is broken rather than the story. That was true of most of the
+ * stories in this file.
+ *
+ * ARGS FIRST, THEN THE STORY'S OWN PROPS. The panel supplies the shared knobs —
+ * density, scale, variant, colour, state — while whatever a story hardcodes is
+ * the thing that story exists to demonstrate, and must not be overridable from
+ * the panel or the demonstration quietly stops being one. So `Selection` keeps
+ * its selected row and still answers the density slider.
+ */
+function StoryRow({
+  args,
+  ...own
+}: { args: Partial<BaseListCardProps> } & Partial<BaseListCardProps>): React.JSX.Element {
+  return <StoryRow args={args} {...args} {...own} />;
+}
+
+
 
 
 /**
@@ -319,7 +343,7 @@ export const Pedido: Story = {
  * no control to set it.
  */
 export const Selection: Story = {
-  render: () => {
+  render: (args) => {
     const [picked, setPicked] = useState<Set<string>>(new Set(["B75A6858"]));
     const toggle = (id: string): void =>
       setPicked((prev) => {
@@ -330,7 +354,8 @@ export const Selection: Story = {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 900 }}>
         {["B75A6858", "1D970689", "0112CF89"].map((id) => (
-          <BaseListCard
+          <StoryRow
+          args={args}
             key={id}
             leading={marker}
             title={id}
@@ -356,12 +381,13 @@ export const Selection: Story = {
  * the row does not also open.
  */
 export const Actions: Story = {
-  render: () => {
+  render: (args) => {
     const [log, setLog] = useState<string[]>([]);
     const note = (what: string): void => setLog((prev) => [what, ...prev].slice(0, 4));
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 900 }}>
-        <BaseListCard
+        <StoryRow
+          args={args}
           leading={marker}
           title="B75A6858"
           subtitle="Luiz Gustavo"
@@ -398,7 +424,7 @@ export const Actions: Story = {
  * dependency to `@12-apps/ui`.
  */
 export const DraggableInsideAContainer: Story = {
-  render: () => {
+  render: (args) => {
     const [order, setOrder] = useState(["B75A6858", "1D970689", "0112CF89", "89E40634"]);
     const [active, setActive] = useState<string | number | null>(null);
     // WHERE IT WOULD LAND, computed from the pointer against the row it is over:
@@ -453,7 +479,8 @@ export const DraggableInsideAContainer: Story = {
       >
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 900 }}>
           {order.map((id) => (
-            <BaseListCard
+            <StoryRow
+          args={args}
               key={id}
               dragId={id}
               leading={marker}
@@ -488,13 +515,14 @@ export const NotDraggableWithoutAContainer: Story = {
  * than squeezing the title to two characters.
  */
 export const RespondsToItsOwnWidth: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       {[900, 480, 320].map((width) => (
         <Box key={width}>
           <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{width}px</Box>
           <Box sx={{ width }}>
-            <BaseListCard
+            <StoryRow
+          args={args}
               leading={marker}
               title="B75A6858"
               subtitle="Luiz Gustavo"
@@ -515,18 +543,18 @@ export const RespondsToItsOwnWidth: Story = {
 
 /** Outlined (default) vs `divider`, for a host drawing its own gapless list. */
 export const Divider: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 4, maxWidth: 900 }}>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         <Box sx={{ fontSize: "0.75rem", color: "text.secondary" }}>outlined + gap (default)</Box>
         {["B75A6858", "1D970689"].map((id) => (
-          <BaseListCard key={id} leading={marker} title={id} value="R$ 13,90" onToggleSelect={() => {}} />
+          <StoryRow args={args} key={id} leading={marker} title={id} value="R$ 13,90" onToggleSelect={() => {}} />
         ))}
       </Box>
       <Box>
         <Box sx={{ fontSize: "0.75rem", color: "text.secondary", mb: 1 }}>divider, no gap</Box>
         {["B75A6858", "1D970689"].map((id) => (
-          <BaseListCard key={id} divider leading={marker} title={id} value="R$ 13,90" onToggleSelect={() => {}} />
+          <StoryRow args={args} key={id} divider leading={marker} title={id} value="R$ 13,90" onToggleSelect={() => {}} />
         ))}
       </Box>
     </Box>
@@ -543,14 +571,15 @@ export const Divider: Story = {
  * row's contents lined up with the toolbar above it at every setting.
  */
 export const Density: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 900 }}>
       {(["compact", "cozy", "comfortable"] as const).map((density) => (
         <Box key={density}>
           <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{density}</Box>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {["B75A6858", "1D970689", "0112CF89"].map((id) => (
-              <BaseListCard
+              <StoryRow
+          args={args}
                 key={id}
                 density={density}
                 testId={`row-${density}`}
@@ -576,12 +605,13 @@ export const Density: Story = {
  * question is how much chrome it claims.
  */
 export const Variants: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 900 }}>
       {(["outline", "ghost", "text", "glass"] as const).map((variant) => (
         <Box key={variant}>
           <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{variant}</Box>
-          <BaseListCard
+          <StoryRow
+          args={args}
             variant={variant}
             leading={marker}
             title="B75A6858"
@@ -603,11 +633,12 @@ export const Variants: Story = {
  * make a read-only row look picked.
  */
 export const Selectable: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 900 }}>
-      <BaseListCard title="selectable, selected" selected onToggleSelect={() => {}} value="R$ 13,90" />
-      <BaseListCard title="selectable, not selected" onToggleSelect={() => {}} value="R$ 2,98" />
-      <BaseListCard
+      <StoryRow args={args} title="selectable, selected" selected onToggleSelect={() => {}} value="R$ 13,90" />
+      <StoryRow args={args} title="selectable, not selected" onToggleSelect={() => {}} value="R$ 2,98" />
+      <StoryRow
+          args={args}
         title="selectable={false} — and `selected` is ignored"
         selectable={false}
         selected
@@ -624,7 +655,7 @@ export const Selectable: Story = {
  * a card that grew and shrank would reflow every neighbour on each beat.
  */
 export const EmphasisAndState: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 900, p: 2 }}>
       {(
         [
@@ -636,7 +667,8 @@ export const EmphasisAndState: Story = {
       ).map(([name, effect]) => (
         <Box key={name}>
           <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{name}</Box>
-          <BaseListCard
+          <StoryRow
+          args={args}
             {...effect}
             color="primary"
             leading={marker}
@@ -665,7 +697,7 @@ export const EmphasisAndState: Story = {
  * aligned at one edge.
  */
 export const SharedRails: Story = {
-  render: () => (
+  render: (args) => (
     <ListCardGroup density="cozy" dataTestId="rails-group">
       {[
         ["B75A6858", "R$ 13,90"],
@@ -673,7 +705,8 @@ export const SharedRails: Story = {
         ["0112CF89", "R$ 1.250,00"],
         ["89E40634", "R$ 8,90"],
       ].map(([id, amount]) => (
-        <BaseListCard
+        <StoryRow
+          args={args}
           key={id}
           testId={`rail-${id}`}
           leading={marker}
@@ -716,11 +749,11 @@ export const LinkedRow: Story = {
 
 /** Selected, dimmed, and a row with no controls at all. */
 export const States: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 900 }}>
-      <BaseListCard title="Selecionada" value="R$ 13,90" selected onToggleSelect={() => {}} />
-      <BaseListCard title="Cancelada" value="R$ 8,90" state="cancelled" onToggleSelect={() => {}} />
-      <BaseListCard title="Somente leitura" subtitle="sem checkbox, sem menu" value="R$ 5,90" />
+      <StoryRow args={args} title="Selecionada" value="R$ 13,90" selected onToggleSelect={() => {}} />
+      <StoryRow args={args} title="Cancelada" value="R$ 8,90" state="cancelled" onToggleSelect={() => {}} />
+      <StoryRow args={args} title="Somente leitura" subtitle="sem checkbox, sem menu" value="R$ 5,90" />
     </Box>
   ),
 };
@@ -836,9 +869,10 @@ export const ExpandedByDefault: Story = {
  * of chevrons stays a truthful index of which rows have more behind them.
  */
 export const ChevronOnlyWhenThereIsMore: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      <BaseListCard
+      <StoryRow
+          args={args}
         leading={<ReceiptLongOutlinedIcon />}
         title="Ana Paula"
         subtitle="Mesa 12 · 8 itens"
@@ -846,8 +880,9 @@ export const ChevronOnlyWhenThereIsMore: Story = {
         onToggleSelect={() => {}}
       >
         <OrderDetail />
-      </BaseListCard>
-      <BaseListCard
+      </StoryRow>
+      <StoryRow
+          args={args}
         leading={<ReceiptLongOutlinedIcon />}
         title="Anônimo"
         subtitle="Balcão · 1 item"
@@ -869,7 +904,7 @@ export const ChevronOnlyWhenThereIsMore: Story = {
  * captions stay on one edge whether or not a given row has a body.
  */
 export const ControlledAccordion: Story = {
-  render: function ControlledAccordionStory() {
+  render: function ControlledAccordionStory(args) {
     const [open, setOpen] = useState<string | null>("ana");
     const rows = [
       { id: "ana", title: "Ana Paula", subtitle: "Mesa 12 · 8 itens", value: "R$ 312,50" },
@@ -879,7 +914,8 @@ export const ControlledAccordion: Story = {
     return (
       <ListCardGroup metaColumns={0}>
         {rows.map((row) => (
-          <BaseListCard
+          <StoryRow
+          args={args}
             key={row.id}
             leading={<ReceiptLongOutlinedIcon />}
             title={row.title}
@@ -890,7 +926,7 @@ export const ControlledAccordion: Story = {
             onExpandedChange={(next) => setOpen(next ? row.id : null)}
           >
             <OrderDetail />
-          </BaseListCard>
+          </StoryRow>
         ))}
       </ListCardGroup>
     );
@@ -942,10 +978,11 @@ const PEDIDO_ROWS = [
 ];
 
 export const ConfiguredCells: Story = {
-  render: () => (
+  render: (args) => (
     <ListCardGroup cells={PEDIDO_CELLS}>
       {PEDIDO_ROWS.map((row) => (
-        <BaseListCard
+        <StoryRow
+          args={args}
           key={String(row.shortId)}
           row={row}
           leading={<ReceiptLongOutlinedIcon />}
@@ -958,7 +995,7 @@ export const ConfiguredCells: Story = {
           }
         >
           <OrderDetail />
-        </BaseListCard>
+        </StoryRow>
       ))}
     </ListCardGroup>
   ),
