@@ -5,9 +5,18 @@ on:
   push:
     branches: [main]
 
+# Cancel superseded in-flight runs so a new push preempts its own stale work.
+#
+# Push runs on main are keyed by SHA, not by ref, and that is load-bearing here:
+# GitHub allows only ONE pending run per concurrency group, and a newer arrival
+# CANCELS the older PENDING one. While every merge shared a single
+# `refs/heads/main` group, a burst of merges could silently drop an intermediate
+# run — and on this repo a dropped push run is a dropped `release` job, i.e. a
+# version that never reaches npm. One group per SHA gives every merge its own
+# run. PRs keep the ref-keyed group, where preempting stale work is the point.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 permissions:
   contents: read
@@ -46,8 +55,66 @@ env:
     packages/shared-helpers
 
 jobs:
+  # ── Change detection ───────────────────────────────────────────────────────
+  # Every job below used to start unconditionally, so a README-only PR paid ten
+  # runners, ten checkouts and ten `pnpm install`s to prove nothing. This job
+  # answers "can this diff reach anything CI builds?" once, and the jobs read it.
+  #
+  # On PUSH it reports every category true (`force-all`), which is the safety net
+  # the PR-time selection rests on: the post-merge run skips nothing, so a filter
+  # that is too narrow is caught at the merge rather than shipping. It is also
+  # what keeps `release` (which needs every gate) intact on main.
+  #
+  # This repo has no `monorepo-static.yml` tier, so a standalone detector is the
+  # right shape here — see the "When NOT to use this" note in 12-apps/ci's README
+  # for why a repo that HAS that tier must use its `extra-filters` input instead.
+  changes:
+    name: Detect Changes
+    uses: 12-apps/ci/.github/workflows/detect-changes.yml@807621ba204f0f40c0a3b97b5360163cd5566a95
+    with:
+      # Deliberately COARSE, and the two categories are nearly the same set. That
+      # is the honest shape for this repo, not laziness — see the PR description.
+      # Per-package globs would be wrong here: packages import each other, the
+      # portability gate lints files OUTSIDE packages/payments/** by design, and
+      # the harness/consumer lanes pack EVERY package into tarballs. A filter
+      # narrow enough to skip "unrelated" packages would silently skip real
+      # coverage, which costs far more than the minute it saves. The dependency
+      # graph — not a path glob — is the right tool for that job, and turbo
+      # already has it (`turbo run … --affected`); that is a separate change.
+      path-filters: |
+        # Anything that can affect a build, a type, a lint or a test.
+        # Everything NOT matched here is documentation, and documentation-only
+        # PRs are exactly what this exists to make free.
+        code:
+          - 'packages/**'
+          - 'harness/**'
+          - 'scripts/**'
+          - '.github/workflows/**'
+          - '*.mjs'
+          - '*.json'
+          - '.npmrc'
+          - 'pnpm-lock.yaml'
+          - 'pnpm-workspace.yaml'
+        # The lanes that exercise the PUBLISHED surface (tarballs, storybook,
+        # both harnesses). They cannot be reached by a change to a root quality
+        # script, which is the one useful thing this separates from `code`.
+        publishable:
+          - 'packages/**'
+          - 'harness/**'
+          - 'scripts/harness-install.mjs'
+          - 'scripts/prepare-publish.mjs'
+          - 'scripts/verify-package-consumers.mjs'
+          - 'pnpm-lock.yaml'
+          - 'pnpm-workspace.yaml'
+          # Self-verifying: narrowing these filters must re-run the lanes they
+          # gate, or a filter could be quietly weakened with nothing to catch it.
+          - '.github/workflows/ci.yml'
+      force-all: ${{ github.event_name == 'push' }}
+
   lint:
     name: Lint
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).code
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +138,8 @@ jobs:
 
   type-check:
     name: Type Check
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).code
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -94,6 +163,8 @@ jobs:
 
   build:
     name: Build
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).code
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -117,6 +188,8 @@ jobs:
 
   unit-tests:
     name: Unit Tests
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).code
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -144,6 +217,8 @@ jobs:
   # not a runnable app — so both e2e inputs are disabled.
   quality:
     name: Quality
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).code
     # Least-privilege: the reusable quality gate only reads the repo. Grant
     # exactly this so nothing broader leaks into the reusable workflow.
     permissions:
@@ -166,6 +241,8 @@ jobs:
   # fails the run if any of them reaches the network.
   storybook:
     name: Storybook
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).publishable
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -210,6 +287,13 @@ jobs:
   # through the same config and fails if any of them comes back clean.
   portability:
     name: Payments Portability
+    needs: changes
+    # Gated on `code`, NOT on a payments-only filter: rule 2 of the gate
+    # (`payments/no-provider-names`) applies to source OUTSIDE
+    # packages/payments/**, so a vendor name introduced in packages/ui is
+    # exactly what it exists to catch. A payments-scoped filter would
+    # disarm it for that case without anything going red.
+    if: fromJSON(needs.changes.outputs.changes).code
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -247,6 +331,8 @@ jobs:
   # workspace. See scripts/verify-package-consumers.mjs.
   consumers:
     name: Consumer Verification
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).publishable
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -283,6 +369,8 @@ jobs:
   # future-pay finds out at e2e time, a release too late.
   frontend-harness:
     name: Frontend Harness
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).publishable
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -340,6 +428,8 @@ jobs:
   # a real Postgres — assets no other job in this repo ever opens.
   backend-harness:
     name: Backend Harness
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).publishable
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -461,13 +551,44 @@ jobs:
           npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
           node scripts/publish.mjs
 
+  # What this PR's CI has cost, as one comment that is edited in place on every
+  # push rather than a new comment per run.
+  #
+  # This repo is PUBLIC, so these minutes are not billed — the comment says so
+  # itself. It is here for gross-minute visibility and trend, which is the thing
+  # nobody has today, not for a line on an invoice.
+  #
+  # `always()` so the estimate still posts when a gate failed: a red run costs
+  # the same minutes as a green one, and that is exactly when the number is
+  # worth seeing. Deliberately NOT in `ci-success`'s needs — a reporting lane
+  # must never be able to fail the merge.
+  cost-report:
+    name: CI Cost
+    if: always() && github.event_name == 'pull_request'
+    # Every heavy lane, so the report runs LAST and sees as much of the run as
+    # possible. The job's own minutes, and anything still running beside it, are
+    # necessarily not counted yet — the comment states that caveat.
+    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, backend-harness, portability]
+    # Required at the caller: a reusable workflow's effective grant is the
+    # INTERSECTION with its caller's, so omitting either yields a 403 rather
+    # than a wrong number. This job needs no `contents` access at all.
+    permissions:
+      pull-requests: write
+      actions: read
+    uses: 12-apps/ci/.github/workflows/cost-report.yml@807621ba204f0f40c0a3b97b5360163cd5566a95
+    secrets: inherit
+
   # Required-checks aggregation: one status that branch protection can gate on,
   # green only when every prerequisite job succeeded.
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
     if: always()
-    needs: [lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, backend-harness, portability]
+    # `changes` MUST be listed even though every other job depends on it. If it
+    # FAILS, its dependents go `skipped` — not `failure` — and this aggregation
+    # treats `skipped` as fine, so without it a broken change-detector would
+    # report green with zero tests run.
+    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, backend-harness, portability]
     steps:
       - name: Verify all required jobs passed
         shell: bash
