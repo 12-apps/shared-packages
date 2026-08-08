@@ -16,6 +16,7 @@ import {
 import { useState } from 'react';
 
 import type {
+  ConnectedOAuthAccount,
   MaskedProviderConfig,
   PaymentEnvironment,
   ProviderDescriptor,
@@ -85,6 +86,54 @@ function connectLabel(displayName: string, connected: boolean, busy: string | nu
   return connected ? 'Reconectar' : `Conectar com ${displayName}`;
 }
 
+/**
+ * pt-BR labels for the scopes a store owner actually sees. Unknown scopes fall
+ * back to the provider's own spelling — wrong words are worse than raw ones.
+ */
+const SCOPE_LABELS: Record<string, string> = {
+  'payments.read': 'Consultar pagamentos',
+  'payments.create': 'Criar cobranças',
+  'payments.refund': 'Estornar pagamentos',
+  'accounts.read': 'Consultar dados da conta',
+};
+
+/**
+ * WHICH account is connected (FUT-300): identity, granted scopes and the
+ * connect date — the difference between "conectado" and "conectado como".
+ * Without it, the only way an owner could tell which PagBank account a store
+ * charges into was to disconnect and connect again.
+ */
+function ConnectedAccountDetails(props: { account: ConnectedOAuthAccount }) {
+  const { account } = props;
+  const identity = account.accountLabel ?? account.accountId;
+  return (
+    <Stack spacing={0.5} data-testid="payments-connected-account">
+      {identity ? (
+        <Typography variant="body2">
+          Conta conectada: <strong>{identity}</strong>
+        </Typography>
+      ) : null}
+      {account.connectedAt ? (
+        <Typography variant="caption" color="text.secondary">
+          {`Conectada em ${new Date(account.connectedAt).toLocaleString('pt-BR')}`}
+        </Typography>
+      ) : null}
+      {account.grantedScopes.length > 0 ? (
+        <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+          {account.grantedScopes.map((scope) => (
+            <Chip
+              key={scope}
+              size="small"
+              variant="outlined"
+              label={SCOPE_LABELS[scope] ?? scope}
+            />
+          ))}
+        </Stack>
+      ) : null}
+    </Stack>
+  );
+}
+
 /** Header + explanatory copy + any warning banner for the connection. */
 function ConnectionSummary(props: {
   displayName: string;
@@ -92,6 +141,7 @@ function ConnectionSummary(props: {
   connected: boolean;
   expiresAt: string | null;
   environment: PaymentEnvironment;
+  connectedAccount: ConnectedOAuthAccount | null;
 }) {
   return (
     <>
@@ -118,6 +168,9 @@ function ConnectionSummary(props: {
           ? 'Sua conta está conectada. O Future Pay cria as cobranças em seu nome — nenhuma chave precisa ser copiada.'
           : `Conecte sua conta ${props.displayName} autorizando o acesso no site do provedor. Nenhuma chave precisa ser copiada.`}
       </Typography>
+      {props.connected && props.connectedAccount ? (
+        <ConnectedAccountDetails account={props.connectedAccount} />
+      ) : null}
       {props.status === 'RECONNECT_REQUIRED' ? (
         <Alert severity="warning">
           A autorização expirou ou foi revogada. Reconecte para voltar a receber pagamentos.
@@ -243,6 +296,7 @@ export function ProviderConnection(props: ProviderConnectionProps) {
         connected={connected}
         expiresAt={config?.expiresAt ?? null}
         environment={environment}
+        connectedAccount={config?.connectedAccount ?? null}
       />
 
       {error ? <Alert severity="error">{error}</Alert> : null}

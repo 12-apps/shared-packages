@@ -2,6 +2,7 @@ import { CredentialsError, UnknownProviderError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { ProviderRegistry } from '../core/registry';
 import type { MerchantRef, PaymentEnvironment, ProviderName, ResolvedCredentials } from '../core/types';
+import { preserveIdentityFields } from './connected-account';
 import type { ProviderConfigStore, StoredProviderConfig } from './types';
 
 /**
@@ -117,7 +118,11 @@ async function completeConnect(
   });
   const config = (await deps.store.get(merchant, provider)) ?? emptyConfig(provider, environment);
   config.environment = environment;
-  config.environments[environment] = tokens.fields;
+  // `connectedAt` is stamped HERE, not by the adapter: a completed exchange is
+  // the connect moment whoever the vendor is, and the settings page reads it
+  // back as "conectada em" (FUT-300). A reconnect re-stamps on purpose — it is
+  // a new authorization, possibly of a different account.
+  config.environments[environment] = { ...tokens.fields, connectedAt: new Date().toISOString() };
   config.expiresAt = tokens.expiresAt ?? null;
   // A completed authorization IS proof the connection works — no separate
   // verify probe needed, unlike a pasted credential set.
@@ -151,7 +156,12 @@ async function refreshConnect(
       deps.appCreds(provider, environment),
     );
     rotated = true;
-    existing.environments[environment] = tokens.fields;
+    // A refresh renews the SAME grant, so the identity recorded at connect
+    // time survives an adapter whose refresh response carries tokens only.
+    existing.environments[environment] = preserveIdentityFields(
+      existing.environments[environment],
+      tokens.fields,
+    );
     existing.expiresAt = tokens.expiresAt ?? null;
     existing.status = 'VERIFIED';
     existing.lastVerifiedAt = new Date();

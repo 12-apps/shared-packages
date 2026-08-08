@@ -21,6 +21,7 @@ import type {
   StoredProviderConfig,
 } from './types';
 
+import { connectedAccountFrom } from './connected-account';
 import { assertSaveCredentialsInput } from './credential-input';
 import {
   applyProof,
@@ -163,6 +164,8 @@ function toMasked(adapter: PaymentProviderAdapter, config: StoredProviderConfig)
       SANDBOX: maskEnvironment(adapter, config.environments.SANDBOX),
       PRODUCTION: maskEnvironment(adapter, config.environments.PRODUCTION),
     },
+    // WHO is connected (FUT-300) — identity facts only, never a credential.
+    connectedAccount: connectedAccountFrom(adapter, config),
   };
 }
 
@@ -362,9 +365,8 @@ export function credentialStoreFrom(
         throw new CredentialsError(provider, `Provider ${provider} is configured but not enabled`);
       }
       // The chain already routes around this row; refusing here too stops a
-      // DIRECT charge (explicit provider, no chain consulted) from spending a
-      // request on a token the provider has already refused. Listening stays
-      // open — `getConnectedCredentials` below.
+      // DIRECT charge (explicit provider, no chain consulted). Listening
+      // stays open — `getConnectedCredentials` below.
       if (config.status === 'RECONNECT_REQUIRED') {
         throw new CredentialsError(provider, `Provider ${provider} requires reauthorization to charge`);
       }

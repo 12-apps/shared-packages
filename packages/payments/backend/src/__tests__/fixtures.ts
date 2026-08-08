@@ -436,7 +436,14 @@ function fakeOAuthAdapter(
       },
       async exchangeCode(code: string) {
         return {
-          fields: { accessToken: `at_${code}`, refreshToken: 'rt_1' },
+          fields: {
+            accessToken: `at_${code}`,
+            refreshToken: 'rt_1',
+            // The identity facts a real exchange reports beside the tokens —
+            // what pagbank-oauth stores as `accountId` / `scope` (FUT-300).
+            accountId: 'acct_9',
+            scope: 'payments.read payments.create',
+          },
           expiresAt: new Date('2030-01-01T00:00:00Z'),
         };
       },

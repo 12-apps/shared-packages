@@ -29,6 +29,7 @@ function config(provider: string, enabled: boolean, priority: number): MaskedPro
     expiresAt: null,
     stub: false,
     environments: { SANDBOX: {}, PRODUCTION: {} },
+    connectedAccount: null,
   };
 }
 
