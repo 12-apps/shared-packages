@@ -43,113 +43,178 @@ export interface HarnessPage {
   slug: string;
   title: string;
   pkg: string;
+  /** Which {@link NAV_GROUPS} section this page's row joins. */
+  group: HarnessNavGroupKey;
+  /**
+   * Nest this page under a group's parent row instead of listing it as a
+   * top-level one — the key of an entry in that group's `parents`.
+   */
+  parent?: string;
   Component: ComponentType;
 }
+
+/**
+ * The nav SECTIONS, borrowed wholesale from the admin sidebar's structure
+ * (future-pay `apps/admin/src/shell/nav-config.ts`, FUT-428): labelled groups
+ * in a deliberate order, a collapsible disclosure per group, a caret on the
+ * group header and nowhere else, and parent rows whose children appear when
+ * you are inside them.
+ *
+ * What is NOT borrowed is the vocabulary. The admin's five groups — Operação,
+ * Catálogo, Estoque, Financeiro, Equipe — are a mental model of running a
+ * restaurant, and that doc's first rule is that a group IS a mental model
+ * rather than a department. The thing being navigated here is a set of
+ * PUBLISHED SURFACES, so the model that fits is *whose screen is this*: the
+ * same split future-pay itself makes between `apps/client` and `apps/admin`.
+ *
+ * Ordered the same way the admin orders its groups — by how often you open
+ * them. Thirteen of the seventeen pages are buyer flows.
+ */
+export type HarnessNavGroupKey = 'storefront' | 'backoffice';
+
+/**
+ * A nav-only row that OWNS other rows: a label, and the page it lands on.
+ *
+ * `slug` is one of its own children, the way the admin's Cozinha row leads to
+ * its first child and repeats that child under itself. A parent with a landing
+ * page nobody can see reads as "no children" to anyone who never clicks it,
+ * and pointing it at a real child means the row and the disclosure can never
+ * disagree about where clicking goes.
+ */
+export interface HarnessNavParent {
+  key: string;
+  label: string;
+  slug: string;
+}
+
+export interface HarnessNavGroup {
+  key: HarnessNavGroupKey;
+  label: string;
+  parents?: readonly HarnessNavParent[];
+}
+
+export const NAV_GROUPS: readonly HarnessNavGroup[] = [
+  {
+    key: 'storefront',
+    label: 'Storefront',
+    // The thirteen buyer flows are ASPECTS of one screen, not thirteen
+    // destinations — the same claim the admin makes by nesting an area's
+    // reports under it. Flat, they were the whole sidebar and the two pages
+    // that are not payments sank below them.
+    parents: [{ key: 'checkout', label: 'Checkout', slug: 'payments-checkout-pix' }],
+  },
+  { key: 'backoffice', label: 'Backoffice' },
+];
 
 /** The `payments-checkout-*` block: one page per BUYER FLOW (FUT-743). */
 const PAYMENTS_FRONTEND = '@12-apps/payments-frontend';
 
+/**
+ * Every page of the `checkout` parent shares these, so the flows read as one
+ * list of variations rather than thirteen restatements of where they live.
+ */
+const CHECKOUT_FLOW = {
+  pkg: PAYMENTS_FRONTEND,
+  group: 'storefront',
+  parent: 'checkout',
+} as const;
+
 export const PAGES: readonly HarnessPage[] = [
+  // --- Storefront: what a BUYER sees --------------------------------------
+  //
+  // Titles inside `checkout` name only what VARIES. The parent row already
+  // says "Checkout", so repeating it thirteen times pushed the distinguishing
+  // word — the reason each page exists — off to the right of every row.
+  { ...CHECKOUT_FLOW, slug: 'payments-checkout-pix', title: 'PIX', Component: PaymentsCheckoutPixPage },
+  { ...CHECKOUT_FLOW, slug: 'payments-checkout-card', title: 'Card', Component: PaymentsCheckoutCardPage },
   {
-    slug: 'payments-provider-settings',
-    title: 'Provider settings',
-    pkg: PAYMENTS_FRONTEND,
-    Component: PaymentsProviderSettingsPage,
-  },
-  {
-    slug: 'payments-checkout-pix',
-    title: 'Checkout · PIX',
-    pkg: PAYMENTS_FRONTEND,
-    Component: PaymentsCheckoutPixPage,
-  },
-  {
-    slug: 'payments-checkout-card',
-    title: 'Checkout · card',
-    pkg: PAYMENTS_FRONTEND,
-    Component: PaymentsCheckoutCardPage,
-  },
-  {
+    ...CHECKOUT_FLOW,
     slug: 'payments-checkout-google-pay',
-    title: 'Checkout · Google Pay',
-    pkg: PAYMENTS_FRONTEND,
+    title: 'Google Pay',
     Component: PaymentsCheckoutGooglePayPage,
   },
+  { ...CHECKOUT_FLOW, slug: 'payments-checkout-both', title: 'Both methods', Component: PaymentsCheckoutBothPage },
   {
-    slug: 'payments-checkout-both',
-    title: 'Checkout · both methods',
-    pkg: PAYMENTS_FRONTEND,
-    Component: PaymentsCheckoutBothPage,
-  },
-  {
+    ...CHECKOUT_FLOW,
     slug: 'payments-checkout-no-provider',
-    title: 'Checkout · cannot charge',
-    pkg: PAYMENTS_FRONTEND,
+    title: 'Cannot charge',
     Component: PaymentsCheckoutNoProviderPage,
   },
   {
+    ...CHECKOUT_FLOW,
     slug: 'payments-checkout-redirect',
-    title: 'Checkout · hosted handover',
-    pkg: PAYMENTS_FRONTEND,
+    title: 'Hosted handover',
     Component: PaymentsCheckoutRedirectPage,
   },
   {
+    ...CHECKOUT_FLOW,
     slug: 'payments-checkout-chain-failover',
-    title: 'Checkout · provider chain',
-    pkg: PAYMENTS_FRONTEND,
+    title: 'Provider chain',
     Component: PaymentsCheckoutChainFailoverPage,
   },
   {
+    ...CHECKOUT_FLOW,
     slug: 'payments-checkout-provider-screens',
-    title: 'Checkout · provider screens',
-    pkg: PAYMENTS_FRONTEND,
+    title: 'Provider screens',
     Component: PaymentsCheckoutProviderScreensPage,
   },
   {
+    ...CHECKOUT_FLOW,
     slug: 'payments-checkout-method-gate',
-    title: 'Checkout · method gate',
-    pkg: PAYMENTS_FRONTEND,
+    title: 'Method gate',
     Component: PaymentsCheckoutMethodGatePage,
   },
   {
+    ...CHECKOUT_FLOW,
     slug: 'payments-checkout-buyer-fields',
-    title: 'Checkout · buyer fields',
-    pkg: PAYMENTS_FRONTEND,
+    title: 'Buyer fields',
     Component: PaymentsCheckoutBuyerFieldsPage,
   },
   {
+    ...CHECKOUT_FLOW,
     slug: 'payments-checkout-failures',
-    title: 'Checkout · refusals',
-    pkg: PAYMENTS_FRONTEND,
+    title: 'Refusals',
     Component: PaymentsCheckoutFailuresPage,
   },
   {
+    ...CHECKOUT_FLOW,
     slug: 'payments-checkout-saved-cards',
-    title: 'Checkout · saved cards',
-    pkg: PAYMENTS_FRONTEND,
+    title: 'Saved cards',
     Component: PaymentsCheckoutSavedCardsPage,
   },
   {
+    ...CHECKOUT_FLOW,
     slug: 'payments-checkout-slots',
-    title: 'Checkout · two design systems',
-    pkg: PAYMENTS_FRONTEND,
+    title: 'Two design systems',
     Component: PaymentsCheckoutSlotsPage,
   },
   {
+    ...CHECKOUT_FLOW,
     slug: 'payments-checkout-headless',
-    title: 'Checkout · composed by hand',
-    pkg: PAYMENTS_FRONTEND,
+    title: 'Composed by hand',
     Component: PaymentsCheckoutHeadlessPage,
   },
   {
     slug: 'pwa-install-prompt',
     title: 'Install prompt',
     pkg: '@12-apps/ui',
+    group: 'storefront',
     Component: PwaInstallPromptPage,
+  },
+
+  // --- Backoffice: what the STORE sees ------------------------------------
+  {
+    slug: 'payments-provider-settings',
+    title: 'Provider settings',
+    pkg: PAYMENTS_FRONTEND,
+    group: 'backoffice',
+    Component: PaymentsProviderSettingsPage,
   },
   {
     slug: 'report-builder',
     title: 'Report builder',
     pkg: '@12-apps/report-builder',
+    group: 'backoffice',
     Component: ReportBuilderPage,
   },
 ];
