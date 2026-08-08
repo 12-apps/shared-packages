@@ -39,12 +39,22 @@ import type { CredentialFieldSpec } from '../core/types';
 export interface PendingVerification {
   /** The reference the charge was minted under — the correlation key. */
   reference: string;
-  /** Where the merchant pays it. */
+  /** Where the merchant pays it. Empty for a card attempt — nothing to visit. */
   checkoutUrl: string;
   /** Provider-side invoice code, when the provider returns one. */
   slug?: string;
   /** ISO timestamp the charge was minted — what "how long has this been open" reads. */
   startedAt: string;
+  /**
+   * Which activation flow wrote it (FUT-679). `CARD` marks the card phase's
+   * write-ahead intent: recorded BEFORE `createCharge`, cleared on any settled
+   * answer, and therefore still present exactly when a create's response was
+   * lost with a real cent possibly charged — the row the reconcile sweep and
+   * the retry path resolve through `findChargeByReference`. Absent on redirect
+   * rows (including every row written before this field existed), whose
+   * lifecycle is unchanged.
+   */
+  phase?: 'CARD';
 }
 
 export type ProviderConfigStatus = 'UNVERIFIED' | 'VERIFIED' | 'FAILED' | 'RECONNECT_REQUIRED';

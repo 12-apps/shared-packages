@@ -511,6 +511,34 @@ describe('createSettingsService', () => {
     expect(reloaded?.pendingVerification).toBeNull();
   });
 
+  /**
+   * FUT-679 — the one exception to "a failure clears the pending charge": a
+   * CARD write-ahead row still standing at failure time is an attempt whose
+   * answer was LOST (the flow clears it itself on every settled outcome), and
+   * hosts settle card failures with `applyChargeVerification(false)`. Erasing
+   * it here would hide a possibly-real cent from the reconcile sweep, which
+   * only scans configs holding a pending row.
+   */
+  it('a failed CARD verification keeps its unresolved write-ahead row for the sweep', async () => {
+    const { settings, store } = setup();
+    await settings.setPendingVerification(TENANT, 'stone', {
+      reference: 'verify-stone-t1--k9x',
+      checkoutUrl: '',
+      startedAt: '2026-07-31T21:00:00.000Z',
+      phase: 'CARD',
+    });
+
+    await settings.applyChargeVerification(TENANT, 'stone', false);
+
+    expect((await store.get(TENANT, 'stone'))?.pendingVerification?.reference).toBe(
+      'verify-stone-t1--k9x',
+    );
+
+    // A PASS settles everything — the row goes, exactly as before.
+    await settings.applyChargeVerification(TENANT, 'stone', true);
+    expect((await store.get(TENANT, 'stone'))?.pendingVerification).toBeNull();
+  });
+
   it('voids the proof when credentials change — a new account has proven nothing', async () => {
     const { settings } = setup();
     await settings.applyChargeVerification(TENANT, 'stone', true);
