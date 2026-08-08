@@ -41,7 +41,12 @@
         "eslint-config-prettier",
         "typescript-eslint",
         "eslint-plugin-react-hooks",
-        "eslint-plugin-react"
+        "eslint-plugin-react",
+        "// Every package's .releaserc.json names this in `extends`, which is how",
+        "// a release is scoped to the one package's directory. knip reads the",
+        "// `plugins` of a semantic-release config but does not follow `extends`,",
+        "// so the only reference to it is invisible from here.",
+        "semantic-release-monorepo"
       ]
     },
     "packages/ui": {

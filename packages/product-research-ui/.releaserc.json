@@ -1,4 +1,5 @@
 {
+  "extends": "semantic-release-monorepo",
   "branches": [
     "main"
   ],
@@ -11,6 +12,11 @@
         "npmPublish": false
       }
     ],
-    "@semantic-release/github"
+    [
+      "@semantic-release/github",
+      {
+        "successComment": ":tada: This PR is included in `${nextRelease.gitTag}` :tada:"
+      }
+    ]
   ]
 }
