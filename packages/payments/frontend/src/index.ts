@@ -97,7 +97,16 @@ export {
   type GooglePaymentsClient,
   type GooglePayGatewayParams,
 } from './components/checkout/google-pay-button';
-export { googlePayConfig } from './components/checkout/method-capability';
+export {
+  ApplePayButton,
+  applePaySupported,
+  APPLE_PAY_SUPPORTED_NETWORKS,
+  type ApplePayButtonProps,
+  type ApplePayPaymentRequest,
+  type ApplePaySessionClass,
+  type ApplePaySessionLike,
+} from './components/checkout/apple-pay-button';
+export { applePayDeclared, googlePayConfig } from './components/checkout/method-capability';
 export {
   CheckoutComponentsProvider,
   type CheckoutActionBarProps,
@@ -184,6 +193,28 @@ export {
   PaymentProviderSettings,
   type PaymentProviderSettingsProps,
 } from './components/PaymentProviderSettings';
+
+// ---------------------------------------------------------------------------
+// The PLATFORM operations screens (FUT-479 / FUT-483, packaged by FUT-573) —
+// the Connect-application consult and the homologação, as dumb components a
+// host page mounts with data + callbacks from its own routes. Their backend
+// halves live in `@12-apps/payments-backend` (`consultConnectApplications`,
+// `platformHomologacaoGuide`, `createHomologationRecordService`,
+// `buildPlatformHomologacaoAnexo`).
+// ---------------------------------------------------------------------------
+export {
+  ConnectApplicationPanel,
+  type ConnectApplicationPanelProps,
+} from './components/platform/ConnectApplicationPanel';
+export {
+  PlatformHomologacao,
+  type PlatformHomologacaoProps,
+} from './components/platform/PlatformHomologacao';
+export {
+  type HomologacaoSaveInput,
+  type HomologacaoSaveState,
+  type PlatformHomologationRecordView,
+} from './components/platform/HomologacaoOutcomeCard';
 
 /**
  * Re-exported because it appears in the `prepareConnect` prop a host must

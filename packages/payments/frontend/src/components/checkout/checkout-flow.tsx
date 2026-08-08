@@ -46,6 +46,13 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
   providerConfig?: CheckoutProviderConfig | null;
   /** Scopes the saved-card list to the store being paid. */
   tenantSlug?: string;
+  /**
+   * The host's Apple Pay merchant-validation port (FUT-472): exchange the
+   * session's `validationURL` for an Apple merchant session, SERVER-SIDE.
+   * Optional — without it the Apple Pay sheet cannot start, and the card form
+   * remains the way to pay.
+   */
+  validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
   /** Host content shown on the paid confirmation (the storefront's install invite). */
   confirmationExtra?: ReactNode;
   /** Design-system slots; unfilled slots render the raw-MUI defaults. */
@@ -118,7 +125,7 @@ function ProgressHeader({ step, completed }: { step: string; completed: Set<stri
  * card public key are loaded lazily by the card path (order-scoped REST).
  */
 function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Element {
-  const { cart, defaultBuyer, comanda, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, ...ports } = props;
+  const { cart, defaultBuyer, comanda, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, validateApplePayMerchant, ...ports } = props;
   // Resolved for NO method on purpose (FUT-595): the Dados step opens before
   // the picker, and the form is filled once — so it asks for the union of what
   // any chain member may need rather than re-opening after the choice. A chain
@@ -176,6 +183,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
           onEditBuyer={c.editBuyer}
           providerConfig={providerConfig}
           tenantSlug={tenantSlug}
+          validateApplePayMerchant={validateApplePayMerchant}
           onResolved={c.handleResolved}
         />
       ) : null}
