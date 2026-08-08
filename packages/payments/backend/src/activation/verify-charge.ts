@@ -1,8 +1,17 @@
 import { stubResolvedFor } from '../core/stub-mode';
+import { classifyFailure } from '../core/failover';
+import type { PaymentProviderAdapter } from '../core/provider';
 import type { MerchantRef, ResolvedCredentials } from '../core/types';
-import type { ActivationContext } from './context';
-import { failureFor, type VerifyChargeResult } from './failure';
 import {
+  cardAttemptRecord,
+  isCardAttemptRecord,
+  probeLostCardAttempt,
+  refundCent,
+} from './card-attempt';
+import type { ActivationContext } from './context';
+import { failureFor, unreachableReason, type VerifyChargeResult } from './failure';
+import {
+  ownsVerificationReference,
   verificationAmountCents,
   verificationAttemptId,
   verificationReference,
@@ -104,6 +113,15 @@ export async function verificationCardPublicKey(
   return ctx.mintCardPublicKey(merchant, provider, credentials);
 }
 
+/** Everything one card-phase attempt runs against, resolved once. */
+interface CardPhase {
+  ctx: ActivationContext;
+  adapter: PaymentProviderAdapter;
+  merchant: MerchantRef;
+  provider: string;
+  credentials: ResolvedCredentials;
+}
+
 /**
  * Charge a cent through the merchant's own connection and give it straight
  * back.
@@ -111,6 +129,14 @@ export async function verificationCardPublicKey(
  * Returns `ok: false` with the provider's reason rather than throwing: a
  * failed verification is an ANSWER, not an error — it is the screen telling
  * the owner what is still wrong.
+ *
+ * A LOST answer is neither (FUT-679). The attempt's intent is recorded before
+ * the create (see `card-attempt.ts`), an earlier attempt still standing is
+ * resolved through the provider BEFORE any new charge is minted — the fresh
+ * per-attempt reference below means a retry is a new charge at the provider,
+ * so an unaccounted-for earlier cent must be found first or the retry stacks
+ * a second one on it — and an attempt that cannot be resolved right now
+ * leaves its record for the settings-screen heal and the reconcile sweep.
  */
 export async function verifyProviderCharge(
   ctx: ActivationContext,
@@ -126,12 +152,27 @@ export async function verifyProviderCharge(
   const credentials = await credentialsForVerification(ctx, merchant, provider);
   if (!credentials) return { ok: false, reason: 'Conecte a conta antes de verificar a cobrança.' };
 
+  const phase: CardPhase = { ctx, adapter, merchant, provider, credentials };
+
+  const earlier = await resolveEarlierAttempt(phase);
+  if (earlier) return earlier;
+
   // A FRESH reference per attempt (FUT-679): the adapters fall back to the
   // reference as the provider idempotency key, and PagBank dedupes on it — a
   // constant one replayed the FIRST attempt's decline onto every retry. The
   // `--attempt` suffix is the redirect flow's own mechanism, already stripped
   // by `ownsVerificationReference` / `parseVerificationReference` everywhere.
   const reference = verificationReference(provider, merchant.id, verificationAttemptId());
+
+  // Write-ahead intent, gated on the adapter declaring the probe that could
+  // ever resolve it: recorded before the create, this row is what still
+  // remembers the charge when the response is lost — the reconcile sweep only
+  // scans configs holding a pending row, and a card charge leaves neither of
+  // its durable proofs (no stored charge; PagBank's webhook `verify` proves
+  // the sender, not the payment).
+  if (adapter.findChargeByReference) {
+    await ctx.settings.setPendingVerification(merchant, provider, cardAttemptRecord(reference));
+  }
 
   let snapshot;
   try {
@@ -147,33 +188,148 @@ export async function verifyProviderCharge(
       credentials,
     );
   } catch (error) {
-    return { ok: false, ...failureFor(error) };
+    return settleFailedCreate(phase, reference, error);
   }
 
+  // The provider answered: the attempt is settled, whatever the answer was.
+  await clearCardAttempt(phase);
+
   if (snapshot.status !== 'PAID' && snapshot.status !== 'AUTHORIZED') {
-    return {
-      ok: false,
-      reason: snapshot.declineReason
-        ? `A cobrança de teste foi recusada (${snapshot.declineReason}).`
-        : `A cobrança de teste não foi aprovada (${snapshot.status}).`,
-    };
+    return { ok: false, reason: notApprovedText(snapshot) };
   }
 
   // Give the cent back. A failed refund must NOT fail the verification — the
   // merchant demonstrably charges, which is what was being proven — so it is
   // reported instead, and the owner sees a cent they can reconcile.
-  let refunded = false;
-  try {
-    if (adapter.refund) {
-      await adapter.refund(
-        { providerChargeId: snapshot.providerChargeId, reason: 'verification' },
-        credentials,
-      );
-      refunded = true;
-    }
-  } catch {
-    refunded = false;
+  return { ok: true, refunded: await refundCent(adapter, snapshot.providerChargeId, credentials) };
+}
+
+/**
+ * Settle the card attempt still outstanding, if one is.
+ *
+ * `null` lets a fresh attempt proceed: nothing is outstanding, or the
+ * provider itself said the earlier reference holds no live charge. A result
+ * is returned INSTEAD of charging again — either the earlier cent was found
+ * (the proof it is: refunded and adopted as this call's pass), or the
+ * question is still unanswerable, and minting a second real charge under an
+ * unaccounted-for first one is exactly what this resolution exists to
+ * prevent ("no máximo uma cobrança real existe").
+ */
+async function resolveEarlierAttempt(phase: CardPhase): Promise<VerifyChargeResult | null> {
+  const { ctx, adapter, merchant, provider, credentials } = phase;
+  // An adapter that cannot be probed never wrote a record (see the gate on
+  // the write-ahead) — and a row it cannot resolve must not block retries.
+  if (!adapter.findChargeByReference) return null;
+
+  const pending = await ctx.settings.getPendingVerification(merchant, provider);
+  if (!pending || !isCardAttemptRecord(pending)) return null;
+  // Derivation check, as everywhere a stored reference is read (FUT-463): a
+  // row naming another merchant's or provider's charge proves nothing here —
+  // the fresh attempt simply overwrites it.
+  if (!ownsVerificationReference(pending.reference, provider, merchant.id)) return null;
+
+  const outcome = await probeLostCardAttempt(adapter, pending.reference, credentials);
+  if (outcome.kind === 'PROVEN') return adoptProvenAttempt(phase, outcome);
+  // DECLINED was the EARLIER attempt's own answer, arrived late — the owner
+  // is retrying with another card, and replaying an old refusal onto it is
+  // the exact bug the per-attempt reference kills. GONE is the provider's
+  // word that no live charge exists. Neither kept any money: forget the row.
+  if (outcome.kind === 'DECLINED' || outcome.kind === 'GONE') {
+    await ctx.settings.setPendingVerification(merchant, provider, null);
+    return null;
+  }
+  if (outcome.kind === 'OPEN') {
+    return {
+      ok: false,
+      reason: 'A cobrança de teste anterior ainda está em processamento. Tente de novo em instantes.',
+    };
+  }
+  return stillUnaccounted(adapter.displayName, outcome.error);
+}
+
+/**
+ * The create THREW — decide what that means for the write-ahead record.
+ *
+ * `classifyFailure` is the gateway's own vocabulary for this exact call (see
+ * `core/charge-attempt.ts`): only AMBIGUOUS means the provider may have
+ * created the charge before failing. A refusal that provably created nothing
+ * (4xx, a pre-send network error) and a thrown decline both SETTLE the
+ * attempt — the record is cleared and the failure surfaces as before. An
+ * AMBIGUOUS failure is resolved through the provider right here when it can
+ * be; when it cannot, the record STAYS — it is the only thing that remembers
+ * a cent whose answer was lost, and the sweep/heal cures it (FUT-679).
+ */
+async function settleFailedCreate(
+  phase: CardPhase,
+  reference: string,
+  error: unknown,
+): Promise<VerifyChargeResult> {
+  const { adapter, credentials } = phase;
+  const failure: VerifyChargeResult = { ok: false, ...failureFor(error) };
+  if (!adapter.findChargeByReference) return failure;
+
+  if (classifyFailure(error) !== 'AMBIGUOUS') {
+    await clearCardAttempt(phase);
+    return failure;
   }
 
+  const outcome = await probeLostCardAttempt(adapter, reference, credentials);
+  if (outcome.kind === 'PROVEN') return adoptProvenAttempt(phase, outcome);
+  if (outcome.kind === 'DECLINED') {
+    await clearCardAttempt(phase);
+    return {
+      ok: false,
+      reason: notApprovedText({ status: 'DECLINED', declineReason: outcome.declineReason }),
+    };
+  }
+  if (outcome.kind === 'GONE') {
+    await clearCardAttempt(phase);
+    return failure;
+  }
+  // OPEN or UNANSWERED: a real charge may exist, and only the record
+  // remembers it. Leave it standing.
+  return failure;
+}
+
+/**
+ * The lost cent was FOUND: give it back (unless the provider already did),
+ * clear the record, and answer the pass the charge itself proved. The caller
+ * settles enablement from this result exactly as from a first-try pass.
+ */
+async function adoptProvenAttempt(
+  phase: CardPhase,
+  outcome: { providerChargeId: string; alreadyRefunded: boolean },
+): Promise<VerifyChargeResult> {
+  const { ctx, adapter, merchant, provider, credentials } = phase;
+  const refunded =
+    outcome.alreadyRefunded || (await refundCent(adapter, outcome.providerChargeId, credentials));
+  await ctx.settings.setPendingVerification(merchant, provider, null);
   return { ok: true, refunded };
+}
+
+/** Clear the write-ahead record — the attempt's answer arrived. */
+async function clearCardAttempt(phase: CardPhase): Promise<void> {
+  if (!phase.adapter.findChargeByReference) return;
+  await phase.ctx.settings.setPendingVerification(phase.merchant, phase.provider, null);
+}
+
+/** The screen's sentence for a charge the provider did not approve. */
+function notApprovedText(snapshot: { status: string; declineReason?: string }): string {
+  return snapshot.declineReason
+    ? `A cobrança de teste foi recusada (${snapshot.declineReason}).`
+    : `A cobrança de teste não foi aprovada (${snapshot.status}).`;
+}
+
+/**
+ * The earlier cent is still unaccounted for and the provider unreachable —
+ * nothing was created NOW, so the honest offer is the transport one: wait and
+ * ask again. The record stays; the sweep is the fallback nobody has to click.
+ */
+function stillUnaccounted(displayName: string, error: unknown): VerifyChargeResult {
+  const failure = failureFor(error);
+  return {
+    ok: false,
+    ...failure,
+    ...(failure.transport ? { reason: unreachableReason(displayName) } : {}),
+  };
 }

@@ -47,8 +47,13 @@ export type VerifyChargeResult =
    * provider's words with our own. It is the raw refusal, shown on screen so
    * the owner can read it back to the provider's support line — nothing logs
    * or stores it.
+   *
+   * `transport` is {@link VerificationFailure}'s flag, carried through so a
+   * host can tell "the provider refused" from "we never reached it" — the
+   * card flow's failures ride this type back to the route, and a host that
+   * revokes state on every failure needs the distinction (FUT-679/FUT-686).
    */
-  | { ok: false; reason: string; providerMessage?: string };
+  | { ok: false; reason: string; providerMessage?: string; transport?: boolean };
 
 /** What {@link failureFor} classified — the reason plus the raw exchange. */
 export interface VerificationFailure {

@@ -207,7 +207,16 @@ export async function applyProof(
 ): Promise<StoredProviderConfig> {
   if (passed && !config.chargeVerifiedAt) config.chargeVerifiedAt = new Date();
   // Cleared either way — a refused charge must not leave the screen waiting.
-  config.pendingVerification = null;
+  // ONE exception (FUT-679): a failed CARD verification that still holds its
+  // write-ahead row is an attempt whose answer was LOST, not refused — the
+  // card flow clears the row itself on every settled outcome, so its survival
+  // to this point means a real cent may exist that only this row remembers.
+  // Hosts settle a card failure with `applyChargeVerification(false)`, and
+  // erasing the row here would hide that charge from the reconcile sweep,
+  // which only scans configs with a pending row.
+  if (passed || config.pendingVerification?.phase !== 'CARD') {
+    config.pendingVerification = null;
+  }
   await store.save(merchant, config);
   return toggleInChain(store, merchant, config, passed);
 }
