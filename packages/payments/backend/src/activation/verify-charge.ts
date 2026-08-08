@@ -162,14 +162,20 @@ export async function verifyProviderCharge(
   // Give the cent back. A failed refund must NOT fail the verification — the
   // merchant demonstrably charges, which is what was being proven — so it is
   // reported instead, and the owner sees a cent they can reconcile.
+  //
+  // `refunded` is read off the SNAPSHOT, not off "the call did not throw"
+  // (FUT-680): an adapter that answers honestly can resolve with FAILED, and
+  // reporting that as a completed refund tells the owner a cent came back
+  // when it did not. PENDING counts as not-yet-refunded for the same reason —
+  // this flag is shown to a human as a done deal or a cent to reconcile.
   let refunded = false;
   try {
     if (adapter.refund) {
-      await adapter.refund(
+      const refund = await adapter.refund(
         { providerChargeId: snapshot.providerChargeId, reason: 'verification' },
         credentials,
       );
-      refunded = true;
+      refunded = refund.status === 'REFUNDED';
     }
   } catch {
     refunded = false;
