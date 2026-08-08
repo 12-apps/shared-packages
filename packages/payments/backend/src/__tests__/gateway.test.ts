@@ -12,6 +12,7 @@ import {
   UNUSED_VAULT_STEPS,
   cardInput,
   pixInput,
+  setupBridgedGatewayWorld,
   setupCancellingWorld,
   setupGatewayWorld,
   setupVaultingWorld,
@@ -173,6 +174,58 @@ describe('createPaymentsGateway', () => {
       world.gateway.forgetVault(TENANT, 'vaulting', { instrumentId: 'pm_1' }),
     ).rejects.toBeInstanceOf(CredentialsError);
     expect(forget).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The gateway wired the way a HOST wires it — through `credentialStoreFrom`
+   * over stored config rows — so a row's status can decide routing (FUT-683).
+   * The raw memory credential store the other tests use has no status at all.
+   */
+  describe('routing around a dead grant (FUT-683)', () => {
+    async function bridgedWorldWithChain() {
+      const world = setupBridgedGatewayWorld();
+      for (const provider of ['primary', 'backup'] as const) {
+        await world.settings.saveCredentials(TENANT, provider, {
+          environment: 'SANDBOX',
+          fields: {},
+        });
+        await world.settings.applyChargeVerification(TENANT, provider, true);
+      }
+      return world;
+    }
+
+    async function killGrant(world: Awaited<ReturnType<typeof bridgedWorldWithChain>>) {
+      // What a refused refresh records — see `refreshConnect`: status flips,
+      // `enabled` deliberately does not.
+      const primary = await world.configStore.get(TENANT, 'primary');
+      await world.configStore.save(TENANT, { ...primary!, status: 'RECONNECT_REQUIRED' });
+    }
+
+    it('given the head grant is dead, when a charge is raised, then it lands on the healthy second provider', async () => {
+      const world = await bridgedWorldWithChain();
+      await killGrant(world);
+
+      // Straight to `backup` as chain[0] — not a failover bounce off a 401
+      // against the token the provider already refused.
+      const stored = await world.gateway.charge(TENANT, pixInput());
+      expect(stored.provider).toBe('backup');
+    });
+
+    it('given an only-provider store whose grant is dead, then a charge finds no provider at all', async () => {
+      const world = setupBridgedGatewayWorld();
+      await world.settings.saveCredentials(TENANT, 'primary', {
+        environment: 'SANDBOX',
+        fields: {},
+      });
+      await world.settings.applyChargeVerification(TENANT, 'primary', true);
+      await killGrant(world);
+
+      // The same refusal an unconfigured store gets — which upstream is the
+      // storefront's "payments unavailable", not a generic charge error.
+      await expect(world.gateway.charge(TENANT, pixInput())).rejects.toThrow(
+        /No payment provider configured/,
+      );
+    });
   });
 
   describe('cancelCharge (FUT-379)', () => {

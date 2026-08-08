@@ -25,6 +25,18 @@ works for tenant accounts.
   expire soon*.
 - `RECONNECT_REQUIRED` status — distinct from `FAILED` because the remedy
   differs: reauthorize (a button) vs. fix a credential (a form).
+- **A dead grant does not receive checkouts.** The routing chain (both the
+  settings view's `providerChain` and the gateway's `credentialStoreFrom`
+  bridge) excludes `RECONNECT_REQUIRED` rows even though they stay `enabled`:
+  a healthy second provider becomes the active one, and a store whose only
+  provider lost its grant collapses to the empty chain — the storefront's
+  "payments unavailable" state — instead of failing every charge against a
+  token the provider already refused. `getCredentials` refuses such a row too
+  (direct charges included), while `getConnectedCredentials` still resolves it,
+  so webhooks about money that already moved keep authenticating. Because
+  `enabled` is never touched, a successful reconnect (`complete` →
+  `VERIFIED`) puts the provider straight back into rotation with no manual
+  re-activation.
 - HTTP endpoints: `POST …/oauth/begin`, `…/oauth/complete`, `…/oauth/disconnect`.
 
 ## What YOU still have to build
