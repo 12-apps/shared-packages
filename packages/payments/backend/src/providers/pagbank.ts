@@ -10,6 +10,7 @@ import {
 } from './pagbank-http';
 import { pagbankOAuth } from './pagbank-oauth';
 import { findChargeByReference, getCharge, refund } from './pagbank-operations';
+import { pagbankVault } from './pagbank-vault';
 import { activateApplePayCertificate, requestApplePayCsr } from './pagbank-wallets';
 import { verifyPagbankCredentials } from './pagbank-probe';
 import {
@@ -279,6 +280,12 @@ export function pagbankProvider(): PaymentProviderAdapter {
     verifyCredentials: verifyPagbankCredentials,
     createCharge,
     oauth: pagbankOAuth,
+
+    // Card vaulting WITHOUT a purchase (FUT-478/FUT-183) — the dedicated
+    // `POST /tokens/cards` validation-and-storage call; see `pagbank-vault.ts`.
+    // No `forget`: PagBank documents no token delete, and the omission is the
+    // contract's honest way to say so.
+    vault: pagbankVault,
 
     // Apple Pay's certificate round-trip (FUT-472) — see `pagbank-wallets.ts`.
     applePay: {
