@@ -5,7 +5,7 @@ import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 import { Modal, ModalContent } from './Modal';
 
 const meta: Meta<typeof Modal> = {
-  title: 'Feedback/Modal/Tests',
+  title: 'Overlays/Modal/Tests',
   component: Modal,
   parameters: {
     layout: 'centered',

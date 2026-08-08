@@ -23,7 +23,7 @@ import { Table } from './Table';
 import type { ColumnConfig, SortConfig } from './Table.types';
 
 const meta: Meta<typeof Table> = {
-  title: 'DataDisplay/Table',
+  title: 'Dashboards/Table',
   component: Table,
   parameters: {
     layout: 'padded',

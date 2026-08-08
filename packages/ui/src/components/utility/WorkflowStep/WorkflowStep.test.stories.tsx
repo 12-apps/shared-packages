@@ -5,7 +5,7 @@ import { WorkflowStep } from './WorkflowStep';
 import type { WorkflowStepItem } from './WorkflowStep.types';
 
 const meta: Meta<typeof WorkflowStep> = {
-  title: 'Enhanced/WorkflowStep/Tests',
+  title: 'Navigation/WorkflowStep/Tests',
   component: WorkflowStep,
   parameters: {
     layout: 'centered',

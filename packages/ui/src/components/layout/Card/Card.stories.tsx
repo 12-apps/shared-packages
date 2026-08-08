@@ -13,7 +13,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Card, CardActions, CardContent, CardHeader, CardMedia } from './Card';
 
 const meta: Meta<typeof Card> = {
-  title: 'Layout/Card',
+  title: 'Cards/Card',
   component: Card,
   parameters: {
     layout: 'padded',

@@ -6,7 +6,7 @@ import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 import { StackedModalActions, StackedModalContent, ModalStackProvider, StackedModal } from './StackedModal';
 
 const meta: Meta<typeof StackedModal> = {
-  title: 'Enhanced/StackedModal/Tests',
+  title: 'Overlays/StackedModal/Tests',
   component: StackedModal,
   parameters: {
     layout: 'centered',

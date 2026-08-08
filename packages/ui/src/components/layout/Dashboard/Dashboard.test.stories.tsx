@@ -5,7 +5,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Dashboard, markDashboardSlot } from './Dashboard';
 
 const meta: Meta<typeof Dashboard> = {
-  title: 'Layout/Dashboard/Tests',
+  title: 'Dashboards/Dashboard/Tests',
   component: Dashboard,
   parameters: {
     layout: 'padded',

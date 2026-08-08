@@ -6,7 +6,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { RichTextEditor } from './RichTextEditor';
 
 const meta: Meta<typeof RichTextEditor> = {
-  title: 'Enhanced/RichTextEditor/Tests',
+  title: 'Form/RichTextEditor/Tests',
   component: RichTextEditor,
   parameters: {
     layout: 'centered',

@@ -7,7 +7,7 @@ import { Lightbox } from './Lightbox';
 import type { LightboxItem, LightboxRef } from './Lightbox.types';
 
 const meta: Meta<typeof Lightbox> = {
-  title: 'DataDisplay/Lightbox/Tests',
+  title: 'Overlays/Lightbox/Tests',
   component: Lightbox,
   parameters: {
     layout: 'centered',

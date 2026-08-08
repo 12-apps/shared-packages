@@ -5,7 +5,7 @@ import React from 'react';
 import { Popover } from './Popover';
 
 const meta: Meta<typeof Popover> = {
-  title: 'DataDisplay/Popover',
+  title: 'Overlays/Popover',
   component: Popover,
   parameters: {
     layout: 'centered',

@@ -5,7 +5,7 @@ import { fn } from 'storybook/test';
 import { ErrorState } from './ErrorState';
 
 const meta: Meta<typeof ErrorState> = {
-  title: 'DataDisplay/AsyncStates/ErrorState',
+  title: 'Feedback/AsyncStates/ErrorState',
   component: ErrorState,
   parameters: {
     layout: 'centered',

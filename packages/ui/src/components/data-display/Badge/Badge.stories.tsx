@@ -29,7 +29,7 @@ import { useState } from 'react';
 import { Badge } from './Badge';
 
 const meta: Meta<typeof Badge> = {
-  title: 'DataDisplay/Badge',
+  title: 'Indicators/Badge',
   component: Badge,
   parameters: {
     layout: 'centered',

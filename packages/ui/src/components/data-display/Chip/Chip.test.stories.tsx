@@ -6,7 +6,7 @@ import { expect, fn, Mock, userEvent, waitFor, within } from 'storybook/test';
 import { Chip } from './Chip';
 
 const meta: Meta<typeof Chip> = {
-  title: 'DataDisplay/Chip/Tests',
+  title: 'Indicators/Chip/Tests',
   component: Chip,
   parameters: {
     layout: 'centered',

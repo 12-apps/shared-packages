@@ -6,7 +6,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { CodeEditor } from './CodeEditor';
 
 const meta: Meta<typeof CodeEditor> = {
-  title: 'Enhanced/CodeEditor/Tests',
+  title: 'Form/CodeEditor/Tests',
   component: CodeEditor,
   parameters: {
     layout: 'centered',

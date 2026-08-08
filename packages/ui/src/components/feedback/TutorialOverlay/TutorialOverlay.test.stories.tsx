@@ -6,7 +6,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { TutorialOverlay } from './TutorialOverlay';
 
 const meta: Meta<typeof TutorialOverlay> = {
-  title: 'Enhanced/TutorialOverlay/Tests',
+  title: 'Overlays/TutorialOverlay/Tests',
   component: TutorialOverlay,
   parameters: {
     layout: 'fullscreen',

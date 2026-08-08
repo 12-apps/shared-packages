@@ -6,7 +6,7 @@ import { MapPreview } from './MapPreview';
 import type { HeatmapPoint,MapMarker } from './MapPreview.types';
 
 const meta: Meta<typeof MapPreview> = {
-  title: 'Enhanced/MapPreview/Tests',
+  title: 'Media/MapPreview/Tests',
   component: MapPreview,
   parameters: {
     layout: 'centered',

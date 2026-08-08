@@ -11,7 +11,7 @@ import { fn } from 'storybook/test';
 import { Banner } from './Banner';
 
 const meta: Meta<typeof Banner> = {
-  title: 'DataDisplay/Banner',
+  title: 'Feedback/Banner',
   component: Banner,
   parameters: {
     layout: 'fullscreen',

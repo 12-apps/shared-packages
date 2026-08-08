@@ -10,7 +10,7 @@ import React from 'react';
 import { Alert } from './Alert';
 
 const meta: Meta<typeof Alert> = {
-  title: 'DataDisplay/Alert',
+  title: 'Feedback/Alert',
   component: Alert,
   parameters: {
     layout: 'padded',

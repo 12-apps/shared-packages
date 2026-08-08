@@ -9,7 +9,7 @@ import { expect, userEvent, waitFor,within } from 'storybook/test';
 import { Tooltip } from './Tooltip';
 
 const meta: Meta<typeof Tooltip> = {
-  title: 'DataDisplay/Tooltip/Tests',
+  title: 'Overlays/Tooltip/Tests',
   component: Tooltip,
   parameters: {
     layout: 'centered',

@@ -5,7 +5,7 @@ import { fn } from 'storybook/test';
 import { Dashboard } from './Dashboard';
 
 const meta: Meta<typeof Dashboard> = {
-  title: 'Layout/Dashboard',
+  title: 'Dashboards/Dashboard',
   component: Dashboard,
   parameters: {
     layout: 'padded',

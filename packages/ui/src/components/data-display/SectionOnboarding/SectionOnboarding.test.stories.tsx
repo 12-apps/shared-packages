@@ -15,7 +15,7 @@ const SETUP_STEPS = [
 ];
 
 const meta: Meta<typeof SectionOnboarding> = {
-  title: 'DataDisplay/AsyncStates/SectionOnboarding/Tests',
+  title: 'Feedback/AsyncStates/SectionOnboarding/Tests',
   component: SectionOnboarding,
   parameters: {
     layout: 'padded',

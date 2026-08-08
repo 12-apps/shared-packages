@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { Modal, ModalContent } from './Modal';
 
 const meta: Meta<typeof Modal> = {
-  title: 'Feedback/Modal',
+  title: 'Overlays/Modal',
   component: Modal,
   tags: ['autodocs', 'component:Modal'],
   parameters: {

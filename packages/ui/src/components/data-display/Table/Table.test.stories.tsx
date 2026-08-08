@@ -7,7 +7,7 @@ import { Table } from './Table';
 import type { ColumnConfig } from './Table.types';
 
 const meta: Meta<typeof Table> = {
-  title: 'DataDisplay/Table/Tests',
+  title: 'Dashboards/Table/Tests',
   component: Table,
   parameters: {
     layout: 'centered',

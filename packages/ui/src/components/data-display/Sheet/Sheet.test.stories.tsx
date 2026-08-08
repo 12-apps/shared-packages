@@ -17,7 +17,7 @@ import { expect, fireEvent, fn,userEvent, waitFor, within } from 'storybook/test
 import { Sheet } from './Sheet';
 
 const meta: Meta<typeof Sheet> = {
-  title: 'DataDisplay/Sheet/Tests',
+  title: 'Overlays/Sheet/Tests',
   component: Sheet,
   parameters: {
     layout: 'centered',

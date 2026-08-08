@@ -7,7 +7,7 @@ import { TableFilter } from './TableFilter';
 import type { TableFilterRange } from './TableFilter.types';
 
 const meta: Meta<typeof TableFilter> = {
-  title: 'Layout/TableFilter',
+  title: 'Dashboards/TableFilter',
   component: TableFilter,
   parameters: {
     layout: 'fullscreen',

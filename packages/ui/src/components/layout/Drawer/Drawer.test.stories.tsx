@@ -21,7 +21,7 @@ import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 import { Drawer, DrawerContent,DrawerHeader } from './Drawer';
 
 const meta: Meta<typeof Drawer> = {
-  title: 'Layout/Drawer/Tests',
+  title: 'Overlays/Drawer/Tests',
   component: Drawer,
   parameters: {
     layout: 'fullscreen',

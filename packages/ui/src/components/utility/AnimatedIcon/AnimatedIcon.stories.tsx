@@ -24,7 +24,7 @@ import React from 'react';
 import { AnimatedIcon } from './AnimatedIcon';
 
 const meta: Meta<typeof AnimatedIcon> = {
-  title: 'Enhanced/AnimatedIcon',
+  title: 'Media/AnimatedIcon',
   component: AnimatedIcon,
   parameters: {
     layout: 'centered',

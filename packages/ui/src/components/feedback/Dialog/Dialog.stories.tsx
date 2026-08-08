@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Dialog, DialogActions,DialogContent, DialogHeader } from './Dialog';
 
 const meta: Meta<typeof Dialog> = {
-  title: 'Feedback/Dialog',
+  title: 'Overlays/Dialog',
   component: Dialog,
   tags: ['autodocs', 'component:Dialog'],
   parameters: {

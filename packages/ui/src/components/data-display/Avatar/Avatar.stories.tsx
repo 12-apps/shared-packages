@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import { Avatar, AvatarGroup } from './Avatar';
 
 const meta: Meta<typeof Avatar> = {
-  title: 'DataDisplay/Avatar',
+  title: 'Media/Avatar',
   component: Avatar,
   parameters: {
     layout: 'centered',

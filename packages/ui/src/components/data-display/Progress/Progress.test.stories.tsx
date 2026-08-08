@@ -6,7 +6,7 @@ import { expect, fireEvent, userEvent, waitFor,within } from 'storybook/test';
 import { Progress } from './Progress';
 
 const meta: Meta<typeof Progress> = {
-  title: 'DataDisplay/Progress/Tests',
+  title: 'Feedback/Progress/Tests',
   component: Progress,
   parameters: {
     layout: 'centered',

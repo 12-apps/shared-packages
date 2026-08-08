@@ -8,7 +8,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Tooltip } from './Tooltip';
 
 const meta: Meta<typeof Tooltip> = {
-  title: 'DataDisplay/Tooltip',
+  title: 'Overlays/Tooltip',
   component: Tooltip,
   parameters: {
     layout: 'centered',

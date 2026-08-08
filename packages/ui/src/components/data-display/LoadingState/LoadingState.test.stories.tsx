@@ -4,7 +4,7 @@ import { expect, within } from 'storybook/test';
 import { LoadingState } from './LoadingState';
 
 const meta: Meta<typeof LoadingState> = {
-  title: 'DataDisplay/AsyncStates/LoadingState/Tests',
+  title: 'Feedback/AsyncStates/LoadingState/Tests',
   component: LoadingState,
   parameters: {
     layout: 'padded',

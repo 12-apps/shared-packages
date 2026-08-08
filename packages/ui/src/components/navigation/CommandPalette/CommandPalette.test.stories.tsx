@@ -10,7 +10,7 @@ import { PaletteCommand } from './CommandPalette.types';
 import {CommandPalette } from './CommandPalette';
 
 const meta: Meta<typeof CommandPalette> = {
-  title: 'Enhanced/CommandPalette/Tests',
+  title: 'Navigation/CommandPalette/Tests',
   component: CommandPalette,
   parameters: {
     layout: 'centered',

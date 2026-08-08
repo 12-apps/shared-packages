@@ -10,7 +10,7 @@ import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 import { AnimatedIcon } from './AnimatedIcon';
 
 const meta: Meta<typeof AnimatedIcon> = {
-  title: 'Enhanced/AnimatedIcon/Tests',
+  title: 'Media/AnimatedIcon/Tests',
   component: AnimatedIcon,
   parameters: {
     layout: 'centered',

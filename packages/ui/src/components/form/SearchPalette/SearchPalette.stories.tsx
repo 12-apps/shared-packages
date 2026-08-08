@@ -34,7 +34,7 @@ const FILTERS = [
 const theme = createTheme();
 
 const meta: Meta<typeof SearchPalette<Item>> = {
-  title: 'Form/SearchPalette',
+  title: 'Navigation/SearchPalette',
   component: SearchPalette,
   tags: ['autodocs', 'component:SearchPalette'],
   parameters: {

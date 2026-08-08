@@ -4,7 +4,7 @@ import { expect, userEvent,waitFor, within } from 'storybook/test';
 import { TimingDiagram } from './TimingDiagram';
 
 const meta: Meta<typeof TimingDiagram> = {
-  title: 'Enhanced/TimingDiagram/Tests',
+  title: 'Charts/TimingDiagram/Tests',
   component: TimingDiagram,
   parameters: {
     layout: 'centered',

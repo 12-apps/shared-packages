@@ -8,7 +8,7 @@ import { TableFilter } from './TableFilter';
 import type { TableFilterRange } from './TableFilter.types';
 
 const meta: Meta<typeof TableFilter> = {
-  title: 'Layout/TableFilter/Tests',
+  title: 'Dashboards/TableFilter/Tests',
   component: TableFilter,
   parameters: { layout: 'fullscreen', chromatic: { disableSnapshot: false } },
   tags: ['autodocs', 'test', 'component:TableFilter', 'checked'],

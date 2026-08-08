@@ -4,7 +4,7 @@ import { expect, fn } from 'storybook/test';
 import { Command } from './Command';
 
 const meta: Meta<typeof Command> = {
-  title: 'Form/Command/Tests',
+  title: 'Navigation/Command/Tests',
   component: Command,
   parameters: {
     layout: 'centered',

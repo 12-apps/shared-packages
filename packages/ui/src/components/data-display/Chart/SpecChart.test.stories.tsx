@@ -4,7 +4,7 @@ import { expect, within } from 'storybook/test';
 import { SpecChart } from './SpecChart';
 
 const meta: Meta<typeof SpecChart> = {
-  title: 'DataDisplay/SpecChart/Tests',
+  title: 'Charts/Chart/Tests',
   component: SpecChart,
   parameters: { layout: 'padded' },
   tags: ['autodocs', 'test', 'component:Chart'],
@@ -18,7 +18,7 @@ const data = [
   { day: 'Ter', total: 98000 },
 ];
 
-export const RendersFromSpec: Story = {
+export const SpecRendersFromSpec: Story = {
   args: {
     spec: {
       type: 'bar',
@@ -36,7 +36,7 @@ export const RendersFromSpec: Story = {
   },
 };
 
-export const DonutCenterLabel: Story = {
+export const SpecDonutCenterLabel: Story = {
   args: {
     spec: {
       type: 'donut',

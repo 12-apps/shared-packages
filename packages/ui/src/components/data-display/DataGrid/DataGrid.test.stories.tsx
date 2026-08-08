@@ -42,7 +42,7 @@ const testColumns: GridColumn<TestRow>[] = [
 ];
 
 const meta: Meta<typeof DataGrid> = {
-  title: 'Enhanced/DataGrid/Tests',
+  title: 'Dashboards/DataGrid/Tests',
   component: DataGrid,
   parameters: {
     layout: 'fullscreen',

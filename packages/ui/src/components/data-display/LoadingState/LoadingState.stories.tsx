@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { LoadingState } from './LoadingState';
 
 const meta: Meta<typeof LoadingState> = {
-  title: 'DataDisplay/AsyncStates/LoadingState',
+  title: 'Feedback/AsyncStates/LoadingState',
   component: LoadingState,
   parameters: {
     layout: 'centered',
