@@ -42,9 +42,18 @@ export interface PagBankCardResponse {
   charges?: PagBankCardCharge[];
 }
 
+/** One charge entry of an order body, as much of it as this mapping reads. */
+export interface PagBankOrderCharge {
+  id?: unknown;
+  status?: unknown;
+  amount?: { value?: unknown; summary?: { refunded?: unknown } };
+}
+
 export interface PagBankOrderResponse {
+  id?: unknown;
   reference_id?: unknown;
-  charges?: Array<{ id?: unknown; status?: unknown; amount?: { value?: unknown } }>;
+  charges?: PagBankOrderCharge[];
+  qr_codes?: Array<{ expiration_date?: unknown }>;
 }
 
 /**
@@ -57,12 +66,84 @@ export function settledCharge(res: PagBankOrderResponse) {
   return charges.find((c) => c.status === 'PAID') ?? charges[0];
 }
 
+/** The refunded total a canceled charge reports, or 0 when it reports none. */
+export function refundedCents(charge: PagBankOrderCharge | undefined): number {
+  const refunded = charge?.amount?.summary?.refunded;
+  return typeof refunded === 'number' ? refunded : 0;
+}
+
+/**
+ * Slack after the QR's own deadline before this mapping calls the order
+ * EXPIRED. A PIX initiated in the window's final seconds may legitimately
+ * SETTLE after it — the deadline gates initiation at the payer's bank, not
+ * completion — and `EXPIRED` and `PAID` are contradictory outcomes the status
+ * ranks refuse to reorder. Half an hour is far beyond any bank's completion
+ * lag, and the buyer-facing screen does not wait for this: the host's own TTL
+ * already shows the expired state with a retry path.
+ */
+const QR_EXPIRY_GRACE_MS = 30 * 60 * 1000;
+
+/** True when the order can no longer be paid: no charge, every QR long dead. */
+function qrExpired(res: PagBankOrderResponse, now: number): boolean {
+  const qrCodes = Array.isArray(res.qr_codes) ? res.qr_codes : [];
+  if (qrCodes.length === 0) return false;
+  return qrCodes.every((qr) => {
+    const expiresAt = typeof qr.expiration_date === 'string' ? Date.parse(qr.expiration_date) : NaN;
+    return Number.isFinite(expiresAt) && now > expiresAt + QR_EXPIRY_GRACE_MS;
+  });
+}
+
+/**
+ * A deciding charge's status in OUR vocabulary (FUT-681).
+ *
+ * PagBank's cancel operation both VOIDS an unpaid charge and REFUNDS a paid
+ * one, and answers `CANCELED` for either — the two are told apart by the
+ * money: `amount.summary.refunded` is what actually went back. Collapsing both
+ * into CANCELED hid every refund from the host (the ticket's "estornos são
+ * invisíveis"); collapsing everything unpaid into PENDING made a canceled or
+ * expired PIX poll "aguardando" forever.
+ */
+function chargeStatus(charge: PagBankOrderCharge): ChargeSnapshot['status'] {
+  switch (charge.status) {
+    case 'PAID':
+      return 'PAID';
+    case 'AUTHORIZED':
+      return 'AUTHORIZED';
+    case 'DECLINED':
+      return 'DECLINED';
+    case 'CANCELED':
+      return refundedCents(charge) > 0 ? 'REFUNDED' : 'CANCELED';
+    case 'EXPIRED':
+      return 'EXPIRED';
+    default:
+      // IN_ANALYSIS, WAITING, and whatever PagBank adds next: still live.
+      return 'PENDING';
+  }
+}
+
+/**
+ * An order body's status: the deciding charge's, when one exists. An order
+ * with NO charge is an unpaid PIX — PENDING while its QR can still be paid,
+ * EXPIRED once every QR is past its deadline (plus {@link QR_EXPIRY_GRACE_MS}).
+ */
+function orderStatus(
+  res: PagBankOrderResponse,
+  charge: PagBankOrderCharge | undefined,
+): ChargeSnapshot['status'] {
+  if (charge) return chargeStatus(charge);
+  return qrExpired(res, Date.now()) ? 'EXPIRED' : 'PENDING';
+}
+
 /**
  * Normalize an order body's charge into the shared snapshot shape.
  *
  * A PAID charge with no `amount.value` is REFUSED rather than normalized to 0
  * ({@link capturedAmountCents}). An unpaid PIX order legitimately carries no
  * charge — and so no amount — on every status poll, and stays PENDING.
+ *
+ * The order's own id rides along as `settlementHints.orderId` so every later
+ * read knows which `/orders/{id}` to poll — `providerChargeId` cannot carry
+ * that fact, because for a paid order it is the CHARGE's id (see FUT-681).
  */
 export function orderSnapshot(
   res: PagBankOrderResponse,
@@ -77,9 +158,10 @@ export function orderSnapshot(
     providerChargeId: typeof paid?.id === 'string' ? paid.id : fallbackChargeId,
     // The `reference_id` we sent, echoed back — see `ChargeSnapshot.reference`.
     ...(typeof res.reference_id === 'string' ? { reference: res.reference_id } : {}),
-    status: settled ? 'PAID' : 'PENDING',
+    status: orderStatus(res, paid),
     amount: { amountCents: capturedAmountCents(NAME, settled, captured), currency: 'BRL' },
     method: 'PIX',
+    ...(typeof res.id === 'string' ? { settlementHints: { orderId: res.id } } : {}),
     raw: res,
   };
 }
@@ -95,17 +177,28 @@ export function mapPix(
 ): ChargeSnapshot {
   const providerOrderId = res.id;
   const qrText = pixQrText(res);
-  const providerChargeId = res.charges?.[0]?.id ?? providerOrderId;
-  if (!providerOrderId || !providerChargeId || !qrText) {
-    throw new ProviderRequestError(NAME, 'PagBank PIX response missing order/charge/qr fields.');
+  if (!providerOrderId || !qrText) {
+    throw new ProviderRequestError(NAME, 'PagBank PIX response missing order/qr fields.');
   }
+  // An unpaid PIX order has NO charge — PagBank mints the charge only when the
+  // buyer pays, so the real create response carries no `charges[]` at all
+  // (FUT-681; the old fixtures inventing one is what hid this). The order id
+  // is the only provider-side identity in existence and keys the row until a
+  // webhook or poll names the real charge id; `settlementHints.orderId` labels
+  // it as an ORDER id so that later read can re-key the row (see
+  // `upsertByProviderChargeId`) instead of never finding it.
+  const providerChargeId = res.charges?.[0]?.id ?? providerOrderId;
   return {
     provider: NAME,
     providerChargeId,
+    // What `chargePayload` sent as `reference_id` — the correlation every
+    // rescue path falls back to when ids alone cannot find the row.
+    reference: input.reference,
     status: 'PENDING',
     amount: input.amount,
     method: 'PIX',
     pix: { qrText, expiresAt: res.qr_codes?.[0]?.expiration_date ?? expiresAt },
+    settlementHints: { orderId: providerOrderId },
     raw: res,
   };
 }
@@ -152,6 +245,9 @@ export function mapCard(res: PagBankCardResponse, input: ChargeInput): ChargeSna
     // `vaultToken` is the id PagBank mints when it agreed to STORE the card —
     // normalized here so no host has to read this vendor payload itself.
     card: { brand: card?.brand, last4: card?.last_digits, vaultToken: card?.id },
+    // The container the charge lives under — what `getCharge` polls, since
+    // PagBank's read API is keyed by order, not by charge (FUT-681).
+    settlementHints: { orderId: res.id },
     raw: res,
   };
 }
