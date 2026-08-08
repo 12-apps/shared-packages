@@ -32,6 +32,8 @@
     "jscpd": "^4.0.5",
     "jsdom": "^26.1.0",
     "knip": "^5.66.0",
+    "semantic-release": "^25.0.9",
+    "semantic-release-monorepo": "^8.0.2",
     "turbo": "^2.7.2",
     "typescript": "5.9.2",
     "vitest": "^3.2.4"
