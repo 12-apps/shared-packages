@@ -79,7 +79,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    uses: 12-apps/ci/.github/workflows/detect-changes.yml@807621ba204f0f40c0a3b97b5360163cd5566a95
+    uses: 12-apps/ci/.github/workflows/detect-changes.yml@130076f29b25c0bddf10ee4f22cba2bf0bfc1d6e
     with:
       # Deliberately COARSE, and the two categories are nearly the same set. That
       # is the honest shape for this repo, not laziness — see the PR description.
@@ -584,7 +584,7 @@ jobs:
     permissions:
       pull-requests: write
       actions: read
-    uses: 12-apps/ci/.github/workflows/cost-report.yml@807621ba204f0f40c0a3b97b5360163cd5566a95
+    uses: 12-apps/ci/.github/workflows/cost-report.yml@130076f29b25c0bddf10ee4f22cba2bf0bfc1d6e
     secrets: inherit
 
   # Required-checks aggregation: one status that branch protection can gate on,
