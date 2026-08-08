@@ -752,35 +752,33 @@ function OrderDetail(): React.JSX.Element {
  * card imposes nothing and would span anything across the same width.
  */
 export const Expandable: Story = {
-  render: () => (
-    <BaseListCard
-      leading={<ReceiptLongOutlinedIcon />}
-      title="Ana Paula"
-      subtitle="Mesa 12 · 8 itens"
-      meta={[{ label: "Cupom", value: "BEMVINDO10" }]}
-      value="R$ 312,50"
-      status={<Chip label="Abandonado" size="small" variant="outlined" color="warning" />}
-      onToggleSelect={() => {}}
-    >
-      <OrderDetail />
-    </BaseListCard>
-  ),
+  // ARGS, not a hardcoded render. A story that builds its own card ignores the
+  // controls panel entirely, and a reader who reaches for `density` or `scale`
+  // here and sees nothing happen concludes the COMPONENT is broken rather than
+  // the story.
+  args: {
+    leading: <ReceiptLongOutlinedIcon />,
+    title: "Ana Paula",
+    subtitle: "Mesa 12 · 8 itens",
+    meta: [{ label: "Cupom", value: "BEMVINDO10" }],
+    value: "R$ 312,50",
+    status: <Chip label="Abandonado" size="small" variant="outlined" color="warning" />,
+    onToggleSelect: () => {},
+    children: <OrderDetail />,
+  },
 };
 
 /** Open on first render, for a list whose detail is the reason you came. */
 export const ExpandedByDefault: Story = {
-  render: () => (
-    <BaseListCard
-      leading={<ReceiptLongOutlinedIcon />}
-      title="Ana Paula"
-      subtitle="Mesa 12 · 8 itens"
-      value="R$ 312,50"
-      defaultExpanded
-      onToggleSelect={() => {}}
-    >
-      <OrderDetail />
-    </BaseListCard>
-  ),
+  args: {
+    leading: <ReceiptLongOutlinedIcon />,
+    title: "Ana Paula",
+    subtitle: "Mesa 12 · 8 itens",
+    value: "R$ 312,50",
+    defaultExpanded: true,
+    onToggleSelect: () => {},
+    children: <OrderDetail />,
+  },
 };
 
 /**
