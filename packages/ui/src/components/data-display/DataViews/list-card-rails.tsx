@@ -4,6 +4,7 @@ import { createContext, useContext, type ReactNode } from "react";
 
 import { Box } from "../../../mui/Box";
 import { DENSITY_ROW_PADDING, type DataViewsDensity } from "./data-views-layout-context";
+import { CellConfigProvider, cellTracks, type ListCardCellConfig } from "./list-card-cells";
 
 /**
  * THE LIST OWNS THE COLUMNS, NOT THE ROW.
@@ -27,6 +28,15 @@ import { DENSITY_ROW_PADDING, type DataViewsDensity } from "./data-views-layout-
 
 /** One rail. Fixed where alignment matters, flexible where it does not. */
 export interface ListRails {
+  /**
+   * The disclosure chevron, ahead of everything.
+   *
+   * Reserved on the same terms as the gutters behind it: a list where only SOME
+   * rows carry an expandable body would otherwise indent those rows and no
+   * others, and a column of captions that starts at two different offsets reads
+   * as a rendering fault rather than as a row you can open.
+   */
+  disclose: string;
   /** Reserved even when nothing drags: toggling drag mode must not shift the list. */
   drag: string;
   /** Reserved even when nothing is selectable, for the same reason. */
@@ -83,6 +93,7 @@ export function contentRails(metaColumns: number): Pick<ListRails, "caption" | "
 }
 
 export const DEFAULT_RAILS: ListRails = {
+  disclose: "auto",
   drag: "auto",
   select: "auto",
   leading: "auto",
@@ -102,6 +113,14 @@ interface ListRailsValue {
   density: DataViewsDensity;
   /** Whether the gutters are held open even when empty. */
   reserveGutters: boolean;
+  /**
+   * How many tracks a row spans.
+   *
+   * Fixed at {@link RAIL_COUNT} for the named-slot layout, but a cell-configured
+   * list has as many tracks as the config declares, and every row must span the
+   * same number or subgrid tears.
+   */
+  railCount: number;
 }
 
 const ListRailsContext = createContext<ListRailsValue | null>(null);
@@ -122,6 +141,7 @@ export function useListRails(): ListRailsValue | null {
  */
 export function railsTemplate(rails: RailOverrides): string {
   return [
+    rails.disclose,
     rails.drag,
     rails.select,
     rails.leading,
@@ -163,7 +183,7 @@ export const RAIL_GAP_PX = RAIL_GAP * 8;
  * mode on does not shift every row sideways.
  */
 export function railsTemplateFor(
-  gutters: { drag: boolean; select: boolean },
+  gutters: { disclose: boolean; drag: boolean; select: boolean },
   metaColumns: number,
 ): string {
   return railsTemplate({
@@ -171,13 +191,41 @@ export function railsTemplateFor(
     // Standalone, the card can simply COUNT its pairs — no `metaColumns` to be
     // told, and no guess.
     ...contentRails(metaColumns),
+    ...(gutters.disclose ? {} : { disclose: null }),
     ...(gutters.drag ? {} : { drag: null }),
     ...(gutters.select ? {} : { select: null }),
   });
 }
 
-/** How many rails there are — the span a card claims. */
-export const RAIL_COUNT = 8;
+/** How many rails the named-slot layout has — the span such a card claims. */
+export const RAIL_COUNT = 9;
+
+/**
+ * The gutters and the trailing menu that bracket a CONFIGURED row.
+ *
+ * A cell-configured list still has a head and a tail the config does not
+ * describe: the disclosure chevron, the drag grip and the checkbox in front, and
+ * the overflow menu behind. The menu is not optional — it is where a row's
+ * actions live, and a list that hid it would have nowhere to put them.
+ */
+const CELL_FIXED_RAILS = 4;
+
+/** Tracks for a cell-configured row: gutters, leading, the cells, then the menu. */
+export function cellRailsTemplate(cells: readonly string[]): string {
+  return [
+    DEFAULT_RAILS.disclose,
+    DEFAULT_RAILS.drag,
+    DEFAULT_RAILS.select,
+    DEFAULT_RAILS.leading,
+    ...cells,
+    DEFAULT_RAILS.actions,
+  ].join(" ");
+}
+
+/** How many tracks such a row spans — the fixed head/tail plus one per cell. */
+export function cellRailCount(cells: number): number {
+  return CELL_FIXED_RAILS + cells + 1;
+}
 
 /**
  * A list of {@link BaseListCard}s that share one set of columns.
@@ -191,6 +239,7 @@ export const RAIL_COUNT = 8;
 export function ListCardGroup({
   children,
   density = "cozy",
+  cells,
   metaColumns,
   rails,
   reserveGutters = true,
@@ -199,6 +248,20 @@ export function ListCardGroup({
 }: {
   children: ReactNode;
   density?: DataViewsDensity;
+  /**
+   * The list's CELL CONFIG — declared once here, obeyed by every row.
+   *
+   * This is what makes the columns line up by construction rather than by
+   * convention: the group resolves the tracks and hands the same config to every
+   * card, so two rows cannot disagree about the shape of the list because
+   * neither of them decides it.
+   *
+   * Supplying this replaces the named-slot layout (title/subtitle/meta/value/
+   * status) for the rows inside — they render `row` through these cells instead.
+   * The gutters and the overflow menu are unaffected; they bracket the cells and
+   * are not the config's to describe.
+   */
+  cells?: readonly ListCardCellConfig<never>[];
   /**
    * How many labelled pairs the rows in this list carry.
    *
@@ -226,8 +289,12 @@ export function ListCardGroup({
     ...(metaColumns == null ? {} : contentRails(metaColumns)),
     ...rails,
   };
+  const configured = cells != null && cells.length > 0;
+  const template = configured ? cellRailsTemplate(cellTracks(cells)) : railsTemplate(resolved);
+  const railCount = configured ? cellRailCount(cells.length) : RAIL_COUNT;
   return (
-    <ListRailsContext.Provider value={{ density, reserveGutters }}>
+    <ListRailsContext.Provider value={{ density, reserveGutters, railCount }}>
+     <CellConfigProvider cells={cells}>
       <Box
         data-testid={dataTestId}
         sx={{
@@ -237,13 +304,14 @@ export function ListCardGroup({
           // honest place to ask the question.
           containerType: "inline-size",
           display: "grid",
-          gridTemplateColumns: railsTemplate(resolved),
+          gridTemplateColumns: template,
           alignItems: "center",
           rowGap: gap ?? DENSITY_ROW_PADDING[density],
         }}
       >
         {children}
       </Box>
+     </CellConfigProvider>
     </ListRailsContext.Provider>
   );
 }

@@ -235,7 +235,7 @@ function ListCardValue({ value }: { value: ReactNode }): React.JSX.Element {
  * `:focus-within` is what keeps them reachable by keyboard, and `visibility`
  * rather than `display` keeps their space reserved so nothing shifts.
  */
-function ListCardActions({
+export function ListCardActions({
   actions,
   alwaysVisible,
   menu,

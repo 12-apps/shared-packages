@@ -667,3 +667,245 @@ export const States: Story = {
     </Box>
   ),
 };
+
+/**
+ * The expanded body a consumer might build: line items on the left, a totals
+ * ledger on the right, then the actions this record affords.
+ *
+ * None of this shape comes from `BaseListCard`. The card spans the body across
+ * every rail and stops there; what is drawn inside is entirely the caller's,
+ * which is the point of the slot. A different entity would put something else
+ * here and the envelope would not know the difference.
+ */
+function CartDetail(): React.JSX.Element {
+  const items = [
+    { qty: 2, name: "Picanha na chapa", total: "179,80" },
+    { qty: 4, name: "Chopp pilsen 500ml", total: "95,60", note: "sem colarinho" },
+    { qty: 2, name: "Pudim de leite", total: "57,10" },
+  ];
+  return (
+    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 3 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        {items.map((item) => (
+          <Box key={item.name} sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+            <Box component="span" sx={{ color: "text.secondary", fontSize: 13, minWidth: 24 }}>
+              {item.qty}×
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ fontSize: 14, fontWeight: 600 }}>{item.name}</Box>
+              {item.note && (
+                <Box sx={{ fontSize: 12, color: "text.secondary" }}>{item.note}</Box>
+              )}
+            </Box>
+            <Box component="span" sx={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+              {item.total}
+            </Box>
+          </Box>
+        ))}
+      </Box>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+          <Box component="span" sx={{ color: "text.secondary" }}>Subtotal</Box>
+          <Box component="span">332,50</Box>
+        </Box>
+        <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+          <Box component="span" sx={{ color: "info.main" }}>Cupom</Box>
+          <Box component="span" sx={{ color: "info.main" }}>−20,00</Box>
+        </Box>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontWeight: 700,
+            borderTop: 1,
+            borderColor: "divider",
+            pt: 0.5,
+            mt: 0.5,
+          }}
+        >
+          <Box component="span">Total</Box>
+          <Box component="span">R$ 312,50</Box>
+        </Box>
+        <Box sx={{ display: "flex", gap: 1, mt: 1, justifyContent: "flex-end" }}>
+          <Button size="small" variant="outlined">Recuperar</Button>
+          <Button size="small" variant="outlined">Ver cliente</Button>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * THE POINT OF THE COMPONENT: a summary that opens onto the record itself.
+ *
+ * Press the chevron. The row keeps its rails and its columns collapsed, and the
+ * detail underneath is free-form — this one is a two-column ledger, but the
+ * card imposes nothing and would span anything across the same width.
+ */
+export const Expandable: Story = {
+  render: () => (
+    <BaseListCard
+      leading={<ReceiptLongOutlinedIcon />}
+      title="Ana Paula"
+      subtitle="Mesa 12 · 8 itens"
+      meta={[{ label: "Cupom", value: "BEMVINDO10" }]}
+      value="R$ 312,50"
+      status={<Chip label="Abandonado" size="small" variant="outlined" color="warning" />}
+      onToggleSelect={() => {}}
+    >
+      <CartDetail />
+    </BaseListCard>
+  ),
+};
+
+/** Open on first render, for a list whose detail is the reason you came. */
+export const ExpandedByDefault: Story = {
+  render: () => (
+    <BaseListCard
+      leading={<ReceiptLongOutlinedIcon />}
+      title="Ana Paula"
+      subtitle="Mesa 12 · 8 itens"
+      value="R$ 312,50"
+      defaultExpanded
+      onToggleSelect={() => {}}
+    >
+      <CartDetail />
+    </BaseListCard>
+  ),
+};
+
+/**
+ * NO CHILDREN, NO CHEVRON — and standalone, no rail for one either.
+ *
+ * The two rows below are identical apart from the body. A chevron on the second
+ * would be a promise the row cannot keep, so it is simply absent, and a column
+ * of chevrons stays a truthful index of which rows have more behind them.
+ */
+export const ChevronOnlyWhenThereIsMore: Story = {
+  render: () => (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      <BaseListCard
+        leading={<ReceiptLongOutlinedIcon />}
+        title="Ana Paula"
+        subtitle="Mesa 12 · 8 itens"
+        value="R$ 312,50"
+        onToggleSelect={() => {}}
+      >
+        <CartDetail />
+      </BaseListCard>
+      <BaseListCard
+        leading={<ReceiptLongOutlinedIcon />}
+        title="Anônimo"
+        subtitle="Balcão · 1 item"
+        value="R$ 8,90"
+        onToggleSelect={() => {}}
+      />
+    </Box>
+  ),
+};
+
+/**
+ * A LIST THAT OWNS THE STATE — one row open at a time.
+ *
+ * Uncontrolled, rows open independently and several can be open at once, which
+ * is what comparing two records needs. Pass `expanded` + `onExpandedChange` and
+ * the list decides instead; this one enforces an accordion.
+ *
+ * Inside a `ListCardGroup` the disclose rail is RESERVED on every row, so the
+ * captions stay on one edge whether or not a given row has a body.
+ */
+export const ControlledAccordion: Story = {
+  render: function ControlledAccordionStory() {
+    const [open, setOpen] = useState<string | null>("ana");
+    const rows = [
+      { id: "ana", title: "Ana Paula", subtitle: "Mesa 12 · 8 itens", value: "R$ 312,50" },
+      { id: "thom", title: "Thompson Filgueiras", subtitle: "Mesa 4 · 6 itens", value: "R$ 142,60" },
+      { id: "anon", title: "Anônimo", subtitle: "Balcão · 1 item", value: "R$ 8,90" },
+    ];
+    return (
+      <ListCardGroup metaColumns={0}>
+        {rows.map((row) => (
+          <BaseListCard
+            key={row.id}
+            leading={<ReceiptLongOutlinedIcon />}
+            title={row.title}
+            subtitle={row.subtitle}
+            value={row.value}
+            onToggleSelect={() => {}}
+            expanded={open === row.id}
+            onExpandedChange={(next) => setOpen(next ? row.id : null)}
+          >
+            <CartDetail />
+          </BaseListCard>
+        ))}
+      </ListCardGroup>
+    );
+  },
+};
+
+/**
+ * CELLS DECLARED ONCE BY THE LIST — the shape no row can break.
+ *
+ * The group holds the config; each card only supplies its `row`. Nothing here
+ * lets one card put a column where another has not, which is what makes the
+ * alignment structural rather than a convention four rows happen to keep.
+ *
+ * Note what the config does NOT mean. The second line is not a subtitle: here it
+ * is the client under the pedido, the time under the date, and the method under
+ * the money — three different pairings, one mechanism, no semantics the config
+ * did not put there. A cell wanting one line simply omits `secondary`.
+ *
+ * The rows carry deliberately uneven content — a long client name, a short one,
+ * a missing second line — because even columns are only proven by rows that
+ * disagree about how much they have to say.
+ */
+const PEDIDO_CELLS = [
+  {
+    id: "pedido",
+    primary: (row: Record<string, unknown>) => String(row.shortId),
+    secondary: (row: Record<string, unknown>) => String(row.customer),
+  },
+  {
+    id: "quando",
+    align: "center" as const,
+    primary: (row: Record<string, unknown>) => String(row.date),
+    secondary: (row: Record<string, unknown>) => String(row.time),
+  },
+  {
+    id: "total",
+    align: "end" as const,
+    width: "max-content",
+    strong: true,
+    primary: (row: Record<string, unknown>) => String(row.total),
+    secondary: (row: Record<string, unknown>) => (row.method == null ? null : String(row.method)),
+  },
+];
+
+const PEDIDO_ROWS = [
+  { shortId: "B75A6858", customer: "Luiz Gustavo", date: "05/08/2026", time: "13:45", total: "R$ 13,90", method: "PIX" },
+  { shortId: "C91B2210", customer: "Ana Paula Rodrigues de Menezes", date: "05/08/2026", time: "14:02", total: "R$ 312,50", method: "Crédito" },
+  { shortId: "D22F7741", customer: "Thom", date: "06/08/2026", time: "09:10", total: "R$ 8,90", method: null },
+];
+
+export const ConfiguredCells: Story = {
+  render: () => (
+    <ListCardGroup cells={PEDIDO_CELLS}>
+      {PEDIDO_ROWS.map((row) => (
+        <BaseListCard
+          key={String(row.shortId)}
+          row={row}
+          leading={<ReceiptLongOutlinedIcon />}
+          onToggleSelect={() => {}}
+          menu={
+            <DropdownMenu
+              items={[{ id: "open", label: "Abrir" }]}
+              trigger={<MoreVertIcon fontSize="small" />}
+            />
+          }
+        >
+          <CartDetail />
+        </BaseListCard>
+      ))}
+    </ListCardGroup>
+  ),
+};
