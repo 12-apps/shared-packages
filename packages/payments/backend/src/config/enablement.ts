@@ -250,7 +250,9 @@ export function pendingVerificationMethods(
 }
 
 /**
- * The active environment's decrypted fields, for whichever question asked.
+ * One environment's decrypted fields, for whichever question asked — the
+ * ACTIVE environment unless the caller names another (the webhook pipeline
+ * verifying an in-flight delivery against the non-active one, FUT-678).
  *
  * `stub` is DECIDED here, not read: the column says what the row was written
  * with, and a row outlives the deployment that wrote it. A dev dump restored
@@ -261,8 +263,11 @@ export function pendingVerificationMethods(
  * (`allowStubMode`, from `resolveStubMode`) is required on every resolve, and
  * PRODUCTION credentials are excluded even when the answer is yes.
  */
-export function resolvedFrom(config: StoredProviderConfig, allowStubMode: boolean) {
-  const environment: PaymentEnvironment = config.environment;
+export function resolvedFrom(
+  config: StoredProviderConfig,
+  allowStubMode: boolean,
+  environment: PaymentEnvironment = config.environment,
+) {
   return {
     environment,
     fields: config.environments[environment],

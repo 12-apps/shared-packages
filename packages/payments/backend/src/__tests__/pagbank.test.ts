@@ -470,13 +470,85 @@ describe('pagbank adapter — webhooks', () => {
     ).resolves.toBe(false);
   });
 
-  it('fails closed in live mode when no webhook token is configured', async () => {
+  it('fails closed in live mode when no secret of any kind is configured', async () => {
     await expect(
       pagbankProvider().webhook.verify(
         { provider: 'pagbank', rawBody: body, headers: { 'x-authenticity-token': signature } },
         { environment: 'PRODUCTION', fields: {} },
       ),
     ).resolves.toBe(false);
+  });
+
+  /**
+   * FUT-678 — the signing secret under Connect. PagBank documents the
+   * signature as SHA-256 of `{account token}-{payload}`, so the API token is
+   * the DEFAULT secret; `webhookToken` is only the platform's explicit
+   * override. Requiring `webhookToken` alone rejected every delivery of every
+   * OAuth-connected store BEFORE the durable inbox whenever the env-var copy
+   * was absent.
+   */
+  describe('the signing secret under Connect (FUT-678)', () => {
+    it('accepts a delivery signed with the account token when no webhook token is set', async () => {
+      const accountToken = 'acct_tok';
+      const signed = createHash('sha256').update(`${accountToken}-${body}`).digest('hex');
+      await expect(
+        pagbankProvider().webhook.verify(
+          { provider: 'pagbank', rawBody: body, headers: { 'x-authenticity-token': signed } },
+          { environment: 'PRODUCTION', fields: { token: accountToken } },
+        ),
+      ).resolves.toBe(true);
+    });
+
+    it('keeps an explicitly configured webhook token authoritative', async () => {
+      const creds = {
+        environment: 'PRODUCTION' as const,
+        fields: { token: 'acct_tok', webhookToken: 'dedicated' },
+      };
+      const signedWithDedicated = createHash('sha256').update(`dedicated-${body}`).digest('hex');
+      const signedWithAccount = createHash('sha256').update(`acct_tok-${body}`).digest('hex');
+
+      await expect(
+        pagbankProvider().webhook.verify(
+          {
+            provider: 'pagbank',
+            rawBody: body,
+            headers: { 'x-authenticity-token': signedWithDedicated },
+          },
+          creds,
+        ),
+      ).resolves.toBe(true);
+      // The override REPLACES the default rather than widening it: two live
+      // secrets at once is a bigger surface than the configuration asked for.
+      await expect(
+        pagbankProvider().webhook.verify(
+          {
+            provider: 'pagbank',
+            rawBody: body,
+            headers: { 'x-authenticity-token': signedWithAccount },
+          },
+          creds,
+        ),
+      ).resolves.toBe(false);
+    });
+
+    it('verifies a legacy form-encoded notification body the same way', async () => {
+      // The FUT-477 post-transaction shape rides the same URL and the same
+      // `x-authenticity-token` scheme; this pins that the verify layer does
+      // not reopen the redelivery loop one step above the parse fix.
+      const legacyBody =
+        'notificationCode=093C100E7FA87FA8C0B664B79F8359773B96&notificationType=transaction';
+      const signed = createHash('sha256').update(`acct_tok-${legacyBody}`).digest('hex');
+      await expect(
+        pagbankProvider().webhook.verify(
+          {
+            provider: 'pagbank',
+            rawBody: legacyBody,
+            headers: { 'x-authenticity-token': signed },
+          },
+          { environment: 'PRODUCTION', fields: { token: 'acct_tok' } },
+        ),
+      ).resolves.toBe(true);
+    });
   });
 
   it('parses the order payload into a PAID charge event', async () => {

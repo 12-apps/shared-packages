@@ -383,5 +383,18 @@ export function credentialStoreFrom(
       const config = await store.get(merchant, provider);
       return config ? resolvedFrom(config, allowStubMode) : null;
     },
+    async listListeningCredentials(merchant, provider) {
+      const config = await store.get(merchant, provider);
+      if (!config) return [];
+      // Active environment first (the port's ordering contract), then the
+      // other when it holds anything — flipped-away deliveries, FUT-678.
+      const other: PaymentEnvironment =
+        config.environment === 'PRODUCTION' ? 'SANDBOX' : 'PRODUCTION';
+      const sets = [resolvedFrom(config, allowStubMode)];
+      if (Object.values(config.environments[other] ?? {}).some((value) => value)) {
+        sets.push(resolvedFrom(config, allowStubMode, other));
+      }
+      return sets;
+    },
   };
 }
