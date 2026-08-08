@@ -7,7 +7,7 @@ import { AlertDialog } from './AlertDialog';
 import type { AlertDialogProps } from './AlertDialog.types';
 
 const meta: Meta<typeof AlertDialog> = {
-  title: 'Feedback/AlertDialog/Tests',
+  title: 'Overlays/AlertDialog/Tests',
   component: AlertDialog,
   parameters: {
     layout: 'centered',

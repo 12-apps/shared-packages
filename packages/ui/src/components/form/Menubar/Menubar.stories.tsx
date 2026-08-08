@@ -9,7 +9,7 @@ import { Menubar } from './Menubar';
 import type { MenubarItem } from './Menubar.types';
 
 const meta: Meta<typeof Menubar> = {
-  title: 'Form/Menubar',
+  title: 'Navigation/Menubar',
   component: Menubar,
   parameters: {
     layout: 'fullscreen',

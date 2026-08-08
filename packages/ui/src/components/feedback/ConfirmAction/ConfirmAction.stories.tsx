@@ -8,7 +8,7 @@ import { ConfirmButton } from './ConfirmButton';
 import { withConfirmation } from './with-confirmation';
 
 const meta: Meta<typeof ConfirmAction> = {
-  title: 'Feedback/ConfirmAction',
+  title: 'Overlays/ConfirmAction',
   component: ConfirmAction,
   parameters: {
     layout: 'centered',

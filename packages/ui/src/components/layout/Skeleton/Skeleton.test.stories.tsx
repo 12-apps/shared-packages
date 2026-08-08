@@ -5,7 +5,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { Skeleton } from './Skeleton';
 
 const meta: Meta<typeof Skeleton> = {
-  title: 'Layout/Skeleton/Tests',
+  title: 'Feedback/Skeleton/Tests',
   component: Skeleton,
   parameters: {
     layout: 'padded',

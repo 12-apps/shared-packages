@@ -11,7 +11,7 @@ import { Menubar } from './Menubar';
 import type { MenubarItem } from './Menubar.types';
 
 const meta: Meta<typeof Menubar> = {
-  title: 'Form/Menubar/Tests',
+  title: 'Navigation/Menubar/Tests',
   component: Menubar,
   parameters: {
     layout: 'fullscreen',
