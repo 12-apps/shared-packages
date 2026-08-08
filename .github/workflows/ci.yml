@@ -81,15 +81,21 @@ jobs:
       pull-requests: read
     uses: 12-apps/ci/.github/workflows/detect-changes.yml@e9cf0dbee4cfb864c6fdfc6ee876a79fdf6959e2
     with:
-      # Deliberately COARSE, and the two categories are nearly the same set. That
-      # is the honest shape for this repo, not laziness — see the PR description.
-      # Per-package globs would be wrong here: packages import each other, the
-      # portability gate lints files OUTSIDE packages/payments/** by design, and
-      # the harness/consumer lanes pack EVERY package into tarballs. A filter
-      # narrow enough to skip "unrelated" packages would silently skip real
-      # coverage, which costs far more than the minute it saves. The dependency
-      # graph — not a path glob — is the right tool for that job, and turbo
-      # already has it (`turbo run … --affected`); that is a separate change.
+      # Deliberately COARSE, because these two categories answer only the CHEAP
+      # question: "can this diff reach anything CI builds at all?" That is what a
+      # path glob is good for, and a docs-only PR is what it makes free.
+      #
+      # It is NOT the tool for "which packages does this diff affect?" — these
+      # packages import each other, so a per-package glob would have to encode
+      # the dependency graph by hand and would silently skip real coverage the
+      # first time someone forgot to widen one. That question is now answered by
+      # turbo itself, from the manifests, in the lint/type-check/build/unit-test
+      # jobs below (`turbo run … --affected`). Globs bound WHETHER the pipeline
+      # runs; the graph bounds WHICH packages it runs for.
+      #
+      # The lanes that stay whole-workspace are the ones that genuinely are:
+      # portability lints files OUTSIDE packages/payments/** by design, and the
+      # harness/consumer lanes pack EVERY package into tarballs.
       path-filters: |
         # Anything that can affect a build, a type, a lint or a test.
         # Everything NOT matched here is documentation, and documentation-only
@@ -127,6 +133,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: turbo --affected diffs against the base ref.
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           run_install: false
@@ -139,11 +148,25 @@ jobs:
         run: |
           set -o pipefail
           pnpm install --frozen-lockfile 2>&1 | tee install.log
+      # turbo selects by the real dependency GRAPH, which is the thing a path
+      # glob cannot do: a change in packages/ui reaches payments-frontend because
+      # the manifest says so, not because someone remembered to widen a filter.
+      - name: Fetch the base branch for turbo --affected
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
       - name: Lint
         shell: bash
         run: |
           set -o pipefail
-          pnpm lint 2>&1 | tee lint.log
+          # PR: only the packages this diff can reach, per the turbo graph.
+          # push: the whole workspace — the post-merge safety net that makes
+          # PR-time selection safe to trust in the first place.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            pnpm turbo run lint --affected 2>&1 | tee lint.log
+          else
+            pnpm turbo run lint 2>&1 | tee lint.log
+          fi
 
   type-check:
     name: Type Check
@@ -152,6 +175,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: turbo --affected diffs against the base ref.
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           run_install: false
@@ -164,11 +190,25 @@ jobs:
         run: |
           set -o pipefail
           pnpm install --frozen-lockfile 2>&1 | tee install.log
+      # turbo selects by the real dependency GRAPH, which is the thing a path
+      # glob cannot do: a change in packages/ui reaches payments-frontend because
+      # the manifest says so, not because someone remembered to widen a filter.
+      - name: Fetch the base branch for turbo --affected
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
       - name: Type check
         shell: bash
         run: |
           set -o pipefail
-          pnpm check-types 2>&1 | tee typecheck.log
+          # PR: only the packages this diff can reach, per the turbo graph.
+          # push: the whole workspace — the post-merge safety net that makes
+          # PR-time selection safe to trust in the first place.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            pnpm turbo run check-types --affected 2>&1 | tee typecheck.log
+          else
+            pnpm turbo run check-types 2>&1 | tee typecheck.log
+          fi
 
   build:
     name: Build
@@ -177,6 +217,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: turbo --affected diffs against the base ref.
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           run_install: false
@@ -189,11 +232,25 @@ jobs:
         run: |
           set -o pipefail
           pnpm install --frozen-lockfile 2>&1 | tee install.log
+      # turbo selects by the real dependency GRAPH, which is the thing a path
+      # glob cannot do: a change in packages/ui reaches payments-frontend because
+      # the manifest says so, not because someone remembered to widen a filter.
+      - name: Fetch the base branch for turbo --affected
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
       - name: Build
         shell: bash
         run: |
           set -o pipefail
-          pnpm build 2>&1 | tee build.log
+          # PR: only the packages this diff can reach, per the turbo graph.
+          # push: the whole workspace — the post-merge safety net that makes
+          # PR-time selection safe to trust in the first place.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            pnpm turbo run build --affected 2>&1 | tee build.log
+          else
+            pnpm turbo run build 2>&1 | tee build.log
+          fi
 
   unit-tests:
     name: Unit Tests
@@ -202,6 +259,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: turbo --affected diffs against the base ref.
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           run_install: false
@@ -214,11 +274,25 @@ jobs:
         run: |
           set -o pipefail
           pnpm install --frozen-lockfile 2>&1 | tee install.log
+      # turbo selects by the real dependency GRAPH, which is the thing a path
+      # glob cannot do: a change in packages/ui reaches payments-frontend because
+      # the manifest says so, not because someone remembered to widen a filter.
+      - name: Fetch the base branch for turbo --affected
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
       - name: Run unit tests
         shell: bash
         run: |
           set -o pipefail
-          pnpm test 2>&1 | tee unit.log
+          # PR: only the packages this diff can reach, per the turbo graph.
+          # push: the whole workspace — the post-merge safety net that makes
+          # PR-time selection safe to trust in the first place.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            pnpm turbo run test --affected 2>&1 | tee unit.log
+          else
+            pnpm turbo run test 2>&1 | tee unit.log
+          fi
 
   # Static-quality gate via the org's reusable workflow (12-apps/ci): complexity,
   # flakiness, duplication, flaky quarantine, knip (shrink-only ratchet), and the
