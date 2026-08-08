@@ -921,6 +921,73 @@ describe('pagbank connect oauth', () => {
 });
 
 /**
+ * FUT-680 — the PagBank refund must read the response, not narrate one. It
+ * used to POST `{"amount":{}}` (partialRefunds is false, so `value` was always
+ * undefined) and answer a hardcoded REFUNDED with a fabricated 0-cent amount,
+ * whatever PagBank said. Mirrors the Stripe test below.
+ */
+describe('pagbank refund honesty', () => {
+  const creds: ResolvedCredentials = {
+    environment: 'PRODUCTION',
+    fields: { token: 'tok_live' },
+  };
+
+  it('reports a failed PagBank refund as FAILED, not REFUNDED', async () => {
+    for (const [status, expected] of [
+      ['CANCELED', 'REFUNDED'],
+      // The cancel endpoint answers with the charge as it now stands; a
+      // charge still PAID is the provider saying the cancel did not take.
+      ['PAID', 'FAILED'],
+      ['AUTHORIZED', 'FAILED'],
+      ['DECLINED', 'FAILED'],
+      ['IN_ANALYSIS', 'FAILED'],
+      // An unknown status must never be optimistically called complete.
+      ['SOMETHING_NEW', 'PENDING'],
+      [undefined, 'PENDING'],
+    ] as const) {
+      stubFetch([{ body: { id: 'CHAR_1', status, amount: { value: 500 } } }]);
+      const snapshot = await pagbankProvider().refund!({ providerChargeId: 'CHAR_1' }, creds);
+      expect(snapshot.status, `pagbank cancel status "${status}"`).toBe(expected);
+    }
+  });
+
+  it('sends NO body for a full refund — never the {"amount":{}} shape', async () => {
+    const calls = stubFetch([{ body: { id: 'CHAR_2', status: 'CANCELED' } }]);
+    await pagbankProvider().refund!({ providerChargeId: 'CHAR_2' }, creds);
+
+    expect(calls[0]!.url).toBe('https://api.pagseguro.com/charges/CHAR_2/cancel');
+    expect(calls[0]!.init.method).toBe('POST');
+    // PagBank documents an omitted `amount` as "cancel the total"; an empty
+    // amount object asserts nothing and is the wire bug FUT-680 names.
+    expect(calls[0]!.init.body).toBeUndefined();
+  });
+
+  it('still sends the explicit amount when the caller has one', async () => {
+    const calls = stubFetch([{ body: { id: 'CHAR_3', status: 'CANCELED' } }]);
+    await pagbankProvider().refund!(
+      { providerChargeId: 'CHAR_3', amount: { amountCents: 500, currency: 'BRL' } },
+      creds,
+    );
+    expect(jsonOf(calls[0]!.init)).toEqual({ amount: { value: 500 } });
+  });
+
+  it('reports the amount PagBank says went back, not a fabricated zero', async () => {
+    stubFetch([
+      {
+        body: {
+          id: 'CHAR_4',
+          status: 'CANCELED',
+          amount: { value: 12_50, summary: { refunded: 12_50 } },
+        },
+      },
+    ]);
+    const snapshot = await pagbankProvider().refund!({ providerChargeId: 'CHAR_4' }, creds);
+    expect(snapshot.amount).toEqual({ amountCents: 12_50, currency: 'BRL' });
+    expect(snapshot.providerRefundId).toBe('CHAR_4');
+  });
+});
+
+/**
  * Regressions for the four defects the FUT-305 review caught. Each one was
  * silently wrong rather than loud — the class of bug that reconciles badly
  * weeks later — so each keeps a test.

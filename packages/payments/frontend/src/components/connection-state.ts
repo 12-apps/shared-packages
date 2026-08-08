@@ -46,6 +46,37 @@ export function canAttemptCharge(config: MaskedProviderConfig | null | undefined
   return false;
 }
 
+/**
+ * How close `expiresAt` is to becoming an outage, in buckets the UI can
+ * style (FUT-683).
+ *
+ * The host's renewal sweep normally refreshes a grant long before this ever
+ * says `NEAR` — so `NEAR` is not "working as intended", it is the sweep having
+ * failed quietly for days, and the caption is the only place an owner can see
+ * it coming before checkout starts refusing. `PAST` means the grant is already
+ * dead even if the status has not caught up yet.
+ */
+type ExpiryProximity = 'SAFE' | 'NEAR' | 'PAST';
+
+/**
+ * A week: several sweep cycles' worth of margin, so a single missed run never
+ * alarms anyone, while a renewal that keeps failing surfaces well before the
+ * grant actually lapses.
+ */
+const EXPIRY_WARNING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Where `expiresAt` stands relative to `now`; null when it cannot expire. */
+export function expiryProximity(
+  expiresAt: string | null | undefined,
+  now: Date = new Date(),
+): ExpiryProximity | null {
+  if (!expiresAt) return null;
+  const at = new Date(expiresAt).getTime();
+  if (Number.isNaN(at)) return null;
+  if (at <= now.getTime()) return 'PAST';
+  return at - now.getTime() <= EXPIRY_WARNING_WINDOW_MS ? 'NEAR' : 'SAFE';
+}
+
 /** What a provider card reports at a glance. */
 type ConnectionBadge =
   | { label: 'Ativo'; color: 'success' }

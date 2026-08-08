@@ -1,6 +1,6 @@
 import type { PaymentProviderAdapter } from '../core/provider';
 import { stubDeliveryTrusted } from '../core/stub-mode';
-import type { ChargeInput, ResolvedCredentials } from '../core/types';
+import type { ChargeInput, NormalizedWebhookEvent, ResolvedCredentials } from '../core/types';
 import {
   customerPayload,
   customerSchema,
@@ -9,18 +9,20 @@ import {
   pagbankRequest,
 } from './pagbank-http';
 import { pagbankOAuth } from './pagbank-oauth';
+import { findChargeByReference, getCharge, refund } from './pagbank-operations';
 import { verifyPagbankCredentials } from './pagbank-probe';
 import {
   mapCard,
   mapPix,
   orderSnapshot,
+  refundedCents,
   settledCharge,
   type PagBankCardResponse,
   type PagBankOrderResponse,
   type PagBankPixResponse,
 } from './pagbank-snapshots';
 import { postTransactionEvents } from './pagbank-webhook';
-import { secureEquals, sha256Hex, stubCharge, stubPendingSnapshot, stubRefund } from './shared';
+import { secureEquals, sha256Hex, stubCharge } from './shared';
 
 /**
  * PagBank (PagSeguro) Orders API adapter — a port of the integration this
@@ -93,30 +95,6 @@ function cardPayload(input: ChargeInput, credentials: ResolvedCredentials) {
   };
 }
 
-/**
- * Reconciliation probe. PagBank indexes orders by the `reference_id` we set
- * at creation, so an order created moments before a timeout is findable
- * immediately — this reads the orders collection directly, with no search
- * index in between and therefore no staleness window.
- *
- * Errors deliberately propagate: the walk must be able to tell "PagBank says
- * there is no such order" from "PagBank did not answer", and only the former
- * is proof that it is safe to charge somewhere else.
- */
-const findChargeByReference: NonNullable<
-  PaymentProviderAdapter['findChargeByReference']
-> = async (reference, credentials) => {
-  if (credentials.stub) return null;
-  const res = await pagbankRequest<{ orders?: Array<PagBankOrderResponse & { id?: string }> }>(
-    `/orders?reference_id=${encodeURIComponent(reference)}`,
-    credentials,
-    { method: 'GET' },
-  );
-  const order = res.orders?.[0];
-  if (!order?.id) return null;
-  return orderSnapshot(order, order.id);
-};
-
 const createCharge: PaymentProviderAdapter['createCharge'] = async (input, credentials) => {
   if (credentials.stub) return stubCharge(NAME, input, credentials);
   // The provider-side idempotency key: a retried create is deduped by PagBank
@@ -173,15 +151,35 @@ const webhook: PaymentProviderAdapter['webhook'] = {
     if (!providerChargeId) {
       return [{ provider: NAME, eventId, type: 'UNKNOWN', raw: body }];
     }
-    return [
-      {
-        provider: NAME,
-        eventId,
-        type: 'CHARGE_UPDATED',
-        charge: orderSnapshot(body, providerChargeId),
-        raw: body,
-      },
+    const charge = orderSnapshot(body, providerChargeId);
+    const events: NormalizedWebhookEvent[] = [
+      { provider: NAME, eventId, type: 'CHARGE_UPDATED', charge, raw: body },
     ];
+    // A canceled charge whose summary shows money RETURNED is a refund, and
+    // the host must be able to see it as one (FUT-681 — "estornos são
+    // invisíveis ao host"). The charge event above already moves the row to
+    // REFUNDED; this names the refund itself, the way Stone and Stripe do.
+    // Its own event id, because the inbox dedups per event.
+    const refunded = refundedCents(paid);
+    if (refunded > 0) {
+      events.push({
+        provider: NAME,
+        eventId: `${eventId}:refund`,
+        type: 'REFUND_UPDATED',
+        refund: {
+          provider: NAME,
+          providerChargeId,
+          // PagBank's order body names no separate refund object; the charge
+          // id is the only stable handle the delivery carries.
+          providerRefundId: providerChargeId,
+          status: 'REFUNDED',
+          amount: { amountCents: refunded, currency: 'BRL' },
+          raw: body,
+        },
+        raw: body,
+      });
+    }
+    return events;
   },
 };
 
@@ -230,34 +228,11 @@ export function pagbankProvider(): PaymentProviderAdapter {
     createCharge,
     oauth: pagbankOAuth,
 
-    async getCharge(providerChargeId, credentials) {
-      if (credentials.stub) return stubPendingSnapshot(NAME, providerChargeId);
-      const res = await pagbankRequest<PagBankOrderResponse>(
-        `/orders/${encodeURIComponent(providerChargeId)}`,
-        credentials,
-        { method: 'GET' },
-      );
-      return orderSnapshot(res, providerChargeId);
-    },
-
+    // The read/refund operations live in `pagbank-operations.ts`, which is
+    // where the FUT-681 identity rule (charge id vs order id) is enforced.
+    getCharge,
     findChargeByReference,
-
-    async refund(input, credentials) {
-      if (credentials.stub) return stubRefund(NAME, input);
-      const res = await pagbankRequest<{ id?: string }>(
-        `/charges/${encodeURIComponent(input.providerChargeId)}/cancel`,
-        credentials,
-        { method: 'POST', body: { amount: { value: input.amount?.amountCents } } },
-      );
-      return {
-        provider: NAME,
-        providerChargeId: input.providerChargeId,
-        providerRefundId: res.id ?? input.providerChargeId,
-        status: 'REFUNDED',
-        amount: input.amount ?? { amountCents: 0, currency: 'BRL' },
-        raw: res,
-      };
-    },
+    refund,
 
     webhook,
 

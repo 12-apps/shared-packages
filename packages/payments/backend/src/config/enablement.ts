@@ -259,6 +259,27 @@ export function pendingVerificationMethods(
 }
 
 /**
+ * Whether the chain may ROUTE to this row (FUT-683).
+ *
+ * `enabled` alone is not the answer: a `RECONNECT_REQUIRED` row still reads
+ * `enabled: true` — the owner never switched it off, the GRANT died — and
+ * routing to it sends every checkout to a token the provider has already
+ * refused. A 401 is `DEFINITELY_NOT_CHARGED`, so a store with a second
+ * provider limped along on failover; a store whose ONLY provider lost its
+ * grant simply failed every checkout.
+ *
+ * So the dead row sits the chain out: a healthy second provider becomes
+ * `chain[0]`, and an only-provider store collapses to the empty chain the
+ * storefront already knows how to say ("payments unavailable") instead of a
+ * generic charge error. `enabled` is deliberately left standing — reconnecting
+ * (`complete` → `VERIFIED`) restores the provider to the chain with no manual
+ * re-activation, exactly because nothing here ever switched it off.
+ */
+export function inRotation(config: StoredProviderConfig): boolean {
+  return config.enabled && config.status !== 'RECONNECT_REQUIRED';
+}
+
+/**
  * The active environment's decrypted fields, for whichever question asked.
  *
  * `stub` is DECIDED here, not read: the column says what the row was written

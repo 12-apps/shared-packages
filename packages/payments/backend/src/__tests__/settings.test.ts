@@ -223,6 +223,93 @@ describe('createOAuthConnectService', () => {
   });
 });
 
+/**
+ * A dead grant must not receive checkouts (FUT-683).
+ *
+ * `RECONNECT_REQUIRED` used to change nothing but the settings badge: the row
+ * stayed `enabled`, the chain filtered on `enabled` alone, and checkout kept
+ * routing to a token the provider had already refused. These are the ticket's
+ * scenarios, kept in Given/When/Then form.
+ */
+describe('RECONNECT_REQUIRED routing (FUT-683)', () => {
+  /** Connect oauthy, put it (and optionally backup) in the chain. */
+  async function connectedWorld(overrides: Parameters<typeof setupOAuthWorld>[0] = {}) {
+    const world = setupOAuthWorld(overrides);
+    await world.oauth.complete(TENANT, 'oauthy', {
+      code: 'abc',
+      redirectUri: 'https://host.test/cb',
+    });
+    await world.settings.setEnabled(TENANT, 'oauthy', true);
+    return { ...world, credentials: credentialStoreFrom(world.store) };
+  }
+
+  it('given a healthy second provider, when the refresh is refused, then the chain routes to it', async () => {
+    const world = await connectedWorld({ failRefresh: true, withBackup: true });
+    await world.settings.setEnabled(TENANT, 'backup', true);
+    expect(await world.credentials.providerChain(TENANT)).toEqual(['oauthy', 'backup']);
+
+    await world.oauth.refresh(TENANT, 'oauthy');
+
+    // The dead grant drops out and the healthy provider becomes chain[0] —
+    // new checkouts go straight to it rather than failing over off a 401.
+    expect(await world.credentials.providerChain(TENANT)).toEqual(['backup']);
+    expect(await world.credentials.defaultProvider(TENANT)).toBe('backup');
+    // The settings view publishes the SAME chain — the screen may never claim
+    // an active provider that checkout will not walk.
+    const view = await world.settings.getSettings(TENANT);
+    expect(view.providerChain).toEqual(['backup']);
+    expect(view.activeProvider).toBe('backup');
+    // And nothing switched the row off: the owner's enablement stands, the
+    // GRANT is what died.
+    expect(view.configs.find((c) => c.provider === 'oauthy')?.enabled).toBe(true);
+  });
+
+  it('given a store whose only provider lost its grant, then the chain is empty — the NO_PROVIDER path', async () => {
+    const world = await connectedWorld({ failRefresh: true });
+    await world.oauth.refresh(TENANT, 'oauthy');
+
+    // An empty chain is the state the storefront already words honestly
+    // ("payments unavailable") instead of a generic charge error.
+    expect(await world.credentials.providerChain(TENANT)).toEqual([]);
+    expect(await world.credentials.defaultProvider(TENANT)).toBeNull();
+    expect((await world.settings.getSettings(TENANT)).activeProvider).toBeNull();
+  });
+
+  it('refuses to resolve CHARGING credentials for a dead grant, but keeps LISTENING open', async () => {
+    const world = await connectedWorld({ failRefresh: true });
+    await world.oauth.refresh(TENANT, 'oauthy');
+
+    // A direct charge (explicit provider, no chain consulted) must not spend
+    // a request on a token the provider already refused.
+    await expect(world.credentials.getCredentials(TENANT, 'oauthy')).rejects.toThrow(
+      /requires reauthorization/,
+    );
+    // Listening is not routing: a webhook about money that ALREADY moved must
+    // still authenticate, or paid orders stop confirming exactly when the
+    // owner is distracted by reconnecting.
+    await expect(
+      world.credentials.getConnectedCredentials?.(TENANT, 'oauthy'),
+    ).resolves.toMatchObject({ environment: 'PRODUCTION' });
+  });
+
+  it('when the owner reconnects via OAuth, then the provider returns to the chain with no manual re-activation', async () => {
+    const world = await connectedWorld({ failRefresh: true });
+    await world.oauth.refresh(TENANT, 'oauthy');
+    expect(await world.credentials.providerChain(TENANT)).toEqual([]);
+
+    // Reauthorize — the same `complete` a first connect runs.
+    await world.oauth.complete(TENANT, 'oauthy', {
+      code: 'again',
+      redirectUri: 'https://host.test/cb',
+    });
+
+    // VERIFIED again, and straight back into rotation: `enabled` was never
+    // touched, so no one has to find a switch to flip.
+    expect(await world.credentials.providerChain(TENANT)).toEqual(['oauthy']);
+    expect(await world.credentials.defaultProvider(TENANT)).toBe('oauthy');
+  });
+});
+
 describe('createSettingsService', () => {
   it('never lets a request body turn on stub mode, and never stubs PRODUCTION', async () => {
     const { settings, store } = setup();

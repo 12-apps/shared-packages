@@ -112,8 +112,13 @@ export async function refundCent(
 ): Promise<boolean> {
   if (!adapter.refund) return false;
   try {
-    await adapter.refund({ providerChargeId, reason: 'verification' }, credentials);
-    return true;
+    const refund = await adapter.refund({ providerChargeId, reason: 'verification' }, credentials);
+    // Read off the SNAPSHOT, not off "the call did not throw" (FUT-680): an
+    // adapter that answers honestly can resolve with FAILED, and reporting
+    // that as a completed refund tells the owner a cent came back when it did
+    // not. PENDING counts as not-yet-refunded for the same reason — this flag
+    // is shown to a human as a done deal or a cent to reconcile.
+    return refund.status === 'REFUNDED';
   } catch {
     return false;
   }

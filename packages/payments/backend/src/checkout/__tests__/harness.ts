@@ -40,7 +40,7 @@ import type {
  * rather than a cosmetic one.
  */
 
-const MERCHANT: MerchantRef = { kind: 'TENANT', id: 'merchant-1' };
+export const MERCHANT: MerchantRef = { kind: 'TENANT', id: 'merchant-1' };
 export const BRL = (amountCents: number): Money => ({ amountCents, currency: 'BRL' });
 
 /** A caller. Opaque to the library — it only ever travels back into the ports. */

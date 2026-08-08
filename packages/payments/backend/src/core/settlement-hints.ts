@@ -21,4 +21,18 @@ export interface SettlementHints {
   slug?: string;
   /** Provider-side transaction id, learned only once the payment happened. */
   transactionNsu?: string;
+  /**
+   * Provider-side ORDER (container) id the charge lives under, when the
+   * provider keys its read API by order rather than by charge (FUT-681).
+   *
+   * PagBank is the case: an unpaid PIX order carries NO charge at all — the
+   * charge is minted only when the buyer pays — so at creation the order id is
+   * the only identity in existence, and `GET /orders/{id}` stays the one poll
+   * that answers for both paid and unpaid states. Carrying it here (instead of
+   * smuggling it through `providerChargeId`) is what lets `providerChargeId`
+   * become the real charge id the moment one exists, and what lets the charge
+   * store re-key a row recorded under the order id when the paid webhook
+   * finally names the charge.
+   */
+  orderId?: string;
 }
