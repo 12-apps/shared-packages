@@ -1,9 +1,10 @@
 import { ProviderRequestError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
-import type { ResolvedCredentials } from '../core/types';
+import type { RefundSnapshot, ResolvedCredentials } from '../core/types';
 import { NAME, pagbankRequest } from './pagbank-http';
 import {
   orderSnapshot,
+  refundedCents,
   settledCharge,
   type PagBankOrderCharge,
   type PagBankOrderResponse,
@@ -126,23 +127,70 @@ async function refundableChargeId(
   return charge.id;
 }
 
+/**
+ * PagBank cancel response → normalized refund status (FUT-680).
+ *
+ * The cancel endpoint answers with the CHARGE as it now stands, so `CANCELED`
+ * is the only status that says the money went (or is going) back. A charge
+ * that comes back still `PAID` (or in any other live state) is the provider
+ * saying the cancel did NOT take — a terminal "no", never a success. An
+ * unrecognized or missing status is PENDING: a refund this code does not
+ * understand is one it must not declare complete. Mirrors the Stripe
+ * `refundStatusOf` contract ("reports a failed refund as FAILED, not
+ * REFUNDED").
+ */
+function refundStatusOf(status: unknown): RefundSnapshot['status'] {
+  switch (status) {
+    case 'CANCELED':
+      return 'REFUNDED';
+    case 'PAID':
+    case 'AUTHORIZED':
+    case 'IN_ANALYSIS':
+    case 'DECLINED':
+      return 'FAILED';
+    default:
+      return 'PENDING';
+  }
+}
+
+/** What the cancel response says actually went back, in cents. */
+function reportedRefundCents(res: PagBankOrderCharge): number {
+  const refunded = refundedCents(res);
+  if (refunded > 0) return refunded;
+  const value = res.amount?.value;
+  return typeof value === 'number' ? value : 0;
+}
+
 export const refund: NonNullable<PaymentProviderAdapter['refund']> = async (
   input,
   credentials,
 ) => {
   if (credentials.stub) return stubRefund(NAME, input);
   const chargeId = await refundableChargeId(input.providerChargeId, credentials);
-  const res = await pagbankRequest<{ id?: string }>(
+  // NO body for a full refund: PagBank documents an omitted `amount` as
+  // "cancel the total". The old body was `{"amount":{}}` — `partialRefunds` is
+  // false, so the gateway never passes an amount and `value` was always
+  // undefined — an accidental shape asserting nothing. An explicit amount
+  // still travels for the caller that has one (partial, capability-gated).
+  const res = await pagbankRequest<PagBankOrderCharge & { id?: string }>(
     `/charges/${encodeURIComponent(chargeId)}/cancel`,
     credentials,
-    { method: 'POST', body: { amount: { value: input.amount?.amountCents } } },
+    {
+      method: 'POST',
+      ...(input.amount ? { body: { amount: { value: input.amount.amountCents } } } : {}),
+    },
   );
   return {
     provider: NAME,
     providerChargeId: input.providerChargeId,
-    providerRefundId: res.id ?? chargeId,
-    status: 'REFUNDED',
-    amount: input.amount ?? { amountCents: 0, currency: 'BRL' },
+    providerRefundId: typeof res.id === 'string' ? res.id : chargeId,
+    // The response decides — a hardcoded REFUNDED here is the bug FUT-680
+    // names: the same file whose `capturedAmountCents` refuses to fabricate
+    // amounts was fabricating refund outcomes.
+    status: refundStatusOf(res.status),
+    // Prefer what the provider reports as returned; the requested amount only
+    // stands in when the response names none.
+    amount: input.amount ?? { amountCents: reportedRefundCents(res), currency: 'BRL' },
     raw: res,
   };
 };

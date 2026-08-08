@@ -63,7 +63,9 @@ describe('activation branch, from capabilities alone', () => {
       config: connectedConfig({ provider: 'cardpay' }),
     });
     h.createCharge.mockResolvedValue({ status: 'PAID', providerChargeId: 'CH_1' });
-    h.refund.mockResolvedValue({});
+    // A real snapshot: `refunded` is read off its status (FUT-680), so a bare
+    // resolve no longer counts as "the cent came back".
+    h.refund.mockResolvedValue({ status: 'REFUNDED' });
 
     const result = await verifyProviderCharge(ctx, ACME, 'cardpay', {
       token: 'tok',

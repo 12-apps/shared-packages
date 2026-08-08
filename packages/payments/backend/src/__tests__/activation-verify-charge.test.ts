@@ -47,7 +47,9 @@ describe('verifyProviderCharge', () => {
 
   it("charges one cent through the merchant's own credentials and refunds it", async () => {
     h.createCharge.mockResolvedValue({ status: 'PAID', providerChargeId: 'CHAR_1' } as ChargeSnapshot);
-    h.refund.mockResolvedValue({});
+    // A real snapshot, because the flag is read off it (FUT-680): resolving
+    // alone no longer counts as "the cent came back".
+    h.refund.mockResolvedValue({ status: 'REFUNDED' });
 
     const result = await verifyProviderCharge(cardContext(), ACME, 'pagbank', CARD);
 
@@ -150,6 +152,28 @@ describe('verifyProviderCharge', () => {
 
     // The store demonstrably charges — which is what was being proven — so a
     // stuck cent must not block activation, only be reported.
+    expect(await verifyProviderCharge(cardContext(), ACME, 'pagbank', CARD)).toEqual({
+      ok: true,
+      refunded: false,
+    });
+  });
+
+  it('Given the activation-cent refund FAILED, the owner is told the cent was kept and activation still concludes', async () => {
+    h.createCharge.mockResolvedValue({ status: 'PAID', providerChargeId: 'C' } as ChargeSnapshot);
+    // The honest adapter path (FUT-680): the provider ANSWERED, and the answer
+    // was no. Resolving must not read as "refunded" — only the snapshot may.
+    h.refund.mockResolvedValue({ status: 'FAILED' });
+
+    expect(await verifyProviderCharge(cardContext(), ACME, 'pagbank', CARD)).toEqual({
+      ok: true,
+      refunded: false,
+    });
+  });
+
+  it('reports a refund still PENDING as not-yet-returned, not as done', async () => {
+    h.createCharge.mockResolvedValue({ status: 'PAID', providerChargeId: 'C' } as ChargeSnapshot);
+    h.refund.mockResolvedValue({ status: 'PENDING' });
+
     expect(await verifyProviderCharge(cardContext(), ACME, 'pagbank', CARD)).toEqual({
       ok: true,
       refunded: false,
