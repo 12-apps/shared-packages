@@ -193,6 +193,24 @@ export interface ExpiringConnection {
   expiresAt: Date;
 }
 
+/**
+ * Client-safe identity of the account an OAuth connection was granted for —
+ * what lets the settings page answer "connected as WHOM", not merely
+ * "configured" (FUT-300). Never a credential: these are the identity facts the
+ * provider reported beside the tokens at exchange time, copied out of the
+ * stored fields by the masking path (see `config/connected-account.ts`).
+ */
+export interface ConnectedOAuthAccount {
+  /** Provider-side account id (e.g. PagBank's `ACCO_…`), or null if unreported. */
+  accountId: string | null;
+  /** Human-recognizable name/email, when the provider supplied one. */
+  accountLabel: string | null;
+  /** The scopes the owner granted, as the provider reported them. */
+  grantedScopes: readonly string[];
+  /** ISO timestamp of when the authorization completed; null for legacy rows. */
+  connectedAt: string | null;
+}
+
 /** Client-safe state of ONE credential field: never the secret itself. */
 export interface MaskedFieldState {
   configured: boolean;
@@ -222,6 +240,13 @@ export interface MaskedProviderConfig {
   stub: boolean;
   /** Masked hints for BOTH environments, so the form can switch without reload. */
   environments: Record<PaymentEnvironment, MaskedFields>;
+  /**
+   * WHO is connected, for an OAuth-mode provider that reported it — see
+   * {@link ConnectedOAuthAccount}. Null for credentials-mode providers, for
+   * rows that are not connected, and for grants made before the identity was
+   * recorded.
+   */
+  connectedAccount: ConnectedOAuthAccount | null;
 }
 
 /** Static description of a provider, for rendering its settings form. */

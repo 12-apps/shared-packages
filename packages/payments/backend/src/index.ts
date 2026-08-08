@@ -208,6 +208,7 @@ export {
   type RevokeFailureReporter,
 } from './config/oauth';
 export type {
+  ConnectedOAuthAccount,
   MaskedFieldState,
   MerchantFailoverPolicy,
   MaskedFields,

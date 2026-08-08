@@ -224,6 +224,70 @@ describe('createOAuthConnectService', () => {
 });
 
 /**
+ * A connected store must show WHICH account is connected (FUT-300).
+ *
+ * The exchange already stored the provider's answer (`accountId`, `scope`)
+ * beside the tokens, but the masking layer only echoed `credentialSchema`
+ * keys, so the settings page could say no more than "configured". The masked
+ * view now carries the identity — and nothing else out of the blob.
+ */
+describe('connected-account identity (FUT-300)', () => {
+  it('surfaces which account is connected — id, scopes, connected-at — in the masked view', async () => {
+    const { oauth, settings } = setupOAuthWorld();
+    await oauth.complete(TENANT, 'oauthy', { code: 'abc', redirectUri: 'https://host.test/cb' });
+
+    const view = await settings.getSettings(TENANT);
+    const config = view.configs.find((c) => c.provider === 'oauthy');
+    expect(config?.connectedAccount).toMatchObject({
+      accountId: 'acct_9',
+      grantedScopes: ['payments.read', 'payments.create'],
+    });
+    // Stamped by `complete` itself — the connect moment, whoever the vendor.
+    expect(config?.connectedAccount?.connectedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    // Identity, never a credential: the tokens stay behind the mask.
+    expect(JSON.stringify(view)).not.toContain('at_abc');
+    expect(JSON.stringify(view)).not.toContain('rt_1');
+  });
+
+  it('keeps the identity across a refresh whose response carries tokens only', async () => {
+    const { oauth, settings } = setupOAuthWorld();
+    await oauth.complete(TENANT, 'oauthy', { code: 'abc', redirectUri: 'https://host.test/cb' });
+    const before = (await settings.getSettings(TENANT)).configs[0]?.connectedAccount;
+
+    // The fake's refresh answers with tokens alone — no accountId, no scope —
+    // and a refresh renews the SAME grant, so nothing about WHO may change.
+    await oauth.refresh(TENANT, 'oauthy');
+
+    const after = (await settings.getSettings(TENANT)).configs[0]?.connectedAccount;
+    expect(after).toEqual(before);
+  });
+
+  it('reports no account for a credentials-mode provider, even one with look-alike fields', async () => {
+    const { settings } = setup();
+    // A pasted credential whose key HAPPENS to be named like an identity fact
+    // must stay sealed behind the mask — only the OAuth flow's own writes are
+    // ever read back as identity.
+    await settings.saveCredentials(TENANT, 'stone', {
+      environment: 'SANDBOX',
+      fields: { secretKey: 'sk_1' },
+    });
+    const view = await settings.getSettings(TENANT);
+    expect(view.configs.find((c) => c.provider === 'stone')?.connectedAccount).toBeNull();
+  });
+
+  it('a disconnect clears the identity with the tokens', async () => {
+    const { oauth, settings } = setupOAuthWorld();
+    await oauth.complete(TENANT, 'oauthy', { code: 'abc', redirectUri: 'https://host.test/cb' });
+    await oauth.disconnect(TENANT, 'oauthy');
+
+    // The row outlives the disconnect; an account summary must not — it would
+    // keep naming an account that is no longer authorized.
+    const view = await settings.getSettings(TENANT);
+    expect(view.configs.find((c) => c.provider === 'oauthy')?.connectedAccount).toBeNull();
+  });
+});
+
+/**
  * A dead grant must not receive checkouts (FUT-683).
  *
  * `RECONNECT_REQUIRED` used to change nothing but the settings badge: the row
