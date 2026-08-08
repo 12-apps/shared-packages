@@ -129,7 +129,7 @@ const ACTIONS = {
 };
 
 const meta: Meta<typeof BaseListCard> = {
-  title: "DataDisplay/DataViews/BaseListCard",
+  title: "DataDisplay/DataViews/Cards/BaseListCard",
   component: BaseListCard,
   parameters: { layout: "padded" },
   tags: ["autodocs"],
@@ -1036,48 +1036,3 @@ export const ConfiguredCells: Story = {
   ),
 };
 
-/**
- * DIVIDER COMPOSES WITH VARIANT — it changes the row's SHAPE, not its surface.
- *
- * It used to set `border: 0` and hard-code its own rule colour, so `outline`,
- * `text` and `ghost` all collapsed to one identical flush row: the variant
- * control silently stopped meaning anything the moment `divider` was on.
- *
- * Now only the geometry changes — the box's sides go, one edge stays — and the
- * colour still comes from the variant. Each pair below is the same variant
- * boxed and then flush; read down the right-hand column to see that the four
- * flush rows are no longer identical.
- *
- * `text` and `ghost` draw no border of their own, so they fall back to the
- * neutral rule rather than inheriting the text colour and painting a black bar.
- */
-export const DividerComposesWithVariant: Story = {
-  render: (args) => (
-    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
-      {(["outline", "ghost", "text", "glass"] as const).map((variant) => (
-        <Box key={variant} sx={{ display: "contents" }}>
-          <StoryRow
-            args={args}
-            variant={variant}
-            divider={false}
-            leading={marker}
-            title={variant}
-            subtitle="divider: false"
-            value="R$ 13,90"
-            menu={kebab}
-          />
-          <StoryRow
-            args={args}
-            variant={variant}
-            divider
-            leading={marker}
-            title={variant}
-            subtitle="divider: true"
-            value="R$ 13,90"
-            menu={kebab}
-          />
-        </Box>
-      ))}
-    </Box>
-  ),
-};
