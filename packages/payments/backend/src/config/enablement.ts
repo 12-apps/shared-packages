@@ -295,3 +295,43 @@ export function resolvedFrom(
     stub: stubResolvedFor(allowStubMode, config.stub, environment),
   };
 }
+
+const EMPTY_ENVIRONMENTS: StoredProviderConfig['environments'] = {
+  SANDBOX: {},
+  PRODUCTION: {},
+};
+
+export function emptyConfig(provider: ProviderName): StoredProviderConfig {
+  return {
+    provider,
+    enabled: false,
+    priority: 0,
+    environment: 'SANDBOX',
+    status: 'UNVERIFIED',
+    lastVerifiedAt: null,
+    chargeVerifiedAt: null,
+    pendingVerification: null,
+    expiresAt: null,
+    stub: false,
+    environments: { SANDBOX: { ...EMPTY_ENVIRONMENTS.SANDBOX }, PRODUCTION: { ...EMPTY_ENVIRONMENTS.PRODUCTION } },
+  };
+}
+
+/**
+ * Every credential set a delivery may be authenticated against, ACTIVE
+ * environment first (the port's ordering contract).
+ *
+ * A store that has just flipped SANDBOX→PRODUCTION still has sandbox
+ * deliveries in flight; verifying only against the active environment kills
+ * them before the durable inbox, with no row to replay (FUT-678). The other
+ * environment is offered only when it actually holds credentials, so the
+ * common single-environment store still presents exactly one set.
+ */
+export function listeningSetsFrom(config: StoredProviderConfig, allowStubMode: boolean) {
+  const other: PaymentEnvironment = config.environment === 'PRODUCTION' ? 'SANDBOX' : 'PRODUCTION';
+  const sets = [resolvedFrom(config, allowStubMode)];
+  if (Object.values(config.environments[other] ?? {}).some((value) => value)) {
+    sets.push(resolvedFrom(config, allowStubMode, other));
+  }
+  return sets;
+}
