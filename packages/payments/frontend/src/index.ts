@@ -84,6 +84,20 @@ export {
 export { type CheckoutHostPorts } from './components/checkout/use-checkout-controller';
 export { PaymentsUnavailable } from './components/checkout/payments-unavailable';
 export { fetchCheckoutConfig } from './components/checkout/client';
+// ---------------------------------------------------------------------------
+// Digital wallets (FUT-471/472) — the Google-branded button and the capability
+// read it is gated on. `CheckoutFlow` wires these automatically; they are
+// exported for hosts composing their own pixels.
+// ---------------------------------------------------------------------------
+export {
+  GooglePayButton,
+  type GooglePayApi,
+  type GooglePayButtonProps,
+  type GooglePaymentData,
+  type GooglePaymentsClient,
+  type GooglePayGatewayParams,
+} from './components/checkout/google-pay-button';
+export { googlePayConfig } from './components/checkout/method-capability';
 export {
   CheckoutComponentsProvider,
   type CheckoutActionBarProps,
@@ -103,11 +117,13 @@ export {
   type BuyerContact,
   type BuyerField,
   type BuyerInfo,
+  type ChargeWalletInput,
   type CheckoutChainLink,
   type CheckoutCustomerField,
   type CheckoutError,
   type CheckoutOrder,
   type CheckoutProviderConfig,
+  type CheckoutWalletType,
   type ComandaCheckout,
   type CreateOrderRequest,
   type CreateOrderResult,

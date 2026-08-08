@@ -1,4 +1,4 @@
-import type { CustomerInfo } from '../core/types';
+import type { CustomerInfo, WalletInstrument } from '../core/types';
 
 import type { CheckoutChargeDraft } from './types';
 
@@ -69,26 +69,49 @@ function tokensByProvider(value: unknown): Record<string, string> | undefined {
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
+/**
+ * A wallet instrument (FUT-471/472), when the body carries a well-formed one.
+ * Both halves are mandatory on PagBank's wire, so a wallet missing either is
+ * an absent wallet — never a `{ type }` husk the adapter would forward.
+ */
+function walletOf(value: unknown): WalletInstrument | undefined {
+  const raw = record(value);
+  if (!raw) return undefined;
+  const type = raw.type;
+  const key = text(raw.key);
+  if ((type !== 'GOOGLE_PAY' && type !== 'APPLE_PAY') || !key) return undefined;
+  return { type, key };
+}
+
+/** The card block's fields, from whichever wire shape carried each. */
+function cardOf(
+  nested: Record<string, unknown> | null,
+  raw: Record<string, unknown>,
+): NonNullable<CheckoutChargeDraft['card']> {
+  const minted = tokensByProvider(nested ? nested.tokensByProvider : raw.tokensByProvider);
+  const token = text(nested ? nested.token : raw.token);
+  const savedCardToken = text(nested?.savedCardToken);
+  const wallet = walletOf(nested ? nested.wallet : raw.wallet);
+  return {
+    ...(token ? { token } : {}),
+    ...(savedCardToken ? { savedCardToken } : {}),
+    ...(minted ? { tokensByProvider: minted } : {}),
+    ...(wallet ? { wallet } : {}),
+  };
+}
+
 /** The instrument half of a draft, from whichever shape carried it. */
 function instrumentOf(raw: Record<string, unknown>): Pick<
   CheckoutChargeDraft,
   'card' | 'ambiguousInstrument'
 > {
   const nested = record(raw.card);
-  const minted = tokensByProvider(nested ? nested.tokensByProvider : raw.tokensByProvider);
-  const token = text(nested ? nested.token : raw.token);
-  const savedCardToken = text(nested?.savedCardToken);
-
-  const card = {
-    ...(token ? { token } : {}),
-    ...(savedCardToken ? { savedCardToken } : {}),
-    ...(minted ? { tokensByProvider: minted } : {}),
-  };
+  const card = cardOf(nested, raw);
   if (Object.keys(card).length === 0) return {};
   // ONLY the flat shape conflates the two kinds. A nested `token` was sent by a
   // client that had a `savedCardToken` field available and chose not to use it,
   // so it means what it says.
-  return { card, ...(!nested && token ? { ambiguousInstrument: true } : {}) };
+  return { card, ...(!nested && card.token ? { ambiguousInstrument: true } : {}) };
 }
 
 const CUSTOMER_KEYS = ['name', 'email', 'taxId', 'phone'] as const;

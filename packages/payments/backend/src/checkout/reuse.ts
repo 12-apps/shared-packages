@@ -127,13 +127,16 @@ export function holdsInstrumentFor(
   if (!card) return false;
   const minted = card.tokensByProvider;
   if (minted && Object.keys(minted).length > 0) return Boolean(minted[provider]);
-  return Boolean(card.token ?? card.savedCardToken);
+  // A wallet key counts (FUT-471): the buyer just authorized THIS payment on
+  // the wallet sheet, and answering with a parked hosted link would silently
+  // discard that authorization the same way ignoring a typed card would.
+  return Boolean(card.token ?? card.savedCardToken ?? card.wallet);
 }
 
 /** The instrument fields a checkout request may carry. */
 export type CheckoutCard = Pick<
   CardDetails,
-  'token' | 'savedCardToken' | 'tokensByProvider'
+  'token' | 'savedCardToken' | 'tokensByProvider' | 'wallet'
 >;
 
 /** A still-payable charge left behind by a reprice. */
