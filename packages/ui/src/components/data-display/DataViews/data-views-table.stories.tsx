@@ -378,7 +378,7 @@ function PedidosHeader(): React.JSX.Element {
 }
 
 const meta: Meta<typeof DataViewsTableBase<PedidoRow>> = {
-  title: "DataDisplay/DataViews/DataViewsTable",
+  title: "DataDisplay/Dashboards/DataViewsTable",
   component: DataViewsTableBase,
   parameters: {
     layout: "fullscreen",
