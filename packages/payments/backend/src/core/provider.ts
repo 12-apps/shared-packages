@@ -1,4 +1,6 @@
 import type {
+  ApplePayActivation,
+  ApplePayCsr,
   ChargeInput,
   ChargeSnapshot,
   ClientTokenization,
@@ -264,6 +266,31 @@ export interface PaymentProviderAdapterBase {
      * to mean "retrying will not help" and drops its pointer regardless.
      */
     forget?(input: VaultForgetInput, credentials: ResolvedCredentials): Promise<void>;
+  };
+
+  /**
+   * Apple Pay's certificate ROUND-TRIP (FUT-472) — the merchant-account
+   * enrolment that must happen before an `APPLE_PAY` wallet charge can ever
+   * authorize: ask the provider for a CSR, submit it in the Apple Developer
+   * portal, and hand the resulting `.cer` back to the provider to activate
+   * the integration.
+   *
+   * Optional, and declared per adapter because the endpoints are the
+   * provider's own (PagBank: `POST /wallets/apple-pay/csr` and
+   * `POST /wallets/apple-pay/cer`). Stateless like everything else here —
+   * credentials arrive per call. Whether the pair is registered once for the
+   * platform or once per connected seller is undocumented for PagBank Connect
+   * (the ticket's open question); the per-call credentials can express either
+   * answer, so the host's enrolment surface decides, not this contract.
+   */
+  applePay?: {
+    /** Step 1: mint the CSR the merchant submits to Apple. */
+    requestCsr(credentials: ResolvedCredentials): Promise<ApplePayCsr>;
+    /** Step 3: hand Apple's `.cer` back; activates the integration. */
+    activateCertificate(
+      certificate: string,
+      credentials: ResolvedCredentials,
+    ): Promise<ApplePayActivation>;
   };
 
   /** Void a not-yet-paid charge. Optional: capability-gated by the gateway. */

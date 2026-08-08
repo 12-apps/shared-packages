@@ -104,6 +104,12 @@ export interface HarnessHost {
    * affected; everything else still reaches the real mount.
    */
   configRead?: 'ok' | 'pending' | 'failing';
+  /**
+   * Apple Pay merchant validation (FUT-472) — the port a real host implements
+   * server-side. The harness answers a fixed session; a page without it
+   * exercises the abort path.
+   */
+  validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
 }
 
 /** Wrap the mount's fetch so `/config` can stall or refuse. */
@@ -158,6 +164,7 @@ export function harnessFlows(
       // departure is observable at all — so the probe shows where the buyer
       // would have gone, which no `window.location.assign` ever could.
       navigate: (url) => world.recordNavigation(url),
+      validateApplePayMerchant: host.validateApplePayMerchant,
       useAvailability: () => host.availability ?? { payable: true },
     },
   });

@@ -23,8 +23,24 @@ Given('a compradora abre o checkout de uma loja com Google Pay', async ({ page }
   await paymentsWorld().open(page, 'google-pay');
 });
 
+Given('a compradora abre o checkout de uma loja com Apple Pay', async ({ page }) => {
+  await paymentsWorld().open(page, 'apple-pay');
+});
+
+/** The SAME store shape, on a device without Apple Pay (any non-Safari). */
+Given(
+  'a compradora abre o checkout da loja com Apple Pay num aparelho sem Apple Pay',
+  async ({ page }) => {
+    await paymentsWorld().open(page, 'apple-pay-unsupported');
+  },
+);
+
 When('ela paga com o Google Pay', async ({ page }) => {
   await page.getByTestId('google-pay-button').click();
+});
+
+When('ela paga com o Apple Pay', async ({ page }) => {
+  await page.getByTestId('apple-pay-button').click();
 });
 
 Then('ela vê o botão do Google Pay', async ({ page }) => {
@@ -35,6 +51,14 @@ Then('nenhum botão do Google Pay é mostrado', async ({ page }) => {
   await expect(page.getByTestId('google-pay-button')).toHaveCount(0);
 });
 
+Then('ela vê o botão do Apple Pay', async ({ page }) => {
+  await expect(page.getByTestId('apple-pay-button')).toBeVisible();
+});
+
+Then('nenhum botão do Apple Pay é mostrado', async ({ page }) => {
+  await expect(page.getByTestId('apple-pay-button')).toHaveCount(0);
+});
+
 Then('a cobrança enviada ao provedor carrega a carteira do Google', async ({ page }) => {
   // What the PROVIDER received, not what the client recorded sending: hosts
   // tag a provider-charge line with `wallet:<TYPE>` when the charge's card
@@ -42,4 +66,8 @@ Then('a cobrança enviada ao provedor carrega a carteira do Google', async ({ pa
   // `tok:`. This is the line that fails if the mount stops reading the flat
   // wallet body — the sheet then produced a token the charge never carried.
   await expect(paymentsWorld().wire.providerCharges(page)).toContainText('wallet:GOOGLE_PAY');
+});
+
+Then('a cobrança enviada ao provedor carrega a carteira da Apple', async ({ page }) => {
+  await expect(paymentsWorld().wire.providerCharges(page)).toContainText('wallet:APPLE_PAY');
 });

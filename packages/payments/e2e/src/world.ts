@@ -65,6 +65,19 @@ export type PaymentsStore =
    * uses an installed global without touching the network).
    */
   | 'google-pay'
+  /**
+   * A store whose chain head declares Apple Pay (FUT-472), opened on a device
+   * that HAS it: the host provides a page where `window.ApplePaySession`
+   * exists and `canMakePayments()` answers true (a stub, outside Safari),
+   * plus a merchant-validation port that answers a session.
+   */
+  | 'apple-pay'
+  /**
+   * The SAME Apple Pay store on a device WITHOUT Apple Pay (every non-Safari
+   * browser): no `ApplePaySession` global. The scenario this hosts is the
+   * fallback rule — no button, and the card form stays the way to pay.
+   */
+  | 'apple-pay-unsupported'
   /** Declares the on-page screen (FUT-596). */
   | 'screen-on-page'
   /** Declares the hand-off screen (FUT-596). */

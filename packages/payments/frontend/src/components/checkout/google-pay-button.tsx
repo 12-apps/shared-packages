@@ -196,6 +196,11 @@ export interface GooglePayButtonProps {
   environment?: "TEST" | "PRODUCTION";
   /** Injectable API namespace for tests/harnesses; omit to load pay.js. */
   api?: GooglePayApi | null;
+  /**
+   * Fired once `isReadyToPay` approved and the button will render — how the
+   * pane knows its wallet chrome (the divider) has something to sit above.
+   */
+  onReady?: () => void;
 }
 
 /**
@@ -211,13 +216,18 @@ export function GooglePayButton({
   onError,
   environment = "TEST",
   api,
+  onReady,
 }: GooglePayButtonProps): JSX.Element | null {
   const client = useGooglePayClient(api, environment);
   const container = useRef<HTMLDivElement | null>(null);
   // The latest handlers/order, so the Google-rendered button — mounted once —
   // never closes over a stale charge target.
-  const current = useRef({ order, params, onKey, onError });
-  current.current = { order, params, onKey, onError };
+  const current = useRef({ order, params, onKey, onError, onReady });
+  current.current = { order, params, onKey, onError, onReady };
+
+  useEffect(() => {
+    if (client) current.current.onReady?.();
+  }, [client]);
 
   useEffect(() => {
     const mount = container.current;

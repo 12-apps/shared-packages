@@ -168,6 +168,24 @@ export function googlePayConfig(
 }
 
 /**
+ * Whether the chain head declares Apple Pay (FUT-472) — the capability half
+ * of the button's gate; the DEVICE half (`ApplePaySession` exists and can
+ * pay) is `applePaySupported()` in `apple-pay-button.tsx`, because it is a
+ * browser fact, not a store fact.
+ *
+ * FAILS CLOSED like {@link googlePayConfig}, and read off the HEAD for the
+ * same reason: the Apple token is decrypted with the head merchant's
+ * certificate, so only the provider the walk tries first can charge it.
+ * Unlike Google there are no client parameters to publish — merchant
+ * validation runs server-side through the host's port.
+ */
+export function applePayDeclared(config: CheckoutProviderConfig | null): boolean {
+  const head = config?.chain?.[0];
+  if (!head?.methods.includes("CARD")) return false;
+  return head.wallets?.includes("APPLE_PAY") ?? false;
+}
+
+/**
  * The methods the picker may offer, from the chain's declared capabilities
  * (FUT-698). `null` config — still loading, or a fetch blip — fails OPEN like
  * {@link cardPathAvailable}: the picker renders everything and the server

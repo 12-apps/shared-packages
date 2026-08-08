@@ -84,8 +84,8 @@ files do not change either way.
 `pix-only` · `card` · `both-methods` · `hosted` · `awaiting` · `settles` ·
 `declined` · `unresolved` · `unavailable` · `no-provider` ·
 `no-provider-remedy` · `payments-off` · `two-mintable` · `redirect-head` ·
-`google-pay` · `screen-on-page` · `screen-handoff` · `screen-undeclared` ·
-`screen-unknown`
+`google-pay` · `apple-pay` · `apple-pay-unsupported` · `screen-on-page` ·
+`screen-handoff` · `screen-undeclared` · `screen-unknown`
 
 Adding a member is a breaking change for hosts, deliberately: a scenario needing
 a store nobody can build is a scenario that silently never runs.

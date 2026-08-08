@@ -52,6 +52,14 @@ export interface ProviderCheckoutScreenProps {
   tenantSlug?: string;
   /** The shell's polling cadence, passed through so tests can shorten it. */
   pollIntervalMs?: number;
+  /**
+   * The host's Apple Pay merchant-validation port (FUT-472): exchange the
+   * session's `validationURL` for an Apple merchant session, SERVER-SIDE —
+   * the merchant identity certificate must never reach a browser. Optional;
+   * absent, the Apple Pay sheet cannot start and the pane says so while the
+   * card form stays the way to pay.
+   */
+  validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
   /** A terminal status — the shell moves to Confirmação. */
   onResolved: (status: OrderStatus) => void;
 }

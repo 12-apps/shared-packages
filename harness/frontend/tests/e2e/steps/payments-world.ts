@@ -26,6 +26,8 @@ const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string 
   'pix-only': { slug: 'payments-checkout-pix', caseId: 'awaiting' },
   card: { slug: 'payments-checkout-card' },
   'google-pay': { slug: 'payments-checkout-google-pay' },
+  'apple-pay': { slug: 'payments-checkout-apple-pay', caseId: 'device' },
+  'apple-pay-unsupported': { slug: 'payments-checkout-apple-pay', caseId: 'no-device' },
   'both-methods': { slug: 'payments-checkout-both' },
   hosted: { slug: 'payments-checkout-redirect' },
   awaiting: { slug: 'payments-checkout-pix', caseId: 'awaiting' },
