@@ -267,7 +267,16 @@ function StoryRow({
   args,
   ...own
 }: { args: Partial<BaseListCardProps> } & Partial<BaseListCardProps>): React.JSX.Element {
-  return <StoryRow args={args} {...args} {...own} />;
+  // THE CONTROLLED PAIR NEVER COMES FROM THE PANEL. Storybook's actions addon
+  // supplies an `onExpandedChange` mock for any `on*` prop, and a persisted
+  // `expanded` arg then satisfies the card's controlled check — so the row would
+  // hand its state to a handler that records the call and changes nothing, and
+  // the chevron would stop collapsing. `ControlledAccordion` passes the real
+  // pair itself, through `own`, and is unaffected.
+  const panel = { ...args };
+  delete panel.expanded;
+  delete panel.onExpandedChange;
+  return <BaseListCard {...panel} {...own} />;
 }
 
 
