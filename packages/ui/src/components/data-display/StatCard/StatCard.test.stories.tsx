@@ -6,7 +6,7 @@ import { expect, waitFor, within } from 'storybook/test';
 import { StatCard } from './StatCard';
 
 const meta: Meta<typeof StatCard> = {
-  title: 'DataDisplay/StatCard/Tests',
+  title: 'Cards/StatCard/Tests',
   component: StatCard,
   parameters: {
     layout: 'padded',

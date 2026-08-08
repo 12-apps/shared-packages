@@ -129,7 +129,7 @@ const ACTIONS = {
 };
 
 const meta: Meta<typeof BaseListCard> = {
-  title: "DataDisplay/DataViews/Cards/BaseListCard",
+  title: "Cards/BaseListCard",
   component: BaseListCard,
   parameters: { layout: "padded" },
   tags: ["autodocs"],

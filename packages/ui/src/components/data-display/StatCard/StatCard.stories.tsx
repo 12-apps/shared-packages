@@ -8,7 +8,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { StatCard } from './StatCard';
 
 const meta: Meta<typeof StatCard> = {
-  title: 'DataDisplay/StatCard',
+  title: 'Cards/StatCard',
   component: StatCard,
   parameters: {
     layout: 'centered',
