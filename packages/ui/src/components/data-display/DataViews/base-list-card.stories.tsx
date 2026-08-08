@@ -155,6 +155,14 @@ const meta: Meta<typeof BaseListCard> = {
       // worth being able to try from the panel rather than read about.
       defaultExpanded: { control: "boolean" },
       children: { control: "boolean", mapping: { true: <OrderDetail />, false: undefined } },
+      // NO CONTROL FOR `expanded`. It is the CONTROLLED-mode prop: setting it
+      // hands the state to a list that then has to feed it back through
+      // `onExpandedChange`. From the panel there is no such owner, so a value
+      // set here freezes the row open or shut and the chevron stops working —
+      // which reads as a broken component rather than as controlled mode doing
+      // exactly what it says. `ControlledAccordion` is where that path is shown.
+      expanded: { control: false, table: { disable: true } },
+      onExpandedChange: { control: false, table: { disable: true } },
     }),
     ...category("Appearance", {
       variant: { control: "inline-radio", options: ["outline", "ghost", "text", "glass"] },
@@ -267,6 +275,9 @@ export const Pedido: Story = {
     // panel and both the control and its rail leave the row — a chevron that
     // opens onto nothing is a promise the row cannot keep.
     children: <OrderDetail />,
+    // Closed to begin with. The chevron is the affordance under test, and a row
+    // that starts open shows its result without ever showing the control work.
+    defaultExpanded: false,
     testId: "pedido-row",
   },
 };
