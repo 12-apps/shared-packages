@@ -31,7 +31,9 @@ import { NAME } from './pagbank-http';
  * ...which answers in XML. That resolution is deliberately NOT done here: it
  * needs a different host, a different credential pair (`email` + `token_api`,
  * not the Connect access token) and an XML parser. Recognizing the delivery is
- * what stops the redelivery loop; resolving it is separate work.
+ * what stops the redelivery loop; resolving it is
+ * `pagbank-legacy-notifications.ts` (`resolvePagbankNotification`), which a
+ * host runs over these UNKNOWN rows' stored codes.
  */
 
 /** The two fields a post-transaction delivery carries. */

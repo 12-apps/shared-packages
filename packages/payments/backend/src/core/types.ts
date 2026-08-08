@@ -252,6 +252,14 @@ export interface RefundSnapshot {
   provider: ProviderName;
   providerChargeId: string;
   providerRefundId: string;
+  /**
+   * OUR reference (the order id), when the payload names it —
+   * `ChargeSnapshot.reference`'s counterpart (FUT-477): a chargeback reported
+   * through a LEGACY surface carries a transaction code no stored row is
+   * keyed by, so this is the only handle to the order whose money went back.
+   * Optional; absent, callers fall back to `(provider, providerChargeId)`.
+   */
+  reference?: string;
   status: 'PENDING' | 'REFUNDED' | 'FAILED';
   amount: Money;
   raw?: unknown;
@@ -376,7 +384,14 @@ export interface NormalizedWebhookEvent {
    * provider that lacks one should hash the raw body.
    */
   eventId: string;
-  type: 'CHARGE_UPDATED' | 'REFUND_UPDATED' | 'UNKNOWN';
+  /**
+   * `DISPUTE_UPDATED` (FUT-477): a dispute the provider reported — money
+   * HELD, not yet moved, so it carries neither snapshot; either would assert
+   * an outcome the dispute has not reached. Its terminal outcomes arrive as
+   * their own events (`REFUND_UPDATED` when the merchant loses). Hosts that
+   * predate the member fall through their default branch, like `UNKNOWN`.
+   */
+  type: 'CHARGE_UPDATED' | 'REFUND_UPDATED' | 'DISPUTE_UPDATED' | 'UNKNOWN';
   /** Present when the event carries a charge state change. */
   charge?: ChargeSnapshot;
   /** Present when the event carries a refund state change. */
