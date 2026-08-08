@@ -48,8 +48,6 @@ export interface ListRails {
   meta: string;
   /** The value's own rail, with a fixed right edge. */
   value: string;
-  /** Wide enough for the longest status this list holds. */
-  status: string;
   actions: string;
 }
 
@@ -105,7 +103,6 @@ export const DEFAULT_RAILS: ListRails = {
   // NOT an `fr`: the value's whole promise is a fixed right edge, and a rail
   // that grows with the spare width moves that edge on every list.
   value: "max-content",
-  status: "max-content",
   actions: "auto",
 };
 
@@ -148,7 +145,6 @@ export function railsTemplate(rails: RailOverrides): string {
     rails.caption,
     rails.meta,
     rails.value,
-    rails.status,
     rails.actions,
   ]
     .filter((rail): rail is string => rail != null)
@@ -198,7 +194,7 @@ export function railsTemplateFor(
 }
 
 /** How many rails the named-slot layout has — the span such a card claims. */
-export const RAIL_COUNT = 9;
+export const RAIL_COUNT = 8;
 
 /**
  * The gutters and the trailing menu that bracket a CONFIGURED row.

@@ -73,8 +73,6 @@ export interface BaseListCardProps extends CardSurfaceProps {
   metaSlot?: ReactNode;
   /** The number this row is about. Its own rail, tabular figures, never truncated. */
   value?: ReactNode;
-  /** A status chip or badge. Its own fixed slot, so it cannot move the value. */
-  status?: ReactNode;
   /**
    * Inline actions — the one or two things done often enough to deserve a
    * button. Revealed on hover and `:focus-within` by default, so fifty rows of
@@ -247,7 +245,7 @@ function rowSx(opts: {
     // children happen to be in.
     //
     //   [ select ][ leading ][ title …………… ][   menu ]
-    //                        [ status …………… ][  value ]
+    //                        [ (cells) …………… ][  value ]
     //
     // The MENU stays in the top-right corner at every width. It is the row's
     // one fixed landmark — an overflow that moves to the second line on a phone
@@ -264,7 +262,6 @@ function rowSx(opts: {
       '& > [data-slot="actions"]': { gridArea: "1 / 4", justifyContent: "flex-end" },
       '& > [data-slot="meta"]': { display: "none" },
       // Second line, starting under the title rather than under the checkbox.
-      '& > [data-slot="status"]': { gridArea: "2 / 3", justifyContent: "flex-start" },
       '& > [data-slot="value"]': { gridArea: "2 / 4", textAlign: "right" },
     },
     ...(divider
@@ -402,7 +399,11 @@ function useDisclosure(props: BaseListCardProps): {
   regionId: string;
 } {
   const [own, setOwn] = useState(props.defaultExpanded ?? false);
-  const controlled = props.expanded != null;
+  // CONTROLLED ONLY WITH AN OWNER. `expanded` without `onExpandedChange` is a
+  // value nothing can ever change — the chevron would move nothing and the row
+  // would look broken. Storybook can persist a stray arg into a URL and produce
+  // exactly that, so the pair is required before the card gives up its state.
+  const controlled = props.expanded != null && props.onExpandedChange != null;
   const expanded = controlled ? props.expanded === true : own;
   // `useId` rather than a counter: the id has to survive an SSR pass and match
   // on hydration, or `aria-controls` points at nothing on the first paint.
@@ -501,7 +502,6 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
           <ListCardTail
             value={props.value}
             separated={meta.present}
-            status={props.status}
             actions={actionable ? props.actions : undefined}
             actionsAlwaysVisible={props.actionsAlwaysVisible}
             menu={props.menu}
