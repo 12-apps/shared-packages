@@ -4,7 +4,6 @@ import type {
   MerchantRef,
   NormalizedWebhookEvent,
   ProviderName,
-  ResolvedCredentials,
   WebhookDelivery,
 } from './types';
 
@@ -16,58 +15,11 @@ import type {
  * style of `@12-apps/entitlements`.
  */
 
-/**
- * Resolves which provider a merchant uses and its decrypted credentials.
- * This port is where the two money directions meet one code path: for
- * `kind: 'TENANT'` the host reads the tenant's connected-account row (the
- * existing `PaymentIntegration` table pattern); for `kind: 'PLATFORM'` it
- * reads the platform's own account (env/config). Encryption-at-rest is the
- * host's job — the core only ever sees decrypted fields, per call.
- */
-export interface CredentialStore {
-  /**
-   * The merchant's enabled providers in FAILOVER ORDER — index 0 is tried
-   * first. Empty when payments are off.
-   *
-   * This is the authoritative routing input; `defaultProvider` is just its
-   * head, kept for the single-provider callers (client tokenization config,
-   * "are payments configured at all" checks) that have no notion of a chain.
-   */
-  providerChain(merchant: MerchantRef): Promise<ProviderName[]>;
-  /** The first provider in the chain, or null when payments are off. */
-  defaultProvider(merchant: MerchantRef): Promise<ProviderName | null>;
-  /**
-   * Decrypted credentials for (merchant, provider), or null if not connected.
-   *
-   * For CHARGING: it refuses a provider that is connected but not enabled,
-   * because enablement is what routing means.
-   */
-  getCredentials(merchant: MerchantRef, provider: ProviderName): Promise<ResolvedCredentials | null>;
-  /**
-   * Decrypted credentials for LISTENING to a provider — inbound webhooks and
-   * reconciliation — ignoring whether it is enabled.
-   *
-   * Charging and listening are not the same question, and conflating them
-   * loses money. Enablement decides where a NEW charge is routed. A delivery is
-   * about money that has ALREADY moved, and the provider's willingness to tell
-   * us has nothing to do with whether the owner currently wants new orders
-   * going there.
-   *
-   * Two failures came from the single gate:
-   *
-   *   - the ACTIVATION charge (FUT-463) is paid while the provider is by
-   *     definition NOT yet enabled — enabling is what the charge earns — so
-   *     its confirmation was rejected before `webhook.verify` could run;
-   *   - an owner pausing a provider with a PIX still outstanding had every
-   *     inbound notification for it refused, and those orders never confirmed.
-   *
-   * Neither left a trace: verification precedes the inbox, so a delivery
-   * refused here is never recorded.
-   *
-   * Optional — a host that does not implement it keeps the old behaviour.
-   */
-  getConnectedCredentials?(merchant: MerchantRef, provider: ProviderName): Promise<ResolvedCredentials | null>;
-}
+// The credential-resolution port lives in `./credential-store.ts` since the
+// FUT-678 listening read pushed this file past its size gate — re-exported
+// because `core/ports.ts` is the one door every storage port has ever come
+// through (same split as `charge-queries.ts` below).
+export type { CredentialStore } from './credential-store';
 
 /** A charge row as the host persists it. */
 export interface StoredCharge {
