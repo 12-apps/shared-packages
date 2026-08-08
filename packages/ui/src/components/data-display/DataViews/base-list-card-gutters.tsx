@@ -120,7 +120,6 @@ export function DiscloseSlot({
   reserve,
   onToggle,
   controls,
-  label,
   testId,
 }: {
   expandable: boolean;
@@ -129,7 +128,6 @@ export function DiscloseSlot({
   onToggle: () => void;
   /** The id of the region this button opens, for `aria-controls`. */
   controls: string;
-  label: string;
   testId?: string;
 }): React.JSX.Element | null {
   if (!expandable) return reserve ? <Box data-slot="disclose" /> : null;
@@ -145,7 +143,7 @@ export function DiscloseSlot({
         size="small"
         aria-expanded={expanded}
         aria-controls={expanded ? controls : undefined}
-        aria-label={label}
+        aria-label={expanded ? "Recolher detalhes" : "Expandir detalhes"}
         data-testid={testId}
         onClick={(event) => {
           event.stopPropagation();

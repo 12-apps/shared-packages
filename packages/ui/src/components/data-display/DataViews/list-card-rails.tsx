@@ -106,7 +106,7 @@ export const DEFAULT_RAILS: ListRails = {
   actions: "auto",
 };
 
-interface ListRailsValue {
+export interface ListRailsValue {
   density: DataViewsDensity;
   /** Whether the gutters are held open even when empty. */
   reserveGutters: boolean;
