@@ -5,8 +5,8 @@
   "description": "Server half of the vendor-agnostic payments platform: normalized charge/refund/webhook model behind per-provider adapters (Stone, InfinitePay, Stripe, ...), merchant-scoped credential settings with masking, fetch-native HTTP handlers, hexagonal storage ports with in-memory and Prisma adapters, and a self-owned Prisma schema fragment + migration. Framework-free; deployable inside a host app today or as a standalone payments microservice later. Zero app coupling.",
   "exports": {
     ".": "./src/index.ts",
+    "./pagbank-legacy-notifications": "./src/providers/pagbank-legacy-notifications.ts",
     "./providers/pagbank": "./src/providers/pagbank.ts",
-    "./providers/pagbank-legacy-notifications": "./src/providers/pagbank-legacy-notifications.ts",
     "./providers/stone": "./src/providers/stone.ts",
     "./providers/infinitepay": "./src/providers/infinitepay.ts",
     "./providers/stripe": "./src/providers/stripe.ts"
