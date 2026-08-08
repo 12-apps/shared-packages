@@ -217,6 +217,7 @@ export {
   type RevokeFailureReporter,
 } from './config/oauth';
 export type {
+  ConnectedOAuthAccount,
   MaskedFieldState,
   MerchantFailoverPolicy,
   MaskedFields,
@@ -395,3 +396,11 @@ export { settleActivationCharge } from './activation/webhook';
 // retiring the admin's provider-name table (`tokenizerFor`). No host consumer
 // yet, on purpose — pinned by `activation-contract.test.ts` until it lands.
 export { activationFlowOf } from './activation/flow';
+
+// ---- Platform operations (FUT-479 / FUT-483, packaged by FUT-573) ---------
+// The PLATFORM's own PagBank surfaces — the Connect application consult with
+// its redirect-URI mismatch verdict, and the homologação (paste-ready guide,
+// sandbox evidence generator, outcome record). The explicit export list lives
+// in `platform/index.ts` (this file is at the size gate); the matching
+// screens live in `@12-apps/payments-frontend`.
+export * from './platform/index';

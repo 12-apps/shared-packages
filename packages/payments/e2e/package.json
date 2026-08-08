@@ -11,6 +11,7 @@
   "files": [
     "dist",
     "features",
+    "features-platform",
     "*.md"
   ],
   "exports": {

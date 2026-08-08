@@ -113,8 +113,11 @@
         "// Step definitions are reached by playwright-bdd's `steps` GLOB, never",
         "// by an import \u2014 the same shape as the stories entry above. A host",
         "// points at dist/steps/**/*.js and bddgen loads each file for its",
-        "// registration side effect.",
-        "src/steps/**/*.ts"
+        "// registration side effect. steps-platform/ is the opt-in platform",
+        "// journeys' steps glob, dist/steps-platform on the host side \u2014",
+        "// same mechanism.",
+        "src/steps/**/*.ts",
+        "src/steps-platform/**/*.ts"
       ],
       "ignoreDependencies": [
         "playwright-bdd"

@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { CssBaseline } from '@12-apps/ui/mui/CssBaseline';
+import { ThemeProvider } from '@12-apps/ui/mui/styles';
+
 import { PAGES } from './pages/registry';
+import { HarnessShell } from './shell/harness-shell';
+import { harnessTheme } from './shell/theme';
 
 /**
  * The harness shell: a panel of every published surface, one page each.
@@ -10,6 +15,15 @@ import { PAGES } from './pages/registry';
  * harness carries but none of the packages under test require, and every
  * dependency here is one more thing that can explain a failure that is supposed
  * to be about OUR packages. `location.hash` needs nothing.
+ *
+ * `ThemeProvider` + `CssBaseline` are the exception, and they are not chrome:
+ * they are the mounting a host performs, in the same order future-pay's
+ * `apps/admin/src/App.tsx` performs it. Without them, every package under test
+ * renders against MUI's stock palette instead of the design system's, so a
+ * page that looks right here would look wrong in the only place it ships.
+ *
+ * The chrome itself lives in `shell/` — see `harness-nav.tsx` for what it takes
+ * from the admin sidebar and what it leaves behind.
  */
 function useHashSlug(fallback: string) {
   const read = () => window.location.hash.replace(/^#\/?/, '') || fallback;
@@ -27,36 +41,17 @@ function Shell() {
   const page = PAGES.find((candidate) => candidate.slug === slug);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
-      <nav
-        data-testid="harness-nav"
-        style={{ width: 260, flexShrink: 0, borderRight: '1px solid #ddd', padding: 16 }}
-      >
-        <h1 style={{ fontSize: 14, textTransform: 'uppercase', color: '#666' }}>Published surfaces</h1>
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          {PAGES.map((entry) => (
-            <li key={entry.slug} style={{ margin: '12px 0' }}>
-              <a
-                href={`#/${entry.slug}`}
-                data-testid={`harness-nav-${entry.slug}`}
-                aria-current={entry.slug === slug ? 'page' : undefined}
-                style={{ fontWeight: entry.slug === slug ? 700 : 400 }}
-              >
-                {entry.title}
-              </a>
-              <div style={{ fontSize: 12, color: '#888' }}>{entry.pkg}</div>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      <main data-testid="harness-page" data-page={page?.slug ?? 'unknown'} style={{ flex: 1, padding: 24 }}>
-        {/* An unknown slug is a spec pointing at a page that was renamed or
-            removed. Saying so beats rendering the first page, which would let
-            that spec keep passing against something it is not asking for. */}
-        {page ? <page.Component /> : <p data-testid="harness-unknown-page">No harness page named “{slug}”.</p>}
-      </main>
-    </div>
+    <ThemeProvider theme={harnessTheme}>
+      <CssBaseline />
+      <HarnessShell activeSlug={slug}>
+        <div data-testid="harness-page" data-page={page?.slug ?? 'unknown'}>
+          {/* An unknown slug is a spec pointing at a page that was renamed or
+              removed. Saying so beats rendering the first page, which would let
+              that spec keep passing against something it is not asking for. */}
+          {page ? <page.Component /> : <p data-testid="harness-unknown-page">No harness page named “{slug}”.</p>}
+        </div>
+      </HarnessShell>
+    </ThemeProvider>
   );
 }
 
