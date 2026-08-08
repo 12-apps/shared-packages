@@ -51,9 +51,16 @@ describe('provider skeletons (stub mode)', () => {
     }
   });
 
-  it('pagbank runs in stub mode with the proven credential trio', async () => {
+  it('pagbank runs in stub mode with the proven credential schema', async () => {
     const adapter = pagbankProvider();
-    expect(adapter.credentialSchema.map((f) => f.key)).toEqual(['token', 'publicKey', 'webhookToken']);
+    // The proven trio, plus the Google Pay merchant id (FUT-471) — optional,
+    // non-secret, and only read by `clientConfig`.
+    expect(adapter.credentialSchema.map((f) => f.key)).toEqual([
+      'token',
+      'publicKey',
+      'webhookToken',
+      'googlePayMerchantId',
+    ]);
     const snapshot = await adapter.createCharge(pixInput(), STUB_CREDS);
     expect(snapshot).toMatchObject({ provider: 'pagbank', status: 'PENDING', method: 'PIX' });
   });

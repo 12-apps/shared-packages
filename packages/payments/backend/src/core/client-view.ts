@@ -4,10 +4,12 @@ import type {
   ChargeSnapshot,
   ChargeStatus,
   ClientTokenization,
+  GooglePayClientConfig,
   Money,
   PaymentMethodKind,
   ProviderName,
   ResolvedCredentials,
+  WalletType,
 } from './types';
 
 /**
@@ -104,6 +106,22 @@ export interface ClientProviderConfig {
    */
   methods: readonly PaymentMethodKind[];
   /**
+   * The digital wallets the adapter's capabilities declare (FUT-471/472).
+   * Stamped by the gateway for the same reason `methods` is: the capability
+   * table is the single source, and a per-adapter copy inside `clientConfig`
+   * would drift — in the direction of a wallet button the charge then refuses.
+   * Normalized: an adapter that declares nothing publishes `[]`.
+   */
+  wallets: readonly WalletType[];
+  /**
+   * Google Pay's PAYMENT_GATEWAY parameters, or `null` when this provider
+   * cannot run it (FUT-471). Unlike `wallets` this IS a per-credential fact —
+   * the merchant id arrives with the connection — so it comes from the
+   * adapter's `clientConfig`, normalized here so consumers never meet
+   * `undefined`.
+   */
+  googlePay: GooglePayClientConfig | null;
+  /**
    * The buyer screen this provider's flow needs (FUT-596), or `null` for the
    * capability default. Stamped here for the same reason `methods` is: the
    * adapter's declaration is the single source, and a second copy inside each
@@ -118,10 +136,13 @@ export function toClientProviderConfig(
   adapter: PaymentProviderAdapter,
   credentials: ResolvedCredentials,
 ): ClientProviderConfig {
+  const config = adapter.clientConfig(credentials);
   return {
-    ...adapter.clientConfig(credentials),
+    ...config,
     customerSchema: adapter.customerSchema ?? [],
     methods: adapter.capabilities.methods,
+    wallets: adapter.capabilities.wallets ?? [],
+    googlePay: config.googlePay ?? null,
     checkoutScreen: adapter.checkoutScreen ?? null,
   };
 }

@@ -5,11 +5,13 @@ import type {
   ClientTokenization,
   CustomerInfo,
   CustomerSchema,
+  GooglePayClientConfig,
   MerchantRef,
   Money,
   PaymentMethodKind,
   ProviderName,
   ResolvedCredentials,
+  WalletType,
 } from '../core/types';
 
 /**
@@ -77,8 +79,8 @@ export interface Payable {
  * the shipped client's. Nothing else in the library reads a raw body.
  */
 export interface CheckoutChargeDraft {
-  /** A fresh instrument, a saved-instrument id, or per-provider instruments. */
-  card?: Pick<CardDetails, 'token' | 'savedCardToken' | 'tokensByProvider'>;
+  /** A fresh instrument, a saved-instrument id, per-provider instruments, or a wallet key. */
+  card?: Pick<CardDetails, 'token' | 'savedCardToken' | 'tokensByProvider' | 'wallet'>;
   /**
    * `card.token` may ALSO be a saved instrument's id.
    *
@@ -108,6 +110,20 @@ export interface BuyerProviderLink {
   /** Server-granted stub permission for THIS connection (never in production). */
   mockTokenization: boolean;
   methods: readonly PaymentMethodKind[];
+  /**
+   * The digital wallets THIS entry's card charge accepts (FUT-471/472) — the
+   * capability read the wallet buttons gate on. `[]` for a provider that
+   * declared none, and the frontend fails CLOSED on it: a wallet button the
+   * charge then refuses is worse than no button.
+   */
+  wallets: readonly WalletType[];
+  /**
+   * Google Pay's PAYMENT_GATEWAY parameters for THIS entry, or `null` when it
+   * cannot run Google Pay (FUT-471). Published beside `wallets` because the
+   * capability alone cannot mint a token — the browser also needs the gateway
+   * id and the merchant's id at that gateway.
+   */
+  googlePay: GooglePayClientConfig | null;
   /**
    * The buyer fields THIS provider asks for (FUT-595), per entry rather than
    * once for the merchant: requiredness is a per-provider fact, so a chain the

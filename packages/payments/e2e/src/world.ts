@@ -57,6 +57,14 @@ export type PaymentsStore =
   | 'two-mintable'
   /** A hand-off provider at the head, a minting one behind it. */
   | 'redirect-head'
+  /**
+   * A store whose chain head declares Google Pay (FUT-471): the wallet
+   * capability, the PAYMENT_GATEWAY parameters, a merchant id — and a page
+   * where `google.payments.api` answers, which the host provides by
+   * installing a stub of it before the checkout loads (the shipped button
+   * uses an installed global without touching the network).
+   */
+  | 'google-pay'
   /** Declares the on-page screen (FUT-596). */
   | 'screen-on-page'
   /** Declares the hand-off screen (FUT-596). */

@@ -12,37 +12,22 @@
  */
 import type { JSX } from "react";
 
-import { CardView } from "../card-view";
-import { cardChain, cardTokenization } from "../method-capability";
 import { PixView } from "../pix-view";
+import { WalletCardPane } from "../wallet-pane";
 
 import type { ProviderCheckoutScreenProps } from "./types";
 
-export function PixAndCardScreen({
-  order,
-  buyer,
-  config,
-  tenantSlug,
-  onResolved,
-  pollIntervalMs,
-}: ProviderCheckoutScreenProps): JSX.Element | null {
+export function PixAndCardScreen(props: ProviderCheckoutScreenProps): JSX.Element | null {
+  const { order, onResolved, pollIntervalMs } = props;
   if (order?.method === "PIX") {
     return <PixView order={order} onResolved={onResolved} pollIntervalMs={pollIntervalMs} />;
   }
   if (order?.method === "CARD") {
-    return (
-      <CardView
-        order={order}
-        buyer={buyer}
-        providerConfig={cardTokenization(config)}
-        // The whole chain (FUT-563): one instrument is minted per provider so
-        // the charge survives the first one failing, with nothing re-typed.
-        providerChain={cardChain(config)}
-        tenantSlug={tenantSlug}
-        onResolved={onResolved}
-        pollIntervalMs={pollIntervalMs}
-      />
-    );
+    // The card pane, with its wallet fast lane above the form (FUT-471/472).
+    // The pane reads the chain itself (FUT-563: one instrument per provider,
+    // so the charge survives the first one failing with nothing re-typed) and
+    // renders exactly the old CardView for a store with no wallet.
+    return <WalletCardPane {...props} order={order} />;
   }
   // No order yet — the shell is still showing the picker, and raises one as
   // soon as a method is chosen.

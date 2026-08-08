@@ -25,9 +25,9 @@ import type { PaymentProviderAdapter } from './provider';
 import type {
   ChargeInput,
   ChargeSnapshot,
-  ClientTokenization,
   DeclineReason,
   MerchantRef,
+  ProviderCapabilities,
   ProviderName,
   ResolvedCredentials,
 } from './types';
@@ -313,9 +313,9 @@ async function instrumentFor(
   provider: ProviderName,
   pinned: boolean,
   chainHead: ProviderName | undefined,
-  tokenization: ClientTokenization,
+  capabilities: Pick<ProviderCapabilities, 'tokenization' | 'wallets'>,
 ): Promise<ChargeInput | WalkFailure> {
-  const forProvider = chargeInputFor(ctx.input, provider, chainHead, tokenization);
+  const forProvider = chargeInputFor(ctx.input, provider, chainHead, capabilities);
   if (hasInstrument(forProvider)) return forProvider;
   await recordAttempt(deps, ctx, provider, {
     outcome: 'SKIPPED',
@@ -364,8 +364,9 @@ export async function step(
     return { kind: 'ADVANCE', failure: { provider, message, kind: 'SKIP' } };
   }
 
-  const scheme = adapter.capabilities.tokenization;
-  const forProvider = await instrumentFor(deps, ctx, provider, pinned, chainHead, scheme);
+  const forProvider = await instrumentFor(
+    deps, ctx, provider, pinned, chainHead, adapter.capabilities,
+  );
   if ('kind' in forProvider) return { kind: 'ADVANCE', failure: forProvider };
 
   let snapshot: ChargeSnapshot;

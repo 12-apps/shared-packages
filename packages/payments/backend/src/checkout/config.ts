@@ -104,6 +104,8 @@ async function toBuyerLink(
     publicKey,
     mockTokenization: isStub && publicKey === null,
     methods: [...entry.methods],
+    wallets: [...entry.wallets],
+    googlePay: entry.googlePay,
     customerSchema: [...entry.customerSchema],
     checkoutScreen: entry.checkoutScreen,
   };

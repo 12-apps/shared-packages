@@ -25,6 +25,7 @@ import { openCase, openPage } from '../helpers/checkout';
 const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string }>> = {
   'pix-only': { slug: 'payments-checkout-pix', caseId: 'awaiting' },
   card: { slug: 'payments-checkout-card' },
+  'google-pay': { slug: 'payments-checkout-google-pay' },
   'both-methods': { slug: 'payments-checkout-both' },
   hosted: { slug: 'payments-checkout-redirect' },
   awaiting: { slug: 'payments-checkout-pix', caseId: 'awaiting' },

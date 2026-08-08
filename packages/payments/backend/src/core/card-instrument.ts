@@ -1,4 +1,4 @@
-import type { ChargeInput, ClientTokenization, ProviderName } from './types';
+import type { ChargeInput, ClientTokenization, ProviderCapabilities, ProviderName } from './types';
 
 /**
  * CARD INSTRUMENTS ARE PROVIDER-BOUND.
@@ -40,13 +40,16 @@ interface NoInstrument {
 /**
  * Who the bare instrument belongs to.
  *
- * The chain-head default applies ONLY to a one-time `token`, and only because
- * that token was minted moments ago from what `clientConfig()` described to
- * the browser — which is the head. A `savedCardToken` has no such context: it
- * names a card in whichever provider's vault held it when the buyer saved it,
- * possibly long before the current chain existed. Defaulting a vault token to
- * the head would hand the head a foreign token AND skip the provider that can
- * actually charge it, breaking a saved-card payment that used to work.
+ * The chain-head default applies ONLY to a one-time `token` or a WALLET key
+ * (FUT-471), and only because either was minted moments ago from what
+ * `clientConfig()` described to the browser — which is the head. A Google Pay
+ * token is bound to the head's `gatewayMerchantId` and an Apple Pay payload to
+ * its certificate, so a tail provider could no more read one than it could a
+ * foreign encrypted blob. A `savedCardToken` has no such context: it names a
+ * card in whichever provider's vault held it when the buyer saved it, possibly
+ * long before the current chain existed. Defaulting a vault token to the head
+ * would hand the head a foreign token AND skip the provider that can actually
+ * charge it, breaking a saved-card payment that used to work.
  *
  * So an unattributed vault token is `undefined` here — unknown, not assumed.
  */
@@ -55,25 +58,49 @@ function ownerOf(
   chainHead: ProviderName | undefined,
 ): ProviderName | undefined {
   if (card.tokenProvider) return card.tokenProvider;
-  return card.token ? chainHead : undefined;
+  return card.token || card.wallet ? chainHead : undefined;
 }
 
 /** Schemes that ask the BROWSER for an instrument. The others need none. */
 const NEEDS_INSTRUMENT: ReadonlySet<ClientTokenization> = new Set(['PUBLIC_KEY', 'SDK']);
+
+/** What the resolved adapter declares — the slice the ownership rules read. */
+type DeclaredCapabilities = Pick<ProviderCapabilities, 'tokenization' | 'wallets'>;
+
+/**
+ * A wallet charge on a provider that never declared that wallet (FUT-471), or
+ * null when the wallet question does not arise. Checked BEFORE ownership is
+ * even asked: an undeclared wallet is a guaranteed rejection, and the skip
+ * semantics (nothing went out) are exactly a foreign instrument's.
+ */
+function walletRefusal(
+  card: NonNullable<ChargeInput['card']>,
+  provider: ProviderName,
+  capabilities: DeclaredCapabilities | undefined,
+): NoInstrument | null {
+  const wallet = card.wallet;
+  if (!wallet || !capabilities) return null;
+  if ((capabilities.wallets ?? []).includes(wallet.type)) return null;
+  return { reason: `provider ${provider} does not support the ${wallet.type} wallet` };
+}
 
 export function chargeInputFor(
   input: ChargeInput,
   provider: ProviderName,
   chainHead: ProviderName | undefined,
   /**
-   * What this provider DECLARES about client tokenization. Optional only so a
-   * caller with no adapter in hand still gets the ownership rules; `step()`
-   * has already resolved the adapter and always passes it.
+   * What this provider DECLARES — tokenization scheme and wallet support.
+   * Optional only so a caller with no adapter in hand still gets the
+   * ownership rules; `step()` has already resolved the adapter and always
+   * passes its capability table.
    */
-  tokenization?: ClientTokenization,
+  capabilities?: DeclaredCapabilities,
 ): ChargeInput | NoInstrument {
   const card = input.method === 'CARD' ? input.card : undefined;
   if (!card) return input;
+  const refused = walletRefusal(card, provider, capabilities);
+  if (refused) return refused;
+  const tokenization = capabilities?.tokenization;
 
   const mine = card.tokensByProvider?.[provider];
   if (mine) {

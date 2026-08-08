@@ -5,6 +5,7 @@ import { PaymentsCheckoutBuyerFieldsPage } from './payments-checkout-buyer-field
 import { PaymentsCheckoutCardPage } from './payments-checkout-card';
 import { PaymentsCheckoutChainFailoverPage } from './payments-checkout-chain-failover';
 import { PaymentsCheckoutFailuresPage } from './payments-checkout-failures';
+import { PaymentsCheckoutGooglePayPage } from './payments-checkout-google-pay';
 import { PaymentsCheckoutHeadlessPage } from './payments-checkout-headless';
 import { PaymentsCheckoutMethodGatePage } from './payments-checkout-method-gate';
 import { PaymentsCheckoutNoProviderPage } from './payments-checkout-no-provider';
@@ -66,6 +67,12 @@ export const PAGES: readonly HarnessPage[] = [
     title: 'Checkout · card',
     pkg: PAYMENTS_FRONTEND,
     Component: PaymentsCheckoutCardPage,
+  },
+  {
+    slug: 'payments-checkout-google-pay',
+    title: 'Checkout · Google Pay',
+    pkg: PAYMENTS_FRONTEND,
+    Component: PaymentsCheckoutGooglePayPage,
   },
   {
     slug: 'payments-checkout-both',

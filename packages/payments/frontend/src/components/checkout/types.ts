@@ -13,6 +13,14 @@
 export type PaymentMethod = "PIX" | "CARD";
 
 /**
+ * The digital wallets a chain entry can charge (FUT-471/472). Mirrors the
+ * backend's `WalletType` — a wallet is not a fourth method: it is another way
+ * of producing the CARD instrument, so it rides the CARD tile and the CARD
+ * charge.
+ */
+export type CheckoutWalletType = "GOOGLE_PAY" | "APPLE_PAY";
+
+/**
  * Order lifecycle, aligned with the FUT-43 backend:
  * - `AWAITING_PAYMENT` — order created, charge raised, not yet reconciled (the
  *   "pending" UI state). Payment confirmation is **async** (provider webhook),
@@ -198,6 +206,20 @@ export interface ChargeCardInput {
   taxId?: string;
 }
 
+/**
+ * Input to charge a WALLET instrument against an order (FUT-471/472) —
+ * `ChargeCardInput`'s wallet sibling, posted to the same `/charge` route. One
+ * shape for both wallets because the wire is one shape: `key` is whatever the
+ * wallet handed the browser (Google's `tokenizationData.token`, Apple's
+ * serialized `token.paymentData`), forwarded verbatim and never persisted.
+ */
+export interface ChargeWalletInput {
+  orderId: string;
+  wallet: { type: CheckoutWalletType; key: string };
+  /** Buyer CPF for the provider charge (`customer.tax_id`); never persisted. */
+  taxId?: string;
+}
+
 /** A buyer field a provider asks for, as `/config` publishes it (FUT-595). */
 export interface CheckoutCustomerField {
   key: "name" | "email" | "taxId" | "phone";
@@ -236,6 +258,25 @@ export interface CheckoutChainLink {
    * never shown a field for.
    */
   customerSchema?: CheckoutCustomerField[];
+  /**
+   * The digital wallets THIS entry's card charge accepts (FUT-471/472).
+   *
+   * Optional, and the DEGRADE DIRECTION IS CLOSED — the opposite of
+   * `customerSchema`'s above, because the stakes invert: a chain that asks for
+   * nothing produces a refused charge, but a wallet button on a store whose
+   * server cannot charge wallets produces a buyer who authorized a payment on
+   * the wallet sheet and was then refused. Absent (an older host) means NO
+   * wallet buttons, which is exactly what that host's charge route supports.
+   */
+  wallets?: CheckoutWalletType[];
+  /**
+   * Google Pay's `PAYMENT_GATEWAY` tokenizationSpecification parameters for
+   * THIS entry (FUT-471), or absent/`null` when it cannot run Google Pay.
+   * `gatewayMerchantId: null` means the connection carries no merchant id yet
+   * — the button must not render, because a token minted against a missing id
+   * charges nobody.
+   */
+  googlePay?: { gateway: string; gatewayMerchantId: string | null } | null;
   /**
    * The buyer screen THIS provider's flow needs (FUT-596) — an opaque id the
    * adapter declares and `providers/registry.ts` resolves to a component.

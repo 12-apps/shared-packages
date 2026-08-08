@@ -141,6 +141,33 @@ function toCardLink(link: CheckoutChainLink): CardChainLink {
 }
 
 /**
+ * Everything the Google Pay button needs to mint a token (FUT-471), or `null`
+ * when the button must not render.
+ *
+ * Read off the chain HEAD only, like the checkout screen: the wallet token is
+ * minted against ONE gateway's `gatewayMerchantId`, so only the provider the
+ * walk tries first can charge it — a tail entry's declaration cannot be
+ * honoured from this browser.
+ *
+ * FAILS CLOSED, deliberately the opposite of `offeredMethods`' fail-open: a
+ * missing config only costs the buyer a button they still have the card form
+ * without, while rendering one on a store that cannot charge wallets sends a
+ * buyer through the wallet sheet into a guaranteed refusal. Every clause
+ * narrows toward NOT rendering: no config, no chain, a head that cannot CARD,
+ * no `GOOGLE_PAY` declaration, no gateway parameters, no merchant id.
+ */
+export function googlePayConfig(
+  config: CheckoutProviderConfig | null,
+): { gateway: string; gatewayMerchantId: string } | null {
+  const head = config?.chain?.[0];
+  if (!head?.methods.includes("CARD")) return null;
+  if (!head.wallets?.includes("GOOGLE_PAY")) return null;
+  const params = head.googlePay;
+  if (!params?.gatewayMerchantId) return null;
+  return { gateway: params.gateway, gatewayMerchantId: params.gatewayMerchantId };
+}
+
+/**
  * The methods the picker may offer, from the chain's declared capabilities
  * (FUT-698). `null` config — still loading, or a fetch blip — fails OPEN like
  * {@link cardPathAvailable}: the picker renders everything and the server
