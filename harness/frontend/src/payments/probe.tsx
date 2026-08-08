@@ -58,11 +58,17 @@ function lastChargeBody(world: HarnessWorld): Record<string, unknown> | null {
 function chargeLines(world: HarnessWorld): string[] {
   return world.seen.map((charge) => {
     const card = charge.card;
-    const instrument = card?.savedCardToken
-      ? `vault:${card.savedCardToken}`
-      : card?.token
-        ? `tok:${card.token}`
-        : '(no-instrument)';
+    // A wallet instrument prints its TYPE (`wallet:GOOGLE_PAY`), first because
+    // it wins on the wire (FUT-471): the packaged journey asserts on this tag,
+    // and a mount that stopped reading the flat wallet body degrades to
+    // `(no-instrument)` here rather than to a green run.
+    const instrument = card?.wallet
+      ? `wallet:${card.wallet.type}`
+      : card?.savedCardToken
+        ? `vault:${card.savedCardToken}`
+        : card?.token
+          ? `tok:${card.token}`
+          : '(no-instrument)';
     return `${charge.provider}:${charge.method}:${charge.customer?.taxId ?? '(no-taxId)'}:${instrument}`;
   });
 }
