@@ -25,11 +25,15 @@ import type { ChargeSnapshot } from './types';
  *
  *  - **status** always comes from the refresh — that is what it is for, and
  *    the caller has already checked the transition goes forward;
- *  - **amount** comes from the refresh once the charge is SETTLED, because a
+ *  - **amount** comes from the refresh whenever it REPORTS one, because a
  *    captured amount is a fact about money and the shortfall guard depends on
- *    reading the real one (FUT-373). While UNSETTLED, a reported 0 means "not
- *    captured yet", not "this charge is worth nothing", so the stored amount
- *    stands;
+ *    reading the real one (FUT-373). A reported 0 is silence, not a price:
+ *    while unsettled it means "not captured yet", and on a terminal-but-unpaid
+ *    refresh (an EXPIRED PIX order, a CANCELED charge with no amount echoed —
+ *    FUT-681) it means the provider had nothing to say about money at all. In
+ *    both cases the stored amount stands. A PAID refresh always carries a real
+ *    amount — `capturedAmountCents` refuses to fabricate one — so nothing a
+ *    settlement reports is ever masked;
  *  - **the instrument** — hosted link, QR, boleto, card — is kept whenever the
  *    refresh carries none. These exist because the charge was CREATED, not
  *    because it was later observed, and a provider that omits them is silent
@@ -51,7 +55,7 @@ export function mergeRefreshedSnapshot(
   return {
     ...stored,
     ...refreshed,
-    amount: settled || refreshed.amount.amountCents > 0 ? refreshed.amount : stored.amount,
+    amount: refreshed.amount.amountCents > 0 ? refreshed.amount : stored.amount,
     method: settled ? refreshed.method : stored.method,
     ...keepIfAbsent(stored, refreshed),
     // Hints ACCUMULATE. Each one is learned at a different moment — the invoice
