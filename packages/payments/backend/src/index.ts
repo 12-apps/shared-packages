@@ -138,6 +138,17 @@ export {
   type StubModeEnv,
 } from './core/stub-mode';
 
+// The FUT-477 follow-up resolver for PagBank's legacy `notificationCode`
+// deliveries: a stored code → normalized events (chargeback, dispute,
+// cancellation, settlement) a host applies with machinery it already has.
+// `webhook.parse` only RECOGNIZES that shape; this is the query that resolves
+// it, exported because its credentials — the legacy e-mail + API-token pair —
+// are the host's to supply per call. Contract: the module header.
+export {
+  resolvePagbankNotification,
+  type PagbankLegacyNotificationDetail,
+} from './providers/pagbank-legacy-notifications';
+
 export type {
   CardDetails,
   ChargeInput,
