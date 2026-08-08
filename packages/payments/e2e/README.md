@@ -103,6 +103,47 @@ does not rescue them either; it skips `node_modules` by design.
 Shipping source here would produce a package that type-checks, publishes,
 installs, and then throws on your first test run.
 
+## The platform-operations journeys (opt-in)
+
+The buyer journeys above run in any app that mounts the checkout. A second,
+**separate** set covers the app that operates the PLATFORM — the
+Connect-application consult screen and the platform homologação
+(`ConnectApplicationPanel` / `PlatformHomologacao` from
+`@12-apps/payments-frontend`). Most checkout consumers have no such surface,
+so these ship behind their own port and glob triple: nothing about them lands
+in `paymentsFeatures` or `paymentsSteps`, and a host that never lists them is
+untouched.
+
+```ts
+// tests/e2e/steps/platform-world.ts — inside your super-admin steps glob
+import { definePaymentsPlatformWorld } from '@12-apps/payments-e2e';
+
+definePaymentsPlatformWorld({
+  openConnectApplication: async (page, shape) => { /* sign in + route */ },
+  openHomologacao: async (page, shape) => { /* sign in + produce the shape */ },
+});
+```
+
+```ts
+import {
+  paymentsPlatformFeatures,
+  paymentsPlatformFeaturesRoot,
+  paymentsPlatformSteps,
+} from '@12-apps/payments-e2e';
+
+defineBddConfig({
+  features: [paymentsPlatformFeatures],
+  featuresRoot: paymentsPlatformFeaturesRoot,
+  steps: [paymentsPlatformSteps, 'tests/e2e/steps/**/*.ts'],
+  outputDir: '.features-gen/platform',
+});
+```
+
+The same three silent failures apply verbatim — use the exported globs, set
+`featuresRoot`, assert your scenario count. And `openHomologacao` must
+PRODUCE its shape, not just navigate: one scenario records an outcome, so a
+later `unrequested` opening has to clear it again.
+
 ## Writing your own specs in the same vocabulary
 
 The buyer gestures are exported too, so hand-written specs beside the journeys

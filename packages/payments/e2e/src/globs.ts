@@ -72,3 +72,35 @@ export const paymentsFeaturesRoot: string = join(packageRoot(), 'features');
  * in every worker.
  */
 export const paymentsSteps: string = join(packageRoot(), 'dist/steps/**/*.js');
+
+/**
+ * The PLATFORM-OPERATIONS journeys (FUT-479 / FUT-483, packaged by FUT-573),
+ * as a SEPARATE opt-in glob triple.
+ *
+ * Separate on purpose, twice over. The buyer journeys above run in any app
+ * that mounts the checkout; these run in the app that operates the PLATFORM
+ * (typically a super-admin SPA), and most checkout consumers have none.
+ * Folding them into `paymentsFeatures` would hand every existing host
+ * scenarios whose steps it never registered — bddgen fails on the undefined
+ * steps — and folding the steps into `paymentsSteps` would hand it orphan
+ * definitions instead, which is what a strict bdd gate fails on. A host that
+ * wants these lists all three, next to `definePaymentsPlatformWorld`:
+ *
+ * ```ts
+ * defineBddConfig({
+ *   features: [paymentsPlatformFeatures],
+ *   featuresRoot: paymentsPlatformFeaturesRoot,
+ *   steps: [paymentsPlatformSteps, 'tests/e2e/steps/**\/*.ts'],
+ * });
+ * ```
+ */
+export const paymentsPlatformFeatures: string = join(
+  packageRoot(),
+  'features-platform/**/*.feature',
+);
+
+/** Same trap as {@link paymentsFeaturesRoot} — unset, the specs land under a path Playwright ignores. */
+export const paymentsPlatformFeaturesRoot: string = join(packageRoot(), 'features-platform');
+
+/** Compiled for Node, like {@link paymentsSteps} and for the same reason. */
+export const paymentsPlatformSteps: string = join(packageRoot(), 'dist/steps-platform/**/*.js');
