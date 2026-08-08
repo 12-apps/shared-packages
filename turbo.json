@@ -64,10 +64,20 @@
     "USE_FILE_DB",
     "WRITE_HEAP_SNAPSHOTS"
   ],
+  "remoteCache": {
+    "signature": true
+  },
   "tasks": {
+    "prisma:generate": {
+      "cache": false,
+      "inputs": [
+        "prisma/**"
+      ]
+    },
     "build": {
       "dependsOn": [
-        "^build"
+        "^build",
+        "prisma:generate"
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -85,12 +95,14 @@
     "check-types": {
       "dependsOn": [
         "^build",
-        "^check-types"
+        "^check-types",
+        "prisma:generate"
       ]
     },
     "test": {
       "dependsOn": [
-        "^build"
+        "^build",
+        "prisma:generate"
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -104,7 +116,8 @@
     },
     "test:coverage": {
       "dependsOn": [
-        "^build"
+        "^build",
+        "prisma:generate"
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
