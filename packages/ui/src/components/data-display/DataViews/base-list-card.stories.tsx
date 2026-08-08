@@ -4,7 +4,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import type { InputType } from "storybook/internal/types";
 
-import { Chip } from "../Chip";
 import { Button } from "../../form/Button";
 import { DropdownMenu } from "../../navigation/DropdownMenu";
 import { Box } from "../../../mui/Box";
@@ -16,7 +15,7 @@ import { ListCardGroup } from "./list-card-rails";
 /**
  * BaseListCard is BaseCard's horizontal sibling: the full-width row the "Lista"
  * layout wanted and never had. A marker, a title over a subtitle, labelled
- * middle columns, a value, a status, inline actions and a menu.
+ * middle columns, a value, inline actions and a menu.
  *
  * It answers its OWN width with a container query, not the viewport — the same
  * row renders full-bleed on a phone, inside a 300px board column, and beside an
@@ -81,17 +80,7 @@ function slot(mapping: Record<string, unknown>): InputType {
   return { control: "select", options: Object.keys(mapping), mapping };
 }
 
-const chip = (label: string, color: "info" | "success" | "error"): React.JSX.Element => (
-  <Chip label={label} size="small" variant="outlined" color={color} />
-);
-
 const LEADING = { nenhum: undefined, "ícone de recibo": marker };
-const STATUS = {
-  nenhum: undefined,
-  "Em aberto": chip("Em aberto", "info"),
-  Pago: chip("Pago", "success"),
-  Cancelado: chip("Cancelado", "error"),
-};
 const MENU = { nenhum: undefined, "kebab (⋮)": kebab };
 const ACTIONS = {
   nenhuma: undefined,
@@ -135,7 +124,7 @@ const meta: Meta<typeof BaseListCard> = {
   argTypes: {
     // ORDERED BY WHAT SOMEBODY WOULD ACTUALLY REACH FOR.
     //
-    // Left alone, the table opens on `leading`, `meta`, `status` and `menu` —
+    // Left alone, the table opens on `leading`, `meta` and `menu` —
     // a React element rendered as `$$typeof: Symbol(react.transitional.element)`
     // and an array of objects behind a raw JSON editor. Nobody tunes a row by
     // hand-editing that blob, so the knobs that DO change what you see were
@@ -188,7 +177,6 @@ const meta: Meta<typeof BaseListCard> = {
     ...category("Slots", {
       // Pick between real nodes rather than editing an element blob.
       leading: slot(LEADING),
-      status: slot(STATUS),
       menu: slot(MENU),
       actions: slot(ACTIONS),
       // These two ARE directly editable: an array of label/value pairs is
@@ -265,7 +253,6 @@ export const Pedido: Story = {
       { label: "Data", value: "05/08/2026, 13:45" },
       { label: "Método", value: "PIX" },
     ],
-    status: <Chip label="Em aberto" size="small" variant="outlined" color="info" />,
     // ONE overflow, no inline buttons. A row offering `Ver` beside a kebab that
     // also opens `Editar`/`Excluir` asks the same question twice; see the
     // `Actions` story for the case where a host does want both (and where
@@ -336,7 +323,6 @@ export const Actions: Story = {
           title="B75A6858"
           subtitle="Luiz Gustavo"
           value="R$ 13,90"
-          status={<Chip label="Pago" size="small" variant="outlined" color="success" />}
           onClick={() => note("abriu a linha")}
           actions={
             <>
@@ -372,6 +358,11 @@ export const DraggableInsideAContainer: Story = {
   render: () => {
     const [order, setOrder] = useState(["B75A6858", "1D970689", "0112CF89", "89E40634"]);
     const [active, setActive] = useState<string | number | null>(null);
+    // WHERE IT WOULD LAND, computed from the pointer against the row it is over:
+    // past the midpoint means after, otherwise before. The container owns this
+    // because only it knows the geometry — the card being hovered cannot see
+    // where the pointer is relative to its neighbours.
+    const [drop, setDrop] = useState<{ id: string | number; edge: "before" | "after" } | null>(null);
     const move = (from: string, to: string): void =>
       setOrder((prev) => {
         const next = prev.filter((id) => id !== from);
@@ -390,14 +381,29 @@ export const DraggableInsideAContainer: Story = {
               event.dataTransfer.setData("text/plain", String(id));
               setActive(id);
             },
-            onDragEnd: () => setActive(null),
+            onDragEnd: () => {
+              setActive(null);
+              setDrop(null);
+            },
           }),
+          dropIndicator: drop,
           itemProps: (id) => ({
-            onDragOver: (event: React.DragEvent) => event.preventDefault(),
+            onDragOver: (event: React.DragEvent) => {
+              event.preventDefault();
+              const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+              const edge = event.clientY > box.top + box.height / 2 ? "after" : "before";
+              setDrop((prev) =>
+                prev?.id === id && prev.edge === edge ? prev : { id, edge },
+              );
+            },
+            // Not `onDragLeave`: it fires as the pointer crosses INTO a child of
+            // the same row, so the marker would strobe off and on across every
+            // cell. The list clears it once, when the drag ends.
             onDrop: (event: React.DragEvent) => {
               event.preventDefault();
               move(event.dataTransfer.getData("text/plain"), String(id));
               setActive(null);
+              setDrop(null);
             },
           }),
         }}
@@ -435,7 +441,7 @@ export const NotDraggableWithoutAContainer: Story = {
 
 /**
  * The container query, at three widths. Below ~520px the labelled middle
- * columns go; below ~360px the value and status drop to their own line rather
+ * columns go; below ~360px the value drops to its own line rather
  * than squeezing the title to two characters.
  */
 export const RespondsToItsOwnWidth: Story = {
@@ -454,7 +460,6 @@ export const RespondsToItsOwnWidth: Story = {
                 { label: "Método", value: "PIX" },
               ]}
               value="R$ 13,90"
-              status={<Chip label="Em aberto" size="small" variant="outlined" color="info" />}
               menu={kebab}
               onToggleSelect={() => {}}
             />
@@ -511,7 +516,6 @@ export const Density: Story = {
                 subtitle="Luiz Gustavo"
                 meta={[{ label: "Data", value: "05/08/2026, 13:45" }]}
                 value="R$ 13,90"
-                status={<Chip label="Em aberto" size="small" variant="outlined" color="info" />}
                 menu={kebab}
                 onToggleSelect={() => {}}
               />
@@ -540,7 +544,6 @@ export const Variants: Story = {
             title="B75A6858"
             subtitle="Luiz Gustavo"
             value="R$ 13,90"
-            status={<Chip label="Em aberto" size="small" variant="outlined" color="info" />}
             menu={kebab}
             onToggleSelect={() => {}}
           />
@@ -608,7 +611,7 @@ export const EmphasisAndState: Story = {
  * THE LIST OWNS THE COLUMNS.
  *
  * Inside a {@link ListCardGroup} every row is `grid-template-columns: subgrid`
- * over one shared set of rails, so the value sits on a fixed edge and the status
+ * over one shared set of rails, so the value sits on a fixed edge and the cells
  * chip has a slot of its own. Note the amounts: they line up down the page even
  * though `Em aberto`, `Pago` and `Cancelado` are three different widths — which
  * is exactly what the old per-row flex could not do, since a wider chip shoved
@@ -622,11 +625,11 @@ export const SharedRails: Story = {
   render: () => (
     <ListCardGroup density="cozy" dataTestId="rails-group">
       {[
-        ["B75A6858", "R$ 13,90", "Em aberto", "info"],
-        ["1D970689", "R$ 2,98", "Pago", "success"],
-        ["0112CF89", "R$ 1.250,00", "Cancelado", "error"],
-        ["89E40634", "R$ 8,90", "Pago", "success"],
-      ].map(([id, amount, label, tone]) => (
+        ["B75A6858", "R$ 13,90"],
+        ["1D970689", "R$ 2,98"],
+        ["0112CF89", "R$ 1.250,00"],
+        ["89E40634", "R$ 8,90"],
+      ].map(([id, amount]) => (
         <BaseListCard
           key={id}
           testId={`rail-${id}`}
@@ -638,14 +641,6 @@ export const SharedRails: Story = {
             { label: "Método", value: "PIX" },
           ]}
           value={amount}
-          status={
-            <Chip
-              label={label}
-              size="small"
-              variant="outlined"
-              color={tone as "info" | "success" | "error"}
-            />
-          }
           menu={kebab}
           onToggleSelect={() => {}}
         />
@@ -671,7 +666,6 @@ export const LinkedRow: Story = {
     title: "B75A6858",
     subtitle: "cmd-click / middle-click me",
     value: "R$ 13,90",
-    status: <Chip label="Em aberto" size="small" variant="outlined" color="info" />,
     menu: kebab,
     onToggleSelect: () => {},
   },
@@ -773,7 +767,6 @@ export const Expandable: Story = {
     subtitle: "Mesa 12 · 8 itens",
     meta: [{ label: "Cupom", value: "BEMVINDO10" }],
     value: "R$ 312,50",
-    status: <Chip label="Abandonado" size="small" variant="outlined" color="warning" />,
     onToggleSelect: () => {},
     children: <OrderDetail />,
   },
