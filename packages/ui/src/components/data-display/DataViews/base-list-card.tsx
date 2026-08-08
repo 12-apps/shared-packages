@@ -16,7 +16,7 @@ import {
   slotTestIds,
   type CardSurfaceProps,
 } from "./card-surface";
-import { useDragItem } from "./data-views-drag";
+import { DropIndicator, useDragItem } from "./data-views-drag";
 import { DiscloseSlot, DragSlot, SelectSlot } from "./base-list-card-gutters";
 import { DENSITY_ROW_PADDING, type DataViewsDensity } from "./data-views-layout-context";
 import { RAIL_COUNT, RAIL_GAP, cellRailsTemplate, railsTemplateFor, useListRails } from "./list-card-rails";
@@ -448,6 +448,7 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
       // A PLAIN OBJECT: `Card` merges by spreading, so a function sx vanishes.
       sx={rowStyles(props, shell, cellTemplate)}
     >
+      {drag.dropEdge != null && <DropIndicator edge={drag.dropEdge} />}
       <DiscloseSlot
         expandable={disclosure.expandable}
         expanded={disclosure.expanded}
