@@ -693,11 +693,14 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
     it('stays PENDING inside the grace window, where a straggler can still settle', async () => {
       // EXPIRED and PAID are contradictory outcomes the status ranks refuse to
       // reorder, so the mapping must not call the race for the buyer's bank.
+      // Fixed clock: the QR expired one minute "ago" — inside the grace.
+      const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2030-01-01T12:01:00Z'));
       mockFetch({
         id: 'ORDE_8',
-        qr_codes: [{ text: 'emv', expiration_date: new Date(Date.now() - 60_000).toISOString() }],
+        qr_codes: [{ text: 'emv', expiration_date: '2030-01-01T12:00:00Z' }],
       });
       const snapshot = await pagbankProvider().getCharge('ORDE_8', CREDS);
+      now.mockRestore();
       expect(snapshot.status).toBe('PENDING');
     });
   });
