@@ -53,5 +53,5 @@ Three findings, in order of weight.
 
 ## Follow-through
 
-- `porting.md` §2 still prescribes `@dnd-kit/sortable`. It is superseded by this record — leave the section as written history and read this file first, per `README.md`'s precedence.
+- `porting.md` §2 still prescribes `@dnd-kit/sortable`. It is superseded by this record — leave the section as written history and read this file first, per `instructions.md`'s precedence.
 - `plan.md` entry 16 links here and carries the reconciled scope.
