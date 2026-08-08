@@ -145,4 +145,19 @@ describe('mergeRefreshedSnapshot — everything the refresh does report wins', (
 
     expect(mergeRefreshedSnapshot(withQr, UNPAID_REREAD).pix?.qrText).toBe('00020126-live');
   });
+
+  it('keeps what the charge was worth through a terminal-but-unpaid refresh', () => {
+    // An EXPIRED PIX order (FUT-681) carries no charge and so no amount: the
+    // provider is silent about money, not retracting it. Zeroing the row here
+    // would erase what the order was for — the number the retry screen and
+    // every report still needs.
+    const expired: ChargeSnapshot = {
+      ...UNPAID_REREAD,
+      status: 'EXPIRED',
+    };
+
+    const merged = mergeRefreshedSnapshot(CREATED, expired);
+    expect(merged.status).toBe('EXPIRED');
+    expect(merged.amount).toEqual({ amountCents: 1290, currency: 'BRL' });
+  });
 });

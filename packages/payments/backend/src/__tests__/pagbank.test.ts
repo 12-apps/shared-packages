@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ProviderRequestError } from '../core/errors';
+import { createMemoryChargeStore } from '../memory';
 import { pagbankProvider } from '../providers/pagbank';
 import { cardInput, pixInput } from './fixtures';
 
@@ -39,11 +40,17 @@ describe('pagbank adapter — charges', () => {
    * confirmation quietly depended on the client polling instead.
    */
   it.each(['pix', 'card'] as const)('announces the store webhook URL on a %s order', async (kind) => {
-    const spy = mockFetch({
-      id: 'ORDE_1',
-      charges: [{ id: 'CHAR_1', status: 'PAID', payment_response: { code: '20000' } }],
-      qr_codes: [{ text: 'emv', expiration_date: '2030-01-01T00:00:00Z' }],
-    });
+    // Each kind gets its REAL response shape: an unpaid PIX order carries no
+    // charges[] (PagBank mints the charge only when the buyer pays), a card
+    // order settles synchronously and does.
+    const spy = mockFetch(
+      kind === 'pix'
+        ? { id: 'ORDE_1', qr_codes: [{ text: 'emv', expiration_date: '2030-01-01T00:00:00Z' }] }
+        : {
+            id: 'ORDE_1',
+            charges: [{ id: 'CHAR_1', status: 'PAID', payment_response: { code: '20000' } }],
+          },
+    );
 
     await pagbankProvider().createCharge(kind === 'pix' ? pixInput() : cardInput(), {
       ...LIVE,
@@ -59,9 +66,11 @@ describe('pagbank adapter — charges', () => {
   });
 
   it('sends the proven PIX order shape and maps the QR back', async () => {
+    // The REAL create response for an unpaid PIX: no charges[] — the charge
+    // does not exist until the buyer pays (FUT-681). The old fixture invented
+    // a CHAR_1 entry, which is exactly what hid the identity bug.
     const spy = mockFetch({
       id: 'ORDE_1',
-      charges: [{ id: 'CHAR_1' }],
       qr_codes: [{ text: '00020126-emv', expiration_date: '2030-01-01T00:00:00Z' }],
     });
     const snapshot = await pagbankProvider().createCharge(
@@ -86,14 +95,18 @@ describe('pagbank adapter — charges', () => {
 
     expect(snapshot).toMatchObject({
       provider: 'pagbank',
-      providerChargeId: 'CHAR_1',
+      // The order id is the only identity an unpaid PIX has; the hint labels
+      // it as an ORDER id so later reads can re-key the row (FUT-681).
+      providerChargeId: 'ORDE_1',
+      reference: 'order-1',
       status: 'PENDING',
       pix: { qrText: '00020126-emv' },
+      settlementHints: { orderId: 'ORDE_1' },
     });
   });
 
   it('routes PRODUCTION credentials at the live host, sandbox by default', async () => {
-    const spy = mockFetch({ id: 'O', charges: [{ id: 'C' }], qr_codes: [{ text: 'q' }] });
+    const spy = mockFetch({ id: 'O', qr_codes: [{ text: 'q' }] });
     await pagbankProvider().createCharge(pixInput(), {
       environment: 'PRODUCTION',
       fields: { token: 't' },
@@ -320,7 +333,7 @@ describe('pagbank adapter — charges', () => {
 describe('pagbank adapter — customer.phones', () => {
   /** The `customer` block as it went over the wire. */
   async function sentCustomer(phone?: string) {
-    const spy = mockFetch({ id: 'ORDE_1', charges: [{ id: 'CHAR_1' }], qr_codes: [{ text: 'emv' }] });
+    const spy = mockFetch({ id: 'ORDE_1', qr_codes: [{ text: 'emv' }] });
     const input = pixInput();
     await pagbankProvider().createCharge(
       { ...input, customer: { ...input.customer, phone } },
@@ -529,6 +542,231 @@ describe('pagbank adapter — webhooks', () => {
       // Deliberately unchanged: only the DOCUMENTED second format is claimed
       // here. Inventing a policy for arbitrary junk is a separate decision.
       await expect(parse('<?xml version="1.0"?><transaction/>')).rejects.toThrow();
+    });
+  });
+});
+
+/**
+ * FUT-681 — one charge identity across create, webhook, poll and refund.
+ *
+ * PIX create used to record the ORDER id as `providerChargeId` (an unpaid PIX
+ * has no charge), the paid webhook then presented the CHARGE id, and the two
+ * never met: `upsertByProviderChargeId` updated nothing, `payment_charges`
+ * stayed PENDING, and only the reference rescue settled the order.
+ */
+describe('pagbank adapter — charge identity (FUT-681)', () => {
+  const CREDS = { environment: 'SANDBOX' as const, fields: { token: 'tok' } };
+
+  /** Stub `fetch` with a QUEUE of responses (the last one repeats). */
+  function mockFetchQueue(responses: unknown[]) {
+    const calls: Array<[string, RequestInit]> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        calls.push([String(url), init]);
+        const body = responses[Math.min(calls.length - 1, responses.length - 1)];
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => body,
+          text: async () => JSON.stringify(body),
+        } as unknown as Response;
+      }),
+    );
+    return calls;
+  }
+
+  it('Given a PIX order, When the paid webhook arrives, Then the charge row reflects PAID', async () => {
+    const store = createMemoryChargeStore();
+    const merchant = { kind: 'TENANT', id: 'acme' } as const;
+    // The row PIX create writes: keyed by the ORDER id, labeled as such.
+    mockFetch({ id: 'ORDE_7', qr_codes: [{ text: 'emv' }] });
+    const created = await pagbankProvider().createCharge(pixInput('order-7'), LIVE);
+    await store.create({ merchant, reference: 'order-7', snapshot: created });
+
+    // The paid webhook names the charge PagBank minted at payment time.
+    const [event] = await pagbankProvider().webhook.parse(
+      {
+        provider: 'pagbank',
+        rawBody: JSON.stringify({
+          id: 'ORDE_7',
+          reference_id: 'order-7',
+          charges: [{ id: 'CHAR_7', status: 'PAID', amount: { value: 12_50 } }],
+        }),
+        headers: {},
+      },
+      LIVE,
+    );
+    const updated = await store.upsertByProviderChargeId(merchant, event!.charge!);
+
+    // The row itself moved — not merely the order via the reference rescue.
+    expect(updated).not.toBeNull();
+    expect(updated?.snapshot.status).toBe('PAID');
+    // ...and it is RE-KEYED to the charge id every later caller will present.
+    expect(updated?.providerChargeId).toBe('CHAR_7');
+    await expect(store.findByProviderChargeId('pagbank', 'CHAR_7')).resolves.toBe(updated);
+  });
+
+  describe('getCharge works for card and PIX', () => {
+    it('polls /orders/{orderId} for a card charge via the order hint', async () => {
+      const spy = mockFetch({
+        id: 'ORDE_2',
+        charges: [{ id: 'CHAR_2', status: 'PAID', amount: { value: 99_90 } }],
+      });
+      const snapshot = await pagbankProvider().getCharge('CHAR_2', CREDS, { orderId: 'ORDE_2' });
+      expect((spy.mock.calls[0] as [string])[0]).toBe(
+        'https://sandbox.api.pagseguro.com/orders/ORDE_2',
+      );
+      expect(snapshot).toMatchObject({ providerChargeId: 'CHAR_2', status: 'PAID' });
+    });
+
+    it('polls /charges/{id} for a card row stored before the hint existed', async () => {
+      // `/orders/{CHAR_…}` is the 404 the ticket names; the charge endpoint is
+      // the read that answers for a bare charge id.
+      const spy = mockFetch({
+        id: 'CHAR_3',
+        reference_id: 'order-3',
+        status: 'PAID',
+        amount: { value: 99_90 },
+      });
+      const snapshot = await pagbankProvider().getCharge('CHAR_3', CREDS);
+      expect((spy.mock.calls[0] as [string])[0]).toBe(
+        'https://sandbox.api.pagseguro.com/charges/CHAR_3',
+      );
+      expect(snapshot).toMatchObject({
+        providerChargeId: 'CHAR_3',
+        reference: 'order-3',
+        status: 'PAID',
+        amount: { amountCents: 99_90 },
+      });
+    });
+
+    it('polls /orders/{id} for a PIX row keyed by its order id', async () => {
+      const spy = mockFetch({ id: 'ORDE_4', qr_codes: [{ text: 'emv' }] });
+      const snapshot = await pagbankProvider().getCharge('ORDE_4', CREDS);
+      expect((spy.mock.calls[0] as [string])[0]).toBe(
+        'https://sandbox.api.pagseguro.com/orders/ORDE_4',
+      );
+      expect(snapshot.status).toBe('PENDING');
+    });
+  });
+
+  describe('refund works for a charge created as PIX', () => {
+    it('resolves the order to its paid charge before cancelling', async () => {
+      const calls = mockFetchQueue([
+        { id: 'ORDE_5', charges: [{ id: 'CHAR_5', status: 'PAID', amount: { value: 12_50 } }] },
+        { id: 'CHAR_5', status: 'CANCELED' },
+      ]);
+      const refund = await pagbankProvider().refund!({ providerChargeId: 'ORDE_5' }, CREDS);
+
+      expect(calls[0]![0]).toBe('https://sandbox.api.pagseguro.com/orders/ORDE_5');
+      expect(calls[1]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_5/cancel');
+      expect(refund.providerRefundId).toBe('CHAR_5');
+    });
+
+    it('cancels a charge id directly, with no order read', async () => {
+      const calls = mockFetchQueue([{ id: 'CHAR_6', status: 'CANCELED' }]);
+      await pagbankProvider().refund!({ providerChargeId: 'CHAR_6' }, CREDS);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_6/cancel');
+    });
+
+    it('refuses to refund an order nobody paid instead of 404-ing blind', async () => {
+      mockFetch({ id: 'ORDE_6', qr_codes: [{ text: 'emv' }] });
+      await expect(
+        pagbankProvider().refund!({ providerChargeId: 'ORDE_6' }, CREDS),
+      ).rejects.toThrow(ProviderRequestError);
+    });
+  });
+
+  describe('When PagBank expires a PIX, the charge stops reading as waiting', () => {
+    it('answers EXPIRED once every QR is past its deadline plus the grace', async () => {
+      mockFetch({
+        id: 'ORDE_8',
+        qr_codes: [{ text: 'emv', expiration_date: '2020-01-01T00:00:00Z' }],
+      });
+      const snapshot = await pagbankProvider().getCharge('ORDE_8', CREDS);
+      expect(snapshot.status).toBe('EXPIRED');
+    });
+
+    it('stays PENDING inside the grace window, where a straggler can still settle', async () => {
+      // EXPIRED and PAID are contradictory outcomes the status ranks refuse to
+      // reorder, so the mapping must not call the race for the buyer's bank.
+      mockFetch({
+        id: 'ORDE_8',
+        qr_codes: [{ text: 'emv', expiration_date: new Date(Date.now() - 60_000).toISOString() }],
+      });
+      const snapshot = await pagbankProvider().getCharge('ORDE_8', CREDS);
+      expect(snapshot.status).toBe('PENDING');
+    });
+  });
+
+  describe('canceled and refunded charges stop collapsing into PENDING', () => {
+    async function polledStatus(charge: Record<string, unknown>) {
+      mockFetch({ id: 'ORDE_9', charges: [charge] });
+      return (await pagbankProvider().getCharge('ORDE_9', CREDS)).status;
+    }
+
+    it('maps a voided charge to CANCELED and a refunded one to REFUNDED', async () => {
+      expect(await polledStatus({ id: 'CHAR_9', status: 'CANCELED' })).toBe('CANCELED');
+      // PagBank answers CANCELED for a refund too; the refunded summary is
+      // what tells money-went-back from voided-before-payment.
+      expect(
+        await polledStatus({
+          id: 'CHAR_9',
+          status: 'CANCELED',
+          amount: { value: 12_50, summary: { refunded: 12_50 } },
+        }),
+      ).toBe('REFUNDED');
+      expect(await polledStatus({ id: 'CHAR_9', status: 'DECLINED' })).toBe('DECLINED');
+    });
+
+    it('emits REFUND_UPDATED alongside the charge event when money went back', async () => {
+      const rawBody = JSON.stringify({
+        id: 'ORDE_10',
+        reference_id: 'order-10',
+        charges: [
+          {
+            id: 'CHAR_10',
+            status: 'CANCELED',
+            amount: { value: 12_50, summary: { refunded: 12_50 } },
+          },
+        ],
+      });
+      const events = await pagbankProvider().webhook.parse(
+        { provider: 'pagbank', rawBody, headers: {} },
+        LIVE,
+      );
+
+      expect(events).toHaveLength(2);
+      expect(events[0]).toMatchObject({
+        type: 'CHARGE_UPDATED',
+        charge: { providerChargeId: 'CHAR_10', status: 'REFUNDED' },
+      });
+      expect(events[1]).toMatchObject({
+        type: 'REFUND_UPDATED',
+        refund: {
+          providerChargeId: 'CHAR_10',
+          status: 'REFUNDED',
+          amount: { amountCents: 12_50, currency: 'BRL' },
+        },
+      });
+      // Its own dedup key: the inbox records one row per event.
+      expect(events[1]!.eventId).not.toBe(events[0]!.eventId);
+    });
+
+    it('emits no refund event for a plain cancel where no money moved', async () => {
+      const rawBody = JSON.stringify({
+        id: 'ORDE_11',
+        charges: [{ id: 'CHAR_11', status: 'CANCELED' }],
+      });
+      const events = await pagbankProvider().webhook.parse(
+        { provider: 'pagbank', rawBody, headers: {} },
+        LIVE,
+      );
+      expect(events).toHaveLength(1);
+      expect(events[0]!.charge?.status).toBe('CANCELED');
     });
   });
 });
