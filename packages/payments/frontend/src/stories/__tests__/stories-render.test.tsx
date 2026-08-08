@@ -21,6 +21,7 @@ import type { StoryObj } from "@storybook/react-vite";
 import * as checkoutStories from "../Checkout.stories";
 import * as compositionStories from "../Composition.stories";
 import * as hostedStories from "../Hosted.stories";
+import * as platformOpsStories from "../PlatformOps.stories";
 import * as providerScreenStories from "../ProviderScreens.stories";
 import * as screenStories from "../Screens.stories";
 
@@ -57,6 +58,7 @@ const MODULES: [string, Record<string, unknown>][] = [
   ["Hosted", hostedStories],
   ["Composition", compositionStories],
   ["ProviderScreens", providerScreenStories],
+  ["PlatformOps", platformOpsStories],
 ];
 
 describe.each(MODULES)("%s stories", (_name, module) => {
