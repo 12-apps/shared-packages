@@ -523,7 +523,27 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
         // the alternative re-runs every consumer's effects on each toggle.
         <Box sx={{ gridColumn: "1 / -1", minWidth: 0 }}>
           <Collapse in={disclosure.expanded} timeout={150}>
-            <Box id={disclosure.regionId} role="region" sx={{ mt: pad * 0.5, minWidth: 0 }}>
+            <Box
+              id={disclosure.regionId}
+              role="region"
+              sx={{
+                minWidth: 0,
+                mt: pad * 0.5,
+                pt: pad * 0.5,
+                // A RULE BETWEEN THE SUMMARY AND THE BODY. Without it the line
+                // items ran straight on from the row's own text and the whole
+                // card read as one block — the summary stopped looking like a
+                // header and started looking like the body's first line.
+                borderTop: 1,
+                borderColor: "divider",
+                // Bled through the row's horizontal padding so the rule spans
+                // the card edge to edge. Inset, it reads as a border around the
+                // content rather than a division of the card, which is the
+                // opposite of what it is for.
+                mx: -pad,
+                px: pad,
+              }}
+            >
               {props.children}
             </Box>
           </Collapse>
