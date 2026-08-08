@@ -81,6 +81,21 @@ seven published while it was private are still restricted on npm; their next
 release flips them, and a package's access covers every version it has, so the
 versions already up there become readable too.
 
+### Where a release announces itself
+
+On the [Releases page][releases] and on the merged PR's `released` label —
+**not** in a PR comment. Each package in `PUBLISH_DIRS` is its own
+semantic-release run, so `@semantic-release/github`'s default success comment
+posted once per package: two dozen `:tada: This PR is included in version X`
+comments on a single merge, each carrying a bare version number that does not
+say which package it belongs to. A package's *first* release made it worse
+still — with no earlier tag its commit range is the entire history, so every
+PR the repo had ever merged got one. Every `.releaserc.json` sets
+`successComment: false`.
+
+Failures are still announced: semantic-release opens and updates a
+`The automated release is failing 🚨` issue.
+
 ### The first publish of a new package
 
 OIDC cannot make a package's first publish. A Trusted Publisher is configured
@@ -103,6 +118,7 @@ Settings → Trusted Publisher → GitHub Actions, repository
 secret is dead weight and can be revoked; npm is
 [phasing out token-based publishing][2fa] in favour of exactly this.
 
+[releases]: https://github.com/12-apps/shared-packages/releases
 [oidc-issue]: https://github.com/npm/cli/issues/8544
 [granular]: https://docs.npmjs.com/creating-and-viewing-access-tokens
 [2fa]: https://gh.io/npm-gat-bypass2fa-deprecation

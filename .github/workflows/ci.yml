@@ -386,8 +386,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # tags + GitHub releases
-      issues: write # semantic-release release comments
-      pull-requests: write
+      issues: write # semantic-release's "release is failing" issue
+      pull-requests: write # the `released` label semantic-release puts on a PR
       id-token: write # OIDC trusted publishing — no token
     steps:
       - uses: actions/checkout@v4
@@ -422,6 +422,16 @@ jobs:
           # topological — a package is released only after everything it
           # depends on, so prepare-publish.mjs always resolves workspace:*
           # interdeps to a version that already exists.
+          #
+          # Every .releaserc.json sets successComment:false, and this loop is
+          # why. @semantic-release/github comments on the PRs behind a release,
+          # and each iteration below is its own release — so one merge posted
+          # one ":tada: This PR is included in version X" per package, 24 of
+          # them, all identical apart from a bare version number that names no
+          # package. Worse, a package releasing for the FIRST time has no prior
+          # tag, so its commit range is the whole history and every PR the repo
+          # has ever merged got one too. The Releases page and the `released`
+          # label carry the same information without the fan-out.
           for dir in $PUBLISH_DIRS; do
             pkg="$(basename "$dir")"
             echo "::group::semantic-release $pkg"
