@@ -22,7 +22,7 @@ import type {
 } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
-import { isConnected } from './connection-state';
+import { expiryProximity, isConnected } from './connection-state';
 
 /**
  * The `authMode: 'oauth'` half of the settings page: a provider whose
@@ -49,10 +49,35 @@ export interface ProviderConnectionProps {
   onChanged: () => void;
 }
 
-function expiryNote(expiresAt: string | null): string | null {
-  if (!expiresAt) return null;
-  const when = new Date(expiresAt);
-  return `Autorização válida até ${when.toLocaleString('pt-BR')}`;
+/**
+ * The expiry caption, with PROXIMITY emphasis (FUT-683): the renewal sweep
+ * normally refreshes a grant long before it lapses, so an expiry that is
+ * actually close means renewal has been failing quietly — and this caption is
+ * the only warning an owner gets before checkout starts refusing. A neutral
+ * gray line read the same on the eve of an outage as a year out.
+ */
+function ExpiryNote(props: { expiresAt: string }) {
+  const when = new Date(props.expiresAt).toLocaleString('pt-BR');
+  const proximity = expiryProximity(props.expiresAt);
+  if (proximity === 'SAFE' || proximity === null) {
+    return (
+      <Typography variant="caption" color="text.secondary">
+        {`Autorização válida até ${when}`}
+      </Typography>
+    );
+  }
+  return (
+    <Typography
+      variant="caption"
+      color={proximity === 'PAST' ? 'error.main' : 'warning.main'}
+      sx={{ fontWeight: 600 }}
+      data-testid="payments-expiry-warning"
+    >
+      {proximity === 'PAST'
+        ? `A autorização expirou em ${when}. Reconecte para voltar a receber pagamentos.`
+        : `A autorização expira em ${when}. Se o aviso continuar, reconecte a conta.`}
+    </Typography>
+  );
 }
 
 function connectLabel(displayName: string, connected: boolean, busy: string | null) {
@@ -98,11 +123,7 @@ function ConnectionSummary(props: {
           A autorização expirou ou foi revogada. Reconecte para voltar a receber pagamentos.
         </Alert>
       ) : null}
-      {props.expiresAt ? (
-        <Typography variant="caption" color="text.secondary">
-          {expiryNote(props.expiresAt)}
-        </Typography>
-      ) : null}
+      {props.expiresAt ? <ExpiryNote expiresAt={props.expiresAt} /> : null}
     </>
   );
 }
