@@ -43,6 +43,26 @@ export {
 export { paymentsFeatures, paymentsFeaturesRoot, paymentsSteps } from './globs.js';
 
 /**
+ * The PLATFORM-OPERATIONS journeys (FUT-479 / FUT-483, packaged by FUT-573):
+ * the Connect-application consult and the platform homologação, for the app
+ * that operates the platform. A separate OPT-IN port and glob triple — see
+ * `platform-world.ts` for why folding them into `PaymentsWorld` would have
+ * broken every checkout-only consumer.
+ */
+export {
+  definePaymentsPlatformWorld,
+  paymentsPlatformWorld,
+  type ConnectApplicationShape,
+  type PaymentsPlatformWorld,
+  type PlatformHomologacaoShape,
+} from './platform-world.js';
+export {
+  paymentsPlatformFeatures,
+  paymentsPlatformFeaturesRoot,
+  paymentsPlatformSteps,
+} from './globs.js';
+
+/**
  * The buyer gestures the packaged steps are built from, exported so a host can
  * write its OWN specs in the same vocabulary. Every one drives a test id the
  * payments components render, so they are as portable as the journeys.

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -131,6 +131,58 @@ function renderConnection(over: Partial<MaskedProviderConfig>) {
     />,
   );
 }
+
+/**
+ * WHICH account is connected (FUT-300) — the difference between "conectado"
+ * and "conectado como". Before this the only way an owner could tell which
+ * provider account a store charges into was to disconnect and reconnect.
+ */
+describe('ProviderConnection — the connected account', () => {
+  it('shows the account identity, its scopes in pt-BR, and the connect date', () => {
+    renderConnection({
+      status: 'VERIFIED',
+      connectedAccount: {
+        accountId: 'ACCO_1234',
+        accountLabel: null,
+        grantedScopes: ['payments.read', 'custom.scope'],
+        connectedAt: '2026-08-01T15:00:00Z',
+      },
+    });
+    const details = screen.getByTestId('payments-connected-account');
+    expect(details.textContent).toContain('Conta conectada');
+    expect(details.textContent).toContain('ACCO_1234');
+    expect(details.textContent).toContain('Conectada em');
+    // A known scope reads in the owner's language; an unknown one falls back
+    // to the provider's own spelling rather than a wrong translation.
+    expect(details.textContent).toContain('Consultar pagamentos');
+    expect(details.textContent).toContain('custom.scope');
+  });
+
+  it('prefers a human-recognizable label over the raw account id', () => {
+    renderConnection({
+      status: 'VERIFIED',
+      connectedAccount: {
+        accountId: 'ACCO_1234',
+        accountLabel: 'loja@exemplo.com.br',
+        grantedScopes: [],
+        connectedAt: null,
+      },
+    });
+    expect(screen.getByTestId('payments-connected-account').textContent).toContain(
+      'loja@exemplo.com.br',
+    );
+  });
+
+  it('claims nothing for a store connected before the identity was recorded', async () => {
+    renderConnection({ status: 'VERIFIED', connectedAccount: null });
+    // The connected copy still renders; an account block naming nobody would
+    // be a claim the data cannot back.
+    expect(screen.getByText(/Sua conta está conectada/).textContent).toContain('conectada');
+    await waitFor(() => {
+      expect(screen.queryByTestId('payments-connected-account')).toBeNull();
+    });
+  });
+});
 
 /**
  * The expiry caption's proximity emphasis (FUT-683). The renewal sweep

@@ -285,13 +285,13 @@ export interface RefundSnapshot {
 export type ClientTokenization = 'NONE' | 'PUBLIC_KEY' | 'SDK' | 'REDIRECT';
 
 /**
- * The digital-wallet descriptors (FUT-471/472) — wallet union, the wallet
- * instrument a card charge can carry, and Google Pay's client parameters.
- * Their own module for the same reason as {@link SettlementHints} (this
- * file's size gate), re-exported here so consumers keep importing from
- * `core/types`, the one door.
+ * The digital-wallet descriptors (FUT-471/472) — their own module for the
+ * same reason as {@link SettlementHints} (this file's size gate); consumers
+ * keep importing from `core/types`, the one door.
  */
-export type { GooglePayClientConfig, WalletInstrument, WalletType } from './wallet-types';
+export type {
+  ApplePayActivation, ApplePayCsr, GooglePayClientConfig, WalletInstrument, WalletType,
+} from './wallet-types';
 
 /**
  * What a provider adapter can actually do. The gateway consults this BEFORE
