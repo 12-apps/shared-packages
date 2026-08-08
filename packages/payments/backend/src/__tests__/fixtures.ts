@@ -394,6 +394,31 @@ export async function setupHttpWorld(): Promise<{
   return { http, charges, configStore };
 }
 
+/**
+ * A gateway routed through the settings bridge (`credentialStoreFrom`) over a
+ * real config store, rather than the raw memory credential store — the wiring
+ * FUT-683 is about. What this gateway walks IS the merchant's stored rows, so
+ * a row's `status` can take it out of rotation; the raw credential store the
+ * other worlds use has no status at all and cannot stage that.
+ */
+export function setupBridgedGatewayWorld() {
+  const configStore = createMemoryProviderConfigStore();
+  const providers = defineProviders({
+    primary: fakeAdapter('primary'),
+    backup: fakeAdapter('backup'),
+  } as const);
+  const settings = createSettingsService(providers, configStore, { allowStubMode: true });
+  const charges = createMemoryChargeStore();
+  const gateway = createPaymentsGateway({
+    providers,
+    credentials: credentialStoreFrom(configStore, { allowStubMode: true }),
+    charges,
+    webhooks: createMemoryWebhookInbox(),
+    attempts: createMemoryAttemptLedger(),
+  });
+  return { configStore, settings, charges, gateway };
+}
+
 /** A minimal OAuth-mode adapter, for exercising the connect flow. */
 function fakeOAuthAdapter(
   overrides: { failRefresh?: boolean; failRevoke?: boolean; revoked?: string[] } = {},
@@ -438,6 +463,11 @@ export function setupOAuthWorld(
     missingAppCredentials?: boolean;
     /** Made to throw, to prove a broken reporter cannot break a disconnect. */
     reporterThrows?: boolean;
+    /**
+     * Register a SECOND, credentials-mode provider beside the OAuth one — the
+     * "store with a healthy second provider" the FUT-683 scenarios need.
+     */
+    withBackup?: boolean;
   } = {},
 ) {
   const store = createMemoryProviderConfigStore();
@@ -447,6 +477,7 @@ export function setupOAuthWorld(
   const reported: RevokeFailure[] = [];
   const providers = defineProviders({
     oauthy: fakeOAuthAdapter({ ...overrides, revoked }),
+    ...(overrides.withBackup ? { backup: fakeAdapter('backup') } : {}),
   } as const);
   const settings = createSettingsService(providers, store);
   const oauth = createOAuthConnectService(

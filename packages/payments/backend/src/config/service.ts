@@ -25,6 +25,7 @@ import { assertSaveCredentialsInput } from './credential-input';
 import {
   applyProof,
   assertReorderOnly,
+  inRotation,
   pendingVerificationMethods,
   requireProven,
   resolvedFrom,
@@ -227,8 +228,11 @@ async function buildSettingsView(
   // Only providers the registry still knows can be routed to; a row left
   // behind by a removed adapter must not appear in the chain.
   const known = configs.filter((c) => providers.has(c.provider));
+  // `inRotation`, not `enabled`: this chain is published as "what checkout
+  // will actually walk", so it must agree with `credentialStoreFrom.chain`
+  // about a row whose grant is dead (FUT-683).
   const chain = known
-    .filter((c) => c.enabled)
+    .filter(inRotation)
     .sort((a, b) => a.priority - b.priority || a.provider.localeCompare(b.provider))
     .map((c) => c.provider);
   return {
@@ -353,7 +357,7 @@ export function credentialStoreFrom(
   async function chain(merchant: MerchantRef): Promise<ProviderName[]> {
     const configs = await store.list(merchant);
     return configs
-      .filter((c) => c.enabled)
+      .filter(inRotation)
       .sort(
         (a, b) =>
           // Rank first; provider name only as a tie-break. The partial unique
@@ -372,9 +376,16 @@ export function credentialStoreFrom(
     },
     async getCredentials(merchant, provider) {
       const config = await store.get(merchant, provider);
-      if (!config || !config.enabled) {
-        if (!config) return null;
+      if (!config) return null;
+      if (!config.enabled) {
         throw new CredentialsError(provider, `Provider ${provider} is configured but not enabled`);
+      }
+      // The chain already routes around this row; refusing here too stops a
+      // DIRECT charge (explicit provider, no chain consulted) from spending a
+      // request on a token the provider has already refused. Listening stays
+      // open — `getConnectedCredentials` below.
+      if (config.status === 'RECONNECT_REQUIRED') {
+        throw new CredentialsError(provider, `Provider ${provider} requires reauthorization to charge`);
       }
       return resolvedFrom(config, allowStubMode);
     },
