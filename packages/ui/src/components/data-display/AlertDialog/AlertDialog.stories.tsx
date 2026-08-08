@@ -8,7 +8,7 @@ import React from 'react';
 import { AlertDialog } from './AlertDialog';
 
 const meta: Meta<typeof AlertDialog> = {
-  title: 'DataDisplay/AlertDialog',
+  title: 'Feedback/AlertDialog',
   component: AlertDialog,
   parameters: {
     layout: 'centered',

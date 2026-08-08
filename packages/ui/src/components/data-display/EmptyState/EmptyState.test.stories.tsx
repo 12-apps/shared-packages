@@ -17,7 +17,7 @@ const TestIcon = () => (
 );
 
 const meta: Meta<typeof EmptyState> = {
-  title: 'DataDisplay/AsyncStates/EmptyState/Tests',
+  title: 'Feedback/AsyncStates/EmptyState/Tests',
   component: EmptyState,
   parameters: {
     layout: 'centered',

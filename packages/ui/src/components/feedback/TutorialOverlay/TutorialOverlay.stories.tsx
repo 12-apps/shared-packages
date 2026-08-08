@@ -6,7 +6,7 @@ import { action } from 'storybook/actions';
 import { TutorialOverlay } from './TutorialOverlay';
 
 const meta: Meta<typeof TutorialOverlay> = {
-  title: 'Enhanced/TutorialOverlay',
+  title: 'Overlays/TutorialOverlay',
   component: TutorialOverlay,
   parameters: {
     layout: 'fullscreen',

@@ -5,7 +5,7 @@ import React from 'react';
 import { TimingDiagram } from './TimingDiagram';
 
 const meta: Meta<typeof TimingDiagram> = {
-  title: 'Enhanced/TimingDiagram',
+  title: 'Charts/TimingDiagram',
   component: TimingDiagram,
   parameters: {
     layout: 'padded',

@@ -127,7 +127,7 @@ const sampleColumns: GridColumn<SampleRow>[] = [
 ];
 
 const meta: Meta<typeof DataGrid> = {
-  title: 'Enhanced/DataGrid',
+  title: 'Dashboards/DataGrid',
   component: DataGrid,
   parameters: {
     layout: 'fullscreen',

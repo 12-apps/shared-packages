@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { RichTextEditor } from './RichTextEditor';
 
 const meta: Meta<typeof RichTextEditor> = {
-  title: 'Enhanced/RichTextEditor',
+  title: 'Form/RichTextEditor',
   component: RichTextEditor,
   parameters: {
     layout: 'centered',

@@ -5,7 +5,7 @@ import { SpecChart } from './SpecChart';
 import type { ChartSpec } from './ChartSpec.types';
 
 const meta: Meta<typeof SpecChart> = {
-  title: 'DataDisplay/SpecChart',
+  title: 'Charts/SpecChart',
   component: SpecChart,
   parameters: {
     layout: 'padded',

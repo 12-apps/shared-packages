@@ -4,7 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { ErrorState } from './ErrorState';
 
 const meta: Meta<typeof ErrorState> = {
-  title: 'DataDisplay/AsyncStates/ErrorState/Tests',
+  title: 'Feedback/AsyncStates/ErrorState/Tests',
   component: ErrorState,
   parameters: {
     layout: 'padded',

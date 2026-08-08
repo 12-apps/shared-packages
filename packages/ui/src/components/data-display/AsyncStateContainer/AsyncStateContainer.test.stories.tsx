@@ -9,7 +9,7 @@ import { ErrorState } from '../ErrorState/ErrorState';
 import { LoadingState } from '../LoadingState/LoadingState';
 
 const meta: Meta<typeof AsyncStateContainer> = {
-  title: 'DataDisplay/AsyncStates/AsyncStateContainer/Tests',
+  title: 'Feedback/AsyncStates/AsyncStateContainer/Tests',
   component: AsyncStateContainer,
   parameters: {
     layout: 'padded',

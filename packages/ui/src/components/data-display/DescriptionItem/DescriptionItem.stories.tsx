@@ -7,7 +7,7 @@ import { Chip } from '../Chip/Chip';
 import { DescriptionItem } from './DescriptionItem';
 
 const meta: Meta<typeof DescriptionItem> = {
-  title: 'DataDisplay/DescriptionItem',
+  title: 'Content/DescriptionItem',
   component: DescriptionItem,
   parameters: {
     layout: 'centered',

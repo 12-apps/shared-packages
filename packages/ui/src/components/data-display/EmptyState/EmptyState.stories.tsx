@@ -28,7 +28,7 @@ const ErrorIcon = () => (
 );
 
 const meta: Meta<typeof EmptyState> = {
-  title: 'DataDisplay/AsyncStates/EmptyState',
+  title: 'Feedback/AsyncStates/EmptyState',
   component: EmptyState,
   parameters: {
     layout: 'centered',

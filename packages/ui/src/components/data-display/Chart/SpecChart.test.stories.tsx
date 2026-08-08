@@ -4,7 +4,7 @@ import { expect, within } from 'storybook/test';
 import { SpecChart } from './SpecChart';
 
 const meta: Meta<typeof SpecChart> = {
-  title: 'DataDisplay/SpecChart/Tests',
+  title: 'Charts/SpecChart/Tests',
   component: SpecChart,
   parameters: { layout: 'padded' },
   tags: ['autodocs', 'test', 'component:Chart'],

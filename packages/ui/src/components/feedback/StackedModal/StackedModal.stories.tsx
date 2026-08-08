@@ -63,7 +63,7 @@ import {
 } from './StackedModal';
 
 const meta: Meta<typeof StackedModal> = {
-  title: 'Enhanced/StackedModal',
+  title: 'Overlays/StackedModal',
   component: StackedModal,
   parameters: {
     layout: 'fullscreen',

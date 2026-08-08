@@ -4,7 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Banner } from './Banner';
 
 const meta: Meta<typeof Banner> = {
-  title: 'DataDisplay/Banner/Tests',
+  title: 'Feedback/Banner/Tests',
   component: Banner,
   parameters: {
     layout: 'fullscreen',

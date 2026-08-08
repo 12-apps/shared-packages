@@ -6,7 +6,7 @@ import { Button } from '../../form/Button';
 import { InteractiveTooltip } from './InteractiveTooltip';
 
 const meta: Meta<typeof InteractiveTooltip> = {
-  title: 'DataDisplay/InteractiveTooltip',
+  title: 'Overlays/InteractiveTooltip',
   component: InteractiveTooltip,
   parameters: {
     layout: 'centered',

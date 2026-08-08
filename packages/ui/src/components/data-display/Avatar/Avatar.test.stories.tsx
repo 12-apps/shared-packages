@@ -7,7 +7,7 @@ import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 import { Avatar, AvatarGroup } from './Avatar';
 
 const meta: Meta<typeof Avatar> = {
-  title: 'DataDisplay/Avatar/Tests',
+  title: 'Media/Avatar/Tests',
   component: Avatar,
   parameters: {
     layout: 'centered',

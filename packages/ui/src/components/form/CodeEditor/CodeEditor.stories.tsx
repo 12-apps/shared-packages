@@ -6,7 +6,7 @@ import { CodeEditor } from './CodeEditor';
 import type { EditorLanguage } from './CodeEditor.types';
 
 const meta: Meta<typeof CodeEditor> = {
-  title: 'Enhanced/CodeEditor',
+  title: 'Form/CodeEditor',
   component: CodeEditor,
   parameters: {
     layout: 'padded',
