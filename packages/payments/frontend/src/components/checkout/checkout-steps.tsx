@@ -71,6 +71,7 @@ function PaymentBody({
   tenantSlug,
   onResolved,
   pollIntervalMs,
+  validateApplePayMerchant,
 }: {
   order: CheckoutOrder | null;
   buyer: BuyerInfo;
@@ -79,6 +80,7 @@ function PaymentBody({
   tenantSlug?: string;
   onResolved: (status: OrderStatus) => void;
   pollIntervalMs?: number;
+  validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
 }): JSX.Element | null {
   const Screen = resolveCheckoutScreen(providerConfig?.chain?.[0]?.checkoutScreen);
   return (
@@ -90,6 +92,7 @@ function PaymentBody({
       tenantSlug={tenantSlug}
       onResolved={onResolved}
       pollIntervalMs={pollIntervalMs}
+      validateApplePayMerchant={validateApplePayMerchant}
     />
   );
 }
@@ -291,6 +294,8 @@ interface PaymentStepProps {
   /** Scopes the saved-card list to the store being paid (host routing owns it). */
   tenantSlug?: string;
   pollIntervalMs?: number;
+  /** The host's Apple Pay merchant-validation port (FUT-472) — see the screen contract. */
+  validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
   onResolved: (status: OrderStatus) => void;
 }
 
@@ -314,6 +319,7 @@ export function PaymentStep({
   providerConfig,
   tenantSlug,
   pollIntervalMs,
+  validateApplePayMerchant,
   onResolved,
 }: PaymentStepProps): JSX.Element {
   const { LoadingState } = useCheckoutComponents();
@@ -342,6 +348,7 @@ export function PaymentStep({
         tenantSlug={tenantSlug}
         onResolved={onResolved}
         pollIntervalMs={pollIntervalMs}
+        validateApplePayMerchant={validateApplePayMerchant}
       />
 
       {!order && creating ? (
