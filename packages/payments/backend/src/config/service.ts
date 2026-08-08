@@ -25,7 +25,9 @@ import { assertSaveCredentialsInput } from './credential-input';
 import {
   applyProof,
   assertReorderOnly,
+  emptyConfig,
   inRotation,
+  listeningSetsFrom,
   pendingVerificationMethods,
   requireProven,
   resolvedFrom,
@@ -127,27 +129,6 @@ export interface SettingsService {
   ): Promise<VerifiedProviderConfig>;
   /** The provider's onboarding walkthrough, or null when it has none. */
   setupGuide(provider: ProviderName, ctx: SetupGuideContext): ProviderSetupGuide | null;
-}
-
-const EMPTY_ENVIRONMENTS: StoredProviderConfig['environments'] = {
-  SANDBOX: {},
-  PRODUCTION: {},
-};
-
-function emptyConfig(provider: ProviderName): StoredProviderConfig {
-  return {
-    provider,
-    enabled: false,
-    priority: 0,
-    environment: 'SANDBOX',
-    status: 'UNVERIFIED',
-    lastVerifiedAt: null,
-    chargeVerifiedAt: null,
-    pendingVerification: null,
-    expiresAt: null,
-    stub: false,
-    environments: { SANDBOX: { ...EMPTY_ENVIRONMENTS.SANDBOX }, PRODUCTION: { ...EMPTY_ENVIRONMENTS.PRODUCTION } },
-  };
 }
 
 /** `••••` + last 4 — enough to recognize a value, never to use it. */
@@ -396,16 +377,7 @@ export function credentialStoreFrom(
     },
     async listListeningCredentials(merchant, provider) {
       const config = await store.get(merchant, provider);
-      if (!config) return [];
-      // Active environment first (the port's ordering contract), then the
-      // other when it holds anything — flipped-away deliveries, FUT-678.
-      const other: PaymentEnvironment =
-        config.environment === 'PRODUCTION' ? 'SANDBOX' : 'PRODUCTION';
-      const sets = [resolvedFrom(config, allowStubMode)];
-      if (Object.values(config.environments[other] ?? {}).some((value) => value)) {
-        sets.push(resolvedFrom(config, allowStubMode, other));
-      }
-      return sets;
+      return config ? listeningSetsFrom(config, allowStubMode) : [];
     },
   };
 }
