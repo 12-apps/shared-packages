@@ -60,6 +60,20 @@ function clickKeys(onClick: () => void) {
  * 1.4 all four rows keep identical rail edges, because subgrid tracks and the
  * zoom that reads them are the same for every row.
  */
+/**
+ * DIVIDER COMPOSES WITH THE VARIANT — it changes the row's SHAPE, not its
+ * surface.
+ *
+ * It used to set `border: 0` and hard-code its own rule colour, which discarded
+ * whatever the variant had drawn: `outline`, `text` and `ghost` all collapsed
+ * to one identical flush row, and the variant control silently stopped meaning
+ * anything the moment `divider` was on.
+ *
+ * Now only the GEOMETRY changes here — the box's sides go, one edge stays — and
+ * no `borderColor` is written, so the colour set by `cardSurfaceStyles` survives.
+ * A variant that draws no border of its own gets the neutral rule from
+ * {@link rowStyles}.
+ */
 export function rowSx(opts: {
   inGroup: boolean;
   railCount: number;
@@ -134,7 +148,7 @@ export function rowSx(opts: {
       '& > [data-slot="value"]': { gridArea: "2 / 4", textAlign: "right" },
     },
     ...(divider
-      ? { border: 0, borderRadius: 0, borderBottom: 1, borderBottomStyle: "solid", borderBottomColor: "divider" }
+      ? { borderRadius: 0, borderWidth: 0, borderBottomWidth: 1, borderStyle: "solid" }
       : {}),
   };
 }
@@ -217,22 +231,36 @@ export function actionProps(onClick: (() => void) | undefined) {
 }
 
 /** The surface and the geometry, merged — the row's whole `sx` in one place. */
+
+/**
+ * The row's painted surface, plus the divider's colour fallback.
+ *
+ * A variant with no border of its own (`text`, `ghost`) would draw its rule in
+ * the inherited colour — the TEXT colour, i.e. a black bar across the row. The
+ * neutral divider token is supplied only in that case; a variant that has a
+ * border keeps it, which is the whole point of composing the two.
+ */
+function rowSurface(
+  props: BaseListCardProps,
+  shell: ReturnType<typeof useRowShell>,
+): Record<string, unknown> {
+  const { theme, selectable, drag } = shell;
+  const surface = cardSurfaceStyles(
+    { ...props, selectable, shape: "row", state: drag.dragging ? "disabled" : props.state },
+    theme,
+  );
+  if (props.divider !== true || surface.borderColor != null) return surface;
+  return { ...surface, borderBottomColor: theme.palette.divider };
+}
+
 export function rowStyles(
   props: BaseListCardProps,
   shell: ReturnType<typeof useRowShell>,
   cellTemplate: string | null,
 ): Record<string, unknown> {
-  const { group, theme, selectable, drag, reserve, pad, padY, scale, acts } = shell;
+  const { group, selectable, drag, reserve, pad, padY, scale, acts } = shell;
   return {
-    ...cardSurfaceStyles(
-      {
-        ...props,
-        selectable,
-        shape: "row",
-        state: drag.dragging ? "disabled" : props.state,
-      },
-      theme,
-    ),
+    ...rowSurface(props, shell),
     ...rowSx({
       inGroup: group !== null,
       railCount: group?.railCount ?? RAIL_COUNT,
