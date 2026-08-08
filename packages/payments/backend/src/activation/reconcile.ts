@@ -1,8 +1,16 @@
+import { resolvedFrom } from '../config/enablement';
 import type { ProviderConfigStore } from '../config/types';
 import type { SettingsService } from '../config/service';
 import type { ChargeStore } from '../core/ports';
+import type { PaymentProviderAdapter } from '../core/provider';
 import type { ProviderRegistry } from '../core/registry';
-import type { MerchantRef } from '../core/types';
+import type { MerchantRef, ResolvedCredentials } from '../core/types';
+import {
+  isCardAttemptRecord,
+  probeLostCardAttempt,
+  refundCent,
+  type LostCardAttempt,
+} from './card-attempt';
 import { ownsVerificationReference } from './reference';
 
 /**
@@ -19,11 +27,11 @@ import { ownsVerificationReference } from './reference';
  *
  * ## What counts as proof
  *
- * Never the provider, asked fresh: confirming a hosted-checkout payment can
- * demand correlation values (a transaction id, an invoice code) that exist
- * only in the buyer's return trip and the delivery — precisely what a
- * stranded row no longer has. What it DOES have is one of two durable records
- * this system already verified:
+ * For a REDIRECT row, never the provider, asked fresh: confirming a
+ * hosted-checkout payment can demand correlation values (a transaction id, an
+ * invoice code) that exist only in the buyer's return trip and the delivery —
+ * precisely what a stranded row no longer has. What it DOES have is one of
+ * two durable records this system already verified:
  *
  *   - a stored charge for the activation reference in PAID — written wherever
  *     a stored charge existed to update;
@@ -37,6 +45,20 @@ import { ownsVerificationReference } from './reference';
  *     breath as the flag (FUT-726) — the correlation key is a fact about that
  *     provider's payload shape, and a parse of one vendor's field out here
  *     would answer confidently and wrongly for the second adapter to arrive.
+ *
+ * ## The CARD exception (FUT-679)
+ *
+ * A card verification attempt whose `createCharge` answer was LOST leaves
+ * NEITHER durable record, ever: the charge is raised through the adapter
+ * directly (nothing stored to update), and a signature-verifying provider's
+ * inbox rows prove nothing. What it has instead is exactly what a redirect
+ * row lacks: its reference alone is sufficient correlation, because it is the
+ * key the adapter indexed the order under at creation — the precise contract
+ * of `findChargeByReference`. So for a pending row the card flow marked
+ * (`phase: 'CARD'`), the sweep MAY ask the provider — and then it must not
+ * merely stamp but CURE: refund the stranded cent when it was paid, apply the
+ * activation the charge proved, or release a row the provider says holds no
+ * live charge. Never forget the cent; never guess on an unanswered question.
  */
 
 /** Per-pass bound, so one sweep can never become an unbounded fan-out. */
@@ -90,10 +112,25 @@ export interface ActivationLogger {
 /** Everything a reconcile pass reads and writes, all host-wired. */
 export interface ActivationReconcileContext {
   providers: ProviderRegistry;
-  settings: Pick<SettingsService, 'applyChargeVerification'>;
+  /**
+   * The pending-row pair joined `applyChargeVerification` for the CARD cure
+   * (FUT-679): the sweep reads the row to see the card flow's `phase` marker,
+   * and releases a row the provider says holds no live charge. A host passing
+   * its whole settings service (the wiring in practice) needs no change.
+   */
+  settings: Pick<
+    SettingsService,
+    'applyChargeVerification' | 'getPendingVerification' | 'setPendingVerification'
+  >;
   config: Pick<ProviderConfigStore, 'get'>;
   charges: Pick<ChargeStore, 'findByProviderChargeId'>;
   proofs: ActivationProofStore;
+  /**
+   * Whether this deployment may resolve stub credentials as stub — same
+   * contract as `ActivationContext.allowStubMode`, from
+   * `resolveStubMode(process.env)`, never inferred. Defaults to OFF.
+   */
+  allowStubMode?: boolean;
   log?: ActivationLogger;
 }
 
@@ -166,19 +203,119 @@ async function confirmedDeliveryLanded(
   return adapter.referenceOfDelivery(payload) === stranded.reference;
 }
 
-/** Stamp one stranded activation if either durable proof exists. */
-async function settleIfProven(
-  ctx: ActivationReconcileContext,
-  stranded: Stranded,
-): Promise<boolean> {
-  if (!(await chargeLanded(ctx, stranded)) && !(await confirmedDeliveryLanded(ctx, stranded))) {
-    return false;
-  }
+/** Apply the proven activation — the one door to `chargeVerifiedAt` here. */
+async function stamp(ctx: ActivationReconcileContext, stranded: Stranded): Promise<boolean> {
   await ctx.settings.applyChargeVerification(stranded.merchant, stranded.provider, true);
   ctx.log?.info(
     `payments.reconcile-activations stamped ${stranded.provider} for ${stranded.merchant.id}`,
   );
   return true;
+}
+
+/**
+ * Stamp one stranded activation if either durable proof exists — and when
+ * neither ever can (a CARD attempt, FUT-679), cure it through the provider.
+ */
+async function settleIfProven(
+  ctx: ActivationReconcileContext,
+  stranded: Stranded,
+): Promise<boolean> {
+  if ((await chargeLanded(ctx, stranded)) || (await confirmedDeliveryLanded(ctx, stranded))) {
+    return stamp(ctx, stranded);
+  }
+  return cureLostCardAttempt(ctx, stranded);
+}
+
+/**
+ * The CARD cure: resolve a stranded card attempt by asking the provider what
+ * its reference became — see the module note on why this row alone may be
+ * asked fresh. Only rows the card flow itself marked (`phase: 'CARD'`) and
+ * only through an adapter that declares `findChargeByReference`; everything
+ * else answers false untouched, keeping the redirect lifecycle exactly as it
+ * was.
+ */
+async function cureLostCardAttempt(
+  ctx: ActivationReconcileContext,
+  stranded: Stranded,
+): Promise<boolean> {
+  const pending = await ctx.settings.getPendingVerification(stranded.merchant, stranded.provider);
+  // Re-read from the row rather than trusted from the sweep's listing: the
+  // attempt may have settled between the listing and this pass.
+  if (!pending || pending.reference !== stranded.reference || !isCardAttemptRecord(pending)) {
+    return false;
+  }
+  const adapter = ctx.providers.has(stranded.provider) ? ctx.providers.get(stranded.provider) : null;
+  if (!adapter?.findChargeByReference) return false;
+  const stored = await ctx.config.get(stranded.merchant, stranded.provider);
+  if (!stored) return false;
+
+  const credentials = resolvedFrom(stored, ctx.allowStubMode ?? false);
+  const outcome = await probeLostCardAttempt(adapter, stranded.reference, credentials);
+  return applyCardCure(ctx, stranded, adapter, credentials, outcome);
+}
+
+/**
+ * Act on what the provider said the stranded cent became. PROVEN both cures
+ * AND stamps: the money moved through this connection, which is the exact
+ * fact activation exists to establish — and the cent is refunded first, so it
+ * is never forgotten even though the attempt's own refund never ran.
+ */
+async function applyCardCure(
+  ctx: ActivationReconcileContext,
+  stranded: Stranded,
+  adapter: PaymentProviderAdapter,
+  credentials: ResolvedCredentials,
+  outcome: LostCardAttempt,
+): Promise<boolean> {
+  if (outcome.kind === 'PROVEN') {
+    await refundStrandedCent(ctx, stranded, adapter, credentials, outcome);
+    return stamp(ctx, stranded);
+  }
+  if (outcome.kind === 'GONE' || outcome.kind === 'DECLINED') {
+    return releaseDeadAttempt(ctx, stranded, outcome.kind);
+  }
+  if (outcome.kind === 'UNANSWERED') {
+    ctx.log?.warn(
+      `payments.reconcile-activations could not resolve card attempt for ${stranded.provider} ` +
+        `(${stranded.merchant.id}): ${outcome.error instanceof Error ? outcome.error.message : String(outcome.error)}`,
+    );
+  }
+  // OPEN or UNANSWERED: nothing settled — the row stays; the next pass asks again.
+  return false;
+}
+
+/** Give the found cent back — best effort, reported when it cannot be. */
+async function refundStrandedCent(
+  ctx: ActivationReconcileContext,
+  stranded: Stranded,
+  adapter: PaymentProviderAdapter,
+  credentials: ResolvedCredentials,
+  outcome: { providerChargeId: string; alreadyRefunded: boolean },
+): Promise<void> {
+  if (outcome.alreadyRefunded) return;
+  if (await refundCent(adapter, outcome.providerChargeId, credentials)) return;
+  ctx.log?.warn(
+    `payments.reconcile-activations could not refund verification cent ` +
+      `${outcome.providerChargeId} (${stranded.provider}, ${stranded.merchant.id})`,
+  );
+}
+
+/**
+ * The provider's own word that no live charge exists behind this reference
+ * (never created, expired, or its decline arrived late): release the row so
+ * the screen stops resuming a dead attempt and a retry starts clean.
+ */
+async function releaseDeadAttempt(
+  ctx: ActivationReconcileContext,
+  stranded: Stranded,
+  kind: 'GONE' | 'DECLINED',
+): Promise<boolean> {
+  await ctx.settings.setPendingVerification(stranded.merchant, stranded.provider, null);
+  ctx.log?.info(
+    `payments.reconcile-activations released ${kind === 'DECLINED' ? 'declined' : 'chargeless'} ` +
+      `card attempt for ${stranded.provider} (${stranded.merchant.id})`,
+  );
+  return false;
 }
 
 /**
@@ -189,6 +326,8 @@ async function settleIfProven(
  * Guarded exactly like the sweep: the pending row's reference must be the one
  * this config's own identity derives, and an already-proven config is left
  * alone — healing must never switch a paused-but-proven provider back on.
+ * For a CARD row this includes the provider-poll cure (FUT-679), so a
+ * stranded cent is found the moment the owner opens the screen.
  */
 export async function healStrandedActivation(
   ctx: ActivationReconcileContext,
