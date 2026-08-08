@@ -230,7 +230,7 @@ function makeFailoverPolicy(settings?: MerchantSettingsDelegate) {
 function asPendingVerification(value: unknown): PendingVerification | null {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Record<string, unknown>;
-  const { reference, checkoutUrl, slug, startedAt } = candidate;
+  const { reference, checkoutUrl, slug, startedAt, phase } = candidate;
   if (typeof reference !== 'string' || typeof checkoutUrl !== 'string') return null;
   if (typeof startedAt !== 'string') return null;
   return {
@@ -238,6 +238,10 @@ function asPendingVerification(value: unknown): PendingVerification | null {
     checkoutUrl,
     startedAt,
     ...(typeof slug === 'string' ? { slug } : {}),
+    // The card phase's write-ahead marker (FUT-679). Dropped here, a stranded
+    // card attempt would come back looking like a redirect row and the sweep
+    // would never consult the provider about it.
+    ...(phase === 'CARD' ? { phase } : {}),
   };
 }
 
