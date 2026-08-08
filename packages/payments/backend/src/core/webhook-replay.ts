@@ -8,8 +8,8 @@ import type {
   WebhookInbox,
 } from './ports';
 import type { ProviderRegistry } from './registry';
-import type { NormalizedWebhookEvent } from './types';
-import { ingestWebhookEvents } from './webhook-pipeline';
+import type { NormalizedWebhookEvent, ResolvedCredentials } from './types';
+import { ingestWebhookEvents, verifiedCredentials } from './webhook-pipeline';
 
 /**
  * Webhook REPLAY — the sweep that finishes the deliveries nothing else will.
@@ -274,20 +274,38 @@ async function verifyAndParse<P extends string>(
   // Listen-only, same as the live path: a stored delivery is about money that
   // already moved, so a provider the owner has since paused (or one still
   // earning its activation) must not have its recorded row retired unapplied.
-  const credentials = deps.credentials.getConnectedCredentials
-    ? await deps.credentials.getConnectedCredentials(row.merchant, provider)
-    : await deps.credentials.getCredentials(row.merchant, provider);
+  // And EVERY environment's credentials where the store can answer (FUT-678):
+  // a stranded row is precisely the kind of delivery an environment flip
+  // leaves behind, so replay verifying only the active secret would re-reject
+  // forever the very rows it exists to finish.
+  const candidates = await listeningCandidates(deps.credentials, row.merchant, provider);
   // No credentials means no way to authenticate the row — a disconnected
   // provider, or one whose secret was rotated away. FAIL CLOSED and let the
   // attempt cap retire it; applying an unauthenticated "paid" would be the one
   // outcome worse than a support ticket.
-  if (!credentials) {
+  if (candidates.length === 0) {
     throw new CredentialsError(provider, `Provider ${provider} is no longer connected`);
   }
-  if (!(await adapter.webhook.verify(row.delivery, credentials))) {
+  const credentials = await verifiedCredentials(adapter, row.delivery, candidates);
+  if (!credentials) {
     throw new WebhookVerificationError(adapter.name);
   }
   return adapter.webhook.parse(row.delivery, credentials);
+}
+
+/** The credential sets a stored row may verify against, best source first. */
+async function listeningCandidates(
+  store: CredentialStore,
+  merchant: StoredWebhookDelivery['merchant'],
+  provider: string,
+): Promise<ResolvedCredentials[]> {
+  if (store.listListeningCredentials) {
+    return store.listListeningCredentials(merchant, provider);
+  }
+  const single = store.getConnectedCredentials
+    ? await store.getConnectedCredentials(merchant, provider)
+    : await store.getCredentials(merchant, provider);
+  return single ? [single] : [];
 }
 
 /**

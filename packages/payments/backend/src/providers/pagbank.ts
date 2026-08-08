@@ -119,14 +119,27 @@ const createCharge: PaymentProviderAdapter['createCharge'] = async (input, crede
 
 /**
  * PagBank signs deliveries with `x-authenticity-token` =
- * SHA-256(`${webhookToken}-${rawBody}`). The URL itself carries no secret
- * because `notification_urls` is capped at 150 chars, so this header IS the
- * authentication — hence fail-closed when it is absent or the token is unset
- * (stub mode excepted).
+ * SHA-256(`${secret}-${rawBody}`), where the documented secret is the ACCOUNT
+ * token ("token da conta") — so the API `token` is the default and a stored
+ * `webhookToken` is the platform's explicit override, not a requirement
+ * (FUT-678). Requiring `webhookToken` alone is what killed Connect stores:
+ * an OAuth connection only ever gets that field by env-var copy, and without
+ * it every delivery died fail-closed BEFORE the durable inbox — no row, no
+ * replay, no trace. The `??` order keeps an explicitly configured override
+ * authoritative where one exists.
+ *
+ * Which account signs a CONNECT store's deliveries (the store's own token vs
+ * the platform's) is still to be measured against a live sandbox Connect
+ * store; both secrets reach this verify through the pipeline's candidate
+ * sets, so either answer authenticates.
+ *
+ * The URL itself carries no secret because `notification_urls` is capped at
+ * 150 chars, so this header IS the authentication — hence fail-closed when it
+ * is absent or no secret is configured at all (stub mode excepted).
  */
 const webhook: PaymentProviderAdapter['webhook'] = {
   async verify(delivery, credentials) {
-    const secret = credentials.fields['webhookToken'];
+    const secret = credentials.fields['webhookToken'] ?? credentials.fields['token'];
     if (!secret) return stubDeliveryTrusted(credentials);
     const presented = delivery.headers['x-authenticity-token'];
     if (!presented) return false;
@@ -216,7 +229,10 @@ export function pagbankProvider(): PaymentProviderAdapter {
     credentialSchema: [
       { key: 'token', label: 'Token do PagBank', secret: true, required: true },
       { key: 'publicKey', label: 'Chave pública (cartão)', secret: false, required: false },
-      { key: 'webhookToken', label: 'Token de webhook', secret: true, required: true },
+      // Optional since FUT-678: webhook verification defaults to the account
+      // token (PagBank's documented signing secret); this field is only an
+      // explicit override for deployments that configured a dedicated one.
+      { key: 'webhookToken', label: 'Token de webhook', secret: true, required: false },
     ],
     customerSchema,
     // A PIX code and a card typed on OUR page (FUT-596). Named for the SHAPE,
