@@ -422,7 +422,7 @@ function useDisclosure(props: BaseListCardProps): {
 export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
   const { selected = false, href, onClick } = props;
   const shell = useRowShell(props);
-  const { actionable, selectable, slot, drag, reserve, pad, acts } = shell;
+  const { actionable, selectable, slot, drag, reserve, pad, padY, acts } = shell;
   const meta = metaShape(props);
   const disclosure = useDisclosure(props);
   // The list's config wins over the card's: one declaration of the list's shape
@@ -529,8 +529,14 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
               role="region"
               sx={{
                 minWidth: 0,
-                mt: pad * 0.5,
-                pt: pad * 0.5,
+                // `padY`, not a fixed fraction of the horizontal padding. The
+                // card's own `py` wraps the summary AND the body, so once the
+                // body is in flow the summary has no bottom padding of its own —
+                // at `comfortable` the row visibly lost the height it had while
+                // closed. Matching the density's spacing here gives the summary
+                // back the same air below it that it has above.
+                mt: padY,
+                pt: padY,
                 // A RULE BETWEEN THE SUMMARY AND THE BODY. Without it the line
                 // items ran straight on from the row's own text and the whole
                 // card read as one block — the summary stopped looking like a

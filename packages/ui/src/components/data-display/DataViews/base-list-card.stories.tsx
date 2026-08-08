@@ -186,6 +186,14 @@ const meta: Meta<typeof BaseListCard> = {
       metaSlot: { control: "text" },
       children: { control: "text" },
     }),
+    // LAST, and grouped. `row` and `cells` are the configured-list API: neither
+    // does anything to a card using the named slots, and left ungrouped they
+    // floated to the TOP of the panel — above `density` and `scale` — where the
+    // first two controls a reader meets are the two that do nothing here.
+    ...category("Configured cells", {
+      cells: { control: "object" },
+      row: { control: "object" },
+    }),
     // `actionsAlwaysVisible` joins them: it only reveals INLINE actions, and the
     // primary row carries an overflow menu instead — so as a control here it is
     // a switch wired to nothing. The `Actions` story is where it has something
