@@ -114,7 +114,7 @@ interface ListeningTarget {
 }
 
 /**
- * Resolve an adapter + credentials for an INBOUND delivery.
+ * Resolve an adapter + the CANDIDATE credential sets for an INBOUND delivery.
  *
  * Listening is not routing. Enablement decides where a NEW charge goes; a
  * delivery is about money that has ALREADY moved, so refusing one because the
@@ -125,8 +125,15 @@ interface ListeningTarget {
  * notifications refused so the order never confirmed. Neither left a trace,
  * because verification precedes the inbox.
  *
- * Falls back to the charging lookup when a host has not implemented the
- * listening one, so nobody silently loses their enablement gate by upgrading.
+ * Several sets, not one, for the same before-the-inbox reason (FUT-678): a
+ * store flipped SANDBOX→PRODUCTION still has deliveries in flight signed under
+ * the environment it just left, and a verify that only knows the active
+ * secret rejects them before anything durable exists. The store answers with
+ * every environment's credentials (`listListeningCredentials`, active first);
+ * hosts without that method keep exactly the single-set behaviour.
+ *
+ * Falls back to the charging lookup when a host has implemented neither
+ * listening read, so nobody silently loses their enablement gate by upgrading.
  */
 async function resolveForListening(
   deps: {
@@ -136,18 +143,51 @@ async function resolveForListening(
   chargingFallback: () => Promise<ListeningTarget>,
   merchant: MerchantRef,
   provider: ProviderName,
-): Promise<ListeningTarget> {
-  const listen = deps.credentials.getConnectedCredentials;
-  if (!listen) return chargingFallback();
-
-  const creds = await listen.call(deps.credentials, merchant, provider);
-  if (!creds) {
-    throw new CredentialsError(
+): Promise<{ adapter: PaymentProviderAdapter; candidates: ResolvedCredentials[] }> {
+  const notConnected = () =>
+    new CredentialsError(
       provider,
       `Provider ${provider} is not connected for ${merchant.kind}:${merchant.id}`,
     );
+
+  const listAll = deps.credentials.listListeningCredentials;
+  if (listAll) {
+    const candidates = await listAll.call(deps.credentials, merchant, provider);
+    if (candidates.length === 0) throw notConnected();
+    return { adapter: deps.providers.get(provider), candidates };
   }
-  return { adapter: deps.providers.get(provider), creds };
+
+  const listen = deps.credentials.getConnectedCredentials;
+  if (!listen) {
+    const target = await chargingFallback();
+    return { adapter: target.adapter, candidates: [target.creds] };
+  }
+
+  const creds = await listen.call(deps.credentials, merchant, provider);
+  if (!creds) throw notConnected();
+  return { adapter: deps.providers.get(provider), candidates: [creds] };
+}
+
+/**
+ * The first candidate credential set `webhook.verify` accepts the delivery
+ * under, or null when none does. Sequential on purpose — candidates are
+ * ordered (active environment first) and, for an unsigned provider whose
+ * verify is a live call back to it, one confirmation is all that may be spent.
+ *
+ * Shared by the live path and the replay sweep so "which secret authenticates
+ * a delivery" has exactly one definition — the sweep re-verifies stored rows,
+ * and a copy that drifted would re-reject precisely the flipped-environment
+ * rows this exists to keep.
+ */
+export async function verifiedCredentials(
+  adapter: PaymentProviderAdapter,
+  delivery: WebhookDelivery,
+  candidates: readonly ResolvedCredentials[],
+): Promise<ResolvedCredentials | null> {
+  for (const creds of candidates) {
+    if (await adapter.webhook.verify(delivery, creds)) return creds;
+  }
+  return null;
 }
 
 /**
@@ -171,15 +211,18 @@ export async function runWebhookPipeline(
 ): Promise<NormalizedWebhookEvent[]> {
   // LISTENING, not routing — see `resolveForListening` for what the single
   // gate cost, and why a refusal here left no trace of any kind.
-  const { adapter, creds } = await resolveForListening(
+  const { adapter, candidates } = await resolveForListening(
     deps,
     () => chargingFallback(delivery.provider),
     merchant,
     delivery.provider,
   );
-  const verified = await adapter.webhook.verify(delivery, creds);
-  if (!verified) throw new WebhookVerificationError(adapter.name);
+  const creds = await verifiedCredentials(adapter, delivery, candidates);
+  if (!creds) throw new WebhookVerificationError(adapter.name);
 
+  // Parsed under the credentials that VERIFIED it — for an adapter whose parse
+  // re-reads the provider (unsigned deliveries), the environment that signed
+  // is the one that must be asked.
   const events = await adapter.webhook.parse(delivery, creds);
   const outcome = await ingestWebhookEvents(deps, merchant, delivery, events, 'LIVE');
   // Rethrown verbatim, exactly as this function always did: the HTTP layer

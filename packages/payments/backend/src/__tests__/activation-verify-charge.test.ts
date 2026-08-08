@@ -10,6 +10,8 @@ import {
   activationContextFor,
   activationRegistry,
   connectedConfig,
+  fakeSettings,
+  type FakeSettings,
 } from './activation-fixtures';
 
 const CARD = { token: 'tok_1', taxId: '12345678909', holderName: 'Ana', email: 'a@x.com' };
@@ -326,5 +328,185 @@ describe('verifyProviderCharge attempt reference', () => {
     }
     // The retry is a NEW charge at the provider, not a replay of the refusal.
     expect(refs[0]).not.toBe(refs[1]);
+  });
+});
+
+/** A failure whose response never arrived — AMBIGUOUS to `classifyFailure`
+ * and `transport` to `failureFor`: the provider may have created the charge. */
+const lostResponse = () => new ProviderRequestError('pagbank', 'socket hang up', { retriable: true });
+
+const probing = {
+  createCharge: vi.fn(),
+  refund: vi.fn(),
+  findChargeByReference: vi.fn(),
+};
+
+/** The durable rows under test, remade per test in `beforeEach`. */
+const world: { rows: FakeSettings } = { rows: fakeSettings() };
+
+/** A card context over an adapter that CAN be asked what a reference became. */
+function probingContext(): ReturnType<typeof activationContextFor> {
+  const adapter = activationAdapter('pagbank', {
+    createCharge: probing.createCharge as never,
+    refund: probing.refund as never,
+    findChargeByReference: probing.findChargeByReference as never,
+  });
+  return activationContextFor({
+    providers: activationRegistry({ pagbank: adapter }),
+    config: connectedConfig(),
+    settings: world.rows,
+  });
+}
+
+/**
+ * FUT-679, the lost-answer half. The per-attempt reference above makes every
+ * retry a NEW charge at the provider — so an earlier attempt whose `create`
+ * answer was lost must be resolved through `findChargeByReference` before
+ * another cent can move, and an attempt nothing can resolve must leave a
+ * durable record (`pendingVerification`, phase CARD) for the sweep to cure.
+ */
+describe('Cenário: resposta perdida não cobra duas vezes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // A refund SNAPSHOT, not a bare object: since FUT-680 the cent counts as
+    // returned only when the provider says REFUNDED, so a fixture without a
+    // status would assert the pre-FUT-680 "it did not throw" reading.
+    probing.refund.mockResolvedValue({ status: 'REFUNDED' });
+    world.rows = fakeSettings();
+  });
+
+  it('Dado que o create expirou depois de criar a cobrança no PagBank, Quando o lojista tenta de novo, Então no máximo uma cobrança real existe e a ativação conclui', async () => {
+    const ctx = probingContext();
+    // The create times out AFTER PagBank created the order; the probe cannot
+    // answer either (the outage is the outage) — the attempt stays recorded.
+    probing.createCharge.mockRejectedValueOnce(lostResponse());
+    probing.findChargeByReference.mockRejectedValueOnce(lostResponse());
+    const first = await verifyProviderCharge(ctx, ACME, 'pagbank', CARD);
+    expect(first.ok).toBe(false);
+
+    expect(world.rows.pendingOf(ACME, 'pagbank')?.phase).toBe('CARD');
+    expect(world.rows.pendingOf(ACME, 'pagbank')?.reference).toMatch(/^verify-pagbank-client-1--/);
+
+    // The retry finds the FIRST attempt's real charge and adopts it: no
+    // second create, the cent is refunded, and the verification passes.
+    probing.findChargeByReference.mockResolvedValueOnce({
+      status: 'PAID',
+      providerChargeId: 'CH_LOST',
+    } as ChargeSnapshot);
+    const retry = await verifyProviderCharge(ctx, ACME, 'pagbank', CARD);
+
+    expect(retry).toEqual({ ok: true, refunded: true });
+    expect(probing.createCharge).toHaveBeenCalledTimes(1);
+    expect(probing.refund).toHaveBeenCalledWith(
+      expect.objectContaining({ providerChargeId: 'CH_LOST' }),
+      expect.anything(),
+    );
+    expect(world.rows.pendingOf(ACME, 'pagbank')).toBeNull();
+  });
+
+  it('records the attempt BEFORE the create, so a lost answer is never unrecorded', async () => {
+    const ctx = probingContext();
+    const seen: { atCreate: { phase?: string } | null } = { atCreate: null };
+    probing.createCharge.mockImplementation(() => {
+      seen.atCreate = world.rows.pendingOf(ACME, 'pagbank');
+      return Promise.resolve({ status: 'PAID', providerChargeId: 'C' } as ChargeSnapshot);
+    });
+
+    await verifyProviderCharge(ctx, ACME, 'pagbank', CARD);
+
+    expect(seen.atCreate?.phase).toBe('CARD');
+    // ... and a settled answer clears it — nothing outstanding remains.
+    expect(world.rows.pendingOf(ACME, 'pagbank')).toBeNull();
+  });
+
+  it('settles inline when the probe can already answer: the found charge is adopted', async () => {
+    const ctx = probingContext();
+    probing.createCharge.mockRejectedValueOnce(lostResponse());
+    probing.findChargeByReference.mockResolvedValueOnce({
+      status: 'PAID',
+      providerChargeId: 'CH_1',
+    } as ChargeSnapshot);
+
+    const result = await verifyProviderCharge(ctx, ACME, 'pagbank', CARD);
+
+    expect(result).toEqual({ ok: true, refunded: true });
+    expect(probing.createCharge).toHaveBeenCalledTimes(1);
+    expect(world.rows.pendingOf(ACME, 'pagbank')).toBeNull();
+  });
+
+  it('surfaces a late decline found by the probe as the decline it was', async () => {
+    const ctx = probingContext();
+    probing.createCharge.mockRejectedValueOnce(lostResponse());
+    probing.findChargeByReference.mockResolvedValueOnce({
+      status: 'DECLINED',
+      providerChargeId: 'CH_1',
+      declineReason: 'CARD_DECLINED',
+    } as ChargeSnapshot);
+
+    const result = await verifyProviderCharge(ctx, ACME, 'pagbank', CARD);
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false ? result.reason : '').toContain('recusada');
+    expect(probing.refund).not.toHaveBeenCalled();
+    expect(world.rows.pendingOf(ACME, 'pagbank')).toBeNull();
+  });
+
+  it('lets a retry proceed once the provider says the lost reference holds no charge', async () => {
+    const ctx = probingContext();
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(1_000_000);
+    probing.createCharge.mockRejectedValueOnce(lostResponse());
+    probing.findChargeByReference.mockRejectedValueOnce(lostResponse());
+    await verifyProviderCharge(ctx, ACME, 'pagbank', CARD);
+
+    // This time the provider answers: nothing exists behind that reference.
+    now.mockReturnValue(2_000_000);
+    probing.findChargeByReference.mockResolvedValueOnce(null);
+    probing.createCharge.mockResolvedValueOnce({
+      status: 'PAID',
+      providerChargeId: 'CH_2',
+    } as ChargeSnapshot);
+    const retry = await verifyProviderCharge(ctx, ACME, 'pagbank', CARD);
+    now.mockRestore();
+
+    expect(retry).toEqual({ ok: true, refunded: true });
+    expect(probing.createCharge).toHaveBeenCalledTimes(2);
+    const refs = probing.createCharge.mock.calls.map(
+      (call) => (call[0] as unknown as { reference: string }).reference,
+    );
+    // A fresh attempt under a fresh reference — never a replay of the lost one.
+    expect(refs[0]).not.toBe(refs[1]);
+    expect(world.rows.pendingOf(ACME, 'pagbank')).toBeNull();
+  });
+
+  it('clears the record on a refusal that provably created nothing (no probe needed)', async () => {
+    const ctx = probingContext();
+    probing.createCharge.mockRejectedValueOnce(
+      new ProviderRequestError('pagbank', 'unprocessable', { retriable: false, httpStatus: 422 }),
+    );
+
+    const result = await verifyProviderCharge(ctx, ACME, 'pagbank', CARD);
+
+    expect(result.ok).toBe(false);
+    expect(probing.findChargeByReference).not.toHaveBeenCalled();
+    expect(world.rows.pendingOf(ACME, 'pagbank')).toBeNull();
+  });
+
+  it('holds the retry while the earlier charge is still processing at the provider', async () => {
+    const ctx = probingContext();
+    probing.createCharge.mockRejectedValueOnce(lostResponse());
+    probing.findChargeByReference.mockRejectedValueOnce(lostResponse());
+    await verifyProviderCharge(ctx, ACME, 'pagbank', CARD);
+
+    probing.findChargeByReference.mockResolvedValueOnce({
+      status: 'PENDING',
+      providerChargeId: 'CH_1',
+    } as ChargeSnapshot);
+    const retry = await verifyProviderCharge(ctx, ACME, 'pagbank', CARD);
+
+    // No second create while the first cent's fate is undecided.
+    expect(retry.ok).toBe(false);
+    expect(probing.createCharge).toHaveBeenCalledTimes(1);
+    expect(world.rows.pendingOf(ACME, 'pagbank')).not.toBeNull();
   });
 });

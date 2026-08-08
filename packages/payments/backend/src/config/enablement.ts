@@ -207,7 +207,16 @@ export async function applyProof(
 ): Promise<StoredProviderConfig> {
   if (passed && !config.chargeVerifiedAt) config.chargeVerifiedAt = new Date();
   // Cleared either way — a refused charge must not leave the screen waiting.
-  config.pendingVerification = null;
+  // ONE exception (FUT-679): a failed CARD verification that still holds its
+  // write-ahead row is an attempt whose answer was LOST, not refused — the
+  // card flow clears the row itself on every settled outcome, so its survival
+  // to this point means a real cent may exist that only this row remembers.
+  // Hosts settle a card failure with `applyChargeVerification(false)`, and
+  // erasing the row here would hide that charge from the reconcile sweep,
+  // which only scans configs with a pending row.
+  if (passed || config.pendingVerification?.phase !== 'CARD') {
+    config.pendingVerification = null;
+  }
   await store.save(merchant, config);
   return toggleInChain(store, merchant, config, passed);
 }
@@ -271,7 +280,9 @@ export function inRotation(config: StoredProviderConfig): boolean {
 }
 
 /**
- * The active environment's decrypted fields, for whichever question asked.
+ * One environment's decrypted fields, for whichever question asked — the
+ * ACTIVE environment unless the caller names another (the webhook pipeline
+ * verifying an in-flight delivery against the non-active one, FUT-678).
  *
  * `stub` is DECIDED here, not read: the column says what the row was written
  * with, and a row outlives the deployment that wrote it. A dev dump restored
@@ -282,11 +293,54 @@ export function inRotation(config: StoredProviderConfig): boolean {
  * (`allowStubMode`, from `resolveStubMode`) is required on every resolve, and
  * PRODUCTION credentials are excluded even when the answer is yes.
  */
-export function resolvedFrom(config: StoredProviderConfig, allowStubMode: boolean) {
-  const environment: PaymentEnvironment = config.environment;
+export function resolvedFrom(
+  config: StoredProviderConfig,
+  allowStubMode: boolean,
+  environment: PaymentEnvironment = config.environment,
+) {
   return {
     environment,
     fields: config.environments[environment],
     stub: stubResolvedFor(allowStubMode, config.stub, environment),
   };
+}
+
+const EMPTY_ENVIRONMENTS: StoredProviderConfig['environments'] = {
+  SANDBOX: {},
+  PRODUCTION: {},
+};
+
+export function emptyConfig(provider: ProviderName): StoredProviderConfig {
+  return {
+    provider,
+    enabled: false,
+    priority: 0,
+    environment: 'SANDBOX',
+    status: 'UNVERIFIED',
+    lastVerifiedAt: null,
+    chargeVerifiedAt: null,
+    pendingVerification: null,
+    expiresAt: null,
+    stub: false,
+    environments: { SANDBOX: { ...EMPTY_ENVIRONMENTS.SANDBOX }, PRODUCTION: { ...EMPTY_ENVIRONMENTS.PRODUCTION } },
+  };
+}
+
+/**
+ * Every credential set a delivery may be authenticated against, ACTIVE
+ * environment first (the port's ordering contract).
+ *
+ * A store that has just flipped SANDBOX→PRODUCTION still has sandbox
+ * deliveries in flight; verifying only against the active environment kills
+ * them before the durable inbox, with no row to replay (FUT-678). The other
+ * environment is offered only when it actually holds credentials, so the
+ * common single-environment store still presents exactly one set.
+ */
+export function listeningSetsFrom(config: StoredProviderConfig, allowStubMode: boolean) {
+  const other: PaymentEnvironment = config.environment === 'PRODUCTION' ? 'SANDBOX' : 'PRODUCTION';
+  const sets = [resolvedFrom(config, allowStubMode)];
+  if (Object.values(config.environments[other] ?? {}).some((value) => value)) {
+    sets.push(resolvedFrom(config, allowStubMode, other));
+  }
+  return sets;
 }

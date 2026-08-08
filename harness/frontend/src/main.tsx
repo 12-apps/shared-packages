@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { CssBaseline } from '@12-apps/ui/mui/CssBaseline';
+import { ThemeProvider } from '@12-apps/ui/mui/styles';
+
 import { PAGES } from './pages/registry';
-import { HarnessNav } from './shell/harness-nav';
+import { HarnessShell } from './shell/harness-shell';
+import { harnessTheme } from './shell/theme';
 
 /**
  * The harness shell: a panel of every published surface, one page each.
@@ -12,8 +16,14 @@ import { HarnessNav } from './shell/harness-nav';
  * dependency here is one more thing that can explain a failure that is supposed
  * to be about OUR packages. `location.hash` needs nothing.
  *
- * The nav itself lives in `shell/harness-nav.tsx`, grouped the way future-pay's
- * admin sidebar is — see that file for which of its behaviours are borrowed.
+ * `ThemeProvider` + `CssBaseline` are the exception, and they are not chrome:
+ * they are the mounting a host performs, in the same order future-pay's
+ * `apps/admin/src/App.tsx` performs it. Without them, every package under test
+ * renders against MUI's stock palette instead of the design system's, so a
+ * page that looks right here would look wrong in the only place it ships.
+ *
+ * The chrome itself lives in `shell/` — see `harness-nav.tsx` for what it takes
+ * from the admin sidebar and what it leaves behind.
  */
 function useHashSlug(fallback: string) {
   const read = () => window.location.hash.replace(/^#\/?/, '') || fallback;
@@ -31,16 +41,17 @@ function Shell() {
   const page = PAGES.find((candidate) => candidate.slug === slug);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
-      <HarnessNav activeSlug={slug} />
-
-      <main data-testid="harness-page" data-page={page?.slug ?? 'unknown'} style={{ flex: 1, padding: 24 }}>
-        {/* An unknown slug is a spec pointing at a page that was renamed or
-            removed. Saying so beats rendering the first page, which would let
-            that spec keep passing against something it is not asking for. */}
-        {page ? <page.Component /> : <p data-testid="harness-unknown-page">No harness page named “{slug}”.</p>}
-      </main>
-    </div>
+    <ThemeProvider theme={harnessTheme}>
+      <CssBaseline />
+      <HarnessShell activeSlug={slug}>
+        <div data-testid="harness-page" data-page={page?.slug ?? 'unknown'}>
+          {/* An unknown slug is a spec pointing at a page that was renamed or
+              removed. Saying so beats rendering the first page, which would let
+              that spec keep passing against something it is not asking for. */}
+          {page ? <page.Component /> : <p data-testid="harness-unknown-page">No harness page named “{slug}”.</p>}
+        </div>
+      </HarnessShell>
+    </ThemeProvider>
   );
 }
 

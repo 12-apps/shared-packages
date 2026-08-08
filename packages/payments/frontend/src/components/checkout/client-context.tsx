@@ -20,6 +20,7 @@ import { createContext, useContext, type JSX, type ReactNode } from "react";
 
 import {
   chargeCard,
+  chargeWallet,
   fetchCheckoutConfig,
   listSavedCards,
   pollOrderStatus,
@@ -32,6 +33,7 @@ const DEFAULT_CLIENT: CheckoutClient = {
   getConfig: (tenantSlug) => fetchCheckoutConfig(tenantSlug),
   getStatus: (ref) => pollOrderStatus(ref),
   charge: (input) => chargeCard(input),
+  chargeWallet: (input) => chargeWallet(input),
   listInstruments: (tenantSlug) => listSavedCards(tenantSlug),
   refreshBrowserKey: (input) => refreshCardPublicKey(input),
 };

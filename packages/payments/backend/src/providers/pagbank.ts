@@ -53,9 +53,25 @@ function pixPayload(input: ChargeInput, credentials: ResolvedCredentials, expire
   };
 }
 
+/**
+ * The `card` object of a card charge's `payment_method` — which of PagBank's
+ * three instrument spellings this charge carries.
+ *
+ * A WALLET wins outright (FUT-471/472): `{ wallet: { type, key } }` per the
+ * "Pagando com Google Pay / Apple Pay" guides, both fields mandatory, and
+ * nothing else rides beside it — the wallet token IS the card, so an encrypted
+ * blob or vault id next to it would be a second instrument in one charge.
+ * A saved card charges by vault id; a fresh card sends the encrypted blob and
+ * asks PagBank to store it for reuse.
+ */
+function cardInstrument(card: NonNullable<ChargeInput['card']> | undefined) {
+  if (card?.wallet) return { wallet: { type: card.wallet.type, key: card.wallet.key } };
+  if (card?.savedCardToken) return { id: card.savedCardToken };
+  return { encrypted: card?.token ?? '', store: true };
+}
+
 /** The single `charges[]` entry of a card order. */
 function cardCharge(input: ChargeInput) {
-  const savedCardToken = input.card?.savedCardToken;
   return {
     // PagBank requires a 1–64 char charge description.
     description: `Pedido ${input.reference}`.slice(0, 64),
@@ -64,11 +80,7 @@ function cardCharge(input: ChargeInput) {
       type: 'CREDIT_CARD',
       installments: input.card?.installments ?? 1,
       capture: true,
-      // A saved card charges by vault id; a fresh card sends the encrypted
-      // blob and asks PagBank to store it for reuse.
-      card: savedCardToken
-        ? { id: savedCardToken }
-        : { encrypted: input.card?.token ?? '', store: true },
+      card: cardInstrument(input.card),
     },
     // Declares the stored-credential agreement to the issuer. Omitted
     // entirely for an ordinary storefront charge, where there is none.
@@ -119,14 +131,27 @@ const createCharge: PaymentProviderAdapter['createCharge'] = async (input, crede
 
 /**
  * PagBank signs deliveries with `x-authenticity-token` =
- * SHA-256(`${webhookToken}-${rawBody}`). The URL itself carries no secret
- * because `notification_urls` is capped at 150 chars, so this header IS the
- * authentication — hence fail-closed when it is absent or the token is unset
- * (stub mode excepted).
+ * SHA-256(`${secret}-${rawBody}`), where the documented secret is the ACCOUNT
+ * token ("token da conta") — so the API `token` is the default and a stored
+ * `webhookToken` is the platform's explicit override, not a requirement
+ * (FUT-678). Requiring `webhookToken` alone is what killed Connect stores:
+ * an OAuth connection only ever gets that field by env-var copy, and without
+ * it every delivery died fail-closed BEFORE the durable inbox — no row, no
+ * replay, no trace. The `??` order keeps an explicitly configured override
+ * authoritative where one exists.
+ *
+ * Which account signs a CONNECT store's deliveries (the store's own token vs
+ * the platform's) is still to be measured against a live sandbox Connect
+ * store; both secrets reach this verify through the pipeline's candidate
+ * sets, so either answer authenticates.
+ *
+ * The URL itself carries no secret because `notification_urls` is capped at
+ * 150 chars, so this header IS the authentication — hence fail-closed when it
+ * is absent or no secret is configured at all (stub mode excepted).
  */
 const webhook: PaymentProviderAdapter['webhook'] = {
   async verify(delivery, credentials) {
-    const secret = credentials.fields['webhookToken'];
+    const secret = credentials.fields['webhookToken'] ?? credentials.fields['token'];
     if (!secret) return stubDeliveryTrusted(credentials);
     const presented = delivery.headers['x-authenticity-token'];
     if (!presented) return false;
@@ -172,6 +197,7 @@ const webhook: PaymentProviderAdapter['webhook'] = {
           // PagBank's order body names no separate refund object; the charge
           // id is the only stable handle the delivery carries.
           providerRefundId: providerChargeId,
+          ...(typeof body.reference_id === 'string' ? { reference: body.reference_id } : {}),
           status: 'REFUNDED',
           amount: { amountCents: refunded, currency: 'BRL' },
           raw: body,
@@ -194,6 +220,28 @@ const webhook: PaymentProviderAdapter['webhook'] = {
 const webhookPath = (tenantSlug: string): string =>
   `/api/webhooks/pagseguro/${tenantSlug}/notifications`;
 
+/** What connecting a PagBank account collects. Hoisted for the size gate. */
+const credentialSchema = [
+  { key: 'token', label: 'Token do PagBank', secret: true, required: true },
+  { key: 'publicKey', label: 'Chave pública (cartão)', secret: false, required: false },
+  // Optional since FUT-678: webhook verification defaults to the account
+  // token (PagBank's documented signing secret); this field is only an
+  // explicit override for deployments that configured a dedicated one.
+  { key: 'webhookToken', label: 'Token de webhook', secret: true, required: false },
+  // The merchant's id at PagBank as Google Pay's `gatewayMerchantId`
+  // (FUT-471). Optional and NOT secret — it is baked into every integrating
+  // page — and the Google Pay button simply does not render for a connection
+  // that has none. Whose id applies under Connect (platform vs connected
+  // seller) is undocumented by PagBank and still an open question on the
+  // ticket; a per-connection field can hold either answer.
+  {
+    key: 'googlePayMerchantId',
+    label: 'Google Pay: ID do lojista (gatewayMerchantId)',
+    secret: false,
+    required: false,
+  },
+] as const;
+
 export function pagbankProvider(): PaymentProviderAdapter {
   return {
     name: NAME,
@@ -205,6 +253,11 @@ export function pagbankProvider(): PaymentProviderAdapter {
     authMode: 'oauth',
     capabilities: {
       methods: ['PIX', 'CARD'],
+      // Google Pay rides the card charge as `card.wallet` (FUT-471). Declared
+      // here — the single capability source — so the gateway skips a wallet
+      // charge on any provider that never made this claim, and the checkout
+      // gates its buttons on the same fact.
+      wallets: ['GOOGLE_PAY'],
       savedCards: true,
       refunds: true,
       partialRefunds: false,
@@ -213,11 +266,7 @@ export function pagbankProvider(): PaymentProviderAdapter {
       tokenization: 'PUBLIC_KEY',
       activationCharge: true,
     },
-    credentialSchema: [
-      { key: 'token', label: 'Token do PagBank', secret: true, required: true },
-      { key: 'publicKey', label: 'Chave pública (cartão)', secret: false, required: false },
-      { key: 'webhookToken', label: 'Token de webhook', secret: true, required: true },
-    ],
+    credentialSchema,
     customerSchema,
     // A PIX code and a card typed on OUR page (FUT-596). Named for the SHAPE,
     // not for this vendor: Stone's flow is the same shape and declares the same
@@ -241,10 +290,16 @@ export function pagbankProvider(): PaymentProviderAdapter {
     // owner here must never be handed the form — see FUT-483.
 
     clientConfig(credentials) {
+      const gatewayMerchantId = credentials.fields['googlePayMerchantId'];
       return {
         provider: NAME,
         tokenization: 'PUBLIC_KEY',
         publicKey: credentials.fields['publicKey'],
+        // Google Pay's PAYMENT_GATEWAY parameters (FUT-471). `gateway` is
+        // PagBank's id in Google's processor registry — a fact about PagBank,
+        // spelled once here; the merchant id is per connection and `null`
+        // until configured, which the button reads as "do not render".
+        googlePay: { gateway: 'pagbank', gatewayMerchantId: gatewayMerchantId || null },
       };
     },
   };

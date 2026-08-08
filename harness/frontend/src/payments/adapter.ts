@@ -36,6 +36,7 @@ import type {
   Money,
   PaymentMethodKind,
   PaymentProviderAdapter,
+  WalletType,
 } from '@12-apps/payments-backend';
 
 /** The one merchant every harness page is set at. */
@@ -70,6 +71,18 @@ export interface HarnessProvider {
   customerSchema?: CustomerFieldSpec[];
   /** A PUBLIC browser key. */
   publicKey?: string | null;
+  /**
+   * The digital wallets this provider's card charge accepts (FUT-471/472) —
+   * declared exactly as a real adapter declares them, so the published
+   * capability gate and button gating run for real on a harness store.
+   */
+  wallets?: WalletType[];
+  /**
+   * Google Pay's `gatewayMerchantId` for this connection (FUT-471). Present ⇒
+   * `clientConfig` publishes the PAYMENT_GATEWAY parameters, with the
+   * provider's own (vendor-free) name as the gateway id.
+   */
+  googlePayMerchantId?: string;
   /** The connection runs the deterministic stub ⇒ `mockTokenization`. */
   stub?: boolean;
   /** The issuer refuses. A real decline, not an outage. */
@@ -142,10 +155,13 @@ function cardAnswer(
   base: ChargeSnapshot,
 ): ChargeSnapshot {
   const card = input.card;
-  if (!card?.token && !card?.savedCardToken) {
+  // A wallet key IS the instrument (FUT-471): a charge carrying one has
+  // nothing to vault and no PAN-derived facts to answer with.
+  if (!card?.token && !card?.savedCardToken && !card?.wallet) {
     return { ...base, status: 'DECLINED', declineReason: 'INVALID_CARD', declineRetriable: false };
   }
   if (spec.declines) return { ...base, status: 'DECLINED', declineReason: 'CARD_DECLINED' };
+  if (card.wallet) return base;
   return { ...base, card: { last4: '4242', vaultToken: `vault_${card.token ?? 'none'}` } };
 }
 
@@ -197,6 +213,9 @@ export function harnessAdapter(spec: HarnessProvider, seen: SeenCharge[]): Payme
     displayName: spec.name,
     capabilities: {
       methods: spec.methods ?? ['PIX', 'CARD'],
+      // Declared, not defaulted: the published walk SKIPS a wallet charge on
+      // any provider without the claim, and that gate must run here for real.
+      wallets: spec.wallets ?? [],
       savedCards: true,
       refunds: false,
       partialRefunds: false,
@@ -242,7 +261,16 @@ export function harnessAdapter(spec: HarnessProvider, seen: SeenCharge[]): Payme
         return [];
       },
     },
-    clientConfig: () => ({ provider: spec.name, tokenization }),
+    clientConfig: () => ({
+      provider: spec.name,
+      tokenization,
+      // The PAYMENT_GATEWAY parameters, published exactly as a real adapter
+      // publishes them (FUT-471) — with this provider's own vendor-free name
+      // as the gateway id, which the frontend must treat as opaque.
+      ...(spec.googlePayMerchantId
+        ? { googlePay: { gateway: spec.name, gatewayMerchantId: spec.googlePayMerchantId } }
+        : {}),
+    }),
   };
 }
 

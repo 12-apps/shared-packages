@@ -1,165 +1,175 @@
-import { useState, type CSSProperties, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 
-import { NAV_GROUPS, PAGES, type HarnessNavGroup, type HarnessPage } from '../pages/registry';
+import BarChartIcon from '@mui/icons-material/BarChartOutlined';
+import CircleIcon from '@mui/icons-material/CircleOutlined';
+import CreditCardIcon from '@mui/icons-material/CreditCardOutlined';
+import ExpandIcon from '@mui/icons-material/KeyboardArrowDown';
+import InstallMobileIcon from '@mui/icons-material/InstallMobileOutlined';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCartOutlined';
 
-/**
- * The harness sidebar, structured like future-pay's admin one
- * (`apps/admin/src/shell/admin-sidebar-nav.tsx`).
- *
- * Four behaviours are borrowed, and each answers something the flat list got
- * wrong once seventeen pages were registered:
- *
- *  - **Labelled groups**, ordered by how often you open them.
- *  - **A caret on the group header and nowhere else.** A per-row chevron sat a
- *    few pixels under the header's, pointing at a different thing.
- *  - **Parent rows whose disclosure IS the route.** A parent opens because you
- *    are inside it and closes when you leave, so there is no stale-open
- *    disclosure and no way for the sidebar to disagree with the page you are
- *    on.
- *  - **Sections that stay collapsed once you collapse them**, including the
- *    one holding the active page.
- *
- * Deliberately NOT borrowed: MUI, the permission/entitlement gates, and the
- * badge counts. Gates are the admin's reason for existing; here every page is
- * always reachable, and a harness that pulled in a component library to draw
- * its own chrome would put that library between a reader and the package they
- * came to look at.
- */
+import { Collapsible } from '@12-apps/ui/layout/Collapsible';
+import { Box } from '@12-apps/ui/mui/Box';
+import { List } from '@12-apps/ui/mui/List';
+import { ListItemButton } from '@12-apps/ui/mui/ListItemButton';
+import { ListItemText } from '@12-apps/ui/mui/ListItemText';
+import { alpha } from '@12-apps/ui/mui/styles';
+import { Text } from '@12-apps/ui/typography/Text';
 
-/** A row the sidebar draws: a destination, plus the rows nested under it. */
-export interface NavRow {
-  /** Stable key — drives the row's `data-testid`. */
-  key: string;
-  label: string;
-  slug: string;
-  /**
-   * The package this row is about, shown under the label. Top-level rows only:
-   * under a parent, every child shares the parent's package, and thirteen
-   * repetitions of one name is the noise that made the flat list unreadable.
-   */
-  pkg?: string;
-  children: readonly NavRow[];
-}
-
-export interface NavSection {
-  key: string;
-  label: string;
-  rows: readonly NavRow[];
-}
-
-function leafRow(page: HarnessPage, showPkg: boolean): NavRow {
-  return {
-    key: page.slug,
-    label: page.title,
-    slug: page.slug,
-    ...(showPkg ? { pkg: page.pkg } : {}),
-    children: [],
-  };
-}
-
-function parentRows(group: HarnessNavGroup, inGroup: readonly HarnessPage[]): readonly NavRow[] {
-  return (group.parents ?? [])
-    .map((parent) => ({
-      key: parent.key,
-      label: parent.label,
-      slug: parent.slug,
-      pkg: inGroup.find((page) => page.slug === parent.slug)?.pkg,
-      children: inGroup
-        .filter((page) => page.parent === parent.key)
-        .map((page) => leafRow(page, false)),
-    }))
-    // A parent with nothing under it is the one-item group all over again: a
-    // disclosure that only ever reveals the row you already clicked.
-    .filter((row) => row.children.length > 0);
-}
+import { buildHarnessNav, rowHoldsSlug, type NavRow, type NavSection } from './nav-tree';
 
 /**
- * Derive the sections from the registry, so adding a page stays ONE edit in
- * `registry.ts` — the promise that file makes, and the reason the tree is not
- * hand-written here the way the admin's is.
+ * The harness sidebar — the same sidebar future-pay's admin has
+ * (`apps/admin/src/shell/admin-sidebar-nav.tsx`), rendered from the same
+ * components against the same theme.
+ *
+ * It is deliberately not a lookalike built from inline styles. Every primitive
+ * below — `Collapsible`, `List`, `ListItemButton`, `ListItemText`, `Text`, and
+ * the `alpha(primary)` selection tint — is the one the admin uses, so the two
+ * sidebars cannot drift into looking similar-but-not-quite. That also means
+ * this chrome is itself a consumer of `@12-apps/ui`: if a release breaks
+ * `Collapsible`, the harness's own navigation is the first thing to show it.
+ *
+ * What is NOT carried over is everything gate-shaped — the permission and
+ * entitlement filters, the lock glyph and its upsell, the badge counts. Those
+ * are the admin's reason for existing; here every page is always reachable.
  */
-export function buildHarnessNav(
-  pages: readonly HarnessPage[] = PAGES,
-  groups: readonly HarnessNavGroup[] = NAV_GROUPS,
-): readonly NavSection[] {
-  return groups.map((group) => {
-    const inGroup = pages.filter((page) => page.group === group.key);
-    return {
-      key: group.key,
-      label: group.label,
-      rows: [
-        ...parentRows(group, inGroup),
-        ...inGroup.filter((page) => page.parent === undefined).map((page) => leafRow(page, true)),
-      ],
-    };
-  });
-}
 
-const SECTIONS = buildHarnessNav();
+/** Icons are keyed by row, exactly as the admin keys them by `testId`. */
+const ICON_BY_KEY: Record<string, typeof CircleIcon> = {
+  checkout: ShoppingCartIcon,
+  'pwa-install-prompt': InstallMobileIcon,
+  'payments-provider-settings': CreditCardIcon,
+  'report-builder': BarChartIcon,
+};
 
-function rowHoldsSlug(row: NavRow, slug: string): boolean {
-  return row.slug === slug || row.children.some((child) => child.slug === slug);
-}
-
-const linkStyle = (active: boolean, depth: number): CSSProperties => ({
-  display: 'block',
-  padding: depth === 0 ? '6px 8px' : '5px 8px 5px 20px',
-  borderRadius: 4,
-  fontSize: depth === 0 ? 14 : 13,
-  fontWeight: active ? 700 : 400,
-  color: active ? '#1a1a1a' : '#2952cc',
-  background: active ? '#eef2ff' : 'transparent',
-  textDecoration: 'none',
-});
-
-function NavLink({
-  row,
-  active,
-  depth,
-}: {
-  row: NavRow;
-  active: boolean;
-  depth: number;
-}): JSX.Element {
+/** The group header's caret — one per section, and nowhere else in the nav. */
+function Chevron({ open }: { open: boolean }): JSX.Element {
   return (
-    <a
-      href={`#/${row.slug}`}
-      data-testid={`harness-nav-${row.key}`}
-      aria-current={active ? 'page' : undefined}
-      style={linkStyle(active, depth)}
-    >
-      {row.label}
-      {row.pkg !== undefined && (
-        <span style={{ display: 'block', fontSize: 11, color: '#888', fontWeight: 400 }}>
-          {row.pkg}
-        </span>
-      )}
-    </a>
+    <ExpandIcon
+      fontSize="small"
+      aria-hidden
+      sx={{
+        transition: 'transform 150ms',
+        transform: open ? 'none' : 'rotate(-90deg)',
+      }}
+    />
   );
 }
 
-/** One top-level row, with its children shown while you are inside it. */
+function NavRowIcon({ row, active }: { row: NavRow; active: boolean }): JSX.Element {
+  // An unknown key falls back to a neutral dot, so a page added to the registry
+  // still renders an icon rather than a ragged row with no leading glyph.
+  const Icon = ICON_BY_KEY[row.key] ?? CircleIcon;
+  return (
+    <Box
+      component="span"
+      sx={{
+        display: 'inline-flex',
+        flex: '0 0 auto',
+        color: 'primary.main',
+        opacity: active ? 1 : 0.75,
+      }}
+    >
+      <Icon fontSize="small" aria-hidden />
+    </Box>
+  );
+}
+
+/** A top-level destination: leading icon + label, tinted when it is the page. */
+function NavItem({ row, active }: { row: NavRow; active: boolean }): JSX.Element {
+  return (
+    <ListItemButton
+      component="a"
+      href={`#/${row.slug}`}
+      data-testid={`harness-nav-${row.key}`}
+      aria-label={row.label}
+      aria-current={active ? 'page' : undefined}
+      selected={active}
+      sx={{
+        gap: 1.5,
+        borderRadius: 1.5,
+        mx: 0.5,
+        px: 1,
+        py: 0.75,
+        my: 0.25,
+        color: active ? 'primary.main' : 'text.secondary',
+        '&.Mui-selected': {
+          bgcolor: (t) => alpha(t.palette.primary.main, 0.12),
+          '&:hover': { bgcolor: (t) => alpha(t.palette.primary.main, 0.18) },
+        },
+      }}
+    >
+      <NavRowIcon row={row} active={active} />
+      <ListItemText
+        primary={row.label}
+        secondary={row.pkg}
+        primaryTypographyProps={{ variant: 'body2', noWrap: true, fontWeight: active ? 600 : 500 }}
+        secondaryTypographyProps={{ variant: 'caption', noWrap: true }}
+      />
+    </ListItemButton>
+  );
+}
+
+/** A nested destination: indented, icon-less, same active treatment. */
+function NavChild({ row, active }: { row: NavRow; active: boolean }): JSX.Element {
+  return (
+    <ListItemButton
+      component="a"
+      href={`#/${row.slug}`}
+      data-testid={`harness-nav-${row.key}`}
+      aria-label={row.label}
+      aria-current={active ? 'page' : undefined}
+      selected={active}
+      sx={{
+        gap: 1,
+        borderRadius: 1.5,
+        ml: 3.5,
+        mr: 0.5,
+        px: 1,
+        py: 0.4,
+        color: active ? 'primary.main' : 'text.secondary',
+        '&.Mui-selected': {
+          bgcolor: (t) => alpha(t.palette.primary.main, 0.1),
+          '&:hover': { bgcolor: (t) => alpha(t.palette.primary.main, 0.16) },
+        },
+      }}
+    >
+      <ListItemText
+        primary={row.label}
+        primaryTypographyProps={{ variant: 'caption', noWrap: true, fontWeight: active ? 600 : 400 }}
+      />
+    </ListItemButton>
+  );
+}
+
+/**
+ * One top-level row plus the rows nested under it.
+ *
+ * The disclosure IS the route and has no control of its own: a row is open
+ * while you are inside it — on its own page or one of its children's — and
+ * closed once you leave. So there is no stale-open disclosure to reset, and no
+ * way for the sidebar to disagree with the page you are on.
+ */
 function NavEntry({ row, activeSlug }: { row: NavRow; activeSlug: string }): JSX.Element {
   const childActive = row.children.some((child) => child.slug === activeSlug);
   return (
-    <li style={{ margin: '2px 0' }}>
-      {/* The parent row lands on one of its own children, so when that child is
-          the active page the CHILD carries the highlight and the parent does
-          not — two highlighted rows for one destination reads as two pages. */}
-      <NavLink row={row} active={row.slug === activeSlug && !childActive} depth={0} />
-      {row.children.length > 0 && rowHoldsSlug(row, activeSlug) && (
-        <ul style={{ listStyle: 'none', padding: 0, margin: '2px 0 6px' }}>
+    <>
+      {/* The parent lands on one of its own children, so when that child is the
+          active page the CHILD carries the highlight and the parent does not —
+          two tinted rows for one destination reads as two pages. */}
+      <NavItem row={row} active={row.slug === activeSlug && !childActive} />
+      {row.children.length > 0 && (
+        <Collapsible open={rowHoldsSlug(row, activeSlug)}>
           {row.children.map((child) => (
-            <li key={child.key}>
-              <NavLink row={child} active={child.slug === activeSlug} depth={1} />
-            </li>
+            <NavChild key={child.key} row={child} active={child.slug === activeSlug} />
           ))}
-        </ul>
+        </Collapsible>
       )}
-    </li>
+    </>
   );
 }
 
+/** One labelled section: a keyboard-operable header whose caret is the state. */
 function NavSectionBlock({
   section,
   activeSlug,
@@ -172,42 +182,47 @@ function NavSectionBlock({
   onToggle: () => void;
 }): JSX.Element {
   return (
-    <section data-testid={`harness-nav-group-${section.key}`} style={{ marginBottom: 12 }}>
-      <button
+    <Box component="section" data-testid={`harness-nav-group-${section.key}`} sx={{ mb: 1 }}>
+      <Box
+        component="button"
         type="button"
         onClick={onToggle}
         data-testid={`harness-nav-section-toggle-${section.key}`}
         aria-expanded={open}
-        style={{
+        aria-label={section.label}
+        sx={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           width: '100%',
-          padding: '6px 8px',
+          px: 1.5,
+          py: 0.75,
+          mt: 0.5,
           border: 0,
           background: 'transparent',
           cursor: 'pointer',
-          color: '#666',
-          font: 'inherit',
-          fontSize: 11,
-          fontWeight: 600,
-          letterSpacing: '0.06em',
+          color: 'text.secondary',
           textTransform: 'uppercase',
+          letterSpacing: '0.06em',
         }}
       >
-        {section.label}
-        <span aria-hidden style={{ color: '#aaa' }}>{open ? '▾' : '▸'}</span>
-      </button>
-      {open && (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          {section.rows.map((row) => (
-            <NavEntry key={row.key} row={row} activeSlug={activeSlug} />
-          ))}
-        </ul>
-      )}
-    </section>
+        <Text variant="caption" size="xs" color="secondary" weight="semibold" as="span">
+          {section.label}
+        </Text>
+        <Box component="span" sx={{ display: 'inline-flex', color: 'text.disabled' }}>
+          <Chevron open={open} />
+        </Box>
+      </Box>
+      <Collapsible open={open}>
+        {section.rows.map((row) => (
+          <NavEntry key={row.key} row={row} activeSlug={activeSlug} />
+        ))}
+      </Collapsible>
+    </Box>
   );
 }
+
+const SECTIONS = buildHarnessNav();
 
 export function HarnessNav({ activeSlug }: { activeSlug: string }): JSX.Element {
   const [collapsed, setCollapsed] = useState<readonly string[]>([]);
@@ -215,25 +230,20 @@ export function HarnessNav({ activeSlug }: { activeSlug: string }): JSX.Element 
     setCollapsed((keys) => (keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]));
 
   return (
-    <nav
-      data-testid="harness-nav"
-      style={{ width: 260, flexShrink: 0, borderRight: '1px solid #ddd', padding: 16 }}
-    >
-      <h1 style={{ fontSize: 14, textTransform: 'uppercase', color: '#666' }}>Published surfaces</h1>
+    <List component="nav" data-testid="harness-nav" sx={{ px: 1, py: 0 }}>
       {SECTIONS.map((section) => (
         <NavSectionBlock
           key={section.key}
           section={section}
           activeSlug={activeSlug}
           // A collapsed section hides its rows even when you are standing in
-          // one of them, exactly as the admin's does. Forcing it back open was
-          // the first version here, and it made the header look broken: you
-          // click collapse on the section you are in and nothing happens.
-          // Where you are is never in doubt anyway — the page is on screen.
+          // one of them, exactly as the admin's does. Forcing it back open made
+          // the header look broken: you click collapse on the section you are
+          // in and nothing happens.
           open={!collapsed.includes(section.key)}
           onToggle={() => toggle(section.key)}
         />
       ))}
-    </nav>
+    </List>
   );
 }

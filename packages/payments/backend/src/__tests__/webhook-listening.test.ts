@@ -1,9 +1,22 @@
+import { createHash } from 'node:crypto';
+
 import { describe, expect, it, vi } from 'vitest';
 
+import { WebhookVerificationError } from '../core/errors';
 import { createPaymentsGateway } from '../core/gateway';
 import type { CredentialStore } from '../core/ports';
 import type { PaymentProviderAdapter } from '../core/provider';
-import type { MerchantRef, ResolvedCredentials } from '../core/types';
+import { defineProviders } from '../core/registry';
+import type { MerchantRef, PaymentEnvironment, ResolvedCredentials, WebhookDelivery } from '../core/types';
+import { credentialStoreFrom } from '../config/service';
+import type { StoredProviderConfig } from '../config/types';
+import {
+  createMemoryAttemptLedger,
+  createMemoryChargeStore,
+  createMemoryProviderConfigStore,
+} from '../memory';
+import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
+import { pagbankProvider } from '../providers/pagbank';
 
 /**
  * Charging and listening are different questions (FUT-463).
@@ -240,6 +253,112 @@ describe('payment_check carries every hint it was given', () => {
     });
     expect(snapshot?.status).toBe('PAID');
     vi.unstubAllGlobals();
+  });
+});
+
+/**
+ * FUT-678 — a delivery signed under the environment a store just flipped AWAY
+ * from must still authenticate. Verification precedes the durable inbox, so a
+ * sandbox delivery in flight during a SANDBOX→PRODUCTION flip that only the
+ * production secret is tried against dies with no row, no replay and no trace.
+ * The credential store answers with EVERY environment's sets
+ * (`listListeningCredentials`) and the pipeline tries each in order.
+ */
+describe('webhook verification across both environments', () => {
+  const ORDER_BODY = JSON.stringify({
+    id: 'ORDE_1',
+    reference_id: 'order-1',
+    charges: [{ id: 'CHAR_1', status: 'PAID', amount: { value: 12_50 } }],
+  });
+
+  function signedDelivery(secret: string): WebhookDelivery {
+    return {
+      provider: 'pagbank',
+      rawBody: ORDER_BODY,
+      headers: {
+        'x-authenticity-token': createHash('sha256')
+          .update(`${secret}-${ORDER_BODY}`)
+          .digest('hex'),
+      },
+    };
+  }
+
+  /** A PagBank connection holding BOTH environments' account tokens. */
+  function bothEnvironments(active: PaymentEnvironment): StoredProviderConfig {
+    return {
+      provider: 'pagbank',
+      enabled: true,
+      priority: 0,
+      environment: active,
+      status: 'UNVERIFIED',
+      lastVerifiedAt: null,
+      chargeVerifiedAt: null,
+      pendingVerification: null,
+      expiresAt: null,
+      stub: false,
+      environments: {
+        SANDBOX: { token: 'sandbox-token' },
+        PRODUCTION: { token: 'production-token' },
+      },
+    };
+  }
+
+  function connectWorld(behavior: { handlerFails: boolean }) {
+    const configStore = createMemoryProviderConfigStore();
+    const webhooks = createMemoryWebhookInbox();
+    const gateway = createPaymentsGateway({
+      providers: defineProviders({ pagbank: pagbankProvider() } as const),
+      credentials: credentialStoreFrom(configStore),
+      charges: createMemoryChargeStore(),
+      webhooks,
+      attempts: createMemoryAttemptLedger(),
+      onWebhookEvent: async () => {
+        if (behavior.handlerFails) throw new Error('host handler down');
+      },
+    });
+    return { configStore, webhooks, gateway };
+  }
+
+  it('verifies a sandbox-signed delivery arriving after the flip to PRODUCTION', async () => {
+    const world = connectWorld({ handlerFails: false });
+    await world.configStore.save(MERCHANT, bothEnvironments('PRODUCTION'));
+
+    const events = await world.gateway.handleWebhook(MERCHANT, signedDelivery('sandbox-token'));
+
+    expect(events[0]).toMatchObject({
+      type: 'CHARGE_UPDATED',
+      charge: { providerChargeId: 'CHAR_1', status: 'PAID' },
+    });
+  });
+
+  it('still rejects a delivery signed with neither environment secret', async () => {
+    const world = connectWorld({ handlerFails: false });
+    await world.configStore.save(MERCHANT, bothEnvironments('PRODUCTION'));
+
+    await expect(
+      world.gateway.handleWebhook(MERCHANT, signedDelivery('forged-secret')),
+    ).rejects.toThrow(WebhookVerificationError);
+  });
+
+  it('replays a stranded sandbox-signed row after the store flipped to PRODUCTION', async () => {
+    // The replay sweep is the recovery path for exactly this row: recorded
+    // before the flip, failed on a host blip, and re-verified AFTER the store
+    // moved on — with only the active secret it would re-reject forever.
+    const behavior = { handlerFails: true };
+    const world = connectWorld(behavior);
+    await world.configStore.save(MERCHANT, bothEnvironments('SANDBOX'));
+    await expect(
+      world.gateway.handleWebhook(MERCHANT, signedDelivery('sandbox-token')),
+    ).rejects.toThrow('host handler down');
+
+    await world.configStore.save(MERCHANT, bothEnvironments('PRODUCTION'));
+    behavior.handlerFails = false;
+    const [rowId] = Object.keys(world.webhooks.statuses());
+    world.webhooks.backdate(rowId!, new Date('2026-07-27T11:00:00Z'));
+
+    const report = await world.gateway.replayWebhooks({ now: new Date('2026-07-27T12:00:00Z') });
+
+    expect(report).toMatchObject({ attempted: 1, processed: 1, failed: 0 });
   });
 });
 

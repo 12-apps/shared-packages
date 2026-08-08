@@ -138,6 +138,54 @@ describe('pagbank adapter — charges', () => {
     expect(body.charges[0]?.payment_method.card).toEqual({ id: 'CARD_9' });
   });
 
+  /**
+   * FUT-471 — the wallet branch of the card charge, per PagBank's "Pagando com
+   * Google Pay" guide: `payment_method.card` becomes `{ wallet: { type, key }}`,
+   * both fields mandatory, `key` being the token Google handed the browser
+   * (`paymentData.paymentMethodData.tokenizationData.token`) verbatim.
+   */
+  it('sends a Google Pay charge as payment_method.card.wallet (FUT-471)', async () => {
+    const spy = mockFetch({ id: 'ORDE_W', charges: [{ id: 'CHAR_W', status: 'PAID' }] });
+    await pagbankProvider().createCharge(
+      { ...cardInput('order-w'), card: { wallet: { type: 'GOOGLE_PAY', key: 'gp_tok_123' } } },
+      LIVE,
+    );
+
+    const body = JSON.parse((spy.mock.calls[0] as [string, RequestInit])[1].body as string) as {
+      charges: Array<{ payment_method: Record<string, unknown> }>;
+    };
+    expect(body.charges[0]?.payment_method).toEqual({
+      type: 'CREDIT_CARD',
+      installments: 1,
+      capture: true,
+      card: { wallet: { type: 'GOOGLE_PAY', key: 'gp_tok_123' } },
+    });
+  });
+
+  it('a wallet wins over any other instrument — one instrument per charge', async () => {
+    // A body carrying both a wallet key and a vault id must not send two
+    // instruments; the wallet is the one the buyer just authorized.
+    const spy = mockFetch({ id: 'ORDE_W2', charges: [{ id: 'CHAR_W2', status: 'PAID' }] });
+    await pagbankProvider().createCharge(
+      {
+        ...cardInput('order-w2'),
+        card: {
+          wallet: { type: 'GOOGLE_PAY', key: 'gp_tok' },
+          savedCardToken: 'CARD_9',
+          token: 'ENCRYPTED_BLOB',
+        },
+      },
+      LIVE,
+    );
+
+    const body = JSON.parse((spy.mock.calls[0] as [string, RequestInit])[1].body as string) as {
+      charges: Array<{ payment_method: { card: Record<string, unknown> } }>;
+    };
+    expect(body.charges[0]?.payment_method.card).toEqual({
+      wallet: { type: 'GOOGLE_PAY', key: 'gp_tok' },
+    });
+  });
+
   it('treats a card decline as a DECLINED snapshot, not an exception', async () => {
     mockFetch({ id: 'ORDE_3', charges: [{ id: 'CHAR_3', status: 'DECLINED' }] });
     const snapshot = await pagbankProvider().createCharge(cardInput('order-4'), LIVE);
@@ -470,13 +518,85 @@ describe('pagbank adapter — webhooks', () => {
     ).resolves.toBe(false);
   });
 
-  it('fails closed in live mode when no webhook token is configured', async () => {
+  it('fails closed in live mode when no secret of any kind is configured', async () => {
     await expect(
       pagbankProvider().webhook.verify(
         { provider: 'pagbank', rawBody: body, headers: { 'x-authenticity-token': signature } },
         { environment: 'PRODUCTION', fields: {} },
       ),
     ).resolves.toBe(false);
+  });
+
+  /**
+   * FUT-678 — the signing secret under Connect. PagBank documents the
+   * signature as SHA-256 of `{account token}-{payload}`, so the API token is
+   * the DEFAULT secret; `webhookToken` is only the platform's explicit
+   * override. Requiring `webhookToken` alone rejected every delivery of every
+   * OAuth-connected store BEFORE the durable inbox whenever the env-var copy
+   * was absent.
+   */
+  describe('the signing secret under Connect (FUT-678)', () => {
+    it('accepts a delivery signed with the account token when no webhook token is set', async () => {
+      const accountToken = 'acct_tok';
+      const signed = createHash('sha256').update(`${accountToken}-${body}`).digest('hex');
+      await expect(
+        pagbankProvider().webhook.verify(
+          { provider: 'pagbank', rawBody: body, headers: { 'x-authenticity-token': signed } },
+          { environment: 'PRODUCTION', fields: { token: accountToken } },
+        ),
+      ).resolves.toBe(true);
+    });
+
+    it('keeps an explicitly configured webhook token authoritative', async () => {
+      const creds = {
+        environment: 'PRODUCTION' as const,
+        fields: { token: 'acct_tok', webhookToken: 'dedicated' },
+      };
+      const signedWithDedicated = createHash('sha256').update(`dedicated-${body}`).digest('hex');
+      const signedWithAccount = createHash('sha256').update(`acct_tok-${body}`).digest('hex');
+
+      await expect(
+        pagbankProvider().webhook.verify(
+          {
+            provider: 'pagbank',
+            rawBody: body,
+            headers: { 'x-authenticity-token': signedWithDedicated },
+          },
+          creds,
+        ),
+      ).resolves.toBe(true);
+      // The override REPLACES the default rather than widening it: two live
+      // secrets at once is a bigger surface than the configuration asked for.
+      await expect(
+        pagbankProvider().webhook.verify(
+          {
+            provider: 'pagbank',
+            rawBody: body,
+            headers: { 'x-authenticity-token': signedWithAccount },
+          },
+          creds,
+        ),
+      ).resolves.toBe(false);
+    });
+
+    it('verifies a legacy form-encoded notification body the same way', async () => {
+      // The FUT-477 post-transaction shape rides the same URL and the same
+      // `x-authenticity-token` scheme; this pins that the verify layer does
+      // not reopen the redelivery loop one step above the parse fix.
+      const legacyBody =
+        'notificationCode=093C100E7FA87FA8C0B664B79F8359773B96&notificationType=transaction';
+      const signed = createHash('sha256').update(`acct_tok-${legacyBody}`).digest('hex');
+      await expect(
+        pagbankProvider().webhook.verify(
+          {
+            provider: 'pagbank',
+            rawBody: legacyBody,
+            headers: { 'x-authenticity-token': signed },
+          },
+          { environment: 'PRODUCTION', fields: { token: 'acct_tok' } },
+        ),
+      ).resolves.toBe(true);
+    });
   });
 
   it('parses the order payload into a PAID charge event', async () => {
@@ -771,5 +891,32 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
       expect(events).toHaveLength(1);
       expect(events[0]!.charge?.status).toBe('CANCELED');
     });
+  });
+});
+
+describe('pagbank adapter — wallet capability and client config (FUT-471)', () => {
+  it('declares the Google Pay wallet in its capability table', () => {
+    // The single source the gateway's skip and the checkout's button gate on.
+    expect(pagbankProvider().capabilities.wallets).toContain('GOOGLE_PAY');
+  });
+
+  it('publishes the PAYMENT_GATEWAY parameters when the connection carries a merchant id', () => {
+    const config = pagbankProvider().clientConfig({
+      environment: 'SANDBOX',
+      fields: { token: 't', googlePayMerchantId: 'MID_123' },
+    });
+    // `gateway` is PagBank's id in Google's processor registry — a provider
+    // fact, spelled by the adapter so no frontend hardcodes a vendor name.
+    expect(config.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: 'MID_123' });
+  });
+
+  it('publishes a null merchant id for a connection that has none', () => {
+    // The button must not render for this store: a token minted against a
+    // missing gatewayMerchantId charges nobody. Blank normalizes to null too.
+    const config = pagbankProvider().clientConfig({
+      environment: 'SANDBOX',
+      fields: { token: 't', googlePayMerchantId: '' },
+    });
+    expect(config.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: null });
   });
 });

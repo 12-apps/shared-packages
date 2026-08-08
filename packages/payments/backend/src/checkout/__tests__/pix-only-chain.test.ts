@@ -50,6 +50,8 @@ function link(over: Partial<BuyerProviderLink>): BuyerProviderLink {
     publicKey: null,
     mockTokenization: false,
     methods: ['PIX', 'CARD'],
+    wallets: [],
+    googlePay: null,
     customerSchema: [],
     // Declares no screen (FUT-596) — these cases are about the capability
     // reads, which is exactly the path an undeclared provider takes.
