@@ -423,20 +423,29 @@ jobs:
           # depends on, so prepare-publish.mjs always resolves workspace:*
           # interdeps to a version that already exists.
           #
-          # Every .releaserc.json sets successComment:false, and this loop is
-          # why. @semantic-release/github comments on the PRs behind a release,
-          # and each iteration below is its own release — so one merge posted
-          # one ":tada: This PR is included in version X" per package, 24 of
-          # them, all identical apart from a bare version number that names no
-          # package. Worse, a package releasing for the FIRST time has no prior
-          # tag, so its commit range is the whole history and every PR the repo
-          # has ever merged got one too. The Releases page and the `released`
-          # label carry the same information without the fan-out.
+          # Each iteration is an independent release, and what bounds it to ONE
+          # package is `extends: semantic-release-monorepo` in every
+          # .releaserc.json: it filters the commit range down to the commits
+          # that touched this directory. Without it every run analysed the whole
+          # repo history, so a single `feat(payments)` merge cut a release for
+          # all 24 packages — 24 tags, 24 GitHub releases and 24 PR comments per
+          # merge, for 23 packages whose files had not changed at all.
+          #
+          # `pnpm exec`, not `pnpm dlx`: the config `extends` a module, so
+          # semantic-release has to run with the workspace's node_modules on its
+          # resolution path. Pinning it in package.json also means a release is
+          # no longer built by whatever version was latest that morning.
+          #
+          # --tag-format keeps the tag scheme this repo already has (`ui-v1.2.3`,
+          # 700+ tags deep). It deliberately overrides the `@12-apps/ui-v1.2.3`
+          # that semantic-release-monorepo would otherwise impose — under that
+          # scheme no package would find its own last tag, every one would look
+          # unreleased, and they would all reset to 1.0.0.
           for dir in $PUBLISH_DIRS; do
             pkg="$(basename "$dir")"
             echo "::group::semantic-release $pkg"
             ( cd "$dir" \
-                && pnpm dlx semantic-release --tag-format "$pkg-v\${version}" )
+                && pnpm exec semantic-release --tag-format "$pkg-v\${version}" )
             echo "::endgroup::"
           done
       # OIDC trusted publishing needs npm >= 11.5.1 (Node 24 ships an older npm).

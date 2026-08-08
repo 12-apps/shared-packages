@@ -81,20 +81,39 @@ seven published while it was private are still restricted on npm; their next
 release flips them, and a package's access covers every version it has, so the
 versions already up there become readable too.
 
-### Where a release announces itself
+### Which packages a merge releases
 
-On the [Releases page][releases] and on the merged PR's `released` label —
-**not** in a PR comment. Each package in `PUBLISH_DIRS` is its own
-semantic-release run, so `@semantic-release/github`'s default success comment
-posted once per package: two dozen `:tada: This PR is included in version X`
-comments on a single merge, each carrying a bare version number that does not
-say which package it belongs to. A package's *first* release made it worse
-still — with no earlier tag its commit range is the entire history, so every
-PR the repo had ever merged got one. Every `.releaserc.json` sets
-`successComment: false`.
+Only the ones whose own directory changed. Each package in `PUBLISH_DIRS` is a
+separate semantic-release run, and every `.releaserc.json` sets
+`"extends": "semantic-release-monorepo"`, which narrows that run's commit range
+to the commits touching its directory. A merge that changes `packages/payments`
+releases the payments packages and nothing else; the other packages have no
+releasable commits of their own, so they are not versioned, tagged, released or
+published, and `npm publish` for them is a no-op the registry already has.
 
-Failures are still announced: semantic-release opens and updates a
-`The automated release is failing 🚨` issue.
+Without that scoping each run analysed the *whole* repo history, so any
+releasable merge released all 24 packages — 24 tags, 24 GitHub releases and 24
+near-identical `:tada: This PR is included in…` comments per merge, 23 of them
+for packages whose files had not changed. That is what the 700-plus tags in this
+repo are mostly made of.
+
+Two consequences worth knowing:
+
+- **Tags are `<directory>-v<version>`** (`ui-v1.17.0`), set by `--tag-format` in
+  `ci.yml`. That overrides the `@12-apps/ui-v1.17.0` scheme
+  semantic-release-monorepo would otherwise use — switching schemes now would
+  hide every existing tag and reset all 24 packages to 1.0.0. The version string
+  inside the generated release notes still reads `@12-apps/ui-v1.17.0`, because
+  the plugin rewrites it there; the tag and the release itself are unaffected.
+- **`prepare-publish.mjs` reads sibling versions from the git tags**, not from
+  the manifests. Only a released package gets a new version written into its
+  `package.json`, and versions are never committed back, so an untouched package
+  sits at the `1.0.0` in the repo while the registry has it at 1.17.0. Resolving
+  `workspace:*` from the manifest would publish `^1.0.0` for it.
+
+A release announces itself on the [Releases page][releases], with a `released`
+label on the merged PR and a comment naming the tag that included it. Failures
+open and update a `The automated release is failing 🚨` issue.
 
 ### The first publish of a new package
 
