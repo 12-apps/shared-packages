@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
+import { createSettingsService, credentialStoreFrom } from '../../config/service';
+import { createPaymentsGateway } from '../../core/gateway';
 import { attemptReference, baseReference, ownsReference } from '../../core/reference';
+import { defineProviders } from '../../core/registry';
+import {
+  createMemoryAttemptLedger,
+  createMemoryChargeStore,
+  createMemoryProviderConfigStore,
+} from '../../memory';
+import { createMemoryWebhookInbox } from '../../memory-webhook-inbox';
 
-import { call, request, setupCheckoutWorld, testAdapter } from './harness';
+import { MERCHANT, call, request, setupCheckoutWorld, testAdapter } from './harness';
 
 /**
  * THE SURFACE the mount publishes, and the two guarantees that are properties
@@ -121,6 +130,48 @@ describe('the checkout config read', () => {
     credentials.clear();
     const { body } = await call(routes, 'GET', '/config');
     expect(body.data).toMatchObject({ provider: null, methods: [], chain: [] });
+  });
+
+  /**
+   * FUT-683, at the buyer surface. The row is still `enabled` — the owner
+   * switched nothing off, the GRANT died — so this only holds because routing
+   * excludes `RECONNECT_REQUIRED`, not because anything here was disabled.
+   */
+  it('given a store whose only provider lost its grant, when a buyer opens checkout, then payments read unavailable', async () => {
+    // The store bridge (`credentialStoreFrom`) instead of the harness's raw
+    // credential store: status-based routing is a property of stored rows.
+    const configStore = createMemoryProviderConfigStore();
+    const providers = defineProviders({ alpha: testAdapter('alpha') } as const);
+    const settings = createSettingsService(providers, configStore, { allowStubMode: true });
+    const credentials = credentialStoreFrom(configStore, { allowStubMode: true });
+    const gateway = createPaymentsGateway({
+      providers,
+      credentials,
+      charges: createMemoryChargeStore(),
+      webhooks: createMemoryWebhookInbox(),
+      attempts: createMemoryAttemptLedger(),
+    });
+    await settings.saveCredentials(MERCHANT, 'alpha', { environment: 'SANDBOX', fields: {} });
+    await settings.applyChargeVerification(MERCHANT, 'alpha', true);
+    const alpha = await configStore.get(MERCHANT, 'alpha');
+    await configStore.save(MERCHANT, { ...alpha!, status: 'RECONNECT_REQUIRED' });
+
+    const { routes } = setupCheckoutWorld({
+      config: { gateway, credentials, connections: configStore },
+    });
+
+    // The config read is the storefront's availability probe: an empty chain
+    // is what renders the "payments unavailable" state.
+    const config = await call(routes, 'GET', '/config');
+    expect(config.status).toBe(200);
+    expect(config.body.data).toMatchObject({ provider: null, methods: [], chain: [] });
+
+    // And a checkout raised anyway is refused as NOT CONFIGURED — the worded
+    // state — never as a generic provider error off the dead token.
+    const created = await call(routes, 'POST', '/', { method: 'PIX' });
+    expect(created.status).toBe(409);
+    expect(created.body.code).toBe('PAYMENT_NOT_CONFIGURED');
+    expect(created.body.error).toBe('copy.notConfigured');
   });
 
   it('fails closed when the host cannot attribute a merchant', async () => {
