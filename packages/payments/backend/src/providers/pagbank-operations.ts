@@ -1,10 +1,17 @@
 import { ProviderRequestError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
+<<<<<<< HEAD
 import type { RefundSnapshot, ResolvedCredentials } from '../core/types';
 import { NAME, pagbankRequest } from './pagbank-http';
 import {
   orderSnapshot,
   refundedCents,
+=======
+import type { ResolvedCredentials } from '../core/types';
+import { NAME, pagbankRequest } from './pagbank-http';
+import {
+  orderSnapshot,
+>>>>>>> origin/main
   settledCharge,
   type PagBankOrderCharge,
   type PagBankOrderResponse,
@@ -127,6 +134,7 @@ async function refundableChargeId(
   return charge.id;
 }
 
+<<<<<<< HEAD
 /**
  * PagBank cancel response → normalized refund status (FUT-680).
  *
@@ -161,12 +169,15 @@ function reportedRefundCents(res: PagBankOrderCharge): number {
   return typeof value === 'number' ? value : 0;
 }
 
+=======
+>>>>>>> origin/main
 export const refund: NonNullable<PaymentProviderAdapter['refund']> = async (
   input,
   credentials,
 ) => {
   if (credentials.stub) return stubRefund(NAME, input);
   const chargeId = await refundableChargeId(input.providerChargeId, credentials);
+<<<<<<< HEAD
   // NO body for a full refund: PagBank documents an omitted `amount` as
   // "cancel the total". The old body was `{"amount":{}}` — `partialRefunds` is
   // false, so the gateway never passes an amount and `value` was always
@@ -179,10 +190,17 @@ export const refund: NonNullable<PaymentProviderAdapter['refund']> = async (
       method: 'POST',
       ...(input.amount ? { body: { amount: { value: input.amount.amountCents } } } : {}),
     },
+=======
+  const res = await pagbankRequest<{ id?: string }>(
+    `/charges/${encodeURIComponent(chargeId)}/cancel`,
+    credentials,
+    { method: 'POST', body: { amount: { value: input.amount?.amountCents } } },
+>>>>>>> origin/main
   );
   return {
     provider: NAME,
     providerChargeId: input.providerChargeId,
+<<<<<<< HEAD
     providerRefundId: typeof res.id === 'string' ? res.id : chargeId,
     // The response decides — a hardcoded REFUNDED here is the bug FUT-680
     // names: the same file whose `capturedAmountCents` refuses to fabricate
@@ -191,6 +209,11 @@ export const refund: NonNullable<PaymentProviderAdapter['refund']> = async (
     // Prefer what the provider reports as returned; the requested amount only
     // stands in when the response names none.
     amount: input.amount ?? { amountCents: reportedRefundCents(res), currency: 'BRL' },
+=======
+    providerRefundId: res.id ?? chargeId,
+    status: 'REFUNDED',
+    amount: input.amount ?? { amountCents: 0, currency: 'BRL' },
+>>>>>>> origin/main
     raw: res,
   };
 };
