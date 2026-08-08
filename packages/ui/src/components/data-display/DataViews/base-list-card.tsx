@@ -1,7 +1,8 @@
 "use client";
 
+import { Collapse } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { Card } from "../../layout/Card";
 import type { DescriptionItemProps } from "../DescriptionItem";
@@ -16,10 +17,12 @@ import {
   type CardSurfaceProps,
 } from "./card-surface";
 import { useDragItem } from "./data-views-drag";
-import { DragSlot, SelectSlot } from "./base-list-card-gutters";
+import { DiscloseSlot, DragSlot, SelectSlot } from "./base-list-card-gutters";
 import { DENSITY_ROW_PADDING, type DataViewsDensity } from "./data-views-layout-context";
-import { RAIL_COUNT, RAIL_GAP, railsTemplateFor, useListRails } from "./list-card-rails";
+import { RAIL_COUNT, RAIL_GAP, cellRailsTemplate, railsTemplateFor, useListRails } from "./list-card-rails";
+import { ListCardCells, cellTracks, useCellConfig, type ListCardCellConfig } from "./list-card-cells";
 import {
+  ListCardActions,
   ListCardCaption,
   ListCardMeta,
   ListCardTail,
@@ -84,8 +87,39 @@ export interface BaseListCardProps extends CardSurfaceProps {
   menu?: ReactNode;
   /** What opens the overflow menu on right-click / long-press. */
   onContextMenu?: (event: React.MouseEvent) => void;
-  /** Extra content below the main row; spans every rail. */
+  /**
+   * THE EXPANDABLE BODY — and the whole reason this is a card and not a table
+   * row.
+   *
+   * A summary row of labelled columns is a table row with a border round it: it
+   * restates what the table already says and gives nobody a reason to switch to
+   * it. What a card can do that a table cell cannot is OPEN — carry the record's
+   * own detail underneath its summary, in whatever shape that record wants.
+   *
+   * So this container makes no claim about what goes in here. It spans every
+   * rail and imposes nothing: an order puts its line items and a totals ledger
+   * here, a cart adds its recovery actions, a role lists its permissions. The
+   * design of that area belongs entirely to the consumer, and none of it is the
+   * envelope's business.
+   *
+   * ABSENT ⇒ NO CHEVRON. A row given nothing to reveal renders no disclosure
+   * control at all, rather than one that opens onto an empty box, so a column of
+   * chevrons is a truthful index of which rows have more behind them.
+   */
   children?: ReactNode;
+  /** Open on first render, for an uncontrolled card. Ignored when `expanded` is set. */
+  defaultExpanded?: boolean;
+  /**
+   * Open state, when the LIST wants to own it.
+   *
+   * Left unset the card keeps its own, and rows open independently — several at
+   * once, which is what comparing two records requires. Pass this (with
+   * `onExpandedChange`) to impose something else, an accordion being the usual
+   * reason.
+   */
+  expanded?: boolean;
+  /** Fired with the state the card is asking to move to. */
+  onExpandedChange?: (expanded: boolean) => void;
   /** Toggle this row's selection. Receives the raw event so a list can range-select. */
   onToggleSelect?: (event?: React.MouseEvent) => void;
   /** How much air the row gets. Vertical only — a full-width row cannot narrow. */
@@ -102,6 +136,22 @@ export interface BaseListCardProps extends CardSurfaceProps {
   divider?: boolean;
   /** This row's id for drag purposes. Inert outside a `DragContainerProvider`. */
   dragId?: string | number;
+  /**
+   * The record this row is about, read by the list's cell config.
+   *
+   * Required only when cells are configured — the config's `primary`/`secondary`
+   * are functions of the row, so without one there is nothing to render them
+   * from and the card falls back to its named slots.
+   */
+  row?: Record<string, unknown>;
+  /**
+   * A cell config for a STANDALONE card.
+   *
+   * Inside a `ListCardGroup` the list's config wins and this is ignored: one
+   * declaration of the list's shape is the whole point, and a row permitted to
+   * override it could put its columns somewhere no other row has them.
+   */
+  cells?: readonly ListCardCellConfig<never>[];
 }
 
 
@@ -145,7 +195,9 @@ function clickKeys(onClick: () => void) {
  */
 function rowSx(opts: {
   inGroup: boolean;
-  gutters: { drag: boolean; select: boolean };
+  railCount: number;
+  cellTemplate: string | null;
+  gutters: { disclose: boolean; drag: boolean; select: boolean };
   metaColumns: number;
   pad: number;
   padY: number;
@@ -154,7 +206,7 @@ function rowSx(opts: {
   interactive: boolean;
   draggable: boolean;
 }): Record<string, unknown> {
-  const { inGroup, gutters, metaColumns, pad, padY, scale, divider, interactive, draggable } = opts;
+  const { inGroup, railCount, cellTemplate, gutters, metaColumns, pad, padY, scale, divider, interactive, draggable } = opts;
   return {
     position: "relative",
     borderRadius: CARD_RADIUS,
@@ -168,10 +220,10 @@ function rowSx(opts: {
     // So inside a group the GROUP is the query container and the row is the
     // subgrid; standalone, the row is both the container and its own grid.
     ...(inGroup
-      ? { gridColumn: `span ${RAIL_COUNT}`, gridTemplateColumns: "subgrid" }
+      ? { gridColumn: `span ${railCount}`, gridTemplateColumns: "subgrid" }
       : {
           containerType: "inline-size",
-          gridTemplateColumns: railsTemplateFor(gutters, metaColumns),
+          gridTemplateColumns: cellTemplate ?? railsTemplateFor(gutters, metaColumns),
         }),
     alignItems: "center",
     // Wide enough that the meta cluster, the value and the status read as three
@@ -302,6 +354,7 @@ function actionProps(onClick: (() => void) | undefined) {
 function rowStyles(
   props: BaseListCardProps,
   shell: ReturnType<typeof useRowShell>,
+  cellTemplate: string | null,
 ): Record<string, unknown> {
   const { group, theme, selectable, drag, reserve, pad, padY, scale, acts } = shell;
   return {
@@ -316,7 +369,13 @@ function rowStyles(
     ),
     ...rowSx({
       inGroup: group !== null,
-      gutters: { drag: reserve || drag.draggable, select: reserve || selectable },
+      railCount: group?.railCount ?? RAIL_COUNT,
+      cellTemplate,
+      gutters: {
+        disclose: reserve || props.children != null,
+        drag: reserve || drag.draggable,
+        select: reserve || selectable,
+      },
       metaColumns: metaShape(props).columns,
       pad,
       padY,
@@ -328,11 +387,53 @@ function rowStyles(
   };
 }
 
+/**
+ * The row's open state, whether it owns it or the list does.
+ *
+ * Controlled the moment `expanded` is passed, so a list imposing an accordion
+ * is never fighting a second copy of the truth inside each row. Uncontrolled
+ * otherwise, and rows then open independently — which is what comparing two
+ * records side by side actually needs.
+ */
+function useDisclosure(props: BaseListCardProps): {
+  expandable: boolean;
+  expanded: boolean;
+  toggle: () => void;
+  regionId: string;
+} {
+  const [own, setOwn] = useState(props.defaultExpanded ?? false);
+  const controlled = props.expanded != null;
+  const expanded = controlled ? props.expanded === true : own;
+  // `useId` rather than a counter: the id has to survive an SSR pass and match
+  // on hydration, or `aria-controls` points at nothing on the first paint.
+  const regionId = useId();
+  return {
+    expandable: props.children != null,
+    expanded,
+    regionId,
+    toggle: () => {
+      if (!controlled) setOwn((open) => !open);
+      props.onExpandedChange?.(!expanded);
+    },
+  };
+}
+
 export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
   const { selected = false, href, onClick } = props;
   const shell = useRowShell(props);
   const { actionable, selectable, slot, drag, reserve, pad, acts } = shell;
   const meta = metaShape(props);
+  const disclosure = useDisclosure(props);
+  // The list's config wins over the card's: one declaration of the list's shape
+  // is the point, so a row inside a group cannot introduce a column of its own.
+  const groupCells = useCellConfig();
+  const cells = groupCells ?? props.cells ?? null;
+  const configured = cells != null && cells.length > 0 && props.row != null;
+  // Standalone only. Inside a group the GROUP owns the template and the row is
+  // subgrid over it — a row resolving its own tracks there is exactly what stops
+  // a list from lining up.
+  const cellTemplate =
+    configured && shell.group == null ? cellRailsTemplate(cellTracks(cells)) : null;
 
   return (
     <Card
@@ -345,8 +446,17 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
       {...(acts ? actionProps(onClick) : {})}
       {...drag.itemProps}
       // A PLAIN OBJECT: `Card` merges by spreading, so a function sx vanishes.
-      sx={rowStyles(props, shell)}
+      sx={rowStyles(props, shell, cellTemplate)}
     >
+      <DiscloseSlot
+        expandable={disclosure.expandable}
+        expanded={disclosure.expanded}
+        reserve={reserve}
+        onToggle={disclosure.toggle}
+        controls={disclosure.regionId}
+        label={disclosure.expanded ? "Recolher detalhes" : "Expandir detalhes"}
+        testId={slot("disclose")}
+      />
       <DragSlot drag={drag} reserve={reserve} testId={slot("drag")} />
       <SelectSlot
         selectable={selectable}
@@ -358,29 +468,66 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
       <Box data-slot="leading" sx={{ display: "flex", alignItems: "center" }}>
         {props.leading}
       </Box>
-      <ListCardCaption
-        title={props.title}
-        subtitle={props.subtitle}
-        href={href}
-        target={props.target}
-        testId={slot("title")}
-      />
-      <ListCardMeta
-        meta={props.meta}
-        metaSlot={props.metaSlot}
-        trailingRule={props.value != null}
-      />
-      <ListCardTail
-        value={props.value}
-        separated={meta.present}
-        status={props.status}
-        actions={actionable ? props.actions : undefined}
-        actionsAlwaysVisible={props.actionsAlwaysVisible}
-        menu={props.menu}
-        testId={slot}
-      />
-      {props.children != null && (
-        <Box sx={{ gridColumn: "1 / -1", mt: pad * 0.5, minWidth: 0 }}>{props.children}</Box>
+      {configured ? (
+        <>
+          {/* The list's columns, rendered from this row. */}
+          <ListCardCells cells={cells} row={props.row as never} />
+          {/* THE MENU IS NOT PART OF THE CONFIG and never optional: it is where
+            * a row's actions live, and a list that folded it into a cell would
+            * have nowhere left to put them. So it brackets the cells, on its own
+            * rail, exactly as the gutters do at the other end. */}
+          <ListCardActions
+            actions={actionable ? props.actions : undefined}
+            alwaysVisible={props.actionsAlwaysVisible}
+            menu={props.menu}
+            testId={slot}
+          />
+        </>
+      ) : (
+        <>
+          <ListCardCaption
+            title={props.title}
+            subtitle={props.subtitle}
+            href={href}
+            target={props.target}
+            testId={slot("title")}
+          />
+          <ListCardMeta
+            meta={props.meta}
+            metaSlot={props.metaSlot}
+            trailingRule={props.value != null}
+          />
+          <ListCardTail
+            value={props.value}
+            separated={meta.present}
+            status={props.status}
+            actions={actionable ? props.actions : undefined}
+            actionsAlwaysVisible={props.actionsAlwaysVisible}
+            menu={props.menu}
+            testId={slot}
+          />
+        </>
+      )}
+      {disclosure.expandable && (
+        // `gridColumn: 1 / -1` so the body spans every rail: the summary's
+        // columns are the LIST's, and nothing about them should constrain a
+        // detail area whose design belongs to the consumer.
+        //
+        // Collapse rather than an unmount, so the body animates open and — more
+        // importantly — keeps its own state between peeks. A consumer putting a
+        // form or a scrolled table in here would otherwise have it reset every
+        // time the row closed.
+        //
+        // `unmountOnExit` is deliberately NOT set: a list of fifty closed rows
+        // pays for fifty hidden subtrees, which is the trade taken here because
+        // the alternative re-runs every consumer's effects on each toggle.
+        <Box sx={{ gridColumn: "1 / -1", minWidth: 0 }}>
+          <Collapse in={disclosure.expanded} timeout={150}>
+            <Box id={disclosure.regionId} role="region" sx={{ mt: pad * 0.5, minWidth: 0 }}>
+              {props.children}
+            </Box>
+          </Collapse>
+        </Box>
       )}
     </Card>
   );
