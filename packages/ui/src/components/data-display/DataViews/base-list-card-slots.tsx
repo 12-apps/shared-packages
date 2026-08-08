@@ -235,7 +235,7 @@ function ListCardValue({ value }: { value: ReactNode }): React.JSX.Element {
  * `:focus-within` is what keeps them reachable by keyboard, and `visibility`
  * rather than `display` keeps their space reserved so nothing shifts.
  */
-function ListCardActions({
+export function ListCardActions({
   actions,
   alwaysVisible,
   menu,
@@ -283,11 +283,10 @@ function ListCardActions({
   );
 }
 
-/** Value, status and actions — three rails, not one flex run. */
+/** Value and actions — separate rails, not one flex run. */
 export function ListCardTail({
   value,
   separated,
-  status,
   actions,
   actionsAlwaysVisible,
   menu,
@@ -296,7 +295,6 @@ export function ListCardTail({
   value?: ReactNode;
   /** Whether a meta cluster precedes the value and wants dividing from it. */
   separated?: boolean;
-  status?: ReactNode;
   actions?: ReactNode;
   actionsAlwaysVisible?: boolean;
   menu?: ReactNode;
@@ -313,13 +311,6 @@ export function ListCardTail({
         data-testid={testId("value")}
       >
         {value != null && <ListCardValue value={value} />}
-      </Box>
-      <Box
-        data-slot="status"
-        sx={{ display: "flex", justifyContent: "flex-start" }}
-        data-testid={testId("status")}
-      >
-        {status}
       </Box>
       <ListCardActions
         actions={actions}

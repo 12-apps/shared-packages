@@ -4,19 +4,18 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import type { InputType } from "storybook/internal/types";
 
-import { Chip } from "../Chip";
 import { Button } from "../../form/Button";
 import { DropdownMenu } from "../../navigation/DropdownMenu";
 import { Box } from "../../../mui/Box";
 
-import { BaseListCard } from "./base-list-card";
+import { BaseListCard, type BaseListCardProps } from "./base-list-card";
 import { DragContainerProvider } from "./data-views-drag";
 import { ListCardGroup } from "./list-card-rails";
 
 /**
  * BaseListCard is BaseCard's horizontal sibling: the full-width row the "Lista"
  * layout wanted and never had. A marker, a title over a subtitle, labelled
- * middle columns, a value, a status, inline actions and a menu.
+ * middle columns, a value, inline actions and a menu.
  *
  * It answers its OWN width with a container query, not the viewport — the same
  * row renders full-bleed on a phone, inside a 300px board column, and beside an
@@ -81,16 +80,41 @@ function slot(mapping: Record<string, unknown>): InputType {
   return { control: "select", options: Object.keys(mapping), mapping };
 }
 
-const chip = (label: string, color: "info" | "success" | "error"): React.JSX.Element => (
-  <Chip label={label} size="small" variant="outlined" color={color} />
+/**
+ * `leading` takes ANY node — the slot is "a marker", not "an icon", and the row
+ * never inspects what it was given. The control offered only a receipt glyph,
+ * which made a generic slot read as a pedidos-only one, so it now names the
+ * three kinds of marker a list actually uses: an icon, an avatar with initials,
+ * and a square thumbnail.
+ */
+const avatar = (
+  <Box
+    sx={{
+      width: 28,
+      height: 28,
+      borderRadius: "50%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 12,
+      fontWeight: 700,
+      color: "primary.contrastText",
+      bgcolor: "primary.light",
+    }}
+  >
+    LG
+  </Box>
 );
 
-const LEADING = { nenhum: undefined, "ícone de recibo": marker };
-const STATUS = {
+const thumbnail = (
+  <Box sx={{ width: 28, height: 28, borderRadius: 1, bgcolor: "action.selected" }} />
+);
+
+const LEADING = {
   nenhum: undefined,
-  "Em aberto": chip("Em aberto", "info"),
-  Pago: chip("Pago", "success"),
-  Cancelado: chip("Cancelado", "error"),
+  ícone: marker,
+  avatar,
+  miniatura: thumbnail,
 };
 const MENU = { nenhum: undefined, "kebab (⋮)": kebab };
 const ACTIONS = {
@@ -135,7 +159,7 @@ const meta: Meta<typeof BaseListCard> = {
   argTypes: {
     // ORDERED BY WHAT SOMEBODY WOULD ACTUALLY REACH FOR.
     //
-    // Left alone, the table opens on `leading`, `meta`, `status` and `menu` —
+    // Left alone, the table opens on `leading`, `meta` and `menu` —
     // a React element rendered as `$$typeof: Symbol(react.transitional.element)`
     // and an array of objects behind a raw JSON editor. Nobody tunes a row by
     // hand-editing that blob, so the knobs that DO change what you see were
@@ -150,6 +174,19 @@ const meta: Meta<typeof BaseListCard> = {
       divider: { control: "boolean" },
       selectable: { control: "boolean" },
       selected: { control: "boolean" },
+      // The chevron is not its own switch — it is a consequence of `children`.
+      // Clear the body and the control disappears with it, which is the rule
+      // worth being able to try from the panel rather than read about.
+      defaultExpanded: { control: "boolean" },
+      children: { control: "boolean", mapping: { true: <OrderDetail />, false: undefined } },
+      // NO CONTROL FOR `expanded`. It is the CONTROLLED-mode prop: setting it
+      // hands the state to a list that then has to feed it back through
+      // `onExpandedChange`. From the panel there is no such owner, so a value
+      // set here freezes the row open or shut and the chevron stops working —
+      // which reads as a broken component rather than as controlled mode doing
+      // exactly what it says. `ControlledAccordion` is where that path is shown.
+      expanded: { control: false, table: { disable: true } },
+      onExpandedChange: { control: false, table: { disable: true } },
     }),
     ...category("Appearance", {
       variant: { control: "inline-radio", options: ["outline", "ghost", "text", "glass"] },
@@ -175,7 +212,6 @@ const meta: Meta<typeof BaseListCard> = {
     ...category("Slots", {
       // Pick between real nodes rather than editing an element blob.
       leading: slot(LEADING),
-      status: slot(STATUS),
       menu: slot(MENU),
       actions: slot(ACTIONS),
       // These two ARE directly editable: an array of label/value pairs is
@@ -184,6 +220,14 @@ const meta: Meta<typeof BaseListCard> = {
       meta: { control: "object" },
       metaSlot: { control: "text" },
       children: { control: "text" },
+    }),
+    // LAST, and grouped. `row` and `cells` are the configured-list API: neither
+    // does anything to a card using the named slots, and left ungrouped they
+    // floated to the TOP of the panel — above `density` and `scale` — where the
+    // first two controls a reader meets are the two that do nothing here.
+    ...category("Configured cells", {
+      cells: { control: "object" },
+      row: { control: "object" },
     }),
     // `actionsAlwaysVisible` joins them: it only reveals INLINE actions, and the
     // primary row carries an overflow menu instead — so as a control here it is
@@ -202,6 +246,39 @@ const meta: Meta<typeof BaseListCard> = {
 export default meta;
 
 type Story = StoryObj<typeof BaseListCard>;
+
+/**
+ * EVERY STORY'S CARD GOES THROUGH HERE, so the controls panel drives all of
+ * them and not just the one args-driven playground.
+ *
+ * A story that writes `<StoryRow args={args} title="…" />` inside `render` ignores args
+ * completely: Storybook still shows the full control table, every knob is inert,
+ * and a reader who moves `density` and sees nothing happen concludes the
+ * COMPONENT is broken rather than the story. That was true of most of the
+ * stories in this file.
+ *
+ * ARGS FIRST, THEN THE STORY'S OWN PROPS. The panel supplies the shared knobs —
+ * density, scale, variant, colour, state — while whatever a story hardcodes is
+ * the thing that story exists to demonstrate, and must not be overridable from
+ * the panel or the demonstration quietly stops being one. So `Selection` keeps
+ * its selected row and still answers the density slider.
+ */
+function StoryRow({
+  args,
+  ...own
+}: { args: Partial<BaseListCardProps> } & Partial<BaseListCardProps>): React.JSX.Element {
+  // THE CONTROLLED PAIR NEVER COMES FROM THE PANEL. Storybook's actions addon
+  // supplies an `onExpandedChange` mock for any `on*` prop, and a persisted
+  // `expanded` arg then satisfies the card's controlled check — so the row would
+  // hand its state to a handler that records the call and changes nothing, and
+  // the chevron would stop collapsing. `ControlledAccordion` passes the real
+  // pair itself, through `own`, and is unaffected.
+  const panel = { ...args };
+  delete panel.expanded;
+  delete panel.onExpandedChange;
+  return <BaseListCard {...panel} {...own} />;
+}
+
 
 
 
@@ -252,12 +329,18 @@ export const Pedido: Story = {
       { label: "Data", value: "05/08/2026, 13:45" },
       { label: "Método", value: "PIX" },
     ],
-    status: <Chip label="Em aberto" size="small" variant="outlined" color="info" />,
     // ONE overflow, no inline buttons. A row offering `Ver` beside a kebab that
     // also opens `Editar`/`Excluir` asks the same question twice; see the
     // `Actions` story for the case where a host does want both (and where
     // `actionsAlwaysVisible` has something to act on).
     menu: kebab,
+    // A BODY, so the playground has a chevron. Toggle `children` off in the
+    // panel and both the control and its rail leave the row — a chevron that
+    // opens onto nothing is a promise the row cannot keep.
+    children: <OrderDetail />,
+    // Closed to begin with. The chevron is the affordance under test, and a row
+    // that starts open shows its result without ever showing the control work.
+    defaultExpanded: false,
     testId: "pedido-row",
   },
 };
@@ -269,7 +352,7 @@ export const Pedido: Story = {
  * no control to set it.
  */
 export const Selection: Story = {
-  render: () => {
+  render: (args) => {
     const [picked, setPicked] = useState<Set<string>>(new Set(["B75A6858"]));
     const toggle = (id: string): void =>
       setPicked((prev) => {
@@ -280,7 +363,8 @@ export const Selection: Story = {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 900 }}>
         {["B75A6858", "1D970689", "0112CF89"].map((id) => (
-          <BaseListCard
+          <StoryRow
+          args={args}
             key={id}
             leading={marker}
             title={id}
@@ -306,17 +390,17 @@ export const Selection: Story = {
  * the row does not also open.
  */
 export const Actions: Story = {
-  render: () => {
+  render: (args) => {
     const [log, setLog] = useState<string[]>([]);
     const note = (what: string): void => setLog((prev) => [what, ...prev].slice(0, 4));
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 900 }}>
-        <BaseListCard
+        <StoryRow
+          args={args}
           leading={marker}
           title="B75A6858"
           subtitle="Luiz Gustavo"
           value="R$ 13,90"
-          status={<Chip label="Pago" size="small" variant="outlined" color="success" />}
           onClick={() => note("abriu a linha")}
           actions={
             <>
@@ -349,9 +433,14 @@ export const Actions: Story = {
  * dependency to `@12-apps/ui`.
  */
 export const DraggableInsideAContainer: Story = {
-  render: () => {
+  render: (args) => {
     const [order, setOrder] = useState(["B75A6858", "1D970689", "0112CF89", "89E40634"]);
     const [active, setActive] = useState<string | number | null>(null);
+    // WHERE IT WOULD LAND, computed from the pointer against the row it is over:
+    // past the midpoint means after, otherwise before. The container owns this
+    // because only it knows the geometry — the card being hovered cannot see
+    // where the pointer is relative to its neighbours.
+    const [drop, setDrop] = useState<{ id: string | number; edge: "before" | "after" } | null>(null);
     const move = (from: string, to: string): void =>
       setOrder((prev) => {
         const next = prev.filter((id) => id !== from);
@@ -370,21 +459,37 @@ export const DraggableInsideAContainer: Story = {
               event.dataTransfer.setData("text/plain", String(id));
               setActive(id);
             },
-            onDragEnd: () => setActive(null),
+            onDragEnd: () => {
+              setActive(null);
+              setDrop(null);
+            },
           }),
+          dropIndicator: drop,
           itemProps: (id) => ({
-            onDragOver: (event: React.DragEvent) => event.preventDefault(),
+            onDragOver: (event: React.DragEvent) => {
+              event.preventDefault();
+              const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+              const edge = event.clientY > box.top + box.height / 2 ? "after" : "before";
+              setDrop((prev) =>
+                prev?.id === id && prev.edge === edge ? prev : { id, edge },
+              );
+            },
+            // Not `onDragLeave`: it fires as the pointer crosses INTO a child of
+            // the same row, so the marker would strobe off and on across every
+            // cell. The list clears it once, when the drag ends.
             onDrop: (event: React.DragEvent) => {
               event.preventDefault();
               move(event.dataTransfer.getData("text/plain"), String(id));
               setActive(null);
+              setDrop(null);
             },
           }),
         }}
       >
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 900 }}>
           {order.map((id) => (
-            <BaseListCard
+            <StoryRow
+          args={args}
               key={id}
               dragId={id}
               leading={marker}
@@ -415,17 +520,18 @@ export const NotDraggableWithoutAContainer: Story = {
 
 /**
  * The container query, at three widths. Below ~520px the labelled middle
- * columns go; below ~360px the value and status drop to their own line rather
+ * columns go; below ~360px the value drops to its own line rather
  * than squeezing the title to two characters.
  */
 export const RespondsToItsOwnWidth: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       {[900, 480, 320].map((width) => (
         <Box key={width}>
           <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{width}px</Box>
           <Box sx={{ width }}>
-            <BaseListCard
+            <StoryRow
+          args={args}
               leading={marker}
               title="B75A6858"
               subtitle="Luiz Gustavo"
@@ -434,7 +540,6 @@ export const RespondsToItsOwnWidth: Story = {
                 { label: "Método", value: "PIX" },
               ]}
               value="R$ 13,90"
-              status={<Chip label="Em aberto" size="small" variant="outlined" color="info" />}
               menu={kebab}
               onToggleSelect={() => {}}
             />
@@ -447,18 +552,18 @@ export const RespondsToItsOwnWidth: Story = {
 
 /** Outlined (default) vs `divider`, for a host drawing its own gapless list. */
 export const Divider: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 4, maxWidth: 900 }}>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         <Box sx={{ fontSize: "0.75rem", color: "text.secondary" }}>outlined + gap (default)</Box>
         {["B75A6858", "1D970689"].map((id) => (
-          <BaseListCard key={id} leading={marker} title={id} value="R$ 13,90" onToggleSelect={() => {}} />
+          <StoryRow args={args} key={id} leading={marker} title={id} value="R$ 13,90" onToggleSelect={() => {}} />
         ))}
       </Box>
       <Box>
         <Box sx={{ fontSize: "0.75rem", color: "text.secondary", mb: 1 }}>divider, no gap</Box>
         {["B75A6858", "1D970689"].map((id) => (
-          <BaseListCard key={id} divider leading={marker} title={id} value="R$ 13,90" onToggleSelect={() => {}} />
+          <StoryRow args={args} key={id} divider leading={marker} title={id} value="R$ 13,90" onToggleSelect={() => {}} />
         ))}
       </Box>
     </Box>
@@ -475,14 +580,15 @@ export const Divider: Story = {
  * row's contents lined up with the toolbar above it at every setting.
  */
 export const Density: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 900 }}>
       {(["compact", "cozy", "comfortable"] as const).map((density) => (
         <Box key={density}>
           <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{density}</Box>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {["B75A6858", "1D970689", "0112CF89"].map((id) => (
-              <BaseListCard
+              <StoryRow
+          args={args}
                 key={id}
                 density={density}
                 testId={`row-${density}`}
@@ -491,7 +597,6 @@ export const Density: Story = {
                 subtitle="Luiz Gustavo"
                 meta={[{ label: "Data", value: "05/08/2026, 13:45" }]}
                 value="R$ 13,90"
-                status={<Chip label="Em aberto" size="small" variant="outlined" color="info" />}
                 menu={kebab}
                 onToggleSelect={() => {}}
               />
@@ -509,18 +614,18 @@ export const Density: Story = {
  * question is how much chrome it claims.
  */
 export const Variants: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 900 }}>
       {(["outline", "ghost", "text", "glass"] as const).map((variant) => (
         <Box key={variant}>
           <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{variant}</Box>
-          <BaseListCard
+          <StoryRow
+          args={args}
             variant={variant}
             leading={marker}
             title="B75A6858"
             subtitle="Luiz Gustavo"
             value="R$ 13,90"
-            status={<Chip label="Em aberto" size="small" variant="outlined" color="info" />}
             menu={kebab}
             onToggleSelect={() => {}}
           />
@@ -537,11 +642,12 @@ export const Variants: Story = {
  * make a read-only row look picked.
  */
 export const Selectable: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 900 }}>
-      <BaseListCard title="selectable, selected" selected onToggleSelect={() => {}} value="R$ 13,90" />
-      <BaseListCard title="selectable, not selected" onToggleSelect={() => {}} value="R$ 2,98" />
-      <BaseListCard
+      <StoryRow args={args} title="selectable, selected" selected onToggleSelect={() => {}} value="R$ 13,90" />
+      <StoryRow args={args} title="selectable, not selected" onToggleSelect={() => {}} value="R$ 2,98" />
+      <StoryRow
+          args={args}
         title="selectable={false} — and `selected` is ignored"
         selectable={false}
         selected
@@ -558,7 +664,7 @@ export const Selectable: Story = {
  * a card that grew and shrank would reflow every neighbour on each beat.
  */
 export const EmphasisAndState: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 900, p: 2 }}>
       {(
         [
@@ -570,7 +676,8 @@ export const EmphasisAndState: Story = {
       ).map(([name, effect]) => (
         <Box key={name}>
           <Box sx={{ mb: 0.5, fontSize: "0.75rem", color: "text.secondary" }}>{name}</Box>
-          <BaseListCard
+          <StoryRow
+          args={args}
             {...effect}
             color="primary"
             leading={marker}
@@ -588,7 +695,7 @@ export const EmphasisAndState: Story = {
  * THE LIST OWNS THE COLUMNS.
  *
  * Inside a {@link ListCardGroup} every row is `grid-template-columns: subgrid`
- * over one shared set of rails, so the value sits on a fixed edge and the status
+ * over one shared set of rails, so the value sits on a fixed edge and the cells
  * chip has a slot of its own. Note the amounts: they line up down the page even
  * though `Em aberto`, `Pago` and `Cancelado` are three different widths — which
  * is exactly what the old per-row flex could not do, since a wider chip shoved
@@ -599,15 +706,16 @@ export const EmphasisAndState: Story = {
  * aligned at one edge.
  */
 export const SharedRails: Story = {
-  render: () => (
+  render: (args) => (
     <ListCardGroup density="cozy" dataTestId="rails-group">
       {[
-        ["B75A6858", "R$ 13,90", "Em aberto", "info"],
-        ["1D970689", "R$ 2,98", "Pago", "success"],
-        ["0112CF89", "R$ 1.250,00", "Cancelado", "error"],
-        ["89E40634", "R$ 8,90", "Pago", "success"],
-      ].map(([id, amount, label, tone]) => (
-        <BaseListCard
+        ["B75A6858", "R$ 13,90"],
+        ["1D970689", "R$ 2,98"],
+        ["0112CF89", "R$ 1.250,00"],
+        ["89E40634", "R$ 8,90"],
+      ].map(([id, amount]) => (
+        <StoryRow
+          args={args}
           key={id}
           testId={`rail-${id}`}
           leading={marker}
@@ -618,14 +726,6 @@ export const SharedRails: Story = {
             { label: "Método", value: "PIX" },
           ]}
           value={amount}
-          status={
-            <Chip
-              label={label}
-              size="small"
-              variant="outlined"
-              color={tone as "info" | "success" | "error"}
-            />
-          }
           menu={kebab}
           onToggleSelect={() => {}}
         />
@@ -651,7 +751,6 @@ export const LinkedRow: Story = {
     title: "B75A6858",
     subtitle: "cmd-click / middle-click me",
     value: "R$ 13,90",
-    status: <Chip label="Em aberto" size="small" variant="outlined" color="info" />,
     menu: kebab,
     onToggleSelect: () => {},
   },
@@ -659,11 +758,254 @@ export const LinkedRow: Story = {
 
 /** Selected, dimmed, and a row with no controls at all. */
 export const States: Story = {
-  render: () => (
+  render: (args) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 900 }}>
-      <BaseListCard title="Selecionada" value="R$ 13,90" selected onToggleSelect={() => {}} />
-      <BaseListCard title="Cancelada" value="R$ 8,90" state="cancelled" onToggleSelect={() => {}} />
-      <BaseListCard title="Somente leitura" subtitle="sem checkbox, sem menu" value="R$ 5,90" />
+      <StoryRow args={args} title="Selecionada" value="R$ 13,90" selected onToggleSelect={() => {}} />
+      <StoryRow args={args} title="Cancelada" value="R$ 8,90" state="cancelled" onToggleSelect={() => {}} />
+      <StoryRow args={args} title="Somente leitura" subtitle="sem checkbox, sem menu" value="R$ 5,90" />
     </Box>
+  ),
+};
+
+/**
+ * The expanded body a consumer might build: line items on the left, a totals
+ * ledger on the right, then the actions this record affords.
+ *
+ * None of this shape comes from `BaseListCard`. The card spans the body across
+ * every rail and stops there; what is drawn inside is entirely the caller's,
+ * which is the point of the slot. A different entity would put something else
+ * here and the envelope would not know the difference.
+ */
+function OrderDetail(): React.JSX.Element {
+  const items = [
+    { qty: 2, name: "Picanha na chapa", total: "179,80" },
+    { qty: 4, name: "Chopp pilsen 500ml", total: "95,60", note: "sem colarinho" },
+    { qty: 2, name: "Pudim de leite", total: "57,10" },
+  ];
+  return (
+    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 3 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        {items.map((item) => (
+          <Box key={item.name} sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+            <Box component="span" sx={{ color: "text.secondary", fontSize: 13, minWidth: 24 }}>
+              {item.qty}×
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ fontSize: 14, fontWeight: 600 }}>{item.name}</Box>
+              {item.note && (
+                <Box sx={{ fontSize: 12, color: "text.secondary" }}>{item.note}</Box>
+              )}
+            </Box>
+            <Box component="span" sx={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+              {item.total}
+            </Box>
+          </Box>
+        ))}
+      </Box>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+          <Box component="span" sx={{ color: "text.secondary" }}>Subtotal</Box>
+          <Box component="span">332,50</Box>
+        </Box>
+        <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+          <Box component="span" sx={{ color: "info.main" }}>Cupom</Box>
+          <Box component="span" sx={{ color: "info.main" }}>−20,00</Box>
+        </Box>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontWeight: 700,
+            borderTop: 1,
+            borderColor: "divider",
+            pt: 0.5,
+            mt: 0.5,
+          }}
+        >
+          <Box component="span">Total</Box>
+          <Box component="span">R$ 312,50</Box>
+        </Box>
+        <Box sx={{ display: "flex", gap: 1, mt: 1, justifyContent: "flex-end" }}>
+          <Button size="small" variant="outlined">Recuperar</Button>
+          <Button size="small" variant="outlined">Ver cliente</Button>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * THE POINT OF THE COMPONENT: a summary that opens onto the record itself.
+ *
+ * Press the chevron. The row keeps its rails and its columns collapsed, and the
+ * detail underneath is free-form — this one is a two-column ledger, but the
+ * card imposes nothing and would span anything across the same width.
+ */
+export const Expandable: Story = {
+  // ARGS, not a hardcoded render. A story that builds its own card ignores the
+  // controls panel entirely, and a reader who reaches for `density` or `scale`
+  // here and sees nothing happen concludes the COMPONENT is broken rather than
+  // the story.
+  args: {
+    leading: <ReceiptLongOutlinedIcon />,
+    title: "Ana Paula",
+    subtitle: "Mesa 12 · 8 itens",
+    meta: [{ label: "Cupom", value: "BEMVINDO10" }],
+    value: "R$ 312,50",
+    onToggleSelect: () => {},
+    children: <OrderDetail />,
+  },
+};
+
+/** Open on first render, for a list whose detail is the reason you came. */
+export const ExpandedByDefault: Story = {
+  args: {
+    leading: <ReceiptLongOutlinedIcon />,
+    title: "Ana Paula",
+    subtitle: "Mesa 12 · 8 itens",
+    value: "R$ 312,50",
+    defaultExpanded: true,
+    onToggleSelect: () => {},
+    children: <OrderDetail />,
+  },
+};
+
+/**
+ * NO CHILDREN, NO CHEVRON — and standalone, no rail for one either.
+ *
+ * The two rows below are identical apart from the body. A chevron on the second
+ * would be a promise the row cannot keep, so it is simply absent, and a column
+ * of chevrons stays a truthful index of which rows have more behind them.
+ */
+export const ChevronOnlyWhenThereIsMore: Story = {
+  render: (args) => (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      <StoryRow
+          args={args}
+        leading={<ReceiptLongOutlinedIcon />}
+        title="Ana Paula"
+        subtitle="Mesa 12 · 8 itens"
+        value="R$ 312,50"
+        onToggleSelect={() => {}}
+      >
+        <OrderDetail />
+      </StoryRow>
+      <StoryRow
+          args={args}
+        leading={<ReceiptLongOutlinedIcon />}
+        title="Anônimo"
+        subtitle="Balcão · 1 item"
+        value="R$ 8,90"
+        onToggleSelect={() => {}}
+      />
+    </Box>
+  ),
+};
+
+/**
+ * A LIST THAT OWNS THE STATE — one row open at a time.
+ *
+ * Uncontrolled, rows open independently and several can be open at once, which
+ * is what comparing two records needs. Pass `expanded` + `onExpandedChange` and
+ * the list decides instead; this one enforces an accordion.
+ *
+ * Inside a `ListCardGroup` the disclose rail is RESERVED on every row, so the
+ * captions stay on one edge whether or not a given row has a body.
+ */
+export const ControlledAccordion: Story = {
+  render: function ControlledAccordionStory(args) {
+    const [open, setOpen] = useState<string | null>("ana");
+    const rows = [
+      { id: "ana", title: "Ana Paula", subtitle: "Mesa 12 · 8 itens", value: "R$ 312,50" },
+      { id: "thom", title: "Thompson Filgueiras", subtitle: "Mesa 4 · 6 itens", value: "R$ 142,60" },
+      { id: "anon", title: "Anônimo", subtitle: "Balcão · 1 item", value: "R$ 8,90" },
+    ];
+    return (
+      <ListCardGroup metaColumns={0}>
+        {rows.map((row) => (
+          <StoryRow
+          args={args}
+            key={row.id}
+            leading={<ReceiptLongOutlinedIcon />}
+            title={row.title}
+            subtitle={row.subtitle}
+            value={row.value}
+            onToggleSelect={() => {}}
+            expanded={open === row.id}
+            onExpandedChange={(next) => setOpen(next ? row.id : null)}
+          >
+            <OrderDetail />
+          </StoryRow>
+        ))}
+      </ListCardGroup>
+    );
+  },
+};
+
+/**
+ * CELLS DECLARED ONCE BY THE LIST — the shape no row can break.
+ *
+ * The group holds the config; each card only supplies its `row`. Nothing here
+ * lets one card put a column where another has not, which is what makes the
+ * alignment structural rather than a convention four rows happen to keep.
+ *
+ * Note what the config does NOT mean. The second line is not a subtitle: here it
+ * is the client under the pedido, the time under the date, and the method under
+ * the money — three different pairings, one mechanism, no semantics the config
+ * did not put there. A cell wanting one line simply omits `secondary`.
+ *
+ * The rows carry deliberately uneven content — a long client name, a short one,
+ * a missing second line — because even columns are only proven by rows that
+ * disagree about how much they have to say.
+ */
+const PEDIDO_CELLS = [
+  {
+    id: "pedido",
+    primary: (row: Record<string, unknown>) => String(row.shortId),
+    secondary: (row: Record<string, unknown>) => String(row.customer),
+  },
+  {
+    id: "quando",
+    align: "center" as const,
+    primary: (row: Record<string, unknown>) => String(row.date),
+    secondary: (row: Record<string, unknown>) => String(row.time),
+  },
+  {
+    id: "total",
+    align: "end" as const,
+    width: "max-content",
+    strong: true,
+    primary: (row: Record<string, unknown>) => String(row.total),
+    secondary: (row: Record<string, unknown>) => (row.method == null ? null : String(row.method)),
+  },
+];
+
+const PEDIDO_ROWS = [
+  { shortId: "B75A6858", customer: "Luiz Gustavo", date: "05/08/2026", time: "13:45", total: "R$ 13,90", method: "PIX" },
+  { shortId: "C91B2210", customer: "Ana Paula Rodrigues de Menezes", date: "05/08/2026", time: "14:02", total: "R$ 312,50", method: "Crédito" },
+  { shortId: "D22F7741", customer: "Thom", date: "06/08/2026", time: "09:10", total: "R$ 8,90", method: null },
+];
+
+export const ConfiguredCells: Story = {
+  render: (args) => (
+    <ListCardGroup cells={PEDIDO_CELLS}>
+      {PEDIDO_ROWS.map((row) => (
+        <StoryRow
+          args={args}
+          key={String(row.shortId)}
+          row={row}
+          leading={<ReceiptLongOutlinedIcon />}
+          onToggleSelect={() => {}}
+          menu={
+            <DropdownMenu
+              items={[{ id: "open", label: "Abrir" }]}
+              trigger={<MoreVertIcon fontSize="small" />}
+            />
+          }
+        >
+          <OrderDetail />
+        </StoryRow>
+      ))}
+    </ListCardGroup>
   ),
 };

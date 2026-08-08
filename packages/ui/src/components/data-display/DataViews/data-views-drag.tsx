@@ -44,6 +44,23 @@ export interface DragContainerValue {
   handleProps?: (id: string | number) => DragItemProps;
   /** The id currently being dragged, so its card can dim itself. */
   activeId?: string | number | null;
+  /**
+   * WHERE THE DRAGGED ITEM WOULD LAND — the one thing a drag cannot be honest
+   * without.
+   *
+   * A list that dims the row you picked up and shows nothing else asks you to
+   * guess the outcome and find out by dropping. The marker turns that into a
+   * statement: THIS gap is where it goes.
+   *
+   * Published by the container, not computed by the card, for the same reason
+   * everything else here is: only the thing holding the items knows the
+   * geometry — which one you are over, which edge of it, and whether that
+   * position is legal. A card knows none of that about its neighbours.
+   *
+   * `null` while nothing is being dragged, or while the pointer is over no
+   * valid target.
+   */
+  dropIndicator?: { id: string | number; edge: "before" | "after" } | null;
 }
 
 const DragContainerContext = createContext<DragContainerValue | null>(null);
@@ -73,17 +90,63 @@ export function useDragItem(dragId: string | number | undefined): {
   itemProps: DragItemProps;
   handleProps: DragItemProps | undefined;
   dragging: boolean;
+  /** Which of this card's edges the marker sits on, or null for neither. */
+  dropEdge: "before" | "after" | null;
 } {
   const container = useContext(DragContainerContext);
   if (!container || dragId === undefined) {
-    return { draggable: false, itemProps: {}, handleProps: undefined, dragging: false };
+    return { draggable: false, itemProps: {}, handleProps: undefined, dragging: false, dropEdge: null };
   }
+  const indicator = container.dropIndicator;
   return {
     draggable: true,
     itemProps: container.itemProps(dragId),
     handleProps: container.handleProps?.(dragId),
     dragging: container.activeId === dragId,
+    dropEdge: indicator != null && indicator.id === dragId ? indicator.edge : null,
   };
+}
+
+/**
+ * THE DROP MARKER — one rule across the card's edge, drawn where the item lands.
+ *
+ * Shared by every draggable surface rather than reimplemented per card, so a
+ * reorderable list, a board column and a grid of tiles all say the same thing
+ * the same way. A consumer wiring its own DnD gets this for free by publishing
+ * `dropIndicator`; it never draws the marker itself.
+ *
+ * ABSOLUTE, AND OUTSIDE THE FLOW ON PURPOSE. A marker that took layout space
+ * would push every row below it down by its own height the moment it appeared —
+ * the list would twitch as you dragged across it, and the gap you were aiming
+ * at would move out from under the pointer. Drawn over the gap instead, nothing
+ * reflows.
+ *
+ * `pointerEvents: none` so it cannot swallow the dragover events that placed it,
+ * and `aria-hidden` because the position it reports belongs in a live region the
+ * LIST owns — fifty rows each announcing a marker is a screen-reader nightmare.
+ */
+export function DropIndicator({ edge }: { edge: "before" | "after" }): React.JSX.Element {
+  return (
+    <Box
+      aria-hidden
+      data-slot="drop-indicator"
+      data-drop-edge={edge}
+      sx={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        // Centred ON the gap rather than inside the card: the item lands
+        // BETWEEN two rows, and a rule sitting within one of them reads as
+        // "into this row" instead.
+        ...(edge === "before" ? { top: -2 } : { bottom: -2 }),
+        height: 3,
+        borderRadius: 2,
+        bgcolor: "primary.main",
+        pointerEvents: "none",
+        zIndex: 2,
+      }}
+    />
+  );
 }
 
 /**
