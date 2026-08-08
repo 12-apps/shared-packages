@@ -39,8 +39,13 @@ export interface WalletCharge {
   pollError: string | null;
   /** The healthy-poll cap elapsed while still AWAITING (FUT-191). */
   pollTimedOut: boolean;
-  /** Charge the wallet's key. The button calls this once the sheet resolves. */
-  payWithKey(type: CheckoutWalletType, key: string): Promise<void>;
+  /**
+   * Charge the wallet's key. The button calls this once the sheet resolves.
+   * Resolves `true` when the charge was ACCEPTED — paid, confirming, or
+   * handed to the provider's page — and `false` on a refusal or decline, so a
+   * sheet that must be completed with a status (Apple's) can be honest.
+   */
+  payWithKey(type: CheckoutWalletType, key: string): Promise<boolean>;
 }
 
 /**
@@ -72,7 +77,7 @@ export function useWalletCharge(
     if (status && status !== "AWAITING_PAYMENT") onResolved(status);
   }, [status, onResolved]);
 
-  const payWithKey = async (type: CheckoutWalletType, key: string): Promise<void> => {
+  const payWithKey = async (type: CheckoutWalletType, key: string): Promise<boolean> => {
     setError(null);
     setErrorCode(null);
     setPhase("charging");
@@ -92,7 +97,7 @@ export function useWalletCharge(
       // holding the money, and a live button under "não pague de novo" is what
       // the buyer's thumb reaches for.
       setPhase("idle");
-      return;
+      return false;
     }
     // A provider that demands its own page to finish (redirect 3-D Secure,
     // FUT-698): park the order and hand the buyer over, exactly as the card
@@ -100,15 +105,16 @@ export function useWalletCharge(
     if (charged.data.hostedCheckoutUrl) {
       rememberHostedOrder(order);
       navigate(charged.data.hostedCheckoutUrl);
-      return;
+      return true;
     }
     // A business outcome (declined → FAILED) shows the status screen; an
     // accepted charge begins polling for the async confirmation.
     if (charged.data.status !== "AWAITING_PAYMENT") {
       onResolved(charged.data.status);
-      return;
+      return charged.data.status === "PAID";
     }
     setPhase("polling");
+    return true;
   };
 
   return {

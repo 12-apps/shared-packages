@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 
+import { PaymentsCheckoutApplePayPage } from './payments-checkout-apple-pay';
 import { PaymentsCheckoutBothPage } from './payments-checkout-both';
 import { PaymentsCheckoutBuyerFieldsPage } from './payments-checkout-buyer-fields';
 import { PaymentsCheckoutCardPage } from './payments-checkout-card';
@@ -134,6 +135,12 @@ export const PAGES: readonly HarnessPage[] = [
     Component: PaymentsCheckoutGooglePayPage,
   },
   { ...CHECKOUT_FLOW, slug: 'payments-checkout-both', title: 'Both methods', Component: PaymentsCheckoutBothPage },
+  {
+    ...CHECKOUT_FLOW,
+    slug: 'payments-checkout-apple-pay',
+    title: 'Apple Pay',
+    Component: PaymentsCheckoutApplePayPage,
+  },
   {
     ...CHECKOUT_FLOW,
     slug: 'payments-checkout-no-provider',

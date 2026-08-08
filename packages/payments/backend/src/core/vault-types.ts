@@ -8,11 +8,13 @@ import type { ClientTokenization, CustomerInfo, ProviderName } from './types';
  *
  * Because the providers do not agree that it is a charge at all. Stripe vaults
  * through a SetupIntent, which never moves money and is a different object with
- * a different lifecycle; PagBank has no card-only vault and reaches the same
- * end by charging with `store: true`. Modelling vaulting as a charge would have
- * forced Stripe's flow through a shape it does not have, and modelling it as
- * "just save this token" would have ignored that the browser has to complete a
- * provider-side handshake first.
+ * a different lifecycle; PagBank vaults through its Card Validation & Storage
+ * API (`POST /tokens/cards`, FUT-478) — one storage call with no session
+ * object anywhere. Modelling vaulting as a charge would have forced both flows
+ * through a shape neither has; modelling it as "just save this token" would
+ * have ignored that Stripe's browser must complete a provider-side handshake
+ * first. PagBank's sessionless flow still fits the two steps: `begin` merely
+ * equips the browser to encrypt, and `complete` carries the blob via `token`.
  *
  * So it is two steps, mirroring what actually happens:
  *
@@ -47,6 +49,11 @@ import type { ClientTokenization, CustomerInfo, ProviderName } from './types';
  * tenant's FIRST card, when no customer reference exists yet to compare
  * against. `customerRef` is checked too when the host holds one, but it cannot
  * be the primary check for exactly that reason.
+ *
+ * The check binds to SESSIONS. A sessionless `complete` (PagBank's `token`)
+ * carries the instrument itself, which names nothing at the provider until
+ * that very request stores it — there is no pre-existing object for another
+ * tenant to point at, so there is nothing for the reference to guard.
  */
 
 /** What the host knows when it starts vaulting a card. */
@@ -99,7 +106,11 @@ export interface VaultCompleteInput {
   customerRef?: string;
   /** The session the browser confirmed. */
   sessionId?: string;
-  /** A directly-minted instrument, for providers with no session step. */
+  /**
+   * A directly-minted instrument, for providers with no session step —
+   * PagBank's browser-encrypted card blob, which its `complete` stores via
+   * `POST /tokens/cards` (FUT-478).
+   */
   token?: string;
 }
 
