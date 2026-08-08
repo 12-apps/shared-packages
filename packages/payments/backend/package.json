@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./providers/pagbank": "./src/providers/pagbank.ts",
+    "./providers/pagbank-legacy-notifications": "./src/providers/pagbank-legacy-notifications.ts",
     "./providers/stone": "./src/providers/stone.ts",
     "./providers/infinitepay": "./src/providers/infinitepay.ts",
     "./providers/stripe": "./src/providers/stripe.ts"

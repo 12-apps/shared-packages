@@ -138,16 +138,14 @@ export {
   type StubModeEnv,
 } from './core/stub-mode';
 
-// The FUT-477 follow-up resolver for PagBank's legacy `notificationCode`
-// deliveries: a stored code → normalized events (chargeback, dispute,
-// cancellation, settlement) a host applies with machinery it already has.
-// `webhook.parse` only RECOGNIZES that shape; this is the query that resolves
-// it, exported because its credentials — the legacy e-mail + API-token pair —
-// are the host's to supply per call. Contract: the module header.
-export {
-  resolvePagbankNotification,
-  type PagbankLegacyNotificationDetail,
-} from './providers/pagbank-legacy-notifications';
+// The FUT-477 legacy-notification resolver (`resolvePagbankNotification`) is
+// deliberately NOT re-exported here. It ships at the subpath
+// `@12-apps/payments-backend/providers/pagbank-legacy-notifications`, like
+// every provider module: this ROOT entry is value-imported by the frontend
+// package's stories, so any provider export here drags `providers/shared.ts`
+// — and its `node:crypto` import — into a browser bundle and breaks the
+// Storybook build. Provider modules only ever ride the `./providers/*`
+// subpaths, which no browser build reaches.
 
 export type {
   CardDetails,
