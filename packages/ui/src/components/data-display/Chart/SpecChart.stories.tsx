@@ -5,7 +5,7 @@ import { SpecChart } from './SpecChart';
 import type { ChartSpec } from './ChartSpec.types';
 
 const meta: Meta<typeof SpecChart> = {
-  title: 'Charts/SpecChart',
+  title: 'Charts/Chart',
   component: SpecChart,
   parameters: {
     layout: 'padded',
@@ -47,11 +47,11 @@ const lineSpec: ChartSpec = {
   numberFormat: 'brl',
 };
 
-export const Line: Story = {
+export const SpecLine: Story = {
   args: { spec: lineSpec, data: salesByDay },
 };
 
-export const StackedBars: Story = {
+export const SpecStackedBars: Story = {
   args: {
     spec: {
       type: 'bar',
@@ -68,14 +68,14 @@ export const StackedBars: Story = {
   },
 };
 
-export const Area: Story = {
+export const SpecArea: Story = {
   args: {
     spec: { ...lineSpec, type: 'area', title: 'Tendência de vendas' },
     data: salesByDay,
   },
 };
 
-export const Pie: Story = {
+export const SpecPie: Story = {
   args: {
     spec: {
       type: 'pie',
@@ -88,7 +88,7 @@ export const Pie: Story = {
   },
 };
 
-export const Donut: Story = {
+export const SpecDonut: Story = {
   args: {
     spec: {
       type: 'donut',
@@ -102,7 +102,7 @@ export const Donut: Story = {
   },
 };
 
-export const PercentFormat: Story = {
+export const SpecPercentFormat: Story = {
   args: {
     spec: {
       type: 'bar',
@@ -116,7 +116,7 @@ export const PercentFormat: Story = {
   },
 };
 
-export const CustomColorScheme: Story = {
+export const SpecCustomColorScheme: Story = {
   args: {
     spec: {
       ...lineSpec,
@@ -132,7 +132,7 @@ export const CustomColorScheme: Story = {
   },
 };
 
-export const FromJsonString: Story = {
+export const SpecFromJsonString: Story = {
   render: () => {
     const json =
       '{"type":"area","title":"Spec vinda de JSON","xAxis":{"key":"day"},' +
@@ -141,10 +141,10 @@ export const FromJsonString: Story = {
   },
 };
 
-export const Loading: Story = {
+export const SpecLoading: Story = {
   args: { spec: lineSpec, data: [], loading: true },
 };
 
-export const Empty: Story = {
+export const SpecEmpty: Story = {
   args: { spec: { ...lineSpec, title: 'Sem dados' }, data: [] },
 };
