@@ -196,3 +196,46 @@ describe('no control label is elided in any shape', () => {
     expect(controlNames().filter((name) => name === '' || name.includes('…'))).toEqual([]);
   });
 });
+
+/**
+ * FUT-755 — the row's controls are the same field style as the rest of the
+ * column, without becoming the truncation this panel was built to end.
+ *
+ * `visual-pass.md` §Components: one field style. These four were the notch-less
+ * half of a column whose other half floated its labels. They float theirs now —
+ * but the operator lives in a fixed 104px box, so a legend reading
+ * `Filtro 1 — con…` would trade one failure for the exact one the panel
+ * replaced the popover to fix.
+ *
+ * So the two names differ on purpose, and both halves are pinned here: what a
+ * sighted reader sees is short, and what a screen reader announces still says
+ * which row it is in. jsdom cannot prove the short one fits its box — that is a
+ * browser check — only that it is short enough to be worth checking.
+ */
+describe('every filter control is a labelled field', () => {
+  it('shows a short visible label while announcing the indexed one', () => {
+    renderFilter({ field: 'status', operator: 'eq', value: 'PAID' });
+
+    const labels = Array.from(document.querySelectorAll('label')).map(
+      (label) => label.textContent ?? '',
+    );
+    expect(labels).toEqual(['Campo', 'Condição', 'Valor']);
+
+    // Unchanged: the accessible name is what entry 12's suite asserts, and a
+    // visible label must not quietly take it over.
+    expect(controlNames()).toEqual([
+      'Filtro 1 — campo',
+      'Filtro 1 — condição',
+      'Filtro 1 — valor',
+    ]);
+  });
+
+  it('labels the two bounds of a `between` row separately', () => {
+    renderFilter({ field: 'total', operator: 'between', value: '', from: '10', to: '90' });
+
+    const labels = Array.from(document.querySelectorAll('label')).map(
+      (label) => label.textContent ?? '',
+    );
+    expect(labels).toEqual(['Campo', 'Condição', 'De', 'Até']);
+  });
+});

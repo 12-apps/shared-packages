@@ -61,6 +61,7 @@ import {
   usePanelTier,
   type PanelTier,
 } from "./lib/docked-panel";
+import { CONTAINER_RADIUS_PX } from "./lib/report-surface";
 
 /** Wide enough that a filter's three controls read in full (FUT-391). */
 const PANEL_WIDTH_PX = 344;
@@ -98,8 +99,15 @@ const OVERLAY_PAPER_SX = {
   boxShadow: "-12px 0 32px -8px rgba(0, 0, 0, 0.32)",
 };
 
-/** Rounded top corners: the sheet reads as lifted off the canvas, not welded on. */
-const SHEET_PAPER_SX = { borderTopLeftRadius: 16, borderTopRightRadius: 16 };
+/**
+ * Rounded top corners: the sheet reads as lifted off the canvas, not welded on.
+ * At the CONTAINER radius, because a sheet is a container and this was a third
+ * value in a family `visual-pass.md` §Components caps at two.
+ */
+const SHEET_PAPER_SX = {
+  borderTopLeftRadius: CONTAINER_RADIUS_PX,
+  borderTopRightRadius: CONTAINER_RADIUS_PX,
+};
 
 /**
  * A persistent drawer's docked root is a REAL element in the flow of whatever
@@ -250,8 +258,11 @@ function PanelForm({
 
   return (
     // Scrolls inside the panel: the header and its close control stay
-    // reachable however long the form gets.
-    <Box sx={{ overflowY: "auto", pb: 2 }}>
+    // reachable however long the form gets. The top padding is not spacing —
+    // a floating label sits ABOVE its field's border, so with the first field
+    // flush against the scroll container's edge "Coleção" was clipped in half
+    // by the overflow.
+    <Box sx={{ overflowY: "auto", pt: 1.5, pb: 2 }}>
       <BlockQueryFields
         draft={draft}
         entities={entities}

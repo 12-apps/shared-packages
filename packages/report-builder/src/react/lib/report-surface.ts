@@ -12,7 +12,7 @@
  * back out of it would close a module cycle and leave these constants in the
  * temporal dead zone at import time.
  */
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 
 import { createTheme, useTheme, type Theme } from "@12-apps/ui/mui/styles";
 
@@ -73,8 +73,36 @@ export const REPORT_SURFACE_SX = {
   },
   // A shadow means "this floats above the page". A button does not.
   "& .MuiButton-root": { boxShadow: "none" },
+  // A secondary button stands ON the canvas, so it carries the surface colour
+  // (`prototype.html`'s `.btn` is `background:var(--surface)`). Left transparent
+  // it borrowed the tint, and its accent label measured 4.10:1 there against
+  // 4.47:1 on paper — the canvas introduced above cost contrast the rule in
+  // `visual-pass.md` §Colour asks for. It also stops reading as a bare label.
+  "& .MuiButton-outlined": { bgcolor: "background.paper" },
   "& .MuiInputBase-input, & .MuiInputLabel-root": { fontSize: "0.875rem" },
 } as const;
+
+/**
+ * The SECTION level of the type scale — "Agrupar por", "Medidas", "Filtros".
+ *
+ * It is the level `visual-pass.md` §Type lists between the page title and a
+ * card title, and the one this area did not have: these headings rendered at
+ * 12px/600 beside field labels at 12px/400, so two levels sat at exactly the
+ * same size and WEIGHT was the only thing telling them apart — which is the
+ * rule's other half ("One weight per level").
+ *
+ * Rather than invent a fifth size and squeeze the ladder (24 / 18 / 14 / 12,
+ * whose steps are 6 / 4 / 2), the section becomes a different KIND of label:
+ * uppercase and letterspaced, the way `prototype.html`'s `.eyebrow` sets every
+ * group heading in this panel. Case and tracking are visible at a glance where
+ * a 1px size difference is not, and the ladder keeps four steps.
+ */
+export const SECTION_LABEL_STYLE: CSSProperties = {
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  fontSize: "0.75rem",
+  fontWeight: 600,
+};
 
 /**
  * The reports surface, plus the two things only the EDITOR needs.
@@ -104,6 +132,22 @@ export const EDITOR_SURFACE_SX = {
     transform: "translate(14px, 8px) scale(1)",
   },
   '& input[data-testid$="-title"]': { fontSize: "1.125rem", fontWeight: 600 },
+  // …and it is not a BOX either. Sized like a title but framed like a field, a
+  // block's title slot put an outlined input in the one row that is supposed to
+  // read as a heading — a second field style in the block header, on top of the
+  // panel's. `prototype.html`'s `.title-input` is a transparent border that
+  // appears on hover and focus: editable when you reach for it, a title until
+  // then. The sibling combinator does the work MUI's DOM order allows — the
+  // notched outline is rendered after the input inside the same root.
+  '& input[data-testid$="-title"] ~ .MuiOutlinedInput-notchedOutline': {
+    borderColor: "transparent",
+  },
+  '& input[data-testid$="-title"]:hover ~ .MuiOutlinedInput-notchedOutline': {
+    borderColor: "divider",
+  },
+  '& input[data-testid$="-title"]:focus ~ .MuiOutlinedInput-notchedOutline': {
+    borderColor: "primary.main",
+  },
 } as const;
 
 /**
@@ -117,9 +161,12 @@ export const EDITOR_SURFACE_SX = {
  * with a viewport attached.
  *
  * A theme reaches it because React context crosses a portal even though the DOM
- * does not. Same numbers, stated once more where a selector cannot go.
+ * does not. Same numbers, stated once more where a selector cannot go — and the
+ * radius family with them: measured inside the sheet, `.MuiSelect-select` came
+ * back at MUI's own 4px and the header's close control at 50%, so the phone saw
+ * FOUR radii where the desktop saw two.
  */
-export function useReportFieldTheme(): Theme {
+export function useReportPortalTheme(): Theme {
   const base = useTheme();
   return useMemo(
     () =>
@@ -144,6 +191,13 @@ export function useReportFieldTheme(): Theme {
               },
             },
           },
+          // The select's inner display box rounds on its own, under the
+          // outlined root — 4px, MUI's default, visible at the corners.
+          MuiSelect: { styleOverrides: { select: { borderRadius: CONTROL_RADIUS_PX } } },
+          // A circle is not one of the two values (`visual-pass.md`
+          // §Components). The page's own rule squares it; the sheet is
+          // portaled out of reach of that rule and was the last 50% left.
+          MuiIconButton: { styleOverrides: { root: { borderRadius: CONTROL_RADIUS_PX } } },
         },
       }),
     [base],
