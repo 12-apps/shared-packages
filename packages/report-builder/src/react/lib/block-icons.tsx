@@ -64,6 +64,21 @@ export function PencilIcon(): JSX.Element {
   );
 }
 
+/**
+ * Cross — removes one filter row.
+ *
+ * A glyph rather than the word "Remover" because the row has to fit three
+ * controls beside it inside a 344px panel: the text button took ~70px of that
+ * and truncated its neighbours to `S…` / `i…` (FUT-755).
+ */
+export function CloseIcon(): JSX.Element {
+  return (
+    <Glyph>
+      <path d="M18 6L6 18M6 6l12 12" />
+    </Glyph>
+  );
+}
+
 /** Trash can — removes the block (behind a confirmation). */
 export function TrashIcon(): JSX.Element {
   return (

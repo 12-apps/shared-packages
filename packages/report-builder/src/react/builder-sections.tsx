@@ -7,11 +7,13 @@ import type { JSX } from "react";
 import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
 import { Select } from "@12-apps/ui/form/Select";
+import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import type { ReportField } from "./custom-reports-api";
 import { dimensionAt, withDimension } from "./builder-dimensions";
+import { CloseIcon } from "./lib/block-icons";
 import { VizPicker } from "./viz-picker";
 import { editFilterRow, operatorOptionsFor, valueOptionsFor } from "./builder-filters";
 import { AGGREGATION_LABELS, aggregationOptions, editMeasureRow } from "./builder-measures";
@@ -182,7 +184,24 @@ function FilterRow({
 }): JSX.Element {
   const valueOptions = valueOptionsFor(field);
   return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+    /*
+     * Two lines, not one (FUT-755). One row of three selects plus a text
+     * "Remover" button left each control ~70px inside the 344px panel, which
+     * rendered the field as `S…` and the operator as `i…` — the exact
+     * truncation this panel replaced the popover to fix, still shipping.
+     *
+     * Widths alone could not fix it: each MUI select spends ~32px on its own
+     * chrome, so three of them plus a button need ~200px before a single
+     * character of label is drawn, against ~312px of usable width. So the
+     * field — the one open-ended label, and the row's subject — takes a line
+     * of its own, and the operator, its value and the remove control share the
+     * next. The operator's longest label is known and short, so it takes a
+     * fixed 104px and the value gets the rest.
+     *
+     * `minWidth: 0` lets the value actually shrink to its share: a flex item
+     * defaults to `min-width: auto` and would otherwise refuse to.
+     */
+    <Stack spacing={1}>
       <Select
         size="small"
         aria-label={`Filtro ${index + 1} — campo`}
@@ -191,45 +210,51 @@ function FilterRow({
         onChange={(event) => onPatch({ field: event.target.value as string })}
         data-testid={`builder-filter-field-${index}`}
       />
-      <Select
-        size="small"
-        aria-label={`Filtro ${index + 1} — condição`}
-        // Only the operators the FIELD accepts: "status a partir de Pago"
-        // compiles and orders enum codes alphabetically, which is noise.
-        options={operatorOptionsFor(field).map((value) => ({
-          value,
-          label: OPERATOR_LABELS[value] ?? value,
-        }))}
-        value={filter.operator}
-        onChange={(event) => onPatch({ operator: event.target.value as string })}
-        data-testid={`builder-filter-operator-${index}`}
-      />
-      {valueOptions ? (
-        <Select
-          size="small"
-          aria-label={`Filtro ${index + 1} — valor`}
-          options={valueOptions}
-          value={filter.value}
-          onChange={(event) => onPatch({ value: event.target.value as string })}
-          data-testid={`builder-filter-value-${index}`}
-        />
-      ) : (
-        <Input
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+        <Box sx={{ width: 104, flexShrink: 0 }}>
+          <Select
+            size="small"
+            aria-label={`Filtro ${index + 1} — condição`}
+            // Only the operators the FIELD accepts: "status a partir de Pago"
+            // compiles and orders enum codes alphabetically, which is noise.
+            options={operatorOptionsFor(field).map((value) => ({
+              value,
+              label: OPERATOR_LABELS[value] ?? value,
+            }))}
+            value={filter.operator}
+            onChange={(event) => onPatch({ operator: event.target.value as string })}
+            data-testid={`builder-filter-operator-${index}`}
+          />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          {valueOptions ? (
+            <Select
+              size="small"
+              aria-label={`Filtro ${index + 1} — valor`}
+              options={valueOptions}
+              value={filter.value}
+              onChange={(event) => onPatch({ value: event.target.value as string })}
+              data-testid={`builder-filter-value-${index}`}
+            />
+          ) : (
+            <Input
+              size="sm"
+              aria-label={`Filtro ${index + 1} — valor`}
+              value={filter.value}
+              onChange={(event) => onPatch({ value: event.target.value })}
+              data-testid={`builder-filter-value-${index}`}
+            />
+          )}
+        </Box>
+        <Button
+          variant="ghost"
           size="sm"
-          aria-label={`Filtro ${index + 1} — valor`}
-          value={filter.value}
-          onChange={(event) => onPatch({ value: event.target.value })}
-          data-testid={`builder-filter-value-${index}`}
-        />
-      )}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onRemove}
-        aria-label={`Remover filtro ${index + 1}`}
-      >
-        Remover
-      </Button>
+          onClick={onRemove}
+          aria-label={`Remover filtro ${index + 1}`}
+        >
+          <CloseIcon />
+        </Button>
+      </Stack>
     </Stack>
   );
 }
