@@ -10,10 +10,11 @@ import type { StorySpec } from "./store";
 /**
  * The screens ON THEIR OWN (FUT-741/742).
  *
- * `createPaymentFlows` returns eleven of them, and the claim being reviewed
+ * `createPaymentFlows` returns thirteen of them, and the claim being reviewed
  * here is that each one works STANDALONE — mounted with no `Provider` above it,
  * no props threaded from a parent flow, and no host glue beyond its own. Every
- * story below mounts exactly one, straight out of `flows.screens`.
+ * story below mounts exactly one, straight out of `flows.screens` — except the
+ * vault pair (FUT-183), which has its own module, `Vault.stories.tsx`.
  */
 const meta: Meta = {
   title: "Checkout/Screens",

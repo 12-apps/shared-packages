@@ -27,6 +27,7 @@ import { FlowsProvider, useResolvedConfig, type FlowsRuntime } from "./runtime";
 import { buyerScreens } from "./screens-buyer";
 import { hostedScreens } from "./screens-hosted";
 import { payScreens, storeCannotCharge } from "./screens-pay";
+import { vaultScreens } from "./screens-vault";
 import type {
   CheckoutAvailability,
   CheckoutController,
@@ -117,7 +118,7 @@ function buildCheckout(
   };
 }
 
-/** Assemble the eleven screens from their builders. */
+/** Assemble the thirteen screens from their builders. */
 function buildScreens(runtime: FlowsRuntime): CheckoutScreens {
   return {
     MethodChoice: buyerScreens.buildMethodChoice(runtime),
@@ -131,6 +132,8 @@ function buildScreens(runtime: FlowsRuntime): CheckoutScreens {
     PayerSummary: buyerScreens.buildPayerSummary(runtime),
     SavedCards: buyerScreens.buildSavedCards(runtime),
     EmptyCart: buyerScreens.buildEmptyCart(runtime),
+    AddCard: vaultScreens.buildAddCard(runtime),
+    ManageCards: vaultScreens.buildManageCards(runtime),
   };
 }
 

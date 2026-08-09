@@ -134,6 +134,8 @@ function fakeClient(chargeResult?: Awaited<ReturnType<CheckoutClient["chargeWall
       return chargeResult ?? ok({ status: "PAID" as OrderStatus });
     },
     listInstruments: async () => [],
+    beginVault: async () => err("not in this test"),
+    completeVault: async () => err("not in this test"),
     refreshBrowserKey: async () => ok({ publicKey: null }),
   };
   return { client, walletCharges };

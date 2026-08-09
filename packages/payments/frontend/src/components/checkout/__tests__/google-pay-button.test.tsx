@@ -123,6 +123,8 @@ function fakeClient(options: FakeClientOptions = {}) {
       return options.chargeResult ?? ok({ status: "AWAITING_PAYMENT" as OrderStatus });
     },
     listInstruments: async () => [],
+    beginVault: async () => err("not in this test"),
+    completeVault: async () => err("not in this test"),
     refreshBrowserKey: async () => ok({ publicKey: null }),
   };
   return { client, walletCharges };
