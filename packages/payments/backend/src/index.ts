@@ -306,48 +306,11 @@ export {
 
 /**
  * The BUYER-CHECKOUT mount (FUT-740) — `mountPayments`' counterpart for the
- * other side of the till. See `checkout/factory.ts` for what moves into the
- * library and why, and `checkout/types.ts` for the ports that keep "what an
- * order is" outside it.
+ * other side of the till. The explicit export list lives in
+ * `checkout/index.ts` (this file is at the size gate), exactly as the
+ * activation and platform blocks below do.
  */
-export {
-  createPaymentFlowsBE,
-  type PaymentFlowsBE,
-  type PaymentFlowsBEConfig,
-} from './checkout/factory';
-export { CHECKOUT_ROUTES } from './checkout/route-table';
-export { defaultCheckoutCopyPtBR, type CheckoutCopy } from './checkout/copy';
-export {
-  buyerCheckoutConfig,
-  usesHostedCheckout,
-  type CheckoutConfigDeps,
-} from './checkout/config';
-export type {
-  AttachedCharge,
-  BrowserKeyPort,
-  BuyerCheckoutConfig,
-  BuyerProviderLink,
-  ChargeCorrelationPort,
-  CheckoutChargeDraft,
-  CheckoutErrorBody,
-  CheckoutIntentKind,
-  CheckoutLogger,
-  CheckoutPrincipal,
-  CheckoutResponder,
-  CheckoutRouteIntent,
-  CheckoutRouteSpec,
-  InstrumentScope,
-  Payable,
-  PayableLoadContext,
-  PayablePort,
-  SavedInstrumentPort,
-} from './checkout/types';
-/**
- * The charge-body normalizer, exported so a host can assert what its OWN
- * client's request turns into. Which two wire shapes it accepts, and which of
- * them is canonical, is the module's own doc.
- */
-export { chargeDraftOf } from './checkout/draft';
+export * from './checkout/index';
 /**
  * The charge-identity guards (FUT-378) and the `--` attempt-reference
  * convention (FUT-669). Exported because a host that has not yet moved onto the
