@@ -7,6 +7,24 @@
  */
 export { BaseCard } from "./base-card";
 export { BaseListCard, type BaseListCardProps } from "./base-list-card";
+// THE LIST'S HALF OF THE CARD API. `BaseListCard` alone is not usable as
+// designed: its cells are declared by the GROUP and typed by
+// `ListCardCellConfig`, and without these a consumer can only fall back to the
+// named slots and standalone rails — which is the layout the cell config
+// replaced, and gives up the alignment that was the point.
+export {
+  ListCardGroup,
+  DEFAULT_RAILS,
+  RAIL_COUNT,
+  type ListRails,
+} from "./list-card-rails";
+export {
+  type ListCardCellConfig,
+  DEFAULT_CELL_WIDTH,
+} from "./list-card-cells";
+// Published by a drag container so a row can draw the marker; a consumer wiring
+// its own DnD needs the type to build the value.
+export { DropIndicator } from "./data-views-drag";
 export {
   DragContainerProvider,
   useDragItem,
