@@ -40,6 +40,32 @@ interface WebhookIngestDeps {
 }
 
 /**
+ * Observability for the LIVE inbound path (ported from the future-pay host,
+ * FUT-761). Verification runs BEFORE the durable inbox, so a refused delivery
+ * otherwise leaves no trace of any kind — a silence that reads exactly like
+ * "the provider never called us", and that hid a real defect (FUT-463)
+ * through three rounds of fixes: every activation confirmation was being
+ * rejected at the credential lookup while the provider was still earning its
+ * activation.
+ *
+ * Hooks are optional and observational: the pipeline behaves identically when
+ * none is given, and a hook must not throw. They receive names and reasons
+ * only — never the body or headers, which can carry payment correlation ids
+ * and shared secrets; a log that quoted the payload would be a new place for
+ * card-adjacent data to accumulate.
+ */
+export interface WebhookPipelineObserver {
+  /**
+   * The delivery was refused BEFORE the inbox — credential lookup or
+   * signature verification — so no row records it; this call is its only
+   * trace. The thrown error still propagates unchanged.
+   */
+  refused?(provider: ProviderName, reason: string): void;
+  /** Verified, parsed and ingested; `events` counts what THIS call applied. */
+  accepted?(provider: ProviderName, events: number): void;
+}
+
+/**
  * A failure, boxed. The box exists so `failure` can be tested for PRESENCE
  * without inspecting the value: a handler that throws `undefined` (or an empty
  * string, or 0) would be indistinguishable from success under a bare
@@ -204,30 +230,45 @@ export async function runWebhookPipeline(
   deps: WebhookIngestDeps & {
     providers: { get(provider: ProviderName): PaymentProviderAdapter };
     credentials: CredentialStore;
+    webhookObserver?: WebhookPipelineObserver;
   },
   chargingFallback: (provider: ProviderName) => Promise<ListeningTarget>,
   merchant: MerchantRef,
   delivery: WebhookDelivery,
 ): Promise<NormalizedWebhookEvent[]> {
-  // LISTENING, not routing — see `resolveForListening` for what the single
-  // gate cost, and why a refusal here left no trace of any kind.
-  const { adapter, candidates } = await resolveForListening(
-    deps,
-    () => chargingFallback(delivery.provider),
-    merchant,
-    delivery.provider,
-  );
-  const creds = await verifiedCredentials(adapter, delivery, candidates);
-  if (!creds) throw new WebhookVerificationError(adapter.name);
+  // The pre-inbox stretch: everything in here can refuse the delivery with
+  // NOTHING durable recording it, which is why a throw is reported to the
+  // observer before propagating (see `WebhookPipelineObserver`).
+  let verified: { adapter: PaymentProviderAdapter; creds: ResolvedCredentials };
+  try {
+    // LISTENING, not routing — see `resolveForListening` for what the single
+    // gate cost, and why a refusal here left no trace of any kind.
+    const { adapter, candidates } = await resolveForListening(
+      deps,
+      () => chargingFallback(delivery.provider),
+      merchant,
+      delivery.provider,
+    );
+    const creds = await verifiedCredentials(adapter, delivery, candidates);
+    if (!creds) throw new WebhookVerificationError(adapter.name);
+    verified = { adapter, creds };
+  } catch (error) {
+    deps.webhookObserver?.refused?.(
+      delivery.provider,
+      error instanceof Error ? error.message : String(error),
+    );
+    throw error;
+  }
 
   // Parsed under the credentials that VERIFIED it — for an adapter whose parse
   // re-reads the provider (unsigned deliveries), the environment that signed
   // is the one that must be asked.
-  const events = await adapter.webhook.parse(delivery, creds);
+  const events = await verified.adapter.webhook.parse(delivery, verified.creds);
   const outcome = await ingestWebhookEvents(deps, merchant, delivery, events, 'LIVE');
   // Rethrown verbatim, exactly as this function always did: the HTTP layer
   // turns it into a non-2xx so the provider redelivers, and the inbox row is
   // already FAILED with its attempt counted.
   if (outcome.failure) throw outcome.failure.error;
+  deps.webhookObserver?.accepted?.(delivery.provider, outcome.processed.length);
   return outcome.processed;
 }

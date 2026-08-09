@@ -35,6 +35,12 @@ export {
   type PaymentsGateway,
   type PaymentsGatewayConfig,
 } from './core/gateway';
+/**
+ * Observability for inbound deliveries refused BEFORE the durable inbox —
+ * wire it as `PaymentsGatewayConfig.webhookObserver`. A refusal there is
+ * otherwise traceless, the silence that hid FUT-463 (FUT-761).
+ */
+export type { WebhookPipelineObserver } from './core/webhook-pipeline';
 export type { FailoverPolicy } from './core/charge-walk';
 /**
  * The webhook-replay sweep's inputs and result. The entry point itself is
@@ -122,6 +128,21 @@ export {
   WebhookVerificationError,
 } from './core/errors';
 export type { ProviderRequestSnapshot } from './core/errors';
+/**
+ * Readers of the error taxonomy, ported from the future-pay host (FUT-761)
+ * so no adopter re-derives them: the printable request/response pair, the
+ * account-level-rejection test, and "can waiting improve this refusal".
+ */
+export {
+  isAccountAccessError,
+  isPermanentProviderRefusal,
+  providerExchangeReport,
+} from './core/error-readers';
+/**
+ * What a decline MEANS — instrument dead, retry forbidden — as taxonomy
+ * properties. Retry ladders and grace windows stay host policy (FUT-761).
+ */
+export { declineForbidsRetry, declineMeansInstrumentDead } from './core/decline-verdict';
 
 /**
  * The deployment's stub-mode decision. A host resolves it ONCE at startup
@@ -198,6 +219,13 @@ export {
   type SettingsService,
   type SettingsServiceOptions,
 } from './config/service';
+export { hasUsableCredentials } from './config/usable-credentials';
+/**
+ * The account-level downgrade rule (ported from the future-pay host,
+ * FUT-761): a 401/403 on a charge marks the ENABLED connection FAILED so the
+ * settings screen surfaces the outage instead of a stale VERIFIED.
+ */
+export { downgradeOnAccountError } from './config/account-downgrade';
 export { type VerifiedProviderConfig } from './config/verify';
 /**
  * The credential-write contract (FUT-694), exported so a host that mounts its
