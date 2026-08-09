@@ -672,6 +672,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.62.0
         version: 5.101.4(react@19.2.0)
+      '@testing-library/react':
+        specifier: ^16.1.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@types/react':
         specifier: ^19.2.0
         version: 19.2.2
@@ -687,6 +690,9 @@ importers:
       hono:
         specifier: ^4.6.0
         version: 4.12.30
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
       react:
         specifier: 19.2.0
         version: 19.2.0
@@ -701,7 +707,7 @@ importers:
         version: 5.9.2
       vitest:
         specifier: ^3.2.4
-        version: 3.2.7(@types/node@22.20.1)(@vitest/browser@3.2.7)(jiti@2.7.0)(jsdom@26.1.0)(tsx@4.23.1)(yaml@2.9.0)
+        version: 3.2.7(@types/node@22.20.1)(@vitest/browser@3.2.7)(jiti@2.7.0)(jsdom@25.0.1)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/shared-helpers:
     dependencies:
@@ -11486,7 +11492,7 @@ snapshots:
       magic-string: 0.30.21
       sirv: 3.0.2
       tinyrainbow: 2.0.0
-      vitest: 3.2.7(@types/node@22.20.1)(@vitest/browser@3.2.7)(jiti@2.7.0)(jsdom@26.1.0)(tsx@4.23.1)(yaml@2.9.0)
+      vitest: 3.2.7(@types/node@22.20.1)(@vitest/browser@3.2.7)(jiti@2.7.0)(jsdom@25.0.1)(tsx@4.23.1)(yaml@2.9.0)
       ws: 8.21.1
     optionalDependencies:
       playwright: 1.61.1
