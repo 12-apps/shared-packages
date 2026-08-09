@@ -1,10 +1,12 @@
 # Handing this to a coding agent
 
-The plan document is not the instruction. The instruction is a small, bounded task that points at the plan. This file is the method plus the prompts.
+The plan document is not the instruction. The instruction is a **small, bounded task that points at the plan**. This file is the method plus the prompts.
+
+---
 
 ## The four rules
 
-### 1. The spec lives in the repo, not in the prompt.
+**1. The spec lives in the repo, not in the prompt.**
 
 ```
 docs/reports-builder/
@@ -15,15 +17,15 @@ docs/reports-builder/
 
 Commit these first, on their own. An agent that can `read` a file mid-task holds far more of it than one working from a pasted wall that scrolls out of its own context. It also means every session starts from the same source of truth instead of your paraphrase of it.
 
-### 2. One commit per session. Never a phase.
+**2. One commit per session. Never a phase.**
 
 "Implement Phase 2" produces a 900-line diff touching twelve files, and reviewing it costs more than writing it. Each entry in the plan is deliberately sized to be one session, one commit, one PR-able unit.
 
-### 3. Plan before code, always.
+**3. Plan before code, always.**
 
-Make the agent report what it found and what it intends to change before it writes anything. Most bad agent output comes from a wrong assumption in the first 30 seconds — about where a component lives, or which of three similar hooks is the live one. Catching that costs one message; catching it after implementation costs a rewrite.
+Make the agent report what it found and what it intends to change *before* it writes anything. Most bad agent output comes from a wrong assumption in the first 30 seconds — about where a component lives, or which of three similar hooks is the live one. Catching that costs one message; catching it after implementation costs a rewrite.
 
-### 4. Acceptance criteria become tests, not vibes.
+**4. Acceptance criteria become tests, not vibes.**
 
 Every entry in the plan has an `Acceptance` line written to be checkable. Require it as an executable test in the same commit. "Done" means the test passes, not that the agent says it's done.
 
@@ -114,16 +116,14 @@ The three failure modes, roughly in order of frequency:
 
 **The agent is guessing about your codebase.** It doesn't know your naming, your existing abstractions, or which of two similar files is live. Prompt 1 fixes this, and its output is worth pasting into `CLAUDE.md` so the next session starts informed.
 
----
-
-## When you're stuck on a feature and the agent isn't helping
+### When you're stuck on a feature and the agent isn't helping
 
 The problem is almost always upstream of the agent. The recipe that worked here:
 
-1. Show the current state — screenshots of every screen in the flow, or the files.
-2. Get a critique first, separately from a fix. Naming what's wrong is a different task from deciding what to build, and merging them produces a plan optimised for looking thorough.
-3. Get a prototype of the target state. A throwaway single-file HTML that behaves correctly is a far better spec than prose, because interaction details (snapping, weighting, what happens on cancel) are where prose silently omits the hard parts.
-4. Turn it into bounded commits with acceptance criteria.
-5. Then hand it to the agent, one commit at a time.
+1. **Show the current state** — screenshots of every screen in the flow, or the files.
+2. **Get a critique first, separately from a fix.** Naming what's wrong is a different task from deciding what to build, and merging them produces a plan optimised for looking thorough.
+3. **Get a prototype of the target state.** A throwaway single-file HTML that behaves correctly is a far better spec than prose, because interaction details (snapping, weighting, what happens on cancel) are where prose silently omits the hard parts.
+4. **Turn it into bounded commits with acceptance criteria.**
+5. *Then* hand it to the agent, one commit at a time.
 
 Steps 1–4 are the ones people skip, and they're the reason step 5 goes badly.
