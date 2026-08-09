@@ -23,6 +23,17 @@
  * plain `50` still works, and so does `50.00` — a dot with exactly two digits
  * after it is far more likely to be a decimal typed on a numeric keypad than a
  * thousands group, and reading it as `5000` is the very failure this replaces.
+ *
+ * WHICH KEYPAD, and where the request has to be made. `inputMode` goes on the
+ * `<input>`, via `inputProps` — set on the `TextField` it rides the spread onto
+ * the root `FormControl` div, an element nothing types into, so the attribute
+ * has no effect and a phone goes on offering letters for a field that accepts
+ * none of them. It is `decimal` rather than `numeric` because the numeric pad
+ * has no comma on iOS, and the comma is the separator this field exists to
+ * accept — `numeric` here would reopen the bug above from the other side, with
+ * `17,50` untypeable rather than misread. Autofill is off alongside it: its
+ * saved-value strip covers the keypad to offer names and addresses, none of
+ * which survive `ALLOWED` anyway.
  */
 import { Box, TextField } from '@mui/material';
 import React, { useEffect, useState } from 'react';
@@ -136,16 +147,8 @@ export function NumberBoundInput({
         )
       }
       InputLabelProps={{ shrink: true }}
-      // On the `<input>`, not on the TextField: MUI spreads what it does not
-      // recognise onto the root `FormControl` div, and `inputMode` is not in
-      // its prop list, so up there the attribute sat on a non-editable wrapper
-      // and the phone went on offering letters for a field that takes none.
-      //
-      // `decimal` and not `numeric`: that keypad has no comma on iOS, which is
-      // the separator this field exists to accept.
-      //
-      // Autofill off because its saved-value strip covers the keypad to suggest
-      // names and addresses, none of which survive `ALLOWED` anyway.
+      // `inputMode` belongs on the `<input>`, never on the TextField — see the
+      // keypad note at the top of this file for what goes wrong up there.
       inputProps={{ 'data-testid': testId, inputMode: 'decimal', autoComplete: 'off' }}
       InputProps={
         unit
