@@ -201,6 +201,20 @@ describe("the overflow panel's range bounds", () => {
     await waitFor(() => expect(min).toHaveValue("06/08/20"));
   });
 
+  /**
+   * The panel drew its own preset chips before the bounds were delegated to
+   * `RangeBounds` — which draws them too. Both survived the change, so "Data"
+   * offered Hoje/Ontem/Esta semana/Este mês/Este ano twice over, with the same
+   * test ids on both rows (FUT-751). One row, once.
+   */
+  it("offers the day presets once, not once per surface that draws them", async () => {
+    await openOverflow();
+    await screen.findByTestId("lista-more-data-presets");
+    expect(screen.getAllByTestId("lista-more-data-presets")).toHaveLength(1);
+    expect(screen.getAllByTestId("lista-more-data-preset-hoje")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Esta semana" })).toHaveLength(1);
+  });
+
   it("keeps the decimal comma on a value bound, rather than eating it", async () => {
     await openOverflow();
     const min = (await screen.findByTestId("lista-more-valor-min")) as HTMLInputElement;
