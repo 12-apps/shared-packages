@@ -50,8 +50,10 @@ export async function hostGuard(run: () => Promise<Response>): Promise<Response>
       return json({ error: error.name, message: error.message }, 500);
     }
     // A host must not let an unknown throw become an unhandled rejection in a
-    // browser.
-    return json({ error: 'HarnessError', message: String(error) }, 500);
+    // browser — and only an Error's message may cross the wire: stringifying
+    // the value itself ships its stack in runtimes whose toString includes it.
+    const message = error instanceof Error ? error.message : 'non-Error throw';
+    return json({ error: 'HarnessError', message }, 500);
   }
 }
 
