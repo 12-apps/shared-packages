@@ -121,6 +121,7 @@ export const DrawerHeader: React.FC<DrawerHeaderProps> = ({
   children,
   onClose,
   showCloseButton = true,
+  closeLabel,
   dataTestId,
 }) => {
   const theme = useTheme();
@@ -144,7 +145,7 @@ export const DrawerHeader: React.FC<DrawerHeaderProps> = ({
         <IconButton
           onClick={onClose}
           edge="end"
-          aria-label="Close drawer"
+          aria-label={closeLabel ?? 'Close drawer'}
           data-testid={dataTestId ? `${dataTestId}-close` : 'drawer-close'}
         >
           <Close />

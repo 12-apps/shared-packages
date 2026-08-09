@@ -322,7 +322,14 @@ export function BlockEditorPanel({
         dataTestId={testId}
       >
         {asSheet ? <SheetGrip onDismiss={onClose} /> : null}
-        <DrawerHeader onClose={onClose} dataTestId={`${testId}-header`}>
+        {/* Not "Close drawer" (FUT-755): this is a docked side panel, and
+            `specs/editor-config-panel.feature` asks the close control to say
+            what it closes. */}
+        <DrawerHeader
+          onClose={onClose}
+          closeLabel="Fechar painel"
+          dataTestId={`${testId}-header`}
+        >
           <Text variant="heading" size="sm" as="h2">
             Bloco
           </Text>

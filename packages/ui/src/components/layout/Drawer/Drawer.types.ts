@@ -35,6 +35,15 @@ export interface DrawerHeaderProps {
   children: ReactNode;
   onClose?: () => void;
   showCloseButton?: boolean;
+  /**
+   * Accessible name for the close button. Defaults to "Close drawer".
+   *
+   * A drawer that is not a drawer to its user needs to say what it closes:
+   * the report builder's block panel is a docked side panel, and "Fechar
+   * painel" is what its spec asks to hear (FUT-755). Left unset the wording is
+   * unchanged, so existing consumers asserting on the default keep passing.
+   */
+  closeLabel?: string;
   dataTestId?: string;
 }
 

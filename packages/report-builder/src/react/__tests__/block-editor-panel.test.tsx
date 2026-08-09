@@ -493,3 +493,17 @@ describe('the settings drawer stays modal', () => {
     expect(screen.getByRole('presentation')).toBeTruthy();
   });
 });
+
+describe('BlockEditorPanel — the close control says what it closes', () => {
+  it('names the close button "Fechar painel", not "Close drawer"', () => {
+    setViewport(DESKTOP_PX);
+    renderPanel();
+
+    // The shared DrawerHeader defaults to "Close drawer", which is both
+    // English and wrong about what this surface is — it is a docked side
+    // panel. The default is unchanged for every other consumer; this asserts
+    // the panel opts out of it.
+    expect(screen.getByRole('button', { name: 'Fechar painel' })).toBeTruthy();
+    expect(screen.queryAllByRole('button', { name: 'Close drawer' })).toEqual([]);
+  });
+});
