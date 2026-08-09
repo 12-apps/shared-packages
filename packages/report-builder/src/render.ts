@@ -1,4 +1,4 @@
-import type { ChartNumberFormat, ChartSpec } from '@12-apps/ui/charts';
+import type { ChartNumberFormat, ChartSemanticColor, ChartSpec } from '@12-apps/ui/charts';
 
 import { requireEntityForRender } from './catalog';
 import type { ReportPresentation } from './spec';
@@ -101,6 +101,43 @@ function chartNumberFormat(
   return toChartNumberFormat(format);
 }
 
+/**
+ * A single-series chart is ONE accent and nothing else.
+ *
+ * `@12-apps/ui` cycles its whole semantic palette when a spec names no scheme,
+ * so the first series happened to land on `primary` and every extra one pulled
+ * in a competing saturated hue — a bar chart beside a pie put the theme's green
+ * next to the theme's indigo, which `visual-pass.md` §Colour rules out in its
+ * first line: "One accent. If a screen has two competing saturated colours, one
+ * is wrong."
+ */
+const SINGLE_SERIES_SCHEME: ChartSemanticColor[] = ['primary'];
+
+/**
+ * The order the palette is spent in once a chart genuinely has categories to
+ * tell apart — ordered so ADJACENT entries differ in LUMINANCE, not only hue.
+ *
+ * The default order is `primary, secondary, …`, and those two are the same
+ * lightness at neighbouring hues: measured against the shipped theme, slices 1
+ * and 2 of a pie were **1.06:1** apart. That is invisible in greyscale, to a
+ * projector, and to anyone with a red-green deficiency — a chart whose slices
+ * are distinguishable only to a reader with normal colour vision and a good
+ * monitor. Interleaving the palette's light and dark halves takes the same six
+ * tokens to ~1.4:1 between neighbours, which is what the tokens allow.
+ *
+ * It is DELIBERATELY the report builder's decision and not the chart library's:
+ * `@12-apps/ui` stays a raw chart library, and every report-specific chart
+ * choice (labels, formats, axis titles, smoothing, legends) already lives here.
+ */
+const MULTI_SERIES_SCHEME: ChartSemanticColor[] = [
+  'primary',
+  'warning',
+  'success',
+  'info',
+  'error',
+  'secondary',
+];
+
 function toChartSpec(
   query: CompiledQuery,
   presentation: Extract<ReportPresentation, { kind: 'chart' }>,
@@ -113,6 +150,11 @@ function toChartSpec(
     throw new Error('Chart presentation requires one dimension.');
   }
   const firstFormat = query.measures[0]?.format ?? 'decimal';
+  // A pie or a donut is categorical even with ONE measure — its categories are
+  // the slices, not the series — so it needs the separated palette that a
+  // single-series bar or line does not.
+  const isRound = presentation.chartType === 'pie' || presentation.chartType === 'donut';
+  const categorical = isRound || query.measures.length > 1;
   return {
     type: presentation.chartType,
     // NO axis title (FUT-391). It rendered ON TOP of the tick labels, and the
@@ -134,6 +176,7 @@ function toChartSpec(
     // it (FUT-755). It earns its place only once there is something to tell
     // apart.
     legend: query.measures.length > 1,
+    colorScheme: categorical ? MULTI_SERIES_SCHEME : SINGLE_SERIES_SCHEME,
     numberFormat: chartNumberFormat(presentation, firstFormat),
   };
 }

@@ -63,3 +63,45 @@ describe('renderReport — number format drives the tick scale', () => {
     expect(chartSpecFor(BAR_BY_METHOD).numberFormat).toBe('brl');
   });
 });
+
+/**
+ * The palette a chart is drawn from is a REPORT decision, not the chart
+ * library's. `@12-apps/ui` cycles its whole semantic palette when a spec names
+ * no scheme, which put the theme's saturated green beside the accent on a pie
+ * and left slices 1 and 2 **1.06:1** apart in luminance — invisible in
+ * greyscale, on a projector, or to a red-green deficiency.
+ *
+ * Measured in Chromium against the shipped theme: the ordering below takes the
+ * first two slices to 1.44:1, which is what six fixed tokens allow. The
+ * assertions pin the two decisions that produced it — one accent when there is
+ * nothing to tell apart, and `primary` never adjacent to `secondary` when
+ * there is.
+ */
+describe('renderReport — chart colour scheme', () => {
+  it('spends one accent on a single-series chart', () => {
+    expect(chartSpecFor(BAR_BY_METHOD).colorScheme).toEqual(['primary']);
+  });
+
+  it('separates a pie by luminance even with one measure — its slices are the categories', () => {
+    const scheme = chartSpecFor({
+      ...BAR_BY_METHOD,
+      presentation: { kind: 'chart', chartType: 'pie' },
+    }).colorScheme;
+
+    expect(scheme?.length).toBeGreaterThan(1);
+    // The default order is `primary, secondary, …`: two saturated hues at the
+    // same lightness, which is the pairing this exists to break up.
+    expect(scheme?.[0]).toBe('primary');
+    expect(scheme?.[1]).not.toBe('secondary');
+  });
+
+  it('separates multiple series the same way', () => {
+    const scheme = chartSpecFor({
+      ...BAR_BY_METHOD,
+      measures: [{ field: 'totalCents' }, { field: 'itemCount' }],
+    }).colorScheme;
+
+    expect(scheme?.[0]).toBe('primary');
+    expect(scheme?.[1]).not.toBe('secondary');
+  });
+});

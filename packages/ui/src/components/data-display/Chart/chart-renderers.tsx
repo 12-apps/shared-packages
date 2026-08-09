@@ -25,38 +25,15 @@ import {
   YAxis,
 } from 'recharts';
 
-import type { ChartDataPoint, ChartProps, ChartSeries } from './Chart.types';
+import type { ChartProps, ChartSeries } from './Chart.types';
 import { ChartLegendContent, ChartTooltipContent } from './ChartComposables';
-import {
-  getAxisStyles,
-  getDefaultColors,
-  getSizeStyles,
-  resolveSeries,
-  type SizeStyles,
-} from './chart-internals';
+import { buildChartContext, type ChartRenderContext } from './chart-context';
 
 /**
  * Per-type Recharts renderers for the prop-driven Chart, dispatched from a
  * registry keyed by `ChartProps['type']`. Each renderer reads a prepared
  * {@link ChartRenderContext} so every function stays small.
  */
-
-interface ChartRenderContext {
-  props: ChartProps;
-  theme: Theme;
-  sizeStyles: SizeStyles;
-  chartColors: string[];
-  chartSeries: ChartSeries[];
-  strokeType: 'monotone' | 'linear';
-  axisStyle: React.CSSProperties;
-  gridStroke: string;
-  animationDuration: number;
-  commonProps: {
-    data: ChartDataPoint[];
-    margin: { top?: number; right?: number; bottom?: number; left?: number };
-    onClick: (payload: unknown) => void;
-  };
-}
 
 function chartExtras(ctx: ChartRenderContext): React.ReactNode[] {
   const { props } = ctx;
@@ -72,18 +49,37 @@ function chartExtras(ctx: ChartRenderContext): React.ReactNode[] {
   return nodes;
 }
 
+/**
+ * Gridlines: solid, and one step below the card border. A dashed line at the
+ * border's own weight competes with the data drawn over it.
+ */
+function chartGrid(ctx: ChartRenderContext): React.ReactElement {
+  return <CartesianGrid key="grid" stroke={ctx.gridStroke} strokeOpacity={ctx.gridOpacity} />;
+}
+
 function cartesianAxes(ctx: ChartRenderContext): React.ReactNode[] {
-  const { props } = ctx;
+  const { props, axisConfig } = ctx;
   const nodes: React.ReactNode[] = [];
-  if (props.showCartesianGrid !== false) {
-    nodes.push(<CartesianGrid key="grid" strokeDasharray="3 3" stroke={ctx.gridStroke} />);
-  }
+  if (props.showCartesianGrid !== false) nodes.push(chartGrid(ctx));
   nodes.push(
-    <XAxis key="x" dataKey={props.xAxisKey ?? 'name'} style={ctx.axisStyle} label={props.xAxisLabel} />,
+    <XAxis
+      key="x"
+      dataKey={props.xAxisKey ?? 'name'}
+      style={ctx.axisStyle}
+      label={props.xAxisLabel}
+      tickMargin={axisConfig.tickMargin}
+      ticks={axisConfig.categoryTicks}
+      tickFormatter={axisConfig.tickFormatter}
+    />,
     <YAxis
       key="y"
       style={ctx.axisStyle}
       label={props.yAxisLabel}
+      // Sized from its own widest tick: a fixed 60px lets "R$ 1.234,56" spill
+      // out of the card, which is the other way axis text ends up on top of
+      // something.
+      width="auto"
+      tickMargin={axisConfig.tickMargin}
       tickFormatter={props.valueFormatter}
       allowDecimals={props.allowDecimalTicks !== false}
     />,
@@ -125,6 +121,8 @@ function renderBar(ctx: ChartRenderContext): React.ReactElement {
           name={s.name}
           fill={s.fill ?? s.color ?? ctx.chartColors[index % ctx.chartColors.length]}
           stackId={ctx.props.stacked ? 'stack' : undefined}
+          radius={ctx.barGeometry.radius}
+          maxBarSize={ctx.barGeometry.maxBarSize}
           animationDuration={ctx.animationDuration}
         />
       ))}
@@ -239,11 +237,19 @@ function renderScatter(ctx: ChartRenderContext): React.ReactElement {
   const { props } = ctx;
   return (
     <ScatterChart {...ctx.commonProps}>
-      {props.showCartesianGrid !== false && (
-        <CartesianGrid strokeDasharray="3 3" stroke={ctx.gridStroke} />
-      )}
-      <XAxis dataKey={props.xAxisKey ?? 'name'} style={ctx.axisStyle} label={props.xAxisLabel} />
-      <YAxis dataKey={ctx.chartSeries[0]?.dataKey} style={ctx.axisStyle} label={props.yAxisLabel} />
+      {props.showCartesianGrid !== false && chartGrid(ctx)}
+      <XAxis
+        dataKey={props.xAxisKey ?? 'name'}
+        style={ctx.axisStyle}
+        label={props.xAxisLabel}
+        tickMargin={ctx.axisConfig.tickMargin}
+      />
+      <YAxis
+        dataKey={ctx.chartSeries[0]?.dataKey}
+        style={ctx.axisStyle}
+        label={props.yAxisLabel}
+        tickMargin={ctx.axisConfig.tickMargin}
+      />
       {chartExtras(ctx)}
       <Scatter
         name={ctx.chartSeries[0]?.name ?? 'Data'}
@@ -259,7 +265,15 @@ function composedSeries(ctx: ChartRenderContext, s: ChartSeries, index: number):
   const color = s.color ?? ctx.chartColors[index % ctx.chartColors.length];
   if (s.type === 'bar') {
     return (
-      <Bar key={s.dataKey} dataKey={s.dataKey} name={s.name} fill={color} animationDuration={ctx.animationDuration} />
+      <Bar
+        key={s.dataKey}
+        dataKey={s.dataKey}
+        name={s.name}
+        fill={color}
+        radius={ctx.barGeometry.radius}
+        maxBarSize={ctx.barGeometry.maxBarSize}
+        animationDuration={ctx.animationDuration}
+      />
     );
   }
   if (s.type === 'area') {
@@ -308,37 +322,9 @@ const RENDERERS: Record<string, (ctx: ChartRenderContext) => React.ReactElement>
   composed: renderComposed,
 };
 
-function buildContext(props: ChartProps, theme: Theme): ChartRenderContext {
-  const sizeStyles = getSizeStyles(props.size, props.height);
-  const chartColors = getDefaultColors(theme, props.variant ?? 'default', props.colors);
-  const { axisStyle, gridStroke } = getAxisStyles(theme, props.variant ?? 'default', sizeStyles.fontSize);
-  const handleChartClick = (payload: unknown): void => {
-    const chartData = payload as { activePayload?: Array<{ payload: ChartDataPoint }> };
-    if (props.onClick && chartData?.activePayload?.[0]) {
-      props.onClick(chartData.activePayload[0].payload);
-    }
-  };
-  return {
-    props,
-    theme,
-    sizeStyles,
-    chartColors,
-    chartSeries: resolveSeries(props.data, props.series, props.xAxisKey ?? 'name', chartColors),
-    strokeType: (props.curved ?? true) ? 'monotone' : 'linear',
-    axisStyle: { ...axisStyle, fontSize: sizeStyles.fontSize },
-    gridStroke,
-    animationDuration: (props.animate ?? true) ? (props.animationDuration ?? 1500) : 0,
-    commonProps: {
-      data: props.data,
-      margin: { top: 20, right: 30, left: 20, bottom: 20, ...props.margin },
-      onClick: handleChartClick,
-    },
-  };
-}
-
 /** Render the Recharts element for the requested chart type. */
 export function renderChartByType(props: ChartProps, theme: Theme): React.ReactElement {
   const renderer = RENDERERS[props.type ?? 'line'];
-  const ctx = buildContext(props, theme);
+  const ctx = buildChartContext(props, theme);
   return renderer ? renderer(ctx) : <></>;
 }

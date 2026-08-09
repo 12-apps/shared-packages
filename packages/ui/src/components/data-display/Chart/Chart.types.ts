@@ -74,5 +74,20 @@ export interface ChartProps {
    * the time the formatter runs.
    */
   allowDecimalTicks?: boolean;
+  /**
+   * Cap on how many category-axis labels are drawn. Default 8; above it every
+   * nth label is kept, the LAST one always among them. Recharts' own
+   * width-aware thinning still runs on top, so a narrow viewport drops more.
+   */
+  maxCategoryTicks?: number;
+  /** Category tick labels longer than this are truncated with an ellipsis. Default 12. */
+  tickLabelMaxChars?: number;
+  /** Bar corner radius in px (top corners only; stacked segments stay square). Default 3. */
+  barRadius?: number;
+  /**
+   * Cap on a single bar's thickness in px. Default 38 — it is also what keeps
+   * the first and last bar clear of the chart frame in a wide card.
+   */
+  maxBarWidth?: number;
   'data-testid'?: string;
 }
