@@ -52,7 +52,7 @@ export const CONTROL_HEIGHT_PX = 36;
  *    field renders its value at 16px, which was LARGER than the block titles
  *    and section headings labelling it.
  */
-export const REPORT_SURFACE_SX = {
+const REPORT_SURFACE_SX = {
   bgcolor: "grey.100",
   borderRadius: `${CONTAINER_RADIUS_PX}px`,
   p: { xs: 2, md: 3 },
@@ -81,6 +81,101 @@ export const REPORT_SURFACE_SX = {
   "& .MuiButton-outlined": { bgcolor: "background.paper" },
   "& .MuiInputBase-input, & .MuiInputLabel-root": { fontSize: "0.875rem" },
 } as const;
+
+/** WCAG 1.4.3 for body-sized text. */
+const MIN_TEXT_CONTRAST = 4.5;
+
+type Rgb = readonly [number, number, number];
+
+function parseColor(value: string): Rgb | null {
+  const hex = /^#?([0-9a-f]{6})$/i.exec(value.trim());
+  if (hex?.[1] !== undefined) {
+    const n = Number.parseInt(hex[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  const rgb = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(value);
+  if (rgb === null) return null;
+  return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+}
+
+function relativeLuminance([r, g, b]: Rgb): number {
+  const channel = (raw: number): number => {
+    const c = raw / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+/** WCAG contrast between two CSS colours; 1 when either cannot be parsed. */
+export function contrastRatio(foreground: string, background: string): number {
+  const fg = parseColor(foreground);
+  const bg = parseColor(background);
+  if (fg === null || bg === null) return 1;
+  const a = relativeLuminance(fg);
+  const b = relativeLuminance(bg);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+/**
+ * The accent, darkened just far enough to be legible AS TEXT on `background`.
+ *
+ * `visual-pass.md` §Colour asks for 4.5:1 on body text. The shipped accent
+ * lands at 4.47:1 on white — 0.03 short — so every accent-coloured label in the
+ * area failed the rule by a hair, including the report-list card title, which
+ * is the primary click target on the landing screen.
+ *
+ * Derived rather than hardcoded, because the accent is NOT fixed: future-pay
+ * layers a tenant's brand colour onto this same token, so a literal hex would
+ * fix the default palette and leave every branded store failing. Darkening in
+ * small steps keeps the hue and stops at the first shade that clears the bar,
+ * so a brand that already passes is returned untouched.
+ *
+ * FILLS are left alone — a large block of colour is not body text, and the rule
+ * it answers to (§Colour, "large fills never at full saturation") is a
+ * different one.
+ */
+export function accessibleAccent(accent: string, background: string): string {
+  const parsed = parseColor(accent);
+  if (parsed === null) return accent;
+
+  // Verbatim when it already passes: a caller's `#RRGGBB` should come back as
+  // it went in, not reformatted into `rgb()` for no reason.
+  if (contrastRatio(accent, background) >= MIN_TEXT_CONTRAST) return accent;
+
+  let [r, g, b] = parsed;
+  for (let step = 0; step < 40; step += 1) {
+    r *= 0.94;
+    g *= 0.94;
+    b *= 0.94;
+    const candidate = `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+    if (contrastRatio(candidate, background) >= MIN_TEXT_CONTRAST) return candidate;
+  }
+  return "rgb(0, 0, 0)";
+}
+
+/**
+ * `REPORT_SURFACE_SX` plus the one rule that cannot be a constant: the accent
+ * has to be read off the live theme before it can be checked against the
+ * surface it is drawn on.
+ */
+export function useReportSurfaceSx(): Record<string, unknown> {
+  const theme = useTheme();
+  return useMemo(() => {
+    const paper = theme.palette.background.paper;
+    const accentText = accessibleAccent(theme.palette.primary.main, paper);
+    return {
+      ...REPORT_SURFACE_SX,
+      // Text and outline uses only. `contained` keeps the brand: white on the
+      // undarkened accent is the same 4.47:1, but it is the FILL that carries
+      // the brand and darkening it would recolour the product's primary action.
+      "& .MuiButton-text, & .MuiButton-outlined, & .MuiLink-root": { color: accentText },
+      "& .MuiButton-outlined": {
+        ...REPORT_SURFACE_SX["& .MuiButton-outlined"],
+        color: accentText,
+      },
+    };
+  }, [theme]);
+}
 
 /**
  * The SECTION level of the type scale — "Agrupar por", "Medidas", "Filtros".
