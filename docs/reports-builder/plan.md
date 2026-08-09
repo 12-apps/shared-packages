@@ -171,7 +171,21 @@ Shipped with FUT-391, and the file's header gives the plan's two reasons back ve
 
 **Residual, from `inventory.md` §1:** the mobile branch is `Drawer anchor="bottom"` rather than `data-display/Sheet`. It behaves as a sheet; adopting the component would bring the grip for free (entry 25). Cosmetic, not a defect.
 
-**Acceptance:** no truncated control labels at any viewport ≥360px. — *passes today.*
+**Acceptance:** no truncated control labels at any viewport ≥360px. — *did NOT pass; fixed and now pinned by a test.*
+
+> **This status line was wrong, and this file's own header with it.** Rendered
+> in Chromium, the filter row drew its field as `S…`, its operator as `i…` and
+> its value as `P…`, with "Remover" clipped past the panel edge — at 1440px and
+> at 390px alike. The popover's exact failure, still shipping in the panel that
+> replaced it, because the claim that "a fixed 344px give every control its
+> label" was never measured. One row cannot hold three selects plus a button:
+> each MUI select spends ~32px on its own chrome, so the three need ~200px
+> before drawing a character, against ~312px of usable width. The field now
+> takes a line of its own and the operator, value and remove control share the
+> next; "Remover" became the cross glyph `prototype.html` draws. Pinned by
+> `src/react/__tests__/block-editor-panel.test.tsx`, which asserts no elided
+> label in either layout branch — jsdom has no layout engine, so pixel overflow
+> stays a browser check.
 
 ### 10. `feat(reports): drive measure and aggregation pickers from the catalog`
 **Status:** ADJUST EXISTING — `src/react/builder-measures.ts:56-61,102-107`, `src/react/builder-sections.tsx:110-145`
@@ -204,7 +218,18 @@ The typed half shipped. `valueOptionsFor` turns a field's closed `values[]` into
 
 The three unlabelled selects are now three labelled sections: **"Agrupar por"** with the field select labelled `Eixo X` (`:49-54`) and the grain select labelled `Por` and shown for date fields only (`:63`), and **"Separar em séries"** as its own section with `Uma série por` (`:87-91`). Filter and measure rows carry `aria-label`s naming their index and role (`Filtro 1 — condição`, `Medida 2`), so nothing in the panel is an unlabelled control.
 
-**Acceptance:** no unlabelled select in the panel. — *passes today.*
+**Acceptance:** no unlabelled select in the panel. — *held for the labelled sections only; the five `aria-label`-only controls were unlabelled in the accessibility tree until fixed. Now pinned by a test.*
+
+> **The `aria-label`s were in the source and absent from the DOM.**
+> `@12-apps/ui`'s `Select` dropped them: `role="combobox"` sits on MUI's display
+> div, not on the hidden native input the prop spread reaches, so the label
+> never reached the element carrying the role, and MUI's `aria-labelledby` then
+> fell back to that div's OWN id. The accessible name resolved to the control's
+> current VALUE — "Receita", "Soma", "Status", "igual a" — which tells a
+> screen-reader user what the control holds and nothing about what it is. Fixed
+> in the design system, so every consumer passing `aria-label` benefits, and
+> pinned by the panel's test asserting the ROLE names. Verified in Chromium at
+> both viewports against the browser's own name computation.
 
 ### 13. `feat(reports): top-N limit with "Outros" bucket`
 **Status:** ALREADY DONE — `src/memory.ts:131-179`, `src/compile.ts:381`, `src/run.ts:55-59`
