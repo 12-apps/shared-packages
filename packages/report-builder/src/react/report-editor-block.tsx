@@ -1,6 +1,6 @@
 /**
  * One block in EDIT mode (FUT-391): the exact frame the viewer draws, with its
- * chrome added inline — grip, title, ✎ and 🗑 — and its body rendered from a
+ * chrome added inline — grip, title, ✎, ⋮ and 🗑 — and its body rendered from a
  * LIVE run of the block's current spec. Chart, table and KPI all render exactly
  * as they will be read; nothing about editing degrades the rendering.
  *
@@ -8,8 +8,14 @@
  * fetches and renders real data for the selected period, so the author is
  * laying out the actual report, not placeholders that will surprise them after
  * the first save.
+ *
+ * SELECTION LIVES ON THE CANVAS, not here (FUT-755). A block used to own an
+ * `editing` flag and mount its own config panel, which made "click another
+ * block" mean "open a second panel" — the spec asks for one panel that
+ * RETARGETS. So this component is told whether it is the selected one and
+ * reports clicks upward; `report-editor-canvas.tsx` owns the answer.
  */
-import { useRef, useState, type JSX, type RefObject } from "react";
+import { useState, type JSX } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
@@ -17,9 +23,9 @@ import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
+import { DropdownMenu, type DropdownMenuItem } from "@12-apps/ui/navigation/DropdownMenu";
 
-import { BlockEditorPanel } from "./block-editor-panel";
-import { useRunReport, type ReportEntityFields, type ReportSpecWire } from "./custom-reports-api";
+import { useRunReport, type ReportSpecWire } from "./custom-reports-api";
 import { GripIcon, PencilIcon, TrashIcon } from "./lib/block-icons";
 import { ConfirmDialog } from "./lib/confirm-dialog";
 import type { DragReorder, KeyboardReorder } from "./lib/drag-reorder";
@@ -28,12 +34,28 @@ import { ReportRenderView } from "./report-render";
 import { blockLabel, type ReportBlockDraft } from "./report-model";
 import type { ReportRange } from "./reports-api";
 
-/** Visible focus for the block group, which is a container rather than a control. */
-const FOCUS_RING = {
+/**
+ * The ring a block wears when it is FOCUSED or SELECTED — the block group is a
+ * container rather than a control, so it has no ring of its own.
+ *
+ * One look for both states on purpose: they coincide nearly always (the panel
+ * follows the selection, and the keyboard reorder focuses the block it moved),
+ * and two rings on one element would read as two unrelated things. It is SOLID
+ * where the drop target's is dashed, so "the panel is editing this" and "the
+ * drag will land here" stay distinguishable.
+ */
+const BLOCK_RING = {
   outline: "2px solid",
   outlineColor: "primary.main",
   outlineOffset: "2px",
 } as const;
+
+/**
+ * How the canvas finds a block's element again — to put focus back on it when
+ * the panel closes, and to tell a click on a block apart from a click on the
+ * background behind one.
+ */
+export const BLOCK_ID_ATTR = "data-report-block-id";
 
 /** The live preview: the same renderer the viewer uses, over a dry run. */
 function BlockPreview({
@@ -98,14 +120,72 @@ function BlockTitleSlot({
   );
 }
 
-/** ✎ + 🗑 — the block's edit chrome, kept to two icons so it fits any width. */
+/**
+ * The block's overflow menu — where the EXPLICIT move actions live.
+ *
+ * `specs/editor-direct-manipulation.feature`'s `@drag @mobile` scenario asks
+ * for them by name and gives the reason: on a phone the canvas is one column
+ * tall, so moving a block by drag means holding a long press past sticky
+ * chrome while the page scrolls under the thumb. Two menu items do it in one
+ * tap.
+ *
+ * They call the KEYBOARD path (`keyboard.move`), not `moveBlock`: that is what
+ * announces the new position in the canvas's live region and puts focus back
+ * on the block that moved. Reimplementing the move here would silently drop
+ * both, on the tier where they matter most.
+ */
+function BlockMenu({
+  block,
+  keyboard,
+  testId,
+}: {
+  block: ReportBlockDraft;
+  keyboard: KeyboardReorder;
+  testId: string;
+}): JSX.Element {
+  const items: DropdownMenuItem[] = [
+    {
+      id: "move-up",
+      label: "Mover para cima",
+      disabled: !keyboard.canMove(block.id, -1),
+      onClick: () => keyboard.move(block.id, -1),
+    },
+    {
+      id: "move-down",
+      label: "Mover para baixo",
+      disabled: !keyboard.canMove(block.id, 1),
+      onClick: () => keyboard.move(block.id, 1),
+    },
+  ];
+
+  return (
+    <DropdownMenu
+      size="sm"
+      items={items}
+      trigger={
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label="Mais ações do bloco"
+          dataTestId={`${testId}-menu`}
+        >
+          ⋮
+        </Button>
+      }
+    />
+  );
+}
+
+/** ✎ + ⋮ + 🗑 — the block's edit chrome, kept to icons so it fits any width. */
 function BlockActions({
-  penRef,
+  block,
+  keyboard,
   testId,
   onEdit,
   onRemove,
 }: {
-  penRef: RefObject<HTMLButtonElement | null>;
+  block: ReportBlockDraft;
+  keyboard: KeyboardReorder;
   testId: string;
   onEdit: () => void;
   onRemove: () => void;
@@ -113,7 +193,6 @@ function BlockActions({
   return (
     <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
       <Button
-        ref={penRef}
         variant="ghost"
         size="sm"
         aria-label="Editar bloco"
@@ -122,6 +201,7 @@ function BlockActions({
       >
         <PencilIcon />
       </Button>
+      <BlockMenu block={block} keyboard={keyboard} testId={testId} />
       <Button
         variant="ghost"
         size="sm"
@@ -136,72 +216,14 @@ function BlockActions({
 }
 
 /**
- * The config panel and the remove confirmation — the two things a block can
- * put on top of the canvas. They sit OUTSIDE the block's focusable group on
- * purpose: neither is part of the block for keyboard purposes, and Alt+↑/↓
- * typed inside the panel must not reorder the canvas behind it.
- */
-function BlockOverlays({
-  block,
-  entities,
-  penRef,
-  testId,
-  editing,
-  confirmingRemove,
-  onCloseEditor,
-  onSpanChange,
-  onSpecChange,
-  onCancelRemove,
-  onConfirmRemove,
-}: {
-  block: ReportBlockDraft;
-  entities: ReportEntityFields[];
-  penRef: RefObject<HTMLButtonElement | null>;
-  testId: string;
-  editing: boolean;
-  confirmingRemove: boolean;
-  onCloseEditor: () => void;
-  onSpanChange: (span: number) => void;
-  onSpecChange: (spec: ReportSpecWire) => void;
-  onCancelRemove: () => void;
-  onConfirmRemove: () => void;
-}): JSX.Element {
-  return (
-    <>
-      {editing ? (
-        // A panel, not a popover (FUT-391) — so it needs no anchor.
-        <BlockEditorPanel
-          key={`${block.id}-editor`}
-          open
-          onClose={onCloseEditor}
-          restoreFocusTo={penRef}
-          entities={entities}
-          spec={block.spec}
-          span={block.span}
-          onChange={onSpecChange}
-          onSpanChange={onSpanChange}
-          testId={`${testId}-editor`}
-        />
-      ) : null}
-      <ConfirmDialog
-        open={confirmingRemove}
-        destructive
-        title="Remover bloco?"
-        description="O bloco sai do relatório. Você ainda pode cancelar a edição para desfazer tudo."
-        confirmText="Remover"
-        onConfirm={onConfirmRemove}
-        onCancel={onCancelRemove}
-        dataTestId={`${testId}-remove-confirm`}
-      />
-    </>
-  );
-}
-
-/**
  * A named, focusable group around the block's frame — and the reason it is
  * here rather than on `ReportGridItem`: the grid item is shared with the
  * viewer, and this is the tab stop the reorder shortcut needs. Without
  * something to focus, Alt+↑/↓ has nothing to be pressed on.
+ *
+ * It is also the click target that SELECTS the block: the spec's regression
+ * case is a click "in the middle of the canvas, on the body of another block",
+ * so the whole frame selects, not just the ✎.
  */
 function BlockGroup({
   tenantSlug,
@@ -209,10 +231,10 @@ function BlockGroup({
   range,
   dnd,
   keyboard,
-  penRef,
+  selected,
   testId,
+  onSelect,
   onTitleChange,
-  onEdit,
   onRemove,
 }: {
   tenantSlug: string;
@@ -220,19 +242,41 @@ function BlockGroup({
   range: ReportRange;
   dnd: DragReorder;
   keyboard: KeyboardReorder;
-  penRef: RefObject<HTMLButtonElement | null>;
+  selected: boolean;
   testId: string;
+  onSelect: () => void;
   onTitleChange: (title: string) => void;
-  onEdit: () => void;
   onRemove: () => void;
 }): JSX.Element {
+  const reorder = keyboard.blockProps(block.id);
+
   return (
     <Box
-      {...keyboard.blockProps(block.id)}
+      {...reorder}
+      {...{ [BLOCK_ID_ATTR]: block.id }}
       role="group"
       aria-label={blockLabel(block)}
       aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
-      sx={{ height: "100%", borderRadius: 1, "&:focus-visible": FOCUS_RING }}
+      data-selected={selected ? "true" : undefined}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        reorder.onKeyDown(event);
+        // Enter on the BLOCK ITSELF selects it — the keyboard equivalent of
+        // clicking its body, and the only way to reach the panel without
+        // tabbing past the block's chrome. The target check is what keeps
+        // Enter in the title field (which bubbles from inside this group)
+        // from being read as a selection.
+        if (event.defaultPrevented || event.key !== "Enter") return;
+        if (event.target !== event.currentTarget) return;
+        event.preventDefault();
+        onSelect();
+      }}
+      sx={{
+        height: "100%",
+        borderRadius: 1,
+        "&:focus-visible": BLOCK_RING,
+        ...(selected ? BLOCK_RING : {}),
+      }}
     >
       <ReportBlockFrame
         dataTestId={testId}
@@ -241,7 +285,13 @@ function BlockGroup({
           <BlockTitleSlot block={block} dnd={dnd} testId={testId} onTitleChange={onTitleChange} />
         }
         actions={
-          <BlockActions penRef={penRef} testId={testId} onEdit={onEdit} onRemove={onRemove} />
+          <BlockActions
+            block={block}
+            keyboard={keyboard}
+            testId={testId}
+            onEdit={onSelect}
+            onRemove={onRemove}
+          />
         }
       >
         <BlockPreview tenantSlug={tenantSlug} spec={block.spec} range={range} testId={testId} />
@@ -253,30 +303,27 @@ function BlockGroup({
 export function EditableBlock({
   tenantSlug,
   block,
-  entities,
   range,
   dnd,
   keyboard,
+  selected,
+  onSelect,
   onTitleChange,
-  onSpanChange,
-  onSpecChange,
   onRemove,
 }: {
   tenantSlug: string;
   block: ReportBlockDraft;
-  entities: ReportEntityFields[];
   range: ReportRange;
   dnd: DragReorder;
   /** The Alt+↑/↓ path — the block is the thing it is pressed on. */
   keyboard: KeyboardReorder;
+  /** Whether the canvas's one config panel is currently pointed at this block. */
+  selected: boolean;
+  onSelect: () => void;
   onTitleChange: (title: string) => void;
-  onSpanChange: (span: number) => void;
-  onSpecChange: (spec: ReportSpecWire) => void;
   onRemove: () => void;
 }): JSX.Element {
   const testId = `report-block-${block.id}`;
-  const penRef = useRef<HTMLButtonElement | null>(null);
-  const [editing, setEditing] = useState(false);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   return (
@@ -291,27 +338,27 @@ export function EditableBlock({
         range={range}
         dnd={dnd}
         keyboard={keyboard}
-        penRef={penRef}
+        selected={selected}
         testId={testId}
+        onSelect={onSelect}
         onTitleChange={onTitleChange}
-        onEdit={() => setEditing(true)}
         onRemove={() => setConfirmingRemove(true)}
       />
-      <BlockOverlays
-        block={block}
-        entities={entities}
-        penRef={penRef}
-        testId={testId}
-        editing={editing}
-        confirmingRemove={confirmingRemove}
-        onCloseEditor={() => setEditing(false)}
-        onSpanChange={onSpanChange}
-        onSpecChange={onSpecChange}
-        onCancelRemove={() => setConfirmingRemove(false)}
-        onConfirmRemove={() => {
+      {/* Outside the focusable group on purpose: the confirmation is not part
+       * of the block for keyboard purposes, and Alt+↑/↓ typed inside it must
+       * not reorder the canvas behind it. */}
+      <ConfirmDialog
+        open={confirmingRemove}
+        destructive
+        title="Remover bloco?"
+        description="O bloco sai do relatório. Você ainda pode cancelar a edição para desfazer tudo."
+        confirmText="Remover"
+        onConfirm={() => {
           setConfirmingRemove(false);
           onRemove();
         }}
+        onCancel={() => setConfirmingRemove(false)}
+        dataTestId={`${testId}-remove-confirm`}
       />
     </ReportGridItem>
   );

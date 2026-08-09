@@ -111,6 +111,19 @@ export interface KeyboardReorder {
     onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
     ref: (node: HTMLElement | null) => void;
   };
+  /**
+   * The SAME move Alt+↑/↓ performs — announcement, focus restore and boundary
+   * no-op included — for a caller with no key press to react to.
+   *
+   * The block menu's "Mover para cima" / "Mover para baixo" (the `@drag
+   * @mobile` scenario: "a long drag past sticky chrome is impractical
+   * one-handed") call this rather than `moveBlock` directly. Reaching for the
+   * model helper would move the block and say nothing, so the two paths would
+   * differ in exactly the way that matters to the people the menu is for.
+   */
+  move: (id: string, delta: -1 | 1) => void;
+  /** Whether that move would land anywhere — the menu greys out the ends. */
+  canMove: (id: string, delta: -1 | 1) => boolean;
 }
 
 /** Which way Alt + this arrow moves a block, or null for a chord we do not own. */
@@ -154,21 +167,30 @@ export function useKeyboardReorder({
     nodes.current.get(id)?.focus({ preventScroll: true });
   });
 
+  // Off either end is a NO-OP, deliberately: nothing moves, nothing is
+  // announced, and `onMove` is never called — so Alt+↓ on the last block
+  // cannot leave the report claiming unsaved changes it does not have.
+  function canMove(id: string, delta: -1 | 1): boolean {
+    const from = items.findIndex((item) => item.id === id);
+    if (from < 0) return false;
+    const to = from + delta;
+    return to >= 0 && to < items.length;
+  }
+
   function move(id: string, delta: -1 | 1): void {
+    if (!canMove(id, delta)) return;
     const from = items.findIndex((item) => item.id === id);
     const item = items[from];
-    const to = from + delta;
-    // Off either end is a NO-OP, deliberately: nothing moves, nothing is
-    // announced, and `onMove` is never called — so Alt+↓ on the last block
-    // cannot leave the report claiming unsaved changes it does not have.
-    if (!item || to < 0 || to >= items.length) return;
+    if (!item) return;
     onMove(id, delta);
     refocus.current = id;
-    setAnnouncement(`${item.label} movido para a posição ${to + 1} de ${items.length}`);
+    setAnnouncement(`${item.label} movido para a posição ${from + delta + 1} de ${items.length}`);
   }
 
   return {
     announcement,
+    move,
+    canMove,
     blockProps: (id) => ({
       tabIndex: 0,
       onKeyDown: (event) => {

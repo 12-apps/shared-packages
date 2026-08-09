@@ -7,7 +7,7 @@
  * `ReportRenderView`. Edit mode only adds chrome INSIDE the frame (a handle, a
  * pen, a trash); it never re-implements the layout.
  */
-import type { JSX, ReactNode } from "react";
+import type { CSSProperties, JSX, ReactNode } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Card } from "@12-apps/ui/layout/Card";
@@ -19,12 +19,20 @@ import { REPORT_GRID_COLUMNS, responsiveSpan } from "../layout";
 import type { DashboardBlockRender } from "./custom-reports-api";
 import type { DragReorder } from "./lib/drag-reorder";
 import { PRINT_BLOCK_ATTR } from "./lib/print-export";
+import { CONTAINER_RADIUS_PX, CONTROL_RADIUS_PX, GRID_GAP_PX } from "./lib/report-surface";
 import { ReportRenderView } from "./report-render";
 
 /**
- * The 12-column canvas. It stays twelve columns at EVERY width — a phone gets
- * the same layout logic, not a stack that discards it; blocks widen instead
- * (see `responsiveSpan`).
+ * The canvas: twelve columns at EVERY width — a phone gets the same layout
+ * logic, not a stack that discards it; blocks widen instead (`responsiveSpan`).
+ *
+ * It is laid out with `flex-wrap`, not `grid`, for one reason: **no orphan
+ * row** (`visual-pass.md` §Layout). Three half-width blocks on a 12-column grid
+ * land 2-up then 1-up and leave a 548px hole at 1440px, which the eye reads as
+ * a bug. A wrapped flex row hands its leftover width back to the blocks that
+ * are IN that row, in proportion to their spans, so the last row always closes.
+ * Every full row still measures exactly what the grid measured — the basis
+ * below is the grid's own column arithmetic — so nothing else moves.
  */
 export function ReportGrid({
   children,
@@ -36,9 +44,9 @@ export function ReportGrid({
   return (
     <Box
       sx={{
-        display: "grid",
-        gap: 2,
-        gridTemplateColumns: `repeat(${REPORT_GRID_COLUMNS}, minmax(0, 1fr))`,
+        display: "flex",
+        flexWrap: "wrap",
+        gap: `${GRID_GAP_PX}px`,
         alignItems: "stretch",
       }}
       data-testid={dataTestId}
@@ -49,8 +57,22 @@ export function ReportGrid({
 }
 
 /**
+ * The width a `span`-column block starts at: identical to `grid-column: span N`
+ * on a 12-column grid with the same gap. The half pixel is slack — it can only
+ * ever make a row fit, never wrap early, and `flex-grow` hands it straight back.
+ */
+function spanBasis(span: number): string {
+  const gutters = (REPORT_GRID_COLUMNS - 1) * GRID_GAP_PX;
+  return `calc(${span} * (100% - ${gutters}px) / ${REPORT_GRID_COLUMNS} + ${(span - 1) * GRID_GAP_PX}px - 0.5px)`;
+}
+
+/**
  * One placed block: `span` columns on a desktop canvas, widened per tier below
  * it (`sm`/`md` = tablet, `xs` = phone) so narrow screens keep a real layout.
+ *
+ * `flexGrow` is the span rather than `1`: when a row has width to give away,
+ * a block that asked for six columns takes twice as much of it as one that
+ * asked for three, so filling the row cannot reorder the author's emphasis.
  */
 export function ReportGridItem({
   span,
@@ -64,21 +86,85 @@ export function ReportGridItem({
   /** Drop-target handlers when the grid is being rearranged (editor only). */
   dropProps?: ReturnType<DragReorder["targetProps"]>;
 }): JSX.Element {
+  const phone = responsiveSpan(span, "phone");
+  const tablet = responsiveSpan(span, "tablet");
+  const desktop = responsiveSpan(span, "desktop");
   return (
     <Box
       sx={{
-        gridColumn: {
-          xs: `span ${responsiveSpan(span, "phone")}`,
-          sm: `span ${responsiveSpan(span, "tablet")}`,
-          lg: `span ${responsiveSpan(span, "desktop")}`,
-        },
+        flexGrow: { xs: phone, sm: tablet, lg: desktop },
+        flexShrink: 1,
+        flexBasis: { xs: spanBasis(phone), sm: spanBasis(tablet), lg: spanBasis(desktop) },
         minWidth: 0,
+        maxWidth: "100%",
       }}
       data-testid={dataTestId}
       {...dropProps}
     >
       {children}
     </Box>
+  );
+}
+
+/**
+ * The block's spec line reads as a PANEL, not as an inline code chip.
+ *
+ * `typography/Code` and `Text variant="code"` both size themselves for a
+ * fragment quoted inside a sentence — 2px of vertical padding and a 2px radius.
+ * This is a whole sentence, so it gets a block's padding and the control radius
+ * the rest of the screen uses. The mono face and the tint come from the
+ * component; only the box is restated here.
+ */
+const SPEC_SENTENCE_STYLE: CSSProperties = {
+  display: "block",
+  margin: 0,
+  padding: "8px 10px",
+  borderRadius: `${CONTROL_RADIUS_PX}px`,
+  lineHeight: 1.5,
+};
+
+interface ReportBlockFrameProps {
+  title: ReactNode;
+  /**
+   * The block's own caveats, under its title (FUT-454). A built-in report's
+   * description carries what its figures exclude and when they are withheld;
+   * rendering it only on the single-report deep-link page — which the canvas
+   * does not link to — meant those statements were never actually made to the
+   * person reading the numbers.
+   *
+   * It renders in the MONO face, because on the authored canvas it is the
+   * block's generated spec sentence ("soma de receita em pedidos por forma de
+   * pagamento, onde status é PAID") rather than prose someone wrote — and
+   * machine-generated text is set in the mono face throughout the prototype,
+   * which is how a reader tells the two apart at a glance.
+   */
+  description?: string;
+  actions?: ReactNode;
+  children: ReactNode;
+  dataTestId: string;
+  /** Highlight the frame as the current drop slot (editor drag-and-drop). */
+  active?: boolean;
+}
+
+/** The machine-written half of a block's header, in the mono face. */
+function BlockSpecSentence({
+  description,
+  dataTestId,
+}: {
+  description: string;
+  dataTestId: string;
+}): JSX.Element {
+  return (
+    <Text
+      variant="code"
+      size="sm"
+      color="secondary"
+      as="p"
+      style={SPEC_SENTENCE_STYLE}
+      data-testid={`${dataTestId}-description`}
+    >
+      {description}
+    </Text>
   );
 }
 
@@ -95,28 +181,19 @@ export function ReportBlockFrame({
   children,
   dataTestId,
   active = false,
-}: {
-  title: ReactNode;
-  /**
-   * The block's own caveats, under its title (FUT-454). A built-in report's
-   * description carries what its figures exclude and when they are withheld;
-   * rendering it only on the single-report deep-link page — which the canvas
-   * does not link to — meant those statements were never actually made to the
-   * person reading the numbers.
-   */
-  description?: string;
-  actions?: ReactNode;
-  children: ReactNode;
-  dataTestId: string;
-  /** Highlight the frame as the current drop slot (editor drag-and-drop). */
-  active?: boolean;
-}): JSX.Element {
+}: ReportBlockFrameProps): JSX.Element {
   return (
     <Card
       variant="outlined"
       sx={{
         p: 2,
         height: "100%",
+        // Explicit, because the canvas under it is tinted: the card is the
+        // SURFACE and the page is the canvas, which is the pair that gives the
+        // block depth without a shadow.
+        bgcolor: "background.paper",
+        boxShadow: "none",
+        borderRadius: `${CONTAINER_RADIUS_PX}px`,
         ...(active ? { outline: "2px dashed", outlineColor: "primary.main" } : {}),
       }}
       data-testid={dataTestId}
@@ -137,7 +214,7 @@ export function ReportBlockFrame({
           }}
         >
           {typeof title === "string" ? (
-            <Text variant="heading" size="sm" as="h2">
+            <Text variant="heading" size="lg" weight="semibold" as="h2">
               {title}
             </Text>
           ) : (
@@ -146,9 +223,7 @@ export function ReportBlockFrame({
           {actions}
         </Stack>
         {description ? (
-          <Text variant="body" size="sm" color="secondary" data-testid={`${dataTestId}-description`}>
-            {description}
-          </Text>
+          <BlockSpecSentence description={description} dataTestId={dataTestId} />
         ) : null}
         {children}
       </Stack>

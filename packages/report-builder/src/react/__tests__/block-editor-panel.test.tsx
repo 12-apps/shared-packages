@@ -88,13 +88,14 @@ beforeEach(() => {
   }) as unknown as typeof window.matchMedia;
 });
 
-function panelElement(): ReactElement {
+/** The panel, pointed at a block — or at nothing, for the empty state. */
+function panelElement(spec: ReportSpecWire | null = SPEC): ReactElement {
   return (
     <BlockEditorPanel
       open
       onClose={() => undefined}
       entities={[ENTITY]}
-      spec={SPEC}
+      spec={spec}
       span={6}
       onChange={() => undefined}
       onSpanChange={() => undefined}
@@ -246,13 +247,25 @@ function renderedBackdrops(): Element[] {
 }
 
 /** The panel rendered inside the canvas region that yields width to it. */
-function renderDockedEditor(withPanel: boolean): void {
+function renderDockedEditor(withPanel: boolean, spec: ReportSpecWire | null = SPEC): void {
   render(
     <DockedPanelRegion>
       <div data-testid="canvas-probe" />
-      {withPanel ? panelElement() : null}
+      {withPanel ? panelElement(spec) : null}
     </DockedPanelRegion>,
   );
+}
+
+/**
+ * Which of the three responsive layouts the panel chose, as it labels itself.
+ *
+ * The panel writes the tier onto its wrapper precisely so a test can ask. The
+ * alternative — inferring the tier from the anchor class or the paper's width
+ * — reads a CONSEQUENCE of the branch, and passes just as happily when the
+ * branch is right for the wrong reason.
+ */
+function renderedTier(): string {
+  return document.querySelector('[data-panel-tier]')?.getAttribute('data-panel-tier') ?? '';
 }
 
 /** The width the canvas gave up, as the region wrote it. */
@@ -326,6 +339,110 @@ describe('BlockEditorPanel — FUT-755: docked, not modal', () => {
     );
     expect(renderedBackdrops().length).toBe(1);
     expect(painted).toEqual([]);
+  });
+});
+
+/**
+ * FUT-755 — the THREE tiers, and the middle one the feature file adds:
+ *
+ *   @tablet
+ *   Scenario: Between 760 px and 1100 px the panel overlays but stays non-modal
+ *     Given the viewport is 1000 x 800
+ *     When I select a block
+ *     Then the panel is fixed to the right edge, overlaying the canvas
+ *     And the panel casts a shadow to separate it from the content beneath
+ *     And still no backdrop is rendered
+ *     And clicking a block in the visible part of the canvas retargets the panel
+ *
+ * The arithmetic behind it: docking costs the canvas 344px, so a 1000px
+ * viewport is left with ~656px — less than a wide block wants, so the block
+ * being configured reflows into something that no longer resembles the report.
+ * Overlaying keeps the canvas at its real width.
+ *
+ * What jsdom can hold: which branch was taken, and whether the canvas gave up
+ * any width. The shadow itself, and the fact that the panel really does sit
+ * ON TOP rather than beside, are browser checks — there is no layout engine
+ * here to ask.
+ */
+describe('BlockEditorPanel — FUT-755: docked, overlay and sheet', () => {
+  it.each([
+    ['docks on a wide desktop', 1440, 'docked', `${PANEL_WIDTH_PX}px`],
+    ['docks at exactly 1100px, the top of the overlay band', 1100, 'docked', `${PANEL_WIDTH_PX}px`],
+    ['overlays one pixel below it', 1099, 'overlay', '0px'],
+    ['overlays at the scenario’s 1000px', 1000, 'overlay', '0px'],
+    ['overlays at exactly 760px, the bottom of the band', 760, 'overlay', '0px'],
+    ['becomes a sheet one pixel below that', 759, 'sheet', '0px'],
+    ['becomes a sheet on a phone', MOBILE_PX, 'sheet', '0px'],
+  ])('%s', (_case, widthPx, tier, gutter) => {
+    setViewport(widthPx);
+    renderDockedEditor(true);
+
+    expect(renderedTier()).toBe(tier);
+    // The gutter is the whole difference between the tiers: docking TAKES the
+    // width, overlaying borrows the pixels back for the duration.
+    expect(reservedGutter()).toBe(gutter);
+  });
+
+  it('renders no backdrop in the overlay tier either', () => {
+    setViewport(1000);
+    renderDockedEditor(true);
+
+    // "And still no backdrop is rendered" — the tier gives up the reflow, not
+    // the non-modality. A scrim here would swallow the retargeting click the
+    // scenario's last line asks for.
+    expect(screen.getAllByRole('combobox').length).toBeGreaterThan(0);
+    expect(renderedBackdrops()).toEqual([]);
+  });
+
+  it('leaves the canvas operable in the overlay tier', () => {
+    setViewport(1000);
+    renderDockedEditor(true);
+
+    const canvas = screen.getByTestId('canvas-probe');
+    expect(canvas.closest('[aria-hidden="true"]')).toBe(null);
+    expect(canvas.closest('[inert]')).toBe(null);
+    expect(document.body.style.overflow).toBe('');
+  });
+});
+
+/**
+ * FUT-755 — the panel with NOTHING selected.
+ *
+ *   Scenario: Clicking the empty canvas background deselects
+ *     … Then no block is selected
+ *     And the panel shows its empty state with the text
+ *         "Selecione um bloco para editar"
+ *     And the panel remains docked and visible
+ *
+ * "Remains docked" is the load-bearing half: the empty state is a STATE of the
+ * panel, not its absence, so the canvas keeps its 344px gutter and does not
+ * snap wider and back between two clicks.
+ */
+describe('BlockEditorPanel — the empty state', () => {
+  it('prompts for a selection instead of rendering a form', () => {
+    setViewport(DESKTOP_PX);
+    renderDockedEditor(true, null);
+
+    expect(screen.getByText('Selecione um bloco para editar')).toBeTruthy();
+    expect(screen.queryAllByRole('combobox')).toEqual([]);
+  });
+
+  it('stays docked, so the canvas does not jump when the selection clears', () => {
+    setViewport(DESKTOP_PX);
+    renderDockedEditor(true, null);
+
+    expect(reservedGutter()).toBe(`${PANEL_WIDTH_PX}px`);
+  });
+
+  it('renders nothing at all as a sheet, which would cover the blocks', () => {
+    setViewport(MOBILE_PX);
+    renderDockedEditor(true, null);
+
+    // A sheet overlays the canvas, so an empty one would hide the very blocks
+    // the author is choosing between. The canvas probe is the control: the
+    // region really did render, the panel simply is not in it.
+    expect(screen.getByTestId('canvas-probe')).toBeTruthy();
+    expect(screen.queryAllByText('Selecione um bloco para editar')).toEqual([]);
   });
 });
 

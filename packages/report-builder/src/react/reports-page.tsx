@@ -22,6 +22,7 @@ import { SYSTEM_REPORT_KEYS } from "../server/presets";
 import { useSavedReport, useSavedReports } from "./custom-reports-api";
 import { NO_PRINT_CLASS, PRINT_REGION_ATTR, PrintExportButton, PrintStyles } from "./lib/print-export";
 import { RangeToggle } from "./lib/range-toggle";
+import { CONTROL_ROW_SX, PAGE_TITLE_SX, REPORT_SURFACE_SX } from "./lib/report-surface";
 import { ReportCardList } from "./report-card-list";
 import type { ReportScope } from "./report-list-filters";
 import { selectReportOptions } from "./report-model";
@@ -65,10 +66,10 @@ function SelectedReport({
       <Stack
         direction="row"
         spacing={2}
-        sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}
+        sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1, ...CONTROL_ROW_SX }}
         className={NO_PRINT_CLASS}
       >
-        <Text variant="heading" size="md" as="h2" data-testid="report-title">
+        <Text variant="heading" size="lg" weight="semibold" as="h2" data-testid="report-title">
           {view.name}
         </Text>
         {/*
@@ -130,9 +131,9 @@ function NoReports({ showArchived, onCreate }: { showArchived: boolean; onCreate
 function ReportsHeading(): JSX.Element {
   return (
     <Stack spacing={0.5} className={NO_PRINT_CLASS}>
-      <Text variant="heading" size="lg" as="h1">
+      <Box component="h1" sx={PAGE_TITLE_SX}>
         Relatórios
-      </Text>
+      </Box>
       <Text variant="body" size="sm" color="secondary">
         Seus painéis: escolha um para ver, ou monte outro com os blocos que quiser.
       </Text>
@@ -180,7 +181,7 @@ export function ReportsPage({ tenantSlug }: { tenantSlug: string }): JSX.Element
 
   const onCreate = (): void => void navigate(`/${tenantSlug}/reports/new`);
   return (
-    <Stack spacing={3} data-testid="page-reports">
+    <Stack spacing={3} sx={REPORT_SURFACE_SX} data-testid="page-reports">
       <PrintStyles />
       <ReportsHeading />
       <Box className={NO_PRINT_CLASS}>

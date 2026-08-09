@@ -5,6 +5,7 @@
  */
 import { defaultPresentation, presentationCompatibility, type SpecShape } from "../compatibility";
 
+import { filterFromWire, filterToWire } from "./builder-filters";
 import { measureOptions, measureSortKey, type MeasureDraft } from "./builder-measures";
 import type { ReportEntityFields, ReportField, ReportSpecWire } from "./custom-reports-api";
 import type { PublishDraft } from "./lib/publish-section";
@@ -15,10 +16,24 @@ export interface DimensionDraft {
   timeGrain: ReportGrain;
 }
 
+/**
+ * One filter row. It carries all three of the spec's value shapes
+ * (`spec.ts:32-46`) rather than a single `value`, because holding one value is
+ * precisely what made `in` and `between` unofferable — a row that can express
+ * one value can only serialize the four operators that take one.
+ * `builder-filters` keeps exactly one shape populated per row and maps it to
+ * the arity `reportFilterSchema` demands.
+ */
 export interface FilterDraft {
   field: string;
   operator: string;
+  /** `eq` / `neq` / `gte` / `lte`: the single compared value. */
   value: string;
+  /** `in`: the picked set, as the codes the spec stores. */
+  values?: string[];
+  /** `between`: the inclusive bounds. Both or neither — one alone is a 400. */
+  from?: string;
+  to?: string;
 }
 
 export type ChartKind = "table" | "kpi" | "line" | "bar" | "area" | "pie" | "donut";
@@ -173,19 +188,6 @@ export function withValidChart(
   return { ...draft, chartType: picked.kind === "chart" ? picked.chartType : picked.kind };
 }
 
-function coerceFilterValue(
-  field: ReportField | undefined,
-  raw: string,
-): string | number | boolean {
-  const trimmed = raw.trim();
-  if (field && (field.type === "number" || field.type === "money")) {
-    const parsed = Number(trimmed);
-    return Number.isNaN(parsed) ? trimmed : parsed;
-  }
-  if (field?.type === "boolean") return trimmed === "true";
-  return trimmed;
-}
-
 /**
  * The output names the compiler will derive for the current form state —
  * a pass-through sort entry survives only while its key still resolves
@@ -259,13 +261,11 @@ export function specFromDraft(
         ...(floor > 0 ? { minSample: Math.max(options.minSample ?? 0, floor) } : {}),
       };
     });
-  const filters = draft.filters
-    .filter((filter) => filter.field !== "" && filter.value.trim() !== "")
-    .map((filter) => ({
-      field: filter.field,
-      operator: filter.operator,
-      value: coerceFilterValue(fields.get(filter.field), filter.value),
-    }));
+  // A row still being filled in serializes to NOTHING rather than to a spec
+  // the schema rejects — see `filterToWire` for the arity each operator needs.
+  const filters = draft.filters.flatMap((filter) =>
+    filterToWire(filter, fields.get(filter.field)),
+  );
   const sortKeys = resolvableSortKeys(dimensions, draft.measures);
   return {
     entity: draft.entity,
@@ -332,13 +332,7 @@ export function draftFromSpec(
       ...(measure.alias ? { alias: measure.alias } : {}),
       ...measureOptions(measure),
     })),
-    filters: spec.filters
-      .filter((filter) => filter.value !== undefined)
-      .map((filter) => ({
-        field: filter.field,
-        operator: filter.operator,
-        value: String(filter.value),
-      })),
+    filters: spec.filters.flatMap(filterFromWire),
     sort: (spec.sort ?? []).map((entry) => ({ by: entry.by, direction: entry.direction })),
     ...(spec.limit !== undefined ? { limit: spec.limit } : {}),
     ...draftKpiOptions(presentation),

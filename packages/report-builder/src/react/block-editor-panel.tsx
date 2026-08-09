@@ -1,6 +1,6 @@
 /**
- * The block's ✎ config surface (FUT-391): a right-hand PANEL on desktop, a
- * bottom SHEET on a narrow screen.
+ * The block config surface (FUT-391): a right-hand PANEL on desktop, an
+ * OVERLAY of the same panel on a tablet, a bottom SHEET on a phone.
  *
  * It replaces a popover, for two reasons the popover could not fix:
  *
@@ -21,10 +21,22 @@
  * no backdrop, no scroll lock, no focus trap, nothing inert — and reserves its
  * width from the canvas through `useDockReservation`.
  *
- * A bottom sheet on a phone is the deliberate exception: there is no canvas
- * width to give up at 390px, so the sheet overlays. It keeps a MODAL drawer's
- * dismissal (a tap above the sheet closes it) but with an INVISIBLE backdrop,
- * so the block above stays legible rather than sitting behind a scrim.
+ * The two narrow tiers give up the REFLOW, never the non-modality
+ * (`lib/docked-panel.tsx` explains where each threshold comes from):
+ *
+ *   - **overlay** (760–1099px): the identical persistent drawer, reserving
+ *     nothing, floating over the canvas with a shadow. Still no backdrop, so a
+ *     click on the visible part of the canvas retargets the panel rather than
+ *     being eaten.
+ *   - **sheet** (below 760px): anchored to the bottom edge. It keeps a MODAL
+ *     drawer's dismissal — a tap above the sheet closes it — but with an
+ *     INVISIBLE backdrop, so the block being edited stays legible above it
+ *     rather than sitting behind a scrim.
+ *
+ * The panel does not own WHICH block it edits: the canvas does (FUT-755). Pass
+ * `spec: null` and it renders its empty state and stays docked, which is what
+ * clicking the canvas background, pressing Escape and removing the selected
+ * block all produce.
  *
  * The settings drawer elsewhere in the app stays a plain modal drawer. That is
  * not an inconsistency: settings are a discrete task, block configuration is
@@ -34,31 +46,21 @@
  * and `-editor-entity` are driven by future-pay's reports e2e, so swapping the
  * container must not break a consumer's suite.
  */
-import {
-  useEffect,
-  useRef,
-  useState,
-  type JSX,
-  type PointerEvent as ReactPointerEvent,
-  type RefObject,
-} from "react";
+import { useState, type JSX, type PointerEvent as ReactPointerEvent } from "react";
 
 import { Drawer, DrawerContent, DrawerHeader } from "@12-apps/ui/layout/Drawer";
 import { Box } from "@12-apps/ui/mui/Box";
-import useMediaQuery from "@12-apps/ui/mui/useMediaQuery";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { BlockQueryFields, fieldMapOf } from "./block-query-fields";
 import { draftFromSpec, specFromDraft, withValidChart, type BuilderDraft } from "./builder-model";
 import type { ReportEntityFields, ReportSpecWire } from "./custom-reports-api";
-import { useDockReservation } from "./lib/docked-panel";
-
-/**
- * Below this the panel becomes a bottom sheet. It is the FORM's threshold, not
- * a page breakpoint: a 344px panel beside a canvas needs roughly this much
- * room before the canvas it is meant to keep visible stops being visible.
- */
-const SHEET_BELOW_PX = 760;
+import {
+  useDockReservation,
+  useEscapeToClose,
+  usePanelTier,
+  type PanelTier,
+} from "./lib/docked-panel";
 
 /** Wide enough that a filter's three controls read in full (FUT-391). */
 const PANEL_WIDTH_PX = 344;
@@ -68,6 +70,9 @@ const SHEET_HEIGHT = "78vh";
 
 /** How far down the sheet must travel before releasing the grip dismisses it. */
 const SHEET_DISMISS_FRACTION = 0.4;
+
+/** What the panel says when nothing is selected — the spec's exact wording. */
+const EMPTY_TEXT = "Selecione um bloco para editar";
 
 /**
  * The docked panel's surface.
@@ -82,42 +87,63 @@ const DOCKED_PAPER_SX = {
   height: "calc(100% - var(--report-panel-top, 0px))",
 };
 
+/**
+ * The overlay tier's surface: the docked one plus the shadow that separates it
+ * from the canvas it is now floating over. Written as an explicit CSS value
+ * rather than a theme elevation because the elevation scale casts DOWNWARD and
+ * this shadow has to fall leftward, onto the content the panel covers.
+ */
+const OVERLAY_PAPER_SX = {
+  ...DOCKED_PAPER_SX,
+  boxShadow: "-12px 0 32px -8px rgba(0, 0, 0, 0.32)",
+};
+
 /** Rounded top corners: the sheet reads as lifted off the canvas, not welded on. */
 const SHEET_PAPER_SX = { borderTopLeftRadius: 16, borderTopRightRadius: 16 };
 
 /**
- * A persistent drawer's docked root is a REAL element in the grid cell the
- * panel renders from. It has no height — its surface is `position: fixed` — but
- * at its natural 344px it overhangs the cell and can add a horizontal
- * scrollbar. Zero it: the panel's width is reserved from the canvas by
- * `useDockReservation`, never taken from the cell it happens to live in.
+ * A persistent drawer's docked root is a REAL element in the flow of whatever
+ * renders it. It has no height — its surface is `position: fixed` — but at its
+ * natural 344px it overhangs and can add a horizontal scrollbar. Zero it: the
+ * panel's width is reserved from the canvas by `useDockReservation`, never
+ * taken from wherever the element happens to sit.
  */
 const DOCKED_ROOT_SX = { "& .MuiDrawer-docked": { width: 0 } };
 
-/**
- * Escape closes the docked panel.
- *
- * A modal drawer got this from MUI's `Modal`; a docked one renders no modal, so
- * nothing else is listening. The listener sits on `window` and skips a handled
- * event, so a nested dialog (the remove confirmation) still gets Escape first —
- * it stops the event before it reaches here.
- */
-function useEscapeToClose(active: boolean, close: () => void): void {
-  const latest = useRef(close);
-  useEffect(() => {
-    latest.current = close;
-  });
-
-  useEffect(() => {
-    if (!active) return undefined;
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      latest.current();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [active]);
+/** Everything about a tier that is pure geometry, in one lookup. */
+interface TierLayout {
+  anchor: "right" | "bottom";
+  width: number | string;
+  height?: string;
+  /** `false` is a real modal drawer — the sheet, and only the sheet. */
+  persistent: boolean;
+  paperSx: Record<string, number | string>;
+  rootSx?: Record<string, Record<string, number>>;
 }
+
+const TIER_LAYOUT: Record<PanelTier, TierLayout> = {
+  docked: {
+    anchor: "right",
+    width: PANEL_WIDTH_PX,
+    persistent: true,
+    paperSx: DOCKED_PAPER_SX,
+    rootSx: DOCKED_ROOT_SX,
+  },
+  overlay: {
+    anchor: "right",
+    width: PANEL_WIDTH_PX,
+    persistent: true,
+    paperSx: OVERLAY_PAPER_SX,
+    rootSx: DOCKED_ROOT_SX,
+  },
+  sheet: {
+    anchor: "bottom",
+    width: "100%",
+    height: SHEET_HEIGHT,
+    persistent: false,
+    paperSx: SHEET_PAPER_SX,
+  },
+};
 
 /**
  * Drag the grip down to dismiss the sheet; release short of the threshold and
@@ -174,49 +200,46 @@ function SheetGrip({ onDismiss }: { onDismiss: () => void }): JSX.Element {
   );
 }
 
-interface BlockEditorPanelProps {
-  open: boolean;
-  onClose: () => void;
-  /**
-   * The control that opened the panel. Focus returns to it on close — without
-   * that, focus falls to the document and a keyboard user closing the panel
-   * restarts from the top of the page.
-   */
-  restoreFocusTo?: RefObject<HTMLElement | null>;
-  entities: ReportEntityFields[];
-  spec: ReportSpecWire;
-  span: number;
-  onChange: (spec: ReportSpecWire) => void;
-  onSpanChange: (span: number) => void;
-  testId: string;
+/**
+ * What the panel shows with nothing selected.
+ *
+ * It is a STATE of the panel rather than an absence of one: the panel stays
+ * docked, so deselecting does not make the canvas jump 344px wider and back
+ * the moment the author clicks the next block.
+ */
+function PanelEmptyState({ testId }: { testId: string }): JSX.Element {
+  return (
+    <Box
+      data-testid={`${testId}-empty`}
+      sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 6, px: 2 }}
+    >
+      <Text variant="body" size="sm" color="secondary">
+        {EMPTY_TEXT}
+      </Text>
+    </Box>
+  );
 }
 
-export function BlockEditorPanel({
-  open,
-  onClose,
-  restoreFocusTo,
+/** The form half: seeded once per selection, applied live on every edit. */
+function PanelForm({
+  seed,
   entities,
-  spec,
   span,
   onChange,
   onSpanChange,
   testId,
-}: BlockEditorPanelProps): JSX.Element {
+}: {
+  seed: ReportSpecWire;
+  entities: ReportEntityFields[];
+  span: number;
+  onChange: (spec: ReportSpecWire) => void;
+  onSpanChange: (span: number) => void;
+  testId: string;
+}): JSX.Element {
   // Seeded once per opening (the caller remounts via `key`): the draft keeps
   // half-finished rows — a blank "+ Medida" line, a filter with no value yet —
   // that the serialized spec necessarily drops.
-  const [draft, setDraft] = useState<BuilderDraft>(() => draftFromSpec("", "", spec));
-  const asSheet = useMediaQuery(`(max-width:${SHEET_BELOW_PX - 1}px)`);
-  const docked = open && !asSheet;
-
-  const close = (): void => {
-    onClose();
-    restoreFocusTo?.current?.focus();
-  };
-
-  // The canvas gives up exactly the panel's width, so nothing sits under it.
-  useDockReservation(docked ? PANEL_WIDTH_PX : 0);
-  useEscapeToClose(docked, close);
+  const [draft, setDraft] = useState<BuilderDraft>(() => draftFromSpec("", "", seed));
 
   const apply = (next: BuilderDraft): void => {
     const map = fieldMapOf(entities.find((candidate) => candidate.entity === next.entity));
@@ -226,40 +249,97 @@ export function BlockEditorPanel({
   };
 
   return (
-    <Box sx={asSheet ? undefined : DOCKED_ROOT_SX}>
+    // Scrolls inside the panel: the header and its close control stay
+    // reachable however long the form gets.
+    <Box sx={{ overflowY: "auto", pb: 2 }}>
+      <BlockQueryFields
+        draft={draft}
+        entities={entities}
+        span={span}
+        apply={apply}
+        onSpanChange={onSpanChange}
+        testId={testId}
+      />
+    </Box>
+  );
+}
+
+interface BlockEditorPanelProps {
+  open: boolean;
+  /**
+   * Deselect. NOT "unmount": on the two wide tiers the panel stays put and
+   * shows its empty state, which is what the spec asks Escape, the close
+   * button and a click on the canvas background to produce.
+   */
+  onClose: () => void;
+  entities: ReportEntityFields[];
+  /** The selected block's query, or `null` for the empty state. */
+  spec: ReportSpecWire | null;
+  span: number;
+  onChange: (spec: ReportSpecWire) => void;
+  onSpanChange: (span: number) => void;
+  testId: string;
+}
+
+export function BlockEditorPanel({
+  open,
+  onClose,
+  entities,
+  spec,
+  span,
+  onChange,
+  onSpanChange,
+  testId,
+}: BlockEditorPanelProps): JSX.Element {
+  const tier = usePanelTier();
+  const asSheet = tier === "sheet";
+  const layout = TIER_LAYOUT[tier];
+
+  // The canvas gives up exactly the panel's width — and only where there is
+  // width worth giving up, which is what makes the other two tiers overlays.
+  useDockReservation(open && tier === "docked" ? PANEL_WIDTH_PX : 0);
+  // The sheet is a real modal drawer, so MUI answers Escape for it already.
+  useEscapeToClose(open && !asSheet, onClose);
+
+  // A sheet has no empty state to show: it covers the canvas, so leaving it up
+  // with nothing in it would hide the blocks the author is choosing between.
+  if (asSheet && spec === null) return <></>;
+
+  return (
+    <Box sx={layout.rootSx} data-panel-tier={tier}>
       <Drawer
         open={open}
-        onClose={close}
-        anchor={asSheet ? "bottom" : "right"}
-        width={asSheet ? "100%" : PANEL_WIDTH_PX}
-        height={asSheet ? SHEET_HEIGHT : undefined}
-        persistent={!asSheet}
-        // Docked: no modal at all, so nothing to draw. Sheet: a backdrop that
-        // catches the tap above it and closes, but paints nothing — the block
-        // being edited has to stay readable above the sheet.
+        onClose={onClose}
+        anchor={layout.anchor}
+        width={layout.width}
+        height={layout.height}
+        persistent={layout.persistent}
+        // Docked and overlay: no modal at all, so nothing to draw. Sheet: a
+        // backdrop that catches the tap above it and closes, but paints
+        // nothing — the block being edited has to stay readable above it.
         backdrop={false}
-        paperSx={asSheet ? SHEET_PAPER_SX : DOCKED_PAPER_SX}
+        paperSx={layout.paperSx}
         dataTestId={testId}
       >
-        {asSheet ? <SheetGrip onDismiss={close} /> : null}
-        <DrawerHeader onClose={close} dataTestId={`${testId}-header`}>
+        {asSheet ? <SheetGrip onDismiss={onClose} /> : null}
+        <DrawerHeader onClose={onClose} dataTestId={`${testId}-header`}>
           <Text variant="heading" size="sm" as="h2">
             Bloco
           </Text>
         </DrawerHeader>
         <DrawerContent dataTestId={`${testId}-content`}>
-          {/* Scrolls inside the panel: the header and its close control stay
-              reachable however long the form gets. */}
-          <Box sx={{ overflowY: "auto", pb: 2 }}>
-            <BlockQueryFields
-              draft={draft}
+          {spec === null ? (
+            <PanelEmptyState testId={testId} />
+          ) : (
+            <PanelForm
+              seed={spec}
               entities={entities}
               span={span}
-              apply={apply}
+              onChange={onChange}
               onSpanChange={onSpanChange}
               testId={testId}
             />
-          </Box>
+          )}
         </DrawerContent>
       </Drawer>
     </Box>

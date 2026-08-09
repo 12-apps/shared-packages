@@ -16,6 +16,8 @@ import { ErrorState } from "@12-apps/ui/data-display/ErrorState";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
 import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
+import { Box } from "@12-apps/ui/mui/Box";
+import { ThemeProvider } from "@12-apps/ui/mui/styles";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
@@ -33,6 +35,7 @@ import { defaultPublishDraft, PublishSection, type PublishDraft } from "./lib/pu
 import { RangeToggle } from "./lib/range-toggle";
 import { useUnsavedChanges } from "./lib/use-unsaved-changes";
 import { EditorCanvas } from "./report-editor-canvas";
+import { CONTROL_ROW_SX, EDITOR_SURFACE_SX, PAGE_TITLE_SX, useReportFieldTheme } from "./lib/report-surface";
 import {
   documentFromDraft,
   draftFromDocument,
@@ -143,7 +146,11 @@ function EditorActions({
   onSave: () => void;
 }): JSX.Element {
   return (
-    <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
+    <Stack
+      direction="row"
+      spacing={2}
+      sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1, ...CONTROL_ROW_SX }}
+    >
       <RangeToggle value={range} onChange={onRangeChange} dataTestId="report-editor-range" />
       <Stack direction="row" spacing={1} sx={{ ml: "auto", alignItems: "center" }}>
         {/* Announced politely: a status that only changes colour is invisible
@@ -256,22 +263,25 @@ function ReportEditorForm({
   const editor = useEditorState(tenantSlug, editId, initial, initialPublish);
   const { draft, setDraft, publish, setPublish, range, setRange } = editor;
   const { error, saving, dirty, save } = editor;
+  // One field shape, including the panels rendered through a portal.
+  const fieldTheme = useReportFieldTheme();
 
   return (
     // Everything the editor draws lives inside the region, so opening a block's
     // configuration panel NARROWS this column by the panel's width instead of
     // letting the panel float over the block it is configuring (FUT-755).
+    <ThemeProvider theme={fieldTheme}>
     <DockedPanelRegion>
-      <Stack spacing={3} data-testid="page-report-editor">
+      <Stack spacing={3} sx={EDITOR_SURFACE_SX} data-testid="page-report-editor">
         <Stack spacing={0.5}>
           <Link to={`/${tenantSlug}/reports`} data-testid="report-editor-back">
             <Text variant="body" size="sm" color="secondary">
               ← Relatórios
             </Text>
           </Link>
-          <Text variant="heading" size="lg" as="h1">
+          <Box component="h1" sx={PAGE_TITLE_SX}>
             {editId ? "Editar relatório" : "Novo relatório"}
-          </Text>
+          </Box>
           <Text variant="body" size="sm" color="secondary">
             Monte o relatório arrastando os blocos; cada bloco mostra os dados reais do período.
           </Text>
@@ -311,6 +321,7 @@ function ReportEditorForm({
         />
       </Stack>
     </DockedPanelRegion>
+    </ThemeProvider>
   );
 }
 
