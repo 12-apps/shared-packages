@@ -41,7 +41,11 @@ export async function fetchPagbankCardPublicKey(
   config: PagbankPublicKeyConfig,
 ): Promise<string | null> {
   if (!config.token) return null;
-  const url = `${config.apiBase.replace(/\/+$/, '')}/public-keys`;
+  let base = config.apiBase;
+  // Regex-free trailing-slash trim — CodeQL flags `/\/+$/` as polynomial on
+  // repeated '/', and a loop of slices is O(n) with no pattern to reason about.
+  while (base.endsWith('/')) base = base.slice(0, -1);
+  const url = `${base}/public-keys`;
 
   for (let attempt = 0; ; attempt += 1) {
     try {
