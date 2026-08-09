@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 
 import { BlockEditorPanel } from '../block-editor-panel';
@@ -46,16 +46,33 @@ const SPEC: ReportSpecWire = {
   presentation: { kind: 'chart', chartType: 'bar' },
 };
 
+const DESKTOP_PX = 1280;
+
+/**
+ * The width the stubbed `matchMedia` answers from. A container property rather
+ * than a closed-over binding: the flakiness gate rejects reassigning the
+ * latter from inside a stub, and a mutated container is the shape it wants.
+ */
+const viewport = { width: DESKTOP_PX };
+
+const realMatchMedia = window.matchMedia;
+
+/** Choose the branch this test renders. Read by the stub below. */
+function setViewport(widthPx: number): void {
+  viewport.width = widthPx;
+}
+
 /**
  * `useMediaQuery` reads `window.matchMedia`, which jsdom does not implement.
  * Answering from an explicit width makes the panel/sheet branch a choice the
- * test makes rather than a default it inherits.
+ * test makes rather than a default it inherits — and installing it per test,
+ * with a restore, keeps the mutation from leaking into any other suite.
  */
-function setViewport(widthPx: number): void {
+beforeEach(() => {
   window.matchMedia = ((query: string) => {
     const max = /max-width:\s*(\d+)/.exec(query);
     return {
-      matches: max ? widthPx <= Number(max[1]) : false,
+      matches: max ? viewport.width <= Number(max[1]) : false,
       media: query,
       onchange: null,
       addListener: () => undefined,
@@ -65,7 +82,7 @@ function setViewport(widthPx: number): void {
       dispatchEvent: () => false,
     };
   }) as unknown as typeof window.matchMedia;
-}
+});
 
 function renderPanel(): void {
   render(
@@ -99,7 +116,11 @@ function accessibleName(element: HTMLElement): string {
     .trim();
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.matchMedia = realMatchMedia;
+  viewport.width = DESKTOP_PX;
+});
 
 describe('BlockEditorPanel — entry 12: no unlabelled select in the panel', () => {
   it.each([

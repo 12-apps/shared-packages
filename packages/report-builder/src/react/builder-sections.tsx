@@ -160,12 +160,60 @@ export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.El
 }
 
 /**
- * One filter row: field, condition, value, remove.
+ * The value a filter compares against.
  *
- * The VALUE control is the point of FUT-391. A closed-set field is PICKED —
- * the author chooses "Pago" and the spec stores `PAID`. Typing the code was the
+ * This control is the point of FUT-391. A closed-set field is PICKED — the
+ * author chooses "Pago" and the spec stores `PAID`. Typing the code was the
  * largest source of silently-empty blocks: a typo compiles and matches no rows,
  * so the block reads as "no data" rather than as the mistake it is.
+ */
+function FilterValueControl({
+  filter,
+  index,
+  field,
+  onPatch,
+}: {
+  filter: BuilderDraft["filters"][number];
+  index: number;
+  field: ReportField | undefined;
+  onPatch: (patch: Partial<BuilderDraft["filters"][number]>) => void;
+}): JSX.Element {
+  const valueOptions = valueOptionsFor(field);
+  return valueOptions ? (
+    <Select
+      size="small"
+      aria-label={`Filtro ${index + 1} — valor`}
+      options={valueOptions}
+      value={filter.value}
+      onChange={(event) => onPatch({ value: event.target.value as string })}
+      data-testid={`builder-filter-value-${index}`}
+    />
+  ) : (
+    <Input
+      size="sm"
+      aria-label={`Filtro ${index + 1} — valor`}
+      value={filter.value}
+      onChange={(event) => onPatch({ value: event.target.value })}
+      data-testid={`builder-filter-value-${index}`}
+    />
+  );
+}
+
+/**
+ * One filter row: field, condition, value, remove — laid out over TWO lines.
+ *
+ * One row of three selects plus a text "Remover" button left each control
+ * ~70px inside the 344px panel, which rendered the field as `S…` and the
+ * operator as `i…` (FUT-755) — the exact truncation this panel replaced the
+ * popover to fix, still shipping.
+ *
+ * Widths alone could not fix it: each MUI select spends ~32px on its own
+ * chrome, so three of them plus a button need ~200px before a single character
+ * of label is drawn, against ~312px of usable width. So the field — the one
+ * open-ended label, and the row's subject — takes a line of its own, and the
+ * operator, its value and the remove control share the next. The operator's
+ * longest label is known and short, so it keeps `prototype.html`'s fixed 104px
+ * and the value takes the rest.
  */
 function FilterRow({
   filter,
@@ -182,25 +230,7 @@ function FilterRow({
   onPatch: (patch: Partial<BuilderDraft["filters"][number]>) => void;
   onRemove: () => void;
 }): JSX.Element {
-  const valueOptions = valueOptionsFor(field);
   return (
-    /*
-     * Two lines, not one (FUT-755). One row of three selects plus a text
-     * "Remover" button left each control ~70px inside the 344px panel, which
-     * rendered the field as `S…` and the operator as `i…` — the exact
-     * truncation this panel replaced the popover to fix, still shipping.
-     *
-     * Widths alone could not fix it: each MUI select spends ~32px on its own
-     * chrome, so three of them plus a button need ~200px before a single
-     * character of label is drawn, against ~312px of usable width. So the
-     * field — the one open-ended label, and the row's subject — takes a line
-     * of its own, and the operator, its value and the remove control share the
-     * next. The operator's longest label is known and short, so it takes a
-     * fixed 104px and the value gets the rest.
-     *
-     * `minWidth: 0` lets the value actually shrink to its share: a flex item
-     * defaults to `min-width: auto` and would otherwise refuse to.
-     */
     <Stack spacing={1}>
       <Select
         size="small"
@@ -226,25 +256,15 @@ function FilterRow({
             data-testid={`builder-filter-operator-${index}`}
           />
         </Box>
+        {/* `minWidth: 0` lets the value shrink to its share: a flex item
+            defaults to `min-width: auto` and would otherwise refuse to. */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          {valueOptions ? (
-            <Select
-              size="small"
-              aria-label={`Filtro ${index + 1} — valor`}
-              options={valueOptions}
-              value={filter.value}
-              onChange={(event) => onPatch({ value: event.target.value as string })}
-              data-testid={`builder-filter-value-${index}`}
-            />
-          ) : (
-            <Input
-              size="sm"
-              aria-label={`Filtro ${index + 1} — valor`}
-              value={filter.value}
-              onChange={(event) => onPatch({ value: event.target.value })}
-              data-testid={`builder-filter-value-${index}`}
-            />
-          )}
+          <FilterValueControl
+            filter={filter}
+            index={index}
+            field={field}
+            onPatch={onPatch}
+          />
         </Box>
         <Button
           variant="ghost"
