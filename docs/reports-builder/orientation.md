@@ -113,9 +113,18 @@ people may be using.
 ### 2.6 Drag-to-reorder already exists, and `@dnd-kit` is a new dependency
 
 `src/react/lib/drag-reorder.ts` (FUT-311) implements handle-only HTML5 drag reordering with a typed
-payload so foreign drags can't trigger it. Its header notes keyboard and touch users **already have
-up/down buttons** — so the plan's "drag-only reordering is a WCAG 2.1.1 failure" is already mitigated.
-That lowers the urgency of Phase 3 considerably.
+payload so foreign drags can't trigger it. Its header noted keyboard and touch users **already have
+up/down buttons** — so the plan's "drag-only reordering is a WCAG 2.1.1 failure" was read as already
+mitigated, and Phase 3's urgency was lowered accordingly.
+
+> **That was wrong, and this paragraph is why the gap survived (FUT-755).** There were no up/down
+> buttons anywhere in `src/react` — `report-editor-block.tsx` rendered grip, title, ✎ and 🗑, and
+> nothing else. The claim came from the source file's own header, which this section quoted rather
+> than checked, so a live WCAG 2.1.1 failure read as mitigated in the one document written to map the
+> plan onto the real code. The header is corrected, and Alt+↑/↓ with a live region now exists
+> (`useKeyboardReorder`), so the mitigation is real rather than asserted. Kept here as written history:
+> a quoted claim is not a verified one, which is precisely what `instructions.md`'s precedence rule 5
+> is about.
 
 `porting.md` §2 prescribes `@dnd-kit/sortable`. It is **not** a dependency today — the package ships
 with `@12-apps/stock-domain`, `@12-apps/ui` and `zod` only. Adding it puts a new runtime dependency

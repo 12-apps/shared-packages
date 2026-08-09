@@ -109,7 +109,15 @@ Timezone bucketing landed with FUT-454: `ReportSpec.timeZone` (`spec.ts:110`), `
 
 **Scope (reconciled).** Two of the three bugs remain:
 
-- **`dayStartsAt` in tenant config.** No occurrence anywhere in the package. A bar closing at 02:00 wants Tuesday to include Wednesday 00:00–02:00; today the civil day is the only day.
+- ~~**`dayStartsAt` in tenant config.**~~ **DONE (FUT-755).** `truncateDateToGrain` takes an optional
+  boundary hour, and it is plumbed the same way `timeZone` already was: optional on
+  `reportSpecSchema`, resolvable from `CompileOptions` by the host, resolved onto
+  `CompiledQuery.dayStartsAt`, and applied in `memory.ts`'s bucketing. An hour before the boundary
+  buckets to the previous day at EVERY grain — the shift is applied before the month/week truncation,
+  so a 01:00 sale on the 1st is last month's when the day starts at 05:00. Covered by
+  `src/__tests__/day-starts-at.test.ts`, whose end-to-end cases assert the TOTALS merge (one 1500
+  bucket instead of 500 + 1000), not merely that a label moved. Note for a SQL adapter: it must apply
+  this alongside `timeZone`, and `CompiledQuery`'s docstring says so.
 - **The incomplete trailing bucket is neither marked nor excluded.** `server/range.ts:218-220` documents the opposite decision — rolling presets end at the *next* midnight so the current partial day is always fully inside the window ("7d" is today plus six, never six-and-a-bit). That is right for the window and still leaves the last point of a by-day chart covering a partial day, which is the dip the plan spotted. Mark it in the render model; do not change the window.
 
 The plan's third item, money as integer cents formatted only at the edge, is how `ReportValueFormat`/`formatReportCell` already work.

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { reportSpecSchema } from '../../spec';
+import { operatorOptionsFor } from '../builder-filters';
 import { editMeasureRow } from '../builder-measures';
 import {
   chartOptions,
@@ -9,7 +11,7 @@ import {
   withValidChart,
   type BuilderDraft,
 } from '../builder-model';
-import type { ReportEntityFields, ReportField } from '../custom-reports-api';
+import type { ReportEntityFields, ReportField, ReportSpecWire } from '../custom-reports-api';
 
 /**
  * FUT-308 in the form model: the picker disables what the compiler rejects,
@@ -311,5 +313,106 @@ describe('sort/limit pass-through', () => {
       byName,
     );
     expect(spec.sort).toEqual([{ by: 'sum_revenueCents', direction: 'asc' }]);
+  });
+});
+
+/**
+ * Plan entry 11, the half that was outstanding: `in` and `between` expressible
+ * without hand-editing a spec.
+ *
+ * The old `SINGLE_VALUE_OPERATORS` comment named the exact risk of widening the
+ * offer — "offering them would trade a typo for a 400" — so every case here
+ * ends at `reportSpecSchema`, the thing that would have returned that 400. A
+ * round trip that merely agrees with itself would pass with both halves wrong.
+ */
+describe('typed filter values and the full operator set (entry 11)', () => {
+  const STATUS: ReportField = {
+    field: 'status',
+    label: 'Status',
+    type: 'string',
+    role: 'dimension',
+    values: [
+      { value: 'PAID', label: 'Pago' },
+      { value: 'FAILED', label: 'Falhou' },
+    ],
+    ops: ['eq', 'neq', 'in'],
+  };
+  /** The same money field as above, with the `ops` the catalog resolves for it. */
+  const REVENUE: ReportField = {
+    field: 'revenueCents',
+    label: 'Receita',
+    type: 'money',
+    role: 'measure',
+    ops: ['eq', 'neq', 'gte', 'lte', 'between'],
+  };
+  const filterFields = new Map([
+    ...byName,
+    ['status', STATUS],
+    ['revenueCents', REVENUE],
+  ]);
+
+  const specWith = (filters: ReportSpecWire['filters']): ReportSpecWire => ({
+    entity: 'orders',
+    dimensions: [{ field: 'method' }],
+    measures: [{ field: 'revenueCents', aggregation: 'sum' }],
+    filters,
+    sort: [],
+    presentation: { kind: 'table' },
+  });
+
+  /** The spec a stored one becomes after a trip through the form and back. */
+  const roundTrip = (filters: ReportSpecWire['filters']): ReportSpecWire['filters'] =>
+    specFromDraft(draftFromSpec('R', null, specWith(filters)), filterFields).filters;
+
+  it.each([
+    ['in', [{ field: 'status', operator: 'in', values: ['PAID', 'FAILED'] }]],
+    ['between', [{ field: 'revenueCents', operator: 'between', from: 100, to: 5000 }]],
+    ['eq', [{ field: 'status', operator: 'eq', value: 'PAID' }]],
+  ])('round-trips a stored `%s` filter losslessly', (_operator, filters) => {
+    // Lossless in the direction that matters: a report opened in the builder
+    // and saved back unchanged must be the same document. Before this, a spec
+    // whose filter carried no `value` was DROPPED on the way in — so opening an
+    // MCP-authored `in` report and pressing save published it unfiltered.
+    expect(roundTrip(filters)).toEqual(filters);
+  });
+
+  it('accepts every round-tripped filter at `reportSpecSchema`', () => {
+    const filters: ReportSpecWire['filters'] = [
+      { field: 'status', operator: 'in', values: ['PAID', 'FAILED'] },
+      { field: 'revenueCents', operator: 'between', from: 100, to: 5000 },
+    ];
+    const parsed = reportSpecSchema.safeParse(specWith(roundTrip(filters)));
+    expect(parsed.success).toBe(true);
+  });
+
+  it('produces a schema-valid spec for a filter row built through the form', () => {
+    // The offer and the serialization, joined: pick the operator the UI offers,
+    // fill the row the way its control does, and the spec must parse.
+    const rows = [
+      { field: 'status', operator: 'in', value: '', values: ['PAID'] },
+      { field: 'revenueCents', operator: 'between', value: '', from: '10', to: '20' },
+    ];
+    for (const row of rows) {
+      expect(operatorOptionsFor(filterFields.get(row.field))).toContain(row.operator);
+      const spec = specFromDraft(draft({ filters: [row] }), filterFields);
+      const parsed = reportSpecSchema.safeParse({ ...spec, presentation: { kind: 'table' } });
+      expect(parsed.success).toBe(true);
+    }
+  });
+
+  it('never emits a half-filled row, which is the 400 the old narrowing avoided', () => {
+    const spec = specFromDraft(
+      draft({
+        filters: [
+          { field: 'revenueCents', operator: 'between', value: '', from: '10', to: '' },
+          { field: 'status', operator: 'in', value: '', values: [] },
+        ],
+      }),
+      filterFields,
+    );
+    expect(spec.filters).toEqual([]);
+    expect(reportSpecSchema.safeParse({ ...spec, presentation: { kind: 'table' } }).success).toBe(
+      true,
+    );
   });
 });

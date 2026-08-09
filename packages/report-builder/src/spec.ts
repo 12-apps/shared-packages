@@ -108,6 +108,12 @@ export const reportSpecSchema = z.object({
    * execution context decides, falling back to `America/Sao_Paulo`.
    */
   timeZone: z.string().min(1).max(64).optional(),
+  /**
+   * The hour the tenant's trading day begins, 0-23 (FUT-755). Omitted, the
+   * host's execution context decides, falling back to midnight. A bar closing
+   * at 02:00 sets 5, so Wednesday 00:00-02:00 counts as Tuesday's takings.
+   */
+  dayStartsAt: z.number().int().min(0).max(23).optional(),
   dimensions: z.array(reportDimensionSchema).max(2).default([]),
   measures: z.array(reportMeasureSchema).min(1).max(10),
   filters: z.array(reportFilterSchema).max(20).default([]),

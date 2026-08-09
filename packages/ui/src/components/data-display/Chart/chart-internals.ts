@@ -12,19 +12,29 @@ import type { ChartProps, ChartSeries } from './Chart.types';
 export interface SizeStyles {
   height: number;
   fontSize: string;
+  /**
+   * Gap between an axis line and its tick labels, px.
+   *
+   * Recharts' default of 2 is not enough. The bottom VALUE tick is centred on
+   * the x-axis line, so its text box reaches ~0.79em BELOW that line, while
+   * the category labels begin 2px under the 6px tick mark — the two collide at
+   * the axis corner, at every viewport. Each value below is ~0.8em of its own
+   * font size, which clears the value label's descender with ~6px to spare.
+   */
+  tickMargin: number;
 }
 
 const SIZE_PRESETS: Record<NonNullable<ChartProps['size']>, SizeStyles> = {
-  xs: { height: 200, fontSize: '0.75rem' },
-  sm: { height: 300, fontSize: '0.875rem' },
-  md: { height: 400, fontSize: '1rem' },
-  lg: { height: 500, fontSize: '1.125rem' },
-  xl: { height: 600, fontSize: '1.25rem' },
+  xs: { height: 200, fontSize: '0.75rem', tickMargin: 10 },
+  sm: { height: 300, fontSize: '0.875rem', tickMargin: 12 },
+  md: { height: 400, fontSize: '1rem', tickMargin: 14 },
+  lg: { height: 500, fontSize: '1.125rem', tickMargin: 16 },
+  xl: { height: 600, fontSize: '1.25rem', tickMargin: 18 },
 };
 
 export function getSizeStyles(size: ChartProps['size'], height?: number): SizeStyles {
   const preset = SIZE_PRESETS[size ?? 'md'] ?? SIZE_PRESETS.md;
-  return { height: height ?? preset.height, fontSize: preset.fontSize };
+  return { ...preset, height: height ?? preset.height };
 }
 
 const NEON_PALETTE = ['#00ffff', '#ff00ff', '#ffff00', '#00ff00', '#ff0080', '#8000ff'];
@@ -135,14 +145,28 @@ export function resolveSeries(
 interface AxisTextStyles {
   axisStyle: CSSProperties;
   gridStroke: string;
+  /**
+   * Multiplier applied to `gridStroke`'s own alpha. Gridlines must read one
+   * step BELOW the card border — the border is `divider`, so half of it —
+   * without being dashed at data weight. Expressing the step as an opacity
+   * rather than a second colour keeps it derived from the theme's divider
+   * whatever form that takes (rgba, hex, or a CSS variable, which the colour
+   * helpers cannot decompose).
+   */
+  gridOpacity: number;
 }
 
 export function getAxisStyles(theme: Theme, variant: ChartProps['variant'], fontSize: string): AxisTextStyles {
+  const neon = variant === 'neon';
   return {
     axisStyle: {
       fontSize,
-      fill: variant === 'neon' ? '#00ffff' : theme.palette.text.secondary,
+      fill: neon ? '#00ffff' : theme.palette.text.secondary,
+      // Ticks are columns of digits: they have to line up between rows.
+      fontVariantNumeric: 'tabular-nums',
     },
-    gridStroke: variant === 'neon' ? alpha('#00ffff', 0.1) : theme.palette.divider,
+    gridStroke: neon ? alpha('#00ffff', 0.1) : theme.palette.divider,
+    // The neon grid is already a 10%-alpha cyan; halving it again would erase it.
+    gridOpacity: neon ? 1 : 0.5,
   };
 }

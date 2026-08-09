@@ -51,6 +51,27 @@ const getStripeColorFromTheme = (theme: { palette: { primary: { main: string }; 
   return colorMap[stripeColor];
 };
 
+/**
+ * The zebra stripe for one body row.
+ *
+ * `neutral` — the default — resolves to `palette.action.hover`, which ALREADY
+ * carries its subtlety in its own alpha (`rgba(0,0,0,0.04)` in the light
+ * theme). MUI's `alpha()` REPLACES that channel rather than multiplying it, so
+ * re-alpha-ing it at 0.5 amplified the tint 12.5× into `rgba(0,0,0,0.5)` —
+ * solid #808080 on a white card, which reads as a selected or errored row
+ * rather than as a stripe (FUT-755). It is used as-is instead.
+ *
+ * The named colours are opaque `*.main` values with no alpha of their own, so
+ * they still need one.
+ */
+const stripeRowColor = (
+  theme: Parameters<typeof getStripeColorFromTheme>[0],
+  stripeColor: TableStripeColor = 'neutral',
+): string => {
+  const color = getStripeColorFromTheme(theme, stripeColor);
+  return stripeColor === 'neutral' ? color : alpha(color, 0.15);
+};
+
 // One variant applies at a time, so a lookup replaces the mutually exclusive
 // spreads.
 const TABLE_VARIANTS: Record<string, (args: VariantArgs) => CSSObject> = {
@@ -61,7 +82,7 @@ const TABLE_VARIANTS: Record<string, (args: VariantArgs) => CSSObject> = {
   striped: ({ theme, stripeColor }) => ({
       backgroundColor: theme.palette.background.paper,
       '& .MuiTableBody-root .MuiTableRow-root:nth-of-type(even)': {
-        backgroundColor: alpha(getStripeColorFromTheme(theme, stripeColor), stripeColor === 'neutral' ? 0.5 : 0.15) } }),
+        backgroundColor: stripeRowColor(theme, stripeColor) } }),
   glass: ({ theme }) => ({
       backgroundColor: alpha(theme.palette.background.paper, 0.1),
       backdropFilter: 'blur(20px)',

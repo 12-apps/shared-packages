@@ -57,11 +57,17 @@ function bucketValue(
   row: SourceRow,
   dimension: CompiledDimension,
   timeZone: string,
+  dayStartsAt: number,
 ): Comparable | null {
   const raw = row[dimension.field];
   if (raw === null || raw === undefined) return null;
   if (dimension.timeGrain) {
-    return truncateDateToGrain(raw as string | number | Date, dimension.timeGrain, timeZone);
+    return truncateDateToGrain(
+      raw as string | number | Date,
+      dimension.timeGrain,
+      timeZone,
+      dayStartsAt,
+    );
   }
   return normalize(raw);
 }
@@ -74,7 +80,9 @@ interface Group {
 function groupRows(rows: SourceRow[], query: CompiledQuery): Group[] {
   const groups = new Map<string, Group>();
   for (const row of rows) {
-    const key = query.dimensions.map((dimension) => bucketValue(row, dimension, query.timeZone));
+    const key = query.dimensions.map((dimension) =>
+      bucketValue(row, dimension, query.timeZone, query.dayStartsAt),
+    );
     const mapKey = JSON.stringify(key);
     let group = groups.get(mapKey);
     if (!group) {
