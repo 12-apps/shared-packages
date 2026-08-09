@@ -153,7 +153,11 @@ function stubResizeObserver(width: number): void {
   vi.stubGlobal("ResizeObserver", FakeResizeObserver);
 }
 
-function renderAt(width: number): void {
+function renderAt(
+  width: number,
+  /** Swap the declared controls to prove the answer follows THEM, not the width. */
+  declared?: { fields?: FilterFieldConfig<Row>[]; rangeFields?: RangeFieldConfig<Row>[] },
+): void {
   stubMatchMedia();
   stubResizeObserver(width);
   render(
@@ -161,8 +165,8 @@ function renderAt(width: number): void {
       <DataViewsGrid<Row>
         rows={rows}
         columns={columns}
-        fields={fields}
-        rangeFields={rangeFields}
+        fields={declared?.fields ?? fields}
+        rangeFields={declared?.rangeFields ?? rangeFields}
         getRowId={(row) => row.id}
         testIdPrefix="t"
         inlineFilters
@@ -456,5 +460,54 @@ describe("clearing every filter at once", () => {
         `Mais filtros: ${ALL_CONTROLS.length} sem espaço na barra`,
       ),
     );
+  });
+});
+
+/**
+ * THE COUNT IS MEASURED, NOT A BREAKPOINT.
+ *
+ * "One filter on a large phone" is an OUTCOME of pricing this fixture against
+ * that row — it is not a rule, and nothing in `data-views-overflow.ts` reads a
+ * media query. That distinction is the whole reason the ladder measures:
+ * pages declare different numbers of controls with different label lengths,
+ * and the same page collapses at a different width in another language, so a
+ * shared breakpoint is wrong for at least one table by construction.
+ *
+ * These pin it from both directions at ONE width, because a breakpoint would
+ * give the same answer to all three.
+ */
+describe("what fits follows the controls, not the width alone", () => {
+  const shortPills: FilterFieldConfig<Row>[] = [
+    { id: "pagamento", label: "Pg", accessor: (row) => row.pagamento, options: [{ value: "pago", label: "Pago" }] },
+    { id: "situacao", label: "St", accessor: (row) => row.situacao, options: [{ value: "aberto", label: "Aberto" }] },
+  ];
+  const longPills: FilterFieldConfig<Row>[] = [
+    {
+      id: "pagamento",
+      label: "Situação do pagamento conciliada",
+      accessor: (row) => row.pagamento,
+      options: [{ value: "pago", label: "Pago" }],
+    },
+  ];
+
+  it("keeps MORE on the same row when the table declares cheaper controls", async () => {
+    renderAt(LARGE_MOBILE, { fields: shortPills, rangeFields: [] });
+    await waitFor(() => expect(inlineIds()).toEqual(["pagamento", "situacao"]));
+  });
+
+  it("keeps FEWER on that same row when one control is long enough to fill it", async () => {
+    renderAt(LARGE_MOBILE, { fields: longPills, rangeFields: [] });
+    // One control, and it still does not fit — so the bar carries none, at a
+    // width where two short ones both did.
+    await screen.findByTestId("t-more-filters");
+    expect(inlineIds()).toEqual([]);
+  });
+
+  it("promotes one more as the SAME table's row grows, without a breakpoint between", async () => {
+    // 430 keeps one and 1024 keeps four (see the tables above); 900 sits
+    // between them and keeps two. Nothing in the code names any of these.
+    renderAt(900);
+    await screen.findByTestId("t-more-filters");
+    await waitFor(() => expect(inlineIds()).toEqual(["pagamento", "situacao"]));
   });
 });

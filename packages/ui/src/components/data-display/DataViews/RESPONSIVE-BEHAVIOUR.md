@@ -203,6 +203,13 @@ leaves the board with a single populated column, which reads as data loss.
 of the five widths and asserts the tables above. It is the executable copy of
 this document; if the two disagree, the test is right and this needs updating.
 
+`what fits follows the controls, not the width alone` guards the property the
+rest of this document depends on: the counts above are OUTCOMES of pricing one
+fixture against one row, never rules. At a single width it asserts that a table
+declaring cheaper controls keeps more of them, that one long control keeps
+none, and that the same table promotes another as its row grows — three answers
+a breakpoint could not give.
+
 Two things it cannot check, because jsdom has no layout engine: actual pixel
 overflow, and how anything looks. Those are verified in a real browser against
 the running Storybook, at 1600 / 1280 / 1024 / 900 / 768 / 600 / 500 / 430 / 390
