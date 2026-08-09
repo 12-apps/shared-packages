@@ -1,21 +1,37 @@
-import { defineProviders } from '@12-apps/payments-backend';
+/**
+ * Catalog — the landing page of the merchant `payments-admin` parent, and THE
+ * ONE PAGE allowed to spell a vendor name: this exact path is a hard-coded
+ * exemption in `eslint.payments-portability.config.mjs`, so the slug cannot
+ * move. Every other page of the parent runs on the fictional cast in
+ * `../payments/admin-adapter.ts`.
+ *
+ * Nothing here is a mock of OUR code. The registry, the adapters, the
+ * settings service, the mount and the settings screen are the real published
+ * ones; only the network is replaced, by routing the published client's
+ * `fetchImpl` straight into the in-page mount (see `../payments/admin-store`).
+ *
+ * The vendor adapters are imported for DESCRIPTOR PROJECTION ONLY, and the
+ * mount makes that true by construction: `CATALOG_EXCLUDE` below leaves only
+ * `getSettings` and `getSetupGuide` standing (the setup-guide modules are
+ * pure — type-only imports), so a stray click cannot make a vendor adapter
+ * place a cross-origin call or reach a crypto-backed path. `node:crypto` is
+ * externalized by the build and only throws when CALLED; nothing on this page
+ * calls it. Removing an entry from `CATALOG_EXCLUDE` re-opens exactly that
+ * risk — `admin-probe-write` is the exclusion's live proof.
+ */
+import type { JSX, ReactNode } from 'react';
+
+import { defineProviders, type PaymentsIntentKind } from '@12-apps/payments-backend';
 import { infinitePayProvider } from '@12-apps/payments-backend/providers/infinitepay';
 import { pagbankProvider } from '@12-apps/payments-backend/providers/pagbank';
 import { stoneProvider } from '@12-apps/payments-backend/providers/stone';
 import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
-import { PaymentProviderSettings } from '@12-apps/payments-frontend';
 
-/**
- * The composition a host actually performs: adapters registered against
- * @12-apps/payments-backend, rendered by @12-apps/payments-frontend — both
- * installed from their published tarballs, neither reachable as a workspace
- * sibling.
- *
- * Nothing here is a mock of OUR code. The registry, the adapters and the
- * settings page are the real published ones; only the transport is replaced,
- * because a merchant's stored credentials are the host's half of the contract
- * and belong to the backend harness, not this one.
- */
+import { adminCase, RawRequestButton } from '../payments/admin-cases';
+import type { AdminStoreSpec, AdminWorld } from '../payments/admin-store';
+import { CaseTabs, PageIntro, type HarnessCase } from '../payments/panel';
+
+/** The published catalog, composed the way a host composes it. */
 const registry = defineProviders({
   pagbank: pagbankProvider(),
   stone: stoneProvider(),
@@ -23,46 +39,82 @@ const registry = defineProviders({
   stripe: stripeProvider(),
 });
 
-// The same projection the backend's settings service performs — every field
-// read off the adapter itself, so a descriptor the adapters stop supplying
-// shows up here as a card that fails to render rather than as a green test.
-const providers = registry.names.map((name) => {
-  const adapter = registry.get(name);
-  return {
-    name: adapter.name,
-    displayName: adapter.displayName,
-    urlSlug: registry.urlSlugOf(adapter.name),
-    capabilities: adapter.capabilities,
-    authMode: adapter.authMode ?? 'credentials',
-    credentialSchema: adapter.credentialSchema,
-  };
-});
+/**
+ * All twelve non-`getSettings`/`getSetupGuide` members of the canonical route
+ * table. Only the two reads survive, so the mount answers 404 before any
+ * vendor adapter method runs — read-only BY CONSTRUCTION, not by discipline.
+ */
+const CATALOG_EXCLUDE: PaymentsIntentKind[] = [
+  'createCharge',
+  'getCharge',
+  'handleWebhook',
+  'getClientConfig',
+  'completeOAuth',
+  'saveCredentials',
+  'setEnabled',
+  'setPriorities',
+  'setFailoverPolicy',
+  'verify',
+  'beginOAuth',
+  'disconnectOAuth',
+];
 
-const view = {
-  providers,
-  configs: [],
-  providerChain: [],
-  activeProvider: null,
-  failoverPolicy: 'TECHNICAL',
-};
+/** Same mount for every case; only the baseUrl (case isolation) differs. */
+function catalogSpec(caseId: string): AdminStoreSpec {
+  return { registry, exclude: CATALOG_EXCLUDE, baseUrl: `/api/harness/payments/${caseId}` };
+}
 
-const unsupported = (action: string) => async () => {
-  throw new Error(`the frontend harness does not implement ${action} — that is the backend harness's job`);
-};
+/**
+ * The exclusion's live proof: one write at the mount, issued raw (the
+ * published client throws on a non-2xx, which would report the refusal by
+ * exploding instead of by printing a status). Expected answer: 404.
+ */
+function probeWrite(world: AdminWorld): ReactNode {
+  return (
+    <RawRequestButton
+      world={world}
+      testid="admin-probe-write"
+      label="Tentar gravação direta"
+      method="PUT"
+      route="/settings/providers/stone"
+      body={{ environment: 'SANDBOX', fields: {} }}
+    />
+  );
+}
 
-const client = {
-  baseUrl: '/api/harness/payments',
-  getSettings: async () => view,
-  saveCredentials: unsupported('saveCredentials'),
-  setEnabled: unsupported('setEnabled'),
-  setPriorities: unsupported('setPriorities'),
-  setFailoverPolicy: unsupported('setFailoverPolicy'),
-  verify: unsupported('verify'),
-};
+/**
+ * Three cases, one mount shape. They exist so each spec lands on its own
+ * world (distinct baseUrl = distinct localStorage ack scope and wire log):
+ * `catalog` pins the four cards and read-only-ness, `slug-alias` lands
+ * controlled on the raw `infinitepay` name and watches the canonical
+ * `infinite-pay` respelling arrive with `{replace: true}`, `guides` opens the
+ * one vendor that ships a setup guide and the one that ships none.
+ */
+const CASES: readonly HarnessCase[] = [
+  adminCase('catalog', 'Published catalog', catalogSpec('catalog'), {
+    controlled: true,
+    controls: probeWrite,
+  }),
+  adminCase('slug-alias', 'Alias landing', catalogSpec('slug-alias'), {
+    controlled: true,
+    controls: probeWrite,
+  }),
+  adminCase('guides', 'Setup guides', catalogSpec('guides'), {
+    controlled: true,
+    controls: probeWrite,
+  }),
+];
 
-export function PaymentsProviderSettingsPage() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the stub above
-  // implements the transport surface the settings page uses; the full client type
-  // also carries members only the credential flows reach.
-  return <PaymentProviderSettings client={client as any} />;
+export function PaymentsProviderSettingsPage(): JSX.Element {
+  return (
+    <>
+      <PageIntro title="Provider settings · catalog">
+        The four published vendor adapters, projected by the real settings service into the real
+        settings screen — read-only by construction, with selection kept in the hash query
+        (controlled mode, the URL contract the production admin implements). The other pages of
+        this parent exercise the writes, over fictional providers.
+      </PageIntro>
+      <CaseTabs cases={CASES} />
+    </>
+  );
 }
