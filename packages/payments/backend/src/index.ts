@@ -75,6 +75,21 @@ export type {
   WebhookInbox,
 } from './core/ports';
 export { isForwardTransition, isTerminal } from './core/status';
+/**
+ * The pending-charge reconciliation sweep (FUT-761): re-read still-waiting
+ * charges from the provider and hand PAID ones to the host's idempotent
+ * settle port — the machine that rescues a paid charge whose webhook never
+ * arrived once the buyer's tab stops polling.
+ */
+export {
+  reconcilePendingCharges,
+  type PendingChargeWindow,
+  type PendingSweepDeps,
+  type PendingSweepOptions,
+  type PendingSweepReport,
+} from './core/payable-sweep';
+/** Adapter-declared field roles (FUT-761): which credential field authenticates inbound deliveries. */
+export { webhookFieldOf } from './core/credential-roles';
 export { withMerchantRedirectUrl, withMerchantWebhookUrl } from './core/webhook-url';
 export type { MerchantWebhookUrlResolver } from './core/webhook-url';
 export {
@@ -199,6 +214,14 @@ export {
   type SettingsServiceOptions,
 } from './config/service';
 export { type VerifiedProviderConfig } from './config/verify';
+/**
+ * Platform credential bootstrap (FUT-761): env seeds, panel owns. Reading
+ * the seeds out of the deployment's env vars stays host wiring.
+ */
+export {
+  ensurePlatformCredentials,
+  type PlatformCredentialSeed,
+} from './config/platform-seed';
 /**
  * The credential-write contract (FUT-694), exported so a host that mounts its
  * own settings route — rather than `createPaymentsHttp` — refuses the same

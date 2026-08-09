@@ -6,7 +6,7 @@ import type {
 } from './config/types';
 import { PaymentsError } from './core/errors';
 import { mergeRefreshedSnapshot } from './core/snapshot-merge';
-import { isForwardTransition } from './core/status';
+import { isForwardTransition, isTerminal } from './core/status';
 import type {
   AttemptLedger,
   ChargeAttemptRecord,
@@ -140,6 +140,17 @@ function payableQueries(rows: readonly StoredCharge[]): ChargeQueryStore {
       // timestamp sort would then hand back an arbitrary one of them as "the
       // live charge". Insertion order is the only total order a fake has.
       return rows.filter((row) => matchesPayableQuery(row, query)).reverse();
+    },
+    async listPendingCharges(window) {
+      // Oldest first — the sweep's fairness order; a full batch never starves.
+      return rows
+        .filter(
+          (row) =>
+            !isTerminal(row.snapshot.status) &&
+            row.createdAt < window.before &&
+            row.createdAt > window.after,
+        )
+        .slice(0, window.limit);
     },
   };
 }

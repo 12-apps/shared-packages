@@ -1,4 +1,5 @@
 import type { MerchantRef, Money, PaymentMethodKind } from './types';
+import type { PendingChargeWindow } from './payable-sweep';
 import type { StoredCharge } from './ports';
 
 /**
@@ -74,4 +75,13 @@ export interface ChargeQueryStore {
    * every `--<attempt>` suffix under it, never a bare prefix.
    */
   latestByReference(merchant: MerchantRef, reference: string): Promise<StoredCharge | null>;
+  /**
+   * Charges still awaiting the provider's answer — `PENDING`/`AUTHORIZED` —
+   * ACROSS merchants, created inside the window, oldest first, at most
+   * `limit` (FUT-761). The read `reconcilePendingCharges` sweeps on: a paid
+   * charge whose webhook went missing is otherwise rescued only while the
+   * buyer's own tab keeps polling. OPTIONAL for compatibility — both in-repo
+   * stores implement it; the sweep refuses loudly on one that does not.
+   */
+  listPendingCharges?(window: PendingChargeWindow): Promise<StoredCharge[]>;
 }
