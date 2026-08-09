@@ -88,12 +88,26 @@ const MIN_TEXT_CONTRAST = 4.5;
 type Rgb = readonly [number, number, number];
 
 function parseColor(value: string): Rgb | null {
-  const hex = /^#?([0-9a-f]{6})$/i.exec(value.trim());
+  const text = value.trim();
+
+  // SHORT hex matters: MUI's own `background.paper` is `#fff`, so a parser that
+  // only took six digits silently failed on the default theme (FUT-755) — and
+  // "unparseable" then meant "no contrast", which darkened the accent all the
+  // way to black on every screen. Verified in a browser; unit cases that all
+  // passed `#ffffff` could not see it.
+  const short = /^#([0-9a-f]{3})$/i.exec(text);
+  if (short?.[1] !== undefined) {
+    const [r, g, b] = [...short[1]].map((c) => Number.parseInt(c + c, 16));
+    return [r ?? 0, g ?? 0, b ?? 0];
+  }
+
+  const hex = /^#?([0-9a-f]{6})$/i.exec(text);
   if (hex?.[1] !== undefined) {
     const n = Number.parseInt(hex[1], 16);
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
-  const rgb = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(value);
+
+  const rgb = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(text);
   if (rgb === null) return null;
   return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
 }
@@ -136,7 +150,11 @@ export function contrastRatio(foreground: string, background: string): number {
  */
 export function accessibleAccent(accent: string, background: string): string {
   const parsed = parseColor(accent);
-  if (parsed === null) return accent;
+  // Fail SAFE, not black. If either colour cannot be read, the honest answer is
+  // "leave the brand alone" — darkening against an unknown background walks the
+  // loop to black and silently repaints the whole area, which is a worse defect
+  // than the 0.03 this exists to close.
+  if (parsed === null || parseColor(background) === null) return accent;
 
   // Verbatim when it already passes: a caller's `#RRGGBB` should come back as
   // it went in, not reformatted into `rgb()` for no reason.

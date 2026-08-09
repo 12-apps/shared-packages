@@ -71,4 +71,22 @@ describe('accessibleAccent', () => {
     // returning black would be a worse answer than not changing it.
     expect(accessibleAccent('var(--brand)', WHITE)).toBe('var(--brand)');
   });
+
+  it('reads SHORT hex, which is what the default theme actually hands it', () => {
+    // MUI's `background.paper` is `#fff`. A six-digit-only parser made this
+    // read as "no contrast", which walked the accent all the way to black on
+    // every reports screen — and every case above missed it, because they all
+    // pass `#ffffff`. Caught by looking at a browser; pinned here.
+    expect(contrastRatio('#000', '#fff')).toBeCloseTo(21, 0);
+
+    const derived = accessibleAccent(SHIPPED_ACCENT, '#fff');
+    expect(contrastRatio(derived, WHITE)).toBeGreaterThanOrEqual(4.5);
+    expect(derived).not.toBe('rgb(0, 0, 0)');
+  });
+
+  it('leaves the accent alone when the BACKGROUND is unreadable', () => {
+    // Fail safe, not black: darkening against an unknown background repaints
+    // the area rather than closing a 0.03 gap.
+    expect(accessibleAccent(SHIPPED_ACCENT, 'var(--surface)')).toBe(SHIPPED_ACCENT);
+  });
 });
