@@ -190,6 +190,7 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
       pulse,
       'data-testid': dataTestId,
       value,
+      'aria-label': ariaLabel,
       ...props
     },
     ref,
@@ -223,6 +224,24 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
           data-testid={dataTestId ? `${dataTestId}-select` : 'select'}
           value={value ?? ''}
           {...props}
+          /*
+           * `role="combobox"` sits on MUI's display DIV, not on the hidden
+           * native input that `{...props}` reaches — so an `aria-label` passed
+           * to this component never landed on the element carrying the role,
+           * and MUI's `aria-labelledby` then fell back to that div's OWN id.
+           * The control announced as its current value: a filter's field
+           * select read "Status" instead of "Filtro 1 — campo".
+           *
+           * Forwarding it here names the right element. The explicit
+           * `undefined` clears that self-referential `aria-labelledby`, which
+           * would otherwise win — a labelledby always beats a label in the
+           * accessible-name computation.
+           */
+          SelectDisplayProps={
+            ariaLabel === undefined
+              ? undefined
+              : { 'aria-label': ariaLabel, 'aria-labelledby': undefined }
+          }
         >
           {renderMenuItems(options, placeholder, dataTestId)}
         </MuiSelect>
