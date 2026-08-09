@@ -1,6 +1,6 @@
 # Orientation — the plan mapped onto this repo
 
-Output of **Prompt 1** (`handoff.md`) and the **inventory prompt** (`porting.md` §5), run against
+Output of **Prompt 1** (`handoff-method.md`) and the **inventory prompt** (`porting.md` §5), run against
 `packages/report-builder` at `316c22f`. No files were changed to produce this.
 
 `plan.md` and `notes.md` were written from screenshots of the running app, not from the source. This
