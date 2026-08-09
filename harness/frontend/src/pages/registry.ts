@@ -15,6 +15,9 @@ import { PaymentsCheckoutProviderScreensPage } from './payments-checkout-provide
 import { PaymentsCheckoutRedirectPage } from './payments-checkout-redirect';
 import { PaymentsCheckoutSavedCardsPage } from './payments-checkout-saved-cards';
 import { PaymentsCheckoutSlotsPage } from './payments-checkout-slots';
+import { PaymentsProviderChainPage } from './payments-provider-chain';
+import { PaymentsProviderConnectPage } from './payments-provider-connect';
+import { PaymentsProviderCredentialsPage } from './payments-provider-credentials';
 import { PaymentsProviderSettingsPage } from './payments-provider-settings';
 import { PwaInstallPromptPage } from './pwa-install-prompt';
 import { ReportBuilderPage } from './report-builder';
@@ -104,7 +107,19 @@ export const NAV_GROUPS: readonly HarnessNavGroup[] = [
     // that are not payments sank below them.
     parents: [{ key: 'checkout', label: 'Checkout', slug: 'payments-checkout-pix' }],
   },
-  { key: 'backoffice', label: 'Backoffice' },
+  {
+    key: 'backoffice',
+    label: 'Backoffice',
+    // Four pages, one screen. What differs between them is the HOST WIRING —
+    // which ports the mount is given, which built-in intents it serves,
+    // whether provider selection is controlled — not the screen. That is the
+    // same claim `checkout` makes for its buyer flows, and it is the exception
+    // the rule above already carries. Flat, these would outnumber every other
+    // backoffice row three to one.
+    parents: [
+      { key: 'payments-admin', label: 'Provider settings', slug: 'payments-provider-settings' },
+    ],
+  },
 ];
 
 /** The `payments-checkout-*` block: one page per BUYER FLOW (FUT-743). */
@@ -118,6 +133,13 @@ const CHECKOUT_FLOW = {
   pkg: PAYMENTS_FRONTEND,
   group: 'storefront',
   parent: 'checkout',
+} as const;
+
+/** Every page of the `payments-admin` parent shares these. */
+const PAYMENTS_ADMIN = {
+  pkg: PAYMENTS_FRONTEND,
+  group: 'backoffice',
+  parent: 'payments-admin',
 } as const;
 
 export const PAGES: readonly HarnessPage[] = [
@@ -210,12 +232,31 @@ export const PAGES: readonly HarnessPage[] = [
   },
 
   // --- Backoffice: what the STORE sees ------------------------------------
+  // Titles name only what VARIES; the parent row already says "Provider
+  // settings".
   {
+    ...PAYMENTS_ADMIN,
     slug: 'payments-provider-settings',
-    title: 'Provider settings',
-    pkg: PAYMENTS_FRONTEND,
-    group: 'backoffice',
+    title: 'Catalog',
     Component: PaymentsProviderSettingsPage,
+  },
+  {
+    ...PAYMENTS_ADMIN,
+    slug: 'payments-provider-credentials',
+    title: 'Credentials',
+    Component: PaymentsProviderCredentialsPage,
+  },
+  {
+    ...PAYMENTS_ADMIN,
+    slug: 'payments-provider-connect',
+    title: 'Connect (OAuth)',
+    Component: PaymentsProviderConnectPage,
+  },
+  {
+    ...PAYMENTS_ADMIN,
+    slug: 'payments-provider-chain',
+    title: 'Chain & policy',
+    Component: PaymentsProviderChainPage,
   },
   {
     slug: 'report-builder',
