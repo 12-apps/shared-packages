@@ -38,6 +38,13 @@ import type {
   PaymentProviderAdapter,
 } from "@12-apps/payments-backend";
 
+/**
+ * The wallet vocabulary, read off the adapter's own capability table — the
+ * backend's root entry exports no standalone name for it here, and restating
+ * the union would be the copy that drifts.
+ */
+type WalletKind = NonNullable<PaymentProviderAdapter["capabilities"]["wallets"]>[number];
+
 /** The one merchant every story is set at. */
 export const MERCHANT: MerchantRef = { kind: "TENANT", id: "loja-1" };
 /** Money, in the only currency these stories deal in. */
@@ -96,6 +103,20 @@ export interface StoryProvider {
    * named for the vendor, which this file refuses.
    */
   checkoutScreen?: string;
+  /**
+   * The digital wallets this provider's card charge accepts (FUT-471/472) —
+   * declared exactly as a real adapter declares them (and as the harness's
+   * `HarnessProvider` does), so the gateway's capability stamp and the buttons'
+   * fail-closed gates run for real on a story store. Omitted ⇒ `[]` on the
+   * published chain, which is exactly the no-wallet store.
+   */
+  wallets?: WalletKind[];
+  /**
+   * Google Pay's `gatewayMerchantId` for this connection (FUT-471). Present ⇒
+   * `clientConfig` publishes the PAYMENT_GATEWAY parameters, with the
+   * provider's own (fictional) name as the gateway id.
+   */
+  googlePayMerchantId?: string;
 }
 
 /** The PIX payload a stub provider hands back — a payload, never an image. */
@@ -116,6 +137,9 @@ export function storyAdapter(spec: StoryProvider, seen: ChargeInput[]): PaymentP
     displayName: spec.name,
     capabilities: {
       methods: spec.methods ?? ["PIX", "CARD"],
+      // Declared, not defaulted: the published chain carries the claim and the
+      // wallet buttons fail CLOSED on its absence, so that gate runs for real.
+      wallets: spec.wallets ?? [],
       savedCards: true,
       refunds: false,
       partialRefunds: false,
@@ -152,7 +176,16 @@ export function storyAdapter(spec: StoryProvider, seen: ChargeInput[]): PaymentP
         return [];
       },
     },
-    clientConfig: () => ({ provider: spec.name, tokenization }),
+    clientConfig: () => ({
+      provider: spec.name,
+      tokenization,
+      // The PAYMENT_GATEWAY parameters, published exactly as a real adapter
+      // publishes them (FUT-471) — a per-credential fact, so it rides on
+      // `clientConfig` while `wallets` rides on `capabilities`.
+      ...(spec.googlePayMerchantId
+        ? { googlePay: { gateway: spec.name, gatewayMerchantId: spec.googlePayMerchantId } }
+        : {}),
+    }),
   };
 }
 
