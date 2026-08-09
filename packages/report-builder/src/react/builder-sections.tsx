@@ -16,6 +16,7 @@ import { editFilterRow } from "./builder-filters";
 import { FilterRow } from "./builder-filter-row";
 import { AGGREGATION_LABELS, aggregationOptions, editMeasureRow } from "./builder-measures";
 import { chartOptions, GRAIN_LABELS, type BuilderDraft } from "./builder-model";
+import { SECTION_LABEL_STYLE } from "./lib/report-surface";
 import type { ReportGrain } from "./reports-api";
 
 type Patch = (patch: Partial<BuilderDraft>) => void;
@@ -27,6 +28,15 @@ interface SectionProps {
 }
 
 const NONE = { value: "", label: "(nenhuma)" };
+
+/** A section's heading, at the one level every section in this form uses. */
+function SectionHeading({ children }: { children: string }): JSX.Element {
+  return (
+    <Text variant="heading" size="xs" color="secondary" as="h3" style={SECTION_LABEL_STYLE}>
+      {children}
+    </Text>
+  );
+}
 
 function fieldOptions(fields: ReportField[], role?: ReportField["role"]): Array<{ value: string; label: string }> {
   return fields
@@ -40,9 +50,7 @@ export function GroupBySection({ draft, fields, update }: SectionProps): JSX.Ele
   const dimension = dimensionAt(draft, 0);
   return (
     <Stack spacing={1}>
-      <Text variant="heading" size="xs" as="h3">
-        Agrupar por
-      </Text>
+      <SectionHeading>Agrupar por</SectionHeading>
       <Stack direction="row" spacing={1}>
         <Select
           size="small"
@@ -78,9 +86,7 @@ export function SplitBySection({ draft, fields, update }: SectionProps): JSX.Ele
   const axis = dimensionAt(draft, 0);
   return (
     <Stack spacing={1}>
-      <Text variant="heading" size="xs" as="h3">
-        Separar em séries
-      </Text>
+      <SectionHeading>Separar em séries</SectionHeading>
       <Select
         size="small"
         label="Uma série por"
@@ -104,13 +110,18 @@ export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.El
   };
   return (
     <Stack spacing={1}>
-      <Text variant="heading" size="xs" as="h3">
-        Medidas
-      </Text>
+      <SectionHeading>Medidas</SectionHeading>
       {draft.measures.map((measure, index) => (
         <Stack key={index} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          {/* Both a visible `label` and an `aria-label` (FUT-755). The visible
+              one is what makes this field the same SHAPE as every other field
+              in the column — `visual-pass.md` §Components asks for one field
+              style, and a notch-less select beside a floating-label one is two.
+              The `aria-label` stays because it says WHICH measure this is;
+              MUI's own name would otherwise be the current value. */}
           <Select
             size="small"
+            label={`Medida ${index + 1}`}
             aria-label={`Medida ${index + 1}`}
             options={fieldOptions(fields)}
             value={measure.field}
@@ -119,6 +130,7 @@ export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.El
           />
           <Select
             size="small"
+            label="Agregação"
             aria-label="Agregação"
             options={aggregationOptions(byName.get(measure.field)).map((aggregation) => ({
               value: aggregation,
@@ -157,9 +169,7 @@ export function FiltersSection({ draft, fields, update }: SectionProps): JSX.Ele
   const options = [NONE, ...fieldOptions(fields)];
   return (
     <Stack spacing={1}>
-      <Text variant="heading" size="xs" as="h3">
-        Filtros
-      </Text>
+      <SectionHeading>Filtros</SectionHeading>
       {draft.filters.map((filter, index) => (
         <FilterRow
           key={index}
@@ -193,9 +203,7 @@ export function PresentationSection({ draft, fields, update }: SectionProps): JS
   const options = chartOptions(draft, new Map(fields.map((field) => [field.field, field])));
   return (
     <Stack spacing={1}>
-      <Text variant="heading" size="xs" as="h3">
-        Visualização
-      </Text>
+      <SectionHeading>Visualização</SectionHeading>
       <VizPicker
         options={options}
         value={draft.chartType}

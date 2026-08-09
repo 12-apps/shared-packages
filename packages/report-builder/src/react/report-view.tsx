@@ -159,7 +159,12 @@ export function ReportActionsMenu({
         size="sm"
         items={items}
         trigger={
-          <Button variant="text" size="sm" aria-label="Ações do relatório" dataTestId="report-actions">
+          // `outline`, not `text` (FUT-755): this sits on the tinted canvas
+          // beside "Exportar PDF", and a transparent button there borrowed the
+          // tint — 4.10:1 for its glyph against 4.47:1 for the outlined button
+          // next to it. It is also the only route to Editar, so it should read
+          // as a control rather than as a mark someone left on the page.
+          <Button variant="outline" size="sm" aria-label="Ações do relatório" dataTestId="report-actions">
             ⋮
           </Button>
         }

@@ -29,6 +29,7 @@ import { useRunReport, type ReportSpecWire } from "./custom-reports-api";
 import { GripIcon, PencilIcon, TrashIcon } from "./lib/block-icons";
 import { ConfirmDialog } from "./lib/confirm-dialog";
 import type { DragReorder, KeyboardReorder } from "./lib/drag-reorder";
+import { CONTAINER_RADIUS_PX } from "./lib/report-surface";
 import { ReportBlockFrame, ReportGridItem } from "./report-grid";
 import { ReportRenderView } from "./report-render";
 import { blockLabel, type ReportBlockDraft } from "./report-model";
@@ -95,8 +96,15 @@ function BlockTitleSlot({
   testId: string;
   onTitleChange: (title: string) => void;
 }): JSX.Element {
+  // A floor, not `minWidth: 0` (FUT-755). The frame's header wraps, and the
+  // comment there says why — the chrome moves to a second line rather than
+  // stealing width from the rendering. It never did: a title slot allowed to
+  // shrink to zero always wins that argument, so at 1024px with the panel open
+  // the input measured 36px against 170px of title and the block was headed
+  // `Rec`. A floor makes the row genuinely unable to fit, which is the
+  // condition `flexWrap` was waiting for.
   return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: "center", flex: 1, minWidth: 0 }}>
+    <Stack direction="row" spacing={1} sx={{ alignItems: "center", flex: 1, minWidth: 140 }}>
       <Box
         {...dnd.handleProps(block.id)}
         sx={{ cursor: "grab", userSelect: "none", display: "inline-flex", color: "text.secondary" }}
@@ -272,8 +280,7 @@ function BlockGroup({
         onSelect();
       }}
       sx={{
-        height: "100%",
-        borderRadius: 1,
+        borderRadius: `${CONTAINER_RADIUS_PX}px`,
         "&:focus-visible": BLOCK_RING,
         ...(selected ? BLOCK_RING : {}),
       }}

@@ -47,7 +47,14 @@ export function ReportGrid({
         display: "flex",
         flexWrap: "wrap",
         gap: `${GRID_GAP_PX}px`,
-        alignItems: "stretch",
+        // A block is as tall as its CONTENT (`prototype.html`'s canvas is
+        // `align-items:start`). Stretched, a three-row table beside a chart was
+        // padded out to the chart's height and carried ~180px of empty white
+        // inside its own border. That is "dead space" — sixth in
+        // `visual-pass.md`'s ranking of what makes these screens read as cheap
+        // — and it is worse than a ragged row, because a block with a hole in
+        // it looks like one that failed to load the rest of itself.
+        alignItems: "flex-start",
       }}
       data-testid={dataTestId}
     >
@@ -187,7 +194,6 @@ export function ReportBlockFrame({
       variant="outlined"
       sx={{
         p: 2,
-        height: "100%",
         // Explicit, because the canvas under it is tinted: the card is the
         // SURFACE and the page is the canvas, which is the pair that gives the
         // block depth without a shadow.
@@ -199,7 +205,7 @@ export function ReportBlockFrame({
       data-testid={dataTestId}
       {...{ [PRINT_BLOCK_ATTR]: "" }}
     >
-      <Stack spacing={1.5} sx={{ height: "100%" }}>
+      <Stack spacing={1.5}>
         {/* Wraps rather than squeezes: a 2-column block's chrome moves to a
          * second line instead of stealing width from the rendering below. */}
         <Stack

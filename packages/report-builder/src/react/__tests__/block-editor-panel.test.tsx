@@ -507,3 +507,65 @@ describe('BlockEditorPanel — the close control says what it closes', () => {
     expect(screen.queryAllByRole('button', { name: 'Close drawer' })).toEqual([]);
   });
 });
+
+/**
+ * FUT-755 — the panel is ONE field style and ONE section level.
+ *
+ * `visual-pass.md` §Components asks for one field style, and this column had
+ * two: the collection, axis and split selects carried floating labels while
+ * every measure and filter control was a bare notch-less box beside them. Two
+ * field shapes in one column is the "default component identity" failure that
+ * file ranks third — "two design languages in one screen reads as unfinished
+ * rather than as a choice".
+ *
+ * §Type asks for one scale with no two adjacent levels within 2px, and one
+ * weight per level. The section headings rendered at exactly the field labels'
+ * size, so WEIGHT alone separated a heading from a label. They become the
+ * scale's eyebrow level instead: same size, different case and tracking.
+ *
+ * jsdom cannot prove either of those looks right — there is no layout engine
+ * and `sx` compiles to a class it will not cascade. What it proves is the
+ * structure each rule turns on: that no field is left without a label element,
+ * and that every heading carries the eyebrow's own declarations.
+ */
+describe('BlockEditorPanel — one field style, one section level', () => {
+  it.each([
+    ['the desktop panel', DESKTOP_PX],
+    ['the bottom sheet', MOBILE_PX],
+  ])('gives every field in %s a visible label', (_branch, widthPx) => {
+    setViewport(widthPx);
+    renderPanel();
+
+    // MUI renders the notch from an `InputLabel` inside the field's own
+    // `FormControl`. No label element means no notch — the bare box this
+    // closes — so the count of unlabelled controls is the assertion.
+    const controls = Array.from(document.querySelectorAll('.MuiFormControl-root'));
+    expect(controls.length).toBeGreaterThan(0);
+
+    const bare = controls
+      .filter((control) => control.getElementsByClassName('MuiInputLabel-root').length === 0)
+      .map((control) => control.getAttribute('data-testid') ?? '(unnamed)');
+    expect(bare).toEqual([]);
+  });
+
+  it('sets every section heading in the eyebrow case, not merely in bold', () => {
+    setViewport(DESKTOP_PX);
+    renderPanel();
+
+    const headings = Array.from(document.querySelectorAll('h3'));
+    expect(headings.length).toBeGreaterThan(0);
+
+    // Read off the inline style, which is why the eyebrow is declared as one:
+    // jsdom does not cascade an emotion class, so an `sx` rule here would be
+    // untestable and this one is not.
+    const notEyebrow = headings
+      .filter((heading) => (heading as HTMLElement).style.textTransform !== 'uppercase')
+      .map((heading) => heading.textContent ?? '');
+    expect(notEyebrow).toEqual([]);
+
+    const untracked = headings.filter(
+      (heading) => (heading as HTMLElement).style.letterSpacing === '',
+    );
+    expect(untracked).toEqual([]);
+  });
+});
