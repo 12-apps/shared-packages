@@ -2,10 +2,10 @@ import type { ProviderConfigStore } from '../config/types';
 import { providerCorrelationId } from '../core/client-view';
 import type { PaymentsGateway } from '../core/gateway';
 import type { ChargeQueryStore, ChargeStore, CredentialStore } from '../core/ports';
-import type { ChargeSnapshot, MerchantRef } from '../core/types';
+import type { ChargeSnapshot, MerchantRef, PaymentMethodKind } from '../core/types';
 
 import type { CheckoutCopy } from './copy';
-import type { CheckoutRefusal } from './failure';
+import { checkoutRefusalFor, type CheckoutRefusal, type FailureContext } from './failure';
 import type {
   AttachedCharge,
   BrowserKeyPort,
@@ -68,6 +68,16 @@ export interface PaymentFlowsBEConfig<Caller, View extends object, Display = unk
   copy: CheckoutCopy;
   /** One vendor's error vocabulary. See `FailureContext.mapProviderError`. */
   mapProviderError?: (error: unknown) => CheckoutErrorBody | null;
+  /**
+   * See a THROWN charge failure raw, before it is worded (FUT-490) — the
+   * account-bookkeeping seam. future-pay flips the merchant's connection to
+   * FAILED on an account-level rejection (401/403), so its settings screen
+   * surfaces the outage instead of a stale VERIFIED. Fired from both money
+   * paths' catch; a guard refusal (an identity mismatch) is an outcome, not an
+   * error, and never reaches it. Awaited, and CONTAINED: a hook that throws is
+   * logged and cannot mask the refusal the buyer is owed.
+   */
+  onChargeError?: (merchant: MerchantRef, error: unknown) => Promise<void> | void;
   respond?: CheckoutResponder;
   logger?: CheckoutLogger;
 
@@ -150,6 +160,45 @@ export function sendRefusal(
   refusal: CheckoutRefusal,
 ): Response {
   return runtime.respond.fail(refusal.body, refusal.status);
+}
+
+/** The wording pipeline's inputs, assembled from the runtime once per failure. */
+export function failureContext<Caller, View extends object, Display>(
+  runtime: CheckoutRuntime<Caller, View, Display>,
+  ref: string,
+  method: PaymentMethodKind,
+): FailureContext {
+  return {
+    copy: runtime.copy,
+    log: runtime.log,
+    ref,
+    method,
+    mapProviderError: runtime.config.mapProviderError,
+  };
+}
+
+/**
+ * Word a THROWN charge failure and answer it — after the host's bookkeeping
+ * hook has seen the raw error. Both money paths' catch blocks end here, so
+ * `onChargeError` cannot be skipped on one of them.
+ */
+export async function chargeRefusal<Caller, View extends object, Display>(
+  runtime: CheckoutRuntime<Caller, View, Display>,
+  payable: Payable,
+  error: unknown,
+): Promise<Response> {
+  try {
+    await runtime.config.onChargeError?.(payable.merchant, error);
+  } catch (hookError) {
+    // Contained: host bookkeeping must never mask the refusal the buyer is owed.
+    runtime.log.error(
+      `[payments] onChargeError hook failed for ${payable.ref}: ${
+        hookError instanceof Error ? hookError.message : String(hookError)
+      }`,
+    );
+  }
+  const context = failureContext(runtime, payable.ref, payable.method);
+  return sendRefusal(runtime, checkoutRefusalFor(context, error));
 }
 
 /** The merchant cannot take payment at all. 409: a state the buyer cannot fix. */

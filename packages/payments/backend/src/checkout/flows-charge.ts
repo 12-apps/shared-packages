@@ -3,11 +3,13 @@ import type { ChargeSnapshot, PaymentMethodKind } from '../core/types';
 
 import { buyerCheckoutConfig, usesHostedCheckout } from './config';
 import { chargeDraftOf } from './draft';
-import { chargeMismatchRefusal, checkoutRefusalFor, type FailureContext } from './failure';
+import { chargeMismatchRefusal } from './failure';
 import { raiseCharge } from './raise';
 import type { CheckoutCard } from './reuse';
 import {
   attachedChargeOf,
+  chargeRefusal,
+  failureContext,
   loadPayable,
   notConfigured,
   payableNotFound,
@@ -32,20 +34,6 @@ import type { CheckoutChargeDraft, CheckoutRouteIntent, Payable } from './types'
  */
 
 type Runtime<C, V extends object, D> = CheckoutRuntime<C, V, D>;
-
-function failureContext<C, V extends object, D>(
-  runtime: Runtime<C, V, D>,
-  ref: string,
-  method: PaymentMethodKind,
-): FailureContext {
-  return {
-    copy: runtime.copy,
-    log: runtime.log,
-    ref,
-    method,
-    mapProviderError: runtime.config.mapProviderError,
-  };
-}
 
 /** The payable's view after a correlation write, or the one we already had. */
 async function refreshedView<C, V extends object, D>(
@@ -199,8 +187,7 @@ export async function createCheckout<C, V extends object, D>(
       usesHostedCheckout(config, created.payable.method),
     );
   } catch (error) {
-    const context = failureContext(runtime, created.payable.ref, created.payable.method);
-    return sendRefusal(runtime, checkoutRefusalFor(context, error));
+    return chargeRefusal(runtime, created.payable, error);
   }
 }
 
@@ -387,7 +374,8 @@ export async function chargeInstrument<C, V extends object, D>(
     await maybeSaveInstrument(runtime, caller, payable, snapshot, draft, instrument.vaulted);
     return runtime.respond.ok({ status });
   } catch (error) {
-    const context = failureContext(runtime, payable.ref, 'CARD');
-    return sendRefusal(runtime, checkoutRefusalFor(context, error));
+    // `payable.method` IS 'CARD' here — `unchargeableBy` refused anything else
+    // before the try, so the wording names the method that was actually charged.
+    return chargeRefusal(runtime, payable, error);
   }
 }
