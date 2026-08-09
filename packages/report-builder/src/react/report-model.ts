@@ -108,6 +108,20 @@ export function updateBlockSpec(
   };
 }
 
+/**
+ * How a block is NAMED when it is spoken rather than read — its own title, or
+ * a stand-in for one that has never been given a name.
+ *
+ * The stand-in is deliberately not positional: "Bloco 4" would rename itself
+ * the moment the block moved, which is precisely when the name is being read
+ * out ("Bloco 4 movido para a posição 3" describes a block that no longer
+ * exists under that name).
+ */
+export function blockLabel(block: ReportBlockDraft): string {
+  const title = block.title.trim();
+  return title === "" ? "Bloco sem título" : title;
+}
+
 /** Move a block one position up (-1) or down (+1); out-of-range is a no-op. */
 export function moveBlock(draft: ReportDraft, id: string, delta: -1 | 1): ReportDraft {
   const index = draft.blocks.findIndex((block) => block.id === id);

@@ -67,6 +67,28 @@ import { Chart } from '@procurement/ui';
 - `curved` (boolean): Use curved lines for line/area charts (default: true)
 - `stacked` (boolean): Stack data series for bar/area charts
 - `showValues` (boolean): Display data values on chart
+- `valueFormatter` (function): Formats tooltip values and value-axis ticks
+- `allowDecimalTicks` (boolean): Allow half-steps on the value axis (default: true; set
+  false for a COUNT metric, or the axis repeats itself — `0, 1, 1, 2, 2`)
+
+### Axis & bar geometry
+
+Defaults that hold the chart to the visual-pass rules; every one is opt-out.
+
+- `maxCategoryTicks` (number): Cap on drawn category labels (default: 8). Above it every
+  nth label is kept and **the last one always is** — Recharts' own width-aware thinning
+  then runs on top, so a narrow viewport drops more. Full values stay in the tooltip.
+- `tickLabelMaxChars` (number): Category labels longer than this are truncated with an
+  ellipsis (default: 12)
+- `barRadius` (number): Bar corner radius in px, top corners only (default: 3). Stacked
+  segments stay square — a rounded top notches into the segment above it.
+- `maxBarWidth` (number): Cap on a bar's thickness in px (default: 38). It is also what
+  keeps the first and last bar clear of the chart frame in a wide card.
+
+Tick labels are laid out with a size-derived `tickMargin` (10–18px) rather than
+Recharts' default of 2. The bottom value tick is centred ON the x-axis line, so its box
+reaches below it; at the default margin it collides with the first category label at the
+axis corner, at every viewport.
 
 ### Display Options
 

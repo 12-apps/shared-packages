@@ -42,10 +42,17 @@ The Drawer component is perfect for:
 
 ### Styling Props
 
-| Prop        | Type      | Default | Description                      |
-| ----------- | --------- | ------- | -------------------------------- |
-| `glass`     | `boolean` | `false` | Enable glass/blur effect styling |
-| `className` | `string`  | -       | Additional CSS class names       |
+| Prop        | Type        | Default | Description                                      |
+| ----------- | ----------- | ------- | ------------------------------------------------ |
+| `glass`     | `boolean`   | `false` | Enable glass/blur effect styling                 |
+| `paperSx`   | `CSSObject` | -       | Extra styles for the sliding surface (see below) |
+| `className` | `string`    | -       | Additional CSS class names                       |
+
+`paperSx` is merged after the width/height the drawer derives from its anchor,
+onto MUI's drawer paper. A temporary drawer PORTALS that surface, so a consumer
+cannot reach it with a wrapper's descendant selector — this is how a bottom
+sheet asks for rounded top corners, or a docked panel for its own offset. Omit
+it and the drawer renders exactly as before.
 
 ## Sub-components
 

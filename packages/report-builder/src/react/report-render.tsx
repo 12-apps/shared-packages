@@ -17,12 +17,49 @@ import { EmptyState } from "@12-apps/ui/data-display/EmptyState";
 import { StatCard } from "@12-apps/ui/data-display/StatCard";
 import { Table } from "@12-apps/ui/data-display/Table";
 import { Button } from "@12-apps/ui/form/Button";
+import { Box } from "@12-apps/ui/mui/Box";
 
 import { formatKpiFigure, formatReportValue } from "../format";
 import { chartColumnsOf } from "./chart-as-table";
 import type { ExportColumn } from "./lib/export-rows";
 import { NO_PRINT_CLASS } from "./lib/print-export";
 import type { ReportRender, ReportRow, ReportTableColumn } from "./reports-api";
+
+/**
+ * Every figure this file renders, in tabular figures.
+ *
+ * Nothing set `font-variant-numeric` anywhere, so a column of currency lined up
+ * only because Roboto happens to ship uniform digit advances — a font swap in a
+ * host's theme would have shredded it silently. It is declared once, on each
+ * rendering's outermost box, and inherits into table cells, the KPI tile and
+ * (SVG text inherits it too) the axis ticks.
+ */
+const TABULAR_FIGURES = { fontVariantNumeric: "tabular-nums" } as const;
+
+/**
+ * The chart's own box, and the two things it corrects in the chart library.
+ *
+ * **No shadow on a static card** (`visual-pass.md` §Depth). `SpecChart` renders
+ * onto a MUI `Paper`, which arrives with elevation 1 — so a shadowed card sat
+ * inside the bordered block card that already frames it. Shadows belong to
+ * floating layers: menus, sheets, drag ghosts.
+ *
+ * **A large fill is never the accent at full strength.** A bar is ~150px of
+ * solid `#6366f1` across a card, which dominates every other element on the
+ * page including the controls that actually do something. Dropping the fill
+ * short of opaque is the cheapest way to put it back behind the text, and it
+ * costs the series nothing: the stroke and the legend swatch stay the accent.
+ */
+const CHART_BOX_SX = {
+  ...TABULAR_FIGURES,
+  // The radius itself comes from the page's surface, which rounds every
+  // container to one value; importing it here would close a cycle back through
+  // `report-grid`, which renders this file.
+  "& .MuiPaper-root": { boxShadow: "none", backgroundImage: "none" },
+  "& .recharts-bar-rectangle path, & .recharts-rectangle, & path.recharts-sector": {
+    fillOpacity: 0.82,
+  },
+} as const;
 
 /** Format one cell for display/export; `brl` values are integer centavos. */
 function formatReportCell(
@@ -96,7 +133,7 @@ function ChartOrTable({
   const columns = chartColumnsOf(render);
 
   return (
-    <div data-testid={dataTestId}>
+    <Box sx={CHART_BOX_SX} data-testid={dataTestId}>
       <Button
         variant="ghost"
         size="sm"
@@ -129,7 +166,7 @@ function ChartOrTable({
           data-testid={`${dataTestId}-chart`}
         />
       )}
-    </div>
+    </Box>
   );
 }
 
@@ -143,13 +180,13 @@ export function ReportRenderView({
     // A KPI over an empty period renders the tile with "—", not EmptyState —
     // in a dashboard grid the metric's absence should still say which metric.
     return (
-      <div data-testid={dataTestId}>
+      <Box sx={TABULAR_FIGURES} data-testid={dataTestId}>
         <StatCard
           label={render.label}
           value={formatKpiValue(render.value, render.format)}
           data-testid={`${dataTestId}-kpi`}
         />
-      </div>
+      </Box>
     );
   }
   if (render.rows.length === 0) {
@@ -167,7 +204,7 @@ export function ReportRenderView({
     return <ChartOrTable render={render} dataTestId={dataTestId} />;
   }
   return (
-    <div data-testid={dataTestId}>
+    <Box sx={TABULAR_FIGURES} data-testid={dataTestId}>
       <Table
         variant="striped"
         size="small"
@@ -181,6 +218,6 @@ export function ReportRenderView({
         data={render.rows}
         data-testid={`${dataTestId}-table`}
       />
-    </div>
+    </Box>
   );
 }

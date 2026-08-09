@@ -266,6 +266,13 @@ export interface CompiledQuery {
    * `America/Sao_Paulo`. Adapters that group in SQL must convert with it.
    */
   timeZone: string;
+  /**
+   * The hour the tenant's trading day begins, 0-23, resolved at compile time
+   * (FUT-755). 0 is the civil day. Anything earlier than this hour buckets to
+   * the PREVIOUS day, so a bar closing at 02:00 keeps one night's takings on
+   * one date. Adapters that group in SQL must apply it alongside `timeZone`.
+   */
+  dayStartsAt: number;
 }
 
 /** A result row keyed by dimension/measure aliases. */

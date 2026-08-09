@@ -166,6 +166,9 @@ export function specToChartProps(
     showTooltip: spec.tooltip ?? true,
     height: spec.height,
     valueFormatter: chartValueFormatter(spec.numberFormat),
+    // An integer metric is a COUNT: half a row does not exist, so the axis must
+    // not offer half-steps it would then round into duplicates (FUT-755).
+    allowDecimalTicks: spec.numberFormat !== 'integer',
     ...renderer(spec, ctx),
   };
 }

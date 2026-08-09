@@ -49,7 +49,7 @@ const catalog = defineCatalog({
             { value: 'FAILED', label: 'Falhou' },
           ],
         },
-        totalCents: { label: 'Receita', type: 'money', role: 'measure' },
+        revenueCents: { label: 'Receita', type: 'money', role: 'measure' },
         itemCount: { label: 'Itens', type: 'number', role: 'measure' },
       },
     },
@@ -57,11 +57,11 @@ const catalog = defineCatalog({
 });
 
 const ROWS = [
-  { id: 'o1', createdAt: '2026-07-01T10:00:00Z', method: 'PIX', status: 'PAID', totalCents: 1000, itemCount: 1 },
-  { id: 'o2', createdAt: '2026-07-01T14:00:00Z', method: 'CARD', status: 'PAID', totalCents: 2500, itemCount: 3 },
-  { id: 'o3', createdAt: '2026-07-02T02:00:00Z', method: 'PIX', status: 'PAID', totalCents: 3000, itemCount: 2 },
-  { id: 'o4', createdAt: '2026-07-03T09:00:00Z', method: 'WAITER', status: 'FAILED', totalCents: 800, itemCount: 1 },
-  { id: 'o5', createdAt: '2026-07-04T20:00:00Z', method: 'CARD', status: 'PAID', totalCents: 4200, itemCount: 4 },
+  { id: 'o1', createdAt: '2026-07-01T10:00:00Z', method: 'PIX', status: 'PAID', revenueCents: 1000, itemCount: 1 },
+  { id: 'o2', createdAt: '2026-07-01T14:00:00Z', method: 'CARD', status: 'PAID', revenueCents: 2500, itemCount: 3 },
+  { id: 'o3', createdAt: '2026-07-02T02:00:00Z', method: 'PIX', status: 'PAID', revenueCents: 3000, itemCount: 2 },
+  { id: 'o4', createdAt: '2026-07-03T09:00:00Z', method: 'WAITER', status: 'FAILED', revenueCents: 800, itemCount: 1 },
+  { id: 'o5', createdAt: '2026-07-04T20:00:00Z', method: 'CARD', status: 'PAID', revenueCents: 4200, itemCount: 4 },
 ];
 
 /** The permission tier the shipped policy assigns to `orders`. */
@@ -91,7 +91,7 @@ const SYSTEM_REPORTS: SystemReportDef[] = [
       ({
         entity: 'orders',
         dimensions: [{ field: 'method' }],
-        measures: [{ field: 'totalCents' }],
+        measures: [{ field: 'revenueCents' }],
         filters: [{ field: 'status', operator: 'eq', value: 'PAID' }],
         presentation: { kind: 'chart', chartType: 'bar' },
       }) as never,
@@ -121,7 +121,7 @@ const DASHBOARD = {
       spec: {
         entity: 'orders',
         dimensions: [{ field: 'method' }],
-        measures: [{ field: 'totalCents' }],
+        measures: [{ field: 'revenueCents' }],
         filters: [{ field: 'status', operator: 'eq', value: 'PAID' }],
         presentation: { kind: 'chart', chartType: 'bar' },
       },
@@ -132,7 +132,7 @@ const DASHBOARD = {
       spec: {
         entity: 'orders',
         dimensions: [{ field: 'createdAt', timeGrain: 'day' }],
-        measures: [{ field: 'totalCents' }],
+        measures: [{ field: 'revenueCents' }],
         presentation: { kind: 'table' },
       },
     },
@@ -161,7 +161,7 @@ function seedRows(): StoredRow[] {
       spec: {
         entity: 'orders',
         dimensions: [],
-        measures: [{ field: 'totalCents', aggregation: 'avg' }],
+        measures: [{ field: 'revenueCents', aggregation: 'avg' }],
         presentation: { kind: 'kpi' },
       },
       status: 'archived',

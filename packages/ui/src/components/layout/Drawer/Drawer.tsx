@@ -36,6 +36,11 @@ const buildDrawerStyles = (
   variant: DrawerProps['variant'],
   width: DrawerProps['width'],
   height: DrawerProps['height'],
+  // Merged LAST into the surface's own rules, so a caller can shape the sliding
+  // surface itself (rounded corners on a bottom sheet, a docked panel's offset)
+  // without reaching for the MUI paper class from outside. Undefined by default:
+  // omit it and the drawer styles exactly as it always has.
+  paperSx?: DrawerProps['paperSx'],
 ) => {
   const baseStyles = {
     width: ['left', 'right'].includes(anchor) ? width : '100%',
@@ -53,6 +58,7 @@ const buildDrawerStyles = (
         backdropFilter: 'blur(20px)',
         border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
         boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
+        ...paperSx,
       },
     };
   }
@@ -63,6 +69,7 @@ const buildDrawerStyles = (
       width: ['left', 'right'].includes(anchor) ? width : '100%',
       height: ['top', 'bottom'].includes(anchor) ? height : '100%',
       boxSizing: 'border-box',
+      ...paperSx,
     },
   };
 };
@@ -79,6 +86,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   backdrop = true,
   hideBackdrop = false,
   keepMounted = false,
+  paperSx,
   className,
   dataTestId,
   ...rest
@@ -99,7 +107,7 @@ export const Drawer: React.FC<DrawerProps> = ({
           invisible: !backdrop,
         },
       }}
-      sx={buildDrawerStyles(theme, drawerAnchor, variant, width, height)}
+      sx={buildDrawerStyles(theme, drawerAnchor, variant, width, height, paperSx)}
       className={className}
       data-testid={dataTestId || 'drawer'}
       {...rest}
@@ -113,6 +121,7 @@ export const DrawerHeader: React.FC<DrawerHeaderProps> = ({
   children,
   onClose,
   showCloseButton = true,
+  closeLabel,
   dataTestId,
 }) => {
   const theme = useTheme();
@@ -136,7 +145,7 @@ export const DrawerHeader: React.FC<DrawerHeaderProps> = ({
         <IconButton
           onClick={onClose}
           edge="end"
-          aria-label="Close drawer"
+          aria-label={closeLabel ?? 'Close drawer'}
           data-testid={dataTestId ? `${dataTestId}-close` : 'drawer-close'}
         >
           <Close />

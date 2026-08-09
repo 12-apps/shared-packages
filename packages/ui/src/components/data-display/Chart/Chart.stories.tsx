@@ -249,6 +249,26 @@ export const BarChart: Story = {
   },
 };
 
+/**
+ * The axis and bar rules, made inspectable: 30 long category names on an axis
+ * that fits a handful. Every nth label survives — the LAST one always —
+ * truncated at 12 chars (the tooltip still carries the full name), and the
+ * bars hold at 38px however wide the card gets.
+ */
+export const DenseCategoryAxis: Story = {
+  args: {
+    type: 'bar',
+    data: Array.from({ length: 30 }, (_, index) => ({
+      name: `Categoria muito longa ${index + 1}`,
+      total: 1000 + Math.round(Math.sin(index) * 800),
+    })),
+    title: 'Dense category axis',
+    subtitle: '30 categories, long labels — thinned, truncated, width-capped',
+    size: 'sm',
+    showLegend: false,
+  },
+};
+
 export const StackedBar: Story = {
   args: {
     type: 'bar',
