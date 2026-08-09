@@ -270,8 +270,10 @@ describe("the filter bar's progressive collapse", () => {
   it("promotes an applied filter to the bar when the overflow panel CLOSES, not while it is open", async () => {
     // Room for the promoted control at its APPLIED width: these fixtures have
     // long labels, and "Status do pagamento" becomes "Status do pagamento:
-    // Pago" the moment it is applied.
-    stubResizeObserver(1250);
+    // Pago" the moment it is applied. 1100 rather than 1250 — since the ladder
+    // started re-spending the width its later rungs free, all four fit at 1250
+    // and there is no overflow left to promote OUT of.
+    stubResizeObserver(1100);
     renderBar();
 
     // Whatever collapsed first, apply it from inside the overflow…
@@ -300,7 +302,13 @@ describe("the filter bar's progressive collapse", () => {
   it("drops the Exibir/Exportar labels before it touches the search", async () => {
     // Step 2 of the ladder, and ONLY step 2: wide enough for the icons plus a
     // full-width search box, not wide enough for the labelled controls too.
-    stubResizeObserver(620);
+    //
+    // The band is 595-610 rather than the old ~620: the re-priced furniture
+    // makes the whole row cheaper, so every rung is taken a little later. That
+    // the band still EXISTS is the point — step 2 must land before step 4, and
+    // a row that collapsed its search in the same breath as its labels would
+    // have skipped a rung.
+    stubResizeObserver(600);
     renderBar({ exportConfig: { onExport: vi.fn() } });
 
     await waitFor(() => expect(screen.getByTestId("lista-display-trigger")).toHaveAttribute("title", "Exibir"));

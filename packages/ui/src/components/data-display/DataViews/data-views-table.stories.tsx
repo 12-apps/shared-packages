@@ -640,3 +640,56 @@ export const Empty: Story = {
   },
   render: screen,
 };
+
+/**
+ * THE TOOLBAR AT A PHONE'S WIDTH — the collapse ladder, visible.
+ *
+ * Each of these pins the bar to a real device width rather than the browser's,
+ * because the ladder measures the ROW: a `ResizeObserver` reports its width and
+ * every control is priced against it (see `RESPONSIVE-BEHAVIOUR.md`). Resizing
+ * the Storybook pane does the same thing live — these just make the interesting
+ * widths reachable in one click.
+ *
+ * Two things to look at:
+ *
+ * 1. **A filter still reaches the bar on a large phone.** The row re-spends the
+ *    width its own collapse frees — before that, all six controls went behind
+ *    "Mais" against the uncollapsed furniture and the freed ~330px sat empty.
+ * 2. **The two triggers no longer share a glyph.** "Mais" is a FUNNEL (which
+ *    rows you see); "Exibir" is display-settings (how they are shown). They
+ *    used to be the same `TuneRounded` sliders, a few px apart, and on a phone
+ *    — where both are icon-only — there was nothing to tell them apart.
+ */
+function atWidth(width: number) {
+  return function AtWidth(
+    args: React.ComponentProps<typeof DataViewsTableBase<PedidoRow>>,
+  ): React.JSX.Element {
+    return (
+      <Box sx={{ width, maxWidth: "100%", mx: "auto", borderInline: 1, borderColor: "divider" }}>
+        <PedidosScreen {...args} />
+      </Box>
+    );
+  };
+}
+
+/** iPhone 13 Pro Max. One filter on the bar, five behind the funnel. */
+export const ToolbarLargePhone: Story = {
+  args: { ...base, inlineFilters: true },
+  render: atWidth(428),
+};
+
+/**
+ * iPhone SE — the floor we support. Every control is behind "Mais" here, and
+ * that is correct rather than a regression: there genuinely is no room for a
+ * pill beside the magnifier, the funnel, the counter and "Exibir".
+ */
+export const ToolbarSmallPhone: Story = {
+  args: { ...base, inlineFilters: true },
+  render: atWidth(320),
+};
+
+/** iPad portrait. The labels are back, and a wider pill fits. */
+export const ToolbarTablet: Story = {
+  args: { ...base, inlineFilters: true },
+  render: atWidth(768),
+};

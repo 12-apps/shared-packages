@@ -142,6 +142,8 @@ interface GridShellFiltersArgs<T extends Record<string, unknown>> {
   rangeFields: RangeFieldConfig<T>[];
   testIdPrefix: string;
   alwaysShowSearch: boolean;
+  /** Is "Exportar" on the bar? Half the right cluster's cost when it is not. */
+  hasExport: boolean;
 }
 
 function useGridShellFilters<T extends Record<string, unknown>>({
@@ -151,6 +153,7 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   rangeFields,
   testIdPrefix,
   alwaysShowSearch,
+  hasExport,
 }: GridShellFiltersArgs<T>): {
   showInline: boolean;
   useModal: boolean;
@@ -171,6 +174,7 @@ function useGridShellFilters<T extends Record<string, unknown>>({
     state.pills,
     c.ranges,
     openControls > 0,
+    hasExport,
   );
   // THE BAR RENDERS AT EVERY WIDTH. It used to be swapped for a full-screen
   // filter MODAL below `lg`, which was the responsive strategy before the
@@ -365,7 +369,15 @@ export function GridShell<T extends Record<string, unknown>>(props: GridShellPro
     inlineFilters = false,
     alwaysShowSearch = false,
   } = props;
-  const filters = useGridShellFilters({ c, inlineFilters, fields, rangeFields, testIdPrefix, alwaysShowSearch });
+  const filters = useGridShellFilters({
+    c,
+    inlineFilters,
+    fields,
+    rangeFields,
+    testIdPrefix,
+    alwaysShowSearch,
+    hasExport: props.exportConfig !== undefined,
+  });
   return (
     <DataViewsLayoutProvider
       canUseCards={Boolean(renderCard)}
