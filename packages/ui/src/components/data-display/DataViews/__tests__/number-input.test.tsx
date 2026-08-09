@@ -67,6 +67,21 @@ describe("formatPtBrNumber", () => {
 });
 
 describe("NumberBoundInput", () => {
+  it("asks for the decimal keypad on the INPUT, where the attribute decides anything", () => {
+    // Passed as a `TextField` prop this rode the `...rest` spread onto the root
+    // `FormControl` div — not an editable element, so the attribute did nothing
+    // and the phone kept opening letters over a field that accepts none.
+    // `decimal` rather than `numeric` is what keeps the comma reachable.
+    const { input } = renderInput();
+    expect(input).toHaveAttribute("inputmode", "decimal");
+    expect(input.tagName).toBe("INPUT");
+  });
+
+  it("keeps autofill off, so its strip cannot cover the keypad with non-amounts", () => {
+    const { input } = renderInput();
+    expect(input).toHaveAttribute("autocomplete", "off");
+  });
+
   it("keeps the comma the merchant typed instead of closing the digits over it", () => {
     const { onChange, input } = renderInput();
     fireEvent.change(input, { target: { value: "50,00" } });
