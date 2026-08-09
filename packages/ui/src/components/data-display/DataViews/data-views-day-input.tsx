@@ -107,8 +107,6 @@ export function DayBoundInput({
       // The mask IS the placeholder, so the expected order is on screen before
       // the first keystroke rather than discovered by getting it wrong.
       placeholder="dd/mm/aaaa"
-      // A numeric keypad on a phone, while still accepting a paste with slashes.
-      inputMode="numeric"
       value={text}
       onChange={(event) => {
         const next = maskBrDate(event.target.value);
@@ -126,7 +124,28 @@ export function DayBoundInput({
       onBlur={() => setText(isoToBr(applied))}
       // The placeholder occupies the space an un-shrunk label would render into.
       InputLabelProps={{ shrink: true }}
-      inputProps={{ 'data-testid': testId, maxLength: 10 }}
+      // `inputMode` HAS to be here rather than on the TextField. Anything
+      // TextField does not recognise is spread onto its root `FormControl` div,
+      // and `inputMode` is not in that list — so passing it up there put the
+      // attribute on a non-editable wrapper, where it means nothing, and the
+      // phone went on offering the letter keyboard for a field that only takes
+      // digits (the `dd/mm/aaaa` hint sitting under a QWERTY layout). Only the
+      // `<input>` this reaches decides which keypad opens.
+      //
+      // `numeric` and not `tel`: both raise a keypad, but the phone one is a
+      // dialler with `+ * #` on it — keys that cannot occur in a date. A paste
+      // carrying separators still lands, because the MASK is what filters the
+      // text; the keypad only narrows what a thumb can reach for.
+      //
+      // Autofill off for the same reason: the browser's saved-value strip
+      // covers the keypad to suggest names and addresses, none of which are a
+      // date, and none of which the mask would keep.
+      inputProps={{
+        'data-testid': testId,
+        maxLength: 10,
+        inputMode: 'numeric',
+        autoComplete: 'off',
+      }}
       sx={{ width: 165 }}
     />
   );

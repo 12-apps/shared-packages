@@ -112,6 +112,33 @@ describe("DayBoundInput", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("asks for the digit keypad on the INPUT, where the attribute decides anything", () => {
+    // Passed as a `TextField` prop this rode the `...rest` spread onto the root
+    // `FormControl` div — an element that is not editable, so the attribute did
+    // nothing and the phone kept opening the letter keyboard over a field that
+    // only accepts digits. Asserting on the input, not on the tree, is the
+    // point: a wrapper carrying `inputmode` is exactly the bug.
+    const { input } = renderInput();
+    expect(input).toHaveAttribute("inputmode", "numeric");
+    expect(input.tagName).toBe("INPUT");
+  });
+
+  it("keeps autofill off, so its strip cannot cover the keypad with non-dates", () => {
+    const { input } = renderInput();
+    expect(input).toHaveAttribute("autocomplete", "off");
+  });
+
+  it("drops letters, so a hardware keyboard cannot type into it either", () => {
+    // The keypad narrows what a thumb can reach; the mask is what makes the
+    // field digits-only for every other way text arrives.
+    const { onChange, input } = renderInput();
+    fireEvent.change(input, { target: { value: "abc" } });
+    expect(input).toHaveValue("");
+    fireEvent.change(input, { target: { value: "0a6b0c8" } });
+    expect(input).toHaveValue("06/08");
+    expect(onChange).not.toHaveBeenCalledWith(expect.stringContaining("a"));
+  });
+
   it("shows the applied bound in the merchant's format, not the wire's", () => {
     const { input } = renderInput("2026-08-06");
     expect(input).toHaveValue("06/08/2026");
