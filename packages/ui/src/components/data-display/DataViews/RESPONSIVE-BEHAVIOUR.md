@@ -23,6 +23,10 @@ later; an eight-filter one degrades sooner. Both are correct.
 | small desktop | 1280 | laptop |
 | large desktop | 1600 | external monitor |
 
+The tests also pin a **crowded** row at 1024, because a small desktop no longer
+overflows at all: the rules about what happens when controls do NOT fit need a
+width where some of them do not.
+
 **These are toolbar ROW widths, not viewport widths.** The `ResizeObserver`
 watches the row, and the row is narrower than the window by whatever the page
 puts around it — around 48px in the Pedidos shell. So a 430px row is roughly a
@@ -77,8 +81,26 @@ Read this as "what the Pedidos table does", not "what the code hard-codes".
 
 | | small mobile | large mobile | tablet | small desktop | large desktop |
 | --- | --- | --- | --- | --- | --- |
-| controls on the bar | 0 | 0 | 0 | 1–2 | 3+ |
-| "Mais" present | yes | yes | yes | yes | only if something overflowed |
+| controls on the bar | 0 | 1 | 1 | all 6 | all 6 |
+| "Mais" present | yes | yes | yes | no | no |
+
+**The bar re-spends what its own collapse frees.** Rungs 2/4/5 turn 200 + 96 +
+216 of furniture into 44 + 0 + 140, and the split used to be decided once,
+against the UNCOLLAPSED row — so a phone shed all six controls to make room for
+a search box and a counter that were about to shrink, and nobody handed the
+~330px back. It showed as a 428px bar carrying a magnifier, "Mais 6", and a
+225px band of nothing. `computeSplit` now iterates to a fixed point: cheaper
+furniture buys more filters, more filters push the ladder further down, a
+further rung makes the furniture cheaper again, and the budget decreases
+monotonically until it stops moving.
+
+The furniture is also priced for what is ACTUALLY on the bar. "Exportar" exists
+only when the host passes an `exportConfig` — several screens put their export
+in the page header instead — and charging for the pair regardless billed the
+filters ~108px for a button that was never rendered.
+
+Which control survives on a phone is whichever fits the room left over, so a
+large mobile keeps a cheaper pill where a tablet affords a wider one.
 
 **An applied filter is ranked first, not exempt.** Applied controls take the
 visible slots ahead of idle ones and go into "Mais" like anything else when even
@@ -133,7 +155,12 @@ Two distinct behaviours, and conflating them was a bug:
 | --- | --- | --- | --- | --- | --- |
 | Exibir / Exportar | icon | icon | label | label | label |
 | dropdown chevron | no | no | yes | yes | yes |
-| "N de N" counter | hidden | hidden | shown | shown | shown |
+| "N de N" counter | hidden | shown | shown | shown | shown |
+
+The counter is priced at 56, not the old 96. It was measured against
+"1.234 de 5.678"; a phone reads "3 de 3" and renders at 35px, so the extra
+~60px was coming straight out of the filter budget at exactly the widths where
+that budget is scarcest.
 
 A tablet keeps the labels, which is worth stating because it is easy to assume
 otherwise. With every filter already behind "Mais" the row has room to spare
@@ -175,6 +202,13 @@ leaves the board with a single populated column, which reads as data loss.
 `__tests__/data-views-responsive.test.tsx` drives a fake `ResizeObserver` at each
 of the five widths and asserts the tables above. It is the executable copy of
 this document; if the two disagree, the test is right and this needs updating.
+
+`what fits follows the controls, not the width alone` guards the property the
+rest of this document depends on: the counts above are OUTCOMES of pricing one
+fixture against one row, never rules. At a single width it asserts that a table
+declaring cheaper controls keeps more of them, that one long control keeps
+none, and that the same table promotes another as its row grows — three answers
+a breakpoint could not give.
 
 Two things it cannot check, because jsdom has no layout engine: actual pixel
 overflow, and how anything looks. Those are verified in a real browser against
