@@ -19,9 +19,7 @@ import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
 import type { OverflowField } from "./data-views-overflow";
-import { RangePresets } from "./data-views-preset-chips";
 import { RangeBounds } from "./data-views-range-pill";
-import { presetsFor } from "./data-views-range-presets";
 import { isRangeSet } from "./data-views-range-values";
 import type { RangeValue } from "./data-views-types";
 
@@ -114,10 +112,11 @@ function OverflowPill<T extends Record<string, unknown>>({
 
 
 /**
- * One overflowed range: its two bounds, as the same inputs the pill uses.
+ * One overflowed range: its presets and its two bounds, as the same controls
+ * the pill uses.
  *
- * The bounds DELEGATE to {@link RangeBounds} rather than being built here,
- * which is the whole point — this panel used to render a raw
+ * The whole control DELEGATES to {@link RangeBounds} rather than being built
+ * here, which is the point — this panel used to render a raw
  * `<input type="date">`, so the masked `dd/mm/aaaa` field existed only while
  * the filter FITTED on the bar. The moment "Data" overflowed it reverted to the
  * native control the mask replaced, and a merchant on a narrow screen never saw
@@ -128,6 +127,12 @@ function OverflowPill<T extends Record<string, unknown>>({
  * native date input reports a wide minimum (its own mask plus the picker
  * glyph), which is what made two of them refuse to shrink and scrolled the
  * panel sideways. A text input has no such minimum.
+ *
+ * `RangeBounds` renders the preset chips ITSELF, above the inputs. This panel
+ * must NOT render its own row as well: when the delegation above landed, the
+ * chips it used to draw by hand stayed behind, and "Data" showed Hoje/Ontem/
+ * Esta semana/Este mês/Este ano twice — two rows, duplicated test ids, and half
+ * the panel's height spent saying the same thing (FUT-751).
  */
 function OverflowRange<T extends Record<string, unknown>>({
   field,
@@ -144,24 +149,12 @@ function OverflowRange<T extends Record<string, unknown>>({
   // set; the guard is for the type, not for a state the caller can reach.
   if (!field.range) return null;
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      {/* The overflow offers the same one-click windows the pill does. A field
-          in here is one that had no room on the bar, not one with fewer
-          controls — otherwise "Data" gains and loses its presets as the window
-          is resized. */}
-      <RangePresets
-        presets={presetsFor(field.range)}
-        value={value}
-        onChange={onChange}
-        testId={`${testIdPrefix}-more-${field.id}`}
-      />
-      <RangeBounds
-        field={field.range}
-        value={value}
-        onChange={onChange}
-        testId={`${testIdPrefix}-more-${field.id}`}
-      />
-    </Box>
+    <RangeBounds
+      field={field.range}
+      value={value}
+      onChange={onChange}
+      testId={`${testIdPrefix}-more-${field.id}`}
+    />
   );
 }
 
