@@ -4,8 +4,14 @@ import type { PaymentsRouteParams } from '../http/route-table';
 
 import { chargeInstrument, createCheckout } from './flows-charge';
 import { getCheckoutConfig, getStatus, listInstruments, refreshBrowserKey } from './flows-read';
+import { beginVault, completeVault } from './flows-vault';
 import { CHECKOUT_ROUTES } from './route-table';
-import { createRuntime, notConfigured, type PaymentFlowsBEConfig } from './runtime';
+import {
+  createRuntime,
+  notConfigured,
+  type CheckoutRuntime,
+  type PaymentFlowsBEConfig,
+} from './runtime';
 import type {
   CheckoutIntentKind,
   CheckoutRouteIntent,
@@ -86,6 +92,96 @@ type FlowRunner = (
   params: PaymentsRouteParams,
 ) => Promise<Response>;
 
+/**
+ * PUBLIC rows never reach `requireAuth`. See `route-table.ts`: the direction
+ * of this decision is what keeps a host's branching mistake from making a
+ * settling route anonymous.
+ */
+async function authorize<Caller, View extends object, Display>(
+  config: PaymentFlowsBEConfig<Caller, View, Display>,
+  principal: CheckoutPrincipal,
+  request: Request,
+  intent: CheckoutRouteIntent,
+): Promise<Authorized<Caller>> {
+  if (principal === 'PUBLIC') return { caller: null as Caller };
+  const caller = await config.requireAuth(request, intent);
+  if (caller instanceof Response) return { response: caller };
+  return { caller };
+}
+
+async function merchantFor<Caller, View extends object, Display>(
+  runtime: CheckoutRuntime<Caller, View, Display>,
+  request: Request,
+  intent: CheckoutRouteIntent,
+  caller: Caller | null,
+): Promise<Response | { merchant: MerchantRef }> {
+  const merchant = await runtime.config.resolveMerchant({ request, intent, caller });
+  // FAILS CLOSED. A merchant the host could not attribute is not a merchant
+  // whose buyer may be charged into some default account.
+  if (!merchant) return notConfigured(runtime);
+  return { merchant };
+}
+
+/** Resolve the merchant (fail-closed) and hand it to one flow. */
+async function withMerchant<Caller, View extends object, Display>(
+  runtime: CheckoutRuntime<Caller, View, Display>,
+  request: Request,
+  intent: CheckoutRouteIntent,
+  caller: Caller | null,
+  flow: (merchant: MerchantRef) => Promise<Response>,
+): Promise<Response> {
+  const resolved = await merchantFor(runtime, request, intent, caller);
+  return resolved instanceof Response ? resolved : flow(resolved.merchant);
+}
+
+/** One authorized request, dispatched to its flow by KIND. */
+async function runFlow<Caller, View extends object, Display>(
+  runtime: CheckoutRuntime<Caller, View, Display>,
+  spec: CheckoutRouteSpec,
+  request: Request,
+  intent: CheckoutRouteIntent,
+  caller: Caller,
+): Promise<Response> {
+  switch (spec.kind) {
+    case 'getCheckoutConfig':
+      return withMerchant(runtime, request, intent, caller, (merchant) =>
+        getCheckoutConfig(runtime, merchant),
+      );
+    case 'listInstruments':
+      // A merchant the host could not attribute lists NOTHING rather than
+      // failing: an unscoped list would offer instruments no charge here
+      // could use, which is the FUT-697 defect one layer up.
+      return listInstruments(
+        runtime,
+        caller,
+        await runtime.config.resolveMerchant({ request, intent, caller }),
+      );
+    case 'createCheckout':
+      return createCheckout(runtime, request, caller, () =>
+        merchantFor(runtime, request, intent, caller),
+      );
+    // The buyer-vault rows carry no payable, so their merchant fails closed
+    // through `resolveMerchant` exactly as the config read's does.
+    case 'beginVault':
+      return withMerchant(runtime, request, intent, caller, (merchant) =>
+        beginVault(runtime, caller, merchant),
+      );
+    case 'completeVault':
+      return withMerchant(runtime, request, intent, caller, (merchant) =>
+        completeVault(runtime, request, caller, merchant),
+      );
+    // The payable-scoped rows all take the PARSED intent: it travels on to
+    // the host's `load`, which is the only port that could not previously see
+    // what it was being asked to authorize.
+    case 'chargeInstrument':
+      return chargeInstrument(runtime, request, caller, intent);
+    case 'getStatus':
+      return getStatus(runtime, request, caller, intent);
+    default:
+      return refreshBrowserKey(runtime, request, caller, intent);
+  }
+}
+
 export function createPaymentFlowsBE<Caller, View extends object, Display = unknown>(
   config: PaymentFlowsBEConfig<Caller, View, Display>,
 ): PaymentFlowsBE {
@@ -93,70 +189,11 @@ export function createPaymentFlowsBE<Caller, View extends object, Display = unkn
   const excluded = new Set<string>(config.exclude ?? []);
   const rows = CHECKOUT_ROUTES.filter((row) => !excluded.has(row.kind));
 
-  /**
-   * PUBLIC rows never reach `requireAuth`. See `route-table.ts`: the direction
-   * of this decision is what keeps a host's branching mistake from making a
-   * settling route anonymous.
-   */
-  const authorize = async (
-    principal: CheckoutPrincipal,
-    request: Request,
-    intent: CheckoutRouteIntent,
-  ): Promise<Authorized<Caller>> => {
-    if (principal === 'PUBLIC') return { caller: null as Caller };
-    const caller = await config.requireAuth(request, intent);
-    if (caller instanceof Response) return { response: caller };
-    return { caller };
-  };
-
-  const merchantFor = async (
-    request: Request,
-    intent: CheckoutRouteIntent,
-    caller: Caller | null,
-  ): Promise<Response | { merchant: MerchantRef }> => {
-    const merchant = await config.resolveMerchant({ request, intent, caller });
-    // FAILS CLOSED. A merchant the host could not attribute is not a merchant
-    // whose buyer may be charged into some default account.
-    if (!merchant) return notConfigured(runtime);
-    return { merchant };
-  };
-
   const run: FlowRunner = async (spec, request, segments, params) => {
     const intent = intentFor(spec, segments, params);
-    const authorized = await authorize(spec.principal, request, intent);
+    const authorized = await authorize(config, spec.principal, request, intent);
     if ('response' in authorized) return authorized.response;
-    const { caller } = authorized;
-
-    switch (spec.kind) {
-      case 'getCheckoutConfig': {
-        const resolved = await merchantFor(request, intent, caller);
-        return resolved instanceof Response
-          ? resolved
-          : getCheckoutConfig(runtime, resolved.merchant);
-      }
-      case 'listInstruments':
-        // A merchant the host could not attribute lists NOTHING rather than
-        // failing: an unscoped list would offer instruments no charge here
-        // could use, which is the FUT-697 defect one layer up.
-        return listInstruments(
-          runtime,
-          caller,
-          await config.resolveMerchant({ request, intent, caller }),
-        );
-      case 'createCheckout':
-        return createCheckout(runtime, request, caller, () =>
-          merchantFor(request, intent, caller),
-        );
-      // The payable-scoped rows all take the PARSED intent: it travels on to
-      // the host's `load`, which is the only port that could not previously see
-      // what it was being asked to authorize.
-      case 'chargeInstrument':
-        return chargeInstrument(runtime, request, caller, intent);
-      case 'getStatus':
-        return getStatus(runtime, request, caller, intent);
-      default:
-        return refreshBrowserKey(runtime, request, caller, intent);
-    }
+    return runFlow(runtime, spec, request, intent, authorized.caller);
   };
 
   return { ...mountedRoutes(config, rows, run), layout: rows };

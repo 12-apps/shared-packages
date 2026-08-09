@@ -357,14 +357,16 @@ export interface CheckoutLogger {
   providerFailure(line: string, error: unknown): void;
 }
 
-/** The six buyer-checkout intents. */
+/** The buyer-checkout intents. */
 export type CheckoutIntentKind =
   | 'getCheckoutConfig'
   | 'listInstruments'
   | 'createCheckout'
   | 'chargeInstrument'
   | 'getStatus'
-  | 'refreshBrowserKey';
+  | 'refreshBrowserKey'
+  | 'beginVault'
+  | 'completeVault';
 
 /**
  * WHO a row serves. A property of the TABLE, never of the host callback — see
