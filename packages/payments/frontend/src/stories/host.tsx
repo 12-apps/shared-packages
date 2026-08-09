@@ -30,7 +30,7 @@ interface Envelope {
 }
 
 /** What the host reads back out of `POST /` and turns into a payable view. */
-async function raisePayable(
+export async function raisePayable(
   world: StoryWorld,
   input: CreateOrderRequest,
 ): Promise<CreateOrderResult> {
@@ -91,6 +91,8 @@ export interface StoryHost {
   /** The store already holds this buyer's CPF ⇒ Dados is skipped (FUT-465). */
   taxIdOnFile?: boolean;
   components?: PaymentFlowsConfig["components"];
+  /** Overrides for the factory-owned sentences (`DEFAULT_CHECKOUT_COPY_FE`). */
+  copy?: PaymentFlowsConfig["copy"];
   /** Where a hosted handover would have taken the buyer. Recorded, not followed. */
   onNavigate?: (url: string) => void;
   confirmationExtra?: ReactNode;
@@ -108,8 +110,12 @@ export interface StoryHost {
   configRead?: "ok" | "pending" | "failing";
 }
 
-/** Wrap the mount's fetch so `/config` can stall or refuse. */
-function withConfigRead(inner: typeof fetch, mode: StoryHost["configRead"]): typeof fetch {
+/**
+ * Wrap the mount's fetch so `/config` can stall or refuse. Exported for the
+ * legacy surface's stories: `CheckoutPayment`'s own config read speaks a
+ * different wire (`client-store.ts`) but stalls the same way.
+ */
+export function withConfigRead(inner: typeof fetch, mode: StoryHost["configRead"]): typeof fetch {
   if (!mode || mode === "ok") return inner;
   const shim = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     if (!String(input).includes("/config")) return inner(input, init);
@@ -155,6 +161,7 @@ export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
     useBuyerDefaults: () => ({ buyer: host.buyer, taxIdOnFile: host.taxIdOnFile ?? false }),
     useComanda: () => host.comanda ?? null,
     components: host.components,
+    copy: host.copy,
     confirmation: host.confirmationExtra ? { extra: host.confirmationExtra } : undefined,
     ports: {
       createPayable: (input) => raisePayable(world, input),
