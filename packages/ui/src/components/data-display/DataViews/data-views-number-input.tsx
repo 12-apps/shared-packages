@@ -107,9 +107,6 @@ export function NumberBoundInput({
       size="small"
       type="text"
       label={label}
-      // Not `numeric`: that keypad has no comma on iOS, which is the separator
-      // this field exists to accept.
-      inputMode="decimal"
       value={text}
       onChange={(event) => {
         // Reject the characters rather than silently dropping them AFTER
@@ -139,7 +136,17 @@ export function NumberBoundInput({
         )
       }
       InputLabelProps={{ shrink: true }}
-      inputProps={{ 'data-testid': testId }}
+      // On the `<input>`, not on the TextField: MUI spreads what it does not
+      // recognise onto the root `FormControl` div, and `inputMode` is not in
+      // its prop list, so up there the attribute sat on a non-editable wrapper
+      // and the phone went on offering letters for a field that takes none.
+      //
+      // `decimal` and not `numeric`: that keypad has no comma on iOS, which is
+      // the separator this field exists to accept.
+      //
+      // Autofill off because its saved-value strip covers the keypad to suggest
+      // names and addresses, none of which survive `ALLOWED` anyway.
+      inputProps={{ 'data-testid': testId, inputMode: 'decimal', autoComplete: 'off' }}
       InputProps={
         unit
           ? {
