@@ -28,7 +28,10 @@ export type PaymentsIntentKind =
   | 'verify'
   | 'beginOAuth'
   | 'completeOAuth'
-  | 'disconnectOAuth';
+  | 'disconnectOAuth'
+  | 'beginVault'
+  | 'completeVault'
+  | 'forgetVault';
 
 /** Host route params, passed through the mount context verbatim. */
 export type PaymentsRouteParams = Readonly<
@@ -104,6 +107,28 @@ export const LIBRARY_ROUTES: readonly BuiltInRoute[] = [
     pattern: ['webhooks', ':provider'],
     dispatch: (http, request, ctx, intent) =>
       http.handleWebhook(request, ctx, intent.provider ?? ''),
+  },
+  {
+    // Vault sits with the money surface: it is the merchant's stored
+    // instrument, not a credential-settings concern. No DELETE in
+    // `PaymentsRouteMethod`, so detaching is an explicit action segment —
+    // the same shape as the OAuth `disconnect` route.
+    kind: 'beginVault',
+    method: 'POST',
+    pattern: ['vault', 'begin'],
+    dispatch: (http, _request, ctx) => http.beginVault(ctx),
+  },
+  {
+    kind: 'completeVault',
+    method: 'POST',
+    pattern: ['vault', 'complete'],
+    dispatch: (http, request, ctx) => http.completeVault(request, ctx),
+  },
+  {
+    kind: 'forgetVault',
+    method: 'POST',
+    pattern: ['vault', ':provider', 'forget'],
+    dispatch: (http, _request, ctx, intent) => http.forgetVault(ctx, intent.provider ?? ''),
   },
   {
     kind: 'getSettings',

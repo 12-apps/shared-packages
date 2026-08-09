@@ -263,6 +263,7 @@ export {
   createPaymentsHttp,
   type ChargeRequestDraft,
   type PaymentsHttpDeps,
+  type VaultRequestResolvers,
   type PaymentsHttpHandlers,
   type PaymentsRequestContext,
 } from './http/handlers';

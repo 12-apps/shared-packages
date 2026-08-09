@@ -14,6 +14,9 @@ import type {
 } from '../core/types';
 
 import { guarded, guardedWebhook, json } from './responses';
+import { makeVaultHandlers, type VaultRequestResolvers } from './vault-handlers';
+
+export type { VaultRequestResolvers } from './vault-handlers';
 
 /**
  * Fetch-native HTTP surface — plug-and-play route handlers for both pages:
@@ -60,6 +63,13 @@ export interface PaymentsHttpDeps {
    * Omit it and the connect endpoints return 404.
    */
   oauth?: OAuthConnectService;
+  /**
+   * Card-vault resolvers — required only for hosts that mount the vault
+   * endpoints (platform billing's card on file). Omit them and those
+   * endpoints answer 404. See `http/vault-handlers.ts` for why the
+   * ownership facts they resolve must never arrive in a request body.
+   */
+  resolveVaultRequests?: VaultRequestResolvers;
   /**
    * Turn an untrusted browser draft into the authoritative `ChargeInput`.
    * REQUIRED, and required for a reason: the buyer must never be able to
@@ -130,6 +140,13 @@ export interface PaymentsHttpHandlers {
   completeOAuth(request: Request, ctx: PaymentsRequestContext, provider: ProviderName): Promise<Response>;
   /** POST — disconnect: revoke at the provider, clear locally. */
   disconnectOAuth(ctx: PaymentsRequestContext, provider: ProviderName): Promise<Response>;
+  // ── Card-vault surface (standalone card on file; see http/vault-handlers.ts) ──
+  /** POST — open a vault session at the merchant's ACTIVE provider. */
+  beginVault(ctx: PaymentsRequestContext): Promise<Response>;
+  /** POST {sessionId?} — finish the confirmed session; answers the durable instrument. */
+  completeVault(request: Request, ctx: PaymentsRequestContext): Promise<Response>;
+  /** POST — detach the stored instrument at the NAMED provider. */
+  forgetVault(ctx: PaymentsRequestContext, provider: ProviderName): Promise<Response>;
 }
 
 type OAuthHandlers = Pick<
@@ -286,6 +303,7 @@ export function createPaymentsHttp(deps: PaymentsHttpDeps): PaymentsHttpHandlers
 
   return {
     ...makeOAuthHandlers(oauth),
+    ...makeVaultHandlers(gateway, deps.resolveVaultRequests),
     getClientConfig: (ctx) =>
       guarded(async () => json(await gateway.clientConfig(ctx.merchant))),
 
