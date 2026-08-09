@@ -222,6 +222,7 @@ export function stripeProvider(): PaymentProviderAdapter {
         label: 'Webhook signing secret (whsec_...)',
         secret: true,
         required: false,
+        role: 'webhookSecret',
       },
       {
         key: 'connectedAccountId',
