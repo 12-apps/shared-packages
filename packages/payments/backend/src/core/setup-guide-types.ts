@@ -26,6 +26,13 @@ export interface CredentialFieldSpec {
   secret: boolean;
   /** Required to enable the provider (vs optional extras). */
   required: boolean;
+  /**
+   * What this field IS to the platform, beyond a string to store (FUT-761).
+   * `webhookSecret` marks the field whose value authenticates INBOUND
+   * deliveries for this provider — the fact hosts used to keep as a
+   * hand-written provider→field table, which is only ever wrong silently.
+   */
+  role?: 'webhookSecret';
   /** Monospace + letter-spaced: `$loja-l0ja` and `$loja-loja` are the same
    * shape in a proportional face, and a wrong handle is not an error — it is
    * somebody else's account. */

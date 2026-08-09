@@ -229,7 +229,7 @@ const credentialSchema = [
   // Optional since FUT-678: webhook verification defaults to the account
   // token (PagBank's documented signing secret); this field is only an
   // explicit override for deployments that configured a dedicated one.
-  { key: 'webhookToken', label: 'Token de webhook', secret: true, required: false },
+  { key: 'webhookToken', label: 'Token de webhook', secret: true, required: false, role: 'webhookSecret' },
   // The merchant's id at PagBank as Google Pay's `gatewayMerchantId`
   // (FUT-471). Optional and NOT secret — it is baked into every integrating
   // page — and the Google Pay button simply does not render for a connection

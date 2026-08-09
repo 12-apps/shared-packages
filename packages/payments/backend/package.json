@@ -9,7 +9,8 @@
     "./providers/pagbank": "./src/providers/pagbank.ts",
     "./providers/stone": "./src/providers/stone.ts",
     "./providers/infinitepay": "./src/providers/infinitepay.ts",
-    "./providers/stripe": "./src/providers/stripe.ts"
+    "./providers/stripe": "./src/providers/stripe.ts",
+    "./pagbank-public-key": "./src/providers/pagbank-public-key.ts"
   },
   "scripts": {
     "clean": "rm -rf node_modules coverage",

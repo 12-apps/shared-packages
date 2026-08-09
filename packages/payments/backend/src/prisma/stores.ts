@@ -47,12 +47,18 @@ interface ChargeRow {
  * silently empty answer would read as "no live charge" and mint a second
  * payable QR, which is the exact defect `checkout/reuse.ts` exists to stop.
  */
+/** The sweep's where-shape: still-waiting statuses inside an age window. */
+interface PendingChargesWhere {
+  status: { in: string[] };
+  createdAt: { lt: Date; gt: Date };
+}
+
 interface ChargeWhere {
   merchantKind: string;
   merchantId: string;
   /** Exact-or-`--`-suffix; see `core/reference.ts`. Never a bare prefix. */
   OR: Array<{ reference: string } | { reference: { startsWith: string } }>;
-  status?: string;
+  status?: string | { in: string[] };
   method?: string;
   amountCents?: number | { not: number };
   currency?: string;
@@ -61,8 +67,10 @@ interface ChargeWhere {
 export interface ChargeDelegate {
   count(args: { where: ChargeWhere }): Promise<number>;
   findMany(args: {
-    where: ChargeWhere;
-    orderBy: { createdAt: 'desc' };
+    // The sweep's cross-merchant pending read (FUT-761) has no reference
+    // clause and windows on age, so `where` is the union of both shapes.
+    where: ChargeWhere | PendingChargesWhere;
+    orderBy: { createdAt: 'desc' | 'asc' };
     /** Row cap — the "newest one" reads take 1 rather than a payable's history. */
     take?: number;
   }): Promise<ChargeRow[]>;
@@ -191,6 +199,20 @@ function payableQueries(delegate: ChargeDelegate): ChargeQueryStore {
       const rows = await delegate.findMany({
         where: payableWhere(query),
         orderBy: { createdAt: 'desc' },
+      });
+      return rows.map(rowToStoredCharge);
+    },
+    async listPendingCharges(window) {
+      // PENDING/AUTHORIZED = `isTerminal`'s complement, spelled as an `in`
+      // so the filter runs in SQL. Oldest first — the sweep's fairness
+      // order: a full batch must never starve the longest-waiting charge.
+      const rows = await delegate.findMany({
+        where: {
+          status: { in: ['PENDING', 'AUTHORIZED'] },
+          createdAt: { lt: window.before, gt: window.after },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: window.limit,
       });
       return rows.map(rowToStoredCharge);
     },
