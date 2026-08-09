@@ -40,6 +40,9 @@ function fakeHttp(): PaymentsHttpHandlers {
     beginOAuth: vi.fn(ok),
     completeOAuth: vi.fn(ok),
     disconnectOAuth: vi.fn(ok),
+    beginVault: vi.fn(ok),
+    completeVault: vi.fn(ok),
+    forgetVault: vi.fn(ok),
   };
 }
 

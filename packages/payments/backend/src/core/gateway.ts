@@ -18,7 +18,7 @@ import type { PaymentProviderAdapter } from './provider';
 import type { ProviderHealth } from './provider-health';
 import type { SettlementHints } from './settlement-hints';
 import type { ProviderRegistry } from './registry';
-import { runWebhookPipeline } from './webhook-pipeline';
+import { runWebhookPipeline, type WebhookPipelineObserver } from './webhook-pipeline';
 import {
   replayRetryableWebhooks,
   type WebhookReplayOptions,
@@ -121,6 +121,12 @@ export interface PaymentsGatewayConfig<P extends string = string> {
   health?: ProviderHealth;
   /** Domain reaction to webhook-driven state changes (mark order paid, ...). */
   onWebhookEvent?: WebhookEventHandler;
+  /**
+   * Observability for inbound deliveries refused BEFORE the durable inbox
+   * (credential lookup, signature verification) — otherwise traceless; see
+   * `WebhookPipelineObserver`. Optional, observational only.
+   */
+  webhookObserver?: WebhookPipelineObserver;
 }
 
 export interface ChargeOptions<P extends string = string> {
