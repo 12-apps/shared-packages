@@ -63,5 +63,16 @@ export interface ChartProps {
   centerLabel?: string | { label: string; value: string | number };
   /** Formats numeric tooltip values and y-axis ticks (e.g. centavos → BRL). */
   valueFormatter?: (value: number) => string;
+  /**
+   * Whether the value axis may place ticks between whole numbers. Default true.
+   *
+   * Set it false for a metric that only takes whole values — a COUNT. Recharts
+   * spaces ticks evenly across the domain, so a count topping out at 2 gets
+   * 0/0.5/1/1.5/2; an integer `valueFormatter` then renders that as
+   * `0, 1, 1, 2, 2`, and the axis reads as though it repeats itself (FUT-755).
+   * Formatting alone cannot fix it — the duplicate ticks are already chosen by
+   * the time the formatter runs.
+   */
+  allowDecimalTicks?: boolean;
   'data-testid'?: string;
 }

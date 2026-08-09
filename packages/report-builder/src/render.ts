@@ -129,6 +129,11 @@ function toChartSpec(
     // and is not. Charts are read by store owners, not by people who know to
     // discount the interpolation.
     curved: false,
+    // A legend that names ONE series repeats the block title and the spec
+    // sentence directly above it, and costs a row of the chart's height to do
+    // it (FUT-755). It earns its place only once there is something to tell
+    // apart.
+    legend: query.measures.length > 1,
     numberFormat: chartNumberFormat(presentation, firstFormat),
   };
 }

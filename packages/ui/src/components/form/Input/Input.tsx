@@ -86,6 +86,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       onFocus,
       onBlur,
       'data-testid': dataTestId,
+      'aria-label': ariaLabel,
       ...props
     },
     ref,
@@ -105,8 +106,17 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       {...interactionProps(loading, onClick, props.disabled)}
       onFocus={onFocus}
       onBlur={onBlur}
+      /*
+       * `aria-label` has to ride `inputProps` to reach the `<input>` (FUT-755).
+       * Spread with the rest it lands on the FormControl DIV that TextField
+       * renders as its root, which carries no role — so the field itself kept
+       * no accessible name, and a source grep saying "this input is labelled"
+       * disagreed with the DOM. The reports search box and the block-title
+       * inputs were both named in source and anonymous to a screen reader.
+       */
       inputProps={{
         'data-testid': dataTestId,
+        ...(ariaLabel === undefined ? {} : { 'aria-label': ariaLabel }),
       }}
       InputProps={{
         startAdornment: startAdornment && (

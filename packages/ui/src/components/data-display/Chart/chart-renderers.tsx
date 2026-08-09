@@ -80,7 +80,13 @@ function cartesianAxes(ctx: ChartRenderContext): React.ReactNode[] {
   }
   nodes.push(
     <XAxis key="x" dataKey={props.xAxisKey ?? 'name'} style={ctx.axisStyle} label={props.xAxisLabel} />,
-    <YAxis key="y" style={ctx.axisStyle} label={props.yAxisLabel} tickFormatter={props.valueFormatter} />,
+    <YAxis
+      key="y"
+      style={ctx.axisStyle}
+      label={props.yAxisLabel}
+      tickFormatter={props.valueFormatter}
+      allowDecimals={props.allowDecimalTicks !== false}
+    />,
   );
   return nodes;
 }

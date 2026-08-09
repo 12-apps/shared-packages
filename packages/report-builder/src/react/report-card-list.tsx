@@ -12,6 +12,7 @@
  */
 import type { JSX } from "react";
 
+import { Chip } from "@12-apps/ui/data-display/Chip";
 import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
 import { Card } from "@12-apps/ui/layout/Card";
@@ -81,10 +82,19 @@ function ReportCard({
             {report.description}
           </Text>
         ) : null}
-        <Text variant="body" size="xs" color="secondary">
-          {shapeNote(report)}
-          {note ? ` · ${note}` : ""}
-        </Text>
+        {/*
+          Status is a STATE, not more prose (FUT-755). It read as ` · Arquivado`
+          inside the same grey caption as the shape note, so the one thing that
+          changes what a card MEANS looked like the one thing that never
+          changes. `inventory.md` §1 is blunt about it: the prototype is right
+          and we are wrong. A published report still carries no badge.
+        */}
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+          <Text variant="body" size="xs" color="secondary">
+            {shapeNote(report)}
+          </Text>
+          {note ? <Chip label={note} size="small" variant="outlined" /> : null}
+        </Stack>
       </Stack>
     </Card>
   );

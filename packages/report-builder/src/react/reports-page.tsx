@@ -71,7 +71,25 @@ function SelectedReport({
         <Text variant="heading" size="md" as="h2" data-testid="report-title">
           {view.name}
         </Text>
-        <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+        {/*
+          `gap: 1` is 8px. It read `gap: 8` (FUT-755), and MUI multiplies by the
+          8px spacing unit, so the real gap was 64px against the `spacing={2}`
+          (16px) its sibling Stack uses. That alone took this row to 455px
+          inside a 390px column and pushed the ⋮ menu off-screen — and since ⋮
+          is the only way to reach Editar, a report could not be edited on a
+          phone at all. Wrapping keeps that true for any label length.
+        */}
+        <Box
+          sx={{
+            ml: "auto",
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+            gap: 1,
+            minWidth: 0,
+          }}
+        >
           <RangeToggle value={range} onChange={onRangeChange} dataTestId="report-range" />
           <PrintExportButton title={view.name} dataTestId="report-export-pdf" />
           <ReportActionsMenu
