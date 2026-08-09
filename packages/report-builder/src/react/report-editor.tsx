@@ -28,6 +28,7 @@ import {
   type ReportEntityFields,
   type SavedReportView,
 } from "./custom-reports-api";
+import { DockedPanelRegion } from "./lib/docked-panel";
 import { defaultPublishDraft, PublishSection, type PublishDraft } from "./lib/publish-section";
 import { RangeToggle } from "./lib/range-toggle";
 import { useUnsavedChanges } from "./lib/use-unsaved-changes";
@@ -257,54 +258,59 @@ function ReportEditorForm({
   const { error, saving, dirty, save } = editor;
 
   return (
-    <Stack spacing={3} data-testid="page-report-editor">
-      <Stack spacing={0.5}>
-        <Link to={`/${tenantSlug}/reports`} data-testid="report-editor-back">
-          <Text variant="body" size="sm" color="secondary">
-            ← Relatórios
+    // Everything the editor draws lives inside the region, so opening a block's
+    // configuration panel NARROWS this column by the panel's width instead of
+    // letting the panel float over the block it is configuring (FUT-755).
+    <DockedPanelRegion>
+      <Stack spacing={3} data-testid="page-report-editor">
+        <Stack spacing={0.5}>
+          <Link to={`/${tenantSlug}/reports`} data-testid="report-editor-back">
+            <Text variant="body" size="sm" color="secondary">
+              ← Relatórios
+            </Text>
+          </Link>
+          <Text variant="heading" size="lg" as="h1">
+            {editId ? "Editar relatório" : "Novo relatório"}
           </Text>
-        </Link>
-        <Text variant="heading" size="lg" as="h1">
-          {editId ? "Editar relatório" : "Novo relatório"}
-        </Text>
-        <Text variant="body" size="sm" color="secondary">
-          Monte o relatório arrastando os blocos; cada bloco mostra os dados reais do período.
-        </Text>
+          <Text variant="body" size="sm" color="secondary">
+            Monte o relatório arrastando os blocos; cada bloco mostra os dados reais do período.
+          </Text>
+        </Stack>
+
+        <EditorMeta
+          tenantSlug={tenantSlug}
+          draft={draft}
+          publish={publish}
+          setDraft={setDraft}
+          setPublish={setPublish}
+        />
+
+        <EditorActions
+          range={range}
+          onRangeChange={setRange}
+          saving={saving}
+          dirty={dirty}
+          onCancel={() =>
+            void navigate(editId ? `/${tenantSlug}/reports/${editId}` : `/${tenantSlug}/reports`)
+          }
+          onSave={save}
+        />
+
+        {error ? (
+          <Alert severity="error" data-testid="report-editor-error">
+            {error}
+          </Alert>
+        ) : null}
+
+        <EditorCanvas
+          tenantSlug={tenantSlug}
+          draft={draft}
+          entities={entities}
+          range={range}
+          onChange={setDraft}
+        />
       </Stack>
-
-      <EditorMeta
-        tenantSlug={tenantSlug}
-        draft={draft}
-        publish={publish}
-        setDraft={setDraft}
-        setPublish={setPublish}
-      />
-
-      <EditorActions
-        range={range}
-        onRangeChange={setRange}
-        saving={saving}
-        dirty={dirty}
-        onCancel={() =>
-          void navigate(editId ? `/${tenantSlug}/reports/${editId}` : `/${tenantSlug}/reports`)
-        }
-        onSave={save}
-      />
-
-      {error ? (
-        <Alert severity="error" data-testid="report-editor-error">
-          {error}
-        </Alert>
-      ) : null}
-
-      <EditorCanvas
-        tenantSlug={tenantSlug}
-        draft={draft}
-        entities={entities}
-        range={range}
-        onChange={setDraft}
-      />
-    </Stack>
+    </DockedPanelRegion>
   );
 }
 
