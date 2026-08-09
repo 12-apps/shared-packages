@@ -22,7 +22,7 @@ import { SYSTEM_REPORT_KEYS } from "../server/presets";
 import { useSavedReport, useSavedReports } from "./custom-reports-api";
 import { NO_PRINT_CLASS, PRINT_REGION_ATTR, PrintExportButton, PrintStyles } from "./lib/print-export";
 import { RangeToggle } from "./lib/range-toggle";
-import { CONTROL_ROW_SX, PAGE_TITLE_SX, REPORT_SURFACE_SX } from "./lib/report-surface";
+import { CONTROL_ROW_SX, PAGE_TITLE_SX, useReportSurfaceSx } from "./lib/report-surface";
 import { ReportCardList } from "./report-card-list";
 import type { ReportScope } from "./report-list-filters";
 import { selectReportOptions } from "./report-model";
@@ -149,6 +149,8 @@ export function ReportsPage({ tenantSlug }: { tenantSlug: string }): JSX.Element
   const [scope, setScope] = useState<ReportScope>("active");
   const [search, setSearch] = useState("");
   const query = useSavedReports(tenantSlug);
+  // Above the early returns — a hook cannot sit behind a conditional.
+  const surfaceSx = useReportSurfaceSx();
   const { selectedId } = selectReportOptions(
     query.data?.reports ?? [],
     scope === "archived",
@@ -181,7 +183,7 @@ export function ReportsPage({ tenantSlug }: { tenantSlug: string }): JSX.Element
 
   const onCreate = (): void => void navigate(`/${tenantSlug}/reports/new`);
   return (
-    <Stack spacing={3} sx={REPORT_SURFACE_SX} data-testid="page-reports">
+    <Stack spacing={3} sx={surfaceSx} data-testid="page-reports">
       <PrintStyles />
       <ReportsHeading />
       <Box className={NO_PRINT_CLASS}>

@@ -40,6 +40,24 @@ interface ValueFieldProps {
 }
 
 /**
+ * The VISIBLE half of a row's label: "Filtro 1 — condição" → "Condição".
+ *
+ * Every control in this panel is a floating-label field now, because one column
+ * holding both notched and notch-less fields is the "two design languages"
+ * failure `visual-pass.md` ranks third and its §Components rule forbids.
+ *
+ * These four could not simply SHOW their full label: the operator sits in a
+ * fixed 104px box, and a legend reading `Filtro 1 — con…` is the truncation
+ * this panel was built to end. So the accessible name keeps the index — it is
+ * what tells a screen-reader user which row they are in, and what the panel's
+ * own suite asserts — and the notch carries the part the position does not.
+ */
+function visibleLabel(label: string): string {
+  const tail = label.split("—").pop()?.trim() ?? label;
+  return tail.charAt(0).toUpperCase() + tail.slice(1);
+}
+
+/**
  * ONE value a filter compares against — the row's `valor`, or one bound of a
  * `between`.
  *
@@ -63,6 +81,7 @@ function FilterValueField({
   return options ? (
     <Select
       size="small"
+      label={visibleLabel(label)}
       aria-label={label}
       options={options}
       value={value}
@@ -72,6 +91,7 @@ function FilterValueField({
   ) : (
     <Input
       size="sm"
+      label={visibleLabel(label)}
       aria-label={label}
       placeholder={placeholder}
       value={value}
@@ -102,6 +122,7 @@ function FilterListField({
     <Select
       multiple
       size="small"
+      label={visibleLabel(label)}
       aria-label={label}
       options={options}
       value={values}
@@ -112,6 +133,7 @@ function FilterListField({
   ) : (
     <Input
       size="sm"
+      label={visibleLabel(label)}
       aria-label={label}
       placeholder="Valores separados por vírgula"
       value={joinValueList(values)}
@@ -223,6 +245,7 @@ export function FilterRow({
     <Stack spacing={1}>
       <Select
         size="small"
+        label="Campo"
         aria-label={`Filtro ${index + 1} — campo`}
         options={fieldOptions}
         value={filter.field}
@@ -233,6 +256,7 @@ export function FilterRow({
         <Box sx={{ width: 104, flexShrink: 0 }}>
           <Select
             size="small"
+            label="Condição"
             aria-label={`Filtro ${index + 1} — condição`}
             // Only the operators the FIELD accepts: "status a partir de Pago"
             // compiles and orders enum codes alphabetically, which is noise.

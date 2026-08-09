@@ -8,7 +8,7 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import type { BlockTemplate, BlockTemplateGroup } from "../server/block-templates";
-import { CONTAINER_RADIUS_PX, CONTROL_RADIUS_PX } from "./lib/report-surface";
+import { CONTAINER_RADIUS_PX, CONTROL_RADIUS_PX, SECTION_LABEL_STYLE } from "./lib/report-surface";
 
 /**
  * A template is a CARD, and dismissing is not.
@@ -142,7 +142,7 @@ export function BlockTemplatePicker({
 
           {groups.map((group, groupIndex) => (
             <Stack key={group.id} spacing={1}>
-              <Text variant="body" size="xs" color="secondary" as="h3">
+              <Text variant="heading" size="xs" color="secondary" as="h3" style={SECTION_LABEL_STYLE}>
                 {group.title}
               </Text>
               <Box sx={TEMPLATE_GRID_SX}>

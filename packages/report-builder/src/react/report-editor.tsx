@@ -35,7 +35,7 @@ import { defaultPublishDraft, PublishSection, type PublishDraft } from "./lib/pu
 import { RangeToggle } from "./lib/range-toggle";
 import { useUnsavedChanges } from "./lib/use-unsaved-changes";
 import { EditorCanvas } from "./report-editor-canvas";
-import { CONTROL_ROW_SX, EDITOR_SURFACE_SX, PAGE_TITLE_SX, useReportFieldTheme } from "./lib/report-surface";
+import { CONTROL_ROW_SX, EDITOR_SURFACE_SX, PAGE_TITLE_SX, useReportPortalTheme } from "./lib/report-surface";
 import {
   documentFromDraft,
   draftFromDocument,
@@ -264,7 +264,7 @@ function ReportEditorForm({
   const { draft, setDraft, publish, setPublish, range, setRange } = editor;
   const { error, saving, dirty, save } = editor;
   // One field shape, including the panels rendered through a portal.
-  const fieldTheme = useReportFieldTheme();
+  const fieldTheme = useReportPortalTheme();
 
   return (
     // Everything the editor draws lives inside the region, so opening a block's

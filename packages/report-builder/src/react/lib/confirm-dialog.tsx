@@ -20,19 +20,33 @@ import { CONTAINER_RADIUS_PX, CONTROL_RADIUS_PX } from "./report-surface";
  * screen reads as two design languages, which is failure #3 in that file.
  *
  * The title is MUI's `h6` at 20px, which made the question in a confirmation
- * larger than the PAGE TITLE behind it. It drops to the same 18px the report
- * and block titles use — it is a section heading, not the page.
+ * the largest thing on screen — above the 18px a report, a card and a block
+ * title all use. It drops to that: a confirmation asks a section-sized
+ * question, not a page-sized one.
  *
- * The radii come from the same two-value family as the rest of the area.
+ * It takes BOTH selectors below, because `AlertDialog` renders the title over
+ * two elements: an `<h2 class="MuiDialogTitle-root">` wrapping an icon and a
+ * `<span class="MuiTypography-h6">` holding the words. The span carries its own
+ * 20px, which beats anything inherited, so the descendant rule is the one that
+ * sizes the text a reader sees; the outer rule sizes the heading itself, for
+ * the day a variant renders its title without that span.
+ *
+ * The radii come from the same two-value family as the rest of the area —
+ * including the header's close control, which arrives as a circle and was the
+ * only `50%` left in the reports screens.
  */
 const DIALOG_SX = {
   "& .MuiDialog-paper": { borderRadius: `${CONTAINER_RADIUS_PX}px` },
-  "& .MuiDialogTitle-root .MuiTypography-root": { fontSize: "1.125rem", fontWeight: 600 },
+  "& .MuiDialogTitle-root, & .MuiDialogTitle-root .MuiTypography-root": {
+    fontSize: "1.125rem",
+    fontWeight: 600,
+  },
   "& .MuiButton-root": {
     textTransform: "none",
     borderRadius: `${CONTROL_RADIUS_PX}px`,
     boxShadow: "none",
   },
+  "& .MuiIconButton-root": { borderRadius: `${CONTROL_RADIUS_PX}px` },
 } as const;
 
 export function ConfirmDialog({

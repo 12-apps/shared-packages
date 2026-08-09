@@ -20,6 +20,7 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { minSpanForPresentation, REPORT_GRID_COLUMNS, type PresentationShape } from "../layout";
+import { CONTROL_RADIUS_PX, SECTION_LABEL_STYLE } from "./lib/report-surface";
 
 /** The four widths worth a segment; anything else is expressible but not offered. */
 const CANONICAL_WIDTHS = [
@@ -54,7 +55,7 @@ export function BlockWidthPicker({
   const min = minSpanForPresentation(presentation);
   return (
     <Stack spacing={1}>
-      <Text variant="heading" size="xs" as="h3">
+      <Text variant="heading" size="xs" color="secondary" as="h3" style={SECTION_LABEL_STYLE}>
         Largura
       </Text>
       <Stack direction="row" spacing={1} data-testid={testId} sx={{ flexWrap: "wrap", rowGap: 1 }}>
@@ -82,7 +83,12 @@ export function BlockWidthPicker({
                   sx={{
                     width: `${(segment.span / REPORT_GRID_COLUMNS) * 48}px`,
                     height: 6,
-                    borderRadius: 1,
+                    // The control radius, not a fourth value: these four bars
+                    // were the last 4px in the editor subtree, against the two
+                    // `visual-pass.md` §Components allows. A 6px-tall bar reads
+                    // the same either way — the point is that nothing in here
+                    // rounds by a number nobody chose.
+                    borderRadius: `${CONTROL_RADIUS_PX}px`,
                     bgcolor: "currentColor",
                     opacity: tooNarrow ? 0.35 : 1,
                   }}
