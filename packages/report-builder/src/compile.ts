@@ -24,6 +24,11 @@ export interface CompileOptions {
    * names its own. Defaults to {@link DEFAULT_REPORT_TIME_ZONE}.
    */
   timeZone?: string;
+  /**
+   * The hour the calling tenant's trading day begins, 0-23, used unless the
+   * spec names its own. Defaults to midnight.
+   */
+  dayStartsAt?: number;
 }
 
 const NUMERIC_TYPES: ReadonlySet<string> = new Set(['number', 'money']);
@@ -380,5 +385,6 @@ export function compileReport(
     // is 500 truncated, not "the top 500 and everything else".
     ...(spec.limit !== undefined && spec.limit <= maxRows ? { topN: spec.limit } : {}),
     timeZone: resolveTimeZone(spec, options),
+    dayStartsAt: spec.dayStartsAt ?? options.dayStartsAt ?? 0,
   };
 }
