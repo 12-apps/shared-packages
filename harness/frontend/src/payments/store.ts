@@ -27,7 +27,6 @@ import {
   createPaymentsGateway,
   defineProviders,
   type MemoryChargeStore,
-  type PaymentFlowsBE,
   type MemoryCredentialStore,
   type MemoryProviderConfigStore,
   type PaymentMethodKind,
@@ -41,6 +40,11 @@ import {
   type SeenCharge,
 } from './adapter';
 import { correlationPort, payablesPort, seedPayables, type HarnessView } from './payables';
+import { notifier, recordingTransport, type WireRequest } from './wire';
+
+// The admin store shares the wire (`./wire.ts`); pages and the probe keep
+// importing the request shape from here, where it has always lived.
+export type { WireRequest } from './wire';
 
 /** The whole store a harness page is set in. */
 export interface HarnessStoreSpec {
@@ -61,15 +65,6 @@ export interface HarnessStoreSpec {
    * real round trip instead of a poll against a store that forgot everything.
    */
   settled?: boolean;
-}
-
-/** One request the published client actually put on the wire. */
-export interface WireRequest {
-  method: string;
-  /** The path as the client wrote it, prefix included — `/api/checkout/charge`. */
-  path: string;
-  /** The parsed JSON body, or null for a GET. */
-  body: Record<string, unknown> | null;
 }
 
 /** What a page gets back: the transport to hand the factory, plus the truth. */
@@ -169,18 +164,6 @@ function instrumentsPort(spec: HarnessStoreSpec, world: HarnessWorld, changed: (
   };
 }
 
-/** A minimal listener set — the probe re-renders off this, not off a timer. */
-function notifier(): { fire: () => void; subscribe: HarnessWorld['subscribe'] } {
-  const listeners = new Set<() => void>();
-  return {
-    fire: () => listeners.forEach((listener) => listener()),
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-  };
-}
-
 /** The gateway, with one local adapter per declared chain entry. */
 function harnessGateway(chain: readonly HarnessProvider[], seen: SeenCharge[], charges: MemoryChargeStore, credentials: MemoryCredentialStore) {
   return createPaymentsGateway({
@@ -193,40 +176,6 @@ function harnessGateway(chain: readonly HarnessProvider[], seen: SeenCharge[], c
     attempts: createMemoryAttemptLedger(),
     onWebhookEvent: async () => undefined,
   });
-}
-
-/**
- * The `fetch` the published client is handed: record what crossed, then route
- * it straight into the mount.
- *
- * The recording is the whole point. It is the only place the BYTES are visible,
- * and every FUT-740 critical was a byte-level disagreement that both sides'
- * own tests were structurally unable to see.
- */
-function transportInto(
-  routes: PaymentFlowsBE,
-  out: HarnessWorld,
-  fire: () => void,
-): (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> {
-  return async (input, init) => {
-    // Named anything but `path`: a local called `path` reads as `node:path` to
-    // the flakiness gate's unmocked-fs rule.
-    const target = String(input);
-    const [route = '', query] = target.replace('/api/checkout', '').split('?');
-    out.requests.push({
-      method: init?.method ?? 'GET',
-      path: target.split('?')[0] ?? target,
-      body: parseBody(init?.body),
-    });
-    fire();
-    const url = `https://loja.exemplo/api/checkout${route}${query ? `?${query}` : ''}`;
-    const verb = (init?.method ?? 'GET') as 'GET' | 'POST';
-    const response = await routes[verb](new Request(url, init as RequestInit), {
-      params: { segments: route.split('/').filter(Boolean) },
-    });
-    fire();
-    return response;
-  };
 }
 
 /**
@@ -276,20 +225,16 @@ export function createHarnessStore(spec: HarnessStoreSpec = {}): HarnessWorld {
     logger: { warn: () => undefined, error: () => undefined, providerFailure: () => undefined },
   });
 
-  const call = transportInto(routes, out, fire);
+  // The recording transport (`./wire.ts`) is the only place the BYTES are
+  // visible — every FUT-740 critical was a byte-level disagreement both sides'
+  // own tests were structurally unable to see.
+  const call = recordingTransport<'GET' | 'POST'>(routes, {
+    baseUrl: '/api/checkout',
+    requests: out.requests,
+    fire,
+  });
   out.fetchImpl = call as typeof fetch;
   out.createPayable = (body) =>
     call('/api/checkout', { method: 'POST', body: JSON.stringify(body) });
   return out;
-}
-
-/** The request body as an object, or null — never a throw on a GET. */
-function parseBody(body: BodyInit | null | undefined): Record<string, unknown> | null {
-  if (typeof body !== 'string') return null;
-  try {
-    const parsed: unknown = JSON.parse(body);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
 }

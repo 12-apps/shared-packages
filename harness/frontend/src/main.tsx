@@ -26,7 +26,11 @@ import { harnessTheme } from './shell/theme';
  * from the admin sidebar and what it leaves behind.
  */
 function useHashSlug(fallback: string) {
-  const read = () => window.location.hash.replace(/^#\/?/, '') || fallback;
+  // The slug is the hash's PATH; anything after `?` is the page's own query.
+  // The OAuth callback comes back to a page carrying `?connected=`/`?code=`,
+  // exactly as future-pay's admin does — and a fragment-only navigation is
+  // what keeps the in-page mount alive across the provider hop.
+  const read = () => (window.location.hash.replace(/^#\/?/, '').split('?')[0] ?? '') || fallback;
   const [slug, setSlug] = useState(read);
   useEffect(() => {
     const onChange = () => setSlug(read());
