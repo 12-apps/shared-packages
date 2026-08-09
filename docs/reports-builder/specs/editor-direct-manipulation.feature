@@ -109,15 +109,28 @@ Feature: Reordering and resizing blocks by direct manipulation
       | block           | from | keys       | to |
       | Receita por dia | 4    | Alt+Up     | 3  |
       | Receita por dia | 4    | Alt+Down   | 5  |
-      | Receita no período | 1 | Alt+Up     | 1  |
+
+  # A third row used to sit above — "Receita no período | 1 | Alt+Up | 1" — and
+  # it contradicted the scenario below (FUT-755). An Outline row inherits every
+  # Then, so that row asserted a block at the top announces "movido para a
+  # posição 1 de 5" and marks the report dirty, while the boundary scenario says
+  # a press at the end announces nothing and leaves the unsaved state alone.
+  # Both cannot hold. The boundary case is the one worth having, so it now
+  # covers BOTH ends rather than only the last block.
 
   @drag @a11y
-  Scenario: Keyboard reorder at the boundaries is a no-op, not an error
-    Given focus is on the last block
-    When I press "Alt+Down"
+  Scenario Outline: Keyboard reorder at the boundaries is a no-op, not an error
+    Given focus is on the <position> block
+    When I press "<keys>"
     Then nothing moves
+    And focus stays on it
     And no announcement is made
     And the report's unsaved state is unchanged
+
+    Examples:
+      | position | keys     |
+      | last     | Alt+Down |
+      | first    | Alt+Up   |
 
   @drag @mobile
   Scenario: Touch reordering

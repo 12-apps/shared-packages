@@ -18,11 +18,13 @@ import { blockTemplateGroups, type BlockTemplate } from "../server/block-templat
 import { BlockTemplatePicker } from "./block-template-picker";
 import type { ReportEntityFields } from "./custom-reports-api";
 import { PlusIcon } from "./lib/block-icons";
-import { useDragReorder } from "./lib/drag-reorder";
+import { useDragReorder, useKeyboardReorder } from "./lib/drag-reorder";
 import { ReportGrid, ReportGridItem } from "./report-grid";
 import { EditableBlock } from "./report-editor-block";
 import {
   addBlock,
+  blockLabel,
+  moveBlock,
   removeBlock,
   reorderBlock,
   REPORT_MAX_BLOCKS,
@@ -80,6 +82,35 @@ function AddBlockRow({ disabled, onAdd }: { disabled: boolean; onAdd: () => void
   );
 }
 
+/**
+ * The canvas's one polite live region: where a reorder says what it did.
+ *
+ * Absolutely positioned, so it is NOT a grid item — a visually hidden cell
+ * would still open a twelfth-column row and put a gap under the canvas.
+ */
+function CanvasLiveRegion({ text }: { text: string }): JSX.Element {
+  return (
+    <Box
+      role="status"
+      aria-live="polite"
+      data-testid="report-editor-live-region"
+      sx={{
+        position: "absolute",
+        width: "1px",
+        height: "1px",
+        p: 0,
+        m: "-1px",
+        overflow: "hidden",
+        clip: "rect(0 0 0 0)",
+        whiteSpace: "nowrap",
+        border: 0,
+      }}
+    >
+      {text}
+    </Box>
+  );
+}
+
 export function EditorCanvas({
   tenantSlug,
   draft,
@@ -97,6 +128,12 @@ export function EditorCanvas({
   const dnd = useDragReorder((sourceId, targetId) =>
     onChange((current) => reorderBlock(current, sourceId, targetId)),
   );
+  // The same reorder, without a pointer (FUT-755). It reads the blocks AS
+  // RENDERED, so "one position up" means the same thing to both paths.
+  const keyboard = useKeyboardReorder({
+    items: draft.blocks.map((block) => ({ id: block.id, label: blockLabel(block) })),
+    onMove: (id, delta) => onChange((current) => moveBlock(current, id, delta)),
+  });
   const full = draft.blocks.length >= REPORT_MAX_BLOCKS;
   const first = entities[0];
 
@@ -110,6 +147,7 @@ export function EditorCanvas({
           entities={entities}
           range={range}
           dnd={dnd}
+          keyboard={keyboard}
           onTitleChange={(title) =>
             onChange((current) => updateBlock(current, block.id, { title }))
           }
@@ -139,6 +177,7 @@ export function EditorCanvas({
           onChange((current) => addBlock(current, spec, title));
         }}
       />
+      <CanvasLiveRegion text={keyboard.announcement} />
     </ReportGrid>
   );
 }
