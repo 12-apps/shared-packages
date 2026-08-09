@@ -1,7 +1,9 @@
 "use client";
 
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+// Says "display settings" rather than the generic tune sliders it used to
+// share with the "Mais" FILTER trigger — see the note there.
+import DisplaySettingsRoundedIcon from "@mui/icons-material/DisplaySettingsRounded";
 import { Popover } from "@mui/material";
 import { useState } from "react";
 
@@ -267,7 +269,7 @@ function DisplayTrigger({
       title={compact ? "Exibir" : undefined}
     >
       <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
-        <TuneRoundedIcon fontSize="small" />
+        <DisplaySettingsRoundedIcon fontSize="small" />
         {!compact && (
           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
             Exibir

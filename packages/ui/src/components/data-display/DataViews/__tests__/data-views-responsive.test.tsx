@@ -106,6 +106,15 @@ const SMALL_MOBILE = 320;
 const LARGE_MOBILE = 430;
 const TABLET = 768;
 const SMALL_DESKTOP = 1280;
+/**
+ * A width where filter controls STILL overflow.
+ *
+ * It used to be `SMALL_DESKTOP`, and is not any more: since the ladder started
+ * re-spending the width its later rungs free, all six controls fit at 1280.
+ * The rules below are about what happens when they do NOT fit, so they need a
+ * row narrow enough to have an overflow at all.
+ */
+const CROWDED = 1024;
 const LARGE_DESKTOP = 1600;
 
 /* ── Harness ─────────────────────────────────────────────────────────────── */
@@ -237,20 +246,41 @@ describe("how many filter controls reach the bar", () => {
     await waitFor(() => expect(inlineIds().length).toBeGreaterThanOrEqual(3));
   });
 
-  it("sheds ONE AT A TIME on a small desktop, never all at once", async () => {
+  it("keeps every control inline on a small desktop", async () => {
     renderAt(SMALL_DESKTOP);
+    await waitFor(() => expect(inlineIds()).toEqual(ALL_CONTROLS));
+  });
+
+  it("sheds ONE AT A TIME on a crowded row, never all at once", async () => {
+    renderAt(CROWDED);
     await screen.findByTestId("t-more-filters");
     const shown = inlineIds();
     expect(shown.length).toBeGreaterThan(0);
     expect(shown.length).toBeLessThan(ALL_CONTROLS.length);
   });
 
+  /**
+   * A phone keeps ONE control, and that is the point of the re-spend: the bar
+   * used to shed all six against the UNCOLLAPSED furniture (search 200 +
+   * counter 96 + right 216), then collapse that furniture to 44 + 0 + 140 and
+   * leave the freed ~330px as an empty band beside "Mais 6".
+   *
+   * Which one survives is whichever fits the room that is left, so a large
+   * mobile keeps the cheaper "situacao" where a tablet affords "pagamento".
+   */
   it.each([
-    ["tablet", TABLET],
-    ["large mobile", LARGE_MOBILE],
-    ["small mobile", SMALL_MOBILE],
-  ])("moves them all behind Mais at %s", async (_name, width) => {
+    ["tablet", TABLET, ["pagamento"]],
+    ["large mobile", LARGE_MOBILE, ["situacao"]],
+  ])("keeps one control on the bar at %s", async (_name, width, expected) => {
     renderAt(width);
+    await screen.findByTestId("t-more-filters");
+    await waitFor(() => expect(inlineIds()).toEqual(expected));
+  });
+
+  it("still moves them all behind Mais at small mobile", async () => {
+    // 320 is the floor we support, and there genuinely is no room for a pill
+    // beside the magnifier, "Mais", the counter and the right-hand control.
+    renderAt(SMALL_MOBILE);
     await screen.findByTestId("t-more-filters");
     expect(inlineIds()).toEqual([]);
   });
@@ -271,7 +301,7 @@ describe("an applied filter is ranked first, NOT exempt", () => {
   });
 
   it("ranks it ahead of an idle one where there IS a slot", async () => {
-    renderAt(SMALL_DESKTOP);
+    renderAt(CROWDED);
     await screen.findByTestId("t-more-filters");
     await applyPagamento();
     await waitFor(() => expect(inlineIds()).toContain("pagamento"));
@@ -282,10 +312,12 @@ describe("the Mais badge tells applied apart from merely hidden", () => {
   it("counts hidden FIELDS, in the neutral tone, while none is applied", async () => {
     renderAt(TABLET);
     const badge = await screen.findByTestId("t-more-badge");
-    expect(badge).toHaveTextContent(String(ALL_CONTROLS.length));
+    // One control now reaches the bar at this width, so five are behind it.
+    const hidden = ALL_CONTROLS.length - 1;
+    expect(badge).toHaveTextContent(String(hidden));
     expect(screen.getByTestId("t-more-filters")).toHaveAttribute(
       "aria-label",
-      `Mais filtros: ${ALL_CONTROLS.length} sem espaço na barra`,
+      `Mais filtros: ${hidden} sem espaço na barra`,
     );
   });
 

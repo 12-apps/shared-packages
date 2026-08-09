@@ -1,7 +1,12 @@
 "use client";
 
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+// A FUNNEL, not the tune sliders this used to share with "Exibir". The two
+// sit a few px apart on the same bar and do unrelated things — one narrows
+// WHICH rows you see, the other changes HOW they are shown — and with one
+// glyph between them the bar offered the operator no way to tell which was
+// which. On a phone, where both are icon-only, they were indistinguishable.
+import FilterAltRoundedIcon from "@mui/icons-material/FilterAltRounded";
 import { Popover } from "@mui/material";
 import { useState } from "react";
 
@@ -76,7 +81,7 @@ function MoreTrigger({
           color: applied ? "primary.main" : undefined,
         }}
       >
-        <TuneRoundedIcon fontSize="small" />
+        <FilterAltRoundedIcon fontSize="small" />
         {!compact && (
           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
             Mais

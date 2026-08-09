@@ -2,7 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { estimateWidth, GAP, isRangeSet, pillText, RESERVED } from "./data-views-overflow-costs";
+import {
+  estimateWidth,
+  furnitureCost,
+  GAP,
+  isRangeSet,
+  pillText,
+  RESERVED,
+  rightClusterCost,
+} from "./data-views-overflow-costs";
 import type { FilterFieldConfig, RangeFieldConfig, RangeValue } from "./data-views-types";
 
 /**
@@ -154,6 +162,10 @@ function splitFilters<T extends Record<string, unknown>>(
   pills: Record<string, string[]>,
   ranges: Record<string, RangeValue>,
   width: number,
+  /** Search + counter + right cluster + chrome, at the rung being considered. */
+  furniture: number,
+  /** Is the bar already down to icons? "Mais" shrinks with everything else. */
+  compact: boolean,
 ): Split<T> {
   const none: OverflowField<T>[] = [];
   const widthOf = (field: OverflowField<T>): number => fieldWidth(field, pills, ranges);
@@ -164,14 +176,15 @@ function splitFilters<T extends Record<string, unknown>>(
 
   // "Limpar" rides the end of the cluster whenever anything is applied.
   const clearCost = active.length > 0 ? RESERVED.clearAll + GAP : 0;
-  let available =
-    width - RESERVED.search - RESERVED.counter - RESERVED.right - RESERVED.chrome - clearCost;
+  let available = width - furniture - clearCost;
   if (cost(all) <= available) {
     return { inline: all, overflow: none, used: cost(all) + clearCost };
   }
 
-  // There IS an overflow, so its button now costs room too.
-  available -= RESERVED.overflowButton;
+  // There IS an overflow, so its button now costs room too — at the width it
+  // will actually have, which on a phone is the icon-and-badge one.
+  const overflowButton = compact ? RESERVED.overflowButtonCompact : RESERVED.overflowButton;
+  available -= overflowButton;
   // APPLIED FIRST, BUT NOT EXEMPT.
   //
   // Applied controls take the visible slots ahead of idle ones — that part was
@@ -198,7 +211,7 @@ function splitFilters<T extends Record<string, unknown>>(
   return {
     inline,
     overflow: all.filter((field) => !keep.has(field.id)),
-    used: cost(inline) + RESERVED.overflowButton + clearCost,
+    used: cost(inline) + overflowButton + clearCost,
   };
 }
 
@@ -224,6 +237,8 @@ function computeSplit<T extends Record<string, unknown>>(
   pills: Record<string, string[]>,
   ranges: Record<string, RangeValue>,
   width: number,
+  /** Does the host render "Exportar" beside "Exibir"? Half the cluster if not. */
+  hasExport: boolean,
 ): Omit<OverflowSplit<T>, "barRef"> {
   // Unmeasured (SSR, or jsdom without a ResizeObserver) ⇒ degrade nothing.
   if (width === 0) {
@@ -237,12 +252,47 @@ function computeSplit<T extends Record<string, unknown>>(
       searchTakeover: false,
     };
   }
-  const { inline, overflow, used } = splitFilters(all, pills, ranges, width);
+  // Pass 1 prices the furniture at its widest — no rung has been taken yet.
+  let split = splitFilters(all, pills, ranges, width, furnitureCost(UNCOLLAPSED, hasExport), false);
+  let flags = ladderFlags(split, width, hasExport);
+  // RE-SPEND WHAT THE LATER RUNGS FREED.
+  //
+  // Rungs 2/4/5 turn 200 + 96 + 216 of furniture into 44 + 0 + 140, and until
+  // this loop existed nobody handed those ~330px back to the filters: the
+  // split was decided once, against the uncollapsed row, so a phone shed every
+  // control and then sat with a band of empty bar beside "Mais 5".
+  //
+  // Settles rather than oscillates, and cannot overfill: a cheaper furniture
+  // can only give the filters MORE room, more filter width can only push the
+  // ladder FURTHER down, and a further rung can only make the furniture
+  // cheaper again — so the budget decreases monotonically and the loop exits
+  // the moment it stops moving. The bound is a backstop, not the exit.
+  let budget = furnitureCost(UNCOLLAPSED, hasExport);
+  for (let pass = 0; pass < 3; pass += 1) {
+    const freed = furnitureCost(flags, hasExport);
+    if (freed >= budget) break;
+    budget = freed;
+    split = splitFilters(all, pills, ranges, width, budget, flags.compactControls);
+    flags = ladderFlags(split, width, hasExport);
+  }
+  return { inline: split.inline, overflow: split.overflow, ...flags };
+}
+
+/** The widest the furniture ever is — every rung still untaken. */
+const UNCOLLAPSED = { searchCollapsed: false, counterHidden: false, compactControls: false };
+
+/** Rungs 2 and 4-6, priced against what the filters actually took. */
+function ladderFlags<T extends Record<string, unknown>>(
+  split: Split<T>,
+  width: number,
+  hasExport: boolean,
+): Omit<OverflowSplit<T>, "barRef" | "inline" | "overflow"> {
+  const { overflow, used } = split;
   const base = width - used - RESERVED.chrome;
 
   // Would the search still make its minimum with the labels on?
-  const compactControls = base - RESERVED.counter - RESERVED.right < RESERVED.search;
-  const rightCost = compactControls ? RESERVED.rightCompact : RESERVED.right;
+  const compactControls = base - RESERVED.counter - rightClusterCost(hasExport, false) < RESERVED.search;
+  const rightCost = rightClusterCost(hasExport, compactControls);
   // …and with them off?
   const searchCollapsed = base - RESERVED.counter - rightCost < RESERVED.search;
   // Everything has collapsed and the row STILL overflows. The controls cannot
@@ -258,26 +308,29 @@ function computeSplit<T extends Record<string, unknown>>(
   // on there BEING an overflow, because with no panel the footer does not
   // exist and dropping this would strand the operator.
   const clearAllHidden = counterHidden && overflow.length > 0;
-  // What the keyword box would get if the operator expanded the magnifier and
-  // everything else stayed put. `searchCollapsed` is a different question — it
-  // asks whether the box fits at its PREFERRED 200px, and is deliberately
-  // pessimistic — so reusing it to decide the takeover evicted the filters on
-  // screens where the box had plenty of room to simply shrink.
-  const searchBoxRoom = base - (counterHidden ? 0 : RESERVED.counter) - rightCost;
+  // What the keyword box would get if the operator expanded the magnifier.
+  // `searchCollapsed` is a different question — it asks whether the box fits at
+  // its PREFERRED 200px, and is deliberately pessimistic — so reusing it to
+  // decide the takeover evicted the filters on screens where the box had plenty
+  // of room to simply shrink.
+  //
+  // Asked with the inline filters SHED, because shedding them is exactly what
+  // expanding the box does: the row re-splits and they go behind "Mais".
+  // Measuring against the resting row instead made a filter argue for its own
+  // eviction — now that a large phone keeps one, its width came out of `base`,
+  // pushed the box under `usableSearch`, and tipped a row that had ample space
+  // to share into a full takeover.
+  const overflowButton = compactControls
+    ? RESERVED.overflowButtonCompact
+    : RESERVED.overflowButton;
+  const shedRoom = width - RESERVED.chrome - (overflow.length > 0 ? overflowButton : 0);
+  const searchBoxRoom = shedRoom - (counterHidden ? 0 : RESERVED.counter) - rightCost;
   // Below this a box is too narrow to read what you typed into it, and shrinking
   // further buys nothing; that is the only point at which taking the whole
   // cluster is worth losing the filters.
   const searchTakeover = searchCollapsed && searchBoxRoom < RESERVED.usableSearch;
 
-  return {
-    inline,
-    overflow,
-    compactControls,
-    counterHidden,
-    searchCollapsed,
-    clearAllHidden,
-    searchTakeover,
-  };
+  return { compactControls, counterHidden, searchCollapsed, clearAllHidden, searchTakeover };
 }
 
 /**
@@ -307,12 +360,20 @@ export function useFilterOverflow<T extends Record<string, unknown>>(
    * that is mid-edit.
    */
   frozen = false,
+  /** Whether "Exportar" is on the bar — see `rightClusterCost`. */
+  hasExport = true,
 ): OverflowSplit<T> {
   const { barRef, width } = useBarWidth();
-  const signature = JSON.stringify({ ids: all.map((field) => field.id), pills, ranges, width });
+  const signature = JSON.stringify({
+    ids: all.map((field) => field.id),
+    pills,
+    ranges,
+    width,
+    hasExport,
+  });
   const cache = useRef<{ signature: string; split: ReturnType<typeof computeSplit<T>> } | null>(null);
   if (cache.current === null || (!frozen && cache.current.signature !== signature)) {
-    cache.current = { signature, split: computeSplit(all, pills, ranges, width) };
+    cache.current = { signature, split: computeSplit(all, pills, ranges, width, hasExport) };
   }
   return { ...cache.current.split, barRef };
 }
