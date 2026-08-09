@@ -35,11 +35,7 @@ export {
   type PaymentsGateway,
   type PaymentsGatewayConfig,
 } from './core/gateway';
-/**
- * Observability for inbound deliveries refused BEFORE the durable inbox —
- * wire it as `PaymentsGatewayConfig.webhookObserver`. A refusal there is
- * otherwise traceless, the silence that hid FUT-463 (FUT-761).
- */
+// Pre-inbox refusal observability (FUT-761) — wire as `PaymentsGatewayConfig.webhookObserver`.
 export type { WebhookPipelineObserver } from './core/webhook-pipeline';
 export type { FailoverPolicy } from './core/charge-walk';
 /**
@@ -81,12 +77,7 @@ export type {
   WebhookInbox,
 } from './core/ports';
 export { isForwardTransition, isTerminal } from './core/status';
-/**
- * The pending-charge reconciliation sweep (FUT-761): re-read still-waiting
- * charges from the provider and hand PAID ones to the host's idempotent
- * settle port — the machine that rescues a paid charge whose webhook never
- * arrived once the buyer's tab stops polling.
- */
+// The pending-charge reconciliation sweep (FUT-761) — see `core/payable-sweep.ts`.
 export {
   reconcilePendingCharges,
   type PendingChargeWindow,
@@ -143,20 +134,13 @@ export {
   WebhookVerificationError,
 } from './core/errors';
 export type { ProviderRequestSnapshot } from './core/errors';
-/**
- * Readers of the error taxonomy, ported from the future-pay host (FUT-761)
- * so no adopter re-derives them: the printable request/response pair, the
- * account-level-rejection test, and "can waiting improve this refusal".
- */
+// Error-taxonomy readers (FUT-761) — see `core/error-readers.ts`.
 export {
   isAccountAccessError,
   isPermanentProviderRefusal,
   providerExchangeReport,
 } from './core/error-readers';
-/**
- * What a decline MEANS — instrument dead, retry forbidden — as taxonomy
- * properties. Retry ladders and grace windows stay host policy (FUT-761).
- */
+// Decline verdicts as taxonomy properties (FUT-761); ladders stay host policy.
 export { declineForbidsRetry, declineMeansInstrumentDead } from './core/decline-verdict';
 
 /**
@@ -235,21 +219,11 @@ export {
   type SettingsServiceOptions,
 } from './config/service';
 export { hasUsableCredentials } from './config/usable-credentials';
-/**
- * The account-level downgrade rule (ported from the future-pay host,
- * FUT-761): a 401/403 on a charge marks the ENABLED connection FAILED so the
- * settings screen surfaces the outage instead of a stale VERIFIED.
- */
+// Account-level downgrade rule (FUT-761) — see `config/account-downgrade.ts`.
 export { downgradeOnAccountError } from './config/account-downgrade';
 export { type VerifiedProviderConfig } from './config/verify';
-/**
- * Platform credential bootstrap (FUT-761): env seeds, panel owns. Reading
- * the seeds out of the deployment's env vars stays host wiring.
- */
-export {
-  ensurePlatformCredentials,
-  type PlatformCredentialSeed,
-} from './config/platform-seed';
+// Platform credential bootstrap (FUT-761): env seeds, panel owns.
+export { ensurePlatformCredentials, type PlatformCredentialSeed } from './config/platform-seed';
 /**
  * The credential-write contract (FUT-694), exported so a host that mounts its
  * own settings route — rather than `createPaymentsHttp` — refuses the same
