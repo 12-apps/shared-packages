@@ -18,6 +18,7 @@
  * stored credentials, and the provider at the other end of them.
  */
 import {
+  ProviderRequestError,
   createMemoryAttemptLedger,
   createMemoryChargeStore,
   createMemoryCredentialStore,
@@ -26,10 +27,12 @@ import {
   createPaymentFlowsBE,
   createPaymentsGateway,
   defineProviders,
+  type CheckoutErrorBody,
   type MemoryChargeStore,
   type MemoryCredentialStore,
   type MemoryProviderConfigStore,
   type PaymentMethodKind,
+  type VaultedCardDisplay,
 } from '@12-apps/payments-backend';
 
 import {
@@ -134,17 +137,30 @@ function seedConnections(
   }
 }
 
+/** A card the buyer put on file THIS session, through `/cards/complete`. */
+interface AddedInstrument {
+  id: string;
+  token: string;
+  display: VaultedCardDisplay;
+}
+
 /**
  * The host's vault.
  *
  * `resolve` answers three different things on purpose: a token, an id the
  * caller OWNS that this scope cannot charge (409 — "not usable here", never a
  * decline), and an id the vault has never heard of.
+ *
+ * `save` also keeps its own ROWS, the way a real host writes a table: the ids
+ * are minted here and the vault token stays behind them, so `list` can answer
+ * a card added a moment ago with display metadata only — which is what lets
+ * the wallet page's saved list re-read what is now on file.
  */
 function instrumentsPort(spec: HarnessStoreSpec, world: HarnessWorld, changed: () => void) {
+  const added: AddedInstrument[] = [];
   return {
-    list: async () =>
-      (spec.instruments ?? []).map((card) => ({
+    list: async () => [
+      ...(spec.instruments ?? []).map((card) => ({
         id: card.id,
         last4: card.last4,
         brand: card.brand ?? 'visa',
@@ -152,15 +168,45 @@ function instrumentsPort(spec: HarnessStoreSpec, world: HarnessWorld, changed: (
         expYear: 2031,
         holder: 'ANA COMPRADORA',
       })),
+      ...added.map((row) => ({
+        id: row.id,
+        last4: row.display.last4 ?? '0000',
+        brand: row.display.brand ?? 'visa',
+        expMonth: row.display.expMonth ?? 12,
+        expYear: row.display.expYear ?? 2031,
+        holder: 'ANA COMPRADORA',
+      })),
+    ],
     resolve: async (_caller: unknown, _scope: unknown, instrumentId: string) => {
       if (spec.unusableInstruments?.includes(instrumentId)) return { token: null, owned: true };
+      const row = added.find((entry) => entry.id === instrumentId);
+      if (row) return { token: row.token };
       const known = spec.instruments?.some((card) => card.id === instrumentId);
       return known ? { token: `vault_${instrumentId}` } : { token: null, owned: false };
     },
     save: async (_caller: unknown, scope: { provider: string }, token: string, display: unknown) => {
+      // The display is whatever the mount answered `/cards/complete` with —
+      // display metadata only by contract, so the row narrows it as such.
+      added.push({ id: `card_nova_${added.length + 1}`, token, display: display as VaultedCardDisplay });
       world.vaulted.push({ provider: scope.provider, token, display });
       changed();
     },
+  };
+}
+
+/**
+ * The host's wording for ONE provider-vocabulary failure: the stub vault's
+ * validation 400 (FUT-478). Field-level on purpose — the refused add-card form
+ * keeps the buyer's input under a reason naming what to fix, which is the seam
+ * the S2 tests pin. Nothing else reaches this mapping in the harness: the
+ * charge-path adapters answer declines as OUTCOMES, never as thrown errors.
+ */
+function vaultValidationRefusal(error: unknown): CheckoutErrorBody | null {
+  if (!(error instanceof ProviderRequestError) || error.options.httpStatus !== 400) return null;
+  return {
+    code: 'CARD_VALIDATION_REFUSED',
+    message: 'O cartão foi recusado na validação. Confira os dados e tente de novo.',
+    field: 'cardNumber',
   };
 }
 
@@ -221,6 +267,15 @@ export function createHarnessStore(spec: HarnessStoreSpec = {}): HarnessWorld {
     payables: payablesPort(book, charges),
     correlation: correlationPort(book),
     instruments: instrumentsPort(spec, out, fire),
+    // The buyer-vault ownership facts (FUT-478): reference and customer are
+    // derived from the CALLER, never read from a request body — the same rule
+    // the S2 server-derivation tests pin. Wired unconditionally: a store whose
+    // chain head declares no `vault` seam still answers the not-enabled 404.
+    vault: async (caller) => ({
+      reference: `vault_${caller.id}`,
+      customer: { name: 'Ana Compradora', email: 'ana@exemplo.br', taxId: '52998224725' },
+    }),
+    mapProviderError: vaultValidationRefusal,
     copy: harnessCopy,
     logger: { warn: () => undefined, error: () => undefined, providerFailure: () => undefined },
   });

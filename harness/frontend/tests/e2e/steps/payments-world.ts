@@ -40,6 +40,8 @@ const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string 
   'payments-off': { slug: 'payments-checkout-no-provider', caseId: 'host-veto' },
   'two-mintable': { slug: 'payments-checkout-chain-failover', caseId: 'two-mintable' },
   'redirect-head': { slug: 'payments-checkout-chain-failover', caseId: 'redirect-head' },
+  // The saved-card wallet (FUT-183/FUT-478) — a buyer screen, not a checkout.
+  wallet: { slug: 'payments-wallet' },
   'screen-on-page': { slug: 'payments-checkout-provider-screens', caseId: 'screen-on-page' },
   'screen-handoff': { slug: 'payments-checkout-provider-screens', caseId: 'screen-handoff' },
   'screen-undeclared': { slug: 'payments-checkout-provider-screens', caseId: 'screen-undeclared' },
