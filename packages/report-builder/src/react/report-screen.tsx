@@ -14,13 +14,11 @@
  */
 import type { JSX } from "react";
 
-import { Chip } from "@12-apps/ui/data-display/Chip";
 import { ErrorState } from "@12-apps/ui/data-display/ErrorState";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
 import { Button } from "@12-apps/ui/form/Button";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
-import { useTheme } from "@12-apps/ui/mui/styles";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { useSavedReport, type SavedReportView } from "./custom-reports-api";
@@ -28,42 +26,13 @@ import { PencilIcon } from "./lib/block-icons";
 import type { CustomRangeWindow } from "./lib/custom-range-dialog";
 import { NO_PRINT_CLASS, PRINT_REGION_ATTR, PrintExportButton } from "./lib/print-export";
 import { RangeToggle } from "./lib/range-toggle";
-import { CONTROL_ROW_SX, PAGE_TITLE_SX, stateChipSx } from "./lib/report-surface";
+import { ReportBreadcrumbs } from "./lib/report-breadcrumbs";
+import { ReportStatusChip } from "./lib/report-status-chip";
+import { CONTROL_ROW_SX, PAGE_TITLE_SX } from "./lib/report-surface";
 import { windowDays, windowLabel } from "./lib/resolved-window";
 import { relativeReportTime, visibilityLabel } from "./report-list-filters";
 import { ReportActionsMenu, ReportViewCanvas } from "./report-view";
 import type { ReportRangeSelection } from "./reports-api";
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Rascunho",
-  archived: "Arquivado",
-  published: "Publicado",
-};
-
-/**
- * The lifecycle badge beside the name. Unlike the card's, this one ALWAYS shows
- * — a report you have opened is one whose state you are about to act on, and
- * "Publicado" is the fact that makes Arquivar the sensible next move.
- */
-function StatusChip({ status }: { status: SavedReportView["status"] }): JSX.Element {
-  const theme = useTheme();
-  const tone =
-    status === "draft"
-      ? theme.palette.warning.main
-      : status === "archived"
-        ? theme.palette.text.secondary
-        : theme.palette.primary.main;
-  return (
-    <Box
-      sx={{
-        display: "inline-flex",
-        "& .MuiChip-root": stateChipSx(tone, theme.palette.background.paper),
-      }}
-    >
-      <Chip label={STATUS_LABELS[status] ?? status} size="sm" variant="filled" />
-    </Box>
-  );
-}
 
 /**
  * Description, who can read it and how stale it is — one line, `·`-separated.
@@ -138,6 +107,41 @@ function ReportHeaderActions({
   );
 }
 
+/**
+ * The left column: name + status on one line, the three facts under it.
+ *
+ * `minWidth: 0` is load-bearing — a flex item defaults to `min-width:auto` and
+ * refuses to shrink below its content, which is how a near-identical row in
+ * this area measured 455px inside a 390px column and pushed the ⋮ clean
+ * off-screen. `flex-basis` past a phone's width makes it the item that takes
+ * the whole first line when the row wraps.
+ */
+function ReportTitleColumn({
+  view,
+  subtitle,
+}: {
+  view: SavedReportView;
+  subtitle: string;
+}): JSX.Element {
+  return (
+    <Stack spacing={0.25} sx={{ minWidth: 0, flex: "1 1 260px" }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: "center", flexWrap: "wrap", minWidth: 0 }}
+      >
+        <Box component="h1" sx={PAGE_TITLE_SX} data-testid="report-title">
+          {view.name}
+        </Box>
+        <ReportStatusChip status={view.status} />
+      </Stack>
+      <Text variant="body" size="sm" color="secondary" data-testid="report-subtitle">
+        {subtitle}
+      </Text>
+    </Stack>
+  );
+}
+
 function ReportScreenHeader({
   tenantSlug,
   view,
@@ -161,52 +165,48 @@ function ReportScreenHeader({
   onChanged: (status: string) => void;
 }): JSX.Element {
   return (
-    // `Box` + `gap` rather than `Stack spacing` — see `ReportPeriodRow`: Stack's
-    // spacing selector outranks a child's own `ml: auto`, which is what pins
-    // the action cluster to the opposite edge.
-    <Box
-      className={NO_PRINT_CLASS}
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        gap: 1.5,
-        flexWrap: "wrap",
-        rowGap: 1,
-        ...CONTROL_ROW_SX,
-      }}
-    >
-      {/* Back INLINE at the far left, vertically centred against the two lines
-          it precedes — a compact affordance beside the name, not a breadcrumb
-          stacked above it. */}
-      <Button variant="ghost" size="sm" onClick={onBack} dataTestId="report-back">
-        ← Relatórios
-      </Button>
-      {/*
-        The left column: name + status on one line, the three facts under it.
-        `minWidth: 0` is load-bearing — a flex item defaults to `min-width:auto`
-        and refuses to shrink below its content, which is how a near-identical
-        row in this area measured 455px inside a 390px column and pushed the ⋮
-        clean off-screen. `flex-basis` past a phone's width makes it the item
-        that takes the whole first line when the row wraps.
-      */}
-      <Stack spacing={0.25} sx={{ minWidth: 0, flex: "1 1 260px" }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
-          <Box component="h1" sx={PAGE_TITLE_SX} data-testid="report-title">
-            {view.name}
-          </Box>
-          <StatusChip status={view.status} />
-        </Stack>
-        <Text variant="body" size="sm" color="secondary" data-testid="report-subtitle">
-          {subtitleOf(view, updatedAt, now)}
-        </Text>
-      </Stack>
-      <ReportHeaderActions
-        tenantSlug={tenantSlug}
-        view={view}
-        onEdit={onEdit}
-        onChanged={onChanged}
+    <Stack spacing={1}>
+      {/* The trail, on its own line above the report — `report-back` rides on
+          the crumb that goes where the old `← Relatórios` button went, so the
+          e2e that clicks it does not need to know it stopped being a button.
+          The href is real (middle-click, copy address); `onSelect` keeps the
+          moving in the caller's `onBack`, which this screen has always been
+          handed rather than routing for itself. */}
+      <ReportBreadcrumbs
+        dataTestId="report-crumbs"
+        crumbs={[
+          {
+            label: "Relatórios",
+            href: `/${tenantSlug}/reports`,
+            dataTestId: "report-back",
+            onSelect: onBack,
+          },
+          { label: view.name },
+        ]}
       />
-    </Box>
+      {/* `Box` + `gap` rather than `Stack spacing` — see `ReportPeriodRow`:
+          Stack's spacing selector outranks a child's own `ml: auto`, which is
+          what pins the action cluster to the opposite edge. */}
+      <Box
+        className={NO_PRINT_CLASS}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          flexWrap: "wrap",
+          rowGap: 1,
+          ...CONTROL_ROW_SX,
+        }}
+      >
+        <ReportTitleColumn view={view} subtitle={subtitleOf(view, updatedAt, now)} />
+        <ReportHeaderActions
+          tenantSlug={tenantSlug}
+          view={view}
+          onEdit={onEdit}
+          onChanged={onChanged}
+        />
+      </Box>
+    </Stack>
   );
 }
 

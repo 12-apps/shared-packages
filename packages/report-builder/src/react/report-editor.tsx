@@ -110,8 +110,15 @@ function EditorSettings({
  * The header and the question it asks on the way out.
  *
  * They live together because they are one interaction: the header owns the
- * only way out of the editor, and the dialog is what that exit has to say
- * when there is work the store has not been shown yet.
+ * ways out of the editor, and the dialog is what those exits have to say when
+ * there is work the store has not been shown yet.
+ *
+ * The exit now has more than one DESTINATION — the trail offers the report and
+ * the list — so the pending href is held while the dialog is open and used to
+ * resume. Navigating to a fixed target instead would answer "Sair sem
+ * publicar?" by putting you somewhere you did not click, which is a worse bug
+ * than the one the prompt exists to prevent: it only shows up when there ARE
+ * unsaved changes, i.e. every time it matters.
  */
 function EditorTopBar({
   tenantSlug,
@@ -127,7 +134,8 @@ function EditorTopBar({
   onOpenSettings: () => void;
 }): JSX.Element {
   const navigate = useNavigate();
-  const [prompt, setPrompt] = useState(false);
+  /** The href the guard interrupted; `null` while nothing is being asked. */
+  const [pendingExit, setPendingExit] = useState<string | null>(null);
   const { draft, setDraft, publish, saving, dirty, save, unpublished } = editor;
 
   return (
@@ -145,20 +153,21 @@ function EditorTopBar({
         onOpenSettings={onOpenSettings}
         onCancel={() => void navigate(exitTarget)}
         onSave={save}
-        onBeforeExit={() => {
+        onBeforeExit={(href) => {
           if (!hasPendingWork(dirty, unpublished.present)) return true;
-          setPrompt(true);
+          setPendingExit(href);
           return false;
         }}
       />
       <ExitConfirmDialog
-        open={prompt}
+        open={pendingExit !== null}
         publish={publish}
         onLeave={() => {
-          setPrompt(false);
-          void navigate(exitTarget);
+          const href = pendingExit ?? exitTarget;
+          setPendingExit(null);
+          void navigate(href);
         }}
-        onStay={() => setPrompt(false)}
+        onStay={() => setPendingExit(null)}
       />
     </>
   );
