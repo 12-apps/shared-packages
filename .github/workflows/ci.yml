@@ -690,7 +690,22 @@ jobs:
     # FAILS, its dependents go `skipped` — not `failure` — and this aggregation
     # treats `skipped` as fine, so without it a broken change-detector would
     # report green with zero tests run.
-    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, backend-harness, portability]
+    #
+    # `release` MUST be listed for a related but distinct reason: it is the only
+    # job whose failure nothing else can reveal. Every gate above is also run on
+    # the PR, so a broken one is caught before merge; `release` runs ONLY on the
+    # push to main, and if it fails the packages simply do not publish. Without
+    # it here the run goes green, the merge looks finished, and the gap surfaces
+    # much later as a consumer pinning a version that was never cut.
+    #
+    # That is not hypothetical — it is why this line exists. `@12-apps/auth`'s
+    # browser half merged, its release failed on a push race with the release
+    # 11 minutes before it, `CI Success` reported green, and the package sat
+    # unpublished until a consumer could not resolve `@12-apps/auth/react`.
+    #
+    # On a pull request `release` is skipped, which this aggregation already
+    # treats as fine — so this costs PRs nothing.
+    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, backend-harness, portability, release]
     steps:
       - name: Verify all required jobs passed
         shell: bash
