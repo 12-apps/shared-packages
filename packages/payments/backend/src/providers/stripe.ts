@@ -207,7 +207,11 @@ export function stripeProvider(): PaymentProviderAdapter {
       savedCards: true,
       refunds: true,
       partialRefunds: true,
-      splits: true,
+      // Stripe Connect CAN split, but this adapter never sends
+      // transfer_data/application_fee_amount and ChargeInput carries no split
+      // instruction to forward — declaring it was a false claim the settings
+      // API and the MCP manifest repeated (FUT-692).
+      splits: false,
       webhooks: true,
       tokenization: 'SDK',
     },
