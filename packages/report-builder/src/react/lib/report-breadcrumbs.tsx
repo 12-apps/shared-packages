@@ -49,11 +49,6 @@ export interface ReportCrumb {
   onSelect?: () => void;
 }
 
-/**
- * The trail is metadata about the page, not part of the report, so it does not
- * print — `print-export` renders the report region alone and this would come
- * out as a stray line of navigation above it.
- */
 /** The design system's own crumb padding — `theme.spacing(0.5, 0.75)`. */
 const CRUMB_PAD_X = "6px";
 
@@ -117,6 +112,9 @@ export function ReportBreadcrumbs({
   });
 
   return (
+    // The trail is metadata about the page, not part of the report, so it does
+    // not print: `print-export` renders the report region alone, and this would
+    // come out as a stray line of navigation above it.
     <Box className={NO_PRINT_CLASS} sx={CRUMBS_SX}>
       <Breadcrumbs
         items={items}
