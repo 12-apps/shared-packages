@@ -1,8 +1,15 @@
-import type { ColorValue } from '../../../tokens/scales';
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { AvatarProps as MuiAvatarProps } from '@mui/material';
 import type React from 'react';
 
-export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
+/**
+ * The house scale, EXTENDED by one stop rather than replacing it.
+ *
+ * `xxl` is real — an avatar is the one component with a portrait size above the
+ * scale's top — so it is added to `SizeValue` instead of the union being
+ * rewritten by hand. Spelling all six out again is how the copy drifts.
+ */
+export type AvatarSize = SizeValue | 'xxl';
 export type AvatarVariant = 'circle' | 'square' | 'rounded' | 'status';
 export type AvatarStatus = 'online' | 'offline' | 'away' | 'busy';
 

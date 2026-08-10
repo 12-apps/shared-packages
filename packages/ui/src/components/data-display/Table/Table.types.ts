@@ -1,3 +1,4 @@
+import type { ColorValue } from '../../../tokens/scales';
 import type { TableProps as MuiTableProps } from '@mui/material';
 import type React from 'react';
 
@@ -57,7 +58,8 @@ export interface SelectionConfig {
   rowKeyExtractor?: (rowData: Record<string, unknown>, index: number) => string | number;
 }
 
-export type TableStripeColor = 'primary' | 'secondary' | 'info' | 'success' | 'warning' | 'error' | 'neutral';
+/** The full house vocabulary — a stripe can take any accent, or none. */
+export type TableStripeColor = ColorValue;
 
 export interface TableProps extends Omit<MuiTableProps, 'variant'> {
   /**

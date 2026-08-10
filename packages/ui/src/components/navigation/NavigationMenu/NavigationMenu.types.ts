@@ -1,4 +1,4 @@
-import type { SizeValue } from '../../../tokens/scales';
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { ReactNode } from 'react';
 
 export interface NavigationMenuItem {
@@ -77,7 +77,11 @@ export interface NavigationMenuProps {
   /**
    * Color scheme of the menu
    */
-  color?: 'default' | 'primary' | 'secondary';
+  /**
+   * `neutral` is what this called `default`: the unaccented state, renamed to
+   * the house word rather than kept as a third spelling of the same idea.
+   */
+  color?: Extract<ColorValue, 'primary' | 'secondary' | 'neutral'>;
 
   /**
    * Size of the menu items

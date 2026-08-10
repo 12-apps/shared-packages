@@ -1,4 +1,4 @@
-import type { SizeValue } from '../../../tokens/scales';
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { ReactNode } from 'react';
 
 export type ChipVariant = 'filled' | 'outlined';
@@ -35,14 +35,7 @@ export type ChipSize = Extract<SizeValue, 'sm' | 'md'>;
  * using the vocabulary the rest of the system taught them. The fix is for the
  * chip to speak it and translate at the MUI boundary, exactly as `Button` does.
  */
-export type ChipColor =
-  | 'primary'
-  | 'secondary'
-  | 'success'
-  | 'warning'
-  | 'info'
-  | 'danger'
-  | 'neutral';
+export type ChipColor = ColorValue;
 
 export interface ChipProps {
   /** Text content displayed in the chip */
