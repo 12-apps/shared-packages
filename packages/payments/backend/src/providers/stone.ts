@@ -130,7 +130,10 @@ export function stoneProvider(): PaymentProviderAdapter {
     authMode: 'credentials',
     capabilities: {
       methods: ['PIX', 'CARD', 'BOLETO'],
-      savedCards: true,
+      // Pagar.me can vault cards, but this adapter implements no vault seam —
+      // the flag advertised a wallet no buyer could reach (caught by the
+      // FUT-692 capabilities audit; the vault itself is Stone sub-epic work).
+      savedCards: false,
       refunds: true,
       partialRefunds: true,
       // Split exists on Pagar.me, but only for a platform that onboarded the

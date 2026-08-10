@@ -396,4 +396,4 @@ export type {
  * {@link SettlementHints} (this file's size gate), re-exported here so every
  * adapter and host keeps importing them from `core/types`, the one door.
  */
-export type { NormalizedWebhookEvent, WebhookDelivery } from './webhook-event-types';
+export type { IntakeFreshness, NormalizedWebhookEvent, WebhookDelivery } from './webhook-event-types';

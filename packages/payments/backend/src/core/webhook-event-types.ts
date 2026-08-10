@@ -16,6 +16,17 @@ export interface WebhookDelivery {
   headers: Record<string, string>;
 }
 
+/**
+ * What an adapter's OPTIONAL intake-freshness check answers: the delivery is
+ * inside the provider's documented timestamp tolerance, or it is not and here
+ * is why. A discriminated pair rather than a boolean so a refusal always
+ * carries its reason — the pipeline reports it through the refusal observer,
+ * and "too old" must be distinguishable from "bad signature" in that log.
+ * Declared beside the delivery shape it inspects; the check itself is the
+ * adapter contract's `webhook.intakeFreshness` (see `core/provider.ts`).
+ */
+export type IntakeFreshness = { fresh: true } | { fresh: false; reason: string };
+
 /** Normalized event an adapter extracts from a verified webhook delivery. */
 export interface NormalizedWebhookEvent {
   provider: ProviderName;

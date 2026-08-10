@@ -7,6 +7,7 @@ import type {
   CredentialFieldSpec,
   CustomerSchema,
   GooglePayClientConfig,
+  IntakeFreshness,
   NormalizedWebhookEvent,
   ProviderCapabilities,
   OAuthAuthorizeRequest,
@@ -307,6 +308,25 @@ export interface PaymentProviderAdapterBase {
    */
   webhook: {
     verify(delivery: WebhookDelivery, credentials: ResolvedCredentials): Promise<boolean>;
+    /**
+     * Replay-tolerance for the LIVE intake path ONLY (FUT-690) — is this
+     * delivery's signed timestamp within the provider's documented skew
+     * window right now?
+     *
+     * A separate member, and NOT part of `verify`, is the design constraint:
+     * the replay sweep re-runs `verify` over rows the inbox stored HOURS
+     * earlier and must keep succeeding forever (see `webhook-replay.ts`), so
+     * a skew window inside `verify` would re-reject exactly the stranded rows
+     * that sweep exists to finish. Only `runWebhookPipeline` consults this,
+     * before anything durable exists, and refuses a stale delivery the same
+     * fail-closed way it refuses a bad signature.
+     *
+     * `nowMs` is a parameter so the policy is testable against a fixed clock;
+     * the pipeline reads the real clock at its call site. Synchronous on
+     * purpose — it is a header inspection, never a network call. Adapters
+     * whose scheme carries no timestamp simply omit it.
+     */
+    intakeFreshness?(delivery: WebhookDelivery, nowMs: number): IntakeFreshness;
     /**
      * Credentials are passed because a body is not always its own authority:
      * an adapter for an UNSIGNED provider can only report an amount it re-read
