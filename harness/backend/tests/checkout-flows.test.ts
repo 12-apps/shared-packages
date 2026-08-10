@@ -205,10 +205,12 @@ async function call(
 }
 
 describe('@12-apps/payments-backend — the published buyer-checkout mount', () => {
-  it('publishes the six-row table, and 404s anything outside it', async () => {
+  it('publishes the eight-row table, and 404s anything outside it', async () => {
     expect(CHECKOUT_ROUTES.map((row) => row.kind)).toEqual([
       'getCheckoutConfig',
       'listInstruments',
+      'beginVault',
+      'completeVault',
       'createCheckout',
       'chargeInstrument',
       'getStatus',
@@ -216,6 +218,22 @@ describe('@12-apps/payments-backend — the published buyer-checkout mount', () 
     ]);
     const { routes } = setup([harnessAdapter('alpha')]);
     expect((await call(routes, 'GET', '/nope')).status).toBe(404);
+  });
+
+  it('answers the buyer vault rows with the not-enabled 404 when the host wired no vault', async () => {
+    // FUT-478's fail-closed rule, through the consumer's door: this host wires
+    // no vault port and no instruments.save, so `/cards/begin` and
+    // `/cards/complete` refuse BEFORE any adapter runs — no provider-side
+    // token is ever minted that the host has nowhere to store.
+    const { routes } = setup([harnessAdapter('alpha')]);
+
+    const begun = await call(routes, 'POST', '/cards/begin');
+    const completed = await call(routes, 'POST', '/cards/complete', { token: 'tok_1' });
+
+    expect(begun.status).toBe(404);
+    expect(begun.body.code).toBe('VAULT_NOT_ENABLED');
+    expect(completed.status).toBe(404);
+    expect(completed.body.code).toBe('VAULT_NOT_ENABLED');
   });
 
   it('charges the payable\'s own amount, under its own reference and key', async () => {
