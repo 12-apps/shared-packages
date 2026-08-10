@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { SliderProps as MuiSliderProps } from '@mui/material';
 
 export interface SliderProps extends Omit<MuiSliderProps, 'color' | 'size'> {
@@ -9,12 +10,12 @@ export interface SliderProps extends Omit<MuiSliderProps, 'color' | 'size'> {
   /**
    * The color theme of the slider
    */
-  color?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral';
+  color?: Exclude<ColorValue, 'info'>;
 
   /**
    * The size of the slider
    */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: SizeValue;
 
   /**
    * Label for the slider

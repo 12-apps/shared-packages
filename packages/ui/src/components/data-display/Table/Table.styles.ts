@@ -46,7 +46,7 @@ const getStripeColorFromTheme = (theme: { palette: { primary: { main: string }; 
     info: theme.palette.info.main,
     success: theme.palette.success.main,
     warning: theme.palette.warning.main,
-    error: theme.palette.error.main,
+    danger: theme.palette.error.main,
     neutral: theme.palette.action.hover };
   return colorMap[stripeColor];
 };

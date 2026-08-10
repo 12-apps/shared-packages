@@ -3,17 +3,20 @@ import { forwardRef } from 'react';
 
 import { useDateTimeParts } from './DateTimeDisplay.hooks';
 import type { DateTimeDisplayProps } from './DateTimeDisplay.types';
+import type { SizeValue } from '../../../tokens/scales';
 
 /**
  * Get font sizes based on size prop
  */
-function getFontSizes(size: 'small' | 'medium' | 'large') {
+function getFontSizes(size: SizeValue) {
   switch (size) {
-    case 'small':
+    case 'xs':
+    case 'sm':
       return { date: '0.75rem', time: '0.65rem' };
-    case 'large':
+    case 'lg':
+    case 'xl':
       return { date: '1rem', time: '0.875rem' };
-    case 'medium':
+    case 'md':
     default:
       return { date: '0.875rem', time: '0.75rem' };
   }
@@ -81,7 +84,7 @@ export const DateTimeDisplay = forwardRef<HTMLSpanElement, DateTimeDisplayProps>
       dateFormat = 'short',
       timeFormat = '12h',
       showTimezone = false,
-      size = 'medium',
+      size = 'md',
       showTooltip = true,
       tooltipContent,
       sx,

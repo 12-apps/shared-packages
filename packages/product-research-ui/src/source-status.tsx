@@ -119,7 +119,7 @@ function answeredChip(stat: SourceStatView, t: ResearchMessages): JSX.Element {
   const caveat = answerCaveat(stat);
   const label = answeredLabel(stat, t, caveat);
   if (caveat === null) {
-    return <Chip label={label} size="small" variant="outlined" color="success" />;
+    return <Chip label={label} size="sm" variant="outlined" color="success" />;
   }
   const outsideArea = caveat === 'outside-area';
   return (
@@ -138,12 +138,12 @@ function answeredChip(stat: SourceStatView, t: ResearchMessages): JSX.Element {
 function statChip(stat: SourceStatView, t: ResearchMessages, reason: string | null): JSX.Element {
   if (stat.status === 'OK' || stat.status === 'CACHED') return answeredChip(stat, t);
   if (stat.status === 'SKIPPED') {
-    return <Chip label={t.statusSkipped} size="small" variant="outlined" />;
+    return <Chip label={t.statusSkipped} size="sm" variant="outlined" />;
   }
   const failed = stat.status === 'FAILED';
   const label = failed ? t.statusFailed : t.statusBudget;
   if (reason === null) {
-    return <Chip label={label} size="small" variant="outlined" color={failed ? 'error' : 'warning'} />;
+    return <Chip label={label} size="sm" variant="outlined" color={failed ? 'danger' : 'warning'} />;
   }
   // The reason in full (up to REASON_HINT_MAX) lives here — the row line below
   // is truncated much harder, for layout.
@@ -151,7 +151,7 @@ function statChip(stat: SourceStatView, t: ResearchMessages, reason: string | nu
     <CaveatChip
       label={label}
       hint={t.statusFailureReason(reason)}
-      color={failed ? 'error' : 'warning'}
+      color={failed ? 'danger' : 'warning'}
       dataTestId={`source-status-why-${stat.sourceId}`}
     />
   );
@@ -211,7 +211,7 @@ function SourceStatusRowView({
         {row.stat !== null ? (
           statChip(row.stat, t, reason)
         ) : (
-          <Chip label={running ? t.statusQuerying : '…'} size="small" variant="outlined" />
+          <Chip label={running ? t.statusQuerying : '…'} size="sm" variant="outlined" />
         )}
       </Stack>
       {reason !== null && (

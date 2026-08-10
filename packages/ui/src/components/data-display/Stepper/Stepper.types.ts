@@ -1,3 +1,4 @@
+import type { SizeValue } from '../../../tokens/scales';
 import type { ReactNode } from 'react';
 
 export interface Step {
@@ -40,7 +41,7 @@ export interface StepperProps {
    * takes far less vertical space — useful above the fold on mobile checkouts.
    * @default 'md'
    */
-  size?: 'sm' | 'md';
+  size?: Extract<SizeValue, 'sm' | 'md'>;
   
   /**
    * Navigation variant controlling step access

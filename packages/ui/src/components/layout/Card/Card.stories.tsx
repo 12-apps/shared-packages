@@ -203,7 +203,7 @@ export const ProductCard: Story = {
           <Typography variant="h6" component="div">
             Premium Headphones
           </Typography>
-          <Chip label="New" color="primary" size="small" />
+          <Chip label="New" color="primary" size="sm" />
         </Stack>
         <Stack direction="row" alignItems="center" spacing={1} mb={1}>
           <Star sx={{ color: 'orange', fontSize: 16 }} />
@@ -263,9 +263,9 @@ export const ProfileCard: Story = {
             <Typography variant="body2">+1 (555) 123-4567</Typography>
           </Box>
           <Stack direction="row" spacing={1} mt={2}>
-            <Chip label="React" size="small" variant="outlined" />
-            <Chip label="TypeScript" size="small" variant="outlined" />
-            <Chip label="Node.js" size="small" variant="outlined" />
+            <Chip label="React" size="sm" variant="outlined" />
+            <Chip label="TypeScript" size="sm" variant="outlined" />
+            <Chip label="Node.js" size="sm" variant="outlined" />
           </Stack>
         </Stack>
       </CardContent>
@@ -285,7 +285,7 @@ export const DashboardCard: Story = {
       <CardContent>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="h6">Revenue</Typography>
-          <Chip label="+12%" color="success" size="small" />
+          <Chip label="+12%" color="success" size="sm" />
         </Stack>
         <Typography variant="h3" color="primary" fontWeight="bold" mb={1}>
           $24,596
@@ -563,10 +563,10 @@ export const ComplexLayoutCard: Story = {
         </Box>
 
         <Stack direction="row" spacing={1}>
-          <Chip label="AI/ML" size="small" />
-          <Chip label="Web3" size="small" />
-          <Chip label="Cloud" size="small" />
-          <Chip label="DevOps" size="small" />
+          <Chip label="AI/ML" size="sm" />
+          <Chip label="Web3" size="sm" />
+          <Chip label="Cloud" size="sm" />
+          <Chip label="DevOps" size="sm" />
         </Stack>
       </CardContent>
       <CardActions alignment="space-between">

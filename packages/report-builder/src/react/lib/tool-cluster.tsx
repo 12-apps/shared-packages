@@ -179,7 +179,7 @@ function toMenuItem(tool: BlockTool): DropdownMenuItem {
     label: tool.label,
     onClick: tool.onSelect,
     dataTestId: tool.dataTestId,
-    color: tool.danger === true ? "error" : undefined,
+    color: tool.danger === true ? "danger" : undefined,
   };
 }
 

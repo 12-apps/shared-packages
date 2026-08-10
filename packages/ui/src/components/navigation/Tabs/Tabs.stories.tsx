@@ -188,8 +188,8 @@ const ProfileContent = () => (
           Senior Developer
         </Typography>
         <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
-          <Chip size="small" label="Admin" color="primary" />
-          <Chip size="small" label="Verified" color="success" />
+          <Chip size="sm" label="Admin" color="primary" />
+          <Chip size="sm" label="Verified" color="success" />
         </Box>
       </Box>
     </Box>

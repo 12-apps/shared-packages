@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { CSSProperties,ReactNode } from 'react';
 
 export interface MenubarItem {
@@ -14,8 +15,8 @@ export interface MenubarItem {
 export interface MenubarProps {
   items: MenubarItem[];
   variant?: 'default' | 'glass' | 'gradient' | 'elevated' | 'minimal' | 'bordered';
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info' | 'default';
+  size?: SizeValue;
+  color?: ColorValue;
   orientation?: 'horizontal' | 'vertical';
   glow?: boolean;
   pulse?: boolean;
@@ -47,8 +48,8 @@ export interface MenubarGroupProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onClick?: (item: MenubarItem) => void;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info' | 'default';
+  size?: SizeValue;
+  color?: ColorValue;
   className?: string;
   style?: CSSProperties;
 }
@@ -56,8 +57,8 @@ export interface MenubarGroupProps {
 export interface MenubarItemProps extends MenubarItem {
   selected?: boolean;
   onClick?: () => void;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info' | 'default';
+  size?: SizeValue;
+  color?: ColorValue;
   showShortcut?: boolean;
   ripple?: boolean;
   className?: string;

@@ -5,6 +5,7 @@ import { Chart } from './Chart';
 import type { ChartDataPoint } from './Chart.types';
 import type { ChartSemanticColor, ChartSpec } from './ChartSpec.types';
 import { CHART_SEMANTIC_COLORS, specToChartProps } from './chart-spec';
+import { accentFor } from '../../../tokens/scales';
 
 export interface SpecChartProps {
   /** Validated spec — parse untrusted JSON with `parseChartSpec` first. */
@@ -36,7 +37,7 @@ export const SpecChart: React.FC<SpecChartProps> = ({
     const scheme: readonly ChartSemanticColor[] =
       spec.colorScheme && spec.colorScheme.length > 0 ? spec.colorScheme : CHART_SEMANTIC_COLORS;
     const resolveColor = (token: ChartSemanticColor | undefined, index: number): string =>
-      theme.palette[token ?? scheme[index % scheme.length] ?? 'primary'].main;
+      accentFor(theme, token ?? scheme[index % scheme.length] ?? 'primary').main;
     return specToChartProps(spec, data, { resolveColor });
   }, [spec, data, theme]);
 

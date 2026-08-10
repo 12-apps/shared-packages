@@ -1,7 +1,8 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { PaginationProps as MuiPaginationProps } from '@mui/material';
 import type { ReactNode } from 'react';
 
-export interface PaginationProps extends Omit<MuiPaginationProps, 'variant' | 'size'> {
+export interface PaginationProps extends Omit<MuiPaginationProps, 'variant' | 'size' | 'color'> {
   /**
    * The variant of the pagination
    */
@@ -10,7 +11,7 @@ export interface PaginationProps extends Omit<MuiPaginationProps, 'variant' | 's
   /**
    * Size of the pagination buttons
    */
-  size?: 'sm' | 'md' | 'lg';
+  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
   
   /**
    * Current page number
@@ -85,7 +86,8 @@ export interface PaginationProps extends Omit<MuiPaginationProps, 'variant' | 's
   /**
    * Custom color for the active page
    */
-  color?: 'primary' | 'secondary' | 'standard';
+  /** `neutral` is what MUI spells `standard`; it is translated at the boundary. */
+  color?: Extract<ColorValue, 'primary' | 'secondary' | 'neutral'>;
   
   /**
    * Whether to show page info text

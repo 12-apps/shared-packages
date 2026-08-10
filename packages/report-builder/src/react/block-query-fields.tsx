@@ -51,7 +51,7 @@ export function BlockQueryFields({
   return (
     <Stack spacing={2}>
       <Select
-        size="small"
+        size="sm"
         label="Coleção"
         options={entities.map((candidate) => ({
           value: candidate.entity,

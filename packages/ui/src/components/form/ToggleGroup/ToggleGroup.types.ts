@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { ToggleButtonGroupProps } from '@mui/material';
 import type React from 'react';
 
@@ -17,12 +18,12 @@ export interface ToggleGroupProps extends Omit<ToggleButtonGroupProps, 'color' |
   /**
    * The color theme of the toggle group
    */
-  color?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral';
+  color?: Exclude<ColorValue, 'info'>;
 
   /**
    * The size of the toggle group
    */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: SizeValue;
 
   /**
    * Array of toggle options

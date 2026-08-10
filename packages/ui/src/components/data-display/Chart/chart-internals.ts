@@ -2,6 +2,7 @@ import { alpha, type Theme } from '@mui/material';
 import type { CSSProperties } from 'react';
 
 import type { ChartProps, ChartSeries } from './Chart.types';
+import { accentFor} from '../../../tokens/scales';
 
 /**
  * Non-JSX internals of the prop-driven Chart: size/variant styling, palette
@@ -65,7 +66,7 @@ interface VariantOptions {
 }
 
 function effectStyles(theme: Theme, options: VariantOptions): SxStyles {
-  const accent = theme.palette[options.color].main;
+  const accent = accentFor(theme, options.color).main;
   const glow = options.glow ? { boxShadow: `0 0 30px ${alpha(accent, 0.4)}` } : {};
   const pulse = options.pulse
     ? {
@@ -91,7 +92,7 @@ function variantSurface(theme: Theme, options: VariantOptions): SxStyles {
     case 'gradient':
       return {
         background: options.gradient
-          ? `linear-gradient(135deg, ${alpha(theme.palette[options.color].light, 0.05)}, ${alpha(theme.palette[options.color].dark, 0.05)})`
+          ? `linear-gradient(135deg, ${alpha(accentFor(theme, options.color).light, 0.05)}, ${alpha(accentFor(theme, options.color).dark, 0.05)})`
           : theme.palette.background.paper,
       };
     case 'elevated':

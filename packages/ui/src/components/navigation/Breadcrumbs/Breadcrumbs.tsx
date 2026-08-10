@@ -114,7 +114,7 @@ const BREADCRUMBS_DEFAULTS: Pick<BreadcrumbsProps, BreadcrumbsDefaultedKeys> = {
   maxItems: 8,
   showHomeIcon: true,
   size: 'md',
-  color: 'default',
+  color: 'neutral',
   elevation: 1,
   collapseBehavior: 'menu',
   mobileMaxItems: 3 };

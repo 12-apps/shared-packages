@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { CSSProperties } from 'react';
 
 export type ChartType = 'line' | 'bar' | 'area' | 'pie' | 'radar' | 'scatter' | 'composed';
@@ -26,8 +27,8 @@ export interface ChartProps {
   series?: ChartSeries[];
   type?: ChartType;
   variant?: 'default' | 'glass' | 'gradient' | 'elevated' | 'minimal' | 'neon';
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
+  size?: SizeValue;
+  color?: Exclude<ColorValue, 'neutral'>;
   height?: number;
   width?: number | string;
   glow?: boolean;

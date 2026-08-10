@@ -42,15 +42,15 @@ export interface ResearchHistoryListProps {
 function statusChip(request: ResearchRequestView, t: ResearchMessages): JSX.Element {
   const status = request.latestRun?.status;
   if (status === 'COMPLETED') {
-    return <Chip label={t.historyStatusDone} size="small" variant="outlined" color="success" />;
+    return <Chip label={t.historyStatusDone} size="sm" variant="outlined" color="success" />;
   }
   if (status === 'FAILED') {
-    return <Chip label={t.historyStatusFailed} size="small" variant="outlined" color="error" />;
+    return <Chip label={t.historyStatusFailed} size="sm" variant="outlined" color="danger" />;
   }
   if (status === undefined) {
-    return <Chip label={t.historyStatusNone} size="small" variant="outlined" />;
+    return <Chip label={t.historyStatusNone} size="sm" variant="outlined" />;
   }
-  return <Chip label={t.historyStatusRunning} size="small" variant="outlined" color="warning" />;
+  return <Chip label={t.historyStatusRunning} size="sm" variant="outlined" color="warning" />;
 }
 
 /** One request's row: what it asked for, when, how it ended, and its actions. */

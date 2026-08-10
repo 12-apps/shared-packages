@@ -82,7 +82,7 @@ export const ConfiguredCollapsesFormBehindToggle: Story = {
     status: 'configured',
     title: 'PagBank',
     configuredTitle: 'PagBank conectado',
-    configuredSummary: <Chip label="Ativo" color="success" size="small" />,
+    configuredSummary: <Chip label="Ativo" color="success" size="sm" />,
     children: <MockForm />,
   },
   play: async ({ canvasElement }) => {
@@ -108,7 +108,7 @@ export const ConfiguredDefaultExpanded: Story = {
   args: {
     status: 'configured',
     title: 'PagBank',
-    configuredSummary: <Chip label="Ativo" color="success" size="small" />,
+    configuredSummary: <Chip label="Ativo" color="success" size="sm" />,
     defaultExpanded: true,
     children: <MockForm />,
   },
@@ -175,7 +175,7 @@ export const ConfiguredWithoutChildrenHidesToggle: Story = {
       <SectionOnboarding
         status="configured"
         title="PagBank"
-        configuredSummary={<Chip label="Ativo" color="success" size="small" />}
+        configuredSummary={<Chip label="Ativo" color="success" size="sm" />}
       />
     </Box>
   ),

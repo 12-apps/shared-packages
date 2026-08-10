@@ -2,6 +2,7 @@ import { alpha } from '@mui/material';
 import type { CSSObject, Theme } from '@mui/material';
 
 import type { CommandProps } from './Command.types';
+import { accentFor } from '../../../tokens/scales';
 
 type CommandVariant = NonNullable<CommandProps['variant']>;
 type CommandColor = NonNullable<CommandProps['color']>;
@@ -24,14 +25,14 @@ const emphasisStyles = (
   pulse: boolean,
 ): CSSObject => ({
   ...(glow && {
-    boxShadow: `0 0 20px ${alpha(theme.palette[color].main, 0.4)}`,
+    boxShadow: `0 0 20px ${alpha(accentFor(theme, color).main, 0.4)}`,
   }),
   ...(pulse && {
     animation: 'pulse 2s infinite',
     '@keyframes pulse': {
-      '0%': { boxShadow: `0 0 0 0 ${alpha(theme.palette[color].main, 0.4)}` },
-      '70%': { boxShadow: `0 0 0 10px ${alpha(theme.palette[color].main, 0)}` },
-      '100%': { boxShadow: `0 0 0 0 ${alpha(theme.palette[color].main, 0)}` },
+      '0%': { boxShadow: `0 0 0 0 ${alpha(accentFor(theme, color).main, 0.4)}` },
+      '70%': { boxShadow: `0 0 0 10px ${alpha(accentFor(theme, color).main, 0)}` },
+      '100%': { boxShadow: `0 0 0 0 ${alpha(accentFor(theme, color).main, 0)}` },
     },
   }),
 });
@@ -46,12 +47,12 @@ const surfaceStyles = (
       return {
         backgroundColor: alpha(theme.palette.background.paper, 0.1),
         backdropFilter: 'blur(20px)',
-        border: `1px solid ${alpha(theme.palette[color].main, 0.2)}`,
+        border: `1px solid ${alpha(accentFor(theme, color).main, 0.2)}`,
       };
     case 'gradient':
       return {
-        background: `linear-gradient(135deg, ${theme.palette[color].main}, ${theme.palette[color].dark})`,
-        color: theme.palette[color].contrastText,
+        background: `linear-gradient(135deg, ${accentFor(theme, color).main}, ${accentFor(theme, color).dark})`,
+        color: accentFor(theme, color).contrastText,
       };
     case 'elevated':
       return { boxShadow: theme.shadows[8] };

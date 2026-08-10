@@ -2,6 +2,7 @@ import { alpha } from '@mui/material';
 import type { CSSObject, Theme } from '@mui/material';
 
 import type { LabelProps } from './Label.types';
+import { accentFor} from '../../../tokens/scales';
 
 type Size = NonNullable<LabelProps['size']>;
 type Variant = NonNullable<LabelProps['variant']>;
@@ -53,8 +54,8 @@ export interface LabelStyleFlags {
 export const textColor = (theme: Theme, flags: LabelStyleFlags): string => {
   if (flags.error) return theme.palette.error.main;
   if (flags.disabled) return theme.palette.text.disabled;
-  if (flags.color === 'default') return theme.palette.text.primary;
-  return theme.palette[flags.color].main;
+  if (flags.color === 'neutral') return theme.palette.text.primary;
+  return accentFor(theme, flags.color).main;
 };
 
 /** The ripple that expands from the centre on press, for clickable labels. */
@@ -119,7 +120,9 @@ const SURFACES: Record<Variant, (input: SurfaceInput) => CSSObject> = {
   }),
 
   gradient: ({ theme, flags }) => {
-    const key = flags.color === 'default' ? 'primary' : flags.color;
+    // `neutral` has no accent of its own in the gradient; it borrows primary,
+    // which is what this branch already did before the vocabulary was named.
+    const accent = accentFor(theme, flags.color === 'neutral' ? 'primary' : flags.color);
     // The gradient paints the glyphs themselves rather than the box behind them.
     const clip = {
       WebkitBackgroundClip: 'text',
@@ -128,11 +131,11 @@ const SURFACES: Record<Variant, (input: SurfaceInput) => CSSObject> = {
     };
 
     return {
-      background: `linear-gradient(135deg, ${theme.palette[key].light}, ${theme.palette[key].main})`,
+      background: `linear-gradient(135deg, ${accent.light}, ${accent.main})`,
       ...clip,
       '&:hover': flags.clickable
         ? {
-            background: `linear-gradient(135deg, ${theme.palette[key].main}, ${theme.palette[key].dark})`,
+            background: `linear-gradient(135deg, ${accent.main}, ${accent.dark})`,
             ...clip,
           }
         : {},

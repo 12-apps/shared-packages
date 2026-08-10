@@ -49,11 +49,11 @@ export function BestOfferCard({ offer, quantity, messages }: BestOfferCardProps)
     >
       <Stack spacing={1.5}>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <Chip label={t.bestOfferTitle} size="small" color="success" variant="filled" />
-          <Chip label={offer.sourceType} size="small" variant="outlined" />
+          <Chip label={t.bestOfferTitle} size="sm" color="success" variant="filled" />
+          <Chip label={offer.sourceType} size="sm" variant="outlined" />
           <Chip
             label={t.relevance(Math.round(offer.relevanceScore * 100))}
-            size="small"
+            size="sm"
             variant="outlined"
           />
           {/* FUT-491: the cheapest price may come from a store that does not

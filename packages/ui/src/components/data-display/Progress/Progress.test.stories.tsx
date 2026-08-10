@@ -937,7 +937,7 @@ export const ThemeVariations: Story = {
             <Progress color="secondary" value={70} showLabel data-testid="theme-secondary" />
             <Progress color="success" value={70} showLabel data-testid="theme-success" />
             <Progress color="warning" value={70} showLabel data-testid="theme-warning" />
-            <Progress color="error" value={70} showLabel data-testid="theme-error" />
+            <Progress color="danger" value={70} showLabel data-testid="theme-error" />
             <Progress color="neutral" value={70} showLabel data-testid="theme-neutral" />
           </Stack>
         </Box>
@@ -1197,7 +1197,7 @@ export const VisualStates: Story = {
             </Box>
             <Box>
               <Typography variant="caption">Error State</Typography>
-              <Progress value={15} showLabel color="error" pulse data-testid="error-state" />
+              <Progress value={15} showLabel color="danger" pulse data-testid="error-state" />
             </Box>
           </Stack>
         </Box>

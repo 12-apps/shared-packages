@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { CSSProperties, HTMLAttributes,ReactNode } from 'react';
 
 export interface LabelProps extends HTMLAttributes<globalThis.HTMLLabelElement> {
@@ -7,8 +8,8 @@ export interface LabelProps extends HTMLAttributes<globalThis.HTMLLabelElement> 
   disabled?: boolean;
   error?: boolean;
   variant?: 'default' | 'filled' | 'outlined' | 'glass' | 'gradient' | 'minimal';
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info' | 'default';
+  size?: SizeValue;
+  color?: ColorValue;
   glow?: boolean;
   pulse?: boolean;
   glass?: boolean;

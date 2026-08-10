@@ -20,6 +20,7 @@
     "./social-login-button": "./src/social-login-button/index.ts",
     "./user-avatar": "./src/user-avatar/index.ts",
     "./utils": "./src/utils/index.ts",
+    "./tokens": "./src/tokens/scales.ts",
     "./mui/Box": "./src/mui/Box.ts",
     "./mui/Link": "./src/mui/Link.ts",
     "./mui/Stack": "./src/mui/Stack.ts",

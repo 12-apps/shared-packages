@@ -172,6 +172,18 @@ function renderMenuItems(
   return items;
 }
 
+/**
+ * The house scale as a FormControl size.
+ *
+ * Not `muiSize`: that collapses five onto MUI's three, and a FormControl takes
+ * only two. This component's scale is already narrowed to `sm | md`, so the map
+ * is exact rather than lossy.
+ */
+const formControlSize = (size: SelectProps['size']): 'small' | 'medium' | undefined => {
+  if (size === undefined) return undefined;
+  return size === 'sm' ? 'small' : 'medium';
+};
+
 export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
   (
     {
@@ -202,7 +214,7 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
     return (
       <StyledFormControl
         fullWidth={fullWidth}
-        size={size}
+        size={formControlSize(size)}
         error={error}
         customVariant={variant}
         glow={glow}

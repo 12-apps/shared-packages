@@ -1,8 +1,9 @@
+import type { SizeValue } from '../../../tokens/scales';
 import type { DialogProps as MuiDialogProps } from '@mui/material';
 import type { ReactNode } from 'react';
 
 export type DialogVariant = 'default' | 'glass' | 'fullscreen' | 'drawer';
-export type DialogSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+export type DialogSize = SizeValue;
 
 export interface DialogProps extends Omit<MuiDialogProps, 'variant' | 'title'> {
   children: ReactNode;

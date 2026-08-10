@@ -58,7 +58,7 @@ export const WithCustomContent: Story = {
   render: () => (
     <DescriptionItem
       label="Status"
-      value={<Chip label="Active" color="success" size="small" />}
+      value={<Chip label="Active" color="success" size="sm" />}
     />
   ),
 };
@@ -68,7 +68,7 @@ export const HorizontalOrientation: Story = {
     <Stack spacing={2} sx={{ width: 400 }}>
       <DescriptionItem label="Name" value="John Doe" orientation="horizontal" />
       <DescriptionItem label="Email" value="john.doe@example.com" orientation="horizontal" />
-      <DescriptionItem label="Status" value={<Chip label="Active" color="success" size="small" />} orientation="horizontal" />
+      <DescriptionItem label="Status" value={<Chip label="Active" color="success" size="sm" />} orientation="horizontal" />
       <DescriptionItem label="Role" value="Administrator" orientation="horizontal" />
     </Stack>
   ),
@@ -79,7 +79,7 @@ export const VerticalOrientation: Story = {
     <Stack spacing={3} sx={{ width: 300 }}>
       <DescriptionItem label="Name" value="John Doe" orientation="vertical" />
       <DescriptionItem label="Email" value="john.doe@example.com" orientation="vertical" />
-      <DescriptionItem label="Status" value={<Chip label="Active" color="success" size="small" />} orientation="vertical" />
+      <DescriptionItem label="Status" value={<Chip label="Active" color="success" size="sm" />} orientation="vertical" />
       <DescriptionItem label="Role" value="Administrator" orientation="vertical" />
     </Stack>
   ),
@@ -133,7 +133,7 @@ export const VerticalStack: Story = {
       <DescriptionItem label="Department" value="Engineering" />
       <DescriptionItem
         label="Role"
-        value={<Chip label="Admin" color="primary" size="small" />}
+        value={<Chip label="Admin" color="primary" size="sm" />}
       />
     </Stack>
   ),
@@ -152,7 +152,7 @@ export const ResponsiveGrid: Story = {
       <DescriptionItem label="Order ID" value="ORD-2024-001" />
       <DescriptionItem label="Customer" value="Acme Corp" />
       <DescriptionItem label="Total Amount" value="$1,234.56" />
-      <DescriptionItem label="Status" value={<Chip label="Completed" color="success" size="small" />} />
+      <DescriptionItem label="Status" value={<Chip label="Completed" color="success" size="sm" />} />
       <DescriptionItem label="Order Date" value="Jan 15, 2024" />
       <DescriptionItem label="Shipping Method" value="Express" />
       <DescriptionItem label="Items" value={3} />
@@ -232,7 +232,7 @@ export const AllVariations: Story = {
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, mt: 2 }}>
           <DescriptionItem
             label="With Chip"
-            value={<Chip label="Active" color="success" size="small" />}
+            value={<Chip label="Active" color="success" size="sm" />}
           />
           <DescriptionItem
             label="With Button"
@@ -242,8 +242,8 @@ export const AllVariations: Story = {
             label="Multiple Elements"
             value={
               <Box sx={{ display: 'flex', gap: 0.5 }}>
-                <Chip label="Tag 1" size="small" />
-                <Chip label="Tag 2" size="small" />
+                <Chip label="Tag 1" size="sm" />
+                <Chip label="Tag 2" size="sm" />
               </Box>
             }
           />

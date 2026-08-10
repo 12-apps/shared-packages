@@ -201,7 +201,7 @@ function buildColumns(t: ResearchMessages): DataViewColumn<OfferRow>[] {
       id: 'source',
       header: t.columnSource,
       accessor: 'sourceType',
-      cell: ({ row }) => <Chip label={row.sourceType} size="small" variant="outlined" />,
+      cell: ({ row }) => <Chip label={row.sourceType} size="sm" variant="outlined" />,
     },
     { id: 'title', header: t.columnProduct, accessor: 'title', searchable: true },
     { id: 'pack', header: t.columnPack, accessor: 'packLabel', enableSort: false },

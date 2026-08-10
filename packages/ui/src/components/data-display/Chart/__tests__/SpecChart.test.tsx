@@ -12,7 +12,7 @@ const json = JSON.stringify({
   xAxis: { key: 'day' },
   series: [
     { key: 'total', label: 'Total', color: 'primary' },
-    { key: 'perdas', label: 'Perdas', color: 'error' },
+    { key: 'perdas', label: 'Perdas', color: 'danger' },
   ],
   numberFormat: 'brl',
 });

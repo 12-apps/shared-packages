@@ -1,3 +1,4 @@
+import type { ColorValue } from '../../../tokens/scales';
 import type { AlertProps as MuiAlertProps } from '@mui/material';
 import type React from 'react';
 
@@ -10,7 +11,7 @@ export interface AlertProps extends Omit<MuiAlertProps, 'variant' | 'color' | 'r
   /**
    * The color of the alert (when not using variant-specific colors)
    */
-  color?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral';
+  color?: Exclude<ColorValue, 'info'>;
   
   /**
    * Whether the alert should have a glow effect

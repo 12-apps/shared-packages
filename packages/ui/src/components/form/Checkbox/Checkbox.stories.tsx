@@ -21,7 +21,7 @@ const meta: Meta<typeof Checkbox> = {
     },
     size: {
       control: { type: 'select' },
-      options: ['small', 'medium', 'large'],
+      options: ['sm', 'md', 'lg'],
     },
     loading: {
       control: { type: 'boolean' },

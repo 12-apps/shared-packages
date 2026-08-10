@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { CSSProperties, ReactNode } from 'react';
 
 export interface CarouselItem {
@@ -12,8 +13,8 @@ export interface CarouselItem {
 export interface CarouselProps {
   items: CarouselItem[];
   variant?: 'default' | 'glass' | 'gradient' | 'elevated' | 'minimal' | 'cards';
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
+  size?: SizeValue;
+  color?: Exclude<ColorValue, 'neutral'>;
   autoPlay?: boolean;
   autoPlayInterval?: number;
   loop?: boolean;
@@ -50,7 +51,7 @@ export interface CarouselIndicatorsProps {
   activeIndex: number;
   onSelect: (index: number) => void;
   position?: 'top' | 'bottom' | 'left' | 'right';
-  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
+  color?: Exclude<ColorValue, 'neutral'>;
   variant?: 'dots' | 'lines' | 'numbers';
   className?: string;
   style?: CSSProperties;
@@ -63,8 +64,8 @@ export interface CarouselArrowsProps {
   disabled?: boolean;
   disablePrev?: boolean;
   disableNext?: boolean;
-  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
-  size?: 'small' | 'medium' | 'large';
+  color?: Exclude<ColorValue, 'neutral'>;
+  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
   className?: string;
   style?: CSSProperties;
 }
@@ -73,7 +74,7 @@ export interface CarouselThumbnailsProps {
   items: CarouselItem[];
   activeIndex: number;
   onSelect: (index: number) => void;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: SizeValue;
   className?: string;
   style?: CSSProperties;
 }

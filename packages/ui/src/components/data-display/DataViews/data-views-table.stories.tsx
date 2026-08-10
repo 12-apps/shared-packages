@@ -5,12 +5,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 import { useState } from "react";
 
-import { Chip } from "../Chip";
+import { Chip, type ChipColor } from "../Chip";
 import { Breadcrumbs } from "../../navigation/Breadcrumbs";
 import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 
 import { BaseCard } from "./base-card";
+import { BaseListCard } from "./base-list-card";
 import { queryPedidos, type ServerPage, type ServerRow } from "./pedidos.server";
 import { DataViewsTableBase } from "./DataViewsTableBase";
 import type { BoardConfig } from "./DataViewsBoard";
@@ -94,14 +95,18 @@ const ROWS: PedidoRow[] = [
 /** What the real endpoint reports across all pages; the export is page 1 of it. */
 const TOTAL_COUNT = 34;
 
-const PAGAMENTO_COLOR: Record<string, string> = { Pago: "success", Pendente: "warning" };
-const SITUACAO_COLOR: Record<string, string> = { "Em aberto": "info", Cancelado: "error" };
+// Typed as `ChipColor`, not `string`. Stories are excluded from `tsc` (see
+// tsconfig `exclude`), so this annotation is documentation rather than a gate —
+// but it is the shape the chip actually accepts, and it compiles the day the
+// exclusion is lifted.
+const PAGAMENTO_COLOR: Record<string, ChipColor> = { Pago: "success", Pendente: "warning" };
+const SITUACAO_COLOR: Record<string, ChipColor> = { "Em aberto": "info", Cancelado: "error" };
 
 /** Status cells are chips so a row's state reads at a glance, as on the real screen. */
-function statusCell(palette: Record<string, string>) {
+function statusCell(palette: Record<string, ChipColor>) {
   return ({ value }: { value: unknown }): React.JSX.Element => {
     const label = String(value);
-    return <Chip label={label} size="small" variant="outlined" color={palette[label] ?? "default"} />;
+    return <Chip label={label} size="sm" variant="outlined" color={palette[label] ?? "default"} />;
   };
 }
 
@@ -294,8 +299,8 @@ function renderPedidoCard(row: PedidoRow, selection: DataViewCardSelection): Rea
       imageFallback={<Box sx={{ fontSize: "1.5rem" }}>🧾</Box>}
     >
       <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 0.5 }}>
-        <Chip label={row.pagamento} size="small" variant="outlined" color={PAGAMENTO_COLOR[row.pagamento]} />
-        <Chip label={row.metodo} size="small" variant="outlined" />
+        <Chip label={row.pagamento} size="sm" variant="outlined" color={PAGAMENTO_COLOR[row.pagamento]} />
+        <Chip label={row.metodo} size="sm" variant="outlined" />
       </Box>
     </BaseCard>
   );
@@ -320,7 +325,7 @@ function renderPedidoListRow(row: PedidoRow, selection: DataViewCardSelection): 
       <Box sx={{ color: "text.secondary", minWidth: 150 }}>{row.data}</Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>{row.itens}</Box>
       <Box sx={{ minWidth: 90, textAlign: "right" }}>{row.total}</Box>
-      <Chip label={row.situacao} size="small" variant="outlined" color={SITUACAO_COLOR[row.situacao]} />
+      <Chip label={row.situacao} size="sm" variant="outlined" color={SITUACAO_COLOR[row.situacao]} />
     </Box>
   );
 }
@@ -575,6 +580,46 @@ export const Board: Story = {
 /** The Lista layout: one full-width, entity-rendered row per pedido. */
 export const List: Story = {
   args: { ...ScopesAndBoard.args, defaultLayout: "list", ignoreStoredLayout: true },
+  render: screen,
+};
+
+/**
+ * The same Lista, with its COLUMNS DECLARED BY THE LIST.
+ *
+ * `listGroup` hands one cell config to the whole list, so every row is subgrid
+ * over one set of tracks. Compare with {@link List} above, where each row lays
+ * itself out: there the rails agree only because the rows happen to agree —
+ * which holds for this data and stops holding the first time one record carries
+ * a wider value than its neighbours.
+ *
+ * `Total` is `max-content`, so the column of amounts is as wide as the widest
+ * one and no wider, and its right edge does not move when a longer total loads.
+ */
+export const ListWithSharedColumns: Story = {
+  args: {
+    ...ScopesAndBoard.args,
+    defaultLayout: "list",
+    ignoreStoredLayout: true,
+    renderListRow: (row: PedidoRow, selection: DataViewCardSelection) => (
+      <BaseListCard
+        row={row}
+        testId={`pedido-${row.pedido}`}
+        selected={selection.selected}
+        onToggleSelect={selection.onToggleSelect}
+      />
+    ),
+    listGroup: {
+      cells: [
+        { id: "pedido", primary: (row: PedidoRow) => row.pedido, strong: true },
+        {
+          id: "cliente",
+          primary: (row: PedidoRow) => row.cliente,
+          secondary: (row: PedidoRow) => row.data,
+        },
+        { id: "total", primary: (row: PedidoRow) => row.total, align: "end", width: "max-content" },
+      ],
+    },
+  },
   render: screen,
 };
 

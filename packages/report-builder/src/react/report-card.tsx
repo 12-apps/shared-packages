@@ -136,7 +136,7 @@ function StatusChips({ report }: { report: SavedReportSummary }): JSX.Element | 
         ),
       }}
     >
-      <Chip label={draft ? "Rascunho" : "Arquivado"} size="small" variant="filled" />
+      <Chip label={draft ? "Rascunho" : "Arquivado"} size="sm" variant="filled" />
     </Box>
   );
 }

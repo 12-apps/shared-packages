@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { RadioGroupProps as MuiRadioGroupProps } from '@mui/material';
 import type React from 'react';
 
@@ -18,12 +19,12 @@ export interface RadioGroupProps extends Omit<MuiRadioGroupProps, 'color'> {
   /**
    * The color theme of the radio group
    */
-  color?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral';
+  color?: Exclude<ColorValue, 'info'>;
 
   /**
    * The size of the radio group
    */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: SizeValue;
 
   /**
    * Array of radio options

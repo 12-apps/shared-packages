@@ -5,6 +5,7 @@ import type { ChartProps } from './Chart.types';
 import { ChartContainer } from './ChartComposables';
 import { getSizeStyles, getVariantStyles } from './chart-internals';
 import { renderChartByType } from './chart-renderers';
+import { muiColor } from '../../../tokens/scales';
 
 /**
  * Prop-driven Recharts wrapper (line/bar/area/pie/radar/scatter/composed)
@@ -70,7 +71,7 @@ export const Chart: React.FC<ChartProps> = (props) => {
         data-testid={`${dataTestId}-loading`}
         sx={{ ...styles, ...sizeStyles, display: 'flex', justifyContent: 'center', alignItems: 'center' }}
       >
-        <CircularProgress color={props.color ?? 'primary'} data-testid={`${dataTestId}-loading-spinner`} />
+        <CircularProgress color={muiColor(props.color ?? 'primary', 'inherit')} data-testid={`${dataTestId}-loading-spinner`} />
       </Paper>
     );
   }

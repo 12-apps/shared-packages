@@ -1,3 +1,4 @@
+import type { SizeValue } from '../../../tokens/scales';
 /** One selectable option: a stable `value` and its human `label`. */
 export interface CreatableSelectOption {
   value: string;
@@ -44,7 +45,7 @@ export interface CreatableSelectProps {
    * Control height, matching {@link Input}'s scale so the two line up when they
    * share a grid row (default: `md`).
    */
-  size?: 'sm' | 'md';
+  size?: Extract<SizeValue, 'sm' | 'md'>;
   /** Base test id; the input is `<dataTestId>-input`. */
   dataTestId?: string;
 }

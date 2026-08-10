@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { ComponentProps } from 'react';
 
 /**
@@ -18,12 +19,12 @@ export type WorkflowStepOrientation = 'horizontal' | 'vertical';
 /**
  * Color theme for the workflow step component
  */
-export type WorkflowStepColor = 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'neutral';
+export type WorkflowStepColor = Exclude<ColorValue, 'info'>;
 
 /**
  * Size variant for step indicators
  */
-export type WorkflowStepSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+export type WorkflowStepSize = SizeValue;
 
 /**
  * Individual step item configuration

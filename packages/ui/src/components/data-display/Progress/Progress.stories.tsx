@@ -128,7 +128,7 @@ export const Colors: Story = {
       <Progress color="secondary" value={70} showLabel />
       <Progress color="success" value={70} showLabel />
       <Progress color="warning" value={70} showLabel />
-      <Progress color="error" value={70} showLabel />
+      <Progress color="danger" value={70} showLabel />
       <Progress color="neutral" value={70} showLabel />
     </Stack>
   ),
@@ -310,7 +310,7 @@ export const SkillLevels: Story = {
             Beginner
           </Typography>
         </Box>
-        <Progress variant="segmented" segments={5} value={20} color="error" />
+        <Progress variant="segmented" segments={5} value={20} color="danger" />
       </Box>
     </Stack>
   ),
@@ -335,7 +335,7 @@ export const Dashboard: Story = {
         <Typography variant="h6" sx={{ mb: 2 }}>
           Storage
         </Typography>
-        <Progress variant="circular" value={89} showLabel color="error" size="lg" pulse />
+        <Progress variant="circular" value={89} showLabel color="danger" size="lg" pulse />
       </Box>
     </Stack>
   ),

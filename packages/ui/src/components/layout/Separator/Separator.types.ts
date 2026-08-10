@@ -1,8 +1,9 @@
+import type { SizeValue } from '../../../tokens/scales';
 import type { ReactNode } from 'react';
 
 export type SeparatorVariant = 'solid' | 'dashed' | 'dotted' | 'gradient';
 export type SeparatorOrientation = 'horizontal' | 'vertical';
-export type SeparatorSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+export type SeparatorSize = SizeValue;
 
 export interface SeparatorProps {
   variant?: SeparatorVariant;

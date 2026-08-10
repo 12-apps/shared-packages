@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { TextareaAutosizeProps } from '@mui/material';
 import type React from 'react';
 
@@ -10,12 +11,12 @@ export interface TextareaProps extends Omit<TextareaAutosizeProps, 'variant' | '
   /**
    * The color theme of the textarea
    */
-  color?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral';
+  color?: Exclude<ColorValue, 'info'>;
   
   /**
    * The size of the textarea
    */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: SizeValue;
   
   /**
    * Whether the textarea has an error

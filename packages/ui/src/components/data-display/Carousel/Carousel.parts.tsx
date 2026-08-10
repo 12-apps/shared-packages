@@ -7,6 +7,8 @@ import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';
 
+import { accentFor, muiSize } from '../../../tokens/scales';
+
 import type {
   CarouselArrowsProps,
   CarouselIndicatorsProps,
@@ -69,8 +71,8 @@ const LineIndicator: React.FC<IndicatorProps> = ({ index, isActive, color, onSel
         width: isActive ? 30 : 20,
         height: 3,
         backgroundColor: isActive
-          ? theme.palette[color].main
-          : alpha(theme.palette[color].main, 0.3),
+          ? accentFor(theme, color).main
+          : alpha(accentFor(theme, color).main, 0.3),
         borderRadius: 1.5,
         transition: theme.transitions.create(['width', 'background-color']),
         cursor: 'pointer',
@@ -96,9 +98,9 @@ const NumberIndicator: React.FC<IndicatorProps> = ({ index, isActive, color, onS
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: '50%',
-        backgroundColor: isActive ? theme.palette[color].main : 'transparent',
-        color: isActive ? theme.palette[color].contrastText : theme.palette[color].main,
-        border: `1px solid ${theme.palette[color].main}`,
+        backgroundColor: isActive ? accentFor(theme, color).main : 'transparent',
+        color: isActive ? accentFor(theme, color).contrastText : accentFor(theme, color).main,
+        border: `1px solid ${accentFor(theme, color).main}`,
         fontSize: '0.75rem',
         fontWeight: isActive ? 'bold' : 'normal',
         cursor: 'pointer',
@@ -122,7 +124,7 @@ const DotIndicator: React.FC<IndicatorProps> = ({ index, isActive, color, onSele
       onClick={onSelect}
       sx={{
         p: 0.5,
-        color: isActive ? theme.palette[color].main : alpha(theme.palette[color].main, 0.3),
+        color: isActive ? accentFor(theme, color).main : alpha(accentFor(theme, color).main, 0.3),
         transform: isActive ? 'scale(1.2)' : 'scale(1)',
         transition: theme.transitions.create(['transform', 'color']),
       }}
@@ -185,7 +187,7 @@ const ARROWS_DEFAULTS = {
   disablePrev: false,
   disableNext: false,
   color: 'primary',
-  size: 'medium',
+  size: 'md',
 } satisfies Partial<CarouselArrowsProps>;
 
 /**
@@ -198,7 +200,7 @@ const arrowSx = (theme: Theme, color: Color, isOverlay: boolean): CSSObject => (
   transform: 'translateY(-50%)',
   zIndex: 3,
   backgroundColor: alpha(theme.palette.background.paper, 0.8),
-  color: theme.palette[color].main,
+  color: accentFor(theme, color).main,
   '&:disabled': { opacity: 0.3 },
   ...(isOverlay
     ? {
@@ -223,7 +225,7 @@ export const CarouselArrows: React.FC<CarouselArrowsProps> = (props) => {
       <IconButton
         onClick={onPrev}
         disabled={disabled || disablePrev}
-        size={size}
+        size={muiSize(size)}
         className={className}
         aria-label="Previous slide"
         data-testid="carousel-prev-button"
@@ -236,7 +238,7 @@ export const CarouselArrows: React.FC<CarouselArrowsProps> = (props) => {
         onClick={onNext}
         disabled={disabled || disableNext}
         aria-label="Next slide"
-        size={size}
+        size={muiSize(size)}
         className={className}
         data-testid="carousel-next-button"
         sx={{ ...sx, right: offset, ...style }}

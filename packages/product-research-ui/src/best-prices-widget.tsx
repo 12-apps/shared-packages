@@ -91,7 +91,7 @@ function OfferLine({
       <Text variant="caption" as="span" color="secondary">
         {offer.supplierName}
       </Text>
-      <Chip label={offer.sourceType} size="small" variant="outlined" />
+      <Chip label={offer.sourceType} size="sm" variant="outlined" />
       {/* FUT-495: the same OfferOutput the full screen badges. This widget
           showed these prices UNFLAGGED, so a store that does not deliver to the
           buyer looked ordinary on the product subpage — which defeats the whole

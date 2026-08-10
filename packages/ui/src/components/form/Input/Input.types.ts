@@ -1,9 +1,10 @@
+import type { SizeValue } from '../../../tokens/scales';
 import type { InputLabelProps as MuiInputLabelProps } from '@mui/material';
 import type { InputHTMLAttributes, ReactNode } from 'react';
 import type React from 'react';
 
 export type InputVariant = 'outlined' | 'filled' | 'glass' | 'underline' | 'gradient';
-export type InputSize = 'sm' | 'md' | 'lg';
+export type InputSize = Extract<SizeValue, 'sm' | 'md' | 'lg'>;
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'color'> {
   variant?: InputVariant;

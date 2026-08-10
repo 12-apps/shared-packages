@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { MenuProps } from '@mui/material';
 import type { ReactNode } from 'react';
 
@@ -40,7 +41,7 @@ export interface ContextMenuItem {
   /**
    * Color variant for the item
    */
-  color?: 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success';
+  color?: ColorValue;
   
   /**
    * Whether the item is dangerous/destructive
@@ -82,7 +83,7 @@ export interface ContextMenuProps extends Omit<MenuProps, 'open' | 'anchorEl' | 
   /**
    * Size of the menu items
    */
-  size?: 'sm' | 'md' | 'lg';
+  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
   
   /**
    * Custom className for the trigger element

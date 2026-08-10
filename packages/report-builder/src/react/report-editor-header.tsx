@@ -83,7 +83,7 @@ function NameAndStatus({
           />
         </Box>
         <Chip
-          size="small"
+          size="sm"
           // A draft is a WARNING-toned pill in the prototype (amber), because
           // "nobody else can see this yet" is a caveat, not a decoration.
           color={status === "draft" ? "warning" : "primary"}

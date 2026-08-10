@@ -197,7 +197,7 @@ export const AllSizes: Story = {
               <Box key={item.id} style={style}>
                 <ListItem dense>
                   <ListItemAvatar>
-                    <Avatar size="small">{item.id + 1}</Avatar>
+                    <Avatar size="sm">{item.id + 1}</Avatar>
                   </ListItemAvatar>
                   <ListItemText primary={`Item ${item.id + 1}`} />
                 </ListItem>
@@ -534,7 +534,7 @@ export const Responsive: Story = {
                 <Box key={item.id} style={style}>
                   <ListItem dense>
                     <ListItemAvatar>
-                      <Avatar size="small">{item.id + 1}</Avatar>
+                      <Avatar size="sm">{item.id + 1}</Avatar>
                     </ListItemAvatar>
                     <ListItemText primary={`Item ${item.id + 1}`} />
                   </ListItem>

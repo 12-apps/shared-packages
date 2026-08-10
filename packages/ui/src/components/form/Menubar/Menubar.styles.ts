@@ -2,6 +2,7 @@ import { alpha } from '@mui/material';
 import type { CSSObject, Theme } from '@mui/material';
 
 import type { MenubarProps } from './Menubar.types';
+import { accentFor} from '../../../tokens/scales';
 
 type Size = NonNullable<MenubarProps['size']>;
 type Variant = NonNullable<MenubarProps['variant']>;
@@ -20,13 +21,13 @@ export const sizeStyles = (theme: Theme, size: Size): CSSObject =>
 
 /** `default` is not a palette entry — it means the paper surface and its text. */
 const accentOf = (theme: Theme, color: Color) =>
-  color === 'default' ? theme.palette.primary.main : theme.palette[color].main;
+  color === 'neutral' ? theme.palette.primary.main : accentFor(theme, color).main;
 
 const colorStyles = (theme: Theme, color: Color, transparent: boolean): CSSObject => {
   const surface =
-    color === 'default'
+    color === 'neutral'
       ? { backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }
-      : { backgroundColor: theme.palette[color].main, color: theme.palette[color].contrastText };
+      : { backgroundColor: accentFor(theme, color).main, color: accentFor(theme, color).contrastText };
 
   return transparent ? { ...surface, backgroundColor: 'transparent' } : surface;
 };
@@ -57,12 +58,13 @@ const SURFACES: Record<Variant, (theme: Theme, flags: MenubarStyleFlags) => CSSO
   }),
 
   gradient: (theme, { color, gradient }) => {
-    const key = color === 'default' ? 'primary' : color;
+    // `neutral` borrows primary for the gradient, as this branch always did.
+    const accent = accentFor(theme, color === 'neutral' ? 'primary' : color);
     return {
       background: gradient
-        ? `linear-gradient(135deg, ${theme.palette[key].light}, ${theme.palette[key].dark})`
-        : theme.palette[key].main,
-      color: theme.palette[key].contrastText,
+        ? `linear-gradient(135deg, ${accent.light}, ${accent.dark})`
+        : accent.main,
+      color: accent.contrastText,
     };
   },
 
@@ -80,7 +82,7 @@ const SURFACES: Record<Variant, (theme: Theme, flags: MenubarStyleFlags) => CSSO
   bordered: (theme, { blur, color }) => ({
     ...(blur && { backdropFilter: 'blur(10px)' }),
     borderBottom: `2px solid ${
-      color === 'default' ? theme.palette.divider : theme.palette[color].main
+      color === 'neutral' ? theme.palette.divider : accentFor(theme, color).main
     }`,
   }),
 

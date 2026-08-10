@@ -1,3 +1,4 @@
+import type { SizeValue } from '../../../tokens/scales';
 import type { SelectProps as MuiSelectProps } from '@mui/material';
 
 export type SelectVariant = 'default' | 'glass' | 'gradient';
@@ -8,7 +9,9 @@ export interface SelectOption {
   disabled?: boolean;
 }
 
-export interface SelectProps extends Omit<MuiSelectProps, 'variant'> {
+// `size` is omitted alongside `variant`: MUI declares it in its own words
+// (`small | medium`), and this component speaks the house scale.
+export interface SelectProps extends Omit<MuiSelectProps, 'variant' | 'size'> {
   /**
    * Visual variant of the select component
    * @default 'default'
@@ -35,7 +38,7 @@ export interface SelectProps extends Omit<MuiSelectProps, 'variant'> {
    * Size of the select component
    * @default 'medium'
    */
-  size?: 'small' | 'medium';
+  size?: Extract<SizeValue, 'sm' | 'md'>;
   /**
    * Placeholder text when no option is selected
    */

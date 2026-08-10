@@ -18,7 +18,7 @@ const meta: Meta<typeof Select> = {
     },
     size: {
       control: { type: 'select' },
-      options: ['small', 'medium'],
+      options: ['sm', 'md'],
       description: 'Size of the select component',
     },
     glow: {
@@ -72,11 +72,11 @@ export const WithLabel: Story = {
 export const AllSizes: Story = {
   render: () => (
     <Stack spacing={3} sx={{ width: 300 }}>
-      <Select options={defaultOptions} label="Small Select" size="small" placeholder="Small size" />
+      <Select options={defaultOptions} label="Small Select" size="sm" placeholder="Small size" />
       <Select
         options={defaultOptions}
         label="Medium Select"
-        size="medium"
+        size="md"
         placeholder="Medium size"
       />
     </Stack>
@@ -340,7 +340,7 @@ export const Responsive: Story = {
           options={defaultOptions}
           label="Compact View (200px)"
           placeholder="Compact"
-          size="small"
+          size="sm"
           helperText="Compact for small screens"
         />
       </div>

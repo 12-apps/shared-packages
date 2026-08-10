@@ -80,7 +80,7 @@ function FilterValueField({
 }): JSX.Element {
   return options ? (
     <Select
-      size="small"
+      size="sm"
       label={visibleLabel(label)}
       aria-label={label}
       options={options}
@@ -121,7 +121,7 @@ function FilterListField({
   return options ? (
     <Select
       multiple
-      size="small"
+      size="sm"
       label={visibleLabel(label)}
       aria-label={label}
       options={options}
@@ -244,7 +244,7 @@ export function FilterRow({
   return (
     <Stack spacing={1}>
       <Select
-        size="small"
+        size="sm"
         label="Campo"
         aria-label={`Filtro ${index + 1} — campo`}
         options={fieldOptions}
@@ -255,7 +255,7 @@ export function FilterRow({
       <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
         <Box sx={{ width: 104, flexShrink: 0 }}>
           <Select
-            size="small"
+            size="sm"
             label="Condição"
             aria-label={`Filtro ${index + 1} — condição`}
             // Only the operators the FIELD accepts: "status a partir de Pago"

@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { ButtonProps as MuiButtonProps } from '@mui/material';
 import type * as React from 'react';
 
@@ -10,12 +11,12 @@ export interface ButtonProps extends Omit<MuiButtonProps, 'variant' | 'color' | 
   /**
    * The color of the button
    */
-  color?: 'primary' | 'secondary' | 'success' | 'warning' | 'info' | 'danger' | 'neutral';
+  color?: ColorValue;
   
   /**
    * The size of the button
    */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: SizeValue;
   
   /**
    * Whether the button is in loading state

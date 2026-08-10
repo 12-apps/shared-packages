@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { type SortFieldDefinition } from "../../layout/ContentToolbar";
 
 import { GridShell } from "./data-views-grid-parts";
+import type { ListGroupConfig } from "./list-card-rails";
 import type { DisplayPanelView } from "./data-views-display-panel";
 import type { BoardConfig } from "./DataViewsBoard";
 import type { DataViewExport } from "./data-views-export";
@@ -123,6 +124,15 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
    * offered, exactly as `renderCard` gates the cards.
    */
   renderListRow?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
+  /**
+   * The Lista's SHARED COLUMNS — declared once for the list, obeyed by every row.
+   *
+   * This is what makes a list line up by construction rather than by convention.
+   * Omit it and each row still resolves its own tracks from its own config,
+   * which agrees with its neighbours right up until one row carries an unusually
+   * wide value.
+   */
+  listGroup?: ListGroupConfig<T>;
   /**
    * The page-level partition rendered as an exclusive tab strip above the
    * toolbar, with server-supplied counts. Requires `server`: a scope is applied

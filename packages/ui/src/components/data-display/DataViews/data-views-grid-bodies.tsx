@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+
 import { DataGrid, type GridColumn, type GridSort } from "../DataGrid";
 import { Box } from "../../../mui/Box";
 
@@ -10,9 +12,11 @@ import {
   DENSITY_CARD_COLUMNS,
   DENSITY_ROW_PADDING,
   useDataViewsLayout,
+  type DataViewsDensity,
 } from "./data-views-layout-context";
 import { DataViewsBoard, type BoardConfig } from "./DataViewsBoard";
 import { SelectAllStrip } from "./data-views-select-all-strip";
+import { ListCardGroup, type ListGroupConfig } from "./list-card-rails";
 import type { DataViewCardSelection } from "./data-views-types";
 import type { DataViewsController } from "./use-data-views-state";
 
@@ -160,6 +164,10 @@ interface ListBodyProps<T extends Record<string, unknown>> {
   onToggleId: (id: string | number) => void;
   /** Gap between rows, from the density preference. */
   rowGap: number;
+  /** The list's shared column config. See {@link ListGroupConfig}. */
+  group?: ListGroupConfig<T>;
+  /** The density every row answers, handed to the group when there is one. */
+  density: DataViewsDensity;
   dataTestId?: string;
   emptyState?: React.ReactNode;
 }
@@ -186,28 +194,59 @@ function ListBody<T extends Record<string, unknown>>({
   selectedIds,
   onToggleId,
   rowGap,
+  group,
+  density,
   dataTestId,
   emptyState,
 }: ListBodyProps<T>): React.JSX.Element {
   if (rows.length === 0) {
     return <Box sx={{ mt: 1.5 }}>{emptyState}</Box>;
   }
+  const testId = dataTestId ? `${dataTestId}-list` : "data-views-list";
+  const selectionFor = (id: string | number): DataViewCardSelection => ({
+    selected: selectedIds.has(id),
+    onToggleSelect: () => onToggleId(id),
+    scale: 1,
+  });
+
+  if (group) {
+    return (
+      <Box sx={{ mt: 1.5 }}>
+        <ListCardGroup
+          cells={group.cells}
+          metaColumns={group.metaColumns}
+          rails={group.rails}
+          reserveGutters={group.reserveGutters}
+          density={density}
+          gap={rowGap}
+          dataTestId={testId}
+        >
+          {rows.map((row) => {
+            const id = getRowId(row);
+            // A FRAGMENT, NOT A BOX. The row is subgrid over the group's tracks
+            // (`gridColumn: span railCount`), which only resolves while the card
+            // is a DIRECT child of the group's grid. One wrapper element and the
+            // span is measured against a grid that isn't there, so every rail
+            // collapses — the exact failure the group exists to prevent.
+            return (
+              <React.Fragment key={id}>
+                {renderListRow(row, selectionFor(id))}
+              </React.Fragment>
+            );
+          })}
+        </ListCardGroup>
+      </Box>
+    );
+  }
+
   return (
     <Box
       sx={{ mt: 1.5, display: "flex", flexDirection: "column", gap: rowGap }}
-      data-testid={dataTestId ? `${dataTestId}-list` : "data-views-list"}
+      data-testid={testId}
     >
       {rows.map((row) => {
         const id = getRowId(row);
-        return (
-          <Box key={id}>
-            {renderListRow(row, {
-              selected: selectedIds.has(id),
-              onToggleSelect: () => onToggleId(id),
-              scale: 1,
-            })}
-          </Box>
-        );
+        return <Box key={id}>{renderListRow(row, selectionFor(id))}</Box>;
       })}
     </Box>
   );
@@ -221,6 +260,8 @@ interface GridMainProps<T extends Record<string, unknown>> {
   renderCard?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
   /** Opt-in "Lista" layout — one full-width row per record. */
   renderListRow?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
+  /** The Lista's shared columns. Omitted, each row resolves its own tracks. */
+  listGroup?: ListGroupConfig<T>;
   /** Opt-in "Quadro" (board) layout — needs `renderCard`, since it reuses the card. */
   board?: BoardConfig<T>;
   dataTestId?: string;
@@ -260,68 +301,78 @@ function Headerless<T extends Record<string, unknown>>({
   );
 }
 
-/** Picks the body from the layout context: board, list, cards, or the dense grid. */
-export function GridMain<T extends Record<string, unknown>>({
-  c,
-  getRowId,
-  renderCard,
-  renderListRow,
-  board,
-  dataTestId,
-  emptyState,
-  testIdPrefix,
-}: GridMainProps<T>): React.JSX.Element {
-  const { layout, zoom, density } = useDataViewsLayout();
+/**
+ * The body for one of the three HEADERLESS layouts, or `null` for the table.
+ *
+ * Split out from {@link GridMain} so the select-all strip is wrapped around the
+ * result exactly once instead of being repeated identically in every branch —
+ * which is also what keeps either function inside the line budget.
+ */
+function headerlessBody<T extends Record<string, unknown>>(
+  { c, getRowId, renderCard, renderListRow, listGroup, board, dataTestId, emptyState }: GridMainProps<T>,
+  { layout, zoom, density }: ReturnType<typeof useDataViewsLayout>,
+): React.ReactNode | null {
   if (layout === "list" && renderListRow) {
     return (
-      <Headerless c={c} getRowId={getRowId} testIdPrefix={testIdPrefix}>
-        <ListBody
-          rows={c.matched}
-          renderListRow={renderListRow}
-          getRowId={getRowId}
-          selectedIds={c.selectedIds}
-          onToggleId={c.toggleId}
-          rowGap={DENSITY_ROW_PADDING[density]}
-          dataTestId={dataTestId}
-          emptyState={emptyState}
-        />
-      </Headerless>
+      <ListBody
+        rows={c.matched}
+        renderListRow={renderListRow}
+        getRowId={getRowId}
+        selectedIds={c.selectedIds}
+        onToggleId={c.toggleId}
+        rowGap={DENSITY_ROW_PADDING[density]}
+        group={listGroup}
+        density={density}
+        dataTestId={dataTestId}
+        emptyState={emptyState}
+      />
     );
   }
   if (layout === "board" && board && renderCard) {
     return (
-      <Headerless c={c} getRowId={getRowId} testIdPrefix={testIdPrefix}>
-        <DataViewsBoard
-          rows={c.matched}
-          board={board}
-          getRowId={getRowId}
-          renderCard={renderCard}
-          selectedIds={c.selectedIds}
-          onToggleId={c.toggleId}
-          // DENSITY, not zoom: the board's own knob in the Exibição tab is how
-          // wide its columns are, and it is the only sizing control the board
-          // has since the zoom slider was removed.
-          cardScale={DENSITY_BOARD_SCALE[density]}
-          dataTestId={dataTestId}
-        />
-      </Headerless>
+      <DataViewsBoard
+        rows={c.matched}
+        board={board}
+        getRowId={getRowId}
+        renderCard={renderCard}
+        selectedIds={c.selectedIds}
+        onToggleId={c.toggleId}
+        // DENSITY, not zoom: the board's own knob in the Exibição tab is how
+        // wide its columns are, and it is the only sizing control the board
+        // has since the zoom slider was removed.
+        cardScale={DENSITY_BOARD_SCALE[density]}
+        dataTestId={dataTestId}
+      />
     );
   }
   if (layout === "cards" && renderCard) {
     return (
+      <CardBody
+        rows={c.matched}
+        renderCard={renderCard}
+        getRowId={getRowId}
+        selectedIds={c.selectedIds}
+        onToggleId={c.toggleId}
+        minCardWidth={cardMinWidthForZoom(zoom)}
+        maxColumns={DENSITY_CARD_COLUMNS[density]}
+        cardScale={cardScaleForZoom(zoom)}
+        dataTestId={dataTestId}
+        emptyState={emptyState}
+      />
+    );
+  }
+  return null;
+}
+
+/** Picks the body from the layout context: board, list, cards, or the dense grid. */
+export function GridMain<T extends Record<string, unknown>>(props: GridMainProps<T>): React.JSX.Element {
+  const { c, getRowId, dataTestId, emptyState, testIdPrefix } = props;
+  const layoutState = useDataViewsLayout();
+  const body = headerlessBody(props, layoutState);
+  if (body) {
+    return (
       <Headerless c={c} getRowId={getRowId} testIdPrefix={testIdPrefix}>
-        <CardBody
-          rows={c.matched}
-          renderCard={renderCard}
-          getRowId={getRowId}
-          selectedIds={c.selectedIds}
-          onToggleId={c.toggleId}
-          minCardWidth={cardMinWidthForZoom(zoom)}
-          maxColumns={DENSITY_CARD_COLUMNS[density]}
-          cardScale={cardScaleForZoom(zoom)}
-          dataTestId={dataTestId}
-          emptyState={emptyState}
-        />
+        {body}
       </Headerless>
     );
   }
@@ -335,7 +386,7 @@ export function GridMain<T extends Record<string, unknown>>({
       sortBy={c.state.sortBy}
       onChangeSortBy={(next: GridSort[]) => c.patch({ sortBy: next })}
       sortMode={c.serverMode ? "server" : "client"}
-      rowPadding={DENSITY_ROW_PADDING[density]}
+      rowPadding={DENSITY_ROW_PADDING[layoutState.density]}
       dataTestId={dataTestId}
       emptyState={emptyState}
     />

@@ -22,6 +22,10 @@ export {
   type ListCardCellConfig,
   DEFAULT_CELL_WIDTH,
 } from "./list-card-cells";
+// The list's columns declared at the TABLE, not per card — which is what makes
+// a Lista line up by construction. Without it a consumer can still hand a cell
+// config to each row, and they agree until one row carries a wider value.
+export type { ListGroupConfig } from "./list-card-rails";
 // Published by a drag container so a row can draw the marker; a consumer wiring
 // its own DnD needs the type to build the value.
 export { DropIndicator } from "./data-views-drag";

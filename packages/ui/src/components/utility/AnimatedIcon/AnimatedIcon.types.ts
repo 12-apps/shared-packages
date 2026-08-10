@@ -1,3 +1,4 @@
+import type { SizeValue } from '../../../tokens/scales';
 import type React from 'react';
 
 export type AnimationVariant =
@@ -19,7 +20,7 @@ export type AnimationVariant =
   | 'neonFlicker'
   | 'breathe';
 
-export type AnimationSize = 'sm' | 'md' | 'lg' | 'xl';
+export type AnimationSize = Extract<SizeValue, 'sm' | 'md' | 'lg' | 'xl'>;
 
 export type ShadowStyle = 'soft' | 'hard' | 'elevated' | 'none';
 
