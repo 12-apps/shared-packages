@@ -1,13 +1,17 @@
 /**
- * Shared publish controls (FUT-307) for the report and dashboard builders:
- * lifecycle status (draft/published), the sharing rule and — for role-based
- * sharing — the tenant-role allowlist. Pure controlled component; the page
- * owns the state and the server enforces everything.
+ * The publish MODEL (FUT-307) — lifecycle status, the sharing rule, and the
+ * tenant-role allowlist that role-based sharing needs.
+ *
+ * It used to ship a `PublishSection` component too: two selects the report
+ * editor rendered inline at the top of the page. GAP 8 moved those settings
+ * into the *Ajustes* dialog as radio cards, where each choice can carry the
+ * line that says what it means — something a `<select>` cannot do. The
+ * allowlist survived the move intact and is shared from here, so there is one
+ * roles control and one loading/error story rather than two.
  */
 import type { JSX } from "react";
 
 import { Checkbox } from "@12-apps/ui/form/Checkbox";
-import { Select } from "@12-apps/ui/form/Select";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
@@ -28,17 +32,6 @@ export function defaultPublishDraft(): PublishDraft {
   return { status: "published", visibility: "tenant", visibilityRoles: [] };
 }
 
-const STATUS_OPTIONS: Array<{ value: ReportStatusWire; label: string }> = [
-  { value: "published", label: "Publicado" },
-  { value: "draft", label: "Rascunho (só você e admins)" },
-];
-
-const VISIBILITY_OPTIONS: Array<{ value: ReportVisibilityWire; label: string }> = [
-  { value: "tenant", label: "Toda a equipe" },
-  { value: "roles", label: "Funções específicas" },
-  { value: "private", label: "Somente autor e admins" },
-];
-
 function toggleRole(roles: string[], id: string, checked: boolean): string[] {
   if (checked) return roles.includes(id) ? roles : [...roles, id];
   return roles.filter((role) => role !== id);
@@ -49,8 +42,13 @@ function toggleRole(roles: string[], id: string, checked: boolean): string[] {
  * failure are rendered DISTINCTLY from an empty catalog — a failed roles
  * request must not look like "no roles to pick" while saving stays enabled
  * (the pre-save guard in the builders backs this up).
+ *
+ * Exported so the report editor's *Ajustes* dialog can offer the same list
+ * under its own radio cards (GAP 8). One roles control, one loading/error
+ * story — a second copy would be a second place for "failed" to look like
+ * "none".
  */
-function RolesAllowlist({
+export function RolesAllowlist({
   tenantSlug,
   value,
   onChange,
@@ -100,42 +98,6 @@ function RolesAllowlist({
           data-testid={`publish-role-${role.id}`}
         />
       ))}
-    </Stack>
-  );
-}
-
-export function PublishSection({
-  tenantSlug,
-  value,
-  onChange,
-}: {
-  tenantSlug: string;
-  value: PublishDraft;
-  onChange: (next: PublishDraft) => void;
-}): JSX.Element {
-  return (
-    <Stack spacing={2} data-testid="publish-section">
-      <Select
-        label="Status"
-        options={STATUS_OPTIONS}
-        value={value.status}
-        onChange={(event) =>
-          onChange({ ...value, status: event.target.value as ReportStatusWire })
-        }
-        data-testid="publish-status"
-      />
-      <Select
-        label="Quem pode ver"
-        options={VISIBILITY_OPTIONS}
-        value={value.visibility}
-        onChange={(event) =>
-          onChange({ ...value, visibility: event.target.value as ReportVisibilityWire })
-        }
-        data-testid="publish-visibility"
-      />
-      {value.visibility === "roles" ? (
-        <RolesAllowlist tenantSlug={tenantSlug} value={value} onChange={onChange} />
-      ) : null}
     </Stack>
   );
 }

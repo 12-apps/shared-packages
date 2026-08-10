@@ -68,8 +68,10 @@ const SUMMARY: SavedReportSummary = {
   type: 'dashboard',
   entity: 'orders',
   entities: ['orders'],
+  blockCount: 2,
   status: 'published',
   visibility: 'tenant',
+  ownedByMe: true,
   updatedAt: '2026-02-01T12:00:00.000Z',
 };
 
@@ -297,12 +299,15 @@ describe('entry 6 — the /:reportId screen carries the viewer chrome only', () 
  * failed to render could not pass the negative by accident.
  */
 describe('entry 6 — /:reportId/edit is where the save controls live', () => {
-  it('renders Salvar relatório and Cancelar in edit mode', async () => {
+  it('renders Salvar and Descartar in edit mode', async () => {
     renderSurfaceAt(`/${TENANT}/reports/${REPORT_ID}/edit`);
 
     expect(await screen.findByTestId('report-editor-save')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Salvar relatório' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeTruthy();
+    // The header renames these (GAP 8): the save carries its ⌘S hint and the
+    // discard says what it discards. Both are still matched by the sweep above,
+    // which is the point of asserting them by their exact rendered names here.
+    expect(screen.getByRole('button', { name: 'Salvar ⌘S' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Descartar' })).toBeTruthy();
   });
 
   it('does not render the viewer ⋮ menu', async () => {

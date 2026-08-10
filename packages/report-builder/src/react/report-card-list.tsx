@@ -1,212 +1,143 @@
 /**
- * The saved-report list as CARDS (FUT-391).
+ * The saved-report list as a CARD GRID (FUT-391, ported in FUT-755).
  *
- * It replaced a `<select>`, which gave a name and nothing else — no
+ * It replaced a `<select>` first, which gave a name and nothing else — no
  * description, no last-edited date, no sense of whether a report was a single
  * chart or a twelve-block dashboard — and then repeated that name as the page
  * heading. Picking between "Vendas" and "Vendas 2" meant opening both.
  *
- * "Mostrar arquivados" was a floating checkbox beside it, which made archiving
- * read as a display toggle rather than as one of the list's states; it becomes
- * a scope pill next to the search.
+ * What replaced the select was still a LIST: one full-width row per report,
+ * with the filters threaded through the middle of it. `prototype.html`'s
+ * `renderList()` is a grid of cards instead, and the difference is not
+ * cosmetic — a grid gives every report the same fixed footprint, so the
+ * screen answers "which of these is the one I want" by comparison rather than
+ * by reading each row in turn. This module is that grid: the toolbar and the
+ * card live in their own files, and what is left here is the composition and
+ * the one state a grid can be in that a row cannot — empty.
  */
 import type { JSX } from "react";
 
-import { Chip } from "@12-apps/ui/data-display/Chip";
-import { Button } from "@12-apps/ui/form/Button";
-import { Input } from "@12-apps/ui/form/Input";
-import { Card } from "@12-apps/ui/layout/Card";
+import { EmptyState } from "@12-apps/ui/data-display/EmptyState";
+import { CardGrid } from "@12-apps/ui/layout/CardGrid";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
-import { Text } from "@12-apps/ui/typography/Text";
 
 import type { SavedReportSummary } from "./custom-reports-api";
-import { CONTAINER_RADIUS_PX, CONTROL_ROW_SX } from "./lib/report-surface";
-import {
-  REPORT_SCOPE_LABELS,
-  filterReports,
-  scopeCounts,
-  type ReportScope,
-} from "./report-list-filters";
+import { NewReportCard, ReportCard } from "./report-card";
+import { filterReports, type ReportScope } from "./report-list-filters";
+import { ReportListToolbar } from "./report-list-toolbar";
 
-const SCOPES: ReportScope[] = ["active", "archived"];
+/** The prototype's `minmax(268px, 1fr)` — two cards on a phone-wide tablet. */
+const CARD_MIN_WIDTH_PX = 268;
 
 /**
- * The card's name, as a TITLE that happens to be clickable.
+ * Nothing matched — and WHY nothing matched is the whole message.
  *
- * It was a plain `Button variant="text"`, which had it rendering in the accent
- * at 14/500 — **4.47:1** on the card, under the 4.5:1 floor for body text, and
- * this is the primary click target on the landing screen. A text button is also
- * centred, so the one line that names the card sat centred above its own
- * description and status, both of them left-aligned.
- *
- * `color="neutral"` puts it back on `text.primary` (15.9:1) and the overrides
- * below make the control the shape of the text inside it rather than the shape
- * of a button: full width, left-aligned, no padding of its own.
+ * A search that found nothing is a typo away from working, so it says so; an
+ * empty scope is an invitation, so it names three reports worth building. One
+ * string for both would be wrong in one of the two cases, which is how an
+ * empty state ends up saying "Nenhum resultado" to someone who has never
+ * created anything.
  */
-const CARD_TITLE_SX = {
-  justifyContent: "flex-start",
-  textAlign: "left",
-  textTransform: "none",
-  p: 0,
-  minWidth: 0,
-  width: "100%",
-  boxShadow: "none",
-  "&:hover": { bgcolor: "transparent" },
-} as const;
-
-/** A draft or archived report says so; a published one needs no badge. */
-function statusNote(report: SavedReportSummary): string | null {
-  if (report.status === "archived") return "Arquivado";
-  if (report.status === "draft") return "Rascunho";
-  return null;
-}
-
-/** "Painel · 3 coleções" — what the name alone never said. */
-function shapeNote(report: SavedReportSummary): string {
-  const kind = report.type === "dashboard" ? "Painel" : "Relatório";
-  const count = report.entities.length;
-  return count > 1 ? `${kind} · ${count} coleções` : kind;
-}
-
-function ReportCard({
-  report,
-  selected,
-  onSelect,
-}: {
-  report: SavedReportSummary;
-  selected: boolean;
-  onSelect: () => void;
-}): JSX.Element {
-  const note = statusNote(report);
+function NoMatches({ searching, onCreate }: { searching: boolean; onCreate: () => void }): JSX.Element {
   return (
-    <Card
-      variant="outlined"
+    <Box
       sx={{
-        p: 2,
-        cursor: "pointer",
-        bgcolor: "background.paper",
-        boxShadow: "none",
-        borderRadius: `${CONTAINER_RADIUS_PX}px`,
-        ...(selected ? { outline: "2px solid", outlineColor: "primary.main" } : {}),
+        // Spans the whole grid, in the cell the cards would have filled.
+        gridColumn: "1 / -1",
+        // `EmptyState` builds its action from MUI's own `Button`, which
+        // uppercases — so this one control shouted `NOVO RELATÓRIO` while the
+        // identical button in the toolbar two rows above reads `Novo
+        // relatório`. `visual-pass.md` §Components: one button case across the
+        // product, sentence case. `lib/confirm-dialog.tsx` restates the same
+        // rule for `AlertDialog`, for the same reason.
+        "& .MuiButton-root": { textTransform: "none" },
       }}
-      onClick={onSelect}
-      data-testid={`reports-card-${report.id}`}
     >
-      {/* A real button inside the card, not a click handler alone: the card is
-          reachable by keyboard and announced as the control it is. */}
-      <Stack spacing={0.5}>
-        <Button
-          variant="text"
-          color="neutral"
-          size="sm"
-          onClick={onSelect}
-          aria-current={selected ? "true" : undefined}
-          sx={CARD_TITLE_SX}
-          data-testid={`reports-card-${report.id}-open`}
-        >
-          <Text variant="heading" size="lg" weight="semibold" as="span">
-            {report.name}
-          </Text>
-        </Button>
-        {report.description ? (
-          <Text variant="body" size="sm" color="secondary">
-            {report.description}
-          </Text>
-        ) : null}
-        {/*
-          Status is a STATE, not more prose (FUT-755). It read as ` · Arquivado`
-          inside the same grey caption as the shape note, so the one thing that
-          changes what a card MEANS looked like the one thing that never
-          changes. `inventory.md` §1 is blunt about it: the prototype is right
-          and we are wrong. A published report still carries no badge.
-        */}
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-          <Text variant="body" size="xs" color="secondary">
-            {shapeNote(report)}
-          </Text>
-          {note ? <Chip label={note} size="sm" variant="outlined" /> : null}
-        </Stack>
-      </Stack>
-    </Card>
+      <EmptyState
+        variant="minimal"
+        title="Nenhum relatório aqui."
+        description={
+          searching
+            ? "Tente outro termo."
+            : "Monte o primeiro com receita por dia, top produtos e ticket médio."
+        }
+        primaryAction={{ label: "Novo relatório", onClick: onCreate }}
+        dataTestId="reports-empty"
+      />
+    </Box>
   );
 }
 
 export function ReportCardList({
   reports,
-  selectedId,
   scope,
   search,
+  now = new Date(),
   onScopeChange,
   onSearchChange,
   onSelect,
+  onEdit,
+  onArchive,
   onCreate,
 }: {
   reports: readonly SavedReportSummary[];
-  selectedId: string;
   scope: ReportScope;
   search: string;
+  /**
+   * The instant the cards' "há 2 min" is measured against. Injected rather
+   * than read from the clock inside the card so the relative times on one
+   * screen all agree, and so a test can state a time instead of stubbing one.
+   */
+  now?: Date;
   onScopeChange: (scope: ReportScope) => void;
   onSearchChange: (search: string) => void;
   onSelect: (id: string) => void;
+  /** The ⋮ menu's edit action — the editor route belongs to the host's router. */
+  onEdit: (id: string) => void;
+  /** The ⋮ menu's archive/restore; the caller owns the confirmation and write. */
+  onArchive: (report: SavedReportSummary) => void;
   onCreate: () => void;
 }): JSX.Element {
-  const counts = scopeCounts(reports);
-  // The selected report is kept whatever the filters say — losing the thing
-  // you are looking at because you typed in a search box is a worse surprise
-  // than an out-of-scope card.
-  const visible = filterReports(reports, { scope, search, keepId: selectedId });
+  // Nothing is "kept" past the filters any more: opening a report NAVIGATES
+  // (FUT-755), so the grid has no current selection to protect from a scope
+  // change, and a grid that kept showing one card while you typed a term it
+  // does not match read as broken search.
+  const searching = search.trim() !== "";
+  const visible = filterReports(reports, { scope, search });
 
   return (
     <Stack spacing={2}>
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1, ...CONTROL_ROW_SX }}
-      >
-        {SCOPES.map((option) => (
-          <Button
-            key={option}
-            variant={option === scope ? "solid" : "outline"}
-            size="sm"
-            aria-pressed={option === scope}
-            onClick={() => onScopeChange(option)}
-            data-testid={`reports-scope-${option}`}
-          >
-            {REPORT_SCOPE_LABELS[option]} ({counts[option]})
-          </Button>
-        ))}
-        <Box sx={{ minWidth: 220 }}>
-          <Input
-            size="sm"
-            aria-label="Buscar relatórios"
-            placeholder="Buscar…"
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            data-testid="reports-search"
-          />
-        </Box>
-        <Button variant="solid" size="sm" onClick={onCreate} data-testid="reports-new">
-          Novo relatório
-        </Button>
-      </Stack>
+      <ReportListToolbar
+        scope={scope}
+        search={search}
+        onScopeChange={onScopeChange}
+        onSearchChange={onSearchChange}
+        onCreate={onCreate}
+      />
 
-      {visible.length === 0 ? (
-        <Text variant="body" size="sm" color="secondary" data-testid="reports-none-match">
-          Nenhum relatório encontrado.
-        </Text>
-      ) : (
-        <Stack spacing={1} data-testid="reports-card-list">
-          {visible.map((report) => (
-            <ReportCard
-              key={report.id}
-              report={report}
-              selected={report.id === selectedId}
-              onSelect={() => onSelect(report.id)}
-            />
-          ))}
-        </Stack>
-      )}
+      <CardGrid variant="fluid" cardWidth={CARD_MIN_WIDTH_PX} gridTestId="reports-card-list">
+        {visible.length === 0 ? (
+          <NoMatches searching={searching} onCreate={onCreate} />
+        ) : (
+          <>
+            {visible.map((report) => (
+              <ReportCard
+                key={report.id}
+                report={report}
+                now={now}
+                onSelect={() => onSelect(report.id)}
+                onEdit={() => onEdit(report.id)}
+                onArchive={() => onArchive(report)}
+              />
+            ))}
+            {/* Last cell, not a toolbar echo: the grid ENDS in the way to add
+                one more, so the affordance is where the eye already is after
+                reading the cards. */}
+            <NewReportCard onCreate={onCreate} />
+          </>
+        )}
+      </CardGrid>
     </Stack>
   );
 }

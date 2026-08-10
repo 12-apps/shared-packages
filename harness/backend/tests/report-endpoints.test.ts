@@ -361,14 +361,21 @@ describe('documentShape', () => {
   it('reads the entities a dashboard queries', () => {
     expect(
       documentShape({ kind: 'dashboard', blocks: [{ spec: { entity: 'orders' } }] }),
-    ).toEqual({ type: 'dashboard', entity: '', entities: ['orders'] });
+    ).toEqual({ type: 'dashboard', entity: '', entities: ['orders'], blockCount: 1 });
   });
 
   it('maps a malformed stored document to no entities rather than throwing', () => {
     // A legacy or corrupt row must not take the whole list down; it is simply
-    // listed for nobody.
-    expect(documentShape(null)).toEqual({ type: 'report', entity: '', entities: [] });
-    expect(documentShape('nonsense')).toEqual({ type: 'report', entity: '', entities: [] });
+    // listed for nobody. `blockCount` is 0 rather than 1 for the same reason it
+    // reports no entities: we could not read the document, so the card must not
+    // claim it holds a block.
+    expect(documentShape(null)).toEqual({ type: 'report', entity: '', entities: [], blockCount: 0 });
+    expect(documentShape('nonsense')).toEqual({
+      type: 'report',
+      entity: '',
+      entities: [],
+      blockCount: 0,
+    });
   });
 });
 

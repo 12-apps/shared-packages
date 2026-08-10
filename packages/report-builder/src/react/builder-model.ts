@@ -3,7 +3,12 @@
  * and its mapping to/from the declarative ReportSpec. Pure functions — the
  * page owns state, the server owns validation.
  */
-import { defaultPresentation, presentationCompatibility, type SpecShape } from "../compatibility";
+import {
+  defaultPresentation,
+  isOrderedDimension,
+  presentationCompatibility,
+  type SpecShape,
+} from "../compatibility";
 
 import { filterFromWire, filterToWire } from "./builder-filters";
 import { measureOptions, measureSortKey, type MeasureDraft } from "./builder-measures";
@@ -73,9 +78,15 @@ export const OPERATOR_LABELS: Record<string, string> = {
   between: "entre",
 };
 
+/**
+ * `prototype.html`'s own words, verbatim. `kpi` was "KPI (número único)" here:
+ * a parenthetical three times the length of every other label, which is what
+ * forced the picker's tiles onto a ragged grid — one cell wide enough for the
+ * sentence and the rest not. The prototype calls it `Número`.
+ */
 const CHART_LABELS: Record<ChartKind, string> = {
   table: "Tabela",
-  kpi: "KPI (número único)",
+  kpi: "Número",
   line: "Linha",
   bar: "Barras",
   area: "Área",
@@ -155,7 +166,12 @@ function draftShape(draft: BuilderDraft, fields: Map<string, ReportField>): Spec
     dimensionCount: dimensions.length,
     // An all-blank measure list still submits as 1 (the spec minimum).
     measureCount: Math.max(measures.length, 1),
-    firstDimensionIsDate: fields.get(dimensions[0]?.field ?? "")?.type === "date",
+    // `/reports/fields` sends `ordered` for the string dimensions that carry an
+    // ordinal (FUT-755); `isOrderedDimension` reads it STRUCTURALLY, so a
+    // response predating the field — a cached one — falls back to the type rule
+    // and offers bars, which is the pre-FUT-755 behaviour everywhere except an
+    // hour or weekday axis.
+    firstDimensionIsOrdered: isOrderedDimension(fields.get(dimensions[0]?.field ?? "")),
   };
 }
 

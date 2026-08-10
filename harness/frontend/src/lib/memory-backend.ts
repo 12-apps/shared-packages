@@ -1,6 +1,11 @@
 import { createMemoryDataSource, defineCatalog } from '@12-apps/report-builder';
 import { reportBuilderRouter } from '@12-apps/report-builder/hono';
-import type { ReportActor, SavedReportDb, SystemReportDef } from '@12-apps/report-builder/server';
+import type {
+  ReportActor,
+  ReportWindow,
+  SavedReportDb,
+  SystemReportDef,
+} from '@12-apps/report-builder/server';
 import type { ReportBuilderTransport } from '@12-apps/report-builder/react';
 import { Hono } from 'hono';
 
@@ -56,23 +61,59 @@ const catalog = defineCatalog({
   },
 });
 
+/**
+ * The fixture's orders, laid out so the three presets VISIBLY differ.
+ *
+ * `NOW` is 2026-07-05 09:00 in São Paulo, so the local days are: `o6` today,
+ * `o1`–`o5` across the four days before it, and `o7` a fortnight back —
+ * inside 30 days and outside 7. Each preset therefore returns strictly more
+ * than the one below it, which is the only arrangement in which the toggle
+ * can be seen to work at all.
+ *
+ * The zone matters: `o3` is 02:00Z, which is 23:00 on the PREVIOUS local day.
+ * A fixture laid out in UTC days silently disagrees with the buckets.
+ */
 const ROWS = [
+  { id: 'o7', createdAt: '2026-06-20T15:00:00Z', method: 'CARD', status: 'PAID', revenueCents: 900, itemCount: 1 },
   { id: 'o1', createdAt: '2026-07-01T10:00:00Z', method: 'PIX', status: 'PAID', revenueCents: 1000, itemCount: 1 },
   { id: 'o2', createdAt: '2026-07-01T14:00:00Z', method: 'CARD', status: 'PAID', revenueCents: 2500, itemCount: 3 },
   { id: 'o3', createdAt: '2026-07-02T02:00:00Z', method: 'PIX', status: 'PAID', revenueCents: 3000, itemCount: 2 },
   { id: 'o4', createdAt: '2026-07-03T09:00:00Z', method: 'WAITER', status: 'FAILED', revenueCents: 800, itemCount: 1 },
   { id: 'o5', createdAt: '2026-07-04T20:00:00Z', method: 'CARD', status: 'PAID', revenueCents: 4200, itemCount: 4 },
+  { id: 'o6', createdAt: '2026-07-05T13:00:00Z', method: 'PIX', status: 'PAID', revenueCents: 1500, itemCount: 2 },
 ];
 
 /** The permission tier the shipped policy assigns to `orders`. */
 const SALES = 'reports:sales:read';
 
 /**
- * Frozen so the fixture rows are always inside the window. A rolling preset
- * resolved against the real clock would empty every report the moment July
- * 2026 fell out of the last thirty days.
+ * The clock every rolling preset resolves against, frozen. Against the REAL
+ * clock every report would empty the moment July 2026 fell out of the last
+ * thirty days — and, now that the window is honoured (`rowsInWindow`), the
+ * freeze also fixes WHICH rows each preset returns: move it and "Hoje" stops
+ * meaning `o6`.
  */
 const NOW = new Date('2026-07-05T12:00:00Z');
+
+/**
+ * The rows inside the window the server resolved — the HOST's job, and the one
+ * this fixture used to skip. `runOptions` hands the adapter factory a
+ * `{ from, toExclusive }`; this one ignored it and returned every row for every
+ * preset, so the period toggle had never done anything here, and `defaultRange`
+ * and the resolved-window line were unverifiable with it.
+ *
+ * `toExclusive` is exclusive, as its name says: `<`, not `<=`. An inclusive
+ * bound quietly pulls in the first row of the next day — exactly the off-by-one
+ * a day-bucketed report is least able to show you.
+ */
+function rowsInWindow(window: ReportWindow): typeof ROWS {
+  const from = window.from.getTime();
+  const toExclusive = window.toExclusive.getTime();
+  return ROWS.filter((row) => {
+    const at = Date.parse(row.createdAt);
+    return at >= from && at < toExclusive;
+  });
+}
 
 /**
  * A built-in defined over THIS catalog. The shipped presets are written
@@ -139,25 +180,68 @@ const DASHBOARD = {
   ],
 };
 
-/** Storage is per-transport, so each mount starts from the same fixture. */
+/** A one-block document, for the cards whose point is that they are SMALL. */
+function singleBlockDashboard(id: string, title: string): unknown {
+  return {
+    kind: 'dashboard',
+    blocks: [{ id, span: 12, title, spec: DASHBOARD.blocks[0]?.spec }],
+  };
+}
+
+/** A document big enough to saturate the list card's six-bar sparkline. */
+function wideDashboard(): unknown {
+  return {
+    kind: 'dashboard',
+    blocks: Array.from({ length: 7 }, (_, index) => ({
+      id: `b${index + 1}`,
+      span: 4,
+      title: `Bloco ${index + 1}`,
+      spec: DASHBOARD.blocks[0]?.spec,
+    })),
+  };
+}
+
+/** Minutes/days ago, from the real clock — a card's "há 2 min" never rots. */
+function minutesAgo(minutes: number): Date {
+  return new Date(Date.now() - minutes * 60_000);
+}
+
+/** One stored row, with the fields a fixture rarely wants to restate. */
+function row(patch: Partial<StoredRow> & { id: string; name: string }): StoredRow {
+  return {
+    description: null,
+    spec: singleBlockDashboard(patch.id, patch.name),
+    status: 'published',
+    visibility: 'tenant',
+    visibilityRoles: [],
+    createdBy: 'u1',
+    createdAt: new Date('2026-06-01T12:00:00Z'),
+    updatedAt: minutesAgo(60 * 24 * 7),
+    ...patch,
+  };
+}
+
+/**
+ * Storage is per-transport, so each mount starts from the same fixture.
+ *
+ * Two rows were enough when the screen was a list of rows. The card grid is a
+ * COMPARISON — sizes, scopes, staleness, who authored what — and two cards
+ * show none of it. These seven cover every state a card renders: both chips,
+ * all three visibilities, one block against seven, a missing description, an
+ * author who is not the caller, and edit times from minutes to weeks.
+ */
 function seedRows(): StoredRow[] {
   return [
-    {
+    row({
       id: 'r1',
       name: 'Vendas por forma de pagamento',
       description: 'Receita diária separada por PIX, cartão e garçom',
       spec: DASHBOARD,
-      status: 'published',
-      visibility: 'tenant',
-      visibilityRoles: [],
-      createdBy: 'u1',
-      createdAt: new Date('2026-06-01T12:00:00Z'),
-      updatedAt: new Date('2026-08-01T12:00:00Z'),
-    },
-    {
+      updatedAt: minutesAgo(60 * 24 * 9),
+    }),
+    row({
       id: 'r2',
       name: 'Ticket médio',
-      description: null,
       spec: {
         entity: 'orders',
         dimensions: [],
@@ -166,17 +250,54 @@ function seedRows(): StoredRow[] {
       },
       status: 'archived',
       visibility: 'private',
-      visibilityRoles: [],
-      createdBy: 'u1',
-      createdAt: new Date('2026-06-01T12:00:00Z'),
       updatedAt: new Date('2026-06-15T18:00:00Z'),
-    },
+    }),
+    row({
+      id: 'r3',
+      name: 'Movimento por hora',
+      description: 'A que horas a loja enche — pedidos por faixa de hora, no período.',
+      spec: wideDashboard(),
+      updatedAt: minutesAgo(12),
+    }),
+    row({
+      id: 'r4',
+      name: 'Fechamento do caixa',
+      spec: singleBlockDashboard('caixa', 'Total do dia'),
+      status: 'draft',
+      visibility: 'private',
+      updatedAt: minutesAgo(60 * 26),
+    }),
+    row({
+      id: 'r5',
+      name: 'Metas da equipe',
+      description: 'Painel da gerência: quanto cada turno vendeu contra a meta do mês.',
+      spec: DASHBOARD,
+      visibility: 'roles',
+      visibilityRoles: ['gerente'],
+      // Someone ELSE authored it, so `Meus` has something to leave out.
+      createdBy: 'u2',
+      updatedAt: minutesAgo(60 * 24 * 3),
+    }),
+    row({
+      id: 'r6',
+      name: 'Perdas por motivo',
+      description: 'Quanto saiu do estoque sem virar venda, por motivo declarado.',
+      updatedAt: minutesAgo(60 * 24 * 16),
+    }),
+    row({
+      id: 'r7',
+      name: 'Cardápio antigo',
+      description: 'Vendas do cardápio de verão — mantido para consulta.',
+      status: 'archived',
+      createdBy: 'u2',
+      updatedAt: new Date('2026-05-20T12:00:00Z'),
+    }),
   ];
 }
 
 /** The structural `SavedReportDb` seam a real host fills with Prisma. */
 function memoryDb(): SavedReportDb {
-  const state = { rows: seedRows(), next: 2 };
+  const state = { rows: seedRows(), next: 7 };
   return {
     savedReport: {
       findMany: () => Promise.resolve(state.rows.slice()),
@@ -226,7 +347,7 @@ function buildRouter(): Hono {
     '/api/admin/:tenantSlug',
     reportBuilderRouter({
       catalog,
-      adapter: () => createMemoryDataSource({ orders: ROWS }),
+      adapter: ({ window }) => createMemoryDataSource({ orders: rowsInWindow(window) }),
       db: () => Promise.resolve(db),
       timeZone: 'America/Sao_Paulo',
       now: () => NOW,

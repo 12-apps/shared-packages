@@ -1,6 +1,8 @@
 import type { ChartNumberFormat, ChartSemanticColor, ChartSpec } from '@12-apps/ui/charts';
 
 import { requireEntityForRender } from './catalog';
+import { isOrderedDimension } from './compatibility';
+import { pivotSplit } from './pivot';
 import type { ReportPresentation } from './spec';
 import {
   isPercentileAggregation,
@@ -27,9 +29,12 @@ export type ReportRenderModel =
       kind: 'chart';
       chartSpec: ChartSpec;
       /**
-       * The same columns the TABLE presentation would produce, carried so a
-       * chart can be read as a table ("Ver como tabela", FUT-391) and exported
-       * without re-deriving anything.
+       * The columns describing THESE rows, carried so a chart can be read as a
+       * table ("Ver como tabela", FUT-391) and exported without re-deriving
+       * anything. Without a split they are exactly the columns the TABLE
+       * presentation would produce; with one they describe the pivoted
+       * crosstab the chart is drawn from (axis, then one column per series),
+       * because that is what `rows` holds.
        *
        * It cannot be derived from `chartSpec`: the x-axis carries no title (it
        * rendered on top of the tick labels), so a derivation falls back to the
@@ -138,6 +143,16 @@ const MULTI_SERIES_SCHEME: ChartSemanticColor[] = [
   'secondary',
 ];
 
+/**
+ * The most series a SPLIT may draw — tied to the palette rather than picked,
+ * because the palette is the constraint. Past this many, two series necessarily
+ * share a colour and the legend stops telling them apart; `visual-pass.md`
+ * §Colour asks for series separated by luminance, and a repeat is neither.
+ * `pivotSplit` folds the remainder into "Outros" (visible in the legend) when
+ * the measure allows it.
+ */
+const MAX_SPLIT_SERIES = MULTI_SERIES_SCHEME.length;
+
 function toChartSpec(
   query: CompiledQuery,
   presentation: Extract<ReportPresentation, { kind: 'chart' }>,
@@ -228,6 +243,91 @@ function withoutSuppressedCells(rows: ReportRow[]): ReportRow[] {
   );
 }
 
+/**
+ * A split charted as multiple series (FUT-755).
+ *
+ * The rows are PIVOTED — see `pivot.ts` — so `rows`, `chartSpec.series` and
+ * `tableColumns` all describe the same crosstab. They have to: `report-render`
+ * hands one row array to both the chart and the "Ver como tabela" fallback, so
+ * a chart drawn from wide rows beside columns describing long ones would put a
+ * table of empty cells one keystroke from the chart.
+ */
+function toSplitChartModel(
+  query: CompiledQuery,
+  presentation: Extract<ReportPresentation, { kind: 'chart' }>,
+  catalog: FieldCatalog,
+  rows: ReportRow[],
+): ReportRenderModel {
+  const entity = requireEntityForRender(catalog, query.entity);
+  const axis = query.dimensions[0];
+  const measure = query.measures[0];
+  if (!axis || !measure) {
+    // compileReport already rejects this; kept as a defensive invariant.
+    throw new Error('A split chart requires one axis dimension and one measure.');
+  }
+  const pivot = pivotSplit(query, entity, withoutSuppressedCells(rows), MAX_SPLIT_SERIES);
+  return {
+    kind: 'chart',
+    chartSpec: {
+      type: presentation.chartType,
+      xAxis: { key: axis.alias },
+      series: pivot.series,
+      // Grouped side by side when off, stacked when on — the panel's
+      // "Empilhado" toggle, which reaches a split bar exactly as it reaches a
+      // multi-measure one.
+      stacked: presentation.stacked,
+      curved: false,
+      // Always: with a split the series ARE the categories, so the legend is
+      // the only thing naming them. Colour must never carry meaning alone.
+      legend: true,
+      colorScheme: MULTI_SERIES_SCHEME,
+      numberFormat: chartNumberFormat(presentation, measure.format),
+    },
+    tableColumns: [
+      {
+        key: axis.alias,
+        label: dimensionLabel(entity.fields[axis.field], axis.alias, axis.timeGrain),
+        format: 'text' as const,
+      },
+      ...pivot.series.map((series) => ({
+        key: series.key,
+        label: series.label,
+        format: measure.format,
+      })),
+    ],
+    rows: pivot.rows,
+  };
+}
+
+/**
+ * Draw a stored line/area over an UNORDERED axis as bars instead (FUT-755).
+ *
+ * This exists for blocks SAVED BEFORE the rule. A line or an area asserts that
+ * the space between two points is a value; over payment methods or product
+ * names it is not, so the slope shows a relationship that does not exist. The
+ * picker now refuses that shape going forward (`compatibility.ts`), and the
+ * compiler deliberately still ACCEPTS it (`presentation-shape.ts`) so those
+ * blocks keep rendering rather than turning into an error message for their
+ * owners.
+ *
+ * Bars are the honest form of the identical data: nothing is recomputed, no
+ * row changes, only the mark. The author is nudged the next time they open the
+ * block, at which point saving rewrites the stored `chartType` for good.
+ */
+function withDrawableChartType(
+  query: CompiledQuery,
+  presentation: Extract<ReportPresentation, { kind: 'chart' }>,
+  catalog: FieldCatalog,
+): Extract<ReportPresentation, { kind: 'chart' }> {
+  const { chartType } = presentation;
+  if (chartType !== 'line' && chartType !== 'area') return presentation;
+  const axis = query.dimensions[0];
+  if (!axis) return presentation;
+  const entity = requireEntityForRender(catalog, query.entity);
+  if (isOrderedDimension(entity.fields[axis.field])) return presentation;
+  return { ...presentation, chartType: 'bar' };
+}
+
 export function renderReport(
   query: CompiledQuery,
   presentation: ReportPresentation,
@@ -235,9 +335,13 @@ export function renderReport(
   rows: ReportRow[],
 ): ReportRenderModel {
   if (presentation.kind === 'chart') {
+    const drawable = withDrawableChartType(query, presentation, catalog);
+    if (query.dimensions.length > 1) {
+      return toSplitChartModel(query, drawable, catalog, rows);
+    }
     return {
       kind: 'chart',
-      chartSpec: toChartSpec(query, presentation, catalog),
+      chartSpec: toChartSpec(query, drawable, catalog),
       tableColumns: tableColumnsFor(query, catalog),
       rows: withoutSuppressedCells(rows),
     };

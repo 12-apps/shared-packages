@@ -113,6 +113,38 @@ export interface FieldDef {
   type: FieldType;
   /** Whether the field groups rows (dimension) or is aggregated (measure). */
   role: 'dimension' | 'measure';
+  /**
+   * Marks a DIMENSION whose values have a meaningful ORDER, so a line or an
+   * area may use it as an axis (FUT-755).
+   *
+   * Only needed to OVERRIDE the default, which is derived from
+   * {@link FieldType}: `date`, `number` and `money` are ordered inherently —
+   * their values carry a magnitude, so the distance between two of them is a
+   * real quantity — while `string` and `boolean` are not. Declare it on the
+   * string dimensions that encode an ordinal, and nowhere else.
+   *
+   * The rule it feeds: a line or an area asserts that the space BETWEEN two
+   * points means something. Half-way between CARD and PIX is not a value, so
+   * the slope draws a relationship that does not exist; half-way between 09:00
+   * and 10:00 is 09:30, so it does. A bar makes no such claim, which is why
+   * the same data is always offerable as bars.
+   *
+   * It lives on the catalog rather than on a list of field names in
+   * `compatibility.ts` because a name list is correct exactly until someone
+   * adds a field — declaring it here means a new ordered dimension arrives
+   * already knowing what it is.
+   *
+   * A STRING dimension that declares this is asserting that its values sort
+   * into their real order LEXICOGRAPHICALLY, because a string column is all
+   * the sort has to work with. Future Pay's six — `orders.hourOfDay` /
+   * `dayOfWeek` and the kitchen's four — are encoded precisely so they do:
+   * the hour is zero-padded ("09", never "9") and the weekday numeric-prefixed
+   * ("1-seg", never "seg"). Shortening either would sort 10:00 before 09:00
+   * and Saturday before Monday on every chart whose axis it is. The encodings
+   * are produced in `server/local-time.ts` and pinned by its test — so that
+   * suite, not this comment, is what actually stops the "tidy-up".
+   */
+  ordered?: boolean;
   /** Allowed aggregations for a measure; defaults per {@link FieldType}. */
   aggregations?: readonly Aggregation[];
   /** How the field's values render; defaults per {@link FieldType}. */

@@ -113,14 +113,50 @@ describe('compileReport', () => {
     ).toThrow(/not an output column/);
   });
 
-  it('requires exactly one dimension for chart presentations', () => {
+  it('requires at least one dimension for chart presentations', () => {
     expect(() =>
       compile({
         entity: 'orders',
         measures: [{ field: 'totalCents' }],
         presentation: { kind: 'chart', chartType: 'line' },
       }),
-    ).toThrow(/exactly 1 dimension/);
+    ).toThrow(/at least 1 dimension/);
+  });
+
+  it('accepts a SPLIT — a second dimension charted as one series per value', () => {
+    // FUT-755. The renderer pivots it; before that existed a chart built its
+    // series from the MEASURES alone, so this shape was rejected outright and
+    // the rejection was honest.
+    expect(() =>
+      compile({
+        entity: 'orders',
+        dimensions: [{ field: 'createdAt' }, { field: 'method' }],
+        measures: [{ field: 'totalCents' }],
+        presentation: { kind: 'chart', chartType: 'bar' },
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects a split alongside a second measure — nothing draws three ways', () => {
+    expect(() =>
+      compile({
+        entity: 'orders',
+        dimensions: [{ field: 'createdAt' }, { field: 'method' }],
+        measures: [{ field: 'totalCents' }, { field: 'itemCount' }],
+        presentation: { kind: 'chart', chartType: 'bar' },
+      }),
+    ).toThrow(/charts exactly 1 measure/);
+  });
+
+  it('rejects a split on a pie — a pie is ONE series’ composition', () => {
+    expect(() =>
+      compile({
+        entity: 'orders',
+        dimensions: [{ field: 'method' }, { field: 'id' }],
+        measures: [{ field: 'totalCents' }],
+        presentation: { kind: 'chart', chartType: 'pie' },
+      }),
+    ).toThrow(/one series/);
   });
 
   it('requires a single measure for pie charts', () => {
