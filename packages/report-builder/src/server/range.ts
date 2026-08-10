@@ -28,6 +28,30 @@ export const REPORT_RANGE_PRESETS = ['today', '7d', '30d', 'custom'] as const;
 export type ReportRangePreset = (typeof REPORT_RANGE_PRESETS)[number];
 
 /**
+ * The presets a SAVED report may declare as the one it OPENS on (FUT-755).
+ *
+ * Every rolling preset, and deliberately not `custom`: a stored preference has
+ * nowhere to keep the explicit from/to that `custom` means, so admitting it
+ * would store a period that resolves to nothing months later. Mirrors
+ * `REPORT_RANGES` in `react/reports-api.ts`, and a test pins the two equal —
+ * the toggle the author picks from and the values the store accepts have to be
+ * the same list or one of them silently refuses the other.
+ */
+export const REPORT_DEFAULT_RANGES = ['today', '7d', '30d'] as const;
+export type ReportDefaultRange = (typeof REPORT_DEFAULT_RANGES)[number];
+
+/**
+ * A stored `default_range` as a preset the reader can use.
+ *
+ * NULL, absent, or a value written before the CHECK existed all resolve to
+ * `30d` — the period the area opened on before this was configurable, so an
+ * unreadable preference degrades to today's behaviour rather than to nothing.
+ */
+export function resolveDefaultRange(stored: string | null | undefined): ReportDefaultRange {
+  return REPORT_DEFAULT_RANGES.find((candidate) => candidate === stored) ?? '30d';
+}
+
+/**
  * The longest custom window that will resolve. A daily series over a year is
  * 366 points — enough for any report, and a hard bound on the response an
  * agent or a hand-written query string can ask for.

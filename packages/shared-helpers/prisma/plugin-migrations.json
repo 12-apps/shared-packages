@@ -19,6 +19,7 @@
     "20260730130000_research_runs_created_at_index",
     "20260730210000_add_shifts",
     "20260731000000_offer_shipping_unknown",
-    "20260731210000_shift_delete_guard"
+    "20260731210000_shift_delete_guard",
+    "20260810120000_add_report_default_range"
   ]
 }

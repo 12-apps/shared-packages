@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { dashboardSpecSchema, reportDocumentSchema, reportSpecSchema } from '../spec';
 import { SYSTEM_REPORT_KEYS } from './presets';
-import { REPORT_MAX_RANGE_DAYS, REPORT_RANGE_PRESETS } from './range';
+import { REPORT_DEFAULT_RANGES, REPORT_MAX_RANGE_DAYS, REPORT_RANGE_PRESETS } from './range';
 import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
 
 /**
@@ -107,6 +107,13 @@ export const saveReportBody = z.object({
   visibility: z.enum(REPORT_VISIBILITIES).optional(),
   /** Host role ids granted access when visibility = 'roles'. */
   visibilityRoles: z.array(z.string().min(1).max(64)).max(20).optional(),
+  /**
+   * The period this report OPENS on (FUT-755). Omitted keeps the stored value
+   * on an update and stores nothing on a create; explicit `null` clears it back
+   * to the reader's default. Validated here as well as by a DB CHECK, because
+   * this body is written by MCP authors too.
+   */
+  defaultRange: z.enum(REPORT_DEFAULT_RANGES).nullish(),
 });
 
 /** One row of a report result, keyed by output-column alias. */
@@ -199,9 +206,17 @@ export const savedReportSummarySchema = z.object({
   entity: z.string(),
   /** Every entity the document queries (one for a single report). */
   entities: z.array(z.string()),
+  /** Blocks in the stored document; a single report is 1 (FUT-755). */
+  blockCount: z.number(),
   /** Lifecycle + sharing (FUT-307). */
   status: z.enum(REPORT_STATUSES),
   visibility: z.enum(REPORT_VISIBILITIES),
+  /**
+   * Whether the CALLER authored it — the list's `Meus` scope (FUT-755). A
+   * boolean, not `createdBy`: the comparison happens server-side, so no user id
+   * rides a listing that has no use for one.
+   */
+  ownedByMe: z.boolean(),
   updatedAt: z.string(),
 });
 
@@ -237,6 +252,8 @@ const savedLifecycleFields = {
   status: z.enum(REPORT_STATUSES),
   visibility: z.enum(REPORT_VISIBILITIES),
   visibilityRoles: z.array(z.string()),
+  /** The period the report opens on; null when it has no preference. */
+  defaultRange: z.enum(REPORT_DEFAULT_RANGES).nullable(),
 } as const;
 
 const savedSingleReportViewSchema = z.object({
