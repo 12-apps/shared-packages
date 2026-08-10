@@ -47,8 +47,18 @@ kbd{font-family:"JetBrains Mono",monospace;font-size:10.5px;background:rgba(255,
 /* ---- top bar ---- */
 .topbar{position:sticky;top:0;z-index:40;background:var(--surface);border-bottom:1px solid var(--line);
   display:flex;align-items:center;gap:12px;padding:9px 18px;min-height:var(--header-h)}
-.back{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;padding:7px 9px;border-radius:8px;margin-left:-9px}
-.back:hover{background:var(--line-2);color:var(--ink)}
+/* Breadcrumbs — the trail replaced the two back buttons (`← Relatórios` and
+   `← Sair da edição`). A back link names its destination; a trail names where
+   you ARE, and the editor is two levels down, which is a fact no single back
+   link could carry. Its own line, directly above the report. */
+.crumbs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 18px 0;font-size:12.5px;color:var(--muted);min-height:0}
+.crumbs a{display:inline-flex;align-items:center;color:var(--muted);text-decoration:none;padding:3px 6px;border-radius:6px}
+/* Only the FIRST crumb is pulled back, so its WORD — not its hover box —
+   starts on the same column as the report name one line below. */
+.crumbs a:first-child{margin-left:-6px}
+.crumbs a:hover{background:var(--line-2);color:var(--ink)}
+.crumbs .sep{opacity:.55;font-size:11px}
+.crumbs .here{color:var(--ink);font-weight:600;padding:3px 6px;max-width:46vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
 .brand .mark{width:22px;height:22px;border-radius:6px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
 .title-wrap{min-width:0;display:flex;flex-direction:column;gap:1px}
@@ -311,10 +321,12 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);
 
 <!-- ============ VIEW ============ -->
 <section class="screen" id="screen-view">
+  <nav class="crumbs" aria-label="Trilha de navegação">
+    <a href="#" data-nav="list">Relatórios</a>
+    <span class="sep" aria-hidden="true">›</span>
+    <span class="here" id="vCrumb" aria-current="page"></span>
+  </nav>
   <header class="topbar">
-    <button class="back" data-nav="list">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Relatórios
-    </button>
     <div class="title-wrap">
       <div class="title-row"><span class="h-title" id="vTitle"></span><span class="chip" id="vChip">Publicado</span></div>
       <div class="sub" id="vSub"></div>
@@ -349,10 +361,16 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);
 
 <!-- ============ EDIT ============ -->
 <section class="screen" id="screen-edit">
+  <nav class="crumbs" aria-label="Trilha de navegação">
+    <a href="#" data-nav="list">Relatórios</a>
+    <span class="sep" aria-hidden="true">›</span>
+    <!-- Leaving by EITHER crumb is leaving the editor, so both are guarded —
+         see `report-editor.tsx`, which holds the clicked href while it asks. -->
+    <a href="#" data-nav="view" id="eCrumb"></a>
+    <span class="sep" aria-hidden="true">›</span>
+    <span class="here" aria-current="page">Editando</span>
+  </nav>
   <header class="topbar">
-    <button class="back" data-nav="view">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Sair da edição
-    </button>
     <div class="title-wrap">
       <div class="title-row">
         <input class="title-input" id="reportName" aria-label="Nome do relatório">
@@ -672,6 +690,7 @@ function renderList(){
 function renderView(){
   const r=cur();
   $("#vTitle").textContent=r.name;
+  $("#vCrumb").textContent=r.name;
   $("#vChip").textContent=r.status==="draft"?"Rascunho":"Publicado";
   $("#vChip").className="chip"+(r.status==="draft"?" draft":"");
   $("#vSub").textContent=`${r.desc||"Sem descrição"} · ${r.visibility==="team"?"visível para toda a equipe":r.visibility==="private"?"visível só para você":"visível para cargos específicos"} · editado ${r.updated}`;
@@ -682,6 +701,7 @@ function renderView(){
 function renderEdit(){
   const r=cur();
   $("#reportName").value=r.name;$("#reportName").size=Math.max(10,r.name.length);
+  $("#eCrumb").textContent=r.name;
   $("#eChip").textContent=r.status==="draft"?"Rascunho":"Publicado";
   $("#eChip").className="chip"+(r.status==="draft"?" draft":"");
   $("#eSub").textContent=`${r.blocks.length} blocos · ${r.visibility==="team"?"toda a equipe":r.visibility==="private"?"só você":"cargos específicos"}`;
@@ -922,8 +942,11 @@ document.addEventListener("change",e=>{
 document.addEventListener("input",e=>{
   const t=e.target;
   if(t.id==="q"){query=t.value.toLowerCase();renderList();return}
-  if(t.id==="reportName"){cur().name=t.value;t.size=Math.max(10,t.value.length);markDirty();return}
-  if(t.id==="s-name"){cur().name=t.value;$("#reportName").value=t.value;markDirty();return}
+  // The trail carries the report's REAL name, so it follows the name as it is
+  // typed — a crumb still reading the old one is a trail pointing at a report
+  // that no longer goes by that name.
+  if(t.id==="reportName"){cur().name=t.value;t.size=Math.max(10,t.value.length);$("#eCrumb").textContent=t.value||"Relatório sem título";markDirty();return}
+  if(t.id==="s-name"){cur().name=t.value;$("#reportName").value=t.value;$("#eCrumb").textContent=t.value||"Relatório sem título";markDirty();return}
   if(t.id==="s-desc"){cur().desc=t.value;markDirty();return}
   const b=cur().blocks.find(x=>x.id===selectedId);
   if(t.id==="f-title"&&b){b.title=t.value||null;
