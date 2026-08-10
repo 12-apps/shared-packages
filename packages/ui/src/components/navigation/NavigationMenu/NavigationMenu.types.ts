@@ -1,3 +1,4 @@
+import type { SizeValue } from '../../../tokens/scales';
 import type { ReactNode } from 'react';
 
 export interface NavigationMenuItem {
@@ -81,7 +82,7 @@ export interface NavigationMenuProps {
   /**
    * Size of the menu items
    */
-  size?: 'sm' | 'md' | 'lg';
+  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
 
   /**
    * Minimal style with no borders, shadows, or container backgrounds

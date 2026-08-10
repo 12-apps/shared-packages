@@ -610,7 +610,7 @@ export const ThemeIntegration: Story = {
           <Stack direction="row" spacing={2}>
             <Avatar fallback="LT" color="primary" dataTestId="theme-avatar-primary" />
             <Avatar fallback="SC" color="secondary" dataTestId="theme-avatar-secondary" />
-            <Avatar fallback="ER" color="error" dataTestId="theme-avatar-error" />
+            <Avatar fallback="ER" color="danger" dataTestId="theme-avatar-error" />
             <Avatar fallback="WN" color="warning" dataTestId="theme-avatar-warning" />
             <Avatar fallback="SU" color="success" dataTestId="theme-avatar-success" />
           </Stack>
@@ -665,7 +665,7 @@ export const AccessibilityCompliance: Story = {
         />
         <Avatar
           fallback="BB"
-          color="error"
+          color="danger"
           dataTestId="contrast-error"
           aria-label="Error color avatar"
         />

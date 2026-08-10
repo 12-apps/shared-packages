@@ -1,3 +1,4 @@
+import type { SizeValue } from '../../../tokens/scales';
 import type { PaginationProps as MuiPaginationProps } from '@mui/material';
 import type { ReactNode } from 'react';
 
@@ -10,7 +11,7 @@ export interface PaginationProps extends Omit<MuiPaginationProps, 'variant' | 's
   /**
    * Size of the pagination buttons
    */
-  size?: 'sm' | 'md' | 'lg';
+  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
   
   /**
    * Current page number

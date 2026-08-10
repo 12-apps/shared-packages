@@ -122,11 +122,11 @@ export const Sizes: Story = {
 export const Colors: Story = {
   render: () => (
     <Stack spacing={2}>
-      <Label color="default">Default Color</Label>
+      <Label color="neutral">Default Color</Label>
       <Label color="primary">Primary Color</Label>
       <Label color="secondary">Secondary Color</Label>
       <Label color="success">Success Color</Label>
-      <Label color="error">Error Color</Label>
+      <Label color="danger">Error Color</Label>
       <Label color="warning">Warning Color</Label>
       <Label color="info">Info Color</Label>
     </Stack>

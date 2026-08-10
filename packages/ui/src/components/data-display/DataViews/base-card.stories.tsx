@@ -170,7 +170,7 @@ export const CenteredBody: Story = {
     children: (
       <>
         <strong>Mesa 12</strong>
-        <Chip label="Livre" size="small" color="success" variant="outlined" />
+        <Chip label="Livre" size="sm" color="success" variant="outlined" />
       </>
     ),
   },

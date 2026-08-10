@@ -1,3 +1,4 @@
+import type { SizeValue } from '../../../tokens/scales';
 import type { BreadcrumbsProps as MuiBreadcrumbsProps } from '@mui/material';
 import type { ReactNode } from 'react';
 
@@ -105,7 +106,7 @@ export interface BreadcrumbsProps extends Omit<MuiBreadcrumbsProps, 'separator'>
    * Size of the breadcrumbs
    * @default 'md'
    */
-  size?: 'sm' | 'md' | 'lg';
+  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
   
   /**
    * Color scheme for separators and accents

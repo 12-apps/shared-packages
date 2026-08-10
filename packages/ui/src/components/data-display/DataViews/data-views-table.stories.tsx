@@ -106,7 +106,7 @@ const SITUACAO_COLOR: Record<string, ChipColor> = { "Em aberto": "info", Cancela
 function statusCell(palette: Record<string, ChipColor>) {
   return ({ value }: { value: unknown }): React.JSX.Element => {
     const label = String(value);
-    return <Chip label={label} size="small" variant="outlined" color={palette[label] ?? "default"} />;
+    return <Chip label={label} size="sm" variant="outlined" color={palette[label] ?? "default"} />;
   };
 }
 
@@ -299,8 +299,8 @@ function renderPedidoCard(row: PedidoRow, selection: DataViewCardSelection): Rea
       imageFallback={<Box sx={{ fontSize: "1.5rem" }}>🧾</Box>}
     >
       <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 0.5 }}>
-        <Chip label={row.pagamento} size="small" variant="outlined" color={PAGAMENTO_COLOR[row.pagamento]} />
-        <Chip label={row.metodo} size="small" variant="outlined" />
+        <Chip label={row.pagamento} size="sm" variant="outlined" color={PAGAMENTO_COLOR[row.pagamento]} />
+        <Chip label={row.metodo} size="sm" variant="outlined" />
       </Box>
     </BaseCard>
   );
@@ -325,7 +325,7 @@ function renderPedidoListRow(row: PedidoRow, selection: DataViewCardSelection): 
       <Box sx={{ color: "text.secondary", minWidth: 150 }}>{row.data}</Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>{row.itens}</Box>
       <Box sx={{ minWidth: 90, textAlign: "right" }}>{row.total}</Box>
-      <Chip label={row.situacao} size="small" variant="outlined" color={SITUACAO_COLOR[row.situacao]} />
+      <Chip label={row.situacao} size="sm" variant="outlined" color={SITUACAO_COLOR[row.situacao]} />
     </Box>
   );
 }

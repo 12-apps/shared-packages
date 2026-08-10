@@ -1,3 +1,4 @@
+import type { ColorValue } from '../../../tokens/scales';
 import type { AvatarProps as MuiAvatarProps } from '@mui/material';
 import type React from 'react';
 
@@ -49,7 +50,7 @@ export interface AvatarProps extends Omit<MuiAvatarProps, 'variant'> {
   /**
    * Color of the avatar background when no image is provided
    */
-  color?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'neutral';
+  color?: Exclude<ColorValue, 'info'>;
 
   /**
    * Whether the avatar is in a loading state

@@ -6,12 +6,12 @@
 interface ChipProps {
   label: string;
   variant?: 'filled' | 'outlined';
-  size?: 'small' | 'medium';
+  size?: SizeValue narrowed to 'sm' | 'md';
   /**
-   * A CLOSED set. `danger` is not one of them — use `error` for the
-   * destructive/attention meaning. See `ChipColor`.
+   * The house vocabulary, identical to Button's. `danger` and `neutral` are
+   * ours and are translated at the MUI boundary. See `ColorValue`.
    */
-  color?: 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' | 'default';
+  color?: ColorValue;
   avatarSrc?: string; // or avatar node via `avatar`
   avatar?: React.ReactNode;
   icon?: React.ReactNode; // leading icon
@@ -300,7 +300,7 @@ test('tag removal in list', async () => {
 test('status chip with color coding', () => {
   const statuses = [
     { label: 'Success', color: 'success', testId: 'status-success' },
-    { label: 'Error', color: 'error', testId: 'status-error' },
+    { label: 'Error', color: 'danger', testId: 'status-error' },
     { label: 'Warning', color: 'warning', testId: 'status-warning' },
   ];
 

@@ -8,6 +8,7 @@ import { CarouselChrome } from './Carousel.chrome';
 import { CarouselTrack } from './Carousel.slide';
 import { containerStyles } from './Carousel.styles';
 import type { CarouselItem, CarouselProps } from './Carousel.types';
+import { muiColor } from '../../../tokens/scales';
 
 export { CarouselArrows, CarouselIndicators, CarouselThumbnails } from './Carousel.parts';
 
@@ -80,7 +81,7 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
   if (loading) {
     return (
       <Box sx={{ ...frameSx, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <CircularProgress color={color} />
+        <CircularProgress color={muiColor(color, 'inherit')} />
       </Box>
     );
   }

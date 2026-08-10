@@ -14,7 +14,7 @@ const DEFAULTS = {
   error: false,
   variant: 'default',
   size: 'md',
-  color: 'default',
+  color: 'neutral',
   glow: false,
   pulse: false,
   ripple: false,

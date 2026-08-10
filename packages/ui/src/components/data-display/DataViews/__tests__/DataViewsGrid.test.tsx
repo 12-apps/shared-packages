@@ -208,7 +208,7 @@ describe("DataViewsGrid", () => {
       rowActions: [
         // `bulk: false` → appears in the kebab but NOT the bulk menu.
         { id: "edit", label: "Editar", bulk: false, onSelect: (r) => onEdit(r.length) },
-        { id: "archive", label: "Arquivar", color: "error", onSelect: (r) => onArchive(r.length) },
+        { id: "archive", label: "Arquivar", color: "danger", onSelect: (r) => onArchive(r.length) },
       ],
     });
 

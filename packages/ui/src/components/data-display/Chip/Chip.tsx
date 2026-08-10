@@ -13,10 +13,39 @@ import {
 } from './Chip.helpers';
 import type { ChipProps } from './Chip.types';
 
+/** MUI draws two chip sizes; ours are the house abbreviations for them. */
+const muiSizeFor = (size: NonNullable<ChipProps['size']>): 'small' | 'medium' =>
+  size === 'sm' ? 'small' : 'medium';
+
+type MuiChipColor =
+  | 'primary'
+  | 'secondary'
+  | 'error'
+  | 'info'
+  | 'success'
+  | 'warning'
+  | 'default';
+
+/**
+ * `danger` and `neutral` are ours; the rest are MUI's own names already.
+ *
+ * The same boundary translation `Button` performs, and it must stay a
+ * translation rather than a cast: a cast is what let `danger` through untouched
+ * and had MUI silently fall back to grey.
+ *
+ * `neutral` maps to `default`, not to `inherit` as it does on a button. A chip's
+ * unaccented state is a real palette entry with its own fill; `inherit` would
+ * take the surrounding text colour and paint a chip that reads as disabled.
+ */
+const muiColorFor = (color: NonNullable<ChipProps['color']>): MuiChipColor => {
+  if (color === 'danger') return 'error';
+  return color === 'neutral' ? 'default' : color;
+};
+
 export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
   label,
   variant = 'filled',
-  size = 'medium',
+  size = 'md',
   color = 'primary',
   avatarSrc,
   avatar,
@@ -39,8 +68,8 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
       ref={ref}
       label={<span data-testid={testId('label')}>{label}</span>}
       variant={variant}
-      size={size}
-      color={color}
+      size={muiSizeFor(size)}
+      color={muiColorFor(color)}
       avatar={avatarFor(avatar, avatarSrc)}
       icon={iconWithTestId(icon, testId('icon'))}
       onDelete={deletable ? onDelete : undefined}

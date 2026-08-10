@@ -125,7 +125,7 @@ function ReportCard({
           <Text variant="body" size="xs" color="secondary">
             {shapeNote(report)}
           </Text>
-          {note ? <Chip label={note} size="small" variant="outlined" /> : null}
+          {note ? <Chip label={note} size="sm" variant="outlined" /> : null}
         </Stack>
       </Stack>
     </Card>

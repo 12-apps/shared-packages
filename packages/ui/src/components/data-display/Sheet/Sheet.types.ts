@@ -1,3 +1,4 @@
+import type { ColorValue } from '../../../tokens/scales';
 import type { CSSProperties,ReactNode } from 'react';
 
 export interface SheetProps {
@@ -9,7 +10,7 @@ export interface SheetProps {
   position?: 'top' | 'bottom' | 'left' | 'right';
   variant?: 'default' | 'glass' | 'gradient' | 'elevated' | 'minimal' | 'draggable';
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
-  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
+  color?: Exclude<ColorValue, 'neutral'>;
   glow?: boolean;
   pulse?: boolean;
   glass?: boolean;

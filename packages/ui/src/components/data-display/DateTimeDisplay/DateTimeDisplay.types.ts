@@ -1,3 +1,4 @@
+import type { SizeValue } from '../../../tokens/scales';
 import type { SxProps, Theme } from '@mui/material';
 
 export interface DateTimeDisplayProps {
@@ -25,7 +26,7 @@ export interface DateTimeDisplayProps {
    * Size variant
    * @default 'medium'
    */
-  size?: 'small' | 'medium' | 'large';
+  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
   /**
    * Whether to show a tooltip with full date/time
    * @default true

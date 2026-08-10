@@ -2,6 +2,7 @@ import { alpha } from '@mui/material';
 import type { CSSObject, Theme } from '@mui/material';
 
 import type { CarouselProps } from './Carousel.types';
+import { accentFor } from '../../../tokens/scales';
 
 type Variant = NonNullable<CarouselProps['variant']>;
 type Size = NonNullable<CarouselProps['size']>;
@@ -39,12 +40,12 @@ const SURFACES: Record<Variant, (input: ContainerStyleInput) => CSSObject> = {
   glass: ({ theme, color, glass }) => ({
     backgroundColor: alpha(theme.palette.background.paper, glass ? 0.1 : 0.9),
     backdropFilter: 'blur(20px)',
-    border: `1px solid ${alpha(theme.palette[color].main, 0.2)}`,
+    border: `1px solid ${alpha(accentFor(theme, color).main, 0.2)}`,
   }),
 
   gradient: ({ theme, color, gradient }) => ({
     background: gradient
-      ? `linear-gradient(135deg, ${alpha(theme.palette[color].light, 0.1)}, ${alpha(theme.palette[color].dark, 0.1)})`
+      ? `linear-gradient(135deg, ${alpha(accentFor(theme, color).light, 0.1)}, ${alpha(accentFor(theme, color).dark, 0.1)})`
       : 'transparent',
   }),
 
@@ -59,7 +60,7 @@ const SURFACES: Record<Variant, (input: ContainerStyleInput) => CSSObject> = {
 
 export const containerStyles = (input: ContainerStyleInput): CSSObject => {
   const { theme, variant, size, color, height, width, glow, pulse } = input;
-  const accent = theme.palette[color].main;
+  const accent = accentFor(theme, color).main;
 
   return {
     position: 'relative' as const,

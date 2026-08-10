@@ -129,7 +129,7 @@ const basicColumns: ColumnConfig[] = [
     sortable: true,
     priority: 4,
     render: (value) => (
-      <Chip label={value} color={value === 'Active' ? 'success' : 'default'} size="small" />
+      <Chip label={value} color={value === 'Active' ? 'success' : 'default'} size="sm" />
     ),
   },
 ];
@@ -163,7 +163,7 @@ const extendedColumns: ColumnConfig[] = [
     sortable: true,
     priority: 7,
     render: (value) => (
-      <Chip label={value} color={value === 'Active' ? 'success' : 'default'} size="small" />
+      <Chip label={value} color={value === 'Active' ? 'success' : 'default'} size="sm" />
     ),
   },
   {
@@ -207,7 +207,7 @@ export const Default: Story = {
                 <Chip
                   label={row.status}
                   color={row.status === 'Active' ? 'success' : 'default'}
-                  size="small"
+                  size="sm"
                 />
               </TableCell>
             </TableRow>
@@ -559,7 +559,7 @@ export const BackwardCompatibility: Story = {
                     <Chip
                       label={row.status}
                       color={row.status === 'Active' ? 'success' : 'default'}
-                      size="small"
+                      size="sm"
                     />
                   </TableCell>
                 </TableRow>

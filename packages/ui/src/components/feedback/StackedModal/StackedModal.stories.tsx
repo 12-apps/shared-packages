@@ -407,9 +407,9 @@ const MultiLevelStackingComponent = () => {
                     Features
                   </Typography>
                   <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Chip label="Authentication" size="small" />
-                    <Chip label="Database" size="small" />
-                    <Chip label="Testing" size="small" />
+                    <Chip label="Authentication" size="sm" />
+                    <Chip label="Database" size="sm" />
+                    <Chip label="Testing" size="sm" />
                   </Stack>
                 </Box>
               </Stack>
@@ -588,14 +588,14 @@ const AsyncContentLoadingComponent = () => {
                         <TableCell>
                           <Chip
                             label={user.role}
-                            size="small"
+                            size="sm"
                             color={user.role === 'Admin' ? 'primary' : 'default'}
                           />
                         </TableCell>
                         <TableCell>
                           <Chip
                             label={user.status}
-                            size="small"
+                            size="sm"
                             color={user.status === 'Active' ? 'success' : 'default'}
                           />
                         </TableCell>

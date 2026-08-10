@@ -1,3 +1,4 @@
+import type { SizeValue } from '../../../tokens/scales';
 import type { TooltipProps as MuiTooltipProps } from '@mui/material';
 
 export interface TooltipProps extends Omit<MuiTooltipProps, 'variant'> {
@@ -19,7 +20,7 @@ export interface TooltipProps extends Omit<MuiTooltipProps, 'variant'> {
   /**
    * Size of the tooltip
    */
-  size?: 'sm' | 'md' | 'lg';
+  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
 
   /**
    * Maximum width of the tooltip

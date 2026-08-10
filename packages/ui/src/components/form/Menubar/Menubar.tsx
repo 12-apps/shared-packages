@@ -18,6 +18,7 @@ import { withDefaults } from '../../../utils/withDefaults';
 import { useMenubarMenus } from './Menubar.hooks';
 import { barStyles } from './Menubar.styles';
 import { MenubarToolbar } from './Menubar.toolbar';
+
 import type {
   MenubarGroupProps,
   MenubarItem,
@@ -27,7 +28,7 @@ import type {
 const DEFAULTS = {
   variant: 'default',
   size: 'md',
-  color: 'default',
+  color: 'neutral',
   orientation: 'horizontal',
   glow: false,
   pulse: false,

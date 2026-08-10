@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 
 export interface InputOTPProps {
   /**
@@ -8,12 +9,12 @@ export interface InputOTPProps {
   /**
    * The color theme of the OTP input
    */
-  color?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral';
+  color?: Exclude<ColorValue, 'info'>;
   
   /**
    * The size of the OTP input
    */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: SizeValue;
   
   /**
    * Number of OTP digits

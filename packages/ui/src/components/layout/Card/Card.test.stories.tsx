@@ -1078,9 +1078,9 @@ export const IntegrationWithOtherComponentsTest: Story = {
         <Stack spacing={1}>
           <Typography variant="body1">Full-stack developer with 5 years of experience</Typography>
           <Stack direction="row" spacing={1}>
-            <Chip label="React" size="small" />
-            <Chip label="TypeScript" size="small" />
-            <Chip label="Node.js" size="small" />
+            <Chip label="React" size="sm" />
+            <Chip label="TypeScript" size="sm" />
+            <Chip label="Node.js" size="sm" />
           </Stack>
         </Stack>
       </CardContent>

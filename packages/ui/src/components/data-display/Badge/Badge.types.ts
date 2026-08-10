@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { BadgeProps as MuiBadgeProps } from '@mui/material';
 import type React from 'react';
 
@@ -13,7 +14,7 @@ export type BadgeVariant =
   | 'success'
   | 'warning';
 
-export type BadgeSize = 'xs' | 'sm' | 'md' | 'lg';
+export type BadgeSize = Extract<SizeValue, 'xs' | 'sm' | 'md' | 'lg'>;
 
 export interface BadgeProps extends Omit<MuiBadgeProps, 'variant' | 'color' | 'content'> {
   /**
@@ -29,7 +30,7 @@ export interface BadgeProps extends Omit<MuiBadgeProps, 'variant' | 'color' | 'c
   /**
    * The color of the badge
    */
-  color?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'neutral' | 'info';
+  color?: ColorValue;
   
   /**
    * Whether the badge should have a glow effect

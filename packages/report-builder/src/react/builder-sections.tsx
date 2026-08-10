@@ -53,7 +53,7 @@ export function GroupBySection({ draft, fields, update }: SectionProps): JSX.Ele
       <SectionHeading>Agrupar por</SectionHeading>
       <Stack direction="row" spacing={1}>
         <Select
-          size="small"
+          size="sm"
           label="Eixo X"
           options={[NONE, ...fieldOptions(fields, "dimension")]}
           value={dimension.field}
@@ -62,7 +62,7 @@ export function GroupBySection({ draft, fields, update }: SectionProps): JSX.Ele
         />
         {byName.get(dimension.field)?.type === "date" ? (
           <Select
-            size="small"
+            size="sm"
             label="Por"
             options={Object.entries(GRAIN_LABELS).map(([value, label]) => ({ value, label }))}
             value={dimension.timeGrain}
@@ -88,7 +88,7 @@ export function SplitBySection({ draft, fields, update }: SectionProps): JSX.Ele
     <Stack spacing={1}>
       <SectionHeading>Separar em séries</SectionHeading>
       <Select
-        size="small"
+        size="sm"
         label="Uma série por"
         // Splitting without grouping has nothing to split, so the control is
         // disabled with the reason rather than silently producing nothing.
@@ -120,7 +120,7 @@ export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.El
               The `aria-label` stays because it says WHICH measure this is;
               MUI's own name would otherwise be the current value. */}
           <Select
-            size="small"
+            size="sm"
             label={`Medida ${index + 1}`}
             aria-label={`Medida ${index + 1}`}
             options={fieldOptions(fields)}
@@ -129,7 +129,7 @@ export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.El
             data-testid={`builder-measure-${index}`}
           />
           <Select
-            size="small"
+            size="sm"
             label="Agregação"
             aria-label="Agregação"
             options={aggregationOptions(byName.get(measure.field)).map((aggregation) => ({

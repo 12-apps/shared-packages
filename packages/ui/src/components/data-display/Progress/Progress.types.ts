@@ -1,7 +1,8 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { LinearProgressProps } from '@mui/material';
 
 export type ProgressVariant = 'linear' | 'circular' | 'segmented' | 'gradient' | 'glass';
-export type ProgressSize = 'sm' | 'md' | 'lg';
+export type ProgressSize = Extract<SizeValue, 'sm' | 'md' | 'lg'>;
 
 export interface ProgressProps extends Omit<LinearProgressProps, 'variant' | 'color'> {
   /**
@@ -17,7 +18,7 @@ export interface ProgressProps extends Omit<LinearProgressProps, 'variant' | 'co
   /**
    * The color of the progress
    */
-  color?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'neutral';
+  color?: Exclude<ColorValue, 'info'>;
 
   /**
    * Whether the progress should have a glow effect

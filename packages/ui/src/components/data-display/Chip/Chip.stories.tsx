@@ -29,12 +29,12 @@ const meta: Meta<typeof Chip> = {
     },
     size: {
       control: 'select',
-      options: ['small', 'medium'],
+      options: ['sm', 'md'],
       description: 'Size of the chip',
     },
     color: {
       control: 'select',
-      options: ['primary', 'secondary', 'error', 'info', 'success', 'warning', 'default'],
+      options: ['primary', 'secondary', 'success', 'warning', 'info', 'danger', 'neutral'],
       description: 'Theme color token — a closed set; `error` is the destructive one',
     },
     avatarSrc: {
@@ -145,9 +145,9 @@ export const LargeSize: Story = {
 export const AllSizes: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-      <Chip label="Small" size="small" />
-      <Chip label="Medium" size="medium" />
-      <Chip label="Large" size="medium" />
+      <Chip label="Small" size="sm" />
+      <Chip label="Medium" size="md" />
+      <Chip label="Large" size="md" />
     </div>
   ),
 };
@@ -190,17 +190,17 @@ export const Responsive: Story = {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
         {Array.from({ length: 10 }, (_, i) => (
-          <Chip key={i} label={`Tag ${i + 1}`} size="small" />
+          <Chip key={i} label={`Tag ${i + 1}`} size="sm" />
         ))}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
         {Array.from({ length: 8 }, (_, i) => (
-          <Chip key={i} label={`Category ${i + 1}`} size="medium" deletable onDelete={() => {}} />
+          <Chip key={i} label={`Category ${i + 1}`} size="md" deletable onDelete={() => {}} />
         ))}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
         {Array.from({ length: 5 }, (_, i) => (
-          <Chip key={i} label={`Filter ${i + 1}`} size="medium" selectable />
+          <Chip key={i} label={`Filter ${i + 1}`} size="md" selectable />
         ))}
       </div>
     </div>
