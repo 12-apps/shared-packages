@@ -17,7 +17,6 @@
     "@playwright/test": "^1.49.0",
     "@tanstack/react-query": "^5.62.0",
     "@vitejs/plugin-react": "^5.1.0",
-    "hono": "^4.6.0",
     "playwright-bdd": "^9.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -25,5 +24,5 @@
     "vite": "^8.2.0"
   },
   "//peers": "react-router-dom and @tanstack/react-query are PEERS of @12-apps/report-builder, not conveniences. Its react entry re-exports pages that import them, so the barrel must resolve them at build time even when the harness renders only a component that needs neither. A real consumer of that entry has both installed \u2014 which is what this harness exists to replicate.",
-  "//hono": "The harness answers the reports surface with the package's OWN Hono binding rather than a hand-written stand-in, so the client half and the server half of one contract are exercised against each other. Hono is isomorphic \u2014 `router.request()` needs no socket \u2014 so this runs in the browser exactly as written."
+  "//backend": "This SPA has no backend of its own and depends on `hono` for nothing. The reports surface is answered by harness/backend \u2014 a real server, on a real port, over a real Postgres \u2014 which vite.config.ts proxies `/api` to. `hono` used to be here because the package's OWN router was mounted INSIDE the browser: isomorphic, no socket, and so no request left the tab and no save survived a reload."
 }
