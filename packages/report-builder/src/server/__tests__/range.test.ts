@@ -61,6 +61,76 @@ describe('rolling presets are calendar days on the tenant’s clock', () => {
   });
 });
 
+/**
+ * “Este mês” (FUT-755) — month-TO-DATE on the tenant's clock.
+ *
+ * Two distinct claims, and only the second is about time zones: that the window
+ * opens on the FIRST of the month rather than a number of days back, and that
+ * WHICH month that is is read on the merchant's clock. The zone cases are
+ * stated at instants where UTC has already rolled into the next month and São
+ * Paulo has not — anywhere else the two agree and the assertion would pass for
+ * the wrong reason.
+ */
+describe('“este mês” is the calendar month to date', () => {
+  it('opens on the 1st, not a number of days back', () => {
+    const range = resolveReportRange({ preset: 'month' }, DINNER, SAO_PAULO);
+
+    // 00:00 on 1 July in São Paulo is 03:00Z; the window still ends at the
+    // next local midnight, so the partial current day is inside it.
+    expect(range.from.toISOString()).toBe('2026-07-01T03:00:00.000Z');
+    expect(range.toExclusive.toISOString()).toBe('2026-07-15T03:00:00.000Z');
+  });
+
+  it('is NOT the same window as “30d”', () => {
+    // The whole reason the preset exists: on the 14th, "this month" is fourteen
+    // days while "30 dias" reaches back into June. A resolver that treated
+    // month as another day count would make the new pill a duplicate.
+    const monthToDate = resolveReportRange({ preset: 'month' }, DINNER, SAO_PAULO);
+    const thirty = resolveReportRange({ preset: '30d' }, DINNER, SAO_PAULO);
+
+    expect(monthToDate.from.getTime()).toBeGreaterThan(thirty.from.getTime());
+    expect(monthToDate.toExclusive.getTime()).toBe(thirty.toExclusive.getTime());
+  });
+
+  it('is one day long on the 1st', () => {
+    // 21:00 in São Paulo on 1 August. Worth stating, because the window is at
+    // its shortest exactly when a merchant is most likely to open the report
+    // and doubt it.
+    const firstOfMonth = new Date('2026-08-02T00:00:00Z');
+    const range = resolveReportRange({ preset: 'month' }, firstOfMonth, SAO_PAULO);
+
+    expect(range.from.toISOString()).toBe('2026-08-01T03:00:00.000Z');
+    expect(range.toExclusive.getTime() - range.from.getTime()).toBe(86_400_000);
+  });
+
+  it('reads WHICH month on the tenant’s clock, not on UTC’s', () => {
+    // 21:30 on 31 July in São Paulo. In UTC it is already 1 August, so a month
+    // resolved on UTC opens August's one-day window while the store is still
+    // serving July's dinner — the whole month's figures gone from the screen
+    // three hours early, on the one evening a merchant is closing the month.
+    const lastNightOfJuly = new Date('2026-08-01T00:30:00Z');
+
+    const local = resolveReportRange({ preset: 'month' }, lastNightOfJuly, SAO_PAULO);
+    expect(local.from.toISOString()).toBe('2026-07-01T03:00:00.000Z');
+    expect(lastNightOfJuly.getTime()).toBeGreaterThan(local.from.getTime());
+    expect(lastNightOfJuly.getTime()).toBeLessThan(local.toExclusive.getTime());
+
+    // …and the contrast that makes the assertion above mean something.
+    const utc = resolveReportRange({ preset: 'month' }, lastNightOfJuly);
+    expect(utc.from.toISOString()).toBe('2026-08-01T00:00:00.000Z');
+    expect(utc.from.getTime()).toBeGreaterThan(local.from.getTime());
+  });
+
+  it('rolls into the new month only once the tenant’s clock does', () => {
+    // 00:30 on 1 August in São Paulo (03:30Z) — the same boundary from the
+    // other side: August IS the tenant's month now, and July's window is over.
+    const firstMinutesOfAugust = new Date('2026-08-01T03:30:00Z');
+    const range = resolveReportRange({ preset: 'month' }, firstMinutesOfAugust, SAO_PAULO);
+
+    expect(range.from.toISOString()).toBe('2026-08-01T03:00:00.000Z');
+  });
+});
+
 describe('a custom range is inclusive at both ends', () => {
   it('runs to the END of the final day, not to its midnight', () => {
     const range = resolveReportRange(
@@ -120,6 +190,12 @@ describe('an incoherent period is the caller’s mistake', () => {
 describe('reading a period off a query string', () => {
   it('defaults to 30d when the caller named none', () => {
     expect(rangeFromQuery({})).toEqual({ preset: '30d' });
+  });
+
+  it('carries `month` through', () => {
+    // A preset added to the list has to be readable off a query string too, or
+    // the toggle sets a period the server quietly resolves as 30 dias.
+    expect(rangeFromQuery({ preset: 'month' })).toEqual({ preset: 'month' });
   });
 
   it('ignores a preset that is not one of ours rather than failing', () => {

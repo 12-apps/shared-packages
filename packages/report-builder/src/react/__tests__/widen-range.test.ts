@@ -19,6 +19,20 @@ describe('widerRange', () => {
     // Nothing to offer: at 30 days the emptiness means the data is not there.
     expect(widerRange('30d')).toBeNull();
   });
+
+  it('offers nothing from the periods that are not on the ladder', () => {
+    // FUT-755 put two more pills on the toggle and neither can be a rung.
+    // `month` is month-TO-DATE, so for the first week of every month it is
+    // NARROWER than `7d` — offering it as "see more" would hand back fewer
+    // rows, the exact confusion the offer exists to end. `custom` names dates
+    // the empty state does not have, so it would resolve to nothing at all.
+    //
+    // This is the regression guard for the ladder itself: it used to walk
+    // `REPORT_RANGES`, so both would have become offers the moment the toggle
+    // grew them.
+    expect(widerRange('month')).toBeNull();
+    expect(widerRange('custom')).toBeNull();
+  });
 });
 
 describe('widenLabel', () => {

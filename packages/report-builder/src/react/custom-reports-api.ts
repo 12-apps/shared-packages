@@ -8,9 +8,20 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { useTransport } from "./transport-context";
 
+import { isRunnableRange, rangeQuery, rangeQueryKey, rangeSelection } from "./reports-api";
+
 import type { Result } from "./lib/rest-result";
 import type { ReportBuilderTransport } from "./transport";
-import type { ReportGrain, ReportRange, ReportRender } from "./reports-api";
+import type {
+  ReportGrain,
+  ReportRange,
+  ReportRangeSelection,
+  ReportRender,
+  ReportRollingRange,
+} from "./reports-api";
+
+/** A period as any caller may hold it — a bare rolling preset, or the object. */
+type RangeArg = ReportRange | ReportRangeSelection;
 
 /** One catalog field as listed by `GET /reports/fields`. */
 export interface ReportField {
@@ -151,8 +162,9 @@ interface SavedReportViewBase {
   visibility: ReportVisibilityWire;
   visibilityRoles: string[];
   /** The period it OPENS on (FUT-755), resolved server-side; absent only on a
-   * response cached before the field existed, where readers use 30d. */
-  defaultRange?: ReportRange;
+   * response cached before the field existed, where readers use 30d. Rolling
+   * only — a stored `custom` would open the report on a frozen window. */
+  defaultRange?: ReportRollingRange;
   range: { preset: string; from: string; toExclusive: string };
 }
 
@@ -242,59 +254,33 @@ export function useSavedReports(
   });
 }
 
-/** Open + run one saved document (report or dashboard) for the period. */
+/**
+ * Open + run one saved document (report or dashboard) for the period.
+ *
+ * This built `?preset=${range}` by hand and keyed on the bare preset, which a
+ * custom window breaks in both directions at once: the request loses its dates
+ * and resolves as something else, and the answer is filed under a key every
+ * OTHER custom window also hits. Both now come off the same two helpers.
+ */
 export function useSavedReport(
   tenantSlug: string,
   id: string,
-  range: ReportRange,
+  range: RangeArg,
 ): UseQueryResult<SavedReportView> {
   const adminFetch = useAdminFetch();
+  const selection = rangeSelection(range);
   return useQuery({
-    queryKey: ["admin", tenantSlug, "reports", "custom", id, range],
+    queryKey: ["admin", tenantSlug, "reports", "custom", id, ...rangeQueryKey(selection)],
     queryFn: () =>
       adminFetch<SavedReportView>(
-        adminPath(tenantSlug, `/reports/custom/${encodeURIComponent(id)}?preset=${range}`),
+        adminPath(
+          tenantSlug,
+          `/reports/custom/${encodeURIComponent(id)}?${rangeQuery(selection)}`,
+        ),
       ),
-    enabled: tenantSlug !== "" && id !== "",
-  });
-}
-
-/** One tenant role, as the publish section's allowlist picker needs it. */
-interface TenantRoleOption {
-  id: string;
-  name: string;
-}
-
-/**
- * The tenant's roles for the `visibility: "roles"` allowlist picker
- * (FUT-307). Reuses `GET /roles` (roles:manage — the same admin tier that
- * may save documents); pages are unwrapped (`{ data, pagination }`) and the
- * picker walks EVERY page so no role is silently unpickable. The page cap
- * is a runaway guard only — 20 × 100 is far beyond any real tenant.
- */
-export function useTenantRoles(
-  tenantSlug: string,
-  enabled: boolean,
-): UseQueryResult<TenantRoleOption[]> {
-  const transport = useTransport();
-  return useQuery({
-    queryKey: ["admin", tenantSlug, "roles", "picker"],
-    queryFn: async () => {
-      const roles: TenantRoleOption[] = [];
-      for (let page = 1; page <= 20; page += 1) {
-        // The roles endpoint answers with a paginated envelope rather than
-        // the `{ data }` one every reports endpoint uses, so this asks the
-        // transport for the page itself and reads both halves.
-        const result = await transport.getRaw<{
-          data: TenantRoleOption[];
-          pagination: { hasNextPage: boolean };
-        }>(adminPath(tenantSlug, `/roles?page=${page}&pageSize=100`));
-        roles.push(...result.data.map((role) => ({ id: role.id, name: role.name })));
-        if (!result.pagination.hasNextPage) break;
-      }
-      return roles;
-    },
-    enabled: enabled && tenantSlug !== "",
+    // A half-picked custom window holds the query rather than sending a request
+    // the server can only answer with 400.
+    enabled: tenantSlug !== "" && id !== "" && isRunnableRange(selection),
   });
 }
 
@@ -310,11 +296,16 @@ function runReportAction(
   transport: ReportBuilderTransport,
   tenantSlug: string,
   spec: ReportSpecWire,
-  range: ReportRange,
+  range: ReportRangeSelection,
 ): Promise<Result<RunResult>> {
   return transport.send<RunResult>(adminPath(tenantSlug, "/reports/run"), "POST", {
     spec,
-    preset: range,
+    preset: range.preset,
+    // The dry run reads its period from the BODY (`windowOfBody`), so a custom
+    // window's dates ride there rather than on a query string.
+    ...(range.preset === "custom" && range.from && range.to
+      ? { from: range.from, to: range.to }
+      : {}),
   });
 }
 
@@ -332,18 +323,26 @@ function runReportAction(
 export function useRunReport(
   tenantSlug: string,
   spec: ReportSpecWire | null,
-  range: ReportRange,
+  range: RangeArg,
 ): UseQueryResult<RunResult> {
   const transport = useTransport();
+  const selection = rangeSelection(range);
   return useQuery({
-    queryKey: ["admin", tenantSlug, "reports", "run", JSON.stringify(spec), range],
+    queryKey: [
+      "admin",
+      tenantSlug,
+      "reports",
+      "run",
+      JSON.stringify(spec),
+      ...rangeQueryKey(selection),
+    ],
     queryFn: async () => {
       if (!spec) throw new Error("Bloco sem consulta.");
-      const result = await runReportAction(transport, tenantSlug, spec, range);
+      const result = await runReportAction(transport, tenantSlug, spec, selection);
       if (!result.ok) throw new Error(result.error);
       return result.data;
     },
-    enabled: tenantSlug !== "" && spec !== null,
+    enabled: tenantSlug !== "" && spec !== null && isRunnableRange(selection),
     retry: false,
   });
 }

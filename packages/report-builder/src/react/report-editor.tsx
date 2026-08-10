@@ -42,7 +42,7 @@ import {
   emptyReportDraft,
   type ReportDraft,
 } from "./report-model";
-import type { ReportRange } from "./reports-api";
+import type { ReportRange, ReportRollingRange } from "./reports-api";
 import { useTransport } from "./transport-context";
 
 /** Validate + persist the draft, landing on the saved report's viewer. */
@@ -51,7 +51,7 @@ function useReportSave(
   editId: string | undefined,
   draft: ReportDraft,
   publish: PublishDraft,
-  defaultRange: ReportRange,
+  defaultRange: ReportRollingRange,
 ): { error: string | null; saving: boolean; onSave: () => Promise<boolean> } {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -97,7 +97,16 @@ function useReportSave(
   return { error, saving, onSave };
 }
 
-/** The preview period — all that is left on the page above the canvas. */
+/**
+ * The preview period — all that is left on the page above the canvas.
+ *
+ * Rolling presets only: no `custom` prop, so no `Personalizado…` pill. The two
+ * dates a custom window is would have to reach `useRunReport` through
+ * `EditorCanvas` and every block, and a block holds its period as a bare
+ * `ReportRange`. Offering the pill before that is threaded would send
+ * `preset=custom` with nothing to resolve — a 400 per block. `Este mês` needs
+ * no dates and is offered here exactly as it is on the viewer.
+ */
 function EditorActions({
   range,
   onRangeChange,
@@ -134,7 +143,7 @@ function useEditorState(
   editId: string | undefined,
   initial: ReportDraft,
   initialPublish: PublishDraft,
-  initialRange: ReportRange,
+  initialRange: ReportRollingRange,
 ): {
   draft: ReportDraft;
   // The updater form, because EditorMeta patches fields off the previous draft.
@@ -144,8 +153,8 @@ function useEditorState(
   range: ReportRange;
   setRange: (next: ReportRange) => void;
   /** The period the SAVED report will open on — persisted, unlike `range`. */
-  defaultRange: ReportRange;
-  setDefaultRange: (next: ReportRange) => void;
+  defaultRange: ReportRollingRange;
+  setDefaultRange: (next: ReportRollingRange) => void;
   error: string | null;
   saving: boolean;
   dirty: boolean;
@@ -153,7 +162,7 @@ function useEditorState(
 } {
   const [draft, setDraft] = useState<ReportDraft>(initial);
   const [publish, setPublish] = useState<PublishDraft>(initialPublish);
-  const [defaultRange, setDefaultRange] = useState<ReportRange>(initialRange);
+  const [defaultRange, setDefaultRange] = useState<ReportRollingRange>(initialRange);
   // The preview STARTS on the report's own default: the editor should open on
   // the period the reader will (FUT-755). It is then free to differ — moving
   // the toggle previews another window without changing what is stored.
@@ -214,7 +223,7 @@ function ReportEditorForm({
   entities: ReportEntityFields[];
   initial: ReportDraft;
   initialPublish: PublishDraft;
-  initialRange: ReportRange;
+  initialRange: ReportRollingRange;
 }): JSX.Element {
   const navigate = useNavigate();
   const editor = useEditorState(tenantSlug, editId, initial, initialPublish, initialRange);

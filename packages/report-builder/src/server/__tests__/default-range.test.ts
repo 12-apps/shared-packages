@@ -10,14 +10,26 @@ import { saveReportBody } from '../wire';
  * Three things have to agree or the feature silently half-works: the toggle the
  * author picks from, the values the wire accepts, and the values the DB CHECK
  * admits. The first two are pinned here; the third is the same list written
- * into `prisma/migrations/20260810120000_add_report_default_range`.
+ * into `prisma/migrations/20260810160000_report_default_range_month`.
  */
 
 describe('REPORT_DEFAULT_RANGES', () => {
-  it('is exactly what the range toggle offers', () => {
-    // A server list that drifted from the client's would refuse a value the
-    // author could still choose — a 400 on a control that looks fine.
-    expect([...REPORT_DEFAULT_RANGES]).toEqual([...REPORT_RANGES]);
+  it('is exactly the toggle’s presets, minus `custom`', () => {
+    // RESTATED (FUT-755). This asserted plain equality with `REPORT_RANGES`,
+    // which held only while every preset the toggle offered was also storable.
+    // It now offers `Personalizado…` as well, so the two lists differ by one
+    // entry BY DESIGN and the old equality fails for the right reason — but
+    // deleting it would leave nothing pinning the other four.
+    //
+    // So the rule the equality stood in for is stated directly: the defaults
+    // ARE the toggle's presets minus `custom`. Deliberately not relaxed to
+    // "every default is also a preset" — a subset check passes while the two
+    // drift, which is the exact silent half-working this file exists to catch:
+    // add `month` to the toggle, forget the store, and the author picks a
+    // default the save then refuses with a 400 from a control that looked fine.
+    expect([...REPORT_DEFAULT_RANGES]).toEqual(
+      REPORT_RANGES.filter((preset) => preset !== 'custom'),
+    );
   });
 
   it('does NOT admit `custom`', () => {
@@ -26,6 +38,15 @@ describe('REPORT_DEFAULT_RANGES', () => {
     // nothing the next time the report is opened.
     expect(REPORT_RANGE_PRESETS).toContain('custom');
     expect([...REPORT_DEFAULT_RANGES]).not.toContain('custom');
+  });
+
+  it('DOES admit `month`, which needs no dates to resolve', () => {
+    // The other half of the same rule, and the half the migration had to
+    // learn. Named explicitly so the trio — this list, the wire's `z.enum`,
+    // the DB CHECK — has a failing test the day one is changed without the
+    // others, rather than a 400 discovered from the settings dialog.
+    expect([...REPORT_DEFAULT_RANGES]).toContain('month');
+    expect(resolveDefaultRange('month')).toBe('month');
   });
 });
 
@@ -63,6 +84,13 @@ describe('saveReportBody', () => {
   it('accepts a preset', () => {
     const parsed = saveReportBody.parse({ ...base, defaultRange: '7d' });
     expect(parsed.defaultRange).toBe('7d');
+  });
+
+  it('accepts `month`, the preset the toggle grew (FUT-755)', () => {
+    // The wire is the second of the three gates; a `z.enum` that had not
+    // learned `month` would refuse the settings dialog's new option with a 400
+    // while the list and the CHECK both allowed it.
+    expect(saveReportBody.parse({ ...base, defaultRange: 'month' }).defaultRange).toBe('month');
   });
 
   it('accepts null, which clears the preference', () => {

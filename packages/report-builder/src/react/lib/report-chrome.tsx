@@ -22,13 +22,22 @@ import {
   REPORT_GRAIN_LABELS,
   REPORT_GRAINS,
   REPORT_RANGE_LABELS,
-  REPORT_RANGES,
+  REPORT_ROLLING_RANGES,
   type ReportGrain,
   type ReportRange,
 } from "../reports-api";
 import { NO_PRINT_CLASS, PrintExportButton } from "./print-export";
 
-const RANGE_OPTIONS = REPORT_RANGES.map((range) => ({
+/**
+ * ROLLING presets only — no `Personalizado…` on a built-in surface (FUT-755).
+ *
+ * That pill is not a period; it opens a picker whose two dates then have to
+ * travel with every request. These surfaces hold their period as a bare
+ * `useState<ReportRange>` and hand it straight to `useSystemReport`, so the
+ * pill would send `preset=custom` with nothing to resolve — a 400 from a
+ * control that looked fine. `Este mês` needs no dates, so it IS offered here.
+ */
+const RANGE_OPTIONS = REPORT_ROLLING_RANGES.map((range) => ({
   value: range,
   label: REPORT_RANGE_LABELS[range],
 }));

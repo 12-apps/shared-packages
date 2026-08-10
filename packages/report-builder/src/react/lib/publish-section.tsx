@@ -15,11 +15,8 @@ import { Checkbox } from "@12-apps/ui/form/Checkbox";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
-import {
-  useTenantRoles,
-  type ReportStatusWire,
-  type ReportVisibilityWire,
-} from "../custom-reports-api";
+import type { ReportStatusWire, ReportVisibilityWire } from "../custom-reports-api";
+import { useTenantRoles } from "./tenant-roles";
 
 export interface PublishDraft {
   status: ReportStatusWire;

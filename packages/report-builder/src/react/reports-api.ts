@@ -9,15 +9,97 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { apiFetch } from "./lib/api";
 import type { ChartSpec } from "@12-apps/ui/charts";
 
-/** The period presets the selector offers (mirrors the API's rolling presets). */
-export const REPORT_RANGES = ["today", "7d", "30d"] as const;
+/**
+ * The presets that resolve against the CLOCK, narrow → wide-ish.
+ *
+ * Every one of these is a complete period on its own: naming it is all the
+ * server needs, so it is what a saved report may store as its opening period
+ * and what a surface with no picker (the built-in dashboards) offers.
+ *
+ * "Wide-ish" because `month` is month-TO-DATE, so on the 3rd it is narrower
+ * than `7d`. Nothing may read this list as an ordering — see `widen-range.ts`,
+ * which keeps its own ladder for exactly that reason.
+ */
+export const REPORT_ROLLING_RANGES = ["today", "7d", "30d", "month"] as const;
+export type ReportRollingRange = (typeof REPORT_ROLLING_RANGES)[number];
+
+/**
+ * Everything the period toggle offers, in the order it renders them.
+ *
+ * `custom` is last and is not a period: it names a window the reader supplies,
+ * so its pill opens a picker instead of resolving anything. That is also why it
+ * is absent from {@link REPORT_ROLLING_RANGES} rather than merely last in it —
+ * a stored default of `custom` would freeze one window forever, and a built-in
+ * dashboard offering the pill would send `preset=custom` with no dates and get
+ * a 400 from a control that looked fine.
+ */
+export const REPORT_RANGES = [...REPORT_ROLLING_RANGES, "custom"] as const;
 export type ReportRange = (typeof REPORT_RANGES)[number];
 
 export const REPORT_RANGE_LABELS: Record<ReportRange, string> = {
   today: "Hoje",
   "7d": "7 dias",
   "30d": "30 dias",
+  month: "Este mês",
+  custom: "Personalizado…",
 };
+
+/**
+ * A period as a SCREEN holds it: the preset, plus the two dates `custom` means.
+ *
+ * The dates have to travel with the preset everywhere the preset travels. A
+ * `custom` that arrives without them is not "a custom range with defaults" —
+ * the server has nothing to resolve and answers 400 — and a react-query key
+ * that carries only the preset serves one custom window's rows for another,
+ * which looks exactly like a period control that does nothing.
+ */
+export interface ReportRangeSelection {
+  preset: ReportRange;
+  /** `AAAA-MM-DD`, inclusive. Only read when the preset is `custom`. */
+  from?: string;
+  /** `AAAA-MM-DD`, inclusive. Only read when the preset is `custom`. */
+  to?: string;
+}
+
+/**
+ * The two shapes a caller may hold a period in, as one.
+ *
+ * A rolling preset is complete as a bare string and most callers still pass one
+ * — so the hooks take either rather than forcing every call site through an
+ * object literal that would only ever wrap a single field.
+ */
+export function rangeSelection(range: ReportRange | ReportRangeSelection): ReportRangeSelection {
+  return typeof range === "string" ? { preset: range } : range;
+}
+
+/**
+ * Whether this period can actually be run. Only `custom` can fail: it is the
+ * only preset whose window lives outside the preset name, so a half-picked one
+ * must hold the query back rather than send a request that 400s.
+ */
+export function isRunnableRange(range: ReportRangeSelection): boolean {
+  return range.preset !== "custom" || (Boolean(range.from) && Boolean(range.to));
+}
+
+/** `preset=…[&from=…&to=…]` — the one place a period becomes a query string. */
+export function rangeQuery(range: ReportRangeSelection): string {
+  const parts = [`preset=${encodeURIComponent(range.preset)}`];
+  if (range.preset === "custom" && range.from && range.to) {
+    parts.push(`from=${encodeURIComponent(range.from)}`, `to=${encodeURIComponent(range.to)}`);
+  }
+  return parts.join("&");
+}
+
+/**
+ * The period's parts as react-query key segments.
+ *
+ * Spread into a key rather than passed as the object, so the dates are visible
+ * IN the key: two windows of the same preset are two different cached results,
+ * and a key that dropped them would hand the first window's rows to the second.
+ */
+export function rangeQueryKey(range: ReportRangeSelection): [string, string, string] {
+  return [range.preset, range.from ?? "", range.to ?? ""];
+}
 
 /** Date-bucket grains for reports that support them. */
 export const REPORT_GRAINS = ["day", "week", "month"] as const;
