@@ -224,6 +224,35 @@ export function cellRailCount(cells: number): number {
 }
 
 /**
+ * A {@link ListCardGroup}'s configuration, as a value a caller can pass around.
+ *
+ * The same fields the group takes as props, named once so a table can accept
+ * "the list's columns" as a single prop and hand them straight over. It is what
+ * makes a list line up BY CONSTRUCTION rather than by convention: without it
+ * every row resolves its own tracks from its own copy of the config, which
+ * agrees with its neighbours right until one row carries an unusually wide value.
+ */
+export interface ListGroupConfig<T extends Record<string, unknown>> {
+  /**
+   * The cells every row renders. Supplying these replaces the named-slot layout
+   * (title/subtitle/meta/value/status) for the rows inside.
+   */
+  cells?: readonly ListCardCellConfig<T>[];
+  /**
+   * How many labelled pairs the rows carry, in the named-slot layout. The group
+   * renders its children opaquely and cannot count them.
+   */
+  metaColumns?: number;
+  /** Override individual rails; anything omitted keeps its default. */
+  rails?: Partial<ListRails>;
+  /**
+   * Hold the drag and select gutters open even when nothing uses them. On by
+   * default, so a selectable list and a read-only one still line up.
+   */
+  reserveGutters?: boolean;
+}
+
+/**
  * A list of {@link BaseListCard}s that share one set of columns.
  *
  * Also the natural home for the things a review pointed out belong to the list

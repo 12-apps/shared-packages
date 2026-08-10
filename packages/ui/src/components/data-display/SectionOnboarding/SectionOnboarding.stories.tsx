@@ -111,7 +111,7 @@ export const Configured: Story = {
     configuredTitle: 'PagBank conectado',
     configuredSummary: (
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
-        <Chip label="Ativo" color="success" size="small" />
+        <Chip label="Ativo" color="success" size="sm" />
         <Typography variant="body2" color="text.secondary">
           Ambiente: Produção
         </Typography>
@@ -151,7 +151,7 @@ export const AllStates: Story = {
         status="configured"
         title="PagBank"
         configuredTitle="PagBank conectado"
-        configuredSummary={<Chip label="Ativo — Produção" color="success" size="small" />}
+        configuredSummary={<Chip label="Ativo — Produção" color="success" size="sm" />}
       >
         <MockForm />
       </SectionOnboarding>

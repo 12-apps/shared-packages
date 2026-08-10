@@ -368,7 +368,7 @@ export function ReportSettingsDialog({
               onChange={(event) =>
                 onChange({ ...value, defaultRange: asReportRange(String(event.target.value)) })
               }
-              size="small"
+              size="sm"
               data-testid={`${testId}-default-range`}
             />
           </Field>

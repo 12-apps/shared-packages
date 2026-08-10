@@ -139,7 +139,7 @@ const MULTI_SERIES_SCHEME: ChartSemanticColor[] = [
   'warning',
   'success',
   'info',
-  'error',
+  'danger',
   'secondary',
 ];
 

@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { SwitchProps as MuiSwitchProps } from '@mui/material';
 import type { FocusEventHandler,MouseEventHandler, ReactNode } from 'react';
 
@@ -10,12 +11,12 @@ export interface SwitchProps extends Omit<MuiSwitchProps, 'color' | 'size'> {
   /**
    * The color theme of the switch
    */
-  color?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral';
+  color?: Exclude<ColorValue, 'info'>;
   
   /**
    * The size of the switch
    */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: SizeValue;
   
   /**
    * Label text for the switch

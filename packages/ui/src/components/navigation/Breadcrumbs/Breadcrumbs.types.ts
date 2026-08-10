@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { BreadcrumbsProps as MuiBreadcrumbsProps } from '@mui/material';
 import type { ReactNode } from 'react';
 
@@ -105,13 +106,17 @@ export interface BreadcrumbsProps extends Omit<MuiBreadcrumbsProps, 'separator'>
    * Size of the breadcrumbs
    * @default 'md'
    */
-  size?: 'sm' | 'md' | 'lg';
+  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
   
   /**
    * Color scheme for separators and accents
    * @default 'default'
    */
-  color?: 'default' | 'primary' | 'secondary';
+  /**
+   * `neutral` is what this called `default`: the unaccented state, renamed to
+   * the house word rather than kept as a third spelling of the same idea.
+   */
+  color?: Extract<ColorValue, 'primary' | 'secondary' | 'neutral'>;
   
   /**
    * Elevation level for glass and elevated variants (0-5)

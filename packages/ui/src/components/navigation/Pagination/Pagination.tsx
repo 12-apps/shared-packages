@@ -139,7 +139,9 @@ const PaginationControl: React.FC<
       showFirstButton={p.showFirstButton && !isDots}
       showLastButton={p.showLastButton && !isDots}
       disabled={p.disabled}
-      color={p.color}
+      // MUI spells the unaccented pagination colour `standard`; ours is
+      // `neutral`, translated here rather than carried as a second name.
+      color={p.color === undefined ? undefined : p.color === 'neutral' ? 'standard' : p.color}
       renderItem={renderItem}
       {...rest}
     />

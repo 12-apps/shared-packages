@@ -21,6 +21,7 @@ import type { JSX } from 'react';
 import { Chip } from '@12-apps/ui/data-display/Chip';
 import { Tooltip } from '@12-apps/ui/data-display/Tooltip';
 import { Box } from '@12-apps/ui/mui/Box';
+import type { ColorValue } from '@12-apps/ui/tokens';
 
 /** Off-screen but in the accessibility tree — the standard sr-only recipe. */
 const VISUALLY_HIDDEN = {
@@ -40,7 +41,7 @@ interface CaveatChipProps {
   label: string;
   /** The full explanation: tooltip text AND the announced description. */
   hint: string;
-  color?: 'warning' | 'error';
+  color?: Extract<ColorValue, 'warning' | 'danger'>;
   /** Test id of the wrapper — the hook every surface's test asserts on. */
   dataTestId: string;
 }
@@ -61,7 +62,7 @@ export function CaveatChip({
         tabIndex={0}
         sx={{ display: 'inline-flex', alignItems: 'center', cursor: 'help' }}
       >
-        <Chip label={label} size="small" variant="outlined" color={color} />
+        <Chip label={label} size="sm" variant="outlined" color={color} />
         <Box component="span" sx={VISUALLY_HIDDEN}>
           {hint}
         </Box>

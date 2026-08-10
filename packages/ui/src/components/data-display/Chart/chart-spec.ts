@@ -7,12 +7,22 @@ import {
   type ChartSpecRenderContext,
 } from './chart-spec-registry';
 
+/**
+ * BREAKING FOR STORED SPECS, not just for types.
+ *
+ * A chart spec is DATA — it is authored as JSON and can be persisted — and this
+ * list is validated at runtime, so a saved spec carrying `"error"` now throws
+ * `ChartSpecError` instead of silently drawing. That is the right failure (the
+ * alternative is a series quietly losing its colour), but unlike the rest of
+ * this migration a type-check will not find the affected specs: anything stored
+ * outside the repo has to be rewritten `error` → `danger`.
+ */
 export const CHART_SEMANTIC_COLORS: readonly ChartSemanticColor[] = [
   'primary',
   'secondary',
   'success',
   'warning',
-  'error',
+  'danger',
   'info',
 ];
 

@@ -1,4 +1,5 @@
-export type SpacerSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+import type { SizeValue } from '../../../tokens/scales';
+export type SpacerSize = SizeValue;
 export type SpacerDirection = 'horizontal' | 'vertical' | 'both';
 
 export interface SpacerProps {

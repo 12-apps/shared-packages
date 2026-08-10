@@ -4,6 +4,7 @@ import type { SortFieldDefinition } from "../../layout/ContentToolbar";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { DataViewsGrid } from "./DataViewsGrid";
+import type { ListGroupConfig } from "./list-card-rails";
 import type { DisplayPanelView } from "./data-views-display-panel";
 import { viewStateKey } from "./data-views-dirty";
 import { DeleteViewDialog } from "./DeleteViewDialog";
@@ -83,6 +84,8 @@ export interface DataViewsTableBaseProps<T extends Record<string, unknown>> {
   board?: BoardConfig<T>;
   /** Opt-in "Lista" layout — one full-width, entity-rendered row per record (FUT-733). */
   renderListRow?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
+  /** The Lista's shared columns, so its rows line up by construction not convention. */
+  listGroup?: ListGroupConfig<T>;
   /** The page-level partition rendered as tabs under the toolbar (server mode only). */
   scopes?: ScopeConfig[];
   /** The row field the scopes partition by — used only to reject a pill over the same field. */

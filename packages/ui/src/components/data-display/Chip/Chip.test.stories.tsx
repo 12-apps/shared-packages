@@ -93,7 +93,7 @@ export const ResponsiveDesign: Story = {
       }}
     >
       {Array.from({ length: 8 }, (_, i) => (
-        <Chip key={i} label={`Responsive ${i + 1}`} size="small" onClick={() => {}} />
+        <Chip key={i} label={`Responsive ${i + 1}`} size="sm" onClick={() => {}} />
       ))}
     </div>
   ),
@@ -123,7 +123,7 @@ export const ThemeVariations: Story = {
         <Chip label="Primary" color="primary" onClick={() => {}} />
         <Chip label="Secondary" color="secondary" onClick={() => {}} />
         <Chip label="Success" color="success" onClick={() => {}} />
-        <Chip label="Error" color="error" onClick={() => {}} />
+        <Chip label="Error" color="danger" onClick={() => {}} />
         <Chip label="Warning" color="warning" onClick={() => {}} />
       </div>
       <div style={{ display: 'flex', gap: '8px' }}>

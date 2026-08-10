@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { MenuProps } from '@mui/material';
 import type { ReactNode } from 'react';
 
@@ -55,7 +56,7 @@ export interface DropdownMenuItem {
   /**
    * Color variant for the item
    */
-  color?: 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success';
+  color?: ColorValue;
 
   /**
    * Test ID for the rendered item.
@@ -101,7 +102,7 @@ export interface DropdownMenuProps extends Omit<MenuProps, 'open' | 'variant'> {
   /**
    * Size of the menu items
    */
-  size?: 'sm' | 'md' | 'lg';
+  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
   
   /**
    * Maximum height of the menu
