@@ -88,6 +88,14 @@ function unprovenAdapter(name = 'unproven'): PaymentProviderAdapter {
   return { ...base, capabilities: { ...base.capabilities, activationCharge: true } };
 }
 
+/**
+ * A fake with NO `activationCharge` — the shape the proof gate deliberately
+ * leaves alone. Its own name because every SHIPPED adapter now declares the
+ * charge (Stripe was the last, FUT-689), so the "binds only where the proof
+ * is obtainable" cases can no longer ride a real one.
+ */
+export const chargelessAdapter = fakeAdapter;
+
 export const TENANT: MerchantRef = { kind: 'TENANT', id: 'tenant-1' };
 export const OTHER_TENANT: MerchantRef = { kind: 'TENANT', id: 'tenant-2' };
 

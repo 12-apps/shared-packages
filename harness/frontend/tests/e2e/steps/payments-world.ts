@@ -42,6 +42,9 @@ const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string 
   'redirect-head': { slug: 'payments-checkout-chain-failover', caseId: 'redirect-head' },
   // The saved-card wallet (FUT-183/FUT-478) — a buyer screen, not a checkout.
   wallet: { slug: 'payments-wallet' },
+  // The activation charge (FUT-689) — the ADMIN settings surface. `open`
+  // additionally walks onto the provider's own panel below.
+  activation: { slug: 'payments-provider-activation', caseId: 'unproven' },
   'screen-on-page': { slug: 'payments-checkout-provider-screens', caseId: 'screen-on-page' },
   'screen-handoff': { slug: 'payments-checkout-provider-screens', caseId: 'screen-handoff' },
   'screen-undeclared': { slug: 'payments-checkout-provider-screens', caseId: 'screen-undeclared' },
@@ -63,6 +66,12 @@ definePaymentsWorld({
     await openPage(page, where.slug);
     currentSlug = where.slug;
     if (where.caseId) await openCase(page, where.caseId);
+    if (store === 'activation') {
+      // The admin shape lands ON the provider's panel: the journey's subject
+      // is one provider's switch and activation step, not the landing list.
+      await page.getByTestId('payments-provider-card-aurora').click();
+      await expect(page.getByTestId('payments-provider-back')).toBeVisible();
+    }
   },
 
   async raiseHostedPayable(page) {

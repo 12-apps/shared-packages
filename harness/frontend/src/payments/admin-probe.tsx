@@ -148,6 +148,11 @@ export function AdminProbe({ world, label }: { world: AdminWorld; label?: string
     ['admin-failover-policy', truth.view?.failoverPolicy ?? '(none)'],
     ['admin-enabled', enabledChain(truth.view)],
     ...world.registry.names.flatMap((name) => providerFacts(name, truth)),
+    [
+      'admin-activation-charges',
+      listed(world.activationCharges.map((c) => `${c.provider}:${c.status}:${c.reference}`)),
+    ],
+    ['admin-activation-refunds', listed(world.activationRefunds)],
     ['admin-oauth-state', listed(world.mintedStates)],
     ['admin-oauth-consumed', listed(world.consumedStates)],
     ['admin-verify-calls', listed(world.verifyCalls.map((v) => `${v.provider}:${v.environment}`))],

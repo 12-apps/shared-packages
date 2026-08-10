@@ -21,8 +21,14 @@ import {
   CredentialsError,
   PaymentsError,
   ProviderRequestError,
+  verifyProviderCharge,
+  type ActivationContext,
   type OAuthConnectService,
   type PaymentsRouteExtension,
+  type ProviderConfigStore,
+  type ProviderRegistry,
+  type SettingsService,
+  type VerifyChargeInput,
 } from '@12-apps/payments-backend';
 
 import type { AdminCaller } from './admin-ports';
@@ -107,6 +113,40 @@ export function connectPrepareFor(
  * 403 BEFORE any code is spent; that check happening on a host route is the
  * entire reason `completeOAuth` is excluded from the mount.
  */
+/**
+ * `POST {base}/activation/verify/:provider` — the host route behind the
+ * activation step (FUT-463/FUT-689): run the package's card-phase verification
+ * over this store's OWN ports, then settle enablement BOTH ways, exactly as
+ * future-pay's route does. A refused verification answers 200 — it is the
+ * ANSWER the screen exists to show, not a transport error.
+ */
+export function activationVerifyFor(
+  world: AdminSinks,
+  ports: { registry: ProviderRegistry; store: ProviderConfigStore; settings: SettingsService },
+): PaymentsRouteExtension<AdminCaller> {
+  return {
+    kind: 'hostActivationVerify',
+    method: 'POST',
+    pattern: ['activation', 'verify', ':provider'],
+    handler: ({ request, intent, merchant }) =>
+      hostGuard(async () => {
+        const input = (await request.json()) as VerifyChargeInput;
+        const ctx: ActivationContext = {
+          providers: ports.registry,
+          config: ports.store,
+          settings: ports.settings,
+          // The deployment's own yes: this store is a stub world by design.
+          allowStubMode: true,
+        };
+        const provider = intent.provider ?? '';
+        const result = await verifyProviderCharge(ctx, merchant, provider, input);
+        await ports.settings.applyChargeVerification(merchant, provider, result.ok);
+        world.fire();
+        return json(result, 200);
+      }),
+  };
+}
+
 export function oauthCallbackFor(
   world: AdminSinks,
   oauth: OAuthConnectService,

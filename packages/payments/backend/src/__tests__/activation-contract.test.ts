@@ -47,6 +47,27 @@ const redirectAdapter = () =>
     findChargeByReference: h.findChargeByReference as never,
   });
 
+/**
+ * An SDK-tokenization provider that declares the activation charge — the
+ * Stripe shape (FUT-689), as a fake so the branch stays chosen from
+ * capabilities alone.
+ */
+const sdkAdapter = () =>
+  activationAdapter('tokenpay', {
+    capabilities: {
+      methods: ['PIX', 'CARD'],
+      savedCards: false,
+      refunds: true,
+      partialRefunds: false,
+      splits: false,
+      webhooks: true,
+      tokenization: 'SDK',
+      activationCharge: true,
+    },
+    createCharge: h.createCharge as never,
+    refund: h.refund as never,
+  });
+
 describe('activation branch, from capabilities alone', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -55,6 +76,32 @@ describe('activation branch, from capabilities alone', () => {
   it('a PUBLIC_KEY adapter is the card branch; a REDIRECT adapter the link branch', () => {
     expect(activationFlowOf(cardAdapter())).toBe('CARD');
     expect(activationFlowOf(redirectAdapter())).toBe('REDIRECT');
+  });
+
+  it('given an SDK adapter with activationCharge, then it takes the card branch, never the link one', () => {
+    expect(activationFlowOf(sdkAdapter())).toBe('CARD');
+  });
+
+  it('given an SDK provider, when the cent is verified, then the generic card branch serves it', async () => {
+    const ctx = activationContextFor({
+      providers: activationRegistry({ tokenpay: sdkAdapter() }),
+      config: connectedConfig({ provider: 'tokenpay' }),
+    });
+    h.createCharge.mockResolvedValue({ status: 'PAID', providerChargeId: 'CH_SDK' });
+    h.refund.mockResolvedValue({ status: 'REFUNDED' });
+
+    const result = await verifyProviderCharge(ctx, ACME, 'tokenpay', {
+      token: 'pm_tok',
+      taxId: '12345678909',
+      holderName: 'Ana',
+      email: 'a@x.com',
+    });
+
+    // The cent moves and comes back through the same branch every other
+    // card-tokenizing provider uses — no SDK-specific fork anywhere.
+    expect(result).toEqual({ ok: true, refunded: true });
+    const [input] = h.createCharge.mock.calls[0] as [{ method: string }];
+    expect(input.method).toBe('CARD');
   });
 
   it('the card branch proves with a synchronous charge-and-refund', async () => {
