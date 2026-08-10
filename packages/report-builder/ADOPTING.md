@@ -67,8 +67,11 @@ Mounted under whatever prefix the host chooses (future-pay uses
 | GET | `/reports/custom` | Saved documents, narrowed by lifecycle AND by entity. |
 | GET | `/reports/custom/:id` | Opens AND runs it. 404 — never 403 — when the actor may not see it. |
 | POST | `/reports/custom` | 200 with the summary; 409 on a duplicate name. |
-| PUT | `/reports/custom/:id` | Omitted lifecycle fields keep their stored values. |
+| PUT | `/reports/custom/:id` | Omitted lifecycle fields keep their stored values. Leaves a parked working copy alone. |
 | DELETE | `/reports/custom/:id` | 204, with no body. |
+| PUT | `/reports/custom/:id/working-copy` | Park an in-progress edit. `spec` is NOT written. 400 unless the report is published. |
+| POST | `/reports/custom/:id/working-copy/publish` | Make the edit live AND drop the parked copy, in one write. |
+| DELETE | `/reports/custom/:id/working-copy` | Discard the parked edit; the published document is untouched. 404 when there is none. |
 | POST | `/reports/run` | Dry run. The entity check happens before the spec reaches the adapter. |
 
 ## Host wiring, end to end
@@ -105,6 +108,29 @@ Everything else — MCP registry paths/summaries, the nav entries built from
   per presentation (`minSpanForPresentation`) so a block is never narrower
   than it can render at. Retiring one is a lifecycle change (`status:
   'archived'`), never a delete.
+
+## `status: 'draft'` is not a draft REVISION (FUT-755)
+
+Two states that sound alike and must never be conflated in code or in copy:
+
+- **`status: 'draft'`** — the report has NEVER been published. Only its author
+  and tenant admins can see it at all, so editing one has nothing to protect
+  and every edit is written straight through.
+- **A working copy** (`working_copy`, a JSON column on `saved_reports`) — the
+  author's unpublished changes to a report that IS published. Its readers are
+  looking at it right now, so flipping its status would take the report down
+  for the whole store; the edit is parked beside `spec` instead and the
+  published version stays live until the author saves.
+
+The editor autosaves into the working copy on a debounce, resumes it when the
+report is reopened, and offers "descartar alterações" to drop it and return to
+the published version. `GET /reports/custom/:id` echoes it only to a caller with
+`canAuthor`; every other reader gets the published document. The list summary
+carries `hasUnpublishedChanges`, which is a boolean about the document, never
+its content.
+
+Nothing here is entitlement-gated: an autosave that keeps work from dying with
+the browser tab is not a feature a tenant can be missing.
 
 ## Porting to another repo
 

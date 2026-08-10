@@ -42,6 +42,23 @@ model SavedReport {
   // that predates this column keeps behaving exactly as it did. String + DB
   // CHECK, house style.
   defaultRange String? @map("default_range")
+  // Unpublished changes to a PUBLISHED report (FUT-755): the author's
+  // in-progress edit, stored BESIDE the live document rather than over it.
+  //
+  // Deliberately NOT `status: 'draft'`. That column says the report has never
+  // been published; flipping it while someone edits would unpublish a report
+  // its readers are reading right now. So the whole editable payload — name,
+  // description, spec, sharing, default range — is parked here as JSON, `spec`
+  // is left untouched, and readers keep getting the published document until
+  // the author publishes. NULL = no unpublished changes, which is every row
+  // that predates this column.
+  //
+  // A COLUMN, not a side table: one working copy per report is then a
+  // structural fact rather than a partial unique index a host has to remember
+  // to create, publish is a single row update that cannot half-apply, and
+  // discard is setting it back to NULL. Untrusted JSON like `spec` —
+  // re-validated against the field catalog on write and again on publish.
+  workingCopy Json?   @map("working_copy")
   createdBy   String?  @map("created_by")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")

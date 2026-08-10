@@ -10,6 +10,8 @@ import { useTransport } from "./transport-context";
 
 import { isRunnableRange, rangeQuery, rangeQueryKey, rangeSelection } from "./reports-api";
 
+import type { ReportWorkingCopyWire } from "./custom-reports-write";
+
 import type { Result } from "./lib/rest-result";
 import type { ReportBuilderTransport } from "./transport";
 import type {
@@ -151,8 +153,18 @@ export interface SavedReportSummary {
    * (FUT-755). Resolved server-side, so the client never sees a user id.
    */
   ownedByMe: boolean;
+  /**
+   * A PUBLISHED report carrying an edit nobody has published yet (FUT-755).
+   *
+   * Deliberately NOT `status === "draft"`: that says the report was never
+   * published at all. This one is live to its readers AND being changed, which
+   * is why the card draws it as its own chip. Optional only because a response
+   * cached before the field existed omits it — absent reads as "none".
+   */
+  hasUnpublishedChanges?: boolean;
   updatedAt: string;
 }
+
 
 interface SavedReportViewBase {
   id: string;
@@ -165,6 +177,15 @@ interface SavedReportViewBase {
    * response cached before the field existed, where readers use 30d. Rolling
    * only — a stored `custom` would open the report on a frozen window. */
   defaultRange?: ReportRollingRange;
+  /**
+   * The parked edit, present only for a caller who may AUTHOR (FUT-755).
+   *
+   * Everything else on this view is the PUBLISHED document, for everyone: a
+   * reader opening a report while its author edits sees what is live. The
+   * editor is the only screen that looks at this field, and resuming it is the
+   * whole point — reopening must land you back where you stopped.
+   */
+  workingCopy?: ReportWorkingCopyWire | null;
   range: { preset: string; from: string; toExclusive: string };
 }
 
@@ -354,7 +375,11 @@ export function useRunReport(
  * writes are the part with no query wiring in them.
  */
 export {
+  discardWorkingCopyAction,
+  publishWorkingCopyAction,
   saveReportAction,
+  saveWorkingCopyAction,
   setReportStatusAction,
   updateReportAction,
+  type ReportWorkingCopyWire,
 } from "./custom-reports-write";

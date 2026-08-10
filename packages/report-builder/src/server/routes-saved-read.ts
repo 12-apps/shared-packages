@@ -21,6 +21,7 @@ import type { SavedReportRecord, SavedReportStore } from './saved';
 import { documentShape, toSummary } from './summary';
 import { resolveDefaultRange } from './range';
 import { canViewSavedReport, visibilityRoleIds } from './visibility';
+import { readWorkingCopy, type ReportWorkingCopy } from './working-copy';
 
 /**
  * Reading a tenant's saved documents.
@@ -33,17 +34,29 @@ import { canViewSavedReport, visibilityRoleIds } from './visibility';
  * itself a disclosure on a tenant surface.
  */
 
-/** The lifecycle fields echoed on every opened document. */
-function lifecycleOf(record: SavedReportRecord): {
+/**
+ * The lifecycle fields echoed on every opened document — plus, for a caller
+ * who may AUTHOR, the edit parked beside it (FUT-755).
+ *
+ * Everything else in the payload stays the PUBLISHED document whoever is
+ * asking: a reader opening a report while its author is editing must see what
+ * is live. Only an author is handed the parked copy, and only the editor asks.
+ */
+function lifecycleOf(
+  record: SavedReportRecord,
+  actor: ReportActor,
+): {
   status: string;
   visibility: string;
   visibilityRoles: string[];
   defaultRange: string;
+  workingCopy: ReportWorkingCopy | null;
 } {
   return {
     status: record.status,
     visibility: record.visibility,
     visibilityRoles: visibilityRoleIds(record.visibilityRoles),
+    workingCopy: actor.canAuthor ? readWorkingCopy(record.workingCopy) : null,
     // Resolved rather than echoed: a row written before the column existed
     // carries NULL, and the client should be told the period it will actually
     // open on rather than left to re-derive the fallback (FUT-755).
@@ -87,7 +100,7 @@ async function renderSaved(
     id: record.id,
     name: record.name,
     description: record.description,
-    ...lifecycleOf(record),
+    ...lifecycleOf(record, actor),
     range: toReportRangeView(range),
   };
 

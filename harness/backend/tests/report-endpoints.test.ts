@@ -229,14 +229,21 @@ describe('the package ships the endpoints, not the host', () => {
     const { route, routes } = setup();
     expect(routes.map((entry) => `${entry.method} ${entry.path}`).sort()).toEqual([
       'DELETE /reports/custom/:id',
+      // The working copy is three routes, not one: park it, publish it, throw
+      // it away. They are listed here because this assertion IS the package's
+      // endpoint contract — a route that appears without being named here is a
+      // surface someone added without saying so.
+      'DELETE /reports/custom/:id/working-copy',
       'GET /reports/custom',
       'GET /reports/custom/:id',
       'GET /reports/fields',
       'GET /reports/system',
       'GET /reports/system/:key',
       'POST /reports/custom',
+      'POST /reports/custom/:id/working-copy/publish',
       'POST /reports/run',
       'PUT /reports/custom/:id',
+      'PUT /reports/custom/:id/working-copy',
     ]);
   });
 
