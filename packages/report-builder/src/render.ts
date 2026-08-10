@@ -1,6 +1,7 @@
 import type { ChartNumberFormat, ChartSemanticColor, ChartSpec } from '@12-apps/ui/charts';
 
 import { requireEntityForRender } from './catalog';
+import { isOrderedDimension } from './compatibility';
 import { pivotSplit } from './pivot';
 import type { ReportPresentation } from './spec';
 import {
@@ -298,6 +299,35 @@ function toSplitChartModel(
   };
 }
 
+/**
+ * Draw a stored line/area over an UNORDERED axis as bars instead (FUT-755).
+ *
+ * This exists for blocks SAVED BEFORE the rule. A line or an area asserts that
+ * the space between two points is a value; over payment methods or product
+ * names it is not, so the slope shows a relationship that does not exist. The
+ * picker now refuses that shape going forward (`compatibility.ts`), and the
+ * compiler deliberately still ACCEPTS it (`presentation-shape.ts`) so those
+ * blocks keep rendering rather than turning into an error message for their
+ * owners.
+ *
+ * Bars are the honest form of the identical data: nothing is recomputed, no
+ * row changes, only the mark. The author is nudged the next time they open the
+ * block, at which point saving rewrites the stored `chartType` for good.
+ */
+function withDrawableChartType(
+  query: CompiledQuery,
+  presentation: Extract<ReportPresentation, { kind: 'chart' }>,
+  catalog: FieldCatalog,
+): Extract<ReportPresentation, { kind: 'chart' }> {
+  const { chartType } = presentation;
+  if (chartType !== 'line' && chartType !== 'area') return presentation;
+  const axis = query.dimensions[0];
+  if (!axis) return presentation;
+  const entity = requireEntityForRender(catalog, query.entity);
+  if (isOrderedDimension(entity.fields[axis.field])) return presentation;
+  return { ...presentation, chartType: 'bar' };
+}
+
 export function renderReport(
   query: CompiledQuery,
   presentation: ReportPresentation,
@@ -305,12 +335,13 @@ export function renderReport(
   rows: ReportRow[],
 ): ReportRenderModel {
   if (presentation.kind === 'chart') {
+    const drawable = withDrawableChartType(query, presentation, catalog);
     if (query.dimensions.length > 1) {
-      return toSplitChartModel(query, presentation, catalog, rows);
+      return toSplitChartModel(query, drawable, catalog, rows);
     }
     return {
       kind: 'chart',
-      chartSpec: toChartSpec(query, presentation, catalog),
+      chartSpec: toChartSpec(query, drawable, catalog),
       tableColumns: tableColumnsFor(query, catalog),
       rows: withoutSuppressedCells(rows),
     };
