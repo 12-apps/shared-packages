@@ -7,6 +7,7 @@ export * from './CepField';
 export * from './Checkbox';
 export * from './CodeEditor';
 export * from './Command';
+export * from './DateRangePicker';
 export * from './Form';
 export * from './Input';
 export * from './InputOTP';

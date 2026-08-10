@@ -164,10 +164,10 @@ async function openPicker(): Promise<void> {
  * Click a day in JANUARY, the picker's first visible month.
  *
  * The picker shows TWO months, so `calendar-date-5` matches twice — once in
- * January and once in February. An unscoped query fails on the ambiguity
- * rather than picking one, which is the right behaviour and the reason this
- * helper exists: every case here means the January day, and saying so once is
- * better than each case disambiguating differently.
+ * each. An unscoped query fails on the ambiguity rather than picking one,
+ * which is the right behaviour and the reason this helper exists: every case
+ * here means the January day, and saying so once beats each case
+ * disambiguating differently.
  */
 function clickJanuary(day: number): void {
   fireEvent.click(
@@ -181,13 +181,17 @@ function clickJanuary(day: number): void {
  * The seeded window is already complete, so the FIRST click opens a new range
  * and the second closes it — the calendar's own rule, not something this file
  * arranges. January's matrix runs 28/12 → 31/01, so a day in the first three
- * weeks appears exactly once WITHIN that month and needs no further
- * disambiguation.
+ * weeks appears exactly once and needs no disambiguation.
  */
 function pickJanuary(from: number, to: number): void {
   clickJanuary(from);
   clickJanuary(to);
   fireEvent.click(screen.getByTestId('report-range-custom-apply'));
+}
+
+/** One end of the picker's typed pair, as the reader sees it. */
+function bound(which: 'from' | 'to'): string {
+  return (screen.getByTestId(`report-range-picker-${which}`) as HTMLInputElement).value;
 }
 
 describe('the period row offers every preset the prototype does', () => {
@@ -230,10 +234,10 @@ describe('Personalizado… asks before it applies', () => {
 
     // The run payload resolved to the tenant's 02/01 – 31/01, so that is what
     // the picker starts from — choosing "Personalizado…" while reading thirty
-    // days means adjusting those thirty days.
-    expect(screen.getByTestId('report-range-custom-summary').textContent).toBe(
-      '02/01/2026 – 31/01/2026',
-    );
+    // days means adjusting those thirty days. Read off the two typed fields,
+    // which is where the seed has to LAND for it to be editable.
+    expect(bound('from')).toBe('02/01/2026');
+    expect(bound('to')).toBe('31/01/2026');
   });
 
   it('holds Aplicar until BOTH ends are chosen', async () => {
@@ -312,8 +316,92 @@ describe('Personalizado… asks before it applies', () => {
     // Scratch state, dropped: a cancelled pick must not be what the next open
     // resumes from.
     expect(await screen.findByTestId('report-range-custom')).toBeTruthy();
-    expect(screen.getByTestId('report-range-custom-summary').textContent).toBe(
-      '02/01/2026 – 31/01/2026',
+    expect(bound('from')).toBe('02/01/2026');
+    expect(bound('to')).toBe('31/01/2026');
+  });
+});
+
+/**
+ * The dialog is a THIN consumer of `@12-apps/ui/form/DateRangePicker` (FUT-755).
+ *
+ * The picker's own behaviour — which days each quick range covers, what a
+ * reversed pair does, how the cap refuses — is tested where it lives, in the
+ * design system, on a frozen clock. What can only be checked HERE is the
+ * wiring: that the quick column is on screen, that the two typed fields reach
+ * the request, and that a quick entry which IS one of our presets is applied as
+ * that preset rather than as an identical-looking custom window.
+ */
+describe('the picker is wired to the reports surface', () => {
+  it('offers the quick column, including periods the pills do not have', async () => {
+    await openPicker();
+
+    // The whole reason the column exists: "Este trimestre" is not a pill and
+    // could otherwise only be reached by paging the calendar back to 1 July.
+    expect(screen.getByTestId('report-range-picker-quick-this-quarter').textContent).toContain(
+      'Este trimestre',
+    );
+    expect(screen.getByTestId('report-range-picker-quick-yesterday').textContent).toContain(
+      'Ontem',
+    );
+  });
+
+  it('sends a typed pair, so the fields are a real way in', async () => {
+    await openPicker();
+
+    fireEvent.change(screen.getByTestId('report-range-picker-from'), {
+      target: { value: '07/01/2026' },
+    });
+    fireEvent.change(screen.getByTestId('report-range-picker-to'), {
+      target: { value: '09/01/2026' },
+    });
+    fireEvent.click(screen.getByTestId('report-range-custom-apply'));
+
+    expect(await screen.findByTestId('report-title')).toBeTruthy();
+    expect(lastAsked()).toBe('preset=custom&from=2026-01-07&to=2026-01-09');
+  });
+
+  it('holds Aplicar shut on a reversed pair rather than sending it', async () => {
+    await openPicker();
+
+    fireEvent.change(screen.getByTestId('report-range-picker-to'), {
+      target: { value: '01/01/2026' },
+    });
+
+    // 02/01 → 01/01. The server would answer this with a 400; the button that
+    // would send it is the one that says so.
+    const apply = screen.getByTestId('report-range-custom-apply');
+    expect(apply.hasAttribute('disabled')).toBe(true);
+    expect(screen.getByTestId('report-range-picker-status').textContent).toBe(
+      'A data final deve ser igual ou posterior à inicial.',
+    );
+  });
+
+  it('applies "Hoje" as the PRESET, not as a custom window of today', async () => {
+    await openPicker();
+
+    fireEvent.click(screen.getByTestId('report-range-picker-quick-today'));
+    fireEvent.click(screen.getByTestId('report-range-custom-apply'));
+
+    expect(await screen.findByTestId('report-title')).toBeTruthy();
+    // `preset=today` re-resolves on every run; `custom` with today's two dates
+    // would freeze one day forever under a pill reading "Personalizado…".
+    expect(lastAsked()).toBe('preset=today');
+    expect(screen.getByTestId('report-range-item-today').getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+  });
+
+  it('applies a quick period the pills do NOT have as a custom window', async () => {
+    await openPicker();
+
+    fireEvent.click(screen.getByTestId('report-range-picker-quick-yesterday'));
+    fireEvent.click(screen.getByTestId('report-range-custom-apply'));
+
+    expect(await screen.findByTestId('report-title')).toBeTruthy();
+    // "Ontem" is no preset of ours, so it travels as the two dates it is.
+    expect(lastAsked()).toContain('preset=custom&from=');
+    expect(screen.getByTestId('report-range-item-custom').getAttribute('aria-pressed')).toBe(
+      'true',
     );
   });
 });

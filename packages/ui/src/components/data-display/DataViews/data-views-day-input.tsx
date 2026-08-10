@@ -71,6 +71,36 @@ export function maskBrDate(raw: string): string {
 }
 
 /**
+ * What has to land on the `<input>` itself rather than on the `TextField`.
+ *
+ * Anything `TextField` does not recognise is spread onto its root `FormControl`
+ * div. `inputMode` went up there once: the attribute sat on a non-editable
+ * wrapper, meant nothing, and the phone went on offering the letter keyboard
+ * for a field that only takes digits (the `dd/mm/aaaa` hint under a QWERTY
+ * layout). Only the `<input>` this reaches decides which keypad opens — and the
+ * same is true of `aria-describedby`, which on the wrapper points at a
+ * description no screen reader will read out for the field.
+ *
+ * `numeric` and not `tel`: both raise a keypad, but the phone one is a dialler
+ * with `+ * #` on it — keys that cannot occur in a date. A paste carrying
+ * separators still lands, because the MASK is what filters the text; the keypad
+ * only narrows what a thumb can reach for.
+ *
+ * Autofill off for the same reason: the browser's saved-value strip covers the
+ * keypad to suggest names and addresses, none of which are a date, and none of
+ * which the mask would keep.
+ */
+function dayInputProps(testId: string, describedBy: string | undefined) {
+  return {
+    'data-testid': testId,
+    maxLength: 10,
+    inputMode: 'numeric' as const,
+    autoComplete: 'off',
+    ...(describedBy ? { 'aria-describedby': describedBy } : {}),
+  };
+}
+
+/**
  * One end of a day window. The BOUND stays `AAAA-MM-DD` — the form the backend's
  * inclusive day comparison already speaks, and the form the chip label reads —
  * so only the typing surface changes.
@@ -80,12 +110,23 @@ export function DayBoundInput({
   value,
   onChange,
   testId,
+  error = false,
+  describedBy,
 }: {
   label: string;
   /** The applied bound, `AAAA-MM-DD`, or undefined when this end is open. */
   value: string | undefined;
   onChange: (bound: string | undefined) => void;
   testId: string;
+  /**
+   * Paint the field as rejected. It only ever writes a real day by itself, so
+   * this is for a caller judging the PAIR: a window whose end precedes its
+   * start is two valid days and one impossible period, and the field it was
+   * typed into is the only place to say which half is being complained about.
+   */
+  error?: boolean;
+  /** Id of the element carrying that complaint, so it is read WITH the field. */
+  describedBy?: string;
 }): React.JSX.Element {
   const applied = value ?? '';
   const [text, setText] = useState(() => isoToBr(applied));
@@ -104,6 +145,7 @@ export function DayBoundInput({
       size="small"
       type="text"
       label={label}
+      error={error}
       // The mask IS the placeholder, so the expected order is on screen before
       // the first keystroke rather than discovered by getting it wrong.
       placeholder="dd/mm/aaaa"
@@ -124,28 +166,7 @@ export function DayBoundInput({
       onBlur={() => setText(isoToBr(applied))}
       // The placeholder occupies the space an un-shrunk label would render into.
       InputLabelProps={{ shrink: true }}
-      // `inputMode` HAS to be here rather than on the TextField. Anything
-      // TextField does not recognise is spread onto its root `FormControl` div,
-      // and `inputMode` is not in that list — so passing it up there put the
-      // attribute on a non-editable wrapper, where it means nothing, and the
-      // phone went on offering the letter keyboard for a field that only takes
-      // digits (the `dd/mm/aaaa` hint sitting under a QWERTY layout). Only the
-      // `<input>` this reaches decides which keypad opens.
-      //
-      // `numeric` and not `tel`: both raise a keypad, but the phone one is a
-      // dialler with `+ * #` on it — keys that cannot occur in a date. A paste
-      // carrying separators still lands, because the MASK is what filters the
-      // text; the keypad only narrows what a thumb can reach for.
-      //
-      // Autofill off for the same reason: the browser's saved-value strip
-      // covers the keypad to suggest names and addresses, none of which are a
-      // date, and none of which the mask would keep.
-      inputProps={{
-        'data-testid': testId,
-        maxLength: 10,
-        inputMode: 'numeric',
-        autoComplete: 'off',
-      }}
+      inputProps={dayInputProps(testId, describedBy)}
       sx={{ width: 165 }}
     />
   );

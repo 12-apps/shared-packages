@@ -33,6 +33,31 @@ const ROLLING_OPTIONS = REPORT_ROLLING_RANGES.map(option);
 const ALL_OPTIONS = REPORT_RANGES.map(option);
 
 /**
+ * The picker's quick entries that ARE one of our own rolling presets.
+ *
+ * Choosing "Hoje" inside the picker and choosing "Hoje" on the toggle have to
+ * end in the same state, and only one of the two is expressible as a period a
+ * report can keep: `preset=today` re-resolves every time it runs, while
+ * `custom` carrying today's two dates freezes one day forever and leaves the
+ * pill reading "Personalizado…" over a window that is no longer today.
+ *
+ * The mapping is on the id the picker REPORTS, not on the dates it returns:
+ * comparing windows would also fire for a reader who picked the same two days
+ * by hand out of the calendar, and "the 10th to the 10th" chosen deliberately
+ * is not the same intent as "Hoje".
+ *
+ * The five quick entries absent from this map (ontem, esta semana, este
+ * trimestre, este ano, 365 dias) have no preset to become and stay custom
+ * windows — which is most of why the column is worth having.
+ */
+const QUICK_RANGE_PRESETS: Record<string, ReportRange> = {
+  today: "today",
+  "last-7-days": "7d",
+  "last-30-days": "30d",
+  "this-month": "month",
+};
+
+/**
  * A SEGMENTED control, and one the height of everything beside it.
  *
  * `ToggleGroup` puts a 4px margin round each button and draws no frame, so the
@@ -132,8 +157,16 @@ export function RangeToggle({
         <CustomRangeDialog
           open={picking}
           seed={custom.seed}
-          onApply={(window) => {
+          onApply={(window, quickRangeId) => {
             setPicking(false);
+            // A quick entry that is one of our presets is APPLIED as that
+            // preset: the pill then reads "Hoje" rather than "Personalizado…",
+            // and the period stays a rolling one instead of a frozen day.
+            const preset = quickRangeId ? QUICK_RANGE_PRESETS[quickRangeId] : undefined;
+            if (preset) {
+              onChange(preset);
+              return;
+            }
             custom.onApply(window);
           }}
           onClose={() => setPicking(false)}
