@@ -21,6 +21,14 @@ export const salesCatalog = defineCatalog({
           ],
         },
         product: { label: 'Produto', type: 'string', role: 'dimension' },
+        /**
+         * A STRING carrying an ordinal, mirroring the real catalog's
+         * `orders.hourOfDay` ("00"–"23"): its TYPE says categorical and only
+         * `ordered` says otherwise. It is what makes the ordered-axis rule
+         * (FUT-755) testable as a property of the CATALOG — without it,
+         * "ordered" and "is a date" would be indistinguishable in every test.
+         */
+        hourOfDay: { label: 'Hora do dia', type: 'string', role: 'dimension', ordered: true },
         totalCents: { label: 'Receita', type: 'money', role: 'measure' },
         itemCount: { label: 'Itens', type: 'number', role: 'measure' },
         /** Declares a render format, so p90/percentile columns come out as durations. */

@@ -24,8 +24,10 @@ export {
 } from './catalog';
 export {
   defaultPresentation,
+  isOrderedDimension,
   PRESENTATION_OPTIONS,
   presentationCompatibility,
+  type AxisFieldFacts,
   type PresentationCompatibility,
   type PresentationOption,
   type SpecShape,

@@ -18,9 +18,21 @@ import type { ReportEntityFields, ReportField, ReportSpecWire } from '../custom-
  * edits that invalidate the chart fall back to the smart default, and a new
  * report opens on the entity's starter spec.
  */
-const FIELDS: ReportField[] = [
+/**
+ * `ordered` rides the `/reports/fields` wire (FUT-755) but `ReportField` does
+ * not declare it yet, so it is intersected in here. That is deliberate and it
+ * is what the runtime does: `listCatalogFields` sends the key and the
+ * transport is a plain `json()` cast, so the value arrives whether or not the
+ * interface names it — and `isOrderedDimension` reads it structurally.
+ */
+type WireField = ReportField & { ordered?: boolean };
+
+const FIELDS: WireField[] = [
   { field: 'createdAt', label: 'Data', type: 'date', role: 'dimension' },
   { field: 'method', label: 'Forma', type: 'string', role: 'dimension' },
+  // A string the catalog declares ordered — the `orders.hourOfDay` case.
+  { field: 'hourOfDay', label: 'Hora', type: 'string', role: 'dimension', ordered: true },
+  { field: 'closed', label: 'Encerrado', type: 'boolean', role: 'dimension' },
   { field: 'revenueCents', label: 'Receita', type: 'money', role: 'measure' },
   { field: 'quantity', label: 'Qtd', type: 'number', role: 'measure' },
 ];
@@ -47,11 +59,15 @@ describe('chartOptions', () => {
     // the cartesian types draw it. A pie cannot — it shows ONE series'
     // composition — and its reason must name the split rather than repeat the
     // blanket "gráficos exigem exatamente 1 agrupamento" five times over.
+    //
+    // The AXIS is the date: the FIRST dimension is what a line's slope runs
+    // along, and it is the one the ordered-axis rule judges. Splitting a date
+    // axis by payment method is exactly the shape the pivot exists to draw.
     const options = chartOptions(
       draft({
         dimensions: [
-          { field: 'method', timeGrain: 'day' },
           { field: 'createdAt', timeGrain: 'day' },
+          { field: 'method', timeGrain: 'day' },
         ],
       }),
       byName,
@@ -83,6 +99,40 @@ describe('chartOptions', () => {
     expect(options.find((option) => option.value === 'table')?.disabledReason).toBeNull();
   });
 
+  it('refuses line and area over a categorical axis, offering bars (FUT-755)', () => {
+    // The bug report: an AREA chart whose x-axis was CARD → PIX. A line or an
+    // area asserts the space BETWEEN two points is a value; half-way between
+    // two payment methods is not one.
+    const options = chartOptions(draft({ dimensions: [{ field: 'method', timeGrain: 'day' }] }), byName);
+    const reasonOf = (value: string): string | null | undefined =>
+      options.find((option) => option.value === value)?.disabledReason;
+
+    expect(reasonOf('line')).toContain('Barras');
+    expect(reasonOf('area')).toContain('Barras');
+    // The same data as bars makes no claim about the gap, so it stays offered.
+    expect(reasonOf('bar')).toBeNull();
+    expect(reasonOf('table')).toBeNull();
+  });
+
+  it('allows line and area over an ORDERED string axis the catalog declares', () => {
+    // `hourOfDay` is a string, so only the catalog's `ordered` flag separates
+    // it from `method`. "Pedidos por hora" is the textbook line chart.
+    const options = chartOptions(
+      draft({ dimensions: [{ field: 'hourOfDay', timeGrain: 'day' }] }),
+      byName,
+    );
+
+    expect(options.find((option) => option.value === 'line')?.disabledReason).toBeNull();
+    expect(options.find((option) => option.value === 'area')?.disabledReason).toBeNull();
+  });
+
+  it('refuses line and area over a BOOLEAN axis', () => {
+    const options = chartOptions(draft({ dimensions: [{ field: 'closed', timeGrain: 'day' }] }), byName);
+
+    expect(options.find((option) => option.value === 'line')?.disabledReason).not.toBeNull();
+    expect(options.find((option) => option.value === 'bar')?.disabledReason).toBeNull();
+  });
+
   it('disables only pie/donut when a second measure appears', () => {
     const options = chartOptions(
       draft({
@@ -109,6 +159,50 @@ describe('withValidChart', () => {
   it('falls back to the KPI tile when the last grouping is removed (FUT-309)', () => {
     const next = withValidChart(draft({ dimensions: [], chartType: 'pie' }), byName);
     expect(next.chartType).toBe('kpi');
+  });
+
+  it('rewrites a line to bars when the author picks a categorical grouping', () => {
+    // The author is on a line over the date, then switches the grouping to
+    // payment method. The draft self-corrects as they edit, so the shape the
+    // rule refuses is never what gets saved (FUT-755).
+    const next = withValidChart(
+      draft({ dimensions: [{ field: 'method', timeGrain: 'day' }], chartType: 'line' }),
+      byName,
+    );
+
+    expect(next.chartType).toBe('bar');
+  });
+
+  it('rewrites an area the same way', () => {
+    const next = withValidChart(
+      draft({ dimensions: [{ field: 'method', timeGrain: 'day' }], chartType: 'area' }),
+      byName,
+    );
+
+    expect(next.chartType).toBe('bar');
+  });
+
+  it('leaves a line alone when the grouping is an ORDERED string', () => {
+    const current = draft({
+      dimensions: [{ field: 'hourOfDay', timeGrain: 'day' }],
+      chartType: 'line',
+    });
+
+    expect(withValidChart(current, byName)).toBe(current);
+  });
+
+  it('opens an hour-of-day grouping ON a line rather than bars', () => {
+    // The smart default follows the same rule, so an author who groups by hour
+    // while on a pie lands on the chart the data actually wants.
+    const next = withValidChart(
+      draft({ dimensions: [{ field: 'hourOfDay', timeGrain: 'day' }], chartType: 'pie', measures: [
+        { field: 'revenueCents', aggregation: 'sum' },
+        { field: 'quantity', aggregation: 'sum' },
+      ] }),
+      byName,
+    );
+
+    expect(next.chartType).toBe('line');
   });
 
   it('falls back from pie to bar when a second measure lands', () => {

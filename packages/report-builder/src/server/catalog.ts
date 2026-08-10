@@ -21,7 +21,7 @@ import {
  * - Money fields are integer centavos (repo-wide convention).
  * - `createdAt`/`occurredAt` bucket by UTC calendar (day/week/month grains).
  * - `hourOfDay` ("00"–"23") and `dayOfWeek` ("1-seg"–"7-dom") are derived in
- *   America/Sao_Paulo so peak-hour analysis matches the merchant's clock.
+ *   America/Sao_Paulo (peak hours on the merchant's clock); both are `ordered`.
  */
 export const reportCatalog = defineCatalog({
   entities: {
@@ -36,12 +36,14 @@ export const reportCatalog = defineCatalog({
           label: "Hora do dia",
           type: "string",
           role: "dimension",
+          ordered: true,
           description: "Hora local (America/Sao_Paulo), '00' a '23'.",
         },
         dayOfWeek: {
           label: "Dia da semana",
           type: "string",
           role: "dimension",
+          ordered: true,
           description: "Dia local (America/Sao_Paulo), '1-seg' a '7-dom'.",
         },
         // Closed sets, so a filter on either is PICKED rather than typed
@@ -153,24 +155,28 @@ export const reportCatalog = defineCatalog({
           label: "Hora da conclusão",
           type: "string",
           role: "dimension",
+          ordered: true,
           description: "Hora local (America/Sao_Paulo) em que a linha ficou pronta.",
         },
         completionDayOfWeek: {
           label: "Dia da conclusão",
           type: "string",
           role: "dimension",
+          ordered: true,
           description: "Dia local (America/Sao_Paulo), '1-seg' a '7-dom'.",
         },
         demandHourOfDay: {
           label: "Hora da demanda",
           type: "string",
           role: "dimension",
+          ordered: true,
           description: "Hora local em que o pedido foi enviado — quando a demanda chegou.",
         },
         demandDayOfWeek: {
           label: "Dia da demanda",
           type: "string",
           role: "dimension",
+          ordered: true,
           description: "Dia local do envio do pedido, '1-seg' a '7-dom'.",
         },
         stationName: { label: "Estação", type: "string", role: "dimension" },
