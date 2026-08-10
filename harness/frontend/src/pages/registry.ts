@@ -15,6 +15,7 @@ import { PaymentsCheckoutProviderScreensPage } from './payments-checkout-provide
 import { PaymentsCheckoutRedirectPage } from './payments-checkout-redirect';
 import { PaymentsCheckoutSavedCardsPage } from './payments-checkout-saved-cards';
 import { PaymentsCheckoutSlotsPage } from './payments-checkout-slots';
+import { PaymentsWalletPage } from './payments-wallet';
 import { PaymentsProviderChainPage } from './payments-provider-chain';
 import { PaymentsProviderConnectPage } from './payments-provider-connect';
 import { PaymentsProviderCredentialsPage } from './payments-provider-credentials';
@@ -222,6 +223,15 @@ export const PAGES: readonly HarnessPage[] = [
     slug: 'payments-checkout-headless',
     title: 'Composed by hand',
     Component: PaymentsCheckoutHeadlessPage,
+  },
+  // NOT under `checkout`: saving a card here is deliberately OUTSIDE any
+  // purchase (FUT-183/FUT-478), so the wallet is its own buyer screen.
+  {
+    slug: 'payments-wallet',
+    title: 'Wallet',
+    pkg: PAYMENTS_FRONTEND,
+    group: 'storefront',
+    Component: PaymentsWalletPage,
   },
   {
     slug: 'pwa-install-prompt',
