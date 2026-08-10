@@ -1,24 +1,21 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { publishGuardError } from "./builder-model";
-import {
-  discardWorkingCopyAction,
-  publishWorkingCopyAction,
-  saveReportAction,
-  saveWorkingCopyAction,
-  updateReportAction,
-  type ReportWorkingCopyWire,
-} from "./custom-reports-api";
+import { discardWorkingCopyAction } from "./custom-reports-api";
+import type { ReportBuilderTransport } from "./transport";
 import { useAutosave, type AutosaveState } from "./lib/use-autosave";
 import { useUnsavedChanges } from "./lib/use-unsaved-changes";
 import type { PublishDraft } from "./lib/publish-section";
-import type { Result } from "./lib/rest-result";
 import type { EditorSource, PersistedEditorState } from "./report-editor-source";
-import { documentFromDraft, type ReportDraft } from "./report-model";
+import type { ReportDraft } from "./report-model";
+import {
+  createOnAutosave,
+  documentGuardError,
+  sendAutosave,
+  sendSave,
+} from "./report-editor-writes";
 import type { ReportRange, ReportRollingRange } from "./reports-api";
-import type { ReportBuilderTransport } from "./transport";
 import { useTransport } from "./transport-context";
 
 /**
@@ -39,80 +36,6 @@ import { useTransport } from "./transport-context";
  * manual or autosaved. That is what leaves a failed save dirty and its
  * tab-close guard armed, which is the moment it protects work.
  */
-
-/** The save payload — the same shape a working copy is stored as. */
-function toSaveInput(state: PersistedEditorState): ReportWorkingCopyWire {
-  const description = state.draft.description.trim();
-  return {
-    name: state.draft.name.trim(),
-    ...(description === "" ? {} : { description }),
-    spec: documentFromDraft(state.draft),
-    status: state.publish.status,
-    visibility: state.publish.visibility,
-    visibilityRoles: state.publish.visibility === "roles" ? state.publish.visibilityRoles : [],
-    defaultRange: state.defaultRange,
-  };
-}
-
-/**
- * Why this document cannot go live yet, in the author's words — or null.
- *
- * Shared by the Salvar button (which shows it) and by the autosave (which uses
- * it to stay QUIET): a half-built report is not an error to shout about, it is
- * a report that is not finished, so autosave simply does not run until it can
- * succeed rather than flashing a red alert at every keystroke.
- */
-function documentGuardError(state: PersistedEditorState): string | null {
-  if (state.draft.name.trim() === "") return "Dê um nome ao relatório antes de salvar.";
-  if (state.draft.blocks.length === 0) return "Adicione ao menos um bloco ao relatório.";
-  return publishGuardError(state.publish);
-}
-
-/** Who a write is for: which tenant, which report, and which promise it makes. */
-interface WriteContext {
-  transport: ReportBuilderTransport;
-  tenantSlug: string;
-  /** Absent on a report that has never been saved. */
-  editId?: string;
-  /** True when this report's edits are parked rather than written through. */
-  parksEdits: boolean;
-}
-
-/**
- * One MANUAL save.
- *
- * Saving a published report PUBLISHES the parked edit and drops it, in one
- * server-side write: the button that says Salvar is the one that makes a change
- * visible to readers, and it must not leave behind a phantom "alterações não
- * publicadas" pointing at what it just published.
- */
-function sendSave(
-  context: WriteContext,
-  state: PersistedEditorState,
-): Promise<Result<{ id: string }>> {
-  const { transport, tenantSlug, editId, parksEdits } = context;
-  const input = toSaveInput(state);
-  if (editId === undefined) return saveReportAction(transport, tenantSlug, input);
-  return parksEdits
-    ? publishWorkingCopyAction(transport, tenantSlug, editId, input)
-    : updateReportAction(transport, tenantSlug, editId, input);
-}
-
-/**
- * One AUTOSAVE round trip: park it beside the published document, or — for a
- * report nobody is reading yet — write it straight through.
- */
-async function sendAutosave(
-  context: WriteContext & { editId: string },
-  state: PersistedEditorState,
-): Promise<boolean> {
-  const { transport, tenantSlug, editId, parksEdits } = context;
-  const input = toSaveInput(state);
-  const result = parksEdits
-    ? await saveWorkingCopyAction(transport, tenantSlug, editId, input)
-    : await updateReportAction(transport, tenantSlug, editId, input);
-  return result.ok;
-}
 
 /** Validate + persist the state, landing on the saved report's viewer. */
 function useSaveDocument(
@@ -225,6 +148,113 @@ function useDocumentState(initial: PersistedEditorState): DocumentState {
   };
 }
 
+/** Everything one autosave round needs that is not the state being saved. */
+interface AutosaveDeps {
+  transport: ReportBuilderTransport;
+  tenantSlug: string;
+  parksEdits: boolean;
+  /** The report's id, or undefined for one that has never been saved. */
+  knownId: string | undefined;
+  /** Guards against a second create while the first POST is still in flight. */
+  creating: { current: boolean };
+  onCreated: (id: string) => void;
+  onStored: () => void;
+  markSaved: (state: PersistedEditorState) => void;
+}
+
+/**
+ * One autosave: create the report if it has never been saved, otherwise park
+ * or write through.
+ *
+ * Extracted from the hook because the CREATE branch is the delicate one — it
+ * must run at most once, and every early return here is a case where the
+ * baseline must NOT move, so the work stays dirty and the guard stays armed.
+ */
+async function runAutosave(deps: AutosaveDeps, state: PersistedEditorState): Promise<boolean> {
+  const { transport, tenantSlug, parksEdits, knownId, creating } = deps;
+  if (knownId === undefined) {
+    if (creating.current) return false;
+    creating.current = true;
+    const created = await createOnAutosave({ transport, tenantSlug, parksEdits }, state);
+    creating.current = false;
+    if (created === null) return false;
+    deps.markSaved(state);
+    deps.onCreated(created);
+    return true;
+  }
+  const stored = await sendAutosave(
+    { transport, tenantSlug, editId: knownId, parksEdits },
+    state,
+  );
+  if (!stored) return false;
+  deps.markSaved(state);
+  if (parksEdits) deps.onStored();
+  return true;
+}
+
+/**
+ * Assemble one round's dependencies.
+ *
+ * A factory rather than an object literal in the hook, because remembering the
+ * newly-created id is a rule about autosave and not about the component that
+ * happens to hold the ref: `onCreated` must record the id BEFORE anything
+ * navigates, or the next timer sees no id and creates a twin.
+ */
+function autosaveDeps(input: {
+  transport: ReportBuilderTransport;
+  tenantSlug: string;
+  parksEdits: boolean;
+  knownId: string | undefined;
+  creating: { current: boolean };
+  createdId: { current: string | null };
+  markSaved: (state: PersistedEditorState) => void;
+  onStored: () => void;
+  afterCreate: (id: string) => void;
+}): AutosaveDeps {
+  return {
+    transport: input.transport,
+    tenantSlug: input.tenantSlug,
+    parksEdits: input.parksEdits,
+    knownId: input.knownId,
+    creating: input.creating,
+    markSaved: input.markSaved,
+    onStored: input.onStored,
+    onCreated: (id) => {
+      input.createdId.current = id;
+      input.afterCreate(id);
+    },
+  };
+}
+
+/**
+ * Throwing the parked edit away.
+ *
+ * Restoring is deliberately CLEAN: the baseline moves to the published state
+ * along with the screen, so the unsaved-changes guard does not then claim the
+ * reset itself is unsaved work and re-offer to save what was just discarded.
+ */
+async function runDiscard(
+  target: { transport: ReportBuilderTransport; tenantSlug: string; editId: string },
+  outcome: {
+    published: PersistedEditorState;
+    done: () => void;
+    failed: (message: string) => void;
+    restored: () => void;
+  },
+): Promise<void> {
+  const result = await discardWorkingCopyAction(
+    target.transport,
+    target.tenantSlug,
+    target.editId,
+  );
+  outcome.done();
+  if (!result.ok) {
+    outcome.failed(result.error);
+    return;
+  }
+  outcome.restored();
+}
+
 /**
  * The parked edit: keeping it current, and the one way it is thrown away.
  *
@@ -247,53 +277,67 @@ function useWorkingCopy(context: {
   const { tenantSlug, editId, source, persisted } = context;
   const transport = useTransport();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [present, setPresent] = useState(source.hasUnpublishedChanges);
   const [discarding, setDiscarding] = useState(false);
+
+  // The id of a report this hook CREATED, held for the render or two between
+  // the POST resolving and the route param catching up. Without it the next
+  // timer would see `editId === undefined` and create a second report.
+  const createdId = useRef<string | null>(null);
+  // Set for the whole duration of a create, so a timer that fires while the
+  // POST is still in flight waits rather than starting a twin.
+  const creating = useRef(false);
+  const knownId = editId ?? createdId.current ?? undefined;
+  const runnerDeps = autosaveDeps({
+    transport,
+    tenantSlug,
+    parksEdits: source.parksEdits,
+    knownId,
+    creating,
+    createdId,
+    markSaved: context.markSaved,
+    onStored: () => setPresent(true),
+    afterCreate: (id) => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", tenantSlug, "reports"] });
+      void navigate(`/${tenantSlug}/reports/${id}/edit`, { replace: true });
+    },
+  });
 
   const autosave = useAutosave({
     value: persisted,
     dirty: context.dirty,
-    // A brand-new report has no row to park against, and creating one behind
-    // the author's back would drop half-built reports into everyone's list.
-    // The tab-close guard still covers that case.
+    // A report that has never been saved is autosaved TOO, by creating it —
+    // see `createOnAutosave` for why that is safe now and was not before. It
+    // has to be valid first, though: the create endpoint validates the
+    // document, and a half-built one would 400 on every tick.
     //
     // Off during a DISCARD as well as during a manual save: a timer that fired
     // while the DELETE was in flight would re-park the very edit being thrown
     // away, and the editor would then show the published version while the
     // server quietly kept a copy of what it was told to discard.
     enabled:
-      editId !== undefined &&
       !context.saving &&
       !discarding &&
-      (source.parksEdits || !documentGuardError(persisted)),
-    onSave: async (state) => {
-      const stored = await sendAutosave(
-        { transport, tenantSlug, editId: editId ?? "", parksEdits: source.parksEdits },
-        state,
-      );
-      if (!stored) return false;
-      context.markSaved(state);
-      if (source.parksEdits) setPresent(true);
-      return true;
-    },
+      (knownId === undefined
+        ? !documentGuardError(persisted)
+        : source.parksEdits || !documentGuardError(persisted)),
+    onSave: (state) => runAutosave(runnerDeps, state),
   });
 
   function discard(): void {
     if (editId === undefined) return;
     setDiscarding(true);
-    void discardWorkingCopyAction(transport, tenantSlug, editId).then((result) => {
-      setDiscarding(false);
-      if (!result.ok) {
-        context.setError(result.error);
-        return;
-      }
-      // Back to what the readers have been seeing all along, and CLEAN: the
-      // baseline moves with it, so the guard does not then claim the reset
-      // itself is unsaved work.
-      context.reset(source.published);
-      context.markSaved(source.published);
-      setPresent(false);
-      void queryClient.invalidateQueries({ queryKey: ["admin", tenantSlug, "reports"] });
+    void runDiscard({ transport, tenantSlug, editId }, {
+      published: source.published,
+      done: () => setDiscarding(false),
+      failed: context.setError,
+      restored: () => {
+        context.reset(source.published);
+        context.markSaved(source.published);
+        setPresent(false);
+        void queryClient.invalidateQueries({ queryKey: ["admin", tenantSlug, "reports"] });
+      },
     });
   }
 
