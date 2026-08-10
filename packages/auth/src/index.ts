@@ -115,9 +115,22 @@ export async function auth(request: Request): Promise<Session | null> {
 }
 
 /**
+ * The sanctioned way to adopt this package: one factory, one config object.
+ *
+ * Everything above (`handlers`, `auth`, `authConfig`, and the two setters
+ * re-exported below) is the legacy module-global surface it replaces. Those
+ * remain so a host can move in its own time, and they delegate to the same
+ * builder, so the two cannot disagree about what a session is.
+ */
+export { createApiAuth } from "./create-api-auth";
+export type { ApiAuth, ApiAuthConfig } from "./create-api-auth";
+
+/**
  * Re-export the config (and its `ExtendedSession` type) so consumers can reach
  * it from the package root, while `@12-apps/auth/config` stays importable without
  * applying the env defaults (tests).
+ *
+ * @deprecated Prefer `createApiAuth`.
  */
 export { authConfig };
 export { setSignInGate, setSessionAdminResolver } from "./config";
