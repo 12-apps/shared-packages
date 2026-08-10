@@ -78,6 +78,16 @@ export type PaymentsStore =
    * fallback rule — no button, and the card form stays the way to pay.
    */
   | 'apple-pay-unsupported'
+  /**
+   * The buyer's saved-card WALLET (FUT-183 over FUT-478), not a checkout: the
+   * host opens the package's manage-cards surface at a store whose provider
+   * can vault — one mintable chain entry with the vault seam, connected in
+   * stub mode — and the wallet starts EMPTY. The card the buyer types decides
+   * the outcome: the package's `DECLINE_PAN` is refused at validation, any
+   * other valid card is stored. (Not a digital wallet — those are the
+   * `google-pay` / `apple-pay` shapes above.)
+   */
+  | 'wallet'
   /** Declares the on-page screen (FUT-596). */
   | 'screen-on-page'
   /** Declares the hand-off screen (FUT-596). */

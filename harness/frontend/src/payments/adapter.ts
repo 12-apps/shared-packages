@@ -26,17 +26,18 @@
  * the server-granted stub path instead of injecting a real acquirer's SDK —
  * a harness page must not make a cross-origin call to Pagar.me to render.
  */
-import type {
-  ChargeInput,
-  ChargeSnapshot,
-  CheckoutCopy,
-  ClientTokenization,
-  CustomerFieldSpec,
-  MerchantRef,
-  Money,
-  PaymentMethodKind,
-  PaymentProviderAdapter,
-  WalletType,
+import {
+  ProviderRequestError,
+  type ChargeInput,
+  type ChargeSnapshot,
+  type CheckoutCopy,
+  type ClientTokenization,
+  type CustomerFieldSpec,
+  type MerchantRef,
+  type Money,
+  type PaymentMethodKind,
+  type PaymentProviderAdapter,
+  type WalletType,
 } from '@12-apps/payments-backend';
 
 /** The one merchant every harness page is set at. */
@@ -119,6 +120,62 @@ export interface HarnessProvider {
    * package, and every fixture here is already fictional for that reason.
    */
   checkoutScreen?: string;
+  /**
+   * The provider can VAULT a card outside a purchase (FUT-478/FUT-183) —
+   * declares the adapter's `vault` seam, so `/cards/begin` and
+   * `/cards/complete` answer for real on a page that mounts the wallet.
+   * Omitted ⇒ no seam, and those rows answer the not-enabled 404.
+   */
+  vaultable?: boolean;
+}
+
+/**
+ * Whether the stub vault refuses this token — the card failed validation.
+ *
+ * Two spellings on purpose. The backend's stub convention is the `-declined`
+ * SUFFIX (`stubCharge`, `stubVaultedCard`); the shipped stub tokenizer encodes
+ * the decline PAN as a `tok_declined…` PREFIX. Honouring both lets the wallet
+ * journey type the package's own `DECLINE_PAN` through the real form while a
+ * raw suffix token behaves exactly as it does against a stub connection.
+ */
+function vaultRefusesToken(token: string): boolean {
+  return token.endsWith('-declined') || token.startsWith('tok_declined');
+}
+
+/**
+ * The vault seam a `vaultable` provider declares — the same shape a
+ * sessionless PUBLIC_KEY provider answers: `begin` merely equips the browser
+ * (the key, when the connection holds one), and `complete` mints the
+ * instrument the HOST must store. A refused validation is thrown as the
+ * non-retriable 400 a real adapter raises, so the mount's failure pipeline —
+ * and the host's `mapProviderError` wording — runs for real.
+ */
+function harnessVault(spec: HarnessProvider): NonNullable<PaymentProviderAdapter['vault']> {
+  return {
+    async begin() {
+      return {
+        provider: spec.name,
+        tokenization: spec.tokenization ?? 'PUBLIC_KEY',
+        publicKey: spec.publicKey ?? undefined,
+      };
+    },
+    async complete(input) {
+      if (!input.token || vaultRefusesToken(input.token)) {
+        throw new ProviderRequestError(spec.name, `${spec.name} refused to validate the card (stub).`, {
+          retriable: false,
+          httpStatus: 400,
+        });
+      }
+      return {
+        provider: spec.name,
+        instrumentId: `vault_${spec.name}_${input.reference}`,
+        brand: 'visa',
+        last4: '4242',
+        expMonth: 12,
+        expYear: 2031,
+      };
+    },
+  };
 }
 
 /**
@@ -211,6 +268,7 @@ export function harnessAdapter(spec: HarnessProvider, seen: SeenCharge[]): Payme
   return {
     name: spec.name,
     displayName: spec.name,
+    ...(spec.vaultable ? { vault: harnessVault(spec) } : {}),
     capabilities: {
       methods: spec.methods ?? ['PIX', 'CARD'],
       // Declared, not defaulted: the published walk SKIPS a wallet charge on

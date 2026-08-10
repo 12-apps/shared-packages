@@ -4,9 +4,10 @@ The buyer journeys for the payments checkout, as Gherkin you run **against your
 own app**.
 
 Mounting `createPaymentFlows` gives you a checkout. This gives you its
-end-to-end coverage: twenty scenarios across seven features — PIX, card, hosted
-hand-off and return, provider failover, issuer declines, an unresolved charge, a
-store that cannot charge at all, and per-provider screens. You implement one
+end-to-end coverage: twenty-seven scenarios across ten features — PIX, card,
+digital wallets, hosted hand-off and return, provider failover, issuer
+declines, an unresolved charge, a store that cannot charge at all,
+per-provider screens, and saving a card outside checkout. You implement one
 port and add three lines of config. Nothing is copied, so a scenario added here
 later runs in your app on the next version bump.
 
@@ -84,11 +85,21 @@ files do not change either way.
 `pix-only` · `card` · `both-methods` · `hosted` · `awaiting` · `settles` ·
 `declined` · `unresolved` · `unavailable` · `no-provider` ·
 `no-provider-remedy` · `payments-off` · `two-mintable` · `redirect-head` ·
-`google-pay` · `apple-pay` · `apple-pay-unsupported` · `screen-on-page` ·
-`screen-handoff` · `screen-undeclared` · `screen-unknown`
+`google-pay` · `apple-pay` · `apple-pay-unsupported` · `wallet` ·
+`screen-on-page` · `screen-handoff` · `screen-undeclared` · `screen-unknown`
 
 Adding a member is a breaking change for hosts, deliberately: a scenario needing
 a store nobody can build is a scenario that silently never runs.
+
+`wallet` (added for FUT-183/FUT-478) is the one member that is **not a
+checkout**: `open(page, 'wallet')` must land the buyer on the package's
+manage-cards surface (`screens.ManageCards` from `createPaymentFlows`) at a
+store whose single provider can vault — the chain head declares the adapter
+`vault` seam, the connection runs in stub mode, and the wallet starts empty.
+The journey types the shared `DECLINE_PAN` for the refusal path, so no store
+flag decides the outcome; the card does. Hosts upgrading across this version
+must add the member to their `open` mapping or their world stops compiling —
+which is the point.
 
 ## Why this package ships compiled JavaScript
 
