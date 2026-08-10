@@ -9,7 +9,7 @@
  */
 import { fireEvent, render, screen } from '@testing-library/react';
 import React, { useState } from 'react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DateRangePicker } from '../DateRangePicker';
 import { createQuickRanges } from '../DateRangePicker.quick';
@@ -305,5 +305,64 @@ describe('the list and the copy are the caller’s', () => {
 
     expect(status()).toBe('A data final deve ser igual ou posterior à inicial.');
     expect(screen.getByLabelText('Início')).toBe(field('from'));
+  });
+});
+
+/**
+ * The phone layout, which is a RENDER decision and not a stylesheet one.
+ *
+ * `sx` breakpoints handle the rest of the narrow tier — the quick list turning
+ * from a column into a scrolling pill row, the rules changing axis — and those
+ * are CSS, so jsdom has nothing to say about them and they are checked in the
+ * browser. What is testable here is the one thing CSS cannot do: a second month
+ * is not rendered at all below `md`, because two 280px grids do not fit on a
+ * 390px screen and `display: none` would still cost the layout.
+ */
+describe('the picker draws one month on a narrow screen', () => {
+  /** Whatever jsdom had, so a stub cannot leak into the cases above. */
+  const original = { matchMedia: window.matchMedia };
+
+  beforeEach(() => {
+    // jsdom implements no `matchMedia`, so MUI falls back to "does not match"
+    // and every other case in this file takes the wide path. Only the cases
+    // below opt in.
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      configurable: true,
+      value: (query: string) => ({
+        matches: query.includes('max-width'),
+        media: query,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        onchange: null,
+        dispatchEvent: () => false,
+      }),
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      configurable: true,
+      value: original.matchMedia,
+    });
+  });
+
+  it('caps a consumer asking for two months at one', () => {
+    render(<Harness numberOfMonths={2} />);
+
+    // The reports dialog asks for two, and is right to on a desktop. Here the
+    // request cannot be honoured, so it is capped rather than half-drawn.
+    expect(screen.getAllByTestId(/^calendar-month-/)).toHaveLength(1);
+  });
+
+  it('still offers the quick ranges — they are the fastest answer on a phone', () => {
+    render(<Harness numberOfMonths={2} />);
+
+    // The narrow layout MOVES them above the calendar; it does not drop them.
+    expect(quick('today')).toBeTruthy();
+    expect(screen.getByTestId(`${TEST_ID}-quick-list`)).toBeTruthy();
   });
 });
