@@ -2,6 +2,7 @@ export * from './AnimatedIcon';
 export * from './AspectRatio';
 export * from './InfiniteScroll';
 export * from './InstallPrompt';
+export * from './Overflow';
 export * from './Portal';
 export * from './Transition';
 export * from './VirtualList';

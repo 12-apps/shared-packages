@@ -14,12 +14,14 @@ import { Card } from "@12-apps/ui/layout/Card";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
+import { useMeasuredWidth } from "@12-apps/ui/utility/Overflow";
 
 import { REPORT_GRID_COLUMNS, responsiveSpan } from "../layout";
 import type { DashboardBlockRender } from "./custom-reports-api";
 import type { DragReorder } from "./lib/drag-reorder";
 import { PRINT_BLOCK_ATTR } from "./lib/print-export";
-import { CONTAINER_RADIUS_PX, CONTROL_RADIUS_PX, GRID_GAP_PX } from "./lib/report-surface";
+import { CONTAINER_RADIUS_PX, GRID_GAP_PX } from "./lib/report-surface";
+import { BLOCK_TOOLS_REVEAL_SX, TOOL_ROW, ToolRowProvider } from "./lib/tool-cluster";
 import { ReportRenderView } from "./report-render";
 
 /**
@@ -114,36 +116,69 @@ export function ReportGridItem({
 }
 
 /**
- * The block's spec line reads as a PANEL, not as an inline code chip.
+ * The spec sentence is ONE DISCREET LINE, not a panel (FUT-755).
  *
- * `typography/Code` and `Text variant="code"` both size themselves for a
- * fragment quoted inside a sentence — 2px of vertical padding and a 2px radius.
- * This is a whole sentence, so it gets a block's padding and the control radius
- * the rest of the screen uses. The mono face and the tint come from the
- * component; only the box is restated here.
+ * It used to be a full-width tinted box that wrapped onto a second line —
+ * `Text variant="code"` brings a tint, a border, padding and a radius of its
+ * own, and this restated the box bigger still. That put the machine's summary
+ * of the query in a container louder than the figures the block exists to
+ * show. `prototype.html`'s `.block-spec` is a caption: mono, muted, `nowrap`,
+ * `overflow:hidden`, `text-overflow:ellipsis` — one line, truncated, directly
+ * under the title. So the box is switched OFF here (the component's tint,
+ * border, padding and radius all come back to nothing) and only the mono face
+ * survives.
+ *
+ * Inline rather than `sx` because it has to beat the component's own emotion
+ * class, and because a style this component sets on itself is the one thing
+ * that must not be overridable by a host's theme.
  */
 const SPEC_SENTENCE_STYLE: CSSProperties = {
   display: "block",
   margin: 0,
-  padding: "8px 10px",
-  borderRadius: `${CONTROL_RADIUS_PX}px`,
+  padding: "0px",
+  // `borderWidth: 0` rather than `border: none` — it overrides exactly the one
+  // longhand the component sets and leaves the rest alone, and unlike the
+  // shorthand it survives jsdom, so the absence of the box is testable.
+  borderWidth: 0,
+  borderRadius: "0px",
+  backgroundColor: "transparent",
   lineHeight: 1.5,
+  // The truncation itself. `maxWidth` is what gives the ellipsis something to
+  // measure against — a `nowrap` flex child is otherwise sized by its content.
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  maxWidth: "100%",
 };
+
+/** Authored prose wraps, and carries no box either. */
+const BLOCK_DESCRIPTION_STYLE: CSSProperties = { display: "block", margin: 0 };
 
 interface ReportBlockFrameProps {
   title: ReactNode;
   /**
-   * The block's own caveats, under its title (FUT-454). A built-in report's
-   * description carries what its figures exclude and when they are withheld;
-   * rendering it only on the single-report deep-link page — which the canvas
-   * does not link to — meant those statements were never actually made to the
-   * person reading the numbers.
+   * The MACHINE's one-line summary of what this block asks for — "soma de
+   * receita em pedidos por forma de pagamento, onde status é PAID" — as the
+   * server's `specSentence` writes it.
    *
-   * It renders in the MONO face, because on the authored canvas it is the
-   * block's generated spec sentence ("soma de receita em pedidos por forma de
-   * pagamento, onde status é PAID") rather than prose someone wrote — and
-   * machine-generated text is set in the mono face throughout the prototype,
-   * which is how a reader tells the two apart at a glance.
+   * Mono, because that is how a reader tells generated text from written text
+   * throughout the prototype. Truncated to one line, because it is a restatement
+   * of the query rather than something to read: the full sentence stays
+   * available in the element's `title`, and the block's own configuration is
+   * where it is actually edited.
+   */
+  specSentence?: string;
+  /**
+   * PROSE somebody wrote, under the title (FUT-454) — a built-in report's
+   * statement of what its figures exclude and when they are withheld.
+   *
+   * It wraps in full and is never truncated: this is the screen where the
+   * numbers it qualifies are being read, and half a disclosure is worse than
+   * none. It is not set in the mono face for the same reason the sentence
+   * above is — the two must not look like the same kind of text.
+   *
+   * The two were ONE prop until FUT-755, which is how a change aimed at the
+   * generated sentence nearly cut a disclosure off mid-word.
    */
   description?: string;
   actions?: ReactNode;
@@ -153,12 +188,18 @@ interface ReportBlockFrameProps {
   active?: boolean;
 }
 
-/** The machine-written half of a block's header, in the mono face. */
+/**
+ * The machine-written half of a block's header: mono, one line, ellipsis.
+ *
+ * The `title` attribute is not decoration — truncation HIDES text, so the full
+ * sentence has to stay recoverable somewhere, and the element that hid it is
+ * the only place a reader would think to look.
+ */
 function BlockSpecSentence({
-  description,
+  sentence,
   dataTestId,
 }: {
-  description: string;
+  sentence: string;
   dataTestId: string;
 }): JSX.Element {
   return (
@@ -168,10 +209,93 @@ function BlockSpecSentence({
       color="secondary"
       as="p"
       style={SPEC_SENTENCE_STYLE}
+      title={sentence}
+      data-testid={`${dataTestId}-description`}
+    >
+      {sentence}
+    </Text>
+  );
+}
+
+/** The written half: whole sentences, in the reading face, wrapping in full. */
+function BlockDescription({
+  description,
+  dataTestId,
+}: {
+  description: string;
+  dataTestId: string;
+}): JSX.Element {
+  return (
+    <Text
+      size="sm"
+      color="secondary"
+      as="p"
+      style={BLOCK_DESCRIPTION_STYLE}
       data-testid={`${dataTestId}-description`}
     >
       {description}
     </Text>
+  );
+}
+
+/**
+ * THE CHROME NEVER LEAVES THIS ROW (FUT-755, gap 18).
+ *
+ * It used to be `flexWrap: "wrap"`, so a block too narrow for title + chrome
+ * put the chrome on a second line, left-aligned under the title. That was a
+ * real trade, not an oversight: the row it replaced simply OVERFLOWED at 390px
+ * and pushed ⋮ off-screen, and ⋮ was the only route to Editar — a report could
+ * not be edited on a phone at all. Wrapping was the cheap way to stop losing a
+ * control.
+ *
+ * Overflowing into the ⋮ menu answers the same problem without the trade.
+ * Nothing is pushed off-screen, because a tool that does not fit MOVES into
+ * the menu as a real labelled item running the same handler; and nothing
+ * steals width from the rendering below, because the row can no longer grow a
+ * second line. So it is `nowrap` now, and the cluster is pinned right at every
+ * width.
+ *
+ * The row is also the thing with a WIDTH, so it is what measures itself: the
+ * cluster inside `actions` is an opaque node from here and reads the answer
+ * out of `ToolRowProvider`. The deciding lives in `lib/tool-cluster`.
+ */
+function BlockHeaderRow({
+  title,
+  actions,
+}: {
+  title: ReactNode;
+  actions?: ReactNode;
+}): JSX.Element {
+  const { ref, width } = useMeasuredWidth<HTMLDivElement>();
+  return (
+    <Stack
+      ref={ref}
+      direction="row"
+      spacing={1}
+      sx={{
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexWrap: "nowrap",
+        minHeight: 32,
+      }}
+    >
+      <ToolRowProvider width={width}>
+        {/* The title takes the room the tools do not — down to a floor, which
+          * is the SAME number the cluster prices it at. A row whose CSS lets
+          * the title take more than the arithmetic assumed sheds nothing and
+          * overflows anyway. */}
+        <Box sx={{ flex: 1, minWidth: `${TOOL_ROW.title}px` }}>
+          {typeof title === "string" ? (
+            <Text variant="heading" size="lg" weight="semibold" as="h2">
+              {title}
+            </Text>
+          ) : (
+            title
+          )}
+        </Box>
+        {actions}
+      </ToolRowProvider>
+    </Stack>
   );
 }
 
@@ -183,6 +307,7 @@ function BlockSpecSentence({
  */
 export function ReportBlockFrame({
   title,
+  specSentence,
   description,
   actions,
   children,
@@ -200,36 +325,25 @@ export function ReportBlockFrame({
         bgcolor: "background.paper",
         boxShadow: "none",
         borderRadius: `${CONTAINER_RADIUS_PX}px`,
+        // The card is what hides and reveals its own tool cluster, because CSS
+        // has no ancestor selector and hovering the BLOCK is what should show
+        // the tools. Keyboard and touch are handled with it — see the constant.
+        ...BLOCK_TOOLS_REVEAL_SX,
         ...(active ? { outline: "2px dashed", outlineColor: "primary.main" } : {}),
       }}
       data-testid={dataTestId}
       {...{ [PRINT_BLOCK_ATTR]: "" }}
     >
       <Stack spacing={1.5}>
-        {/* Wraps rather than squeezes: a 2-column block's chrome moves to a
-         * second line instead of stealing width from the rendering below. */}
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            rowGap: 0.5,
-            minHeight: 32,
-          }}
-        >
-          {typeof title === "string" ? (
-            <Text variant="heading" size="lg" weight="semibold" as="h2">
-              {title}
-            </Text>
-          ) : (
-            title
-          )}
-          {actions}
-        </Stack>
-        {description ? (
-          <BlockSpecSentence description={description} dataTestId={dataTestId} />
+        <BlockHeaderRow title={title} actions={actions} />
+        {/* ONE subtitle slot, two kinds of subtitle — and no block authors
+         * both. Where one somehow did, the written disclosure would win: it is
+         * the half a reader cannot reconstruct from the block's own settings,
+         * and it is the half that must never be hidden. */}
+        {description !== undefined && description !== "" ? (
+          <BlockDescription description={description} dataTestId={dataTestId} />
+        ) : specSentence !== undefined && specSentence !== "" ? (
+          <BlockSpecSentence sentence={specSentence} dataTestId={dataTestId} />
         ) : null}
         {children}
       </Stack>
@@ -245,9 +359,12 @@ export function ReportBlockFrame({
 export function ReportBlockBody({
   block,
   dataTestId,
+  asTable = false,
 }: {
   block: DashboardBlockRender;
   dataTestId: string;
+  /** Chart blocks only: draw the rendering as its table (the header toggle). */
+  asTable?: boolean;
 }): JSX.Element {
   if (block.status === "error") {
     return (
@@ -256,5 +373,11 @@ export function ReportBlockBody({
       </Alert>
     );
   }
-  return <ReportRenderView render={block.render} dataTestId={`${dataTestId}-render`} />;
+  return (
+    <ReportRenderView
+      render={block.render}
+      dataTestId={`${dataTestId}-render`}
+      asTable={asTable}
+    />
+  );
 }
