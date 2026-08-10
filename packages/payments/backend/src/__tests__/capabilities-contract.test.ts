@@ -51,18 +51,12 @@ describe('capabilities contract — no capability true without an implementation
         // one — there is no field to forward, so a `true` here cannot be
         // implemented. The day ChargeInput grows a split instruction, this
         // assertion is the reminder to replace itself with a payload test.
-        expect(
-          adapter.capabilities.splits ?? false,
-          `${adapter.name} declares splits but ChargeInput has no split field`,
-        ).toBe(false);
+        expect(adapter.capabilities.splits ?? false, `${adapter.name}: splits`).toBe(false);
       });
 
       it('Given APPLE_PAY in wallets, Then the applePay operations exist', () => {
         if (adapter.capabilities.wallets?.includes('APPLE_PAY')) {
-          expect(
-            adapter.applePay,
-            `${adapter.name} declares APPLE_PAY without the certificate operations`,
-          ).toBeDefined();
+          expect(adapter.applePay, `${adapter.name}: applePay ops`).toBeDefined();
         }
       });
 
