@@ -24,9 +24,25 @@ export interface PublishDraft {
   visibilityRoles: string[];
 }
 
-/** The pre-FUT-307 behavior: saved documents go live for the whole team. */
+/**
+ * What a brand-new report starts as: a private draft (FUT-755).
+ *
+ * It used to start PUBLISHED and visible to the whole team, which was the
+ * pre-FUT-307 behaviour carried forward. Two things make that wrong now:
+ *
+ * 1. A report is built one block at a time, so the published default put a
+ *    half-finished report in front of the store from the first keystroke.
+ * 2. Editing is autosaved. A default of "published to everyone" plus "saves
+ *    itself every second" is a combination nobody would choose deliberately —
+ *    it broadcasts every intermediate state of a report being assembled.
+ *
+ * Starting private makes autosave safe by construction rather than by the
+ * author remembering to change a select before they begin. Publishing is the
+ * deliberate act it should have been all along, and the editor's header says
+ * "Rascunho · só você" until they take it.
+ */
 export function defaultPublishDraft(): PublishDraft {
-  return { status: "published", visibility: "tenant", visibilityRoles: [] };
+  return { status: "draft", visibility: "private", visibilityRoles: [] };
 }
 
 function toggleRole(roles: string[], id: string, checked: boolean): string[] {

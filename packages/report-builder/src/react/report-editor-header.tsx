@@ -194,6 +194,41 @@ function HeaderActions({
   );
 }
 
+/**
+ * The way out of the editor.
+ *
+ * Intercepted when the caller has something to say first — see `onBeforeExit`.
+ * This guards the LINK, which is the exit the editor offers. It is not a
+ * general route guard: blocking arbitrary in-app navigation needs
+ * react-router's blocker, which requires a data router, and this surface
+ * mounts under whatever router its host has. The `beforeunload` guard in
+ * `use-unsaved-changes` still covers closing the tab, so between them every
+ * exit this package can see is covered.
+ */
+function ExitLink({
+  tenantSlug,
+  editId,
+  onBeforeExit,
+}: {
+  tenantSlug: string;
+  editId?: string;
+  onBeforeExit?: () => boolean;
+}): JSX.Element {
+  return (
+    <Link
+      to={editId ? `/${tenantSlug}/reports/${editId}` : `/${tenantSlug}/reports`}
+      data-testid="report-editor-back"
+      onClick={(event) => {
+        if (onBeforeExit && !onBeforeExit()) event.preventDefault();
+      }}
+    >
+      <Text variant="body" size="sm" color="secondary">
+        ← Sair da edição
+      </Text>
+    </Link>
+  );
+}
+
 export function ReportEditorHeader({
   tenantSlug,
   editId,
@@ -207,6 +242,7 @@ export function ReportEditorHeader({
   onOpenSettings,
   onCancel,
   onSave,
+  onBeforeExit,
 }: {
   tenantSlug: string;
   /** Absent on a new report — there is no saved report to go back to. */
@@ -222,6 +258,12 @@ export function ReportEditorHeader({
   onOpenSettings: () => void;
   onCancel: () => void;
   onSave: () => void;
+  /**
+   * Asked before leaving. Return `false` to cancel the navigation — the
+   * caller then owns saying why. Omitted, leaving is never interrupted, which
+   * is what a host with nothing to warn about should get for free.
+   */
+  onBeforeExit?: () => boolean;
 }): JSX.Element {
   return (
     <Stack
@@ -230,14 +272,7 @@ export function ReportEditorHeader({
       sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}
       data-testid="report-editor-header"
     >
-      <Link
-        to={editId ? `/${tenantSlug}/reports/${editId}` : `/${tenantSlug}/reports`}
-        data-testid="report-editor-back"
-      >
-        <Text variant="body" size="sm" color="secondary">
-          ← Sair da edição
-        </Text>
-      </Link>
+      <ExitLink tenantSlug={tenantSlug} {...(editId ? { editId } : {})} onBeforeExit={onBeforeExit} />
       <NameAndStatus
         name={name}
         status={publish.status}
