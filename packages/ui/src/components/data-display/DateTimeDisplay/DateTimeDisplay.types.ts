@@ -26,7 +26,7 @@ export interface DateTimeDisplayProps {
    * Size variant
    * @default 'medium'
    */
-  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
+  size?: SizeValue;
   /**
    * Whether to show a tooltip with full date/time
    * @default true

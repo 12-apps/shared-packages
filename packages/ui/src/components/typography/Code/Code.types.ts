@@ -8,6 +8,6 @@ export interface CodeProps extends React.HTMLAttributes<HTMLElement> {
   language?: string;
   copyable?: boolean;
   lineNumbers?: boolean;
-  size?: Extract<SizeValue, 'xs' | 'sm' | 'md' | 'lg'>;
+  size?: SizeValue;
   children: React.ReactNode;
 }

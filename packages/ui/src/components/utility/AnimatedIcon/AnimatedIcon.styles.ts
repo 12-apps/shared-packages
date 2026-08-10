@@ -24,6 +24,7 @@ import {
 import type { AnimationSize, AnimationVariant } from './AnimatedIcon.types';
 
 export const sizeConfigs: Record<AnimationSize, { size: number; fontSize: number }> = {
+  xs: { size: 12, fontSize: 10 },
   sm: { size: 24, fontSize: 20 },
   md: { size: 32, fontSize: 28 },
   lg: { size: 48, fontSize: 44 },

@@ -102,7 +102,7 @@ export interface DropdownMenuProps extends Omit<MenuProps, 'open' | 'variant'> {
   /**
    * Size of the menu items
    */
-  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
+  size?: SizeValue;
   
   /**
    * Maximum height of the menu

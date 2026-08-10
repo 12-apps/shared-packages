@@ -5,7 +5,7 @@ export type ParagraphVariant = 'default' | 'lead' | 'muted' | 'small';
 
 export interface ParagraphProps extends React.HTMLAttributes<globalThis.HTMLParagraphElement> {
   variant?: ParagraphVariant;
-  color?: Exclude<ColorValue, 'info'>;
+  color?: ColorValue;
   size?: SizeValue;
   children: React.ReactNode;
 }

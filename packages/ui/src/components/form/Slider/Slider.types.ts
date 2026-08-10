@@ -10,7 +10,7 @@ export interface SliderProps extends Omit<MuiSliderProps, 'color' | 'size'> {
   /**
    * The color theme of the slider
    */
-  color?: Exclude<ColorValue, 'info'>;
+  color?: ColorValue;
 
   /**
    * The size of the slider

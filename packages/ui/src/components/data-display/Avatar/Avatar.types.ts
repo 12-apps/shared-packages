@@ -57,7 +57,7 @@ export interface AvatarProps extends Omit<MuiAvatarProps, 'variant'> {
   /**
    * Color of the avatar background when no image is provided
    */
-  color?: Exclude<ColorValue, 'info'>;
+  color?: ColorValue;
 
   /**
    * Whether the avatar is in a loading state

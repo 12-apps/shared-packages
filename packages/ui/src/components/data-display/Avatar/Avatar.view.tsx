@@ -64,7 +64,11 @@ const getColorFromTheme = (theme: Theme, color: string): PaletteLike => {
     secondary: theme.palette.secondary,
     success: theme.palette.success,
     warning: theme.palette.warning,
-    error: theme.palette.error,
+    info: theme.palette.info,
+    // `danger`, not `error`. This map was keyed on MUI's word while the prop
+    // took the house one, so `danger` matched nothing and fell through to
+    // primary — a red avatar rendering blue, silently.
+    danger: theme.palette.error,
     neutral: { main: theme.palette.grey[700], contrastText: '#fff' },
   };
 

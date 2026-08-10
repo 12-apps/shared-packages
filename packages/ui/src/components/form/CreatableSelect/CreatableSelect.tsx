@@ -9,6 +9,7 @@ import { useId, useMemo } from 'react';
 
 import { FormControl, FormLabel, FormMessage } from '../Form';
 import type { CreatableSelectOption, CreatableSelectProps } from './CreatableSelect.types';
+import type { SizeValue } from '../../../tokens/scales';
 
 /** Internal option shape: a real option, or the synthetic "create new" row. */
 interface InternalOption extends CreatableSelectOption {
@@ -25,7 +26,9 @@ const filterOptions = createFilterOptions<InternalOption>();
 const INDENT_STEP = 16;
 
 /** `sm`/`md` → MUI's own scale, the same mapping {@link Input} uses. */
-const MUI_SIZE = { sm: 'small', md: 'medium' } as const;
+// All five house stops onto MUI's two. `xs`/`sm` draw small; `md` and up draw
+// medium, because an autocomplete field has no third or fourth height to give.
+const MUI_SIZE = { xs: 'small', sm: 'small', md: 'medium', lg: 'medium', xl: 'medium' } as const;
 
 /** Match the outlined border treatment of `Input` so siblings look identical. */
 const fieldSx = {
@@ -92,7 +95,7 @@ function renderField(
     placeholder?: string;
     error?: string;
     loading: boolean;
-    size: 'sm' | 'md';
+    size: SizeValue;
     dataTestId: string;
   },
 ): React.JSX.Element {

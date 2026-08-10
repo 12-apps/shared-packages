@@ -207,6 +207,9 @@ export const breadcrumbLinkStyles = ({
       padding: theme.spacing(0.375, 0.5) } });
 
 export const sizeIconMap = {
-  sm: 'small' as const,
-  md: 'small' as const,
-  lg: 'medium' as const };
+  xs: 'small',
+  sm: 'small',
+  md: 'small',
+  lg: 'medium',
+  xl: 'medium',
+} as const;

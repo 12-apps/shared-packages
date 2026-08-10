@@ -18,7 +18,7 @@ export type ChartSpecType = 'line' | 'bar' | 'area' | 'pie' | 'donut';
  * The house vocabulary minus `neutral`: a data series is always an accent, and
  * an unaccented series would be indistinguishable from the grid it sits on.
  */
-export type ChartSemanticColor = Exclude<ColorValue, 'neutral'>;
+export type ChartSemanticColor = ColorValue;
 
 /**
  * Number formatting applied to tooltip values and the y axis.

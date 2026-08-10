@@ -9,7 +9,7 @@ export interface InputOTPProps {
   /**
    * The color theme of the OTP input
    */
-  color?: Exclude<ColorValue, 'info'>;
+  color?: ColorValue;
   
   /**
    * The size of the OTP input

@@ -11,7 +11,7 @@ export interface SwitchProps extends Omit<MuiSwitchProps, 'color' | 'size'> {
   /**
    * The color theme of the switch
    */
-  color?: Exclude<ColorValue, 'info'>;
+  color?: ColorValue;
   
   /**
    * The size of the switch

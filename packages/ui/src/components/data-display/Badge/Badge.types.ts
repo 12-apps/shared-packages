@@ -14,7 +14,7 @@ export type BadgeVariant =
   | 'success'
   | 'warning';
 
-export type BadgeSize = Extract<SizeValue, 'xs' | 'sm' | 'md' | 'lg'>;
+export type BadgeSize = SizeValue;
 
 export interface BadgeProps extends Omit<MuiBadgeProps, 'variant' | 'color' | 'content'> {
   /**

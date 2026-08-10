@@ -20,7 +20,7 @@ export interface TooltipProps extends Omit<MuiTooltipProps, 'variant'> {
   /**
    * Size of the tooltip
    */
-  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
+  size?: SizeValue;
 
   /**
    * Maximum width of the tooltip

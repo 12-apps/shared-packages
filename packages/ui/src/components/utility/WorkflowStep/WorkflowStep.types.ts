@@ -19,7 +19,7 @@ export type WorkflowStepOrientation = 'horizontal' | 'vertical';
 /**
  * Color theme for the workflow step component
  */
-export type WorkflowStepColor = Exclude<ColorValue, 'info'>;
+export type WorkflowStepColor = ColorValue;
 
 /**
  * Size variant for step indicators

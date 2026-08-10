@@ -41,7 +41,7 @@ export interface StepperProps {
    * takes far less vertical space — useful above the fold on mobile checkouts.
    * @default 'md'
    */
-  size?: Extract<SizeValue, 'sm' | 'md'>;
+  size?: SizeValue;
   
   /**
    * Navigation variant controlling step access
@@ -89,7 +89,7 @@ export interface StepItemProps {
   isCompleted: boolean;
   isLast: boolean;
   orientation: 'horizontal' | 'vertical';
-  size: 'sm' | 'md';
+  size: SizeValue;
   variant: 'linear' | 'non-linear';
   clickable: boolean;
   onStepClick?: (id: string) => void;
