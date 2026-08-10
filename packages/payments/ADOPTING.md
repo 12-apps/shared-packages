@@ -108,6 +108,24 @@ also lists the per-vendor documentation to consult. Webhooks may also stay on
 their own dedicated routes (this repo keeps `/api/webhooks/**` as permanent
 aliases); `handleWebhook` needs the RAW body either way.
 
+Two webhook-hardening seams are the host's to wire (FUT-690):
+
+- **Timestamp tolerance lives at intake, not in `verify`.** An adapter may
+  declare `webhook.intakeFreshness` (Stripe does: five minutes on the signed
+  `t=`), and `handleWebhook` refuses a stale delivery the same fail-closed
+  way it refuses a bad signature. The replay sweep deliberately never applies
+  the window — it re-verifies rows the inbox stored hours earlier and must
+  keep succeeding — so nothing here changes replay behaviour and nothing is
+  required of the host beyond mounting the normal pipeline.
+- **`withPlatformWebhookSecret`** — for Connect-style providers whose
+  deliveries are signed with the PLATFORM's endpoint secret. The secret is
+  snapshotted into each merchant's fields at connect time, so rotating it in
+  the provider dashboard silently breaks every already-connected store until
+  each reconnects. Wrap the credential store (beside `withMerchantWebhookUrl`
+  in the gateway wiring) so the CURRENT secret is stamped at resolve time as
+  `platformWebhookSecret`; adapters accept a signature under either it or the
+  merchant's own `webhookSecret`, which is what carries stores through a roll.
+
 For platform-charges-tenants billing, mount the same handlers under a
 platform-admin route with `{ merchant: { kind: 'PLATFORM', id: 'platform' } }`.
 
