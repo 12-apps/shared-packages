@@ -212,7 +212,19 @@ export function CustomRangeDialog({
   const status = resolveDayRange(picker.draft, REPORT_MAX_RANGE_DAYS);
 
   return (
-    <Modal open={open} onClose={onClose} size="md" dataTestId={dataTestId}>
+    // `xl`, because of what this dialog puts in ONE row: two 280px months, and
+    // the quick column beside them. That needs ~840px of content box, and at
+    // `md` (640) it did not fit — the second month dropped UNDER the first,
+    // which doubled the dialog's height and pushed `Aplicar` past the fold on
+    // a 900px screen. The dialog grew a quick column when it stopped being a
+    // bare calendar; its width had not been revisited since.
+    //
+    // Sizing the container to its contents is the fix. Shrinking the contents
+    // to fit a width chosen before they existed — one month, or the quick
+    // ranges under the calendar — would be the tail wagging the dog. Below
+    // roughly 940px `Modal`'s own `maxWidth: 90vw` takes over and the picker
+    // stacks by its own breakpoint, which is the intended narrow layout.
+    <Modal open={open} onClose={onClose} size="xl" dataTestId={dataTestId}>
       <ModalContent dataTestId={`${dataTestId}-content`}>
         <Stack spacing={2}>
           <Text variant="heading" size="lg" weight="semibold" as="h2">
