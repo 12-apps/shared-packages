@@ -27,6 +27,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 
 import type { PublishDraft } from "./lib/publish-section";
 import { CONTROL_ROW_SX } from "./lib/report-surface";
+import type { AutosaveState } from "./lib/use-autosave";
 
 /** Who can see it, in the words the subtitle uses. */
 const VISIBILITY_WORDS: Record<PublishDraft["visibility"], string> = {
@@ -99,16 +100,50 @@ function NameAndStatus({
   );
 }
 
+/**
+ * What autosave is doing, in the two states a person must not have to guess at
+ * (FUT-755).
+ *
+ * SUCCESS is deliberately silent: a save the server accepted moves the
+ * unsaved-changes baseline, so "Alterações não salvas" disappears on its own —
+ * which IS the feedback. Saying it a second time would make a routine autosave
+ * the loudest thing on the header.
+ *
+ * FAILURE is not silent, and it says where the work went. A failed save leaves
+ * the report dirty and its tab-close guard armed (see `dirty-state`), so the
+ * accurate sentence is that the changes are still here — not that something
+ * broke and they are gone.
+ */
+function AutosaveNotice({ autosave }: { autosave: AutosaveState }): JSX.Element | null {
+  if (autosave !== "saving" && autosave !== "error") return null;
+  const failed = autosave === "error";
+  return (
+    <Text
+      variant="body"
+      size="sm"
+      color={failed ? "danger" : "secondary"}
+      role="status"
+      data-testid="report-editor-autosave"
+    >
+      {failed
+        ? "Não foi possível salvar automaticamente. Suas alterações continuam aqui."
+        : "Salvando automaticamente…"}
+    </Text>
+  );
+}
+
 /** ⚙ Ajustes · Descartar · Salvar — the cluster that may wrap to its own line. */
 function HeaderActions({
   saving,
   dirty,
+  autosave,
   onOpenSettings,
   onCancel,
   onSave,
 }: {
   saving: boolean;
   dirty: boolean;
+  autosave: AutosaveState;
   onOpenSettings: () => void;
   onCancel: () => void;
   onSave: () => void;
@@ -119,6 +154,7 @@ function HeaderActions({
       spacing={1}
       sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1, ...CONTROL_ROW_SX }}
     >
+      <AutosaveNotice autosave={autosave} />
       {/* Announced politely: a status that only changes colour is invisible to
           a screen reader, and "unsaved" is the one state a person must not
           have to look for. */}
@@ -166,6 +202,7 @@ export function ReportEditorHeader({
   blockCount,
   saving,
   dirty,
+  autosave = "idle",
   onNameChange,
   onOpenSettings,
   onCancel,
@@ -179,6 +216,8 @@ export function ReportEditorHeader({
   blockCount: number;
   saving: boolean;
   dirty: boolean;
+  /** Autosave's state (FUT-755); defaults to idle, which renders nothing. */
+  autosave?: AutosaveState;
   onNameChange: (name: string) => void;
   onOpenSettings: () => void;
   onCancel: () => void;
@@ -208,6 +247,7 @@ export function ReportEditorHeader({
       <HeaderActions
         saving={saving}
         dirty={dirty}
+        autosave={autosave}
         onOpenSettings={onOpenSettings}
         onCancel={onCancel}
         onSave={onSave}

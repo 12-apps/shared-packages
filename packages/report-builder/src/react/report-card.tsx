@@ -117,26 +117,53 @@ function Sparkline({ blockCount }: { blockCount: number }): JSX.Element {
   );
 }
 
-/** `Rascunho` while unpublished, `Arquivado` once archived; published says nothing. */
+/**
+ * The one chip a card carries, and which state wins it.
+ *
+ * Three states, and the third is the one that is easy to get wrong.
+ * `Rascunho` means the report has NEVER been published — only its author sees
+ * it at all. `Alterações não publicadas` is very nearly the opposite: the
+ * report IS live, its readers are looking at it, and an edit is sitting beside
+ * it waiting (FUT-755). Collapsing the two into one chip would tell a reader
+ * their report had been taken down.
+ *
+ * A lifecycle state beats an edit state, because it is the bigger claim about
+ * who can see the report at all: on a draft or an archived report there is no
+ * published version for changes to be unpublished RELATIVE to.
+ */
+export function reportCardChip(
+  report: SavedReportSummary,
+): { label: string; tone: "warning" | "muted" } | null {
+  if (report.status === "draft") return { label: "Rascunho", tone: "warning" };
+  if (report.status === "archived") return { label: "Arquivado", tone: "muted" };
+  if (report.hasUnpublishedChanges) {
+    return { label: "Alterações não publicadas", tone: "warning" };
+  }
+  return null;
+}
+
 function StatusChips({ report }: { report: SavedReportSummary }): JSX.Element | null {
   const theme = useTheme();
-  if (report.status !== "draft" && report.status !== "archived") return null;
-  const draft = report.status === "draft";
+  const chip = reportCardChip(report);
+  if (!chip) return null;
   return (
     // The tint and the label colour are computed against the surface (see
     // `stateChipSx`), and `Chip` takes no `sx` of its own — so they arrive
     // through the wrapper, which is also what keeps the chip on the design
-    // system's component rather than a hand-rolled span.
+    // system's component rather than a hand-rolled span. The third state reuses
+    // that treatment rather than inventing a fourth (`visual-pass.md`
+    // §Components), and it is amber for the same reason a draft is: "not
+    // everyone is seeing this" is a caveat, not a decoration.
     <Box
       sx={{
         display: "inline-flex",
         "& .MuiChip-root": stateChipSx(
-          draft ? theme.palette.warning.main : theme.palette.text.secondary,
+          chip.tone === "warning" ? theme.palette.warning.main : theme.palette.text.secondary,
           theme.palette.background.paper,
         ),
       }}
     >
-      <Chip label={draft ? "Rascunho" : "Arquivado"} size="sm" variant="filled" />
+      <Chip label={chip.label} size="sm" variant="filled" />
     </Box>
   );
 }

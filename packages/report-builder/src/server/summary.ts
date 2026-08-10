@@ -1,4 +1,5 @@
 import type { SavedReportRecord } from './saved';
+import { readWorkingCopy } from './working-copy';
 
 /**
  * How a stored document is described in a LISTING — the shape both the picker
@@ -76,6 +77,19 @@ export interface SavedReportSummary {
    * screen needs and which no amount of client-side care can un-send.
    */
   ownedByMe: boolean;
+  /**
+   * A PUBLISHED report carrying an edit its author has not published yet
+   * (FUT-755) — a state worth seeing on the list card without opening it.
+   *
+   * NOT the same claim as `status: 'draft'`, and the card draws them as two
+   * different chips for exactly that reason: a draft has never been published,
+   * while this one is live to its readers AND being changed.
+   *
+   * Reported to every viewer rather than only to authors: it is a property of
+   * the document, not of the caller, and it discloses only THAT the report is
+   * being edited — the parked content itself never rides a listing.
+   */
+  hasUnpublishedChanges: boolean;
   updatedAt: string;
 }
 
@@ -98,6 +112,10 @@ export function toSummary(record: SavedReportRecord, viewerId: string | null): S
     // An anonymous actor owns nothing: `null === null` is true, and an
     // unauthenticated caller must not inherit every unattributed document.
     ownedByMe: record.createdBy !== null && record.createdBy === viewerId,
+    // Through the same reader the EDITOR uses, so a card can never advertise
+    // unpublished changes the editor then fails to open (or hide changes it
+    // would happily resume).
+    hasUnpublishedChanges: readWorkingCopy(record.workingCopy) !== null,
     updatedAt: record.updatedAt.toISOString(),
   };
 }

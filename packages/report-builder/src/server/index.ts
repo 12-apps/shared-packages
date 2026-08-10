@@ -104,6 +104,7 @@ export {
   reportRangeViewSchema,
   reportRenderSchema,
   reportsParams,
+  reportWorkingCopySchema,
   runReportBody,
   runResultSchema,
   saveReportBody,

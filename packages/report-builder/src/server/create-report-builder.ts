@@ -3,6 +3,7 @@ import { createSavedReportStore } from './saved';
 import { catalogRoute } from './routes-catalog';
 import { runRoute } from './routes-run';
 import { savedReadRoutes } from './routes-saved-read';
+import { savedWorkingCopyRoutes } from './routes-saved-working-copy';
 import { savedWriteRoutes } from './routes-saved-write';
 import { systemRoutes } from './routes-system';
 import type { ReportBuilderServerConfig, ReportRoute } from './context';
@@ -44,6 +45,7 @@ export function createApiReportBuilder(config: ReportBuilderServerConfig): {
       ...systemRoutes(config),
       ...savedReadRoutes(config, store),
       ...savedWriteRoutes(config, store),
+      ...savedWorkingCopyRoutes(config, store),
       runRoute(config),
     ],
   };
