@@ -37,7 +37,7 @@ import type {
   OrderStatus,
   PaymentMethod,
 } from "../components/checkout/types";
-import type { CheckoutTransport } from "../components/checkout/transport";
+import type { CheckoutTransport, VaultedCardDisplay } from "../components/checkout/transport";
 import type { useCheckoutController } from "../components/checkout/use-checkout-controller";
 import type { Result } from "../result";
 
@@ -164,6 +164,18 @@ export interface CheckoutScreens {
   PayerSummary: ComponentType<{ buyer: BuyerInfo; onEdit?(): void }>;
   SavedCards: ComponentType<{ selection: string; onSelect(id: string): void }>;
   EmptyCart: ComponentType<Record<string, never>>;
+  /**
+   * Put a card on file OUTSIDE a purchase (FUT-183, over FUT-478's
+   * `/cards/begin` + `/cards/complete`). `onSaved` fires with display metadata
+   * only — the vault token never reaches the browser.
+   */
+  AddCard: ComponentType<{ onSaved?(display: VaultedCardDisplay): void }>;
+  /**
+   * The buyer's saved cards, plus the door into {@link CheckoutScreens.AddCard}.
+   * Read-only beyond that: there is no buyer-side delete (PagBank publishes no
+   * token-delete endpoint — see `flows/screens-vault.tsx`).
+   */
+  ManageCards: ComponentType<Record<string, never>>;
 }
 
 /** The fetched store protocol, plus whether it is still in flight. */

@@ -2,7 +2,7 @@
  * The checkout's HTTP transport, as a bound client (FUT-741).
  *
  * Everything `client.ts` used to do with a hard-coded prefix and the ambient
- * `fetch` now lives here behind {@link createCheckoutClient}, so the same five
+ * `fetch` now lives here behind {@link createCheckoutClient}, so the same
  * calls can be pointed at a different mount, carry a host's auth headers, or —
  * the reason this exists — be driven through an injected `fetch` that routes
  * straight into a real `createPaymentFlowsBE` mount. A story or a harness page
@@ -14,6 +14,8 @@
  * pinned wire suites drive them; a prefix that is "cleaned up" here breaks the
  * shipped contract in the same release that introduces the factory.
  */
+
+import type { BuyerVaultSession, VaultedCardDisplay } from "@12-apps/payments-backend";
 
 import type { SavedCard } from "../../card";
 import { err, ok, type Result } from "../../result";
@@ -27,6 +29,28 @@ import type {
 } from "./types";
 
 /**
+ * The two buyer-vault answer shapes (FUT-478/FUT-183), imported as TYPES from
+ * the backend package rather than mirrored: `/cards/begin` and `/cards/complete`
+ * are new rows with no older-host degrade story to encode, so a mirror here
+ * would only be a copy that can drift from the wire it names. Re-exported for
+ * the same reason `PaymentEnvironment` is on the barrel — a host typing its
+ * own callback must not need a direct backend dependency.
+ */
+export type { BuyerVaultSession, VaultedCardDisplay };
+
+/**
+ * The browser's two legitimate contributions to `POST /cards/complete`: the
+ * session it confirmed, and — for a sessionless PUBLIC_KEY provider — the
+ * encrypted card blob. The ownership facts (`reference`, `customerRef`) are
+ * answered server-side by the host's vault port and are NOT here on purpose:
+ * a body naming them is ignored by the mount.
+ */
+export interface CompleteVaultInput {
+  sessionId?: string;
+  token?: string;
+}
+
+/**
  * The prefix every shipped buyer checkout posts to today. Exported so a host
  * (or a test) can state it rather than re-type it, and so a change to it is a
  * change to one named constant with this comment attached.
@@ -35,7 +59,10 @@ export const DEFAULT_CHECKOUT_BASE_URL = "/api/checkout";
 
 /** Where the `createPaymentFlowsBE` mount lives, and how to reach it. */
 export interface CheckoutTransport {
-  /** Prefix for `/config`, `/status`, `/charge`, `/cards`, `/refresh-key`. */
+  /**
+   * Prefix for `/config`, `/status`, `/charge`, `/cards`, `/cards/begin`,
+   * `/cards/complete`, `/refresh-key`.
+   */
   baseUrl?: string;
   /**
    * The `fetch` to call. Omitted ⇒ the ambient one, resolved PER CALL so a
@@ -46,7 +73,7 @@ export interface CheckoutTransport {
   headers?: () => HeadersInit | Promise<HeadersInit>;
 }
 
-/** The six calls the buyer checkout makes, pre-bound to a {@link CheckoutTransport}. */
+/** The eight calls the buyer checkout makes, pre-bound to a {@link CheckoutTransport}. */
 export interface CheckoutClient {
   getConfig(tenantSlug: string): Promise<Result<CheckoutProviderConfig>>;
   getStatus(ref: string): Promise<Result<OrderStatus>>;
@@ -54,6 +81,18 @@ export interface CheckoutClient {
   /** A wallet instrument against the same `/charge` route (FUT-471/472). */
   chargeWallet(input: ChargeWalletInput): Promise<Result<ChargeOutcome>>;
   listInstruments(tenantSlug?: string): Promise<SavedCard[]>;
+  /**
+   * `POST /cards/begin` (FUT-478): equip the browser to mint an instrument
+   * OUTSIDE a purchase. The answer names the tokenization scheme, the public
+   * key when the provider has one, and the session to echo to `completeVault`.
+   */
+  beginVault(): Promise<Result<BuyerVaultSession>>;
+  /**
+   * `POST /cards/complete`: the provider accepted the card — the server stores
+   * the vault token against the caller and answers DISPLAY metadata only. The
+   * token that can charge never reaches the browser.
+   */
+  completeVault(input: CompleteVaultInput): Promise<Result<VaultedCardDisplay>>;
   refreshBrowserKey(input: { orderId: string }): Promise<Result<{ publicKey: string | null }>>;
 }
 
@@ -146,7 +185,20 @@ function flatWalletBody(input: ChargeWalletInput): string {
 }
 
 /**
- * The five checkout calls, bound to one transport.
+ * The wire body of `POST /cards/complete` — ONLY the browser's two facts, and
+ * each present only when it exists. `flows-vault.ts` reads exactly these two
+ * string fields (`browserVaultFacts`) and ignores everything else, so a field
+ * added here without a backend reader would be silently dropped.
+ */
+function completeVaultBody(input: CompleteVaultInput): string {
+  return JSON.stringify({
+    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+    ...(input.token ? { token: input.token } : {}),
+  });
+}
+
+/**
+ * The checkout calls, bound to one transport.
  *
  * Passing no transport reproduces exactly what the free functions in
  * `client.ts` have always done: `/api/checkout/**` on the ambient `fetch`.
@@ -202,6 +254,14 @@ export function createCheckoutClient(transport: CheckoutTransport = {}): Checkou
       const result = await call<SavedCard[]>(`/cards${query}`, { method: "GET" });
       return result.ok ? result.data : [];
     },
+
+    beginVault: () => call<BuyerVaultSession>("/cards/begin", { method: "POST" }),
+
+    completeVault: (input) =>
+      call<VaultedCardDisplay>("/cards/complete", {
+        method: "POST",
+        body: completeVaultBody(input),
+      }),
 
     refreshBrowserKey: (input) =>
       call<{ publicKey: string | null }>("/refresh-key", {
