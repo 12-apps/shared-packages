@@ -21,15 +21,14 @@ import { useParams } from "react-router-dom";
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { ErrorState } from "@12-apps/ui/data-display/ErrorState";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
-import { Button } from "@12-apps/ui/form/Button";
 import { Stack } from "@12-apps/ui/mui/Stack";
 
 import { getSystemDashboard, SYSTEM_REPORT_NAV } from "../server/presets";
-import { exportRows } from "./lib/export-rows";
-import { NO_PRINT_CLASS, PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
+import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
+import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
 import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
 import { ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
-import { exportColumnsFor, ReportRenderView } from "./report-render";
+import { ReportRenderView } from "./report-render";
 import { widenAction } from "./lib/widen-range";
 import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
 
@@ -70,6 +69,7 @@ function DashboardBlock({
   const navEntry = SYSTEM_REPORT_NAV.find((entry) => entry.key === reportKey);
   const title = navEntry?.title ?? reportKey;
   const report = query.data;
+  const tableView = useBlockTableView(report?.render);
 
   return (
     <ReportGridItem span={span}>
@@ -77,28 +77,22 @@ function DashboardBlock({
         title={title}
         // The preset's own statement of what its figures exclude and when they
         // are withheld — from the catalog, so it is present before the run
-        // resolves and cannot drift from the report it describes.
+        // resolves and cannot drift from the report it describes. PROSE: it
+        // wraps in full, and is never truncated the way the authored canvas's
+        // generated sentence is (FUT-755).
         description={navEntry?.description}
         dataTestId={testId}
         actions={
-          report ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                exportRows(
-                  "csv",
-                  report.render.rows,
-                  exportColumnsFor(report.render),
-                  `relatorio-${report.key}`,
-                )
-              }
-              data-testid={`${testId}-export`}
-              className={NO_PRINT_CLASS}
-            >
-              CSV
-            </Button>
-          ) : null
+          <BlockToolCluster
+            view={tableView}
+            renderTestId={`${testId}-render`}
+            menuTestId={`${testId}-menu`}
+            csv={
+              report
+                ? { filename: `relatorio-${report.key}`, dataTestId: `${testId}-export` }
+                : undefined
+            }
+          />
         }
       >
         {query.isError ? (
@@ -110,6 +104,7 @@ function DashboardBlock({
             render={report.render}
             dataTestId={`${testId}-render`}
             onWidenRange={widenAction(range, onRangeChange)}
+            asTable={tableView.asTable}
           />
         ) : (
           <LoadingState dataTestId={`${testId}-loading`} />

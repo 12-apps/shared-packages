@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 
 import { createTheme } from '@12-apps/ui/mui/styles';
 
@@ -117,10 +117,16 @@ function renderTableBlock(): HTMLElement {
   return screen.getByTestId('bloco-table');
 }
 
-/** Renders a chart block and flips it to its "Ver como tabela" fallback. */
+/**
+ * Renders a chart block in its "Ver como tabela" fallback.
+ *
+ * `asTable` is an input rather than a click because the toggle moved out of
+ * the rendering and into the block's header cluster (FUT-755) — the button and
+ * the test ids it carries are covered in `block-tool-cluster.test.tsx`. What
+ * this file is about is the table that comes out either way.
+ */
 function renderChartAsTable(): HTMLElement {
-  render(<ReportRenderView render={CHART_RENDER} dataTestId="grafico" />);
-  fireEvent.click(screen.getByTestId('grafico-as-table'));
+  render(<ReportRenderView render={CHART_RENDER} dataTestId="grafico" asTable />);
   return screen.getByTestId('grafico-table');
 }
 
@@ -221,10 +227,10 @@ describe('report table — one style for both call sites', () => {
   });
 
   it('keeps the test ids the reports e2e drives', () => {
-    render(<ReportRenderView render={CHART_RENDER} dataTestId="grafico" />);
+    const { rerender } = render(<ReportRenderView render={CHART_RENDER} dataTestId="grafico" />);
 
-    expect(screen.getByTestId('grafico-as-table')).not.toBeNull();
-    fireEvent.click(screen.getByTestId('grafico-as-table'));
+    expect(screen.getByTestId('grafico-chart')).not.toBeNull();
+    rerender(<ReportRenderView render={CHART_RENDER} dataTestId="grafico" asTable />);
     expect(screen.getByTestId('grafico-table')).not.toBeNull();
   });
 });

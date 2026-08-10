@@ -10,19 +10,17 @@
  * API's own metadata all render a duration, a percent or a SUPPRESSED cell
  * identically.
  */
-import { useState, type JSX } from "react";
+import type { JSX } from "react";
 
 import { SpecChart, type ChartDataPoint } from "@12-apps/ui/charts";
 import { EmptyState } from "@12-apps/ui/data-display/EmptyState";
 import { StatCard } from "@12-apps/ui/data-display/StatCard";
 import { Table } from "@12-apps/ui/data-display/Table";
-import { Button } from "@12-apps/ui/form/Button";
 import { Box } from "@12-apps/ui/mui/Box";
 
 import { formatKpiFigure, formatReportValue } from "../format";
 import { chartColumnsOf } from "./chart-as-table";
 import type { ExportColumn } from "./lib/export-rows";
-import { NO_PRINT_CLASS } from "./lib/print-export";
 import { SECTION_LABEL_STYLE } from "./lib/report-surface";
 import type { ReportRender, ReportRow, ReportTableColumn } from "./reports-api";
 
@@ -226,6 +224,15 @@ interface ReportRenderViewProps {
    * offer could not be taken.
    */
   onWidenRange?: { label: string; onClick: () => void };
+  /**
+   * Draw a CHART rendering as its table instead (FUT-755). A plain input, not
+   * an internal mode: the control that flips it is an icon in the block's tool
+   * cluster, which is a sibling of this rendering rather than a child, so the
+   * state belongs to whoever renders both — `useBlockTableView` in
+   * `lib/block-tools`. Keeping a fallback copy of it here would give every
+   * consumer a controlled and an uncontrolled way to be wrong.
+   */
+  asTable?: boolean;
 }
 
 /**
@@ -237,34 +244,27 @@ interface ReportRenderViewProps {
  * also simply useful — reading an exact value off a chart is guesswork, and
  * this is the values the chart was drawn from rather than a paraphrase.
  *
- * The toggle is per block and NOT persisted: it is how someone wants to read
- * this block right now, not a property of the report. Saving it would change
- * what every other viewer sees.
+ * The table REPLACES the chart in the same box; nothing is stacked above or
+ * below it, so switching costs the block only the difference between the two
+ * renderings' own heights.
  */
 function ChartOrTable({
   render,
   dataTestId,
+  asTable,
 }: {
   render: Extract<ReportRender, { kind: "chart" }>;
   dataTestId: string;
+  asTable: boolean;
 }): JSX.Element {
-  const [asTable, setAsTable] = useState(false);
-  const columns = chartColumnsOf(render);
-
   return (
     <Box sx={CHART_BOX_SX} data-testid={dataTestId}>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setAsTable((current) => !current)}
-        aria-pressed={asTable}
-        data-testid={`${dataTestId}-as-table`}
-        className={NO_PRINT_CLASS}
-      >
-        {asTable ? "Ver como gráfico" : "Ver como tabela"}
-      </Button>
       {asTable ? (
-        <ReportTable columns={columns} rows={render.rows} dataTestId={dataTestId} />
+        <ReportTable
+          columns={chartColumnsOf(render)}
+          rows={render.rows}
+          dataTestId={dataTestId}
+        />
       ) : (
         <SpecChart
           spec={render.chartSpec}
@@ -282,6 +282,7 @@ export function ReportRenderView({
   render,
   dataTestId = "report-render",
   onWidenRange,
+  asTable = false,
 }: ReportRenderViewProps): JSX.Element {
   if (render.kind === "kpi") {
     // A KPI over an empty period renders the tile with "—", not EmptyState —
@@ -308,7 +309,7 @@ export function ReportRenderView({
     );
   }
   if (render.kind === "chart") {
-    return <ChartOrTable render={render} dataTestId={dataTestId} />;
+    return <ChartOrTable render={render} dataTestId={dataTestId} asTable={asTable} />;
   }
   return (
     <Box sx={TABULAR_FIGURES} data-testid={dataTestId}>

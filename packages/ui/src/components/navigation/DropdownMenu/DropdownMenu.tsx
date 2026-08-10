@@ -189,6 +189,7 @@ const renderLeafMenuItem = (
       onClick={!item.disabled ? () => handleItemClick(item) : undefined} // ← change
       color={item.color}
       showIconSpace={showIconSpace && !hasIcon}
+      data-testid={item.dataTestId}
     >
       {hasIcon && (
         <ListItemIcon sx={{ minWidth: size === 'sm' ? 32 : 40 }}>{item.icon}</ListItemIcon>

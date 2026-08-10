@@ -16,23 +16,26 @@ import {
   type ReportStatusWire,
   type SavedReportView,
 } from "./custom-reports-api";
+import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
 import { ConfirmDialog } from "./lib/confirm-dialog";
-import { exportRows } from "./lib/export-rows";
-import { NO_PRINT_CLASS } from "./lib/print-export";
 import { ReportBlockBody, ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
-import { exportColumnsFor } from "./report-render";
 import { viewBlocks } from "./report-model";
 import { useTransport } from "./transport-context";
 
 /**
- * One block on the viewer's canvas: title, what it asks for, result, and its
- * own CSV export.
+ * One block on the viewer's canvas: title, what it asks for, result, and the
+ * two tools that act on it.
  *
  * A NAMED block shows its name with the spec sentence beneath — the two say
  * different things, and "Receita do mês" does not tell you it is filtered to
  * PIX. An UNNAMED block is titled by the sentence itself and shows no
  * subtitle, because repeating one string as both heading and caption is noise
  * rather than information.
+ *
+ * The table view is held HERE rather than inside the rendering (FUT-755): the
+ * icon that flips it lives in the header cluster, which is the rendering's
+ * sibling, so this block is the nearest thing that owns both. It is per block
+ * and never saved — see `useBlockTableView`.
  */
 function ViewBlock({ block }: { block: DashboardBlockRender }): JSX.Element {
   const testId = `report-block-${block.id}`;
@@ -43,34 +46,23 @@ function ViewBlock({ block }: { block: DashboardBlockRender }): JSX.Element {
     : sentence === ""
       ? ""
       : sentence.charAt(0).toLocaleUpperCase("pt-BR") + sentence.slice(1);
+  const tableView = useBlockTableView(block.status === "ok" ? block.render : undefined);
   return (
     <ReportGridItem span={block.span}>
       <ReportBlockFrame
         title={heading}
-        description={named && sentence !== "" ? sentence : undefined}
+        specSentence={named && sentence !== "" ? sentence : undefined}
         dataTestId={testId}
         actions={
-          block.status === "ok" ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                exportRows(
-                  "csv",
-                  block.render.rows,
-                  exportColumnsFor(block.render),
-                  `bloco-${block.id}`,
-                )
-              }
-              data-testid={`${testId}-export`}
-              className={NO_PRINT_CLASS}
-            >
-              CSV
-            </Button>
-          ) : null
+          <BlockToolCluster
+            view={tableView}
+            renderTestId={`${testId}-render`}
+            menuTestId={`${testId}-menu`}
+            csv={{ filename: `bloco-${block.id}`, dataTestId: `${testId}-export` }}
+          />
         }
       >
-        <ReportBlockBody block={block} dataTestId={testId} />
+        <ReportBlockBody block={block} dataTestId={testId} asTable={tableView.asTable} />
       </ReportBlockFrame>
     </ReportGridItem>
   );

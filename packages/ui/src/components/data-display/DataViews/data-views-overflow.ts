@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 
+import { splitToFit, useMeasuredWidth } from "../../utility/Overflow";
 import {
   estimateWidth,
   furnitureCost,
@@ -106,26 +107,6 @@ export function toOverflowFields<T extends Record<string, unknown>>(
 }
 
 
-/** Observe the bar's width. Returns 0 until the first measurement lands. */
-function useBarWidth(): { barRef: React.RefObject<HTMLDivElement | null>; width: number } {
-  const barRef = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    const element = barRef.current;
-    // jsdom has no ResizeObserver, and neither does an SSR pass — with no
-    // measurement the hook keeps every control inline, which is the honest
-    // fallback: nothing is hidden behind a menu nobody can see.
-    if (!element || typeof ResizeObserver === "undefined") return undefined;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) setWidth(entry.contentRect.width);
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-  return { barRef, width };
-}
-
 /** Is this control carrying a value the operator set? */
 function isActiveField<T extends Record<string, unknown>>(
   field: OverflowField<T>,
@@ -167,24 +148,11 @@ function splitFilters<T extends Record<string, unknown>>(
   /** Is the bar already down to icons? "Mais" shrinks with everything else. */
   compact: boolean,
 ): Split<T> {
-  const none: OverflowField<T>[] = [];
-  const widthOf = (field: OverflowField<T>): number => fieldWidth(field, pills, ranges);
-  const cost = (fields: OverflowField<T>[]): number =>
-    fields.reduce((sum, field) => sum + widthOf(field) + GAP, 0);
   const active = all.filter((field) => isActiveField(field, pills, ranges));
   const idle = all.filter((field) => !isActiveField(field, pills, ranges));
 
   // "Limpar" rides the end of the cluster whenever anything is applied.
   const clearCost = active.length > 0 ? RESERVED.clearAll + GAP : 0;
-  let available = width - furniture - clearCost;
-  if (cost(all) <= available) {
-    return { inline: all, overflow: none, used: cost(all) + clearCost };
-  }
-
-  // There IS an overflow, so its button now costs room too — at the width it
-  // will actually have, which on a phone is the icon-and-badge one.
-  const overflowButton = compact ? RESERVED.overflowButtonCompact : RESERVED.overflowButton;
-  available -= overflowButton;
   // APPLIED FIRST, BUT NOT EXEMPT.
   //
   // Applied controls take the visible slots ahead of idle ones — that part was
@@ -197,22 +165,21 @@ function splitFilters<T extends Record<string, unknown>>(
   // vanished silently: the trigger goes to the applied tone and says how many
   // are in there (see `MoreTrigger`), which is the same signal the pill itself
   // was carrying. A control you scroll off-screen carries no signal at all.
-  const keep = new Set<string>();
-  for (const field of [...active, ...idle]) {
-    const next = widthOf(field) + GAP;
-    if (next > available) continue;
-    available -= next;
-    keep.add(field.id);
-  }
-  // Rendered in the DECLARED order, not the applied-first one: which controls
-  // are visible may change with the width, but the ones that stay must not
-  // reshuffle under the operator's cursor.
-  const inline = all.filter((field) => keep.has(field.id));
-  return {
-    inline,
-    overflow: all.filter((field) => !keep.has(field.id)),
-    used: cost(inline) + overflowButton + clearCost,
-  };
+  //
+  // The keep-what-fits loop itself is `splitToFit` (`utility/Overflow`) — the
+  // one part of this that is not filter-shaped, and the part a second cluster
+  // in the design system would otherwise have had to reimplement.
+  const split = splitToFit(all, {
+    widthOf: (field) => fieldWidth(field, pills, ranges),
+    keyOf: (field) => field.id,
+    gap: GAP,
+    available: width - furniture - clearCost,
+    // The overflow button at the width it will actually have, which on a phone
+    // is the icon-and-badge one.
+    overflowCost: compact ? RESERVED.overflowButtonCompact : RESERVED.overflowButton,
+    priority: [...active, ...idle],
+  });
+  return { ...split, used: split.used + clearCost };
 }
 
 /**
@@ -363,7 +330,12 @@ export function useFilterOverflow<T extends Record<string, unknown>>(
   /** Whether "Exportar" is on the bar — see `rightClusterCost`. */
   hasExport = true,
 ): OverflowSplit<T> {
-  const { barRef, width } = useBarWidth();
+  // The measurement is `useMeasuredWidth` (`utility/Overflow`): the same
+  // ResizeObserver every collapsing cluster in the design system reads, so
+  // there is one loop to get right rather than one per bar. `0` until the
+  // first measurement lands (and forever under SSR or jsdom), which
+  // `computeSplit` reads as "degrade nothing".
+  const { ref: barRef, width } = useMeasuredWidth<HTMLDivElement>();
   const signature = JSON.stringify({
     ids: all.map((field) => field.id),
     pills,

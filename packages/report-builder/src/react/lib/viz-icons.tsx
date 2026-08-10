@@ -10,24 +10,11 @@
 import type { JSX, ReactNode } from "react";
 
 import type { ChartKind } from "../builder-model";
+import { Glyph as IconFrame } from "./glyph";
 
+/** A tile's glyph is drawn larger than the chrome's — 22px, not 16. */
 function Glyph({ children }: { children: ReactNode }): JSX.Element {
-  return (
-    <svg
-      width={22}
-      height={22}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {children}
-    </svg>
-  );
+  return <IconFrame size={22}>{children}</IconFrame>;
 }
 
 const ICONS: Record<ChartKind, JSX.Element> = {

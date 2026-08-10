@@ -3,43 +3,16 @@
  * dependency-free: grip (drag to place), pen (edit the query), trash (remove).
  * `currentColor`-driven, so the button's colour fully controls them.
  */
-import type { JSX, ReactNode } from "react";
+import type { JSX } from "react";
 
-function Glyph({ children }: { children: ReactNode }): JSX.Element {
-  return (
-    <svg
-      width={16}
-      height={16}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {children}
-    </svg>
-  );
-}
+import { Glyph } from "./glyph";
 
 /** Plus — the canvas's add-a-block affordance (drawn larger than the chrome). */
 export function PlusIcon(): JSX.Element {
   return (
-    <svg
-      width={28}
-      height={28}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      aria-hidden="true"
-      focusable="false"
-    >
+    <Glyph size={28}>
       <path d="M12 5v14M5 12h14" />
-    </svg>
+    </Glyph>
   );
 }
 
