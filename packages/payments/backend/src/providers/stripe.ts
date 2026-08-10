@@ -342,6 +342,11 @@ export function stripeProvider(): PaymentProviderAdapter {
       splits: false,
       webhooks: true,
       tokenization: 'SDK',
+      // Runnable end to end (FUT-689): the browser mints a PaymentMethod with
+      // the publishable key (FUT-698's `stripe-pm`), the generic CARD branch
+      // charges and refunds it. Declaring it is what makes `proofMissing`
+      // fire — without it a connection could be enabled with zero proof.
+      activationCharge: true,
     },
     // OAuth fills these in itself; they stay declared because a store MAY
     // paste its own keys instead (and because the settings page renders the

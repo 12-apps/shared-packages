@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { credentialStoreFrom } from '../config/service';
+import { createSettingsService, credentialStoreFrom } from '../config/service';
 import { IrreversibleChainRemovalError, UnprovenProviderError } from '../core/errors';
+import { defineProviders } from '../core/registry';
+import { createMemoryProviderConfigStore } from '../memory';
 import {
   TENANT,
+  chargelessAdapter,
   setupOAuthWorld,
   setupSettingsWorld as setup,
   setupStrictSettings,
@@ -560,18 +563,37 @@ describe('createSettingsService', () => {
   });
 
   /**
-   * The rule binds only where the proof is obtainable.
-   *
-   * Stripe has no browser tokenization written, so no verification charge can
-   * ever run for it. Requiring one anyway did not make its "Ativo" honest — it
-   * made the provider impossible to enable at all, which is how three adapters
-   * got bricked by the gate that was meant to protect one.
+   * The FUT-689 half of the same rule: Stripe used to be the "cannot run the
+   * charge" example, so an unproven Stripe connection could be enabled with no
+   * proof at all. The `stripe-pm` tokenizer (FUT-698) made the charge runnable,
+   * and the adapter now declares it — so `proofMissing` fires for Stripe too.
    */
-  it('enables a provider that cannot run the charge, without one', async () => {
+  it('given a connected but unproven Stripe, when the owner enables it, then it is refused', async () => {
     const { settings } = setup();
+    // Probe-verified — the state that used to be enough to switch Stripe on.
     await settings.verify(TENANT, 'stripe');
 
-    await expect(settings.setEnabled(TENANT, 'stripe', true)).resolves.toMatchObject({
+    await expect(settings.setEnabled(TENANT, 'stripe', true)).rejects.toThrow(
+      UnprovenProviderError,
+    );
+    expect((await settings.getSettings(TENANT)).providerChain).toEqual([]);
+  });
+
+  /**
+   * The rule binds only where the proof is obtainable.
+   *
+   * An adapter with no browser tokenization can never produce the charge, so
+   * requiring one would not make its "Ativo" honest — it would make the
+   * provider impossible to enable at all, which is how three adapters got
+   * bricked by the gate that was meant to protect one. Every SHIPPED adapter
+   * now declares the charge, so the case rides a purpose-built fake.
+   */
+  it('enables a provider that cannot run the charge, without one', async () => {
+    const store = createMemoryProviderConfigStore();
+    const providers = defineProviders({ chargeless: chargelessAdapter('chargeless') } as const);
+    const settings = createSettingsService(providers, store, { allowStubMode: true });
+
+    await expect(settings.setEnabled(TENANT, 'chargeless', true)).resolves.toMatchObject({
       enabled: true,
     });
   });
@@ -781,10 +803,11 @@ describe('createSettingsService', () => {
   it('given a configured but disabled provider, when the chain is reordered including it, then it stays disabled', async () => {
     const { settings } = setup();
     await settings.applyChargeVerification(TENANT, 'stone', true);
-    // Connected, never switched on. Stripe cannot run an activation charge, so
-    // the ONLY thing standing between it and the chain is the owner's switch —
-    // and the plan slot that switch spends.
-    await settings.saveCredentials(TENANT, 'stripe', { environment: 'SANDBOX', fields: {} });
+    // Proven, then deliberately switched OFF. The proof gate has nothing left
+    // to say about this row, so the ONLY thing standing between it and the
+    // chain is the owner's switch — and the plan slot that switch spends.
+    await settings.applyChargeVerification(TENANT, 'stripe', true);
+    await settings.setEnabled(TENANT, 'stripe', false);
 
     await expect(settings.setPriorities(TENANT, ['stone', 'stripe'])).rejects.toThrow(
       /stripe is not enabled/,
