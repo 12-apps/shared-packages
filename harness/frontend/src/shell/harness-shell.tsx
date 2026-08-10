@@ -1,8 +1,12 @@
-import type { JSX, ReactNode } from 'react';
+import { useEffect, useState, type JSX, type ReactNode } from 'react';
 
+import MenuIcon from '@mui/icons-material/Menu';
+
+import { Drawer } from '@12-apps/ui/layout/Drawer';
 import { Sidebar, SidebarContent, SidebarHeader } from '@12-apps/ui/layout/Sidebar';
 import { Box } from '@12-apps/ui/mui/Box';
 import { alpha, type Theme } from '@12-apps/ui/mui/styles';
+import useMediaQuery from '@12-apps/ui/mui/useMediaQuery';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import { HarnessNav } from './harness-nav';
@@ -14,12 +18,25 @@ import { HarnessNav } from './harness-nav';
  * panel tinted a few percent of primary so it reads as chrome rather than as
  * more page.
  *
- * The admin's shell does three further things this one has no use for: it
- * resolves the actor's permissions and the tenant's entitlements before it can
- * draw a row, it swaps to an overlay drawer on phones, and it persists the
- * rail and section state per tenant+user. None of those have a meaning here —
- * there is no actor, no tenant, and the harness is opened to look at one page.
+ * On a phone it becomes what the admin becomes: an overlay drawer behind a
+ * menu button, so the content gets the whole width. This file used to say that
+ * behaviour had "no meaning here" — that was wrong, and hand-testing found it.
+ * A 280px rail out of a 660px viewport leaves the report canvas 380px, which
+ * is narrower than one chart, and the harness is where these packages are
+ * looked at on a phone.
+ *
+ * The admin's shell still does two things this one has no use for: it resolves
+ * the actor's permissions and the tenant's entitlements before it can draw a
+ * row, and it persists rail and section state per tenant+user. There is no
+ * actor and no tenant here.
  */
+
+/**
+ * Where the rail stops fitting. The same query the admin uses, deliberately —
+ * the two shells changing shape at different widths would make the harness a
+ * bad place to check how a package behaves at a breakpoint.
+ */
+const MOBILE_QUERY = '(max-width:900px)';
 
 /** Subtle primary tint that distinguishes the sidebar panel from the content. */
 export const panelBg = (t: Theme): string => alpha(t.palette.primary.main, 0.04);
@@ -70,6 +87,150 @@ function BrandHeader(): JSX.Element {
   );
 }
 
+/**
+ * Whether the overlay nav is open, and the two rules that close it.
+ *
+ * It closes on a route change, because every row in this nav IS a route change
+ * and a drawer that stays open over the page you just asked for hides it. And
+ * it closes when the viewport grows back to desktop, so rotating a tablet with
+ * the drawer open does not leave an overlay pinned above a rail that is now
+ * docked anyway.
+ */
+function useMobileNav(
+  isMobile: boolean,
+  activeSlug: string,
+): { open: boolean; toggle: () => void; close: () => void } {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [activeSlug]);
+
+  useEffect(() => {
+    if (!isMobile) setOpen(false);
+  }, [isMobile]);
+
+  return {
+    open,
+    toggle: () => setOpen((prev) => !prev),
+    close: () => setOpen(false),
+  };
+}
+
+/** The rail's contents — identical either way; only what wraps them changes. */
+function NavPanel({ activeSlug }: { activeSlug: string }): JSX.Element {
+  return (
+    <>
+      <SidebarHeader style={{ padding: 0 }}>
+        <BrandHeader />
+      </SidebarHeader>
+      <SidebarContent>
+        <Box sx={{ bgcolor: panelBg, minHeight: '100%' }}>
+          <HarnessNav activeSlug={activeSlug} />
+        </Box>
+      </SidebarContent>
+    </>
+  );
+}
+
+/**
+ * Docks the sidebar in-flow on desktop; wraps it in an overlay drawer on
+ * mobile.
+ *
+ * `Sidebar` stays on both paths so the nav is the same component in the same
+ * theme at every width — the drawer supplies the overlay and the backdrop, not
+ * a second implementation of the rail.
+ */
+function HarnessNavRegion({
+  isMobile,
+  open,
+  onClose,
+  activeSlug,
+}: {
+  isMobile: boolean;
+  open: boolean;
+  onClose: () => void;
+  activeSlug: string;
+}): JSX.Element {
+  const panel = (
+    <Sidebar variant="fixed" width={280} dataTestId="harness-sidebar">
+      <NavPanel activeSlug={activeSlug} />
+    </Sidebar>
+  );
+
+  if (!isMobile) return panel;
+
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      variant="left"
+      width={280}
+      dataTestId="harness-sidebar-drawer"
+    >
+      {panel}
+    </Drawer>
+  );
+}
+
+/**
+ * The phone's only chrome: the mark, the name, and the way back to the nav.
+ *
+ * It exists because the drawer is closed by default, and a nav you cannot see
+ * needs something visible to open it. On desktop it is not rendered at all —
+ * the rail is already on screen, and a second header above it would be a title
+ * bar for a page that has its own.
+ */
+function MobileTopBar({ onOpenNav }: { onOpenNav: () => void }): JSX.Element {
+  return (
+    <Box
+      component="header"
+      data-testid="harness-top-bar"
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        px: 1,
+        py: 1,
+        flex: '0 0 auto',
+        bgcolor: panelBg,
+        borderBottom: 1,
+        borderColor: 'divider',
+      }}
+    >
+      <Box
+        component="button"
+        type="button"
+        onClick={onOpenNav}
+        data-testid="harness-nav-toggle"
+        aria-label="Abrir navegação"
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          // 44px, which is the smallest target a thumb hits reliably. The icon
+          // inside is 20px; the rest is the part you are allowed to miss by.
+          width: 44,
+          height: 44,
+          flex: '0 0 auto',
+          border: 0,
+          borderRadius: 1.5,
+          background: 'transparent',
+          cursor: 'pointer',
+          color: 'text.secondary',
+          '&:hover': { bgcolor: (t) => alpha(t.palette.primary.main, 0.08) },
+        }}
+      >
+        <MenuIcon fontSize="small" aria-hidden />
+      </Box>
+      <BrandMark />
+      <Text variant="heading" size="md" as="span">
+        Harness
+      </Text>
+    </Box>
+  );
+}
+
 export function HarnessShell({
   activeSlug,
   children,
@@ -77,19 +238,39 @@ export function HarnessShell({
   activeSlug: string;
   children: ReactNode;
 }): JSX.Element {
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const nav = useMobileNav(isMobile, activeSlug);
+
   return (
-    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <Sidebar variant="fixed" width={280} dataTestId="harness-sidebar">
-        <SidebarHeader style={{ padding: 0 }}>
-          <BrandHeader />
-        </SidebarHeader>
-        <SidebarContent>
-          <Box sx={{ bgcolor: panelBg, minHeight: '100%' }}>
-            <HarnessNav activeSlug={activeSlug} />
-          </Box>
-        </SidebarContent>
-      </Sidebar>
-      <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, overflow: 'auto', p: 3 }}>{children}</Box>
+    // `100dvh`, not `100vh`: on a phone the browser's own chrome retracts as
+    // you scroll, and `vh` measures the tallest state — so a fixed-viewport
+    // shell sized in `vh` puts its last row under the address bar, where it
+    // cannot be tapped. `dvh` follows the viewport that actually exists.
+    <Box sx={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
+      <HarnessNavRegion
+        isMobile={isMobile}
+        open={nav.open}
+        onClose={nav.close}
+        activeSlug={activeSlug}
+      />
+      {/* A column on both paths, so the page below scrolls under a top bar that
+          stays put rather than scrolling away with it. */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
+        {isMobile ? <MobileTopBar onOpenNav={nav.toggle} /> : null}
+        <Box
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            minHeight: 0,
+            overflow: 'auto',
+            // 24px of gutter on a 390px screen spends 12% of the width on
+            // nothing. The narrow tier keeps a margin, not a frame.
+            p: { xs: 1.5, md: 3 },
+          }}
+        >
+          {children}
+        </Box>
+      </Box>
     </Box>
   );
 }
