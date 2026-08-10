@@ -4,6 +4,7 @@ import React from 'react';
 
 import { Carousel } from './Carousel';
 import type { CarouselItem } from './Carousel.types';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Carousel> = {
   title: 'Media/Carousel',
@@ -19,11 +20,11 @@ const meta: Meta<typeof Carousel> = {
     },
     size: {
       control: 'select',
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
     color: {
       control: 'select',
-      options: ['primary', 'secondary', 'success', 'error', 'warning', 'info'],
+      options: COLOR_VALUES,
     },
     animation: {
       control: 'select',
@@ -268,7 +269,7 @@ export const Animations: Story = {
 export const Sizes: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((size) => (
+      {(SIZE_VALUES).map((size) => (
         <Box key={size}>
           <Typography variant="h6" gutterBottom>
             Size: {size.toUpperCase()}
@@ -283,7 +284,7 @@ export const Sizes: Story = {
 export const Colors: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {(['primary', 'secondary', 'success', 'error', 'warning', 'info'] as const).map((color) => (
+      {COLOR_VALUES.map((color) => (
         <Box key={color}>
           <Typography variant="h6" gutterBottom>
             Color: {color}
@@ -473,7 +474,7 @@ export const AllVariants: Story = {
 export const AllSizes: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((size) => (
+      {(SIZE_VALUES).map((size) => (
         <Box key={size}>
           <Typography variant="h6" gutterBottom>
             Size: {size.toUpperCase()}
@@ -587,13 +588,19 @@ export const Responsive: Story = {
         Responsive Carousel (resize viewport to test)
       </Typography>
       <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: 600, md: 800, lg: 1000 } }}>
+        {/*
+          `size` is one value, not a breakpoint map — the component has never
+          read one. The neighbouring `height`, `showArrows` and `showThumbnails`
+          props are handed maps here too and are just as unsupported; those are
+          outside this change and still do not type-check.
+        */}
         <Carousel
           items={imageItems}
           height={{ xs: 200, sm: 300, md: 400, lg: 500 }}
           showArrows={{ xs: false, sm: true }}
           showIndicators={true}
           showThumbnails={{ xs: false, md: true }}
-          size={{ xs: 'xs', sm: 'sm', md: 'md', lg: 'lg' }}
+          size="md"
         />
       </Box>
       <Typography variant="body2" sx={{ mt: 2 }} color="text.secondary">

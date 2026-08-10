@@ -2,6 +2,7 @@ import { FormGroup,Stack } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Checkbox } from './Checkbox';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Checkbox> = {
   title: 'Form/Checkbox',
@@ -17,11 +18,11 @@ const meta: Meta<typeof Checkbox> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'error'],
+      options: COLOR_VALUES,
     },
     size: {
       control: { type: 'select' },
-      options: ['sm', 'md', 'lg'],
+      options: SIZE_VALUES,
     },
     loading: {
       control: { type: 'boolean' },

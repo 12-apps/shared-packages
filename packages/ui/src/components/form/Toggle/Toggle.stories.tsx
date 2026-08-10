@@ -22,6 +22,7 @@ import {
 import { useState } from 'react';
 
 import { Toggle } from './Toggle';
+import { COLOR_VALUES, SIZE_VALUES, ColorValue, SizeValue } from '../../../tokens/scales';
 
 const meta: Meta<typeof Toggle> = {
   title: 'Form/Toggle',
@@ -37,11 +38,11 @@ const meta: Meta<typeof Toggle> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'],
+      options: COLOR_VALUES,
     },
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
   },
 };
@@ -136,20 +137,24 @@ export const Variants: Story = {
 };
 
 const ColorsComponent = () => {
-  const [states, setStates] = useState({
+  const [states, setStates] = useState<Record<ColorValue, boolean>>({
     primary: false,
     secondary: false,
     success: false,
     warning: false,
+    info: false,
     danger: false,
     neutral: false,
   });
 
-  const icons = {
+  // Both maps are `Record<ColorValue, …>`, so a colour added to the vocabulary
+  // cannot reach this story without an icon and a state. Neither had `info`.
+  const icons: Record<ColorValue, React.ReactNode> = {
     primary: <ThumbsUp size={16} />,
     secondary: <Share2 size={16} />,
     success: <Download size={16} />,
     warning: <Bell size={16} />,
+    info: <Bell size={16} />,
     danger: <Heart size={16} />,
     neutral: <Settings size={16} />,
   };
@@ -158,15 +163,13 @@ const ColorsComponent = () => {
     <Box
       sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2 }}
     >
-      {Object.entries(states).map(([color, selected]) => (
+      {COLOR_VALUES.map((color) => (
         <Toggle
           key={color}
           color={color}
-          icon={icons[color as keyof typeof icons]}
-          selected={selected}
-          onChange={() =>
-            setStates((prev) => ({ ...prev, [color]: !prev[color as keyof typeof prev] }))
-          }
+          icon={icons[color]}
+          selected={states[color]}
+          onChange={() => setStates((prev) => ({ ...prev, [color]: !prev[color] }))}
         >
           {color.charAt(0).toUpperCase() + color.slice(1)}
         </Toggle>
@@ -180,7 +183,7 @@ export const Colors: Story = {
 };
 
 const SizesComponent = () => {
-  const [states, setStates] = useState({
+  const [states, setStates] = useState<Record<SizeValue, boolean>>({
     xs: false,
     sm: false,
     md: false,
@@ -190,7 +193,7 @@ const SizesComponent = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
-      {Object.entries(states).map(([size, selected]) => (
+      {SIZE_VALUES.map((size) => (
         <Box key={size} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Typography variant="body2" sx={{ minWidth: '40px' }}>
             {size.toUpperCase()}:
@@ -212,10 +215,8 @@ const SizesComponent = () => {
                 }
               />
             }
-            selected={selected}
-            onChange={() =>
-              setStates((prev) => ({ ...prev, [size]: !prev[size as keyof typeof prev] }))
-            }
+            selected={states[size]}
+            onChange={() => setStates((prev) => ({ ...prev, [size]: !prev[size] }))}
           >
             Toggle {size.toUpperCase()}
           </Toggle>
@@ -587,11 +588,12 @@ const ResponsiveComponent = () => {
           gap: 2,
         }}
       >
+        {/* Scalar: `size` never accepted a breakpoint map. */}
         <Toggle
           selected={selected}
           onChange={() => setSelected(!selected)}
           icon={<Heart size={16} />}
-          size={{ xs: 'sm', sm: 'md', md: 'lg' }}
+          size="md"
         >
           Responsive Size
         </Toggle>

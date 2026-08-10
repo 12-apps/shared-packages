@@ -18,6 +18,7 @@ import React from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { ToggleGroup } from './ToggleGroup';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof ToggleGroup> = {
   title: 'Form/ToggleGroup/Tests',
@@ -329,7 +330,7 @@ export const VisualStates: Story = {
           Size Variations
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((size) => (
+          {(SIZE_VALUES).map((size) => (
             <ToggleGroup
               key={size}
               options={formatOptions}
@@ -370,7 +371,7 @@ export const VisualStates: Story = {
     expect(gradientGroup).toBeInTheDocument();
 
     // Test size variations
-    const sizes = ['xs', 'sm', 'md', 'lg', 'xl'];
+    const sizes = SIZE_VALUES;
     for (const size of sizes) {
       const sizeGroup = canvas.getByTestId(`size-${size}`);
       expect(sizeGroup).toBeInTheDocument();

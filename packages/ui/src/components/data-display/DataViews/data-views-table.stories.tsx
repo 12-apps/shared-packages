@@ -100,13 +100,13 @@ const TOTAL_COUNT = 34;
 // but it is the shape the chip actually accepts, and it compiles the day the
 // exclusion is lifted.
 const PAGAMENTO_COLOR: Record<string, ChipColor> = { Pago: "success", Pendente: "warning" };
-const SITUACAO_COLOR: Record<string, ChipColor> = { "Em aberto": "info", Cancelado: "error" };
+const SITUACAO_COLOR: Record<string, ChipColor> = { "Em aberto": "info", Cancelado: "danger" };
 
 /** Status cells are chips so a row's state reads at a glance, as on the real screen. */
 function statusCell(palette: Record<string, ChipColor>) {
   return ({ value }: { value: unknown }): React.JSX.Element => {
     const label = String(value);
-    return <Chip label={label} size="sm" variant="outlined" color={palette[label] ?? "default"} />;
+    return <Chip label={label} size="sm" variant="outlined" color={palette[label] ?? "neutral"} />;
   };
 }
 
@@ -237,7 +237,7 @@ const rowActions: RowAction<PedidoRow>[] = [
   {
     id: "cancelar",
     label: "Cancelar pedido",
-    color: "error",
+    color: "danger",
     // A cancelled order has nowhere left to go, so the action hides on those
     // rows; in bulk it runs only on the ones that pass.
     isVisible: (row) => row.situacao !== "Cancelado",

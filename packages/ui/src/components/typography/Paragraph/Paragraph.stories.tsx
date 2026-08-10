@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { Paragraph } from './Paragraph';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Paragraph> = {
   title: 'Typography/Paragraph',
@@ -25,12 +26,12 @@ const meta: Meta<typeof Paragraph> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'],
+      options: COLOR_VALUES,
       description: 'Theme color',
     },
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
       description: 'Size variant',
     },
   },

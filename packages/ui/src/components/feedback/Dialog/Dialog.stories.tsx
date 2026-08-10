@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { Dialog, DialogActions,DialogContent, DialogHeader } from './Dialog';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Dialog> = {
   title: 'Overlays/Dialog',
@@ -24,7 +25,7 @@ const meta: Meta<typeof Dialog> = {
     },
     size: {
       control: 'select',
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
       description: 'Size of the dialog',
     },
     borderRadius: {
@@ -207,7 +208,7 @@ export const DrawerStyle: Story = {
 };
 
 const AllSizesComponent = () => {
-const sizes = ['xs', 'sm', 'md', 'lg', 'xl'] as const;
+const sizes = SIZE_VALUES;
     const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
 
     const handleOpen = (size: string) => {
@@ -800,7 +801,7 @@ export const Responsive: Story = {
           gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
           gap: 2 
         }}>
-          {['xs', 'sm', 'md', 'lg', 'xl'].map(size => (
+          {SIZE_VALUES.map(size => (
             <Box key={size} sx={{ border: '1px solid #ccc', borderRadius: 1, p: 2 }}>
               <Typography variant="body2" gutterBottom>{size.toUpperCase()} Size</Typography>
               <DialogWrapper variant="glass" size={size as 'xs' | 'sm' | 'md' | 'lg' | 'xl'}>

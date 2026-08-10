@@ -11,6 +11,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { WorkflowStep } from './WorkflowStep';
 import type { WorkflowStepItem } from './WorkflowStep.types';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof WorkflowStep> = {
   title: 'Navigation/WorkflowStep',
@@ -46,12 +47,12 @@ const meta: Meta<typeof WorkflowStep> = {
     color: {
       description: 'Theme color',
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'error', 'neutral'],
+      options: COLOR_VALUES,
     },
     size: {
       description: 'Size of step indicators',
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
     showProgress: {
       description: 'Whether to show progress bar between steps',
@@ -304,7 +305,7 @@ export const VerticalOrientation: Story = {
 export const ColorVariations: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 800 }}>
-      {(['primary', 'secondary', 'success', 'warning', 'error'] as const).map((color) => (
+      {COLOR_VALUES.map((color) => (
         <Paper key={color} elevation={1} sx={{ p: 3 }}>
           <h3>{color.charAt(0).toUpperCase() + color.slice(1)} Color</h3>
           <WorkflowStep 

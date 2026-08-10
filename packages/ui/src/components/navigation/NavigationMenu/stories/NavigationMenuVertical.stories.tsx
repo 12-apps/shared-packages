@@ -11,6 +11,7 @@ import { Avatar,Box, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { NavigationMenu } from '../NavigationMenu';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../../tokens/scales';
 
 const meta: Meta<typeof NavigationMenu> = {
   title: 'Navigation/NavigationMenu/Vertical',
@@ -33,12 +34,12 @@ const meta: Meta<typeof NavigationMenu> = {
     },
     size: {
       control: 'select',
-      options: ['sm', 'md', 'lg'],
+      options: SIZE_VALUES,
       description: 'Size of the menu items',
     },
     color: {
       control: 'select',
-      options: ['default', 'primary', 'secondary'],
+      options: COLOR_VALUES,
       description: 'Color scheme for the menu',
     },
     collapsible: {

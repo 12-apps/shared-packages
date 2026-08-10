@@ -22,6 +22,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { AnimatedIcon } from './AnimatedIcon';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof AnimatedIcon> = {
   title: 'Media/AnimatedIcon',
@@ -66,7 +67,7 @@ const meta: Meta<typeof AnimatedIcon> = {
     },
     size: {
       control: 'select',
-      options: ['sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
       description: 'Size of the animated icon container',
     },
     color: {

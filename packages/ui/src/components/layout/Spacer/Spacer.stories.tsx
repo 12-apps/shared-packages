@@ -2,6 +2,7 @@ import { Box, Paper,Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Spacer } from './Spacer';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Spacer> = {
   title: 'Layout/Spacer',
@@ -19,7 +20,7 @@ const meta: Meta<typeof Spacer> = {
   argTypes: {
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
       description: 'Predefined spacing size',
     },
     direction: {
@@ -344,7 +345,7 @@ export const AllSizes: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 2 }}>
       <Typography variant="h6">All Size Variants</Typography>
-      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((size) => (
+      {(SIZE_VALUES).map((size) => (
         <Box key={size} sx={{ display: 'flex', alignItems: 'center' }}>
           <Typography variant="caption" sx={{ width: 30 }}>
             {size}:

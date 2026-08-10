@@ -5,6 +5,7 @@ import React from 'react';
 import { expect, fireEvent, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { Label } from './Label';
+import { COLOR_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Label> = {
   title: 'Form/Label/Tests',
@@ -601,7 +602,7 @@ export const PerformanceTest: Story = {
       id: i,
       text: `Label ${i}`,
       variant: (['default', 'filled', 'outlined', 'glass', 'gradient'] as const)[i % 5],
-      color: (['primary', 'secondary', 'success', 'error', 'warning'] as const)[i % 5],
+      color: COLOR_VALUES[i % COLOR_VALUES.length],
     }));
 
     return (

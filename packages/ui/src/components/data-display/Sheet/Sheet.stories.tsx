@@ -31,6 +31,7 @@ import React, { useState } from 'react';
 
 import { Sheet } from './Sheet';
 import type { SheetProps } from './Sheet.types';
+import { COLOR_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Sheet> = {
   title: 'Overlays/Sheet',
@@ -54,7 +55,7 @@ const meta: Meta<typeof Sheet> = {
     },
     color: {
       control: 'select',
-      options: ['primary', 'secondary', 'success', 'error', 'warning', 'info'],
+      options: COLOR_VALUES,
     },
   },
 };

@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect,within } from 'storybook/test';
 
 import { Separator } from './Separator';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Separator> = {
   title: 'Layout/Separator/Tests',
@@ -126,7 +127,7 @@ export const ResponsiveDesign: Story = {
   },
   render: () => (
     <Stack spacing={2} sx={{ width: '100%', p: 2 }}>
-      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((size) => (
+      {(SIZE_VALUES).map((size) => (
         <Box key={size}>
           <Typography variant="caption">{size.toUpperCase()} Size</Typography>
           <Separator size={size} data-testid={`${size}-separator`} />

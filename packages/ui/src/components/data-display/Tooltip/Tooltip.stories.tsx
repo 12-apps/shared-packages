@@ -6,6 +6,7 @@ import { Avatar, Box, Button, IconButton, Stack, Typography } from '@mui/materia
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Tooltip } from './Tooltip';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Tooltip> = {
   title: 'Overlays/Tooltip',
@@ -21,7 +22,7 @@ const meta: Meta<typeof Tooltip> = {
     },
     size: {
       control: { type: 'select' },
-      options: ['sm', 'md', 'lg'],
+      options: SIZE_VALUES,
     },
     placement: {
       control: { type: 'select' },

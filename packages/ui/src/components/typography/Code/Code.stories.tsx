@@ -37,7 +37,7 @@ const meta: Meta<typeof Code> = {
     },
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg'],
+      options: SIZE_VALUES,
       description: 'Size of the code text',
     },
     children: {
@@ -409,6 +409,7 @@ export const WithLineNumbers: Story = {
       <Code variant="block" language="javascript" lineNumbers>
         {`// React component with hooks
 import React, { useState, useEffect } from 'react';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 function Counter() {
   const [count, setCount] = useState(0);

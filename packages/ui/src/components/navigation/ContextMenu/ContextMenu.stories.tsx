@@ -6,6 +6,7 @@ import { Box, Card, CardContent,Paper, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { ContextMenu } from './ContextMenu';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof ContextMenu> = {
   title: 'Navigation/ContextMenu',
@@ -28,7 +29,7 @@ const meta: Meta<typeof ContextMenu> = {
     },
     size: {
       control: 'select',
-      options: ['sm', 'md', 'lg'],
+      options: SIZE_VALUES,
       description: 'Size of the menu items',
     },
     disabled: {

@@ -17,6 +17,7 @@ import { useState } from 'react';
 
 import { Breadcrumbs } from './Breadcrumbs';
 import type { BreadcrumbItem } from './Breadcrumbs.types';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Breadcrumbs> = {
   title: 'Navigation/Breadcrumbs',
@@ -69,7 +70,7 @@ A sophisticated breadcrumb navigation component with glass morphism effects, smo
     },
     size: {
       control: 'select',
-      options: ['sm', 'md', 'lg'],
+      options: SIZE_VALUES,
       description: 'Size of the breadcrumb text and icons',
       table: {
         category: 'Appearance',
@@ -77,7 +78,7 @@ A sophisticated breadcrumb navigation component with glass morphism effects, smo
     },
     color: {
       control: 'select',
-      options: ['default', 'primary', 'secondary'],
+      options: COLOR_VALUES,
       description: 'Color scheme for separators and accents',
       table: {
         category: 'Appearance',

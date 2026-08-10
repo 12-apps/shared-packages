@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { Heading } from './Heading';
+import { COLOR_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Heading> = {
   title: 'Typography/Heading',
@@ -30,7 +31,7 @@ const meta: Meta<typeof Heading> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'textPrimary', 'textSecondary', 'inherit'],
+      options: COLOR_VALUES,
       description: 'Heading color',
     },
     align: {
@@ -104,20 +105,21 @@ export const DisplayVariants: Story = {
 export const ColoredHeadings: Story = {
   render: () => (
     <Stack spacing={2}>
-      <Heading level={2} color="primary">
-        Primary Color Heading
-      </Heading>
-      <Heading level={2} color="secondary">
-        Secondary Color Heading
-      </Heading>
-      <Heading level={2} color="textPrimary">
-        Text Primary Color
-      </Heading>
-      <Heading level={2} color="textSecondary">
-        Text Secondary Color
-      </Heading>
+      {/*
+        Driven off COLOR_VALUES so the showcase cannot fall behind the
+        vocabulary. It listed `textPrimary`, `textSecondary` and `inherit` —
+        none of which the component has ever accepted. All three fell through
+        `getColorFromTheme`'s old fallback and rendered as ordinary body text,
+        so the story showed four headings in two colours while naming four.
+      */}
+      {COLOR_VALUES.map((color) => (
+        <Heading key={color} level="h2" color={color}>
+          {color.charAt(0).toUpperCase() + color.slice(1)} Color Heading
+        </Heading>
+      ))}
+      {/* `inherit` was a prop that did nothing; the `sx` is what painted this white. */}
       <Box sx={{ bgcolor: 'primary.main', p: 2 }}>
-        <Heading level={2} color="inherit" sx={{ color: 'white' }}>
+        <Heading level="h2" sx={{ color: 'white' }}>
           Inherited Color Heading
         </Heading>
       </Box>
@@ -211,10 +213,10 @@ export const PageHierarchy: Story = {
       <Box sx={{ pl: 2 }}>
         <Heading level={3}>1.1 Overview</Heading>
         <Box sx={{ pl: 2 }}>
-          <Heading level={4} color="textSecondary">
+          <Heading level={4} color="neutral">
             1.1.1 Background
           </Heading>
-          <Heading level={4} color="textSecondary">
+          <Heading level={4} color="neutral">
             1.1.2 Objectives
           </Heading>
         </Box>
@@ -245,7 +247,7 @@ export const MarketingHeaders: Story = {
         Welcome to the Future
       </Heading>
 
-      <Heading level={2} align="center" color="textSecondary" weight="light">
+      <Heading level={2} align="center" color="neutral" weight="light">
         Innovate • Create • Transform
       </Heading>
 
@@ -253,7 +255,7 @@ export const MarketingHeaders: Story = {
         <Heading level={3} variant="display" decorated>
           🚀 Launch Your Ideas
         </Heading>
-        <Heading level={4} color="textSecondary" weight="regular">
+        <Heading level={4} color="neutral" weight="regular">
           Start building amazing products today
         </Heading>
       </Paper>
@@ -270,18 +272,18 @@ export const BlogPostHeader: Story = {
       <Heading level={1} weight="bold">
         The Rise of Artificial Intelligence in Modern Web Development
       </Heading>
-      <Heading level={4} color="textSecondary" weight="regular">
+      <Heading level={4} color="neutral" weight="regular">
         How AI is transforming the way we build and deploy applications
       </Heading>
       <Divider sx={{ my: 2 }} />
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-        <Heading level={6} color="textSecondary">
+        <Heading level={6} color="neutral">
           By Jane Doe
         </Heading>
-        <Heading level={6} color="textSecondary">
+        <Heading level={6} color="neutral">
           •
         </Heading>
-        <Heading level={6} color="textSecondary">
+        <Heading level={6} color="neutral">
           5 min read
         </Heading>
       </Box>
@@ -375,7 +377,7 @@ export const AllStates: Story = {
       <Heading level={2} color="secondary">
         Secondary Color
       </Heading>
-      <Heading level={2} color="textSecondary">
+      <Heading level={2} color="neutral">
         Text Secondary
       </Heading>
       <Heading level={2} decorated>

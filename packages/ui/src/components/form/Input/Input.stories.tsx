@@ -8,6 +8,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { Input } from './Input';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Input> = {
   title: 'Form/Input',
@@ -23,7 +24,7 @@ const meta: Meta<typeof Input> = {
     },
     size: {
       control: { type: 'select' },
-      options: ['sm', 'md', 'lg'],
+      options: SIZE_VALUES,
     },
     type: {
       control: { type: 'select' },

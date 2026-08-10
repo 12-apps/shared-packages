@@ -27,6 +27,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { Badge } from './Badge';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Badge> = {
   title: 'Indicators/Badge',
@@ -60,11 +61,11 @@ const meta: Meta<typeof Badge> = {
     },
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg'],
+      options: SIZE_VALUES,
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'error', 'neutral'],
+      options: COLOR_VALUES,
     },
     position: {
       control: { type: 'select' },
@@ -144,7 +145,7 @@ export const Default: Story = {
 export const WithIcon: Story = {
   args: {
     badgeContent: 12,
-    color: 'error',
+    color: 'danger',
     children: <Notifications />,
   },
 };
@@ -357,7 +358,7 @@ export const WithGlow: Story = {
   args: {
     glow: true,
     badgeContent: 'HOT',
-    color: 'error',
+    color: 'danger',
     size: 'lg',
     children: <Favorite />,
   },
@@ -789,7 +790,7 @@ export const BadgesWithIcons: Story = {
         <Badge
           icon={<ErrorIcon sx={{ fontSize: 'inherit' }} />}
           badgeContent="Failed"
-          color="error"
+          color="danger"
           variant="destructive"
         >
           <Paper sx={{ p: 2 }}>Task 3</Paper>

@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { Slider } from './Slider';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Slider> = {
   title: 'Form/Slider',
@@ -18,11 +19,11 @@ const meta: Meta<typeof Slider> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'],
+      options: COLOR_VALUES,
     },
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
   },
 };
@@ -137,7 +138,7 @@ const ColorsComponent = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, px: 2 }}>
-      {['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'].map((color) => (
+      {COLOR_VALUES.map((color) => (
         <Box key={color}>
           <Slider
             color={color}
@@ -162,7 +163,7 @@ const SizesComponent = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, px: 2 }}>
-      {['xs', 'sm', 'md', 'lg', 'xl'].map((size) => (
+      {SIZE_VALUES.map((size) => (
         <Box key={size}>
           <Slider
             size={size}

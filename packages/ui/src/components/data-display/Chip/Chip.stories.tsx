@@ -3,6 +3,7 @@ import Star from '@mui/icons-material/Star';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Chip } from './Chip';
+import { COLOR_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Chip> = {
   title: 'Indicators/Chip',
@@ -29,12 +30,12 @@ const meta: Meta<typeof Chip> = {
     },
     size: {
       control: 'select',
-      options: ['sm', 'md'],
+      options: SIZE_VALUES,
       description: 'Size of the chip',
     },
     color: {
       control: 'select',
-      options: ['primary', 'secondary', 'success', 'warning', 'info', 'danger', 'neutral'],
+      options: COLOR_VALUES,
       description: 'Theme color token — a closed set; `error` is the destructive one',
     },
     avatarSrc: {
@@ -124,21 +125,21 @@ export const Disabled: Story = {
 export const SmallSize: Story = {
   args: {
     label: 'Small',
-    size: 'small',
+    size: 'sm',
   },
 };
 
 export const MediumSize: Story = {
   args: {
     label: 'Medium',
-    size: 'medium',
+    size: 'md',
   },
 };
 
 export const LargeSize: Story = {
   args: {
     label: 'Large',
-    size: 'medium',
+    size: 'lg',
   },
 };
 

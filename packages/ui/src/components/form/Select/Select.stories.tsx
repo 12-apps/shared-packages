@@ -2,6 +2,7 @@ import { Stack } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Select } from './Select';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Select> = {
   title: 'Form/Select',
@@ -18,7 +19,7 @@ const meta: Meta<typeof Select> = {
     },
     size: {
       control: { type: 'select' },
-      options: ['sm', 'md'],
+      options: SIZE_VALUES,
       description: 'Size of the select component',
     },
     glow: {
@@ -354,7 +355,7 @@ export const Playground: Story = {
     label: 'Playground Select',
     placeholder: 'Choose an option',
     variant: 'default',
-    size: 'medium',
+    size: 'md',
     fullWidth: true,
     error: false,
     glow: false,

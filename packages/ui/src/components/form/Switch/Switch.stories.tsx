@@ -4,6 +4,7 @@ import { Bell, BellOff,Moon, Sun, Volume2, VolumeX, Wifi, WifiOff } from 'lucide
 import { useState } from 'react';
 
 import { Switch } from './Switch';
+import { COLOR_VALUES, SIZE_VALUES, ColorValue, SizeValue } from '../../../tokens/scales';
 
 const meta: Meta<typeof Switch> = {
   title: 'Form/Switch',
@@ -19,11 +20,11 @@ const meta: Meta<typeof Switch> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'],
+      options: COLOR_VALUES,
     },
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
     labelPosition: {
       control: { type: 'select' },
@@ -131,12 +132,18 @@ export const Variants: Story = {
   render: () => <VariantsComponent />,
 };
 
+// `Record<ColorValue, …>` rather than an inferred object literal, and iterated
+// over COLOR_VALUES rather than `Object.entries`. Both matter: the annotation
+// makes a missing colour a compile error — this map had no `info` — and
+// `Object.entries` widens its keys to `string`, which is what stopped the story
+// from type-checking against the very prop it documents.
 const ColorsComponent = () => {
-  const [states, setStates] = useState({
+  const [states, setStates] = useState<Record<ColorValue, boolean>>({
     primary: true,
     secondary: true,
     success: true,
     warning: true,
+    info: true,
     danger: true,
     neutral: true,
   });
@@ -145,12 +152,12 @@ const ColorsComponent = () => {
     <Box
       sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 2 }}
     >
-      {Object.entries(states).map(([color, checked]) => (
+      {COLOR_VALUES.map((color) => (
         <Switch
           key={color}
           color={color}
           label={`${color.charAt(0).toUpperCase() + color.slice(1)} color`}
-          checked={checked}
+          checked={states[color]}
           onChange={(e) => setStates((prev) => ({ ...prev, [color]: e.target.checked }))}
         />
       ))}
@@ -163,7 +170,7 @@ export const Colors: Story = {
 };
 
 const SizesComponent = () => {
-  const [states, setStates] = useState({
+  const [states, setStates] = useState<Record<SizeValue, boolean>>({
     xs: true,
     sm: true,
     md: true,
@@ -173,12 +180,12 @@ const SizesComponent = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {Object.entries(states).map(([size, checked]) => (
+      {SIZE_VALUES.map((size) => (
         <Switch
           key={size}
           size={size}
           label={`Size: ${size.toUpperCase()}`}
-          checked={checked}
+          checked={states[size]}
           onChange={(e) => setStates((prev) => ({ ...prev, [size]: e.target.checked }))}
         />
       ))}

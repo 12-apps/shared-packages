@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { LoadingState } from './LoadingState';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof LoadingState> = {
   title: 'Feedback/AsyncStates/LoadingState',
@@ -23,7 +24,7 @@ const meta: Meta<typeof LoadingState> = {
     },
     size: {
       control: 'radio',
-      options: ['sm', 'md', 'lg'],
+      options: SIZE_VALUES,
       description: 'Size of the loading indicator',
     },
     message: {

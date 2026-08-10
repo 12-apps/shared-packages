@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import React from 'react';
 
 import { Heading } from './Heading';
+import { COLOR_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Heading> = {
   title: 'Typography/Heading/Tests',
@@ -162,7 +163,7 @@ const PerformanceTestComponent = () => {
           key={index}
           level={(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const)[index % 6]}
           color={
-            (['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'] as const)[
+            (COLOR_VALUES)[
               index % 6
             ]
           }
