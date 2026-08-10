@@ -34,8 +34,10 @@ model SavedReport {
   // of strings). No FK by design (the payments doctrine): a stale id simply
   // matches no actor. Bounded by the wire contract (≤20 ids).
   visibilityRoles Json @default("[]") @map("visibility_roles")
-  // The period the report OPENS on (FUT-755): today | 7d | 30d, the presets in
-  // `react/reports-api.ts`. Nullable on purpose — NULL means "no preference",
+  // The period the report OPENS on (FUT-755): today | 7d | 30d | month — the
+  // presets in `react/reports-api.ts` MINUS `custom`, which names explicit
+  // dates this column has nowhere to keep and would freeze the report on a
+  // window that ages badly. Nullable on purpose — NULL means "no preference",
   // which the reader resolves to the pre-existing default of 30d, so every row
   // that predates this column keeps behaving exactly as it did. String + DB
   // CHECK, house style.

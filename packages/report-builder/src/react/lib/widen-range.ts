@@ -1,4 +1,16 @@
-import { REPORT_RANGES, REPORT_RANGE_LABELS, type ReportRange } from "../reports-api";
+import { REPORT_RANGE_LABELS, type ReportRange } from "../reports-api";
+
+/**
+ * The widening ladder, narrow → wide. Its OWN list, and no longer the toggle's.
+ *
+ * Walking `REPORT_RANGES` was correct only while every preset on it was a fixed
+ * lookback. Two are not (FUT-755). `month` is month-TO-DATE, so for the first
+ * week of every month it is NARROWER than `7d` — offering it as the way to see
+ * more would hand back fewer rows, which is the exact confusion the offer
+ * exists to end. And `custom` names dates the empty state does not have, so
+ * "Ver Personalizado…" would resolve to nothing at all.
+ */
+const WIDENING_LADDER: readonly ReportRange[] = ["today", "7d", "30d"];
 
 /**
  * The next WIDER period, or null when there is none (FUT-391).
@@ -9,14 +21,14 @@ import { REPORT_RANGES, REPORT_RANGE_LABELS, type ReportRange } from "../reports
  * empty state offers the widening rather than leaving the author to find the
  * period selector and guess.
  *
- * `REPORT_RANGES` is ordered narrow → wide, so "wider" is the next entry. At
- * the widest, this returns null and the empty state says nothing extra: an
- * offer that cannot be taken is worse than no offer.
+ * A period that is not ON the ladder (`month`, `custom`) has no next entry:
+ * null, and the empty state says nothing extra — an offer that cannot be taken
+ * is worse than no offer.
  */
 export function widerRange(range: ReportRange): ReportRange | null {
-  const index = REPORT_RANGES.indexOf(range);
+  const index = WIDENING_LADDER.indexOf(range);
   if (index < 0) return null;
-  return REPORT_RANGES[index + 1] ?? null;
+  return WIDENING_LADDER[index + 1] ?? null;
 }
 
 /** "Ver 30 dias" — the action label for widening to `range`. */
