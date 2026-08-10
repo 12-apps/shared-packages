@@ -89,6 +89,13 @@ export {
 export { webhookFieldOf } from './core/credential-roles';
 export { withMerchantRedirectUrl, withMerchantWebhookUrl } from './core/webhook-url';
 export type { MerchantWebhookUrlResolver } from './core/webhook-url';
+/**
+ * Resolve-time stamp of the platform's CURRENT webhook signing secret
+ * (FUT-690) — what keeps Connect stores verifying deliveries after the
+ * platform rolls its endpoint secret, without every store reconnecting.
+ */
+export { withPlatformWebhookSecret } from './core/webhook-secret';
+export type { PlatformWebhookSecretResolver } from './core/webhook-secret';
 export {
   toClientChargeView,
   isSettled,
@@ -181,6 +188,7 @@ export type {
   CustomerInfo,
   CustomerSchema,
   DeclineReason,
+  IntakeFreshness,
   ProbeFault,
   ProbeOutcome,
   VaultBeginInput,

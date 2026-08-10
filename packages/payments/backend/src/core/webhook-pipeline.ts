@@ -217,6 +217,23 @@ export async function verifiedCredentials(
 }
 
 /**
+ * Refuse a delivery outside the adapter's declared intake tolerance —
+ * LIVE PATH ONLY, by design (FUT-690). The replay sweep re-runs `verify` over
+ * rows stored hours earlier and must keep succeeding, so the skew window
+ * lives here rather than inside any adapter's `verify` (see the adapter
+ * contract's `intakeFreshness` and `webhook-replay.ts`). Checked AFTER the
+ * signature verified: a timestamp is only a fact about the sender once the
+ * HMAC over it held. The real clock is read here, at the one live call site;
+ * the adapter's policy itself stays clock-free and testable.
+ */
+function refuseStaleAtIntake(adapter: PaymentProviderAdapter, delivery: WebhookDelivery): void {
+  const freshness = adapter.webhook.intakeFreshness?.(delivery, Date.now());
+  if (freshness && !freshness.fresh) {
+    throw new WebhookVerificationError(adapter.name, freshness.reason);
+  }
+}
+
+/**
  * The LIVE inbound path: verify the signature, parse, then hand off to the
  * shared post-verification ingest.
  *
@@ -251,6 +268,7 @@ export async function runWebhookPipeline(
     );
     const creds = await verifiedCredentials(adapter, delivery, candidates);
     if (!creds) throw new WebhookVerificationError(adapter.name);
+    refuseStaleAtIntake(adapter, delivery);
     verified = { adapter, creds };
   } catch (error) {
     deps.webhookObserver?.refused?.(
