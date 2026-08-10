@@ -210,6 +210,186 @@ test('the editor is reachable, and “new” is not read as a report id', async 
 });
 
 /**
+ * The block picker's eight templates, and the catalog they need behind them.
+ *
+ * The picker is served from the PACKAGE and lists every template whose starter
+ * exists — it never asks the host's catalog what it can actually run. So a
+ * harness with one entity offered all eight and five of them created a block
+ * that answered *Acesso negado*, because an entity absent from the catalog is
+ * an entity nobody holds the permission for. The failure was silent from the
+ * package's side and looked, from the browser, exactly like a broken template.
+ *
+ * These are the cases that make the catalog the acceptance surface it is meant
+ * to be: every template runs, and each one draws ITS OWN entity.
+ */
+const NEW_REPORT_BLOCK = 'bloco-1';
+
+/** Open a blank report and add one template from the picker. */
+async function addTemplate(page: import('@playwright/test').Page, template: string): Promise<void> {
+  await page.goto('#/report-builder');
+  await page.getByTestId('reports-new').click();
+  await expect(page.getByTestId('page-report-editor')).toBeVisible();
+  await page.getByTestId(`block-template-picker-${template}`).click();
+  await expect(page.getByTestId(`report-block-${NEW_REPORT_BLOCK}`)).toBeVisible({
+    timeout: 15_000,
+  });
+}
+
+test('“Coleção” offers the product’s real collections, with the product’s labels', async ({
+  page,
+}) => {
+  await addTemplate(page, 'receita-por-dia');
+
+  await page.getByTestId(`report-block-${NEW_REPORT_BLOCK}-editor-entity`).click();
+
+  // Seven, in catalog order, labelled the way `server/catalog.ts` labels them.
+  // A harness that models a different world tests nothing, and for as long as
+  // this dropdown held only “Pedidos” most of the builder could not be driven
+  // at all — a split had `id` to reach for and nothing else.
+  await expect(page.getByRole('option')).toHaveText([
+    'Pedidos',
+    'Itens vendidos',
+    'Pagamentos',
+    'Movimentações de estoque',
+    'Perdas',
+    'Cozinha — linhas',
+    'Cozinha — turnos',
+  ]);
+});
+
+test('every template in the picker resolves and runs', async ({ page }) => {
+  await page.goto('#/report-builder');
+  await page.getByTestId('reports-new').click();
+  await expect(page.getByTestId('block-template-picker')).toBeVisible();
+
+  const templates = [
+    'receita-por-dia',
+    'produtos-mais-vendidos',
+    'preparo-por-estacao',
+    'horas-por-estacao',
+    'formas-de-pagamento',
+    'perdas-por-motivo',
+    'movimentacoes-de-estoque',
+  ];
+
+  for (const [index, template] of templates.entries()) {
+    if (index > 0) await page.getByTestId('report-editor-add-block').click();
+    await page.getByTestId(`block-template-picker-${template}`).click();
+    await expect(page.getByTestId(`report-block-bloco-${index + 1}`)).toBeVisible({
+      timeout: 15_000,
+    });
+  }
+
+  // Every block RAN. A spec the catalog cannot serve surfaces as the block's
+  // own error alert, which is how all five non-orders templates used to end up.
+  await expect(page.locator('[data-report-block-id] [data-testid$="-render"]')).toHaveCount(
+    templates.length,
+  );
+  await expect(page.locator('[data-report-block-id] [data-testid$="-error"]')).toHaveCount(0);
+});
+
+test('a kitchen template draws the kitchen, not the fallback', async ({ page }) => {
+  await addTemplate(page, 'horas-por-estacao');
+
+  const block = page.getByTestId(`report-block-${NEW_REPORT_BLOCK}`);
+  // The stations, the hours they cost and the lines they produced — the
+  // starter's own three columns, over `kitchen_shifts`.
+  await expect(block).toContainText('Chapa');
+  await expect(block).toContainText('Fritadeira');
+  await expect(block).toContainText('45h 30m');
+  // …and NOT the sales vocabulary. A block drawing the wrong entity's data is
+  // worse than one drawing none, and "money over CARD/PIX" is precisely what
+  // this template looked like it was doing before the catalog grew.
+  await expect(block).not.toContainText('PIX');
+});
+
+test('a preparo template withholds the p90 below the sample floor', async ({ page }) => {
+  await addTemplate(page, 'preparo-por-estacao');
+
+  const block = page.getByTestId(`report-block-${NEW_REPORT_BLOCK}`);
+  const montagem = block.locator('tbody tr').filter({ hasText: 'Montagem' });
+  await expect(montagem).toBeVisible();
+  // 6 lines against a floor of 20, so the timing is withheld and the counting
+  // measure beside it is not — the catalog's `identityMinSample`, demonstrated.
+  await expect(montagem).toContainText('—');
+  await expect(montagem).toContainText('6');
+  await expect(block.locator('tbody tr').filter({ hasText: 'Chapa' })).not.toContainText('—');
+});
+
+/**
+ * The period toggle over a NEW entity.
+ *
+ * The window filter is the host's, applied per entity on that entity's own
+ * date field — `readyAt` here, because a cozinha line belongs to the period in
+ * which the work FINISHED. Six new entities is six new chances to wire that to
+ * the wrong column, or to no column at all, and a report that ignores the
+ * period looks identical to one that honours it until the counts are read.
+ */
+test('the period presets narrow the kitchen as well as the orders', async ({ page }) => {
+  await addTemplate(page, 'preparo-por-estacao');
+
+  const chapa = page
+    .getByTestId(`report-block-${NEW_REPORT_BLOCK}`)
+    .locator('tbody tr')
+    .filter({ hasText: 'Chapa' });
+
+  // 30 dias — every day the station worked.
+  await expect(chapa).toContainText('31');
+
+  await page.getByTestId('report-editor-range-item-7d').click();
+  await expect(chapa).toContainText('28');
+
+  await page.getByTestId('report-editor-range-item-today').click();
+  // Four lines, and with them the p90 falls under the sample floor.
+  await expect(chapa).toContainText('4');
+  await expect(chapa).toContainText('—');
+});
+
+test('a losses template draws the ledger’s own reasons', async ({ page }) => {
+  await addTemplate(page, 'perdas-por-motivo');
+
+  const block = page.getByTestId(`report-block-${NEW_REPORT_BLOCK}`);
+  await expect(block).toContainText('Quebra');
+  await expect(block).toContainText('Vencimento');
+});
+
+/**
+ * The ordered-axis rule (FUT-755), both ways round.
+ *
+ * A line draws the space BETWEEN two points as though it were data. Half-way
+ * between 09:00 and 10:00 is 09:30; half-way between CARD and PIX is nothing.
+ * So `hourOfDay` — a STRING, offerable as a line only because the catalog
+ * declares `ordered` — must keep the line tile live, and `method` must refuse
+ * it with a reason.
+ *
+ * Neither half was reachable while the harness catalog had no ordered string
+ * dimension at all.
+ */
+test('line is offered on an ordered axis and refused on an unordered one', async ({ page }) => {
+  await addTemplate(page, 'receita-por-dia');
+
+  const axis = page.getByTestId('builder-dimension-0');
+  const line = page.getByTestId('builder-chart-type-line');
+
+  // The starter groups by date, which is ordered by TYPE.
+  await expect(line).not.toHaveAttribute('aria-disabled', 'true');
+
+  // An ordered STRING: only the catalog's flag says so.
+  await axis.click();
+  await page.getByRole('option', { name: 'Hora do dia' }).click();
+  await expect(line).not.toHaveAttribute('aria-disabled', 'true');
+
+  // An unordered one, and the picker says which control to change.
+  await axis.click();
+  await page.getByRole('option', { name: 'Forma de pagamento' }).click();
+  await expect(line).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByTestId('builder-chart-type-area')).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+});
+
+/**
  * The period toggle, end to end (FUT-755).
  *
  * `runOptions` resolves the preset into a window and hands it to the HOST's
