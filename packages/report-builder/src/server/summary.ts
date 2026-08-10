@@ -15,6 +15,13 @@ import type { SavedReportRecord } from './saved';
  * sparkline is drawn from — the one number that tells a single chart apart
  * from a twelve-block dashboard before you open either. A single report is 1:
  * it is one block's worth of document, not zero.
+ *
+ * A document we could not READ is 0, though, and that is not the same claim.
+ * The non-dashboard branch is also where every malformed value lands — `null`,
+ * a string, a legacy row — so counting it as 1 would put "1 bloco" on a card
+ * whose content we just failed to parse. An unreadable document already
+ * reports no entities for exactly this reason; the count follows the same
+ * signal, so the card says "0 blocos" and stops claiming to know.
  */
 export function documentShape(spec: unknown): {
   type: 'report' | 'dashboard';
@@ -45,7 +52,7 @@ export function documentShape(spec: unknown): {
     type: 'report',
     entity,
     entities: entity === '' ? [] : [entity],
-    blockCount: 1,
+    blockCount: entity === '' ? 0 : 1,
   };
 }
 
