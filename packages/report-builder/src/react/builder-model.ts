@@ -73,9 +73,15 @@ export const OPERATOR_LABELS: Record<string, string> = {
   between: "entre",
 };
 
+/**
+ * `prototype.html`'s own words, verbatim. `kpi` was "KPI (número único)" here:
+ * a parenthetical three times the length of every other label, which is what
+ * forced the picker's tiles onto a ragged grid — one cell wide enough for the
+ * sentence and the rest not. The prototype calls it `Número`.
+ */
 const CHART_LABELS: Record<ChartKind, string> = {
   table: "Tabela",
-  kpi: "KPI (número único)",
+  kpi: "Número",
   line: "Linha",
   bar: "Barras",
   area: "Área",

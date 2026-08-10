@@ -139,9 +139,11 @@ export function specSentence(spec: ReportSpec, catalog: FieldCatalog): string {
   const [groupBy, splitBy] = spec.dimensions;
   if (groupBy) {
     sentence += ` por ${dimensionPhrase(groupBy, catalog, entity)}`;
-    // The second dimension is the SPLIT — it divides each bucket rather than
-    // adding another level of grouping, which is what "dividido por" says.
-    if (splitBy) sentence += `, dividido por ${dimensionPhrase(splitBy, catalog, entity)}`;
+    // The second dimension is the SPLIT — it draws one SERIES per value rather
+    // than adding another level of grouping. The clause borrows the control's
+    // own words ("Separar em séries"), so the sentence under a chart and the
+    // field that produced it say the same thing.
+    if (splitBy) sentence += `, separado por ${dimensionPhrase(splitBy, catalog, entity)}`;
   }
 
   if (spec.filters.length > 0) {
