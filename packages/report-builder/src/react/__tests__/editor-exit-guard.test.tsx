@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { createWebReportBuilder } from '../create-report-builder';
 import type {
@@ -205,5 +205,49 @@ describe('leaving the editor', () => {
     // collapsed into one convenient string.
     expect(dialog.textContent).toContain('Ninguém mais vê');
     expect(dialog.textContent).not.toContain('continua vendo');
+  });
+});
+
+/**
+ * The trail replaced the single `← Sair da edição` link, and in doing so gave
+ * the editor a SECOND way out (FUT-755). Both of these are about that second
+ * way, and neither could exist while there was only one.
+ */
+describe('leaving the editor by a breadcrumb', () => {
+  it('names every level above the editor, using the report’s real name', async () => {
+    await openEditor();
+
+    const trail = screen.getByTestId('report-editor-crumbs');
+    const labels = within(trail)
+      .getAllByRole('link')
+      .map((crumb) => crumb.textContent);
+    // The list and the report itself — the two places "back" could mean, which
+    // is exactly why one back link could never say where it went.
+    expect(labels).toEqual(['Relatórios', 'Painel da loja']);
+    // …and the level you are on, which is not a link.
+    expect(trail.textContent).toContain('Editando');
+  });
+
+  it('resumes to the crumb that was clicked, not to a fixed target', async () => {
+    await openEditor();
+
+    fireEvent.change(screen.getByTestId('report-editor-name'), {
+      target: { value: 'Painel da loja — revisado' },
+    });
+    // The LIST crumb, which is not where `report-editor-back` goes. Answering
+    // "Sair sem publicar?" by opening the report instead would put you
+    // somewhere you did not click — and only ever when there ARE unsaved
+    // changes, i.e. every time the prompt matters.
+    const trail = screen.getByTestId('report-editor-crumbs');
+    fireEvent.click(within(trail).getByRole('link', { name: 'Relatórios' }));
+
+    const dialog = await screen.findByTestId('report-editor-exit-confirm');
+    fireEvent.click(within(dialog).getByText('Sair sem publicar'));
+
+    // The list, not the report: `page-reports` is the grid, `page-report` the
+    // single report the fixed target would have taken us to.
+    await waitFor(() => {
+      expect(screen.queryByTestId('page-reports')).toBeTruthy();
+    });
   });
 });

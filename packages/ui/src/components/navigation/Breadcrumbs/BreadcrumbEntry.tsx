@@ -191,11 +191,12 @@ const EllipsisCrumb: React.FC<{ label: string; dataTestId?: string }> = ({
           </Tooltip>
 );
 
-// The same conditional test id was written at each crumb variant.
+// The same conditional test id was written at each crumb variant. An item that
+// names its OWN id wins: see `BreadcrumbItem.dataTestId`.
 const makeTestId =
   (dataTestId?: string) =>
-  (suffix: string): string =>
-    dataTestId ? `${dataTestId}-${suffix}` : `breadcrumbs-${suffix}`;
+  (suffix: string, own?: string): string =>
+    own ?? (dataTestId ? `${dataTestId}-${suffix}` : `breadcrumbs-${suffix}`);
 
 const ClickableCrumb: React.FC<{
   item: BreadcrumbItem;
@@ -204,7 +205,7 @@ const ClickableCrumb: React.FC<{
   size: string;
   variant: string;
   isActive: boolean;
-  testId: (suffix: string) => string;
+  testId: (suffix: string, own?: string) => string;
 }> = ({ item, index, icon, size, variant, isActive, testId }) => (
   <Tooltip title={item.tooltip || item.label} arrow disableHoverListener={!item.tooltip}>
     <BreadcrumbLink
@@ -215,7 +216,7 @@ const ClickableCrumb: React.FC<{
       active={isActive}
       underline="none"
       aria-label={item.ariaLabel || item.label}
-      data-testid={testId(`link-${index}`)}
+      data-testid={testId(`link-${index}`, item.dataTestId)}
     >
       {icon}
       <span>{item.label}</span>
@@ -283,7 +284,7 @@ export const BreadcrumbEntry: React.FC<{
         size={size}
         visualStyle={variant}
         aria-current="page"
-        data-testid={testId(`item-${index}`)}
+        data-testid={testId(`item-${index}`, item.dataTestId)}
       >
         {icon}
         <span>{item.label}</span>

@@ -37,7 +37,18 @@ export interface BreadcrumbItem {
    * Custom aria-label for accessibility
    */
   ariaLabel?: string;
-  
+
+  /**
+   * Test id for THIS crumb, replacing the trail's positional
+   * `<dataTestId>-link-<index>` / `<dataTestId>-item-<index>`.
+   *
+   * A trail that takes over from an older affordance has to keep that
+   * affordance's id, and the positional one cannot: a crumb's index moves the
+   * moment the trail grows a step — which is exactly what happens when a
+   * screen gains an "editing" level.
+   */
+  dataTestId?: string;
+
   /**
    * Internal flag for ellipsis items (used in collapsed behavior)
    * @internal
