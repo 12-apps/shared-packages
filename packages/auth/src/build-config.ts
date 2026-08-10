@@ -142,16 +142,11 @@ export function getEnv(): EnvConfig {
   return envCache;
 }
 
-/** Reset the cached environment. Tests only. */
-export function resetEnvCache(): void {
-  envCache = null;
-}
-
 /**
  * The OAuth providers each credential pair in the environment configures.
  * A provider missing either half is simply not offered.
  */
-export function buildProviders(): Provider[] {
+function buildProviders(): Provider[] {
   const env = getEnv();
   const providers: Provider[] = [];
 
@@ -217,7 +212,7 @@ export function buildProviders(): Provider[] {
 const SECRET_KEY_RE =
   /secret|password|client_secret|access_token|refresh_token|id_token/i;
 
-export function redactSecrets(value: unknown, seen = new WeakSet<object>()): unknown {
+function redactSecrets(value: unknown, seen = new WeakSet<object>()): unknown {
   if (typeof value === "string") {
     return value
       .replace(/GOCSPX-[\w-]+/g, "GOCSPX-***redacted***")
@@ -237,7 +232,7 @@ export function redactSecrets(value: unknown, seen = new WeakSet<object>()): unk
 }
 
 /** What {@link buildAuthConfig} needs. Every field has an environment default. */
-export interface BuildAuthConfigOptions {
+interface BuildAuthConfigOptions {
   /**
    * The sign-in gate, read at CALL time. A getter rather than a value because
    * the legacy path installs it after this module is evaluated.
