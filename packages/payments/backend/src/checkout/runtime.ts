@@ -20,6 +20,7 @@ import type {
   PayablePort,
   SavedInstrumentPort,
 } from './types';
+import type { BuyerVaultPort } from './vault-port';
 
 /**
  * The mount's configuration, and the resolved runtime the flows actually run
@@ -63,6 +64,14 @@ export interface PaymentFlowsBEConfig<Caller, View extends object, Display = unk
   payables: PayablePort<Caller, View>;
   correlation: ChargeCorrelationPort;
   instruments?: SavedInstrumentPort<Caller, Display>;
+  /**
+   * The ownership facts for vaulting a card OUTSIDE a purchase (FUT-478):
+   * `reference`/`customerRef` derived from the CALLER and scope, never from a
+   * request body. Optional — without it (or without `instruments.save`) the
+   * `/cards/begin` + `/cards/complete` rows answer the admin surface's 404
+   * BEFORE any adapter runs, so no provider-side token is ever orphaned.
+   */
+  vault?: BuyerVaultPort<Caller>;
   browserKey?: BrowserKeyPort;
 
   copy: CheckoutCopy;

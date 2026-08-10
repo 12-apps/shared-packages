@@ -19,11 +19,13 @@ import { MERCHANT, call, request, setupCheckoutWorld, testAdapter } from './harn
  * who may reach it.
  */
 describe('createPaymentFlowsBE — the surface', () => {
-  it('serves all six kinds at their canonical paths', async () => {
+  it('serves all eight kinds at their canonical paths', async () => {
     const { routes } = setupCheckoutWorld();
     expect(routes.layout.map((row) => `${row.method} /${row.pattern.join('/')}`)).toEqual([
       'GET /config',
       'GET /cards',
+      'POST /cards/begin',
+      'POST /cards/complete',
       'POST /',
       'POST /charge',
       'GET /status',

@@ -297,6 +297,14 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
         vault.saved.push({ provider: scope.provider, token, display });
       },
     },
+    // The buyer-vault ownership facts (FUT-478): derived from the CALLER,
+    // which is exactly what the server-derivation tests assert the adapter saw
+    // — a request body has no way to produce `vault_caller-1`.
+    vault: async (caller) => ({
+      reference: `vault_${caller.id}`,
+      customer: { name: 'Ana Buyer', email: 'ana@example.com', taxId: '12345678909' },
+      customerRef: 'cus_host_9',
+    }),
     copy: testCopy,
     logger: silentTestLogger,
     ...(options.offlineSettlement ? { offlineSettlement: options.offlineSettlement } : {}),
