@@ -20,6 +20,7 @@ import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
 import { Stack } from "@12-apps/ui/mui/Stack";
 
 import { SYSTEM_REPORT_NAV } from "../server/presets";
+import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
 import { exportRows } from "./lib/export-rows";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
 import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
@@ -31,6 +32,9 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
   const [range, setRange] = useState<ReportRange>("30d");
   const [grain, setGrain] = useState<ReportGrain>("day");
   const query = useSystemReport(tenantSlug, reportKey, range, grain);
+  // Before the early returns below, so the hook order cannot depend on whether
+  // the run has resolved. `undefined` simply means "no tools yet".
+  const tableView = useBlockTableView(query.data?.render);
 
   if (query.isError) {
     return (
@@ -79,7 +83,23 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
         }
       />
 
-      <ReportRenderView render={report.render} />
+      {/* The same toggle every block on a canvas gets — one implementation, so
+        * a chart's table fallback is reached identically wherever it is read.
+        * This page has no block card to hover, so the cluster is simply always
+        * visible here; the CSV stays in the controls row above, where this
+        * page has always exported from. */}
+      <Stack spacing={1}>
+        {tableView.canToggle ? (
+          <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+            <BlockToolCluster
+              view={tableView}
+              renderTestId="report-render"
+              menuTestId="report-render-menu"
+            />
+          </Stack>
+        ) : null}
+        <ReportRenderView render={report.render} asTable={tableView.asTable} />
+      </Stack>
     </Stack>
   );
 }

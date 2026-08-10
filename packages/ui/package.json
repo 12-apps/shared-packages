@@ -134,6 +134,7 @@
     "./utility/AspectRatio": "./src/components/utility/AspectRatio/index.ts",
     "./utility/InfiniteScroll": "./src/components/utility/InfiniteScroll/index.ts",
     "./utility/InstallPrompt": "./src/components/utility/InstallPrompt/index.ts",
+    "./utility/Overflow": "./src/components/utility/Overflow/index.ts",
     "./utility/Portal": "./src/components/utility/Portal/index.ts",
     "./utility/Transition": "./src/components/utility/Transition/index.ts",
     "./utility/VirtualList": "./src/components/utility/VirtualList/index.ts",
