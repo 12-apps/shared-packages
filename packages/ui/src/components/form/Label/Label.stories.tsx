@@ -7,6 +7,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { Label } from './Label';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Label> = {
   title: 'Form/Label',
@@ -22,11 +23,11 @@ const meta: Meta<typeof Label> = {
     },
     size: {
       control: 'select',
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
     color: {
       control: 'select',
-      options: ['primary', 'secondary', 'success', 'error', 'warning', 'info', 'default'],
+      options: COLOR_VALUES,
     },
     weight: {
       control: 'select',

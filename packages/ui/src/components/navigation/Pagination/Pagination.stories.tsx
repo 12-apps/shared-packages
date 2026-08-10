@@ -7,6 +7,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { Pagination } from './Pagination';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Pagination> = {
   title: 'Navigation/Pagination',
@@ -29,7 +30,7 @@ const meta: Meta<typeof Pagination> = {
     },
     size: {
       control: 'select',
-      options: ['sm', 'md', 'lg'],
+      options: SIZE_VALUES,
       description: 'Size of the pagination buttons',
     },
     color: {

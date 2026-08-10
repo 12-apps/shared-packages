@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { Blockquote } from './Blockquote';
+import { COLOR_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Blockquote> = {
   title: 'Typography/Blockquote',
@@ -25,7 +26,7 @@ const meta: Meta<typeof Blockquote> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'],
+      options: COLOR_VALUES,
       description: 'Theme color',
     },
     author: {

@@ -2,6 +2,7 @@ import { Box, Card, CardContent,Stack, Typography } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Separator } from './Separator';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Separator> = {
   title: 'Layout/Separator',
@@ -21,7 +22,7 @@ const meta: Meta<typeof Separator> = {
     },
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
     color: {
       control: { type: 'color' },
@@ -92,7 +93,7 @@ export const AllVariants: Story = {
 export const AllSizes: Story = {
   render: () => (
     <Stack spacing={4}>
-      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((size) => (
+      {(SIZE_VALUES).map((size) => (
         <Box key={size}>
           <Typography variant="h6" gutterBottom>
             {size.toUpperCase()} Size

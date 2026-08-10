@@ -8,6 +8,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { Alert } from './Alert';
+import { COLOR_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Alert> = {
   title: 'Feedback/Alert',
@@ -34,7 +35,7 @@ const meta: Meta<typeof Alert> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'],
+      options: COLOR_VALUES,
       description: 'Override color for the alert',
       table: {
         type: { summary: 'string' },

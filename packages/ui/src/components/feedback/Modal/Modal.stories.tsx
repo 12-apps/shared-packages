@@ -4,6 +4,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { Modal, ModalContent } from './Modal';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Modal> = {
   title: 'Overlays/Modal',
@@ -25,7 +26,7 @@ const meta: Meta<typeof Modal> = {
     },
     size: {
       control: 'select',
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
       description: 'Size of the modal',
     },
     glass: {
@@ -264,7 +265,7 @@ export const GradientGlow: Story = {
 };
 
 const ResponsiveSizesComponent = () => {
-const sizes = ['xs', 'sm', 'md', 'lg', 'xl'] as const;
+const sizes = SIZE_VALUES;
     const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
 
     return (
@@ -315,7 +316,7 @@ export const ResponsiveSizes: Story = {
 
 // AllSizes story - showing all size variations
 const AllSizesComponent = () => {
-  const sizes = ['xs', 'sm', 'md', 'lg', 'xl'] as const;
+  const sizes = SIZE_VALUES;
   const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
 
   return (

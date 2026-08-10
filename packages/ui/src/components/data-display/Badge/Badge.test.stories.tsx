@@ -220,7 +220,7 @@ export const ScreenReaderTest: Story = {
   name: '🔊 Screen Reader Test',
   args: {
     badgeContent: 12,
-    color: 'error',
+    color: 'danger',
     'aria-label': '12 new notifications',
     children: (
       <IconButton aria-label="Notifications">
@@ -303,7 +303,7 @@ export const ThemeVariations: Story = {
   name: '🎨 Theme Variations Test',
   args: {
     badgeContent: 'HOT',
-    color: 'error',
+    color: 'danger',
     variant: 'gradient',
     glow: true,
     children: <ShoppingCart />,
@@ -1052,7 +1052,7 @@ export const WCAGComplianceTest: Story = {
   name: '♿ WCAG Compliance Test',
   args: {
     badgeContent: 'Alert',
-    color: 'error',
+    color: 'danger',
     'aria-label': 'Error alert notification',
     'aria-live': 'assertive',
     'aria-atomic': true,

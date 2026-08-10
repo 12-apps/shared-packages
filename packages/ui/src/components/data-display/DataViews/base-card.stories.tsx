@@ -43,7 +43,7 @@ const kebab = (
     size="sm"
     items={[
       { id: "edit", label: "Editar", onClick: () => {} },
-      { id: "delete", label: "Excluir", color: "error", onClick: () => {} },
+      { id: "delete", label: "Excluir", color: "danger", onClick: () => {} },
     ]}
     trigger={
       // `icon` and no children: `Button` renders an icon-only button square,

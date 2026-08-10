@@ -59,7 +59,7 @@ export const SpecStackedBars: Story = {
       xAxis: { key: 'day' },
       series: [
         { key: 'total', label: 'Vendas', color: 'primary' },
-        { key: 'perdas', label: 'Perdas', color: 'error' },
+        { key: 'perdas', label: 'Perdas', color: 'danger' },
       ],
       stacked: true,
       numberFormat: 'brl',

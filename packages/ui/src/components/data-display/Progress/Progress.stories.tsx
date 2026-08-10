@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { Progress } from './Progress';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Progress> = {
   title: 'Feedback/Progress',
@@ -18,11 +19,11 @@ const meta: Meta<typeof Progress> = {
     },
     size: {
       control: { type: 'select' },
-      options: ['sm', 'md', 'lg'],
+      options: SIZE_VALUES,
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'error', 'neutral'],
+      options: COLOR_VALUES,
     },
     value: {
       control: { type: 'range', min: 0, max: 100, step: 1 },

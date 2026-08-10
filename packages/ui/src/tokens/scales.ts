@@ -18,13 +18,13 @@ import type { Theme } from '@mui/material/styles';
  *
  * So the vocabulary is declared once, here, and components derive from it.
  *
- * DERIVE, DON'T COPY, AND SUBSET HONESTLY. A component that cannot draw the
- * whole scale narrows with `Extract` rather than restating a union — an
- * independent copy is what drifts. And it narrows rather than accepting the lot:
- * a MUI chip draws two sizes, so putting `lg` in its type would promise
- * something nothing can render.
- *
- *     size?: Extract<SizeValue, 'sm' | 'md'>;
+ * DERIVE, DON'T COPY — AND TAKE THE WHOLE VOCABULARY. Every size prop is
+ * `SizeValue` and every colour prop is `ColorValue`, with no `Extract` and no
+ * `Exclude`. Handing a component a slice was tried and undone: it is the same
+ * fragmentation wearing the canonical type's name, and it leaves a caller having
+ * to remember which components accept `xs` and which accept `info`. Where the
+ * underlying widget draws fewer steps than five, that is a rendering detail and
+ * belongs at the MUI boundary below — not in the prop's type.
  *
  * A component whose size or colour is not this concept at all keeps its own type
  * — `Scrollbar`'s `thin|medium|thick` is a track width, `Sheet`'s `full` is a
@@ -37,8 +37,16 @@ import type { Theme } from '@mui/material/styles';
  *
  * Abbreviated, because that is what 26 of the 30 components with a real size
  * already used and what every caller has been taught to write.
+ *
+ * Declared as the array and the type together so the two cannot disagree. The
+ * runtime list is what Storybook `argTypes.options` and the demo grids iterate;
+ * spelled by hand in each story it drifts, and it had — twelve colour lists
+ * omitted `info`, so the control that documents the vocabulary offered a
+ * component less than the component accepted.
  */
 export type SizeValue = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+
+export const SIZE_VALUES = ['xs', 'sm', 'md', 'lg', 'xl'] as const satisfies readonly SizeValue[];
 
 /**
  * The house colour vocabulary.
@@ -53,6 +61,8 @@ export type SizeValue = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
  * component calls its unaccented state). The translation must be a real mapping
  * and never a cast: a cast is precisely what let `danger` through untouched and
  * had MUI fall back to grey.
+ *
+ * Array and type declared together, for the reason given on {@link SIZE_VALUES}.
  */
 export type ColorValue =
   | 'primary'
@@ -62,6 +72,47 @@ export type ColorValue =
   | 'info'
   | 'danger'
   | 'neutral';
+
+export const COLOR_VALUES = [
+  'primary',
+  'secondary',
+  'success',
+  'warning',
+  'info',
+  'danger',
+  'neutral',
+] as const satisfies readonly ColorValue[];
+
+/* ── Array and union, pinned to each other ────────────────────────────────── */
+
+/**
+ * The arrays above are written out rather than derived, because deriving the
+ * union from the array (`(typeof COLOR_VALUES)[number]`) costs the alias its
+ * name: TypeScript resolves the indexed access eagerly, and every error in the
+ * package stops saying `not assignable to type 'ColorValue'` and starts dumping
+ * seven string literals. In a package whose entire purpose is teaching this
+ * vocabulary, the name in the error message is worth keeping.
+ *
+ * Writing both means they could disagree, so both directions are checked here.
+ * `satisfies` above catches an entry that is not a member. These catch the other
+ * half — a member missing from the array — which `satisfies` cannot see and
+ * which is the direction that actually bit: twelve story control lists offered
+ * six colours for a vocabulary of seven, so `info` was undocumented everywhere.
+ *
+ * A gap makes the assignment below fail, and the error names the missing member.
+ */
+type Missing<Union extends string, Listed extends string> = Exclude<Union, Listed>;
+
+const _allSizesListed: Missing<SizeValue, (typeof SIZE_VALUES)[number]> extends never
+  ? true
+  : never = true;
+
+const _allColorsListed: Missing<ColorValue, (typeof COLOR_VALUES)[number]> extends never
+  ? true
+  : never = true;
+
+void _allSizesListed;
+void _allColorsListed;
 
 /* ── The MUI boundary ─────────────────────────────────────────────────────── */
 

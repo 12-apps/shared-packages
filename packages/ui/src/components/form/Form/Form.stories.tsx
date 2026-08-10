@@ -7,6 +7,7 @@ import { Input } from '../Input';
 import { Select } from '../Select';
 import { Textarea } from '../Textarea';
 import { Form, FormField } from './Form';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Form> = {
   title: 'Form/Form',
@@ -34,7 +35,7 @@ const meta: Meta<typeof Form> = {
     },
     spacing: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
       description: 'Spacing between form elements',
     },
     onSubmit: {

@@ -1,16 +1,23 @@
 import type { CSSObject, Theme } from '@mui/material';
 
 import type { HeadingProps } from './Heading.types';
+import type { ColorValue } from '../../../tokens/scales';
 
 type Level = NonNullable<HeadingProps['level']>;
 type Weight = NonNullable<HeadingProps['weight']>;
 
-const getColorFromTheme = (theme: Theme, color: string): string => {
+// Exhaustive over ColorValue, and deliberately without a fallback. The map
+// happened to hold all seven already, but it was `Record<string, string>` with
+// `|| text.primary` behind it — so nothing kept it that way, and the eighth
+// colour would have rendered as ordinary body text with no complaint. That is
+// the failure this whole vocabulary exists to make impossible; `Text` was
+// tightened the same way and this one was missed.
+const getColorFromTheme = (theme: Theme, color: ColorValue): string => {
   if (color === 'neutral') {
     return theme.palette.text.primary;
   }
 
-  const colorMap: Record<string, string> = {
+  const colorMap: Record<Exclude<ColorValue, 'neutral'>, string> = {
     primary: theme.palette.primary.main,
     secondary: theme.palette.secondary.main,
     success: theme.palette.success.main,
@@ -19,7 +26,7 @@ const getColorFromTheme = (theme: Theme, color: string): string => {
     danger: theme.palette.error.main,
   };
 
-  return colorMap[color] || theme.palette.text.primary;
+  return colorMap[color];
 };
 
 const WEIGHTS: Record<Weight, number> = {
@@ -51,22 +58,30 @@ const PRIMARY_STOPS = (theme: Theme): [string, string] => [
   theme.palette.secondary.main,
 ];
 
-const GRADIENT_STOPS: Record<string, (theme: Theme) => [string, string]> = {
+// Keyed over the whole vocabulary, with no `?? PRIMARY_STOPS` behind it. Two
+// stops were missing — `info` and `neutral` — so a gradient heading in either
+// colour painted the PRIMARY gradient and looked deliberate while ignoring the
+// prop entirely. The fallback is what hid it, so the fallback is gone.
+const GRADIENT_STOPS: Record<ColorValue, (theme: Theme) => [string, string]> = {
   primary: PRIMARY_STOPS,
   secondary: (theme) => [theme.palette.secondary.main, theme.palette.primary.main],
   success: (theme) => [theme.palette.success.light, theme.palette.success.dark],
   warning: (theme) => [theme.palette.warning.light, theme.palette.warning.dark],
+  info: (theme) => [theme.palette.info.light, theme.palette.info.dark],
   danger: (theme) => [theme.palette.error.light, theme.palette.error.dark],
+  // The grey ramp has no light/dark pair, and every stop on it is
+  // `string | undefined` under `noUncheckedIndexedAccess`.
+  neutral: (theme) => [theme.palette.grey[500] ?? '#9e9e9e', theme.palette.grey[900] ?? '#212121'],
 };
 
-const gradientFor = (theme: Theme, color: string) => {
-  const [from, to] = (GRADIENT_STOPS[color] ?? PRIMARY_STOPS)(theme);
+const gradientFor = (theme: Theme, color: ColorValue) => {
+  const [from, to] = GRADIENT_STOPS[color](theme);
   return `linear-gradient(135deg, ${from} 0%, ${to} 100%)`;
 };
 
 export interface HeadingFlags {
   customLevel?: string;
-  customColor?: string;
+  customColor?: ColorValue;
   customWeight?: string;
   gradient?: boolean;
 }

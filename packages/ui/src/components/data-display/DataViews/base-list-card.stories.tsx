@@ -48,7 +48,7 @@ const kebab = (
     size="sm"
     items={[
       { id: "edit", label: "Editar", onClick: () => {} },
-      { id: "delete", label: "Excluir", color: "error", onClick: () => {} },
+      { id: "delete", label: "Excluir", color: "danger", onClick: () => {} },
     ]}
     trigger={
       // `icon` and no children, which is what makes `Button` render it square
@@ -852,8 +852,8 @@ function OrderDetail(): React.JSX.Element {
           <Box component="span">R$ 312,50</Box>
         </Box>
         <Box sx={{ display: "flex", gap: 1, mt: 1, justifyContent: "flex-end" }}>
-          <Button size="small" variant="outlined">Recuperar</Button>
-          <Button size="small" variant="outlined">Ver cliente</Button>
+          <Button size="sm" variant="outlined">Recuperar</Button>
+          <Button size="sm" variant="outlined">Ver cliente</Button>
         </Box>
       </Box>
     </Box>

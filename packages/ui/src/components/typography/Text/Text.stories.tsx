@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { Text } from './Text';
+import { COLOR_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Text> = {
   title: 'Typography/Text',
@@ -25,17 +26,7 @@ const meta: Meta<typeof Text> = {
     },
     color: {
       control: { type: 'select' },
-      options: [
-        'primary',
-        'secondary',
-        'error',
-        'warning',
-        'info',
-        'success',
-        'textPrimary',
-        'textSecondary',
-        'textDisabled',
-      ],
+      options: COLOR_VALUES,
       description: 'Text color',
     },
     align: {
@@ -98,15 +89,21 @@ export const AllVariants: Story = {
 export const ColorVariations: Story = {
   render: () => (
     <Stack spacing={2}>
-      <Text color="primary">Primary color text</Text>
-      <Text color="secondary">Secondary color text</Text>
-      <Text color="error">Error color text</Text>
-      <Text color="warning">Warning color text</Text>
-      <Text color="info">Info color text</Text>
-      <Text color="success">Success color text</Text>
-      <Text color="textPrimary">Primary text color</Text>
-      <Text color="textSecondary">Secondary text color</Text>
-      <Text color="textDisabled">Disabled text color</Text>
+      {/*
+        Nine lines naming nine colours, of which four did not exist. `error`,
+        `textPrimary`, `textSecondary` and `textDisabled` all missed the old
+        colour map and hit its `|| text.primary` fallback — so "Error color
+        text" rendered in plain body text, and the story that documents the
+        colours was the thing least able to show they were broken.
+
+        Driven off COLOR_VALUES now, so it lists what the component accepts and
+        nothing else, and gains any colour the vocabulary gains.
+      */}
+      {COLOR_VALUES.map((color) => (
+        <Text key={color} color={color}>
+          {color.charAt(0).toUpperCase() + color.slice(1)} color text
+        </Text>
+      ))}
     </Stack>
   ),
 };
@@ -203,26 +200,26 @@ export const RealWorldExamples: Story = {
         <Text variant="subtitle1" weight="bold" gutterBottom>
           Introducing Advanced Analytics
         </Text>
-        <Text variant="body2" color="textSecondary">
+        <Text variant="body2" color="secondary">
           Get deeper insights into your data with our new analytics dashboard. Track metrics,
           visualize trends, and make data-driven decisions.
         </Text>
       </Paper>
 
       <Paper sx={{ p: 3 }}>
-        <Text variant="caption" color="textSecondary">
+        <Text variant="caption" color="secondary">
           Posted 2 hours ago
         </Text>
         <Text variant="body1" gutterBottom>
           Our team has been working hard to bring you the best experience possible.
         </Text>
-        <Text variant="caption" italic color="textSecondary">
+        <Text variant="caption" italic color="secondary">
           By John Doe, Product Manager
         </Text>
       </Paper>
 
       <Paper sx={{ p: 3, bgcolor: 'error.light' }}>
-        <Text variant="subtitle2" color="error" weight="bold">
+        <Text variant="subtitle2" color="danger" weight="bold">
           ⚠️ Important Notice
         </Text>
         <Text variant="body2">System maintenance scheduled for tonight at 10 PM EST.</Text>
@@ -280,10 +277,9 @@ export const AllStates: Story = {
       <Text>Default state</Text>
       <Text color="primary">Primary state</Text>
       <Text color="secondary">Secondary state</Text>
-      <Text color="error">Error state</Text>
+      <Text color="danger">Error state</Text>
       <Text color="warning">Warning state</Text>
       <Text color="success">Success state</Text>
-      <Text color="textDisabled">Disabled state</Text>
       <Text italic>Italic state</Text>
       <Text underline>Underline state</Text>
       <Text strikethrough>Strikethrough state</Text>

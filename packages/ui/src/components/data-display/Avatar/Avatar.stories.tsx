@@ -7,6 +7,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 
 import { Avatar, AvatarGroup } from './Avatar';
+import { COLOR_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Avatar> = {
   title: 'Media/Avatar',
@@ -34,7 +35,7 @@ const meta: Meta<typeof Avatar> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'error', 'neutral'],
+      options: COLOR_VALUES,
       description: 'The color scheme of the avatar',
     },
     status: {
@@ -601,14 +602,7 @@ export const ResponsiveGrid: Story = {
             key={i}
             fallback={`U${i + 1}`}
             color={
-              ['primary', 'secondary', 'success', 'warning', 'error', 'neutral'][i % 6] as
-                | 'primary'
-                | 'secondary'
-                | 'success'
-                | 'warning'
-                | 'error'
-                | 'neutral'
-            }
+              COLOR_VALUES[i % COLOR_VALUES.length]}
             interactive
           />
         ))}
@@ -701,14 +695,7 @@ export const PerformanceDemo: Story = {
                 fallback={`${i}`}
                 size="sm"
                 color={
-                  ['primary', 'secondary', 'success', 'warning', 'error', 'neutral'][i % 6] as
-                    | 'primary'
-                    | 'secondary'
-                    | 'success'
-                    | 'warning'
-                    | 'error'
-                    | 'neutral'
-                }
+                  COLOR_VALUES[i % COLOR_VALUES.length]}
                 animationDelay={i * 10}
               />
             ))}
