@@ -104,6 +104,111 @@ test('opening a report navigates to its own page, and back returns to the grid',
   await expect(page.getByTestId('page-report')).toHaveCount(0);
 });
 
+/**
+ * The ADDRESS BAR — the half of "two screens" that the screens alone cannot
+ * prove.
+ *
+ * The surface has always had routes; what it lacked here was a router that
+ * writes them anywhere a browser can see. `standalone: true` gave it a
+ * `MemoryRouter`, whose location is a variable: every screen worked and none of
+ * them had a URL, so a report could not be linked to, reloaded or backed out
+ * of. The page now mounts the surface under a real `HashRouter` whose
+ * `basename` is the harness slug, and the shell reads only the FIRST hash
+ * segment so a four-segment hash still resolves to this page.
+ *
+ * Both halves have to be true at once, and only a RELOAD says so: a surface
+ * that writes a URL nothing can read back passes any assertion that the URL
+ * changed. So each case below ends by loading the URL it just produced.
+ */
+const LIST_URL = /#\/report-builder\/harness\/reports$/;
+const REPORT_URL = /#\/report-builder\/harness\/reports\/r1$/;
+const EDITOR_URL = /#\/report-builder\/harness\/reports\/r1\/edit$/;
+
+test('opening a report puts that report’s id in the address bar', async ({ page }) => {
+  await page.goto('#/report-builder');
+
+  // The grid has a URL of its own: the page slug alone is not one of the
+  // surface's screens, so `#/report-builder` resolves onto the surface's root.
+  await expect(page.getByTestId('reports-card-list')).toBeVisible();
+  await expect(page).toHaveURL(LIST_URL);
+
+  await page.getByTestId('reports-card-r1-open').click();
+
+  await expect(page.getByTestId('page-report')).toBeVisible({ timeout: 15_000 });
+  // A different URL from the grid's, and the difference is the report's id.
+  await expect(page).toHaveURL(REPORT_URL);
+});
+
+test('the report’s URL reloads onto the report, not the grid', async ({ page }) => {
+  await page.goto('#/report-builder');
+  await page.getByTestId('reports-card-r1-open').click();
+  await expect(page).toHaveURL(REPORT_URL);
+
+  await page.reload();
+
+  await expect(page.getByTestId('page-report')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('report-title')).toHaveText('Vendas por forma de pagamento');
+  await expect(page.getByTestId('reports-card-list')).toHaveCount(0);
+  await expect(page).toHaveURL(REPORT_URL);
+  // The SHELL's half, from a cold load: it found `report-builder` at the front
+  // of a four-segment hash. Reading the whole path looked up a page named
+  // `report-builder/harness/reports/r1`, found none, and drew the not-a-page
+  // message over a surface that had routed correctly.
+  await expect(page.getByTestId('harness-page')).toHaveAttribute('data-page', 'report-builder');
+});
+
+test('the browser’s Back returns from the report to the grid', async ({ page }) => {
+  await page.goto('#/report-builder');
+  await expect(page).toHaveURL(LIST_URL);
+
+  await page.getByTestId('reports-card-r1-open').click();
+  await expect(page.getByTestId('page-report')).toBeVisible({ timeout: 15_000 });
+
+  await page.goBack();
+
+  await expect(page.getByTestId('reports-card-list')).toBeVisible();
+  await expect(page.getByTestId('page-report')).toHaveCount(0);
+  await expect(page).toHaveURL(LIST_URL);
+});
+
+test('the editor has a URL of its own, and reloading it opens the editor', async ({ page }) => {
+  await openFirstReport(page);
+
+  await page.getByTestId('report-edit').click();
+
+  await expect(page.getByTestId('page-report-editor')).toBeVisible({ timeout: 15_000 });
+  // Distinguishable from the report's own URL by more than a query string —
+  // `/edit` is a route, which is what makes the reload below land here.
+  await expect(page).toHaveURL(EDITOR_URL);
+
+  await page.reload();
+
+  await expect(page.getByTestId('page-report-editor')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('page-report')).toHaveCount(0);
+  await expect(page).toHaveURL(EDITOR_URL);
+});
+
+/**
+ * The shell and the surface, agreeing about one hash.
+ *
+ * react-router's hash history listens on `popstate` alone and writes its own
+ * navigations with `pushState`, which fires no `hashchange` — so a hash the
+ * SHELL changed never reaches it. The sidebar's rows are plain `<a href="#/…">`
+ * anchors, and its "Report builder" row points at the bare slug; without the
+ * page following that change, clicking it while reading a report moved the
+ * address bar and left the report on screen. That is the same URL-versus-screen
+ * disagreement this block exists to close, reached from the other side.
+ */
+test('the shell’s own nav row leaves the report it is standing in', async ({ page }) => {
+  await openFirstReport(page);
+
+  await page.getByTestId('harness-nav-report-builder').click();
+
+  await expect(page.getByTestId('reports-card-list')).toBeVisible();
+  await expect(page.getByTestId('page-report')).toHaveCount(0);
+  await expect(page).toHaveURL(LIST_URL);
+});
+
 test('the selected report runs through the published pipeline', async ({ page }) => {
   await openFirstReport(page);
 

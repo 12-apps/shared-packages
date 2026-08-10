@@ -26,11 +26,22 @@ import { harnessTheme } from './shell/theme';
  * from the admin sidebar and what it leaves behind.
  */
 function useHashSlug(fallback: string) {
-  // The slug is the hash's PATH; anything after `?` is the page's own query.
-  // The OAuth callback comes back to a page carrying `?connected=`/`?code=`,
-  // exactly as future-pay's admin does — and a fragment-only navigation is
-  // what keeps the in-page mount alive across the provider hop.
-  const read = () => (window.location.hash.replace(/^#\/?/, '').split('?')[0] ?? '') || fallback;
+  // The slug is the FIRST segment of the hash's path; anything after `?` is the
+  // page's own query. The OAuth callback comes back to a page carrying
+  // `?connected=`/`?code=`, exactly as future-pay's admin does — and a
+  // fragment-only navigation is what keeps the in-page mount alive across the
+  // provider hop.
+  //
+  // Only the first segment, because a page may own a URL SPACE rather than a
+  // single URL: `pages/report-builder.tsx` mounts a router at its own slug, so
+  // the reports surface writes `#/report-builder/harness/reports/r1` and the
+  // shell has to still find `report-builder` in it. Reading the whole path
+  // looked that string up as a page name and found none. Every other page is a
+  // plain slug, whose path has one segment and is returned unchanged.
+  const read = () => {
+    const path = window.location.hash.replace(/^#\/?/, '').split('?')[0] ?? '';
+    return (path.split('/')[0] ?? '') || fallback;
+  };
   const [slug, setSlug] = useState(read);
   useEffect(() => {
     const onChange = () => setSlug(read());
