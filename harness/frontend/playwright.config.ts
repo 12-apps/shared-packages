@@ -1,6 +1,13 @@
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from '@playwright/test';
 import { paymentsFeatures, paymentsFeaturesRoot, paymentsSteps } from '@12-apps/payments-e2e';
 import { defineBddConfig } from 'playwright-bdd';
+
+import { HARNESS_BACKEND_ORIGIN } from '../backend/src/port';
+
+/** `harness/backend`, resolved from THIS file so the spawn ignores the cwd. */
+const BACKEND_DIR = fileURLToPath(new URL('../backend', import.meta.url));
 
 /**
  * Where the buyer journeys compile to (FUT-743), and where they come FROM
@@ -64,10 +71,34 @@ export default defineConfig({
     // The same pages, driven by the Gherkin journeys compiled above.
     { name: 'journeys', testDir: journeys },
   ],
-  webServer: {
-    command: 'npx vite preview --port 4319 --strictPort',
-    url: 'http://localhost:4319',
-    reuseExistingServer: false,
-    timeout: 60_000,
-  },
+  /**
+   * TWO servers, because the harness now has two halves.
+   *
+   * The reports surface used to answer itself: the package's Hono router was
+   * mounted in the browser, so one `vite preview` was the whole world. It is a
+   * real API on a real socket now, and `npm test` still has to be the one
+   * command that runs the suite — so Playwright starts both and orders them by
+   * listing them in dependency order.
+   *
+   * The backend's readiness probe is `/health`, which does not answer until
+   * the migrations have run and the fixture is seeded. That is what stops the
+   * first spec from racing the first migration: PGlite applies six migrations
+   * on boot, and a spec that arrived early would see `relation saved_reports
+   * does not exist` — a package failure, seemingly.
+   */
+  webServer: [
+    {
+      command: 'npm run start',
+      cwd: BACKEND_DIR,
+      url: `${HARNESS_BACKEND_ORIGIN}/health`,
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+    {
+      command: 'npx vite preview --port 4319 --strictPort',
+      url: 'http://localhost:4319',
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+  ],
 });
