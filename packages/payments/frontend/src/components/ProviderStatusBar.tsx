@@ -92,9 +92,10 @@ function anyCredentialStored(
  *
  * Two qualifications, both learned the hard way:
  *
- *  - Only providers that CAN charge are held to having charged. Stripe and
- *    InfinitePay have no browser tokenization written, so requiring the proof
- *    would not make their "Ativo" honest — it would make them unactivatable.
+ *  - Only providers that CAN charge are held to having charged. Every shipped
+ *    adapter now declares activationCharge (Stripe's tokenizer and InfinitePay's
+ *    hosted link included — FUT-689/FUT-698), so today this spares only an
+ *    adapter that genuinely cannot obtain proof.
  *  - Turning OFF is never blocked. An owner must be able to pull a provider out
  *    of rotation at once, and rows enabled before this rule existed would
  *    otherwise be stuck on with no way down.
