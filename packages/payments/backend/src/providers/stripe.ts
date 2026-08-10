@@ -345,9 +345,12 @@ export function stripeProvider(): PaymentProviderAdapter {
     },
     // OAuth fills these in itself; they stay declared because a store MAY
     // paste its own keys instead (and because the settings page renders the
-    // stored connection from this schema either way).
+    // stored connection from this schema either way). The exchange stores its
+    // key under `accessToken`, never `secretKey` (`apiKeyOf` says why the two
+    // must not share a slot) — `fulfilledBy` is what keeps the masked view
+    // reading that store as configured, not as empty fields (FUT-691).
     credentialSchema: [
-      { key: 'secretKey', label: 'Secret key (sk_...)', secret: true, required: false },
+      { key: 'secretKey', label: 'Secret key (sk_...)', secret: true, required: false, fulfilledBy: 'accessToken' },
       { key: 'publishableKey', label: 'Publishable key (pk_...)', secret: false, required: false },
       {
         key: 'webhookSecret',

@@ -114,3 +114,30 @@ test('a provider that ships a guide renders it; one that ships none gets the for
   await expect(page.getByTestId('payments-setup-guide')).toBeHidden();
   await expectWireOrder(page, ['GET /settings/guides/pagbank 404']);
 });
+
+/**
+ * The guide is a function of the store's PROGRESS (FUT-691): the case seeds
+ * stripe as `connected`, and the walkthrough must open on the once-dead
+ * webhook section — the notification URL and its copy button — with the
+ * stepper past "Conectar conta", not stuck on step 1 as it used to be when
+ * the adapter reported no stage at all.
+ */
+test('stripe: a connected store opens on the webhook section, stepper past step 1', async ({
+  page,
+}) => {
+  await openPage(page, 'payments-provider-settings');
+  await openAdminCase(page, 'guides');
+  await openProvider(page, 'stripe');
+
+  await expect(page.getByTestId('payments-setup-guide')).toBeVisible();
+  // The section the stage resolves: webhook (stage 3 of 4), not connect.
+  await expect(page.getByTestId('payments-setup-section-webhook')).toBeVisible();
+  await expect(page.getByTestId('payments-setup-section-webhook')).toContainText(
+    'URL de notificação',
+  );
+  await expect(page.getByTestId('payments-setup-section-connect')).toBeHidden();
+
+  // The probe the guide's copy points at exists on this screen (FUT-691) —
+  // presence only: this mount is read-only, so the button is not driven here.
+  await expect(page.getByTestId('payments-oauth-verify')).toBeVisible();
+});

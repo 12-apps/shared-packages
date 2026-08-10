@@ -288,6 +288,61 @@ describe('connected-account identity (FUT-300)', () => {
 });
 
 /**
+ * An OAuth connection must MASK as configured (FUT-691).
+ *
+ * The exchange stores its tokens under the flow's own names (`accessToken`),
+ * never under the schema key an owner would have pasted (`secretKey`) — so the
+ * masked view, built strictly from schema keys, read a connected Stripe store
+ * as `configured: false` on every field: the settings screen claimed "nothing
+ * here" about the very connection checkout charges through. The adapter now
+ * declares the bridge (`fulfilledBy`), and the mask reads through it.
+ */
+describe('masked OAuth settings (FUT-691)', () => {
+  it('reads a stripe OAuth connection as configured, without echoing the token', async () => {
+    const { store, settings } = setup();
+    await store.save(TENANT, {
+      provider: 'stripe',
+      enabled: false,
+      priority: 0,
+      environment: 'PRODUCTION',
+      status: 'VERIFIED',
+      lastVerifiedAt: new Date('2026-07-01T00:00:00Z'),
+      chargeVerifiedAt: null,
+      pendingVerification: null,
+      expiresAt: null,
+      stub: false,
+      environments: {
+        SANDBOX: {},
+        // What `tokensToFields` + the connect service leave behind.
+        PRODUCTION: {
+          accessToken: 'sk_oauth_grant_7788',
+          refreshToken: 'rt_oauth_1',
+          stripeUserId: 'acct_77',
+          accountId: 'acct_77',
+          publishableKey: 'pk_live_9',
+          scope: 'read_write',
+          connectedAt: '2026-06-30T12:00:00.000Z',
+        },
+      },
+    });
+
+    const view = await settings.getSettings(TENANT);
+    const config = view.configs.find((c) => c.provider === 'stripe');
+    const production = config?.environments.PRODUCTION;
+    // The access token IS the account's secret key (`apiKeyOf`), so the
+    // schema's `secretKey` reads as configured through `fulfilledBy` — as a
+    // hint, never as the value.
+    expect(production?.['secretKey']).toEqual({ configured: true, hint: '••••7788' });
+    expect(production?.['publishableKey']).toEqual({ configured: true, hint: 'pk_live_9' });
+    // WHO is connected, from the reserved identity keys.
+    expect(config?.connectedAccount?.accountId).toBe('acct_77');
+    // The grant itself stays sealed behind the mask.
+    expect(JSON.stringify(view)).not.toContain('sk_oauth_grant_7788');
+    expect(JSON.stringify(view)).not.toContain('rt_oauth_1');
+  });
+});
+
+/**
  * A dead grant must not receive checkouts (FUT-683).
  *
  * `RECONNECT_REQUIRED` used to change nothing but the settings badge: the row

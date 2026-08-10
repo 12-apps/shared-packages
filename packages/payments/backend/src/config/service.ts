@@ -140,7 +140,12 @@ function secretHint(value: string): string {
 function maskEnvironment(adapter: PaymentProviderAdapter, fields: Record<string, string>): MaskedFields {
   const masked: MaskedFields = {};
   for (const spec of adapter.credentialSchema) {
-    const value = fields[spec.key] ?? '';
+    // `fulfilledBy` is the adapter-declared bridge from an OAuth exchange's
+    // own field names to the schema keys this view is built from — without it
+    // an OAuth-connected store masked as `configured: false` on every field,
+    // reading as disconnected on the very screen about its connection
+    // (FUT-691). Read-side only: writes still address `spec.key`.
+    const value = fields[spec.key] || (spec.fulfilledBy && fields[spec.fulfilledBy]) || '';
     masked[spec.key] = {
       configured: value.length > 0,
       hint: value.length === 0 ? null : spec.secret ? secretHint(value) : value,

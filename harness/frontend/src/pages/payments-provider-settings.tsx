@@ -88,7 +88,11 @@ function probeWrite(world: AdminWorld): ReactNode {
  * `catalog` pins the four cards and read-only-ness, `slug-alias` lands
  * controlled on the raw `infinitepay` name and watches the canonical
  * `infinite-pay` respelling arrive with `{replace: true}`, `guides` opens the
- * one vendor that ships a setup guide and the one that ships none.
+ * one vendor that ships a setup guide and the one that ships none — plus a
+ * CONNECTED stripe row, because a guide is no longer a constant: the stage it
+ * opens on is computed from the store's progress, and only a non-fresh
+ * fixture can prove the stepper moves past step 1 (FUT-691). The row is
+ * seeded straight into the store; the mount stays read-only.
  */
 const CASES: readonly HarnessCase[] = [
   adminCase('catalog', 'Published catalog', catalogSpec('catalog'), {
@@ -99,7 +103,7 @@ const CASES: readonly HarnessCase[] = [
     controlled: true,
     controls: probeWrite,
   }),
-  adminCase('guides', 'Setup guides', catalogSpec('guides'), {
+  adminCase('guides', 'Setup guides', { ...catalogSpec('guides'), stages: { stripe: 'connected' } }, {
     controlled: true,
     controls: probeWrite,
   }),
