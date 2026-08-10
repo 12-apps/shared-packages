@@ -130,7 +130,7 @@ export const Colors: Story = {
       <Avatar color="secondary" fallback="SC" />
       <Avatar color="success" fallback="SU" />
       <Avatar color="warning" fallback="WA" />
-      <Avatar color="error" fallback="ER" />
+      <Avatar color="danger" fallback="ER" />
       <Avatar color="neutral" fallback="NT" />
     </Stack>
   ),
@@ -400,7 +400,7 @@ export const NotificationBadges: Story = {
       <Badge badgeContent={4} color="primary">
         <Avatar icon={<Email />} />
       </Badge>
-      <Badge badgeContent={12} color="error">
+      <Badge badgeContent={12} color="danger">
         <Avatar icon={<Notifications />} />
       </Badge>
       <Badge variant="dot" color="success">
@@ -552,7 +552,7 @@ export const AllSizesWithEffects: Story = {
         <Avatar size="sm" fallback="SM" glow color="secondary" />
         <Avatar size="md" fallback="MD" glow color="success" />
         <Avatar size="lg" fallback="LG" glow color="warning" />
-        <Avatar size="xl" fallback="XL" glow color="error" />
+        <Avatar size="xl" fallback="XL" glow color="danger" />
         <Avatar size="xxl" fallback="XXL" glow color="neutral" />
       </Stack>
       <Stack direction="row" spacing={2} alignItems="center">
@@ -563,7 +563,7 @@ export const AllSizesWithEffects: Story = {
         <Avatar size="sm" fallback="SM" pulse color="secondary" />
         <Avatar size="md" fallback="MD" pulse color="success" />
         <Avatar size="lg" fallback="LG" pulse color="warning" />
-        <Avatar size="xl" fallback="XL" pulse color="error" />
+        <Avatar size="xl" fallback="XL" pulse color="danger" />
         <Avatar size="xxl" fallback="XXL" pulse color="neutral" />
       </Stack>
       <Stack direction="row" spacing={2} alignItems="center">

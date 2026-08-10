@@ -3,6 +3,7 @@ import React from 'react';
 
 import { SheetContent, SheetFooter, SheetHeader } from './Sheet.parts';
 import type { SheetProps } from './Sheet.types';
+import { muiColor } from '../../../tokens/scales';
 
 export interface SheetBodyProps extends Pick<
   SheetProps,
@@ -50,7 +51,7 @@ const SheetLoading: React.FC<Pick<SheetBodyProps, 'color'>> = ({ color }) => (
       minHeight: 200,
     }}
   >
-    <CircularProgress color={color} />
+    <CircularProgress color={color === undefined ? undefined : muiColor(color, 'inherit')} />
   </Box>
 );
 

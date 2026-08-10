@@ -122,7 +122,7 @@ const WithRecentCommandsComponent = () => {
             {recentCommands.map((id) => {
               const cmd = sampleCommands.find((c) => c.id === id);
               return cmd ? (
-                <Chip key={id} label={cmd.label} size="small" onClick={() => cmd.action()} />
+                <Chip key={id} label={cmd.label} size="sm" onClick={() => cmd.action()} />
               ) : null;
             })}
           </Stack>

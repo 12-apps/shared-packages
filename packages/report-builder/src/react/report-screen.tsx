@@ -60,7 +60,7 @@ function StatusChip({ status }: { status: SavedReportView["status"] }): JSX.Elem
         "& .MuiChip-root": stateChipSx(tone, theme.palette.background.paper),
       }}
     >
-      <Chip label={STATUS_LABELS[status] ?? status} size="small" variant="filled" />
+      <Chip label={STATUS_LABELS[status] ?? status} size="sm" variant="filled" />
     </Box>
   );
 }

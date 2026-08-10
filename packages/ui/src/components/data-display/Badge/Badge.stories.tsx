@@ -176,7 +176,7 @@ export const Variants: Story = {
           <div style={{ marginTop: 8, fontSize: '0.875rem' }}>Dot</div>
         </Box>
         <Box textAlign="center">
-          <Badge variant="count" badgeContent={99} color="error">
+          <Badge variant="count" badgeContent={99} color="danger">
             <ShoppingCart />
           </Badge>
           <div style={{ marginTop: 8, fontSize: '0.875rem' }}>Count</div>
@@ -208,7 +208,7 @@ export const Variants: Story = {
           <div style={{ marginTop: 8, fontSize: '0.875rem' }}>Secondary</div>
         </Box>
         <Box textAlign="center">
-          <Badge variant="destructive" badgeContent="!" color="error">
+          <Badge variant="destructive" badgeContent="!" color="danger">
             <ErrorIcon />
           </Badge>
           <div style={{ marginTop: 8, fontSize: '0.875rem' }}>Destructive</div>
@@ -278,7 +278,7 @@ export const Colors: Story = {
       <Badge color="warning" badgeContent={4}>
         <Mail />
       </Badge>
-      <Badge color="error" badgeContent={4}>
+      <Badge color="danger" badgeContent={4}>
         <Mail />
       </Badge>
       <Badge color="neutral" badgeContent={4}>
@@ -387,7 +387,7 @@ export const NotificationBadges: Story = {
   render: () => (
     <Stack direction="row" spacing={3} alignItems="center">
       <IconButton>
-        <Badge badgeContent={4} color="error">
+        <Badge badgeContent={4} color="danger">
           <Mail />
         </Badge>
       </IconButton>
@@ -453,7 +453,7 @@ export const ProductBadges: Story = {
           textAlign: 'center',
         }}
       >
-        <Badge badgeContent="50%" color="error" variant="gradient" position="top-right">
+        <Badge badgeContent="50%" color="danger" variant="gradient" position="top-right">
           <Box sx={{ width: '100%', height: 80, bgcolor: 'grey.100', borderRadius: 1, mb: 1 }} />
         </Badge>
         <div style={{ fontSize: '0.875rem' }}>Product B</div>
@@ -519,7 +519,7 @@ export const GlassMorphism: Story = {
             <CheckCircle />
           </IconButton>
         </Badge>
-        <Badge variant="glass" badgeContent="!" color="error" glow>
+        <Badge variant="glass" badgeContent="!" color="danger" glow>
           <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.9)' }}>
             <ErrorIcon />
           </IconButton>
@@ -557,7 +557,7 @@ export const ThemeVariations: Story = {
             <Badge badgeContent="NEW" color="success" variant="gradient">
               <Star />
             </Badge>
-            <Badge variant="dot" color="error" pulse>
+            <Badge variant="dot" color="danger" pulse>
               <Notifications />
             </Badge>
             <Badge variant="glass" badgeContent="5" color="warning">
@@ -579,7 +579,7 @@ export const ThemeVariations: Story = {
             <Badge badgeContent="NEW" color="success" variant="gradient">
               <Star />
             </Badge>
-            <Badge variant="dot" color="error" pulse>
+            <Badge variant="dot" color="danger" pulse>
               <Notifications />
             </Badge>
             <Badge variant="glass" badgeContent="5" color="warning">
@@ -619,7 +619,7 @@ export const StatusIndicators: Story = {
           </Typography>
         </Box>
         <Box textAlign="center">
-          <Badge variant="dot" color="error">
+          <Badge variant="dot" color="danger">
             <Avatar sx={{ bgcolor: 'grey.300' }}>
               <FiberManualRecord />
             </Avatar>
@@ -667,7 +667,7 @@ export const AnimatedBadges: Story = {
           </Typography>
         </Box>
         <Box textAlign="center">
-          <Badge badgeContent={3} color="error" pulse>
+          <Badge badgeContent={3} color="danger" pulse>
             <IconButton>
               <Notifications />
             </IconButton>
@@ -697,7 +697,7 @@ export const AnimatedBadges: Story = {
           </Typography>
         </Box>
         <Box textAlign="center">
-          <Badge badgeContent="!" color="error" glow pulse>
+          <Badge badgeContent="!" color="danger" glow pulse>
             <IconButton>
               <Warning />
             </IconButton>
@@ -820,7 +820,7 @@ export const AnimationShowcase: Story = {
         <Badge badgeContent="Bounce" bounce color="secondary">
           <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>Bounce</Box>
         </Badge>
-        <Badge badgeContent="Pulse" pulse color="error">
+        <Badge badgeContent="Pulse" pulse color="danger">
           <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>Pulse</Box>
         </Badge>
         <Badge badgeContent="Glow" glow color="warning">
@@ -843,7 +843,7 @@ export const AccessibilityExample: Story = {
     <Stack spacing={3}>
       <Typography variant="h6">Accessible Badges</Typography>
       <Stack direction="row" spacing={3}>
-        <Badge badgeContent={5} color="error" aria-label="5 new messages" aria-live="polite">
+        <Badge badgeContent={5} color="danger" aria-label="5 new messages" aria-live="polite">
           <IconButton aria-label="Messages">
             <Mail />
           </IconButton>
@@ -885,7 +885,7 @@ export const AllVariants: Story = {
         <Badge variant="dot" color="success">
           <Notifications />
         </Badge>
-        <Badge variant="count" badgeContent={99} color="error">
+        <Badge variant="count" badgeContent={99} color="danger">
           <ShoppingCart />
         </Badge>
         <Badge variant="gradient" badgeContent="PRO" color="warning">
@@ -900,7 +900,7 @@ export const AllVariants: Story = {
         <Badge variant="secondary" badgeContent="12" color="secondary">
           <TrendingUp />
         </Badge>
-        <Badge variant="destructive" badgeContent="!" color="error">
+        <Badge variant="destructive" badgeContent="!" color="danger">
           <ErrorIcon />
         </Badge>
         <Badge variant="success" badgeContent="✓" color="success">
@@ -971,7 +971,7 @@ export const AllStates: Story = {
           <Badge variant="dot" color="success" pulse>
             <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>Active (Pulse)</Box>
           </Badge>
-          <Badge badgeContent="Glow" color="error" glow>
+          <Badge badgeContent="Glow" color="danger" glow>
             <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>Glow Effect</Box>
           </Badge>
         </Stack>
@@ -1065,7 +1065,7 @@ export const Responsive: Story = {
         <Badge badgeContent="4" color="warning">
           <Paper sx={{ p: 2, textAlign: 'center' }}>Item 4</Paper>
         </Badge>
-        <Badge badgeContent="5" color="error">
+        <Badge badgeContent="5" color="danger">
           <Paper sx={{ p: 2, textAlign: 'center' }}>Item 5</Paper>
         </Badge>
         <Badge badgeContent="6" color="neutral">
@@ -1105,7 +1105,7 @@ export const EdgeCases: Story = {
           </Typography>
         </Box>
         <Box textAlign="center">
-          <Badge badgeContent={999999} max={9999} color="error">
+          <Badge badgeContent={999999} max={9999} color="danger">
             <Notifications />
           </Badge>
           <Typography variant="caption" display="block" mt={1}>

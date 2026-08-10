@@ -4,6 +4,7 @@ import type React from 'react';
 
 import { glowAnimation, pulseAnimation, shimmerAnimation } from './Sheet.animations';
 import type { SheetProps } from './Sheet.types';
+import { accentFor } from '../../../tokens/scales';
 
 type Position = NonNullable<SheetProps['position']>;
 type Variant = NonNullable<SheetProps['variant']>;
@@ -140,7 +141,7 @@ const SURFACES: Record<Variant, (input: SurfaceInput) => Record<string, unknown>
                 135deg,
                 ${theme.palette.background.paper} 0%,
                 ${alpha(accent, 0.08)} 50%,
-                ${alpha(theme.palette[color]?.dark || accent, 0.12)} 100%
+                ${alpha(accentFor(theme, color)?.dark || accent, 0.12)} 100%
               )`
       : theme.palette.background.paper,
     position: 'relative' as const,
@@ -211,7 +212,7 @@ const baseSurface = (input: VariantStyleInput, accent: string) => {
 
 const variantStyles = (input: VariantStyleInput) => {
   const { theme, variant, color, position, glow, pulse, rounded } = input;
-  const accent = theme.palette[color]?.main || theme.palette.primary.main;
+  const accent = accentFor(theme, color)?.main || theme.palette.primary.main;
 
   return {
     ...baseSurface(input, accent),

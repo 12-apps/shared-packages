@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { TabsProps as MuiTabsProps } from '@mui/material';
 import type { ReactNode } from 'react';
 
@@ -57,7 +58,7 @@ export interface TabsProps extends Omit<MuiTabsProps, 'variant' | 'children' | '
   /**
    * Size of the tabs
    */
-  size?: 'sm' | 'md' | 'lg';
+  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
   
   /**
    * Array of tab items
@@ -77,7 +78,7 @@ export interface TabsProps extends Omit<MuiTabsProps, 'variant' | 'children' | '
   /**
    * Color theme for the tabs
    */
-  color?: 'primary' | 'secondary';
+  color?: Extract<ColorValue, 'primary' | 'secondary'>;
   
   /**
    * Whether tabs should fill the full width

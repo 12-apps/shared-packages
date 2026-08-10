@@ -630,7 +630,7 @@ export const IntegrationTest: Story = {
           <Notifications />
         </IconButton>
       </Badge>
-      <Badge {...args} badgeContent={99} color="error" max={99}>
+      <Badge {...args} badgeContent={99} color="danger" max={99}>
         <IconButton data-testid="error-button">
           <ShoppingCart />
         </IconButton>
@@ -671,7 +671,7 @@ export const NewVariantsTest: Story = {
       <Badge variant="secondary" badgeContent="Secondary" color="secondary">
         <Box sx={{ p: 2, bgcolor: 'grey.100' }}>Secondary</Box>
       </Badge>
-      <Badge variant="destructive" badgeContent="!" color="error">
+      <Badge variant="destructive" badgeContent="!" color="danger">
         <Box sx={{ p: 2, bgcolor: 'grey.100' }}>Destructive</Box>
       </Badge>
       <Badge variant="success" badgeContent="✓" color="success">

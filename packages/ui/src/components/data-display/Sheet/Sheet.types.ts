@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { CSSProperties,ReactNode } from 'react';
 
 export interface SheetProps {
@@ -8,8 +9,12 @@ export interface SheetProps {
   description?: string;
   position?: 'top' | 'bottom' | 'left' | 'right';
   variant?: 'default' | 'glass' | 'gradient' | 'elevated' | 'minimal' | 'draggable';
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
-  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
+  /**
+   * The house scale, plus `full`. `full` is not a size on the scale — it is
+   * "the whole viewport", so it extends rather than replaces.
+   */
+  size?: SizeValue | 'full';
+  color?: Exclude<ColorValue, 'neutral'>;
   glow?: boolean;
   pulse?: boolean;
   glass?: boolean;

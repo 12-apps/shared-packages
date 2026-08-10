@@ -146,17 +146,28 @@ export function CustomRangeDialog({
   }, [open, seed]);
 
   return (
-    <Modal open={open} onClose={onClose} size="sm" dataTestId={dataTestId}>
+    <Modal open={open} onClose={onClose} size="lg" dataTestId={dataTestId}>
       <ModalContent dataTestId={`${dataTestId}-content`}>
         <Stack spacing={2}>
           <Text variant="heading" size="lg" weight="semibold" as="h2">
             Período personalizado
           </Text>
-          <Box sx={{ display: "flex", justifyContent: "center" }}>
+          {/*
+            TWO months, side by side. A range that crosses a month boundary is
+            the normal case here — "the last three weeks", "since the 28th" —
+            and with one month visible the reader has to page forward, losing
+            sight of the end they just picked. `Calendar` already defaults to 2
+            in range mode; this dialog was overriding it back down to 1, which
+            is why it rendered as a single month.
+
+            The modal grows with it. At a width where two months genuinely do
+            not fit, the calendar scrolls sideways inside this box rather than
+            the page scrolling or the grid collapsing.
+          */}
+          <Box sx={{ display: "flex", justifyContent: "center", overflowX: "auto" }}>
             <Calendar
               selectionMode="range"
               locale="pt-BR"
-              numberOfMonths={1}
               range={draft}
               // BOTH callbacks, and `onIntermediateRangeChange` is the one that
               // does the work: `onRangeChange` fires only on the click that

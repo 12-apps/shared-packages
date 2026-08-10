@@ -1,3 +1,4 @@
+import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { CSSProperties,ReactNode } from 'react';
 
 export interface CommandItem {
@@ -21,8 +22,8 @@ export interface CommandProps {
   onValueChange?: (value: string) => void;
   onSelect?: (item: CommandItem) => void;
   variant?: 'default' | 'glass' | 'gradient' | 'minimal' | 'elevated';
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
+  size?: SizeValue;
+  color?: Exclude<ColorValue, 'neutral'>;
   glow?: boolean;
   pulse?: boolean;
   loading?: boolean;

@@ -307,7 +307,7 @@ export const Interactive = () => {
 
       <Box>
         <Typography variant="body2" gutterBottom>
-          Current Step: <Chip label={activeId} size="small" />
+          Current Step: <Chip label={activeId} size="sm" />
         </Typography>
         <Typography variant="body2">
           Completed: {Array.from(completed).join(', ') || 'None'}
