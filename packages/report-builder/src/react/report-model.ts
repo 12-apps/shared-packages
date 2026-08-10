@@ -52,8 +52,15 @@ function isDashboardWire(document: ReportDocumentWire): document is DashboardSpe
   return "kind" in document && document.kind === "dashboard";
 }
 
-/** The next free `bloco-N` id (ids stay stable across reorders). */
-function nextBlockId(blocks: ReportBlockDraft[]): string {
+/**
+ * The next free `bloco-N` id (ids stay stable across reorders).
+ *
+ * Exported because the CANVAS needs to know which block a mutation is about to
+ * create, so it can select and focus it. The alternative — diffing the draft
+ * from inside the `setState` updater — makes the updater impure, and React is
+ * allowed to (and under StrictMode does) run it twice.
+ */
+export function nextBlockId(blocks: ReportBlockDraft[]): string {
   const taken = new Set(blocks.map((block) => block.id));
   let candidate = blocks.length + 1;
   while (taken.has(`bloco-${candidate}`)) candidate += 1;
@@ -68,6 +75,39 @@ export function addBlock(draft: ReportDraft, spec: ReportSpecWire, title: string
     spec,
   };
   return { ...draft, blocks: [...draft.blocks, block] };
+}
+
+/**
+ * Copy a block and put the copy DIRECTLY AFTER it (FUT-755, GAP 6).
+ *
+ * Not at the end: on a canvas already a screen tall, a duplicate that lands
+ * twelve rows down reads as "nothing happened". Next to its source is also
+ * where a duplicate is going to be used — the reason to duplicate is to vary
+ * one thing about the block beside it.
+ *
+ * The copy is INDEPENDENT: the spec is cloned, so editing the copy's measures
+ * or filters cannot reach back into the original. A shallow `{...block}` would
+ * share one `spec` object between the two, and the config panel patches specs
+ * in place often enough that this is not theoretical.
+ *
+ * An unknown id is a no-op, matching every other mutation in this file.
+ */
+export function duplicateBlock(draft: ReportDraft, id: string): ReportDraft {
+  const index = draft.blocks.findIndex((block) => block.id === id);
+  const source = draft.blocks[index];
+  if (source === undefined) return draft;
+  const copy: ReportBlockDraft = {
+    id: nextBlockId(draft.blocks),
+    title: `${blockLabel(source)} (cópia)`,
+    span: source.span,
+    // A spec is pure JSON by contract (see `spec.ts`), so this round-trip is a
+    // complete deep copy — and one that works identically in the browser, in
+    // jsdom and on the server, which `structuredClone` does not.
+    spec: JSON.parse(JSON.stringify(source.spec)) as ReportSpecWire,
+  };
+  const blocks = [...draft.blocks];
+  blocks.splice(index + 1, 0, copy);
+  return { ...draft, blocks };
 }
 
 export function removeBlock(draft: ReportDraft, id: string): ReportDraft {

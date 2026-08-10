@@ -1,23 +1,29 @@
 import type { SavedReportSummary } from "./custom-reports-api";
 
 /**
- * Scope + search over the saved-report list (FUT-391).
+ * Scope + search over the saved-report list (FUT-391, FUT-755).
  *
  * "Mostrar arquivados" was a floating checkbox, which made archiving read as a
  * display toggle rather than as one of the list's states. It becomes a SCOPE,
  * alongside search, so the two ways of narrowing the list sit together.
  *
- * `Meus` is deliberately absent: `SavedReportSummary` carries no owner, so a
- * "mine" scope would have to guess. Adding it means adding an owner to the
- * wire type first — a server change, not a filter.
+ * Three scopes, matching `prototype.html`'s `renderList()`: `Todos` is
+ * everything not archived, `Meus` is that narrowed to what YOU wrote, and
+ * `Arquivados` is the archive. `Meus` used to be impossible here — the wire
+ * summary carried no owner — and it is the server's `ownedByMe` that made it a
+ * filter rather than a guess.
  */
 
-export type ReportScope = "active" | "archived";
+export type ReportScope = "active" | "mine" | "archived";
 
 export const REPORT_SCOPE_LABELS: Record<ReportScope, string> = {
   active: "Todos",
+  mine: "Meus",
   archived: "Arquivados",
 };
+
+/** Pill order, left to right — the prototype's `Todos / Meus / Arquivados`. */
+export const REPORT_SCOPES: readonly ReportScope[] = ["active", "mine", "archived"];
 
 /**
  * Case- and accent-insensitive, because the names are Portuguese: someone
@@ -31,7 +37,11 @@ function normalize(value: string): string {
 }
 
 function matchesScope(report: SavedReportSummary, scope: ReportScope): boolean {
-  return scope === "archived" ? report.status === "archived" : report.status !== "archived";
+  if (scope === "archived") return report.status === "archived";
+  // `Meus` is a narrowing of `Todos`, not a third bucket beside it: an archived
+  // report of yours belongs to the archive, the way the prototype has it.
+  if (scope === "mine") return report.status !== "archived" && report.ownedByMe;
+  return report.status !== "archived";
 }
 
 function matchesSearch(report: SavedReportSummary, needle: string): boolean {
@@ -48,28 +58,67 @@ function matchesSearch(report: SavedReportSummary, needle: string): boolean {
 /**
  * The reports a scope + search should show, newest edit first.
  *
- * `keepId` survives both filters — a report reached by deep link must not
- * vanish because it happens to be archived or not to match the current search.
- * The URL is a stronger statement of intent than the filter row.
+ * There is no "keep this one anyway" escape hatch: opening a report navigates
+ * to its own page (FUT-755), so the grid never has a current report that a
+ * filter could pull out from under the reader.
  */
 export function filterReports(
   reports: readonly SavedReportSummary[],
-  { scope, search, keepId }: { scope: ReportScope; search: string; keepId?: string },
+  { scope, search }: { scope: ReportScope; search: string },
 ): SavedReportSummary[] {
   return reports
-    .filter(
-      (report) =>
-        report.id === keepId || (matchesScope(report, scope) && matchesSearch(report, search)),
-    )
+    .filter((report) => matchesScope(report, scope) && matchesSearch(report, search))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-/** How many reports each scope holds, for the pill counts. */
-export function scopeCounts(
-  reports: readonly SavedReportSummary[],
-): Record<ReportScope, number> {
-  return {
-    active: reports.filter((report) => matchesScope(report, "active")).length,
-    archived: reports.filter((report) => matchesScope(report, "archived")).length,
-  };
+/** "3 blocos" / "1 bloco" — the plural the card's footer opens with. */
+export function blockCountLabel(count: number): string {
+  return `${count} ${count === 1 ? "bloco" : "blocos"}`;
+}
+
+/** Who can read it, in the card footer's words. */
+export function visibilityLabel(visibility: SavedReportSummary["visibility"]): string {
+  if (visibility === "private") return "Só você";
+  if (visibility === "roles") return "Cargos específicos";
+  return "Toda a equipe";
+}
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const WEEK_MS = 7 * DAY_MS;
+
+/**
+ * "há 2 min", "ontem", "há 3 dias", "há 1 semana" — the card's last-edited line.
+ *
+ * A pure function taking BOTH instants rather than reading the clock itself:
+ * a relative time is exactly the kind of thing that silently drifts (an
+ * off-by-one at the day boundary reads as "ontem" all afternoon), and a
+ * function that calls `Date.now()` internally can only be tested by stubbing a
+ * global — which is what the flakiness gate exists to stop.
+ *
+ * The steps come from `prototype.html`'s own card footers: minutes, then hours,
+ * then a named "ontem", then days, then weeks. Anything older than a week is
+ * still counted in weeks rather than switching to a date, because the question
+ * the footer answers is "is this stale?", not "which Tuesday was it?".
+ */
+export function relativeReportTime(updatedAt: string, now: Date): string {
+  const then = Date.parse(updatedAt);
+  // An unparseable timestamp is not "just now": say nothing rather than
+  // inventing a freshness the row does not have.
+  if (Number.isNaN(then)) return "";
+  const elapsed = now.getTime() - then;
+  // A clock skewed the other way (a server ahead of the browser) is still
+  // "now", not a negative age counted in weeks.
+  if (elapsed < MINUTE_MS) return "agora";
+  if (elapsed < HOUR_MS) return `há ${Math.floor(elapsed / MINUTE_MS)} min`;
+  if (elapsed < DAY_MS) {
+    const hours = Math.floor(elapsed / HOUR_MS);
+    return `há ${hours} ${hours === 1 ? "hora" : "horas"}`;
+  }
+  const days = Math.floor(elapsed / DAY_MS);
+  if (days === 1) return "ontem";
+  if (elapsed < WEEK_MS) return `há ${days} dias`;
+  const weeks = Math.floor(elapsed / WEEK_MS);
+  return `há ${weeks} ${weeks === 1 ? "semana" : "semanas"}`;
 }

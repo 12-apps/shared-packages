@@ -111,11 +111,17 @@ const DEFINITIONS: Array<{
   },
 ];
 
-/** The blank template, always offered, always last. */
+/**
+ * The blank template, always offered, always last.
+ *
+ * The description is the picker's own words for it (`prototype.html`, the
+ * `Do zero` group): what you are choosing is to pick the data and the measures
+ * yourself, which is the one thing every other entry does for you.
+ */
 export const BLANK_BLOCK_TEMPLATE: BlockTemplate = {
   id: 'blank',
   title: 'Bloco em branco',
-  description: 'Monte a consulta do zero',
+  description: 'Escolha os dados e as medidas você mesmo',
   spec: null,
 };
 
