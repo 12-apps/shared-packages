@@ -260,6 +260,54 @@ function unreachable(provider: string, member: string): () => Promise<never> {
 }
 
 /**
+ * The ACTIVATION half a provider declaring `activationCharge` carries
+ * (FUT-689). The HTTP charge surface stays excluded — only the host's
+ * activation extension reaches these, in-process — and they answer like the
+ * published stub: a token carrying the decline marker is refused with a named
+ * reason, anything else is PAID, and the refund settles REFUNDED so the cent
+ * demonstrably comes back. Every charge and refund lands in the world.
+ */
+function activationOps(
+  declared: AdminProvider,
+  world: AdminSinks,
+): Pick<PaymentProviderAdapter, 'createCharge' | 'refund'> {
+  return {
+    async createCharge(input) {
+      const token = input.card?.token ?? '(none)';
+      const declined = token.endsWith('-declined') || token.startsWith('tok_declined');
+      world.activationCharges.push({
+        provider: declared.name,
+        reference: input.reference,
+        token,
+        status: declined ? 'DECLINED' : 'PAID',
+      });
+      world.fire();
+      const base = {
+        provider: declared.name,
+        providerChargeId: `stub_${declared.name}_${input.reference}`,
+        amount: input.amount,
+        method: input.method,
+      };
+      if (declined) {
+        return { ...base, status: 'DECLINED', declineReason: 'CARD_DECLINED', declineRetriable: true };
+      }
+      return { ...base, status: 'PAID' };
+    },
+    async refund(input) {
+      world.activationRefunds.push(input.providerChargeId);
+      world.fire();
+      return {
+        provider: declared.name,
+        providerChargeId: input.providerChargeId,
+        providerRefundId: `refund_${input.providerChargeId}`,
+        status: 'REFUNDED',
+        amount: input.amount ?? { amountCents: 1, currency: 'BRL' },
+      };
+    },
+  };
+}
+
+/**
  * A local, vendor-free adapter that behaves as the case declared. The
  * settings/OAuth half of the contract is real; the charge half is a thrower,
  * because every admin mount excludes those intents by construction.
@@ -289,6 +337,7 @@ export function adminAdapter(declared: AdminProvider, world: AdminSinks): Paymen
     },
     createCharge: unreachable(declared.name, 'createCharge'),
     getCharge: unreachable(declared.name, 'getCharge'),
+    ...(declared.activationCharge ? activationOps(declared, world) : {}),
     webhook: {
       verify: unreachable(declared.name, 'webhook.verify'),
       parse: unreachable(declared.name, 'webhook.parse'),

@@ -42,7 +42,7 @@ import {
 
 import { MERCHANT } from './adapter';
 import { adminAdapter, type AdminProvider } from './admin-adapter';
-import { connectPrepareFor, oauthCallbackFor } from './admin-extensions';
+import { activationVerifyFor, connectPrepareFor, oauthCallbackFor } from './admin-extensions';
 import {
   appCredentialsFor,
   onRevokeFailure,
@@ -113,6 +113,10 @@ export interface AdminSinks {
   consumedStates: string[];
   /** Every credential probe an adapter received. */
   verifyCalls: { provider: string; environment: string }[];
+  /** Every ACTIVATION charge an adapter received (FUT-689), as it landed. */
+  activationCharges: { provider: string; reference: string; token: string; status: string }[];
+  /** Every refund an adapter was asked for — the cent coming back. */
+  activationRefunds: string[];
   /** Providers whose revoke failed — the `RevokeFailureReporter` sink. */
   revokeFailures: string[];
   /** Every code an adapter's `exchangeCode` was asked to spend. */
@@ -181,6 +185,8 @@ function createSinks(): AdminSinks {
     mintedStates: [],
     consumedStates: [],
     verifyCalls: [],
+    activationCharges: [],
+    activationRefunds: [],
     revokeFailures: [],
     exchanges: [],
     nav: [],
@@ -244,7 +250,14 @@ export function createAdminStore(spec: AdminStoreSpec): { world: AdminWorld; rea
     resolveMerchant: () => MERCHANT,
     prefix: [],
     exclude: excludedIntents(spec),
-    extensions: [connectPrepareFor(sinks, spec), oauthCallbackFor(sinks, oauth)],
+    extensions: [
+      connectPrepareFor(sinks, spec),
+      oauthCallbackFor(sinks, oauth),
+      // The activation charge is a HOST route in every real deployment too —
+      // the charge intents stay excluded; only this extension reaches the
+      // adapter's activation half, in-process (FUT-689).
+      activationVerifyFor(sinks, { registry, store, settings }),
+    ],
   });
   const fetchImpl = recordingTransport<PaymentsRouteMethod>(routes, {
     baseUrl: spec.baseUrl,

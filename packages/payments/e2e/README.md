@@ -86,12 +86,13 @@ files do not change either way.
 `declined` · `unresolved` · `unavailable` · `no-provider` ·
 `no-provider-remedy` · `payments-off` · `two-mintable` · `redirect-head` ·
 `google-pay` · `apple-pay` · `apple-pay-unsupported` · `wallet` ·
-`screen-on-page` · `screen-handoff` · `screen-undeclared` · `screen-unknown`
+`activation` · `screen-on-page` · `screen-handoff` · `screen-undeclared` ·
+`screen-unknown`
 
 Adding a member is a breaking change for hosts, deliberately: a scenario needing
 a store nobody can build is a scenario that silently never runs.
 
-`wallet` (added for FUT-183/FUT-478) is the one member that is **not a
+`wallet` (added for FUT-183/FUT-478) is one of two members that are **not a
 checkout**: `open(page, 'wallet')` must land the buyer on the package's
 manage-cards surface (`screens.ManageCards` from `createPaymentFlows`) at a
 store whose single provider can vault — the chain head declares the adapter
@@ -100,6 +101,16 @@ The journey types the shared `DECLINE_PAN` for the refusal path, so no store
 flag decides the outcome; the card does. Hosts upgrading across this version
 must add the member to their `open` mapping or their world stops compiling —
 which is the point.
+
+`activation` (added for FUT-689) is the other, and the first **admin**-side
+shape: `open(page, 'activation')` must land the OWNER on the settings panel of
+one provider that declares `activationCharge`, connected in stub mode and
+never charged — the sales switch starts locked off. The host's
+`renderVerification` slot must render the shared card form plus the
+`activation-*` test ids `src/steps/activation.steps.ts` documents (pay button,
+outcome, refund line, and the raw enable-attempt probe pair). As in `wallet`,
+the typed card decides the outcome: `DECLINE_PAN` is refused with a named
+reason, anything else pays the cent and gets it refunded.
 
 ## Why this package ships compiled JavaScript
 

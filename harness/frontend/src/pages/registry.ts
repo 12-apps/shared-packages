@@ -16,6 +16,7 @@ import { PaymentsCheckoutRedirectPage } from './payments-checkout-redirect';
 import { PaymentsCheckoutSavedCardsPage } from './payments-checkout-saved-cards';
 import { PaymentsCheckoutSlotsPage } from './payments-checkout-slots';
 import { PaymentsWalletPage } from './payments-wallet';
+import { PaymentsProviderActivationPage } from './payments-provider-activation';
 import { PaymentsProviderChainPage } from './payments-provider-chain';
 import { PaymentsProviderConnectPage } from './payments-provider-connect';
 import { PaymentsProviderCredentialsPage } from './payments-provider-credentials';
@@ -261,6 +262,12 @@ export const PAGES: readonly HarnessPage[] = [
     slug: 'payments-provider-connect',
     title: 'Connect (OAuth)',
     Component: PaymentsProviderConnectPage,
+  },
+  {
+    ...PAYMENTS_ADMIN,
+    slug: 'payments-provider-activation',
+    title: 'Activation charge',
+    Component: PaymentsProviderActivationPage,
   },
   {
     ...PAYMENTS_ADMIN,

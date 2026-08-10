@@ -321,9 +321,10 @@ export interface ProviderCapabilities {
    *
    * Separate from {@link tokenization} because that field does not answer the
    * question: PagBank and Stone both report `PUBLIC_KEY` while speaking
-   * different protocols, and Stripe reports `SDK` with no client integration
-   * written. Gating activation on `tokenization` alone bricked three providers
-   * — the charge was required to enable them and there was no way to make it.
+   * different protocols, and a browser scheme actually being WRITTEN is a
+   * client-integration fact — Stripe reported `SDK` long before `stripe-pm`
+   * existed (FUT-698), and only with it could the adapter honestly declare
+   * the charge (FUT-689). Gating on `tokenization` alone bricked three.
    *
    * Optional and defaulting to FALSE at the gate: a new adapter cannot be
    * accidentally held to a proof it has no means of producing.
