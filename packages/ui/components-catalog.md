@@ -311,6 +311,14 @@ Components for user input and form interactions.
 **Location**: `src/components/form/Calendar`
 **Docs**: `src/components/form/Calendar/Calendar.md`
 
+### DateRangePicker
+**Purpose**: Pick a range of days three ways over one value — calendar, quick ranges, typed dates
+**Use Cases**: Report periods, analytics filters, booking windows, any from/to a reader edits
+**Features**: Range `Calendar` reused (not forked), quick-range column (today, yesterday, this week, last 7/30/365 days, this month, this quarter, this year) with `aria-pressed`, masked `dd/mm/aaaa` fields, `timeZone`-aware "today", a `maxRangeDays` cap that disables over-cap options WITH the reason instead of clamping, overridable copy, stacks on narrow screens
+**Types**: `DateRangeDraft`, `DayWindow`, `DateRangeStatus`, `QuickRange`
+**Location**: `src/components/form/DateRangePicker`
+**Docs**: `src/components/form/DateRangePicker/DateRangePicker.md`
+
 ### Checkbox
 **Purpose**: Toggle selection checkbox
 **Use Cases**: Multi-select, boolean options, agreements
