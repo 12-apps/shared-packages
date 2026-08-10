@@ -88,6 +88,16 @@ export type PaymentsStore =
    * `google-pay` / `apple-pay` shapes above.)
    */
   | 'wallet'
+  /**
+   * A merchant ADMIN surface, not a checkout (FUT-463/FUT-689): the settings
+   * screen of ONE provider that declares the activation charge, connected in
+   * stub mode and never charged — so the sales switch starts locked off. The
+   * host lands the owner on that provider's own panel, whose host-rendered
+   * activation step shows the shared card form (`card-number`…, `buyer-cpf`)
+   * plus the `activation-*` test ids the steps file documents. The card the
+   * owner types decides the outcome, exactly as in the `wallet` shape.
+   */
+  | 'activation'
   /** Declares the on-page screen (FUT-596). */
   | 'screen-on-page'
   /** Declares the hand-off screen (FUT-596). */

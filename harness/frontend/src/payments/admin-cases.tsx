@@ -231,6 +231,8 @@ export interface AdminSettingsProps {
   controlled?: boolean;
   /** Passed through to the published component untouched. */
   renderVerification?: PaymentProviderSettingsProps['renderVerification'];
+  /** `renderVerification` built over the case's world — for a step that must reach host routes. */
+  renderVerificationWith?: (world: AdminWorld) => PaymentProviderSettingsProps['renderVerification'];
   /** Page-owned fixture controls, rendered between the mount and the probe. */
   controls?: (world: AdminWorld) => ReactNode;
 }
@@ -248,6 +250,7 @@ function SettingsMount({ props, world, query, outcome }: MountArgs): JSX.Element
     () => (controlled ? providerChangeWriter(world) : undefined),
     [controlled, world],
   );
+  const verification = props.renderVerificationWith?.(world) ?? props.renderVerification;
   return (
     <div>
       <OutcomeBanner outcome={outcome} />
@@ -264,7 +267,7 @@ function SettingsMount({ props, world, query, outcome }: MountArgs): JSX.Element
         initialProvider={outcome.connected}
         selectedProvider={controlled ? query.get('provider') : undefined}
         onProviderChange={changeProvider}
-        renderVerification={props.renderVerification}
+        renderVerification={verification}
       />
     </div>
   );
