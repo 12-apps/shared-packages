@@ -42,7 +42,11 @@ function draft(patch: Partial<BuilderDraft>): BuilderDraft {
 }
 
 describe('chartOptions', () => {
-  it('disables charts for a two-dimension breakdown, keeping table', () => {
+  it('lets line/area/bar chart a split, and keeps pie/donut out of it', () => {
+    // FUT-755: the second dimension is pivoted into one series per value, so
+    // the cartesian types draw it. A pie cannot — it shows ONE series'
+    // composition — and its reason must name the split rather than repeat the
+    // blanket "gráficos exigem exatamente 1 agrupamento" five times over.
     const options = chartOptions(
       draft({
         dimensions: [
@@ -52,10 +56,31 @@ describe('chartOptions', () => {
       }),
       byName,
     );
-    expect(options.find((option) => option.value === 'table')?.disabledReason).toBeNull();
-    expect(options.find((option) => option.value === 'line')?.disabledReason).toContain(
-      'exatamente 1 agrupamento',
+    const reasonOf = (value: string): string | null | undefined =>
+      options.find((option) => option.value === value)?.disabledReason;
+
+    expect(reasonOf('table')).toBeNull();
+    expect([reasonOf('line'), reasonOf('area'), reasonOf('bar')]).toEqual([null, null, null]);
+    expect(reasonOf('pie')).toContain('separar em séries');
+    expect(reasonOf('donut')).toContain('separar em séries');
+  });
+
+  it('blocks a split PLUS a second measure — no chart draws three ways', () => {
+    const options = chartOptions(
+      draft({
+        dimensions: [
+          { field: 'method', timeGrain: 'day' },
+          { field: 'createdAt', timeGrain: 'day' },
+        ],
+        measures: [
+          { field: 'revenueCents', aggregation: 'sum' },
+          { field: 'quantity', aggregation: 'sum' },
+        ],
+      }),
+      byName,
     );
+    expect(options.find((option) => option.value === 'bar')?.disabledReason).toContain('medida');
+    expect(options.find((option) => option.value === 'table')?.disabledReason).toBeNull();
   });
 
   it('disables only pie/donut when a second measure appears', () => {
@@ -69,7 +94,9 @@ describe('chartOptions', () => {
       byName,
     );
     expect(options.find((option) => option.value === 'bar')?.disabledReason).toBeNull();
-    expect(options.find((option) => option.value === 'pie')?.disabledReason).toContain('1 medida');
+    expect(options.find((option) => option.value === 'pie')?.disabledReason).toContain(
+      'uma medida só',
+    );
   });
 });
 
@@ -97,7 +124,7 @@ describe('withValidChart', () => {
     expect(next.chartType).toBe('bar');
   });
 
-  it('falls back to line for a time series and table for two groupings', () => {
+  it('falls back to line for a time series, and to bars for a split', () => {
     expect(
       withValidChart(
         draft({ dimensions: [{ field: 'createdAt', timeGrain: 'day' }], chartType: 'pie', measures: [
@@ -107,12 +134,32 @@ describe('withValidChart', () => {
         byName,
       ).chartType,
     ).toBe('line');
+    // Adding a split while on a pie used to drop the author all the way to a
+    // table. The axis here is a plain category, so bars are the smart default.
     expect(
       withValidChart(
         draft({
           dimensions: [
             { field: 'method', timeGrain: 'day' },
             { field: 'createdAt', timeGrain: 'day' },
+          ],
+        }),
+        byName,
+      ).chartType,
+    ).toBe('bar');
+  });
+
+  it('still falls back to a table for a split alongside two measures', () => {
+    expect(
+      withValidChart(
+        draft({
+          dimensions: [
+            { field: 'method', timeGrain: 'day' },
+            { field: 'createdAt', timeGrain: 'day' },
+          ],
+          measures: [
+            { field: 'revenueCents', aggregation: 'sum' },
+            { field: 'quantity', aggregation: 'sum' },
           ],
         }),
         byName,

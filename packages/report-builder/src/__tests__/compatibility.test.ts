@@ -56,6 +56,44 @@ function compiles(input: ReportSpecInput): boolean {
   }
 }
 
+/**
+ * The split's own rules (FUT-755), stated as the SENTENCES an author reads.
+ * The matrix ⟺ compiler suite above proves the boolean agrees; these prove the
+ * blocked ones say WHY, and say it about the control the author must touch —
+ * "use Tabela" was the same generic line under five options at once.
+ */
+describe('presentationCompatibility — what a split blocks, and what it says', () => {
+  const SPLIT: SpecShape = { dimensionCount: 2, measureCount: 1, firstDimensionIsDate: true };
+  const reasonOf = (shape: SpecShape, option: string): string | null =>
+    presentationCompatibility(shape).find((entry) => entry.option === option)?.disabledReason ??
+    null;
+
+  it.each(['line', 'area', 'bar'])('lets %s chart a split', (option) => {
+    expect(reasonOf(SPLIT, option)).toBeNull();
+  });
+
+  it.each(['pie', 'donut'])('keeps %s blocked, naming the split and not "1 agrupamento"', (option) => {
+    const reason = reasonOf(SPLIT, option);
+    expect(reason).toContain('separar em séries');
+    expect(reason).not.toContain('1 agrupamento');
+  });
+
+  it('keeps KPI blocked whatever the dimensions are', () => {
+    expect(reasonOf(SPLIT, 'kpi')).toContain('agrupamento');
+    expect(reasonOf({ ...SPLIT, dimensionCount: 1 }, 'kpi')).toContain('agrupamento');
+  });
+
+  it('blocks a split plus a second measure with its OWN reason', () => {
+    const reason = reasonOf({ ...SPLIT, measureCount: 2 }, 'bar');
+    expect(reason).toContain('separar em séries');
+    expect(reason).toContain('medida');
+  });
+
+  it('leaves the table always available', () => {
+    expect(reasonOf({ ...SPLIT, measureCount: 3 }, 'table')).toBeNull();
+  });
+});
+
 describe('presentationCompatibility ⟺ compiler', () => {
   for (const { shape, dimensions } of SHAPES) {
     for (const measureCount of [1, 2] as const) {
@@ -93,8 +131,24 @@ describe('defaultPresentation', () => {
     expect(
       defaultPresentation({ dimensionCount: 0, measureCount: 2, firstDimensionIsDate: false }),
     ).toEqual({ kind: 'table' });
+  });
+
+  it('charts a SPLIT rather than dropping to a table (FUT-755)', () => {
+    // It used to fall back to a table for ANY second dimension, because
+    // nothing pivoted one into series. Now a split draws, so an author who
+    // adds one while on a pie lands on bars — not three steps back.
     expect(
       defaultPresentation({ dimensionCount: 2, measureCount: 1, firstDimensionIsDate: true }),
+    ).toEqual({ kind: 'chart', chartType: 'line' });
+    expect(
+      defaultPresentation({ dimensionCount: 2, measureCount: 1, firstDimensionIsDate: false }),
+    ).toEqual({ kind: 'chart', chartType: 'bar' });
+  });
+
+  it('still falls back to a table for a split PLUS a second measure', () => {
+    // Two measures and a split is a three-way breakdown; no chart draws it.
+    expect(
+      defaultPresentation({ dimensionCount: 2, measureCount: 2, firstDimensionIsDate: true }),
     ).toEqual({ kind: 'table' });
   });
 
