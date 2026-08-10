@@ -219,8 +219,8 @@ test('the editor is reachable, and “new” is not read as a report id', async 
  * in this file happened to hold for the full data set.
  *
  * Counting the day-bucketed block's rows is what makes it visible: the fixture
- * is laid out so `Hoje` ⊂ `7 dias` ⊂ `30 dias`, and each step must be a strict
- * increase. Equal counts is exactly the shape of the bug.
+ * is laid out so `Hoje` ⊂ `Este mês` ⊂ `7 dias` ⊂ `30 dias`, and each step must
+ * be a strict change. Equal counts is exactly the shape of the bug.
  */
 test('each period preset returns a different window of data', async ({ page }) => {
   await openFirstReport(page);
@@ -229,7 +229,7 @@ test('each period preset returns a different window of data', async ({ page }) =
   await expect(daily).toBeVisible({ timeout: 15_000 });
   const dayRows = daily.locator('tbody tr');
 
-  // The report opens on 30 dias, which is the widest of the three.
+  // The report opens on 30 dias, the widest of the presets.
   await expect(daily.locator('tbody tr')).not.toHaveCount(0);
   const wide = await dayRows.count();
 
@@ -238,11 +238,57 @@ test('each period preset returns a different window of data', async ({ page }) =
   await expect(dayRows).toHaveCount(wide - 1);
   const week = await dayRows.count();
 
+  // `Este mês` is month-TO-DATE (FUT-755), so on the 5th it is NARROWER than
+  // seven days — one fewer bucket, because `o8` fell on 30 June. Asserted as a
+  // distinct count and not merely "some rows": the whole risk in adding a
+  // fourth preset is that it silently resolves to one of the three already
+  // here, and equal counts is exactly the shape of that bug.
+  await page.getByTestId('report-range-item-month').click();
+  await expect(daily).toBeVisible({ timeout: 15_000 });
+  await expect(dayRows).toHaveCount(week - 1);
+  const month = await dayRows.count();
+
   await page.getByTestId('report-range-item-today').click();
   await expect(daily).toBeVisible({ timeout: 15_000 });
   // One local day, and it is `o6` — the only row on 2026-07-05 in São Paulo.
   await expect(dayRows).toHaveCount(1);
 
-  expect(week).toBeGreaterThan(1);
+  expect(month).toBeGreaterThan(1);
+  expect(week).toBeGreaterThan(month);
   expect(wide).toBeGreaterThan(week);
+});
+
+/**
+ * "Personalizado…" end to end (FUT-755).
+ *
+ * The one preset whose meaning is not in its own name, so this is the case that
+ * proves the two dates SURVIVE the trip: the picker → the transport →
+ * `?preset=custom&from=…&to=…` → the package's own range resolver → the host
+ * adapter's window → the rows. Any link that drops them leaves a window
+ * resolved as something else, with nothing on screen saying so.
+ *
+ * The calendar opens on the window ALREADY on screen — 30 dias, which the
+ * frozen clock puts at 06/06 – 05/07 — so it lands on June with no reference to
+ * the machine's own date, and 20 and 25 each appear once in that grid.
+ */
+test('a custom period runs the window the picker asked for', async ({ page }) => {
+  await openFirstReport(page);
+
+  const daily = page.getByTestId('report-block-daily');
+  await expect(daily).toBeVisible({ timeout: 15_000 });
+
+  await page.getByTestId('report-range-item-custom').click();
+  await expect(page.getByTestId('report-range-custom')).toBeVisible();
+
+  await page.getByTestId('calendar-date-20').click();
+  await page.getByTestId('calendar-date-25').click();
+  await page.getByTestId('report-range-custom-apply').click();
+
+  await expect(daily).toBeVisible({ timeout: 15_000 });
+  // 20–25 June holds exactly one order: `o7`, on the 20th.
+  await expect(daily.locator('tbody tr')).toHaveCount(1);
+  // …and the resolved-window line reads back the window that was asked for,
+  // which is the half of this that comes from the SERVER rather than from the
+  // control that set it.
+  await expect(page.getByTestId('report-window')).toHaveText('20/06 – 25/06');
 });

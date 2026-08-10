@@ -23,21 +23,29 @@ import { ReportBuilderError } from '../errors';
  *     the same clock for either to matter.
  */
 
-/** The period presets the reports surface offers. */
-export const REPORT_RANGE_PRESETS = ['today', '7d', '30d', 'custom'] as const;
+/**
+ * The period presets the reports surface offers, in the order the toggle
+ * renders them: `Hoje | 7 dias | 30 dias | Este mês | Personalizado…`.
+ *
+ * `custom` is last because it is the only one that is not a period on its own —
+ * it names a window the caller supplies, so the pill opens a picker rather than
+ * resolving anything by itself.
+ */
+export const REPORT_RANGE_PRESETS = ['today', '7d', '30d', 'month', 'custom'] as const;
 export type ReportRangePreset = (typeof REPORT_RANGE_PRESETS)[number];
 
 /**
  * The presets a SAVED report may declare as the one it OPENS on (FUT-755).
  *
- * Every rolling preset, and deliberately not `custom`: a stored preference has
+ * Every ROLLING preset, and deliberately not `custom`: a stored preference has
  * nowhere to keep the explicit from/to that `custom` means, so admitting it
- * would store a period that resolves to nothing months later. Mirrors
- * `REPORT_RANGES` in `react/reports-api.ts`, and a test pins the two equal —
- * the toggle the author picks from and the values the store accepts have to be
- * the same list or one of them silently refuses the other.
+ * would freeze a specific window and open the report on a period that ages
+ * badly. That is the whole rule, and `default-range.test.ts` states it as one —
+ * these are exactly `REPORT_RANGES` (`react/reports-api.ts`) minus `custom`, so
+ * a preset added to either list without the other fails the test rather than
+ * silently letting the store refuse a value the toggle still offers.
  */
-export const REPORT_DEFAULT_RANGES = ['today', '7d', '30d'] as const;
+export const REPORT_DEFAULT_RANGES = ['today', '7d', '30d', 'month'] as const;
 export type ReportDefaultRange = (typeof REPORT_DEFAULT_RANGES)[number];
 
 /**
@@ -60,8 +68,17 @@ export const REPORT_MAX_RANGE_DAYS = 366;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** How many trailing calendar days each rolling preset covers (today included). */
-const PRESET_DAYS: Record<Exclude<ReportRangePreset, 'custom'>, number> = {
+/** A preset that resolves against the clock, as opposed to carrying its dates. */
+type RollingPreset = Exclude<ReportRangePreset, 'custom'>;
+
+/**
+ * How many trailing calendar days each FIXED-LENGTH rolling preset covers
+ * (today included). `month` is absent on purpose — it is a calendar boundary,
+ * not a day count — and stating that as an `Exclude` rather than a hand-written
+ * union is what makes a NEW preset a compile error here instead of a silent
+ * `undefined` day count.
+ */
+const PRESET_DAYS: Record<Exclude<RollingPreset, 'month'>, number> = {
   today: 1,
   '7d': 7,
   '30d': 30,
@@ -223,15 +240,34 @@ function resolveCustomWindow(
   return { from, toExclusive };
 }
 
-/** A rolling preset's window: N calendar days ending at the next midnight. */
+/**
+ * The civil day a rolling preset's window OPENS on, on the tenant's clock.
+ *
+ * `month` ("Este mês") is month-TO-DATE: the 1st of the civil month TODAY falls
+ * in, never a 30-day lookback. The two are different windows in eleven months
+ * of twelve, and the difference is the whole reason the preset exists — a store
+ * checking "this month" on the 3rd wants three days, not the last thirty.
+ *
+ * Which month that is has to be read on the TENANT's clock like every other
+ * boundary here: at 21:30 on 31 July in São Paulo it is already 1 August in
+ * UTC, so a month resolved on UTC would open August's window while the store is
+ * still serving July's dinner — the whole month's figures gone from the screen
+ * three hours early.
+ */
+function rollingStart(preset: RollingPreset, today: CivilDay): CivilDay {
+  if (preset === 'month') return { year: today.year, month: today.month, day: 1 };
+  return civilDayPlus(today, 1 - PRESET_DAYS[preset]);
+}
+
+/** A rolling preset's window: it opens on {@link rollingStart}, ends tomorrow. */
 function resolveRollingWindow(
-  preset: Exclude<ReportRangePreset, 'custom'>,
+  preset: RollingPreset,
   now: Date,
   timeZone: string | undefined,
 ): { from: Date; toExclusive: Date } {
   const today = civilDayOf(now, timeZone);
   return {
-    from: startOfCivilDay(civilDayPlus(today, 1 - PRESET_DAYS[preset]), timeZone),
+    from: startOfCivilDay(rollingStart(preset, today), timeZone),
     toExclusive: startOfCivilDay(civilDayPlus(today, 1), timeZone),
   };
 }

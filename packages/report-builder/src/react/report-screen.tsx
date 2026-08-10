@@ -25,12 +25,14 @@ import { Text } from "@12-apps/ui/typography/Text";
 
 import { useSavedReport, type SavedReportView } from "./custom-reports-api";
 import { PencilIcon } from "./lib/block-icons";
+import type { CustomRangeWindow } from "./lib/custom-range-dialog";
 import { NO_PRINT_CLASS, PRINT_REGION_ATTR, PrintExportButton } from "./lib/print-export";
 import { RangeToggle } from "./lib/range-toggle";
 import { CONTROL_ROW_SX, PAGE_TITLE_SX, stateChipSx } from "./lib/report-surface";
+import { windowDays, windowLabel } from "./lib/resolved-window";
 import { relativeReportTime, visibilityLabel } from "./report-list-filters";
 import { ReportActionsMenu, ReportViewCanvas } from "./report-view";
-import type { ReportRange } from "./reports-api";
+import type { ReportRangeSelection } from "./reports-api";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
@@ -61,47 +63,6 @@ function StatusChip({ status }: { status: SavedReportView["status"] }): JSX.Elem
       <Chip label={STATUS_LABELS[status] ?? status} size="small" variant="filled" />
     </Box>
   );
-}
-
-const DAY_MS = 86_400_000;
-
-/**
- * The tenant's UTC offset, inferred from a window boundary.
- *
- * The payload carries instants, not a zone — but `from` is by construction the
- * tenant's LOCAL MIDNIGHT, so how far it sits from a UTC midnight IS the
- * offset. Without this the label is rendered in whichever zone the reader's
- * laptop happens to be in, and a window ending at local midnight lands a day
- * late (or early) for everyone outside the store's own zone.
- *
- * Anything past twelve hours is the other side of the dateline: a boundary
- * 22 hours after UTC midnight is a zone 2 hours AHEAD, not 22 behind.
- */
-function tenantOffsetMs(fromMs: number): number {
-  const rem = ((fromMs % DAY_MS) + DAY_MS) % DAY_MS;
-  return rem <= DAY_MS / 2 ? -rem : DAY_MS - rem;
-}
-
-/**
- * The window the server actually resolved, as "07/07 – 06/08".
- *
- * The preset says "30 dias"; this says WHICH thirty, and that is the only
- * version of the period a number can be checked against. `toExclusive` is the
- * next midnight AFTER the window, so the day shown is the one before it —
- * otherwise a 30-day window reads as ending on a day it does not include.
- */
-function windowLabel(range: SavedReportView["range"]): string {
-  const from = Date.parse(range.from);
-  const toExclusive = Date.parse(range.toExclusive);
-  if (Number.isNaN(from) || Number.isNaN(toExclusive)) return "";
-  const offset = tenantOffsetMs(from);
-  const day = new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: "UTC",
-  });
-  const local = (instant: number): string => day.format(new Date(instant + offset));
-  return `${local(from)} – ${local(toExclusive - 1)}`;
 }
 
 /**
@@ -281,10 +242,13 @@ function ReportPeriodRow({
   range,
   onRangeChange,
   resolved,
+  customSeed,
 }: {
-  range: ReportRange;
-  onRangeChange: (next: ReportRange) => void;
+  range: ReportRangeSelection;
+  onRangeChange: (next: ReportRangeSelection) => void;
   resolved: string;
+  /** What "Personalizado…" opens on: the window currently being read. */
+  customSeed: CustomRangeWindow | null;
 }): JSX.Element {
   return (
     // `Box` + `gap`, not `Stack spacing` (FUT-755): MUI's Stack implements its
@@ -303,7 +267,15 @@ function ReportPeriodRow({
         ...CONTROL_ROW_SX,
       }}
     >
-      <RangeToggle value={range} onChange={onRangeChange} dataTestId="report-range" />
+      <RangeToggle
+        value={range.preset}
+        onChange={(preset) => onRangeChange({ preset })}
+        dataTestId="report-range"
+        custom={{
+          seed: customSeed,
+          onApply: (window) => onRangeChange({ preset: "custom", ...window }),
+        }}
+      />
       <Box
         sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.5, color: "text.secondary" }}
       >
@@ -329,11 +301,11 @@ export function ReportScreen({
 }: {
   tenantSlug: string;
   reportId: string;
-  range: ReportRange;
+  range: ReportRangeSelection;
   /** The document's last-edit time, from the listing. */
   updatedAt: string;
   now: Date;
-  onRangeChange: (next: ReportRange) => void;
+  onRangeChange: (next: ReportRangeSelection) => void;
   onBack: () => void;
   onEdit: () => void;
   /** Told which lifecycle the report landed in, so the page can navigate. */
@@ -368,7 +340,15 @@ export function ReportScreen({
         onEdit={onEdit}
         onChanged={onChanged}
       />
-      <ReportPeriodRow range={range} onRangeChange={onRangeChange} resolved={windowLabel(view.range)} />
+      <ReportPeriodRow
+        range={range}
+        onRangeChange={onRangeChange}
+        resolved={windowLabel(view.range)}
+        // The picker opens on the window ON SCREEN — the one the server just
+        // resolved — so "Personalizado…" starts from the thirty days being
+        // read rather than from a blank calendar to page back through.
+        customSeed={windowDays(view.range)}
+      />
       <ReportViewCanvas view={view} />
     </Stack>
   );

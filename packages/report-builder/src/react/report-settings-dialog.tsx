@@ -19,7 +19,6 @@ import type { JSX } from "react";
 import { Modal, ModalContent } from "@12-apps/ui/feedback/Modal";
 import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
-import { Select } from "@12-apps/ui/form/Select";
 import { Textarea } from "@12-apps/ui/form/Textarea";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
@@ -28,8 +27,9 @@ import { Text } from "@12-apps/ui/typography/Text";
 
 import type { ReportStatusWire, ReportVisibilityWire } from "./custom-reports-api";
 import { RolesAllowlist, type PublishDraft } from "./lib/publish-section";
-import { REPORT_RANGES, type ReportRange } from "./reports-api";
-import { CONTAINER_RADIUS_PX, CONTROL_RADIUS_PX, SECTION_LABEL_STYLE } from "./lib/report-surface";
+import { DefaultRangeField, Field } from "./lib/settings-fields";
+import type { ReportRollingRange } from "./reports-api";
+import { CONTAINER_RADIUS_PX, CONTROL_RADIUS_PX } from "./lib/report-surface";
 
 /**
  * A radio CARD: the control, a bold title, and the line that says what the
@@ -98,24 +98,6 @@ function RadioCard({
         </Text>
       </Stack>
     </Box>
-  );
-}
-
-/** One labelled block inside the dialog — the eyebrow plus whatever it labels. */
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: JSX.Element | JSX.Element[];
-}): JSX.Element {
-  return (
-    <Stack spacing={0.75}>
-      <Text variant="heading" size="xs" color="secondary" as="h3" style={SECTION_LABEL_STYLE}>
-        {label}
-      </Text>
-      {children}
-    </Stack>
   );
 }
 
@@ -197,24 +179,7 @@ interface ReportSettingsValue {
   description: string;
   publish: PublishDraft;
   /** The period the saved report opens on — a real column (FUT-755). */
-  defaultRange: ReportRange;
-}
-
-/**
- * Longer labels than the editor's range toggle, on purpose: a toggle reads in
- * context ("30 dias"), a select in a settings list has to say what it is
- * choosing without it, and `prototype.html` writes it out the same way. No
- * `Personalizado…` — a stored preference has nowhere to keep explicit dates.
- */
-const DEFAULT_RANGE_OPTIONS: Array<{ value: ReportRange; label: string }> = [
-  { value: "today", label: "Hoje" },
-  { value: "7d", label: "Últimos 7 dias" },
-  { value: "30d", label: "Últimos 30 dias" },
-];
-
-/** Guard the wire's word before it reaches state — a stale value opens nothing. */
-function asReportRange(value: string): ReportRange {
-  return REPORT_RANGES.find((candidate) => candidate === value) ?? "30d";
+  defaultRange: ReportRollingRange;
 }
 
 /** The two radio groups, so the dialog's own body stays a list of fields. */
@@ -360,18 +325,11 @@ export function ReportSettingsDialog({
             testId={testId}
           />
 
-          <Field label="Período padrão ao abrir">
-            <Select
-              aria-label="Período padrão ao abrir"
-              options={DEFAULT_RANGE_OPTIONS}
-              value={value.defaultRange}
-              onChange={(event) =>
-                onChange({ ...value, defaultRange: asReportRange(String(event.target.value)) })
-              }
-              size="small"
-              data-testid={`${testId}-default-range`}
-            />
-          </Field>
+          <DefaultRangeField
+            value={value.defaultRange}
+            onChange={(defaultRange) => onChange({ ...value, defaultRange })}
+            testId={`${testId}-default-range`}
+          />
 
           {/* FUT-776 — scheduled e-mail delivery of a saved report. Shown
               because the setting belongs here and hiding it would make the

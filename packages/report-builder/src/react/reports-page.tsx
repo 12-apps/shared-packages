@@ -35,10 +35,10 @@ import { ReportCardList } from "./report-card-list";
 import { ArchiveFromListDialog } from "./report-list-archive";
 import type { ReportScope } from "./report-list-filters";
 import { ReportScreen } from "./report-screen";
-import type { ReportRange } from "./reports-api";
+import type { ReportRangeSelection, ReportRollingRange } from "./reports-api";
 
 /** What a report opens on when it stores no "Período padrão ao abrir". */
-const FALLBACK_RANGE: ReportRange = "30d";
+const FALLBACK_RANGE: ReportRollingRange = "30d";
 
 /**
  * A saved report's stored opening period, read STRUCTURALLY.
@@ -55,11 +55,17 @@ const FALLBACK_RANGE: ReportRange = "30d";
 type ReportOpeningRange = Pick<SavedReportSummary, "id"> & {
   // `| null` as well as optional: the column is nullable, so "no preference"
   // reaches the client as an explicit null on a report that once had one.
-  defaultRange?: ReportRange | null;
+  // Rolling only — `custom` is not storable, so it can never arrive here.
+  defaultRange?: ReportRollingRange | null;
 };
 
-function openingRange(reports: readonly ReportOpeningRange[], selectedId: string): ReportRange {
-  return reports.find((report) => report.id === selectedId)?.defaultRange ?? FALLBACK_RANGE;
+function openingRange(
+  reports: readonly ReportOpeningRange[],
+  selectedId: string,
+): ReportRangeSelection {
+  return {
+    preset: reports.find((report) => report.id === selectedId)?.defaultRange ?? FALLBACK_RANGE,
+  };
 }
 
 /**
@@ -78,8 +84,14 @@ function openingRange(reports: readonly ReportOpeningRange[], selectedId: string
 function useSelectedRange(
   reports: readonly ReportOpeningRange[],
   selectedId: string,
-): { range: ReportRange; onRangeChange: (next: ReportRange) => void } {
-  const [picked, setPicked] = useState<{ reportId: string; range: ReportRange } | null>(null);
+): { range: ReportRangeSelection; onRangeChange: (next: ReportRangeSelection) => void } {
+  // The whole SELECTION, not the preset: a hand-picked `custom` is its two
+  // dates, and remembering only the word would bring the reader back to a
+  // period the surface cannot run.
+  const [picked, setPicked] = useState<{
+    reportId: string;
+    range: ReportRangeSelection;
+  } | null>(null);
   return {
     range:
       picked !== null && picked.reportId === selectedId
@@ -173,8 +185,8 @@ function OpenReportScreen({
   tenantSlug: string;
   reports: readonly SavedReportSummary[];
   reportId: string;
-  range: ReportRange;
-  onRangeChange: (next: ReportRange) => void;
+  range: ReportRangeSelection;
+  onRangeChange: (next: ReportRangeSelection) => void;
 }): JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
