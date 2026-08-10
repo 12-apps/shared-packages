@@ -41,7 +41,10 @@ describe('specSentence', () => {
     ).toBe('soma de receita em pedidos por data');
   });
 
-  it('calls the second dimension a split, not a second grouping', () => {
+  it('calls the second dimension a split, in the control’s own words', () => {
+    // "Separar em séries" is what the panel's field is called, and one series
+    // per value is what the chart now actually draws (FUT-755) — so the
+    // sentence under the chart and the field that produced it agree.
     expect(
       sentence({
         entity: 'orders',
@@ -49,7 +52,7 @@ describe('specSentence', () => {
         measures: [{ field: 'totalCents' }],
       }),
     ).toBe(
-      'soma de receita em pedidos por data (mês), dividido por forma de pagamento',
+      'soma de receita em pedidos por data (mês), separado por forma de pagamento',
     );
   });
 
@@ -137,7 +140,7 @@ describe('specSentence', () => {
         limit: 10,
       }),
     ).toBe(
-      'soma de receita em pedidos por data (semana), dividido por forma de pagamento, ' +
+      'soma de receita em pedidos por data (semana), separado por forma de pagamento, ' +
         'onde forma de pagamento não é PIX, top 10',
     );
   });

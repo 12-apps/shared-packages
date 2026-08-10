@@ -147,8 +147,13 @@ export const OTHERS_BUCKET_LABEL = 'Outros';
  * for every aggregation — see {@link mergeAccumulator}.
  *
  * Single-dimension queries only. With a split, groups are per PAIR, so one
- * "Outros" row would have to answer "which series?" and any answer is a guess;
- * those keep the plain truncation until top-N is defined for a split.
+ * "Outros" ROW would have to answer "which series?" and any answer is a guess;
+ * those keep the plain truncation.
+ *
+ * A split's tail is folded a level up instead, over SERIES rather than rows —
+ * see `pivot.ts`, where "which series?" is the question being answered rather
+ * than begged. That fold is the render layer's, so it applies to every adapter
+ * alike; this one stays the in-memory source's own top-N.
  */
 function foldOthers(ordered: Group[], query: CompiledQuery): Group[] | null {
   const topN = query.topN;

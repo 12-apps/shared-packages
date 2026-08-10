@@ -1,4 +1,5 @@
 import { invalidSpecError, unknownEntityError, unknownFieldError } from './errors';
+import { assertChartShape, assertKpiShape } from './presentation-shape';
 import type { ReportDimension, ReportFilter, ReportMeasure, ReportSpec } from './spec';
 import { DEFAULT_REPORT_TIME_ZONE, isValidTimeZone } from './time';
 import { PERCENTILE_AGGREGATIONS } from './types';
@@ -217,31 +218,6 @@ function assertUniqueAliases(dimensions: CompiledDimension[], measures: Compiled
       throw invalidSpecError(`Duplicate output column "${alias}". Give measures distinct aliases.`);
     }
     seen.add(alias);
-  }
-}
-
-function assertChartShape(spec: ReportSpec, dimensions: CompiledDimension[]): void {
-  if (spec.presentation.kind !== 'chart') return;
-  const { chartType } = spec.presentation;
-  if (dimensions.length !== 1) {
-    throw invalidSpecError(
-      `Chart presentation ("${chartType}") requires exactly 1 dimension, got ${dimensions.length}. Use presentation.kind "table" for multi-dimension breakdowns.`,
-    );
-  }
-  if ((chartType === 'pie' || chartType === 'donut') && spec.measures.length !== 1) {
-    throw invalidSpecError(`"${chartType}" charts require exactly 1 measure, got ${spec.measures.length}.`);
-  }
-}
-
-function assertKpiShape(spec: ReportSpec, dimensions: CompiledDimension[]): void {
-  if (spec.presentation.kind !== 'kpi') return;
-  if (dimensions.length !== 0) {
-    throw invalidSpecError(
-      `KPI presentation aggregates the whole period and takes no dimensions, got ${dimensions.length}. Remove the dimensions or use a chart/table.`,
-    );
-  }
-  if (spec.measures.length !== 1) {
-    throw invalidSpecError(`KPI presentation requires exactly 1 measure, got ${spec.measures.length}.`);
   }
 }
 
