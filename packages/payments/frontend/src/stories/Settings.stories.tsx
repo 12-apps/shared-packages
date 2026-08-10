@@ -388,6 +388,36 @@ export const OAuthWithoutConnectSeam: StoryObj = {
   render: () => <SettingsScene spec={{ providers: [INFINITO] }} provider="infinito" withPrepareConnect={false} />,
 };
 
+/**
+ * The connect branch with a walkthrough, un-buried (FUT-691): the guide and
+ * "Testar conexão" render OUTSIDE the manual-credentials disclosure — the
+ * connect card says no key needs copying, so nothing in there could ever be
+ * found — while the credential FORM stays folded behind it. The guide came
+ * over the wire with this store's progress (connected, unproven), so it opens
+ * on the step still owed, not on step 1. The probe button is LIVE: clicking it
+ * runs the real verify against the mount.
+ *
+ * A distinct provider name (`polaris`), so the confirm step's per-store
+ * browser state never bleeds between guide stories.
+ */
+export const OAuthGuideUnburied: StoryObj = scene(
+  "Conta OAuth conectada — guia e Testar conexão à vista",
+  {
+    providers: [
+      {
+        ...INFINITO,
+        name: "polaris",
+        displayName: "Polaris Conta",
+        guide: true,
+        stage: "saved",
+        expiresInDays: 180,
+        account: CONTA_DA_ANA,
+      },
+    ],
+  },
+  "polaris",
+);
+
 // ---------------------------------------------------------------------------
 // The failover chain
 // ---------------------------------------------------------------------------

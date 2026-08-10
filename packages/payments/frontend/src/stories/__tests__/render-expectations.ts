@@ -375,6 +375,16 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     ],
     absentText: ["Conectar com Infinito Conta"],
   },
+  // The FUT-691 layout: guide + probe visible beside the collapsed disclosure.
+  "Settings/OAuthGuideUnburied": {
+    testIds: [
+      "payments-setup-guide",
+      "payments-setup-section-habilitar",
+      "payments-oauth-verify",
+      "payments-manual-fallback",
+    ],
+    text: ["Testar conexão", "Passo 2 · Habilite as cobranças online"],
+  },
   "Settings/FailoverChain": {
     testIds: ["payments-priority-list", "payments-priority-item-aurora", "payments-priority-first"],
     text: ["O checkout tenta Aurora Pagamentos primeiro"],

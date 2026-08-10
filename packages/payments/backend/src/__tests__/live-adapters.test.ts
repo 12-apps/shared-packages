@@ -539,6 +539,9 @@ describe('stripe live mode', () => {
     expect(formOf(calls[0]!.init)['grant_type']).toBe('authorization_code');
     expect(tokens.fields['accessToken']).toBe('sk_acct_new');
     expect(tokens.fields['stripeUserId']).toBe('acct_new');
+    // Also under the RESERVED identity key, which is what the settings page
+    // reads back as "Conta conectada: acct_…" (FUT-691 / FUT-300).
+    expect(tokens.fields['accountId']).toBe('acct_new');
     expect(tokens.fields['publishableKey']).toBe('pk_new');
     // Connect deliveries are signed with the PLATFORM secret — without this
     // copy an OAuth-connected store could not verify its own webhooks.

@@ -54,6 +54,20 @@ export interface CredentialFieldSpec {
    * confirmation dialog that would otherwise ask the owner to vouch for them.
    */
   pattern?: string;
+  /**
+   * Key of another STORED field whose value satisfies this one when the field
+   * itself is empty — read-side only; writes and clears still address `key`.
+   *
+   * Exists for OAuth. An authorization stores its tokens under the flow's own
+   * names (Stripe's `accessToken`), never under the schema key an owner would
+   * have pasted (`secretKey`) — deliberately, so a reconnect can never leave a
+   * stale pasted key outranking the fresh grant. But the masked settings view
+   * is built from this schema, so without the mapping a connected store read
+   * `configured: false` on every field: a screen claiming "nothing here" about
+   * the very connection it charges through (FUT-691). The adapter declares the
+   * bridge; no consumer has to know a provider's token vocabulary.
+   */
+  fulfilledBy?: string;
 }
 
 /** A labelled external link rendered inline within a setup step. */

@@ -177,6 +177,56 @@ describe('provider skeletons (stub mode)', () => {
     expect(proven?.activeStage).toBe(proven?.stages.length);
   });
 
+  /**
+   * Stripe's guide used to declare a `webhook` section no stage pointed at.
+   *
+   * The renderer shows ONE section — the one whose id matches the active
+   * stage — so the store's notification URL and its copy button were
+   * unreachable from every state, and the `activate` stage resolved to no
+   * section at all. The fix is Stone's shape: a section per stage (FUT-691).
+   */
+  it('stripe pairs every stage with a section, 1:1 and in order', () => {
+    const ctx = { webhookUrl: 'https://host.example/api/webhooks/x' };
+    const guide = stripeProvider().setupGuide?.(ctx);
+
+    expect(guide?.stages.map((s) => s.id)).toEqual(['connect', 'methods', 'webhook', 'activate']);
+    expect(guide?.sections.map((s) => s.id)).toEqual(['connect', 'methods', 'webhook', 'activate']);
+    // The once-dead section is the one carrying the per-store fact.
+    const webhook = guide?.sections.find((s) => s.id === 'webhook');
+    expect(JSON.stringify(webhook)).toContain(ctx.webhookUrl);
+    // A host that reports no progress gets no stage claim — renders as step 1.
+    expect(guide?.activeStage).toBeUndefined();
+  });
+
+  /**
+   * And it used to return no `activeStage` at all, so the stepper sat on
+   * "Conectar conta" forever — over a store that had already connected. Same
+   * contract as InfinitePay's above: the adapter reports the stage the server
+   * can PROVE, from `ctx.progress` (FUT-691).
+   */
+  it('stripe reports the stage it can prove from the host progress', () => {
+    const guide = (progress: {
+      configured: Record<string, boolean>;
+      connected: boolean;
+      proven: boolean;
+    }) => stripeProvider().setupGuide?.({ webhookUrl: 'https://host.example/w', progress });
+
+    const fresh = guide({ configured: {}, connected: false, proven: false });
+    expect(fresh?.activeStage).toBe(0);
+
+    // Connected moves it to the webhook stage — the dashboard steps in the
+    // middle cannot be told apart by any API, and this is the last stage with
+    // a per-store fact to show. Not step 1, which is what the stepper was
+    // stuck on before.
+    const connected = guide({ configured: { publishableKey: true }, connected: true, proven: false });
+    expect(connected?.activeStage).toBe(2);
+    expect(connected?.stages[2]?.id).toBe('webhook');
+
+    // Charged: past the last stage, so every step reads as complete.
+    const proven = guide({ configured: { publishableKey: true }, connected: true, proven: true });
+    expect(proven?.activeStage).toBe(proven?.stages.length);
+  });
+
   it('declares an auth mode per provider: OAuth where the vendor supports it', () => {
     // PagBank Connect and Stripe Connect are real merchant-authorization
     // flows. Stone (key-only across every one of its APIs) and InfinitePay
