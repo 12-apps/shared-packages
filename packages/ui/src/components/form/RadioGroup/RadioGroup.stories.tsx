@@ -4,6 +4,7 @@ import { Banknote, CreditCard, Globe, Heart, Shield,Smartphone, Star, Zap } from
 import { useState } from 'react';
 
 import { RadioGroup } from './RadioGroup';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof RadioGroup> = {
   title: 'Form/RadioGroup',
@@ -19,11 +20,11 @@ const meta: Meta<typeof RadioGroup> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'],
+      options: COLOR_VALUES,
     },
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
     direction: {
       control: { type: 'select' },
@@ -159,7 +160,7 @@ const ColorsComponent = () => {
     neutral: '',
   });
 
-  const colors = ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'];
+  const colors = COLOR_VALUES;
 
   return (
     <Box
@@ -197,7 +198,7 @@ const SizesComponent = () => {
     xl: '',
   });
 
-  const sizes = ['xs', 'sm', 'md', 'lg', 'xl'];
+  const sizes = SIZE_VALUES;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>

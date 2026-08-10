@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { Slider } from './Slider';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Slider> = {
   title: 'Form/Slider/Tests',
@@ -496,7 +497,7 @@ export const ThemeVariations: Story = {
         Theme Color Variations
       </Typography>
 
-      {(['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'] as const).map(
+      {(COLOR_VALUES).map(
         (color) => (
           <Box key={color} sx={{ mb: 3 }}>
             <Slider
@@ -556,7 +557,7 @@ export const ThemeVariations: Story = {
     const canvas = within(canvasElement);
 
     await step('Verify all theme colors render', async () => {
-      const colors = ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'];
+      const colors = COLOR_VALUES;
 
       for (const color of colors) {
         // Find slider in the color container
@@ -603,7 +604,7 @@ export const VisualStates: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Size Variations
         </Typography>
-        {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((size) => (
+        {(SIZE_VALUES).map((size) => (
           <Box key={size} sx={{ mb: 2 }}>
             <Slider
               data-testid={`size-${size}`}
@@ -635,7 +636,7 @@ export const VisualStates: Story = {
     });
 
     await step('Size variations verification', async () => {
-      const sizes = ['xs', 'sm', 'md', 'lg', 'xl'];
+      const sizes = SIZE_VALUES;
 
       for (const size of sizes) {
         const slider = within(canvas.getByTestId(`size-${size}`)).getByRole('slider');

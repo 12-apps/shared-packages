@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { InputOTP } from './InputOTP';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof InputOTP> = {
   title: 'Form/InputOTP',
@@ -18,11 +19,11 @@ const meta: Meta<typeof InputOTP> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'],
+      options: COLOR_VALUES,
     },
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
     length: {
       control: { type: 'number', min: 3, max: 10 },
@@ -80,7 +81,7 @@ const ColorsComponent = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
-      {['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'].map((color) => (
+      {COLOR_VALUES.map((color) => (
         <Box key={color} sx={{ textAlign: 'center' }}>
           <Typography variant="subtitle1" gutterBottom sx={{ textTransform: 'capitalize' }}>
             {color}
@@ -101,7 +102,7 @@ const SizesComponent = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
-      {['xs', 'sm', 'md', 'lg', 'xl'].map((size) => (
+      {SIZE_VALUES.map((size) => (
         <Box key={size} sx={{ textAlign: 'center' }}>
           <Typography variant="subtitle1" gutterBottom>
             Size: {size.toUpperCase()}
@@ -506,7 +507,7 @@ export const AllVariants: Story = {
 };
 
 const AllSizesComponent = () => {
-  const sizes = ['xs', 'sm', 'md', 'lg', 'xl'] as const;
+  const sizes = SIZE_VALUES;
   const [value, setValue] = useState('');
 
   return (

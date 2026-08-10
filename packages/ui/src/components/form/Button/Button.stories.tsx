@@ -6,6 +6,7 @@ import { Stack } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Button } from './Button';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Button> = {
   title: 'Form/Button',
@@ -21,11 +22,11 @@ const meta: Meta<typeof Button> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'],
+      options: COLOR_VALUES,
     },
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
     loading: {
       control: { type: 'boolean' },

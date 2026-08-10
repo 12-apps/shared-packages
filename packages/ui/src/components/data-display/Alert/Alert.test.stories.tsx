@@ -4,6 +4,7 @@ import React from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { Alert } from './Alert';
+import { COLOR_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Alert> = {
   title: 'Feedback/Alert/Tests',
@@ -20,7 +21,7 @@ const meta: Meta<typeof Alert> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'],
+      options: COLOR_VALUES,
     },
   },
 };

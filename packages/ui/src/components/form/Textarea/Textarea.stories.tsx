@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Edit3, FileText, MessageCircle, Star } from 'lucide-react';
 
 import { Textarea } from './Textarea';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Textarea> = {
   title: 'Form/Textarea',
@@ -18,11 +19,11 @@ const meta: Meta<typeof Textarea> = {
     },
     color: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'],
+      options: COLOR_VALUES,
     },
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
     iconPosition: {
       control: { type: 'select' },

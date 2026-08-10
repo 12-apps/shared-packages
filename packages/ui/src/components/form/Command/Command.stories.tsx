@@ -14,6 +14,7 @@ import React, { useState } from 'react';
 
 import { Command } from './Command';
 import type { CommandItem,CommandProps } from './Command.types';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Command> = {
   title: 'Navigation/Command',
@@ -29,11 +30,11 @@ const meta: Meta<typeof Command> = {
     },
     size: {
       control: 'select',
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
     color: {
       control: 'select',
-      options: ['primary', 'secondary', 'success', 'error', 'warning', 'info'],
+      options: COLOR_VALUES,
     },
   },
 };
@@ -256,7 +257,7 @@ const SizesComponent = () => {
 
   return (
     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((size) => (
+      {(SIZE_VALUES).map((size) => (
         <React.Fragment key={size}>
           <Button variant="outlined" onClick={() => setOpenSize(size)}>
             Size: {size.toUpperCase()}
@@ -280,7 +281,7 @@ export const Sizes: Story = {
 
 const ColorsComponent = () => {
   const [openColor, setOpenColor] = useState<string | null>(null);
-  const colors = ['primary', 'secondary', 'success', 'error', 'warning', 'info'] as const;
+  const colors = COLOR_VALUES;
 
   return (
     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>

@@ -20,6 +20,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Button } from '../../form/Button';
 import { DropdownMenu } from './DropdownMenu';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof DropdownMenu> = {
   title: 'Navigation/DropdownMenu',
@@ -42,7 +43,7 @@ const meta: Meta<typeof DropdownMenu> = {
     },
     size: {
       control: 'select',
-      options: ['sm', 'md', 'lg'],
+      options: SIZE_VALUES,
       description: 'Size of the menu items',
     },
     closeOnItemClick: {

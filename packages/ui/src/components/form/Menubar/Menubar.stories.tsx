@@ -7,6 +7,7 @@ import React from 'react';
 
 import { Menubar } from './Menubar';
 import type { MenubarItem } from './Menubar.types';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Menubar> = {
   title: 'Navigation/Menubar',
@@ -22,11 +23,11 @@ const meta: Meta<typeof Menubar> = {
     },
     size: {
       control: 'select',
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
     color: {
       control: 'select',
-      options: ['primary', 'secondary', 'success', 'error', 'warning', 'info', 'default'],
+      options: COLOR_VALUES,
     },
     orientation: {
       control: 'select',
@@ -143,7 +144,7 @@ export const Bordered: Story = {
 export const Sizes: Story = {
   render: () => (
     <Box>
-      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((size) => (
+      {(SIZE_VALUES).map((size) => (
         <Box key={size} sx={{ mb: 2 }}>
           <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
             Size: {size}
@@ -158,7 +159,7 @@ export const Sizes: Story = {
 export const Colors: Story = {
   render: () => (
     <Box>
-      {(['default', 'primary', 'secondary', 'success', 'error', 'warning', 'info'] as const).map(
+      {COLOR_VALUES.map(
         (color) => (
           <Box key={color} sx={{ mb: 2 }}>
             <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
@@ -342,7 +343,7 @@ export const AllVariants: Story = {
 export const AllSizes: Story = {
   render: () => (
     <Box>
-      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((size) => (
+      {(SIZE_VALUES).map((size) => (
         <Box key={size} sx={{ mb: 2 }}>
           <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
             Size: {size}

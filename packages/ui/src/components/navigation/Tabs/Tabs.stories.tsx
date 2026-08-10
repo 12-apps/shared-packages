@@ -45,6 +45,7 @@ import { useState } from 'react';
 
 import { Tabs } from './Tabs';
 import type { TabItem } from './Tabs.types';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Tabs> = {
   title: 'Navigation/Tabs',
@@ -67,12 +68,12 @@ const meta: Meta<typeof Tabs> = {
     },
     size: {
       control: 'select',
-      options: ['sm', 'md', 'lg'],
+      options: SIZE_VALUES,
       description: 'Size of the tabs',
     },
     color: {
       control: 'select',
-      options: ['primary', 'secondary'],
+      options: COLOR_VALUES,
       description: 'Color theme for the tabs',
     },
     orientation: {

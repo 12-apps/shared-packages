@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { Button } from '../../form/Button';
 import { InteractiveTooltip } from './InteractiveTooltip';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof InteractiveTooltip> = {
   title: 'Overlays/InteractiveTooltip',
@@ -26,7 +27,7 @@ const meta: Meta<typeof InteractiveTooltip> = {
     },
     size: {
       control: 'select',
-      options: ['sm', 'md', 'lg'],
+      options: SIZE_VALUES,
       description: 'Size of the tooltip',
     },
     glow: {

@@ -4,6 +4,7 @@ import React from 'react';
 
 import { Chart } from './Chart';
 import type { ChartDataPoint } from './Chart.types';
+import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Chart> = {
   title: 'Charts/Chart',
@@ -23,11 +24,11 @@ const meta: Meta<typeof Chart> = {
     },
     size: {
       control: 'select',
-      options: ['xs', 'sm', 'md', 'lg', 'xl'],
+      options: SIZE_VALUES,
     },
     color: {
       control: 'select',
-      options: ['primary', 'secondary', 'success', 'error', 'warning', 'info'],
+      options: COLOR_VALUES,
     },
   },
 };
@@ -113,7 +114,7 @@ export const AllVariants: Story = {
 export const AllSizes: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((size) => (
+      {(SIZE_VALUES).map((size) => (
         <Box key={size}>
           <Typography variant="h6" gutterBottom>
             Size: {size.toUpperCase()}
@@ -382,7 +383,7 @@ export const Neon: Story = {
 export const Sizes: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((size) => (
+      {(SIZE_VALUES).map((size) => (
         <Box key={size}>
           <Typography variant="h6" gutterBottom>
             Size: {size.toUpperCase()}
@@ -397,7 +398,7 @@ export const Sizes: Story = {
 export const Colors: Story = {
   render: () => (
     <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
-      {(['primary', 'secondary', 'success', 'error', 'warning', 'info'] as const).map((color) => (
+      {COLOR_VALUES.map((color) => (
         <Chart
           key={color}
           type="bar"
