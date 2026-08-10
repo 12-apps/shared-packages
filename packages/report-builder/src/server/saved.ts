@@ -16,6 +16,12 @@ export interface SavedReportRecord {
   visibility: string;
   /** JSON array of host role ids granted access when visibility = 'roles'. */
   visibilityRoles: unknown;
+  /**
+   * The period the report opens on (FUT-755): 'today' | '7d' | '30d', DB CHECK
+   * enforced. NULL means "no preference" — the reader resolves it to 30d, the
+   * behaviour every row that predates the column already had.
+   */
+  defaultRange: string | null;
   createdBy: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -28,6 +34,8 @@ export interface SavedReportInput {
   status: string;
   visibility: string;
   visibilityRoles: string[];
+  /** Omitted or null clears the preference back to the reader's default. */
+  defaultRange?: string | null;
 }
 
 const summarySelect = {
@@ -38,6 +46,7 @@ const summarySelect = {
   status: true,
   visibility: true,
   visibilityRoles: true,
+  defaultRange: true,
   createdBy: true,
   createdAt: true,
   updatedAt: true,
@@ -69,6 +78,7 @@ export interface SavedReportDb {
         status: string;
         visibility: string;
         visibilityRoles: string[];
+        defaultRange: string | null;
         createdBy: string | null;
       };
       select: typeof summarySelect;
@@ -82,6 +92,7 @@ export interface SavedReportDb {
         status: string;
         visibility: string;
         visibilityRoles: string[];
+        defaultRange: string | null;
       };
     }): Promise<{ count: number }>;
     deleteMany(args: { where: SavedReportWhere }): Promise<{ count: number }>;
@@ -132,6 +143,7 @@ export function createSavedReportStore(getDb: SavedReportDbProvider): SavedRepor
           status: input.status,
           visibility: input.visibility,
           visibilityRoles: input.visibilityRoles,
+          defaultRange: input.defaultRange ?? null,
           createdBy,
         },
         select: summarySelect,
@@ -148,6 +160,7 @@ export function createSavedReportStore(getDb: SavedReportDbProvider): SavedRepor
           status: input.status,
           visibility: input.visibility,
           visibilityRoles: input.visibilityRoles,
+          defaultRange: input.defaultRange ?? null,
         },
       });
       if (count === 0) return null;

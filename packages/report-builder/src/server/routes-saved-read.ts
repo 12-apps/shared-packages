@@ -19,6 +19,7 @@ import {
 } from './context';
 import type { SavedReportRecord, SavedReportStore } from './saved';
 import { documentShape, toSummary } from './summary';
+import { resolveDefaultRange } from './range';
 import { canViewSavedReport, visibilityRoleIds } from './visibility';
 
 /**
@@ -37,11 +38,16 @@ function lifecycleOf(record: SavedReportRecord): {
   status: string;
   visibility: string;
   visibilityRoles: string[];
+  defaultRange: string;
 } {
   return {
     status: record.status,
     visibility: record.visibility,
     visibilityRoles: visibilityRoleIds(record.visibilityRoles),
+    // Resolved rather than echoed: a row written before the column existed
+    // carries NULL, and the client should be told the period it will actually
+    // open on rather than left to re-derive the fallback (FUT-755).
+    defaultRange: resolveDefaultRange(record.defaultRange),
   };
 }
 
@@ -110,7 +116,10 @@ function listRoute(config: ReportBuilderServerConfig, store: SavedReportStore): 
       // the same rule a second time.
       const reports = records
         .filter((record) => canViewSavedReport(record, actor))
-        .map(toSummary)
+        // Not `.map(toSummary)`: `map` hands the INDEX to the second parameter,
+        // which is `viewerId` here — every row would compare its author against
+        // 0, 1, 2…, and `Meus` would come back empty for everyone.
+        .map((record) => toSummary(record, actor.userId))
         .filter((summary) => mayQueryAll(config, actor, summary.entities));
       return ok({ reports });
     },

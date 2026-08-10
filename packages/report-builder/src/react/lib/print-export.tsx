@@ -58,16 +58,49 @@ export function PrintStyles(): JSX.Element {
   );
 }
 
+/** Tray-with-an-arrow — `prototype.html` marks every export with this glyph. */
+function DownloadIcon(): JSX.Element {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+    </svg>
+  );
+}
+
 export function PrintExportButton({
   title,
+  label = "Exportar PDF",
   dataTestId = "report-export-pdf",
 }: {
   title: string;
+  /**
+   * Defaults to the long form the built-in report screens have always shown.
+   * The saved-report page passes the prototype's shorter `Exportar`, where the
+   * button sits in a right-hand cluster of three and the extra word only
+   * competes with the primary action beside it.
+   */
+  label?: string;
   dataTestId?: string;
 }): JSX.Element {
   return (
-    <Button variant="outline" size="sm" onClick={() => printWithTitle(title)} data-testid={dataTestId}>
-      Exportar PDF
+    <Button
+      variant="outline"
+      size="sm"
+      icon={<DownloadIcon />}
+      onClick={() => printWithTitle(title)}
+      data-testid={dataTestId}
+    >
+      {label}
     </Button>
   );
 }

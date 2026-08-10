@@ -80,8 +80,10 @@ const SUMMARY: SavedReportSummary = {
   type: 'dashboard',
   entity: 'orders',
   entities: ['orders'],
+  blockCount: 2,
   status: 'published',
   visibility: 'tenant',
+  ownedByMe: true,
   updatedAt: '2026-02-01T12:00:00.000Z',
 };
 

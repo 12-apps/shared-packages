@@ -14,116 +14,46 @@
  * a SECOND panel, and clicking the background could not deselect because
  * nothing above the blocks knew what "selected" meant. One id here, one panel
  * beside the grid, and both fall out.
+ *
+ * The removal CONFIRMATION lives here for the same reason: the panel's
+ * *Remover* and a block's 🗑 are two entry points to one behaviour, so there is
+ * one dialog rather than one per entry point (GAP 6).
  */
-import { useState, type JSX, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useState, type JSX, type MouseEvent as ReactMouseEvent } from "react";
 
-import { Card } from "@12-apps/ui/layout/Card";
 import { Box } from "@12-apps/ui/mui/Box";
-import { Text } from "@12-apps/ui/typography/Text";
 
-import { REPORT_GRID_COLUMNS } from "../layout";
 import { blockTemplateGroups, type BlockTemplate } from "../server/block-templates";
-import { BlockEditorPanel } from "./block-editor-panel";
 import { BlockTemplatePicker } from "./block-template-picker";
-import type { ReportEntityFields, ReportSpecWire } from "./custom-reports-api";
-import { PlusIcon } from "./lib/block-icons";
+import type { ReportEntityFields } from "./custom-reports-api";
 import {
   useDragReorder,
   useKeyboardReorder,
   type DragReorder,
   type KeyboardReorder,
 } from "./lib/drag-reorder";
-import { ReportGrid, ReportGridItem } from "./report-grid";
+import { ReportGrid } from "./report-grid";
+import {
+  AddBlockRow,
+  CanvasLiveRegion,
+  RemoveBlockConfirm,
+} from "./report-editor-canvas-chrome";
+import { CanvasPanel } from "./report-editor-canvas-panel";
 import { BLOCK_ID_ATTR, EditableBlock } from "./report-editor-block";
 import {
   addBlock,
   blockLabel,
+  duplicateBlock,
   moveBlock,
+  nextBlockId,
   removeBlock,
   reorderBlock,
   REPORT_MAX_BLOCKS,
   starterBlockSpec,
   updateBlock,
-  updateBlockSpec,
   type ReportDraft,
 } from "./report-model";
 import type { ReportRange } from "./reports-api";
-
-/**
- * The add affordance: a full-row dashed strip closing the canvas, with a large
- * ⊕ centred in it. A whole row (never a block-sized cell) because it is not a
- * block — it is the seam where the next one lands, and it should read as one
- * at any width.
- */
-function AddBlockRow({ disabled, onAdd }: { disabled: boolean; onAdd: () => void }): JSX.Element {
-  return (
-    <ReportGridItem span={REPORT_GRID_COLUMNS} dataTestId="report-editor-add-cell">
-      <Card
-        variant="outlined"
-        sx={{ borderStyle: "dashed", p: 0, overflow: "hidden" }}
-      >
-        <Box
-          component="button"
-          type="button"
-          onClick={onAdd}
-          disabled={disabled}
-          aria-label="Adicionar bloco"
-          data-testid="report-editor-add-block"
-          sx={{
-            width: "100%",
-            minHeight: 96,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 0.5,
-            border: 0,
-            background: "transparent",
-            color: disabled ? "text.disabled" : "primary.main",
-            cursor: disabled ? "not-allowed" : "pointer",
-            "&:hover": { bgcolor: disabled ? "transparent" : "action.hover" },
-          }}
-        >
-          <PlusIcon />
-          <Text variant="body" size="xs" color="secondary">
-            {disabled
-              ? `Limite de ${REPORT_MAX_BLOCKS} blocos por relatório.`
-              : "Adicionar bloco — gráfico, tabela ou indicador"}
-          </Text>
-        </Box>
-      </Card>
-    </ReportGridItem>
-  );
-}
-
-/**
- * The canvas's one polite live region: where a reorder says what it did.
- *
- * Absolutely positioned, so it is NOT a grid item — a visually hidden cell
- * would still open a twelfth-column row and put a gap under the canvas.
- */
-function CanvasLiveRegion({ text }: { text: string }): JSX.Element {
-  return (
-    <Box
-      role="status"
-      aria-live="polite"
-      data-testid="report-editor-live-region"
-      sx={{
-        position: "absolute",
-        width: "1px",
-        height: "1px",
-        p: 0,
-        m: "-1px",
-        overflow: "hidden",
-        clip: "rect(0 0 0 0)",
-        whiteSpace: "nowrap",
-        border: 0,
-      }}
-    >
-      {text}
-    </Box>
-  );
-}
 
 /** Which block the panel is pointed at, and whether the panel is on screen. */
 interface CanvasSelection {
@@ -165,7 +95,7 @@ function useCanvasSelection(): CanvasSelection {
  * the panel never reaches here at all — "clicking inside the panel never
  * deselects" is structural rather than a guard that can be forgotten.
  *
- * The containment test is NOT redundant with that. A block's menu and its
+ * The containment test is NOT redundant with that. A block's menu and the
  * remove confirmation render into portals at `document.body`, and React
  * bubbles their clicks along the REACT tree regardless — so "Mover para cima"
  * and "Cancelar" arrive here with a target that is outside every block and
@@ -180,10 +110,121 @@ function isBackgroundClick(event: ReactMouseEvent<HTMLElement>): boolean {
   return target.closest(`[${BLOCK_ID_ATTR}]`) === null;
 }
 
-/** Put focus back on a block after the panel lets go of it. */
-function focusBlock(id: string | null): void {
-  if (id === null) return;
-  document.querySelector<HTMLElement>(`[${BLOCK_ID_ATTR}="${id}"]`)?.focus();
+/** Find a block's element again — for focus, and for scrolling to it. */
+function blockElement(id: string | null): HTMLElement | null {
+  if (id === null) return null;
+  return document.querySelector<HTMLElement>(`[${BLOCK_ID_ATTR}="${id}"]`);
+}
+
+/**
+ * Bring a just-created block to the author: focus it, and scroll it to the
+ * middle of the viewport.
+ *
+ * Without the scroll, adding to a canvas already a screen tall appends the
+ * block below the fold and nothing appears to have happened (`plan.md` entry
+ * 18). `scrollIntoView` is called optionally because jsdom does not implement
+ * it, and a test environment must not be the reason a feature is left out.
+ */
+function revealBlock(id: string): void {
+  const element = blockElement(id);
+  if (element === null) return;
+  element.focus();
+  element.scrollIntoView?.({ behavior: "smooth", block: "center" });
+}
+
+/** Everything the canvas can DO, so its render function only renders. */
+interface CanvasActions {
+  picking: boolean;
+  openPicker: () => void;
+  closePicker: () => void;
+  chooseTemplate: (template: BlockTemplate) => void;
+  removalTargetId: string | null;
+  requestRemove: (id: string | null) => void;
+  cancelRemove: () => void;
+  confirmRemove: () => void;
+  duplicateSelected: () => void;
+  closePanel: () => void;
+}
+
+function useCanvasActions({
+  draft,
+  first,
+  startWithPicker,
+  selection,
+  onChange,
+}: {
+  draft: ReportDraft;
+  /** The first catalog entity — the blank template's fallback spec. */
+  first: ReportEntityFields | undefined;
+  startWithPicker: boolean;
+  selection: CanvasSelection;
+  onChange: (next: (draft: ReportDraft) => ReportDraft) => void;
+}): CanvasActions {
+  // Lazy initial state: read on mount and never again, so dismissing the
+  // picker on a new report leaves a usable empty canvas rather than a modal
+  // that reappears. The entity check keeps it from opening a picker whose
+  // every choice would be refused for want of a catalog.
+  const [picking, setPicking] = useState(() => startWithPicker && first !== undefined);
+  const [removalTargetId, setRemovalTargetId] = useState<string | null>(null);
+  // A block that has just been created; cleared by the effect that reveals it,
+  // once React has actually rendered it.
+  const [revealId, setRevealId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (revealId === null) return;
+    revealBlock(revealId);
+    setRevealId(null);
+  }, [revealId]);
+
+  /** Select, focus and scroll to a block the author just created. */
+  const landOn = (id: string): void => {
+    selection.select(id);
+    setRevealId(id);
+  };
+
+  return {
+    picking,
+    openPicker: () => setPicking(true),
+    closePicker: () => setPicking(false),
+    chooseTemplate: (template) => {
+      setPicking(false);
+      if (!first) return;
+      // A template carries a ready spec; the blank one carries null and falls
+      // back to the entity's starter, which is the smart default the add
+      // button used to produce unconditionally.
+      const spec = template.spec ?? starterBlockSpec(first);
+      const title = template.spec ? template.title : first.label;
+      const id = nextBlockId(draft.blocks);
+      onChange((current) => addBlock(current, spec, title));
+      landOn(id);
+    },
+    removalTargetId,
+    requestRemove: setRemovalTargetId,
+    cancelRemove: () => setRemovalTargetId(null),
+    confirmRemove: () => {
+      const id = removalTargetId;
+      setRemovalTargetId(null);
+      if (id === null) return;
+      // Deliberately does NOT hand the panel a neighbour: the spec says
+      // removing the selected block empties the panel.
+      if (selection.selectedId === id) selection.deselect();
+      onChange((current) => removeBlock(current, id));
+    },
+    duplicateSelected: () => {
+      const source = selection.selectedId;
+      if (source === null || draft.blocks.length >= REPORT_MAX_BLOCKS) return;
+      const id = nextBlockId(draft.blocks);
+      onChange((current) => duplicateBlock(current, source));
+      // The panel follows the copy: the reason to duplicate a block is to then
+      // change something about the copy.
+      landOn(id);
+    },
+    closePanel: () => {
+      const previous = selection.selectedId;
+      selection.deselect();
+      blockElement(previous)?.focus();
+    },
+  };
 }
 
 export function EditorCanvas({
@@ -191,16 +232,29 @@ export function EditorCanvas({
   draft,
   entities,
   range,
+  startWithPicker = false,
   onChange,
 }: {
   tenantSlug: string;
   draft: ReportDraft;
   entities: ReportEntityFields[];
   range: ReportRange;
+  /**
+   * Open the template picker as soon as the canvas mounts — for a NEW report,
+   * and only a new one (`plan.md` entry 22; `prototype.html` runs
+   * `nav("edit"); openPicker()` the moment one is created).
+   *
+   * Threaded from the ROUTE rather than inferred from "this report has no
+   * blocks": a saved report whose blocks were all deleted also has none, and
+   * re-opening the picker on every visit to it would be a nuisance with no way
+   * to refuse.
+   */
+  startWithPicker?: boolean;
   onChange: (next: (draft: ReportDraft) => ReportDraft) => void;
 }): JSX.Element {
-  const [picking, setPicking] = useState(false);
+  const first = entities[0];
   const selection = useCanvasSelection();
+  const actions = useCanvasActions({ draft, first, startWithPicker, selection, onChange });
   const dnd = useDragReorder((sourceId, targetId) =>
     onChange((current) => reorderBlock(current, sourceId, targetId)),
   );
@@ -212,7 +266,6 @@ export function EditorCanvas({
     onMove: (id, delta) => onChange((current) => moveBlock(current, id, delta)),
   });
   const full = draft.blocks.length >= REPORT_MAX_BLOCKS;
-  const first = entities[0];
 
   return (
     <>
@@ -226,36 +279,69 @@ export function EditorCanvas({
             keyboard={keyboard}
             selection={selection}
             onChange={onChange}
+            onRequestRemove={actions.requestRemove}
           />
-          <AddBlockRow disabled={full || !first} onAdd={() => setPicking(true)} />
+          <AddBlockRow disabled={full || !first} onAdd={actions.openPicker} />
           <CanvasLiveRegion text={keyboard.announcement} />
         </ReportGrid>
       </Box>
+      <CanvasOverlays
+        draft={draft}
+        entities={entities}
+        selection={selection}
+        actions={actions}
+        onChange={onChange}
+      />
+    </>
+  );
+}
+
+/**
+ * Everything the canvas puts ABOVE itself: the template picker, the one
+ * configuration panel, and the one removal confirmation.
+ *
+ * Grouped so the canvas's own render function stays a description of the grid.
+ */
+function CanvasOverlays({
+  draft,
+  entities,
+  selection,
+  actions,
+  onChange,
+}: {
+  draft: ReportDraft;
+  entities: ReportEntityFields[];
+  selection: CanvasSelection;
+  actions: CanvasActions;
+  onChange: (next: (draft: ReportDraft) => ReportDraft) => void;
+}): JSX.Element {
+  return (
+    <>
       {/* "Adicionar bloco" opens the templates rather than dropping an empty
        * block on the canvas. An empty block asks the author to know their data
        * model before they have seen a number; a template shows one first and
        * lets them adjust it. The BLANK template is still in the picker, so
        * someone who knows exactly what they want is not forced through it. */}
       <BlockTemplatePicker
-        open={picking}
+        open={actions.picking}
         groups={blockTemplateGroups()}
-        onClose={() => setPicking(false)}
-        onSelect={(template: BlockTemplate) => {
-          setPicking(false);
-          if (!first) return;
-          // A template carries a ready spec; the blank one carries null and
-          // falls back to the entity's starter, which is the smart default the
-          // add button used to produce unconditionally.
-          const spec = template.spec ?? starterBlockSpec(first);
-          const title = template.spec ? template.title : first.label;
-          onChange((current) => addBlock(current, spec, title));
-        }}
+        onClose={actions.closePicker}
+        onSelect={actions.chooseTemplate}
       />
       <CanvasPanel
         draft={draft}
         entities={entities}
-        selection={selection}
+        selectedId={selection.selectedId}
+        everOpened={selection.everOpened}
+        onClose={actions.closePanel}
         onChange={onChange}
+        onDuplicate={actions.duplicateSelected}
+        onRemove={() => actions.requestRemove(selection.selectedId)}
+      />
+      <RemoveBlockConfirm
+        targetId={actions.removalTargetId}
+        onConfirm={actions.confirmRemove}
+        onCancel={actions.cancelRemove}
       />
     </>
   );
@@ -270,6 +356,7 @@ function CanvasBlocks({
   keyboard,
   selection,
   onChange,
+  onRequestRemove,
 }: {
   tenantSlug: string;
   draft: ReportDraft;
@@ -278,6 +365,7 @@ function CanvasBlocks({
   keyboard: KeyboardReorder;
   selection: CanvasSelection;
   onChange: (next: (draft: ReportDraft) => ReportDraft) => void;
+  onRequestRemove: (id: string) => void;
 }): JSX.Element {
   return (
     <>
@@ -294,89 +382,9 @@ function CanvasBlocks({
           onTitleChange={(title) =>
             onChange((current) => updateBlock(current, block.id, { title }))
           }
-          onRemove={() => {
-            // Deliberately does NOT hand the panel a neighbour: the spec says
-            // removing the selected block empties the panel.
-            if (selection.selectedId === block.id) selection.deselect();
-            onChange((current) => removeBlock(current, block.id));
-          }}
+          onRemove={() => onRequestRemove(block.id)}
         />
       ))}
     </>
-  );
-}
-
-/** What the one panel is pointed at, flattened so its JSX has no branches. */
-interface PanelTarget {
-  /** Remount key: a new block re-seeds the form and resets its scroll. */
-  key: string;
-  spec: ReportSpecWire | null;
-  span: number;
-  testId: string;
-  /** `null` in the empty state — nothing to edit, so nothing to patch. */
-  id: string | null;
-}
-
-function panelTarget(draft: ReportDraft, selectedId: string | null): PanelTarget {
-  const block = draft.blocks.find((candidate) => candidate.id === selectedId);
-  if (block === undefined) {
-    return {
-      key: "sem-selecao",
-      spec: null,
-      span: REPORT_GRID_COLUMNS,
-      testId: "report-editor-panel",
-      id: null,
-    };
-  }
-  // The test id is the one future-pay's reports e2e drives, so it stays keyed
-  // by the BLOCK even though the panel no longer belongs to one.
-  return {
-    key: block.id,
-    spec: block.spec,
-    span: block.span,
-    testId: `report-block-${block.id}-editor`,
-    id: block.id,
-  };
-}
-
-/**
- * The canvas's ONE configuration panel — the whole point of lifting the
- * selection. Keyed by the selected block so switching re-seeds the form and
- * resets its scroll, while re-clicking the same block leaves both alone.
- */
-function CanvasPanel({
-  draft,
-  entities,
-  selection,
-  onChange,
-}: {
-  draft: ReportDraft;
-  entities: ReportEntityFields[];
-  selection: CanvasSelection;
-  onChange: (next: (draft: ReportDraft) => ReportDraft) => void;
-}): JSX.Element | null {
-  if (!selection.everOpened) return null;
-
-  const target = panelTarget(draft, selection.selectedId);
-  const apply = (next: (current: ReportDraft, id: string) => ReportDraft): void => {
-    const id = target.id;
-    if (id !== null) onChange((current) => next(current, id));
-  };
-
-  return (
-    <BlockEditorPanel
-      key={target.key}
-      open
-      onClose={() => {
-        selection.deselect();
-        focusBlock(selection.selectedId);
-      }}
-      entities={entities}
-      spec={target.spec}
-      span={target.span}
-      onChange={(spec) => apply((current, id) => updateBlockSpec(current, id, spec))}
-      onSpanChange={(span) => apply((current, id) => updateBlock(current, id, { span }))}
-      testId={target.testId}
-    />
   );
 }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import type { ReactElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { useState, type ComponentProps, type ReactElement } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { Drawer, DrawerContent, DrawerHeader } from '@12-apps/ui/layout/Drawer';
 
@@ -88,8 +88,19 @@ beforeEach(() => {
   }) as unknown as typeof window.matchMedia;
 });
 
-/** The panel, pointed at a block — or at nothing, for the empty state. */
-function panelElement(spec: ReportSpecWire | null = SPEC): ReactElement {
+type PanelProps = ComponentProps<typeof BlockEditorPanel>;
+
+/**
+ * The panel, pointed at a block — or at nothing, for the empty state.
+ *
+ * `overrides` exists for the GAP 6/7 cases at the bottom of this file, which
+ * need a spy on one callback or a single prop flipped; every earlier case takes
+ * the defaults and reads exactly as it did before.
+ */
+function panelElement(
+  spec: ReportSpecWire | null = SPEC,
+  overrides: Partial<PanelProps> = {},
+): ReactElement {
   return (
     <BlockEditorPanel
       open
@@ -97,9 +108,15 @@ function panelElement(spec: ReportSpecWire | null = SPEC): ReactElement {
       entities={[ENTITY]}
       spec={spec}
       span={6}
+      title=""
       onChange={() => undefined}
       onSpanChange={() => undefined}
+      onTitleChange={() => undefined}
+      onDuplicate={() => undefined}
+      canDuplicate
+      onRemove={() => undefined}
       testId="report-block-b1-editor"
+      {...overrides}
     />
   );
 }
@@ -567,5 +584,274 @@ describe('BlockEditorPanel — one field style, one section level', () => {
       (heading) => (heading as HTMLElement).style.letterSpacing === '',
     );
     expect(untracked).toEqual([]);
+  });
+});
+
+/**
+ * FUT-755 GAP 7 — the top of the panel says WHAT THIS BLOCK IS.
+ *
+ * The hand test's words: *"on top is missing, instead of 'bloco' the
+ * explanation of that thing"*. The header read `Bloco` — a word that is true of
+ * every block, so the panel opened having said nothing about the one it had
+ * just been pointed at.
+ *
+ *   Scenario: The spec sentence tracks the configuration
+ *     Given the panel is open for a block reading "…"
+ *     When I change the aggregation to "Média"
+ *     Then the panel's spec sentence reads "média de receita em …"
+ *
+ * The LIVE half is what these cases are really for. A sentence rendered once
+ * from the spec the panel opened with passes any "does it show the sentence"
+ * assertion while still being exactly the defect — a caption, not feedback. So
+ * two cases drive a change and watch the words move: one through the props (the
+ * canvas re-pointing the panel), one through the form itself.
+ */
+
+/** The block's sentence as a reader sees it, with the emphasis flattened away. */
+function sentenceText(): string {
+  return screen.getByTestId('report-block-b1-editor-sentence').textContent ?? '';
+}
+
+/**
+ * The panel wired to state, the way the canvas wires it: what the form emits
+ * comes straight back in as the spec to describe. Without the loop a test can
+ * only prove the panel re-renders when told to, which is the easy half.
+ */
+function LivePanel(): ReactElement {
+  const [spec, setSpec] = useState<ReportSpecWire>(SPEC);
+  const [title, setTitle] = useState('');
+  return panelElement(spec, { title, onChange: setSpec, onTitleChange: setTitle });
+}
+
+describe('BlockEditorPanel — GAP 7: the panel explains the block', () => {
+  it('leads with the spec sentence, in the engine’s own words', () => {
+    setViewport(DESKTOP_PX);
+    renderPanel();
+
+    // The whole sentence, not a fragment: this is the string `specSentence`
+    // produces for SPEC, and the block's card shows the same one.
+    expect(sentenceText()).toBe(
+      'soma de receita em pedidos por data (dia), onde status é PAID.',
+    );
+  });
+
+  it('emphasises the terms the author chose and not the words joining them', () => {
+    setViewport(DESKTOP_PX);
+    renderPanel();
+
+    // `<strong>`, not a styled span: the emphasis is a fact about the sentence
+    // and lives in the markup, which is also the only form of it jsdom can see
+    // — an `sx` weight compiles to an emotion class this environment does not
+    // cascade.
+    const strong = Array.from(
+      screen.getByTestId('report-block-b1-editor-sentence').querySelectorAll('strong'),
+    );
+
+    expect(strong.map((element) => element.textContent)).toEqual([
+      'soma de receita',
+      'pedidos',
+      'data (dia)',
+      'status é PAID',
+    ]);
+  });
+
+  it('says what it is DOING once a block is selected', () => {
+    setViewport(DESKTOP_PX);
+    renderPanel();
+
+    expect(screen.getByRole('heading', { name: 'Editando bloco' })).toBeTruthy();
+  });
+
+  it('falls back to "Bloco" with nothing selected, and shows no sentence', () => {
+    setViewport(DESKTOP_PX);
+    renderDockedEditor(true, null);
+
+    expect(screen.getByRole('heading', { name: 'Bloco' })).toBeTruthy();
+    expect(screen.queryAllByTestId('report-editor-panel-sentence')).toEqual([]);
+  });
+
+  it('re-writes the sentence when the canvas re-points the panel', () => {
+    setViewport(DESKTOP_PX);
+    const { rerender } = render(panelElement());
+    expect(sentenceText()).toContain('soma de receita');
+
+    rerender(
+      panelElement({ ...SPEC, measures: [{ field: 'revenueCents', aggregation: 'avg' }] }),
+    );
+
+    expect(sentenceText()).toContain('média de receita');
+  });
+
+  it('re-writes the sentence as the form is edited', async () => {
+    setViewport(DESKTOP_PX);
+    render(<LivePanel />);
+    expect(sentenceText()).toContain('soma de receita');
+
+    // The scenario's own gesture: change the aggregation to "Média".
+    fireEvent.mouseDown(
+      within(screen.getByTestId('builder-aggregation-0')).getByRole('combobox'),
+    );
+    fireEvent.click(screen.getByTestId('builder-aggregation-0-option-avg'));
+
+    await waitFor(() => {
+      expect(sentenceText()).toContain('média de receita');
+    });
+  });
+
+  it('offers the title override, with the automatic description in it', () => {
+    setViewport(DESKTOP_PX);
+    renderPanel();
+
+    const field = screen.getByTestId('report-block-b1-editor-title-override');
+    // The placeholder IS the auto title, so an untitled block shows the name it
+    // already has rather than an empty box.
+    expect(field.getAttribute('placeholder')).toBe(
+      'Soma de receita em pedidos por data (dia), onde status é PAID',
+    );
+    expect(screen.getByLabelText('Título')).toBe(field);
+  });
+
+  it('says in words what leaving the title empty does', () => {
+    setViewport(DESKTOP_PX);
+    renderPanel();
+
+    const described = screen
+      .getByTestId('report-block-b1-editor-title-override')
+      .getAttribute('aria-describedby');
+    const hint = described === null ? null : document.getElementById(described);
+
+    expect(hint?.textContent).toContain('Vazio = usa a descrição automática');
+  });
+
+  it('reports each keystroke in the title field', () => {
+    setViewport(DESKTOP_PX);
+    const onTitleChange = vi.fn();
+    render(panelElement(SPEC, { onTitleChange }));
+
+    fireEvent.change(screen.getByTestId('report-block-b1-editor-title-override'), {
+      target: { value: 'Faturamento diário' },
+    });
+
+    expect(onTitleChange).toHaveBeenCalledWith('Faturamento diário');
+  });
+
+  it('shows the title it was given rather than the placeholder', () => {
+    setViewport(DESKTOP_PX);
+    render(panelElement(SPEC, { title: 'Faturamento diário' }));
+
+    const field = screen.getByTestId('report-block-b1-editor-title-override');
+    expect((field as HTMLInputElement).value).toBe('Faturamento diário');
+  });
+
+  it('offers no title field with nothing selected', () => {
+    setViewport(DESKTOP_PX);
+    renderDockedEditor(true, null);
+
+    expect(screen.queryAllByLabelText('Título')).toEqual([]);
+  });
+});
+
+/**
+ * FUT-755 GAP 6 — *"missing duplicar / remover option"*.
+ *
+ * Both already exist on the block's own chrome. The footer is a SECOND ENTRY
+ * POINT to them, which is why every case below asserts the panel ASKS rather
+ * than acts: the canvas owns the removal confirmation, so a panel that grew its
+ * own dialog would be a second behaviour wearing the first one's name.
+ */
+describe('BlockEditorPanel — GAP 6: Duplicar and Remover', () => {
+  it('puts both actions in a footer', () => {
+    setViewport(DESKTOP_PX);
+    renderPanel();
+
+    const footer = screen.getByTestId('report-block-b1-editor-footer');
+    expect(within(footer).getByRole('button', { name: 'Duplicar' })).toBeTruthy();
+    expect(within(footer).getByRole('button', { name: 'Remover' })).toBeTruthy();
+  });
+
+  it('asks the canvas to duplicate', () => {
+    setViewport(DESKTOP_PX);
+    const onDuplicate = vi.fn();
+    render(panelElement(SPEC, { onDuplicate }));
+
+    fireEvent.click(screen.getByTestId('report-block-b1-editor-duplicate'));
+
+    expect(onDuplicate).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks the canvas to remove, and confirms nothing itself', () => {
+    setViewport(DESKTOP_PX);
+    const onRemove = vi.fn();
+    render(panelElement(SPEC, { onRemove }));
+
+    fireEvent.click(screen.getByTestId('report-block-b1-editor-remove'));
+
+    expect(onRemove).toHaveBeenCalledTimes(1);
+    // The confirmation is the canvas's, shared with the block's own 🗑. A
+    // dialog here would mean two of them, which is two behaviours.
+    expect(screen.queryAllByRole('alertdialog')).toEqual([]);
+    expect(screen.queryAllByRole('dialog')).toEqual([]);
+  });
+
+  it('marks Remover as the destructive one', () => {
+    setViewport(DESKTOP_PX);
+    renderPanel();
+
+    // MUI carries the tone in the class, which is the only place jsdom can see
+    // it — there is no cascade here to read a colour off.
+    const remove = screen.getByTestId('report-block-b1-editor-remove');
+    expect(remove.className).toContain('Error');
+    expect(screen.getByTestId('report-block-b1-editor-duplicate').className).not.toContain(
+      'Error',
+    );
+  });
+
+  it('keeps Duplicar reachable at the block ceiling, and says why', () => {
+    setViewport(DESKTOP_PX);
+    render(panelElement(SPEC, { canDuplicate: false }));
+
+    const duplicate = screen.getByTestId('report-block-b1-editor-duplicate');
+    // `aria-disabled`, never `disabled`: a disabled button leaves the tab order
+    // and swallows pointer events, so the reason would sit behind an
+    // interaction the people who need it cannot perform.
+    expect(duplicate.getAttribute('aria-disabled')).toBe('true');
+    expect(duplicate.hasAttribute('disabled')).toBe(false);
+
+    // Reachable three ways: on screen, as the button's description, and
+    // wired to it by id.
+    const reason = screen.getByTestId('report-block-b1-editor-duplicate-reason');
+    expect(reason.textContent).toContain('Limite de 12 blocos');
+    expect(duplicate.getAttribute('title')).toContain('Limite de 12 blocos');
+    expect(duplicate.getAttribute('aria-describedby')).toBe(reason.id);
+  });
+
+  it('does nothing when Duplicar is refused', () => {
+    setViewport(DESKTOP_PX);
+    const onDuplicate = vi.fn();
+    render(panelElement(SPEC, { canDuplicate: false, onDuplicate }));
+
+    fireEvent.click(screen.getByTestId('report-block-b1-editor-duplicate'));
+
+    expect(onDuplicate).not.toHaveBeenCalled();
+  });
+
+  it('explains nothing while duplication is allowed', () => {
+    setViewport(DESKTOP_PX);
+    renderPanel();
+
+    const duplicate = screen.getByTestId('report-block-b1-editor-duplicate');
+    expect(duplicate.getAttribute('aria-disabled')).toBe(null);
+    expect(screen.queryAllByTestId('report-block-b1-editor-duplicate-reason')).toEqual([]);
+  });
+
+  it('offers neither with nothing selected', () => {
+    setViewport(DESKTOP_PX);
+    renderDockedEditor(true, null);
+
+    // Nothing to copy and nothing to drop: a footer here would be two controls
+    // that cannot mean anything.
+    expect(screen.queryAllByTestId('report-editor-panel-footer')).toEqual([]);
+    expect(screen.queryAllByRole('button', { name: 'Duplicar' })).toEqual([]);
+    expect(screen.queryAllByRole('button', { name: 'Remover' })).toEqual([]);
   });
 });

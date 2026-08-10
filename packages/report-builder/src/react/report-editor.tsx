@@ -8,14 +8,12 @@
  * as a one-block report and is saved back as a regular multi-block document.
  */
 import { useState, type Dispatch, type JSX, type SetStateAction } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { ErrorState } from "@12-apps/ui/data-display/ErrorState";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
-import { Button } from "@12-apps/ui/form/Button";
-import { Input } from "@12-apps/ui/form/Input";
 import { Box } from "@12-apps/ui/mui/Box";
 import { ThemeProvider } from "@12-apps/ui/mui/styles";
 import { Stack } from "@12-apps/ui/mui/Stack";
@@ -31,11 +29,13 @@ import {
   type SavedReportView,
 } from "./custom-reports-api";
 import { DockedPanelRegion } from "./lib/docked-panel";
-import { defaultPublishDraft, PublishSection, type PublishDraft } from "./lib/publish-section";
+import { defaultPublishDraft, type PublishDraft } from "./lib/publish-section";
 import { RangeToggle } from "./lib/range-toggle";
 import { useUnsavedChanges } from "./lib/use-unsaved-changes";
 import { EditorCanvas } from "./report-editor-canvas";
-import { CONTROL_ROW_SX, EDITOR_SURFACE_SX, PAGE_TITLE_SX, useReportPortalTheme } from "./lib/report-surface";
+import { ReportEditorHeader } from "./report-editor-header";
+import { ReportSettingsDialog } from "./report-settings-dialog";
+import { CONTROL_ROW_SX, EDITOR_SURFACE_SX, useReportPortalTheme } from "./lib/report-surface";
 import {
   documentFromDraft,
   draftFromDocument,
@@ -51,6 +51,7 @@ function useReportSave(
   editId: string | undefined,
   draft: ReportDraft,
   publish: PublishDraft,
+  defaultRange: ReportRange,
 ): { error: string | null; saving: boolean; onSave: () => Promise<boolean> } {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -78,6 +79,7 @@ function useReportSave(
       status: publish.status,
       visibility: publish.visibility,
       visibilityRoles: publish.visibility === "roles" ? publish.visibilityRoles : [],
+      defaultRange,
     };
     const result = editId
       ? await updateReportAction(transport, tenantSlug, editId, input)
@@ -95,55 +97,13 @@ function useReportSave(
   return { error, saving, onSave };
 }
 
-/** Name + description + publish controls — the report's own metadata. */
-function EditorMeta({
-  tenantSlug,
-  draft,
-  publish,
-  setDraft,
-  setPublish,
-}: {
-  tenantSlug: string;
-  draft: ReportDraft;
-  publish: PublishDraft;
-  setDraft: (next: (draft: ReportDraft) => ReportDraft) => void;
-  setPublish: (next: PublishDraft) => void;
-}): JSX.Element {
-  return (
-    <Stack spacing={2} sx={{ maxWidth: 560 }}>
-      <Input
-        label="Nome"
-        value={draft.name}
-        onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
-        data-testid="report-editor-name"
-      />
-      <Input
-        label="Descrição (opcional)"
-        value={draft.description}
-        onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
-        data-testid="report-editor-description"
-      />
-      <PublishSection tenantSlug={tenantSlug} value={publish} onChange={setPublish} />
-    </Stack>
-  );
-}
-
-/** Preview period + the save/cancel pair, above the canvas. */
+/** The preview period — all that is left on the page above the canvas. */
 function EditorActions({
   range,
   onRangeChange,
-  saving,
-  dirty,
-  onCancel,
-  onSave,
 }: {
   range: ReportRange;
   onRangeChange: (next: ReportRange) => void;
-  saving: boolean;
-  /** Unsaved work exists — derived from the draft, not raised by an edit. */
-  dirty: boolean;
-  onCancel: () => void;
-  onSave: () => void;
 }): JSX.Element {
   return (
     <Stack
@@ -152,34 +112,11 @@ function EditorActions({
       sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1, ...CONTROL_ROW_SX }}
     >
       <RangeToggle value={range} onChange={onRangeChange} dataTestId="report-editor-range" />
-      <Stack direction="row" spacing={1} sx={{ ml: "auto", alignItems: "center" }}>
-        {/* Announced politely: a status that only changes colour is invisible
-            to a screen reader, and "unsaved" is the one state a person must
-            not have to look for. */}
-        {dirty ? (
-          <Text
-            variant="body"
-            size="sm"
-            color="secondary"
-            role="status"
-            data-testid="report-editor-dirty"
-          >
-            Alterações não salvas
-          </Text>
-        ) : null}
-        <Button variant="outline" size="sm" onClick={onCancel} dataTestId="report-editor-cancel">
-          Cancelar
-        </Button>
-        <Button
-          variant="solid"
-          size="sm"
-          onClick={onSave}
-          disabled={saving}
-          dataTestId="report-editor-save"
-        >
-          {saving ? "Salvando…" : "Salvar relatório"}
-        </Button>
-      </Stack>
+      <Box sx={{ ml: "auto" }}>
+        <Text variant="body" size="sm" color="secondary">
+          Pré-visualização com dados reais
+        </Text>
+      </Box>
     </Stack>
   );
 }
@@ -197,6 +134,7 @@ function useEditorState(
   editId: string | undefined,
   initial: ReportDraft,
   initialPublish: PublishDraft,
+  initialRange: ReportRange,
 ): {
   draft: ReportDraft;
   // The updater form, because EditorMeta patches fields off the previous draft.
@@ -205,6 +143,9 @@ function useEditorState(
   setPublish: Dispatch<SetStateAction<PublishDraft>>;
   range: ReportRange;
   setRange: (next: ReportRange) => void;
+  /** The period the SAVED report will open on — persisted, unlike `range`. */
+  defaultRange: ReportRange;
+  setDefaultRange: (next: ReportRange) => void;
   error: string | null;
   saving: boolean;
   dirty: boolean;
@@ -212,19 +153,31 @@ function useEditorState(
 } {
   const [draft, setDraft] = useState<ReportDraft>(initial);
   const [publish, setPublish] = useState<PublishDraft>(initialPublish);
-  const [range, setRange] = useState<ReportRange>("30d");
-  const { error, saving, onSave } = useReportSave(tenantSlug, editId, draft, publish);
+  const [defaultRange, setDefaultRange] = useState<ReportRange>(initialRange);
+  // The preview STARTS on the report's own default: the editor should open on
+  // the period the reader will (FUT-755). It is then free to differ — moving
+  // the toggle previews another window without changing what is stored.
+  const [range, setRange] = useState<ReportRange>(initialRange);
+  const { error, saving, onSave } = useReportSave(
+    tenantSlug,
+    editId,
+    draft,
+    publish,
+    defaultRange,
+  );
 
   // Only what a save persists: `range` is a preview control, so choosing a
-  // different period must not arm the unsaved-changes guard.
+  // different period must not arm the unsaved-changes guard — while
+  // `defaultRange`, which IS stored, must.
+  const persisted = { draft, publish, defaultRange };
   const { dirty, markSaved } = useUnsavedChanges({
-    current: { draft, publish },
+    current: persisted,
     enabled: !saving,
     onSave: async () => {
       const saved = await onSave();
       // A rejected save leaves the report dirty and the guard armed, which is
       // exactly when it protects work.
-      if (saved) markSaved({ draft, publish });
+      if (saved) markSaved(persisted);
     },
   });
 
@@ -235,12 +188,14 @@ function useEditorState(
     setPublish,
     range,
     setRange,
+    defaultRange,
+    setDefaultRange,
     error,
     saving,
     dirty,
     save: () => {
       void onSave().then((saved) => {
-        if (saved) markSaved({ draft, publish });
+        if (saved) markSaved(persisted);
       });
     },
   };
@@ -252,17 +207,20 @@ function ReportEditorForm({
   entities,
   initial,
   initialPublish,
+  initialRange,
 }: {
   tenantSlug: string;
   editId?: string;
   entities: ReportEntityFields[];
   initial: ReportDraft;
   initialPublish: PublishDraft;
+  initialRange: ReportRange;
 }): JSX.Element {
   const navigate = useNavigate();
-  const editor = useEditorState(tenantSlug, editId, initial, initialPublish);
+  const editor = useEditorState(tenantSlug, editId, initial, initialPublish, initialRange);
   const { draft, setDraft, publish, setPublish, range, setRange } = editor;
-  const { error, saving, dirty, save } = editor;
+  const { defaultRange, setDefaultRange, error, saving, dirty, save } = editor;
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // One field shape, including the panels rendered through a portal.
   const fieldTheme = useReportPortalTheme();
 
@@ -273,38 +231,23 @@ function ReportEditorForm({
     <ThemeProvider theme={fieldTheme}>
     <DockedPanelRegion>
       <Stack spacing={3} sx={EDITOR_SURFACE_SX} data-testid="page-report-editor">
-        <Stack spacing={0.5}>
-          <Link to={`/${tenantSlug}/reports`} data-testid="report-editor-back">
-            <Text variant="body" size="sm" color="secondary">
-              ← Relatórios
-            </Text>
-          </Link>
-          <Box component="h1" sx={PAGE_TITLE_SX}>
-            {editId ? "Editar relatório" : "Novo relatório"}
-          </Box>
-          <Text variant="body" size="sm" color="secondary">
-            Monte o relatório arrastando os blocos; cada bloco mostra os dados reais do período.
-          </Text>
-        </Stack>
-
-        <EditorMeta
+        <ReportEditorHeader
           tenantSlug={tenantSlug}
-          draft={draft}
+          {...(editId ? { editId } : {})}
+          name={draft.name}
           publish={publish}
-          setDraft={setDraft}
-          setPublish={setPublish}
-        />
-
-        <EditorActions
-          range={range}
-          onRangeChange={setRange}
+          blockCount={draft.blocks.length}
           saving={saving}
           dirty={dirty}
+          onNameChange={(name) => setDraft((prev) => ({ ...prev, name }))}
+          onOpenSettings={() => setSettingsOpen(true)}
           onCancel={() =>
             void navigate(editId ? `/${tenantSlug}/reports/${editId}` : `/${tenantSlug}/reports`)
           }
           onSave={save}
         />
+
+        <EditorActions range={range} onRangeChange={setRange} />
 
         {error ? (
           <Alert severity="error" data-testid="report-editor-error">
@@ -317,9 +260,23 @@ function ReportEditorForm({
           draft={draft}
           entities={entities}
           range={range}
+          // `/new` opens on the picker; `/:id/edit` never does (plan entry 22).
+          startWithPicker={editId === undefined}
           onChange={setDraft}
         />
       </Stack>
+
+      <ReportSettingsDialog
+        open={settingsOpen}
+        tenantSlug={tenantSlug}
+        value={{ name: draft.name, description: draft.description, publish, defaultRange }}
+        onChange={(next) => {
+          setDraft((prev) => ({ ...prev, name: next.name, description: next.description }));
+          setPublish(next.publish);
+          setDefaultRange(next.defaultRange);
+        }}
+        onClose={() => setSettingsOpen(false)}
+      />
     </DockedPanelRegion>
     </ThemeProvider>
   );
@@ -394,6 +351,7 @@ export function ReportEditorPage({ tenantSlug }: { tenantSlug: string }): JSX.El
       entities={fieldsQuery.data.entities}
       initial={initial}
       initialPublish={initialPublishDraft(saved)}
+      initialRange={saved?.defaultRange ?? "30d"}
     />
   );
 }

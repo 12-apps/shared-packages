@@ -236,8 +236,10 @@ describe('selectReportOptions', () => {
     type: 'dashboard',
     entity: '',
     entities: ['orders'],
+    blockCount: 2,
     status,
     visibility: 'tenant',
+    ownedByMe: true,
     updatedAt: '2026-07-27T00:00:00.000Z',
   });
   const reports = [report('live', 'published'), report('wip', 'draft'), report('old', 'archived')];

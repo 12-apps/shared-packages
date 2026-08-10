@@ -126,8 +126,20 @@ export interface SavedReportSummary {
   type: "report" | "dashboard";
   entity: string;
   entities: string[];
+  /**
+   * Blocks in the stored document; a single report is 1 (FUT-755). The list
+   * card says it ("3 blocos") and draws its sparkline from it — the one number
+   * that tells a single chart apart from a twelve-block dashboard before you
+   * open either.
+   */
+  blockCount: number;
   status: ReportStatusWire;
   visibility: ReportVisibilityWire;
+  /**
+   * Whether the SIGNED-IN user authored it — what the `Meus` scope filters on
+   * (FUT-755). Resolved server-side, so the client never sees a user id.
+   */
+  ownedByMe: boolean;
   updatedAt: string;
 }
 
@@ -138,6 +150,9 @@ interface SavedReportViewBase {
   status: ReportStatusWire;
   visibility: ReportVisibilityWire;
   visibilityRoles: string[];
+  /** The period it OPENS on (FUT-755), resolved server-side; absent only on a
+   * response cached before the field existed, where readers use 30d. */
+  defaultRange?: ReportRange;
   range: { preset: string; from: string; toExclusive: string };
 }
 
@@ -185,9 +200,12 @@ interface RunResult {
   render: ReportRender;
 }
 
-function adminPath(tenantSlug: string, path: string): string {
+/** Exported for `custom-reports-write`: one place decides the URL shape. */
+export function adminReportsPath(tenantSlug: string, path: string): string {
   return `/api/admin/${encodeURIComponent(tenantSlug)}${path}`;
 }
+
+const adminPath = adminReportsPath;
 
 /**
  * Reads go through the transport in scope (FUT-391), so a host — or a consumer
@@ -330,59 +348,14 @@ export function useRunReport(
   });
 }
 
-/** Save/update payload; omitted lifecycle fields default server-side. */
-interface SaveReportInput {
-  name: string;
-  description?: string;
-  spec: ReportDocumentWire;
-  status?: ReportStatusWire;
-  visibility?: ReportVisibilityWire;
-  visibilityRoles?: string[];
-}
-
-export function saveReportAction(
-  transport: ReportBuilderTransport,
-  tenantSlug: string,
-  input: SaveReportInput,
-): Promise<Result<SavedReportSummary>> {
-  return transport.send<SavedReportSummary>(
-    adminPath(tenantSlug, "/reports/custom"),
-    "POST",
-    input,
-  );
-}
-
-export function updateReportAction(
-  transport: ReportBuilderTransport,
-  tenantSlug: string,
-  id: string,
-  input: SaveReportInput,
-): Promise<Result<SavedReportSummary>> {
-  return transport.send<SavedReportSummary>(
-    adminPath(tenantSlug, `/reports/custom/${encodeURIComponent(id)}`),
-    "PUT",
-    input,
-  );
-}
-
 /**
- * Archive / restore an open document (FUT-391). Re-sends the document the
- * viewer already holds with only `status` changed — the save endpoint is the
- * one write path, so archiving re-validates exactly like any other edit and
- * needs no second endpoint (nor a second set of permission rules).
+ * The WRITE half — save, update and archive — lives in `custom-reports-write`
+ * and is re-exported here so every caller keeps one import path for the
+ * reports API. Split because this module is at the size gate's ceiling and the
+ * writes are the part with no query wiring in them.
  */
-export function setReportStatusAction(
-  transport: ReportBuilderTransport,
-  tenantSlug: string,
-  view: SavedReportView,
-  status: ReportStatusWire,
-): Promise<Result<SavedReportSummary>> {
-  return updateReportAction(transport, tenantSlug, view.id, {
-    name: view.name,
-    ...(view.description ? { description: view.description } : {}),
-    spec: view.spec,
-    status,
-    visibility: view.visibility,
-    visibilityRoles: view.visibilityRoles,
-  });
-}
+export {
+  saveReportAction,
+  setReportStatusAction,
+  updateReportAction,
+} from "./custom-reports-write";

@@ -7,13 +7,27 @@ import type { SavedReportRecord } from './saved';
 
 /**
  * Lenient shape probe over the STORED document (never trusted): which variant
- * it is, and which entities it queries. A malformed or legacy value maps to no
- * entities, so it is listed for nobody rather than throwing the whole list.
+ * it is, which entities it queries, and how many blocks it holds. A malformed
+ * or legacy value maps to no entities, so it is listed for nobody rather than
+ * throwing the whole list.
+ *
+ * `blockCount` is what the list card says out loud ("3 blocos") and what its
+ * sparkline is drawn from — the one number that tells a single chart apart
+ * from a twelve-block dashboard before you open either. A single report is 1:
+ * it is one block's worth of document, not zero.
+ *
+ * A document we could not READ is 0, though, and that is not the same claim.
+ * The non-dashboard branch is also where every malformed value lands — `null`,
+ * a string, a legacy row — so counting it as 1 would put "1 bloco" on a card
+ * whose content we just failed to parse. An unreadable document already
+ * reports no entities for exactly this reason; the count follows the same
+ * signal, so the card says "0 blocos" and stops claiming to know.
  */
 export function documentShape(spec: unknown): {
   type: 'report' | 'dashboard';
   entity: string;
   entities: string[];
+  blockCount: number;
 } {
   const record = typeof spec === 'object' && spec !== null ? (spec as Record<string, unknown>) : {};
   if (record.kind === 'dashboard') {
@@ -31,10 +45,15 @@ export function documentShape(spec: unknown): {
           .filter((entity) => entity !== ''),
       ),
     ];
-    return { type: 'dashboard', entity: '', entities };
+    return { type: 'dashboard', entity: '', entities, blockCount: blocks.length };
   }
   const entity = String(record.entity ?? '');
-  return { type: 'report', entity, entities: entity === '' ? [] : [entity] };
+  return {
+    type: 'report',
+    entity,
+    entities: entity === '' ? [] : [entity],
+    blockCount: entity === '' ? 0 : 1,
+  };
 }
 
 export interface SavedReportSummary {
@@ -44,12 +63,31 @@ export interface SavedReportSummary {
   type: 'report' | 'dashboard';
   entity: string;
   entities: string[];
+  /** How many blocks the stored document holds; a single report is 1. */
+  blockCount: number;
   status: string;
   visibility: string;
+  /**
+   * Whether the CALLER authored this document — the `Meus` scope of the list.
+   *
+   * Resolved here, against the actor the route already holds, rather than by
+   * shipping `createdBy` and letting the client compare: a tenant's report list
+   * would then carry a user id per row, which is an identifier nobody on that
+   * screen needs and which no amount of client-side care can un-send.
+   */
+  ownedByMe: boolean;
   updatedAt: string;
 }
 
-export function toSummary(record: SavedReportRecord): SavedReportSummary {
+/**
+ * One stored row as the list reads it.
+ *
+ * `viewerId` is the signed-in user (`ReportActor.userId`), and it is required
+ * rather than defaulted: every caller has an actor in hand, and a default would
+ * make "nobody owns anything" the silent answer for a route that simply forgot
+ * to pass it — a `Meus` scope that is always empty and never errors.
+ */
+export function toSummary(record: SavedReportRecord, viewerId: string | null): SavedReportSummary {
   return {
     id: record.id,
     name: record.name,
@@ -57,6 +95,9 @@ export function toSummary(record: SavedReportRecord): SavedReportSummary {
     ...documentShape(record.spec),
     status: record.status,
     visibility: record.visibility,
+    // An anonymous actor owns nothing: `null === null` is true, and an
+    // unauthenticated caller must not inherit every unattributed document.
+    ownedByMe: record.createdBy !== null && record.createdBy === viewerId,
     updatedAt: record.updatedAt.toISOString(),
   };
 }

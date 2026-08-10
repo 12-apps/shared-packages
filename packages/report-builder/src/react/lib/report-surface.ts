@@ -195,6 +195,42 @@ export function useReportSurfaceSx(): Record<string, unknown> {
   }, [theme]);
 }
 
+/** How far a state chip's fill is pulled toward the surface behind it. */
+const CHIP_TINT = 0.88;
+
+/** `tone` blended `amount` of the way toward `surface`, as an `rgb()` string. */
+function mixToward(tone: Rgb, surface: Rgb, amount: number): string {
+  const channel = (from: number, to: number): number => Math.round(from + (to - from) * amount);
+  return `rgb(${channel(tone[0], surface[0])}, ${channel(tone[1], surface[1])}, ${channel(tone[2], surface[2])})`;
+}
+
+/**
+ * A status chip that reads as a STATE: a soft tint of its own tone, with a
+ * label dark enough to be legible ON that tint.
+ *
+ * MUI's filled chip paints `warning.main` and picks its label by MUI's own
+ * `contrastThreshold` of 3 — which lands white on `#ed6c02` at **3.11:1**,
+ * measured in a browser at 13px. That is a body-sized label under the 4.5:1
+ * floor `visual-pass.md` §Colour sets, on the one element whose whole job is to
+ * be read at a glance. The outlined variant is no better: the same hue AS TEXT
+ * on white is 3.1:1 too.
+ *
+ * So the fill is the tone pulled most of the way to the surface — which is what
+ * `prototype.html`'s `.chip.draft` is (`#fff3e0` on `#95560a`) — and the label
+ * is {@link accessibleAccent} against that fill, darkening exactly as far as it
+ * must and no further. Derived rather than hardcoded for the same reason
+ * `accessibleAccent` is: a tenant's brand colour flows through these tokens.
+ */
+export function stateChipSx(tone: string, surface: string): { bgcolor: string; color: string } {
+  const toneRgb = parseColor(tone);
+  const surfaceRgb = parseColor(surface);
+  // Unreadable input means "leave it alone" — a chip in MUI's own colours is a
+  // smaller defect than one painted from a colour we misread.
+  if (toneRgb === null || surfaceRgb === null) return { bgcolor: surface, color: tone };
+  const bgcolor = mixToward(toneRgb, surfaceRgb, CHIP_TINT);
+  return { bgcolor, color: accessibleAccent(tone, bgcolor) };
+}
+
 /**
  * The SECTION level of the type scale — "Agrupar por", "Medidas", "Filtros".
  *

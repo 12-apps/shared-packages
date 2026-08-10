@@ -15,7 +15,7 @@
  * RETARGETS. So this component is told whether it is the selected one and
  * reports clicks upward; `report-editor-canvas.tsx` owns the answer.
  */
-import { useState, type JSX } from "react";
+import type { JSX } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
@@ -27,7 +27,6 @@ import { DropdownMenu, type DropdownMenuItem } from "@12-apps/ui/navigation/Drop
 
 import { useRunReport, type ReportSpecWire } from "./custom-reports-api";
 import { GripIcon, PencilIcon, TrashIcon } from "./lib/block-icons";
-import { ConfirmDialog } from "./lib/confirm-dialog";
 import type { DragReorder, KeyboardReorder } from "./lib/drag-reorder";
 import { CONTAINER_RADIUS_PX } from "./lib/report-surface";
 import { ReportBlockFrame, ReportGridItem } from "./report-grid";
@@ -328,10 +327,15 @@ export function EditableBlock({
   selected: boolean;
   onSelect: () => void;
   onTitleChange: (title: string) => void;
+  /**
+   * REQUESTS removal — it does not perform it. The confirmation lives on the
+   * CANVAS (FUT-755, GAP 6), because the configuration panel's *Remover* has
+   * to open the same dialog this 🗑 does. Owned here, the panel's remove would
+   * have needed a second confirmation, with its own copy and its own bugs.
+   */
   onRemove: () => void;
 }): JSX.Element {
   const testId = `report-block-${block.id}`;
-  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   return (
     <ReportGridItem
@@ -349,23 +353,7 @@ export function EditableBlock({
         testId={testId}
         onSelect={onSelect}
         onTitleChange={onTitleChange}
-        onRemove={() => setConfirmingRemove(true)}
-      />
-      {/* Outside the focusable group on purpose: the confirmation is not part
-       * of the block for keyboard purposes, and Alt+↑/↓ typed inside it must
-       * not reorder the canvas behind it. */}
-      <ConfirmDialog
-        open={confirmingRemove}
-        destructive
-        title="Remover bloco?"
-        description="O bloco sai do relatório. Você ainda pode cancelar a edição para desfazer tudo."
-        confirmText="Remover"
-        onConfirm={() => {
-          setConfirmingRemove(false);
-          onRemove();
-        }}
-        onCancel={() => setConfirmingRemove(false)}
-        dataTestId={`${testId}-remove-confirm`}
+        onRemove={onRemove}
       />
     </ReportGridItem>
   );

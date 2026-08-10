@@ -42,171 +42,57 @@
  * not an inconsistency: settings are a discrete task, block configuration is
  * continuous work alongside the thing being configured.
  *
+ * What it SAYS is GAPs 6 and 7 of the hand-test (FUT-755). The header used to
+ * read `Bloco` — true of every block, so the panel opened having said nothing
+ * about the one it was pointed at — and there was no way to copy or drop a
+ * block without going back to the canvas. It now leads with the block's spec
+ * sentence, offers the title that overrides it, and closes with *Duplicar* /
+ * *Remover*. All three live in `lib/block-panel-chrome.tsx`; the sentence
+ * itself comes from the engine's own `specSentence`, through the catalog
+ * adapter in `lib/spec-sentence.ts`, so the panel and the saved card cannot
+ * describe one block two ways.
+ *
  * The test ids are unchanged from the popover on purpose: `report-block-<id>-editor`
  * and `-editor-entity` are driven by future-pay's reports e2e, so swapping the
  * container must not break a consumer's suite.
  */
-import { useState, type JSX, type PointerEvent as ReactPointerEvent } from "react";
+import { useMemo, useState, type JSX } from "react";
 
 import { Drawer, DrawerContent, DrawerHeader } from "@12-apps/ui/layout/Drawer";
 import { Box } from "@12-apps/ui/mui/Box";
+import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { BlockQueryFields, fieldMapOf } from "./block-query-fields";
 import { draftFromSpec, specFromDraft, withValidChart, type BuilderDraft } from "./builder-model";
 import type { ReportEntityFields, ReportSpecWire } from "./custom-reports-api";
+import { BlockPanelFooter, BlockSpecSentence, BlockTitleField } from "./lib/block-panel-chrome";
+import { useDockReservation, useEscapeToClose, usePanelTier } from "./lib/docked-panel";
+import { PANEL_WIDTH_PX, SheetGrip, TIER_LAYOUT } from "./lib/panel-tiers";
 import {
-  useDockReservation,
-  useEscapeToClose,
-  usePanelTier,
-  type PanelTier,
-} from "./lib/docked-panel";
-import { CONTAINER_RADIUS_PX } from "./lib/report-surface";
-
-/** Wide enough that a filter's three controls read in full (FUT-391). */
-const PANEL_WIDTH_PX = 344;
-
-/** Leaves the canvas peeking above the sheet, so the edit still has context. */
-const SHEET_HEIGHT = "78vh";
-
-/** How far down the sheet must travel before releasing the grip dismisses it. */
-const SHEET_DISMISS_FRACTION = 0.4;
+  blockAutoTitle,
+  blockSentence,
+  catalogFromEntities,
+  sentenceParts,
+  type SentencePart,
+} from "./lib/spec-sentence";
+import { REPORT_MAX_BLOCKS } from "./report-model";
 
 /** What the panel says when nothing is selected — the spec's exact wording. */
 const EMPTY_TEXT = "Selecione um bloco para editar";
 
 /**
- * The docked panel's surface.
+ * The panel's own name for itself, in the prototype's two states.
  *
- * `--report-panel-top` is the host's own header height: a host that renders a
- * fixed app bar sets it and the panel starts below the bar instead of under it.
- * Unset — the harness, a host with no fixed chrome — it resolves to 0 and the
- * panel is full height, which is what it was.
+ * `Bloco` alone was the GAP-7 defect: it is true of every block, so the panel
+ * opened saying nothing about the one it had just been pointed at. The heading
+ * now says what the panel is DOING, and the sentence below it says to what.
  */
-const DOCKED_PAPER_SX = {
-  top: "var(--report-panel-top, 0px)",
-  height: "calc(100% - var(--report-panel-top, 0px))",
-};
+const IDLE_HEADING = "Bloco";
+const EDITING_HEADING = "Editando bloco";
 
-/**
- * The overlay tier's surface: the docked one plus the shadow that separates it
- * from the canvas it is now floating over. Written as an explicit CSS value
- * rather than a theme elevation because the elevation scale casts DOWNWARD and
- * this shadow has to fall leftward, onto the content the panel covers.
- */
-const OVERLAY_PAPER_SX = {
-  ...DOCKED_PAPER_SX,
-  boxShadow: "-12px 0 32px -8px rgba(0, 0, 0, 0.32)",
-};
-
-/**
- * Rounded top corners: the sheet reads as lifted off the canvas, not welded on.
- * At the CONTAINER radius, because a sheet is a container and this was a third
- * value in a family `visual-pass.md` §Components caps at two.
- */
-const SHEET_PAPER_SX = {
-  borderTopLeftRadius: CONTAINER_RADIUS_PX,
-  borderTopRightRadius: CONTAINER_RADIUS_PX,
-};
-
-/**
- * A persistent drawer's docked root is a REAL element in the flow of whatever
- * renders it. It has no height — its surface is `position: fixed` — but at its
- * natural 344px it overhangs and can add a horizontal scrollbar. Zero it: the
- * panel's width is reserved from the canvas by `useDockReservation`, never
- * taken from wherever the element happens to sit.
- */
-const DOCKED_ROOT_SX = { "& .MuiDrawer-docked": { width: 0 } };
-
-/** Everything about a tier that is pure geometry, in one lookup. */
-interface TierLayout {
-  anchor: "right" | "bottom";
-  width: number | string;
-  height?: string;
-  /** `false` is a real modal drawer — the sheet, and only the sheet. */
-  persistent: boolean;
-  paperSx: Record<string, number | string>;
-  rootSx?: Record<string, Record<string, number>>;
-}
-
-const TIER_LAYOUT: Record<PanelTier, TierLayout> = {
-  docked: {
-    anchor: "right",
-    width: PANEL_WIDTH_PX,
-    persistent: true,
-    paperSx: DOCKED_PAPER_SX,
-    rootSx: DOCKED_ROOT_SX,
-  },
-  overlay: {
-    anchor: "right",
-    width: PANEL_WIDTH_PX,
-    persistent: true,
-    paperSx: OVERLAY_PAPER_SX,
-    rootSx: DOCKED_ROOT_SX,
-  },
-  sheet: {
-    anchor: "bottom",
-    width: "100%",
-    height: SHEET_HEIGHT,
-    persistent: false,
-    paperSx: SHEET_PAPER_SX,
-  },
-};
-
-/**
- * Drag the grip down to dismiss the sheet; release short of the threshold and
- * it springs back.
- *
- * The offset is written as an INLINE transform on MUI's paper because that is
- * where the slide transition writes too — an `sx` rule would lose to the
- * `transform: none` the transition leaves behind once the sheet is in.
- */
-function sheetDragHandler(onDismiss: () => void) {
-  return (event: ReactPointerEvent<HTMLElement>): void => {
-    const paper = event.currentTarget.closest<HTMLElement>(".MuiDrawer-paper");
-    if (paper === null) return;
-    const startY = event.clientY;
-    const threshold = paper.getBoundingClientRect().height * SHEET_DISMISS_FRACTION;
-    const travelled = (moved: globalThis.PointerEvent): number => Math.max(0, moved.clientY - startY);
-
-    const onMove = (moved: globalThis.PointerEvent): void => {
-      paper.style.transform = `translateY(${travelled(moved)}px)`;
-    };
-    const onUp = (moved: globalThis.PointerEvent): void => {
-      document.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerup", onUp);
-      paper.style.transform = "none";
-      if (travelled(moved) > threshold) onDismiss();
-    };
-    document.addEventListener("pointermove", onMove);
-    document.addEventListener("pointerup", onUp);
-  };
-}
-
-/**
- * The sheet's grab affordance. Decorative to assistive tech on purpose — the
- * header's close button is the announced, keyboard-reachable dismissal, and a
- * second control with the same meaning is noise in the tab order.
- */
-function SheetGrip({ onDismiss }: { onDismiss: () => void }): JSX.Element {
-  return (
-    <Box
-      aria-hidden="true"
-      onPointerDown={sheetDragHandler(onDismiss)}
-      sx={{
-        display: "flex",
-        justifyContent: "center",
-        flex: "0 0 auto",
-        py: 1,
-        cursor: "grab",
-        // Otherwise the browser claims the vertical drag for page scrolling.
-        touchAction: "none",
-      }}
-    >
-      <Box sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: "divider" }} />
-    </Box>
-  );
-}
+/** Why *Duplicar* is refused — the canvas's own wording for the same ceiling. */
+const DUPLICATE_BLOCKED_TEXT = `Limite de ${REPORT_MAX_BLOCKS} blocos por relatório.`;
 
 /**
  * What the panel shows with nothing selected.
@@ -228,22 +114,59 @@ function PanelEmptyState({ testId }: { testId: string }): JSX.Element {
   );
 }
 
+/**
+ * Everything the panel knows about the selected block, recomputed on every
+ * edit — which is the point of GAP 7: the sentence is live feedback, not a
+ * caption written once when the panel opened.
+ *
+ * Bundling the spec with its description is what lets the whole panel branch on
+ * ONE nullable value: `null` is the empty state, and anything else carries a
+ * block, its words and its automatic name together.
+ */
+interface SelectedBlock {
+  spec: ReportSpecWire;
+  /** The spec sentence, split into the runs the panel emphasises. */
+  parts: SentencePart[];
+  /** What the block is called while its title is empty. */
+  autoTitle: string;
+}
+
+function useSelectedBlock(
+  spec: ReportSpecWire | null,
+  entities: ReportEntityFields[],
+): SelectedBlock | null {
+  const catalog = useMemo(() => catalogFromEntities(entities), [entities]);
+  return useMemo(() => {
+    if (spec === null) return null;
+    return {
+      spec,
+      parts: sentenceParts(blockSentence(spec, catalog)),
+      autoTitle: blockAutoTitle(spec, catalog),
+    };
+  }, [spec, catalog]);
+}
+
 /** The form half: seeded once per selection, applied live on every edit. */
 function PanelForm({
-  seed,
+  block,
   entities,
   span,
+  title,
   onChange,
   onSpanChange,
+  onTitleChange,
   testId,
 }: {
-  seed: ReportSpecWire;
+  block: SelectedBlock;
   entities: ReportEntityFields[];
   span: number;
+  title: string;
   onChange: (spec: ReportSpecWire) => void;
   onSpanChange: (span: number) => void;
+  onTitleChange: (title: string) => void;
   testId: string;
 }): JSX.Element {
+  const seed = block.spec;
   // Seeded once per opening (the caller remounts via `key`): the draft keeps
   // half-finished rows — a blank "+ Medida" line, a filter with no value yet —
   // that the serialized spec necessarily drops.
@@ -263,15 +186,97 @@ function PanelForm({
     // flush against the scroll container's edge "Coleção" was clipped in half
     // by the overflow.
     <Box sx={{ overflowY: "auto", pt: 1.5, pb: 2 }}>
-      <BlockQueryFields
-        draft={draft}
-        entities={entities}
-        span={span}
-        apply={apply}
-        onSpanChange={onSpanChange}
+      <Stack spacing={2}>
+        {/* First field in the form, directly under the sentence it overrides —
+            `prototype.html` orders it exactly so. */}
+        <BlockTitleField
+          title={title}
+          autoTitle={block.autoTitle}
+          onTitleChange={onTitleChange}
+          testId={testId}
+        />
+        <BlockQueryFields
+          draft={draft}
+          entities={entities}
+          span={span}
+          apply={apply}
+          onSpanChange={onSpanChange}
+          testId={testId}
+        />
+      </Stack>
+    </Box>
+  );
+}
+
+/**
+ * Everything below the header: the spec sentence, the form (or the empty state)
+ * and the footer.
+ *
+ * One component because all three answer the SAME question — is a block
+ * selected — and answering it once here keeps `BlockEditorPanel` about which
+ * responsive tier it is in, which is the only other thing it decides.
+ */
+function PanelBody({
+  block,
+  entities,
+  span,
+  title,
+  canDuplicate,
+  onChange,
+  onSpanChange,
+  onTitleChange,
+  onDuplicate,
+  onRemove,
+  testId,
+}: {
+  block: SelectedBlock | null;
+  entities: ReportEntityFields[];
+  span: number;
+  title: string;
+  canDuplicate: boolean;
+  onChange: (spec: ReportSpecWire) => void;
+  onSpanChange: (span: number) => void;
+  onTitleChange: (title: string) => void;
+  onDuplicate: () => void;
+  onRemove: () => void;
+  testId: string;
+}): JSX.Element {
+  // Nothing selected: the prompt, and NO footer — there is nothing to copy and
+  // nothing to drop, so either control would be one that cannot mean anything.
+  if (block === null) {
+    return (
+      <DrawerContent dataTestId={`${testId}-content`}>
+        <PanelEmptyState testId={testId} />
+      </DrawerContent>
+    );
+  }
+
+  return (
+    <>
+      {/* Outside `DrawerContent`, which is the scrolling half: the sentence has
+          to stay readable while the author is at the bottom of the form
+          changing the very thing it describes. */}
+      <BlockSpecSentence parts={block.parts} testId={testId} />
+      <DrawerContent dataTestId={`${testId}-content`}>
+        <PanelForm
+          block={block}
+          entities={entities}
+          span={span}
+          title={title}
+          onChange={onChange}
+          onSpanChange={onSpanChange}
+          onTitleChange={onTitleChange}
+          testId={testId}
+        />
+      </DrawerContent>
+      <BlockPanelFooter
+        canDuplicate={canDuplicate}
+        blockedReason={DUPLICATE_BLOCKED_TEXT}
+        onDuplicate={onDuplicate}
+        onRemove={onRemove}
         testId={testId}
       />
-    </Box>
+    </>
   );
 }
 
@@ -287,8 +292,20 @@ interface BlockEditorPanelProps {
   /** The selected block's query, or `null` for the empty state. */
   spec: ReportSpecWire | null;
   span: number;
+  /** The block's title override. Empty string means "use the auto description". */
+  title: string;
   onChange: (spec: ReportSpecWire) => void;
   onSpanChange: (span: number) => void;
+  onTitleChange: (title: string) => void;
+  onDuplicate: () => void;
+  /** False at REPORT_MAX_BLOCKS — the control stays visible and explains why. */
+  canDuplicate: boolean;
+  /**
+   * Ask the canvas to remove the selected block. It owns the confirmation, so
+   * this is a second entry point to the block's own 🗑 and not a second
+   * behaviour — see `BlockPanelFooter`.
+   */
+  onRemove: () => void;
   testId: string;
 }
 
@@ -298,13 +315,19 @@ export function BlockEditorPanel({
   entities,
   spec,
   span,
+  title,
   onChange,
   onSpanChange,
+  onTitleChange,
+  onDuplicate,
+  canDuplicate,
+  onRemove,
   testId,
 }: BlockEditorPanelProps): JSX.Element {
   const tier = usePanelTier();
   const asSheet = tier === "sheet";
   const layout = TIER_LAYOUT[tier];
+  const block = useSelectedBlock(spec, entities);
 
   // The canvas gives up exactly the panel's width — and only where there is
   // width worth giving up, which is what makes the other two tiers overlays.
@@ -342,23 +365,22 @@ export function BlockEditorPanel({
           dataTestId={`${testId}-header`}
         >
           <Text variant="heading" size="sm" as="h2">
-            Bloco
+            {block === null ? IDLE_HEADING : EDITING_HEADING}
           </Text>
         </DrawerHeader>
-        <DrawerContent dataTestId={`${testId}-content`}>
-          {spec === null ? (
-            <PanelEmptyState testId={testId} />
-          ) : (
-            <PanelForm
-              seed={spec}
-              entities={entities}
-              span={span}
-              onChange={onChange}
-              onSpanChange={onSpanChange}
-              testId={testId}
-            />
-          )}
-        </DrawerContent>
+        <PanelBody
+          block={block}
+          entities={entities}
+          span={span}
+          title={title}
+          canDuplicate={canDuplicate}
+          onChange={onChange}
+          onSpanChange={onSpanChange}
+          onTitleChange={onTitleChange}
+          onDuplicate={onDuplicate}
+          onRemove={onRemove}
+          testId={testId}
+        />
       </Drawer>
     </Box>
   );

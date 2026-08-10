@@ -50,13 +50,26 @@ function parseSaveBody(body: unknown): SaveBody {
 function lifecycleFor(
   body: SaveBody,
   current: SavedReportRecord | null,
-): Pick<SavedReportInput, 'status' | 'visibility' | 'visibilityRoles'> {
+): Pick<SavedReportInput, 'status' | 'visibility' | 'visibilityRoles' | 'defaultRange'> {
   return {
     status: body.status ?? current?.status ?? 'published',
     visibility: body.visibility ?? current?.visibility ?? 'tenant',
     visibilityRoles:
       body.visibilityRoles ?? (current ? visibilityRoleIds(current.visibilityRoles) : []),
+    defaultRange: defaultRangeFor(body, current),
   };
+}
+
+/**
+ * The period the saved report opens on, after a write.
+ *
+ * `undefined` keeps what is stored and an explicit `null` clears it — the same
+ * omitted-keeps rule the lifecycle fields follow, which is what lets an MCP
+ * author patch a spec without resetting the period the report opens on.
+ */
+function defaultRangeFor(body: SaveBody, current: SavedReportRecord | null): string | null {
+  if (body.defaultRange !== undefined) return body.defaultRange;
+  return current?.defaultRange ?? null;
 }
 
 function toInput(body: SaveBody, current: SavedReportRecord | null): SavedReportInput {
@@ -82,7 +95,7 @@ function createRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
         // that could name its own `createdBy` could author as someone else,
         // and authorship is what `visibility: 'private'` is judged on.
         const record = await store.create(actor.clientId, toInput(input, null), actor.userId);
-        return ok(toSummary(record));
+        return ok(toSummary(record, actor.userId));
       } catch (error) {
         if (isDuplicateName(error)) return fail(409, DUPLICATE_NAME);
         return foldSpecError(error);
@@ -105,7 +118,7 @@ function updateRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
         const current = await store.get(actor.clientId, id);
         if (!current) return fail(404, NOT_FOUND);
         const record = await store.update(actor.clientId, id, toInput(input, current));
-        return record ? ok(toSummary(record)) : fail(404, NOT_FOUND);
+        return record ? ok(toSummary(record, actor.userId)) : fail(404, NOT_FOUND);
       } catch (error) {
         if (isDuplicateName(error)) return fail(409, DUPLICATE_NAME);
         return foldSpecError(error);

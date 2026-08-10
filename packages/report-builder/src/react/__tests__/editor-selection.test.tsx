@@ -75,8 +75,10 @@ const SUMMARY: SavedReportSummary = {
   type: 'dashboard',
   entity: 'orders',
   entities: ['orders'],
+  blockCount: 2,
   status: 'published',
   visibility: 'tenant',
+  ownedByMe: true,
   updatedAt: '2026-02-01T12:00:00.000Z',
 };
 
@@ -396,7 +398,15 @@ describe('editor canvas — deselecting leaves the panel in its empty state', ()
       expect(emptyPrompts().length).toBe(1);
     });
     // "And the panel does not select a neighbouring block on my behalf."
-    expect(selectedTitles()).toEqual([]);
+    //
+    // Waited for, because the confirmation now belongs to the CANVAS rather
+    // than to the block it removes (GAP 6 — the panel's *Remover* opens the
+    // same dialog). It therefore survives the removal and closes on MUI's exit
+    // transition, during which the canvas behind it is still `aria-hidden` and
+    // has no queryable roles at all.
+    await waitFor(() => {
+      expect(selectedTitles()).toEqual([]);
+    });
   });
 });
 

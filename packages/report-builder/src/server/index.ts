@@ -15,10 +15,13 @@ export {
  * math exists to prevent.
  */
 export {
+  REPORT_DEFAULT_RANGES,
+  resolveDefaultRange,
   resolveReportRange,
   startOfDay,
   startOfNextDay,
   toReportRangeView,
+  type ReportDefaultRange,
   type ReportRangeInput,
   type ReportRangePreset,
   type ReportRangeView,
