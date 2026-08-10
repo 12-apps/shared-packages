@@ -83,7 +83,7 @@ export function DefaultRangeField({
         options={DEFAULT_RANGE_OPTIONS}
         value={value}
         onChange={(event) => onChange(asDefaultRange(String(event.target.value)))}
-        size="small"
+        size="sm"
         data-testid={testId}
       />
     </Field>
