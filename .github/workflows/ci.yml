@@ -746,6 +746,17 @@ jobs:
           # id-token for trusted publishing.
           npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
           node scripts/publish.mjs
+      # Tagging and publishing are separate steps above, so a run that dies
+      # between them leaves a tag for a version npm never received — and that
+      # state is silent AND self-perpetuating: semantic-release sees its own tag
+      # and cuts nothing forever after, while both steps keep reporting success.
+      #
+      # LAST, and deliberately not first: a stuck package must report itself
+      # without holding every healthy package's release hostage. The publishes
+      # above have already happened by the time this fails.
+      - name: Verify every release tag reached the registry
+        shell: bash
+        run: node scripts/verify-released.mjs
 
   # What this PR's CI has cost, as one comment that is edited in place on every
   # push rather than a new comment per run.
