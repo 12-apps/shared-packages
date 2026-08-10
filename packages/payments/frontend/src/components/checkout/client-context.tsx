@@ -26,7 +26,7 @@ import {
   pollOrderStatus,
   refreshCardPublicKey,
 } from "./client";
-import type { CheckoutClient } from "./transport";
+import { createCheckoutClient, type CheckoutClient } from "./transport";
 
 /** The unbound client: `/api/checkout` on the ambient `fetch`. */
 const DEFAULT_CLIENT: CheckoutClient = {
@@ -35,6 +35,11 @@ const DEFAULT_CLIENT: CheckoutClient = {
   charge: (input) => chargeCard(input),
   chargeWallet: (input) => chargeWallet(input),
   listInstruments: (tenantSlug) => listSavedCards(tenantSlug),
+  // The vault pair (FUT-183) has no `client.ts` free function to bind — it is
+  // newer than that module. Built lazily from the default transport instead,
+  // which is the same wire: `/api/checkout`, ambient `fetch` resolved per call.
+  beginVault: () => createCheckoutClient().beginVault(),
+  completeVault: (input) => createCheckoutClient().completeVault(input),
   refreshBrowserKey: (input) => refreshCardPublicKey(input),
 };
 

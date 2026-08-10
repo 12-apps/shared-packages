@@ -26,16 +26,19 @@
  * is also what keeps a story about `tokenization: 'REDIRECT'` a story about the
  * DECLARATION rather than about one vendor.
  */
-import type {
-  ChargeInput,
-  ChargeSnapshot,
-  CheckoutCopy,
-  ClientTokenization,
-  CustomerFieldSpec,
-  MerchantRef,
-  Money,
-  PaymentMethodKind,
-  PaymentProviderAdapter,
+import {
+  ProviderRequestError,
+  type ChargeInput,
+  type ChargeSnapshot,
+  type CheckoutCopy,
+  type ClientTokenization,
+  type CustomerFieldSpec,
+  type MerchantRef,
+  type Money,
+  type PaymentMethodKind,
+  type PaymentProviderAdapter,
+  type VaultBeginInput,
+  type VaultCompleteInput,
 } from "@12-apps/payments-backend";
 
 /**
@@ -117,6 +120,65 @@ export interface StoryProvider {
    * provider's own (fictional) name as the gateway id.
    */
   googlePayMerchantId?: string;
+  /**
+   * The provider can VAULT a card outside a purchase (FUT-478/FUT-183) —
+   * declares the adapter's `vault` seam, so `/cards/begin` + `/cards/complete`
+   * answer for real. Omitted ⇒ no seam, which is exactly the store whose buyer
+   * reads "not enabled here".
+   */
+  vaultable?: boolean;
+  /** The provider refuses the card at vault time — a validation 400. */
+  vaultDeclines?: boolean;
+}
+
+/** Everything the vault seam was handed — the stories' assertion surface. */
+export interface VaultSeamLog {
+  begin: VaultBeginInput[];
+  complete: VaultCompleteInput[];
+}
+
+/**
+ * The vendor-free vault seam a `vaultable` story provider declares. Mirrors
+ * the shape a sessionless PUBLIC_KEY provider answers: `begin` merely equips
+ * the browser (key when the connection holds one, a session id to echo), and
+ * `complete` mints the instrument the host must store. `vaultDeclines` throws
+ * the validation 400 the host's `mapProviderError` words with a field-level
+ * reason — the same seam a charge decline is worded through.
+ */
+function vaultSeam(
+  spec: StoryProvider,
+  seam: VaultSeamLog,
+): NonNullable<PaymentProviderAdapter["vault"]> {
+  return {
+    begin: async (input) => {
+      seam.begin.push(input);
+      return {
+        provider: spec.name,
+        tokenization: spec.tokenization ?? "PUBLIC_KEY",
+        publicKey: spec.publicKey ?? undefined,
+        customerRef: "cus_story_7",
+        sessionId: `vs_${spec.name}_1`,
+      };
+    },
+    complete: async (input) => {
+      seam.complete.push(input);
+      if (spec.vaultDeclines) {
+        throw new ProviderRequestError(spec.name, "card_number is not a valid card", {
+          httpStatus: 400,
+          retriable: false,
+        });
+      }
+      return {
+        provider: spec.name,
+        instrumentId: `vault_tok_${input.reference}`,
+        customerRef: "cus_story_7",
+        brand: "visa",
+        last4: "4242",
+        expMonth: 12,
+        expYear: 2031,
+      };
+    },
+  };
 }
 
 /** The PIX payload a stub provider hands back — a payload, never an image. */
@@ -130,11 +192,17 @@ function pixPayload(reference: string): { qrText: string; expiresAt: string } {
 }
 
 /** A local, vendor-free adapter that behaves as the story declared. */
-export function storyAdapter(spec: StoryProvider, seen: ChargeInput[]): PaymentProviderAdapter {
+export function storyAdapter(
+  spec: StoryProvider,
+  seen: ChargeInput[],
+  /** Records what the vault seam was shown; only read for `vaultable` specs. */
+  vaultLog: VaultSeamLog = { begin: [], complete: [] },
+): PaymentProviderAdapter {
   const tokenization = spec.tokenization ?? "PUBLIC_KEY";
   return {
     name: spec.name,
     displayName: spec.name,
+    ...(spec.vaultable ? { vault: vaultSeam(spec, vaultLog) } : {}),
     capabilities: {
       methods: spec.methods ?? ["PIX", "CARD"],
       // Declared, not defaulted: the published chain carries the claim and the

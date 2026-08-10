@@ -78,8 +78,11 @@ export {
 export {
   createCheckoutClient,
   DEFAULT_CHECKOUT_BASE_URL,
+  type BuyerVaultSession,
   type CheckoutClient,
   type CheckoutTransport,
+  type CompleteVaultInput,
+  type VaultedCardDisplay,
 } from './components/checkout/transport';
 export { type CheckoutHostPorts } from './components/checkout/use-checkout-controller';
 export { PaymentsUnavailable } from './components/checkout/payments-unavailable';

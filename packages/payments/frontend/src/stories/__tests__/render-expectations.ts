@@ -182,6 +182,42 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   "Screens/SavedCardsEmpty": { text: ["(nada acima desta linha — é o estado vazio)"] },
   "Screens/EmptyCartScreen": { testIds: ["checkout-empty"], text: ["Seu carrinho está vazio."] },
 
+  // ----------------------------------------------------------------- Vault
+  // The add-card form at rest — `begin` answered through the real mount, so
+  // the marker is the live form, never the preparing spinner.
+  "Vault/AddCardForm": {
+    testIds: ["add-card", "card-number", "card-holder", "add-card-save"],
+    text: ["Adicionar cartão", "Salvar cartão"],
+  },
+  "Vault/AddCardSaving": {
+    testIds: ["add-card", "add-card-save"],
+    text: ["salvando: a chamada /cards/complete está em voo"],
+  },
+  "Vault/AddCardSaved": {
+    testIds: ["add-card-saved"],
+    text: ["Cartão salvo", "visa •••• 4242", "Validade 12/2031"],
+  },
+  "Vault/AddCardDeclined": {
+    testIds: ["add-card", "add-card-error", "card-number"],
+    text: ["O cartão foi recusado. Confira o número e tente novamente."],
+  },
+  // The real mount's VAULT_NOT_ENABLED 404, worded by the factory's own copy —
+  // and no form: a screen that cannot save must not collect a card.
+  "Vault/AddCardUnavailable": {
+    testIds: ["add-card-unavailable"],
+    text: ["Esta loja não aceita salvar cartões no momento."],
+    absentTestIds: ["add-card-save", "card-number"],
+  },
+  "Vault/ManageCardsEmpty": {
+    testIds: ["manage-cards", "manage-cards-empty", "manage-cards-add"],
+    text: ["Meus cartões", "Você ainda não tem cartões salvos."],
+  },
+  "Vault/ManageCardsPopulated": {
+    testIds: ["manage-cards", "manage-cards-list", "manage-cards-item-card_1", "manage-cards-add"],
+    text: ["visa •••• 4242", "mastercard •••• 0005", "Validade 04/2030"],
+    absentTestIds: ["manage-cards-empty"],
+  },
+
   // ---------------------------------------------------------------- Hosted
   "Hosted/Interstitial": {
     testIds: ["checkout-hosted-handoff", "checkout-hosted-link"],

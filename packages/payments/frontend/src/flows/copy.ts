@@ -3,10 +3,11 @@
  *
  * Scope is deliberately narrow and stated rather than implied: this covers the
  * copy the FACTORY owns — the unavailable screen's two remedies, the hosted
- * handover and its fallback link, the empty cart, and the buyer form's continue
- * action. The screens that already carried their own product copy before this
- * ticket (PIX, card, status) keep it; moving all of it here in the same change
- * that introduces the factory would be a copy rewrite disguised as an API.
+ * handover and its fallback link, the empty cart, the buyer form's continue
+ * action, and the add-card / manage-cards screens (FUT-183). The screens that
+ * already carried their own product copy before this ticket (PIX, card, status)
+ * keep it; moving all of it here in the same change that introduces the factory
+ * would be a copy rewrite disguised as an API.
  *
  * Every default below is today's pt-BR, verbatim — a host that passes no `copy`
  * reads exactly what a buyer reads now.
@@ -34,6 +35,19 @@ export interface CheckoutCopyFE {
   emptyCartAction: string;
   /** The Dados step's primary action. */
   continueAction: string;
+  /** The add-card screen (FUT-183): putting a card on file outside a purchase. */
+  addCardTitle: string;
+  addCardAction: string;
+  addCardPreparing: string;
+  addCardSavedTitle: string;
+  addCardSavedBody: string;
+  addCardFailedTitle: string;
+  /** The host wired no vaulting, or the provider cannot vault — the buyer can fix neither. */
+  addCardUnavailable: string;
+  /** The manage-cards screen: the buyer's cards on file, and the door to add one. */
+  manageCardsTitle: string;
+  manageCardsEmpty: string;
+  manageCardsAdd: string;
 }
 
 export const DEFAULT_CHECKOUT_COPY_FE: CheckoutCopyFE = {
@@ -54,4 +68,14 @@ export const DEFAULT_CHECKOUT_COPY_FE: CheckoutCopyFE = {
   emptyCartTitle: "Seu carrinho está vazio.",
   emptyCartAction: "Ver cardápio",
   continueAction: "Continuar",
+  addCardTitle: "Adicionar cartão",
+  addCardAction: "Salvar cartão",
+  addCardPreparing: "Preparando o formulário…",
+  addCardSavedTitle: "Cartão salvo",
+  addCardSavedBody: "Você poderá usá-lo nas próximas compras.",
+  addCardFailedTitle: "Não foi possível salvar o cartão",
+  addCardUnavailable: "Esta loja não aceita salvar cartões no momento.",
+  manageCardsTitle: "Meus cartões",
+  manageCardsEmpty: "Você ainda não tem cartões salvos.",
+  manageCardsAdd: "Adicionar cartão",
 };

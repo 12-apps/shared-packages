@@ -32,7 +32,9 @@ import {
   createPaymentFlowsBE,
   createPaymentsGateway,
   defineProviders,
+  ProviderRequestError,
   type ChargeInput,
+  type CheckoutErrorBody,
   type MemoryChargeStore,
   type MemoryCredentialStore,
   type MemoryProviderConfigStore,
@@ -46,13 +48,15 @@ import {
   storyAdapter,
   storyCopy,
   type StoryProvider,
+  type VaultSeamLog,
 } from "./store-adapter";
 
 /** The whole store a story is set in. */
 export interface StorySpec {
   chain?: StoryProvider[];
-  /** Instruments the buyer already has vaulted here. */
-  instruments?: { id: string; last4: string; brand?: string }[];
+  /** Instruments the buyer already has vaulted here. Expiry is optional
+   * because it is display-only metadata some providers never share. */
+  instruments?: { id: string; last4: string; brand?: string; expMonth?: number; expYear?: number }[];
   /**
    * Vault ids this caller OWNS but this store cannot charge (FUT-697) — the
    * "not usable here" case, which must not read as a decline.
@@ -85,6 +89,8 @@ export interface StoryWorld {
   seen: ChargeInput[];
   /** Every instrument the mount asked to vault. */
   vaulted: { provider: string; token: string; display: unknown }[];
+  /** What the adapters' VAULT seam was shown (FUT-183) — begin and complete. */
+  vaultCalls: VaultSeamLog;
   /** `POST /` — raise the payable and its first charge, over the real wire. */
   createPayable: (body: {
     method: PaymentMethodKind;
@@ -194,6 +200,8 @@ function instrumentsPort(
         id: card.id,
         last4: card.last4,
         brand: card.brand ?? "visa",
+        ...(card.expMonth ? { expMonth: card.expMonth } : {}),
+        ...(card.expYear ? { expYear: card.expYear } : {}),
       })),
     resolve: async (_caller: unknown, _scope: unknown, instrumentId: string) => {
       if (spec.unusableInstruments?.includes(instrumentId)) return { token: null, owned: true };
@@ -207,6 +215,37 @@ function instrumentsPort(
 }
 
 /**
+ * The buyer-vault half of the mount's config (FUT-478/FUT-183).
+ *
+ * `vault` answers the OWNERSHIP facts from the caller — a request body can
+ * name neither. Always wired here, because `instruments.save` is; the "not
+ * enabled" stories come from a provider that declares no vault seam instead.
+ *
+ * `mapProviderError` is the HOST's wording of one vendor's error vocabulary
+ * (the same seam a charge decline is worded through): a vault-time validation
+ * 400 becomes the field-level pt-BR reason the add-card screen shows.
+ */
+function vaultHostConfig(spec: StorySpec): {
+  vault: () => Promise<{ reference: string; customer: { name?: string; email?: string } }>;
+  mapProviderError: (error: unknown) => CheckoutErrorBody | null;
+} {
+  return {
+    vault: async () => ({
+      reference: "vault_buyer-1",
+      customer: spec.customer ?? { name: "Ana Compradora", email: "ana@exemplo.com" },
+    }),
+    mapProviderError: (error) =>
+      error instanceof ProviderRequestError && error.options.httpStatus === 400
+        ? {
+            code: "CARD_VALIDATION_REFUSED",
+            message: "O cartão foi recusado. Confira o número e tente novamente.",
+            field: "cardNumber",
+          }
+        : null,
+  };
+}
+
+/**
  * Build the store. Everything below the `fetch` is real: the gateway, the
  * failover walk, the reference convention, the charge-identity guards, the
  * buyer-field gate and the copy table are the shipped ones.
@@ -215,11 +254,14 @@ export function createStoryStore(spec: StorySpec = {}): StoryWorld {
   const chain = spec.chain ?? [{ name: "aurora", stub: true, publicKey: null }];
   const seen: ChargeInput[] = [];
   const vaulted: StoryWorld["vaulted"] = [];
+  const vaultCalls: VaultSeamLog = { begin: [], complete: [] };
   const credentials = createMemoryCredentialStore();
   const charges = createMemoryChargeStore();
   const gateway = createPaymentsGateway({
     providers: defineProviders(
-      Object.fromEntries(chain.map((entry) => [entry.name, storyAdapter(entry, seen)])),
+      Object.fromEntries(
+        chain.map((entry) => [entry.name, storyAdapter(entry, seen, vaultCalls)]),
+      ),
     ),
     credentials,
     charges,
@@ -258,6 +300,7 @@ export function createStoryStore(spec: StorySpec = {}): StoryWorld {
     payables: payablesPort(world, charges),
     correlation: correlationPort(world),
     instruments: instrumentsPort(spec, vaulted),
+    ...vaultHostConfig(spec),
     copy: storyCopy,
     logger: { warn: () => undefined, error: () => undefined, providerFailure: () => undefined },
   });
@@ -278,6 +321,7 @@ export function createStoryStore(spec: StorySpec = {}): StoryWorld {
     fetchImpl: call as typeof fetch,
     seen,
     vaulted,
+    vaultCalls,
     createPayable: (body) =>
       call("/api/checkout", { method: "POST", body: JSON.stringify(body) }),
   };

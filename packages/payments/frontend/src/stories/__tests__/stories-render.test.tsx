@@ -41,6 +41,7 @@ import * as providerScreenStories from "../ProviderScreens.stories";
 import * as screenStories from "../Screens.stories";
 import * as settingsStories from "../Settings.stories";
 import * as setupGuideStories from "../SetupGuide.stories";
+import * as vaultStories from "../Vault.stories";
 import * as walletStories from "../Wallets.stories";
 import { EXPECTATIONS, type RenderExpectation } from "./render-expectations";
 
@@ -76,6 +77,7 @@ function moduleEntries(): [string, Record<string, unknown>][] {
   return [
     ["Checkout", checkoutStories],
     ["Screens", screenStories],
+    ["Vault", vaultStories],
     ["Hosted", hostedStories],
     ["Composition", compositionStories],
     ["ProviderScreens", providerScreenStories],
