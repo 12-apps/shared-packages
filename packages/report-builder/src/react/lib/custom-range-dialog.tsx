@@ -14,21 +14,32 @@
  * applied — nothing on the page updates while you pick, and there is nothing to
  * read underneath. `report-settings-dialog` is modal for the same reason.
  *
- * `Calendar` in range mode is the design system's own range input
- * (`@12-apps/ui/form/Calendar`, `selectionMode="range"`), so the hover preview,
- * the keyboard grid and the backwards selection all come with it rather than
- * being re-invented here.
+ * WHAT IS HERE AND WHAT IS NOT: the picking is `DateRangePicker`
+ * (`@12-apps/ui/form/DateRangePicker`) — calendar, quick ranges and the two
+ * typed `dd/mm/aaaa` fields, all three over one range. This file supplies only
+ * what the design system must not know: the tenant's clock, the server's
+ * ceiling, the Portuguese copy, and the window the picker opens on. It reads
+ * back a range; deciding how the reports surface EXPRESSES that range (a
+ * rolling preset, or a custom window) belongs to `range-toggle.tsx`.
  */
-import { useEffect, useState, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 
 import { Modal, ModalContent } from "@12-apps/ui/feedback/Modal";
 import { Button } from "@12-apps/ui/form/Button";
-import { Calendar, type DateRange } from "@12-apps/ui/form/Calendar";
-import { Box } from "@12-apps/ui/mui/Box";
+import {
+  createQuickRanges,
+  DateRangePicker,
+  resolveDayRange,
+  type DateRangeChangeMeta,
+  type DateRangeDraft,
+  type DateRangePickerMessages,
+  type QuickRange,
+} from "@12-apps/ui/form/DateRangePicker";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { REPORT_MAX_RANGE_DAYS } from "../../server/range";
+import { DEFAULT_REPORT_TIME_ZONE } from "../../time";
 
 /** A custom period, as two INCLUSIVE calendar days on the tenant's clock. */
 export interface CustomRangeWindow {
@@ -39,60 +50,66 @@ export interface CustomRangeWindow {
 }
 
 /**
- * `AAAA-MM-DD` → a LOCAL `Date`, which is the only kind `Calendar` deals in.
+ * The quick column, in the reader's words.
  *
- * Deliberately not `new Date(day)` / `Date.parse(day)`: the spec reads a bare
- * `AAAA-MM-DD` as UTC midnight, so in São Paulo it lands at 21:00 on the day
- * BEFORE and every date in the picker is off by one. Passing the three parts
- * separately builds local midnight, which round-trips exactly through
- * {@link toDayString}.
+ * Four of these are deliberately word-for-word the period pills
+ * (`REPORT_RANGE_LABELS`): choosing `Hoje` here has to mean the same thing as
+ * choosing `Hoje` out there, and the picker reports WHICH entry was chosen so
+ * the caller can apply the real preset rather than an identical-looking custom
+ * window. The other five are periods the toggle does not offer at all, which is
+ * most of the reason this column exists.
  */
-function toLocalDate(day: string): Date | null {
-  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
-  if (!parts) return null;
-  const date = new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
+const QUICK_RANGES: QuickRange[] = createQuickRanges({
+  today: "Hoje",
+  yesterday: "Ontem",
+  "this-week": "Esta semana",
+  "last-7-days": "7 dias",
+  "this-month": "Este mês",
+  "last-30-days": "30 dias",
+  "this-quarter": "Este trimestre",
+  "this-year": "Este ano",
+  "last-365-days": "365 dias",
+});
 
-/** A LOCAL `Date` → `AAAA-MM-DD`, read off the same local getters. */
-function toDayString(date: Date): string {
-  const pad = (value: number): string => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
+/**
+ * The refusals, in the SAME words the server uses (`server/range.ts`).
+ *
+ * A window this refuses is one the server would refuse too, so a reader who
+ * ignores the message and one who reaches the API by hand read the same
+ * sentence — rather than one of them meeting it as "não foi possível carregar
+ * o relatório".
+ */
+const MESSAGES: Partial<DateRangePickerMessages> = {
+  from: "Data inicial",
+  to: "Data final",
+  quickRanges: "Períodos rápidos",
+  incomplete: "Informe as datas inicial e final do período.",
+  reversed: "A data final deve ser igual ou posterior à inicial.",
+  overMax: ({ maxRangeDays }) => `O período não pode exceder ${maxRangeDays} dias.`,
+};
 
-/** The seed window as `Calendar`'s own value, or an empty range when unusable. */
-function seedRange(seed: CustomRangeWindow | null): DateRange {
-  if (!seed) return { start: null, end: null };
-  return { start: toLocalDate(seed.from), end: toLocalDate(seed.to) };
-}
-
-/** What is picked so far, in words — the sentence the Aplicar button acts on. */
-function draftLabel(draft: DateRange): string {
-  const day = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-  if (!draft.start) return "Escolha a data inicial.";
-  if (!draft.end) return `${day.format(draft.start)} – escolha a data final.`;
-  return `${day.format(draft.start)} – ${day.format(draft.end)}`;
-}
-
-/** The picked window, or null while only one end has been chosen. */
-function draftWindow(draft: DateRange): CustomRangeWindow | null {
-  if (!draft.start || !draft.end) return null;
-  return { from: toDayString(draft.start), to: toDayString(draft.end) };
+/** The seed as the picker's own value; an empty draft when there is none. */
+function seedDraft(seed: CustomRangeWindow | null): DateRangeDraft {
+  return seed ? { from: seed.from, to: seed.to } : { from: null, to: null };
 }
 
 /**
  * Cancel and confirm. Its own component so the dialog stays a body: `Aplicar`
- * carries the one rule worth reading twice — half a range is not a period.
+ * carries the one rule worth reading twice — half a range is not a period, and
+ * neither is a reversed or over-long one.
  */
 function PickerFooter({
   picked,
+  quickRangeId,
   onApply,
   onClose,
   dataTestId,
 }: {
-  /** The window so far, or null while only one end has been chosen. */
+  /** The window so far, or null while it is not one the server would accept. */
   picked: CustomRangeWindow | null;
-  onApply: (window: CustomRangeWindow) => void;
+  /** Which quick entry produced it, when one did. */
+  quickRangeId: string | undefined;
+  onApply: (window: CustomRangeWindow, quickRangeId?: string) => void;
   onClose: () => void;
   dataTestId: string;
 }): JSX.Element {
@@ -105,10 +122,11 @@ function PickerFooter({
         variant="solid"
         size="sm"
         // Disabled rather than hidden, so the way out of the dialog does not
-        // move under the pointer as the reader picks.
+        // move under the pointer as the reader picks. The picker has already
+        // said WHY it is disabled, in the line above these buttons.
         disabled={picked === null}
         onClick={() => {
-          if (picked) onApply(picked);
+          if (picked) onApply(picked, quickRangeId);
         }}
         dataTestId={`${dataTestId}-apply`}
       >
@@ -118,13 +136,50 @@ function PickerFooter({
   );
 }
 
-export function CustomRangeDialog({
-  open,
-  seed,
-  onApply,
-  onClose,
-  dataTestId,
-}: {
+/**
+ * The draft the dialog is holding, and which quick entry last set it.
+ *
+ * Its own hook so the component below stays a body: the re-seeding rule is the
+ * fiddly part and it is easier to read on its own.
+ */
+function usePickerDraft(
+  open: boolean,
+  seed: CustomRangeWindow | null,
+): {
+  draft: DateRangeDraft;
+  quickRangeId: string | undefined;
+  change: (next: DateRangeDraft, meta: DateRangeChangeMeta) => void;
+} {
+  const [draft, setDraft] = useState<DateRangeDraft>(() => seedDraft(seed));
+  const [quickRangeId, setQuickRangeId] = useState<string | undefined>(undefined);
+  const wasOpen = useRef(false);
+
+  // Re-seed on the transition INTO open, not on every render while open: the
+  // draft is scratch state, a cancelled pick must not be what the next open
+  // starts from, and re-seeding on every render would throw away a half-picked
+  // range each time the screen behind the dialog re-rendered.
+  useEffect(() => {
+    if (open && !wasOpen.current) {
+      setDraft(seedDraft(seed));
+      setQuickRangeId(undefined);
+    }
+    wasOpen.current = open;
+  }, [open, seed]);
+
+  return {
+    draft,
+    quickRangeId,
+    change: (next, meta) => {
+      setDraft(next);
+      // Only a quick pick carries an id, and any later edit drops it: a window
+      // that started as "Hoje" and had one end retyped is a custom window
+      // again, whatever it happens to equal.
+      setQuickRangeId(meta.source === "quick" ? meta.quickRangeId : undefined);
+    },
+  };
+}
+
+interface CustomRangeDialogProps {
   open: boolean;
   /**
    * The window the picker OPENS on: the applied custom range, or the window the
@@ -133,59 +188,64 @@ export function CustomRangeDialog({
    * starts at nothing makes the reader page back to find them again.
    */
   seed: CustomRangeWindow | null;
-  onApply: (window: CustomRangeWindow) => void;
+  /** The chosen window, and the quick entry that produced it if one did. */
+  onApply: (window: CustomRangeWindow, quickRangeId?: string) => void;
   onClose: () => void;
   dataTestId: string;
-}): JSX.Element {
-  const [draft, setDraft] = useState<DateRange>(() => seedRange(seed));
+  /**
+   * The clock "hoje" is read on. Defaults to the same zone the report engine
+   * falls back to when neither the spec nor the host names one, so the picker
+   * and the numbers it produces agree about which day it is.
+   */
+  timeZone?: string;
+}
 
-  // Re-seed on every OPEN, not on every render: the draft is scratch state, and
-  // a cancelled pick must not be what the next open starts from.
-  useEffect(() => {
-    if (open) setDraft(seedRange(seed));
-  }, [open, seed]);
+export function CustomRangeDialog({
+  open,
+  seed,
+  onApply,
+  onClose,
+  dataTestId,
+  timeZone = DEFAULT_REPORT_TIME_ZONE,
+}: CustomRangeDialogProps): JSX.Element {
+  const picker = usePickerDraft(open, seed);
+  const status = resolveDayRange(picker.draft, REPORT_MAX_RANGE_DAYS);
 
   return (
-    <Modal open={open} onClose={onClose} size="lg" dataTestId={dataTestId}>
+    <Modal open={open} onClose={onClose} size="md" dataTestId={dataTestId}>
       <ModalContent dataTestId={`${dataTestId}-content`}>
         <Stack spacing={2}>
           <Text variant="heading" size="lg" weight="semibold" as="h2">
             Período personalizado
           </Text>
-          {/*
-            TWO months, side by side. A range that crosses a month boundary is
-            the normal case here — "the last three weeks", "since the 28th" —
-            and with one month visible the reader has to page forward, losing
-            sight of the end they just picked. `Calendar` already defaults to 2
-            in range mode; this dialog was overriding it back down to 1, which
-            is why it rendered as a single month.
-
-            The modal grows with it. At a width where two months genuinely do
-            not fit, the calendar scrolls sideways inside this box rather than
-            the page scrolling or the grid collapsing.
-          */}
-          <Box sx={{ display: "flex", justifyContent: "center", overflowX: "auto" }}>
-            <Calendar
-              selectionMode="range"
-              locale="pt-BR"
-              range={draft}
-              // BOTH callbacks, and `onIntermediateRangeChange` is the one that
-              // does the work: `onRangeChange` fires only on the click that
-              // CLOSES a range, so a picker wired to it alone would not repaint
-              // after the first click and the reader would see nothing happen.
-              onIntermediateRangeChange={setDraft}
-              onRangeChange={setDraft}
-              // The server's own ceiling, so an over-long window is refused by
-              // the control that offers it rather than by a 400 the reader
-              // meets as "não foi possível carregar o relatório".
-              maxRangeLength={REPORT_MAX_RANGE_DAYS}
-            />
-          </Box>
-          <Text variant="body" size="sm" color="secondary" data-testid={`${dataTestId}-summary`}>
-            {draftLabel(draft)}
-          </Text>
+          <DateRangePicker
+            value={picker.draft}
+            onChange={picker.change}
+            timeZone={timeZone}
+            // The server's own ceiling, so an over-long window is refused by
+            // the control that offers it rather than by a 400 the reader meets
+            // as "não foi possível carregar o relatório".
+            maxRangeDays={REPORT_MAX_RANGE_DAYS}
+            locale="pt-BR"
+            // TWO months, which is this component's own default in range mode
+            // and what this dialog was asked for. A range crossing a month
+            // boundary — "the last three weeks", "since the 28th" — is the
+            // normal case here, and with one month visible the reader has to
+            // page forward and loses sight of the end they just picked.
+            //
+            // It does mean two cells answer to `calendar-date-<day>`, because
+            // `Calendar` numbers them by day of month. That is handled where it
+            // belongs: the specs scope the day to `calendar-month-0`. Rendering
+            // less than the control should to keep a selector short would be
+            // the tail wagging the dog.
+            numberOfMonths={2}
+            quickRanges={QUICK_RANGES}
+            messages={MESSAGES}
+            dataTestId="report-range-picker"
+          />
           <PickerFooter
-            picked={draftWindow(draft)}
+            picked={status.ok ? status.window : null}
+            quickRangeId={picker.quickRangeId}
             onApply={onApply}
             onClose={onClose}
             dataTestId={dataTestId}

@@ -84,6 +84,7 @@
     "./form/CodeEditor": "./src/components/form/CodeEditor/index.ts",
     "./form/Command": "./src/components/form/Command/index.ts",
     "./form/CreatableSelect": "./src/components/form/CreatableSelect/index.ts",
+    "./form/DateRangePicker": "./src/components/form/DateRangePicker/index.ts",
     "./form/Form": "./src/components/form/Form/index.ts",
     "./form/HeaderButton": "./src/components/form/HeaderButton/index.ts",
     "./form/total-form": "./src/components/form/total-form/index.ts",
