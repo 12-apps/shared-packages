@@ -24,6 +24,25 @@ import type { CompiledDimension } from './types';
  * dimension has nowhere to go. And a split ALREADY spends the series axis, so
  * a second measure beside it is a three-way breakdown with two axes to draw it
  * on — and the two measures would have to share one number format besides.
+ *
+ * ONE RULE IS DELIBERATELY ABSENT: the ordered-axis rule (FUT-755) — a line or
+ * an area needs an axis whose values have an order, so a line over payment
+ * methods draws a slope between two things with nothing in between.
+ * `compatibility.ts` enforces that for the PICKER; this file does NOT enforce
+ * it for the compiler, and the asymmetry is the point.
+ *
+ * Saved reports already exist with exactly that shape. Throwing here would
+ * replace those blocks with an error message for their owners — a worse
+ * outcome than the chart they have, because the DATA is right and only the
+ * join between points is a fiction. So `render.ts` degrades such a block to
+ * BARS instead (same numbers, still legible, no error), and the picker refuses
+ * the shape the next time the author opens the block. A correctness fix that
+ * breaks stored data is not an improvement; one that quietly redraws it
+ * correctly is.
+ *
+ * Keeping the compiler permissive also keeps the matrix ⟺ compiler test
+ * honest: it still proves everything the matrix OFFERS compiles, and pins this
+ * as the single rule on which the two deliberately differ.
  */
 export function assertChartShape(spec: ReportSpec, dimensions: CompiledDimension[]): void {
   if (spec.presentation.kind !== 'chart') return;

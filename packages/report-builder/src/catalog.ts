@@ -18,6 +18,14 @@ export interface CatalogFieldListing {
       label: string;
       type: string;
       role: 'dimension' | 'measure';
+      /**
+       * Present on a DIMENSION whose order the catalog had to DECLARE
+       * (FUT-755) — an encoded ordinal such as an hour-of-day. Absent means
+       * the type rule decides (`date`/`number`/`money` ordered,
+       * `string`/`boolean` not). It is what lets the builder offer a line or
+       * an area for this field's axis.
+       */
+      ordered?: boolean;
       aggregations?: readonly string[];
       /** Declared render format (`duration`, `percent`…), when the field has one. */
       format?: string;
@@ -62,6 +70,7 @@ export function listCatalogFields(catalog: FieldCatalog): CatalogFieldListing {
         label: fieldDef.label,
         type: fieldDef.type,
         role: fieldDef.role,
+        ordered: fieldDef.ordered,
         aggregations: fieldDef.aggregations,
         format: fieldDef.format,
         description: fieldDef.description,
