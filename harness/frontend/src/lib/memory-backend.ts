@@ -1,10 +1,17 @@
-import { createMemoryDataSource, defineCatalog } from '@12-apps/report-builder';
+import { createMemoryDataSource } from '@12-apps/report-builder';
 import { reportBuilderRouter } from '@12-apps/report-builder/hono';
-import type { ReportActor, SavedReportDb, SystemReportDef } from '@12-apps/report-builder/server';
+import {
+  REPORT_ENTITY_PERMISSION,
+  type ReportActor,
+  type SavedReportDb,
+} from '@12-apps/report-builder/server';
 import type { ReportBuilderTransport } from '@12-apps/report-builder/react';
 import { Hono } from 'hono';
 
-import { NOW, rowsInWindow } from './report-orders-fixture';
+import { HARNESS_CATALOG } from './report-catalog';
+import { fixtureTables } from './report-fixture-tables';
+import { HARNESS_TIME_ZONE, NOW } from './report-fixture-window';
+import { seedRows, type StoredRow } from './report-saved-fixture';
 
 /**
  * The harness's stand-in for a host backend.
@@ -22,55 +29,56 @@ import { NOW, rowsInWindow } from './report-orders-fixture';
  * in the browser.
  *
  * What is genuinely the HOST's, and all that is left here: which tenant, who
- * is calling, where the rows come from, and where documents are stored.
+ * is calling, where the rows come from, and where documents are stored. The
+ * catalog is `report-catalog.ts`, the rows are the fixtures beside it and the
+ * saved documents are `report-saved-fixture.ts`; what is left here is wiring —
+ * which is also what kept it under the size gate when the catalog went from one
+ * entity to seven.
  */
-const catalog = defineCatalog({
-  entities: {
-    orders: {
-      label: 'Pedidos',
-      fields: {
-        id: { label: 'Pedido', type: 'string', role: 'dimension' },
-        createdAt: { label: 'Data', type: 'date', role: 'dimension' },
-        method: {
-          label: 'Forma de pagamento',
-          type: 'string',
-          role: 'dimension',
-          values: [
-            { value: 'PIX', label: 'PIX' },
-            { value: 'CARD', label: 'Cartão' },
-            { value: 'WAITER', label: 'Com o garçom' },
-          ],
-        },
-        status: {
-          label: 'Status',
-          type: 'string',
-          role: 'dimension',
-          values: [
-            { value: 'PAID', label: 'Pago' },
-            { value: 'AWAITING_PAYMENT', label: 'Aguardando pagamento' },
-            { value: 'FAILED', label: 'Falhou' },
-          ],
-        },
-        revenueCents: { label: 'Receita', type: 'money', role: 'measure' },
-        itemCount: { label: 'Itens', type: 'number', role: 'measure' },
-      },
-    },
-  },
-});
 
 /** The permission tier the shipped policy assigns to `orders`. */
 const SALES = 'reports:sales:read';
 
 /**
- * A built-in defined over THIS catalog. The shipped presets are written
- * against Future Pay's real fields, which this fixture does not have.
+ * What the harness user may query, DERIVED from the shipped policy rather than
+ * typed out: every tier the catalog's own entities require, and nothing else.
+ *
+ * Typing the list is how the old fixture would have failed. An entity absent
+ * from an actor's permissions is indistinguishable from an entity that does not
+ * exist — both answer *Acesso negado* — so a catalog that grew an entity while
+ * this list stayed still would look exactly like the bug being fixed.
  */
-const SYSTEM_REPORTS: SystemReportDef[] = [
+const PERMISSIONS: string[] = [
+  ...new Set(
+    Object.keys(HARNESS_CATALOG.entities).map((entity) => {
+      const permission = REPORT_ENTITY_PERMISSION[entity];
+      if (!permission) throw new Error(`No shipped permission tier for entity "${entity}".`);
+      return permission;
+    }),
+  ),
+];
+
+/**
+ * A built-in's type, derived from the router's own config rather than imported.
+ * `SystemReportDef` lives in the package's internal `preset-types` and its
+ * server barrel does not re-export it, so naming it directly is a type error —
+ * one the harness's bundler happens not to raise, because a type-only import is
+ * erased before anything checks it.
+ */
+type SystemReport = NonNullable<Parameters<typeof reportBuilderRouter>[0]['systemReports']>[number];
+
+/**
+ * A built-in defined over THIS catalog rather than the shipped `SYSTEM_REPORTS`.
+ * The catalog is now the product's, but a SUBSET of it — the shipped presets
+ * reach for plan and promise measures this fixture deliberately leaves out, and
+ * a preset that 400s is a worse fixture than one that is absent.
+ */
+const SYSTEM_REPORTS: SystemReport[] = [
   {
     key: 'receita-por-forma',
     title: 'Receita por forma de pagamento',
     description: 'Quanto entrou por PIX, cartão e garçom no período.',
-    permission: SALES as SystemReportDef['permission'],
+    permission: SALES as SystemReport['permission'],
     section: 'orders',
     supportsGrain: false,
     presentation: 'chart',
@@ -84,162 +92,6 @@ const SYSTEM_REPORTS: SystemReportDef[] = [
       }) as never,
   },
 ];
-
-interface StoredRow {
-  id: string;
-  name: string;
-  description: string | null;
-  spec: unknown;
-  status: string;
-  visibility: string;
-  visibilityRoles: unknown;
-  createdBy: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-const DASHBOARD = {
-  kind: 'dashboard',
-  blocks: [
-    {
-      id: 'revenue',
-      span: 6,
-      title: 'Receita por forma',
-      spec: {
-        entity: 'orders',
-        dimensions: [{ field: 'method' }],
-        measures: [{ field: 'revenueCents' }],
-        filters: [{ field: 'status', operator: 'eq', value: 'PAID' }],
-        presentation: { kind: 'chart', chartType: 'bar' },
-      },
-    },
-    {
-      id: 'daily',
-      span: 6,
-      spec: {
-        entity: 'orders',
-        dimensions: [{ field: 'createdAt', timeGrain: 'day' }],
-        measures: [{ field: 'revenueCents' }],
-        presentation: { kind: 'table' },
-      },
-    },
-  ],
-};
-
-/** A one-block document, for the cards whose point is that they are SMALL. */
-function singleBlockDashboard(id: string, title: string): unknown {
-  return {
-    kind: 'dashboard',
-    blocks: [{ id, span: 12, title, spec: DASHBOARD.blocks[0]?.spec }],
-  };
-}
-
-/** A document big enough to saturate the list card's six-bar sparkline. */
-function wideDashboard(): unknown {
-  return {
-    kind: 'dashboard',
-    blocks: Array.from({ length: 7 }, (_, index) => ({
-      id: `b${index + 1}`,
-      span: 4,
-      title: `Bloco ${index + 1}`,
-      spec: DASHBOARD.blocks[0]?.spec,
-    })),
-  };
-}
-
-/** Minutes/days ago, from the real clock — a card's "há 2 min" never rots. */
-function minutesAgo(minutes: number): Date {
-  return new Date(Date.now() - minutes * 60_000);
-}
-
-/** One stored row, with the fields a fixture rarely wants to restate. */
-function row(patch: Partial<StoredRow> & { id: string; name: string }): StoredRow {
-  return {
-    description: null,
-    spec: singleBlockDashboard(patch.id, patch.name),
-    status: 'published',
-    visibility: 'tenant',
-    visibilityRoles: [],
-    createdBy: 'u1',
-    createdAt: new Date('2026-06-01T12:00:00Z'),
-    updatedAt: minutesAgo(60 * 24 * 7),
-    ...patch,
-  };
-}
-
-/**
- * Storage is per-transport, so each mount starts from the same fixture.
- *
- * Two rows were enough when the screen was a list of rows. The card grid is a
- * COMPARISON — sizes, scopes, staleness, who authored what — and two cards
- * show none of it. These seven cover every state a card renders: both chips,
- * all three visibilities, one block against seven, a missing description, an
- * author who is not the caller, and edit times from minutes to weeks.
- */
-function seedRows(): StoredRow[] {
-  return [
-    row({
-      id: 'r1',
-      name: 'Vendas por forma de pagamento',
-      description: 'Receita diária separada por PIX, cartão e garçom',
-      spec: DASHBOARD,
-      updatedAt: minutesAgo(60 * 24 * 9),
-    }),
-    row({
-      id: 'r2',
-      name: 'Ticket médio',
-      spec: {
-        entity: 'orders',
-        dimensions: [],
-        measures: [{ field: 'revenueCents', aggregation: 'avg' }],
-        presentation: { kind: 'kpi' },
-      },
-      status: 'archived',
-      visibility: 'private',
-      updatedAt: new Date('2026-06-15T18:00:00Z'),
-    }),
-    row({
-      id: 'r3',
-      name: 'Movimento por hora',
-      description: 'A que horas a loja enche — pedidos por faixa de hora, no período.',
-      spec: wideDashboard(),
-      updatedAt: minutesAgo(12),
-    }),
-    row({
-      id: 'r4',
-      name: 'Fechamento do caixa',
-      spec: singleBlockDashboard('caixa', 'Total do dia'),
-      status: 'draft',
-      visibility: 'private',
-      updatedAt: minutesAgo(60 * 26),
-    }),
-    row({
-      id: 'r5',
-      name: 'Metas da equipe',
-      description: 'Painel da gerência: quanto cada turno vendeu contra a meta do mês.',
-      spec: DASHBOARD,
-      visibility: 'roles',
-      visibilityRoles: ['gerente'],
-      // Someone ELSE authored it, so `Meus` has something to leave out.
-      createdBy: 'u2',
-      updatedAt: minutesAgo(60 * 24 * 3),
-    }),
-    row({
-      id: 'r6',
-      name: 'Perdas por motivo',
-      description: 'Quanto saiu do estoque sem virar venda, por motivo declarado.',
-      updatedAt: minutesAgo(60 * 24 * 16),
-    }),
-    row({
-      id: 'r7',
-      name: 'Cardápio antigo',
-      description: 'Vendas do cardápio de verão — mantido para consulta.',
-      status: 'archived',
-      createdBy: 'u2',
-      updatedAt: new Date('2026-05-20T12:00:00Z'),
-    }),
-  ];
-}
 
 /** The structural `SavedReportDb` seam a real host fills with Prisma. */
 function memoryDb(): SavedReportDb {
@@ -282,7 +134,7 @@ const ACTOR: ReportActor = {
   roleIds: [],
   isAdmin: true,
   canAuthor: true,
-  permissions: [SALES],
+  permissions: PERMISSIONS,
 };
 
 /** Everything the package needs from a host, in one object. */
@@ -292,10 +144,10 @@ function buildRouter(): Hono {
   router.route(
     '/api/admin/:tenantSlug',
     reportBuilderRouter({
-      catalog,
-      adapter: ({ window }) => createMemoryDataSource({ orders: rowsInWindow(window) }),
+      catalog: HARNESS_CATALOG,
+      adapter: ({ window }) => createMemoryDataSource(fixtureTables(window)),
       db: () => Promise.resolve(db),
-      timeZone: 'America/Sao_Paulo',
+      timeZone: HARNESS_TIME_ZONE,
       now: () => NOW,
       systemReports: SYSTEM_REPORTS,
       resolveActor: () => ACTOR,
