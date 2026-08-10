@@ -1,6 +1,6 @@
 import type { SizeValue } from '../../../tokens/scales';
 export type LoadingStateVariant = 'spinner' | 'skeleton';
-export type LoadingStateSize = Extract<SizeValue, 'sm' | 'md' | 'lg'>;
+export type LoadingStateSize = SizeValue;
 
 export interface LoadingStateProps {
   /**

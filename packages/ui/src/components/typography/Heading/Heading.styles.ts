@@ -15,6 +15,7 @@ const getColorFromTheme = (theme: Theme, color: string): string => {
     secondary: theme.palette.secondary.main,
     success: theme.palette.success.main,
     warning: theme.palette.warning.main,
+    info: theme.palette.info.main,
     danger: theme.palette.error.main,
   };
 

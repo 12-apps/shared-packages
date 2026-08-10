@@ -106,7 +106,7 @@ export interface BreadcrumbsProps extends Omit<MuiBreadcrumbsProps, 'separator'>
    * Size of the breadcrumbs
    * @default 'md'
    */
-  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
+  size?: SizeValue;
   
   /**
    * Color scheme for separators and accents

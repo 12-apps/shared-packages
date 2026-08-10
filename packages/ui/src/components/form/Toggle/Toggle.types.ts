@@ -11,7 +11,7 @@ export interface ToggleProps extends Omit<ToggleButtonProps, 'color' | 'size'> {
   /**
    * The color theme of the toggle
    */
-  color?: Exclude<ColorValue, 'info'>;
+  color?: ColorValue;
   
   /**
    * The size of the toggle

@@ -14,7 +14,7 @@ export interface CarouselProps {
   items: CarouselItem[];
   variant?: 'default' | 'glass' | 'gradient' | 'elevated' | 'minimal' | 'cards';
   size?: SizeValue;
-  color?: Exclude<ColorValue, 'neutral'>;
+  color?: ColorValue;
   autoPlay?: boolean;
   autoPlayInterval?: number;
   loop?: boolean;
@@ -51,7 +51,7 @@ export interface CarouselIndicatorsProps {
   activeIndex: number;
   onSelect: (index: number) => void;
   position?: 'top' | 'bottom' | 'left' | 'right';
-  color?: Exclude<ColorValue, 'neutral'>;
+  color?: ColorValue;
   variant?: 'dots' | 'lines' | 'numbers';
   className?: string;
   style?: CSSProperties;
@@ -64,8 +64,8 @@ export interface CarouselArrowsProps {
   disabled?: boolean;
   disablePrev?: boolean;
   disableNext?: boolean;
-  color?: Exclude<ColorValue, 'neutral'>;
-  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
+  color?: ColorValue;
+  size?: SizeValue;
   className?: string;
   style?: CSSProperties;
 }

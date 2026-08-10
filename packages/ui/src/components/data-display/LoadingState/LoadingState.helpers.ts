@@ -4,15 +4,19 @@ export const SIZE_MAP: Record<
   LoadingStateSize,
   { spinner: number; text: 'body2' | 'body1' | 'h6' }
 > = {
+  xs: { spinner: 16, text: 'body2' },
   sm: { spinner: 24, text: 'body2' },
   md: { spinner: 40, text: 'body1' },
   lg: { spinner: 56, text: 'h6' },
+  xl: { spinner: 64, text: 'h6' },
 };
 
 export const SKELETON_ROW_HEIGHT: Record<LoadingStateSize, number> = {
+  xs: 14,
   sm: 20,
   md: 28,
   lg: 36,
+  xl: 44,
 };
 
 type LoadingStateDefaultedKeys = 'variant' | 'size' | 'skeletonRows';

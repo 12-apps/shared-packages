@@ -86,7 +86,7 @@ export interface NavigationMenuProps {
   /**
    * Size of the menu items
    */
-  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
+  size?: SizeValue;
 
   /**
    * Minimal style with no borders, shadows, or container backgrounds

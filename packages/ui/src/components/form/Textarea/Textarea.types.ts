@@ -11,7 +11,7 @@ export interface TextareaProps extends Omit<TextareaAutosizeProps, 'variant' | '
   /**
    * The color theme of the textarea
    */
-  color?: Exclude<ColorValue, 'info'>;
+  color?: ColorValue;
   
   /**
    * The size of the textarea

@@ -24,8 +24,10 @@ const getColorFromTheme = (theme: Theme, color: string) => {
     secondary: theme.palette.secondary,
     success: theme.palette.success,
     warning: theme.palette.warning,
-    error: theme.palette.error,
     info: theme.palette.info,
+    // `danger`, the house word the prop actually takes. Keyed on MUI's `error`
+    // it matched nothing and fell through to the default.
+    danger: theme.palette.error,
     neutral: {
       main: theme.palette.grey[600],
       light: theme.palette.grey[400],
@@ -74,7 +76,14 @@ export const getSizeStyles = (size: BadgeSize) => {
       fontSize: '0.875rem',
       padding: '0 8px',
       dotSize: 12,
-      iconSize: '1rem' } };
+      iconSize: '1rem' },
+    xl: {
+      minWidth: 28,
+      height: 28,
+      fontSize: '1rem',
+      padding: '0 10px',
+      dotSize: 14,
+      iconSize: '1.125rem' } };
 
   return sizeMap[size] || sizeMap.md;
 };

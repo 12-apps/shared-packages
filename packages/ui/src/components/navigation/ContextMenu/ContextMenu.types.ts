@@ -83,7 +83,7 @@ export interface ContextMenuProps extends Omit<MenuProps, 'open' | 'anchorEl' | 
   /**
    * Size of the menu items
    */
-  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
+  size?: SizeValue;
   
   /**
    * Custom className for the trigger element

@@ -38,7 +38,7 @@ export interface SelectProps extends Omit<MuiSelectProps, 'variant' | 'size'> {
    * Size of the select component
    * @default 'medium'
    */
-  size?: Extract<SizeValue, 'sm' | 'md'>;
+  size?: SizeValue;
   /**
    * Placeholder text when no option is selected
    */

@@ -7,6 +7,6 @@ export interface BlockquoteProps extends React.HTMLAttributes<HTMLElement> {
   variant?: BlockquoteVariant;
   author?: string;
   source?: string;
-  color?: Exclude<ColorValue, 'info'>;
+  color?: ColorValue;
   children: React.ReactNode;
 }

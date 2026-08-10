@@ -58,7 +58,7 @@ export interface TabsProps extends Omit<MuiTabsProps, 'variant' | 'children' | '
   /**
    * Size of the tabs
    */
-  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
+  size?: SizeValue;
   
   /**
    * Array of tab items

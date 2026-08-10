@@ -4,7 +4,7 @@ import type { InputHTMLAttributes, ReactNode } from 'react';
 import type React from 'react';
 
 export type InputVariant = 'outlined' | 'filled' | 'glass' | 'underline' | 'gradient';
-export type InputSize = Extract<SizeValue, 'sm' | 'md' | 'lg'>;
+export type InputSize = SizeValue;
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'color'> {
   variant?: InputVariant;

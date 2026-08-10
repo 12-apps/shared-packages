@@ -6,8 +6,9 @@ import { styled } from '@mui/material/styles';
 import React from 'react';
 
 import type { TextProps } from './Text.types';
+import type { ColorValue } from '../../../tokens/scales';
 
-const getColorFromTheme = (theme: Theme, color: string) => {
+const getColorFromTheme = (theme: Theme, color: ColorValue): string => {
   if (color === 'neutral') {
     return theme.palette.text.primary;
   }
@@ -16,14 +17,19 @@ const getColorFromTheme = (theme: Theme, color: string) => {
     return theme.palette.text.secondary;
   }
 
-  const colorMap: Record<string, string> = {
+  // Exhaustive over ColorValue on purpose. It was a partial `Record<string, …>`
+  // with a silent `|| text.primary` fallback, so `info` — accepted by the type
+  // — rendered as ordinary body text. Typing the key means a colour added to
+  // the vocabulary cannot reach here without a home.
+  const colorMap: Record<Exclude<ColorValue, 'neutral' | 'secondary'>, string> = {
     primary: theme.palette.primary.main,
     success: theme.palette.success.main,
     warning: theme.palette.warning.main,
+    info: theme.palette.info.main,
     danger: theme.palette.error.main,
   };
 
-  return colorMap[color] || theme.palette.text.primary;
+  return colorMap[color];
 };
 
 const SIZE_MAP: Record<string, { fontSize: string; lineHeight: number }> = {
@@ -45,7 +51,7 @@ const WEIGHT_MAP: Record<string, number> = {
 interface TextStyleArgs {
   theme: Theme;
   customVariant?: string;
-  customColor?: string;
+  customColor?: ColorValue;
   customSize?: string;
   customWeight?: string;
   italic?: boolean;
@@ -119,7 +125,7 @@ const StyledText = styled(Typography, {
     ].includes(prop as string),
 })<{
   customVariant?: string;
-  customColor?: string;
+  customColor?: ColorValue;
   customSize?: string;
   customWeight?: string;
   italic?: boolean;

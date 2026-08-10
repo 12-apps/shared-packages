@@ -19,7 +19,7 @@ export interface RadioGroupProps extends Omit<MuiRadioGroupProps, 'color'> {
   /**
    * The color theme of the radio group
    */
-  color?: Exclude<ColorValue, 'info'>;
+  color?: ColorValue;
 
   /**
    * The size of the radio group

@@ -20,7 +20,7 @@ export type AnimationVariant =
   | 'neonFlicker'
   | 'breathe';
 
-export type AnimationSize = Extract<SizeValue, 'sm' | 'md' | 'lg' | 'xl'>;
+export type AnimationSize = SizeValue;
 
 export type ShadowStyle = 'soft' | 'hard' | 'elevated' | 'none';
 

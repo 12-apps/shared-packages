@@ -11,7 +11,7 @@ export interface AlertProps extends Omit<MuiAlertProps, 'variant' | 'color' | 'r
   /**
    * The color of the alert (when not using variant-specific colors)
    */
-  color?: Exclude<ColorValue, 'info'>;
+  color?: ColorValue;
   
   /**
    * Whether the alert should have a glow effect

@@ -46,6 +46,7 @@ export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => 
     secondary: theme.palette.secondary as ColorPalette,
     success: theme.palette.success as ColorPalette,
     warning: theme.palette.warning as ColorPalette,
+    info: theme.palette.info as ColorPalette,
     danger: theme.palette.error as ColorPalette,
   };
 

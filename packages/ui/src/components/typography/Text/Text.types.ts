@@ -5,7 +5,7 @@ export type TextVariant = 'body' | 'heading' | 'caption' | 'code';
 
 export interface TextProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: TextVariant;
-  color?: Exclude<ColorValue, 'info'>;
+  color?: ColorValue;
   size?: SizeValue;
   weight?: 'light' | 'normal' | 'medium' | 'semibold' | 'bold';
   as?: keyof React.JSX.IntrinsicElements;

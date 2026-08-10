@@ -34,6 +34,7 @@ export const getColorFromTheme = (theme: Theme, color: string): PaletteColor => 
     success: theme.palette.success,
     warning: theme.palette.warning,
     error: theme.palette.error,
+    info: theme.palette.info,
     danger: theme.palette.error, // Add danger alias
   };
 
@@ -42,9 +43,11 @@ export const getColorFromTheme = (theme: Theme, color: string): PaletteColor => 
 };
 
 const SIZE_MAP: Record<ProgressSize, { height: number; circularSize: number; fontSize: string }> = {
+  xs: { height: 2, circularSize: 24, fontSize: '0.625rem' },
   sm: { height: 4, circularSize: 32, fontSize: '0.75rem' },
   md: { height: 6, circularSize: 40, fontSize: '0.875rem' },
   lg: { height: 8, circularSize: 48, fontSize: '1rem' },
+  xl: { height: 10, circularSize: 56, fontSize: '1.125rem' },
 };
 
 export const getSizeStyles = (size?: ProgressSize) => SIZE_MAP[size as ProgressSize] || SIZE_MAP.md;
