@@ -1,11 +1,7 @@
 import { ProviderRequestError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { CustomerSchema } from '../core/customer-schema';
-import type {
-  NormalizedWebhookEvent,
-  ResolvedCredentials,
-  WebhookDelivery,
-} from '../core/types';
+import type { NormalizedWebhookEvent, WebhookDelivery } from '../core/types';
 import { sha256Hex } from './shared';
 import { intentSnapshot, type StripePaymentIntent } from './stripe-charges';
 import {
