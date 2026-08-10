@@ -11,7 +11,7 @@
  *     as a one-block report, so old documents keep working and become regular
  *     multi-block reports the moment they are saved again.
  */
-import { clampBlockSpan } from "../layout";
+import { clampBlockHeight, clampBlockSpan } from "../layout";
 
 import { specFromDraft, starterDraft } from "./builder-model";
 import type {
@@ -29,6 +29,13 @@ export interface ReportBlockDraft {
   id: string;
   title: string;
   span: number;
+  /**
+   * The block's height tier (1..3), or `undefined` for its own content height
+   * (FUT-755). `undefined` is not "unset pending a default" — it is the value
+   * every block saved before heights existed has, and the one that keeps them
+   * rendering exactly as they do now.
+   */
+  height?: number;
   spec: ReportSpecWire;
 }
 
@@ -72,6 +79,7 @@ export function addBlock(draft: ReportDraft, spec: ReportSpecWire, title: string
     id: nextBlockId(draft.blocks),
     title,
     span: clampBlockSpan(DEFAULT_BLOCK_SPAN, spec.presentation),
+    // No height: a new block is as tall as what it renders, same as before.
     spec,
   };
   return { ...draft, blocks: [...draft.blocks, block] };
@@ -100,6 +108,7 @@ export function duplicateBlock(draft: ReportDraft, id: string): ReportDraft {
     id: nextBlockId(draft.blocks),
     title: `${blockLabel(source)} (cópia)`,
     span: source.span,
+    ...(source.height === undefined ? {} : { height: source.height }),
     // A spec is pure JSON by contract (see `spec.ts`), so this round-trip is a
     // complete deep copy — and one that works identically in the browser, in
     // jsdom and on the server, which `structuredClone` does not.
@@ -118,14 +127,18 @@ export function removeBlock(draft: ReportDraft, id: string): ReportDraft {
 export function updateBlock(
   draft: ReportDraft,
   id: string,
-  patch: Partial<Pick<ReportBlockDraft, "title" | "span">>,
+  patch: Partial<Pick<ReportBlockDraft, "title" | "span" | "height">>,
 ): ReportDraft {
   return {
     ...draft,
     blocks: draft.blocks.map((block) => {
       if (block.id !== id) return block;
       const next = { ...block, ...patch };
-      return { ...next, span: clampBlockSpan(next.span, next.spec.presentation) };
+      return {
+        ...next,
+        span: clampBlockSpan(next.span, next.spec.presentation),
+        height: clampBlockHeight(next.height),
+      };
     }),
   };
 }
@@ -143,7 +156,14 @@ export function updateBlockSpec(
   return {
     ...draft,
     blocks: draft.blocks.map((block) =>
-      block.id === id ? { ...block, spec, span: clampBlockSpan(block.span, spec.presentation) } : block,
+      block.id === id
+        ? {
+            ...block,
+            spec,
+            span: clampBlockSpan(block.span, spec.presentation),
+            height: clampBlockHeight(block.height),
+          }
+        : block,
     ),
   };
 }
@@ -203,6 +223,9 @@ export function documentFromDraft(draft: ReportDraft): DashboardSpecWire {
         id: block.id,
         ...(title === "" ? {} : { title }),
         span: block.span,
+        // OMITTED when there is none, never written as a default: a document
+        // that has always been content-height must stay byte-identical.
+        ...(block.height === undefined ? {} : { height: block.height }),
         spec: block.spec,
       };
     }),
@@ -229,6 +252,7 @@ export function draftFromDocument(
       id: block.id,
       title: block.title ?? "",
       span: clampBlockSpan(block.span, block.spec.presentation),
+      height: clampBlockHeight(block.height),
       spec: block.spec,
     })),
   };

@@ -114,6 +114,12 @@ export interface DashboardBlockWire {
   id: string;
   title?: string;
   span: number;
+  /**
+   * The block's height TIER, 1..3 (FUT-755). ABSENT means "as tall as its
+   * content", which is what every block saved before this field is — so the
+   * field is omitted from the document rather than written as a default.
+   */
+  height?: number;
   spec: ReportSpecWire;
 }
 
@@ -201,6 +207,8 @@ export type DashboardBlockRender =
       id: string;
       title?: string;
       span: number;
+      /** Height tier (1..3); absent = as tall as its content (FUT-755). */
+      height?: number;
       /**
        * What this block asks for, in Portuguese — computed server-side by
        * `specSentence` so the viewer, the editor and an export cannot drift.
@@ -214,6 +222,8 @@ export type DashboardBlockRender =
       id: string;
       title?: string;
       span: number;
+      /** Height tier (1..3); absent = as tall as its content (FUT-755). */
+      height?: number;
       /** Present on a FAILED block too — that is when a reader most needs it. */
       sentence?: string;
       status: "error";

@@ -59,6 +59,85 @@ export function spanOptionsFor(presentation: PresentationShape): number[] {
   return options;
 }
 
+/**
+ * THREE HEIGHTS, and why they are not an arithmetic scale (FUT-755).
+ *
+ * The width axis is arithmetic because the canvas gives it a unit: a span is a
+ * number of twelfths of a real container. The vertical axis has no such unit —
+ * `ReportGrid` is a wrapped flex row rather than a CSS grid (`visual-pass.md`
+ * §Layout: a real grid leaves an orphan hole), so there is no row TRACK to span
+ * and never was. A block's height has always been its own content.
+ *
+ * The first attempt invented a unit anyway — a 140px "row", `N` of them plus
+ * their gutters — and it failed the only test that matters, which is whether an
+ * author can SEE the difference: 300px against 440px is two charts that look
+ * alike, and the user set one block to `Média` and then to `Alta` and reported
+ * the two as "almost nothing".
+ *
+ * So a height is a TIER, and a tier is stated the way a reader experiences one:
+ * as a fraction of the window, floored and capped so it stays sane on a laptop
+ * in a short window and on a 4K panel. Each tier is roughly twice the one below
+ * it at any viewport, which is the point — three sizes nobody has to compare
+ * side by side to tell apart.
+ */
+export const BLOCK_HEIGHT_MIN = 1;
+export const BLOCK_HEIGHT_MAX = 3;
+
+/** One tier's floor, its share of the window, and its ceiling. */
+interface BlockHeightTier {
+  minPx: number;
+  vh: number;
+  maxPx: number;
+}
+
+/**
+ * `Baixa` · `Média` · `Alta`, in order.
+ *
+ * The floors are what each has to be to READ — 200px is a chart with a plot
+ * rather than a band of axis labels, which is why no tier is refused to any
+ * presentation any more. The ceilings stop `Alta` becoming a block nobody can
+ * see the bottom of on a tall screen.
+ */
+const BLOCK_HEIGHT_TIERS: readonly BlockHeightTier[] = [
+  { minPx: 200, vh: 24, maxPx: 280 },
+  { minPx: 340, vh: 44, maxPx: 500 },
+  { minPx: 520, vh: 68, maxPx: 780 },
+];
+
+/**
+ * A height the canvas can render, or `undefined` for the block's own content.
+ *
+ * `undefined` in, `undefined` out — that is the compatibility contract. A block
+ * saved before heights existed carries none and must go on measuring exactly
+ * what its content measures; only a height somebody actually chose is clamped.
+ * Junk resolves to something valid rather than throwing, as {@link clampBlockSpan}
+ * does: layout is never the reason a saved report fails to open.
+ *
+ * It takes no presentation, unlike {@link clampBlockSpan}. A narrow block
+ * TRUNCATES — a table in a third of the canvas loses columns — so widths need a
+ * floor per presentation. A short block does not: every tier is tall enough to
+ * read, and anything taller than its tier simply outgrows it.
+ */
+export function clampBlockHeight(height: number | undefined): number | undefined {
+  if (height === undefined) return undefined;
+  if (!Number.isFinite(height)) return BLOCK_HEIGHT_MIN;
+  return Math.min(BLOCK_HEIGHT_MAX, Math.max(BLOCK_HEIGHT_MIN, Math.round(height)));
+}
+
+/**
+ * What a tier is worth on screen, as the CSS the cell carries.
+ *
+ * Applied as a MINIMUM, never a maximum: a thirty-row table in a `Baixa` block
+ * must outgrow its tier rather than be clipped, because a report that hides
+ * data is worse than one taller than it was asked to be.
+ */
+export function blockHeightCss(height: number): string {
+  const index = (clampBlockHeight(height) ?? BLOCK_HEIGHT_MIN) - 1;
+  const tier = BLOCK_HEIGHT_TIERS[index] ?? BLOCK_HEIGHT_TIERS[0];
+  if (tier === undefined) return '0px';
+  return `clamp(${tier.minPx}px, ${tier.vh}vh, ${tier.maxPx}px)`;
+}
+
 /** The screen the canvas is being drawn on. */
 export type ViewportTier = 'phone' | 'tablet' | 'desktop';
 

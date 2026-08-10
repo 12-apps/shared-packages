@@ -82,16 +82,24 @@ function assertSplitChartShape(
   }
 }
 
+/**
+ * The KPI rule (FUT-755): no dimensions, ONE OR MORE measures.
+ *
+ * The one-measure ceiling is gone. A KPI block renders one figure per measure
+ * (`render.ts`'s `figures`), so "receita, pedidos e ticket médio" is ONE block
+ * of three labelled numbers — where before, adding the second measure silently
+ * fell back to a table and drew a header row above a single line.
+ *
+ * The no-dimension half stays, and it is the half with a reason: a KPI
+ * summarises the WHOLE period, so with a grouping there is no single figure per
+ * measure to show. The floor of one measure is the spec schema's own
+ * (`measures: z.array(...).min(1)`), so nothing is left to assert on that side.
+ */
 export function assertKpiShape(spec: ReportSpec, dimensions: CompiledDimension[]): void {
   if (spec.presentation.kind !== 'kpi') return;
   if (dimensions.length !== 0) {
     throw invalidSpecError(
       `KPI presentation aggregates the whole period and takes no dimensions, got ${dimensions.length}. Remove the dimensions or use a chart/table.`,
-    );
-  }
-  if (spec.measures.length !== 1) {
-    throw invalidSpecError(
-      `KPI presentation requires exactly 1 measure, got ${spec.measures.length}.`,
     );
   }
 }

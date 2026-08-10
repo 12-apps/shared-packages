@@ -25,6 +25,8 @@ interface PanelTarget {
   key: string;
   spec: ReportSpecWire | null;
   span: number;
+  /** The block's height tier, or `undefined` for its own content height. */
+  height: number | undefined;
   /** The block's own title, or "" in the empty state. */
   title: string;
   testId: string;
@@ -39,6 +41,7 @@ function panelTarget(draft: ReportDraft, selectedId: string | null): PanelTarget
       key: "sem-selecao",
       spec: null,
       span: REPORT_GRID_COLUMNS,
+      height: undefined,
       title: "",
       testId: "report-editor-panel",
       id: null,
@@ -50,6 +53,7 @@ function panelTarget(draft: ReportDraft, selectedId: string | null): PanelTarget
     key: block.id,
     spec: block.spec,
     span: block.span,
+    height: block.height,
     title: block.title,
     testId: `report-block-${block.id}-editor`,
     id: block.id,
@@ -100,9 +104,11 @@ export function CanvasPanel({
       entities={entities}
       spec={target.spec}
       span={target.span}
+      height={target.height}
       title={target.title}
       onChange={(spec) => apply((current, id) => updateBlockSpec(current, id, spec))}
       onSpanChange={(span) => apply((current, id) => updateBlock(current, id, { span }))}
+      onHeightChange={(height) => apply((current, id) => updateBlock(current, id, { height }))}
       onTitleChange={(title) => apply((current, id) => updateBlock(current, id, { title }))}
       onDuplicate={onDuplicate}
       // Visible-but-refused at the ceiling, rather than absent: a control that

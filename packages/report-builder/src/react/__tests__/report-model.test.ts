@@ -159,6 +159,99 @@ describe('draftFromDocument', () => {
   });
 });
 
+/**
+ * `Altura` travels the way `span` does (FUT-755) — with ONE difference that is
+ * the entire compatibility story: it is optional, so a block that has never
+ * been given a height carries none, saves none, and is therefore as tall as
+ * its content exactly as it has always been.
+ */
+describe('height — a block with none must stay a block with none', () => {
+  it('adds a new block with no height at all', () => {
+    const draft = addBlock(emptyReportDraft(), TABLE_SPEC, 'Vendas');
+    expect(draft.blocks[0]?.height).toBeUndefined();
+  });
+
+  it('OMITS the key from the saved document rather than writing a default', () => {
+    // A document that has always been content-height has to stay byte-identical
+    // — a `height: 1` written on save would resize every stored report.
+    const document = documentFromDraft(draftWith(['a', 'b']));
+    expect(document.blocks[0]).not.toHaveProperty('height');
+    expect(document.blocks[1]).not.toHaveProperty('height');
+  });
+
+  it('reads a stored document with no heights back as no heights', () => {
+    const draft = draftFromDocument('Painel', null, {
+      kind: 'dashboard',
+      blocks: [{ id: 'a', span: 6, spec: TABLE_SPEC }],
+    });
+    expect(draft.blocks[0]?.height).toBeUndefined();
+  });
+
+  it('keeps a legacy single-spec report content-height too', () => {
+    expect(draftFromDocument('Antigo', 'desc', TABLE_SPEC).blocks[0]?.height).toBeUndefined();
+  });
+
+  it('leaves height alone when some OTHER property of the block changes', () => {
+    const draft = updateBlock(draftWith(['a']), 'a', { title: 'Receita' });
+    expect(draft.blocks[0]?.height).toBeUndefined();
+    expect(documentFromDraft(draft).blocks[0]).not.toHaveProperty('height');
+  });
+});
+
+describe('height — once chosen, it round-trips', () => {
+  it('stores a chosen height and reads it back', () => {
+    const draft = updateBlock(draftWith(['a']), 'a', { height: 3 });
+    expect(draft.blocks[0]?.height).toBe(3);
+    const document = documentFromDraft(draft);
+    expect(document.blocks[0]?.height).toBe(3);
+    expect(draftFromDocument('Painel', null, document).blocks[0]?.height).toBe(3);
+  });
+
+  it('keeps the shortest tier for any presentation — no height is ever refused', () => {
+    // NOT the mirror of the width case above. A narrow block TRUNCATES, so a
+    // width has a floor per presentation; a short one merely outgrows its tier,
+    // and every tier is tall enough to read at. A tier an author cannot choose
+    // makes the whole set look broken.
+    const draft = draftFromDocument('Painel', null, {
+      kind: 'dashboard',
+      blocks: [{ id: 'a', span: 6, height: 1, spec: TABLE_SPEC }],
+    });
+    expect(draft.blocks[0]?.height).toBe(1);
+  });
+
+  it('leaves the height alone when the PRESENTATION changes under it', () => {
+    // The width IS re-fitted here (a table needs six columns). The height is
+    // not, because there is no floor to re-fit it to.
+    const kpi = updateBlock(
+      { name: 'P', description: '', blocks: [{ id: 'a', title: '', span: 6, spec: KPI_SPEC }] },
+      'a',
+      { height: 1 },
+    );
+    expect(kpi.blocks[0]?.height).toBe(1);
+    expect(updateBlockSpec(kpi, 'a', TABLE_SPEC).blocks[0]?.height).toBe(1);
+  });
+
+  it('clamps a stored height outside the three tiers instead of failing to open', () => {
+    const draft = draftFromDocument('Painel', null, {
+      kind: 'dashboard',
+      blocks: [{ id: 'a', span: 6, height: 9, spec: TABLE_SPEC }],
+    });
+    expect(draft.blocks[0]?.height).toBe(3);
+  });
+
+  it('does not invent a height when the presentation changes under a block without one', () => {
+    const draft = updateBlockSpec(draftWith(['a']), 'a', KPI_SPEC);
+    expect(draft.blocks[0]?.height).toBeUndefined();
+  });
+
+  it('clears back to content height when the author picks Auto', () => {
+    const chosen = updateBlock(draftWith(['a']), 'a', { height: 3 });
+    const cleared = updateBlock(chosen, 'a', { height: undefined });
+    expect(cleared.blocks[0]?.height).toBeUndefined();
+    expect(documentFromDraft(cleared).blocks[0]).not.toHaveProperty('height');
+  });
+});
+
 describe('viewBlocks', () => {
   const base = {
     id: 'r1',

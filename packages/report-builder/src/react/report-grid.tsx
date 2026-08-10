@@ -16,8 +16,8 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 import { useMeasuredWidth } from "@12-apps/ui/utility/Overflow";
 
-import { REPORT_GRID_COLUMNS, responsiveSpan } from "../layout";
 import type { DashboardBlockRender } from "./custom-reports-api";
+import { BLOCK_FILL_BODY_SX, BLOCK_FILL_CARD_SX, blockCellSx } from "./lib/block-cell";
 import type { DragReorder } from "./lib/drag-reorder";
 import { PRINT_BLOCK_ATTR } from "./lib/print-export";
 import { CONTAINER_RADIUS_PX, GRID_GAP_PX } from "./lib/report-surface";
@@ -28,13 +28,18 @@ import { ReportRenderView } from "./report-render";
  * The canvas: twelve columns at EVERY width — a phone gets the same layout
  * logic, not a stack that discards it; blocks widen instead (`responsiveSpan`).
  *
- * It is laid out with `flex-wrap`, not `grid`, for one reason: **no orphan
- * row** (`visual-pass.md` §Layout). Three half-width blocks on a 12-column grid
- * land 2-up then 1-up and leave a 548px hole at 1440px, which the eye reads as
- * a bug. A wrapped flex row hands its leftover width back to the blocks that
- * are IN that row, in proportion to their spans, so the last row always closes.
- * Every full row still measures exactly what the grid measured — the basis
- * below is the grid's own column arithmetic — so nothing else moves.
+ * It is laid out with `flex-wrap` rather than `display: grid`. The original
+ * reason was **no orphan row** (`visual-pass.md` §Layout): three half-width
+ * blocks on a 12-column grid land 2-up then 1-up and leave a 548px hole at
+ * 1440px, and a wrapped flex row could hand that leftover width back to the
+ * blocks IN the row.
+ *
+ * IT NO LONGER DOES (FUT-755) — see `lib/block-cell`. Closing the row meant a
+ * block alone on one took all of it, so a width the author picked was silently
+ * overridden by how many neighbours it happened to have. The wrapping is kept
+ * because the widths are computed from the grid's own column arithmetic either
+ * way, and because `flex-wrap` is what lets `responsiveSpan` widen a block per
+ * tier without a second layout mode.
  */
 export function ReportGrid({
   children,
@@ -66,50 +71,29 @@ export function ReportGrid({
 }
 
 /**
- * The width a `span`-column block starts at: identical to `grid-column: span N`
- * on a 12-column grid with the same gap. The half pixel is slack — it can only
- * ever make a row fit, never wrap early, and `flex-grow` hands it straight back.
- */
-function spanBasis(span: number): string {
-  const gutters = (REPORT_GRID_COLUMNS - 1) * GRID_GAP_PX;
-  return `calc(${span} * (100% - ${gutters}px) / ${REPORT_GRID_COLUMNS} + ${(span - 1) * GRID_GAP_PX}px - 0.5px)`;
-}
-
-/**
  * One placed block: `span` columns on a desktop canvas, widened per tier below
  * it (`sm`/`md` = tablet, `xs` = phone) so narrow screens keep a real layout.
  *
- * `flexGrow` is the span rather than `1`: when a row has width to give away,
- * a block that asked for six columns takes twice as much of it as one that
- * asked for three, so filling the row cannot reorder the author's emphasis.
+ * The geometry — including why a block no longer GROWS past its span — is in
+ * `lib/block-cell`, where it can be asserted on directly.
  */
 export function ReportGridItem({
   span,
+  height,
   children,
   dataTestId,
   dropProps,
 }: {
   span: number;
+  /** The block's height tier; omitted, the cell is as tall as its content. */
+  height?: number;
   children: ReactNode;
   dataTestId?: string;
   /** Drop-target handlers when the grid is being rearranged (editor only). */
   dropProps?: ReturnType<DragReorder["targetProps"]>;
 }): JSX.Element {
-  const phone = responsiveSpan(span, "phone");
-  const tablet = responsiveSpan(span, "tablet");
-  const desktop = responsiveSpan(span, "desktop");
   return (
-    <Box
-      sx={{
-        flexGrow: { xs: phone, sm: tablet, lg: desktop },
-        flexShrink: 1,
-        flexBasis: { xs: spanBasis(phone), sm: spanBasis(tablet), lg: spanBasis(desktop) },
-        minWidth: 0,
-        maxWidth: "100%",
-      }}
-      data-testid={dataTestId}
-      {...dropProps}
-    >
+    <Box sx={blockCellSx(span, height)} data-testid={dataTestId} {...dropProps}>
       {children}
     </Box>
   );
@@ -186,6 +170,13 @@ interface ReportBlockFrameProps {
   dataTestId: string;
   /** Highlight the frame as the current drop slot (editor drag-and-drop). */
   active?: boolean;
+  /**
+   * Stretch the card, and the rendering in it, down the whole cell — set when
+   * the block stores an `Altura` (FUT-755). Off, the frame is as tall as its
+   * content: what it has always been, and what a block with no stored height
+   * must go on being.
+   */
+  fill?: boolean;
 }
 
 /**
@@ -300,6 +291,32 @@ function BlockHeaderRow({
 }
 
 /**
+ * ONE subtitle slot, two kinds of subtitle — and no block authors both.
+ *
+ * Where one somehow did, the WRITTEN disclosure wins: it is the half a reader
+ * cannot reconstruct from the block's own settings, and the half that must
+ * never be hidden. The generated sentence is a restatement of the query, which
+ * the config panel shows in full anyway.
+ */
+function BlockSubtitle({
+  specSentence,
+  description,
+  dataTestId,
+}: {
+  specSentence?: string;
+  description?: string;
+  dataTestId: string;
+}): JSX.Element | null {
+  if (description !== undefined && description !== "") {
+    return <BlockDescription description={description} dataTestId={dataTestId} />;
+  }
+  if (specSentence !== undefined && specSentence !== "") {
+    return <BlockSpecSentence sentence={specSentence} dataTestId={dataTestId} />;
+  }
+  return null;
+}
+
+/**
  * A block's frame: the card, its title row and an `actions` slot. The viewer
  * fills that slot with an export button, the editor with its edit chrome —
  * the frame itself is identical in both, which is what keeps the two modes
@@ -313,6 +330,7 @@ export function ReportBlockFrame({
   children,
   dataTestId,
   active = false,
+  fill = false,
 }: ReportBlockFrameProps): JSX.Element {
   return (
     <Card
@@ -330,22 +348,21 @@ export function ReportBlockFrame({
         // the tools. Keyboard and touch are handled with it — see the constant.
         ...BLOCK_TOOLS_REVEAL_SX,
         ...(active ? { outline: "2px dashed", outlineColor: "primary.main" } : {}),
+        ...(fill ? BLOCK_FILL_CARD_SX : {}),
       }}
       data-testid={dataTestId}
       {...{ [PRINT_BLOCK_ATTR]: "" }}
     >
-      <Stack spacing={1.5}>
+      <Stack spacing={1.5} sx={fill ? BLOCK_FILL_CARD_SX : undefined}>
         <BlockHeaderRow title={title} actions={actions} />
-        {/* ONE subtitle slot, two kinds of subtitle — and no block authors
-         * both. Where one somehow did, the written disclosure would win: it is
-         * the half a reader cannot reconstruct from the block's own settings,
-         * and it is the half that must never be hidden. */}
-        {description !== undefined && description !== "" ? (
-          <BlockDescription description={description} dataTestId={dataTestId} />
-        ) : specSentence !== undefined && specSentence !== "" ? (
-          <BlockSpecSentence sentence={specSentence} dataTestId={dataTestId} />
-        ) : null}
-        {children}
+        <BlockSubtitle
+          specSentence={specSentence}
+          description={description}
+          dataTestId={dataTestId}
+        />
+        {/* The slot the height is FOR — without it the card grows and the
+         * rendering stays at the top. Wrapped only when filling. */}
+        {fill ? <Box sx={BLOCK_FILL_BODY_SX}>{children}</Box> : children}
       </Stack>
     </Card>
   );

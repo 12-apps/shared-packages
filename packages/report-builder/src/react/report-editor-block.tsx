@@ -288,6 +288,7 @@ function BlockGroup({
       <ReportBlockFrame
         dataTestId={testId}
         active={dnd.overId === block.id}
+        fill={block.height !== undefined}
         title={
           <BlockTitleSlot block={block} dnd={dnd} testId={testId} onTitleChange={onTitleChange} />
         }
@@ -341,6 +342,7 @@ export function EditableBlock({
   return (
     <ReportGridItem
       span={block.span}
+      height={block.height}
       dataTestId={`${testId}-cell`}
       dropProps={dnd.targetProps(block.id)}
     >

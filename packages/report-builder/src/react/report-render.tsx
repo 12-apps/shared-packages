@@ -21,7 +21,12 @@ import { Box } from "@12-apps/ui/mui/Box";
 import { formatKpiFigure, formatReportValue } from "../format";
 import { chartColumnsOf } from "./chart-as-table";
 import type { ExportColumn } from "./lib/export-rows";
-import { SECTION_LABEL_STYLE } from "./lib/report-surface";
+import {
+  kpiFigures,
+  type ReportKpiFigure,
+  type ReportKpiFormat,
+} from "./lib/kpi-figures";
+import { GRID_GAP_PX, SECTION_LABEL_STYLE } from "./lib/report-surface";
 import type { ReportRender, ReportRow, ReportTableColumn } from "./reports-api";
 
 /**
@@ -187,11 +192,59 @@ function formatReportCell(
 }
 
 /** The KPI tile figure (FUT-309); a suppressed tile shows the same em-dash. */
-function formatKpiValue(
-  value: number | null,
-  format: Extract<ReportRender, { kind: "kpi" }>["format"],
-): string {
+function formatKpiValue(value: number | null, format: ReportKpiFormat): string {
   return formatKpiFigure(value, format);
+}
+
+/**
+ * A KPI block's figures, side by side (FUT-755).
+ *
+ * `Número` takes one or more measures now, and several figures in one block is
+ * NOT a one-row table: each figure keeps its own caption ABOVE its own number,
+ * which is the arrangement a table's header row cannot produce. The row wraps
+ * rather than scrolling, so a narrow block stacks the figures instead of
+ * truncating any — `flex: 1 1 <floor>` is what makes it wrap at a width where a
+ * figure is still readable rather than at the container's edge.
+ *
+ * The first tile keeps `…-kpi`, the id from when a KPI block could only ever
+ * hold one figure. The rest are added beside it as `…-kpi-1`, `…-kpi-2`.
+ *
+ * Through `dataTestId`, which is `StatCard`'s prop for it — NOT `data-testid`.
+ * The hyphenated form is what was written here, and TypeScript does not
+ * excess-check a hyphenated JSX attribute, so it type-checked, rendered
+ * nothing, and left every tile carrying `StatCard`'s own default of
+ * `stat-card`. Harmless while a KPI block held one figure; with three it put
+ * the SAME id on three elements, which is a `getByTestId` that throws rather
+ * than a query that misses.
+ */
+const KPI_FIGURE_MIN_PX = 132;
+
+function KpiFigures({
+  figures,
+  dataTestId,
+}: {
+  figures: ReportKpiFigure[];
+  dataTestId: string;
+}): JSX.Element {
+  return (
+    <Box
+      sx={{ ...TABULAR_FIGURES, display: "flex", flexWrap: "wrap", gap: `${GRID_GAP_PX}px` }}
+      data-testid={dataTestId}
+    >
+      {figures.map((figure, index) => (
+        <Box
+          key={`${index}-${figure.label}`}
+          sx={{ flex: `1 1 ${KPI_FIGURE_MIN_PX}px`, minWidth: 0 }}
+        >
+          <StatCard
+            label={figure.label}
+            value={formatKpiValue(figure.value, figure.format)}
+            dataTestId={index === 0 ? `${dataTestId}-kpi` : `${dataTestId}-kpi-${index}`}
+          />
+        </Box>
+      ))}
+    </Box>
+  );
 }
 
 /** Export columns matching exactly what the render model displays. */
@@ -203,7 +256,12 @@ export function exportColumnsFor(render: ReportRender): ExportColumn<ReportRow>[
     }));
   }
   if (render.kind === "kpi") {
-    return [{ header: render.label, value: () => formatKpiValue(render.value, render.format) }];
+    // One column per FIGURE — the download and the tile show the same numbers,
+    // which stopped being one column the moment a KPI could carry several.
+    return kpiFigures(render).map((figure) => ({
+      header: figure.label,
+      value: () => formatKpiValue(figure.value, figure.format),
+    }));
   }
   // The SAME derivation "Ver como tabela" uses, so a column can never appear on
   // screen and be missing from the download.
@@ -285,17 +343,9 @@ export function ReportRenderView({
   asTable = false,
 }: ReportRenderViewProps): JSX.Element {
   if (render.kind === "kpi") {
-    // A KPI over an empty period renders the tile with "—", not EmptyState —
+    // A KPI over an empty period renders its tiles with "—", not EmptyState —
     // in a dashboard grid the metric's absence should still say which metric.
-    return (
-      <Box sx={TABULAR_FIGURES} data-testid={dataTestId}>
-        <StatCard
-          label={render.label}
-          value={formatKpiValue(render.value, render.format)}
-          data-testid={`${dataTestId}-kpi`}
-        />
-      </Box>
-    );
+    return <KpiFigures figures={kpiFigures(render)} dataTestId={dataTestId} />;
   }
   if (render.rows.length === 0) {
     return (
