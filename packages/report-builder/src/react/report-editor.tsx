@@ -33,6 +33,7 @@ import { EditorCanvas } from "./report-editor-canvas";
 import { ReportEditorHeader } from "./report-editor-header";
 import { editorSource, type EditorSource } from "./report-editor-source";
 import { useEditorState } from "./report-editor-state";
+import { ExitConfirmDialog, hasPendingWork } from "./report-editor-exit";
 import { UnpublishedChangesBar } from "./report-editor-unpublished";
 import { ReportSettingsDialog } from "./report-settings-dialog";
 import { CONTROL_ROW_SX, EDITOR_SURFACE_SX, useReportPortalTheme } from "./lib/report-surface";
@@ -71,6 +72,98 @@ function EditorActions({
   );
 }
 
+/**
+ * The Ajustes dialog, wired to the editor's state.
+ *
+ * Split out because it is the one place that fans a single change across three
+ * setters — the page above reads better without that arithmetic in the middle
+ * of its layout.
+ */
+function EditorSettings({
+  tenantSlug,
+  editor,
+  open,
+  onClose,
+}: {
+  tenantSlug: string;
+  editor: ReturnType<typeof useEditorState>;
+  open: boolean;
+  onClose: () => void;
+}): JSX.Element {
+  const { draft, setDraft, publish, setPublish, defaultRange, setDefaultRange } = editor;
+  return (
+    <ReportSettingsDialog
+      open={open}
+      tenantSlug={tenantSlug}
+      value={{ name: draft.name, description: draft.description, publish, defaultRange }}
+      onChange={(next) => {
+        setDraft((prev) => ({ ...prev, name: next.name, description: next.description }));
+        setPublish(next.publish);
+        setDefaultRange(next.defaultRange);
+      }}
+      onClose={onClose}
+    />
+  );
+}
+
+/**
+ * The header and the question it asks on the way out.
+ *
+ * They live together because they are one interaction: the header owns the
+ * only way out of the editor, and the dialog is what that exit has to say
+ * when there is work the store has not been shown yet.
+ */
+function EditorTopBar({
+  tenantSlug,
+  editId,
+  editor,
+  exitTarget,
+  onOpenSettings,
+}: {
+  tenantSlug: string;
+  editId?: string;
+  editor: ReturnType<typeof useEditorState>;
+  exitTarget: string;
+  onOpenSettings: () => void;
+}): JSX.Element {
+  const navigate = useNavigate();
+  const [prompt, setPrompt] = useState(false);
+  const { draft, setDraft, publish, saving, dirty, save, unpublished } = editor;
+
+  return (
+    <>
+      <ReportEditorHeader
+        tenantSlug={tenantSlug}
+        {...(editId ? { editId } : {})}
+        name={draft.name}
+        publish={publish}
+        blockCount={draft.blocks.length}
+        saving={saving}
+        dirty={dirty}
+        autosave={unpublished.autosave}
+        onNameChange={(name) => setDraft((prev) => ({ ...prev, name }))}
+        onOpenSettings={onOpenSettings}
+        onCancel={() => void navigate(exitTarget)}
+        onSave={save}
+        onBeforeExit={() => {
+          if (!hasPendingWork(dirty, unpublished.present)) return true;
+          setPrompt(true);
+          return false;
+        }}
+      />
+      <ExitConfirmDialog
+        open={prompt}
+        publish={publish}
+        onLeave={() => {
+          setPrompt(false);
+          void navigate(exitTarget);
+        }}
+        onStay={() => setPrompt(false)}
+      />
+    </>
+  );
+}
+
 function ReportEditorForm({
   tenantSlug,
   editId,
@@ -82,11 +175,10 @@ function ReportEditorForm({
   entities: ReportEntityFields[];
   source: EditorSource;
 }): JSX.Element {
-  const navigate = useNavigate();
   const editor = useEditorState(tenantSlug, editId, source);
-  const { draft, setDraft, publish, setPublish, range, setRange } = editor;
-  const { defaultRange, setDefaultRange, error, saving, dirty, save, unpublished } = editor;
+  const { draft, setDraft, range, setRange, error, unpublished } = editor;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const exitTarget = editId ? `/${tenantSlug}/reports/${editId}` : `/${tenantSlug}/reports`;
   // One field shape, including the panels rendered through a portal.
   const fieldTheme = useReportPortalTheme();
 
@@ -97,21 +189,12 @@ function ReportEditorForm({
     <ThemeProvider theme={fieldTheme}>
     <DockedPanelRegion>
       <Stack spacing={3} sx={EDITOR_SURFACE_SX} data-testid="page-report-editor">
-        <ReportEditorHeader
+        <EditorTopBar
           tenantSlug={tenantSlug}
           {...(editId ? { editId } : {})}
-          name={draft.name}
-          publish={publish}
-          blockCount={draft.blocks.length}
-          saving={saving}
-          dirty={dirty}
-          autosave={unpublished.autosave}
-          onNameChange={(name) => setDraft((prev) => ({ ...prev, name }))}
+          editor={editor}
+          exitTarget={exitTarget}
           onOpenSettings={() => setSettingsOpen(true)}
-          onCancel={() =>
-            void navigate(editId ? `/${tenantSlug}/reports/${editId}` : `/${tenantSlug}/reports`)
-          }
-          onSave={save}
         />
 
         <UnpublishedChangesBar unpublished={unpublished} />
@@ -135,17 +218,7 @@ function ReportEditorForm({
         />
       </Stack>
 
-      <ReportSettingsDialog
-        open={settingsOpen}
-        tenantSlug={tenantSlug}
-        value={{ name: draft.name, description: draft.description, publish, defaultRange }}
-        onChange={(next) => {
-          setDraft((prev) => ({ ...prev, name: next.name, description: next.description }));
-          setPublish(next.publish);
-          setDefaultRange(next.defaultRange);
-        }}
-        onClose={() => setSettingsOpen(false)}
-      />
+      <EditorSettings tenantSlug={tenantSlug} editor={editor} open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </DockedPanelRegion>
     </ThemeProvider>
   );
