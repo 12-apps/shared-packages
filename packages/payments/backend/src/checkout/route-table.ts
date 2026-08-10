@@ -43,6 +43,26 @@ export const CHECKOUT_ROUTES: readonly CheckoutRouteSpec[] = [
     principal: 'BUYER',
     payableScoped: false,
   },
+  // Vault a card OUTSIDE any purchase (FUT-478) — the buyer-side counterpart
+  // of the admin table's `vault/begin` + `vault/complete`. Deliberately on
+  // THIS table rather than reusing that one: the mount split is a privilege
+  // boundary (see `http/mount.ts`), and these rows serve the BUYER principal.
+  // There is intentionally NO buyer-side forget row — removal stays a
+  // merchant/host concern; see `flows-vault.ts`.
+  {
+    kind: 'beginVault',
+    method: 'POST',
+    pattern: ['cards', 'begin'],
+    principal: 'BUYER',
+    payableScoped: false,
+  },
+  {
+    kind: 'completeVault',
+    method: 'POST',
+    pattern: ['cards', 'complete'],
+    principal: 'BUYER',
+    payableScoped: false,
+  },
   {
     kind: 'createCheckout',
     method: 'POST',

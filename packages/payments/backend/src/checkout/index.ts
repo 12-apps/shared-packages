@@ -45,6 +45,15 @@ export type {
   SavedInstrumentPort,
 } from './types';
 /**
+ * The buyer-vault vocabulary (FUT-478): the ownership port `/cards/begin` +
+ * `/cards/complete` run under, and the two browser-safe answer shapes.
+ */
+export type {
+  BuyerVaultPort,
+  BuyerVaultSession,
+  VaultedCardDisplay,
+} from './vault-port';
+/**
  * The charge-body normalizer, exported so a host can assert what its OWN
  * client's request turns into. Which two wire shapes it accepts, and which of
  * them is canonical, is the module's own doc.

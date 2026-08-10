@@ -128,6 +128,8 @@ export const { GET, POST } = createPaymentFlowsBE({ /* config below */ });
 | --- | --- | --- | --- | --- |
 | `getCheckoutConfig` | GET | `/config` | PUBLIC | `resolveMerchant` |
 | `listInstruments` | GET | `/cards` | BUYER | `resolveMerchant` |
+| `beginVault` | POST | `/cards/begin` | BUYER | `resolveMerchant` |
+| `completeVault` | POST | `/cards/complete` | BUYER | `resolveMerchant` |
 | `createCheckout` | POST | `/` | BUYER | `resolveMerchant` |
 | `chargeInstrument` | POST | `/charge` | BUYER | the loaded payable |
 | `getStatus` | GET | `/status` | BUYER | the loaded payable |
@@ -190,6 +192,21 @@ requires it when your own payable row has no column to keep one in.
   decides WHEN each fires and WITH WHAT AMOUNT.
 - `instruments` — vault storage. The library owns the (merchant, provider)
   scoping rule and the 409 that keeps a scope mismatch from becoming a decline.
+- `vault` — the ownership facts for saving a card OUTSIDE a purchase
+  (FUT-478): `(caller, scope) => VaultBeginInput`, where `reference` and
+  `customerRef` come from your rows — derived from the buyer principal and the
+  (merchant, provider) scope, never from a request body, the same rule the
+  admin surface's `VaultRequestResolvers` enforces. The browser contributes
+  exactly two facts to `completeVault`: the `sessionId` it confirmed and, for
+  a sessionless PUBLIC_KEY provider, the encrypted card blob as `token`.
+  Optional — without it, or without `instruments.save`, `/cards/begin` and
+  `/cards/complete` answer 404 `Card vaulting is not enabled` (the admin
+  convention) BEFORE any adapter runs, so no provider-side token is ever
+  minted that you cannot store. `completeVault` answers display metadata only
+  (`brand`/`last4`/`expMonth`/`expYear`), never the vault token. There is
+  deliberately NO buyer-side forget: PagBank publishes no token delete, so
+  removal stays a merchant/host concern on the admin table's
+  `vault/:provider/forget`.
 - `browserKey` — re-mint a PUBLIC key on demand. This is the only place a
   provider NAME belongs on the checkout path, and it belongs to you.
 - `copy` — every buyer-facing sentence. `defaultCheckoutCopyPtBR` ships the
