@@ -577,3 +577,38 @@ test('a custom period runs the window the picker asked for', async ({ page }) =>
   // control that set it.
   await expect(page.getByTestId('report-window')).toHaveText('20/06 – 25/06');
 });
+
+/**
+ * The picker's two months sit BESIDE each other, and `Aplicar` stays reachable.
+ *
+ * This is a layout claim, so it is asserted here rather than in a unit test:
+ * jsdom computes no geometry, and the emotion class that carries the dialog's
+ * width means nothing there — a unit test could only re-state the prop, which
+ * is the very thing that was wrong.
+ *
+ * What it caught: the dialog gained a quick-range column and kept the `md`
+ * width it had as a bare calendar. The row no longer fit, so the second month
+ * wrapped UNDER the first, doubling the dialog's height and pushing the
+ * confirm button off a 900px screen — a period you could pick but not apply.
+ */
+test('the custom-period dialog fits its two months on one row', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openFirstReport(page);
+
+  await page.getByTestId('report-range-item-custom').click();
+  await expect(page.getByTestId('report-range-custom')).toBeVisible();
+
+  const first = await page.getByTestId('calendar-month-0').boundingBox();
+  const second = await page.getByTestId('calendar-month-1').boundingBox();
+  if (!first || !second) throw new Error('both months should be rendered');
+
+  // Same row, second to the right of the first. Comparing tops rather than
+  // asserting an exact x keeps this about the WRAP, not about the gap.
+  expect(Math.abs(first.y - second.y)).toBeLessThan(4);
+  expect(second.x).toBeGreaterThan(first.x);
+
+  // And the way out is on screen without scrolling the dialog.
+  const apply = await page.getByTestId('report-range-custom-apply').boundingBox();
+  if (!apply) throw new Error('Aplicar should be rendered');
+  expect(apply.y + apply.height).toBeLessThanOrEqual(900);
+});
