@@ -34,10 +34,14 @@ export const muiVariantFor = (variant: InputVariant): 'outlined' | 'filled' | 's
   }
 };
 
+// MUI gives a text field two heights, so the five house stops are drawn as two
+// plus padding: `xs` tightens below small, `lg`/`xl` open up above medium.
 export const SIZE_MAP = {
+  xs: { size: 'small' as const, sx: { '& .MuiInputBase-input': { padding: '6px 10px' } } },
   sm: { size: 'small' as const },
   md: { size: 'medium' as const },
   lg: { size: 'medium' as const, sx: { '& .MuiInputBase-input': { padding: '16px 14px' } } },
+  xl: { size: 'medium' as const, sx: { '& .MuiInputBase-input': { padding: '20px 16px' } } },
 };
 
 export const glowStyles = (theme: Theme): CSSObject => ({

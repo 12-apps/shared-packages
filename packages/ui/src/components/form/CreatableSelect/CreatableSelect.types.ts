@@ -45,7 +45,7 @@ export interface CreatableSelectProps {
    * Control height, matching {@link Input}'s scale so the two line up when they
    * share a grid row (default: `md`).
    */
-  size?: Extract<SizeValue, 'sm' | 'md'>;
+  size?: SizeValue;
   /** Base test id; the input is `<dataTestId>-input`. */
   dataTestId?: string;
 }

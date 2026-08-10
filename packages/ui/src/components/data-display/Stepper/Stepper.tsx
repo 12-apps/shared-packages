@@ -8,6 +8,18 @@ import {
 import React from 'react';
 
 import type { Step, StepItemProps, StepperProps } from './Stepper.types';
+import type { SizeValue } from '../../../tokens/scales';
+
+/**
+ * The five house stops, drawn rather than collapsed.
+ *
+ * These were two-way ternaries on `sm`, which is what a two-value size prop
+ * allows; with the full scale they have to be real values or the three new
+ * stops would render identically to `md` and the prop would be a lie.
+ */
+const STEP_MIN_WIDTH: Record<SizeValue, number> = { xs: 44, sm: 56, md: 80, lg: 96, xl: 112 };
+const STEP_ICON_SIZE: Record<SizeValue, number> = { xs: 14, sm: 18, md: 24, lg: 30, xl: 36 };
+
 
 const StepperRoot = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'orientation',
@@ -37,12 +49,12 @@ const StepItem = styled(Box, {
 }));
 
 /** Circle diameter per size. */
-const CIRCLE_SIZE = { sm: 32, md: 48 } as const;
+const CIRCLE_SIZE: Record<SizeValue, number> = { xs: 24, sm: 32, md: 48, lg: 60, xl: 72 };
 
 const StepButton = styled(Button, {
   shouldForwardProp: (prop) =>
     !['isActive', 'isCompleted', 'clickable', 'stepSize'].includes(prop as string),
-})<{ isActive: boolean; isCompleted: boolean; clickable: boolean; stepSize: 'sm' | 'md' }>(
+})<{ isActive: boolean; isCompleted: boolean; clickable: boolean; stepSize: SizeValue }>(
   ({ theme, isActive, isCompleted, clickable, stepSize }) => ({
     minWidth: CIRCLE_SIZE[stepSize],
     width: CIRCLE_SIZE[stepSize],
@@ -80,7 +92,7 @@ const StepButton = styled(Button, {
 const StepConnector = styled(Box, {
   shouldForwardProp: (prop) =>
     !['orientation', 'isCompleted', 'size'].includes(prop as string),
-})<{ orientation: 'horizontal' | 'vertical'; isCompleted: boolean; size: 'sm' | 'md' }>(
+})<{ orientation: 'horizontal' | 'vertical'; isCompleted: boolean; size: SizeValue }>(
   ({ theme, orientation, isCompleted, size }) => ({
     backgroundColor: isCompleted ? theme.palette.primary.main : theme.palette.grey[300],
     transition: theme.transitions.create('background-color', {
@@ -115,7 +127,7 @@ const StepLabel = styled(Box, {
   marginTop: orientation === 'horizontal' ? 8 : 0,
 }));
 
-type StepSize = 'sm' | 'md';
+type StepSize = SizeValue;
 type LabelVariant = 'caption' | 'body2';
 
 /** Space-joined state classes for a step (active / completed / optional). */
@@ -132,7 +144,7 @@ function stepClasses(isActive: boolean, isCompleted: boolean, optional?: boolean
 /** The circle content-column width per orientation/size. */
 function contentSx(orientation: 'horizontal' | 'vertical', size: StepSize) {
   return orientation === 'horizontal'
-    ? { minWidth: size === 'sm' ? 56 : 80, maxWidth: 150, flex: '0 1 auto' }
+    ? { minWidth: STEP_MIN_WIDTH[size], maxWidth: 150, flex: '0 1 auto' }
     : { flexShrink: 0 };
 }
 
@@ -162,7 +174,7 @@ const StepCircle: React.FC<
       data-testid={`stepper-step-icon-${index}`}
     >
       {isCompleted ? (
-        <CheckCircle sx={{ fontSize: size === 'sm' ? 18 : 24 }} />
+        <CheckCircle sx={{ fontSize: STEP_ICON_SIZE[size] }} />
       ) : (
         <Typography variant={labelVariant} fontWeight="bold">
           {index + 1}

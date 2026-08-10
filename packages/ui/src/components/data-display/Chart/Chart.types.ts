@@ -28,7 +28,7 @@ export interface ChartProps {
   type?: ChartType;
   variant?: 'default' | 'glass' | 'gradient' | 'elevated' | 'minimal' | 'neon';
   size?: SizeValue;
-  color?: Exclude<ColorValue, 'neutral'>;
+  color?: ColorValue;
   height?: number;
   width?: number | string;
   glow?: boolean;

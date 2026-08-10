@@ -11,7 +11,7 @@ export interface PaginationProps extends Omit<MuiPaginationProps, 'variant' | 's
   /**
    * Size of the pagination buttons
    */
-  size?: Extract<SizeValue, 'sm' | 'md' | 'lg'>;
+  size?: SizeValue;
   
   /**
    * Current page number

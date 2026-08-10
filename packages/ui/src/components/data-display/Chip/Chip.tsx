@@ -15,7 +15,7 @@ import type { ChipProps } from './Chip.types';
 
 /** MUI draws two chip sizes; ours are the house abbreviations for them. */
 const muiSizeFor = (size: NonNullable<ChipProps['size']>): 'small' | 'medium' =>
-  size === 'sm' ? 'small' : 'medium';
+  size === 'xs' || size === 'sm' ? 'small' : 'medium';
 
 type MuiChipColor =
   | 'primary'

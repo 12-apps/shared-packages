@@ -13,10 +13,13 @@ export type ChipVariant = 'filled' | 'outlined';
  * `ChipSize` nowhere and reached MUI as an unknown value, and the chip silently
  * rendered at the default `medium`. Twelve of them are doing that today.
  *
- * Only two entries, because a MUI chip only draws two. Inventing `lg` here would
- * put a size in the type that nothing can render.
+ * All five stops, and `Chip.tsx` draws them: MUI gives a chip two heights, so
+ * `xs`/`sm` map to small and `md` and up to medium. Offering fewer than five
+ * here is what made callers write `size="sm"` against a type that did not have
+ * it — the scale is the vocabulary, and a component that speaks a dialect of it
+ * is the problem, not the solution.
  */
-export type ChipSize = Extract<SizeValue, 'sm' | 'md'>;
+export type ChipSize = SizeValue;
 
 /**
  * The colours a chip can draw — THE HOUSE VOCABULARY, identical to `ButtonProps`.

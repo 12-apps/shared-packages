@@ -23,7 +23,7 @@ export interface CommandProps {
   onSelect?: (item: CommandItem) => void;
   variant?: 'default' | 'glass' | 'gradient' | 'minimal' | 'elevated';
   size?: SizeValue;
-  color?: Exclude<ColorValue, 'neutral'>;
+  color?: ColorValue;
   glow?: boolean;
   pulse?: boolean;
   loading?: boolean;

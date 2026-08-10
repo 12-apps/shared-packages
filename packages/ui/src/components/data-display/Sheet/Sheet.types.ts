@@ -14,7 +14,7 @@ export interface SheetProps {
    * "the whole viewport", so it extends rather than replaces.
    */
   size?: SizeValue | 'full';
-  color?: Exclude<ColorValue, 'neutral'>;
+  color?: ColorValue;
   glow?: boolean;
   pulse?: boolean;
   glass?: boolean;

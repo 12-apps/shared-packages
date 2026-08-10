@@ -18,7 +18,7 @@ export interface ToggleGroupProps extends Omit<ToggleButtonGroupProps, 'color' |
   /**
    * The color theme of the toggle group
    */
-  color?: Exclude<ColorValue, 'info'>;
+  color?: ColorValue;
 
   /**
    * The size of the toggle group
