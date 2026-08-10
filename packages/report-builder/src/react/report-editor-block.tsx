@@ -19,16 +19,16 @@ import type { JSX } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
-import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
-import { DropdownMenu, type DropdownMenuItem } from "@12-apps/ui/navigation/DropdownMenu";
+import type { DropdownMenuItem } from "@12-apps/ui/navigation/DropdownMenu";
 
 import { useRunReport, type ReportSpecWire } from "./custom-reports-api";
 import { GripIcon, PencilIcon, TrashIcon } from "./lib/block-icons";
 import type { DragReorder, KeyboardReorder } from "./lib/drag-reorder";
 import { CONTAINER_RADIUS_PX } from "./lib/report-surface";
+import { OverflowToolCluster, TOOL_ROW } from "./lib/tool-cluster";
 import { ReportBlockFrame, ReportGridItem } from "./report-grid";
 import { ReportRenderView } from "./report-render";
 import { blockLabel, type ReportBlockDraft } from "./report-model";
@@ -95,15 +95,21 @@ function BlockTitleSlot({
   testId: string;
   onTitleChange: (title: string) => void;
 }): JSX.Element {
-  // A floor, not `minWidth: 0` (FUT-755). The frame's header wraps, and the
-  // comment there says why — the chrome moves to a second line rather than
-  // stealing width from the rendering. It never did: a title slot allowed to
-  // shrink to zero always wins that argument, so at 1024px with the panel open
-  // the input measured 36px against 170px of title and the block was headed
-  // `Rec`. A floor makes the row genuinely unable to fit, which is the
-  // condition `flexWrap` was waiting for.
+  // A floor, not `minWidth: 0` (FUT-755). A title slot allowed to shrink to
+  // zero always wins the argument with the chrome beside it: at 1024px with
+  // the panel open the input measured 36px against 170px of title and the
+  // block was headed `Rec`.
+  //
+  // It is `TOOL_ROW.title` rather than a literal, because the cluster PRICES
+  // the title at that number when it decides how many tools fit. A CSS floor
+  // that let the title take more than the arithmetic assumed would mean the
+  // row sheds nothing and overflows anyway — which is the bug, one level down.
   return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: "center", flex: 1, minWidth: 140 }}>
+    <Stack
+      direction="row"
+      spacing={1}
+      sx={{ alignItems: "center", flex: 1, minWidth: `${TOOL_ROW.title}px` }}
+    >
       <Box
         {...dnd.handleProps(block.id)}
         sx={{ cursor: "grab", userSelect: "none", display: "inline-flex", color: "text.secondary" }}
@@ -128,7 +134,7 @@ function BlockTitleSlot({
 }
 
 /**
- * The block's overflow menu — where the EXPLICIT move actions live.
+ * The EXPLICIT move actions — the two items the ⋮ carries at every width.
  *
  * `specs/editor-direct-manipulation.feature`'s `@drag @mobile` scenario asks
  * for them by name and gives the reason: on a phone the canvas is one column
@@ -140,17 +146,13 @@ function BlockTitleSlot({
  * announces the new position in the canvas's live region and puts focus back
  * on the block that moved. Reimplementing the move here would silently drop
  * both, on the tier where they matter most.
+ *
+ * They are also why the editor's ⋮ is ALWAYS on the row: a cluster with
+ * permanent menu items always has a trigger to render, so the escape hatch
+ * that ✎ and 🗑 overflow into is never itself missing.
  */
-function BlockMenu({
-  block,
-  keyboard,
-  testId,
-}: {
-  block: ReportBlockDraft;
-  keyboard: KeyboardReorder;
-  testId: string;
-}): JSX.Element {
-  const items: DropdownMenuItem[] = [
+function moveItems(block: ReportBlockDraft, keyboard: KeyboardReorder): DropdownMenuItem[] {
+  return [
     {
       id: "move-up",
       label: "Mover para cima",
@@ -164,26 +166,24 @@ function BlockMenu({
       onClick: () => keyboard.move(block.id, 1),
     },
   ];
-
-  return (
-    <DropdownMenu
-      size="sm"
-      items={items}
-      trigger={
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-label="Mais ações do bloco"
-          dataTestId={`${testId}-menu`}
-        >
-          ⋮
-        </Button>
-      }
-    />
-  );
 }
 
-/** ✎ + ⋮ + 🗑 — the block's edit chrome, kept to icons so it fits any width. */
+/**
+ * ✎ + 🗑 + ⋮ — the block's edit chrome, pinned top-right and never wrapped.
+ *
+ * RANKED, which is what decides who keeps a visible slot when the block is too
+ * narrow for both icons: ✎ is the block's primary action and the only route
+ * into its configuration, while 🗑 is the one whose accidental prominence
+ * costs the most. So the trash sheds first — and a delete that has to be found
+ * in a menu, read, and chosen is a delete that is harder to hit by mistake.
+ * It stays destructive either way: the same handler, and the same confirm.
+ *
+ * There is deliberately NO "ver como tabela" here. `prototype.html`'s edit-mode
+ * cluster is duplicate + delete, and its table/CSV pair is view-mode only
+ * (`blockHTML`, the `editable` branch) — an author choosing a visualization
+ * should be looking at the visualization they chose, and the picker is where
+ * that decision is made.
+ */
 function BlockActions({
   block,
   keyboard,
@@ -196,29 +196,30 @@ function BlockActions({
   testId: string;
   onEdit: () => void;
   onRemove: () => void;
-}): JSX.Element {
+}): JSX.Element | null {
   return (
-    <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-label="Editar bloco"
-        onClick={onEdit}
-        dataTestId={`${testId}-edit`}
-      >
-        <PencilIcon />
-      </Button>
-      <BlockMenu block={block} keyboard={keyboard} testId={testId} />
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-label="Remover bloco"
-        onClick={onRemove}
-        dataTestId={`${testId}-remove`}
-      >
-        <TrashIcon />
-      </Button>
-    </Stack>
+    <OverflowToolCluster
+      tools={[
+        {
+          id: "edit",
+          label: "Editar bloco",
+          icon: <PencilIcon />,
+          onSelect: onEdit,
+          dataTestId: `${testId}-edit`,
+        },
+        {
+          id: "remove",
+          label: "Remover bloco",
+          icon: <TrashIcon />,
+          onSelect: onRemove,
+          dataTestId: `${testId}-remove`,
+          danger: true,
+        },
+      ]}
+      menuItems={moveItems(block, keyboard)}
+      menuTestId={`${testId}-menu`}
+      menuLabel="Mais ações do bloco"
+    />
   );
 }
 

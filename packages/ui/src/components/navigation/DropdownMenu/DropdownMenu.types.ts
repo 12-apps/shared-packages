@@ -57,6 +57,15 @@ export interface DropdownMenuItem {
    * Color variant for the item
    */
   color?: ColorValue;
+
+  /**
+   * Test ID for the rendered item.
+   *
+   * Needed by any surface where an action MOVES into this menu when the row
+   * runs out of room: the action's id has to survive the move, or a suite that
+   * drives it by id passes on a wide screen and fails on a narrow one.
+   */
+  dataTestId?: string;
 }
 
 export interface DropdownMenuProps extends Omit<MenuProps, 'open' | 'variant'> {
