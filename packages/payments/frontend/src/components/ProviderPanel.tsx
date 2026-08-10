@@ -19,6 +19,7 @@ import type {
 } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
+import { ConnectionProbe } from './ConnectionProbe';
 import { EnvironmentNotice, EnvironmentSelector } from './EnvironmentTabs';
 import { ProviderConnection } from './ProviderConnection';
 import { ProviderForm } from './ProviderCredentialForm';
@@ -57,10 +58,13 @@ export interface ActivePanelProps {
    * physically contains the field for that step, because "informe sua
    * InfiniteTag" and the box you type it into are one thing.
    *
-   * On the OAUTH path the whole assembly stays inside the manual disclosure. It
-   * is written for someone pasting credentials by hand, so there it is a wall
-   * of instructions contradicting the card above it, which says no key needs
-   * copying. Reachable, just not the first thing read.
+   * On the OAUTH path with a working connect button the walkthrough renders
+   * OUTSIDE the manual disclosure (slots empty — the credential FORM stays
+   * inside it). It used to be stuffed in there whole, which buried the
+   * provider's own setup guide behind "prefiro informar as credenciais
+   * manualmente" — a label the connect card above explicitly says there is no
+   * reason to open (FUT-691). Deliberately shared behavior: every OAuth
+   * provider's screen changes shape, PagBank's included.
    */
   guide?: (slots: {
     rows: ReactNode;
@@ -166,6 +170,35 @@ function requiredStored(
     .every((spec) => stored[spec.key]?.configured === true);
 }
 
+/**
+ * Does this provider get the connect-button branch of {@link OAuthPanel}?
+ * With a working connect button the walkthrough leaves the form; without one
+ * the form IS the path and keeps the guide interleaved.
+ */
+function oauthWithConnect(props: ActivePanelProps): boolean {
+  return props.descriptor.authMode === 'oauth' && Boolean(props.prepareConnect);
+}
+
+/**
+ * The walkthrough as the OAUTH connect branch renders it: standalone, slots
+ * empty (null on every other branch, where the form carries the guide).
+ *
+ * The credential form stays inside the manual disclosure, so the guide gets no
+ * rows and no live field — and `stored` answers for the ACTIVE environment,
+ * which is the one the connect card and the server-computed stage describe
+ * (the tabs inside the disclosure govern the form, not this).
+ */
+function oauthWalkthrough(props: ActivePanelProps): ReactNode {
+  const { descriptor, config, guide } = props;
+  if (!guide || !oauthWithConnect(props)) return null;
+  return guide({
+    rows: null,
+    sectionFooter: null,
+    editing: false,
+    stored: requiredStored(descriptor, config, config?.environment ?? 'SANDBOX'),
+  });
+}
+
 export function ActivePanel(props: ActivePanelProps) {
   const { descriptor, config, client, onChanged, reload, guide, verification } = props;
   const statusBar = <EnableBar {...props} />;
@@ -180,6 +213,10 @@ export function ActivePanel(props: ActivePanelProps) {
   // and the one that costs money is the one you did not ask for.
   const [editing, setEditing] = useState(false);
 
+  // On the connect branch the walkthrough leaves the form (see the `guide`
+  // prop): the form then stands alone inside the manual disclosure.
+  const oauthConnect = oauthWithConnect(props);
+
   const credentials = (
     <ProviderForm
       descriptor={descriptor}
@@ -191,7 +228,7 @@ export function ActivePanel(props: ActivePanelProps) {
       onChanged={onChanged}
       onSaved={reload}
       onCredentialsReplaced={props.onCredentialsReplaced}
-      renderGuide={guide}
+      renderGuide={oauthConnect ? undefined : guide}
     />
   );
 
@@ -226,6 +263,7 @@ export function ActivePanel(props: ActivePanelProps) {
     <OAuthPanel
       {...props}
       statusBar={statusBar}
+      walkthrough={oauthWalkthrough(props)}
       form={
         <Stack spacing={2}>
           {selector}
@@ -254,8 +292,14 @@ function OAuthPanel({
   prepareConnect,
   verification,
   statusBar,
+  walkthrough,
   form,
-}: ActivePanelProps & { statusBar: ReactNode; form: ReactNode }) {
+}: ActivePanelProps & { statusBar: ReactNode; walkthrough: ReactNode; form: ReactNode }) {
+  // The connection probe, for a store whose connection is a grant: the form's
+  // own probe runs off Salvar, which an OAuth store never presses (FUT-691).
+  const probe = (
+    <ConnectionProbe descriptor={descriptor} config={config} client={client} reload={reload} />
+  );
   if (!prepareConnect) {
     return (
       <ProviderCard header={statusBar}>
@@ -264,6 +308,7 @@ function OAuthPanel({
           instalação. Você ainda pode conectar informando as credenciais manualmente.
         </Alert>
         {form}
+        {probe}
         {verification}
       </ProviderCard>
     );
@@ -285,6 +330,15 @@ function OAuthPanel({
         manualmente" to find it.
       */}
       {verification}
+      {/*
+        The provider's walkthrough, OUTSIDE the disclosure for the same reason
+        as the activation step above it: it used to live inside the credential
+        form, which on this branch is folded into the manual fallback — so the
+        guide (and the stepper answering "where am I") was buried behind a
+        label the connect card says there is no reason to open (FUT-691).
+      */}
+      {walkthrough}
+      {probe}
       {descriptor.credentialSchema.length > 0 ? (
         <Accordion disableGutters data-testid="payments-manual-fallback">
           <AccordionSummary expandIcon={<span aria-hidden>▾</span>}>

@@ -163,7 +163,15 @@ export function tokensToFields(
   if (res.access_token) fields['accessToken'] = res.access_token;
   // A refresh response omits `refresh_token`; the original must survive.
   if (res.refresh_token) fields['refreshToken'] = res.refresh_token;
-  if (res.stripe_user_id) fields['stripeUserId'] = res.stripe_user_id;
+  if (res.stripe_user_id) {
+    fields['stripeUserId'] = res.stripe_user_id;
+    // Also under the RESERVED identity key (`connectedAccountFrom` reads
+    // `accountId`, as pagbank-oauth stores it): it is what lets the settings
+    // page say "Conta conectada: acct_…" instead of a nameless connection
+    // (FUT-691). `stripeUserId` stays: `Stripe-Account` headers, webhook
+    // binding and `revoke` all read the provider's own spelling.
+    fields['accountId'] = res.stripe_user_id;
+  }
   if (res.stripe_publishable_key) fields['publishableKey'] = res.stripe_publishable_key;
   if (res.scope) fields['scope'] = res.scope;
   if (typeof res.livemode === 'boolean') fields['livemode'] = String(res.livemode);
