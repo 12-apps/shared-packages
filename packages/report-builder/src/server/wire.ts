@@ -4,6 +4,7 @@ import { dashboardSpecSchema, reportDocumentSchema, reportSpecSchema } from '../
 import { SYSTEM_REPORT_KEYS } from './presets';
 import { REPORT_DEFAULT_RANGES, REPORT_MAX_RANGE_DAYS, REPORT_RANGE_PRESETS } from './range';
 import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
+import { reportWorkingCopySchema } from './working-copy';
 
 /**
  * The wire contract of the reports HTTP/MCP surface — authored ONCE here (the
@@ -18,6 +19,18 @@ import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
  * because it is the wire contract every host imports.
  */
 export { REPORT_MAX_RANGE_DAYS, REPORT_RANGE_PRESETS };
+
+/**
+ * The body of `PUT /reports/custom/:id/working-copy` — one autosave of the
+ * author's in-progress edit to a PUBLISHED report (FUT-755), and the shape the
+ * column stores.
+ *
+ * Re-exported from `./working-copy`, which owns the concept, because this
+ * module is the wire contract every host imports. It is deliberately LOOSER
+ * than {@link saveReportBody}: an autosave fires mid-edit, and a body rejected
+ * mid-edit drops exactly the keystrokes the feature exists to keep.
+ */
+export { reportWorkingCopySchema };
 
 export const REPORT_GRAINS = ['day', 'week', 'month'] as const;
 
@@ -217,6 +230,12 @@ export const savedReportSummarySchema = z.object({
    * rides a listing that has no use for one.
    */
   ownedByMe: z.boolean(),
+  /**
+   * Whether a PUBLISHED report is carrying unpublished changes (FUT-755) — an
+   * edit parked beside the live document. Distinct from `status: 'draft'`,
+   * which is a report that was never published at all.
+   */
+  hasUnpublishedChanges: z.boolean(),
   updatedAt: z.string(),
 });
 
@@ -254,6 +273,13 @@ const savedLifecycleFields = {
   visibilityRoles: z.array(z.string()),
   /** The period the report opens on; null when it has no preference. */
   defaultRange: z.enum(REPORT_DEFAULT_RANGES).nullable(),
+  /**
+   * The author's parked edit, echoed ONLY to a caller who may author (FUT-755).
+   * The rest of the payload is always the PUBLISHED document — a reader opening
+   * a report while someone edits it must see what is live, not what is being
+   * written.
+   */
+  workingCopy: reportWorkingCopySchema.nullish(),
 } as const;
 
 const savedSingleReportViewSchema = z.object({
