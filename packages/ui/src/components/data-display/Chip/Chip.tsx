@@ -13,15 +13,6 @@ import {
 } from './Chip.helpers';
 import type { ChipProps } from './Chip.types';
 
-type MuiChipColor =
-  | 'primary'
-  | 'secondary'
-  | 'error'
-  | 'info'
-  | 'success'
-  | 'warning'
-  | 'default';
-
 export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
   label,
   variant = 'filled',
@@ -49,7 +40,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
       label={<span data-testid={testId('label')}>{label}</span>}
       variant={variant}
       size={size}
-      color={color as MuiChipColor | undefined}
+      color={color}
       avatar={avatarFor(avatar, avatarSrc)}
       icon={iconWithTestId(icon, testId('icon'))}
       onDelete={deletable ? onDelete : undefined}

@@ -14,6 +14,7 @@ import {
 } from "./data-views-layout-context";
 import { FilterDialog, GridFilterPanel } from "./data-views-filter-panel";
 import { GridMain } from "./data-views-grid-bodies";
+import type { ListGroupConfig } from "./list-card-rails";
 import { InlineFilterControls } from "./data-views-inline-bar";
 import { toOverflowFields, useFilterOverflow, type OverflowSplit } from "./data-views-overflow";
 import { ShellToolbar } from "./data-views-shell-toolbar";
@@ -238,6 +239,8 @@ interface GridShellProps<T extends Record<string, unknown>> {
   board?: BoardConfig<T>;
   /** Opt-in "Lista" layout: one full-width, entity-rendered row per record. */
   renderListRow?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
+  /** The Lista's shared columns, so its rows line up by construction. */
+  listGroup?: ListGroupConfig<T>;
   /** The page-level partition rendered as tabs under the toolbar. */
   scopes?: ScopeConfig[];
   /**
@@ -340,6 +343,7 @@ function ShellStack<T extends Record<string, unknown>>({
               getRowId={props.getRowId}
               renderCard={props.renderCard}
               renderListRow={props.renderListRow}
+              listGroup={props.listGroup}
               board={props.board}
               dataTestId={dataTestId}
               testIdPrefix={testIdPrefix}

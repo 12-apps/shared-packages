@@ -6,8 +6,12 @@
 interface ChipProps {
   label: string;
   variant?: 'filled' | 'outlined';
-  size?: 'sm' | 'md' | 'lg';
-  color?: ColorValue; // theme token
+  size?: 'small' | 'medium';
+  /**
+   * A CLOSED set. `danger` is not one of them — use `error` for the
+   * destructive/attention meaning. See `ChipColor`.
+   */
+  color?: 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' | 'default';
   avatarSrc?: string; // or avatar node via `avatar`
   avatar?: React.ReactNode;
   icon?: React.ReactNode; // leading icon

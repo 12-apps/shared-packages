@@ -33,8 +33,9 @@ const meta: Meta<typeof Chip> = {
       description: 'Size of the chip',
     },
     color: {
-      control: 'text',
-      description: 'Theme color token',
+      control: 'select',
+      options: ['primary', 'secondary', 'error', 'info', 'success', 'warning', 'default'],
+      description: 'Theme color token — a closed set; `error` is the destructive one',
     },
     avatarSrc: {
       control: 'text',
