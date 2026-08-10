@@ -102,7 +102,12 @@ export const CalendarMonth: FC<CalendarMonthProps> = ({
   const title = renderHeader ? renderHeader({ month: matrix.month, year: matrix.year }) : monthName;
 
   return (
-    <Box sx={{ minWidth: 280 }}>
+    /* The month is addressable by its position, because in a multi-month
+       calendar every day number appears once PER MONTH — `calendar-date-5` is
+       January's 5th and February's. Without a per-month hook a test can only
+       reach a day positionally, which is exactly what the flakiness gate
+       refuses. Additive: `calendar-grid` below is unchanged. */
+    <Box sx={{ minWidth: 280 }} data-testid={`calendar-month-${monthIndex}`}>
       <MonthNavHeader
         title={title}
         showPrevious={monthIndex === 0}

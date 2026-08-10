@@ -280,8 +280,8 @@ test('a custom period runs the window the picker asked for', async ({ page }) =>
   await page.getByTestId('report-range-item-custom').click();
   await expect(page.getByTestId('report-range-custom')).toBeVisible();
 
-  await page.getByTestId('calendar-date-20').click();
-  await page.getByTestId('calendar-date-25').click();
+  await page.getByTestId('calendar-month-0').getByTestId('calendar-date-20').click();
+  await page.getByTestId('calendar-month-0').getByTestId('calendar-date-25').click();
   await page.getByTestId('report-range-custom-apply').click();
 
   await expect(daily).toBeVisible({ timeout: 15_000 });

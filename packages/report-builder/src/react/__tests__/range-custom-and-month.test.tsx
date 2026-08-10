@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { createWebReportBuilder } from '../create-report-builder';
 import type {
@@ -161,16 +161,32 @@ async function openPicker(): Promise<void> {
 }
 
 /**
+ * Click a day in JANUARY, the picker's first visible month.
+ *
+ * The picker shows TWO months, so `calendar-date-5` matches twice — once in
+ * January and once in February. An unscoped query fails on the ambiguity
+ * rather than picking one, which is the right behaviour and the reason this
+ * helper exists: every case here means the January day, and saying so once is
+ * better than each case disambiguating differently.
+ */
+function clickJanuary(day: number): void {
+  fireEvent.click(
+    within(screen.getByTestId('calendar-month-0')).getByTestId(`calendar-date-${day}`),
+  );
+}
+
+/**
  * Pick `from` → `to` in January 2026.
  *
  * The seeded window is already complete, so the FIRST click opens a new range
  * and the second closes it — the calendar's own rule, not something this file
  * arranges. January's matrix runs 28/12 → 31/01, so a day in the first three
- * weeks appears exactly once and needs no disambiguation.
+ * weeks appears exactly once WITHIN that month and needs no further
+ * disambiguation.
  */
 function pickJanuary(from: number, to: number): void {
-  fireEvent.click(screen.getByTestId(`calendar-date-${from}`));
-  fireEvent.click(screen.getByTestId(`calendar-date-${to}`));
+  clickJanuary(from);
+  clickJanuary(to);
   fireEvent.click(screen.getByTestId('report-range-custom-apply'));
 }
 
@@ -223,15 +239,17 @@ describe('Personalizado… asks before it applies', () => {
   it('holds Aplicar until BOTH ends are chosen', async () => {
     await openPicker();
 
-    fireEvent.click(screen.getByTestId('calendar-date-5'));
+    clickJanuary(5);
 
     // Half a range is not a period, and the button says so rather than the
     // server saying it afterwards.
     const apply = screen.getByTestId('report-range-custom-apply');
     expect(apply.hasAttribute('disabled')).toBe(true);
 
-    fireEvent.click(screen.getByTestId('calendar-date-9'));
-    expect(screen.getByTestId('report-range-custom-apply').hasAttribute('disabled')).toBe(false);
+    clickJanuary(9);
+    await waitFor(() => {
+      expect(screen.getByTestId('report-range-custom-apply').hasAttribute('disabled')).toBe(false);
+    });
   });
 
   it('sends both dates with the preset once confirmed', async () => {
@@ -258,8 +276,8 @@ describe('Personalizado… asks before it applies', () => {
   it('changes nothing when the picker is cancelled', async () => {
     await openPicker();
 
-    fireEvent.click(screen.getByTestId('calendar-date-5'));
-    fireEvent.click(screen.getByTestId('calendar-date-9'));
+    clickJanuary(5);
+    clickJanuary(9);
     fireEvent.click(screen.getByTestId('report-range-custom-cancel'));
 
     // The dialog leaves on a transition, so its node outlives the click.
@@ -286,7 +304,7 @@ describe('Personalizado… asks before it applies', () => {
 
   it('starts the next open from the applied window, not from the cancelled pick', async () => {
     await openPicker();
-    fireEvent.click(screen.getByTestId('calendar-date-5'));
+    clickJanuary(5);
     fireEvent.click(screen.getByTestId('report-range-custom-cancel'));
 
     fireEvent.click(screen.getByTestId('report-range-item-custom'));
