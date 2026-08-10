@@ -81,6 +81,12 @@ jobs:
       pull-requests: read
     uses: 12-apps/ci/.github/workflows/detect-changes.yml@v2
     with:
+      # On a stacked PR, diff against the STACK's base rather than this PR's
+      # immediate base (the layer below). Without it the coarse `code` gate
+      # reads one layer only, so a docs-only top layer sitting on a code layer
+      # would report code:false and skip the whole pipeline for changes that
+      # ARE code. Inert off a stack.
+      stack-aware: true
       # Deliberately COARSE, because these two categories answer only the CHEAP
       # question: "can this diff reach anything CI builds at all?" That is what a
       # path glob is good for, and a docs-only PR is what it makes free.
@@ -154,7 +160,29 @@ jobs:
       - name: Fetch the base branch for turbo --affected
         if: github.event_name == 'pull_request'
         shell: bash
-        run: git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
+        env:
+          # Empty unless this PR is in a stack; the property does not exist
+          # otherwise, so the else-branch below is what every normal PR takes.
+          STACK_BASE_REF: ${{ github.event.pull_request.stack.base.ref }}
+          STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "$STACK_BASE_SHA" ]; then
+            # Mid-stack, GITHUB_BASE_REF is the branch BELOW this PR, so
+            # --affected would select only this layer's packages and skip
+            # everything the layers underneath touched — going green having
+            # checked less. TURBO_SCM_BASE overrides the base turbo diffs from.
+            #
+            # Set from this conditional branch rather than a job-level `env:`
+            # that resolves to '' off a stack: turbo documents the variable but
+            # not how it treats an empty value, and unset is the only behaviour
+            # we can rely on.
+            git fetch --no-tags --depth=50 origin "$STACK_BASE_REF"
+            echo "TURBO_SCM_BASE=$STACK_BASE_SHA" >> "$GITHUB_ENV"
+            echo "Stacked PR — turbo --affected diffs against $STACK_BASE_REF ($STACK_BASE_SHA)"
+          else
+            git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
+          fi
       - name: Lint
         shell: bash
         run: |
@@ -196,7 +224,29 @@ jobs:
       - name: Fetch the base branch for turbo --affected
         if: github.event_name == 'pull_request'
         shell: bash
-        run: git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
+        env:
+          # Empty unless this PR is in a stack; the property does not exist
+          # otherwise, so the else-branch below is what every normal PR takes.
+          STACK_BASE_REF: ${{ github.event.pull_request.stack.base.ref }}
+          STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "$STACK_BASE_SHA" ]; then
+            # Mid-stack, GITHUB_BASE_REF is the branch BELOW this PR, so
+            # --affected would select only this layer's packages and skip
+            # everything the layers underneath touched — going green having
+            # checked less. TURBO_SCM_BASE overrides the base turbo diffs from.
+            #
+            # Set from this conditional branch rather than a job-level `env:`
+            # that resolves to '' off a stack: turbo documents the variable but
+            # not how it treats an empty value, and unset is the only behaviour
+            # we can rely on.
+            git fetch --no-tags --depth=50 origin "$STACK_BASE_REF"
+            echo "TURBO_SCM_BASE=$STACK_BASE_SHA" >> "$GITHUB_ENV"
+            echo "Stacked PR — turbo --affected diffs against $STACK_BASE_REF ($STACK_BASE_SHA)"
+          else
+            git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
+          fi
       - name: Type check
         shell: bash
         run: |
@@ -238,7 +288,29 @@ jobs:
       - name: Fetch the base branch for turbo --affected
         if: github.event_name == 'pull_request'
         shell: bash
-        run: git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
+        env:
+          # Empty unless this PR is in a stack; the property does not exist
+          # otherwise, so the else-branch below is what every normal PR takes.
+          STACK_BASE_REF: ${{ github.event.pull_request.stack.base.ref }}
+          STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "$STACK_BASE_SHA" ]; then
+            # Mid-stack, GITHUB_BASE_REF is the branch BELOW this PR, so
+            # --affected would select only this layer's packages and skip
+            # everything the layers underneath touched — going green having
+            # checked less. TURBO_SCM_BASE overrides the base turbo diffs from.
+            #
+            # Set from this conditional branch rather than a job-level `env:`
+            # that resolves to '' off a stack: turbo documents the variable but
+            # not how it treats an empty value, and unset is the only behaviour
+            # we can rely on.
+            git fetch --no-tags --depth=50 origin "$STACK_BASE_REF"
+            echo "TURBO_SCM_BASE=$STACK_BASE_SHA" >> "$GITHUB_ENV"
+            echo "Stacked PR — turbo --affected diffs against $STACK_BASE_REF ($STACK_BASE_SHA)"
+          else
+            git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
+          fi
       - name: Build
         shell: bash
         run: |
@@ -280,7 +352,29 @@ jobs:
       - name: Fetch the base branch for turbo --affected
         if: github.event_name == 'pull_request'
         shell: bash
-        run: git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
+        env:
+          # Empty unless this PR is in a stack; the property does not exist
+          # otherwise, so the else-branch below is what every normal PR takes.
+          STACK_BASE_REF: ${{ github.event.pull_request.stack.base.ref }}
+          STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "$STACK_BASE_SHA" ]; then
+            # Mid-stack, GITHUB_BASE_REF is the branch BELOW this PR, so
+            # --affected would select only this layer's packages and skip
+            # everything the layers underneath touched — going green having
+            # checked less. TURBO_SCM_BASE overrides the base turbo diffs from.
+            #
+            # Set from this conditional branch rather than a job-level `env:`
+            # that resolves to '' off a stack: turbo documents the variable but
+            # not how it treats an empty value, and unset is the only behaviour
+            # we can rely on.
+            git fetch --no-tags --depth=50 origin "$STACK_BASE_REF"
+            echo "TURBO_SCM_BASE=$STACK_BASE_SHA" >> "$GITHUB_ENV"
+            echo "Stacked PR — turbo --affected diffs against $STACK_BASE_REF ($STACK_BASE_SHA)"
+          else
+            git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
+          fi
       - name: Run unit tests
         shell: bash
         run: |
