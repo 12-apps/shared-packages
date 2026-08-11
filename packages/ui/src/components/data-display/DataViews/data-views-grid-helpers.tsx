@@ -246,3 +246,24 @@ export function togglePillValues(current: string[] | undefined, value: string, c
   const list = current ?? [];
   return checked ? [...list, value] : list.filter((v) => v !== value);
 }
+
+/**
+ * The card grid's `grid-template-columns`, as an sx fragment.
+ *
+ * One rule at every width: each card asks for `targetWidth` and `auto-fill`
+ * decides how many fit. Density moves the target, so it changes the count at
+ * every size — which the previous column-count cap could not do, because its
+ * track floor bottomed out at a constant shared by all three densities.
+ *
+ * Below `sm` this is a single column, and no target changes that. That is why
+ * the density control hides itself there rather than offering three settings
+ * that all draw the same thing.
+ */
+export function cardGridTracks(targetWidth: number) {
+  return {
+    gridTemplateColumns: {
+      xs: "1fr",
+      sm: `repeat(auto-fill, minmax(${targetWidth}px, 1fr))`,
+    },
+  };
+}

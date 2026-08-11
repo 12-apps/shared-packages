@@ -6,14 +6,14 @@ import { DataGrid, type GridColumn, type GridSort } from "../DataGrid";
 import { Box } from "../../../mui/Box";
 
 import {
-  cardMinWidthForZoom,
+  cardTargetWidthFor,
   cardScaleForZoom,
   DENSITY_BOARD_SCALE,
-  DENSITY_CARD_COLUMNS,
   DENSITY_ROW_PADDING,
   useDataViewsLayout,
   type DataViewsDensity,
 } from "./data-views-layout-context";
+import { cardGridTracks } from "./data-views-grid-helpers";
 import { DataViewsBoard, type BoardConfig } from "./DataViewsBoard";
 import { SelectAllStrip } from "./data-views-select-all-strip";
 import { ListCardGroup, type ListGroupConfig } from "./list-card-rails";
@@ -90,9 +90,8 @@ interface CardBodyProps<T extends Record<string, unknown>> {
   getRowId: (row: T) => string | number;
   selectedIds: Set<string | number>;
   onToggleId: (id: string | number) => void;
-  minCardWidth: number;
-  /** Cap on cards per row, from the density preference. */
-  maxColumns: number;
+  /** The width each card asks for; `auto-fill` turns it into a column count. */
+  targetCardWidth: number;
   /** Content scale (padding + type) handed to each card, from the zoom slider. */
   cardScale: number;
   dataTestId?: string;
@@ -112,8 +111,7 @@ function CardBody<T extends Record<string, unknown>>({
   getRowId,
   selectedIds,
   onToggleId,
-  minCardWidth,
-  maxColumns,
+  targetCardWidth,
   cardScale,
   dataTestId,
   emptyState,
@@ -129,12 +127,7 @@ function CardBody<T extends Record<string, unknown>>({
         // Fixed inter-card gap — deliberately NOT scaled by the zoom slider, so
         // only the cards grow while the space between them stays constant.
         gap: 1.5,
-        // `auto-fill` still decides how many FIT; density caps how many are
-        // ALLOWED, so "Poucos" reads as bigger cards rather than more of them.
-        gridTemplateColumns: {
-          xs: "1fr",
-          sm: `repeat(auto-fill, minmax(max(${minCardWidth}px, calc((100% - ${(maxColumns - 1) * 12}px) / ${maxColumns})), 1fr))`,
-        },
+        ...cardGridTracks(targetCardWidth),
       }}
       data-testid={dataTestId ? `${dataTestId}-cards` : "data-views-cards"}
     >
@@ -353,8 +346,7 @@ function headerlessBody<T extends Record<string, unknown>>(
         getRowId={getRowId}
         selectedIds={c.selectedIds}
         onToggleId={c.toggleId}
-        minCardWidth={cardMinWidthForZoom(zoom)}
-        maxColumns={DENSITY_CARD_COLUMNS[density]}
+        targetCardWidth={cardTargetWidthFor(zoom, density)}
         cardScale={cardScaleForZoom(zoom)}
         dataTestId={dataTestId}
         emptyState={emptyState}

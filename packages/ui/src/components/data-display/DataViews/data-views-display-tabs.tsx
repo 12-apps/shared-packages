@@ -2,6 +2,8 @@
 
 import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
 import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import type { Theme } from "@mui/material/styles";
 
 import type { SortFieldDefinition } from "../../layout/ContentToolbar";
 import { Box } from "../../../mui/Box";
@@ -286,9 +288,44 @@ const LAYOUT_TILE_LABELS: Record<DataViewsLayout, string> = {
  * `data-views-glyphs.tsx` for why. A layout this table cannot render is simply
  * not offered, and the panel says why rather than leaving a gap.
  */
+/**
+ * The three density tiles — or, on a phone, a line saying why there are none:
+ * the card grid is `1fr` there, so all three would draw one card per row. Says
+ * so rather than vanishing, for the same reason as the board note below it.
+ */
+function DensityTiles({ testIdPrefix }: { testIdPrefix: string }): React.JSX.Element {
+  const { layout, density, setDensity } = useDataViewsLayout();
+  // Matches the card grid's own `xs: "1fr"` track, so the control and the thing
+  // it controls agree on where density stops meaning anything.
+  const isOneColumn = useMediaQuery((t: Theme) => t.breakpoints.down("sm"));
+  if (layout === "cards" && isOneColumn) {
+    return (
+      <Text variant="caption" as="p">
+        <Box component="span" sx={{ px: 0.5, pt: 0.5, display: "block", color: "text.disabled" }}>
+          Um card por linha nesta largura — a densidade volta em telas maiores.
+        </Box>
+      </Text>
+    );
+  }
+  return (
+    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75, mt: 0.5 }}>
+      {densityTiles(layout).map((tile) => (
+        <Tile
+          key={tile.value}
+          active={density === tile.value}
+          label={tile.label}
+          onClick={() => setDensity(tile.value)}
+          testId={`${testIdPrefix}-density-${tile.value}`}
+        >
+          {densityGlyph(layout, tile, density === tile.value)}
+        </Tile>
+      ))}
+    </Box>
+  );
+}
+
 export function DisplayTab({ testIdPrefix }: { testIdPrefix: string }): React.JSX.Element {
-  const { layout, setLayout, canUseCards, canUseList, canUseBoard, density, setDensity } =
-    useDataViewsLayout();
+  const { layout, setLayout, canUseCards, canUseList, canUseBoard } = useDataViewsLayout();
   const available: DataViewsLayout[] = [
     "table",
     ...(canUseList ? (["list"] as const) : []),
@@ -336,19 +373,7 @@ export function DisplayTab({ testIdPrefix }: { testIdPrefix: string }): React.JS
           {DENSITY_HEADINGS[layout]}
         </Box>
       </Text>
-      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75, mt: 0.5 }}>
-        {densityTiles(layout).map((tile) => (
-          <Tile
-            key={tile.value}
-            active={density === tile.value}
-            label={tile.label}
-            onClick={() => setDensity(tile.value)}
-            testId={`${testIdPrefix}-density-${tile.value}`}
-          >
-            {densityGlyph(layout, tile, density === tile.value)}
-          </Tile>
-        ))}
-      </Box>
+      <DensityTiles testIdPrefix={testIdPrefix} />
       {!canUseBoard && (
         <Text variant="caption" as="p">
           <Box component="span" sx={{ px: 0.5, pt: 1.25, display: "block", color: "text.disabled" }}>
