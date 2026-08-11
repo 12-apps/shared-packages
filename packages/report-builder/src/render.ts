@@ -3,14 +3,13 @@ import type { ChartNumberFormat, ChartSemanticColor, ChartSpec } from '@12-apps/
 import { requireEntityForRender } from './catalog';
 import { isOrderedDimension } from './compatibility';
 import { pivotSplit } from './pivot';
+import { toKpiModel, type ReportKpiFigure } from './render-kpi';
+import { dimensionLabel, measureLabel } from './render-labels';
 import type { ReportPresentation } from './spec';
 import {
-  isPercentileAggregation,
   isSuppressed,
-  type CompiledMeasure,
   type CompiledQuery,
   type FieldCatalog,
-  type FieldDef,
   type ReportKpiFormat,
   type ReportRow,
   type ReportValueFormat,
@@ -58,35 +57,20 @@ export type ReportRenderModel =
        */
       suppressed: boolean;
       format: ReportKpiFormat;
+      /**
+       * ONE FIGURE PER MEASURE (FUT-755) — the whole tile, in measure order.
+       *
+       * The four fields above are `figures[0]` restated, and they are kept
+       * because they are the shape every host already reads: a KPI render has
+       * carried a `label` and a `value` since FUT-309, and a package that
+       * replaced them outright would break a consumer that never asked for a
+       * second measure. So the single-measure payload is byte-for-byte what it
+       * always was, and `figures` is the field a surface reads when it wants
+       * to draw all of them.
+       */
+      figures: ReportKpiFigure[];
       rows: ReportRow[];
     };
-
-function grainLabel(grain: string): string {
-  switch (grain) {
-    case 'week':
-      return 'semana';
-    case 'month':
-      return 'mês';
-    default:
-      return 'dia';
-  }
-}
-
-function dimensionLabel(field: FieldDef | undefined, alias: string, timeGrain?: string): string {
-  const base = field?.label ?? alias;
-  return timeGrain ? `${base} (${grainLabel(timeGrain)})` : base;
-}
-
-function measureLabel(field: FieldDef | undefined, measure: CompiledMeasure): string {
-  const base = field?.label ?? measure.field;
-  if (measure.aggregation === 'count' || measure.aggregation === 'count_distinct') {
-    return `${base} (contagem)`;
-  }
-  if (measure.aggregation === 'avg') return `${base} (média)`;
-  if (isPercentileAggregation(measure.aggregation)) return `${base} (${measure.aggregation})`;
-  if (measure.aggregation === 'ratio') return `${base} (proporção)`;
-  return base;
-}
 
 /**
  * `@12-apps/ui` charts render a fixed set of number formats: `percent` there
@@ -197,37 +181,6 @@ function toChartSpec(
 }
 
 /**
- * Map a compiled query + result rows into a serializable render model:
- * either a table model (columns with format hints) or a `@12-apps/ui`
- * ChartSpec. Every report-specific chart decision (labels, formats, spec
- * mapping) lives HERE — `@12-apps/ui` stays a raw chart library.
- */
-function toKpiModel(
-  query: CompiledQuery,
-  presentation: Extract<ReportPresentation, { kind: 'kpi' }>,
-  catalog: FieldCatalog,
-  rows: ReportRow[],
-): ReportRenderModel {
-  const entity = requireEntityForRender(catalog, query.entity);
-  const measure = query.measures[0];
-  if (!measure) {
-    // compileReport already rejects this; kept as a defensive invariant.
-    throw new Error('KPI presentation requires one measure.');
-  }
-  const field = entity.fields[measure.field];
-  const raw = rows[0]?.[measure.alias];
-  return {
-    kind: 'kpi',
-    label: presentation.label ?? measureLabel(field, measure),
-    // A suppressed tile carries no figure at all — same shape as an empty period.
-    value: typeof raw === 'number' ? raw : null,
-    suppressed: isSuppressed(raw),
-    format: presentation.numberFormat ?? (measure.format === 'text' ? 'decimal' : measure.format),
-    rows,
-  };
-}
-
-/**
  * A chart's data points, with every SUPPRESSED cell turned into a gap
  * (FUT-454). A chart series is numeric: handing it the marker string would
  * plot garbage or NaN. `null` is what the renderer already draws for a missing
@@ -328,6 +281,12 @@ function withDrawableChartType(
   return { ...presentation, chartType: 'bar' };
 }
 
+/**
+ * Map a compiled query + result rows into a serializable render model: a table
+ * model (columns with format hints), a `@12-apps/ui` ChartSpec, or a KPI's
+ * figures. Every report-specific chart decision (labels, formats, spec
+ * mapping) lives HERE — `@12-apps/ui` stays a raw chart library.
+ */
 export function renderReport(
   query: CompiledQuery,
   presentation: ReportPresentation,

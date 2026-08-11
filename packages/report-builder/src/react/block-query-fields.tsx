@@ -15,6 +15,7 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 
 
 
+import { BlockHeightPicker } from "./block-height-picker";
 import { BlockWidthPicker } from "./block-width-picker";
 import { specFromDraft, switchEntityDraft, type BuilderDraft } from "./builder-model";
 import {
@@ -34,20 +35,29 @@ export function BlockQueryFields({
   draft,
   entities,
   span,
+  height,
   apply,
   onSpanChange,
+  onHeightChange,
   testId,
 }: {
   draft: BuilderDraft;
   entities: ReportEntityFields[];
   span: number;
+  /** The block's height tier, or `undefined` for its own content height. */
+  height: number | undefined;
   apply: (next: BuilderDraft) => void;
   onSpanChange: (span: number) => void;
+  onHeightChange: (height: number | undefined) => void;
   testId: string;
 }): JSX.Element {
   const entity = entities.find((candidate) => candidate.entity === draft.entity);
   const fields = entity?.fields ?? [];
   const update = (patch: Partial<BuilderDraft>): void => apply({ ...draft, ...patch });
+  // The width control's floor has to be the presentation the block will be
+  // SAVED with, so the width it refuses cannot disagree with what is rendered.
+  // (`Altura` has no floor to enforce — see `block-height-picker`.)
+  const presentation = specFromDraft(draft, fieldMapOf(entity)).presentation;
   return (
     <Stack spacing={2}>
       <Select
@@ -70,9 +80,14 @@ export function BlockQueryFields({
       <PresentationSection draft={draft} fields={fields} update={update} />
       <BlockWidthPicker
         span={span}
-        presentation={specFromDraft(draft, fieldMapOf(entity)).presentation}
+        presentation={presentation}
         onChange={onSpanChange}
         testId={`${testId}-span`}
+      />
+      <BlockHeightPicker
+        height={height}
+        onChange={onHeightChange}
+        testId={`${testId}-height`}
       />
     </Stack>
   );

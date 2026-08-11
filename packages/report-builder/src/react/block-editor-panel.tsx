@@ -66,7 +66,12 @@ import { Text } from "@12-apps/ui/typography/Text";
 import { BlockQueryFields, fieldMapOf } from "./block-query-fields";
 import { draftFromSpec, specFromDraft, withValidChart, type BuilderDraft } from "./builder-model";
 import type { ReportEntityFields, ReportSpecWire } from "./custom-reports-api";
-import { BlockPanelFooter, BlockSpecSentence, BlockTitleField } from "./lib/block-panel-chrome";
+import {
+  BlockPanelEmptyState,
+  BlockPanelFooter,
+  BlockSpecSentence,
+  BlockTitleField,
+} from "./lib/block-panel-chrome";
 import { useDockReservation, useEscapeToClose, usePanelTier } from "./lib/docked-panel";
 import { PANEL_WIDTH_PX, SheetGrip, TIER_LAYOUT } from "./lib/panel-tiers";
 import {
@@ -77,9 +82,6 @@ import {
   type SentencePart,
 } from "./lib/spec-sentence";
 import { REPORT_MAX_BLOCKS } from "./report-model";
-
-/** What the panel says when nothing is selected — the spec's exact wording. */
-const EMPTY_TEXT = "Selecione um bloco para editar";
 
 /**
  * The panel's own name for itself, in the prototype's two states.
@@ -93,26 +95,6 @@ const EDITING_HEADING = "Editando bloco";
 
 /** Why *Duplicar* is refused — the canvas's own wording for the same ceiling. */
 const DUPLICATE_BLOCKED_TEXT = `Limite de ${REPORT_MAX_BLOCKS} blocos por relatório.`;
-
-/**
- * What the panel shows with nothing selected.
- *
- * It is a STATE of the panel rather than an absence of one: the panel stays
- * docked, so deselecting does not make the canvas jump 344px wider and back
- * the moment the author clicks the next block.
- */
-function PanelEmptyState({ testId }: { testId: string }): JSX.Element {
-  return (
-    <Box
-      data-testid={`${testId}-empty`}
-      sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 6, px: 2 }}
-    >
-      <Text variant="body" size="sm" color="secondary">
-        {EMPTY_TEXT}
-      </Text>
-    </Box>
-  );
-}
 
 /**
  * Everything the panel knows about the selected block, recomputed on every
@@ -151,18 +133,22 @@ function PanelForm({
   block,
   entities,
   span,
+  height,
   title,
   onChange,
   onSpanChange,
+  onHeightChange,
   onTitleChange,
   testId,
 }: {
   block: SelectedBlock;
   entities: ReportEntityFields[];
   span: number;
+  height: number | undefined;
   title: string;
   onChange: (spec: ReportSpecWire) => void;
   onSpanChange: (span: number) => void;
+  onHeightChange: (height: number | undefined) => void;
   onTitleChange: (title: string) => void;
   testId: string;
 }): JSX.Element {
@@ -199,8 +185,10 @@ function PanelForm({
           draft={draft}
           entities={entities}
           span={span}
+          height={height}
           apply={apply}
           onSpanChange={onSpanChange}
+          onHeightChange={onHeightChange}
           testId={testId}
         />
       </Stack>
@@ -220,10 +208,12 @@ function PanelBody({
   block,
   entities,
   span,
+  height,
   title,
   canDuplicate,
   onChange,
   onSpanChange,
+  onHeightChange,
   onTitleChange,
   onDuplicate,
   onRemove,
@@ -232,10 +222,12 @@ function PanelBody({
   block: SelectedBlock | null;
   entities: ReportEntityFields[];
   span: number;
+  height: number | undefined;
   title: string;
   canDuplicate: boolean;
   onChange: (spec: ReportSpecWire) => void;
   onSpanChange: (span: number) => void;
+  onHeightChange: (height: number | undefined) => void;
   onTitleChange: (title: string) => void;
   onDuplicate: () => void;
   onRemove: () => void;
@@ -246,7 +238,7 @@ function PanelBody({
   if (block === null) {
     return (
       <DrawerContent dataTestId={`${testId}-content`}>
-        <PanelEmptyState testId={testId} />
+        <BlockPanelEmptyState testId={testId} />
       </DrawerContent>
     );
   }
@@ -262,9 +254,11 @@ function PanelBody({
           block={block}
           entities={entities}
           span={span}
+          height={height}
           title={title}
           onChange={onChange}
           onSpanChange={onSpanChange}
+          onHeightChange={onHeightChange}
           onTitleChange={onTitleChange}
           testId={testId}
         />
@@ -292,10 +286,13 @@ interface BlockEditorPanelProps {
   /** The selected block's query, or `null` for the empty state. */
   spec: ReportSpecWire | null;
   span: number;
+  /** The block's height tier, or `undefined` for its own content height. */
+  height: number | undefined;
   /** The block's title override. Empty string means "use the auto description". */
   title: string;
   onChange: (spec: ReportSpecWire) => void;
   onSpanChange: (span: number) => void;
+  onHeightChange: (height: number | undefined) => void;
   onTitleChange: (title: string) => void;
   onDuplicate: () => void;
   /** False at REPORT_MAX_BLOCKS — the control stays visible and explains why. */
@@ -315,9 +312,11 @@ export function BlockEditorPanel({
   entities,
   spec,
   span,
+  height,
   title,
   onChange,
   onSpanChange,
+  onHeightChange,
   onTitleChange,
   onDuplicate,
   canDuplicate,
@@ -372,10 +371,12 @@ export function BlockEditorPanel({
           block={block}
           entities={entities}
           span={span}
+          height={height}
           title={title}
           canDuplicate={canDuplicate}
           onChange={onChange}
           onSpanChange={onSpanChange}
+          onHeightChange={onHeightChange}
           onTitleChange={onTitleChange}
           onDuplicate={onDuplicate}
           onRemove={onRemove}

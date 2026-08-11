@@ -80,6 +80,8 @@ export interface DashboardBlockSuccess {
   id: string;
   title?: string;
   span: number;
+  /** Height tier (1..3); absent means "as tall as its content" (FUT-755). */
+  height?: number;
   /**
    * The block's spec in Portuguese ({@link specSentence}) — computed HERE, on
    * the server, so the viewer, the editor and an export all render the same
@@ -98,6 +100,8 @@ export interface DashboardBlockFailure {
   id: string;
   title?: string;
   span: number;
+  /** Height tier (1..3); absent means "as tall as its content" (FUT-755). */
+  height?: number;
   /**
    * Present on a FAILED block too: a block whose spec no longer compiles is
    * exactly when a reader needs to know what it was asking for. `specSentence`
@@ -137,6 +141,7 @@ export async function runDashboard(
         id: block.id,
         title: block.title,
         span: block.span,
+        height: block.height,
         sentence: specSentence(block.spec, options.catalog),
       };
       try {

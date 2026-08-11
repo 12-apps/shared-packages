@@ -157,6 +157,19 @@ export type ReportRender =
       /** True when the server withheld the figure for a too-small sample. */
       suppressed?: boolean;
       format: "brl" | "percent" | "compact" | "integer" | "decimal" | "duration";
+      /**
+       * One figure per measure (FUT-755) — a `Número` block takes one or more.
+       * The three fields above are `figures[0]` restated, so a single-measure
+       * tile is the payload it always was; optional only for a response
+       * produced before the field existed, which `lib/kpi-figures` rebuilds
+       * the one figure from.
+       */
+      figures?: Array<{
+        label: string;
+        value: number | null;
+        suppressed?: boolean;
+        format: "brl" | "percent" | "compact" | "integer" | "decimal" | "duration";
+      }>;
       rows: ReportRow[];
     };
 

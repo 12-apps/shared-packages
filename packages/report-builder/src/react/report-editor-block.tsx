@@ -62,11 +62,14 @@ function BlockPreview({
   tenantSlug,
   spec,
   range,
+  fill,
   testId,
 }: {
   tenantSlug: string;
   spec: ReportSpecWire;
   range: ReportRange;
+  /** The block has a chosen height, so the rendering must take it (FUT-755). */
+  fill: boolean;
   testId: string;
 }): JSX.Element {
   const preview = useRunReport(tenantSlug, spec, range);
@@ -80,7 +83,9 @@ function BlockPreview({
     );
   }
   if (!preview.data) return <LoadingState dataTestId={`${testId}-loading`} />;
-  return <ReportRenderView render={preview.data.render} dataTestId={`${testId}-render`} />;
+  return (
+    <ReportRenderView render={preview.data.render} dataTestId={`${testId}-render`} fill={fill} />
+  );
 }
 
 /** Grip + inline title — the frame's title slot while editing. */
@@ -288,6 +293,7 @@ function BlockGroup({
       <ReportBlockFrame
         dataTestId={testId}
         active={dnd.overId === block.id}
+        fill={block.height !== undefined}
         title={
           <BlockTitleSlot block={block} dnd={dnd} testId={testId} onTitleChange={onTitleChange} />
         }
@@ -301,7 +307,13 @@ function BlockGroup({
           />
         }
       >
-        <BlockPreview tenantSlug={tenantSlug} spec={block.spec} range={range} testId={testId} />
+        <BlockPreview
+          tenantSlug={tenantSlug}
+          spec={block.spec}
+          range={range}
+          fill={block.height !== undefined}
+          testId={testId}
+        />
       </ReportBlockFrame>
     </Box>
   );
@@ -341,6 +353,7 @@ export function EditableBlock({
   return (
     <ReportGridItem
       span={block.span}
+      height={block.height}
       dataTestId={`${testId}-cell`}
       dropProps={dnd.targetProps(block.id)}
     >

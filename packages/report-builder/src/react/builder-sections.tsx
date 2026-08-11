@@ -2,8 +2,9 @@
  * Builder v1 form sections (FUT-138): dimension/measure/filter rows and the
  * presentation picker. Dumb controlled components — the page owns the draft.
  */
-import type { JSX } from "react";
+import { useState, type JSX } from "react";
 
+import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Button } from "@12-apps/ui/form/Button";
 import { Select } from "@12-apps/ui/form/Select";
 import { Stack } from "@12-apps/ui/mui/Stack";
@@ -15,7 +16,7 @@ import { VizPicker } from "./viz-picker";
 import { editFilterRow } from "./builder-filters";
 import { FilterRow } from "./builder-filter-row";
 import { AGGREGATION_LABELS, aggregationOptions, editMeasureRow } from "./builder-measures";
-import { chartOptions, GRAIN_LABELS, type BuilderDraft } from "./builder-model";
+import { chartOptions, GRAIN_LABELS, stackedOption, type BuilderDraft } from "./builder-model";
 import { SECTION_LABEL_STYLE } from "./lib/report-surface";
 import type { ReportGrain } from "./reports-api";
 
@@ -195,30 +196,101 @@ export function FiltersSection({ draft, fields, update }: SectionProps): JSX.Ele
   );
 }
 
+/** The `Empilhado` button and its callout — one id each, unchanged from before. */
+const STACKED_TEST_ID = "builder-chart-stacked";
+
+/** A blocked control reads as unavailable without leaving the tab order. */
+const STACKED_BLOCKED_SX = { opacity: 0.45, cursor: "not-allowed" } as const;
+
+/**
+ * `Empilhado`, and the reason it is refused (FUT-755).
+ *
+ * Stacking one series redraws an identical chart — the same class of defect as
+ * a line over a categorical axis: a control that claims to do something it
+ * cannot. So it is refused when there is nothing to stack, and it is refused the
+ * way every blocked control in this area is — `aria-disabled`, never `disabled`.
+ * A genuinely disabled button leaves the tab order and swallows pointer events,
+ * which would put the explanation behind an interaction the very people who
+ * need it cannot perform. The click is a no-op that explains itself instead.
+ *
+ * The reason is reachable the same four ways `VizPicker`'s are: hover, keyboard
+ * focus, activation, and — with no event at all — as the control's accessible
+ * description through `title`.
+ */
+function StackedToggle({
+  stacked,
+  disabledReason,
+  onToggle,
+}: {
+  stacked: boolean;
+  disabledReason: string | null;
+  onToggle: () => void;
+}): JSX.Element {
+  const [asking, setAsking] = useState(false);
+  const blocked = disabledReason !== null;
+  const showing = blocked && asking;
+  return (
+    <Stack spacing={1}>
+      <Button
+        variant={stacked ? "solid" : "outline"}
+        size="sm"
+        aria-disabled={blocked || undefined}
+        aria-pressed={stacked}
+        title={disabledReason ?? undefined}
+        aria-describedby={showing ? `${STACKED_TEST_ID}-reason` : undefined}
+        sx={blocked ? STACKED_BLOCKED_SX : undefined}
+        onClick={() => (blocked ? setAsking(true) : onToggle())}
+        onMouseEnter={() => setAsking(true)}
+        onMouseLeave={() => setAsking(false)}
+        onFocus={() => setAsking(true)}
+        onBlur={() => setAsking(false)}
+        data-testid={STACKED_TEST_ID}
+      >
+        Empilhado
+      </Button>
+      {/* One callout, only when asked for — `role="note"` and no live region,
+          because the button already carries this same sentence as its
+          description and a polite region would say it twice. */}
+      {showing ? (
+        <Alert
+          variant="warning"
+          showIcon={false}
+          animate={false}
+          role="note"
+          aria-live="off"
+          tabIndex={-1}
+          id={`${STACKED_TEST_ID}-reason`}
+          data-testid={`${STACKED_TEST_ID}-reason`}
+          sx={{ fontSize: "0.75rem", py: 0.5 }}
+        >
+          {disabledReason}
+        </Alert>
+      ) : null}
+    </Stack>
+  );
+}
+
 export function PresentationSection({ draft, fields, update }: SectionProps): JSX.Element {
   // The picker offers only what the compiler accepts for the current form
   // shape (FUT-308). Blocked options now state their REASON rather than going
   // grey (FUT-391): grey says "no" without saying why, leaving the author to
   // guess which of their choices caused it when the compiler already knows.
-  const options = chartOptions(draft, new Map(fields.map((field) => [field.field, field])));
+  const byName = new Map(fields.map((field) => [field.field, field]));
+  const stacking = stackedOption(draft, byName);
   return (
     <Stack spacing={1}>
       <SectionHeading>Visualização</SectionHeading>
       <VizPicker
-        options={options}
+        options={chartOptions(draft, byName)}
         value={draft.chartType}
         onChange={(chartType) => update({ chartType })}
       />
-      {draft.chartType === "bar" || draft.chartType === "area" ? (
-        <Button
-          variant={draft.stacked ? "solid" : "outline"}
-          size="sm"
-          onClick={() => update({ stacked: !draft.stacked })}
-          aria-pressed={draft.stacked}
-          data-testid="builder-chart-stacked"
-        >
-          Empilhado
-        </Button>
+      {stacking !== null ? (
+        <StackedToggle
+          stacked={draft.stacked}
+          disabledReason={stacking.disabledReason}
+          onToggle={() => update({ stacked: !draft.stacked })}
+        />
       ) : null}
     </Stack>
   );

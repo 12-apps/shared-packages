@@ -160,6 +160,9 @@ const chartSpecSchema = z.object({
   colorScheme: z.array(z.string()).optional(),
 });
 
+/** How a KPI figure is printed — shared by the tile and every figure in it. */
+const kpiFormatSchema = z.enum(['brl', 'percent', 'compact', 'integer', 'decimal', 'duration']);
+
 /** Rendered report: a table model or a chart spec, plus the aliased rows. */
 export const reportRenderSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -179,7 +182,26 @@ export const reportRenderSchema = z.discriminatedUnion('kind', [
     value: z.number().nullable(),
     /** True when `minSample` withheld the figure server-side (FUT-454). */
     suppressed: z.boolean(),
-    format: z.enum(['brl', 'percent', 'compact', 'integer', 'decimal', 'duration']),
+    format: kpiFormatSchema,
+    /**
+     * One figure per measure (FUT-755) — the four fields above are `figures[0]`
+     * restated, so a single-measure tile is exactly the payload it always was.
+     *
+     * Optional because a payload produced before the field existed (a cached
+     * response, a host still on the previous version) carries none and the
+     * client falls back to the scalar fields. Never absent from what this
+     * package PRODUCES: `renderReport` always emits it.
+     */
+    figures: z
+      .array(
+        z.object({
+          label: z.string(),
+          value: z.number().nullable(),
+          suppressed: z.boolean(),
+          format: kpiFormatSchema,
+        }),
+      )
+      .optional(),
     rows: z.array(reportRowSchema),
   }),
 ]);
@@ -250,6 +272,8 @@ export const dashboardBlockRenderSchema = z.discriminatedUnion('status', [
     id: z.string(),
     title: z.string().optional(),
     span: z.number().int(),
+    /** Height TIER (1..3); absent = as tall as its content (FUT-755). */
+    height: z.number().int().optional(),
     /** What the block asks for, in Portuguese — computed server-side. */
     sentence: z.string().optional(),
     status: z.literal('ok'),
@@ -259,6 +283,8 @@ export const dashboardBlockRenderSchema = z.discriminatedUnion('status', [
     id: z.string(),
     title: z.string().optional(),
     span: z.number().int(),
+    /** Height TIER (1..3); absent = as tall as its content (FUT-755). */
+    height: z.number().int().optional(),
     /** Present on a FAILED block too — that is when a reader most needs it. */
     sentence: z.string().optional(),
     status: z.literal('error'),

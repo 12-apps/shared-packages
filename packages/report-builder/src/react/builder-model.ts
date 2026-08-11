@@ -7,6 +7,7 @@ import {
   defaultPresentation,
   isOrderedDimension,
   presentationCompatibility,
+  stackedCompatibility,
   type SpecShape,
 } from "../compatibility";
 
@@ -185,6 +186,22 @@ export function chartOptions(
     label: CHART_LABELS[entry.option],
     disabledReason: entry.disabledReason,
   }));
+}
+
+/**
+ * Whether the form should draw `Empilhado`, and why it is refused (FUT-755).
+ *
+ * `null` means the current visualization has no stacking to offer at all — a
+ * pie draws no toggle, which is a different answer from a toggle that is on
+ * screen and blocked. An object means the toggle is drawn, with its reason.
+ */
+export function stackedOption(
+  draft: BuilderDraft,
+  fields: Map<string, ReportField>,
+): { disabledReason: string | null } | null {
+  if (draft.chartType === "table" || draft.chartType === "kpi") return null;
+  const entry = stackedCompatibility(draft.chartType, draftShape(draft, fields));
+  return entry === null ? null : { disabledReason: entry.disabledReason };
 }
 
 /**

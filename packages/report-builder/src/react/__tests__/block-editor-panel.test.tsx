@@ -108,9 +108,12 @@ function panelElement(
       entities={[ENTITY]}
       spec={spec}
       span={6}
+      // The default a block that has never been given a height carries.
+      height={undefined}
       title=""
       onChange={() => undefined}
       onSpanChange={() => undefined}
+      onHeightChange={() => undefined}
       onTitleChange={() => undefined}
       onDuplicate={() => undefined}
       canDuplicate
