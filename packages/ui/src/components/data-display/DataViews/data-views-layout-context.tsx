@@ -81,12 +81,31 @@ export const DENSITY_ROW_PADDING: Record<DataViewsDensity, number> = {
   comfortable: 1.5,
 };
 
-/** Card grid columns per density — how many cards land on one row. */
-export const DENSITY_CARD_COLUMNS: Record<DataViewsDensity, number> = {
-  compact: 5,
-  cozy: 4,
-  comfortable: 3,
+/**
+ * The card WIDTH each density aims for, as a multiple of the base card width.
+ *
+ * Density used to cap the column COUNT, with a track floor of
+ * `max(baseWidth, 100% / count)`. That base is a constant, so wherever it won
+ * the arithmetic every density produced an identical track — "Muitos" and
+ * "Medio" both drew 3 cards of 279px at md — and where the percentage won
+ * instead, on a wide screen, the count was pinned and each card grew to a share
+ * of the viewport: ~430px of card holding one chip and two lines of text.
+ *
+ * One width per density fixes both, because the number `auto-fill` divides by
+ * now differs per density at every size. The spread is chosen so the three land
+ * on DIFFERENT column counts across the range rather than by eye — 4/3/2 at md,
+ * 6/4/3 at lg, 7/5/4 at xl, 13/9/8 at 2560.
+ */
+export const DENSITY_CARD_SCALE: Record<DataViewsDensity, number> = {
+  compact: 0.84,
+  cozy: 1.15,
+  comfortable: 1.4,
 };
+
+/** The width a card aims for: the base width, scaled by zoom, then by density. */
+export function cardTargetWidthFor(zoom: number, density: DataViewsDensity): number {
+  return Math.round(cardMinWidthForZoom(zoom) * DENSITY_CARD_SCALE[density]);
+}
 
 /**
  * The BOARD's column-width multiplier per density.
