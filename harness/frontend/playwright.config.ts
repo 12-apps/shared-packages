@@ -6,7 +6,7 @@ import { paymentsFeatures, paymentsFeaturesRoot, paymentsSteps } from '@12-apps/
 import { reportsFeatures, reportsFeaturesRoot, reportsSteps } from '@12-apps/report-builder/e2e';
 import { defineBddConfig } from 'playwright-bdd';
 
-import { HARNESS_BACKEND_ORIGIN } from '../backend/src/port';
+import { HARNESS_BACKEND_ORIGIN, HARNESS_SPA_ORIGIN, HARNESS_SPA_PORT } from '../backend/src/port';
 
 /** `harness/backend`, resolved from THIS file so the spawn ignores the cwd. */
 const BACKEND_DIR = fileURLToPath(new URL('../backend', import.meta.url));
@@ -102,7 +102,7 @@ export default defineConfig({
   // Chromium set it rather than re-downloading one against a version the
   // preinstalled build does not match.
   use: {
-    baseURL: 'http://localhost:4319',
+    baseURL: HARNESS_SPA_ORIGIN,
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
       ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE }
       : {},
@@ -164,8 +164,8 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: 'npx vite preview --port 4319 --strictPort',
-      url: 'http://localhost:4319',
+      command: `npx vite preview --port ${HARNESS_SPA_PORT} --strictPort`,
+      url: HARNESS_SPA_ORIGIN,
       reuseExistingServer: false,
       timeout: 60_000,
     },

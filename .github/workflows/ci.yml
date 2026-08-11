@@ -585,27 +585,92 @@ jobs:
         run: |
           set -o pipefail
           npm run build 2>&1 | tee harness-build.log
-      # The Gherkin gate, BEFORE the browser run and in this job rather than in
-      # Quality: the journeys ship INSIDE the packages and the only thing that
-      # compiles them is this harness, so the gate needs the install two steps
-      # up. It starts no browser — it compiles and inspects — and it fails on
-      # exactly the states a green suite would hide: a feature that produced no
-      # spec, a step definition nobody speaks, a scenario with no Then.
-      - name: Gate the Gherkin journeys
-        shell: bash
-        run: |
-          set -o pipefail
-          pnpm quality:bdd 2>&1 | tee bdd-gate.log
       - name: Render the published packages in a browser
         working-directory: harness/frontend
         shell: bash
         run: |
           set -o pipefail
-          npm test 2>&1 | tee harness-test.log
+          npm run test:harness 2>&1 | tee harness-test.log
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: frontend-harness-report
+          path: harness/frontend/playwright-report
+          retention-days: 7
+
+  # The Gherkin journeys, in a lane of their own.
+  #
+  # They ran inside `Frontend Harness` first, and that was invisible: the checks
+  # list showed no Gherkin, and the job's log read `138 passed` with no way to
+  # tell whether any of it was a journey. A suite you cannot see is one nobody
+  # notices the absence of — which is the same failure this lane's own gate
+  # exists to prevent, one level up.
+  #
+  # The split is by PROJECT, not a second run of the same tests: `Frontend
+  # Harness` now runs `--project=harness` and this runs `--project=journeys`, so
+  # the two lanes partition the suite rather than duplicating it. What is
+  # duplicated is the setup — install, build, pack, Chromium — because the
+  # journeys ship inside the packages and there is no way to compile them
+  # without it. That is the price of the lane, and it is paid in parallel.
+  gherkin-journeys:
+    name: Gherkin Journeys
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).publishable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      - name: Build packages
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee build.log
+      - name: Install the harness against the published tarballs
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/harness-install.mjs 2>&1 | tee harness-install.log
+      - name: Install Chromium
+        working-directory: harness/frontend
+        run: npx playwright install --with-deps chromium
+      - name: Build the harness app
+        working-directory: harness/frontend
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee harness-build.log
+      # FIRST, and it starts no browser — it compiles and inspects. It fails on
+      # exactly the states a green suite would hide: a feature that produced no
+      # spec, a step definition nobody speaks, a scenario with no Then, a
+      # committed `.features-gen`, an `@skip`. Running it before the browser
+      # means a feature that compiles to nothing is reported as that, rather
+      # than as a suite that happens to be smaller.
+      - name: Gate the Gherkin journeys
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm quality:bdd 2>&1 | tee bdd-gate.log
+      - name: Run the journeys
+        working-directory: harness/frontend
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:journeys 2>&1 | tee journeys-test.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: gherkin-journeys-report
           path: harness/frontend/playwright-report
           retention-days: 7
 
@@ -821,7 +886,7 @@ jobs:
     #
     # On a pull request `release` is skipped, which this aggregation already
     # treats as fine — so this costs PRs nothing.
-    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, backend-harness, portability, release]
+    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, gherkin-journeys, backend-harness, portability, release]
     steps:
       - name: Verify all required jobs passed
         shell: bash
