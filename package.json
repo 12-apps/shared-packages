@@ -17,7 +17,10 @@
     "quality:knip": "node scripts/knip-gate.mjs",
     "quality:knip:update": "node scripts/knip-gate.mjs --update",
     "quality:quarantine": "node scripts/flaky-quarantine-check.mjs",
-    "quality:all": "pnpm quality && pnpm quality:dup && pnpm quality:quarantine && pnpm quality:knip"
+    "bdd:gen": "npm --prefix harness/frontend exec -- bddgen test",
+    "test:bdd": "npm --prefix harness/frontend exec -- playwright test --project=journeys",
+    "quality:bdd": "node scripts/bdd-gate.mjs",
+    "quality:all": "pnpm quality && pnpm quality:dup && pnpm quality:quarantine && pnpm quality:knip && pnpm quality:bdd"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",

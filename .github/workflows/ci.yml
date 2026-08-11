@@ -585,6 +585,17 @@ jobs:
         run: |
           set -o pipefail
           npm run build 2>&1 | tee harness-build.log
+      # The Gherkin gate, BEFORE the browser run and in this job rather than in
+      # Quality: the journeys ship INSIDE the packages and the only thing that
+      # compiles them is this harness, so the gate needs the install two steps
+      # up. It starts no browser — it compiles and inspects — and it fails on
+      # exactly the states a green suite would hide: a feature that produced no
+      # spec, a step definition nobody speaks, a scenario with no Then.
+      - name: Gate the Gherkin journeys
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm quality:bdd 2>&1 | tee bdd-gate.log
       - name: Render the published packages in a browser
         working-directory: harness/frontend
         shell: bash
