@@ -10,7 +10,9 @@ function compile(input: ReportSpecInput, maxRows?: number) {
 }
 
 describe('compileReport', () => {
-  it('rejects KPI presentations with dimensions or multiple measures (FUT-309)', () => {
+  it('rejects KPI presentations with dimensions (FUT-309)', () => {
+    // The half of the FUT-309 rule with a reason behind it: a KPI summarises
+    // the WHOLE period, so with a grouping there is no single figure to show.
     expect(() =>
       compile({
         entity: 'orders',
@@ -22,17 +24,23 @@ describe('compileReport', () => {
     expect(() =>
       compile({
         entity: 'orders',
-        measures: [{ field: 'totalCents' }, { field: 'itemCount' }],
-        presentation: { kind: 'kpi' },
-      }),
-    ).toThrow(/exactly 1 measure/);
-    expect(() =>
-      compile({
-        entity: 'orders',
         measures: [{ field: 'totalCents' }],
         presentation: { kind: 'kpi', label: 'Receita' },
       }),
     ).not.toThrow();
+  });
+
+  it('accepts SEVERAL measures on a KPI — one figure each (FUT-755)', () => {
+    // The one-measure ceiling is gone. It used to make "receita, pedidos e
+    // ticket médio" fall back to a table, which drew a header row above a
+    // single line — a worse Número, not a table.
+    const query = compile({
+      entity: 'orders',
+      measures: [{ field: 'totalCents' }, { field: 'itemCount' }],
+      presentation: { kind: 'kpi' },
+    });
+    expect(query.measures).toHaveLength(2);
+    expect(query.dimensions).toHaveLength(0);
   });
 
 

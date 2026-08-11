@@ -12,6 +12,8 @@ export interface SpecChartProps {
   spec: ChartSpec;
   data: ChartDataPoint[];
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  /** Take the height of the box this chart is placed in — see `ChartProps`. */
+  fillHeight?: boolean;
   loading?: boolean;
   className?: string;
   onClick?: (point: ChartDataPoint) => void;
@@ -27,6 +29,7 @@ export const SpecChart: React.FC<SpecChartProps> = ({
   spec,
   data,
   size,
+  fillHeight,
   loading,
   className,
   onClick,
@@ -45,6 +48,7 @@ export const SpecChart: React.FC<SpecChartProps> = ({
     <Chart
       {...chartProps}
       size={size}
+      fillHeight={fillHeight}
       loading={loading}
       className={className}
       onClick={onClick}

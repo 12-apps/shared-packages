@@ -1,12 +1,12 @@
 /**
  * The furniture around the block config form (FUT-755, GAPs 6 and 7).
  *
- * Three pieces, extracted from `block-editor-panel.tsx` because the panel is at
+ * Four pieces, extracted from `block-editor-panel.tsx` because the panel is at
  * the size gate's ceiling and these are what can leave without splitting an
  * idea in half: the panel decides WHERE each sits and what it is pointed at,
  * these decide what each one is.
  *
- * `prototype.html` puts all three in the panel and this is why:
+ * `prototype.html` puts all of them in the panel and this is why:
  *
  *  - **the sentence** answers "what is this block", which the panel previously
  *    did not answer at all — its header said `Bloco`, a word that is true of
@@ -19,6 +19,8 @@
  *  - **the footer** carries *Duplicar* and *Remover*. The block's own chrome
  *    already has both; a panel that can configure a block but not copy or drop
  *    it sends the author back to the canvas for the two most likely next moves.
+ *  - **the empty state** is what the panel shows with nothing selected — a
+ *    STATE of a panel that stays docked, not the absence of one.
  */
 import { Fragment, type ChangeEvent, type JSX } from "react";
 
@@ -26,9 +28,38 @@ import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
 import { Box } from "@12-apps/ui/mui/Box";
+import { Text } from "@12-apps/ui/typography/Text";
 
 import { CONTROL_RADIUS_PX } from "./report-surface";
 import type { SentencePart } from "./spec-sentence";
+
+/** What the panel says when nothing is selected — the spec's exact wording. */
+const EMPTY_TEXT = "Selecione um bloco para editar";
+
+const EMPTY_SX = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  py: 6,
+  px: 2,
+} as const;
+
+/**
+ * What the panel shows with nothing selected.
+ *
+ * It is a STATE of the panel rather than an absence of one: the panel stays
+ * docked, so deselecting does not make the canvas jump 344px wider and back
+ * the moment the author clicks the next block.
+ */
+export function BlockPanelEmptyState({ testId }: { testId: string }): JSX.Element {
+  return (
+    <Box data-testid={`${testId}-empty`} sx={EMPTY_SX}>
+      <Text variant="body" size="sm" color="secondary">
+        {EMPTY_TEXT}
+      </Text>
+    </Box>
+  );
+}
 
 /**
  * The tinted box the sentence sits in (`prototype.html`'s `.sentence`).

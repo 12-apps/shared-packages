@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  BLOCK_HEIGHT_MAX,
+  BLOCK_HEIGHT_MIN,
   BLOCK_SPAN_MAX,
+  blockHeightCss,
+  clampBlockHeight,
   clampBlockSpan,
   minSpanForPresentation,
   responsiveSpan,
@@ -100,5 +104,108 @@ describe('the stored contract', () => {
     expect(dashboardBlockSchema.parse(block).span).toBe(2);
     expect(() => dashboardBlockSchema.parse({ ...block, span: 0 })).toThrow();
     expect(() => dashboardBlockSchema.parse({ ...block, span: 13 })).toThrow();
+  });
+});
+
+/**
+ * `Altura` (FUT-755) — the vertical half of the grid contract, and the mirror
+ * of everything above it. The rule that carries the whole feature is that
+ * `undefined` means "as tall as its content": every block saved before heights
+ * existed has none, and every one of them must go on rendering exactly as it
+ * does today.
+ */
+describe('clampBlockHeight', () => {
+  it('leaves a block with NO height with no height — the compatibility rule', () => {
+    // `undefined` in, `undefined` out. A default here would silently resize
+    // every report saved before this field existed.
+    expect(clampBlockHeight(undefined)).toBeUndefined();
+  });
+
+  it('keeps the three tiers and clamps anything outside them', () => {
+    expect(clampBlockHeight(BLOCK_HEIGHT_MIN)).toBe(BLOCK_HEIGHT_MIN);
+    expect(clampBlockHeight(2)).toBe(2);
+    expect(clampBlockHeight(BLOCK_HEIGHT_MAX)).toBe(BLOCK_HEIGHT_MAX);
+    expect(clampBlockHeight(0)).toBe(BLOCK_HEIGHT_MIN);
+    expect(clampBlockHeight(99)).toBe(BLOCK_HEIGHT_MAX);
+  });
+
+  it('takes no presentation — every tier is tall enough for every rendering', () => {
+    // Widths have a floor per presentation because a narrow block TRUNCATES.
+    // A short one does not, so no tier is ever refused — a tier nobody can
+    // choose makes the whole set look broken.
+    expect(clampBlockHeight.length).toBe(1);
+  });
+
+  it('resolves junk to the shortest tier instead of throwing', () => {
+    expect(clampBlockHeight(Number.NaN)).toBe(BLOCK_HEIGHT_MIN);
+    expect(clampBlockHeight(Number.POSITIVE_INFINITY)).toBe(BLOCK_HEIGHT_MIN);
+    expect(clampBlockHeight(2.4)).toBe(2);
+  });
+});
+
+/**
+ * The tiers are a CLAMP, not a pixel count — `clamp(min, vh, max)`. The user
+ * set one block to `Média` and then to `Alta` and reported the two as "almost
+ * nothing", so the assertion that matters is that consecutive tiers are far
+ * enough apart to tell apart without comparing them side by side.
+ */
+describe('blockHeightCss', () => {
+  const parse = (css: string): { min: number; vh: number; max: number } => {
+    const match = /^clamp\((\d+)px, (\d+)vh, (\d+)px\)$/.exec(css);
+    if (match === null) throw new Error(`not a clamp: ${css}`);
+    return { min: Number(match[1]), vh: Number(match[2]), max: Number(match[3]) };
+  };
+
+  it('states every tier as a floor, a share of the window and a ceiling', () => {
+    for (const tier of [1, 2, 3]) {
+      const parsed = parse(blockHeightCss(tier));
+      expect(parsed.min).toBeLessThan(parsed.max);
+      // A chart's block spends ~185px on chrome and its own axis before the
+      // plot gets any, so a floor below this draws a sliver rather than a
+      // short chart.
+      expect(parsed.min).toBeGreaterThanOrEqual(260);
+    }
+  });
+
+  it('makes each tier at least half again the one below it, at every bound', () => {
+    // The whole point of the redo: the first attempt's 300px against 440px was
+    // two charts that looked alike.
+    for (const tier of [1, 2]) {
+      const lower = parse(blockHeightCss(tier));
+      const upper = parse(blockHeightCss(tier + 1));
+      expect(upper.min / lower.min).toBeGreaterThanOrEqual(1.5);
+      expect(upper.vh / lower.vh).toBeGreaterThanOrEqual(1.5);
+      expect(upper.max / lower.max).toBeGreaterThanOrEqual(1.5);
+    }
+  });
+
+  it('clamps out-of-range tiers rather than drawing nothing', () => {
+    expect(blockHeightCss(0)).toBe(blockHeightCss(BLOCK_HEIGHT_MIN));
+    expect(blockHeightCss(99)).toBe(blockHeightCss(BLOCK_HEIGHT_MAX));
+  });
+});
+
+describe('the stored contract — height', () => {
+  const block = {
+    id: 'a',
+    span: 6,
+    spec: { entity: 'orders', measures: [{ field: 'revenueCents' }] },
+  };
+
+  it('stores NO height by default — a parsed block that had none still has none', () => {
+    // The single most important assertion of the feature: `.default()` here
+    // would make every stored document grow a height the first time it was read.
+    expect(dashboardBlockSchema.parse(block).height).toBeUndefined();
+    expect('height' in dashboardBlockSchema.parse(block)).toBe(false);
+  });
+
+  it('accepts the three tiers and nothing else', () => {
+    expect(dashboardBlockSchema.parse({ ...block, height: 1 }).height).toBe(1);
+    expect(dashboardBlockSchema.parse({ ...block, height: BLOCK_HEIGHT_MAX }).height).toBe(
+      BLOCK_HEIGHT_MAX,
+    );
+    expect(() => dashboardBlockSchema.parse({ ...block, height: 0 })).toThrow();
+    expect(() => dashboardBlockSchema.parse({ ...block, height: 4 })).toThrow();
+    expect(() => dashboardBlockSchema.parse({ ...block, height: 2.5 })).toThrow();
   });
 });

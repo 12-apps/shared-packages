@@ -48,11 +48,12 @@ function ViewBlock({ block }: { block: DashboardBlockRender }): JSX.Element {
       : sentence.charAt(0).toLocaleUpperCase("pt-BR") + sentence.slice(1);
   const tableView = useBlockTableView(block.status === "ok" ? block.render : undefined);
   return (
-    <ReportGridItem span={block.span}>
+    <ReportGridItem span={block.span} height={block.height}>
       <ReportBlockFrame
         title={heading}
         specSentence={named && sentence !== "" ? sentence : undefined}
         dataTestId={testId}
+        fill={block.height !== undefined}
         actions={
           <BlockToolCluster
             view={tableView}

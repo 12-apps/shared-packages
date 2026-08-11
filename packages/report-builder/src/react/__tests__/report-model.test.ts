@@ -49,7 +49,8 @@ describe('addBlock', () => {
     expect(one.blocks).toHaveLength(1);
     expect(one.blocks[0]?.id).toBe('bloco-1');
     expect(one.blocks[0]?.title).toBe('Vendas');
-    expect(one.blocks[0]?.span).toBe(6);
+    // The FIRST block fills the canvas — see the suite below.
+    expect(one.blocks[0]?.span).toBe(12);
 
     const two = addBlock(one, KPI_SPEC, 'Receita');
     expect(order(two)).toEqual(['bloco-1', 'bloco-2']);
@@ -156,6 +157,123 @@ describe('draftFromDocument', () => {
       blocks: [{ id: 'a', span: 3, spec: TABLE_SPEC }],
     });
     expect(draft.blocks[0]?.span).toBe(6);
+  });
+});
+
+/**
+ * `Altura` travels the way `span` does (FUT-755) — with ONE difference that is
+ * the entire compatibility story: it is optional, so a block that has never
+ * been given a height carries none, saves none, and is therefore as tall as
+ * its content exactly as it has always been.
+ */
+describe('height — a block with none must stay a block with none', () => {
+  it('adds a new block with no height at all', () => {
+    const draft = addBlock(emptyReportDraft(), TABLE_SPEC, 'Vendas');
+    expect(draft.blocks[0]?.height).toBeUndefined();
+  });
+
+  it('OMITS the key from the saved document rather than writing a default', () => {
+    // A document that has always been content-height has to stay byte-identical
+    // — a `height: 1` written on save would resize every stored report.
+    const document = documentFromDraft(draftWith(['a', 'b']));
+    expect(document.blocks[0]).not.toHaveProperty('height');
+    expect(document.blocks[1]).not.toHaveProperty('height');
+  });
+
+  it('reads a stored document with no heights back as no heights', () => {
+    const draft = draftFromDocument('Painel', null, {
+      kind: 'dashboard',
+      blocks: [{ id: 'a', span: 6, spec: TABLE_SPEC }],
+    });
+    expect(draft.blocks[0]?.height).toBeUndefined();
+  });
+
+  it('keeps a legacy single-spec report content-height too', () => {
+    expect(draftFromDocument('Antigo', 'desc', TABLE_SPEC).blocks[0]?.height).toBeUndefined();
+  });
+
+  it('leaves height alone when some OTHER property of the block changes', () => {
+    const draft = updateBlock(draftWith(['a']), 'a', { title: 'Receita' });
+    expect(draft.blocks[0]?.height).toBeUndefined();
+    expect(documentFromDraft(draft).blocks[0]).not.toHaveProperty('height');
+  });
+});
+
+/**
+ * The width a new block starts at (FUT-755).
+ *
+ * With `flexGrow` set to the span, a block alone on its row absorbed the rest
+ * of it — so a report's first block filled the canvas whatever number was
+ * stored under it. Now that a span is rendered literally the default has to say
+ * that itself, or a brand-new report opens as a half-width chart with a hole
+ * beside it.
+ */
+describe('addBlock — the first block fills the canvas', () => {
+  it('gives the first block the whole canvas and the next one a half', () => {
+    const one = addBlock(emptyReportDraft(), TABLE_SPEC, 'A');
+    expect(one.blocks[0]?.span).toBe(12);
+    const two = addBlock(one, TABLE_SPEC, 'B');
+    expect(two.blocks[1]?.span).toBe(6);
+  });
+
+  it('never gives a Número the whole canvas, first or not', () => {
+    // Its own widths stop at a half: past that a single figure is a lonely
+    // number on a banner, which is what narrowed the KPI set to begin with.
+    expect(addBlock(emptyReportDraft(), KPI_SPEC, 'A').blocks[0]?.span).toBe(6);
+  });
+});
+
+describe('height — once chosen, it round-trips', () => {
+  it('stores a chosen height and reads it back', () => {
+    const draft = updateBlock(draftWith(['a']), 'a', { height: 3 });
+    expect(draft.blocks[0]?.height).toBe(3);
+    const document = documentFromDraft(draft);
+    expect(document.blocks[0]?.height).toBe(3);
+    expect(draftFromDocument('Painel', null, document).blocks[0]?.height).toBe(3);
+  });
+
+  it('keeps the shortest tier for any presentation — no height is ever refused', () => {
+    // NOT the mirror of the width case above. A narrow block TRUNCATES, so a
+    // width has a floor per presentation; a short one merely outgrows its tier,
+    // and every tier is tall enough to read at. A tier an author cannot choose
+    // makes the whole set look broken.
+    const draft = draftFromDocument('Painel', null, {
+      kind: 'dashboard',
+      blocks: [{ id: 'a', span: 6, height: 1, spec: TABLE_SPEC }],
+    });
+    expect(draft.blocks[0]?.height).toBe(1);
+  });
+
+  it('leaves the height alone when the PRESENTATION changes under it', () => {
+    // The width IS re-fitted here (a table needs six columns). The height is
+    // not, because there is no floor to re-fit it to.
+    const kpi = updateBlock(
+      { name: 'P', description: '', blocks: [{ id: 'a', title: '', span: 6, spec: KPI_SPEC }] },
+      'a',
+      { height: 1 },
+    );
+    expect(kpi.blocks[0]?.height).toBe(1);
+    expect(updateBlockSpec(kpi, 'a', TABLE_SPEC).blocks[0]?.height).toBe(1);
+  });
+
+  it('clamps a stored height outside the three tiers instead of failing to open', () => {
+    const draft = draftFromDocument('Painel', null, {
+      kind: 'dashboard',
+      blocks: [{ id: 'a', span: 6, height: 9, spec: TABLE_SPEC }],
+    });
+    expect(draft.blocks[0]?.height).toBe(3);
+  });
+
+  it('does not invent a height when the presentation changes under a block without one', () => {
+    const draft = updateBlockSpec(draftWith(['a']), 'a', KPI_SPEC);
+    expect(draft.blocks[0]?.height).toBeUndefined();
+  });
+
+  it('clears back to content height when the author picks Auto', () => {
+    const chosen = updateBlock(draftWith(['a']), 'a', { height: 3 });
+    const cleared = updateBlock(chosen, 'a', { height: undefined });
+    expect(cleared.blocks[0]?.height).toBeUndefined();
+    expect(documentFromDraft(cleared).blocks[0]).not.toHaveProperty('height');
   });
 });
 

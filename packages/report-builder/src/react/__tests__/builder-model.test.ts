@@ -7,6 +7,7 @@ import {
   chartOptions,
   draftFromSpec,
   specFromDraft,
+  stackedOption,
   starterDraft,
   withValidChart,
   type BuilderDraft,
@@ -148,6 +149,99 @@ describe('chartOptions', () => {
       'uma medida só',
     );
   });
+});
+
+/**
+ * With NO grouping, `Número` is the only offer (FUT-755): "on this case we
+ * should not allow table, only number. There is no point in show table if we
+ * will only have 1 line for columns" — and "only numero should be allowed with
+ * multiple boxes".
+ *
+ * This inverts the old fallback, where `Tabela` was the option that was never
+ * blocked. The direction that must not regress is the other one, so the last
+ * case here re-proves the table is still offered the moment a grouping exists.
+ */
+describe('chartOptions — no grouping', () => {
+  const reasonsFor = (measures: BuilderDraft['measures']): Map<string, string | null> =>
+    new Map(
+      chartOptions(draft({ dimensions: [], measures }), byName).map((option) => [
+        option.value,
+        option.disabledReason,
+      ]),
+    );
+  const ONE = [{ field: 'revenueCents', aggregation: 'sum' }];
+  const THREE = [
+    { field: 'revenueCents', aggregation: 'sum' },
+    { field: 'quantity', aggregation: 'sum' },
+    { field: 'quantity', aggregation: 'avg' },
+  ];
+
+  it('offers Número for one measure and for several', () => {
+    expect(reasonsFor(ONE).get('kpi')).toBeNull();
+    expect(reasonsFor(THREE).get('kpi')).toBeNull();
+  });
+
+  it('blocks the table, which would be a header above a single line', () => {
+    const reason = reasonsFor(THREE).get('table') ?? '';
+    expect(reason).toContain('uma linha só');
+    expect(reason).toContain('Número');
+  });
+
+  it('blocks every chart too, and sends the author to the grouping', () => {
+    for (const option of ['line', 'bar', 'area', 'pie', 'donut']) {
+      expect(reasonsFor(THREE).get(option), option).not.toBeNull();
+    }
+  });
+
+  it('offers the table again the moment a grouping exists', () => {
+    const options = chartOptions(draft({ measures: THREE }), byName);
+    expect(options.find((option) => option.value === 'table')?.disabledReason).toBeNull();
+  });
+});
+
+/**
+ * `Empilhado` (FUT-755): "stacked or not, does not make difference", "probably
+ * stacked is the same case of line and area". Stacking is a statement about
+ * SERIES — with one series the toggle redraws an identical chart.
+ */
+describe('stackedOption', () => {
+  const TWO_MEASURES = [
+    { field: 'revenueCents', aggregation: 'sum' },
+    { field: 'quantity', aggregation: 'sum' },
+  ];
+
+  it.each(['bar', 'area'] as const)('offers %s stacking once a split exists', (chartType) => {
+    const current = draft({
+      chartType,
+      dimensions: [
+        { field: 'createdAt', timeGrain: 'day' },
+        { field: 'method', timeGrain: 'day' },
+      ],
+    });
+    expect(stackedOption(current, byName)?.disabledReason).toBeNull();
+  });
+
+  it.each(['bar', 'area'] as const)('offers %s stacking with two measures', (chartType) => {
+    expect(
+      stackedOption(draft({ chartType, measures: TWO_MEASURES }), byName)?.disabledReason,
+    ).toBeNull();
+  });
+
+  it.each(['bar', 'area'] as const)('refuses %s stacking with one series', (chartType) => {
+    const reason = stackedOption(draft({ chartType }), byName)?.disabledReason ?? '';
+    // Names the control to change, in the register the other reasons use.
+    expect(reason).toContain('“separar em séries”');
+    expect(reason).toContain('medida');
+  });
+
+  it.each(['table', 'kpi', 'line', 'pie', 'donut'] as const)(
+    'draws no toggle at all for %s',
+    (chartType) => {
+      // `null` is "this control does not apply here", which is a different
+      // answer from a toggle that is on screen and refused.
+      expect(stackedOption(draft({ chartType, measures: TWO_MEASURES }), byName)).toBeNull();
+    },
+  );
 });
 
 describe('withValidChart', () => {

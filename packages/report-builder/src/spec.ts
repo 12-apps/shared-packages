@@ -152,6 +152,19 @@ export const dashboardBlockSchema = z.object({
     .regex(/^[a-zA-Z0-9_-]{1,40}$/, 'block id must be 1-40 letters, digits, "_" or "-"'),
   title: z.string().min(1).max(120).optional(),
   span: z.number().int().min(1).max(12).default(6),
+  /**
+   * The block's height as a TIER (FUT-755) — 1, 2 or 3, which the canvas draws
+   * as `Baixa`, `Média` and `Alta`. What each is worth on screen is `layout.ts`
+   * (`blockHeightCss`): a clamped share of the window rather than a pixel
+   * count, so the three stay far enough apart to tell apart on any display.
+   *
+   * OPTIONAL, with NO default, and that is the whole compatibility story: a
+   * block storing no height is as tall as its content, which is what every
+   * block saved before this field was and what all of them must go on being. A
+   * default here would silently resize every stored report the first time it
+   * was parsed.
+   */
+  height: z.number().int().min(1).max(3).optional(),
   spec: reportSpecSchema,
 });
 

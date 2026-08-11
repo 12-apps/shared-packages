@@ -83,6 +83,16 @@ export interface ChartProps {
   maxCategoryTicks?: number;
   /** Category tick labels longer than this are truncated with an ellipsis. Default 12. */
   tickLabelMaxChars?: number;
+  /**
+   * Take the height of the box this chart is placed in, rather than the size
+   * preset's fixed one.
+   *
+   * For a host that has already sized the chart's container — a dashboard cell
+   * with a chosen height, say. The preset is a sensible default precisely
+   * because most callers have NOT sized anything, so this is opt-in: without
+   * it a chart in a box with no definite height would collapse to nothing.
+   */
+  fillHeight?: boolean;
   /** Bar corner radius in px (top corners only; stacked segments stay square). Default 3. */
   barRadius?: number;
   /**

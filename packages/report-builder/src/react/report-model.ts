@@ -11,7 +11,7 @@
  *     as a one-block report, so old documents keep working and become regular
  *     multi-block reports the moment they are saved again.
  */
-import { clampBlockSpan } from "../layout";
+import { clampBlockHeight, clampBlockSpan, REPORT_GRID_COLUMNS } from "../layout";
 
 import { specFromDraft, starterDraft } from "./builder-model";
 import type {
@@ -29,6 +29,13 @@ export interface ReportBlockDraft {
   id: string;
   title: string;
   span: number;
+  /**
+   * The block's height tier (1..3), or `undefined` for its own content height
+   * (FUT-755). `undefined` is not "unset pending a default" — it is the value
+   * every block saved before heights existed has, and the one that keeps them
+   * rendering exactly as they do now.
+   */
+  height?: number;
   spec: ReportSpecWire;
 }
 
@@ -40,6 +47,27 @@ export interface ReportDraft {
 
 /** A new block's width before the presentation's floor applies: half the canvas. */
 const DEFAULT_BLOCK_SPAN = 6;
+
+/**
+ * The width a NEWLY ADDED block starts at — and why the FIRST one is different
+ * (FUT-755).
+ *
+ * This default is what the canvas has always DRAWN. With `flexGrow` set to the
+ * span, a block alone on its row absorbed the rest of it and rendered full
+ * width, while two blocks shared the row at a half each — so a report's first
+ * block filled the canvas no matter what number was stored under it. Now that a
+ * span is rendered literally, the stored number has to say that itself instead
+ * of relying on the row closing over it.
+ *
+ * A `Número` is the exception, and for the reason its own widths stop at a half
+ * (`block-width-picker`): a single figure across the whole canvas is a lonely
+ * number on a banner, which is the complaint that narrowed the KPI set in the
+ * first place.
+ */
+function newBlockSpan(draft: ReportDraft, spec: ReportSpecWire): number {
+  const fills = draft.blocks.length === 0 && spec.presentation.kind !== "kpi";
+  return clampBlockSpan(fills ? REPORT_GRID_COLUMNS : DEFAULT_BLOCK_SPAN, spec.presentation);
+}
 
 export const REPORT_MAX_BLOCKS = 12;
 
@@ -71,7 +99,8 @@ export function addBlock(draft: ReportDraft, spec: ReportSpecWire, title: string
   const block: ReportBlockDraft = {
     id: nextBlockId(draft.blocks),
     title,
-    span: clampBlockSpan(DEFAULT_BLOCK_SPAN, spec.presentation),
+    span: newBlockSpan(draft, spec),
+    // No height: a new block is as tall as what it renders, same as before.
     spec,
   };
   return { ...draft, blocks: [...draft.blocks, block] };
@@ -100,6 +129,7 @@ export function duplicateBlock(draft: ReportDraft, id: string): ReportDraft {
     id: nextBlockId(draft.blocks),
     title: `${blockLabel(source)} (cópia)`,
     span: source.span,
+    ...(source.height === undefined ? {} : { height: source.height }),
     // A spec is pure JSON by contract (see `spec.ts`), so this round-trip is a
     // complete deep copy — and one that works identically in the browser, in
     // jsdom and on the server, which `structuredClone` does not.
@@ -118,14 +148,18 @@ export function removeBlock(draft: ReportDraft, id: string): ReportDraft {
 export function updateBlock(
   draft: ReportDraft,
   id: string,
-  patch: Partial<Pick<ReportBlockDraft, "title" | "span">>,
+  patch: Partial<Pick<ReportBlockDraft, "title" | "span" | "height">>,
 ): ReportDraft {
   return {
     ...draft,
     blocks: draft.blocks.map((block) => {
       if (block.id !== id) return block;
       const next = { ...block, ...patch };
-      return { ...next, span: clampBlockSpan(next.span, next.spec.presentation) };
+      return {
+        ...next,
+        span: clampBlockSpan(next.span, next.spec.presentation),
+        height: clampBlockHeight(next.height),
+      };
     }),
   };
 }
@@ -143,7 +177,14 @@ export function updateBlockSpec(
   return {
     ...draft,
     blocks: draft.blocks.map((block) =>
-      block.id === id ? { ...block, spec, span: clampBlockSpan(block.span, spec.presentation) } : block,
+      block.id === id
+        ? {
+            ...block,
+            spec,
+            span: clampBlockSpan(block.span, spec.presentation),
+            height: clampBlockHeight(block.height),
+          }
+        : block,
     ),
   };
 }
@@ -203,6 +244,9 @@ export function documentFromDraft(draft: ReportDraft): DashboardSpecWire {
         id: block.id,
         ...(title === "" ? {} : { title }),
         span: block.span,
+        // OMITTED when there is none, never written as a default: a document
+        // that has always been content-height must stay byte-identical.
+        ...(block.height === undefined ? {} : { height: block.height }),
         spec: block.spec,
       };
     }),
@@ -229,6 +273,7 @@ export function draftFromDocument(
       id: block.id,
       title: block.title ?? "",
       span: clampBlockSpan(block.span, block.spec.presentation),
+      height: clampBlockHeight(block.height),
       spec: block.spec,
     })),
   };

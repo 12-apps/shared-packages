@@ -61,8 +61,12 @@ export {
   SUPPRESSED_PLACEHOLDER,
 } from './format';
 export {
+  BLOCK_HEIGHT_MAX,
+  BLOCK_HEIGHT_MIN,
   BLOCK_SPAN_MAX,
   BLOCK_SPAN_MIN,
+  blockHeightCss,
+  clampBlockHeight,
   clampBlockSpan,
   minSpanForPresentation,
   REPORT_GRID_COLUMNS,
@@ -73,6 +77,7 @@ export {
 } from './layout';
 export { createMemoryDataSource, executeCompiledQuery } from './memory';
 export { renderReport, type ReportRenderModel, type ReportTableColumn } from './render';
+export type { ReportKpiFigure } from './render-kpi';
 export {
   parseReportDocument,
   parseReportSpec,

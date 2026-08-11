@@ -74,11 +74,20 @@ export interface PresentationCompatibility {
  * The register is `prototype.html`'s `vizBlocked`: the author is holding a
  * form, and the useful sentence is which field to touch next.
  */
-const NEEDS_GROUPING = 'Um gráfico precisa de um agrupamento. Escolha um “agrupar por” ou use Tabela.';
+const NEEDS_GROUPING = 'Um gráfico precisa de um agrupamento. Escolha um “agrupar por” ou use Número.';
 const KPI_TAKES_NO_GROUPING =
   'Um número único não usa agrupamento. Tire o “agrupar por” para escolher.';
-const KPI_TAKES_ONE_MEASURE =
-  'Um número único mostra uma medida só. Deixe apenas uma medida para escolher.';
+/**
+ * The inversion (FUT-755). Without a grouping the query returns EXACTLY ONE
+ * row, so a table draws a header and a single line of figures — a worse Número
+ * rather than a table. `Tabela` is therefore the one presentation that is
+ * available for every shape that HAS a grouping and for none that does not,
+ * which is why the sentence sends the author to the grouping first.
+ */
+const TABLE_TAKES_A_GROUPING =
+  'Sem agrupamento a tabela teria uma linha só. Escolha um “agrupar por” ou use Número.';
+const STACK_TAKES_TWO_SERIES =
+  'Empilhar precisa de mais de uma série. Escolha um “separar em séries” ou adicione outra medida.';
 const ROUND_TAKES_NO_SPLIT =
   'Pizza e rosca mostram a composição de uma série só. Tire o “separar em séries” para escolher.';
 const ROUND_TAKES_ONE_MEASURE =
@@ -107,7 +116,6 @@ function unorderedAxisReason(option: PresentationOption, shape: SpecShape): stri
 
 function chartReason(option: PresentationOption, shape: SpecShape): string | null {
   const isRound = option === 'pie' || option === 'donut';
-  if (shape.dimensionCount === 0) return NEEDS_GROUPING;
   if (shape.dimensionCount > 1) {
     if (isRound) return ROUND_TAKES_NO_SPLIT;
     // A split already spends the series axis; a second measure would need a
@@ -119,13 +127,27 @@ function chartReason(option: PresentationOption, shape: SpecShape): string | nul
   return unorderedAxisReason(option, shape);
 }
 
+/**
+ * What an UNGROUPED spec may be drawn as (FUT-755): `Número`, and nothing else.
+ *
+ * One row is the whole result, so every other presentation is a way of drawing
+ * one row badly — a table with a header and a single line, a bar chart with one
+ * bar, a pie that is a full circle. `Número` draws it as what it is: one figure
+ * per measure, labelled, side by side.
+ *
+ * Note this is now the only rule that keeps `kpi` out of anything: several
+ * measures WITHOUT a grouping is a legitimate KPI block ("Número" renders one
+ * figure each), so the old one-measure ceiling is gone from both halves.
+ */
+function ungroupedReason(option: PresentationOption): string | null {
+  if (option === 'kpi') return null;
+  return option === 'table' ? TABLE_TAKES_A_GROUPING : NEEDS_GROUPING;
+}
+
 function reasonFor(option: PresentationOption, shape: SpecShape): string | null {
+  if (shape.dimensionCount === 0) return ungroupedReason(option);
+  if (option === 'kpi') return KPI_TAKES_NO_GROUPING;
   if (option === 'table') return null;
-  if (option === 'kpi') {
-    if (shape.dimensionCount !== 0) return KPI_TAKES_NO_GROUPING;
-    if (shape.measureCount !== 1) return KPI_TAKES_ONE_MEASURE;
-    return null;
-  }
   return chartReason(option, shape);
 }
 
@@ -137,12 +159,46 @@ export function presentationCompatibility(shape: SpecShape): PresentationCompati
   }));
 }
 
+/** The two presentations for which stacking is even defined. */
+const STACKABLE_OPTIONS: ReadonlySet<PresentationOption> = new Set(['bar', 'area']);
+
 /**
- * The smart default presentation for a shape: one ungrouped measure is a KPI
- * tile, an ORDERED axis charts as a line, any other grouping as bars, and only
- * the shapes no chart can express (several measures without a grouping, or
- * several measures ALONGSIDE a split) fall back to a table. Always both
- * matrix- and compiler-valid, which the suite checks shape by shape.
+ * Whether `Empilhado` does anything, and why not when it does not (FUT-755).
+ *
+ * Stacking is a statement about SERIES: bars sat on top of one another sum to
+ * the whole, side by side they are compared. With one series there is nothing
+ * to sit on and nothing to compare, so the toggle redraws an identical chart —
+ * the same class of defect as a line over a categorical axis, a control that
+ * claims to do something it cannot.
+ *
+ * Series come from the SPLIT when there is one (`pivot.ts` makes one series per
+ * value), and from the MEASURES otherwise (`render.ts` builds one series per
+ * measure). So either of those, in the plural, is what the toggle needs.
+ *
+ * `null` means the control does not apply at all — a pie has no stacking to
+ * offer and should render no toggle, which is a different thing from a toggle
+ * that is there and refused.
+ */
+export function stackedCompatibility(
+  option: PresentationOption,
+  shape: SpecShape,
+): PresentationCompatibility | null {
+  if (!STACKABLE_OPTIONS.has(option)) return null;
+  const hasSeveralSeries = shape.dimensionCount > 1 || shape.measureCount > 1;
+  return { option, disabledReason: hasSeveralSeries ? null : STACK_TAKES_TWO_SERIES };
+}
+
+/**
+ * The smart default presentation for a shape: ANY ungrouped spec is a KPI tile,
+ * an ORDERED axis charts as a line, any other grouping as bars, and only the
+ * shape no chart can express (several measures ALONGSIDE a split) falls back to
+ * a table. Always both matrix- and compiler-valid, which the suite checks shape
+ * by shape.
+ *
+ * "Several measures without a grouping" used to be the other table case
+ * (FUT-755). It is now a KPI with several figures — which is what the author
+ * asked for by adding a second measure to a block that has no grouping to
+ * spend it on.
  *
  * "Ordered" replaced "is a date" in FUT-755, so an hour-of-day or a weekday
  * axis now defaults to a line as well — "pedidos por hora" is the textbook
@@ -154,9 +210,7 @@ export function presentationCompatibility(shape: SpecShape): PresentationCompati
  * dropped all the way to a table when bars would now draw it.
  */
 export function defaultPresentation(shape: SpecShape): ReportPresentation {
-  if (shape.dimensionCount === 0) {
-    return shape.measureCount === 1 ? { kind: 'kpi' } : { kind: 'table' };
-  }
+  if (shape.dimensionCount === 0) return { kind: 'kpi' };
   if (shape.dimensionCount > 1 && shape.measureCount !== 1) return { kind: 'table' };
   if (shape.firstDimensionIsOrdered) return { kind: 'chart', chartType: 'line' };
   return { kind: 'chart', chartType: 'bar' };

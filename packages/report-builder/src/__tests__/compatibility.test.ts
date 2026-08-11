@@ -5,6 +5,7 @@ import {
   isOrderedDimension,
   PRESENTATION_OPTIONS,
   presentationCompatibility,
+  stackedCompatibility,
   type SpecShape,
 } from '../compatibility';
 import { compileReport } from '../compile';
@@ -111,6 +112,102 @@ describe('presentationCompatibility — what a split blocks, and what it says', 
 });
 
 /**
+ * The inversion (FUT-755). `Tabela` used to be the option that was never
+ * blocked, which meant an author with no grouping was offered a table of ONE
+ * ROW — a header and a single line of figures, which is a worse Número. Now
+ * `Número` is the only offer for that shape, and it takes as many measures as
+ * the author gives it.
+ *
+ * The direction that must NOT regress is the other one: `Tabela` is still
+ * available for every shape that HAS a grouping, which the matrix ⟺ compiler
+ * suite below re-proves shape by shape.
+ */
+describe('presentationCompatibility — no grouping means Número, and only Número', () => {
+  const ungrouped = (measureCount: number): SpecShape => ({
+    dimensionCount: 0,
+    measureCount,
+    firstDimensionIsOrdered: false,
+  });
+  const reasonOf = (shape: SpecShape, option: string): string | null =>
+    presentationCompatibility(shape).find((entry) => entry.option === option)?.disabledReason ??
+    null;
+
+  it.each([1, 2, 3, 10])('offers Número for %i ungrouped measure(s)', (measureCount) => {
+    expect(reasonOf(ungrouped(measureCount), 'kpi')).toBeNull();
+  });
+
+  it.each(['table', 'line', 'bar', 'area', 'pie', 'donut'])(
+    'blocks %s with no grouping',
+    (option) => {
+      expect(reasonOf(ungrouped(1), option)).not.toBeNull();
+      expect(reasonOf(ungrouped(2), option)).not.toBeNull();
+    },
+  );
+
+  it('tells a blocked table which control to touch, and where else to go', () => {
+    const reason = reasonOf(ungrouped(2), 'table') ?? '';
+    expect(reason).toContain('“agrupar por”');
+    expect(reason).toContain('Número');
+    // The old sentence sent every blocked chart to the table. With no grouping
+    // the table is blocked too, so nothing may still be offering it.
+    expect(reasonOf(ungrouped(2), 'bar')).not.toContain('Tabela');
+  });
+
+  it('keeps the table available for EVERY shape that has a grouping', () => {
+    for (const dimensionCount of [1, 2]) {
+      for (const measureCount of [1, 2, 3]) {
+        for (const firstDimensionIsOrdered of [true, false]) {
+          const shape = { dimensionCount, measureCount, firstDimensionIsOrdered };
+          expect(reasonOf(shape, 'table'), JSON.stringify(shape)).toBeNull();
+        }
+      }
+    }
+  });
+});
+
+/**
+ * `Empilhado` (FUT-755). Stacking one series redraws an identical chart — the
+ * same defect as a line over a categorical axis, one axis over.
+ */
+describe('stackedCompatibility', () => {
+  const shape = (dimensionCount: number, measureCount: number): SpecShape => ({
+    dimensionCount,
+    measureCount,
+    firstDimensionIsOrdered: true,
+  });
+
+  it.each(['bar', 'area'] as const)('offers %s stacking once a SPLIT exists', (option) => {
+    expect(stackedCompatibility(option, shape(2, 1))?.disabledReason).toBeNull();
+  });
+
+  it.each(['bar', 'area'] as const)(
+    'offers %s stacking once there are two MEASURES',
+    (option) => {
+      expect(stackedCompatibility(option, shape(1, 2))?.disabledReason).toBeNull();
+    },
+  );
+
+  it.each(['bar', 'area'] as const)('refuses %s stacking with one series', (option) => {
+    expect(stackedCompatibility(option, shape(1, 1))?.disabledReason).not.toBeNull();
+  });
+
+  it('names the control to change, in the same register as the rest', () => {
+    const reason = stackedCompatibility('bar', shape(1, 1))?.disabledReason ?? '';
+    expect(reason).toContain('“separar em séries”');
+    expect(reason).toContain('medida');
+  });
+
+  it.each(['table', 'kpi', 'line', 'pie', 'donut'] as const)(
+    'draws no toggle at all for %s',
+    (option) => {
+      // `null` is "this control does not apply", which is a different answer
+      // from a toggle that is on screen and refused.
+      expect(stackedCompatibility(option, shape(2, 1))).toBeNull();
+    },
+  );
+});
+
+/**
  * `isOrderedDimension`'s DEFAULT, which is doing most of the work and is
  * invisible at every call site: the answer comes from the field TYPE unless
  * the catalog overrides it. Nothing else in the suite would catch someone
@@ -207,9 +304,25 @@ describe('presentationCompatibility — line and area need an ordered axis', () 
   });
 });
 
-/** The only rule the matrix enforces and the compiler deliberately does not. */
-function isOrderedAxisDivergence(option: string, shape: SpecShape): boolean {
-  return (option === 'line' || option === 'area') && !shape.firstDimensionIsOrdered;
+/**
+ * The rules the matrix enforces and the compiler deliberately does not — and
+ * there are exactly TWO, for the same reason both times: the compiler stays
+ * permissive so blocks ALREADY SAVED in that shape keep rendering, while the
+ * picker refuses it the next time the author opens the block.
+ *
+ *  1. line/area over an unordered axis (FUT-755) — `render.ts` degrades such a
+ *     block to bars rather than erroring.
+ *  2. a table with NO grouping (FUT-755) — `presentation` defaults to `table`,
+ *     so a very large share of stored specs are exactly this shape; throwing
+ *     would replace them all with an error message for their owners. It still
+ *     renders as the one-row table it always did.
+ *
+ * A THIRD pair appearing here is a bug, which is what this function is for.
+ */
+function isSanctionedDivergence(option: string, shape: SpecShape): boolean {
+  const unorderedAxis = (option === 'line' || option === 'area') && !shape.firstDimensionIsOrdered;
+  const ungroupedTable = option === 'table' && shape.dimensionCount === 0;
+  return unorderedAxis || ungroupedTable;
 }
 
 describe('presentationCompatibility ⟺ compiler', () => {
@@ -236,7 +349,7 @@ describe('presentationCompatibility ⟺ compiler', () => {
             // exactly one rule — the ordered axis, kept out of the compiler so
             // stored blocks keep rendering. Any other pair here is a bug.
             expect(
-              isOrderedAxisDivergence(entry.option, fullShape),
+              isSanctionedDivergence(entry.option, fullShape),
               `${label} — divergence the suite does not sanction`,
             ).toBe(true);
           }
@@ -259,9 +372,11 @@ describe('defaultPresentation', () => {
     expect(
       defaultPresentation({ dimensionCount: 1, measureCount: 2, firstDimensionIsOrdered: false }),
     ).toEqual({ kind: 'chart', chartType: 'bar' });
+    // Several measures and NO grouping is a KPI with several figures now — it
+    // used to fall back to a table, which drew a header above a single line.
     expect(
       defaultPresentation({ dimensionCount: 0, measureCount: 2, firstDimensionIsOrdered: false }),
-    ).toEqual({ kind: 'table' });
+    ).toEqual({ kind: 'kpi' });
   });
 
   it('charts a SPLIT rather than dropping to a table (FUT-755)', () => {

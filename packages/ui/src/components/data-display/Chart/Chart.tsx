@@ -93,7 +93,7 @@ export const Chart: React.FC<ChartProps> = (props) => {
       <ChartContainer
         responsive={props.responsive ?? true}
         width={props.width ?? '100%'}
-        height={sizeStyles.height}
+        height={props.fillHeight === true ? '100%' : sizeStyles.height}
         data-testid={`${dataTestId}-container`}
       >
         {renderChartByType(props, theme)}
