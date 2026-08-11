@@ -97,26 +97,6 @@ When(new RegExp(`^${THEY} draws the block as bars$`), async ({ page }) => {
   await expect(vizTile(page, 'bar')).toHaveAttribute('aria-pressed', 'true');
 });
 
-/**
- * A refused control, and the two ways its reason has to be reachable.
- *
- * The tile is `aria-disabled` rather than `disabled` on purpose — a genuinely
- * disabled button leaves the tab order and swallows pointer events, which would
- * put the explanation behind an interaction the people who need it cannot
- * perform. So the reason is asserted twice: once as the control's accessible
- * DESCRIPTION, which needs no event at all, and once in the callout a person
- * gets by pointing at it.
- *
- * `hover`, not `click`: Playwright treats `aria-disabled="true"` as disabled
- * and will wait out a click that the browser would happily deliver.
- */
-async function assertRefusal(control: Locator, reason: Locator, names: RegExp): Promise<void> {
-  await expect(control).toHaveAttribute('aria-disabled', 'true');
-  await expect(control).toHaveAttribute('title', names);
-  await control.hover();
-  await expect(reason).toContainText(names);
-}
-
 // ---------------------------------------------------------------------------
 // When — the size of a block
 // ---------------------------------------------------------------------------
@@ -165,6 +145,26 @@ When(new RegExp(`^${THEY} downloads the chart's rows$`), async ({ page, journey 
 // ---------------------------------------------------------------------------
 // Then — the shape of a block
 // ---------------------------------------------------------------------------
+
+/**
+ * A refused control, and the two ways its reason has to be reachable.
+ *
+ * The tile is `aria-disabled` rather than `disabled` on purpose — a genuinely
+ * disabled button leaves the tab order and swallows pointer events, which would
+ * put the explanation behind an interaction the very people who need it cannot
+ * perform. So the reason is asserted twice: once as the control's accessible
+ * DESCRIPTION, which needs no event at all, and once in the callout a person
+ * gets by pointing at it.
+ *
+ * `hover`, not `click`: Playwright treats `aria-disabled="true"` as disabled
+ * and waits out a click the browser would have delivered happily.
+ */
+async function assertRefusal(control: Locator, reason: Locator, names: RegExp): Promise<void> {
+  await expect(control).toHaveAttribute('aria-disabled', 'true');
+  await expect(control).toHaveAttribute('title', names);
+  await control.hover();
+  await expect(reason).toContainText(names);
+}
 
 Then('a line is offered, because the block is grouped by date', async ({ page }) => {
   await expect(vizTile(page, 'line')).not.toHaveAttribute('aria-disabled', 'true');
