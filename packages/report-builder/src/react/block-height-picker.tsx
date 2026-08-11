@@ -21,8 +21,8 @@
  * not, and each tier is tall enough for any rendering to read at. A tier that
  * can never be picked makes the whole set look broken, and `Baixa` used to be
  * exactly that — refused on anything but a `Número`, because a tier was 140px.
- * It is 200px at its floor now (`layout.ts`), which is a chart with a plot
- * rather than a band of axis labels, so nothing is refused any more.
+ * Its floor is 260px now (`layout.ts`), which is a chart with real bars and a
+ * labelled axis, so nothing is refused any more.
  */
 import type { JSX } from "react";
 

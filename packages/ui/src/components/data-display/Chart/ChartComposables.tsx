@@ -15,7 +15,16 @@ export const ChartTooltip = Tooltip;
 export const ChartLegend = Legend;
 
 export interface ChartContainerProps {
-  height: number;
+  /**
+   * A number of pixels, or a PERCENTAGE of the box this container is given.
+   *
+   * The difference is not cosmetic: Recharts sizes the chart from the number
+   * when it is one and only MEASURES its own box when it is a percentage
+   * (`calculateChartDimensions`). So a container stretched by its parent's
+   * layout goes on drawing a 300px chart inside a 600px box — visibly, as
+   * blank space under the plot — until the height is handed over as a percent.
+   */
+  height: number | `${number}%`;
   width?: number | string;
   responsive?: boolean;
   children: React.ReactElement;

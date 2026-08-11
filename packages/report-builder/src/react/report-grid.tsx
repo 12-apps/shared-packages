@@ -390,11 +390,8 @@ export function ReportBlockBody({
       </Alert>
     );
   }
+  const fill = block.height !== undefined;
   return (
-    <ReportRenderView
-      render={block.render}
-      dataTestId={`${dataTestId}-render`}
-      asTable={asTable}
-    />
+    <ReportRenderView render={block.render} dataTestId={`${dataTestId}-render`} asTable={asTable} fill={fill} />
   );
 }

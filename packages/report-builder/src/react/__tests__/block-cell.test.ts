@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BLOCK_HEIGHT_MAX, blockHeightCss, REPORT_GRID_COLUMNS } from '../../layout';
-import { blockCellSx, spanBasis } from '../lib/block-cell';
+import { BLOCK_FILL_BODY_SX, blockCellSx, spanBasis } from '../lib/block-cell';
 import { GRID_GAP_PX } from '../lib/report-surface';
 
 /**
@@ -193,5 +193,38 @@ describe('blockCellSx — height', () => {
       expect(cell.flexGrow, `height ${height}`).toBe(0);
       expect(basisAt(cell, 'lg'), `height ${height}`).toBe(spanBasis(4));
     }
+  });
+});
+
+/**
+ * The fill chain, which is the half of `Altura` that is easy to get subtly
+ * wrong: the height is only worth anything if every box between the cell and
+ * the rendering passes it on.
+ *
+ * `flex-basis: 0` on the chart is a MAIN-axis size, so it is only a height
+ * while every box above it is a `column`. One missing `flex-direction` and the
+ * same declaration collapses the chart's WIDTH instead — which does not look
+ * like a layout bug, it looks like a chart that lost its axis labels.
+ */
+describe('BLOCK_FILL_BODY_SX — the height has to reach the thing that draws', () => {
+  const COLUMN = { flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column' };
+
+  it('makes both levels between the body and the chart a flex column', () => {
+    // One level is not enough: the render view's box holds the chart's own
+    // box, which holds the responsive container.
+    expect(BLOCK_FILL_BODY_SX['& > *']).toEqual(COLUMN);
+    expect(BLOCK_FILL_BODY_SX['& > * > *']).toEqual(COLUMN);
+  });
+
+  it('is a column itself, so its children stack down the axis it sizes', () => {
+    expect(BLOCK_FILL_BODY_SX.display).toBe('flex');
+    expect(BLOCK_FILL_BODY_SX.flexDirection).toBe('column');
+  });
+
+  it('gives the chart the only zero basis — the one preset height to override', () => {
+    expect(BLOCK_FILL_BODY_SX['& .recharts-responsive-container']).toEqual({
+      flex: '1 1 0',
+      minHeight: 0,
+    });
   });
 });

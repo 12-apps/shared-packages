@@ -160,8 +160,10 @@ describe('blockHeightCss', () => {
     for (const tier of [1, 2, 3]) {
       const parsed = parse(blockHeightCss(tier));
       expect(parsed.min).toBeLessThan(parsed.max);
-      // 200px is a chart with a plot rather than a band of axis labels.
-      expect(parsed.min).toBeGreaterThanOrEqual(200);
+      // A chart's block spends ~185px on chrome and its own axis before the
+      // plot gets any, so a floor below this draws a sliver rather than a
+      // short chart.
+      expect(parsed.min).toBeGreaterThanOrEqual(260);
     }
   });
 

@@ -122,8 +122,15 @@ export const BLOCK_FILL_CARD_SX = FILLS_AS_COLUMN;
  * Each rule is one layer of a rendering, and each needs a different thing:
  *
  *  - `& > *` — the render view's own box (or the error `Alert` in its place).
- *  - `& .MuiPaper-root` — the chart's own surface and the table's container,
- *    the boxes a rendering wraps itself in.
+ *  - `& > * > *` — the layer BELOW it: `SpecChart`'s own div, and a table's
+ *    container. Two levels rather than one because the chain is two boxes
+ *    deep, and a single missing `flex-direction: column` anywhere in it breaks
+ *    the whole thing — a `flex` shorthand on a child of a BLOCK box is inert,
+ *    so the chart silently keeps its preset height and the tier buys padding
+ *    again. It is stated structurally rather than by naming a component's
+ *    class or test id, neither of which layout should depend on.
+ *  - `& .MuiPaper-root` — a rendering that wraps itself in a surface, wherever
+ *    in the two levels it puts it.
  *  - `& .recharts-responsive-container` — the chart's own box, and the ONLY
  *    layer given `flex-basis: 0`. Recharts is handed a preset height by
  *    `ChartContainer` (`sm` = 300px) which it writes inline, and an inline
@@ -133,6 +140,12 @@ export const BLOCK_FILL_CARD_SX = FILLS_AS_COLUMN;
  *    left, up OR down: it is the one layer whose intrinsic size is a default
  *    rather than content, so it is the one layer safe to override.
  *
+ * `flex-basis: 0` is on the MAIN axis, which is only the height because every
+ * box above it here is a `column`. That is what the two levels above are for,
+ * and it is why they are asserted in `block-height-render.test.tsx` rather than
+ * left to reading: a row anywhere in the chain would collapse the chart's WIDTH
+ * instead, which looks like a chart that lost its axis labels.
+ *
  * `ResponsiveContainer` measures its own box, so the chart redraws at whatever
  * flex resolves to — no percentage height has to resolve anywhere for this to
  * work, which is what makes it survive `minHeight` on the cell.
@@ -140,6 +153,7 @@ export const BLOCK_FILL_CARD_SX = FILLS_AS_COLUMN;
 export const BLOCK_FILL_BODY_SX = {
   ...FILLS_AS_COLUMN,
   "& > *": FILLS_AS_COLUMN,
+  "& > * > *": FILLS_AS_COLUMN,
   "& .MuiPaper-root": FILLS_AS_COLUMN,
   "& .recharts-responsive-container": { flex: "1 1 0", minHeight: 0 },
 } as const;

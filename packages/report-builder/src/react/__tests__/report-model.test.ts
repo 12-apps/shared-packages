@@ -49,7 +49,8 @@ describe('addBlock', () => {
     expect(one.blocks).toHaveLength(1);
     expect(one.blocks[0]?.id).toBe('bloco-1');
     expect(one.blocks[0]?.title).toBe('Vendas');
-    expect(one.blocks[0]?.span).toBe(6);
+    // The FIRST block fills the canvas — see the suite below.
+    expect(one.blocks[0]?.span).toBe(12);
 
     const two = addBlock(one, KPI_SPEC, 'Receita');
     expect(order(two)).toEqual(['bloco-1', 'bloco-2']);
@@ -195,6 +196,30 @@ describe('height — a block with none must stay a block with none', () => {
     const draft = updateBlock(draftWith(['a']), 'a', { title: 'Receita' });
     expect(draft.blocks[0]?.height).toBeUndefined();
     expect(documentFromDraft(draft).blocks[0]).not.toHaveProperty('height');
+  });
+});
+
+/**
+ * The width a new block starts at (FUT-755).
+ *
+ * With `flexGrow` set to the span, a block alone on its row absorbed the rest
+ * of it — so a report's first block filled the canvas whatever number was
+ * stored under it. Now that a span is rendered literally the default has to say
+ * that itself, or a brand-new report opens as a half-width chart with a hole
+ * beside it.
+ */
+describe('addBlock — the first block fills the canvas', () => {
+  it('gives the first block the whole canvas and the next one a half', () => {
+    const one = addBlock(emptyReportDraft(), TABLE_SPEC, 'A');
+    expect(one.blocks[0]?.span).toBe(12);
+    const two = addBlock(one, TABLE_SPEC, 'B');
+    expect(two.blocks[1]?.span).toBe(6);
+  });
+
+  it('never gives a Número the whole canvas, first or not', () => {
+    // Its own widths stop at a half: past that a single figure is a lonely
+    // number on a banner, which is what narrowed the KPI set to begin with.
+    expect(addBlock(emptyReportDraft(), KPI_SPEC, 'A').blocks[0]?.span).toBe(6);
   });
 });
 

@@ -291,6 +291,15 @@ interface ReportRenderViewProps {
    * consumer a controlled and an uncontrolled way to be wrong.
    */
   asTable?: boolean;
+  /**
+   * The block that holds this rendering has a chosen height (FUT-755), so the
+   * rendering must take that height rather than its own intrinsic one.
+   *
+   * Off by default, and that is the compatibility rule: a block with no stored
+   * height sizes itself by exactly what it draws, which is what every block
+   * saved before `Altura` existed does.
+   */
+  fill?: boolean;
 }
 
 /**
@@ -310,10 +319,12 @@ function ChartOrTable({
   render,
   dataTestId,
   asTable,
+  fill,
 }: {
   render: Extract<ReportRender, { kind: "chart" }>;
   dataTestId: string;
   asTable: boolean;
+  fill: boolean;
 }): JSX.Element {
   return (
     <Box sx={CHART_BOX_SX} data-testid={dataTestId}>
@@ -328,6 +339,14 @@ function ChartOrTable({
           spec={render.chartSpec}
           data={render.rows as unknown as ChartDataPoint[]}
           size="sm"
+          // THE HALF THAT CSS CANNOT DO (FUT-755). Stretching the chart's
+          // container is not enough: Recharts sizes the plot from the height
+          // it was HANDED when that is a number, and only measures its own box
+          // when it is a percentage. So a block set to `Alta` grew its card,
+          // stretched the container, and drew the same 300px chart with the
+          // rest of the block blank underneath — which is exactly what "alta
+          // and media almost change nothing" described.
+          fillHeight={fill}
           data-testid={`${dataTestId}-chart`}
         />
       )}
@@ -341,6 +360,7 @@ export function ReportRenderView({
   dataTestId = "report-render",
   onWidenRange,
   asTable = false,
+  fill = false,
 }: ReportRenderViewProps): JSX.Element {
   if (render.kind === "kpi") {
     // A KPI over an empty period renders its tiles with "—", not EmptyState —
@@ -359,7 +379,7 @@ export function ReportRenderView({
     );
   }
   if (render.kind === "chart") {
-    return <ChartOrTable render={render} dataTestId={dataTestId} asTable={asTable} />;
+    return <ChartOrTable render={render} dataTestId={dataTestId} asTable={asTable} fill={fill} />;
   }
   return (
     <Box sx={TABULAR_FIGURES} data-testid={dataTestId}>

@@ -91,17 +91,24 @@ interface BlockHeightTier {
 }
 
 /**
- * `Baixa` · `Média` · `Alta`, in order.
+ * `Baixa` · `Média` · `Alta`, in order — and every bound is at least half again
+ * the tier below it, which is the property `layout.test.ts` pins.
  *
- * The floors are what each has to be to READ — 200px is a chart with a plot
- * rather than a band of axis labels, which is why no tier is refused to any
- * presentation any more. The ceilings stop `Alta` becoming a block nobody can
- * see the bottom of on a tall screen.
+ * The floors are what each has to be to READ, and they are stated for the
+ * hardest case: a CHART, whose block spends ~185px on the card's title, padding
+ * and its own axis before the plot gets any. `Baixa` at 260px is therefore a
+ * plot of ~85px — short, deliberately, but a chart with bars and a labelled
+ * axis rather than a band of chrome with a sliver under it. The first cut put
+ * that floor at 200px and drew a 32px plot, which is a block that looks broken
+ * rather than one that looks small.
+ *
+ * The ceilings stop `Alta` becoming a block nobody can see the bottom of on a
+ * tall screen.
  */
 const BLOCK_HEIGHT_TIERS: readonly BlockHeightTier[] = [
-  { minPx: 200, vh: 24, maxPx: 280 },
-  { minPx: 340, vh: 44, maxPx: 500 },
-  { minPx: 520, vh: 68, maxPx: 780 },
+  { minPx: 260, vh: 30, maxPx: 340 },
+  { minPx: 420, vh: 46, maxPx: 520 },
+  { minPx: 640, vh: 70, maxPx: 800 },
 ];
 
 /**
