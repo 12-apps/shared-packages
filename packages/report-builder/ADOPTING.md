@@ -16,6 +16,7 @@ kind.
 | **Hono** | `@12-apps/report-builder/hono` | `app.route(prefix, reportBuilderRouter({ ...serverConfig, resolveActor }))`. A one-call mount for hosts on Hono; `hono` is an OPTIONAL peer, so importing the root or `/server` never resolves it. |
 | **React** | `@12-apps/report-builder/react` | Call `createWebReportBuilder({ tenantSlug })` and mount the `page` it returns. Screens, flows and the routes between them are all inside; the host writes no route table. Nest the built-ins in your menu from `SYSTEM_REPORT_NAV`. |
 | **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync` once: the model + migrations reach the host's schema folder as **committed symlinks**. Never copy them. |
+| **E2E journeys** | `@12-apps/report-builder/e2e` | Implement `defineReportsWorld({ ... })` in a module inside your own playwright-bdd `steps` glob, then add `reportsFeatures` / `reportsFeaturesRoot` / `reportsSteps` to `defineBddConfig`. The Gherkin ships HERE; nothing is copied, so a scenario added upstream runs on your next version bump. See *The journeys ship with the package* below. |
 
 ## Host wiring rules (the ones that bite)
 
@@ -131,6 +132,59 @@ its content.
 
 Nothing here is entitlement-gated: an autosave that keeps work from dying with
 the browser tab is not a feature a tenant can be missing.
+
+## The journeys ship with the package (FUT-755)
+
+The report author's end-to-end flows — composing a report and publishing it,
+the working copy that survives a new session while readers keep the published
+version, the period presets and a window picked from the calendar, the
+visualisations the builder refuses and why, a block's width and height, the
+table view and the CSV — live in `features/*.feature` **inside this package**
+and are exported through `@12-apps/report-builder/e2e`.
+
+That is deliberate, and it is the same arrangement `@12-apps/payments-e2e`
+established: a host that copies the scenarios has forked the contract, and will
+quietly miss every scenario added after it integrated. A host that points at
+the globs runs the upstream suite on its next version bump.
+
+```ts
+// <your app>/tests/e2e/steps/reports-world.ts — inside your `steps` glob
+import { defineReportsWorld } from '@12-apps/report-builder/e2e';
+
+defineReportsWorld({
+  reset: async (page) => { /* back to a known set of saved reports */ },
+  openReports: async (page) => { /* land on the list */ },
+  openInNewSession: async (browser, from) => { /* a fresh browser session */ },
+  fixtures: { /* the rows and fields the scenarios name out loud */ },
+});
+```
+
+```ts
+// playwright.config.ts
+import { reportsFeatures, reportsFeaturesRoot, reportsSteps } from '@12-apps/report-builder/e2e';
+
+const journeys = defineBddConfig({
+  features: [reportsFeatures],
+  featuresRoot: reportsFeaturesRoot,   // REQUIRED — see below
+  steps: [reportsSteps, 'tests/e2e/steps/**/*.ts'],
+  outputDir: '.features-gen',
+});
+```
+
+Two traps, both of which fail **green**:
+
+- **`featuresRoot` is not optional.** Unset, bddgen mirrors each feature's
+  `node_modules/...` path under `outputDir` and Playwright's default
+  `testIgnore` drops every compiled spec. bddgen reports the features compiled
+  and the project collects nothing.
+- **Never write the globs as `node_modules/...` strings.** pnpm's store is
+  nested and a host may install from a tarball; a glob that matches nothing
+  compiles nothing and says nothing. Import the three exports instead — they
+  are resolved by the package.
+
+Running two packaged suites in one project means one `featuresRoot` covering
+both; `harness/frontend/playwright.config.ts` computes it from the two exported
+roots and refuses a root that would put the output back under `node_modules`.
 
 ## Porting to another repo
 

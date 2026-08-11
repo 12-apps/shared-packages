@@ -112,6 +112,26 @@
         "src/vite/*.ts"
       ]
     },
+    "packages/report-builder": {
+      "entry": [
+        "src/index.ts",
+        "// The published subpaths. `./e2e` (FUT-755) is the one that has to be",
+        "// named as SOURCE: its `exports` target is built output, which does",
+        "// not exist in a checkout, so knip would read the whole journey",
+        "// subtree as unused. The step definitions are reached by",
+        "// playwright-bdd's `steps` GLOB and never by an import — a host points",
+        "// at dist/e2e/steps/**/*.js and bddgen loads each file for its",
+        "// registration side effect, the same shape as payments/e2e below.",
+        "src/server/index.ts",
+        "src/react/index.ts",
+        "src/hono/index.ts",
+        "src/e2e/index.ts",
+        "src/e2e/steps/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "playwright-bdd"
+      ]
+    },
     "packages/payments/e2e": {
       "entry": [
         "src/index.ts",

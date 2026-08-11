@@ -19,16 +19,8 @@ import { Given } from './fixtures.js';
  * ship with the library instead of being copied into every consumer.
  */
 
-Given('a compradora abre o checkout da loja de PIX', async ({ page }) => {
-  await paymentsWorld().open(page, 'pix-only');
-});
-
 Given('a compradora abre o checkout da loja de cartão', async ({ page }) => {
   await paymentsWorld().open(page, 'card');
-});
-
-Given('a compradora abre o checkout de uma loja que aceita os dois', async ({ page }) => {
-  await paymentsWorld().open(page, 'both-methods');
 });
 
 Given('a compradora abre o checkout de uma loja de página externa', async ({ page }) => {
