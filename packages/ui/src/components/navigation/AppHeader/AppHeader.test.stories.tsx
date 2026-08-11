@@ -182,6 +182,48 @@ export const ResponsiveDesign: Story = {
   },
 };
 
+/**
+ * The disclosing identity must give way to the actions, not run under them.
+ *
+ * A real browser is the only place this can be caught: jsdom lays nothing out,
+ * so the bug this guards measured clean in every unit test while the title and
+ * state line sat on top of the sign-in button at every phone width. The cause
+ * was that a `<button>` sizes to max-content and will not shrink inside its
+ * block wrapper, so the ellipsis never had a width to work against.
+ */
+export const IdentityYieldsToActions: Story = {
+  render: () => (
+    <Box sx={{ width: 360 }}>
+      <AppHeader position="static" actions={<Button size="sm">Entrar</Button>}>
+        <AppHeaderIdentity
+          title="Mercado de Autoatendimento Venda Nova Belo Horizonte"
+          seedColor="#6366F1"
+          status={<AppHeaderStatus tone="success" items={['Aberto agora', 'Retirada no balcão']} />}
+          onDisclose={fn()}
+        />
+      </AppHeader>
+    </Box>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const identity = canvas.getByTestId('app-header-identity');
+    const actions = canvas.getByTestId('app-header-actions');
+
+    // The assertion that matters: no horizontal overlap. Before the fix the
+    // identity's right edge stayed pinned at its max-content width and crossed
+    // the actions by 327px at 320px wide.
+    await waitFor(() =>
+      expect(identity.getBoundingClientRect().right).toBeLessThanOrEqual(
+        actions.getBoundingClientRect().left,
+      ),
+    );
+
+    // …and it gave way by ellipsising, rather than by overflowing its box.
+    const title = canvas.getByTestId('app-header-identity-title');
+    await expect(title.scrollWidth).toBeGreaterThan(title.clientWidth);
+  },
+};
+
 export const ThemeVariations: Story = {
   render: () => (
     <AppHeader position="static" meta="Build 18" actions={<Button size="sm">Entrar</Button>}>

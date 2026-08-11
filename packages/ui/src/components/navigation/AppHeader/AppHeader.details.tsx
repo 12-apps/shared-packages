@@ -17,6 +17,32 @@ import type {
 /** How wide the dialog presentation grows before it stops. */
 const DIALOG_WIDTH = 460;
 
+/**
+ * Where the smallest phones stop. The theme's scale starts at `xs`/`sm`, so
+ * there is no `xxs` breakpoint to ask for — this is that boundary, named once
+ * rather than inlined at the place it decides something.
+ */
+const XXS_MAX_WIDTH = 360;
+
+/**
+ * The sheet grows to its content and stops at the viewport; it does not take a
+ * fixed slab of height.
+ *
+ * `Sheet`'s vertical presets are absolute (`md` is 400px), which on a phone is
+ * shorter than six detail rows plus a button — so the panel scrolled INSIDE a
+ * screen that had room to spare, putting the address and the way out below the
+ * fold of a sheet using two thirds of the display. `height: auto` sizes it to
+ * what is in it, and the cap keeps a long panel on-screen: 100dvh on the
+ * smallest phones where every pixel counts, 90dvh above that so the panel still
+ * reads as a sheet over a page rather than as a new screen.
+ *
+ * `dvh` and not `vh` — mobile browser chrome makes `vh` overshoot, which would
+ * reintroduce exactly the scroll this removes.
+ */
+function sheetHeight(xxs: boolean): { height: string; maxHeight: string } {
+  return { height: 'auto', maxHeight: xxs ? '100dvh' : '90dvh' };
+}
+
 /** Which surface this viewport calls for. Lifted out to keep the component lean. */
 function usesSheet(presentation: AppHeaderDetailsProps['presentation'], compact: boolean): boolean {
   if (presentation === 'sheet') return true;
@@ -136,6 +162,7 @@ export const AppHeaderDetails: React.FC<AppHeaderDetailsProps> = ({
 }) => {
   const theme = useTheme();
   const asSheet = usesSheet(presentation, useMediaQuery(theme.breakpoints.down(breakpoint)));
+  const xxs = useMediaQuery(`(max-width:${XXS_MAX_WIDTH - 0.05}px)`);
 
   // Split once, not per branch: a STRING subtitle is the panel's own
   // `description` (both surfaces style it as part of their header), anything
@@ -151,6 +178,11 @@ export const AppHeaderDetails: React.FC<AppHeaderDetailsProps> = ({
   const footer = <DetailsAction action={action} dataTestId={dataTestId} />;
 
   if (asSheet) {
+    // No `showHandle`. The grab bar promises a drag this panel does not answer:
+    // its height is its content's, so there is no second position to drag it
+    // to, and the handle sat above a ✕ that already closes it. Swipe-to-dismiss
+    // is `Sheet`'s default and still works — it just stops being advertised by
+    // a control that looked resizable and was not.
     return (
       <Sheet
         open={open}
@@ -158,10 +190,10 @@ export const AppHeaderDetails: React.FC<AppHeaderDetailsProps> = ({
         onOpenChange={(next) => !next && onClose()}
         position="bottom"
         size="md"
+        style={sheetHeight(xxs)}
         className={className}
         title={title}
         description={description}
-        showHandle
         showCloseButton
         rounded
         footer={footer}

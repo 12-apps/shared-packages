@@ -141,11 +141,23 @@ const IdentitySkeleton: React.FC<{ size: SizeValue; dataTestId: string }> = ({
   </Box>
 );
 
-/** Row styling shared by the static and the button rendering. */
+/**
+ * Row styling shared by the static and the button rendering.
+ *
+ * `width: '100%'` is load-bearing, not cosmetic. A `<button>` sizes to
+ * max-content and — unlike the `div` the non-interactive path renders — does
+ * not stretch to fill its block container, so without it the DISCLOSING
+ * identity measured its widest possible line at every viewport: the row's
+ * right edge stayed pinned at 564px while the bar narrowed, `ONE_LINE` never
+ * had a constraint to ellipsise against, and the title and state line ran
+ * straight under the actions — 327px of overlap at 320px wide. Filling the
+ * wrapper is what lets `minWidth: 0` bite and the ellipsis engage.
+ */
 const rowSx = {
   display: 'flex',
   alignItems: 'center',
   gap: 1.25,
+  width: '100%',
   minWidth: 0,
   textAlign: 'left',
 } as const;

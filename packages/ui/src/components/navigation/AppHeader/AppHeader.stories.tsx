@@ -1,7 +1,6 @@
 import MenuIcon from '@mui/icons-material/Menu';
-import SearchIcon from '@mui/icons-material/Search';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import { Box, Chip, InputAdornment, Stack, Tab, Tabs, TextField } from '@mui/material';
+import { Box, Stack } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { fn } from 'storybook/test';
@@ -31,51 +30,79 @@ const StoreStatus = (): React.JSX.Element => (
   <AppHeaderStatus tone="success" items={['Aberto agora', 'Retirada no balcão']} />
 );
 
-const SearchField = (): React.JSX.Element => (
-  <TextField
-    fullWidth
-    size="small"
-    placeholder="Buscar entre 123 produtos"
-    slotProps={{
-      input: {
-        startAdornment: (
-          <InputAdornment position="start">
-            <SearchIcon fontSize="small" />
-          </InputAdornment>
-        ),
-      },
-    }}
-  />
-);
-
 /**
- * The page's own category strip, dropped into `below`. Plain MUI tabs here on
- * purpose: the story is showing what the slot carries, not documenting Tabs.
+ * The bar with its disclosure actually wired.
+ *
+ * Every story that shows a chevron renders through this, because a chevron
+ * hooked to a spy is a lie: it invites the one click the component exists for
+ * and answers with nothing, and from the outside that is indistinguishable from
+ * a broken panel. Real state here, so the click opens the real panel.
  */
-const CategoryTabs = (): React.JSX.Element => {
-  const [tab, setTab] = React.useState('bebidas');
+const DisclosingHeader = ({
+  title,
+  status,
+  presentation,
+  cart = false,
+}: {
+  title: string;
+  status?: React.ReactNode;
+  presentation?: 'auto' | 'sheet' | 'dialog';
+  cart?: boolean;
+}): React.JSX.Element => {
+  const [open, setOpen] = React.useState(false);
   return (
-    <Tabs value={tab} onChange={(_, next: string) => setTab(next)} variant="scrollable">
-      {['Bebidas', 'Snacks', 'Doces', 'Padaria', 'Mercearia'].map((label) => (
-        <Tab key={label} value={label.toLowerCase()} label={label} />
-      ))}
-    </Tabs>
+    <Box sx={{ minHeight: 420 }}>
+      <AppHeader
+        position="static"
+        actions={
+          <>
+            {cart && (
+              <Button variant="text" size="sm" aria-label="Carrinho">
+                <ShoppingCartIcon fontSize="small" />
+              </Button>
+            )}
+            <Button variant="outline" size="sm">
+              Entrar
+            </Button>
+          </>
+        }
+      >
+        <AppHeaderIdentity
+          title={title}
+          seedColor="#6366F1"
+          status={status}
+          disclosed={open}
+          onDisclose={() => setOpen(true)}
+        />
+      </AppHeader>
+      <AppHeaderDetails
+        open={open}
+        onClose={() => setOpen(false)}
+        title={title}
+        subtitle="Mercado de autoatendimento"
+        rows={STORE_ROWS}
+        action={{ label: 'Trocar de loja', onClick: fn() }}
+        presentation={presentation}
+      />
+    </Box>
   );
 };
-
-const SubcategoryChips = (): React.JSX.Element => (
-  <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pt: 1 }}>
-    {['Energéticos', 'Cervejas', 'Refrigerantes', 'Chás e sucos', 'Águas'].map((label) => (
-      <Chip key={label} label={label} variant="outlined" size="small" />
-    ))}
-  </Stack>
-);
 
 const meta: Meta<typeof AppHeader> = {
   title: 'Navigation/AppHeader',
   component: AppHeader,
   parameters: {
     layout: 'fullscreen',
+    // Storybook 9 moved viewport into core and made it globals-driven: the
+    // story-level key is `globals.viewport.value`, naming one of these options.
+    // The old `parameters.viewport.defaultViewport` is accepted silently and
+    // does nothing, which is why the phone story used to render full-width.
+    viewport: {
+      options: {
+        phone: { name: 'Phone', styles: { width: '390px', height: '844px' }, type: 'mobile' },
+        desktop: { name: 'Desktop', styles: { width: '1440px', height: '900px' }, type: 'desktop' },
+      },
+    },
     docs: {
       description: {
         component:
@@ -102,41 +129,15 @@ const meta: Meta<typeof AppHeader> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The storefront bar from the design: mark, name, state line, sign-in, build tag. */
+/** The storefront bar: mark, name, state line, sign-in — and a disclosure that opens. */
 export const Default: Story = {
-  args: {
-    position: 'static',
-    meta: 'Build 18',
-    actions: (
-      <Button variant="outline" size="sm" onClick={fn()}>
-        Entrar
-      </Button>
-    ),
-    children: (
-      <AppHeaderIdentity
-        title="Future Drink"
-        seedColor="#6366F1"
-        status={<StoreStatus />}
-        onDisclose={fn()}
-      />
-    ),
-  },
+  render: () => <DisclosingHeader title="Future Drink" status={<StoreStatus />} cart />,
 };
 
-/** The same bar carrying the page's own search, tabs and chips in `below`. */
-export const WithSearchAndFilters: Story = {
-  args: {
-    ...Default.args,
-    below: (
-      <Box sx={{ pt: 0.5 }}>
-        <SearchField />
-        <Box sx={{ pt: 1 }}>
-          <CategoryTabs />
-        </Box>
-        <SubcategoryChips />
-      </Box>
-    ),
-  },
+/** The same bar on a phone, where the panel takes the bottom-sheet surface. */
+export const Phone: Story = {
+  render: () => <DisclosingHeader title="Future Drink" status={<StoreStatus />} cart />,
+  globals: { viewport: { value: 'phone' } },
 };
 
 /**
@@ -144,13 +145,8 @@ export const WithSearchAndFilters: Story = {
  * and centres — one component, no breakpoint at the call site.
  */
 export const LargeScreen: Story = {
-  args: WithSearchAndFilters.args,
-  parameters: { viewport: { defaultViewport: 'desktop' } },
-};
-
-export const Phone: Story = {
-  args: WithSearchAndFilters.args,
-  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  render: () => <DisclosingHeader title="Future Drink" status={<StoreStatus />} cart />,
+  globals: { viewport: { value: 'desktop' } },
 };
 
 /** A back office: menu toggle in `leading`, no state line, an avatar in `actions`. */
@@ -167,21 +163,6 @@ export const BackOffice: Story = {
   },
 };
 
-/** Every brand input: a seed colour, a logo, a one-word name, no colour at all. */
-export const BrandMarks: Story = {
-  render: () => (
-    <Stack direction="row" spacing={2} sx={{ p: 3, alignItems: 'center' }}>
-      <AppHeaderBrand name="Future Drink" seedColor="#6366F1" />
-      <AppHeaderBrand name="Padaria Central" seedColor="#F97316" />
-      <AppHeaderBrand name="Verde" seedColor="#16A34A" />
-      <AppHeaderBrand name="Cinza Neutro" seedColor="#9CA3AF" />
-      <AppHeaderBrand name="Sem cor" />
-      <AppHeaderBrand name="Com logo" logoUrl="https://placehold.co/80x80/6366F1/FFF/png?text=FD" />
-      <AppHeaderBrand name="Grande" seedColor="#6366F1" size="xl" shape="circle" />
-    </Stack>
-  ),
-};
-
 /** The identity while the store lookup is still in flight. */
 export const LoadingIdentity: Story = {
   args: {
@@ -195,94 +176,39 @@ export const LoadingIdentity: Story = {
   },
 };
 
-/** A name long enough to prove the identity — and only the identity — gives way. */
+/**
+ * A name long enough to prove the identity — and only the identity — gives way.
+ *
+ * Narrow the canvas: the title ellipsises and the state line clips, while the
+ * actions keep their width and stay clear of both.
+ */
 export const LongName: Story = {
-  args: {
-    position: 'static',
-    meta: 'Build 18',
-    actions: (
-      <Button variant="outline" size="sm">
-        Entrar
-      </Button>
-    ),
-    children: (
-      <AppHeaderIdentity
-        title="Mercado de Autoatendimento Venda Nova Belo Horizonte"
-        seedColor="#6366F1"
-        status={<AppHeaderStatus tone="warning" items={['Fecha em 15 min', 'Retirada no balcão']} />}
-        onDisclose={fn()}
-      />
-    ),
-  },
-};
-
-/** Every tone the state line can take. */
-export const StatusTones: Story = {
   render: () => (
-    <Stack spacing={1.5} sx={{ p: 3 }}>
-      <AppHeaderStatus tone="success" items={['Aberto agora', 'Retirada no balcão']} />
-      <AppHeaderStatus tone="warning" items={['Fecha em 15 min']} />
-      <AppHeaderStatus tone="danger" items={['Fechado', 'Abre 8h']} />
-      <AppHeaderStatus tone="info" items={['Somente entrega']} />
-      <AppHeaderStatus tone="neutral" items={['Mesa 12', 'Comanda aberta']} />
-      <AppHeaderStatus items={['Sem indicador']} />
-    </Stack>
+    <DisclosingHeader
+      title="Mercado de Autoatendimento Venda Nova Belo Horizonte"
+      status={<AppHeaderStatus tone="warning" items={['Fecha em 15 min', 'Retirada no balcão']} />}
+    />
   ),
 };
 
-/** The whole thing wired: the disclosure opens the panel, the panel closes it. */
-const StorefrontDemo = ({
-  presentation,
-}: {
-  presentation?: 'auto' | 'sheet' | 'dialog';
-}): React.JSX.Element => {
-  const [open, setOpen] = React.useState(false);
-  return (
-    <Box sx={{ minHeight: 420 }}>
-      <AppHeader
-        position="static"
-        meta="Build 18"
-        actions={
-          <>
-            <Button variant="text" size="sm" aria-label="Carrinho">
-              <ShoppingCartIcon fontSize="small" />
-            </Button>
-            <Button variant="outline" size="sm">
-              Entrar
-            </Button>
-          </>
-        }
-        below={<SearchField />}
-      >
-        <AppHeaderIdentity
-          title="Future Drink"
-          seedColor="#6366F1"
-          status={<StoreStatus />}
-          disclosed={open}
-          onDisclose={() => setOpen(true)}
-        />
-      </AppHeader>
-      <AppHeaderDetails
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Future Drink"
-        subtitle="Mercado de autoatendimento"
-        rows={STORE_ROWS}
-        action={{ label: 'Trocar de loja', onClick: fn() }}
-        presentation={presentation}
-      />
-    </Box>
-  );
+/** Open the panel and let the viewport decide which surface it takes. */
+export const WithDetails: Story = {
+  render: () => <DisclosingHeader title="Future Drink" status={<StoreStatus />} cart />,
 };
 
-/** Open the panel and let the viewport decide which surface it takes. */
-export const WithDetails: Story = { render: () => <StorefrontDemo /> };
-
-/** Forced to the phone surface: a bottom sheet with a grab handle. */
-export const DetailsAsSheet: Story = { render: () => <StorefrontDemo presentation="sheet" /> };
+/** Forced to the phone surface: a bottom sheet, sized to what is in it. */
+export const DetailsAsSheet: Story = {
+  render: () => (
+    <DisclosingHeader title="Future Drink" status={<StoreStatus />} cart presentation="sheet" />
+  ),
+};
 
 /** Forced to the large-screen surface: a centred dialog. */
-export const DetailsAsDialog: Story = { render: () => <StorefrontDemo presentation="dialog" /> };
+export const DetailsAsDialog: Story = {
+  render: () => (
+    <DisclosingHeader title="Future Drink" status={<StoreStatus />} cart presentation="dialog" />
+  ),
+};
 
 /** Sticky, lifted on scroll, with enough page under it to try. */
 export const StickyOnScroll: Story = {
@@ -291,7 +217,6 @@ export const StickyOnScroll: Story = {
       <AppHeader
         position="sticky"
         elevateOnScroll
-        meta="Build 18"
         actions={
           <Button variant="outline" size="sm">
             Entrar
@@ -300,13 +225,13 @@ export const StickyOnScroll: Story = {
       >
         <AppHeaderIdentity title="Future Drink" seedColor="#6366F1" status={<StoreStatus />} />
       </AppHeader>
-      <Box sx={{ p: 3 }}>
+      <Stack sx={{ p: 3 }}>
         {Array.from({ length: 30 }, (_, index) => (
           <Box key={index} sx={{ py: 2, borderBottom: 1, borderColor: 'divider' }}>
             Produto {index + 1}
           </Box>
         ))}
-      </Box>
+      </Stack>
     </Box>
   ),
 };

@@ -72,6 +72,19 @@ within reach of a thumb, a centred dialog under a pointer — and `presentation:
 when the surrounding layout has already decided: a preview frame, a kiosk, a
 story.
 
+The sheet is **as tall as what is in it**, capped at the viewport — `100dvh`
+below 360px, `90dvh` above it. It does not take a fixed slab of height:
+`Sheet`'s vertical presets are absolute (`md` is 400px), which is shorter than
+six rows plus a button, so the panel scrolled INSIDE a screen that had room to
+spare and left the address and the way out below its own fold. `dvh` and not
+`vh`, because mobile browser chrome makes `vh` overshoot and would put that
+scroll straight back.
+
+It carries no grab handle either. There is no second position to drag the panel
+to now that its height is its content's, so the handle promised a resize it
+could not answer while sitting directly above a ✕ that already closes it.
+Swipe-to-dismiss is `Sheet`'s default and still works.
+
 ## One brand colour is enough
 
 `seedColor` takes a single hex and the mark derives its own gradient from it, by
