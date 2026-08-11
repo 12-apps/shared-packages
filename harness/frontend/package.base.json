@@ -7,6 +7,8 @@
   "scripts": {
     "build": "vite build",
     "test": "bddgen && playwright test",
+    "test:harness": "bddgen && playwright test --project=harness",
+    "test:journeys": "bddgen && playwright test --project=journeys",
     "bdd:gen": "bddgen"
   },
   "devDependencies": {

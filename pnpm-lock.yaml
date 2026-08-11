@@ -690,6 +690,9 @@ importers:
       '@12-apps/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@playwright/test':
+        specifier: ^1.56.1
+        version: 1.61.1
       '@tanstack/react-query':
         specifier: ^5.62.0
         version: 5.101.4(react@19.2.0)
@@ -714,6 +717,9 @@ importers:
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1
+      playwright-bdd:
+        specifier: ^8.4.1
+        version: 8.5.1(@playwright/test@1.61.1)
       react:
         specifier: 19.2.0
         version: 19.2.0

@@ -7,10 +7,16 @@
     ".": "./src/index.ts",
     "./server": "./src/server/index.ts",
     "./react": "./src/react/index.ts",
-    "./hono": "./src/hono/index.ts"
+    "./hono": "./src/hono/index.ts",
+    "./e2e": {
+      "types": "./dist/e2e/index.d.ts",
+      "default": "./dist/e2e/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "clean": "rm -rf node_modules coverage",
+    "build": "tsc -p tsconfig.e2e.json",
+    "clean": "rm -rf node_modules coverage dist",
     "test": "node ../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest watch",
     "lint": "eslint src --max-warnings 0",
@@ -27,6 +33,7 @@
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@playwright/test": "^1.56.1",
     "@tanstack/react-query": "^5.62.0",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.2.0",
@@ -35,6 +42,7 @@
     "eslint-plugin-test-flakiness": "^1.4.0",
     "hono": "^4.6.0",
     "jsdom": "^25.0.1",
+    "playwright-bdd": "^8.4.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-router-dom": "^7.1.1",
@@ -46,13 +54,21 @@
   },
   "license": "MIT",
   "peerDependencies": {
+    "@playwright/test": ">=1.40.0",
     "@tanstack/react-query": ">=5.0.0",
     "hono": ">=4.0.0",
+    "playwright-bdd": ">=8.0.0",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
     "react-router-dom": ">=6.0.0"
   },
   "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    },
+    "playwright-bdd": {
+      "optional": true
+    },
     "react": {
       "optional": true
     },
@@ -81,6 +97,7 @@
   "files": [
     "src",
     "dist",
+    "features",
     "prisma",
     "*.js",
     "*.mjs",
