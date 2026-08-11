@@ -266,12 +266,17 @@ for (const feature of featureFiles) {
 // place of the feature it no longer matches, which is the drift this whole gate
 // exists to prevent — reached from the other direction.
 try {
-  const tracked = execFileSync("git", ["ls-files", "--", "**/.features-gen"], {
-    cwd: ROOT,
-    encoding: "utf8",
-  }).trim();
-  if (tracked) {
-    problems.push(".features-gen is committed — it is generated output; keep it gitignored");
+  // The whole index, filtered here rather than by a pathspec: git's default
+  // pathspecs are fnmatch, where `**` is not the recursive wildcard it looks
+  // like — `**/.features-gen` silently matches nothing, so the check passed
+  // while a compiled spec sat in the index.
+  const tracked = execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf8" })
+    .split("\n")
+    .filter((path) => path.split("/").includes(".features-gen"));
+  if (tracked.length > 0) {
+    problems.push(
+      `${tracked[0]} is committed — .features-gen is generated output; keep it gitignored`,
+    );
   }
 } catch {
   // Not a git checkout (or git unavailable): nothing to assert about tracking.
