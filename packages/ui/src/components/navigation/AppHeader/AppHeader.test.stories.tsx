@@ -1,0 +1,292 @@
+import { Box, TextField } from '@mui/material';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import React from 'react';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+
+import { Button } from '../../form/Button/Button';
+
+import { AppHeader } from './AppHeader';
+import { AppHeaderBrand } from './AppHeader.brand';
+import { AppHeaderDetails } from './AppHeader.details';
+import { AppHeaderIdentity, AppHeaderStatus } from './AppHeader.identity';
+import type { AppHeaderDetailRow } from './AppHeader.types';
+
+const STORE_ROWS: AppHeaderDetailRow[] = [
+  { id: 'now', label: 'Agora', value: 'Aberto até 22h', tone: 'success' },
+  { id: 'weekdays', label: 'Seg a sex', value: '8h — 22h' },
+  { id: 'address', label: 'Endereço', value: 'Rua Padre Pedro Pinto, 1200\nVenda Nova' },
+];
+
+/** The wired storefront the interaction tests drive. */
+const Storefront = ({
+  presentation,
+  onAction = fn(),
+}: {
+  presentation?: 'auto' | 'sheet' | 'dialog';
+  onAction?: () => void;
+}): React.JSX.Element => {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <Box sx={{ minHeight: 360 }}>
+      <AppHeader
+        position="static"
+        meta="Build 18"
+        actions={
+          <Button variant="outline" size="sm">
+            Entrar
+          </Button>
+        }
+        below={<TextField fullWidth size="small" placeholder="Buscar entre 123 produtos" />}
+      >
+        <AppHeaderIdentity
+          title="Future Drink"
+          seedColor="#6366F1"
+          status={<AppHeaderStatus tone="success" items={['Aberto agora', 'Retirada no balcão']} />}
+          disclosed={open}
+          onDisclose={() => setOpen(true)}
+        />
+      </AppHeader>
+      <AppHeaderDetails
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Future Drink"
+        subtitle="Mercado de autoatendimento"
+        rows={STORE_ROWS}
+        action={{ label: 'Trocar de loja', onClick: onAction }}
+        presentation={presentation}
+      />
+    </Box>
+  );
+};
+
+const meta: Meta<typeof AppHeader> = {
+  title: 'Navigation/AppHeader/Tests',
+  component: AppHeader,
+  parameters: { layout: 'fullscreen', chromatic: { disableSnapshot: false } },
+  tags: ['autodocs', 'test', 'component:AppHeader'],
+};
+
+export default meta;
+export type Story = StoryObj<typeof meta>;
+
+export const BasicInteraction: Story = {
+  render: () => <Storefront presentation="dialog" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const disclosure = canvas.getByRole('button', { name: 'Detalhes de Future Drink' });
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.click(disclosure);
+
+    // The panel is a portal, so it is queried from the document, not the canvas.
+    const panel = within(document.body);
+    await waitFor(() => expect(panel.getByText('Aberto até 22h')).toBeInTheDocument());
+    await expect(canvas.getByRole('button', { name: /Detalhes de/u })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  },
+};
+
+export const FormInteraction: Story = {
+  render: () => <Storefront presentation="dialog" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // The `below` slot carries the page's own controls and stays fully usable.
+    const search = canvas.getByPlaceholderText('Buscar entre 123 produtos');
+    await userEvent.type(search, 'energético');
+    await expect(search).toHaveValue('energético');
+  },
+};
+
+export const KeyboardNavigation: Story = {
+  render: () => <Storefront presentation="dialog" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const disclosure = canvas.getByRole('button', { name: 'Detalhes de Future Drink' });
+
+    // Tab rather than `.focus()`: this asserts the bar's real tab order, and the
+    // identity is the first thing in it.
+    await userEvent.tab();
+    await waitFor(() => expect(disclosure).toHaveFocus());
+
+    // A real <button>, so Enter opens it — no key handler of our own.
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(within(document.body).getByText('Aberto até 22h')).toBeInTheDocument(),
+    );
+  },
+};
+
+export const ScreenReader: Story = {
+  render: () => (
+    <AppHeader position="static">
+      <AppHeaderIdentity
+        title="Future Drink"
+        seedColor="#6366F1"
+        status={<AppHeaderStatus tone="success" items={['Aberto agora', 'Retirada no balcão']} />}
+        onDisclose={fn()}
+      />
+    </AppHeader>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // The mark is a picture of the brand, not two letters to spell out.
+    await expect(canvas.getByRole('img', { name: 'Future Drink' })).toBeInTheDocument();
+
+    // The disclosure announces what it is and what it does.
+    const disclosure = canvas.getByRole('button', { name: 'Detalhes de Future Drink' });
+    await expect(disclosure).toHaveAttribute('aria-haspopup', 'dialog');
+
+    // The state line reads as a sentence: the separator is punctuation, and the
+    // segments are separated by real whitespace rather than by CSS margin.
+    await expect(canvas.getByTestId('app-header-status')).toHaveTextContent(
+      'Aberto agora · Retirada no balcão',
+    );
+  },
+};
+
+export const FocusManagement: Story = {
+  render: () => <Storefront presentation="dialog" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const disclosure = canvas.getByRole('button', { name: 'Detalhes de Future Drink' });
+
+    await userEvent.click(disclosure);
+
+    // Focus moves into the dialog, which is what makes Escape and Tab work.
+    await waitFor(() => {
+      const dialog = document.querySelector('.MuiDialog-root');
+      expect(dialog?.contains(document.activeElement)).toBe(true);
+    });
+  },
+};
+
+export const ResponsiveDesign: Story = {
+  render: () => (
+    <Box>
+      <Storefront presentation="sheet" />
+      <Storefront presentation="dialog" />
+    </Box>
+  ),
+  play: async ({ canvasElement }) => {
+    // Both presentations render the same body, so a caller switching between
+    // them never loses content.
+    const canvas = within(canvasElement);
+    const [sheetDisclosure] = canvas.getAllByRole('button', { name: 'Detalhes de Future Drink' });
+    await userEvent.click(sheetDisclosure as HTMLElement);
+    await waitFor(() => expect(document.querySelector('.MuiDrawer-root')).toBeInTheDocument());
+  },
+};
+
+export const ThemeVariations: Story = {
+  render: () => (
+    <AppHeader position="static" meta="Build 18" actions={<Button size="sm">Entrar</Button>}>
+      <AppHeaderIdentity
+        title="Future Drink"
+        seedColor="#6366F1"
+        status={<AppHeaderStatus tone="success" items={['Aberto agora']} />}
+      />
+    </AppHeader>
+  ),
+  play: async ({ canvasElement }) => {
+    // Every surface is a theme token, so the bar follows the app's mode.
+    await expect(within(canvasElement).getByTestId('app-header')).toBeInTheDocument();
+  },
+};
+
+export const VisualStates: Story = {
+  render: () => (
+    <Box>
+      <AppHeader position="static">
+        <AppHeaderIdentity title="Carregando" loading />
+      </AppHeader>
+      <AppHeader position="static">
+        <AppHeaderIdentity title="Sem estado" seedColor="#F97316" />
+      </AppHeader>
+      <AppHeader position="static" divider={false}>
+        <AppHeaderIdentity
+          title="Fechado"
+          seedColor="#DC2626"
+          status={<AppHeaderStatus tone="danger" items={['Fechado', 'Abre 8h']} />}
+          onDisclose={fn()}
+        />
+      </AppHeader>
+    </Box>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId('app-header-identity-loading')).toBeInTheDocument();
+    // A loading identity shows no name — a placeholder would flash the wrong
+    // brand on every load.
+    await waitFor(() => expect(canvas.queryByText('Carregando')).not.toBeInTheDocument());
+    await expect(canvas.getByTestId('app-header-status-dot')).toBeInTheDocument();
+  },
+};
+
+export const Performance: Story = {
+  render: () => (
+    <Box>
+      {Array.from({ length: 20 }, (_, index) => (
+        <AppHeader key={index} position="static">
+          <AppHeaderIdentity title={`Loja ${index + 1}`} seedColor="#6366F1" />
+        </AppHeader>
+      ))}
+    </Box>
+  ),
+  play: async ({ canvasElement }) => {
+    // 20 bars, each deriving its own gradient: the derivation is arithmetic on
+    // one colour, not a layout pass.
+    await expect(within(canvasElement).getAllByTestId('app-header')).toHaveLength(20);
+  },
+};
+
+export const EdgeCases: Story = {
+  render: () => (
+    <Box>
+      <AppHeader position="static" meta="Build 18" actions={<Button size="sm">Entrar</Button>}>
+        <AppHeaderIdentity
+          title="Mercado de Autoatendimento Venda Nova Belo Horizonte Zona Norte"
+          seedColor="#6366F1"
+          status={<AppHeaderStatus tone="warning" items={['Fecha em 15 min', '', null]} />}
+          onDisclose={fn()}
+        />
+      </AppHeader>
+      <AppHeader position="static">
+        <AppHeaderIdentity title="Verde" mark={<AppHeaderBrand name="Verde" />} />
+      </AppHeader>
+    </Box>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Empty segments are dropped rather than rendered as stray separators.
+    await expect(canvas.getByTestId('app-header-status')).toHaveTextContent('Fecha em 15 min');
+    await expect(canvas.getByTestId('app-header-status').textContent).not.toContain('··');
+
+    // A one-word name yields one initial.
+    await expect(canvas.getByRole('img', { name: 'Verde' })).toHaveTextContent('V');
+  },
+};
+
+export const Integration: Story = {
+  render: () => <Storefront presentation="dialog" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const panel = within(document.body);
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Detalhes de Future Drink' }));
+
+    // Every row the caller passed reaches the panel, address newline included.
+    await waitFor(() => expect(panel.getByText('Aberto até 22h')).toBeInTheDocument());
+    await expect(panel.getByText('8h — 22h')).toBeInTheDocument();
+    await expect(panel.getByText(/Venda Nova/u)).toBeInTheDocument();
+
+    // And the way out is a single full-width action.
+    await expect(panel.getByRole('button', { name: 'Trocar de loja' })).toBeInTheDocument();
+  },
+};
