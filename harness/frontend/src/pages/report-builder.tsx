@@ -4,19 +4,23 @@ import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'r
 
 import { createWebReportBuilder } from '@12-apps/report-builder/react';
 
-import { memoryBackend } from '../lib/memory-backend';
-
 /**
  * The whole wiring a frontend host performs for this package.
  *
  * Everything the reports feature IS — the list, the viewer, the editor, the
  * config panel, the pickers, the routes between them — lives inside
- * @12-apps/report-builder. This file names the tenant, says how to reach the
- * API, and mounts the surface into a router, which is the only part that is
- * genuinely the host's.
+ * @12-apps/report-builder. This file names the tenant and mounts the surface
+ * into a router, which is the only part that is genuinely the host's.
  *
- * The harness supplies an in-memory backend because it has no server. A real
- * host omits `transport` entirely and gets same-origin fetch.
+ * There is no `transport`, and that absence is the point. This page used to
+ * pass one that mounted the package's Hono router INSIDE the browser — Hono is
+ * isomorphic, so `router.request()` answered every screen with no socket in
+ * between. It proved the client and server halves of the contract against each
+ * other, and it lied about being a consumer: hitting Save produced no network
+ * request, and a reload threw the work away. `harness/backend` is a real server
+ * on a real port now and Vite proxies `/api` to it, so omitting `transport`
+ * gets the package's own same-origin `fetch` — the arrangement a real host has,
+ * and therefore the one this fixture should be exercising.
  */
 
 /** This page's harness slug — and so the hash prefix everything below owns. */
@@ -36,7 +40,6 @@ const SURFACE_ROOT = `/${TENANT_SLUG}/reports`;
 
 const { page: ReportBuilderSurface } = createWebReportBuilder({
   tenantSlug: TENANT_SLUG,
-  transport: memoryBackend(),
   // NOT standalone. `standalone` wraps the surface in a `MemoryRouter`, which
   // is what a host with no router at all needs — and a memory router keeps its
   // location in a variable, so opening a report changed the screen and left the

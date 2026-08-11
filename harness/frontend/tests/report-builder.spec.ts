@@ -8,6 +8,35 @@ import { expect, test } from '@playwright/test';
  * owner sees, because the thing being proven is that the package's public
  * wiring works for a consumer — not that a component renders.
  */
+
+/**
+ * Back to the seeded fixture before every case.
+ *
+ * The backend is a real server over a real Postgres now, so a document written
+ * by one case is still there for the next one — which is the feature, and which
+ * is also why this hook has to exist. The in-browser backend rebuilt its array
+ * on every page load, so each case got a fresh seed for free and no case ever
+ * had to say so. Without this, `archiving writes through the transport` leaves
+ * `r1` archived for every case after it AND for every later RUN, and the suite
+ * passes exactly once.
+ *
+ * Ordinary `fetch` at the SPA's own origin: the reset is served by the same
+ * server the surface talks to, reached through the same Vite proxy, so nothing
+ * here needs to know which port the backend is on.
+ */
+test.beforeEach(async ({ request }) => {
+  /* eslint-disable-next-line test-flakiness/no-unmocked-network --
+     the unmocked network IS the subject. These cases exist to prove the
+     package works for a consumer that reaches a real server, so a mocked
+     reset would restore a database nothing under test is reading. The rule is
+     already off for `tests/e2e/**` for this reason; this file predates that
+     folder and sits beside it. */
+  const response = await request.post('/__harness/reset');
+  // A silent failure here is a suite that starts from whatever the last case
+  // left behind — visible only as an unrelated case going red much later.
+  expect(response.status()).toBe(204);
+});
+
 test('the whole surface mounts from one factory call', async ({ page }) => {
   await page.goto('#/report-builder');
 
