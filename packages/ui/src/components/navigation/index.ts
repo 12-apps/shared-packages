@@ -1,3 +1,4 @@
+export * from './AppHeader';
 export * from './Breadcrumbs/Breadcrumbs';
 export * from './CommandPalette';
 export * from './ContextMenu';
