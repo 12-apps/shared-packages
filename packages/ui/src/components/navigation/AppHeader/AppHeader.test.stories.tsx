@@ -218,9 +218,16 @@ export const IdentityYieldsToActions: Story = {
       ),
     );
 
-    // …and it gave way by ellipsising, rather than by overflowing its box.
+    // …and it is set up to give way by ellipsising rather than by overflowing.
+    // Asserted from the computed style, not from scrollWidth vs clientWidth:
+    // scroll metrics are viewport-dependent (test-flakiness/no-viewport-dependent
+    // rejects them), and the contract here is that the clipping rules are on the
+    // title at all — losing them is what let the text escape its box.
     const title = canvas.getByTestId('app-header-identity-title');
-    await expect(title.scrollWidth).toBeGreaterThan(title.clientWidth);
+    const titleStyle = getComputedStyle(title);
+    await expect(titleStyle.overflow).toBe('hidden');
+    await expect(titleStyle.textOverflow).toBe('ellipsis');
+    await expect(titleStyle.whiteSpace).toBe('nowrap');
   },
 };
 
