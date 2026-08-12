@@ -4,16 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // no unmocked fs read (test-flakiness/no-unmocked-fs) — so the "module shape"
 // assertions below can grep it. Vitest resolves `?raw`; the package's tsc run
 // excludes tests, so no ambient declaration is needed.
-import indexSource from '../../src/prisma/index.ts?raw';
+import indexSource from '../src/index.ts?raw';
 
 import {
   getPrismaClient,
   resetPrismaClient,
   setPrismaClient,
-} from '../../src/prisma/index';
-import type { PrismaClient } from '../../src/prisma/index';
+} from '../src/index';
+import type { PrismaClient } from '../src/index';
 
-// Spyable constructor mock for the generated client, mirroring tests/db/database.test.ts.
+// Spyable constructor mock for the generated client.
 const constructorSpy = vi.fn();
 
 // Mock @prisma/client so the typed import resolves to a controllable stub.

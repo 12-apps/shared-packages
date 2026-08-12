@@ -122,7 +122,7 @@ against your database. **Plug-and-play Prisma models ship with this package**:
 tables (`entity_versions`, `recycle_bin_entries`, `entity_drafts`,
 `change_requests`) — point your Prisma config at a multi-file schema FOLDER
 and sync the partial into it (reference sync step:
-`packages/shared-helpers/scripts/sync-lifecycle-schema.mjs`, run before
+`packages/prisma/scripts/sync-lifecycle-schema.mjs`, run before
 `prisma generate`, with a `--check` drift gate for CI). The partial is
 host-agnostic: tenancy is a by-value `client_id` scalar (add the FK in your
 migration) and closed sets are Strings (add CHECKs in your migration — see

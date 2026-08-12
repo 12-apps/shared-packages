@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getActorUserId, runWithActor, setActor } from '../../src/prisma/actor-context';
+import { getActorUserId, runWithActor, setActor } from '../src/actor-context';
 
 describe('actor-context (FUT-168)', () => {
   it('exposes the actor set by runWithActor to code inside the callback', () => {

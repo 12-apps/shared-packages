@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeSearchText } from '../../src/prisma/search-normalize';
+import { normalizeSearchText } from '../src/search-normalize';
 
 describe('normalizeSearchText (FUT-168)', () => {
   it('strips diacritics and lowercases so "sabao" matches "Sabão"', () => {

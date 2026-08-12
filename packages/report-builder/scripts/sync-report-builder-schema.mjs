@@ -11,7 +11,7 @@
  * Only the schema partial. MIGRATIONS ARE NOT HANDLED HERE — the host discovers
  * and copies them structurally, by looking for a `migrations` directory inside
  * every workspace package and every installed `@12-apps/*` package. See
- * packages/shared-helpers/scripts/prisma-plugins.mjs.
+ * packages/prisma/scripts/prisma-plugins.mjs.
  *
  * A partial is one FILE opened by path, so a symlink is read through and the
  * model is never duplicated into the app. A migration is a DIRECTORY that
@@ -23,7 +23,7 @@
  * The host package that owns the schema folder MUST also declare this package
  * as a dependency: the link is invisible to the dependency graph, so
  * `turbo prune` would otherwise drop this package from the Docker build context
- * and leave it dangling (see the payments ADOPTING.md §1 and the shared-helpers
+ * and leave it dangling (see the payments ADOPTING.md §1 and the @12-apps/prisma
  * package.test.ts gate).
  *
  * Another repo adopts the machinery by pointing HOST_SCHEMA_LINK at its own

@@ -21,7 +21,7 @@ kind.
 ## Host wiring rules (the ones that bite)
 
 1. **Declare the dependency where the schema lands.** The host package owning
-   the Prisma schema folder (here `@12-apps/shared-helpers`) MUST declare this
+   the Prisma schema folder (here `@12-apps/prisma`) MUST declare this
    package as a dependency: symlinks are invisible to the dependency graph, so
    `turbo prune --docker` would otherwise drop the package and dangle every
    link at deploy (see the #336 CD incident; `package.test.ts` gates this).

@@ -38,7 +38,7 @@ if (source === target) {
 } else if (check) {
   console.error(
     '[research-schema] DRIFT: prisma/schema/product-research.prisma does not match ' +
-      'the @12-apps/product-research partial. Run "pnpm --filter @12-apps/shared-helpers ' +
+      'the @12-apps/product-research partial. Run "pnpm --filter @12-apps/prisma ' +
       'prisma:sync-research" and commit the result.',
   );
   process.exit(1);

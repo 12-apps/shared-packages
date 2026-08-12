@@ -47,7 +47,7 @@ import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-/** packages/shared-helpers — the HOST whose migrations folder is assembled. */
+/** packages/prisma — the HOST whose migrations folder is assembled. */
 const HOST_PACKAGE = resolve(HERE, '..');
 export const HOST_MIGRATIONS = join(HOST_PACKAGE, 'prisma', 'migrations');
 const REPO_ROOT = resolve(HOST_PACKAGE, '../..');
@@ -316,7 +316,7 @@ export function syncPluginMigrations({ check = false } = {}) {
 
   if (problems > 0) {
     console.error(
-      '[prisma-plugins] run "pnpm --filter @12-apps/shared-helpers prisma:sync-plugins" ' +
+      '[prisma-plugins] run "pnpm --filter @12-apps/prisma prisma:sync-plugins" ' +
         'and commit the result.',
     );
   }

@@ -15,6 +15,7 @@ lives here is the machinery.
 | `@12-apps/mcp` | App-agnostic MCP server core: one MCP tool per OpenAPI operation, each call proxied to the endpoint carrying the caller's bearer token. Holds zero authorization logic. |
 | `@12-apps/payments-backend` | Vendor-agnostic payments: normalized charge/refund/webhook model behind per-provider adapters. |
 | `@12-apps/payments-frontend` | Plug-and-play MUI components for the per-provider payment settings page. |
+| `@12-apps/prisma` | The Prisma host: multi-file schema folder, the plugin migration seam, and the `PrismaClient` singleton with audit / append-only extensions. |
 | `@12-apps/product-research` | Research-to-buy engine: multi-source price discovery, no-AI relevance scoring, unit-price comparison. |
 | `@12-apps/product-research-ui` | Host-agnostic research screens for the engine above. |
 | `@12-apps/rbac` | Role-Based Access Control: framework-free core plus optional React and server adapters. |
@@ -25,7 +26,7 @@ lives here is the machinery.
 | `@12-apps/ui` | ~90 MUI-based components with stories and interaction tests. |
 | `@12-apps/auth` | NextAuth wrapper plus an env-var admin allowlist. |
 | `@12-apps/onboarding` | Guided-onboarding context and progress repository. |
-| `@12-apps/shared-helpers` | Utilities: S3, caching, DB access, file handling, requests (retry/concurrency/abort), profiling, search, money, date/time. |
+| `@12-apps/shared-helpers` | Utilities: S3, caching, raw `pg` access, file handling, requests (retry/concurrency/abort), profiling, search, money, date/time. No Prisma — that lives in `@12-apps/prisma`. |
 | `@12-apps/eslint-config` | Shared ESLint configs (base, Next.js, react-internal). |
 | `@12-apps/typescript-config` | Shared `tsconfig` bases. |
 
@@ -43,14 +44,19 @@ A host adopts them by running that package's sync script, which copies the
 partial into the host's multi-file schema folder and its migrations into the
 host's migrations folder. Hosts never hand-copy models.
 
-`@12-apps/shared-helpers` acts as the host here, and its
+`@12-apps/prisma` acts as the host here, and its
 `prisma/schema/schema.prisma` is **datasource + generator only** — this repo
 deliberately owns no domain models. The consuming application supplies its own,
 alongside the partials it adopts. Generating in this repo with no domain models
 is exactly what a fresh consumer gets before adding theirs.
 
+The host is its own package on purpose. It used to be a folder inside
+`@12-apps/shared-helpers`, which made every consumer of `formatMoney` install
+`@prisma/client`, PGlite and a WASM Postgres to get it — and put a database
+schema inside a package whose job is generic utilities.
+
 Two rules that came from production incidents, both gated by
-`packages/shared-helpers/package.test.ts`:
+`packages/prisma/package.test.ts`:
 
 - **Migrations are copied, never symlinked.** Prisma enumerates the migrations
   folder with `lstat`, so a symlinked migration reports `isDirectory() === false`

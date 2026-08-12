@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { discoverMigrations } from "../../prisma/migration-files";
+import { discoverMigrations } from "../prisma/migration-files";
 
 /**
  * Migration discovery must follow SYMLINKS.

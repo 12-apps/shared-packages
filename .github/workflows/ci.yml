@@ -52,6 +52,7 @@ env:
     packages/product-research-ui
     packages/report-builder
     packages/mcp
+    packages/prisma
     packages/shared-helpers
 
 jobs:

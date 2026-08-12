@@ -103,7 +103,7 @@ packages/jobs/prisma/migrations/          # its migration
 ```
 
 A host adopts them by COPY (the entity-lifecycle / shift precedent — in this
-repo, `packages/shared-helpers/scripts/sync-jobs-schema.mjs` plus the
+repo, `packages/prisma/scripts/sync-jobs-schema.mjs` plus the
 structural migration sync in `sync-prisma-plugins.mjs`):
 
 - **Migrations are copied, never symlinked.** Prisma enumerates the

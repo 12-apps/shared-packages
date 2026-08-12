@@ -22,7 +22,7 @@ interface ManifestShape {
 const manifestPath = join(__dirname, 'package.json');
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as ManifestShape;
 
-describe('shared-helpers manifest — prisma wiring', () => {
+describe('prisma manifest — prisma wiring', () => {
   // No seed assertions here: seeding belongs to the consuming app, because the
   // seed data describes the domain models this package deliberately does not
   // own. The host schema is datasource + generator plus plugin partials only.
@@ -149,7 +149,7 @@ const migrationOwners = discoverMigrationSources().map((dir) => ({
  * visibility to `readdir` was — so the gate passed throughout. These tests
  * assert the property Prisma actually uses.
  */
-describe('shared-helpers prisma — migrations are visible to Prisma', () => {
+describe('prisma host — migrations are visible to Prisma', () => {
   /** Read fresh per test — exactly the call Prisma itself makes. */
   const migrationEntries = () => readdirSync(migrationsDir, { withFileTypes: true });
 
@@ -212,7 +212,7 @@ describe('shared-helpers prisma — migrations are visible to Prisma', () => {
 
 const prismaLinks = prismaLinksIn(join(__dirname, 'prisma/schema'));
 
-describe('shared-helpers manifest — symlinked prisma schema partials', () => {
+describe('prisma manifest — symlinked prisma schema partials', () => {
   it('has at least one symlinked partial to check', () => {
     expect(prismaLinks.length).toBeGreaterThan(0);
   });
@@ -246,7 +246,7 @@ describe('shared-helpers manifest — symlinked prisma schema partials', () => {
  */
 const copiedPartials = copiedPartialsIn(join(__dirname, 'prisma/schema'));
 
-describe('shared-helpers manifest — copied prisma schema partials', () => {
+describe('prisma manifest — copied prisma schema partials', () => {
   it('has at least one copied partial to check', () => {
     expect(copiedPartials.length).toBeGreaterThan(0);
   });

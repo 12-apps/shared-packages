@@ -38,7 +38,7 @@ if (source === target) {
 } else if (check) {
   console.error(
     '[lifecycle-schema] DRIFT: prisma/schema/entity-lifecycle.prisma does not match ' +
-      'the @12-apps/entity-lifecycle partial. Run "pnpm --filter @12-apps/shared-helpers ' +
+      'the @12-apps/entity-lifecycle partial. Run "pnpm --filter @12-apps/prisma ' +
       'prisma:sync-lifecycle" and commit the result.',
   );
   process.exit(1);

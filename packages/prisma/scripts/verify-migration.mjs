@@ -8,7 +8,7 @@
  * The database's whole lifecycle — create and delete — is owned here, so there
  * is never a stray scratch db to clean up by hand.
  *
- *   pnpm --filter @12-apps/shared-helpers exec node scripts/verify-migration.mjs
+ *   pnpm --filter @12-apps/prisma exec node scripts/verify-migration.mjs
  *
  * Exit code 0 = migrations + seed applied cleanly; non-zero = something failed.
  */

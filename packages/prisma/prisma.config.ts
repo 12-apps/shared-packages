@@ -3,13 +3,13 @@
  *
  * In Prisma 7 the connection URL and the seed command no longer live in
  * schema.prisma / package.json — they move here. The Prisma CLI is invoked with
- * cwd = packages/shared-helpers (`pnpm --filter @12-apps/shared-helpers prisma:*`),
+ * cwd = packages/prisma (`pnpm --filter @12-apps/prisma prisma:*`),
  * so the `schema` / `migrations` paths resolve relative to this file.
  *
  * Prisma 7 also stopped auto-loading `.env`, hence the explicit `dotenv/config`
  * import so `env("DATABASE_URL")` is populated for migrate / db push.
  * The runtime PrismaClient does NOT use this datasource — it reads DATABASE_URL
- * through its driver adapter (see src/prisma/index.ts).
+ * through its driver adapter (see src/index.ts).
  *
  * No `migrations.seed` here: seeding is the consuming app's job, since the seed
  * data belongs to the domain models this package deliberately does not own.

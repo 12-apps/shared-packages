@@ -10,7 +10,7 @@
  * and copies them structurally, by looking for a `migrations` directory inside
  * every workspace package and every installed `@12-apps/*` package, rather than
  * relying on each package to declare and run a sync of its own. See
- * packages/shared-helpers/scripts/prisma-plugins.mjs.
+ * packages/prisma/scripts/prisma-plugins.mjs.
  *
  * The split follows what the two things actually are:
  *

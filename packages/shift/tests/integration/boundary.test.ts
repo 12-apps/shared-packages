@@ -18,6 +18,7 @@ const FORBIDDEN_PREFIXES = [
   '../apps/',
   '../../apps/',
   '@12-apps/shared-helpers',
+  '@12-apps/prisma',
   '@12-apps/auth',
   '@12-apps/jobs',
   '@prisma/client',
