@@ -60,8 +60,15 @@ their own folder, and this package pulls them in:
 | `@12-apps/product-research` | `product-research.prisma` | `scripts/sync-research-schema.mjs` |
 | `@12-apps/shift` | `shift.prisma` | `scripts/sync-shift-schema.mjs` |
 | `@12-apps/jobs` | `jobs.prisma` | `scripts/sync-jobs-schema.mjs` |
-| `@12-apps/payments-backend` | `payments.prisma` | committed symlink |
-| `@12-apps/report-builder` | `report-builder.prisma` | committed symlink |
+| `@12-apps/entitlements` | `entitlements.prisma` | `scripts/sync-entitlements-schema.mjs` |
+| `@12-apps/payments-backend` | `payments.prisma` | `scripts/sync-payments-schema.mjs` |
+| `@12-apps/report-builder` | `report-builder.prisma` | `scripts/sync-report-builder-schema.mjs` |
+
+Every partial is a committed **COPY** — never a symlink, with no exceptions.
+`payments.prisma` and `report-builder.prisma` used to be symlinks, and the
+published tarball shipped without them: `npm pack` silently drops symlinked
+entries, exactly the way Prisma's migration walk skips a linked migration.
+The `--check` syncs and `package.test.ts`'s no-symlink walk keep it true.
 
 Migrations travel separately, through `scripts/sync-prisma-plugins.mjs`, which
 discovers every plugin-owned `migrations` directory **structurally** rather than
@@ -71,11 +78,16 @@ from a hardcoded list.
 deliberately owns no domain models, and no seed command either. The consuming
 application supplies both.
 
-Two rules that came from production incidents, gated by `package.test.ts`:
+Three rules that came from production incidents, gated by `package.test.ts`:
 
 - **Migrations are copied, never symlinked.** Prisma enumerates the migrations
   folder with `lstat`, so a symlinked migration reports `isDirectory() === false`
   and is silently skipped — a green deploy that changed no schema.
+- **Schema partials are copies too — nothing under `prisma/` may be a symlink.**
+  `npm pack` drops symlinked entries from the tarball with no warning, so the
+  published package shipped a schema folder missing three models. A structural
+  walk asserts zero symlinks, and a pack-manifest gate asks `npm pack
+  --dry-run` itself that every partial and migration ships.
 - **A partial's owning package must be a declared workspace dependency.**
   `turbo prune` copies only what the dependency graph reaches; an undeclared
   owner is dropped from the build context, the committed partial's source

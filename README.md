@@ -55,16 +55,20 @@ The host is its own package on purpose. It used to be a folder inside
 `@prisma/client`, PGlite and a WASM Postgres to get it — and put a database
 schema inside a package whose job is generic utilities.
 
-Two rules that came from production incidents, both gated by
+Three rules that came from production incidents, all gated by
 `packages/prisma/package.test.ts`:
 
 - **Migrations are copied, never symlinked.** Prisma enumerates the migrations
   folder with `lstat`, so a symlinked migration reports `isDirectory() === false`
   and is silently skipped — a green deploy that changed no schema.
+- **Schema partials are copies too — nothing under `prisma/` may be a
+  symlink.** `npm pack` drops symlinked entries from the tarball with no
+  warning, so a consumer of the published host package would get a schema
+  folder with models missing.
 - **A partial's owning package must be a declared workspace dependency.**
   `turbo prune` copies only what the dependency graph reaches; an undeclared
-  owner is dropped from the build context, the committed symlink dangles, and
-  `prisma generate` fails.
+  owner is dropped from the build context, the committed copy's source
+  vanishes, and its sync script exits 1 during the image build.
 
 ## Working in this repo
 

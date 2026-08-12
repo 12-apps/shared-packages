@@ -1,1 +1,35 @@
-../../../entitlements/prisma/entitlements.prisma
+// ─────────────────────────────────────────────────────────────────────────────
+// OWNED BY @12-apps/entitlements — the host's multi-file schema folder holds
+// only a copy/symlink of this file (created/verified by `pnpm --filter
+// @12-apps/entitlements prisma:sync`): the retention persistence model lives
+// here, in the package, never in the application.
+//
+// Deliberately self-contained (the payments-backend doctrine): tenant scoping
+// is a `client_id` String column — NO foreign key into any host table — so the
+// model works in every repo without schema coupling. The host repository layer
+// is the tenant boundary: every read/write is `clientId`-scoped.
+//
+// Note what is NOT here: Plan, Subscription, PlanChangeRequest. Those are
+// BILLING models and stay in the host — this package must not learn about
+// money. The only table the entitlement machinery itself needs is the
+// retention watermark below.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// The "downgrade never deletes" anchor for retention quotas: one row per
+// (tenant, retention feature) recording when the CURRENT window took effect.
+// The retention sweep only prunes rows written after `since`, so a shrinking
+// window never retroactively destroys history accumulated while the tenant
+// was entitled to keep it longer (see src/server/retention.ts).
+model RetentionWatermark {
+  clientId   String   @map("client_id")
+  /// The quota feature key, e.g. "audit.retention_days".
+  feature    String
+  /// The window (days) in force since `since`.
+  windowDays Int      @map("window_days")
+  /// When the sweep first observed the current window for this tenant.
+  since      DateTime
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@id([clientId, feature])
+  @@map("retention_watermarks")
+}

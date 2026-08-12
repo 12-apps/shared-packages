@@ -1,10 +1,13 @@
-/* eslint-disable test-flakiness/no-unmocked-fs -- the filesystem IS the subject
-   here: these tests assert that this package's own committed manifest, prisma
-   schema folder and migration symlinks are what the build expects. Mocking the
-   reads would leave the suite asserting against a fixture instead of the repo,
-   which is the one thing it exists to check. Every path read is a checked-in
-   file resolved from __dirname, so there is no ordering or timing to race. */
-import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync } from 'node:fs';
+/* eslint-disable test-flakiness/no-unmocked-fs, test-flakiness/no-test-isolation -- the
+   filesystem IS the subject here: these tests assert that this package's own
+   committed manifest, prisma schema folder and migration copies are what the
+   build — and `npm pack` — expect. Mocking the reads would leave the suite
+   asserting against a fixture instead of the repo, which is the one thing it
+   exists to check. Every path read is a checked-in file resolved from
+   __dirname, so there is no ordering or timing to race; the one spawned
+   process (`npm pack --dry-run`) reads the same checked-in tree. */
+import { execFileSync } from 'node:child_process';
+import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -35,54 +38,69 @@ describe('prisma manifest — prisma wiring', () => {
 });
 
 /**
- * Packages that own Prisma models (@12-apps/payments-backend, @12-apps/report-builder)
- * keep the model file and its migrations in their OWN folder and expose them
- * here — see packages/payments/backend/scripts/sync-payments-schema.mjs.
+ * Packages that own Prisma models keep the model file and its migrations in
+ * their OWN folder and this package pulls them in — as committed COPIES,
+ * repaired by `scripts/sync-*-schema.mjs` and verified by the same scripts'
+ * `--check` mode in the build.
  *
- * The SCHEMA PARTIAL is a committed symlink. Prisma opens it by path, so the
- * read follows the link. But nothing about that composition is visible in the
- * dependency graph, and `turbo prune` copies only the packages the graph
- * reaches: an owner left undeclared is dropped from the Docker build context,
- * the link dangles, and `prisma generate` dies with
- * `ENOENT ... prisma/schema/<owner>.prisma` — which is exactly how CD broke
- * once. Declaring the owner as a workspace dependency is what keeps it in the
- * prune, and the second describe below is that gate.
- *
- * The MIGRATIONS are committed COPIES, and the first describe below is why.
- * They were symlinks until five of them turned out to be invisible in
- * production; see the comment on that block.
+ * EVERYTHING under prisma/ is a copy, NEVER a symlink. Symlinks lose three
+ * different ways, all silent: Prisma's migration walk `lstat`s the folder and
+ * skips a linked entry even when it resolves; `turbo prune` drops an owner
+ * the dependency graph does not reach and leaves the link dangling; and
+ * `npm pack` drops symlinked entries from the tarball entirely — the
+ * published @12-apps/prisma shipped a schema folder missing the three models
+ * whose partials were links. The no-symlink walk below is what makes that
+ * class of bug impossible to reintroduce, and the pack manifest gate at the
+ * bottom verifies the artifact itself.
  */
 const repoRoot = resolve(__dirname, '../..');
 const declaredDeps = { ...manifest.dependencies, ...manifest.devDependencies };
 
-interface PrismaLink {
-  /** Path of the link itself, repo-relative, for readable failures. */
-  readonly link: string;
-  /** Absolute path the link points at. */
-  readonly target: string;
-}
-
-/** Every committed symlink directly inside `dir` (missing dir → none). */
-function prismaLinksIn(dir: string): PrismaLink[] {
+/** Every symlink ANYWHERE under `dir`, repo-relative — lstat, recursive. */
+function symlinksUnder(dir: string): string[] {
   if (!existsSync(dir)) return [];
-  return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isSymbolicLink())
-    .map((entry) => {
-      const link = join(dir, entry.name);
-      return { link: link.slice(repoRoot.length + 1), target: resolve(dir, readlinkSync(link)) };
-    });
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isSymbolicLink()) return [path.slice(repoRoot.length + 1)];
+    if (entry.isDirectory()) return symlinksUnder(path);
+    return [];
+  });
 }
 
 /** A partial that is a committed COPY of some package's own prisma file. */
 interface CopiedPartial {
   /** Repo-relative path of the copy, for readable failures. */
   readonly partial: string;
+  /** Absolute path of the copy. */
+  readonly copy: string;
+  /** Absolute path of the owner's source file. */
+  readonly source: string;
   /** Package name that owns the source file. */
   readonly owner: string;
 }
 
 /**
- * Every non-symlink partial in `dir` whose SOURCE lives in a workspace package.
+ * Where a partial's SOURCE may live: `packages/<name>/prisma/<file>`, or one
+ * level deeper for nested packages (`packages/payments/backend/prisma/
+ * payments.prisma`). Structural, so a moved owner is found rather than
+ * silently skipped.
+ */
+function sourceOf(fileName: string): string | null {
+  const base = fileName.replace(/\.prisma$/, '');
+  const flat = join(repoRoot, 'packages', base, 'prisma', fileName);
+  if (existsSync(flat)) return flat;
+  const parent = join(repoRoot, 'packages', base);
+  if (!existsSync(parent)) return null;
+  for (const entry of readdirSync(parent, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const nested = join(parent, entry.name, 'prisma', fileName);
+    if (existsSync(nested)) return nested;
+  }
+  return null;
+}
+
+/**
+ * Every partial in `dir` whose SOURCE lives in a workspace package.
  *
  * Discovered structurally, by basename: a copied partial keeps the owner's file
  * name (`product-research.prisma` ← `packages/product-research/prisma/
@@ -96,10 +114,12 @@ function copiedPartialsIn(dir: string): CopiedPartial[] {
   return readdirSync(dir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && !entry.isSymbolicLink() && entry.name !== 'schema.prisma')
     .flatMap((entry) => {
-      const source = join(repoRoot, 'packages', entry.name.replace(/\.prisma$/, ''), 'prisma', entry.name);
-      if (!existsSync(source)) return [];
+      const source = sourceOf(entry.name);
+      if (source === null) return [];
       const owner = owningPackage(source);
-      return owner ? [{ partial: `prisma/schema/${entry.name}`, owner }] : [];
+      return owner
+        ? [{ partial: `prisma/schema/${entry.name}`, copy: join(dir, entry.name), source, owner }]
+        : [];
     });
 }
 
@@ -210,22 +230,17 @@ describe('prisma host — migrations are visible to Prisma', () => {
   });
 });
 
-const prismaLinks = prismaLinksIn(join(__dirname, 'prisma/schema'));
-
-describe('prisma manifest — symlinked prisma schema partials', () => {
-  it('has at least one symlinked partial to check', () => {
-    expect(prismaLinks.length).toBeGreaterThan(0);
-  });
-
-  it.each(prismaLinks)('$link resolves to a real file', ({ target }) => {
-    expect(existsSync(target)).toBe(true);
-  });
-
-  it.each(prismaLinks)('$link is owned by a declared workspace dependency', ({ target }) => {
-    const owner = owningPackage(target);
-    expect(owner).toBeDefined();
-    // Undeclared => turbo prune drops the owner => the Docker build breaks.
-    expect(Object.keys(declaredDeps)).toContain(owner);
+/**
+ * NOTHING under prisma/ may be a symlink — not a partial, not a migration,
+ * not anything a future sync invents. `npm pack` silently drops symlinked
+ * entries from the tarball (the published package shipped a schema folder
+ * missing three models this way), on top of the Prisma-migration-walk and
+ * turbo-prune failure modes documented above. One structural walk makes the
+ * whole class unrepresentable in a green tree.
+ */
+describe('prisma assets — no symlinks anywhere', () => {
+  it('finds no symlinked entry under prisma/', () => {
+    expect(symlinksUnder(join(__dirname, 'prisma'))).toEqual([]);
   });
 });
 
@@ -251,9 +266,61 @@ describe('prisma manifest — copied prisma schema partials', () => {
     expect(copiedPartials.length).toBeGreaterThan(0);
   });
 
+  it('covers every plugin partial, including the nested-owner ones', () => {
+    // The ex-symlinks land in this gate the day they become copies; a source
+    // locator that missed a nested owner (payments lives at
+    // packages/payments/backend) would silently exempt it from every check
+    // below.
+    const names = copiedPartials.map(({ partial }) => partial).sort();
+    for (const partial of [
+      'prisma/schema/entitlements.prisma',
+      'prisma/schema/payments.prisma',
+      'prisma/schema/report-builder.prisma',
+    ]) {
+      expect(names).toContain(partial);
+    }
+  });
+
   it.each(copiedPartials)('$partial is owned by a declared workspace dependency', ({ owner }) => {
     // Undeclared => turbo prune drops the owner => its sync script exits 1
     // during `pnpm turbo build` => the Docker image never builds.
     expect(Object.keys(declaredDeps)).toContain(owner);
+  });
+
+  it.each(copiedPartials)('$partial matches its source byte for byte', ({ copy, source }) => {
+    // Drift between the owner and the synced copy means the host generates a
+    // client the package did not author — the `--check` syncs in the build
+    // enforce this too; this is the gate that runs even without a build.
+    expect(readFileSync(copy, 'utf-8')).toBe(readFileSync(source, 'utf-8'));
+  });
+});
+
+/**
+ * The ARTIFACT gate: what `npm pack` would actually upload. Everything under
+ * prisma/ that the repo holds must appear in the pack manifest — this is the
+ * assertion that fails on the symlink bug even if the walk above is ever
+ * weakened, because it asks the packer itself rather than the filesystem.
+ */
+describe('prisma assets — the pack manifest ships every prisma asset', () => {
+  it('lists every schema partial and every migration in npm pack --dry-run', { timeout: 60_000 }, () => {
+    const raw = execFileSync('npm', ['pack', '--dry-run', '--json', '--silent'], {
+      cwd: __dirname,
+      encoding: 'utf-8',
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    const [report] = JSON.parse(raw) as [{ files: { path: string }[] }];
+    const packed = new Set(report.files.map((file) => file.path));
+
+    const schemaDir = join(__dirname, 'prisma/schema');
+    for (const entry of readdirSync(schemaDir)) {
+      expect(packed, `prisma/schema/${entry} missing from the tarball`).toContain(
+        `prisma/schema/${entry}`,
+      );
+    }
+    for (const name of readdirSync(migrationsDir, { withFileTypes: true })) {
+      if (!name.isDirectory()) continue;
+      const sql = `prisma/migrations/${name.name}/migration.sql`;
+      expect(packed, `not packed: ${name.name}`).toContain(sql);
+    }
   });
 });
