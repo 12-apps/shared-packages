@@ -47,28 +47,31 @@ describe('guard detection', () => {
 });
 
 describe('adversarial input stays linear (CodeQL js/polynomial-redos)', () => {
-  // Each input below made the replaced regexes backtrack polynomially —
-  // minutes at this size, not milliseconds. The suite's ordinary per-test
-  // timeout IS the time bound: a regression back to backtracking hangs the
-  // test long past it.
+  // The pathological family for the replaced regexes is MANY UNCLOSED OPENERS,
+  // not one long run: each opener restarts a match attempt that scans to EOF,
+  // so the old code was quadratic in the opener count (measured ~4x per input
+  // doubling). At the sizes below the old implementations blow far past the
+  // suite's per-test timeout, which IS the time bound; the linear walkers
+  // finish in milliseconds.
   it('strips an unterminated escape-run string linearly, failing closed', () => {
-    const source = `requirePermission("x", {}); '${'\\a'.repeat(50_000)}`;
+    const openerStorm = `'${'\\a'.repeat(40)}`.repeat(12_001); // odd count: last string never closes
+    const source = `requirePermission("x", {}); ${openerStorm}`;
     // A guard call BEFORE the malformed literal is still seen…
     expect(isRbacProtected(source, GUARDS)).toBe(true);
     // …and one swallowed BY it reads as unguarded — the unterminated string
     // blanks to end-of-file on purpose, so malformed source can only ever
     // under-claim protection, never over-claim it.
-    const swallowed = `'${'\\a'.repeat(50_000)}; requirePermission("x", {});`;
+    const swallowed = `${openerStorm}; requirePermission("x", {});`;
     expect(isRbacProtected(swallowed, GUARDS)).toBe(false);
   });
 
   it('strips an unterminated block comment linearly, failing closed', () => {
-    const source = `/*${'*'.repeat(50_000)} requirePermission("x", {})`;
+    const source = `${`/*${'x'.repeat(40)}`.repeat(24_000)} requirePermission("x", {})`;
     expect(isRbacProtected(source, GUARDS)).toBe(false);
   });
 
   it('scans export heads over adversarial brace and whitespace runs linearly', () => {
-    const braceNoise = `export {${'{|'.repeat(25_000)}`;
+    const braceNoise = `export {{${'export {{|'.repeat(20_000)}`;
     const spacedNoise = `export${' '.repeat(50_000)}notAnActionKeyword`;
     const source = [
       '"use server";',

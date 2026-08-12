@@ -63,30 +63,73 @@ export function urlPathOf(routeFile: string, appDir: string): string {
 export function exportedActionsOf(source: string): string[] {
   if (!/^[\t ]*["']use server["']/m.test(source)) return [];
   const names = new Set<string>();
-  for (const match of source.matchAll(/\bexport\b/g)) {
-    collectExport(source, (match.index ?? 0) + 'export'.length, names);
-  }
+  // Linearity guards (CodeQL js/polynomial-redos, second round). Two costs
+  // used to repeat per head: the forward scan for `}` (memoized below — the
+  // first `}` at-or-after a position is shared by every head before it), and
+  // parsing a giant "list" slice that actually swallows LATER heads. A brace
+  // list containing another `export` keyword is not legal JS, so such a head
+  // contributes nothing and the later heads parse themselves — real modules
+  // are unaffected, and a malformed one can only lose the illegal list, never
+  // a real standalone export (the gate stays fail-closed).
+  const heads = [...source.matchAll(/\bexport\b/g)].map((m) => m.index ?? 0);
+  const scan: BraceScan = { searchedFrom: Number.POSITIVE_INFINITY, close: -2 };
+  heads.forEach((index, k) => {
+    const nextHead = heads[k + 1] ?? Number.POSITIVE_INFINITY;
+    collectExport(source, index + 'export'.length, names, scan, nextHead);
+  });
   return [...names];
 }
 
+/** Memo for the forward `}` search that keeps repeated list parsing linear. */
+interface BraceScan {
+  /** The position the memoized search started from. */
+  searchedFrom: number;
+  /** First `}` at or after {@link searchedFrom} (-1: none to end of file). */
+  close: number;
+}
+
+/** First `}` at or after `from`, reusing the previous search when valid. */
+function memoClose(source: string, from: number, scan: BraceScan): number {
+  // A previous search from an earlier position found its first `}` at
+  // `scan.close`; if `from` sits inside that gap, the answer is unchanged.
+  if (scan.searchedFrom <= from && (scan.close === -1 || scan.close >= from)) {
+    return scan.close;
+  }
+  scan.searchedFrom = from;
+  scan.close = source.indexOf('}', from);
+  return scan.close;
+}
+
 /** Parse one `export …` head starting just past the keyword. */
-function collectExport(source: string, after: number, names: Set<string>): void {
+function collectExport(
+  source: string,
+  after: number,
+  names: Set<string>,
+  scan: BraceScan,
+  nextHead: number,
+): void {
   const i = skipWs(source, after);
   if (i === after) return; // `export` glued to what follows is not the keyword head
   if (source[i] === '{') {
-    collectBraceList(source, i + 1, names);
+    collectBraceList(source, i + 1, names, scan, nextHead);
     return;
   }
   const word = readWord(source, i);
-  if (word === 'const') collectAfterConst(source, i + word.length, names);
+  if (word === 'const') collectAfterConst(source, i + word.length, names, scan, nextHead);
   if (word === 'async') collectAsyncFunction(source, i + word.length, names);
 }
 
-function collectAfterConst(source: string, after: number, names: Set<string>): void {
+function collectAfterConst(
+  source: string,
+  after: number,
+  names: Set<string>,
+  scan: BraceScan,
+  nextHead: number,
+): void {
   const i = skipWs(source, after);
   if (i === after) return;
   if (source[i] === '{') {
-    collectBraceList(source, i + 1, names);
+    collectBraceList(source, i + 1, names, scan, nextHead);
     return;
   }
   const name = readWord(source, i);
@@ -103,9 +146,19 @@ function collectAsyncFunction(source: string, after: number, names: Set<string>)
 }
 
 /** `{A, B as C, D: E}` — up to the FIRST `}`, as the regex it replaces did. */
-function collectBraceList(source: string, from: number, names: Set<string>): void {
-  const close = source.indexOf('}', from);
+function collectBraceList(
+  source: string,
+  from: number,
+  names: Set<string>,
+  scan: BraceScan,
+  nextHead: number,
+): void {
+  const close = memoClose(source, from, scan);
   if (close === -1) return;
+  // A "list" whose close sits past the next `export` keyword swallowed later
+  // heads — illegal JS, and parsing it would re-walk their slices. Skip it;
+  // the later heads parse themselves.
+  if (close > nextHead) return;
   for (const item of source.slice(from, close).split(',')) {
     const name = itemName(item);
     if (/^\w+$/.test(name)) names.add(name);

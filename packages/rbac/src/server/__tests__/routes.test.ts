@@ -517,6 +517,24 @@ describe('team routes', () => {
     expect(inside.status).toBe(200);
   });
 
+  it('the DEFAULT assignable set excludes every governance owner role', async () => {
+    // Delta re-review MINOR-A: the default must be derived from
+    // governance.ownerRoles (OWNER + SUPERADMIN), not the disable-invariant
+    // ownerRoles knob — this layer exists to refuse BEFORE governance, so the
+    // refusal must be the wire 400 with governance never reached (no
+    // governance.reject audit entry).
+    const h = await teamHost();
+    for (const role of ['OWNER', 'SUPERADMIN']) {
+      const response = await call(h, 'PATCH', '/team/:userId', {
+        actor: memberActor(TENANT, 'owner-1'),
+        params: { userId: 'chef-1' },
+        body: { role },
+      });
+      expect(response.status).toBe(400);
+    }
+    expect(h.audits).toEqual([]);
+  });
+
   it('a route-level permission ceiling narrows the whole surface', async () => {
     const h = await teamHost();
     const actor = {

@@ -236,10 +236,15 @@ function setMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute
         // host schema's CHECK constraint on future-pay) is the wire's 400
         // here rather than a 500 there. Custom roles ride
         // POST /team/:userId/roles instead.
+        //
+        // The exclusion reads `governance.ownerRoles` (grant protection:
+        // OWNER + SUPERADMIN), not the disable/removal-invariant `ownerRoles`
+        // knob — the two sets differ, and this layer exists to refuse BEFORE
+        // governance, so its default must exclude everything governance would.
         const assignable =
           deps.config.assignableBaseRoles ??
           deps.config.roleTemplates
-            .filter((role) => !(deps.config.ownerRoles ?? ['OWNER']).includes(role.name))
+            .filter((role) => !deps.config.governance.ownerRoles.includes(role.name))
             .map((role) => role.name);
         if (!assignable.includes(input.role)) {
           throw new RbacApiError(400, messages.baseRoleNotAssignable);
