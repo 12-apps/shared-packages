@@ -569,6 +569,14 @@ Components for structuring and organizing page layouts.
 
 Components for site and app navigation.
 
+### AppHeader
+**Purpose**: The application bar — brand identity, state line, actions, and the details panel behind them
+**Use Cases**: Storefront header, back-office top bar, platform console header; any app bar that must serve a phone and a desktop from one component
+**Features**: Slot-based (`leading` / identity / `actions` / `meta` / `below`), context-agnostic (no router, session or data), brand mark with a gradient derived from ONE seed colour, dotted state line, disclosure panel that is a bottom sheet on phones and a centred dialog on large screens, sticky/fixed positioning with a self-measured spacer
+**Types**: `AppHeaderProps`, `AppHeaderIdentityProps`, `AppHeaderBrandProps`, `AppHeaderStatusProps`, `AppHeaderDetailsProps`, `AppHeaderDetailRow`
+**Location**: `src/components/navigation/AppHeader`
+**Docs**: `src/components/navigation/AppHeader/AppHeader.md`
+
 ### Breadcrumbs
 **Purpose**: Display navigation path
 **Use Cases**: Hierarchical navigation, page location indicator

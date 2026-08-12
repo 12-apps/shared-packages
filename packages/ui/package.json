@@ -120,6 +120,7 @@
     "./layout/Skeleton": "./src/components/layout/Skeleton/index.ts",
     "./layout/Spacer": "./src/components/layout/Spacer/index.ts",
     "./layout/TableFilter": "./src/components/layout/TableFilter/index.ts",
+    "./navigation/AppHeader": "./src/components/navigation/AppHeader/index.ts",
     "./navigation/Breadcrumbs": "./src/components/navigation/Breadcrumbs/index.ts",
     "./navigation/CommandPalette": "./src/components/navigation/CommandPalette/index.ts",
     "./navigation/ContextMenu": "./src/components/navigation/ContextMenu/index.ts",
