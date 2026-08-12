@@ -1,5 +1,6 @@
 import {
   RbacApiError,
+  fencedAudit,
   foldApiError,
   gatesOf,
   messagesOf,
@@ -26,8 +27,6 @@ import { parseBody, parseTeamListQuery, requireParam, type RoleWireSchemas } fro
  */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const INVITES_NOT_CONFIGURED = { status: 501, body: { error: 'Convites não estão configurados.' } };
 
 interface TeamRouteDeps<P extends string> {
   config: RbacServerConfig<P>;
@@ -97,15 +96,28 @@ function inviteRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
     async handle({ actor, body }) {
       try {
         await requireAdminTier(deps, actor);
+        const messages = messagesOf(deps.config);
         // Accountless invites need storage this package does not own — the
         // optional invites port; without it the affordance does not exist.
-        if (!deps.config.invites) return INVITES_NOT_CONFIGURED;
-        const input = parseBody(deps.wire.inviteBody, body);
+        if (!deps.config.invites) {
+          return { status: 501, body: { error: messages.invitesNotConfigured } };
+        }
+        const input = parseBody(deps.wire.inviteBody, body, messages);
         const email = input.email.trim().toLowerCase();
         if (!EMAIL_RE.test(email)) {
-          throw new RbacApiError(400, messagesOf(deps.config).invalidEmail);
+          throw new RbacApiError(400, messages.invalidEmail);
         }
         const result = await deps.config.invites.invite(actor.tenantId, email);
+        // The invite is a membership-granting write (the "already has an
+        // account" branch grants immediately inside the port), so it reports
+        // like one. The port owns any richer trail of its own storage.
+        await fencedAudit(deps.config.audit)?.({
+          clientId: actor.tenantId,
+          action: 'team.invite',
+          resourceType: 'membership',
+          resourceId: email,
+          after: { status: result.status },
+        });
         return ok({ status: result.status });
       } catch (error) {
         return foldApiError(error);
@@ -154,9 +166,19 @@ function cancelInviteRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
       try {
         await requireAdminTier(deps, actor);
         await requirePermission(deps, actor, gatesOf(deps.config).manageTeam);
-        if (!deps.config.invites) return INVITES_NOT_CONFIGURED;
+        const messages = messagesOf(deps.config);
+        if (!deps.config.invites) {
+          return { status: 501, body: { error: messages.invitesNotConfigured } };
+        }
         // Idempotent — a stale invite id is a no-op.
-        await deps.config.invites.cancel(actor.tenantId, requireParam(params, 'inviteId'));
+        const inviteId = requireParam(params, 'inviteId', messages);
+        await deps.config.invites.cancel(actor.tenantId, inviteId);
+        await fencedAudit(deps.config.audit)?.({
+          clientId: actor.tenantId,
+          action: 'team.invite_cancel',
+          resourceType: 'membership',
+          resourceId: inviteId,
+        });
         return ok({ status: 'cancelled' as const });
       } catch (error) {
         return foldApiError(error);
@@ -173,12 +195,13 @@ function memberDetailRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
       try {
         await requireAdminTier(deps, actor);
         await requirePermission(deps, actor, gatesOf(deps.config).readTeam);
+        const messages = messagesOf(deps.config);
         const member = await deps.team.getTenantMemberDetail(
           actor.tenantId,
-          requireParam(params, 'userId'),
+          requireParam(params, 'userId', messages),
         );
         // A non-member id is a 404 that reveals nothing.
-        if (!member) throw new RbacApiError(404, messagesOf(deps.config).memberNotFound);
+        if (!member) throw new RbacApiError(404, messages.memberNotFound);
         return ok({
           userId: member.userId,
           name: member.name,
@@ -204,8 +227,23 @@ function setMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute
       try {
         await requireAdminTier(deps, actor);
         await requirePermission(deps, actor, gatesOf(deps.config).manageTeam);
-        const input = parseBody(deps.wire.setMemberRoleBody, body);
-        const userId = requireParam(params, 'userId');
+        const messages = messagesOf(deps.config);
+        const input = parseBody(deps.wire.setMemberRoleBody, body, messages);
+        const userId = requireParam(params, 'userId', messages);
+        // The BASE role is a closed set — the non-owner template names, or
+        // whatever `assignableBaseRoles` narrows it to. Enforced BEFORE
+        // governance so a custom role (additive by design, and refused by the
+        // host schema's CHECK constraint on future-pay) is the wire's 400
+        // here rather than a 500 there. Custom roles ride
+        // POST /team/:userId/roles instead.
+        const assignable =
+          deps.config.assignableBaseRoles ??
+          deps.config.roleTemplates
+            .filter((role) => !(deps.config.ownerRoles ?? ['OWNER']).includes(role.name))
+            .map((role) => role.name);
+        if (!assignable.includes(input.role)) {
+          throw new RbacApiError(400, messages.baseRoleNotAssignable);
+        }
         // The shared governance (escalation / scope-ceiling / SoD /
         // owner-protected) runs BEFORE the write.
         await deps.governance.assertCanGrantRole(actor, input.role, userId);
@@ -227,7 +265,7 @@ function removeMemberRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
         const actorRole = await requireAdminTier(deps, actor);
         await deps.team.removeTenantMemberGuarded(
           actor.tenantId,
-          requireParam(params, 'userId'),
+          requireParam(params, 'userId', messagesOf(deps.config)),
           actorRole,
         );
         return ok({ status: 'removed' as const });
@@ -246,10 +284,11 @@ function memberStatusRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
       try {
         await requireAdminTier(deps, actor);
         await requirePermission(deps, actor, gatesOf(deps.config).manageTeam);
-        const input = parseBody(deps.wire.setMemberActiveBody, body);
+        const messages = messagesOf(deps.config);
+        const input = parseBody(deps.wire.setMemberActiveBody, body, messages);
         await deps.team.setMembershipActive(
           actor.tenantId,
-          requireParam(params, 'userId'),
+          requireParam(params, 'userId', messages),
           input.active,
         );
         return ok({ status: 'updated' as const });
@@ -267,8 +306,9 @@ function grantMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRou
     async handle({ actor, params, body }) {
       try {
         await requirePermission(deps, actor, gatesOf(deps.config).manageRoles);
-        const input = parseBody(deps.wire.grantMemberRoleBody, body);
-        const userId = requireParam(params, 'userId');
+        const messages = messagesOf(deps.config);
+        const input = parseBody(deps.wire.grantMemberRoleBody, body, messages);
+        const userId = requireParam(params, 'userId', messages);
         await deps.governance.assertCanGrantRole(actor, input.role, userId);
         await deps.team.grantCustomRoleToMember(actor.tenantId, userId, input.role);
         return ok({ status: 'granted' as const, role: input.role });
@@ -286,11 +326,12 @@ function revokeMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRo
     async handle({ actor, params }) {
       try {
         await requirePermission(deps, actor, gatesOf(deps.config).manageRoles);
+        const messages = messagesOf(deps.config);
         // Idempotent — revoking a role the member doesn't hold is a no-op.
         await deps.team.revokeCustomRoleFromMember(
           actor.tenantId,
-          requireParam(params, 'userId'),
-          requireParam(params, 'role'),
+          requireParam(params, 'userId', messages),
+          requireParam(params, 'role', messages),
         );
         return ok({ status: 'revoked' as const });
       } catch (error) {

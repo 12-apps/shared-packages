@@ -1,10 +1,10 @@
 import {
   foldApiError,
   gatesOf,
+  messagesOf,
   ok,
   pageResponse,
   type RbacActor,
-  type RbacResponse,
   type RbacRoute,
   type RbacServerConfig,
 } from './context';
@@ -56,8 +56,6 @@ function requireManageRoles<P extends string>(
   );
 }
 
-const NOT_FOUND_ROLE: RbacResponse = { status: 404, body: { error: 'Papel não encontrado.' } };
-
 function listRolesRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
   return {
     method: 'GET',
@@ -81,7 +79,7 @@ function createRoleRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
     async handle({ actor, body }) {
       try {
         await requireManageRoles(deps, actor);
-        const input = parseBody(deps.wire.roleWriteBody, body);
+        const input = parseBody(deps.wire.roleWriteBody, body, messagesOf(deps.config));
         // Governance runs BEFORE the write (immediate feedback).
         await deps.governance.assertCanCreateRole(actor, {
           name: input.name,
@@ -107,13 +105,14 @@ function updateRoleRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
     async handle({ actor, params, body }) {
       try {
         await requireManageRoles(deps, actor);
-        const input = parseBody(deps.wire.roleWriteBody, body);
+        const messages = messagesOf(deps.config);
+        const input = parseBody(deps.wire.roleWriteBody, body, messages);
         await deps.governance.assertCanCreateRole(actor, {
           name: input.name,
           permissions: input.permissions,
         });
         const role = await deps.roles.updateTenantRole(
-          requireParam(params, 'id'),
+          requireParam(params, 'id', messages),
           actor.tenantId,
           {
             name: input.name,
@@ -122,7 +121,7 @@ function updateRoleRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
           },
         );
         // A stale id or another tenant's row → 404.
-        return role ? ok(role) : NOT_FOUND_ROLE;
+        return role ? ok(role) : { status: 404, body: { error: messages.roleNotFound } };
       } catch (error) {
         return foldApiError(error);
       }
@@ -137,11 +136,14 @@ function deleteRoleRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
     async handle({ actor, params }) {
       try {
         await requireManageRoles(deps, actor);
+        const messages = messagesOf(deps.config);
         const deleted = await deps.roles.deleteTenantRole(
-          requireParam(params, 'id'),
+          requireParam(params, 'id', messages),
           actor.tenantId,
         );
-        return deleted ? ok({ status: 'deleted' as const }) : NOT_FOUND_ROLE;
+        return deleted
+          ? ok({ status: 'deleted' as const })
+          : { status: 404, body: { error: messages.roleNotFound } };
       } catch (error) {
         return foldApiError(error);
       }
@@ -156,9 +158,10 @@ function overrideTemplateRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRo
     async handle({ actor, params, body }) {
       try {
         await requireManageRoles(deps, actor);
-        const name = requireParam(params, 'name');
+        const messages = messagesOf(deps.config);
+        const name = requireParam(params, 'name', messages);
         deps.governance.assertEditableTemplateName(name);
-        const input = parseBody(deps.wire.templateOverrideBody, body);
+        const input = parseBody(deps.wire.templateOverrideBody, body, messages);
         await deps.governance.assertCanOverrideTemplateRole(actor, {
           name,
           permissions: input.permissions,
@@ -182,7 +185,7 @@ function resetTemplateRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute
     async handle({ actor, params }) {
       try {
         await requireManageRoles(deps, actor);
-        const name = requireParam(params, 'name');
+        const name = requireParam(params, 'name', messagesOf(deps.config));
         deps.governance.assertEditableTemplateName(name);
         await deps.roles.resetTemplateRole(actor.tenantId, name);
         // Reset is idempotent — a no-op still answers `reset`.

@@ -78,15 +78,39 @@ export interface RbacAuditEntry {
     | 'team.role_grant'
     | 'team.role_revoke'
     | 'team.member_remove'
-    | 'team.member_status';
+    | 'team.member_status'
+    | 'team.invite'
+    | 'team.invite_cancel';
   resourceType: 'role' | 'membership' | 'governance';
   resourceId: string;
   before?: Record<string, unknown>;
   after?: Record<string, unknown>;
 }
 
-/** Host audit sink. Failures must be swallowed by the host, never thrown. */
+/** Host audit sink. The package FENCES every call ({@link fencedAudit}), so a
+ * failing sink can never turn the write it reports — or a governance DENIAL —
+ * into a 500; the entry is simply lost, which is why a host wanting a
+ * complete trail should also persist inside its own transaction (the
+ * @12-apps/audit ticket owns that seam). */
 export type RbacAuditSink = (entry: RbacAuditEntry) => Promise<void> | void;
+
+/**
+ * The fence around the host's sink: every store/governance call site reports
+ * through this wrapper, so an audit failure is swallowed rather than escaping
+ * AFTER the guarded write already committed (a 500 for a write that
+ * succeeded, with no entry to show for it — the worst of both).
+ */
+export function fencedAudit(sink: RbacAuditSink | undefined): RbacAuditSink | undefined {
+  if (!sink) return undefined;
+  return async (entry) => {
+    try {
+      await sink(entry);
+    } catch {
+      // Deliberately silent: the security outcome (the write, or the denial)
+      // stands; the host owns its sink's health.
+    }
+  };
+}
 
 /** A member's identity, resolved by the host's user directory. */
 export interface RbacUserIdentity {
@@ -147,6 +171,12 @@ export interface RbacMessages {
   ownerNotDisableable: string;
   templateNotEditable: string;
   invalidEmail: string;
+  /** Composed as `${invalidBody} (field).` by the wire's body validation. */
+  invalidBody: string;
+  notFound: string;
+  invitesNotConfigured: string;
+  unauthenticated: string;
+  baseRoleNotAssignable: string;
   governance: {
     escalation: string;
     scopeCeiling: string;
@@ -170,6 +200,11 @@ export const DEFAULT_MESSAGES: RbacMessages = {
   ownerNotDisableable: 'Não é possível desativar um proprietário.',
   templateNotEditable: 'Este papel do sistema não pode ser editado.',
   invalidEmail: 'Informe um e-mail válido.',
+  invalidBody: 'Dados inválidos',
+  notFound: 'Não encontrado.',
+  invitesNotConfigured: 'Convites não estão configurados.',
+  unauthenticated: 'Não autenticado.',
+  baseRoleNotAssignable: 'Este papel não pode ser definido como papel principal.',
   governance: {
     escalation: 'Você não pode conceder um papel com permissões que você mesmo não possui.',
     scopeCeiling: 'Este papel não pode ser atribuído neste nível de acesso.',
@@ -212,7 +247,12 @@ export interface RbacServerConfig<P extends string = string> {
   tenantRoleSeeds: readonly TenantRoleSeed[];
   /** The host's user directory (roster identity). */
   directory: RbacUserDirectory;
-  /** Roles the roster may hand out as a member's BASE role. */
+  /**
+   * Roles the roster may hand out as a member's BASE role
+   * (`PATCH /team/:userId`). ENFORCED before governance: a name outside the
+   * set is the wire's 400. Defaults to the non-owner template names — a
+   * custom role is additive (`POST /team/:userId/roles`), never a base.
+   */
   assignableBaseRoles?: readonly string[];
   /**
    * The coarse admin tier — the base roles whose members may reach this

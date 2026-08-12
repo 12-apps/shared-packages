@@ -50,6 +50,17 @@ describe('@12-apps/rbac — the prisma assets survive publication', () => {
     }
   });
 
+  it('ships the prisma:sync script the adoption contract names', () => {
+    // ADOPTING.md tells a host to run the package's own sync script; a `files`
+    // list that drops `scripts/` turns that instruction into MODULE_NOT_FOUND
+    // on every real install (it works in a workspace, which is the trap).
+    const script = readFileSync(
+      join(rbacPackage, 'scripts/sync-rbac-schema.mjs'),
+      'utf-8',
+    );
+    expect(script).toContain('rbac.prisma');
+  });
+
   it('ships at least one migration', () => {
     expect(migrations().length).toBeGreaterThan(0);
   });
@@ -101,6 +112,35 @@ describe('@12-apps/rbac — the prisma assets survive publication', () => {
       await db.query(
         `INSERT INTO roles (id, client_id, name, permissions, updated_at)
          VALUES ('a1', 'tenant-a', 'WAITER', '[]', NOW()), ('b1', 'tenant-b', 'WAITER', '[]', NOW())`,
+      );
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('allows at most ONE active assignment per (user, tenant, resource)', async () => {
+    const db = new PGlite();
+    try {
+      for (const name of migrations()) {
+        await db.exec(readFileSync(join(migrationsDir, name, 'migration.sql'), 'utf-8'));
+      }
+      await db.query(
+        `INSERT INTO resource_assignments (id, user_id, client_id, resource_type, resource_id)
+         VALUES ('a1', 'u1', 't1', 'tables', 'mesa-1')`,
+      );
+      // The concurrent double-insert the partial unique index exists to stop.
+      await expect(
+        db.query(
+          `INSERT INTO resource_assignments (id, user_id, client_id, resource_type, resource_id)
+           VALUES ('a2', 'u1', 't1', 'tables', 'mesa-1')`,
+        ),
+      ).rejects.toThrow(/unique|duplicate/i);
+      // Revocation stamps valid_to; a NEW active claim is then legal again —
+      // the index guards concurrency, never history.
+      await db.query(`UPDATE resource_assignments SET valid_to = NOW() WHERE id = 'a1'`);
+      await db.query(
+        `INSERT INTO resource_assignments (id, user_id, client_id, resource_type, resource_id)
+         VALUES ('a3', 'u1', 't1', 'tables', 'mesa-1')`,
       );
     } finally {
       await db.close();

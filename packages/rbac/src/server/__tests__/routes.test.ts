@@ -140,6 +140,52 @@ describe('roles routes', () => {
     expect(data(deleted)).toEqual({ status: 'deleted' });
   });
 
+  it('DELETE archives the role: grants stop, the row survives, repeat is 404', async () => {
+    const h = await host();
+    enrolMember(h.state, TENANT, 'owner-1', 'OWNER');
+    // WAITER's own template does not carry stock:read, so the assertion below
+    // can only be satisfied by the custom grant — and only fail through it.
+    enrolMember(h.state, TENANT, 'waiter-1', 'WAITER');
+    const actor = memberActor(TENANT, 'owner-1');
+    const created = await call(h, 'POST', '/roles', {
+      actor,
+      body: { name: 'Barista', permissions: ['stock:read'] },
+    });
+    const id = data(created).id as string;
+    await call(h, 'POST', '/team/:userId/roles', {
+      actor,
+      params: { userId: 'waiter-1' },
+      body: { role: 'Barista' },
+    });
+    const before = await h.api.guards.getActorPermissions(
+      { userId: 'waiter-1', isSuper: false },
+      TENANT,
+    );
+    expect(before.has('stock:read')).toBe(true);
+
+    const deleted = await call(h, 'DELETE', '/roles/:id', { actor, params: { id } });
+    expect(deleted.status).toBe(200);
+
+    // Deny-by-default: the archived role stops granting at once…
+    const perms = await h.api.guards.getActorPermissions(
+      { userId: 'waiter-1', isSuper: false },
+      TENANT,
+    );
+    expect(perms.has('stock:read')).toBe(false);
+    // …but the row and the member's link SURVIVE (an archive, not a cascade) —
+    // one UPDATE away from restore instead of gone (12-17's surface).
+    const row = h.state.roles.find((candidate) => candidate.id === id);
+    expect(row?.archivedAt).not.toBeNull();
+    expect(h.state.membershipRoles.some((link) => link.roleId === id)).toBe(true);
+    // Gone from the grid, and a second delete is a 404, not a double-archive.
+    const listed = await call(h, 'GET', '/roles', { actor });
+    expect(
+      (listed.body as { data: { id: string }[] }).data.some((r) => r.id === id),
+    ).toBe(false);
+    const again = await call(h, 'DELETE', '/roles/:id', { actor, params: { id } });
+    expect(again.status).toBe(404);
+  });
+
   it('overrides a template per-tenant and resets it to the seed default', async () => {
     const h = await host();
     enrolMember(h.state, TENANT, 'owner-1', 'OWNER');
@@ -437,6 +483,159 @@ describe('team routes', () => {
       actor: memberActor(TENANT, 'chef-1'),
     });
     expect(response.status).toBe(403);
+  });
+
+  it('a base role outside assignableBaseRoles is the wire 400, custom roles included', async () => {
+    // MAJOR-7: the base role is a CLOSED set. A tenant custom role is
+    // additive by design — on future-pay's DB this write would hit the
+    // memberships_role_check CHECK and 500; the package answers the wire's
+    // 400 before governance ever runs.
+    const h = await teamHost();
+    seedRole(h.state, { clientId: TENANT, name: 'Barista', permissions: ['stock:read'] });
+    const custom = await call(h, 'PATCH', '/team/:userId', {
+      actor: memberActor(TENANT, 'owner-1'),
+      params: { userId: 'chef-1' },
+      body: { role: 'Barista' },
+    });
+    expect(custom.status).toBe(400);
+
+    const narrowed = createTestHost({ assignableBaseRoles: ['WAITER'] });
+    await narrowed.api.seedTenantRoles(TENANT);
+    enrolMember(narrowed.state, TENANT, 'owner-1', 'OWNER');
+    enrolMember(narrowed.state, TENANT, 'chef-1', 'CHEF');
+    const outside = await call(narrowed, 'PATCH', '/team/:userId', {
+      actor: memberActor(TENANT, 'owner-1'),
+      params: { userId: 'chef-1' },
+      body: { role: 'MANAGER' },
+    });
+    expect(outside.status).toBe(400);
+    const inside = await call(narrowed, 'PATCH', '/team/:userId', {
+      actor: memberActor(TENANT, 'owner-1'),
+      params: { userId: 'chef-1' },
+      body: { role: 'WAITER' },
+    });
+    expect(inside.status).toBe(200);
+  });
+
+  it('a route-level permission ceiling narrows the whole surface', async () => {
+    const h = await teamHost();
+    const actor = {
+      ...memberActor(TENANT, 'owner-1'),
+      permissionCeiling: new Set(['products:read:all']),
+    };
+    // roles:manage falls outside the ceiling → the roles surface is gone.
+    const roles = await call(h, 'GET', '/roles', { actor });
+    expect(roles.status).toBe(403);
+    // The shell read still answers, narrowed to the intersection.
+    const permissions = await call(h, 'GET', '/permissions', { actor });
+    expect(permissions.status).toBe(200);
+    expect((data(permissions) as { permissions: string[] }).permissions).toEqual([
+      'products:read:all',
+    ]);
+  });
+
+  it('every write reports its audit action through the fenced sink', async () => {
+    // MINOR-13: pins the whole action vocabulary, and MAJOR-6's fence — the
+    // sink here THROWS on every call, and no write may care.
+    const h = createTestHost({
+      audit: () => {
+        throw new Error('sink down');
+      },
+    });
+    await h.api.seedTenantRoles(TENANT);
+    enrolMember(h.state, TENANT, 'owner-1', 'OWNER');
+    enrolMember(h.state, TENANT, 'chef-1', 'CHEF');
+    const actor = memberActor(TENANT, 'owner-1');
+    const created = await call(h, 'POST', '/roles', {
+      actor,
+      body: { name: 'Barista', permissions: ['stock:read'] },
+    });
+    expect(created.status).toBe(200);
+
+    const audited = await teamHost();
+    const auditedActor = memberActor(TENANT, 'owner-1');
+    const id = data(
+      await call(audited, 'POST', '/roles', {
+        actor: auditedActor,
+        body: { name: 'Barista', permissions: ['stock:read'] },
+      }),
+    ).id as string;
+    await call(audited, 'PATCH', '/roles/:id', {
+      actor: auditedActor,
+      params: { id },
+      body: { name: 'Barista', permissions: ['stock:read', 'products:read:all'] },
+    });
+    await call(audited, 'POST', '/team/:userId/roles', {
+      actor: auditedActor,
+      params: { userId: 'chef-1' },
+      body: { role: 'Barista' },
+    });
+    await call(audited, 'DELETE', '/team/:userId/roles/:role', {
+      actor: auditedActor,
+      params: { userId: 'chef-1', role: 'Barista' },
+    });
+    await call(audited, 'DELETE', '/roles/:id', { actor: auditedActor, params: { id } });
+    await call(audited, 'PATCH', '/team/:userId', {
+      actor: auditedActor,
+      params: { userId: 'chef-1' },
+      body: { role: 'MANAGER' },
+    });
+    await call(audited, 'PATCH', '/team/:userId/status', {
+      actor: auditedActor,
+      params: { userId: 'chef-1' },
+      body: { active: false },
+    });
+    await call(audited, 'PATCH', '/team/:userId/status', {
+      actor: auditedActor,
+      params: { userId: 'chef-1' },
+      body: { active: true },
+    });
+    await call(audited, 'DELETE', '/team/:userId', {
+      actor: auditedActor,
+      params: { userId: 'chef-1' },
+    });
+    enrolMember(audited.state, TENANT, 'admin-2', 'ADMIN');
+    await call(audited, 'POST', '/roles', {
+      actor: memberActor(TENANT, 'admin-2'),
+      body: { name: 'Golpe', permissions: ['payouts:manage'] },
+    });
+    const actions = audited.audits.map((entry) => entry.action);
+    for (const expected of [
+      'role.create',
+      'role.update',
+      'role.delete',
+      'team.role_set',
+      'team.role_grant',
+      'team.role_revoke',
+      'team.member_status',
+      'team.member_remove',
+      'governance.reject',
+    ]) {
+      expect(actions).toContain(expected);
+    }
+  });
+
+  it('the invites port reports team.invite / team.invite_cancel', async () => {
+    const h = createTestHost({
+      invites: {
+        invite: async () => ({ status: 'invited' as const }),
+        listPending: async () => [],
+        cancel: async () => undefined,
+      },
+    });
+    await h.api.seedTenantRoles(TENANT);
+    enrolMember(h.state, TENANT, 'owner-1', 'OWNER');
+    const actor = memberActor(TENANT, 'owner-1');
+    await call(h, 'POST', '/team', { actor, body: { email: 'novo@example.com' } });
+    await call(h, 'DELETE', '/team/invites/:inviteId', {
+      actor,
+      params: { inviteId: 'i1' },
+    });
+    expect(h.audits.map((entry) => entry.action)).toEqual([
+      'team.invite',
+      'team.invite_cancel',
+    ]);
+    expect(h.audits[0]).toMatchObject({ resourceId: 'novo@example.com' });
   });
 
   it('a platform admin reaches the roster with no membership', async () => {

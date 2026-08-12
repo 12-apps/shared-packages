@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 
 import { createApiRbac, type ApiRbac } from '../server/create-api-rbac';
-import type { RbacActor, RbacServerConfig } from '../server/context';
+import { messagesOf, type RbacActor, type RbacServerConfig } from '../server/context';
 
 /**
  * `@12-apps/rbac/hono` — the RBAC admin endpoints as a mountable router.
@@ -53,6 +53,7 @@ async function readBody(c: Context): Promise<unknown> {
 
 export function rbacRouter<P extends string>(config: RbacHonoConfig<P>): RbacHono<P> {
   const api = createApiRbac(config);
+  const messages = messagesOf(config);
   const router = new Hono();
 
   // Mounted IN DESCRIPTOR ORDER — `/team/context` before `/team/:userId` is a
@@ -60,7 +61,7 @@ export function rbacRouter<P extends string>(config: RbacHonoConfig<P>): RbacHon
   for (const route of api.routes) {
     const handler = async (c: Context) => {
       const actor = await config.resolveActor(c);
-      if (!actor) return c.json({ error: 'Não autenticado.' }, 401);
+      if (!actor) return c.json({ error: messages.unauthenticated }, 401);
 
       const response = await route.handle({
         actor,

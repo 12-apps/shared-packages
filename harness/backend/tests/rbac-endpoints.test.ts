@@ -5,7 +5,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
-import { RBAC_TENANT_ID } from '../src/rbac-host';
+import { RBAC_TENANT_B_ID, RBAC_TENANT_ID } from '../src/rbac-host';
 
 /**
  * The @12-apps/rbac surface end-to-end (12-13): the port of future-pay's
@@ -15,8 +15,6 @@ import { RBAC_TENANT_ID } from '../src/rbac-host';
  * with the host reduced to the seams the ADOPTING contract names (actor
  * header, directory, PGlite-backed db).
  */
-
-const BASE = `/api/admin/${RBAC_TENANT_ID}`;
 
 let backend: HarnessBackend;
 
@@ -34,12 +32,13 @@ beforeEach(async () => {
 });
 
 /** Drive the app as a given seeded user (the host's actor seam). */
-function asUser(userId: string) {
+function asUser(userId: string, tenantId: string = RBAC_TENANT_ID) {
+  const base = `/api/admin/${tenantId}`;
   const headers = { 'x-rbac-user': userId, 'content-type': 'application/json' };
   return {
-    get: (path: string) => backend.app.request(`${BASE}${path}`, { headers }),
+    get: (path: string) => backend.app.request(`${base}${path}`, { headers }),
     send: (method: string, path: string, body?: unknown) =>
-      backend.app.request(`${BASE}${path}`, {
+      backend.app.request(`${base}${path}`, {
         method,
         headers,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -168,6 +167,49 @@ describe('roles — CRUD + governance against the published surface', () => {
   });
 });
 
+describe('tenant isolation — the neighbour tenant reaches nothing', () => {
+  it('a fully-entitled OWNER of tenant B cannot read or write tenant A rows', async () => {
+    const ownerA = asUser('owner-1');
+    const ownerB = asUser('owner-b', RBAC_TENANT_B_ID);
+
+    // B sees only its own catalog (no Barista/Estoquista — those are A's)…
+    const catalog = await json<{ data: { name: string }[] }>(await ownerB.get('/roles'));
+    expect(catalog.data.map((row) => row.name)).not.toContain('Barista');
+    // …and only its own roster.
+    const roster = await json<{ data: { userId: string }[] }>(await ownerB.get('/team'));
+    expect(roster.data.map((row) => row.userId)).toEqual(['owner-b']);
+
+    // A role id from tenant A is a 404 for B — on edit AND on delete.
+    const barista = await json<{ data: { id: string; name: string }[] }>(
+      await ownerA.get('/roles?q=Barista'),
+    );
+    const foreignId = barista.data[0]?.id as string;
+    const edited = await ownerB.send('PATCH', `/roles/${foreignId}`, {
+      name: 'Roubo',
+      permissions: ['stock:read'],
+    });
+    expect(edited.status).toBe(404);
+    const deleted = await ownerB.send('DELETE', `/roles/${foreignId}`);
+    expect(deleted.status).toBe(404);
+
+    // A member of tenant A is a 404 for B, never a cross-tenant write.
+    const grant = await ownerB.send('POST', '/team/chef-1/roles', { role: 'Barista' });
+    expect(grant.status).toBe(400); // UNKNOWN_ROLE: B has no Barista at all
+    const removed = await ownerB.send('DELETE', '/team/chef-1');
+    expect(removed.status).toBe(404);
+    // And nothing moved on A's side.
+    const still = await json<{ data: { userId: string }[] }>(await ownerA.get('/team'));
+    expect(still.data.some((row) => row.userId === 'chef-1')).toBe(true);
+  });
+
+  it('an unknown tenant slug never reaches a handler (401)', async () => {
+    const response = await backend.app.request('/api/admin/intruso/roles', {
+      headers: { 'x-rbac-user': 'owner-1' },
+    });
+    expect(response.status).toBe(401);
+  });
+});
+
 describe('team — the roster over the directory seam', () => {
   it('lists the seeded staff with identity joined from the directory', async () => {
     const page = await json<{ data: { userId: string; email: string; role: string }[] }>(
@@ -214,10 +256,11 @@ describe('team — the roster over the directory seam', () => {
   it('disable revokes access until re-enable', async () => {
     const owner = asUser('owner-1');
     await owner.send('PATCH', '/team/chef-1/status', { active: false });
-    const off = await json<{ data: { permissions: string[] } }>(
-      await asUser('chef-1').get('/permissions'),
-    );
-    expect(off.data.permissions).toEqual([]);
+    // Not an empty set — no surface at all: a disabled member holds no STAFF
+    // TIER either (BLOCKER-1), so the shell read is a 403, same as their
+    // permissions already resolving to nothing.
+    const off = await asUser('chef-1').get('/permissions');
+    expect(off.status).toBe(403);
 
     await owner.send('PATCH', '/team/chef-1/status', { active: true });
     const on = await json<{ data: { permissions: string[] } }>(

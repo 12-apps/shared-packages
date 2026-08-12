@@ -78,6 +78,7 @@ function roleSetSql(update: RoleUpdateData, params: Params): string {
     update.description !== undefined ? `description = ${params.add(update.description)}` : null,
     update.permissions !== undefined ? `permissions = ${params.add(update.permissions)}` : null,
     update.kind !== undefined ? `kind = ${params.add(update.kind)}` : null,
+    update.archivedAt !== undefined ? `archived_at = ${params.add(update.archivedAt)}` : null,
     'updated_at = NOW()',
   ]
     .filter((part): part is string => part !== null)

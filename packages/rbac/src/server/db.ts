@@ -62,6 +62,8 @@ export interface RoleUpdateData {
   description?: string | null;
   permissions?: string;
   kind?: string;
+  /** Set by the archive write (the soft delete); never cleared here. */
+  archivedAt?: Date;
 }
 
 export type RoleOrderBy = { name: 'asc' | 'desc' } | { createdAt: 'asc' | 'desc' };

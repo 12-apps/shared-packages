@@ -11,9 +11,13 @@ import { useCan } from './context';
 
 import type { RbacApiClient, RoleListRowWire } from './api';
 import type { RbacLabels } from './labels';
+import { Alert } from '@12-apps/ui/data-display/Alert';
+
+import { ConfirmDialog } from './confirm-dialog';
 import { RoleForm, type RoleFormValue } from './role-form';
 import { RolesTable } from './roles-table';
 import { SearchField } from './search-field';
+import { useConfirmable } from './use-confirmable';
 
 /**
  * Papéis — the tenant role catalog (12-13): the seeded template roles plus
@@ -38,6 +42,24 @@ type DialogState =
   | { mode: 'edit'; role: RoleListRowWire }
   | { mode: 'override'; role: RoleListRowWire };
 
+/** A destructive act awaiting its confirm step (FUT-546's shape). */
+type PendingAction = { kind: 'delete' | 'reset'; role: RoleListRowWire } | null;
+
+const CONFIRM_COPY = {
+  delete: {
+    title: 'Excluir o papel?',
+    // The delete is an ARCHIVE (the row survives for 12-17's restore surface),
+    // but what the admin must weigh is the immediate consequence:
+    body: 'Quem tem este papel perde os acessos dele imediatamente.',
+    confirmLabel: 'Excluir',
+  },
+  reset: {
+    title: 'Restaurar padrão do papel?',
+    body: 'As permissões voltam ao padrão do sistema. Esta ação não pode ser desfeita.',
+    confirmLabel: 'Restaurar padrão',
+  },
+} as const;
+
 function dialogTitle(dialog: DialogState): string {
   if (dialog.mode === 'create') return 'Novo papel';
   if (dialog.mode === 'override') return `Editar papel do sistema ${dialog.role.name}`;
@@ -52,6 +74,42 @@ function dialogInitial(dialog: DialogState): RoleFormValue | null {
     description: dialog.role.description,
     permissions: dialog.role.permissions === '*' ? [] : [...dialog.role.permissions],
   };
+}
+
+/** Route a form submission to the write the open dialog stands for. */
+function submitDialog(
+  api: RbacApiClient,
+  dialog: DialogState,
+  value: RoleFormValue,
+): ReturnType<RbacApiClient['createRole']> {
+  if (dialog.mode === 'edit') return api.updateRole(dialog.role.id, value);
+  if (dialog.mode === 'override') {
+    return api.overrideTemplate(dialog.role.name, {
+      description: value.description,
+      permissions: value.permissions,
+    });
+  }
+  return api.createRole(value);
+}
+
+/** The confirm step for the two destructive role writes. */
+function RolesConfirm({
+  confirmable,
+}: {
+  confirmable: ReturnType<typeof useConfirmable<NonNullable<PendingAction>>>;
+}): JSX.Element {
+  const pending = confirmable.pending;
+  return (
+    <ConfirmDialog
+      open={pending !== null}
+      title={pending ? CONFIRM_COPY[pending.kind].title : ''}
+      body={pending ? CONFIRM_COPY[pending.kind].body : ''}
+      confirmLabel={pending ? CONFIRM_COPY[pending.kind].confirmLabel : ''}
+      busy={confirmable.busy}
+      onConfirm={() => void confirmable.confirm()}
+      onCancel={confirmable.cancel}
+    />
+  );
 }
 
 /** The list read + refresh cycle, isolated from the screen's rendering. */
@@ -136,6 +194,13 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
   const [dialog, setDialog] = useState<DialogState>({ mode: 'closed' });
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const confirmable = useConfirmable<NonNullable<PendingAction>>(
+    (pending) =>
+      pending.kind === 'delete'
+        ? api.deleteRole(pending.role.id)
+        : api.resetTemplate(pending.role.name),
+    refresh,
+  );
 
   const closeDialog = (): void => {
     setDialog({ mode: 'closed' });
@@ -145,15 +210,7 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
   const submit = async (value: RoleFormValue): Promise<void> => {
     setBusy(true);
     setFormError(null);
-    const result =
-      dialog.mode === 'edit'
-        ? await api.updateRole(dialog.role.id, value)
-        : dialog.mode === 'override'
-          ? await api.overrideTemplate(dialog.role.name, {
-              description: value.description,
-              permissions: value.permissions,
-            })
-          : await api.createRole(value);
+    const result = await submitDialog(api, dialog, value);
     setBusy(false);
     if (!result.ok) {
       setFormError(result.error);
@@ -177,6 +234,9 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
       </Stack>
       <SearchField placeholder="Buscar papel" testId="roles-search-all" onCommit={setQuery} />
       {loadError && <Text as="p">{loadError}</Text>}
+      {confirmable.error && (
+        <Alert variant="danger" description={confirmable.error} data-testid="roles-error" />
+      )}
       {rows && (
         <RolesTable
           rows={rows}
@@ -184,18 +244,11 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
           onEdit={(role) =>
             setDialog(role.kind === 'SYSTEM' ? { mode: 'override', role } : { mode: 'edit', role })
           }
-          onReset={(role) => {
-            void api.resetTemplate(role.name).then((result) => {
-              if (result.ok) refresh();
-            });
-          }}
-          onDelete={(role) => {
-            void api.deleteRole(role.id).then((result) => {
-              if (result.ok) refresh();
-            });
-          }}
+          onReset={(role) => confirmable.request({ kind: 'reset', role })}
+          onDelete={(role) => confirmable.request({ kind: 'delete', role })}
         />
       )}
+      <RolesConfirm confirmable={confirmable} />
       <RoleFormDialog
         screen={props}
         dialog={dialog}

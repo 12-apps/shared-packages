@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import type { PermissionRegistry } from '../core/types';
 
-import { RbacApiError } from './context';
+import { RbacApiError, type RbacMessages } from './context';
 import type { RoleListQuery } from './roles-store';
 import type { TeamListQuery } from './team-store';
 
@@ -63,12 +63,16 @@ export function buildWireSchemas<P extends string>(
 }
 
 /** Parse a zod body or throw the 400 the wire promises. */
-export function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
+export function parseBody<T>(
+  schema: z.ZodType<T>,
+  body: unknown,
+  messages: Pick<RbacMessages, 'invalidBody'>,
+): T {
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const path = issue?.path.join('.') ?? '';
-    throw new RbacApiError(400, `Dados inválidos${path ? ` (${path})` : ''}.`);
+    throw new RbacApiError(400, `${messages.invalidBody}${path ? ` (${path})` : ''}.`);
   }
   return parsed.data;
 }
@@ -77,9 +81,10 @@ export function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
 export function requireParam(
   params: Record<string, string | undefined>,
   name: string,
+  messages: Pick<RbacMessages, 'notFound'>,
 ): string {
   const value = params[name];
-  if (!value) throw new RbacApiError(404, 'Não encontrado.');
+  if (!value) throw new RbacApiError(404, messages.notFound);
   return decodeURIComponent(value);
 }
 

@@ -171,7 +171,14 @@ function membershipRoleWhereSql(where: MembershipRoleWhere, params: Params): str
     conditions.push(`r.client_id = ${params.add(where.role.clientId)}`);
     conditions.push(`r.name = ${params.add(where.role.name)}`);
   }
-  return conditions.length > 0 ? conditions.join(' AND ') : 'TRUE';
+  if (conditions.length === 0) {
+    // Fail CLOSED: an empty where here would match — and a deleteMany would
+    // destroy — every join row in the database. The package never issues one;
+    // if a new upstream query shape arrives, this fixture's job is to fail
+    // loudly, not to guess (see rbac-db.ts's header).
+    throw new Error('rbac harness: membership-role query with an empty where');
+  }
+  return conditions.join(' AND ');
 }
 
 export function membershipRoleDelegate(sql: SqlRunner): MembershipRoleDelegate {

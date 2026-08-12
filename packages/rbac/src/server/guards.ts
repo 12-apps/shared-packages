@@ -101,6 +101,19 @@ function outsideCeiling(actor: RbacGuardActor, action: string): boolean {
 }
 
 /**
+ * The structural belt for "impersonating means NOT super". Every guard
+ * short-circuits on `isSuper` before any other check runs, so a host that
+ * forgot to force it false while carrying a ceiling would get the UNION —
+ * silently, on every route at once (future-pay calls its equivalent line
+ * "the single most important line in this feature"). A ceiling and platform
+ * authority are never both meaningful: the ceiling wins.
+ */
+function normalized(actor: RbacGuardActor): RbacGuardActor {
+  if (!actor.isSuper || !actor.permissionCeiling) return actor;
+  return { ...actor, isSuper: false };
+}
+
+/**
  * Intersect a resolved permission set with a ceiling — the one expression of
  * "a preview may only ever NARROW". A `null`/absent ceiling passes the set
  * through unchanged.
@@ -233,10 +246,11 @@ export function createRbacGuards<P extends string>(
     messages: messagesOf(config),
   };
   return {
-    requirePermission: (actor, action, opts) => requirePermission(ctx, actor, action, opts),
+    requirePermission: (actor, action, opts) =>
+      requirePermission(ctx, normalized(actor), action, opts),
     can: async (actor, action, opts) => {
       try {
-        await requirePermission(ctx, actor, action, opts);
+        await requirePermission(ctx, normalized(actor), action, opts);
         return true;
       } catch (error) {
         if (error instanceof RbacApiError && error.status === 403) return false;
@@ -244,10 +258,10 @@ export function createRbacGuards<P extends string>(
       }
     },
     getActorPermissions: (actor, scope = GLOBAL_SCOPE) =>
-      getActorPermissions(ctx, actor, scope),
+      getActorPermissions(ctx, normalized(actor), scope),
     visibleResources: (actor, action, type, opts) =>
-      visibleResources(ctx, actor, action, type, opts),
+      visibleResources(ctx, normalized(actor), action, type, opts),
     listVisibility: (actor, actions, type, opts) =>
-      listVisibility(ctx, actor, actions, type, opts),
+      listVisibility(ctx, normalized(actor), actions, type, opts),
   };
 }

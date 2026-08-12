@@ -1,5 +1,6 @@
 import {
   RbacApiError,
+  fencedAudit,
   messagesOf,
   type PaginationMeta,
   type RbacAuditSink,
@@ -68,8 +69,11 @@ async function swapPrimaryRoleLink(
   newRoleName: string,
 ): Promise<void> {
   if (oldRoleName && oldRoleName !== newRoleName) {
+    // `archivedAt: null` on both lookups, like every role read that grants:
+    // an archived outgoing primary has no live link worth unlinking, and an
+    // archived incoming name must never gain a fresh join row.
     const old = await tx.role.findFirst({
-      where: { clientId: membership.clientId, name: oldRoleName },
+      where: { clientId: membership.clientId, name: oldRoleName, archivedAt: null },
       select: ROLE_SELECT,
     });
     if (old) {
@@ -79,7 +83,7 @@ async function swapPrimaryRoleLink(
     }
   }
   const next = await tx.role.findFirst({
-    where: { clientId: membership.clientId, name: newRoleName },
+    where: { clientId: membership.clientId, name: newRoleName, archivedAt: null },
     select: ROLE_SELECT,
   });
   if (next) {
@@ -284,7 +288,7 @@ type TeamStoreConfig<P extends string> = Pick<
 export function createTeamStore<P extends string>(config: TeamStoreConfig<P>): TeamStore {
   const ctx: TeamStoreCtx = {
     db: config.db,
-    audit: config.audit,
+    audit: fencedAudit(config.audit),
     messages: messagesOf(config),
     ownerRoles: new Set(config.ownerRoles ?? ['OWNER']),
     customerRole: config.customerRole ?? 'CUSTOMER',

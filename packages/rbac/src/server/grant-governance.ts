@@ -4,6 +4,7 @@ import type { RoleDef } from '../core/types';
 import {
   GLOBAL_SCOPE,
   RbacApiError,
+  fencedAudit,
   messagesOf,
   type RbacActor,
   type RbacAuditSink,
@@ -89,9 +90,9 @@ interface GovernanceCtx<P extends string> {
 
 /**
  * Record a DENIED role-management attempt: each rejection reports one
- * `governance.reject` entry before the user-safe error is thrown. Fenced by
- * the sink's own contract — a failed log can never turn the DENIAL (the
- * security outcome) into a 500.
+ * `governance.reject` entry before the user-safe error is thrown. The sink is
+ * FENCED ({@link fencedAudit} in the factory below), so a failed log can never
+ * turn the DENIAL (the security outcome) into a 500 — the deny stands.
  */
 async function recordRejection<P extends string>(
   ctx: GovernanceCtx<P>,
@@ -168,7 +169,7 @@ export function createGrantGovernance<P extends string>(
     db: config.db,
     governance: config.governance,
     guards,
-    audit: config.audit,
+    audit: fencedAudit(config.audit),
     messages: messagesOf(config),
   };
   const templateNames = new Set(config.roleTemplates.map((role) => role.name));

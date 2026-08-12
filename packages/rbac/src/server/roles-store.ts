@@ -2,6 +2,7 @@ import type { TenantRoleSeed } from '../tenant-role-seeds';
 
 import {
   RbacApiError,
+  fencedAudit,
   messagesOf,
   paginationMeta,
   type PaginationMeta,
@@ -241,14 +242,25 @@ async function deleteTenantRole(
   tenantId: string,
 ): Promise<boolean> {
   const db = await ctx.db();
-  // `locked: false` keeps an Owner role undeletable through every path;
-  // tenant-scoped `deleteMany` makes a wrong tenant a 0-row no-op.
+  // The delete is an ARCHIVE, exactly like the future-pay route it ports
+  // ("a DELETE soft-archives the role"): the row keeps its id and its
+  // membership links, stops granting at runtime (every resolver read filters
+  // `archived_at IS NULL`) and disappears from the grid — while a hard
+  // `deleteMany` would CASCADE through `membership_roles` and destroy every
+  // member's grant irreversibly. Restore surfaces belong to entity-lifecycle
+  // (12-17); until a host mounts them, the archive is one UPDATE away from
+  // recovery instead of gone. `locked: false` keeps an Owner role
+  // unarchivable through every path; the tenant scope makes a wrong tenant a
+  // 0-row no-op, and `archivedAt: null` makes a second delete idempotent-404.
   const deleted = await db.$transaction(async (tx) => {
     const before = await tx.role.findFirst({
-      where: { id, clientId: tenantId, locked: false },
+      where: { id, clientId: tenantId, locked: false, archivedAt: null },
       select: ROLE_SELECT,
     });
-    const result = await tx.role.deleteMany({ where: { id, clientId: tenantId, locked: false } });
+    const result = await tx.role.updateMany({
+      where: { id, clientId: tenantId, locked: false, archivedAt: null },
+      data: { archivedAt: new Date() },
+    });
     return result.count > 0 && before ? { before } : null;
   });
   if (!deleted) return false;
@@ -288,7 +300,7 @@ type RolesStoreConfig<P extends string> = Pick<
 export function createRolesStore<P extends string>(config: RolesStoreConfig<P>): RolesStore {
   const ctx: RolesStoreCtx = {
     db: config.db,
-    audit: config.audit,
+    audit: fencedAudit(config.audit),
     messages: messagesOf(config),
     templateNames: new Set(config.roleTemplates.map((role) => role.name)),
     tenantRoleSeeds: config.tenantRoleSeeds,

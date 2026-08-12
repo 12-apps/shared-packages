@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { RbacApiError } from '../context';
 
+
 import { assignRole, enrolMember, seedRole } from './fake-db';
 import { createTestHost, memberActor, superActor } from './server-fixtures';
 
@@ -229,6 +230,47 @@ describe('tenant custom-role runtime enforcement (FUT-146 port)', () => {
     assignRole(host.state, 'custom-1', 'STOCK_VIEWER', TENANT_A);
     const perms = await host.api.guards.getActorPermissions(
       { userId: 'custom-1', isSuper: false },
+      TENANT_A,
+    );
+    expect(perms.size).toBe(0);
+  });
+});
+
+describe('the super/ceiling belt (a ceiling is authoritative)', () => {
+  it('a platform admin carrying a ceiling is narrowed, never unioned', async () => {
+    // Every guard short-circuits on isSuper before any check runs, so a host
+    // that forgot to force it false while impersonating would silently get
+    // the union. The belt treats the ceiling as authoritative instead.
+    const host = await seededHost();
+    const actor = {
+      userId: null,
+      isSuper: true,
+      permissionCeiling: new Set(['products:read:all']),
+    };
+    await expect(
+      host.api.guards.requirePermission(actor, 'payouts:manage', { scope: TENANT_A }),
+    ).rejects.toBeInstanceOf(RbacApiError);
+    const perms = await host.api.guards.getActorPermissions(actor, TENANT_A);
+    expect(perms.size).toBeLessThanOrEqual(1);
+    expect(
+      (await host.api.guards.visibleResources(actor, 'orders:read:all', 'orders')).kind,
+    ).toBe('none');
+  });
+});
+
+describe('archived roles on the MEMBERSHIP-JOIN path', () => {
+  it('an archived role linked through a membership stops granting', async () => {
+    // The roleAssignment path is covered above; this pins the join path the
+    // resolver reads for ordinary staff (engine.ts fromMemberships).
+    const host = await seededHost();
+    enrolMember(host.state, TENANT_A, 'waiter-1', 'WAITER');
+    const waiterRow = host.state.roles.find(
+      (row) => row.clientId === TENANT_A && row.name === 'WAITER',
+    );
+    expect(waiterRow).toBeDefined();
+    if (waiterRow) waiterRow.archivedAt = new Date('2026-01-01T00:00:00Z');
+    const perms = await host.api.guards.getActorPermissions(
+      { userId: 'waiter-1', isSuper: false },
       TENANT_A,
     );
     expect(perms.size).toBe(0);

@@ -3,11 +3,15 @@ import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
+import { Alert } from '@12-apps/ui/data-display/Alert';
+
 import { useCan } from './context';
 
 import type { RbacApiClient, TeamContextWire } from './api';
 import type { RbacLabels } from './labels';
+import { ConfirmDialog } from './confirm-dialog';
 import { SearchField } from './search-field';
+import { useConfirmable } from './use-confirmable';
 import {
   applyRoleChanges,
   splitRoleSelection,
@@ -81,6 +85,69 @@ function useTeamPage(api: RbacApiClient, query: string): {
   };
 }
 
+/**
+ * The role-edit popup's state + save orchestration — future-pay's
+ * `use-role-editor.ts`, hookified against the packaged api client: the base
+ * change and the custom-role diff map onto the EXISTING endpoints, so no new
+ * server surface exists for the dialog.
+ */
+function useRoleEditor(
+  api: RbacApiClient,
+  systemSet: ReadonlySet<string>,
+  refresh: () => void,
+): {
+  editing: MemberWithRoles | null;
+  busy: boolean;
+  error: string | null;
+  open: (member: MemberWithRoles) => void;
+  close: () => void;
+  save: (roleNames: string[]) => Promise<void>;
+} {
+  const [editing, setEditing] = useState<MemberWithRoles | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return {
+    editing,
+    busy,
+    error,
+    open: setEditing,
+    close: () => setEditing(null),
+    async save(roleNames) {
+      if (!editing) return;
+      const { base, customRoles } = splitRoleSelection(roleNames, systemSet);
+      if (!base) return; // the dialog blocks a save without exactly one system role
+      setBusy(true);
+      setError(null);
+      const failure = await applyRoleChanges(api, editing, base, customRoles);
+      setBusy(false);
+      setError(failure);
+      if (!failure) {
+        setEditing(null);
+        refresh();
+      }
+    },
+  };
+}
+
+/** The confirm step for the roster's one destructive act. */
+function RemoveConfirm({
+  removal,
+}: {
+  removal: ReturnType<typeof useConfirmable<MemberWithRoles>>;
+}): JSX.Element {
+  return (
+    <ConfirmDialog
+      open={removal.pending !== null}
+      title="Remover da equipe?"
+      body="A pessoa perde o acesso ao painel imediatamente."
+      confirmLabel="Remover"
+      busy={removal.busy}
+      onConfirm={() => void removal.confirm()}
+      onCancel={removal.cancel}
+    />
+  );
+}
+
 /** The accountless invites awaiting signup, when the host wires the port. */
 function PendingInvites({
   context,
@@ -110,9 +177,20 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
   const canManage = can(props.managePermission);
   const [query, setQuery] = useState('');
   const { rows, context, loadError, refresh } = useTeamPage(api, query);
-  const [editing, setEditing] = useState<MemberWithRoles | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
+  const removal = useConfirmable<MemberWithRoles>(
+    (member) => api.removeMember(member.userId),
+    refresh,
+  );
+  const actionError = removal.error ?? toggleError;
+
+  const toggleActive = async (member: MemberWithRoles): Promise<void> => {
+    const result = await api.setMemberActive(member.userId, !member.active);
+    // A refused flip (e.g. "Não é possível desativar um proprietário.")
+    // must SAY so, not render nothing.
+    setToggleError(result.ok ? null : result.error);
+    if (result.ok) refresh();
+  };
 
   const ownerRoles = useMemo(
     () => new Set(props.ownerRoles ?? ['OWNER']),
@@ -123,22 +201,7 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
     () => (context?.assignableRoles ?? []).filter((name) => !systemSet.has(name)),
     [context, systemSet],
   );
-
-  const saveRoles = async (roleNames: string[]): Promise<void> => {
-    if (!editing) return;
-    const { base, customRoles } = splitRoleSelection(roleNames, systemSet);
-    if (!base) return; // the dialog blocks a save without exactly one system role
-    setBusy(true);
-    setEditError(null);
-    const error = await applyRoleChanges(api, editing, base, customRoles);
-    setBusy(false);
-    if (error) {
-      setEditError(error);
-      return;
-    }
-    setEditing(null);
-    refresh();
-  };
+  const editor = useRoleEditor(api, systemSet, refresh);
 
   return (
     <Stack spacing={2}>
@@ -147,35 +210,31 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
       </Text>
       <SearchField placeholder="Buscar membro" testId="team-search-all" onCommit={setQuery} />
       {loadError && <Text as="p">{loadError}</Text>}
+      {actionError && (
+        <Alert variant="danger" description={actionError} data-testid="team-error" />
+      )}
       {rows && (
         <TeamTable
           rows={rows}
           labels={labels}
           canManage={canManage}
           ownerRoles={ownerRoles}
-          onEditRoles={setEditing}
-          onToggleActive={(member) => {
-            void api.setMemberActive(member.userId, !member.active).then((result) => {
-              if (result.ok) refresh();
-            });
-          }}
-          onRemove={(member) => {
-            void api.removeMember(member.userId).then((result) => {
-              if (result.ok) refresh();
-            });
-          }}
+          onEditRoles={editor.open}
+          onToggleActive={(member) => void toggleActive(member)}
+          onRemove={removal.request}
         />
       )}
       <PendingInvites context={context} labels={labels} />
+      <RemoveConfirm removal={removal} />
       <RoleEditDialog
-        member={editing}
+        member={editor.editing}
         systemRoles={systemRoles}
         availableCustomRoles={availableCustomRoles}
         labels={labels}
-        busy={busy}
-        error={editError}
-        onClose={() => setEditing(null)}
-        onSave={(roleNames) => void saveRoles(roleNames)}
+        busy={editor.busy}
+        error={editor.error}
+        onClose={editor.close}
+        onSave={(roleNames) => void editor.save(roleNames)}
       />
     </Stack>
   );

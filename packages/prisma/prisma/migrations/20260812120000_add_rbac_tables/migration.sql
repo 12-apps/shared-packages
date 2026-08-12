@@ -97,5 +97,17 @@ CREATE TABLE "resource_assignments" (
     CONSTRAINT "resource_assignments_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "resource_assignments_user_id_resource_type_idx" ON "resource_assignments"("user_id", "resource_type");
+CREATE INDEX "resource_assignments_user_id_resource_type_idx" ON "resource_assignments"("user_id", "resource_type") WHERE "valid_to" IS NULL;
 CREATE INDEX "resource_assignments_client_id_resource_type_resource_id_idx" ON "resource_assignments"("client_id", "resource_type", "resource_id");
+
+-- At most ONE active assignment per (user, tenant, resource). Two concurrent
+-- requests could each INSERT a new active row; a partial UNIQUE index over the
+-- ACTIVE rows makes the second concurrent insert fail at the DB rather than
+-- relying on a racy app-level check-then-insert. Added while the table is
+-- EMPTY (free) -- it is much harder to add later once live data may already
+-- contain duplicates. Prisma cannot express a filtered index, hence raw SQL
+-- (the same reason as roles_template_name_key above). Revocation stamps
+-- valid_to, so historical rows never collide.
+CREATE UNIQUE INDEX "resource_assignments_active_unique_idx"
+  ON "resource_assignments"("user_id", "client_id", "resource_type", "resource_id")
+  WHERE "valid_to" IS NULL;

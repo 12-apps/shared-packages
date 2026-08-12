@@ -23,19 +23,30 @@ import { rbacDb } from './rbac-db';
 /** The mounted surface's type — inferred, so the guards keep their catalog. */
 export type HarnessRbac = ReturnType<typeof rbacHost>;
 
-/** The one tenant this harness serves — the actor's `tenantId`. */
+/** The primary tenant — the one the SPA page and most specs drive. */
 export const RBAC_TENANT_ID = 'harness';
+
+/**
+ * A second, minimally-populated tenant. Tenant isolation is the property with
+ * the highest stakes in this package, and a harness with one tenant cannot
+ * exercise it at the tarball level — every isolation proof would otherwise
+ * live only in the package's in-memory unit suite.
+ */
+export const RBAC_TENANT_B_ID = 'harness-b';
 
 /**
  * The people. A real host joins its user table; this one holds the roster in
  * code, which is exactly what the directory port exists to allow.
  */
-export const RBAC_USERS: readonly (RbacUserIdentity & { baseRole: string })[] = [
-  { id: 'owner-1', email: 'ana@harness.dev', name: 'Ana Proprietária', image: null, baseRole: 'OWNER' },
-  { id: 'admin-1', email: 'otavio@harness.dev', name: 'Otávio Administrador', image: null, baseRole: 'ADMIN' },
-  { id: 'chef-1', email: 'camila@harness.dev', name: 'Camila Barbosa', image: null, baseRole: 'CHEF' },
-  { id: 'waiter-1', email: 'bruno@harness.dev', name: 'Bruno Carvalho', image: null, baseRole: 'WAITER' },
-  { id: 'role-target', email: 'target@harness.dev', name: 'Role Target', image: null, baseRole: 'CHEF' },
+export const RBAC_USERS: readonly (RbacUserIdentity & { baseRole: string; tenantId: string })[] = [
+  { id: 'owner-1', email: 'ana@harness.dev', name: 'Ana Proprietária', image: null, baseRole: 'OWNER', tenantId: RBAC_TENANT_ID },
+  { id: 'admin-1', email: 'otavio@harness.dev', name: 'Otávio Administrador', image: null, baseRole: 'ADMIN', tenantId: RBAC_TENANT_ID },
+  { id: 'chef-1', email: 'camila@harness.dev', name: 'Camila Barbosa', image: null, baseRole: 'CHEF', tenantId: RBAC_TENANT_ID },
+  { id: 'waiter-1', email: 'bruno@harness.dev', name: 'Bruno Carvalho', image: null, baseRole: 'WAITER', tenantId: RBAC_TENANT_ID },
+  { id: 'role-target', email: 'target@harness.dev', name: 'Role Target', image: null, baseRole: 'CHEF', tenantId: RBAC_TENANT_ID },
+  // The neighbour: one OWNER, so tenant B has a fully-entitled actor whose
+  // reach must still end at its own rows.
+  { id: 'owner-b', email: 'beatriz@harness-b.dev', name: 'Beatriz Vizinha', image: null, baseRole: 'OWNER', tenantId: RBAC_TENANT_B_ID },
 ];
 
 const DIRECTORY = new Map(RBAC_USERS.map((user) => [user.id, user]));
@@ -51,9 +62,10 @@ export async function reseedRbac(pg: PGlite, rbac: HarnessRbac): Promise<void> {
   // The catalog first (the package's own seed — deterministic, idempotent),
   // then the roster the specs read, wiring the n:m join the resolver reads.
   await rbac.seedTenantRoles(RBAC_TENANT_ID);
+  await rbac.seedTenantRoles(RBAC_TENANT_B_ID);
   const params: unknown[] = [];
   const values = RBAC_USERS.map((user, index) => {
-    params.push(`m-${user.id}`, user.id, RBAC_TENANT_ID, user.baseRole);
+    params.push(`m-${user.id}`, user.id, user.tenantId, user.baseRole);
     const base = index * 4;
     return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, TRUE, NOW(), NOW())`;
   }).join(', ');
@@ -108,15 +120,20 @@ export function rbacHost(pg: PGlite) {
           .map((user) => user.id),
     },
     resolveActor: (c) => {
-      // The SPA sends no header and acts as the seeded OWNER — the arrangement
-      // the admin screens assume. A spec that needs another vantage sets the
-      // header; `anonymous` exercises the 401 path.
+      // Which tenant: resolved from the mounted path's own slug, the way a
+      // real host resolves it — an unknown slug is an unauthenticated 401
+      // here (a real host would 404 first).
+      const tenantId = c.req.param('tenantSlug');
+      if (tenantId !== RBAC_TENANT_ID && tenantId !== RBAC_TENANT_B_ID) return null;
+      // Who: the SPA sends no header and acts as the seeded OWNER — the
+      // arrangement the admin screens assume. A spec that needs another
+      // vantage sets the header; `anonymous` exercises the 401 path.
       const userId = c.req.header(ACTOR_HEADER) ?? 'owner-1';
       if (userId === 'anonymous') return null;
       if (userId === 'superadmin') {
-        return { tenantId: RBAC_TENANT_ID, userId: null, isSuper: true };
+        return { tenantId, userId: null, isSuper: true };
       }
-      return { tenantId: RBAC_TENANT_ID, userId, isSuper: false };
+      return { tenantId, userId, isSuper: false };
     },
   });
 }

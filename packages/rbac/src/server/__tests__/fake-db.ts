@@ -258,6 +258,7 @@ export function createFakeRbacDb(): { db: RbacDb; state: FakeRbacState } {
           if (data.description !== undefined) row.description = data.description;
           if (data.permissions !== undefined) row.permissions = data.permissions;
           if (data.kind !== undefined) row.kind = data.kind;
+          if (data.archivedAt !== undefined) row.archivedAt = data.archivedAt;
         }
         return { count: rows.length };
       },
