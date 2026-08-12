@@ -5,6 +5,7 @@ import { resetJobRuntime } from "../../core/runtime";
 import type { JobDriver, JobLogger } from "../../core/types";
 import { createInlineJobDriver } from "../../drivers/inline";
 import type { SweepLeaseDb } from "../../lease/sweep-lease";
+import type { JobsDriverChoice } from "../config";
 import { createApiJobs } from "../create-api-jobs";
 
 /**
@@ -103,7 +104,7 @@ describe("createApiJobs — driver resolution", () => {
     expect(loggedText(error)).toContain("Set REDIS_URL");
   });
 
-  it("refuses the inline driver in production", async () => {
+  it("refuses the inline driver in production, naming the config knob", async () => {
     stubBareEnv();
     const { logger, error } = makeLogger();
     const api = createApiJobs({ jobs: [], logger, production: true, driver: "inline" });
@@ -112,6 +113,48 @@ describe("createApiJobs — driver resolution", () => {
 
     const { status } = await healthOf(api);
     expect(status).toBe(503);
+    // The message names WHERE the choice came from: an operator reading a
+    // JOBS_DRIVER message for a choice made in code would hunt for an env
+    // var that is not set.
+    expect(loggedText(error)).toContain(
+      'createApiJobs({ driver: "inline" }) is refused in production',
+    );
+  });
+
+  it("refuses JOBS_DRIVER=inline in production with future-pay's exact words", async () => {
+    stubBareEnv();
+    vi.stubEnv("JOBS_DRIVER", "inline");
+    const { logger, error } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger, production: true });
+
+    await api.start();
+
+    const { status } = await healthOf(api);
+    expect(status).toBe(503);
+    // Byte-identical to future-pay's runtime.ts — a host greps for this line.
+    expect(loggedText(error)).toContain(
+      "JOBS_DRIVER=inline is refused in production; jobs are disabled.",
+    );
+  });
+
+  it("refuses an inline driver INSTANCE in production too", async () => {
+    // The whole reason inline is refused (no retries, no schedules, work dies
+    // with the request) applies identically to an instance — passing one must
+    // not be the quiet way around the guard.
+    stubBareEnv();
+    const { logger, error } = makeLogger();
+    const api = createApiJobs({
+      jobs: [],
+      driver: createInlineJobDriver({ logger }),
+      logger,
+      production: true,
+    });
+
+    await api.start();
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(body.checks.driver).toBeNull();
     expect(loggedText(error)).toContain("refused in production");
   });
 
@@ -128,7 +171,29 @@ describe("createApiJobs — driver resolution", () => {
     expect(loggedText(error)).toContain('JOBS_DRIVER="rabbitmq"');
   });
 
-  it("needs a Redis URL for an explicit bullmq choice", async () => {
+  it("treats an unrecognised config.driver string as off, loudly", async () => {
+    // The type forbids it, but a JS consumer can pass anything — this used to
+    // fall through the validation and resolve to bullmq with no complaint.
+    stubBareEnv();
+    const { logger, error } = makeLogger();
+    const api = createApiJobs({
+      jobs: [],
+      logger,
+      redisUrl: "redis://localhost:6379", // the silent-bullmq bait
+      driver: "rabbitmq" as unknown as JobsDriverChoice,
+    });
+
+    await api.start();
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(body.checks.driver).toBeNull();
+    expect(loggedText(error)).toContain(
+      'createApiJobs({ driver: "rabbitmq" }) is not a driver; jobs are disabled.',
+    );
+  });
+
+  it("needs a Redis URL for a bullmq choice, naming the knob that chose it", async () => {
     stubBareEnv();
     const { logger, error } = makeLogger();
     const api = createApiJobs({ jobs: [], logger, driver: "bullmq" });
@@ -137,7 +202,25 @@ describe("createApiJobs — driver resolution", () => {
 
     const { status } = await healthOf(api);
     expect(status).toBe(503);
-    expect(loggedText(error)).toContain("needs REDIS_URL");
+    expect(loggedText(error)).toContain(
+      'createApiJobs({ driver: "bullmq" }) needs REDIS_URL; jobs are disabled.',
+    );
+  });
+
+  it("needs a Redis URL for JOBS_DRIVER=bullmq, with future-pay's exact words", async () => {
+    stubBareEnv();
+    vi.stubEnv("JOBS_DRIVER", "bullmq");
+    const { logger, error } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger });
+
+    await api.start();
+
+    const { status } = await healthOf(api);
+    expect(status).toBe(503);
+    // Byte-identical to future-pay's runtime.ts — a host greps for this line.
+    expect(loggedText(error)).toContain(
+      "JOBS_DRIVER=bullmq needs REDIS_URL; jobs are disabled.",
+    );
   });
 
   it("resolves bullmq from a configured Redis URL in a producer", async () => {
