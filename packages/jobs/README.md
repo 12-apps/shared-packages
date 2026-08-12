@@ -1,9 +1,12 @@
 # @12-apps/jobs
 
 Typed background jobs — retries, exponential backoff and cron — behind a
-swappable driver. BullMQ/Redis in production, inline execution in tests.
+swappable driver. BullMQ/Redis in production, inline execution in tests and
+zero-config development.
 
-Framework-free: no Prisma, no Next, no host-app types. The logger is a port.
+Framework-free: no Prisma import, no Next, no host-app types. The logger is a
+port, the lease's database is a structural seam, and the one web framework in
+sight (`hono`) is an optional peer behind its own subpath.
 
 ```ts
 // where the domain lives — the import IS the registration
@@ -24,11 +27,29 @@ defineJob({
 // at an emit site
 await dispatchNotification.enqueue({ notificationId }, { dedupeKey: notificationId });
 
-// at process start
-import { createBullMqJobDriver } from "@12-apps/jobs/bullmq";  // not the barrel
-configureJobs({ driver: createBullMqJobDriver({ redisUrl, logger }), logger });
-await startJobWorkers();   // consumers only
+// at process start — ONE call wires driver, workers, drain, lease and health
+import { createApiJobs } from "@12-apps/jobs/server";
+import { jobsRouter } from "@12-apps/jobs/hono";
+
+const jobsApi = createApiJobs({
+  jobs: () => import("./lib/jobs"),   // the defineJob modules
+  db: () => getPrismaClient(),        // the sweep_leases table (optional)
+});
+await jobsApi.start();
+app.route("/api/internal/jobs", jobsRouter(jobsApi));
 ```
+
+With no `REDIS_URL` and no config, `start()` resolves the INLINE driver
+outside production: handlers run in-process, schedules do not fire (and say
+so), and the app starts green with no Redis container. Production with no
+Redis resolves to NO driver plus a loud error and a 503 from `/health` —
+never a crash, never a silent fake. `JOBS_WORKER=1` is what turns a process
+from producer (enqueue only) into consumer (workers + schedules); the worker
+is the same image, not a second build.
+
+The full adoption contract — config seam, env variables, the sweep lease, the
+Prisma partial and why there is no `createWebJobs` — is in
+[ADOPTING.md](./ADOPTING.md).
 
 ## The two rules
 
@@ -55,6 +76,36 @@ constraints, not on the queue.
 
 The BullMQ driver is exported from `@12-apps/jobs/bullmq`, never the barrel, so
 importing `defineJob` at an emit site does not drag Redis into the bundle.
+`createApiJobs` keeps the same property: it imports the BullMQ driver lazily,
+only in a process whose resolution actually picked it.
 
 Redis must run with `maxmemory-policy noeviction` — the driver checks and
-complains. See [docs/JOBS.md](../../docs/JOBS.md) for the deployment side.
+complains.
+
+## The sweep lease
+
+Scheduled sweeps declare `queue: SWEEP_QUEUE, concurrency: 1`, which makes
+them single-flight within one worker. Across replicas that guarantee needs a
+named, time-bounded claim in the DATABASE — `createSweepLease` (or the bound
+`withSweepLease` on the `createApiJobs` return):
+
+```ts
+defineJob({
+  name: "billing.tick",
+  queue: SWEEP_QUEUE,
+  concurrency: 1,
+  schedule: { pattern: "0 * * * *" },
+  handle: async () => {
+    const { ran, result } = await jobsApi.withSweepLease("billing.tick", 10 * 60_000, () =>
+      runBillingTick(),
+    );
+    if (!ran) return; // another worker holds this tick
+  },
+});
+```
+
+The claim is a conditional UPDATE — the database picks the winner — and only
+a lost race is silent; a missing table or a dead store THROWS, so a stopped
+sweep has a failed job to point at it. The `SweepLease` table ships with this
+package (`prisma/jobs.prisma` + `prisma/migrations/`) and is synced into the
+host's schema; partials and migrations are COPIED, never symlinked.

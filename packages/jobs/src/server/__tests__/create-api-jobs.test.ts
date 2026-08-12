@@ -1,0 +1,346 @@
+import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
+
+import { clearJobs, defineJob } from "../../core/registry";
+import { resetJobRuntime } from "../../core/runtime";
+import type { JobDriver, JobLogger } from "../../core/types";
+import { createInlineJobDriver } from "../../drivers/inline";
+import type { SweepLeaseDb } from "../../lease/sweep-lease";
+import { createApiJobs } from "../create-api-jobs";
+
+/**
+ * The factory over the process-wide runtime: driver RESOLUTION (the zero-config
+ * inline default, the production refusals), the worker switch, and the health
+ * endpoint that reports whichever of those happened.
+ *
+ * The runtime and registry are module-level singletons — that is the design,
+ * one driver per process — so every test resets both, and env expectations go
+ * through `vi.stubEnv` rather than assignment.
+ */
+
+afterEach(() => {
+  resetJobRuntime();
+  clearJobs();
+  vi.unstubAllEnvs();
+});
+
+/** A logger that records instead of printing — fresh mocks per test. */
+function makeLogger(): { logger: JobLogger; info: Mock; error: Mock } {
+  const info = vi.fn();
+  const error = vi.fn();
+  return { info, error, logger: { info, warn: vi.fn(), error } };
+}
+
+/** Everything a mock logger method was told, as one searchable string. */
+function loggedText(mock: Mock): string {
+  return mock.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+}
+
+/** No REDIS_URL, non-production — the zero-config developer environment. */
+function stubBareEnv(): void {
+  vi.stubEnv("REDIS_URL", "");
+  vi.stubEnv("JOBS_DRIVER", "");
+  vi.stubEnv("JOBS_WORKER", "");
+  vi.stubEnv("NODE_ENV", "development");
+}
+
+async function healthOf(api: { routes: { path: string; handle(): Promise<{ status: number; body: unknown }> }[] }) {
+  const route = api.routes.find((candidate) => candidate.path === "/health");
+  if (!route) throw new Error("no /health route");
+  const response = await route.handle();
+  return { status: response.status, body: response.body as { status: string; checks: Record<string, unknown> } };
+}
+
+describe("createApiJobs — driver resolution", () => {
+  it("defaults to the inline driver with no Redis and no config (zero-config dev)", async () => {
+    stubBareEnv();
+    const { logger, info } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger });
+
+    await api.start();
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(200);
+    expect(body.checks.driver).toBe("inline");
+    expect(loggedText(info)).toContain("inline job driver");
+  });
+
+  it("runs an enqueued handler in-process under the zero-config default", async () => {
+    stubBareEnv();
+    const { logger } = makeLogger();
+    // The resolved inline driver is detached (a dev server must not run work
+    // inside the request that enqueued it), so the proof is a promise the
+    // handler itself resolves.
+    const gate: { open?: (value: string) => void } = {};
+    const handled = new Promise<string>((resolve) => {
+      gate.open = resolve;
+    });
+    const job = defineJob<{ id: string }>({
+      name: "test.echo",
+      handle: async ({ id }) => {
+        gate.open?.(id);
+      },
+    });
+    const api = createApiJobs({ jobs: [job], logger });
+    await api.start();
+
+    const result = await job.enqueue({ id: "abc" });
+
+    expect(result.enqueued).toBe(true);
+    await expect(handled).resolves.toBe("abc");
+  });
+
+  it("disables jobs in production when nothing is configured, and says so", async () => {
+    stubBareEnv();
+    const { logger, error } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger, production: true });
+
+    await api.start();
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(body.checks.driver).toBeNull();
+    expect(loggedText(error)).toContain("Set REDIS_URL");
+  });
+
+  it("refuses the inline driver in production", async () => {
+    stubBareEnv();
+    const { logger, error } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger, production: true, driver: "inline" });
+
+    await api.start();
+
+    const { status } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(loggedText(error)).toContain("refused in production");
+  });
+
+  it("treats an unrecognised JOBS_DRIVER as off, loudly", async () => {
+    stubBareEnv();
+    vi.stubEnv("JOBS_DRIVER", "rabbitmq");
+    const { logger, error } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger });
+
+    await api.start();
+
+    const { status } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(loggedText(error)).toContain('JOBS_DRIVER="rabbitmq"');
+  });
+
+  it("needs a Redis URL for an explicit bullmq choice", async () => {
+    stubBareEnv();
+    const { logger, error } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger, driver: "bullmq" });
+
+    await api.start();
+
+    const { status } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(loggedText(error)).toContain("needs REDIS_URL");
+  });
+
+  it("resolves bullmq from a configured Redis URL in a producer", async () => {
+    // A producer never opens a connection (queues are created per enqueue),
+    // so resolution is safe to pin without a Redis behind it.
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const api = createApiJobs({
+      jobs: [],
+      logger,
+      redisUrl: "redis://localhost:6379",
+    });
+
+    await api.start();
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(200);
+    expect(body.checks.driver).toBe("bullmq");
+    expect(body.checks.worker).toBe(false);
+    expect(body.checks.consuming).toBe(false);
+  });
+
+  it("uses a driver instance as-is", async () => {
+    stubBareEnv();
+    const driver: JobDriver = {
+      kind: "custom",
+      enqueue: async () => ({ enqueued: true }),
+      start: async () => undefined,
+      stop: async () => undefined,
+    };
+    const api = createApiJobs({ jobs: [], driver, logger: makeLogger().logger });
+
+    await api.start();
+
+    const { body } = await healthOf(api);
+    expect(body.checks.driver).toBe("custom");
+  });
+});
+
+describe("createApiJobs — worker mode and lifecycle", () => {
+  it("consumes and installs schedules only when worker is set", async () => {
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const started: string[][] = [];
+    const driver: JobDriver = {
+      kind: "recording",
+      enqueue: async () => ({ enqueued: true }),
+      start: async (definitions) => {
+        started.push(definitions.map((definition) => definition.name));
+      },
+      stop: async () => undefined,
+    };
+    defineJob({ name: "test.sweep", handle: async () => undefined });
+
+    const api = createApiJobs({
+      jobs: [],
+      driver,
+      logger,
+      worker: true,
+      installShutdownHooks: false,
+    });
+    await api.start();
+
+    expect(started).toEqual([["test.sweep"]]);
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(200);
+    expect(body.checks.consuming).toBe(true);
+  });
+
+  it("registers jobs through an import thunk before consuming", async () => {
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const started: number[] = [];
+    const driver: JobDriver = {
+      kind: "recording",
+      enqueue: async () => ({ enqueued: true }),
+      start: async (definitions) => {
+        started.push(definitions.length);
+      },
+      stop: async () => undefined,
+    };
+    const api = createApiJobs({
+      jobs: () => {
+        defineJob({ name: "test.late", handle: async () => undefined });
+      },
+      driver,
+      logger,
+      worker: true,
+      installShutdownHooks: false,
+    });
+
+    await api.start();
+
+    expect(started).toEqual([1]);
+  });
+
+  it("reports degraded until start() runs, then ok, then degraded after stop()", async () => {
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const api = createApiJobs({
+      jobs: [],
+      driver: createInlineJobDriver({ logger }),
+      logger,
+      worker: true,
+      installShutdownHooks: false,
+    });
+
+    expect((await healthOf(api)).status).toBe(503);
+
+    await api.start();
+    expect((await healthOf(api)).status).toBe(200);
+
+    await api.stop();
+    expect((await healthOf(api)).status).toBe(503);
+  });
+
+  it("is idempotent: a second start() does not double-consume", async () => {
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const starts: number[] = [];
+    const driver: JobDriver = {
+      kind: "recording",
+      enqueue: async () => ({ enqueued: true }),
+      start: async () => {
+        starts.push(1);
+      },
+      stop: async () => undefined,
+    };
+    const api = createApiJobs({
+      jobs: [],
+      driver,
+      logger,
+      worker: true,
+      installShutdownHooks: false,
+    });
+
+    await api.start();
+    await api.start();
+
+    expect(starts).toHaveLength(1);
+  });
+
+  it("reads the worker switch from JOBS_WORKER", async () => {
+    stubBareEnv();
+    vi.stubEnv("JOBS_WORKER", "1");
+    const { logger } = makeLogger();
+    const api = createApiJobs({
+      jobs: [],
+      driver: createInlineJobDriver({ logger }),
+      logger,
+      installShutdownHooks: false,
+    });
+
+    await api.start();
+
+    const { body } = await healthOf(api);
+    expect(body.checks.worker).toBe(true);
+    expect(body.checks.consuming).toBe(true);
+  });
+});
+
+describe("createApiJobs — the sweep lease seam", () => {
+  it("binds withSweepLease to the configured db", async () => {
+    stubBareEnv();
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const db = (): Promise<SweepLeaseDb> =>
+      Promise.resolve({ sweepLease: { updateMany, create: vi.fn() } });
+    const api = createApiJobs({ jobs: [], logger: makeLogger().logger, db });
+
+    const outcome = await api.withSweepLease("test.sweep", 60_000, async () => "ran");
+
+    expect(outcome).toEqual({ ran: true, result: "ran" });
+    expect(updateMany).toHaveBeenCalled();
+  });
+
+  it("throws — never silently skips — when no db was configured", async () => {
+    stubBareEnv();
+    const api = createApiJobs({ jobs: [], logger: makeLogger().logger });
+
+    // A sweep whose lease quietly no-ops is the unprotected overlap the lease
+    // exists to prevent; misconfiguration must surface as a failed job.
+    expect(() => api.withSweepLease("test.sweep", 60_000, async () => "x")).toThrow(
+      /db/,
+    );
+  });
+});
+
+describe("createApiJobs — health payload", () => {
+  it("counts registered jobs and schedules", async () => {
+    stubBareEnv();
+    defineJob({ name: "test.plain", handle: async () => undefined });
+    defineJob({
+      name: "test.cron",
+      schedule: { pattern: "0 * * * *" },
+      handle: async () => undefined,
+    });
+    const { logger } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger });
+
+    await api.start();
+
+    const { body } = await healthOf(api);
+    expect(body.checks.jobs).toBe(2);
+    expect(body.checks.schedules).toBe(1);
+  });
+});
