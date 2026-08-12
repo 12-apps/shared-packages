@@ -1,1 +1,69 @@
-../../../report-builder/prisma/report-builder.prisma
+// ─────────────────────────────────────────────────────────────────────────────
+// OWNED BY @12-apps/report-builder — the host's multi-file schema folder holds
+// only a SYMLINK to this file (created/verified by `pnpm --filter
+// @12-apps/report-builder prisma:sync`): the report persistence model lives here,
+// in the package, never in the application.
+//
+// Deliberately self-contained (the payments-backend doctrine): tenant scoping
+// is a `client_id` String column — NO foreign key into any host table — so the
+// model works in every repo without schema coupling. The host repository layer
+// is the tenant boundary: every read/write is `clientId`-scoped.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// A tenant-authored custom report (FUT-138): the report-builder JSON
+// `ReportSpec` persisted as DATA. Authored by the admin builder UI or by LLMs
+// over MCP; the stored JSON is untrusted input, re-validated against the host's
+// field catalog on EVERY write and EVERY run — it can only name allowlisted
+// catalog fields, never SQL. Name is unique per tenant (upsert-friendly for
+// MCP authoring). `createdBy` is the host's user id, kept as an opaque scalar.
+model SavedReport {
+  id          String   @id @default(uuid())
+  clientId    String   @map("client_id")
+  name        String
+  description String?
+  spec        Json
+  // Lifecycle (FUT-307): draft | published (String + DB CHECK, house style).
+  // A draft is visible/runnable only by its author and tenant admins; the API
+  // layer decides — this model stays host-agnostic data.
+  status      String   @default("draft")
+  // Sharing (FUT-307): tenant (everyone in the entity's permission tier) |
+  // roles (the ids in visibilityRoles, plus author + admins) | private
+  // (author + admins). String + DB CHECK.
+  visibility  String   @default("tenant")
+  // Opaque HOST role ids granted access when visibility = 'roles' (JSON array
+  // of strings). No FK by design (the payments doctrine): a stale id simply
+  // matches no actor. Bounded by the wire contract (≤20 ids).
+  visibilityRoles Json @default("[]") @map("visibility_roles")
+  // The period the report OPENS on (FUT-755): today | 7d | 30d | month — the
+  // presets in `react/reports-api.ts` MINUS `custom`, which names explicit
+  // dates this column has nowhere to keep and would freeze the report on a
+  // window that ages badly. Nullable on purpose — NULL means "no preference",
+  // which the reader resolves to the pre-existing default of 30d, so every row
+  // that predates this column keeps behaving exactly as it did. String + DB
+  // CHECK, house style.
+  defaultRange String? @map("default_range")
+  // Unpublished changes to a PUBLISHED report (FUT-755): the author's
+  // in-progress edit, stored BESIDE the live document rather than over it.
+  //
+  // Deliberately NOT `status: 'draft'`. That column says the report has never
+  // been published; flipping it while someone edits would unpublish a report
+  // its readers are reading right now. So the whole editable payload — name,
+  // description, spec, sharing, default range — is parked here as JSON, `spec`
+  // is left untouched, and readers keep getting the published document until
+  // the author publishes. NULL = no unpublished changes, which is every row
+  // that predates this column.
+  //
+  // A COLUMN, not a side table: one working copy per report is then a
+  // structural fact rather than a partial unique index a host has to remember
+  // to create, publish is a single row update that cannot half-apply, and
+  // discard is setting it back to NULL. Untrusted JSON like `spec` —
+  // re-validated against the field catalog on write and again on publish.
+  workingCopy Json?   @map("working_copy")
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([clientId, name])
+  @@index([clientId])
+  @@map("saved_reports")
+}
