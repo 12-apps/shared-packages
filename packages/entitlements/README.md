@@ -6,6 +6,17 @@ storage-free, **billing-free**. Zero runtime dependencies.
 For the step-by-step wiring guide see [`ADOPTING.md`](./ADOPTING.md); this file
 is the concepts + API reference.
 
+Beyond the framework-free core, the package ships the SURFACE as two factories
+(the plug-and-play contract): `createApiEntitlements(config)` under `./server`
+(framework-neutral route descriptors — snapshot, plan view + pricing cards,
+plan-change request — plus the guards, the usage-counter registry, the atomic
+quota guard, retention watermarks, the tenant-settings writer and the
+notification channel policy), a `./hono` adapter that mounts them, and
+`createWebEntitlements(config)` under `./react` (the plan screen, the
+`withEntitlement` page gate and the upgrade prompt host). The prisma partial
+for `RetentionWatermark` and the `entitlements-coverage` gate script ship with
+the package. See ADOPTING.md §10.
+
 ---
 
 ## The problem it solves

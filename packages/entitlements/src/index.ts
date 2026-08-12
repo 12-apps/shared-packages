@@ -67,6 +67,13 @@ export type {
 } from './core/types';
 
 export {
+  asRecord,
+  toEntitlementMap,
+  toSettingsMap,
+  type JsonColumn,
+} from './coerce';
+
+export {
   createMemoryCache,
   createMemorySource,
   createMemoryUsage,

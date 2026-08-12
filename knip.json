@@ -86,6 +86,7 @@
         "// build context — see packages/prisma/package.test.ts. The edge is a",
         "// file COPY (or a symlink) made by scripts/sync-*-schema.mjs, never an",
         "// import, so knip cannot see it.",
+        "@12-apps/entitlements",
         "@12-apps/entity-lifecycle",
         "@12-apps/jobs",
         "@12-apps/payments-backend",
@@ -123,6 +124,19 @@
         "src/index.ts",
         "src/react/*.{ts,tsx}",
         "src/vite/*.ts"
+      ]
+    },
+    "packages/entitlements": {
+      "entry": [
+        "src/index.ts",
+        "// The published subpaths (server surface, hono adapter, react",
+        "// bindings), plus the packaged coverage-gate script a HOST runs",
+        "// with `node .../scripts/entitlements-coverage.mjs` — reached by",
+        "// no import in this repo.",
+        "src/server/index.ts",
+        "src/react/index.ts",
+        "src/hono/index.ts",
+        "scripts/*.mjs"
       ]
     },
     "packages/report-builder": {

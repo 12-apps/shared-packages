@@ -9,6 +9,8 @@
  * Three surfaces, and the split between them is the point:
  *
  *  - `/api/admin/:tenantSlug/reports/**` is the PACKAGE'S, mounted whole;
+ *  - `/api/admin/:tenantSlug/{entitlements,plan,plan/request}` is
+ *    @12-apps/entitlements', mounted whole the same way (entitlements-host.ts);
  *  - `/api/admin/:tenantSlug/roles` is the HOST'S — the reports surface reads
  *    it for the "Cargos específicos" allowlist picker and it is not a reports
  *    endpoint, which is why the transport has a `getRaw` at all;
@@ -17,6 +19,9 @@
 import { Hono } from 'hono';
 import type { PGlite } from '@electric-sql/pglite';
 
+import { entitlementDenialResponse, isEntitlementDenial } from '@12-apps/entitlements/server';
+
+import { createEntitlementsHost, TENANT } from './entitlements-host';
 import { reportsRouter } from './reports-host';
 import { openReportsDb, reseed, savedReportDb } from './saved-report-db';
 
@@ -38,6 +43,7 @@ export interface HarnessBackend {
 
 export async function createHarnessBackend(): Promise<HarnessBackend> {
   const pg: PGlite = await openReportsDb();
+  const entitlements = createEntitlementsHost();
   const app = new Hono();
 
   // Liveness, and what Playwright's `webServer` waits on before starting the
@@ -58,10 +64,30 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
    */
   app.post('/__harness/reset', async (c) => {
     await reseed(pg);
+    entitlements.reset();
     return c.body(null, 204);
   });
 
   app.get('/api/admin/:tenantSlug/roles', (c) => c.json(ROLES_PAGE));
+
+  /**
+   * A HOST endpoint standing behind the package's guard — the arrangement
+   * every gated host route has. What it proves is the denial WIRE: the free
+   * tenant answers 402 here with the body the react half's 402 interceptor
+   * parses into an upsell prompt.
+   */
+  app.get('/api/admin/:tenantSlug/audit-demo', async (c) => {
+    try {
+      await entitlements.requireEntitlement(TENANT, 'audit');
+      return c.json({ entries: [] });
+    } catch (error) {
+      if (!isEntitlementDenial(error)) throw error;
+      const denial = entitlementDenialResponse(error);
+      return c.json(denial.body, denial.status as 402);
+    }
+  });
+
+  app.route('/api/admin/:tenantSlug', entitlements.router);
   app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
 
   return { app, close: () => pg.close() };
