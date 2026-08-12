@@ -24,6 +24,17 @@
  * The BullMQ driver is deliberately NOT re-exported here — it is imported
  * from `@12-apps/jobs/bullmq`, so that pulling in `defineJob` at an emit site
  * never drags Redis into a bundle that only ever enqueues.
+ *
+ * The OPERATIONAL half — driver resolution with the inline zero-config
+ * default, the worker switch, graceful drain and the health endpoint — is
+ * `createApiJobs` in `@12-apps/jobs/server` (mount it with
+ * `@12-apps/jobs/hono` or your own adapter). What this root adds to it:
+ *
+ *   - `SWEEP_QUEUE` — the single-flight queue the scheduled sweeps share.
+ *   - `createSweepLease` — the named, time-bounded claim that keeps a sweep
+ *     to ONE pass per tick across a multi-worker deployment. Its `SweepLease`
+ *     table ships in `prisma/jobs.prisma` with its migration; the host syncs
+ *     both (see ADOPTING.md).
  */
 
 export { defineJob, findJob, listJobs, clearJobs, DuplicateJobError } from "./core/registry";
@@ -58,3 +69,16 @@ export type { InlineJobDriver, InlineJobRun } from "./drivers/inline";
 
 export { parseRedisUrl, InvalidRedisUrlError } from "./drivers/redis-url";
 export type { RedisConnectionOptions } from "./drivers/redis-url";
+
+export { SWEEP_QUEUE } from "./core/queues";
+
+export { createSweepLease } from "./lease/sweep-lease";
+export type {
+  SweepLease,
+  SweepLeaseConfig,
+  SweepLeaseDb,
+  SweepLeaseDbProvider,
+  SweepLeaseDelegate,
+  SweepLeaseOutcome,
+  WithSweepLease,
+} from "./lease/sweep-lease";
