@@ -2,11 +2,14 @@
   "name": "@12-apps/jobs",
   "version": "1.0.0",
   "type": "module",
-  "description": "Generic background-job library: a typed job registry with retries, exponential backoff and cron schedules, behind a swappable driver port (BullMQ/Redis in production, inline execution in tests). Framework-free; knows nothing about the host app's domain, ORM or transport.",
+  "description": "Generic background-job library: a typed job registry with retries, exponential backoff and cron schedules, behind a swappable driver port (BullMQ/Redis in production, inline execution in tests and zero-config dev). The runtime half (./server) is one factory — createApiJobs: driver resolution, worker bootstrap, graceful drain, the single-writer sweep lease and a health endpoint — with a Hono adapter (./hono) and the package-owned SweepLease Prisma partial + migrations. Knows nothing about the host app's domain, ORM or transport.",
   "exports": {
     ".": "./src/index.ts",
+    "./server": "./src/server/index.ts",
+    "./hono": "./src/hono/index.ts",
     "./bullmq": "./src/drivers/bullmq.ts",
-    "./inline": "./src/drivers/inline.ts"
+    "./inline": "./src/drivers/inline.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "clean": "rm -rf node_modules coverage",
@@ -24,6 +27,7 @@
     "@12-apps/typescript-config": "workspace:*",
     "eslint": "^9.39.1",
     "eslint-plugin-test-flakiness": "^1.4.0",
+    "hono": "^4.6.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   },
@@ -31,6 +35,14 @@
     "node": ">=22.0.0"
   },
   "license": "MIT",
+  "peerDependencies": {
+    "hono": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "hono": {
+      "optional": true
+    }
+  },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "access": "public"

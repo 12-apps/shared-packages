@@ -11,7 +11,7 @@ lives here is the machinery.
 | `@12-apps/entitlements` | Plan/feature entitlements: layered resolution (code/plan/status/tenant), numeric quotas, per-feature revoke policy, 402-vs-403 denials. |
 | `@12-apps/entity-lifecycle` | Diff-based version history with restore + retention, recycle-bin soft delete, per-item drafts and change approvals. |
 | `@12-apps/forms-core` | Framework-agnostic form primitives — field validators, the `Result` type, `createServerAction`. Zero dependencies. |
-| `@12-apps/jobs` | Typed background-job registry with retries, exponential backoff and cron schedules, behind a swappable driver port (BullMQ/Redis in production). |
+| `@12-apps/jobs` | Typed background-job registry with retries, exponential backoff and cron schedules, behind a swappable driver port (BullMQ/Redis in production, inline zero-config default). `createApiJobs` wires driver resolution, the worker switch, graceful drain, the single-writer sweep lease (package-owned `SweepLease` partial + migration) and a health endpoint in one call. |
 | `@12-apps/mcp` | App-agnostic MCP server core: one MCP tool per OpenAPI operation, each call proxied to the endpoint carrying the caller's bearer token. Holds zero authorization logic. |
 | `@12-apps/payments-backend` | Vendor-agnostic payments: normalized charge/refund/webhook model behind per-provider adapters. |
 | `@12-apps/payments-frontend` | Plug-and-play MUI components for the per-provider payment settings page. |
