@@ -196,7 +196,17 @@ function pageModuleSource(modulePath) {
   try {
     return read(at(join(config.pagesDir, modulePath, "index.tsx")));
   } catch {
-    return read(at(join(config.pagesDir, `${modulePath}.tsx`)));
+    try {
+      return read(at(join(config.pagesDir, `${modulePath}.tsx`)));
+    } catch {
+      // A routed module resolving to no file is a config problem (wrong
+      // pagesDir nesting, renamed page) — diagnose it, don't leak an ENOENT
+      // stack that hides which module was being resolved.
+      fail(
+        `routed module "${modulePath}" has no page file under "${config.pagesDir}" ` +
+          `(tried ${modulePath}/index.tsx and ${modulePath}.tsx).`,
+      );
+    }
   }
 }
 

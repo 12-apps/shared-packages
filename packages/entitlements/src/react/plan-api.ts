@@ -33,8 +33,11 @@ async function readJson<T>(response: Response): Promise<T> {
         : `Falha na requisição (${response.status}).`;
     throw new Error(message);
   }
-  const envelope = (await response.json()) as { data: T };
-  return envelope.data;
+  const envelope = (await response.json()) as { data: T } | null;
+  // A 200 whose body is not the `{ data }` envelope (a host that reshaped the
+  // mount) must land in the page's error state, not as a TypeError deep in a
+  // component — the screen guards on `null`, so normalize to it.
+  return (envelope?.data ?? null) as T;
 }
 
 export function createPlanApi(apiBase: string, fetchImpl: typeof fetch): PlanApi {
