@@ -1,4 +1,4 @@
-import { Box, TextField } from '@mui/material';
+import { Box } from '@mui/material';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
@@ -36,7 +36,6 @@ const Storefront = ({
             Entrar
           </Button>
         }
-        below={<TextField fullWidth size="small" placeholder="Buscar entre 123 produtos" />}
       >
         <AppHeaderIdentity
           title="Future Drink"
@@ -82,22 +81,33 @@ export const BasicInteraction: Story = {
     // The panel is a portal, so it is queried from the document, not the canvas.
     const panel = within(document.body);
     await waitFor(() => expect(panel.getByText('Aberto até 22h')).toBeInTheDocument());
-    await expect(canvas.getByRole('button', { name: /Detalhes de/u })).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    );
+
+    // Assert on the node already held rather than re-querying it by role: an open
+    // MUI Modal marks the rest of the app `aria-hidden` to trap assistive tech
+    // inside the dialog, so while the panel is up the canvas has NO accessible
+    // roles at all and `getByRole` fails on a bar that is behaving correctly.
+    await waitFor(() => expect(disclosure).toHaveAttribute('aria-expanded', 'true'));
   },
 };
 
-export const FormInteraction: Story = {
-  render: () => <Storefront presentation="dialog" />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
+/** Cleared at the top of the play run, so a replay cannot inherit its calls. */
+const chooseStore = fn();
 
-    // The `below` slot carries the page's own controls and stays fully usable.
-    const search = canvas.getByPlaceholderText('Buscar entre 123 produtos');
-    await userEvent.type(search, 'energético');
-    await expect(search).toHaveValue('energético');
+export const FormInteraction: Story = {
+  render: () => <Storefront presentation="dialog" onAction={chooseStore} />,
+  play: async ({ canvasElement }) => {
+    chooseStore.mockClear();
+    const canvas = within(canvasElement);
+    const panel = within(document.body);
+
+    // The bar holds no fields of its own — it is a shell, and the page owns
+    // whatever it puts in `below`. Its one COMMITTING control is the disclosure
+    // panel's call to action, so that is the submit path worth driving here.
+    await userEvent.click(canvas.getByTestId('app-header-identity'));
+
+    const action = await waitFor(() => panel.getByRole('button', { name: 'Trocar de loja' }));
+    await userEvent.click(action);
+    await waitFor(() => expect(chooseStore).toHaveBeenCalled());
   },
 };
 
@@ -193,7 +203,10 @@ export const ResponsiveDesign: Story = {
  */
 export const IdentityYieldsToActions: Story = {
   render: () => (
-    <Box sx={{ width: 360 }}>
+    // `maxWidth` and not `width`: a hard 360 is wider than the narrowest phone
+    // this story exists to cover, so it overflowed the 320px viewport by 40px and
+    // put a horizontal scrollbar under a bar that fits perfectly well.
+    <Box sx={{ width: '100%', maxWidth: 360 }}>
       <AppHeader position="static" actions={<Button size="sm">Entrar</Button>}>
         <AppHeaderIdentity
           title="Mercado de Autoatendimento Venda Nova Belo Horizonte"
