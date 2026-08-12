@@ -168,6 +168,20 @@ jobs:
           STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
         run: |
           set -euo pipefail
+          # NO --depth here. A depth-limited fetch does not merely fetch less:
+          # on the complete checkout above it GRAFTS the repository shallow
+          # (git writes .git/shallow), and merge-base traversals across the
+          # graft point then fail outright. Measured on a scratch repo — full
+          # clone, merge-base resolves; after `fetch --depth=1`, is-shallow
+          # flips to true and merge-base dies. turbo answers that with
+          # "unable to detect git range, assuming all files have changed" and
+          # runs EVERY package while still reporting success, which is a full
+          # run wearing the word "affected".
+          #
+          # `--depth=50` only moved the cliff: a branch that diverged 51
+          # commits ago failed exactly the same way, silently. An unbounded
+          # fetch on an already-complete clone is cheap — the objects are
+          # almost entirely present — and cannot graft anything.
           if [ -n "$STACK_BASE_SHA" ]; then
             # Mid-stack, GITHUB_BASE_REF is the branch BELOW this PR, so
             # --affected would select only this layer's packages and skip
@@ -178,12 +192,21 @@ jobs:
             # that resolves to '' off a stack: turbo documents the variable but
             # not how it treats an empty value, and unset is the only behaviour
             # we can rely on.
-            git fetch --no-tags --depth=50 origin "$STACK_BASE_REF"
-            echo "TURBO_SCM_BASE=$STACK_BASE_SHA" >> "$GITHUB_ENV"
-            echo "Stacked PR — turbo --affected diffs against $STACK_BASE_REF ($STACK_BASE_SHA)"
+            git fetch --no-tags origin "$STACK_BASE_REF"
+            base="$STACK_BASE_SHA"
+            echo "Stacked PR — turbo --affected diffs against $STACK_BASE_REF ($base)"
           else
-            git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
+            git fetch --no-tags origin "$GITHUB_BASE_REF"
+            # Pin the base to the SHA just fetched. Left to itself turbo
+            # resolves GITHUB_BASE_REF by NAME, and a pull request checkout has
+            # no local branch of that name — the same "assume everything
+            # changed" full run, reached by a different route.
+            base=$(git rev-parse FETCH_HEAD)
           fi
+          {
+            echo "TURBO_SCM_BASE=$base"
+            echo "TURBO_SCM_HEAD=HEAD"
+          } >> "$GITHUB_ENV"
       - name: Lint
         shell: bash
         run: |
@@ -232,6 +255,20 @@ jobs:
           STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
         run: |
           set -euo pipefail
+          # NO --depth here. A depth-limited fetch does not merely fetch less:
+          # on the complete checkout above it GRAFTS the repository shallow
+          # (git writes .git/shallow), and merge-base traversals across the
+          # graft point then fail outright. Measured on a scratch repo — full
+          # clone, merge-base resolves; after `fetch --depth=1`, is-shallow
+          # flips to true and merge-base dies. turbo answers that with
+          # "unable to detect git range, assuming all files have changed" and
+          # runs EVERY package while still reporting success, which is a full
+          # run wearing the word "affected".
+          #
+          # `--depth=50` only moved the cliff: a branch that diverged 51
+          # commits ago failed exactly the same way, silently. An unbounded
+          # fetch on an already-complete clone is cheap — the objects are
+          # almost entirely present — and cannot graft anything.
           if [ -n "$STACK_BASE_SHA" ]; then
             # Mid-stack, GITHUB_BASE_REF is the branch BELOW this PR, so
             # --affected would select only this layer's packages and skip
@@ -242,12 +279,21 @@ jobs:
             # that resolves to '' off a stack: turbo documents the variable but
             # not how it treats an empty value, and unset is the only behaviour
             # we can rely on.
-            git fetch --no-tags --depth=50 origin "$STACK_BASE_REF"
-            echo "TURBO_SCM_BASE=$STACK_BASE_SHA" >> "$GITHUB_ENV"
-            echo "Stacked PR — turbo --affected diffs against $STACK_BASE_REF ($STACK_BASE_SHA)"
+            git fetch --no-tags origin "$STACK_BASE_REF"
+            base="$STACK_BASE_SHA"
+            echo "Stacked PR — turbo --affected diffs against $STACK_BASE_REF ($base)"
           else
-            git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
+            git fetch --no-tags origin "$GITHUB_BASE_REF"
+            # Pin the base to the SHA just fetched. Left to itself turbo
+            # resolves GITHUB_BASE_REF by NAME, and a pull request checkout has
+            # no local branch of that name — the same "assume everything
+            # changed" full run, reached by a different route.
+            base=$(git rev-parse FETCH_HEAD)
           fi
+          {
+            echo "TURBO_SCM_BASE=$base"
+            echo "TURBO_SCM_HEAD=HEAD"
+          } >> "$GITHUB_ENV"
       - name: Type check
         shell: bash
         run: |
@@ -296,6 +342,20 @@ jobs:
           STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
         run: |
           set -euo pipefail
+          # NO --depth here. A depth-limited fetch does not merely fetch less:
+          # on the complete checkout above it GRAFTS the repository shallow
+          # (git writes .git/shallow), and merge-base traversals across the
+          # graft point then fail outright. Measured on a scratch repo — full
+          # clone, merge-base resolves; after `fetch --depth=1`, is-shallow
+          # flips to true and merge-base dies. turbo answers that with
+          # "unable to detect git range, assuming all files have changed" and
+          # runs EVERY package while still reporting success, which is a full
+          # run wearing the word "affected".
+          #
+          # `--depth=50` only moved the cliff: a branch that diverged 51
+          # commits ago failed exactly the same way, silently. An unbounded
+          # fetch on an already-complete clone is cheap — the objects are
+          # almost entirely present — and cannot graft anything.
           if [ -n "$STACK_BASE_SHA" ]; then
             # Mid-stack, GITHUB_BASE_REF is the branch BELOW this PR, so
             # --affected would select only this layer's packages and skip
@@ -306,12 +366,21 @@ jobs:
             # that resolves to '' off a stack: turbo documents the variable but
             # not how it treats an empty value, and unset is the only behaviour
             # we can rely on.
-            git fetch --no-tags --depth=50 origin "$STACK_BASE_REF"
-            echo "TURBO_SCM_BASE=$STACK_BASE_SHA" >> "$GITHUB_ENV"
-            echo "Stacked PR — turbo --affected diffs against $STACK_BASE_REF ($STACK_BASE_SHA)"
+            git fetch --no-tags origin "$STACK_BASE_REF"
+            base="$STACK_BASE_SHA"
+            echo "Stacked PR — turbo --affected diffs against $STACK_BASE_REF ($base)"
           else
-            git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
+            git fetch --no-tags origin "$GITHUB_BASE_REF"
+            # Pin the base to the SHA just fetched. Left to itself turbo
+            # resolves GITHUB_BASE_REF by NAME, and a pull request checkout has
+            # no local branch of that name — the same "assume everything
+            # changed" full run, reached by a different route.
+            base=$(git rev-parse FETCH_HEAD)
           fi
+          {
+            echo "TURBO_SCM_BASE=$base"
+            echo "TURBO_SCM_HEAD=HEAD"
+          } >> "$GITHUB_ENV"
       - name: Build
         shell: bash
         run: |
@@ -360,6 +429,20 @@ jobs:
           STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
         run: |
           set -euo pipefail
+          # NO --depth here. A depth-limited fetch does not merely fetch less:
+          # on the complete checkout above it GRAFTS the repository shallow
+          # (git writes .git/shallow), and merge-base traversals across the
+          # graft point then fail outright. Measured on a scratch repo — full
+          # clone, merge-base resolves; after `fetch --depth=1`, is-shallow
+          # flips to true and merge-base dies. turbo answers that with
+          # "unable to detect git range, assuming all files have changed" and
+          # runs EVERY package while still reporting success, which is a full
+          # run wearing the word "affected".
+          #
+          # `--depth=50` only moved the cliff: a branch that diverged 51
+          # commits ago failed exactly the same way, silently. An unbounded
+          # fetch on an already-complete clone is cheap — the objects are
+          # almost entirely present — and cannot graft anything.
           if [ -n "$STACK_BASE_SHA" ]; then
             # Mid-stack, GITHUB_BASE_REF is the branch BELOW this PR, so
             # --affected would select only this layer's packages and skip
@@ -370,12 +453,21 @@ jobs:
             # that resolves to '' off a stack: turbo documents the variable but
             # not how it treats an empty value, and unset is the only behaviour
             # we can rely on.
-            git fetch --no-tags --depth=50 origin "$STACK_BASE_REF"
-            echo "TURBO_SCM_BASE=$STACK_BASE_SHA" >> "$GITHUB_ENV"
-            echo "Stacked PR — turbo --affected diffs against $STACK_BASE_REF ($STACK_BASE_SHA)"
+            git fetch --no-tags origin "$STACK_BASE_REF"
+            base="$STACK_BASE_SHA"
+            echo "Stacked PR — turbo --affected diffs against $STACK_BASE_REF ($base)"
           else
-            git fetch --no-tags --depth=50 origin "$GITHUB_BASE_REF"
+            git fetch --no-tags origin "$GITHUB_BASE_REF"
+            # Pin the base to the SHA just fetched. Left to itself turbo
+            # resolves GITHUB_BASE_REF by NAME, and a pull request checkout has
+            # no local branch of that name — the same "assume everything
+            # changed" full run, reached by a different route.
+            base=$(git rev-parse FETCH_HEAD)
           fi
+          {
+            echo "TURBO_SCM_BASE=$base"
+            echo "TURBO_SCM_HEAD=HEAD"
+          } >> "$GITHUB_ENV"
       - name: Run unit tests
         shell: bash
         run: |
