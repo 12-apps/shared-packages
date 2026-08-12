@@ -33,7 +33,6 @@ env:
     packages/typescript-config
     packages/observability-backend
     packages/auth
-    packages/entitlements
     packages/entity-lifecycle
     packages/forms-core
     packages/jobs
@@ -46,6 +45,7 @@ env:
     packages/payments/frontend
     packages/payments/e2e
     packages/ui
+    packages/entitlements
     packages/pwa
     packages/observability-frontend
     packages/onboarding

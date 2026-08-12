@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 
+import { EntitlementsPlanPage } from './entitlements-plan';
 import { PaymentsCheckoutApplePayPage } from './payments-checkout-apple-pay';
 import { PaymentsCheckoutBothPage } from './payments-checkout-both';
 import { PaymentsCheckoutBuyerFieldsPage } from './payments-checkout-buyer-fields';
@@ -281,5 +282,12 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/report-builder',
     group: 'backoffice',
     Component: ReportBuilderPage,
+  },
+  {
+    slug: 'entitlements-plan',
+    title: 'Plan & entitlements',
+    pkg: '@12-apps/entitlements',
+    group: 'backoffice',
+    Component: EntitlementsPlanPage,
   },
 ];
