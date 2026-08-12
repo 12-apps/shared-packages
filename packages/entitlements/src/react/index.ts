@@ -27,3 +27,31 @@ export type {
   LifecycleStatus,
   RevokePolicy,
 } from '../core/types';
+
+export {
+  createWebEntitlements,
+  type WebEntitlements,
+} from './create-web-entitlements';
+export { withEntitlement } from './with-entitlement';
+export {
+  raiseUpsell,
+  subscribeToUpsell,
+  upsellPromptFromPaymentRequired,
+  type UpsellPrompt,
+  type UpsellReason,
+} from './upsell-channel';
+export type {
+  EntitlementsLinkProps,
+  TenantSwitchLocation,
+  WebEntitlementsConfig,
+} from './web-config';
+export type {
+  ComparisonLine,
+  ComparisonSection,
+  ComparisonTier,
+  OpenPlanRequest,
+  TenantFeatureReason,
+  TenantFeatureView,
+  TenantPlanPayload,
+  TenantPlanView,
+} from '../plan-wire';

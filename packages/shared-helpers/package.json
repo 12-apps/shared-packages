@@ -63,6 +63,7 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@12-apps/entitlements": "workspace:*",
     "@12-apps/entity-lifecycle": "workspace:*",
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/payments-backend": "workspace:*",

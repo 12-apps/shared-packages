@@ -21,6 +21,7 @@ import { PaymentsProviderChainPage } from './payments-provider-chain';
 import { PaymentsProviderConnectPage } from './payments-provider-connect';
 import { PaymentsProviderCredentialsPage } from './payments-provider-credentials';
 import { PaymentsProviderSettingsPage } from './payments-provider-settings';
+import { EntitlementsPlanPage } from './entitlements-plan';
 import { PwaInstallPromptPage } from './pwa-install-prompt';
 import { ReportBuilderPage } from './report-builder';
 
@@ -281,5 +282,12 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/report-builder',
     group: 'backoffice',
     Component: ReportBuilderPage,
+  },
+  {
+    slug: 'entitlements-plan',
+    title: 'Plan & entitlements',
+    pkg: '@12-apps/entitlements',
+    group: 'backoffice',
+    Component: EntitlementsPlanPage,
   },
 ];

@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
 const FORBIDDEN = ['core/engine', 'core/plans', 'core/registry', 'memory'];
 
 /** Modules the React entry is allowed to reach. */
-const ALLOWED = ['core/types', 'core/quota'];
+const ALLOWED = ['core/types', 'core/quota', 'plan-wire'];
 
 /** The `?raw` glob helper Vite injects; declared locally to avoid `any`. */
 interface RawGlob {
@@ -87,7 +87,11 @@ describe('react entry does not reach host wiring', () => {
     }
   });
 
-  it('exposes no engine/adapter factories at runtime', async () => {
+  // 20s, not the 5s default: the entry now carries the createWebEntitlements
+  // surface, whose @12-apps/ui imports make this dynamic import legitimately
+  // slow when the whole repo's suites run in parallel — the assertion itself
+  // is instant once the graph loads.
+  it('exposes no engine/adapter factories at runtime', { timeout: 20_000 }, async () => {
     const entry: Record<string, unknown> = await import('../index');
     for (const banned of [
       'createEntitlements',
