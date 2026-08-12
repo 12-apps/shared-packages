@@ -91,7 +91,7 @@ internal probes live, e.g. `/api/internal/jobs`):
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/health` | 200 `{ status: "ok", checks }` when the runtime is in its intended state; 503 `{ status: "degraded", checks }` when jobs are disabled or a worker is not consuming. `checks` reports the resolved driver kind, producer/consumer role, and the registered job/schedule counts. |
+| GET | `/health` | 200 `{ status: "ok", checks }` when the runtime is in its intended state; 200 `{ status: "disabled", checks }` when jobs are off **by explicit choice** (`JOBS_DRIVER=off` / `driver: "off"` — a review box or CI must not fail a readiness aggregate forever); 503 `{ status: "degraded", checks }` for everything wrong rather than chosen — a misconfiguration, a `start()` that threw, a worker that stopped consuming. `checks` reports the resolved driver kind, producer/consumer role, consuming state, and the registered job/schedule counts. |
 
 ## The Prisma partial — copies, never symlinks
 
@@ -116,6 +116,13 @@ structural migration sync in `sync-prisma-plugins.mjs`):
   dropped from the build context.
 - Never edit the synced copy by hand; re-run the sync. The `--check` variant
   is the CI gate against drift.
+- **The migration's timestamp (`20260727190000`) may sort before migrations
+  your host has already applied.** That is deliberate: the directory is a
+  byte-identical copy of the one future-pay already has in production, so a
+  rename would make that host's sync try to create a second table. For every
+  other host the out-of-order arrival is safe — `prisma migrate dev` may
+  grumble, but the SQL is `CREATE TABLE IF NOT EXISTS`, so even a double
+  apply is inert.
 
 ## Porting to another repo
 

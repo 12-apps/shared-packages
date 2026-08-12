@@ -459,6 +459,43 @@ describe("createApiJobs — worker mode and lifecycle", () => {
     await expect(api.start()).resolves.toBeUndefined();
   });
 
+  it("does not stack drain hooks across stop()/start() cycles", async () => {
+    // Reviewer finding MINOR-9: hooks were installed per successful worker
+    // start, so a stop()/start() cycle left two process.once pairs and one
+    // real signal would have drained the driver twice.
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const driver: JobDriver = {
+      kind: "recording",
+      enqueue: async () => ({ enqueued: true }),
+      start: async () => undefined,
+      stop: async () => undefined,
+    };
+    const listenersBefore = {
+      SIGTERM: new Set(process.listeners("SIGTERM")),
+      SIGINT: new Set(process.listeners("SIGINT")),
+    };
+    const api = createApiJobs({ jobs: [], driver, logger, worker: true });
+    try {
+      await api.start();
+      await api.stop();
+      await api.start();
+
+      const added = process
+        .listeners("SIGTERM")
+        .filter((listener) => !listenersBefore.SIGTERM.has(listener));
+      expect(added).toHaveLength(1);
+    } finally {
+      for (const signal of ["SIGTERM", "SIGINT"] as const) {
+        for (const listener of process.listeners(signal)) {
+          if (!listenersBefore[signal].has(listener)) {
+            process.removeListener(signal, listener);
+          }
+        }
+      }
+    }
+  });
+
   it("stops reporting a drained worker as consuming when the signal hook fires", async () => {
     // Reviewer probe B: the SIGTERM hook drained the driver but never touched
     // the instance state, so /health kept advertising a stopped worker as a
@@ -536,6 +573,51 @@ describe("createApiJobs — the sweep lease seam", () => {
 });
 
 describe("createApiJobs — health payload", () => {
+  it('reports an explicit driver:"off" as disabled (200), not degraded forever', async () => {
+    // `off` is a first-class value of the matrix — a review box or CI that
+    // genuinely wants no queue. A permanent 503 would make any readiness
+    // aggregate that folds this endpoint in unable to ever go green.
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger, driver: "off" });
+
+    await api.start();
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(200);
+    expect(body.status).toBe("disabled");
+    expect(body.checks.driver).toBeNull();
+  });
+
+  it("reports an explicit JOBS_DRIVER=off as disabled too", async () => {
+    stubBareEnv();
+    vi.stubEnv("JOBS_DRIVER", "off");
+    const { logger } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger });
+
+    await api.start();
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(200);
+    expect(body.status).toBe("disabled");
+  });
+
+  it("keeps off-by-misconfiguration degraded — only a CHOICE reads as disabled", async () => {
+    // Production with nothing configured RESOLVES to off, but nobody chose
+    // it; that is the broken state the 503 exists for. (The explicit-off
+    // production case still logs future-pay's error line either way.)
+    stubBareEnv();
+    vi.stubEnv("JOBS_DRIVER", "rabbitmq");
+    const { logger } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger });
+
+    await api.start();
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(body.status).toBe("degraded");
+  });
+
   it("counts registered jobs and schedules", async () => {
     stubBareEnv();
     defineJob({ name: "test.plain", handle: async () => undefined });

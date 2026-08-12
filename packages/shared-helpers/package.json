@@ -66,8 +66,8 @@
   },
   "devDependencies": {
     "@12-apps/entity-lifecycle": "workspace:*",
-    "@12-apps/jobs": "workspace:*",
     "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/jobs": "workspace:*",
     "@12-apps/payments-backend": "workspace:*",
     "@12-apps/product-research": "workspace:*",
     "@12-apps/report-builder": "workspace:*",

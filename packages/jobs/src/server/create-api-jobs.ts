@@ -85,9 +85,18 @@ export interface JobsRoute {
   handle(): Promise<JobsResponse>;
 }
 
-/** The health payload `GET /health` answers with. */
+/**
+ * The health payload `GET /health` answers with.
+ *
+ * Three states, two status codes: `ok` (200) is a working runtime; `disabled`
+ * (200) is an EXPLICIT `off` — `JOBS_DRIVER=off` or
+ * `createApiJobs({ driver: "off" })`, a review box or CI that genuinely wants
+ * no queue, which must not fail a readiness aggregate forever; `degraded`
+ * (503) is everything that is wrong rather than chosen — a misconfiguration,
+ * a failed start, a drained worker.
+ */
 export interface JobsHealth {
-  status: "ok" | "degraded";
+  status: "ok" | "degraded" | "disabled";
   checks: {
     /**
      * `start()` has completed WITHOUT THROWING in this process. A start that
@@ -174,6 +183,14 @@ interface RuntimeState {
    */
   started: boolean;
   consuming: boolean;
+  /** Resolution chose "no driver" because it was TOLD to — see {@link JobsHealth}. */
+  deliberatelyOff: boolean;
+  /**
+   * The drain hooks have been installed — once per instance, ever. A
+   * stop()/start() cycle must not stack a second `process.once` pair, or one
+   * real signal would drain the driver twice.
+   */
+  hooksInstalled: boolean;
   /**
    * The env-resolved config, cached by `start()`. Null until then: the
    * factory deliberately reads no environment (see the module header), so a
@@ -183,18 +200,28 @@ interface RuntimeState {
   resolved: ResolvedConfig | null;
 }
 
+/** "disabled" is a choice, "ok" is a working runtime, "degraded" is a fault. */
+function statusOf(
+  state: RuntimeState,
+  driverKind: string | null,
+  worker: boolean,
+): JobsHealth["status"] {
+  if (state.started && state.deliberatelyOff) return "disabled";
+  const ready = state.started && driverKind !== null && (!worker || state.consuming);
+  return ready ? "ok" : "degraded";
+}
+
 function healthOf(config: JobsServerConfig, state: RuntimeState): JobsHealth {
   const definitions = listJobs();
-  const driver = getJobDriver();
+  const driver = getJobDriver()?.kind ?? null;
   const worker = state.resolved
     ? state.resolved.worker
     : (config.worker ?? isWorkerProcess());
-  const ready = state.started && driver !== null && (!worker || state.consuming);
   return {
-    status: ready ? "ok" : "degraded",
+    status: statusOf(state, driver, worker),
     checks: {
       configured: state.started,
-      driver: driver?.kind ?? null,
+      driver,
       worker,
       consuming: state.consuming,
       jobs: definitions.length,
@@ -237,7 +264,8 @@ async function startRuntime(
   state: RuntimeState,
 ): Promise<void> {
   const { logger, worker } = resolved;
-  const driver = await resolveDriver(config, resolved);
+  const { driver, deliberatelyOff } = await resolveDriver(config, resolved);
+  state.deliberatelyOff = deliberatelyOff;
   if (!driver) {
     // Fail closed, by design: "no driver" is a completed start (future-pay's
     // bootstrapJobs returned normally here too). Health still reports it —
@@ -262,7 +290,10 @@ async function startRuntime(
   await startJobWorkers();
   state.consuming = true;
 
-  if (config.installShutdownHooks ?? true) installDrainHooks(logger, state);
+  if ((config.installShutdownHooks ?? true) && !state.hooksInstalled) {
+    installDrainHooks(logger, state);
+    state.hooksInstalled = true;
+  }
   state.started = true;
 }
 
@@ -271,6 +302,8 @@ export function createApiJobs(config: JobsServerConfig): JobsApi {
     starting: false,
     started: false,
     consuming: false,
+    deliberatelyOff: false,
+    hooksInstalled: false,
     resolved: null,
   };
 
@@ -281,7 +314,9 @@ export function createApiJobs(config: JobsServerConfig): JobsApi {
         path: "/health",
         handle: async () => {
           const body = healthOf(config, state);
-          return { status: body.status === "ok" ? 200 : 503, body };
+          // Only "degraded" is a failure; "disabled" is a choice and must not
+          // fail a readiness aggregate forever.
+          return { status: body.status === "degraded" ? 503 : 200, body };
         },
       },
     ],

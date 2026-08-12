@@ -74,7 +74,7 @@ export interface JobsServerConfig {
 }
 
 /** Fallback logger — used until the host passes its own. */
-export const consoleLogger: JobLogger = {
+const consoleLogger: JobLogger = {
   info: (message, ...meta) => console.info(`[jobs] ${message}`, ...meta),
   warn: (message, ...meta) => console.warn(`[jobs] ${message}`, ...meta),
   error: (message, ...meta) => console.error(`[jobs] ${message}`, ...meta),

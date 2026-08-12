@@ -96,7 +96,7 @@ defineJob({
   concurrency: 1,
   schedule: { pattern: "0 * * * *" },
   handle: async () => {
-    const { ran, result } = await jobsApi.withSweepLease("billing.tick", 10 * 60_000, () =>
+    const { ran } = await jobsApi.withSweepLease("billing.tick", 10 * 60_000, () =>
       runBillingTick(),
     );
     if (!ran) return; // another worker holds this tick
