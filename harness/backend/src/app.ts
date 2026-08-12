@@ -8,27 +8,21 @@
  *
  * Three surfaces, and the split between them is the point:
  *
- *  - `/api/admin/:tenantSlug/reports/**` is the PACKAGE'S, mounted whole;
- *  - `/api/admin/:tenantSlug/roles` is the HOST'S — the reports surface reads
- *    it for the "Cargos específicos" allowlist picker and it is not a reports
- *    endpoint, which is why the transport has a `getRaw` at all;
+ *  - `/api/admin/:tenantSlug/reports/**` is @12-apps/report-builder's, mounted
+ *    whole;
+ *  - `/api/admin/:tenantSlug/{roles,permissions,team}/**` is @12-apps/rbac's
+ *    (12-13), mounted whole — including the `/roles` read the reports surface
+ *    consumes for its "Cargos específicos" allowlist picker, which used to be
+ *    a host stub answering an empty page and is now the real seeded catalog;
  *  - `/__harness/**` is the SUITE'S, and belongs to neither.
  */
 import { Hono } from 'hono';
 import type { PGlite } from '@electric-sql/pglite';
 
+import { applyRbacMigrations } from './rbac-db';
+import { rbacHost, reseedRbac } from './rbac-host';
 import { reportsRouter } from './reports-host';
 import { openReportsDb, reseed, savedReportDb } from './saved-report-db';
-
-/**
- * The roles picker's endpoint, which belongs to the host, not to the package.
- *
- * The harness tenant has no custom roles, so an empty page is a legitimate
- * answer — and it has to be the roles endpoint's OWN envelope
- * (`{ data, pagination }`), not the reports `{ data }` one, or the picker's
- * paging loop reads `hasNextPage` off `undefined` and never terminates.
- */
-const ROLES_PAGE = { data: [], pagination: { hasNextPage: false } };
 
 export interface HarnessBackend {
   app: Hono;
@@ -38,6 +32,14 @@ export interface HarnessBackend {
 
 export async function createHarnessBackend(): Promise<HarnessBackend> {
   const pg: PGlite = await openReportsDb();
+  // The RBAC tables arrive the way a host deploy applies them: the package's
+  // own migrations, read out of the installed tarball (12-13). This also
+  // retires the `/roles` stub that used to answer the reports "Cargos
+  // específicos" picker with an empty page — the picker now reads the REAL
+  // roles endpoint, seeded catalog and all.
+  await applyRbacMigrations(pg);
+  const rbac = rbacHost(pg);
+  await reseedRbac(pg, rbac);
   const app = new Hono();
 
   // Liveness, and what Playwright's `webServer` waits on before starting the
@@ -58,11 +60,12 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
    */
   app.post('/__harness/reset', async (c) => {
     await reseed(pg);
+    await reseedRbac(pg, rbac);
     return c.body(null, 204);
   });
 
-  app.get('/api/admin/:tenantSlug/roles', (c) => c.json(ROLES_PAGE));
   app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
+  app.route('/api/admin/:tenantSlug', rbac.router);
 
   return { app, close: () => pg.close() };
 }

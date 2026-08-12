@@ -76,6 +76,7 @@
         "@12-apps/entity-lifecycle",
         "@12-apps/payments-backend",
         "@12-apps/product-research",
+        "@12-apps/rbac",
         "@12-apps/report-builder",
         "@12-apps/shift",
         "@sentry/node"
