@@ -21,7 +21,7 @@ describe("@12-apps/ui package wiring (Task 5)", () => {
     const pkg = readPkg();
     // @12-apps/ui must stay self-contained: it uses the zero-dependency
     // @12-apps/forms-core for form validation and must NOT pull in the
-    // Prisma/AWS-laden @12-apps/shared-helpers.
+    // AWS-laden @12-apps/shared-helpers.
     expect(pkg.dependencies?.["@12-apps/forms-core"]).toBe("workspace:*");
     expect(pkg.dependencies?.["@12-apps/shared-helpers"]).toBeUndefined();
   });

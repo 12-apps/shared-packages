@@ -1,0 +1,96 @@
+{
+  "name": "@12-apps/prisma",
+  "version": "1.0.0",
+  "description": "Prisma host: the multi-file schema folder, the plugin migration seam, and the shared PrismaClient singleton with its audit / append-only extensions",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node scripts/sync-lifecycle-schema.mjs && node scripts/sync-research-schema.mjs && node scripts/sync-shift-schema.mjs --check && node scripts/sync-jobs-schema.mjs --check && node scripts/sync-prisma-plugins.mjs --check && prisma generate && tsc",
+    "clean": "rm -rf dist node_modules coverage",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint:files": "bash -c 'eslint \"${@:-.}\" --max-warnings 0' _",
+    "lint": "pnpm run lint:files .",
+    "lint:fix": "bash -c 'eslint \"${@:-.}\" --max-warnings 0 --fix' _",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "node scripts/sync-lifecycle-schema.mjs && node scripts/sync-research-schema.mjs && node scripts/sync-shift-schema.mjs --check && node scripts/sync-jobs-schema.mjs --check && node scripts/sync-prisma-plugins.mjs --check && prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:push": "prisma db push",
+    "prisma:studio": "prisma studio",
+    "prisma:sync-lifecycle": "node scripts/sync-lifecycle-schema.mjs",
+    "prisma:sync-research": "node scripts/sync-research-schema.mjs",
+    "prisma:sync-shift": "node scripts/sync-shift-schema.mjs",
+    "prisma:sync-shift:check": "node scripts/sync-shift-schema.mjs --check",
+    "prisma:sync-jobs": "node scripts/sync-jobs-schema.mjs",
+    "prisma:sync-jobs:check": "node scripts/sync-jobs-schema.mjs --check",
+    "prisma:sync-plugins": "node scripts/sync-prisma-plugins.mjs",
+    "prisma:sync-plugins:check": "node scripts/sync-prisma-plugins.mjs --check"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.2.17",
+    "@prisma/adapter-pg": "7.8.0",
+    "@prisma/client": "7.8.0",
+    "dotenv": "^16.4.7",
+    "pglite-prisma-adapter": "0.7.2"
+  },
+  "devDependencies": {
+    "@12-apps/entity-lifecycle": "workspace:*",
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/jobs": "workspace:*",
+    "@12-apps/payments-backend": "workspace:*",
+    "@12-apps/product-research": "workspace:*",
+    "@12-apps/report-builder": "workspace:*",
+    "@12-apps/shift": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@types/node": "^22.10.6",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "prisma": "7.8.0",
+    "typescript": "^5.8.2",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "prisma",
+    "migrations",
+    "postgres",
+    "pglite",
+    "typescript"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/prisma"
+  },
+  "files": [
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*"
+  ]
+}

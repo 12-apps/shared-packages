@@ -69,17 +69,29 @@
     "packages/shared-helpers": {
       "entry": [
         "src/index.{ts,tsx}",
+        "index.{ts,tsx}"
+      ],
+      "ignoreDependencies": [
+        "@sentry/node"
+      ]
+    },
+    "packages/prisma": {
+      "entry": [
+        "src/index.{ts,tsx}",
         "index.{ts,tsx}",
         "scripts/*.mjs"
       ],
       "ignoreDependencies": [
+        "// Declared so `turbo prune` keeps each partial's OWNING package in the",
+        "// build context — see packages/prisma/package.test.ts. The edge is a",
+        "// file COPY (or a symlink) made by scripts/sync-*-schema.mjs, never an",
+        "// import, so knip cannot see it.",
         "@12-apps/entity-lifecycle",
         "@12-apps/jobs",
         "@12-apps/payments-backend",
         "@12-apps/product-research",
         "@12-apps/report-builder",
-        "@12-apps/shift",
-        "@sentry/node"
+        "@12-apps/shift"
       ]
     },
     "packages/*": {
