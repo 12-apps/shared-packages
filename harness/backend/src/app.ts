@@ -6,7 +6,7 @@
  * test of a hand-rolled second app would prove nothing about the one that
  * serves the SPA.
  *
- * Four surfaces, and the split between them is the point:
+ * Seven surfaces, and the split between them is the point:
  *
  *  - `/api/admin/:tenantSlug/reports/**` is @12-apps/report-builder's, mounted
  *    whole;
@@ -16,7 +16,15 @@
  *    (12-13), mounted whole — including the `/roles` read the reports surface
  *    consumes for its "Cargos específicos" allowlist picker, which used to be
  *    a host stub answering an empty page and is now the real seeded catalog;
- *  - `/__harness/**` is the SUITE'S, and belongs to neither.
+ *  - `/api/admin/:tenantSlug/onboarding/:featureKey` is @12-apps/onboarding's
+ *    (12-23), the guided-progress surface its React half persists through;
+ *  - `/api/oauth/**` plus `/.well-known/**` is @12-apps/mcp's OAuth 2.1
+ *    authorization server (12-23), mounted at the ORIGIN ROOT because a
+ *    connector reads the two discovery documents from the origin;
+ *  - `/manifest.webmanifest` and `/sw.js` are @12-apps/pwa's (12-23), also at
+ *    the root — a worker's directory bounds its scope and the manifest is
+ *    linked from a static `index.html` that cannot know a prefix;
+ *  - `/__harness/**` is the SUITE'S, and belongs to none of them.
  */
 import { Hono } from 'hono';
 import type { PGlite } from '@electric-sql/pglite';
@@ -24,6 +32,10 @@ import type { PGlite } from '@electric-sql/pglite';
 import { entitlementDenialResponse, isEntitlementDenial } from '@12-apps/entitlements/server';
 
 import { createEntitlementsHost, TENANT } from './entitlements-host';
+import { mcpProbeRouter } from './harness-mcp-probe';
+import { applyMcpMigrations, mcpOauthHost, reseedMcpOauth } from './mcp-oauth-host';
+import { applyOnboardingMigrations, onboardingHost, reseedOnboarding } from './onboarding-host';
+import { pwaHost } from './pwa-host';
 import { applyRbacMigrations } from './rbac-db';
 import { rbacHost, reseedRbac } from './rbac-host';
 import { reportsRouter } from './reports-host';
@@ -45,6 +57,14 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   await applyRbacMigrations(pg);
   const rbac = rbacHost(pg);
   await reseedRbac(pg, rbac);
+  // Same arrangement for the three surfaces added in 12-23: each package's own
+  // migration, applied out of its own installed tarball. A host that had to hand-
+  // write this DDL would be a host the partial never reached.
+  await applyOnboardingMigrations(pg);
+  await applyMcpMigrations(pg);
+  const onboarding = onboardingHost(pg);
+  const mcpOauth = mcpOauthHost(pg);
+  const pwa = pwaHost();
   const entitlements = createEntitlementsHost();
   const app = new Hono();
 
@@ -67,9 +87,15 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.post('/__harness/reset', async (c) => {
     await reseed(pg);
     await reseedRbac(pg, rbac);
+    await reseedOnboarding(pg);
+    await reseedMcpOauth(pg);
     entitlements.reset();
     return c.body(null, 204);
   });
+
+  // The suite's own window onto what the authorization server wrote, and its
+  // one-endpoint resource server (harness-mcp-probe.ts). Hashes and flags only.
+  app.route('/', mcpProbeRouter(pg, mcpOauth));
 
   /**
    * A HOST endpoint standing behind the package's guard — the arrangement
@@ -91,6 +117,11 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.route('/api/admin/:tenantSlug', entitlements.router);
   app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
   app.route('/api/admin/:tenantSlug', rbac.router);
+  app.route('/api/admin/:tenantSlug', onboarding.router);
+  // The last two mount at the ROOT, and have to: `.well-known` documents and a
+  // service worker are read from the origin, never from under a prefix.
+  app.route('/', mcpOauth.router);
+  app.route('/', pwa.router);
 
   return { app, close: () => pg.close() };
 }
