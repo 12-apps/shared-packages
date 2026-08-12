@@ -297,6 +297,77 @@ describe("createApiJobs — worker mode and lifecycle", () => {
     expect(body.checks.worker).toBe(true);
     expect(body.checks.consuming).toBe(true);
   });
+
+  it("stays degraded when start() threw — a failed boot must not probe green", async () => {
+    // Reviewer probe A: the one case start() is documented to reject in (a
+    // duplicate job name) previously left `started` latched true and the
+    // health endpoint answering 200 over a runtime with no registered jobs.
+    stubBareEnv();
+    const { logger } = makeLogger();
+    defineJob({ name: "test.dup", handle: async () => undefined });
+    const api = createApiJobs({
+      jobs: () => {
+        defineJob({ name: "test.dup", handle: async () => undefined });
+      },
+      logger,
+    });
+
+    await expect(api.start()).rejects.toThrow(/already defined/);
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(body.checks.configured).toBe(false);
+    // And the latch holds: a retry is a no-op, exactly like future-pay's
+    // `bootstrapped` flag — never a silent second bootstrap.
+    await expect(api.start()).resolves.toBeUndefined();
+  });
+
+  it("stops reporting a drained worker as consuming when the signal hook fires", async () => {
+    // Reviewer probe B: the SIGTERM hook drained the driver but never touched
+    // the instance state, so /health kept advertising a stopped worker as a
+    // healthy consumer — the exact field a rolling deploy keys on.
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const stops: number[] = [];
+    const driver: JobDriver = {
+      kind: "recording",
+      enqueue: async () => ({ enqueued: true }),
+      start: async () => undefined,
+      stop: async () => {
+        stops.push(1);
+      },
+    };
+    const listenersBefore = {
+      SIGTERM: new Set(process.listeners("SIGTERM")),
+      SIGINT: new Set(process.listeners("SIGINT")),
+    };
+    const api = createApiJobs({ jobs: [], driver, logger, worker: true });
+    try {
+      await api.start();
+      const added = process
+        .listeners("SIGTERM")
+        .filter((listener) => !listenersBefore.SIGTERM.has(listener));
+      expect(added).toHaveLength(1);
+
+      // Deliver the signal to OUR hook only — emitting a real SIGTERM would
+      // also reach the test runner's own handlers.
+      (added[0] as () => void)();
+
+      const { status, body } = await healthOf(api);
+      expect(status).toBe(503);
+      expect(body.checks.consuming).toBe(false);
+      await vi.waitFor(() => expect(stops).toHaveLength(1));
+    } finally {
+      for (const signal of ["SIGTERM", "SIGINT"] as const) {
+        for (const listener of process.listeners(signal)) {
+          if (!listenersBefore[signal].has(listener)) {
+            process.removeListener(signal, listener);
+          }
+        }
+      }
+    }
+  });
 });
 
 describe("createApiJobs — the sweep lease seam", () => {
@@ -313,15 +384,18 @@ describe("createApiJobs — the sweep lease seam", () => {
     expect(updateMany).toHaveBeenCalled();
   });
 
-  it("throws — never silently skips — when no db was configured", async () => {
+  it("rejects — never silently skips — when no db was configured", async () => {
     stubBareEnv();
     const api = createApiJobs({ jobs: [], logger: makeLogger().logger });
 
     // A sweep whose lease quietly no-ops is the unprotected overlap the lease
-    // exists to prevent; misconfiguration must surface as a failed job.
-    expect(() => api.withSweepLease("test.sweep", 60_000, async () => "x")).toThrow(
-      /db/,
-    );
+    // exists to prevent; misconfiguration must surface as a failed job — and
+    // as a REJECTION, because the type promises a Promise: a synchronous
+    // throw would escape .catch(), Promise.all, and any caller that collects
+    // the promise before awaiting it.
+    await expect(
+      api.withSweepLease("test.sweep", 60_000, async () => "x"),
+    ).rejects.toThrow(/db/);
   });
 });
 

@@ -128,7 +128,12 @@ export interface JobsRoute {
 export interface JobsHealth {
   status: "ok" | "degraded";
   checks: {
-    /** `start()` has completed in this process. */
+    /**
+     * `start()` has completed WITHOUT THROWING in this process. A start that
+     * rejected (a duplicate job name, a failing registration import) leaves
+     * this false and the status degraded — a failed boot must never probe
+     * green.
+     */
     configured: boolean;
     /** The resolved driver's kind, or null when jobs are disabled. */
     driver: string | null;
@@ -271,7 +276,11 @@ async function registerJobs(jobs: JobsSource): Promise<void> {
 /** The lease bound to the configured db — or, without one, a loud refusal. */
 function bindSweepLease(db: SweepLeaseDbProvider | undefined): WithSweepLease {
   const lease = db ? createSweepLease({ db }) : null;
-  return (name, ttlMs, work) => {
+  // Async so the refusal is a REJECTION, which is what the type promises: a
+  // synchronous throw from a Promise-returning function escapes `.catch()`
+  // and `Promise.all`, and a caller that collected the promise before
+  // awaiting it would never see the error at all.
+  return async (name, ttlMs, work) => {
     if (!lease) {
       // Loud, not silent: a sweep whose lease quietly no-ops is exactly the
       // unprotected concurrent pass the lease exists to prevent. Same rule as
@@ -286,6 +295,17 @@ function bindSweepLease(db: SweepLeaseDbProvider | undefined): WithSweepLease {
 
 /** What one `start()`/`stop()` cycle has actually done in this process. */
 interface RuntimeState {
+  /**
+   * `start()` has been ENTERED — the idempotency latch, exactly future-pay's
+   * `bootstrapped` flag: a second call is a no-op, and a start that threw is
+   * not retried by calling it again.
+   */
+  starting: boolean;
+  /**
+   * `start()` has COMPLETED without throwing — the success flag health keys
+   * on. Kept separate from `starting` because a start that rejected must
+   * leave the probe red, not report the half-configured runtime as ok.
+   */
   started: boolean;
   consuming: boolean;
 }
@@ -311,16 +331,30 @@ function healthOf(state: RuntimeState, worker: boolean): JobsHealth {
  * Let in-flight jobs finish on a deploy. Deliberately does NOT call
  * process.exit — the host owns the shutdown, and cutting it short here would
  * kill the very requests we are draining for.
+ *
+ * The hook clears the instance state BEFORE the async drain: a drained worker
+ * is no longer consuming, and the readiness probe must stop saying it is the
+ * moment the drain begins — that flip is what tells a rolling deploy to stop
+ * routing to this process.
  */
-function installDrainHooks(logger: JobLogger): void {
+function installDrainHooks(logger: JobLogger, state: RuntimeState): void {
   for (const signal of ["SIGTERM", "SIGINT"] as const) {
     process.once(signal, () => {
+      state.consuming = false;
+      state.started = false;
       void stopJobs().catch((error) => logger.error("shutdown failed:", error));
     });
   }
 }
 
-/** The `start()` body: configure, register, and — in a worker — consume. */
+/**
+ * The `start()` body: configure, register, and — in a worker — consume.
+ *
+ * `state.started` is set LAST on every successful path, so a throw anywhere
+ * in here (a duplicate job name, a registration import that fails) leaves the
+ * health endpoint degraded rather than reporting the half-configured runtime
+ * as ok.
+ */
 async function startRuntime(
   config: JobsServerConfig,
   resolved: ResolvedConfig,
@@ -328,7 +362,13 @@ async function startRuntime(
 ): Promise<void> {
   const { logger, worker } = resolved;
   const driver = await resolveDriver(config, resolved);
-  if (!driver) return;
+  if (!driver) {
+    // Fail closed, by design: "no driver" is a completed start (future-pay's
+    // bootstrapJobs returned normally here too). Health still reports it —
+    // the driver check is null — so the probe sees what the log line said.
+    state.started = true;
+    return;
+  }
 
   configureJobs({ driver, logger });
 
@@ -339,13 +379,15 @@ async function startRuntime(
 
   if (!worker) {
     logger.info("producer mode: jobs will be enqueued, not consumed by this process.");
+    state.started = true;
     return;
   }
 
   await startJobWorkers();
   state.consuming = true;
 
-  if (config.installShutdownHooks ?? true) installDrainHooks(logger);
+  if (config.installShutdownHooks ?? true) installDrainHooks(logger, state);
+  state.started = true;
 }
 
 export function createApiJobs(config: JobsServerConfig): JobsApi {
@@ -356,7 +398,7 @@ export function createApiJobs(config: JobsServerConfig): JobsApi {
     queuePrefix: config.queuePrefix ?? process.env.JOBS_QUEUE_PREFIX,
     logger: config.logger ?? consoleLogger,
   };
-  const state: RuntimeState = { started: false, consuming: false };
+  const state: RuntimeState = { starting: false, started: false, consuming: false };
 
   return {
     routes: [
@@ -371,8 +413,12 @@ export function createApiJobs(config: JobsServerConfig): JobsApi {
     ],
 
     async start(): Promise<void> {
-      if (state.started) return;
-      state.started = true;
+      // The latch, not the success flag: a second call is a no-op, and a
+      // start that threw is not silently retried — future-pay's bootstrapJobs
+      // latched `bootstrapped` the same way. Success is `startRuntime`'s to
+      // declare, as its last statement.
+      if (state.starting) return;
+      state.starting = true;
       await startRuntime(config, resolved, state);
     },
 
@@ -380,6 +426,7 @@ export function createApiJobs(config: JobsServerConfig): JobsApi {
       await stopJobs();
       state.consuming = false;
       state.started = false;
+      state.starting = false;
     },
 
     withSweepLease: bindSweepLease(config.db),
