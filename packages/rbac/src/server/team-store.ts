@@ -296,7 +296,14 @@ export function createTeamStore<P extends string>(config: TeamStoreConfig<P>): T
     listTenantMemberExtraRoles: async (tenantId) => extraRolesOf(await ctx.db(), tenantId),
     getMemberRole: async (tenantId, userId) => {
       const row = await membershipOf(await ctx.db(), tenantId, userId);
-      return row?.role ?? null;
+      // The TIER reader: a soft-disabled membership grants NOTHING —
+      // "Desativar" is the reversible revocation, and the roster tier is
+      // exactly the kind of access it must revoke (future-pay's
+      // `membershipTier` refuses a disabled row the same way). The WRITE
+      // paths deliberately keep seeing the disabled row: `setMembershipActive`
+      // re-enables it and `removeTenantMemberGuarded` deletes it.
+      if (!row || !row.active) return null;
+      return row.role;
     },
     setMemberRole: (tenantId, userId, role) => setMemberRole(ctx, tenantId, userId, role),
     grantCustomRoleToMember: (tenantId, userId, roleName) =>

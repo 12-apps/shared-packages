@@ -35,11 +35,6 @@ export interface RbacActor {
    */
   isSuper: boolean;
   /**
-   * The base role the actor holds on this tenant, when the host already knows
-   * it. Optional: when absent the package reads the actor's own membership.
-   */
-  role?: string | null;
-  /**
    * An optional permission CEILING (e.g. an impersonation preview): the
    * resolved set is intersected with it, so a ceiling can only ever NARROW.
    */

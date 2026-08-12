@@ -1,6 +1,7 @@
-// The filesystem IS the subject here: the gate walks a route tree, and a
-// mocked fs would test a fixture of the walker instead of the walker.
-// Everything written lives in a fresh temp dir per test.
+/* eslint-disable test-flakiness/no-unmocked-fs -- the filesystem IS the
+   subject: the gate walks a route tree, and a mocked fs would test a fixture
+   of the walker instead of the walker. Everything written lives in a fresh
+   temp dir per test. */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

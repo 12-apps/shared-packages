@@ -402,6 +402,43 @@ describe('team routes', () => {
     expect(h.state.roleAssignments.some((row) => row.userId === 'chef-1')).toBe(false);
   });
 
+  it('a soft-disabled OWNER/ADMIN loses the roster tier entirely', async () => {
+    // BLOCKER-1 regression: "Desativar" is the reversible revocation, and the
+    // tier gates are exactly the access it must revoke. A disabled OWNER —
+    // whose permissions already resolve to nothing — must not keep the roster
+    // read, the invite port or the destructive member removal.
+    const h = await teamHost();
+    enrolMember(h.state, TENANT, 'owner-2', 'OWNER');
+    const disable = h.state.memberships.find((row) => row.userId === 'owner-2');
+    if (disable) disable.active = false;
+    const actor = memberActor(TENANT, 'owner-2');
+
+    const roster = await call(h, 'GET', '/team', { actor });
+    expect(roster.status).toBe(403);
+    const removed = await call(h, 'DELETE', '/team/:userId', {
+      actor,
+      params: { userId: 'chef-1' },
+    });
+    expect(removed.status).toBe(403);
+    const invited = await call(h, 'POST', '/team', {
+      actor,
+      body: { email: 'accomplice@example.com' },
+    });
+    expect(invited.status).toBe(403);
+    // The member they aimed at is untouched.
+    expect(h.state.memberships.some((row) => row.userId === 'chef-1')).toBe(true);
+  });
+
+  it('a soft-disabled member loses the staff tier (GET /permissions is 403)', async () => {
+    const h = await teamHost();
+    const disable = h.state.memberships.find((row) => row.userId === 'chef-1');
+    if (disable) disable.active = false;
+    const response = await call(h, 'GET', '/permissions', {
+      actor: memberActor(TENANT, 'chef-1'),
+    });
+    expect(response.status).toBe(403);
+  });
+
   it('a platform admin reaches the roster with no membership', async () => {
     const h = await teamHost();
     const response = await call(h, 'GET', '/team', { actor: superActor(TENANT) });

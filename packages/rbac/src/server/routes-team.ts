@@ -51,7 +51,11 @@ async function requireAdminTier<P extends string>(
   const adminRoles = new Set(deps.config.adminRoles ?? ['OWNER', 'ADMIN']);
   if (actor.isSuper) return 'SUPERADMIN';
   if (!actor.userId) throw new RbacApiError(403, messages.forbidden);
-  const role = actor.role ?? (await deps.team.getMemberRole(actor.tenantId, actor.userId));
+  // Always resolved from the membership row — never from the actor object.
+  // The store's tier reader refuses a soft-disabled membership, so a
+  // deactivated admin loses the roster (and its removals and invites) the
+  // moment the flag flips, exactly like their permissions.
+  const role = await deps.team.getMemberRole(actor.tenantId, actor.userId);
   if (!role || !adminRoles.has(role)) {
     throw new RbacApiError(403, messages.forbidden);
   }

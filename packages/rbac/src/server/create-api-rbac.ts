@@ -73,7 +73,9 @@ export function createApiRbac<P extends string>(config: RbacServerConfig<P>): Ap
   const requireStaffTier = async (actor: RbacActor): Promise<void> => {
     if (actor.isSuper) return;
     if (!actor.userId) throw new RbacApiError(403, messages.forbidden);
-    const role = actor.role ?? (await team.getMemberRole(actor.tenantId, actor.userId));
+    // Resolved from the membership row (the tier reader refuses a
+    // soft-disabled membership) — never from the actor object.
+    const role = await team.getMemberRole(actor.tenantId, actor.userId);
     if (!role || role === customerRole) {
       throw new RbacApiError(403, messages.forbidden);
     }

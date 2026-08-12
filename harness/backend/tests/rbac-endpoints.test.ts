@@ -226,6 +226,19 @@ describe('team — the roster over the directory seam', () => {
     expect(on.data.permissions.length).toBeGreaterThan(0);
   });
 
+  it('a soft-disabled ADMIN loses the roster tier (BLOCKER-1 regression)', async () => {
+    const owner = asUser('owner-1');
+    await owner.send('PATCH', '/team/admin-1/status', { active: false });
+    const roster = await asUser('admin-1').get('/team');
+    expect(roster.status).toBe(403);
+    const removed = await asUser('admin-1').send('DELETE', '/team/chef-1');
+    expect(removed.status).toBe(403);
+
+    await owner.send('PATCH', '/team/admin-1/status', { active: true });
+    const restored = await asUser('admin-1').get('/team');
+    expect(restored.status).toBe(200);
+  });
+
   it('context lists assignable roles (owner excluded) and invitesEnabled=false', async () => {
     const context = await json<{
       data: { assignableRoles: string[]; invitesEnabled: boolean };
