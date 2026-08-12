@@ -91,7 +91,7 @@ internal probes live, e.g. `/api/internal/jobs`):
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/health` | 200 `{ status: "ok", checks }` when the runtime is in its intended state; 200 `{ status: "disabled", checks }` when jobs are off **by explicit choice** (`JOBS_DRIVER=off` / `driver: "off"` — a review box or CI must not fail a readiness aggregate forever); 503 `{ status: "degraded", checks }` for everything wrong rather than chosen — a misconfiguration, a `start()` that threw, a worker that stopped consuming. `checks` reports the resolved driver kind, producer/consumer role, consuming state, and the registered job/schedule counts. |
+| GET | `/health` | 200 `{ status: "ok", checks }` when the runtime is in its intended state; 200 `{ status: "disabled", checks }` when jobs are off **by explicit choice outside production** (`JOBS_DRIVER=off` / `driver: "off"` — a review box or CI must not fail a readiness aggregate forever); 503 `{ status: "degraded", checks }` for everything wrong rather than chosen — a misconfiguration, a `start()` that threw, a worker that stopped consuming, and ANY production with no queue, spelled out or not: production never deliberately wants none, so an explicit off that reaches it through a shared env template still probes red. `checks` reports the resolved driver kind, producer/consumer role, consuming state, and the registered job/schedule counts. |
 
 ## The Prisma partial — copies, never symlinks
 

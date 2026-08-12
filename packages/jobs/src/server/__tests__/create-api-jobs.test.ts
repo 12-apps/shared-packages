@@ -459,6 +459,43 @@ describe("createApiJobs — worker mode and lifecycle", () => {
     await expect(api.start()).resolves.toBeUndefined();
   });
 
+  it("lets a stop() that lands mid-start win — the start tail must not resurrect it", async () => {
+    // Delta finding N3: moving `started = true` to the tail (the MAJOR-1 fix)
+    // created a window where a stop() during `await driver.start()` was
+    // overwritten by the start's continuation, leaving a stopped runtime
+    // advertising consuming:true. A deferred driver.start makes the
+    // interleaving deterministic.
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const gate: { open?: () => void } = {};
+    const startGate = new Promise<void>((resolve) => {
+      gate.open = resolve;
+    });
+    const driver: JobDriver = {
+      kind: "recording",
+      enqueue: async () => ({ enqueued: true }),
+      start: () => startGate,
+      stop: async () => undefined,
+    };
+    const api = createApiJobs({
+      jobs: [],
+      driver,
+      logger,
+      worker: true,
+      installShutdownHooks: false,
+    });
+
+    const starting = api.start(); // parks inside driver.start()
+    await api.stop(); // lands first
+    gate.open?.(); // now let the start continue to its tail
+    await starting;
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(body.checks.configured).toBe(false);
+    expect(body.checks.consuming).toBe(false);
+  });
+
   it("does not stack drain hooks across stop()/start() cycles", async () => {
     // Reviewer finding MINOR-9: hooks were installed per successful worker
     // start, so a stop()/start() cycle left two process.once pairs and one
@@ -616,6 +653,48 @@ describe("createApiJobs — health payload", () => {
     const { status, body } = await healthOf(api);
     expect(status).toBe(503);
     expect(body.status).toBe("degraded");
+  });
+
+  it("keeps an explicit JOBS_DRIVER=off in PRODUCTION degraded, with the error line", async () => {
+    // Delta finding N1: "deliberate" only counts outside production. In
+    // production, explicit off and nothing-configured are the same fact —
+    // no queue where one is expected (JOBS_DRIVER=off arrives via a shared
+    // env template or a promoted staging config) — and the probe must report
+    // what the log line said, 503 for both, not green-light one of them.
+    stubBareEnv();
+    vi.stubEnv("JOBS_DRIVER", "off");
+    const { logger, error } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger, production: true });
+
+    await api.start();
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(loggedText(error)).toContain(
+      "No job driver: scheduled work will NOT run in this deployment. Set REDIS_URL.",
+    );
+  });
+
+  it("treats a driver that is neither a string nor an instance as off, loudly", async () => {
+    // Delta finding N5: 42 / true / null used to fall through both validation
+    // guards and land on the env matrix as if nothing had been said.
+    stubBareEnv();
+    const { logger, error } = makeLogger();
+    const api = createApiJobs({
+      jobs: [],
+      logger,
+      driver: 42 as unknown as JobsDriverChoice,
+    });
+
+    await api.start();
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(body.checks.driver).toBeNull();
+    expect(loggedText(error)).toContain(
+      "createApiJobs({ driver: 42 }) is not a driver; jobs are disabled.",
+    );
   });
 
   it("counts registered jobs and schedules", async () => {

@@ -45,6 +45,15 @@ function resolveChoice(
     );
     return { choice: "off", source: "default" };
   }
+  if (config.driver !== undefined) {
+    // Not a string, and the caller already peeled off object instances — so
+    // this is 42, true, null: junk only a JS consumer can pass. It must not
+    // fall through to the env matrix as if nothing had been said.
+    resolved.logger.error(
+      `createApiJobs({ driver: ${JSON.stringify(config.driver)} }) is not a driver; jobs are disabled.`,
+    );
+    return { choice: "off", source: "default" };
+  }
   const configured = process.env.JOBS_DRIVER?.trim().toLowerCase();
   if (configured) {
     const named = asChoice(configured);
@@ -79,10 +88,11 @@ interface DriverResolution {
   driver: JobDriver | null;
   /**
    * True only for an EXPLICIT `off` — `JOBS_DRIVER=off` or
-   * `createApiJobs({ driver: "off" })`: a review box or a CI environment
-   * that genuinely wants no queue. False for every misconfiguration that
-   * merely RESOLVES to off, so health can tell "disabled by choice" apart
-   * from "broken".
+   * `createApiJobs({ driver: "off" })` — OUTSIDE production: a review box or
+   * a CI environment that genuinely wants no queue. False for every
+   * misconfiguration that merely RESOLVES to off, and false in production
+   * even when spelled out (production never deliberately wants no queue), so
+   * health can tell "disabled by choice" apart from "broken".
    */
   deliberatelyOff: boolean;
 }
@@ -155,15 +165,22 @@ export async function resolveDriver(
 
   if (choice === "off") {
     if (production) {
-      // Logged in production even for an explicit off — byte-identical to
-      // future-pay's runtime.ts. The health endpoint is what distinguishes
-      // the deliberate case; the log line stays because production with no
-      // queue is worth a line in the log either way.
+      // Logged in production even for an explicit off — the BEHAVIOUR is
+      // future-pay's runtime.ts, though not the bytes: its message named the
+      // domain sweeps, and the examples were dropped when this moved into
+      // the package. Production with no queue is worth a line in the log
+      // however it came about.
       logger.error(
         "No job driver: scheduled work will NOT run in this deployment. Set REDIS_URL.",
       );
     }
-    return off(source !== "default");
+    // Deliberate only OUTSIDE production. A review box or CI genuinely wants
+    // no queue; production never does — a JOBS_DRIVER=off that reaches it
+    // through a shared env template or a promoted staging config is a
+    // mistake, and the probe must answer 503 exactly like the unconfigured
+    // case rather than green-light the same fact the error line above just
+    // reported.
+    return off(source !== "default" && !production);
   }
 
   if (choice === "inline") {

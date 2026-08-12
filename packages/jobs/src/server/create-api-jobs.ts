@@ -90,10 +90,12 @@ export interface JobsRoute {
  *
  * Three states, two status codes: `ok` (200) is a working runtime; `disabled`
  * (200) is an EXPLICIT `off` — `JOBS_DRIVER=off` or
- * `createApiJobs({ driver: "off" })`, a review box or CI that genuinely wants
- * no queue, which must not fail a readiness aggregate forever; `degraded`
- * (503) is everything that is wrong rather than chosen — a misconfiguration,
- * a failed start, a drained worker.
+ * `createApiJobs({ driver: "off" })` — OUTSIDE production: a review box or CI
+ * that genuinely wants no queue, which must not fail a readiness aggregate
+ * forever; `degraded` (503) is everything that is wrong rather than chosen —
+ * a misconfiguration, a failed start, a drained worker, and any production
+ * with no queue, spelled out or not (production never deliberately wants
+ * none).
  */
 export interface JobsHealth {
   status: "ok" | "degraded" | "disabled";
@@ -112,7 +114,12 @@ export interface JobsHealth {
      * configured last.
      */
     driver: string | null;
-    /** Whether this process is meant to consume, not just enqueue. */
+    /**
+     * Whether this process is meant to consume, not just enqueue.
+     * Provisional until `start()` has run: before then it is a best-effort
+     * read of `config.worker` / `JOBS_WORKER` at probe time (pre-start health
+     * is degraded regardless, so nothing is decided from it).
+     */
     worker: boolean;
     /** Whether consuming actually began (always false in a producer). */
     consuming: boolean;
@@ -264,7 +271,15 @@ async function startRuntime(
   state: RuntimeState,
 ): Promise<void> {
   const { logger, worker } = resolved;
+  // A stop() that lands while start() is awaiting wins: `stop()` clears
+  // `starting`, and each publish point below re-checks it — otherwise the
+  // start's continuation would set consuming/started AFTER the stop and a
+  // stopped runtime would advertise itself as a healthy consumer (the same
+  // untruth the drain-hook fix closed, one window narrower).
+  const stopped = (): boolean => !state.starting;
+
   const { driver, deliberatelyOff } = await resolveDriver(config, resolved);
+  if (stopped()) return;
   state.deliberatelyOff = deliberatelyOff;
   if (!driver) {
     // Fail closed, by design: "no driver" is a completed start (future-pay's
@@ -280,6 +295,7 @@ async function startRuntime(
   // whatever is registered — a worker cannot consume a job it has never heard
   // of, and a producer cannot enqueue one.
   await registerJobs(config.jobs);
+  if (stopped()) return;
 
   if (!worker) {
     logger.info("producer mode: jobs will be enqueued, not consumed by this process.");
@@ -288,6 +304,7 @@ async function startRuntime(
   }
 
   await startJobWorkers();
+  if (stopped()) return;
   state.consuming = true;
 
   if ((config.installShutdownHooks ?? true) && !state.hooksInstalled) {
