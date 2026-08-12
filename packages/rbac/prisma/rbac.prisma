@@ -1,0 +1,157 @@
+// ---------------------------------------------------------------------------
+// @12-apps/rbac — CANONICAL Prisma model partial (plug-and-play).
+//
+// This file is the single source of truth for the five generic RBAC tables. A
+// host project does NOT copy these models into its main schema by hand: it
+// uses Prisma's multi-file schema folder and SYNCS this file into it with this
+// package's `prisma:sync` script (a byte-for-byte COPY — never a symlink; see
+// scripts/sync-rbac-schema.mjs for why).
+//
+// Host-agnostic by design (the entity-lifecycle / report-builder doctrine):
+//   - The tenant is a by-value `client_id` scalar — no relation to the host's
+//     tenant model (whose name this package cannot know). The host's SQL
+//     migration may add the FK constraint (recommended: ON DELETE CASCADE).
+//   - The user is a by-value `user_id` scalar for the same reason.
+//   - Relations INTERNAL to the partial (Membership <-> Role via
+//     MembershipRole) are kept: both ends live in this file.
+//   - `role` / `kind` are Strings; a host migration may add CHECK constraints
+//     for its own closed role sets (this package's role catalog is config).
+// ---------------------------------------------------------------------------
+
+// A user's membership in a tenant. One row per (user, tenant); this row is
+// what scopes a user to a tenant — a user shows up in tenant A's roster iff a
+// Membership exists there. `role` is the member's PRIMARY role name (a
+// display/coarse-gate mirror); the authoritative permission assignment is the
+// `membership_roles` n:m join below. `active` is the reversible soft-disable:
+// a disabled member keeps its row + role but resolves to zero permissions.
+model Membership {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  clientId  String   @map("client_id")
+  role      String   @default("CUSTOMER")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // The tenant roles this membership holds — the authoritative
+  // permission-assignment surface (a membership may hold 0..n roles).
+  roles MembershipRole[]
+
+  @@unique([userId, clientId])
+  @@index([clientId])
+  @@index([userId])
+  @@map("memberships")
+}
+
+// A named RBAC role and its permission catalog. Every tenant staff role is a
+// first-class per-tenant `Role` row (`client_id` set): on tenant creation the
+// catalog is seeded from the host's role templates into per-tenant rows, so a
+// tenant's roles are managed entirely from the DB. `client_id` NULL marks a
+// PLATFORM/global TEMPLATE row (e.g. a platform-only SUPERADMIN the engine
+// resolves by name for GLOBAL grants). `permissions` is a String holding a
+// JSON array of permission strings or the literal '*' for all. `kind`
+// (SYSTEM | CUSTOM) tells a seeded catalog role apart from a free-form tenant
+// role; `locked` marks an Owner role that is never editable/deletable.
+// `@@unique([clientId, name])` gives each tenant its own name namespace, but
+// does NOT keep TEMPLATE names unique: Postgres treats NULL `client_id` as
+// distinct, so template uniqueness is enforced by a raw partial unique index
+// (`roles_template_name_key ON (name) WHERE client_id IS NULL`) in this
+// package's migration — Prisma can't express a filtered index here.
+model Role {
+  id          String  @id @default(uuid())
+  clientId    String? @map("client_id")
+  name        String
+  // JSON array of permission strings, or the literal '*' for all permissions.
+  permissions String
+  description String?
+  isTemplate  Boolean @default(true) @map("is_template")
+  kind        String  @default("CUSTOM")
+  locked      Boolean @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  // Soft-delete: a non-null timestamp hides a CUSTOM role from the admin grid
+  // AND stops it granting at runtime (the resolver filters
+  // `archived_at IS NULL`). Null = active. SYSTEM rows are reset, never
+  // archived.
+  archivedAt DateTime? @map("archived_at")
+  // The version of this role currently live/published (an entity-lifecycle
+  // hook — NOT the schema-migration version). 0 = never versioned.
+  publishedVersion Int @default(0) @map("published_version")
+
+  // Memberships assigned this role. Cascades: deleting the role detaches its
+  // assignments (members fall back to their remaining roles).
+  memberRoles MembershipRole[]
+
+  @@unique([clientId, name])
+  @@index([clientId])
+  @@index([clientId, archivedAt])
+  @@map("roles")
+}
+
+// The n:m assignment join between a tenant membership and a `Role`. This is
+// the authoritative role-assignment surface: a membership holds 0..n roles, a
+// role is held by many memberships, and the RBAC resolver derives a member's
+// effective permissions from these rows (each role's `permissions` attached
+// inline). Unique `(membership_id, role_id)` makes a grant idempotent; both
+// FKs cascade so a removed membership or a deleted role takes its assignments
+// with it — never a dangling grant.
+model MembershipRole {
+  id           String   @id @default(uuid())
+  membershipId String   @map("membership_id")
+  roleId       String   @map("role_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, roleId])
+  @@index([membershipId])
+  @@index([roleId])
+  @@map("membership_roles")
+}
+
+// A grant of a role to a user at a given scope. This carries PLATFORM-level
+// grants (e.g. SUPERADMIN at scope 'GLOBAL') and any assignment not
+// expressible as a per-tenant `Membership.role` (an `'org:<id>'` scope, or a
+// tenant custom-role grant). `roleName` references a `Role.name` resolved in
+// the engine's resolver — NOT a hard FK — so GLOBAL/platform roles (whose Role
+// row has a NULL client) can be granted without a composite FK. `scope` is the
+// scope key: a tenant id for a tenant-scoped grant, or the literal 'GLOBAL'.
+// `@@unique([userId, roleName, scope])` makes granting an idempotent upsert.
+model RoleAssignment {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  roleName  String   @map("role_name")
+  scope     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, roleName, scope])
+  @@index([userId])
+  // Scope-first reads: "who holds a grant AT this tenant". `scope` is the
+  // THIRD column of the unique above, so a bare `scope =` predicate cannot use
+  // it and would seq-scan every tenant's grants.
+  @@index([scope])
+  @@map("role_assignments")
+}
+
+// A GENERIC assignment of a user to a scoped resource within a tenant — the
+// relation that backs "assign a waiter to table 12". `resourceType` + a
+// by-value `resourceId` name the resource (not a hard FK), so any resource
+// kind reuses this one relation. `clientId` scopes the assignment to a tenant.
+// `validFrom`/`validTo` are the active window: `validTo` NULL means the
+// assignment is STILL ACTIVE — revocation stamps `validTo` (filter-not-delete)
+// rather than deleting the row, so the audit trail is never lost.
+model ResourceAssignment {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  clientId     String    @map("client_id")
+  resourceType String    @map("resource_type")
+  resourceId   String    @map("resource_id")
+  validFrom    DateTime  @default(now()) @map("valid_from")
+  validTo      DateTime? @map("valid_to")
+
+  @@index([userId, resourceType])
+  @@index([clientId, resourceType, resourceId])
+  @@map("resource_assignments")
+}

@@ -95,14 +95,20 @@ describe('the harness backend serves the package over a real Postgres', () => {
   });
 
   it('answers the roles picker in ITS envelope, not the reports one', async () => {
-    // The one endpoint on this surface that is the HOST's. An empty page is a
-    // legitimate answer; an empty `{ data }` is not, because the picker's
-    // paging loop reads `hasNextPage` off it and never terminates.
+    // This endpoint stopped being a host stub in 12-13: it is now the REAL
+    // @12-apps/rbac catalog, seeded. What the reports picker depends on is the
+    // envelope — `{ data, pagination.hasNextPage }`, not the reports `{ data }`
+    // one, because its paging loop reads `hasNextPage` and never terminates
+    // off `undefined`.
     const roles = await backend.app.request(`${TENANT}/roles`);
-    const page = await roles.json();
+    const page = (await roles.json()) as {
+      data: { name: string }[];
+      pagination: { hasNextPage: boolean };
+    };
 
     expect(roles.status).toBe(200);
-    expect(page).toEqual({ data: [], pagination: { hasNextPage: false } });
+    expect(page.pagination.hasNextPage).toBe(false);
+    expect(page.data.map((row) => row.name)).toContain('Barista');
   });
 
   it('keeps a created document, and stamps it from the FROZEN clock', async () => {

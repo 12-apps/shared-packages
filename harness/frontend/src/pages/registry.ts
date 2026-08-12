@@ -23,6 +23,7 @@ import { PaymentsProviderConnectPage } from './payments-provider-connect';
 import { PaymentsProviderCredentialsPage } from './payments-provider-credentials';
 import { PaymentsProviderSettingsPage } from './payments-provider-settings';
 import { PwaInstallPromptPage } from './pwa-install-prompt';
+import { RbacAdminPage } from './rbac-admin';
 import { ReportBuilderPage } from './report-builder';
 
 /**
@@ -289,5 +290,12 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/entitlements',
     group: 'backoffice',
     Component: EntitlementsPlanPage,
+  },
+  {
+    slug: 'rbac-admin',
+    title: 'Roles & team',
+    pkg: '@12-apps/rbac',
+    group: 'backoffice',
+    Component: RbacAdminPage,
   },
 ];
