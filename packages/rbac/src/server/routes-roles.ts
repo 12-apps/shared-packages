@@ -1,0 +1,238 @@
+import {
+  foldApiError,
+  gatesOf,
+  messagesOf,
+  ok,
+  pageResponse,
+  type RbacActor,
+  type RbacRoute,
+  type RbacServerConfig,
+} from './context';
+import type { GrantGovernance } from './grant-governance';
+import type { RbacGuards } from './guards';
+import type { RolesStore } from './roles-store';
+import {
+  parseBody,
+  parseRoleListQuery,
+  requireParam,
+  type RoleWireSchemas,
+} from './wire';
+
+/**
+ * The role CRUD + template-override + permissions routes (12-13) — the
+ * package half of future-pay's `app/api/admin/[tenantSlug]/{roles,permissions}`
+ * files. Route paths are relative to the host's admin mount (the segment that
+ * used to be `/api/admin/:tenantSlug`).
+ *
+ * What did NOT move in: the entity-lifecycle wrapping (drafts / versions /
+ * approvals — ticket 12-17's surface) and the entitlement gate on custom-role
+ * creation (billing, answered by the host before the request reaches these
+ * handlers — e.g. in its `resolveActor`).
+ */
+
+interface RoleRouteDeps<P extends string> {
+  config: RbacServerConfig<P>;
+  guards: RbacGuards<P>;
+  governance: GrantGovernance;
+  roles: RolesStore;
+  wire: RoleWireSchemas;
+  /**
+   * The staff tier `GET /permissions` sits behind (any non-customer
+   * membership, or a platform admin) — the shell's entry gate.
+   */
+  requireStaffTier: (actor: RbacActor) => Promise<void>;
+}
+
+/** The `roles:manage` gate every route in this file sits behind. */
+function requireManageRoles<P extends string>(
+  deps: RoleRouteDeps<P>,
+  actor: RbacActor,
+): Promise<void> {
+  const gates = gatesOf(deps.config);
+  return deps.guards.requirePermission(
+    { userId: actor.userId, isSuper: actor.isSuper, permissionCeiling: actor.permissionCeiling },
+    gates.manageRoles as P,
+    { scope: actor.tenantId },
+  );
+}
+
+function listRolesRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
+  return {
+    method: 'GET',
+    path: '/roles',
+    async handle({ actor, query }) {
+      try {
+        await requireManageRoles(deps, actor);
+        const page = await deps.roles.listRolesPage(actor.tenantId, parseRoleListQuery(query));
+        return pageResponse(page.data, page.pagination);
+      } catch (error) {
+        return foldApiError(error);
+      }
+    },
+  };
+}
+
+function createRoleRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
+  return {
+    method: 'POST',
+    path: '/roles',
+    async handle({ actor, body }) {
+      try {
+        await requireManageRoles(deps, actor);
+        const input = parseBody(deps.wire.roleWriteBody, body, messagesOf(deps.config));
+        // Governance runs BEFORE the write (immediate feedback).
+        await deps.governance.assertCanCreateRole(actor, {
+          name: input.name,
+          permissions: input.permissions,
+        });
+        const role = await deps.roles.createTenantRole(actor.tenantId, {
+          name: input.name,
+          description: input.description ?? null,
+          permissions: input.permissions,
+        });
+        return ok(role);
+      } catch (error) {
+        return foldApiError(error);
+      }
+    },
+  };
+}
+
+function updateRoleRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
+  return {
+    method: 'PATCH',
+    path: '/roles/:id',
+    async handle({ actor, params, body }) {
+      try {
+        await requireManageRoles(deps, actor);
+        const messages = messagesOf(deps.config);
+        const input = parseBody(deps.wire.roleWriteBody, body, messages);
+        await deps.governance.assertCanCreateRole(actor, {
+          name: input.name,
+          permissions: input.permissions,
+        });
+        const role = await deps.roles.updateTenantRole(
+          requireParam(params, 'id', messages),
+          actor.tenantId,
+          {
+            name: input.name,
+            description: input.description ?? null,
+            permissions: input.permissions,
+          },
+        );
+        // A stale id or another tenant's row → 404.
+        return role ? ok(role) : { status: 404, body: { error: messages.roleNotFound } };
+      } catch (error) {
+        return foldApiError(error);
+      }
+    },
+  };
+}
+
+function deleteRoleRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
+  return {
+    method: 'DELETE',
+    path: '/roles/:id',
+    async handle({ actor, params }) {
+      try {
+        await requireManageRoles(deps, actor);
+        const messages = messagesOf(deps.config);
+        const deleted = await deps.roles.deleteTenantRole(
+          requireParam(params, 'id', messages),
+          actor.tenantId,
+        );
+        return deleted
+          ? ok({ status: 'deleted' as const })
+          : { status: 404, body: { error: messages.roleNotFound } };
+      } catch (error) {
+        return foldApiError(error);
+      }
+    },
+  };
+}
+
+function overrideTemplateRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
+  return {
+    method: 'PUT',
+    path: '/roles/templates/:name',
+    async handle({ actor, params, body }) {
+      try {
+        await requireManageRoles(deps, actor);
+        const messages = messagesOf(deps.config);
+        const name = requireParam(params, 'name', messages);
+        deps.governance.assertEditableTemplateName(name);
+        const input = parseBody(deps.wire.templateOverrideBody, body, messages);
+        await deps.governance.assertCanOverrideTemplateRole(actor, {
+          name,
+          permissions: input.permissions,
+        });
+        const role = await deps.roles.upsertTemplateOverride(actor.tenantId, name, {
+          description: input.description ?? null,
+          permissions: input.permissions,
+        });
+        return ok(role);
+      } catch (error) {
+        return foldApiError(error);
+      }
+    },
+  };
+}
+
+function resetTemplateRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
+  return {
+    method: 'DELETE',
+    path: '/roles/templates/:name',
+    async handle({ actor, params }) {
+      try {
+        await requireManageRoles(deps, actor);
+        const name = requireParam(params, 'name', messagesOf(deps.config));
+        deps.governance.assertEditableTemplateName(name);
+        await deps.roles.resetTemplateRole(actor.tenantId, name);
+        // Reset is idempotent — a no-op still answers `reset`.
+        return ok({ status: 'reset' as const });
+      } catch (error) {
+        return foldApiError(error);
+      }
+    },
+  };
+}
+
+function permissionsRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
+  return {
+    method: 'GET',
+    path: '/permissions',
+    async handle({ actor }) {
+      try {
+        // The caller's OWN resolved set — an actor may always learn what THEY
+        // can do (never another actor's set); the set itself does the fine
+        // gating. Staff-gated (any non-customer membership), the shell's tier.
+        await deps.requireStaffTier(actor);
+        const permissions = await deps.guards.getActorPermissions(
+          {
+            userId: actor.userId,
+            isSuper: actor.isSuper,
+            permissionCeiling: actor.permissionCeiling,
+          },
+          actor.tenantId,
+        );
+        const extras = (await deps.config.permissionsExtras?.(actor)) ?? {};
+        // Sorted for a stable wire shape (Set iteration is insertion-defined).
+        return ok({ permissions: [...permissions].sort(), ...extras });
+      } catch (error) {
+        return foldApiError(error);
+      }
+    },
+  };
+}
+
+export function roleRoutes<P extends string>(deps: RoleRouteDeps<P>): RbacRoute[] {
+  return [
+    listRolesRoute(deps),
+    createRoleRoute(deps),
+    updateRoleRoute(deps),
+    deleteRoleRoute(deps),
+    overrideTemplateRoute(deps),
+    resetTemplateRoute(deps),
+    permissionsRoute(deps),
+  ];
+}
