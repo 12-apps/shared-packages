@@ -1,17 +1,25 @@
-import { listJobs, type RegisteredJob } from "../core/registry";
+import { listJobs } from "../core/registry";
 import {
   configureJobs,
   getJobDriver,
   startJobWorkers,
   stopJobs,
 } from "../core/runtime";
-import type { JobDriver, JobLogger } from "../core/types";
-import { createInlineJobDriver } from "../drivers/inline";
+import type { JobLogger } from "../core/types";
 import {
   createSweepLease,
   type SweepLeaseDbProvider,
   type WithSweepLease,
 } from "../lease/sweep-lease";
+
+import {
+  isWorkerProcess,
+  resolveConfig,
+  type JobsServerConfig,
+  type JobsSource,
+  type ResolvedConfig,
+} from "./config";
+import { resolveDriver } from "./resolve-driver";
 
 /**
  * `createApiJobs` — the jobs runtime as ONE mountable surface.
@@ -50,65 +58,18 @@ import {
  * in-process, schedules do not fire (and say so), and the app starts green
  * with no Redis container. That is the default a fresh host is supposed to
  * boot in.
+ *
+ * ## The environment is read at `start()`, not at the factory
+ *
+ * future-pay's `bootstrapJobs()` read the whole matrix — `JOBS_DRIVER`,
+ * `REDIS_URL`, `NODE_ENV`, `JOBS_WORKER`, `JOBS_QUEUE_PREFIX` — at the moment
+ * it ran, and the recommended host shape is factory-at-module-scope +
+ * `await jobsApi.start()` at process start. Reading part of the matrix at
+ * factory time would honour a late-arriving `JOBS_DRIVER` and silently
+ * ignore a late-arriving `REDIS_URL` (a host whose config module loads after
+ * the module that built the api), so the factory reads nothing and `start()`
+ * resolves everything at one single moment.
  */
-
-/** What the driver choice may say (`JOBS_DRIVER`, or `config.driver`). */
-export type JobsDriverChoice = "bullmq" | "inline" | "off";
-
-/**
- * How the host names its jobs. An import thunk (`() => import("./jobs")`) is
- * the usual form — `defineJob` registers at module scope, so importing the
- * modules IS the registration. An array of already-registered jobs is
- * accepted for hosts (and tests) that hold the references anyway; it forces
- * the modules to have been imported, which is the same guarantee.
- */
-export type JobsSource =
-  | readonly RegisteredJob<never>[]
-  | (() => unknown | Promise<unknown>);
-
-export interface JobsServerConfig {
-  /** Every job this process can enqueue or consume. See {@link JobsSource}. */
-  jobs: JobsSource;
-  /**
-   * A driver INSTANCE (tests, exotic hosts), a choice by name, or unset to
-   * resolve one: `JOBS_DRIVER` if set; else `bullmq` when a Redis URL exists;
-   * else `off` in production and `inline` everywhere else.
-   */
-  driver?: JobDriver | JobsDriverChoice;
-  /** `redis://[user:pass@]host:port[/db]`. Defaults to `REDIS_URL`. */
-  redisUrl?: string;
-  /**
-   * Whether THIS process consumes the queue and runs the schedules, not just
-   * enqueues. Defaults to `JOBS_WORKER` being `1` or `true`.
-   */
-  worker?: boolean;
-  /**
-   * Refuses the inline driver and makes "no queue" loud. Defaults to
-   * `NODE_ENV === "production"`.
-   */
-  production?: boolean;
-  /**
-   * Queue key prefix, so one Redis can carry several environments without a
-   * staging worker consuming production's jobs. Defaults to
-   * `JOBS_QUEUE_PREFIX`.
-   */
-  queuePrefix?: string;
-  /** The host's logger. Defaults to the console. */
-  logger?: JobLogger;
-  /**
-   * Where the `sweep_leases` table lives — enables {@link JobsApi.withSweepLease}.
-   * Omit it and the lease helper throws on first use, loudly, because a sweep
-   * that silently skipped its lease would be the unprotected overlap the
-   * lease exists to prevent.
-   */
-  db?: SweepLeaseDbProvider;
-  /**
-   * Install `SIGTERM`/`SIGINT` handlers that drain in-flight jobs on a deploy
-   * (worker processes only). Defaults to true; turn it off in tests, which
-   * must not leak process listeners.
-   */
-  installShutdownHooks?: boolean;
-}
 
 /** What a route handler answers; the host maps it onto its response type. */
 export interface JobsResponse {
@@ -135,7 +96,12 @@ export interface JobsHealth {
      * green.
      */
     configured: boolean;
-    /** The resolved driver's kind, or null when jobs are disabled. */
+    /**
+     * The resolved driver's kind, or null when jobs are disabled. Reads the
+     * process-wide runtime: with two `createApiJobs` instances in one process
+     * (never a real host's shape) each reports whichever driver was
+     * configured last.
+     */
     driver: string | null;
     /** Whether this process is meant to consume, not just enqueue. */
     worker: boolean;
@@ -166,106 +132,6 @@ export interface JobsApi {
    * {@link createSweepLease} for the contract.
    */
   withSweepLease: WithSweepLease;
-}
-
-/** Fallback logger — used until the host passes its own. */
-const consoleLogger: JobLogger = {
-  info: (message, ...meta) => console.info(`[jobs] ${message}`, ...meta),
-  warn: (message, ...meta) => console.warn(`[jobs] ${message}`, ...meta),
-  error: (message, ...meta) => console.error(`[jobs] ${message}`, ...meta),
-};
-
-/** `JOBS_WORKER=1|true` is how a deployment marks the consuming process. */
-function isWorkerProcess(): boolean {
-  const flag = process.env.JOBS_WORKER?.trim().toLowerCase();
-  return flag === "1" || flag === "true";
-}
-
-interface ResolvedConfig {
-  redisUrl: string | undefined;
-  production: boolean;
-  worker: boolean;
-  queuePrefix: string | undefined;
-  logger: JobLogger;
-}
-
-function resolveChoice(
-  config: JobsServerConfig,
-  resolved: ResolvedConfig,
-): JobsDriverChoice {
-  if (typeof config.driver === "string") return config.driver;
-  const configured = process.env.JOBS_DRIVER?.trim().toLowerCase();
-  if (configured === "bullmq" || configured === "inline" || configured === "off") {
-    return configured;
-  }
-  if (configured) {
-    resolved.logger.error(
-      `JOBS_DRIVER="${configured}" is not a driver; jobs are disabled.`,
-    );
-    return "off";
-  }
-  // Unset: Redis being configured is the signal that a queue exists.
-  if (resolved.redisUrl) return "bullmq";
-  return resolved.production ? "off" : "inline";
-}
-
-/**
- * Pick the driver, or NULL for "jobs are disabled in this process" — which is
- * always accompanied by a loud log line, never silent.
- */
-async function resolveDriver(
-  config: JobsServerConfig,
-  resolved: ResolvedConfig,
-): Promise<JobDriver | null> {
-  // An instance passed in is the host's own decision; use it as-is.
-  if (config.driver && typeof config.driver === "object") return config.driver;
-
-  const choice = resolveChoice(config, resolved);
-  const { logger, production, redisUrl } = resolved;
-
-  if (choice === "off") {
-    if (production) {
-      logger.error(
-        "No job driver: scheduled work will NOT run in this deployment. Set REDIS_URL.",
-      );
-    }
-    return null;
-  }
-
-  if (choice === "inline") {
-    if (production) {
-      // Inline runs the handler inside whatever request enqueued it and has
-      // no retries and no schedules. That is a development convenience, and
-      // in production it would silently drop work a crash interrupts.
-      logger.error("JOBS_DRIVER=inline is refused in production; jobs are disabled.");
-      return null;
-    }
-    logger.info("using the inline job driver (no Redis): schedules will not fire.");
-    // Detached on purpose: in a dev server the handler must not run inside
-    // the request that enqueued it. A test that wants to await the handler
-    // passes its own `createInlineJobDriver({ await: true })` instance.
-    return createInlineJobDriver({ logger, await: false });
-  }
-
-  if (!redisUrl) {
-    logger.error("JOBS_DRIVER=bullmq needs REDIS_URL; jobs are disabled.");
-    return null;
-  }
-  try {
-    // Imported lazily so `bullmq` (and ioredis) are pulled in only by a
-    // process that actually talks to Redis — never into a bundle that only
-    // enqueues. The specifier is a literal, which is what keeps it loadable
-    // once the host bundles this package's published TS source.
-    const { createBullMqJobDriver } = await import("../drivers/bullmq");
-    return createBullMqJobDriver({
-      redisUrl,
-      logger,
-      prefix: resolved.queuePrefix,
-    });
-  } catch (error) {
-    logger.error("could not create the BullMQ driver; jobs are disabled:", error);
-    return null;
-  }
 }
 
 /** Trigger the host's registrations. An array means "already registered". */
@@ -308,11 +174,21 @@ interface RuntimeState {
    */
   started: boolean;
   consuming: boolean;
+  /**
+   * The env-resolved config, cached by `start()`. Null until then: the
+   * factory deliberately reads no environment (see the module header), so a
+   * pre-start health probe falls back to reading the worker switch at handle
+   * time.
+   */
+  resolved: ResolvedConfig | null;
 }
 
-function healthOf(state: RuntimeState, worker: boolean): JobsHealth {
+function healthOf(config: JobsServerConfig, state: RuntimeState): JobsHealth {
   const definitions = listJobs();
   const driver = getJobDriver();
+  const worker = state.resolved
+    ? state.resolved.worker
+    : (config.worker ?? isWorkerProcess());
   const ready = state.started && driver !== null && (!worker || state.consuming);
   return {
     status: ready ? "ok" : "degraded",
@@ -391,14 +267,12 @@ async function startRuntime(
 }
 
 export function createApiJobs(config: JobsServerConfig): JobsApi {
-  const resolved: ResolvedConfig = {
-    redisUrl: config.redisUrl ?? process.env.REDIS_URL,
-    production: config.production ?? process.env.NODE_ENV === "production",
-    worker: config.worker ?? isWorkerProcess(),
-    queuePrefix: config.queuePrefix ?? process.env.JOBS_QUEUE_PREFIX,
-    logger: config.logger ?? consoleLogger,
+  const state: RuntimeState = {
+    starting: false,
+    started: false,
+    consuming: false,
+    resolved: null,
   };
-  const state: RuntimeState = { starting: false, started: false, consuming: false };
 
   return {
     routes: [
@@ -406,7 +280,7 @@ export function createApiJobs(config: JobsServerConfig): JobsApi {
         method: "GET",
         path: "/health",
         handle: async () => {
-          const body = healthOf(state, resolved.worker);
+          const body = healthOf(config, state);
           return { status: body.status === "ok" ? 200 : 503, body };
         },
       },
@@ -419,7 +293,10 @@ export function createApiJobs(config: JobsServerConfig): JobsApi {
       // declare, as its last statement.
       if (state.starting) return;
       state.starting = true;
-      await startRuntime(config, resolved, state);
+      // The whole env matrix is read HERE, at the same moment the driver
+      // choice reads JOBS_DRIVER — never at factory time.
+      state.resolved = resolveConfig(config);
+      await startRuntime(config, state.resolved, state);
     },
 
     async stop(): Promise<void> {

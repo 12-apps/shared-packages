@@ -20,10 +20,8 @@
 export { createApiJobs } from "./create-api-jobs";
 export type {
   JobsApi,
-  JobsDriverChoice,
   JobsHealth,
   JobsResponse,
   JobsRoute,
-  JobsServerConfig,
-  JobsSource,
 } from "./create-api-jobs";
+export type { JobsDriverChoice, JobsServerConfig, JobsSource } from "./config";

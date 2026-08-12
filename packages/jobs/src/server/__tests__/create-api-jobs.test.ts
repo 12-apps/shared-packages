@@ -175,6 +175,59 @@ describe("createApiJobs — driver resolution", () => {
     const { body } = await healthOf(api);
     expect(body.checks.driver).toBe("custom");
   });
+
+  it("reads REDIS_URL at start(), not at factory time", async () => {
+    // Reviewer probe E: future-pay's bootstrapJobs read the WHOLE matrix at
+    // the moment it ran. The recommended host shape is factory-at-module-scope
+    // + start() at process start, so an env var set between the two (a config
+    // module loading after the module that built the api) must be honoured —
+    // for every variable of the matrix, not just JOBS_DRIVER.
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger });
+
+    vi.stubEnv("REDIS_URL", "redis://localhost:6379"); // arrives late
+    await api.start();
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(200);
+    expect(body.checks.driver).toBe("bullmq");
+  });
+
+  it("reads JOBS_WORKER at start(), not at factory time", async () => {
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const api = createApiJobs({
+      jobs: [],
+      driver: createInlineJobDriver({ logger }),
+      logger,
+      installShutdownHooks: false,
+    });
+
+    vi.stubEnv("JOBS_WORKER", "1"); // arrives late
+    await api.start();
+
+    const { body } = await healthOf(api);
+    expect(body.checks.worker).toBe(true);
+    expect(body.checks.consuming).toBe(true);
+  });
+
+  it("reads NODE_ENV at start(), so late-arriving production disables inline", async () => {
+    // Reviewer probe F's counterpart: the same late-env scenario for the
+    // production flag — dev-default inline must NOT win over an environment
+    // that had become production by the time start() ran.
+    stubBareEnv();
+    const { logger, error } = makeLogger();
+    const api = createApiJobs({ jobs: [], logger });
+
+    vi.stubEnv("NODE_ENV", "production"); // arrives late
+    await api.start();
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(body.checks.driver).toBeNull();
+    expect(loggedText(error)).toContain("Set REDIS_URL");
+  });
 });
 
 describe("createApiJobs — worker mode and lifecycle", () => {
