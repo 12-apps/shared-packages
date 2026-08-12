@@ -16,6 +16,10 @@
  *    (12-13), mounted whole — including the `/roles` read the reports surface
  *    consumes for its "Cargos específicos" allowlist picker, which used to be
  *    a host stub answering an empty page and is now the real seeded catalog;
+ *  - `/api/admin/:tenantSlug/{catalog-items,demo-suppliers}/{drafts,:id/…}`
+ *    plus `{recycle-bin,approvals}/**` is @12-apps/entity-lifecycle's (12-17),
+ *    GENERATED from two registrations; the host keeps only the demo-entity
+ *    CRUD (lifecycle-host.ts), which is the glue a real adopter already has;
  *  - `/__harness/**` is the SUITE'S, and belongs to neither.
  */
 import { Hono } from 'hono';
@@ -24,6 +28,13 @@ import type { PGlite } from '@electric-sql/pglite';
 import { entitlementDenialResponse, isEntitlementDenial } from '@12-apps/entitlements/server';
 
 import { createEntitlementsHost, TENANT } from './entitlements-host';
+import { applyLifecycleMigrations } from './lifecycle-db';
+import {
+  createLifecycleDemoTables,
+  demoEntityRoutes,
+  lifecycleHost,
+  reseedLifecycle,
+} from './lifecycle-host';
 import { applyRbacMigrations } from './rbac-db';
 import { rbacHost, reseedRbac } from './rbac-host';
 import { reportsRouter } from './reports-host';
@@ -45,6 +56,13 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   await applyRbacMigrations(pg);
   const rbac = rbacHost(pg);
   await reseedRbac(pg, rbac);
+  // The lifecycle tables arrive the same way (12-17): the package's own
+  // migrations out of the installed tarball; the two DEMO entity tables are
+  // the host's (a real adopter's schema already has its own).
+  await applyLifecycleMigrations(pg);
+  await createLifecycleDemoTables(pg);
+  const lifecycle = lifecycleHost(pg);
+  await reseedLifecycle(pg);
   const entitlements = createEntitlementsHost();
   const app = new Hono();
 
@@ -67,6 +85,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.post('/__harness/reset', async (c) => {
     await reseed(pg);
     await reseedRbac(pg, rbac);
+    await reseedLifecycle(pg);
     entitlements.reset();
     return c.body(null, 204);
   });
@@ -88,9 +107,20 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     }
   });
 
+  // The host's OWN demo-entity CRUD (12-17) — the glue a real adopter already
+  // has — registered BEFORE the packaged router so its literal paths cannot
+  // be captured by a packaged `:slug` route.
+  const demo = demoEntityRoutes(lifecycle, pg);
+  app.get('/api/admin/:tenantSlug/catalog-items', demo.list);
+  app.post('/api/admin/:tenantSlug/catalog-items', demo.save);
+  app.put('/api/admin/:tenantSlug/catalog-items/:id', demo.save);
+  app.delete('/api/admin/:tenantSlug/catalog-items/:id', demo.remove);
+  app.delete('/api/admin/:tenantSlug/demo-suppliers/:id', demo.removeSupplier);
+
   app.route('/api/admin/:tenantSlug', entitlements.router);
   app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
   app.route('/api/admin/:tenantSlug', rbac.router);
+  app.route('/api/admin/:tenantSlug', lifecycle.router);
 
   return { app, close: () => pg.close() };
 }

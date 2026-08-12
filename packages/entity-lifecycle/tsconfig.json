@@ -1,10 +1,12 @@
 {
-  "extends": "@12-apps/typescript-config/base.json",
+  "extends": "@12-apps/typescript-config/react-library.json",
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
+    "jsx": "react-jsx",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "skipLibCheck": true,
     "declaration": false,
     "declarationMap": false,
     "types": ["vitest/globals"]
