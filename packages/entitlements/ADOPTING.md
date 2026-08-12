@@ -263,3 +263,134 @@ separate.
       comments/strings, or ungated surfaces slip through.
 - [ ] `retainWhenRestricted` on at least the read paths, or dunning bricks
       accounts you are still trying to collect from.
+
+---
+
+## 10. Or: mount the whole surface (`createApiEntitlements` + `createWebEntitlements`)
+
+Steps 3–8 wire the ENGINE by hand. Since the surface factories landed, a host
+can instead mount both halves and keep only config:
+
+```ts
+// server — Hono host (other frameworks: adapt `api.routes`, ~40 lines)
+import { entitlementsRouter } from '@12-apps/entitlements/hono';
+
+const { app: entitlements, api } = entitlementsRouter({
+  features: FEATURES,
+  plans: PLANS,
+  source: { load: loadTenantState },          // your DB seam (step 3)
+  usage: usageRegistry,                       // createUsageRegistry(...) — audited at boot
+  defaultPlanKey: 'free',
+  pricing: PRICING_ROWS,                      // display data from YOUR billing
+  comparison: buildTierComparison,            // your pricing cards
+  planChangeRequests: planRequestPort,        // your lead table, behind the port
+  resolveActor: async (c) => {
+    const grant = await requireTenantStaff(c);      // YOUR auth + RBAC
+    return grant && {
+      tenantId: grant.tenantId,
+      userId: grant.userId,
+      canRequestPlanChange: grant.can('config:write'),
+    };
+  },
+});
+app.route('/api/admin/:tenantSlug', entitlements);
+// api.requireEntitlement / api.requireQuota / api.engine for your own gates
+```
+
+```tsx
+// browser
+import { createWebEntitlements } from '@12-apps/entitlements/react';
+
+const { page: PlanPage, UpsellHost, withEntitlement } = createWebEntitlements({
+  apiBase: `/api/admin/${tenantSlug}`,
+  canRequestPlanChange: can('config:write'), // resolved by YOUR RBAC
+  switchLocation: tenantSwitchLocation,      // feature -> { path, label } in YOUR routes
+  plansPath: `/${tenantSlug}/planos`,
+  LinkComponent: RouterLink,                 // your router's Link
+});
+```
+
+Routes served (relative to the mount): `GET /entitlements` (the snapshot the
+provider renders from), `GET /plan` (view + pricing cards), and — only when
+`planChangeRequests` is configured — `GET|POST /plan/request`.
+
+**The wire contract, explicitly.** Every SUCCESS body ships in the
+`{ data: … }` envelope (`{ data: { plan } }`, `{ data: { snapshot } }`,
+`{ data: { request, created } }`) — the same invariant future-pay documents
+for its whole `/api/admin/**` surface, and the shape its MCP response schemas
+declare. Denials and refusals are NEVER wrapped: 402/409/404 mirror the
+host's `paymentRequired` error shape byte for byte, and 400/403 are plain
+`{ error }` bodies. The packaged react half unwraps the envelope for you.
+The POST answers `request: { id, status }` only — the lead's details
+(`requestedPlanKey`, `createdAt`) live on the read next door, so the
+`PlanChangeRequestPort.create` you implement returns exactly that pair.
+`TenantPlanView.price` defaults to BRL wording (`"R$ 59,00"` / `"Grátis"`);
+pass `formatPrice` in the config to word another currency.
+
+### The money boundary, drawn precisely
+
+`Plan`, `Subscription` and `PlanChangeRequest` are **billing models and stay in
+the host**. What crosses into the package:
+
+- the tier ladder as **config** (`definePlans` output — no price, interval or
+  provider id);
+- pricing **display rows** and pre-assembled comparison **cards** (strings and
+  cents your billing computed — the package words them, never computes them);
+- the plan-change ask through the **`PlanChangeRequestPort`** — a lead for a
+  human, written to YOUR table. The package cannot write a tier, mint a charge
+  or reach a provider.
+
+The one table the machinery itself needs — `RetentionWatermark`, the
+"downgrade never deletes" anchor — ships with the package
+(`prisma/entitlements.prisma` + migrations, adopted via
+`pnpm --filter @12-apps/entitlements prisma:sync` and the host's structural
+migration copy).
+
+⚠️ **`retention_watermarks.client_id` carries NO foreign key and NO cascade**
+(the payments doctrine: a package model must not reference a table it cannot
+know). Two consequences you own as the adopter: your repository layer is the
+ONLY tenant boundary — every read and write of the watermark goes through the
+package's `createRetention`, which scopes by `clientId` — and deleting a
+tenant orphans its watermark rows. Sweep them in whatever job deletes the
+tenant (`DELETE FROM retention_watermarks WHERE client_id = $1`), or accept
+the orphans: they are two-column rows keyed by a tenant id that no sweep will
+ever resolve a window for again.
+
+### The coverage gate
+
+`scripts/entitlements-coverage.mjs` (published with the package, zero
+dependencies) is the page-side gate: every routed SPA page is either wrapped
+in `withEntitlement("<key>", …)` or allowlisted with a reason. Point it at
+your app with a JSON config:
+
+```jsonc
+// apps/admin/entitlements-coverage.config.json — paths relative to this file
+{
+  "routesFile": "src/routes.tsx",
+  "pagesDir": "src/pages",
+  "featuresFile": "../web/lib/entitlements/features.ts",
+  "exceptionsFile": "entitlement-gate-exceptions.json",
+  // Nullable, but NEVER omittable: `null` opts out of the check each drives,
+  // while an absent key fails the run — for a completeness gate, silence must
+  // be a decision, not an omission.
+  "navFile": "src/shell/nav-groups.ts",
+  "tenantSwitchFile": "src/lib/tenant-switch-locations.ts",
+  // Optional: the <Route path="…"> whose children are the config pages the
+  // tenant-switch map may point at (default "config").
+  "configRoutePrefix": "config",
+  // Optional: how the routes file spells its page imports; derived from
+  // pagesDir's basename when omitted ("./pages/" for "src/pages"). The gate
+  // fails rather than passes when the prefix parses zero routed exports.
+  "routesImportPrefix": "./pages/"
+}
+```
+
+```jsonc
+// package.json
+"entitlements:coverage": "node node_modules/@12-apps/entitlements/scripts/entitlements-coverage.mjs --config entitlements-coverage.config.json"
+```
+
+Note the file itself still imports nothing, but running it from
+`node_modules` means the CI lane must install first — a caller of 12-apps/ci's
+`entitlements-coverage.yml` that passed `install: false` for the vendored copy
+flips that input when adopting the packaged one.

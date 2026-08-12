@@ -24,6 +24,7 @@
     "20260810120000_add_report_default_range",
     "20260810160000_report_default_range_month",
     "20260810180000_add_report_working_copy",
-    "20260812120000_add_rbac_tables"
+    "20260812120000_add_rbac_tables",
+    "20260812120000_add_retention_watermarks"
   ]
 }

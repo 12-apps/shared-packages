@@ -6,10 +6,12 @@
  * test of a hand-rolled second app would prove nothing about the one that
  * serves the SPA.
  *
- * Three surfaces, and the split between them is the point:
+ * Four surfaces, and the split between them is the point:
  *
  *  - `/api/admin/:tenantSlug/reports/**` is @12-apps/report-builder's, mounted
  *    whole;
+ *  - `/api/admin/:tenantSlug/{entitlements,plan,plan/request}` is
+ *    @12-apps/entitlements', mounted whole the same way (entitlements-host.ts);
  *  - `/api/admin/:tenantSlug/{roles,permissions,team}/**` is @12-apps/rbac's
  *    (12-13), mounted whole — including the `/roles` read the reports surface
  *    consumes for its "Cargos específicos" allowlist picker, which used to be
@@ -19,6 +21,9 @@
 import { Hono } from 'hono';
 import type { PGlite } from '@electric-sql/pglite';
 
+import { entitlementDenialResponse, isEntitlementDenial } from '@12-apps/entitlements/server';
+
+import { createEntitlementsHost, TENANT } from './entitlements-host';
 import { applyRbacMigrations } from './rbac-db';
 import { rbacHost, reseedRbac } from './rbac-host';
 import { reportsRouter } from './reports-host';
@@ -40,6 +45,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   await applyRbacMigrations(pg);
   const rbac = rbacHost(pg);
   await reseedRbac(pg, rbac);
+  const entitlements = createEntitlementsHost();
   const app = new Hono();
 
   // Liveness, and what Playwright's `webServer` waits on before starting the
@@ -61,9 +67,28 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.post('/__harness/reset', async (c) => {
     await reseed(pg);
     await reseedRbac(pg, rbac);
+    entitlements.reset();
     return c.body(null, 204);
   });
 
+  /**
+   * A HOST endpoint standing behind the package's guard — the arrangement
+   * every gated host route has. What it proves is the denial WIRE: the free
+   * tenant answers 402 here with the body the react half's 402 interceptor
+   * parses into an upsell prompt.
+   */
+  app.get('/api/admin/:tenantSlug/audit-demo', async (c) => {
+    try {
+      await entitlements.requireEntitlement(TENANT, 'audit');
+      return c.json({ entries: [] });
+    } catch (error) {
+      if (!isEntitlementDenial(error)) throw error;
+      const denial = entitlementDenialResponse(error);
+      return c.json(denial.body, denial.status as 402);
+    }
+  });
+
+  app.route('/api/admin/:tenantSlug', entitlements.router);
   app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
   app.route('/api/admin/:tenantSlug', rbac.router);
 
