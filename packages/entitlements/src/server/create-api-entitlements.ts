@@ -81,6 +81,11 @@ export interface ApiEntitlementsConfig<F extends string> {
   pricing?: readonly PricingRow[];
   /** The pricing cards, assembled by the host's billing catalog. */
   comparison?: (currentPlanKey: string) => ComparisonTier[];
+  /**
+   * How a price in cents reads on the wire (`TenantPlanView.price`).
+   * Defaults to the BRL wording future-pay ships (`"R$ 59,00"` / `"Grátis"`).
+   */
+  formatPrice?: (priceCents: number | null) => string | null;
   /** The plan-change lead store. Omit it and the request routes do not exist. */
   planChangeRequests?: PlanChangeRequestPort | null;
 }
@@ -151,6 +156,7 @@ export function createApiEntitlements<F extends string>(
     defaultPlanKey: config.defaultPlanKey,
     pricing,
     comparison: config.comparison,
+    formatPrice: config.formatPrice,
   });
 
   const routes = buildEntitlementsRoutes({

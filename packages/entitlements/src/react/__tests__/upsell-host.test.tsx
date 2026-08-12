@@ -43,12 +43,13 @@ function fakeHost() {
   const fetchImpl: typeof fetch = async (input, init) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
-    if (url.endsWith('/plan') && method === 'GET') return Response.json({ plan: payload() });
+    if (url.endsWith('/plan') && method === 'GET') {
+      return Response.json({ data: { plan: payload() } });
+    }
     if (url.endsWith('/plan/request') && method === 'POST') {
       posts.push(JSON.parse(String(init?.body)));
       return Response.json({
-        request: { id: 'r1', requestedPlanKey: 'pro', createdAt: 'now' },
-        created: true,
+        data: { request: { id: 'r1', status: 'open' }, created: true },
       });
     }
     return Response.json({ error: 'rota desconhecida' }, { status: 404 });

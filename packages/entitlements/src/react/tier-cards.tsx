@@ -33,26 +33,37 @@ interface TierCardsProps {
 /**
  * The ✓ / − marks, as plain SVG: this package takes no icon-font dependency
  * for two glyphs, and both are decoration (`aria-hidden`) — the line's
- * `included` state is what carries the meaning.
+ * `included` state is what carries the meaning. Drawn with `currentColor`
+ * under an `sx` palette color, so the marks follow the host THEME (including
+ * dark mode) exactly as the original `color="success"` icons did.
  */
 function IncludedMark({ included }: { included: boolean }): JSX.Element {
-  const stroke = included ? 'var(--mui-palette-success-main, #2e7d32)' : 'currentColor';
   return (
-    <svg
+    <Box
+      component="svg"
       aria-hidden
-      width="18"
-      height="18"
+      width="20"
+      height="20"
       viewBox="0 0 24 24"
       fill="none"
-      style={{ flexShrink: 0, marginTop: 2, opacity: included ? 1 : 0.35 }}
+      sx={{
+        flexShrink: 0,
+        mt: '2px',
+        color: included ? 'success.main' : 'text.disabled',
+      }}
     >
-      <circle cx="12" cy="12" r="9" stroke={stroke} strokeWidth="2" />
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
       {included ? (
-        <path d="M8 12.5l2.5 2.5L16 9.5" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+        <path
+          d="M8 12.5l2.5 2.5L16 9.5"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
       ) : (
-        <path d="M8 12h8" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+        <path d="M8 12h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
       )}
-    </svg>
+    </Box>
   );
 }
 

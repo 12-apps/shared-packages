@@ -13,7 +13,7 @@ import { definePlans } from '../../core/plans';
 import { defineFeatures } from '../../core/registry';
 import { createMemorySource } from '../../memory';
 import { upsellPromptFromPaymentRequired } from '../../plan-wire';
-import type { ComparisonTier, OpenPlanRequest } from '../../plan-wire';
+import type { ComparisonTier, FiledPlanRequest, OpenPlanRequest } from '../../plan-wire';
 import {
   createApiEntitlements,
   type ApiEntitlementsConfig,
@@ -63,6 +63,7 @@ const COMPARISON: ComparisonTier[] = [
 function memoryLeads(): PlanChangeRequestPort & { rows: OpenPlanRequest[] } {
   const rows: OpenPlanRequest[] = [];
   const open = new Map<string, OpenPlanRequest>();
+  const filed = (row: OpenPlanRequest): FiledPlanRequest => ({ id: row.id, status: 'open' });
   return {
     rows,
     async getOpen(tenantId) {
@@ -70,7 +71,7 @@ function memoryLeads(): PlanChangeRequestPort & { rows: OpenPlanRequest[] } {
     },
     async create(input) {
       const existing = open.get(input.tenantId);
-      if (existing) return { request: existing, created: false };
+      if (existing) return { request: filed(existing), created: false };
       const request: OpenPlanRequest = {
         id: `req-${rows.length + 1}`,
         requestedPlanKey: input.requestedPlanKey,
@@ -78,7 +79,7 @@ function memoryLeads(): PlanChangeRequestPort & { rows: OpenPlanRequest[] } {
       };
       open.set(input.tenantId, request);
       rows.push(request);
-      return { request, created: true };
+      return { request: filed(request), created: true };
     },
   };
 }
@@ -109,27 +110,43 @@ function route(api: { routes: EntitlementsRoute[] }, method: string, path: strin
   return found;
 }
 
+/** Unwrap the `{ data: … }` SUCCESS envelope every 2xx body ships in. */
+function dataOf<T>(response: { status: number; body: Record<string, unknown> }): T {
+  expect(response.body.data).toBeDefined();
+  return response.body.data as T;
+}
+
 describe('GET /plan', () => {
-  it('serves the view plus the comparison, priced from the host catalog', async () => {
+  it('serves the view plus the comparison, priced from the host catalog — enveloped', async () => {
     const api = build({ planChangeRequests: memoryLeads() });
     const response = await route(api, 'GET', '/plan').handle({ actor: { tenantId: 't1' } });
 
     expect(response.status).toBe(200);
-    const plan = (response.body as { plan: { name: string; price: string; comparison: unknown[] } })
-      .plan;
+    // The envelope is the surface's contract: `{ data: { plan } }`, exactly
+    // what the host's MCP response schema declares and its client unwraps.
+    expect(Object.keys(response.body)).toEqual(['data']);
+    const plan = dataOf<{ plan: { name: string; price: string; comparison: unknown[] } }>(
+      response,
+    ).plan;
     expect(plan.name).toBe('Gratuito');
     expect(plan.price).toBe('Grátis');
     expect(plan.comparison).toEqual(COMPARISON);
   });
 
+  it('words the price through the injected formatter when the host brings its own currency', async () => {
+    const api = build({
+      formatPrice: (cents) => (cents === null ? null : `USD ${(cents / 100).toFixed(2)}`),
+    });
+    const response = await route(api, 'GET', '/plan').handle({ actor: { tenantId: 't1' } });
+    expect(dataOf<{ plan: { price: string } }>(response).plan.price).toBe('USD 0.00');
+  });
+
   it('names the required tier COMMERCIALLY on a denied row', async () => {
     const api = build();
     const response = await route(api, 'GET', '/plan').handle({ actor: { tenantId: 't1' } });
-    const plan = (
-      response.body as {
-        plan: { features: { feature: string; requiredPlan: string | null; requiredPlanLabel: string | null }[] };
-      }
-    ).plan;
+    const plan = dataOf<{
+      plan: { features: { feature: string; requiredPlan: string | null; requiredPlanLabel: string | null }[] };
+    }>(response).plan;
     const audit = plan.features.find((f) => f.feature === 'audit');
     expect(audit).toMatchObject({ requiredPlan: 'pro', requiredPlanLabel: 'Pro' });
   });
@@ -137,8 +154,8 @@ describe('GET /plan', () => {
   it('measures live usage for enabled quota rows through the usage port', async () => {
     const api = build({ usage: { count: async () => 4 } });
     const response = await route(api, 'GET', '/plan').handle({ actor: { tenantId: 't1' } });
-    const plan = (
-      response.body as { plan: { features: { feature: string; used: number | null; note: string }[] } }
+    const plan = dataOf<{ plan: { features: { feature: string; used: number | null; note: string }[] } }>(
+      response,
     ).plan;
     const locations = plan.features.find((f) => f.feature === 'stock.locations');
     // used 4 > limit 1: the over-quota state, upselling the tier whose
@@ -154,7 +171,7 @@ describe('GET /entitlements', () => {
     const api = build();
     const response = await route(api, 'GET', '/entitlements').handle({ actor: { tenantId: 't1' } });
     expect(response.status).toBe(200);
-    const snapshot = (response.body as { snapshot: { planKey: string; features: object } }).snapshot;
+    const snapshot = dataOf<{ snapshot: { planKey: string; features: object } }>(response).snapshot;
     expect(snapshot.planKey).toBe('free');
     expect(Object.keys(snapshot.features)).toEqual([...FEATURES.list]);
   });
@@ -195,17 +212,43 @@ describe('POST /plan/request', () => {
 
     const first = await post.handle({ actor, body: { requestedPlan: 'pro', feature: 'audit' } });
     expect(first.status).toBe(200);
-    expect(first.body).toMatchObject({ created: true });
+    // The write answers `{ id, status }` — the lead's details live on the
+    // read next door, exactly the host's original response contract.
+    expect(first.body).toEqual({
+      data: { request: { id: 'req-1', status: 'open' }, created: true },
+    });
 
     // A repeat press is one request, not two — and still a 200: "we already
     // have your request" is simply true.
     const second = await post.handle({ actor, body: { requestedPlan: 'pro' } });
     expect(second.status).toBe(200);
-    expect(second.body).toMatchObject({ created: false });
+    expect(dataOf<{ created: boolean }>(second).created).toBe(false);
     expect(leads.rows).toHaveLength(1);
 
     const open = await route(api, 'GET', '/plan/request').handle({ actor });
-    expect((open.body as { request: OpenPlanRequest }).request.requestedPlanKey).toBe('pro');
+    expect(dataOf<{ request: OpenPlanRequest }>(open).request.requestedPlanKey).toBe('pro');
+  });
+
+  it('validates the ask exactly as the host did: trim, then length ceilings', async () => {
+    const leads = memoryLeads();
+    const api = build({ planChangeRequests: leads });
+    const post = route(api, 'POST', '/plan/request');
+    const actor = { tenantId: 't1', canRequestPlanChange: true };
+
+    // Whitespace is trimmed, not refused — `" pro"` is an ask for pro.
+    const padded = await post.handle({ actor, body: { requestedPlan: ' pro ', note: '  ' } });
+    expect(padded.status).toBe(200);
+    expect(leads.rows[0]?.requestedPlanKey).toBe('pro');
+
+    // A present-but-blank feature and over-limit fields are 400s.
+    for (const body of [
+      { requestedPlan: 'pro', feature: '   ' },
+      { requestedPlan: 'pro', feature: 'x'.repeat(121) },
+      { requestedPlan: 'pro', note: 'x'.repeat(1001) },
+    ]) {
+      const response = await post.handle({ actor: { ...actor, tenantId: 't1' }, body });
+      expect(response.status).toBe(400);
+    }
   });
 });
 

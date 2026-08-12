@@ -5,7 +5,7 @@ import type { EntitlementDecision } from "../../core/types";
 import { buildTenantPlanView, formatPrice } from "../plan-view";
 
 /**
- * The store's view of its own plan (FUT-408). What is being protected here is
+ * The store's view of its own plan. What is being protected here is
  * mostly WORDING and what is withheld — the two ways this screen could mislead
  * a customer are selling them an upgrade that fixes nothing, and showing them
  * an operator's sentence.
@@ -178,7 +178,7 @@ describe("buildTenantPlanView", () => {
   });
 });
 
-describe("the over-quota state (FUT-396 / FUT-333)", () => {
+describe("the over-quota state", () => {
   const overQuota = (used: number, nextPlan: string | null = "pro") =>
     buildTenantPlanView(
       "basic",
@@ -188,7 +188,7 @@ describe("the over-quota state (FUT-396 / FUT-333)", () => {
       { "catalog.products": { used, nextPlan } },
     );
 
-  it("says the FUT-396 words when the store holds MORE than its ceiling", () => {
+  it("says the agreed over-quota words when the store holds MORE than its ceiling", () => {
     // Grandfathered or downgraded: the feature IS in the plan, so
     // "Não incluído" would be a lie, and plain "Incluído" would hide that
     // creates refuse. The agreed copy: keep everything, cannot add more.

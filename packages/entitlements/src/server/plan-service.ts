@@ -11,7 +11,7 @@ import type {
   UsageCounter,
 } from '../core/types';
 import type { ComparisonTier, TenantPlanPayload, TenantPlanView } from '../plan-wire';
-import { buildTenantPlanView, type PricingRow, type QuotaUsageView } from './plan-view';
+import { buildTenantPlanView, formatPrice, type PricingRow, type QuotaUsageView } from './plan-view';
 
 interface PlanServiceConfig<F extends string> {
   engine: EntitlementsEngine<F>;
@@ -21,6 +21,7 @@ interface PlanServiceConfig<F extends string> {
   defaultPlanKey: string;
   pricing: readonly PricingRow[];
   comparison?: ((currentPlanKey: string) => ComparisonTier[]) | undefined;
+  formatPrice?: ((priceCents: number | null) => string | null) | undefined;
 }
 
 export interface PlanService {
@@ -73,6 +74,7 @@ export function createPlanService<F extends string>(config: PlanServiceConfig<F>
       // take the store's plan screen down.
       (feature) => (features.has(feature) ? features.def(feature).description : null),
       usage,
+      config.formatPrice ?? formatPrice,
     );
   }
 

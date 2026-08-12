@@ -51,11 +51,12 @@ export function EntitlementsPlanPage(): JSX.Element {
     fetch(`${API_BASE}/entitlements`)
       .then(async (response) => {
         if (!response.ok) throw new Error(`snapshot ${response.status}`);
-        return (await response.json()) as { snapshot: EntitlementSnapshot };
+        // The `{ data: … }` SUCCESS envelope — the surface's wire contract.
+        return (await response.json()) as { data: { snapshot: EntitlementSnapshot } };
       })
       .then(
         (body) => {
-          if (alive) setSnapshot(body.snapshot);
+          if (alive) setSnapshot(body.data.snapshot);
         },
         () => {
           if (alive) setFailed(true);

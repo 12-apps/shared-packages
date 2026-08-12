@@ -71,23 +71,27 @@ function payload(): TenantPlanPayload {
   };
 }
 
-/** A wire-faithful fake host: GET/POST the same paths, same envelopes. */
+/**
+ * A wire-faithful fake host: GET/POST the same paths, every SUCCESS body in
+ * the `{ data: … }` envelope the real routes produce (errors bare, like the
+ * real denial wire), and the POST answering `{ id, status }` only.
+ */
 function fakeHost(initialOpen: OpenPlanRequest | null = null) {
   const state = { open: initialOpen, posts: [] as unknown[] };
   const fetchImpl: typeof fetch = async (input, init) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
     if (url.endsWith('/plan') && method === 'GET') {
-      return Response.json({ plan: payload() });
+      return Response.json({ data: { plan: payload() } });
     }
     if (url.endsWith('/plan/request') && method === 'GET') {
-      return Response.json({ request: state.open });
+      return Response.json({ data: { request: state.open } });
     }
     if (url.endsWith('/plan/request') && method === 'POST') {
       const body = JSON.parse(String(init?.body)) as { requestedPlan: string };
       state.posts.push(body);
       state.open = { id: 'r1', requestedPlanKey: body.requestedPlan, createdAt: 'now' };
-      return Response.json({ request: state.open, created: true });
+      return Response.json({ data: { request: { id: 'r1', status: 'open' }, created: true } });
     }
     return Response.json({ error: 'rota desconhecida' }, { status: 404 });
   };

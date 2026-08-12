@@ -9,13 +9,15 @@
  * the plan-change lead are the HOST's tables, reached through ports.
  */
 
-/** The reasons a store can be shown (`not-supported` rows are dropped). */
-export type TenantFeatureReason =
-  | 'enabled'
-  | 'not-entitled'
-  | 'disabled-by-tenant'
-  | 'restricted'
-  | 'suspended';
+import type { EntitlementReason } from './core/types';
+
+/**
+ * The reasons a store can be shown (`not-supported` rows are dropped).
+ * DERIVED from the engine's own union — never hand-written — so adding a
+ * reason to `EntitlementReason` fails typecheck at the `NOTE` copy table
+ * instead of blanking a note at runtime.
+ */
+export type TenantFeatureReason = Exclude<EntitlementReason, 'not-supported'>;
 
 /** One capability as the STORE should read it. */
 export interface TenantFeatureView {
@@ -90,6 +92,16 @@ export interface OpenPlanRequest {
   id: string;
   requestedPlanKey: string;
   createdAt: string;
+}
+
+/**
+ * What the POST answers with — deliberately NOT the full open request: the
+ * host's lead row exposes `{ id, status }` on the write (the MCP response
+ * contract), and the read next door is where the details live.
+ */
+export interface FiledPlanRequest {
+  id: string;
+  status: string;
 }
 
 /** `POST plan/request` — the ask, as the client sends it. */

@@ -56,14 +56,14 @@ export interface SummarizableTenant<K extends string = string> {
    * Where `currentPlanKey` came from, which decides what an OFF-LADDER key
    * means — the two origins are not interchangeable:
    *
-   * - `client`: billing had no opinion, so the key is the hand-assigned one.
-   *   The resolver drops an unrecognised key to the default plan's ceiling.
-   * - `subscription`: a live subscription supplied it, and the tenant's real
-   *   ceilings are that row's FROZEN entitlements snapshot. An unrecognised
+   * - `assigned`: hand-assigned (nothing external had an opinion). The
+   *   resolver drops an unrecognised key to the default plan's ceiling.
+   * - `snapshot`: an external writer supplied it and the tenant's real
+   *   ceilings are that writer's FROZEN entitlement snapshot. An unrecognised
    *   key here is not the default and not any tier — it is unmodellable by
    *   the catalog, so it is reported rather than scored.
    */
-  planKeyFrom: 'client' | 'subscription';
+  planKeyFrom: 'assigned' | 'snapshot';
   recommendedTier: K | null;
   impactByTier: Record<K, readonly unknown[]>;
 }
@@ -169,7 +169,7 @@ function summarize<K extends string>(
     const key = tenant.currentPlanKey;
     if (isPlanKey(key)) {
       if (tenant.impactByTier[key].length > 0) losingOnCurrent += 1;
-    } else if (tenant.planKeyFrom === 'client') {
+    } else if (tenant.planKeyFrom === 'assigned') {
       offLadder += 1;
       if (tenant.impactByTier[defaultPlanKey].length > 0) losingOnCurrent += 1;
     } else {

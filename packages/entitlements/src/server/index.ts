@@ -84,6 +84,7 @@ export type {
   ComparisonLine,
   ComparisonSection,
   ComparisonTier,
+  FiledPlanRequest,
   OpenPlanRequest,
   PlanChangeRequestBody,
   TenantFeatureReason,

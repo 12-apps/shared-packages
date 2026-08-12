@@ -4,7 +4,7 @@
  * it never reshapes it.
  */
 import type { EntitlementsEngine } from '../core/engine';
-import type { OpenPlanRequest } from '../plan-wire';
+import type { FiledPlanRequest, OpenPlanRequest } from '../plan-wire';
 import type { PlanService } from './plan-service';
 import { entitlementDenialResponse, isEntitlementDenial, type WireResponse } from './wire';
 
@@ -48,6 +48,10 @@ export interface EntitlementsRoute {
  */
 export interface PlanChangeRequestPort {
   getOpen(tenantId: string): Promise<OpenPlanRequest | null>;
+  /**
+   * Returns `{ id, status }` only — the write's contract (what future-pay's
+   * MCP response schema declares). The read route is where the details live.
+   */
   create(input: {
     tenantId: string;
     requestedPlanKey: string;
@@ -56,7 +60,7 @@ export interface PlanChangeRequestPort {
     featureKey: string | null;
     requestedByUserId: string | null;
     note: string | null;
-  }): Promise<{ request: OpenPlanRequest; created: boolean }>;
+  }): Promise<{ request: FiledPlanRequest; created: boolean }>;
 }
 
 interface ParsedAsk {
@@ -65,23 +69,54 @@ interface ParsedAsk {
   note: string | null;
 }
 
-function optionalString(value: unknown, maxLength: number): string | null | undefined {
+/**
+ * The ask, validated by hand — this package has zero runtime dependencies.
+ *
+ * Mirrors the host's original zod contract exactly (`requestedPlan`
+ * trim+min(1)+max(50), `feature` trim+min(1)+max(120) when present, `note`
+ * trim+max(1000) when present), plus one check the ladder makes possible:
+ * the requested key must be a tier the catalog actually declares.
+ */
+/**
+ * `.trim().min(1).max(len)` for an OPTIONAL field: `null` when absent,
+ * `undefined` when invalid (present but wrong type, blank, or over the
+ * ceiling), the trimmed string otherwise.
+ */
+function optionalTrimmed(
+  value: unknown,
+  maxLength: number,
+  { allowEmpty = false } = {},
+): string | null | undefined {
   if (value === undefined) return null;
-  if (typeof value !== 'string' || value.length > maxLength) return undefined;
-  return value === '' ? null : value;
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (trimmed === '') return allowEmpty ? null : undefined;
+  return trimmed.length > maxLength ? undefined : trimmed;
 }
 
-/** The ask, validated by hand — this package has zero runtime dependencies. */
 function parseRequestBody(raw: unknown, isKnownPlan: (key: string) => boolean): ParsedAsk | null {
   if (raw === null || typeof raw !== 'object') return null;
   const body = raw as Record<string, unknown>;
-  const { requestedPlan } = body;
-  if (typeof requestedPlan !== 'string' || !isKnownPlan(requestedPlan)) return null;
-  const feature = optionalString(body.feature, 200);
-  const note = optionalString(body.note, 2000);
+  if (typeof body.requestedPlan !== 'string') return null;
+  const requestedPlan = body.requestedPlan.trim();
+  if (requestedPlan === '' || requestedPlan.length > 50 || !isKnownPlan(requestedPlan)) return null;
+
+  const feature = optionalTrimmed(body.feature, 120);
+  // A blank note is simply no note; a blank feature was named and is invalid.
+  const note = optionalTrimmed(body.note, 1000, { allowEmpty: true });
   if (feature === undefined || note === undefined) return null;
+
   return { requestedPlan, feature, note };
 }
+
+/**
+ * The SUCCESS envelope: every 2xx body ships as `{ data: … }`, matching both
+ * the report-builder reference (`ok()` in its descriptors) and future-pay's
+ * documented `/api/admin/**` invariant — its client unwraps `{ data }`, and
+ * its MCP response schemas declare it. Denials and refusals are NEVER
+ * wrapped: they mirror the host's error shape byte for byte.
+ */
+const ok = (data: Record<string, unknown>): WireResponse => ({ status: 200, body: { data } });
 
 /** Run a handler, mapping the engine's own denials onto the wire contract. */
 async function answering(body: () => Promise<WireResponse>): Promise<WireResponse> {
@@ -135,7 +170,7 @@ function askRoute(
         // 200 either way, including on a repeat press: "we already have your
         // request" is simply true, and an error would read as though the ask
         // had been lost.
-        return { status: 200, body: { request: result.request, created: result.created } };
+        return ok({ request: result.request, created: result.created });
       }),
   };
 }
@@ -155,10 +190,7 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
       method: 'GET',
       path: '/entitlements',
       handle: ({ actor }) =>
-        answering(async () => ({
-          status: 200,
-          body: { snapshot: await engine.toSnapshot(actor.tenantId) },
-        })),
+        answering(async () => ok({ snapshot: await engine.toSnapshot(actor.tenantId) })),
     },
     {
       // What plan this store is on. READ-ONLY, staff-wide, and it deliberately
@@ -168,10 +200,7 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
       method: 'GET',
       path: '/plan',
       handle: ({ actor }) =>
-        answering(async () => ({
-          status: 200,
-          body: { plan: await service.getPlanPayload(actor.tenantId) },
-        })),
+        answering(async () => ok({ plan: await service.getPlanPayload(actor.tenantId) })),
     },
   ];
 
@@ -184,10 +213,7 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
         method: 'GET',
         path: '/plan/request',
         handle: ({ actor }) =>
-          answering(async () => ({
-            status: 200,
-            body: { request: await leads.getOpen(actor.tenantId) },
-          })),
+          answering(async () => ok({ request: await leads.getOpen(actor.tenantId) })),
       },
       askRoute(service, leads, deps.isKnownPlan),
     );

@@ -26,13 +26,18 @@ describe('GET /plan', () => {
   it('answers every staff member — the screen that explains denials is never itself denied', async () => {
     const response = await backend.app.request(PLAN_URL, STAFF);
     expect(response.status).toBe(200);
-    const { plan } = (await response.json()) as {
-      plan: {
-        name: string;
-        price: string;
-        comparison: { key: string; current: boolean; name: string }[];
+    // The `{ data: … }` SUCCESS envelope is the surface's contract — the
+    // same invariant the host documents for its whole /api/admin/** surface.
+    const envelope = (await response.json()) as {
+      data: {
+        plan: {
+          name: string;
+          price: string;
+          comparison: { key: string; current: boolean; name: string }[];
+        };
       };
     };
+    const { plan } = envelope.data;
     expect(plan.name).toBe('Gratuito');
     expect(plan.price).toBe('Grátis');
     expect(plan.comparison.map((tier) => [tier.key, tier.current])).toEqual([
@@ -43,17 +48,19 @@ describe('GET /plan', () => {
 
   it('words each denial for a customer, with the COMMERCIAL tier name on the upsell', async () => {
     const response = await backend.app.request(PLAN_URL);
-    const { plan } = (await response.json()) as {
-      plan: {
-        features: {
-          feature: string;
-          reason: string;
-          requiredPlan: string | null;
-          requiredPlanLabel: string | null;
-          note: string;
-        }[];
+    const { plan } = ((await response.json()) as {
+      data: {
+        plan: {
+          features: {
+            feature: string;
+            reason: string;
+            requiredPlan: string | null;
+            requiredPlanLabel: string | null;
+            note: string;
+          }[];
+        };
       };
-    };
+    }).data;
     const byKey = Object.fromEntries(plan.features.map((f) => [f.feature, f]));
 
     // A plan gap upsells, commercially named.
@@ -91,15 +98,23 @@ describe('the plan-change ask', () => {
         body: JSON.stringify({ requestedPlan: 'pro', feature: 'audit' }),
       });
 
-    const first = (await (await post()).json()) as { created: boolean; request: { id: string } };
+    const first = ((await (await post()).json()) as {
+      data: { created: boolean; request: { id: string; status: string } };
+    }).data;
     expect(first.created).toBe(true);
-    const second = (await (await post()).json()) as { created: boolean; request: { id: string } };
+    // The write answers `{ id, status }` — details live on the read.
+    expect(first.request).toEqual({ id: first.request.id, status: 'open' });
+    const second = ((await (await post()).json()) as {
+      data: { created: boolean; request: { id: string } };
+    }).data;
     expect(second.created).toBe(false);
     expect(second.request.id).toBe(first.request.id);
 
     // Staff can SEE the open ask — nobody is invited to ask again.
     const open = await backend.app.request(REQUEST_URL, STAFF);
-    const body = (await open.json()) as { request: { requestedPlanKey: string } };
+    const body = ((await open.json()) as {
+      data: { request: { requestedPlanKey: string } };
+    }).data;
     expect(body.request.requestedPlanKey).toBe('pro');
   });
 
@@ -133,9 +148,9 @@ describe('the snapshot bootstrap', () => {
   it('serves the server-resolved snapshot the provider renders from', async () => {
     const response = await backend.app.request('/api/admin/harness/entitlements');
     expect(response.status).toBe(200);
-    const { snapshot } = (await response.json()) as {
-      snapshot: { planKey: string; features: Record<string, { reason: string }> };
-    };
+    const { snapshot } = ((await response.json()) as {
+      data: { snapshot: { planKey: string; features: Record<string, { reason: string }> } };
+    }).data;
     expect(snapshot.planKey).toBe('free');
     expect(snapshot.features['storefront.tables']?.reason).toBe('disabled-by-tenant');
   });

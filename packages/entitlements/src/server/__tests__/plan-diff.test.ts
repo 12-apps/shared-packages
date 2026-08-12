@@ -12,7 +12,7 @@ import {
 } from "../plan-diff";
 
 /**
- * The release gate (FUT-387) reports only what a tenant would LOSE, resolved
+ * The release gate reports only what a tenant would LOSE, resolved
  * through the real engine rather than the tier table.
  */
 function decision(

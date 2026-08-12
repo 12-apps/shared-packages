@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
-import type { OpenPlanRequest, TenantPlanPayload } from '../plan-wire';
+import type { FiledPlanRequest, OpenPlanRequest, TenantPlanPayload } from '../plan-wire';
 
 interface PlanApi {
   getPlan(): Promise<{ plan: TenantPlanPayload }>;
@@ -15,9 +15,15 @@ interface PlanApi {
   requestPlanChange(body: {
     requestedPlan: string;
     feature?: string;
-  }): Promise<{ request: OpenPlanRequest; created: boolean }>;
+  }): Promise<{ request: FiledPlanRequest; created: boolean }>;
 }
 
+/**
+ * Every SUCCESS body arrives as the `{ data: … }` envelope (the same
+ * invariant future-pay documents for its whole `/api/admin/**` surface) and
+ * is unwrapped here; error bodies are never enveloped, so the failure path
+ * reads `error` off the bare body.
+ */
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
@@ -27,7 +33,8 @@ async function readJson<T>(response: Response): Promise<T> {
         : `Falha na requisição (${response.status}).`;
     throw new Error(message);
   }
-  return (await response.json()) as T;
+  const envelope = (await response.json()) as { data: T };
+  return envelope.data;
 }
 
 export function createPlanApi(apiBase: string, fetchImpl: typeof fetch): PlanApi {

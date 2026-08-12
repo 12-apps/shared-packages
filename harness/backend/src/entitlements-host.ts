@@ -22,6 +22,7 @@ import {
 import {
   formatPrice,
   type ComparisonTier,
+  type FiledPlanRequest,
   type OpenPlanRequest,
   type PlanChangeRequestPort,
 } from '@12-apps/entitlements/server';
@@ -123,13 +124,16 @@ export function createEntitlementsHost(): EntitlementsHost {
   // by tenant, exactly the contract the port documents.
   const open = new Map<string, OpenPlanRequest>();
   let sequence = 0;
+  // The write answers `{ id, status }` only — the read next door carries the
+  // details, exactly the split future-pay's lead table exposes.
+  const filed = (row: OpenPlanRequest): FiledPlanRequest => ({ id: row.id, status: 'open' });
   const planChangeRequests: PlanChangeRequestPort = {
     async getOpen(tenantId) {
       return open.get(tenantId) ?? null;
     },
     async create(input) {
       const existing = open.get(input.tenantId);
-      if (existing) return { request: existing, created: false };
+      if (existing) return { request: filed(existing), created: false };
       sequence += 1;
       const request: OpenPlanRequest = {
         id: `req-${sequence}`,
@@ -137,7 +141,7 @@ export function createEntitlementsHost(): EntitlementsHost {
         createdAt: new Date().toISOString(),
       };
       open.set(input.tenantId, request);
-      return { request, created: true };
+      return { request: filed(request), created: true };
     },
   };
 

@@ -141,6 +141,12 @@ export function buildTenantPlanView(
   describe: (feature: string) => string | null,
   /** Live usage per quota feature, when the caller measured it. */
   usage: Readonly<Record<string, QuotaUsageView>> = {},
+  /**
+   * How a price in cents reads on the wire. Defaults to {@link formatPrice}
+   * (BRL) — the injection point for a host in another currency, since the
+   * package words money it is handed but must not dictate whose money it is.
+   */
+  priceLabel: (priceCents: number | null) => string | null = formatPrice,
 ): TenantPlanView {
   const priced = pricing.find((plan) => plan.key === planKey) ?? null;
 
@@ -181,7 +187,7 @@ export function buildTenantPlanView(
     planKey,
     name: priced?.name ?? planKey,
     priceCents,
-    price: formatPrice(priceCents),
+    price: priceLabel(priceCents),
     features,
   };
 }

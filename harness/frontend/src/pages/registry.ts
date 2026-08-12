@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 
+import { EntitlementsPlanPage } from './entitlements-plan';
 import { PaymentsCheckoutApplePayPage } from './payments-checkout-apple-pay';
 import { PaymentsCheckoutBothPage } from './payments-checkout-both';
 import { PaymentsCheckoutBuyerFieldsPage } from './payments-checkout-buyer-fields';
@@ -21,7 +22,6 @@ import { PaymentsProviderChainPage } from './payments-provider-chain';
 import { PaymentsProviderConnectPage } from './payments-provider-connect';
 import { PaymentsProviderCredentialsPage } from './payments-provider-credentials';
 import { PaymentsProviderSettingsPage } from './payments-provider-settings';
-import { EntitlementsPlanPage } from './entitlements-plan';
 import { PwaInstallPromptPage } from './pwa-install-prompt';
 import { ReportBuilderPage } from './report-builder';
 

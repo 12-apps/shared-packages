@@ -36,8 +36,17 @@
  *   featuresFile      (required)  the file whose `defineFeatures(` call
  *                                 declares the app catalog
  *   exceptionsFile    (required)  the allowlist JSON ({ Export: "reason" })
- *   navFile           (optional)  the sidebar file carrying `requiredFeature:`
- *   tenantSwitchFile  (optional)  the `path:`-map of tenant-switch screens
+ *   navFile           (required, nullable)  the sidebar file carrying
+ *                                 `requiredFeature:` — or explicitly `null`
+ *                                 to opt out of check 3. ABSENCE fails: for a
+ *                                 completeness gate, silence must be a
+ *                                 decision, never an omission.
+ *   tenantSwitchFile  (required, nullable)  the `path:`-map of tenant-switch
+ *                                 screens — or explicitly `null` to opt out
+ *                                 of check 5. Same rule.
+ *   routesImportPrefix (optional) the import prefix the routes file uses,
+ *                                 default derived from pagesDir's basename
+ *                                 (`./pages/` for `src/pages`)
  *   configRoutePrefix (optional)  the <Route path="..."> whose children are
  *                                 the config pages (default "config"); only
  *                                 used when tenantSwitchFile is set
@@ -50,7 +59,7 @@
  * nothing) — flip that workflow input when adopting the packaged copy.
  */
 import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import process from "node:process";
 
 function fail(message) {
@@ -71,14 +80,46 @@ for (const required of ["routesFile", "pagesDir", "featuresFile", "exceptionsFil
     fail(`config is missing required field "${required}".`);
   }
 }
+// The optional checks may be opted OUT of, never forgotten: an absent key
+// silently skipping a completeness check is how a gate rots. `null` is the
+// explicit opt-out, same shape as an `[]` entry in a coverage map.
+for (const nullable of ["navFile", "tenantSwitchFile"]) {
+  const value = config[nullable];
+  if (value === undefined) {
+    fail(
+      `config is missing "${nullable}" — set it to a path, or explicitly to null to opt out ` +
+        `of the check it drives.`,
+    );
+  }
+  if (value !== null && (typeof value !== "string" || value === "")) {
+    fail(`config field "${nullable}" must be a path or null.`);
+  }
+}
 
 const at = (relativePath) => join(configDir, relativePath);
 const read = (path) => readFileSync(path, "utf8");
 
-/** routes file page imports: `import("./pages/<module>").then((m) => ({ default: m.<Export> }))`. */
+/** Regex-escape a literal path fragment. */
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * routes file page imports:
+ * `import("<prefix><module>").then((m) => ({ default: m.<Export> }))`.
+ *
+ * The prefix is DERIVED from `pagesDir` (or overridden by
+ * `routesImportPrefix`) rather than hardcoded — a host whose pages live in
+ * `src/screens` imports from `./screens/`, and a hardcoded `./pages/` would
+ * parse zero exports and pass the whole gate vacuously.
+ */
 function routedExports() {
   const source = read(at(config.routesFile));
-  const pattern = /import\("\.\/pages\/([^"]+)"\)\s*\.then\(\(m\) => \(\{ default: m\.(\w+) \}\)\)/g;
+  const prefix = config.routesImportPrefix ?? `./${basename(config.pagesDir)}/`;
+  const pattern = new RegExp(
+    `import\\("${escapeRegExp(prefix)}([^"]+)"\\)\\s*\\.then\\(\\(m\\) => \\(\\{ default: m\\.(\\w+) \\}\\)\\)`,
+    "g",
+  );
   const seen = new Map();
   for (const match of source.matchAll(pattern)) {
     seen.set(match[2], match[1]);
@@ -107,7 +148,7 @@ function declaredFeatures() {
 
 /** `requiredFeature` keys the sidebar crowns by. */
 function navFeatureKeys() {
-  if (typeof config.navFile !== "string") return [];
+  if (config.navFile === null) return [];
   const source = read(at(config.navFile));
   return [...source.matchAll(/requiredFeature: "([\w.]+)"/g)].map((match) => match[1]);
 }
@@ -139,6 +180,14 @@ function tenantSwitchPaths() {
 const failures = [];
 
 const routes = routedExports();
+// The anti-vacuity guard `declaredConfigRoutes` already carries, applied to
+// the primary parse too: a gate that found NOTHING routed proved nothing.
+if (routes.size === 0) {
+  fail(
+    `parsed no routed page exports out of ${config.routesFile} — this gate would be vacuous. ` +
+      `Check routesImportPrefix/pagesDir against the routes file; do not ignore this.`,
+  );
+}
 const exceptions = JSON.parse(read(at(config.exceptionsFile)));
 const features = declaredFeatures();
 
@@ -205,7 +254,7 @@ for (const key of navFeatureKeys()) {
 // redirects an unknown path somewhere that "works", so a stale entry here
 // would land the store on a working page with no such switch on it — quietly,
 // which is the exact failure the location map exists to end.
-if (typeof config.tenantSwitchFile === "string") {
+if (config.tenantSwitchFile !== null) {
   const prefix = typeof config.configRoutePrefix === "string" ? config.configRoutePrefix : "config";
   const configRoutes = declaredConfigRoutes(prefix);
   if (configRoutes.size === 0) {

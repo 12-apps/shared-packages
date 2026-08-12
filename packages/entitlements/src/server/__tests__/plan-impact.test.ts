@@ -76,8 +76,8 @@ describe('summarizeImpact — the three meanings of a plan key', () => {
 
   it('counts a loss against the tenant\'s OWN current tier', () => {
     const summary = calc().summarizeImpact([
-      { currentPlanKey: 'free', planKeyFrom: 'client', recommendedTier: 'pro', impactByTier: losing },
-      { currentPlanKey: 'pro', planKeyFrom: 'client', recommendedTier: 'pro', impactByTier: losing },
+      { currentPlanKey: 'free', planKeyFrom: 'assigned', recommendedTier: 'pro', impactByTier: losing },
+      { currentPlanKey: 'pro', planKeyFrom: 'assigned', recommendedTier: 'pro', impactByTier: losing },
     ]);
     // The first loses on free; the second's own tier (pro) is clean.
     expect(summary.losingOnCurrent).toBe(1);
@@ -86,7 +86,7 @@ describe('summarizeImpact — the three meanings of a plan key', () => {
 
   it('scores an off-ladder CLIENT key against the default plan, and says so', () => {
     const summary = calc().summarizeImpact([
-      { currentPlanKey: 'legacy', planKeyFrom: 'client', recommendedTier: null, impactByTier: losing },
+      { currentPlanKey: 'legacy', planKeyFrom: 'assigned', recommendedTier: null, impactByTier: losing },
     ]);
     expect(summary).toMatchObject({ offLadder: 1, losingOnCurrent: 1, unscorable: 0 });
     expect(calc().formatOffLadderNote(summary.offLadder, summary.total)).toContain('"free"');
@@ -99,7 +99,7 @@ describe('summarizeImpact — the three meanings of a plan key', () => {
     const summary = calc().summarizeImpact([
       {
         currentPlanKey: 'legacy',
-        planKeyFrom: 'subscription',
+        planKeyFrom: 'snapshot',
         recommendedTier: null,
         impactByTier: safe,
       },

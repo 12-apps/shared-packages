@@ -314,6 +314,19 @@ Routes served (relative to the mount): `GET /entitlements` (the snapshot the
 provider renders from), `GET /plan` (view + pricing cards), and — only when
 `planChangeRequests` is configured — `GET|POST /plan/request`.
 
+**The wire contract, explicitly.** Every SUCCESS body ships in the
+`{ data: … }` envelope (`{ data: { plan } }`, `{ data: { snapshot } }`,
+`{ data: { request, created } }`) — the same invariant future-pay documents
+for its whole `/api/admin/**` surface, and the shape its MCP response schemas
+declare. Denials and refusals are NEVER wrapped: 402/409/404 mirror the
+host's `paymentRequired` error shape byte for byte, and 400/403 are plain
+`{ error }` bodies. The packaged react half unwraps the envelope for you.
+The POST answers `request: { id, status }` only — the lead's details
+(`requestedPlanKey`, `createdAt`) live on the read next door, so the
+`PlanChangeRequestPort.create` you implement returns exactly that pair.
+`TenantPlanView.price` defaults to BRL wording (`"R$ 59,00"` / `"Grátis"`);
+pass `formatPrice` in the config to word another currency.
+
 ### The money boundary, drawn precisely
 
 `Plan`, `Subscription` and `PlanChangeRequest` are **billing models and stay in
@@ -333,6 +346,16 @@ The one table the machinery itself needs — `RetentionWatermark`, the
 `pnpm --filter @12-apps/entitlements prisma:sync` and the host's structural
 migration copy).
 
+⚠️ **`retention_watermarks.client_id` carries NO foreign key and NO cascade**
+(the payments doctrine: a package model must not reference a table it cannot
+know). Two consequences you own as the adopter: your repository layer is the
+ONLY tenant boundary — every read and write of the watermark goes through the
+package's `createRetention`, which scopes by `clientId` — and deleting a
+tenant orphans its watermark rows. Sweep them in whatever job deletes the
+tenant (`DELETE FROM retention_watermarks WHERE client_id = $1`), or accept
+the orphans: they are two-column rows keyed by a tenant id that no sweep will
+ever resolve a window for again.
+
 ### The coverage gate
 
 `scripts/entitlements-coverage.mjs` (published with the package, zero
@@ -347,8 +370,18 @@ your app with a JSON config:
   "pagesDir": "src/pages",
   "featuresFile": "../web/lib/entitlements/features.ts",
   "exceptionsFile": "entitlement-gate-exceptions.json",
+  // Nullable, but NEVER omittable: `null` opts out of the check each drives,
+  // while an absent key fails the run — for a completeness gate, silence must
+  // be a decision, not an omission.
   "navFile": "src/shell/nav-groups.ts",
-  "tenantSwitchFile": "src/lib/tenant-switch-locations.ts"
+  "tenantSwitchFile": "src/lib/tenant-switch-locations.ts",
+  // Optional: the <Route path="…"> whose children are the config pages the
+  // tenant-switch map may point at (default "config").
+  "configRoutePrefix": "config",
+  // Optional: how the routes file spells its page imports; derived from
+  // pagesDir's basename when omitted ("./pages/" for "src/pages"). The gate
+  // fails rather than passes when the prefix parses zero routed exports.
+  "routesImportPrefix": "./pages/"
 }
 ```
 
