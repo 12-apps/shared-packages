@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  exportedActionsOf,
   guardedSymbols,
   isRbacProtected,
   runRbacCoverage,
@@ -42,6 +43,40 @@ describe('guard detection', () => {
     const guarded = guardedSymbols(source, GUARDS);
     expect(guarded.has('guardedAction')).toBe(true);
     expect(guarded.has('nakedAction')).toBe(false);
+  });
+});
+
+describe('adversarial input stays linear (CodeQL js/polynomial-redos)', () => {
+  // Each input below made the replaced regexes backtrack polynomially —
+  // minutes at this size, not milliseconds. The suite's ordinary per-test
+  // timeout IS the time bound: a regression back to backtracking hangs the
+  // test long past it.
+  it('strips an unterminated escape-run string linearly, failing closed', () => {
+    const source = `requirePermission("x", {}); '${'\\a'.repeat(50_000)}`;
+    // A guard call BEFORE the malformed literal is still seen…
+    expect(isRbacProtected(source, GUARDS)).toBe(true);
+    // …and one swallowed BY it reads as unguarded — the unterminated string
+    // blanks to end-of-file on purpose, so malformed source can only ever
+    // under-claim protection, never over-claim it.
+    const swallowed = `'${'\\a'.repeat(50_000)}; requirePermission("x", {});`;
+    expect(isRbacProtected(swallowed, GUARDS)).toBe(false);
+  });
+
+  it('strips an unterminated block comment linearly, failing closed', () => {
+    const source = `/*${'*'.repeat(50_000)} requirePermission("x", {})`;
+    expect(isRbacProtected(source, GUARDS)).toBe(false);
+  });
+
+  it('scans export heads over adversarial brace and whitespace runs linearly', () => {
+    const braceNoise = `export {${'{|'.repeat(25_000)}`;
+    const spacedNoise = `export${' '.repeat(50_000)}notAnActionKeyword`;
+    const source = [
+      '"use server";',
+      braceNoise,
+      spacedNoise,
+      'export async function realAction() {}',
+    ].join('\n');
+    expect(exportedActionsOf(source)).toEqual(['realAction']);
   });
 });
 

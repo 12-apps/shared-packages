@@ -51,21 +51,109 @@ export function urlPathOf(routeFile: string, appDir: string): string {
  * Exported server-action names in a `"use server"` module. Every runtime
  * export of a use-server module IS a server action. Returns [] for a
  * non-use-server file.
+ *
+ * Hand-parsed from each `export` keyword outward, in linear time — the
+ * `\s+`-joined regexes this replaces backtracked polynomially on adversarial
+ * whitespace runs (CodeQL js/polynomial-redos), and a completeness gate must
+ * stay O(n) on whatever source it is pointed at. The grammar is unchanged:
+ * `export async function NAME`, `export const NAME`, and the brace lists
+ * `export {A, B as C}` / `export const {A, B: C}` (a bare `export function`
+ * cannot appear in a use-server module — actions must be async).
  */
 export function exportedActionsOf(source: string): string[] {
-  if (!/^\s*["']use server["']/m.test(source)) return [];
+  if (!/^[\t ]*["']use server["']/m.test(source)) return [];
   const names = new Set<string>();
-  for (const match of source.matchAll(/export\s+(?:async\s+function|const)\s+(\w+)/g)) {
-    names.add(match[1] as string);
-  }
-  for (const match of source.matchAll(/export\s+(?:const\s+)?\{([^}]+)\}/g)) {
-    (match[1] as string)
-      .split(',')
-      .map((item) => item.trim().split(/\s+as\s+|\s*:\s*/).pop() ?? '')
-      .filter((name) => /^\w+$/.test(name))
-      .forEach((name) => names.add(name));
+  for (const match of source.matchAll(/\bexport\b/g)) {
+    collectExport(source, (match.index ?? 0) + 'export'.length, names);
   }
   return [...names];
+}
+
+/** Parse one `export …` head starting just past the keyword. */
+function collectExport(source: string, after: number, names: Set<string>): void {
+  const i = skipWs(source, after);
+  if (i === after) return; // `export` glued to what follows is not the keyword head
+  if (source[i] === '{') {
+    collectBraceList(source, i + 1, names);
+    return;
+  }
+  const word = readWord(source, i);
+  if (word === 'const') collectAfterConst(source, i + word.length, names);
+  if (word === 'async') collectAsyncFunction(source, i + word.length, names);
+}
+
+function collectAfterConst(source: string, after: number, names: Set<string>): void {
+  const i = skipWs(source, after);
+  if (i === after) return;
+  if (source[i] === '{') {
+    collectBraceList(source, i + 1, names);
+    return;
+  }
+  const name = readWord(source, i);
+  if (name !== '') names.add(name);
+}
+
+function collectAsyncFunction(source: string, after: number, names: Set<string>): void {
+  const i = skipWs(source, after);
+  if (i === after || readWord(source, i) !== 'function') return;
+  const j = skipWs(source, i + 'function'.length);
+  if (j === i + 'function'.length) return;
+  const name = readWord(source, j);
+  if (name !== '') names.add(name);
+}
+
+/** `{A, B as C, D: E}` — up to the FIRST `}`, as the regex it replaces did. */
+function collectBraceList(source: string, from: number, names: Set<string>): void {
+  const close = source.indexOf('}', from);
+  if (close === -1) return;
+  for (const item of source.slice(from, close).split(',')) {
+    const name = itemName(item);
+    if (/^\w+$/.test(name)) names.add(name);
+  }
+}
+
+/**
+ * The name an export-list item resolves to: the token after the last
+ * whitespace-delimited `as` alias or `:` rename — the `.pop()` of the
+ * original split on `\s+as\s+` / `\s*:\s*`, computed with backward scans.
+ * An item carrying neither (e.g. `type Foo`) resolves to itself and is then
+ * dropped by the caller's `^\w+$` filter, exactly as before.
+ */
+function itemName(item: string): string {
+  const trimmed = item.trim();
+  const colonFrom = trimmed.lastIndexOf(':') + 1;
+  const from = Math.max(colonFrom, lastAsAliasEnd(trimmed));
+  return from === 0 ? trimmed : trimmed.slice(from).trim();
+}
+
+/** Index just past the last whitespace-surrounded `as`, or 0 when absent. */
+function lastAsAliasEnd(item: string): number {
+  for (let i = item.length - 3; i >= 1; i -= 1) {
+    const isAlias =
+      item[i] === 'a' &&
+      item[i + 1] === 's' &&
+      isWs(item[i - 1] as string) &&
+      isWs(item[i + 2] as string);
+    if (isAlias) return i + 2;
+  }
+  return 0;
+}
+
+function skipWs(source: string, from: number): number {
+  let to = from;
+  while (to < source.length && isWs(source[to] as string)) to += 1;
+  return to;
+}
+
+/** Longest `\w+` run at `from` — `$` excluded, as in the regexes replaced. */
+function readWord(source: string, from: number): string {
+  let to = from;
+  while (to < source.length && /\w/.test(source[to] as string)) to += 1;
+  return source.slice(from, to);
+}
+
+function isWs(ch: string): boolean {
+  return /\s/.test(ch);
 }
 
 /**

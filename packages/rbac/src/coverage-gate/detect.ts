@@ -19,13 +19,63 @@ function callRegex(guards: readonly string[]): RegExp {
 /**
  * Blank out line comments, block comments and string literals (replaced with
  * spaces, newlines preserved) so no detection is ever fooled by a guard name
- * in prose or a string. Single-pass alternation, so a `//` INSIDE a string is
- * consumed as string content and never mistaken for a comment.
+ * in prose or a string. A single linear character walk — the regex
+ * alternation it replaces backtracked polynomially on adversarial input
+ * (CodeQL js/polynomial-redos) — and a `//` INSIDE a string is still consumed
+ * as string content because the walk enters the string first. An unterminated
+ * comment or string blanks to end-of-file, which fails CLOSED: a guard call
+ * swallowed by malformed source reads as unguarded, never as guarded.
  */
 export function stripCommentsAndStrings(source: string): string {
-  const token =
-    /\/\*[\s\S]*?\*\/|\/\/[^\n]*|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g;
-  return source.replace(token, (match) => match.replace(/[^\n]/g, ' '));
+  const out = source.split('');
+  let i = 0;
+  while (i < source.length) {
+    const end = tokenEndAt(source, i);
+    if (end > i) blankRange(source, out, i, end);
+    i = end > i ? end : i + 1;
+  }
+  return out.join('');
+}
+
+/** End (exclusive) of the comment/string starting at `i`, or `i` when none. */
+function tokenEndAt(source: string, i: number): number {
+  const ch = source[i];
+  if (ch === '/' && source[i + 1] === '/') return lineCommentEnd(source, i + 2);
+  if (ch === '/' && source[i + 1] === '*') return blockCommentEnd(source, i + 2);
+  if (ch === "'" || ch === '"' || ch === '`') return stringEnd(source, i + 1, ch);
+  return i;
+}
+
+function lineCommentEnd(source: string, from: number): number {
+  const newline = source.indexOf('\n', from);
+  return newline === -1 ? source.length : newline;
+}
+
+function blockCommentEnd(source: string, from: number): number {
+  const close = source.indexOf('*/', from);
+  return close === -1 ? source.length : close + 2;
+}
+
+/** Past the closing quote, honoring backslash escapes; EOF when unterminated. */
+function stringEnd(source: string, from: number, quote: string): number {
+  let i = from;
+  while (i < source.length) {
+    if (source[i] === '\\') {
+      i += 2;
+    } else if (source[i] === quote) {
+      return i + 1;
+    } else {
+      i += 1;
+    }
+  }
+  return source.length;
+}
+
+/** Replace [from, to) with spaces in `out`, keeping newlines for line math. */
+function blankRange(source: string, out: string[], from: number, to: number): void {
+  for (let j = from; j < to; j += 1) {
+    if (source[j] !== '\n') out[j] = ' ';
+  }
 }
 
 /** Whether the file's source actually CALLS an accepted RBAC guard. */
@@ -71,9 +121,14 @@ function topLevelSymbols(source: string): TopLevelSymbol[] {
   }));
 }
 
-/** `$` is the only identifier char that is also a regex metachar — escape it. */
+/**
+ * Escape a name for literal use inside a regex. `$` is the only metachar a
+ * JS identifier can carry, but the class is the COMPLETE metachar set — the
+ * backslash included, in one pass so nothing double-escapes — because CodeQL
+ * js/incomplete-sanitization rightly rejects the `$`-only version.
+ */
 function escapeIdent(name: string): string {
-  return name.replace(/[$]/g, '\\$&');
+  return name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function referencesName(body: string, name: string): boolean {
