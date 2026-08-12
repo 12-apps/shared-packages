@@ -1,0 +1,48 @@
+// ---------------------------------------------------------------------------
+// @12-apps/jobs — CANONICAL Prisma model partial (plug-and-play).
+//
+// This file is the single source of truth for the sweep-lease table. A host
+// project does NOT copy this model into its main schema by hand: it uses
+// Prisma's multi-file schema folder and SYNCS this file into it (see
+// packages/shared-helpers/scripts/sync-jobs-schema.mjs in this repo for the
+// reference sync step — run before `prisma generate`). The migration ships
+// alongside, in prisma/migrations/, and is COPIED into the host's migrations
+// folder — never symlinked, because Prisma enumerates that folder with lstat
+// and silently skips a linked directory.
+//
+// Host-agnostic by design: the lease names a JOB, not a tenant or a user, so
+// there is no relation to any host table at all.
+// ---------------------------------------------------------------------------
+
+/// Named, time-bounded claims on the scheduled sweeps.
+///
+/// Within one worker the sweeps are single-flight (their own queue at
+/// concurrency 1). Across two workers that guarantee evaporates: both read
+/// the same work list and do the same work twice. Correctness is expected to
+/// survive that (sweeps are idempotent by durable markers in the host's own
+/// tables), but the effort and the user-visible notices double.
+///
+/// A lease row rather than `pg_advisory_lock`, deliberately. A session-level
+/// advisory lock has to be released on the SAME connection that took it, and
+/// Prisma pools connections with no such guarantee — a release that lands on
+/// another connection silently fails and strands the lock, after which that
+/// sweep never runs again until the connection recycles. The transaction-
+/// scoped variant releases correctly but only holds for the transaction, and
+/// sweeps make external HTTP calls that have no business inside one.
+///
+/// `expiresAt` is what makes a dead holder recoverable without anyone
+/// intervening: a worker that is OOM-killed mid-sweep leaves the row behind,
+/// and the next tick past the expiry simply takes it. The claim itself is a
+/// conditional UPDATE, so the database decides the winner — two workers
+/// racing cannot both see it as free.
+model SweepLease {
+  /// The job name, e.g. "billing.tick". One lease per sweep.
+  name       String   @id
+  /// Which worker run holds it — release only ever matches its own holder.
+  holder     String
+  acquiredAt DateTime @default(now()) @map("acquired_at")
+  /// Past this instant the lease is free, whether or not it was released.
+  expiresAt  DateTime @map("expires_at")
+
+  @@map("sweep_leases")
+}

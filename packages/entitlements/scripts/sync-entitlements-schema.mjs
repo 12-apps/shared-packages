@@ -12,12 +12,12 @@
  * Only the schema partial. MIGRATIONS ARE NOT HANDLED HERE — the host
  * discovers and copies them structurally, by looking for a `migrations`
  * directory inside every workspace package and every installed `@12-apps/*`
- * package. See packages/shared-helpers/scripts/prisma-plugins.mjs.
+ * package. See packages/prisma/scripts/prisma-plugins.mjs.
  *
  * The host package that owns the schema folder MUST also declare this package
  * as a dependency: the link is invisible to the dependency graph, so
  * `turbo prune` would otherwise drop this package from the Docker build
- * context and leave it dangling (gated by shared-helpers' package.test.ts).
+ * context and leave it dangling (gated by @12-apps/prisma's package.test.ts).
  *
  * Another repo adopts the machinery by pointing HOST_SCHEMA_LINK at its own
  * schema folder — a host that copies instead of linking (future-pay does)
@@ -32,7 +32,7 @@ const RESYNC = 'pnpm --filter @12-apps/entitlements prisma:sync';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // Workspace-relative host paths; adopting repos change these two lines.
-const HOST_SCHEMA_LINK = join(HERE, '../../shared-helpers/prisma/schema/entitlements.prisma');
+const HOST_SCHEMA_LINK = join(HERE, '../../prisma/prisma/schema/entitlements.prisma');
 const HOST_SCHEMA_TARGET = '../../../entitlements/prisma/entitlements.prisma';
 
 function safeLstat(path) {
