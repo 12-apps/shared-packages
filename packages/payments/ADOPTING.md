@@ -11,7 +11,7 @@ How a host application wires `@12-apps/payments-backend` + `@12-apps/payments-fr
    symlinks; `prisma:sync:check` is the CI drift gate). No payment model or
    migration is ever copied into the application.
 2. Declare `@12-apps/payments-backend` as a dependency of the package that OWNS
-   the schema folder (here `@12-apps/shared-helpers`). The links are invisible to
+   the schema folder (here `@12-apps/prisma`). The links are invisible to
    the dependency graph, so without this any tool that copies only the packages
    the graph reaches — `turbo prune`, which is how the Docker images are built —
    leaves the links dangling and `prisma generate` dies with

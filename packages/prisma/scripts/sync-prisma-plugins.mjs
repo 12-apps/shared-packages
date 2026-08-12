@@ -16,7 +16,7 @@
  * A check that passes for the wrong reason is the same failure shape as the
  * symlink bug it exists to catch.
  *
- * Repair is therefore explicit: `pnpm --filter @12-apps/shared-helpers
+ * Repair is therefore explicit: `pnpm --filter @12-apps/prisma
  * prisma:sync-plugins`. Add a migration to a plugin and the build fails telling
  * you to run that, instead of silently fixing the tree underneath you.
  *
