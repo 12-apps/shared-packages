@@ -74,6 +74,7 @@
       ],
       "ignoreDependencies": [
         "@12-apps/entity-lifecycle",
+        "@12-apps/jobs",
         "@12-apps/payments-backend",
         "@12-apps/product-research",
         "@12-apps/report-builder",
@@ -152,6 +153,17 @@
       "entry": [
         "src/index.ts",
         "src/react/*.{ts,tsx}"
+      ]
+    },
+    "packages/jobs": {
+      "entry": [
+        "src/index.ts",
+        "// The published subpaths: the server factory and its Hono adapter are",
+        "// reached by a consumer import, never from the root entry.",
+        "src/server/index.ts",
+        "src/hono/index.ts",
+        "src/drivers/bullmq.ts",
+        "src/drivers/inline.ts"
       ]
     }
   },
