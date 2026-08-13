@@ -1,127 +1,70 @@
+import type { RbacLabelVocabulary } from '../core/contribution';
 import type { GovernanceCatalog } from '../governance';
 import type { PermissionRegistry } from '../core/types';
 
 /**
- * pt-BR presentation helpers + catalog grouping for the role screens (12-13)
- * — ported from future-pay's `permission-labels.ts` + `role-labels.ts`. Pure,
- * no React. The label maps are DEFAULTS a host may extend through
- * `createWebRbac`; unknown segments fall back to their raw text so an added
- * permission still renders (just untranslated) rather than disappearing.
+ * Presentation helpers + catalog grouping for the role screens (12-13). Pure,
+ * no React.
+ *
+ * The DICTIONARIES are not here. A generic package shipping one locale's copy
+ * for another application's domain is the same mistake as shipping its
+ * catalog: `Produtos`, `Mesas`, `Cozinha`, `Comprador` describe a restaurant,
+ * not authorization. They now arrive with the contribution that owns the ids
+ * they label, are merged by `composePermissions`, and reach the screens as
+ * `catalog.labels` — this file is the composer, and the words this package
+ * does own (`Papéis`, `Equipe`) ride in its own contribution beside its ids.
+ *
+ * The composer's promise is unchanged: a label is built from the permission's
+ * colon-separated SEGMENTS, and an unknown segment falls back to its raw text,
+ * so a permission nobody has translated still renders (untranslated) rather
+ * than vanishing from the picker.
  */
-
-/** pt-BR labels for the permission domains (the segment before the first `:`). */
-const DOMAIN_LABELS: Record<string, string> = {
-  products: 'Produtos',
-  categories: 'Categorias',
-  ingredients: 'Insumos',
-  stock: 'Estoque',
-  inventory: 'Inventário',
-  suppliers: 'Fornecedores',
-  purchasing: 'Compras',
-  orders: 'Pedidos',
-  kitchen: 'Cozinha',
-  payments: 'Pagamentos',
-  till: 'Caixa',
-  tables: 'Mesas',
-  reports: 'Relatórios',
-  customers: 'Clientes',
-  config: 'Configurações',
-  team: 'Equipe',
-  roles: 'Papéis',
-  payouts: 'Repasses',
-  shift: 'Turnos',
-  user: 'Usuários',
-};
-
-const ACTION_LABELS: Record<string, string> = {
-  read: 'Ver',
-  write: 'Editar',
-  edit: 'Editar',
-  create: 'Criar',
-  delete: 'Excluir',
-  move: 'Movimentar',
-  count: 'Contar',
-  approve: 'Aprovar',
-  void: 'Cancelar',
-  refund: 'Reembolsar',
-  assign: 'Atribuir',
-  manage: 'Gerenciar',
-  update: 'Atualizar',
-  take: 'Receber',
-  open: 'Abrir',
-  close: 'Fechar',
-  end: 'Encerrar',
-  impersonate: 'Ver como',
-};
-
-const NOUN_LABELS: Record<string, string> = {
-  sales: 'vendas',
-  financial: 'financeiro',
-  kitchen: 'cozinha',
-};
-
-const SCOPE_LABELS: Record<string, string> = {
-  all: 'todos',
-  any: 'qualquer',
-  published: 'publicados',
-  own: 'próprios',
-  assigned: 'atribuídos',
-  station: 'estação',
-  operational: 'operacional',
-  // A SCOPE rather than an action, so `user:impersonate:configure` renders
-  // "Ver como (ativar/desativar)" — one row that reads as a narrower slice of
-  // the row above it. As an action it would compose to "Ver como Configurar",
-  // which names no recognisable thing.
-  configure: 'ativar/desativar',
-};
-
-/** pt-BR labels for the seeded staff roles; custom roles show their own name. */
-const ROLE_LABELS: Record<string, string> = {
-  OWNER: 'Proprietário',
-  ADMIN: 'Administrador',
-  MANAGER: 'Gerente',
-  WAITER: 'Garçom',
-  CHEF: 'Cozinheiro',
-  FINANCIAL: 'Financeiro',
-  BUYER: 'Comprador',
-  CUSTOMER: 'Cliente',
-  SUPERADMIN: 'Superadmin',
-};
-
-/** Host-extendable label overrides. */
-export interface RbacLabelOverrides {
-  domains?: Record<string, string>;
-  roles?: Record<string, string>;
-}
 
 export interface RbacLabels {
   domainLabel(domain: string): string;
   /** A friendly label for a permission's action + scope (domain omitted). */
   permissionActionLabel(permission: string): string;
-  /** The pt-BR label for a role name, or the raw name. */
+  /** The label for a role name, or the raw name. */
   roleLabel(role: string): string;
 }
 
-export function createRbacLabels(overrides: RbacLabelOverrides = {}): RbacLabels {
-  const domains = { ...DOMAIN_LABELS, ...overrides.domains };
-  const roles = { ...ROLE_LABELS, ...overrides.roles };
+/** Sort one permission's segments into the three buckets the label composes. */
+function segmentBuckets(
+  segments: readonly string[],
+  vocabulary: RbacLabelVocabulary,
+): { actions: string[]; nouns: string[]; scopes: string[] } {
+  const actions: string[] = [];
+  const nouns: string[] = [];
+  const scopes: string[] = [];
+  for (const segment of segments) {
+    const action = vocabulary.actions?.[segment];
+    const noun = vocabulary.nouns?.[segment];
+    const scope = vocabulary.scopes?.[segment];
+    if (action !== undefined) actions.push(action);
+    else if (noun !== undefined) nouns.push(noun);
+    else if (scope !== undefined) scopes.push(scope);
+    // Unlabelled: the raw segment, so an untranslated permission still reads.
+    else actions.push(segment);
+  }
+  return { actions, nouns, scopes };
+}
+
+export function createRbacLabels(
+  vocabulary: RbacLabelVocabulary = {},
+): RbacLabels {
   return {
-    domainLabel: (domain) => domains[domain] ?? domain,
+    domainLabel: (domain) => vocabulary.domains?.[domain] ?? domain,
     permissionActionLabel(permission) {
+      // A whole-id label (a spec's `label`) wins over segment composition, for
+      // the ids whose parts compose into something nobody says out loud.
+      const exact = vocabulary.permissions?.[permission];
+      if (exact !== undefined) return exact;
       const [, ...rest] = permission.split(':');
-      const actions: string[] = [];
-      const nouns: string[] = [];
-      const scopes: string[] = [];
-      for (const segment of rest) {
-        if (segment in ACTION_LABELS) actions.push(ACTION_LABELS[segment] as string);
-        else if (segment in NOUN_LABELS) nouns.push(NOUN_LABELS[segment] as string);
-        else if (segment in SCOPE_LABELS) scopes.push(SCOPE_LABELS[segment] as string);
-        else actions.push(segment);
-      }
+      const { actions, nouns, scopes } = segmentBuckets(rest, vocabulary);
       const base = [...actions, ...nouns].join(' ') || permission;
       return scopes.length > 0 ? `${base} (${scopes.join(', ')})` : base;
     },
-    roleLabel: (role) => roles[role] ?? role,
+    roleLabel: (role) => vocabulary.roles?.[role] ?? role,
   };
 }
 

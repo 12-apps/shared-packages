@@ -35,8 +35,18 @@ interface TeamScreenProps {
   labels: RbacLabels;
   /** The SYSTEM roles assignable as a member's base (owner tier excluded). */
   systemRoles: readonly string[];
-  /** The owner tier — never disabled/removed from the roster. */
-  ownerRoles?: readonly string[];
+  /**
+   * The owner tier — never disabled/removed from the roster; the rows whose
+   * kebab hides "Desativar" and "Remover".
+   *
+   * REQUIRED, with no `['OWNER']` fallback. `createWebRbac` passes
+   * `catalog.governance.ownerRoles`, but a host is invited to route this
+   * screen itself, and a default meant such a host rendered destructive
+   * affordances on rows the server then refuses — the screen and the endpoints
+   * disagreeing about who an owner is, which is precisely what one composed
+   * catalog exists to prevent.
+   */
+  ownerRoles: readonly string[];
   managePermission: string;
 }
 
@@ -192,10 +202,7 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
     if (result.ok) refresh();
   };
 
-  const ownerRoles = useMemo(
-    () => new Set(props.ownerRoles ?? ['OWNER']),
-    [props.ownerRoles],
-  );
+  const ownerRoles = useMemo(() => new Set(props.ownerRoles), [props.ownerRoles]);
   const systemSet = useMemo(() => new Set(systemRoles), [systemRoles]);
   const availableCustomRoles = useMemo(
     () => (context?.assignableRoles ?? []).filter((name) => !systemSet.has(name)),

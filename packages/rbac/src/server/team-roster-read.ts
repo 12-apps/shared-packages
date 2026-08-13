@@ -125,16 +125,29 @@ function statusFilterCondition(statusIn: readonly string[]): MembershipWhere | n
   return wantEnabled !== wantDisabled ? { active: wantEnabled } : null;
 }
 
+/**
+ * The conditions in force for every roster read: the tenant, and the customer
+ * exclusion.
+ *
+ * A host with no customer tier says so with `customerRole: null`, and the
+ * roster then excludes nobody. The exclusion is skipped only for that STATED
+ * `null` — never for an unset field, which is what used to leak shoppers'
+ * names and e-mails into a staff list whenever a host's customer role was
+ * spelled anything other than the package's old `'CUSTOMER'` default.
+ */
+function baseTeamConditions(ctx: TeamStoreCtx, tenantId: string): MembershipWhere[] {
+  const conditions: MembershipWhere[] = [{ clientId: tenantId }];
+  if (ctx.customerRole !== null) conditions.push({ role: { not: ctx.customerRole } });
+  return conditions;
+}
+
 async function buildTeamWhere(
   ctx: TeamStoreCtx,
   db: RbacDbClient,
   tenantId: string,
   query: TeamListQuery,
 ): Promise<MembershipWhere> {
-  const conditions: MembershipWhere[] = [
-    { clientId: tenantId },
-    { role: { not: ctx.customerRole } },
-  ];
+  const conditions = baseTeamConditions(ctx, tenantId);
   if (query.q) {
     // The keyword lives in the host's user directory (name/email are not this
     // package's columns); without a `searchUsers` seam it is ignored.

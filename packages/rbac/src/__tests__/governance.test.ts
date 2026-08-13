@@ -2,11 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { validateGrant, type GovernanceCatalog } from '../governance';
 import { definePermissions } from '../core/registry';
 import type { RoleDef } from '../core/types';
-import {
-  DEFAULT_ROLE_TEMPLATES,
-  FUTURE_PAY_GOVERNANCE,
-  FUTURE_PAY_PERMISSIONS,
-} from '../templates';
+import { DEMO_CATALOG } from './demo-catalog';
 
 const leaf = { isLeaf: true };
 const org = { isLeaf: false };
@@ -21,7 +17,7 @@ const perms = definePermissions({
 } as const);
 
 const roles: RoleDef[] = [
-  { name: 'OWNER', permissions: '*' },
+  { name: 'DIRECTOR', permissions: '*' },
   { name: 'A_WRITER', permissions: ['a:write'] },
   { name: 'A_BOTH', permissions: ['a:write', 'a:approve'] },
   { name: 'INSTANCE', permissions: ['x:read:own'] },
@@ -32,7 +28,7 @@ const roles: RoleDef[] = [
 const catalog: GovernanceCatalog = {
   permissions: perms,
   roles,
-  ownerRoles: ['OWNER'],
+  ownerRoles: ['DIRECTOR'],
   ownerPermissions: ['danger'],
   leafOnlyRoles: ['LEAFY'],
   sodPairs: [['a:write', 'a:approve']],
@@ -79,7 +75,7 @@ describe('validateGrant — owner-protection', () => {
   it('rejects granting an owner role', () => {
     const r = validateGrant({
       granterPermissions: ['*'],
-      roleBeingGranted: 'OWNER',
+      roleBeingGranted: 'DIRECTOR',
       targetScope: leaf,
       catalog,
     });
@@ -174,41 +170,41 @@ describe('validateGrant — unknown role', () => {
   });
 });
 
-describe('validateGrant — Future Pay governance catalog', () => {
+describe('validateGrant — the demo host’s composed governance catalog', () => {
   it('rejects the real purchasing SoD pair in a custom role', () => {
     const r = validateGrant({
-      granterPermissions: FUTURE_PAY_PERMISSIONS.list,
+      granterPermissions: DEMO_CATALOG.permissions.list,
       roleBeingGranted: {
         name: 'ROGUE_BUYER',
-        permissions: ['purchasing:write', 'purchasing:approve'],
+        permissions: ['acquisitions:write', 'acquisitions:approve'],
       },
       targetScope: leaf,
-      catalog: FUTURE_PAY_GOVERNANCE,
+      catalog: DEMO_CATALOG.governance,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/^SEPARATION_OF_DUTIES/);
   });
 
-  it('rejects assigning MANAGER (leaf-only) at an org scope', () => {
+  it('rejects assigning BRANCH_LEAD (leaf-only) at an org scope', () => {
     const r = validateGrant({
-      granterPermissions: FUTURE_PAY_PERMISSIONS.list,
-      roleBeingGranted: 'MANAGER',
+      granterPermissions: DEMO_CATALOG.permissions.list,
+      roleBeingGranted: 'BRANCH_LEAD',
       targetScope: org,
-      catalog: FUTURE_PAY_GOVERNANCE,
+      catalog: DEMO_CATALOG.governance,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/^SCOPE_CEILING/);
   });
 
-  it('allows a real template role (BUYER) at a leaf scope for a full-power granter', () => {
-    // BUYER holds purchasing:read:own (instance) so it is leaf-scoped; at leaf it is fine.
-    const buyer = DEFAULT_ROLE_TEMPLATES.find((r) => r.name === 'BUYER')!;
+  it('allows a real template role (SELECTOR) at a leaf scope for a full-power granter', () => {
+    // SELECTOR holds purchasing:read:own (instance) so it is leaf-scoped; at leaf it is fine.
+    const buyer = DEMO_CATALOG.roleTemplates.find((r) => r.name === 'SELECTOR')!;
     expect(
       validateGrant({
-        granterPermissions: FUTURE_PAY_PERMISSIONS.list,
+        granterPermissions: DEMO_CATALOG.permissions.list,
         roleBeingGranted: buyer,
         targetScope: leaf,
-        catalog: FUTURE_PAY_GOVERNANCE,
+        catalog: DEMO_CATALOG.governance,
       }).ok,
     ).toBe(true);
   });
@@ -216,24 +212,24 @@ describe('validateGrant — Future Pay governance catalog', () => {
   // Regression (Greptile review, PR #130): a NAMED catalog role that legitimately
   // holds an owner-marker permission must remain grantable — owner-protection for a
   // named template comes solely from `ownerRoles`, not from its permission contents.
-  it('allows granting the named ADMIN template (holds owner-marker roles:manage)', () => {
+  it('allows granting the named HEAD_LIBRARIAN template (holds owner-marker roles:manage)', () => {
     expect(
       validateGrant({
-        granterPermissions: FUTURE_PAY_PERMISSIONS.list,
-        roleBeingGranted: 'ADMIN',
+        granterPermissions: DEMO_CATALOG.permissions.list,
+        roleBeingGranted: 'HEAD_LIBRARIAN',
         targetScope: leaf,
-        catalog: FUTURE_PAY_GOVERNANCE,
+        catalog: DEMO_CATALOG.governance,
       }).ok,
     ).toBe(true);
   });
 
-  it('allows granting the named FINANCIAL template (holds owner-marker payouts:manage)', () => {
+  it('allows granting the named TREASURER template (holds owner-marker budget:manage)', () => {
     expect(
       validateGrant({
-        granterPermissions: FUTURE_PAY_PERMISSIONS.list,
-        roleBeingGranted: 'FINANCIAL',
+        granterPermissions: DEMO_CATALOG.permissions.list,
+        roleBeingGranted: 'TREASURER',
         targetScope: leaf,
-        catalog: FUTURE_PAY_GOVERNANCE,
+        catalog: DEMO_CATALOG.governance,
       }).ok,
     ).toBe(true);
   });
@@ -243,32 +239,32 @@ describe('validateGrant — Future Pay governance catalog', () => {
       granterPermissions: ['*'],
       roleBeingGranted: {
         name: 'SNEAKY',
-        permissions: ['products:read:all', 'roles:manage'],
+        permissions: ['titles:read:all', 'roles:manage'],
       },
       targetScope: leaf,
-      catalog: FUTURE_PAY_GOVERNANCE,
+      catalog: DEMO_CATALOG.governance,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/^OWNER_PROTECTED/);
   });
 
-  it('still rejects the named OWNER role via ownerRoles', () => {
+  it('still rejects the named DIRECTOR role via ownerRoles', () => {
     const r = validateGrant({
       granterPermissions: ['*'],
-      roleBeingGranted: 'OWNER',
+      roleBeingGranted: 'DIRECTOR',
       targetScope: leaf,
-      catalog: FUTURE_PAY_GOVERNANCE,
+      catalog: DEMO_CATALOG.governance,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/^OWNER_PROTECTED/);
   });
 
-  it('still rejects the named SUPERADMIN role via ownerRoles', () => {
+  it('still rejects the named NETWORK_OPS role via ownerRoles', () => {
     const r = validateGrant({
       granterPermissions: ['*'],
-      roleBeingGranted: 'SUPERADMIN',
+      roleBeingGranted: 'NETWORK_OPS',
       targetScope: leaf,
-      catalog: FUTURE_PAY_GOVERNANCE,
+      catalog: DEMO_CATALOG.governance,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/^OWNER_PROTECTED/);
@@ -280,46 +276,46 @@ describe('validateGrant — Future Pay governance catalog', () => {
 // the owner-marker + SoD composition guards, but escalation and scope-ceiling — and
 // owner-role protection — still bite.
 describe('validateGrant — curated template override (FUT-217)', () => {
-  const adminBaseline = DEFAULT_ROLE_TEMPLATES.find((r) => r.name === 'ADMIN')!
+  const adminBaseline = DEMO_CATALOG.roleTemplates.find((r) => r.name === 'HEAD_LIBRARIAN')!
     .permissions as readonly string[];
 
-  it("preserves ADMIN's intrinsic owner-markers when a full-power actor edits it", () => {
-    // The edited set still carries roles:manage + payouts:manage (owner-markers) and
-    // the purchasing:write/approve SoD pair — a curated template keeps both.
+  it("preserves HEAD_LIBRARIAN's intrinsic owner-markers when a full-power actor edits it", () => {
+    // The edited set still carries roles:manage + budget:manage (owner-markers) and
+    // the acquisitions:write/approve SoD pair — a curated template keeps both.
     expect(
       validateGrant({
-        granterPermissions: FUTURE_PAY_PERMISSIONS.list,
-        roleBeingGranted: { name: 'ADMIN', permissions: adminBaseline },
+        granterPermissions: DEMO_CATALOG.permissions.list,
+        roleBeingGranted: { name: 'HEAD_LIBRARIAN', permissions: adminBaseline },
         targetScope: leaf,
-        catalog: FUTURE_PAY_GOVERNANCE,
+        catalog: DEMO_CATALOG.governance,
         curatedTemplate: true,
       }).ok,
     ).toBe(true);
   });
 
   it('rejects editing a template into an ESCALATION (a permission the actor lacks)', () => {
-    // An actor holding only products:read:all tries to override MANAGER while adding
-    // a permission (orders:refund) they do not themselves hold → escalation.
+    // An actor holding only titles:read:all tries to override BRANCH_LEAD while adding
+    // a permission (loans:waive) they do not themselves hold → escalation.
     const r = validateGrant({
-      granterPermissions: ['products:read:all'],
+      granterPermissions: ['titles:read:all'],
       roleBeingGranted: {
-        name: 'MANAGER',
-        permissions: ['products:read:all', 'orders:refund'],
+        name: 'BRANCH_LEAD',
+        permissions: ['titles:read:all', 'loans:waive'],
       },
       targetScope: leaf,
-      catalog: FUTURE_PAY_GOVERNANCE,
+      catalog: DEMO_CATALOG.governance,
       curatedTemplate: true,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/^ESCALATION/);
   });
 
-  it('rejects overriding an owner role (OWNER) even in curated mode', () => {
+  it('rejects overriding an owner role (DIRECTOR) even in curated mode', () => {
     const r = validateGrant({
       granterPermissions: ['*'],
-      roleBeingGranted: { name: 'OWNER', permissions: ['products:read:all'] },
+      roleBeingGranted: { name: 'DIRECTOR', permissions: ['titles:read:all'] },
       targetScope: leaf,
-      catalog: FUTURE_PAY_GOVERNANCE,
+      catalog: DEMO_CATALOG.governance,
       curatedTemplate: true,
     });
     expect(r.ok).toBe(false);
@@ -327,12 +323,12 @@ describe('validateGrant — curated template override (FUT-217)', () => {
   });
 
   it('still enforces the scope-ceiling on a curated template at an org scope', () => {
-    // MANAGER is leaf-only; a curated override does not lift that ceiling.
+    // BRANCH_LEAD is leaf-only; a curated override does not lift that ceiling.
     const r = validateGrant({
-      granterPermissions: FUTURE_PAY_PERMISSIONS.list,
-      roleBeingGranted: { name: 'MANAGER', permissions: ['products:read:all'] },
+      granterPermissions: DEMO_CATALOG.permissions.list,
+      roleBeingGranted: { name: 'BRANCH_LEAD', permissions: ['titles:read:all'] },
       targetScope: org,
-      catalog: FUTURE_PAY_GOVERNANCE,
+      catalog: DEMO_CATALOG.governance,
       curatedTemplate: true,
     });
     expect(r.ok).toBe(false);
@@ -343,52 +339,52 @@ describe('validateGrant — curated template override (FUT-217)', () => {
     // Proves the flag is what exempts markers: the identical inline role, treated as
     // a freshly-composed custom role, trips OWNER_PROTECTED on the owner-marker.
     const r = validateGrant({
-      granterPermissions: FUTURE_PAY_PERMISSIONS.list,
-      roleBeingGranted: { name: 'ADMIN', permissions: adminBaseline },
+      granterPermissions: DEMO_CATALOG.permissions.list,
+      roleBeingGranted: { name: 'HEAD_LIBRARIAN', permissions: adminBaseline },
       targetScope: leaf,
-      catalog: FUTURE_PAY_GOVERNANCE,
+      catalog: DEMO_CATALOG.governance,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/^OWNER_PROTECTED/);
   });
 
-  const managerBaseline = DEFAULT_ROLE_TEMPLATES.find((r) => r.name === 'MANAGER')!
+  const managerBaseline = DEMO_CATALOG.roleTemplates.find((r) => r.name === 'BRANCH_LEAD')!
     .permissions as readonly string[];
 
   it('rejects INJECTING an owner-marker absent from the seed into an editable template', () => {
     // The curated exemption preserves a seed's INTRINSIC markers — it must not let an
-    // actor ADD one the seed never had. A full-power granter (holds payouts:manage,
-    // so escalation would pass) overrides MANAGER with the seed set PLUS payouts:manage.
-    // MANAGER's seed has no owner-marker, so this is composing new owner-level power and
+    // actor ADD one the seed never had. A full-power granter (holds budget:manage,
+    // so escalation would pass) overrides BRANCH_LEAD with the seed set PLUS budget:manage.
+    // BRANCH_LEAD's seed has no owner-marker, so this is composing new owner-level power and
     // must be blocked by owner-protection, NOT merely by escalation.
     const r = validateGrant({
-      granterPermissions: FUTURE_PAY_PERMISSIONS.list,
+      granterPermissions: DEMO_CATALOG.permissions.list,
       roleBeingGranted: {
-        name: 'MANAGER',
-        permissions: [...managerBaseline, 'payouts:manage'],
+        name: 'BRANCH_LEAD',
+        permissions: [...managerBaseline, 'budget:manage'],
       },
       targetScope: leaf,
-      catalog: FUTURE_PAY_GOVERNANCE,
+      catalog: DEMO_CATALOG.governance,
       curatedTemplate: true,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.reason).toMatch(/^OWNER_PROTECTED/);
-      expect(r.reason).toContain('payouts:manage');
+      expect(r.reason).toContain('budget:manage');
     }
   });
 
-  it('allows an edit to MANAGER that stays within its (marker-free) seed', () => {
-    // Guards against over-blocking: trimming MANAGER (no marker added) is still fine.
+  it('allows an edit to BRANCH_LEAD that stays within its (marker-free) seed', () => {
+    // Guards against over-blocking: trimming BRANCH_LEAD (no marker added) is still fine.
     expect(
       validateGrant({
-        granterPermissions: FUTURE_PAY_PERMISSIONS.list,
+        granterPermissions: DEMO_CATALOG.permissions.list,
         roleBeingGranted: {
-          name: 'MANAGER',
-          permissions: ['products:read:all', 'orders:read:all'],
+          name: 'BRANCH_LEAD',
+          permissions: ['titles:read:all', 'loans:read:all'],
         },
         targetScope: leaf,
-        catalog: FUTURE_PAY_GOVERNANCE,
+        catalog: DEMO_CATALOG.governance,
         curatedTemplate: true,
       }).ok,
     ).toBe(true);

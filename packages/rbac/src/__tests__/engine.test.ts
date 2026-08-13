@@ -2,26 +2,22 @@ import { describe, it, expect } from 'vitest';
 import { createRbac } from '../core/engine';
 import { PermissionDeniedError } from '../core/errors';
 import type { AssignmentResolver, RoleAssignment } from '../core/types';
-import {
-  DEFAULT_ROLE_TEMPLATES,
-  FUTURE_PAY_PERMISSIONS,
-  type FuturePayPermission,
-} from '../templates';
+import { DEMO_CATALOG, type DemoPermission } from './demo-catalog';
 
 const TENANT_A = 'tenant-a';
 const TENANT_B = 'tenant-b';
 
 function makeEngine(resolver: AssignmentResolver) {
-  return createRbac<FuturePayPermission>({
-    permissions: FUTURE_PAY_PERMISSIONS,
-    roles: DEFAULT_ROLE_TEMPLATES,
+  return createRbac<DemoPermission>({
+    permissions: DEMO_CATALOG.permissions,
+    roles: DEMO_CATALOG.roleTemplates,
     resolver,
   });
 }
 
 const assignments: Record<string, RoleAssignment[]> = {
-  owner: [{ role: 'OWNER', scope: TENANT_A }],
-  waiter: [{ role: 'WAITER', scope: TENANT_A }],
+  owner: [{ role: 'DIRECTOR', scope: TENANT_A }],
+  waiter: [{ role: 'CLERK', scope: TENANT_A }],
   none: [],
 };
 
@@ -43,14 +39,14 @@ describe('createRbac — converged can() (class permissions)', () => {
   it('denies for a waiter lacking the permission', async () => {
     const rbac = makeEngine((id) => assignments[id] ?? []);
     await expect(
-      rbac.can('waiter', 'till:open', null, { scope: TENANT_A }),
+      rbac.can('waiter', 'desk:open', null, { scope: TENANT_A }),
     ).resolves.toBe(false);
   });
 
   it('denies an actor with no assignments', async () => {
     const rbac = makeEngine((id) => assignments[id] ?? []);
     await expect(
-      rbac.can('none', 'products:read:all', null, { scope: TENANT_A }),
+      rbac.can('none', 'titles:read:all', null, { scope: TENANT_A }),
     ).resolves.toBe(false);
   });
 });
@@ -59,7 +55,7 @@ describe('createRbac — async resolver', () => {
   it('awaits an async resolver', async () => {
     const rbac = makeEngine(async (id) => Promise.resolve(assignments[id] ?? []));
     await expect(
-      rbac.can('owner', 'products:read:all', null, { scope: TENANT_A }),
+      rbac.can('owner', 'titles:read:all', null, { scope: TENANT_A }),
     ).resolves.toBe(true);
   });
 });
@@ -68,14 +64,14 @@ describe('createRbac — getPermissions / canWithAssignments', () => {
   it('getPermissions() returns the scoped union', async () => {
     const rbac = makeEngine((id) => assignments[id] ?? []);
     const perms = await rbac.getPermissions('waiter', TENANT_A);
-    expect(perms.has('orders:create')).toBe(true);
+    expect(perms.has('loans:create')).toBe(true);
     expect(perms.has('config:write')).toBe(false);
   });
 
   it('canWithAssignments() is a sync escape hatch', () => {
     const rbac = makeEngine((id) => assignments[id] ?? []);
     expect(
-      rbac.canWithAssignments(assignments.owner!, 'orders:refund', TENANT_A),
+      rbac.canWithAssignments(assignments.owner!, 'loans:waive', TENANT_A),
     ).toBe(true);
   });
 });
@@ -109,30 +105,30 @@ describe('createRbac — requirePermission', () => {
 });
 
 describe('createRbac — instance permissions & the entity gate', () => {
-  // WAITER holds orders:read:assigned (instance). Ownership + assignment gate.
+  // CLERK holds loans:read:assigned (instance). Ownership + assignment gate.
   function mk() {
-    return createRbac<FuturePayPermission>({
-      permissions: FUTURE_PAY_PERMISSIONS,
-      roles: DEFAULT_ROLE_TEMPLATES,
+    return createRbac<DemoPermission>({
+      permissions: DEMO_CATALOG.permissions,
+      roles: DEMO_CATALOG.roleTemplates,
       resolver: (id) => assignments[id] ?? [],
       ownership: (_subject, type) =>
-        type === 'orders' ? { kind: 'field', field: 'waiter_id' } : null,
+        type === 'loans' ? { kind: 'field', field: 'waiter_id' } : null,
       assignmentResolver: (_subject, type) =>
-        type === 'orders' ? ['order-1', 'order-2'] : [],
+        type === 'loans' ? ['order-1', 'order-2'] : [],
     });
   }
 
   it('denies an instance action when RBAC itself denies (waiter lacks the class perm)', async () => {
     const rbac = mk();
     await expect(
-      rbac.can('waiter', 'orders:void', 'order-1', { scope: TENANT_A }),
+      rbac.can('waiter', 'loans:void', 'order-1', { scope: TENANT_A }),
     ).resolves.toBe(false);
   });
 
   it('grants an assigned instance', async () => {
     const rbac = mk();
     await expect(
-      rbac.can('waiter', 'orders:read:assigned', 'order-1', {
+      rbac.can('waiter', 'loans:read:assigned', 'order-1', {
         scope: TENANT_A,
       }),
     ).resolves.toBe(true);
@@ -141,7 +137,7 @@ describe('createRbac — instance permissions & the entity gate', () => {
   it('denies an unassigned instance', async () => {
     const rbac = mk();
     await expect(
-      rbac.can('waiter', 'orders:read:assigned', 'order-999', {
+      rbac.can('waiter', 'loans:read:assigned', 'order-999', {
         scope: TENANT_A,
       }),
     ).resolves.toBe(false);
@@ -149,7 +145,7 @@ describe('createRbac — instance permissions & the entity gate', () => {
 
   it('visibleResources returns a predicate union for instance perms', async () => {
     const rbac = mk();
-    const v = await rbac.visibleResources('waiter', 'orders:read:assigned', 'orders', {
+    const v = await rbac.visibleResources('waiter', 'loans:read:assigned', 'loans', {
       scope: TENANT_A,
     });
     expect(v.kind).toBe('predicate');
@@ -157,7 +153,7 @@ describe('createRbac — instance permissions & the entity gate', () => {
 
   it('visibleResources returns all for a class perm the actor holds', async () => {
     const rbac = mk();
-    const v = await rbac.visibleResources('owner', 'products:read:all', 'products', {
+    const v = await rbac.visibleResources('owner', 'titles:read:all', 'titles', {
       scope: TENANT_A,
     });
     expect(v).toEqual({ kind: 'all' });
@@ -165,7 +161,7 @@ describe('createRbac — instance permissions & the entity gate', () => {
 
   it('visibleResources returns none when denied', async () => {
     const rbac = mk();
-    const v = await rbac.visibleResources('waiter', 'reports:sales:read', 'reports', {
+    const v = await rbac.visibleResources('waiter', 'reports:circulation:read', 'reports', {
       scope: TENANT_A,
     });
     expect(v).toEqual({ kind: 'none' });

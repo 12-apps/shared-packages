@@ -1,8 +1,11 @@
 /**
  * Guard detection for the RBAC coverage gate (12-13) — ported from
  * future-pay's `scripts/rbac/detect.ts`, with the guard identifier lists
- * turned into ARGUMENTS (the host's guards are host vocabulary; the
- * future-pay lists ship as defaults in `index.ts`).
+ * turned into REQUIRED arguments. The host's guards are host vocabulary, so
+ * there is no generic list to default to — a completeness gate cannot supply
+ * its own subject. Defaulting them was the bug: a second host inherited
+ * seventeen names it did not use, so every route it protected read the same
+ * as every route it forgot.
  *
  * A route/action file counts as protected if its (comment/string-stripped)
  * source CALLS one of the accepted RBAC guards. The entitlement guards are
@@ -11,9 +14,36 @@
  * entitlement guard only ever runs AFTER an RBAC guard.
  */
 
-/** Require a CALL context (`name(`) — not a bare mention. `\s*` spans newlines. */
+/**
+ * Require a CALL context (`name(`) — not a bare mention. `\s*` spans newlines.
+ *
+ * An EMPTY list compiles to `/\b(?:)\s*\(/` — an empty alternation, which
+ * matches ANY `identifier(` — so every file would read as guarded and the gate
+ * would report zero failures over a surface with zero coverage. `/(?!)/` is the
+ * never-matching regex: with no accepted guard, nothing is guarded. That is the
+ * fail-CLOSED direction, and it is a backstop rather than the contract —
+ * {@link assertGuardsConfigured} refuses the empty list outright, because it is
+ * always a configuration mistake rather than a host with no guards.
+ */
 function callRegex(guards: readonly string[]): RegExp {
+  if (guards.length === 0) return /(?!)/;
   return new RegExp(`\\b(?:${guards.join('|')})\\s*\\(`);
+}
+
+/**
+ * Refuse an empty `rbacGuards` before any file is read. Reached from
+ * `runRbacCoverage`, and stated here so every entry point into detection shares
+ * one message naming the option.
+ */
+export function assertGuardsConfigured(guards: readonly string[]): void {
+  if (guards.length > 0) return;
+  throw new Error(
+    '[rbac:coverage] `rbacGuards` is empty — the gate greps your source for YOUR guard ' +
+      'helpers, so an empty list accepts nothing and every route file would have to be ' +
+      'excluded by hand. Name the identifiers this host accepts as an RBAC gate ' +
+      '(e.g. rbacGuards: [\'requirePermission\']). There is no host with no guards: a ' +
+      'surface with nothing to enforce has nothing for this gate to check.',
+  );
 }
 
 /**
@@ -83,7 +113,13 @@ export function isRbacProtected(source: string, guards: readonly string[]): bool
   return callRegex(guards).test(stripCommentsAndStrings(source));
 }
 
-/** Whether the source CALLS a throwing entitlement guard (sequencing only). */
+/**
+ * Whether the source CALLS a throwing entitlement guard (sequencing only).
+ *
+ * `[]` is a legitimate value here — a host with no billing tier — and the
+ * early return is only a fast path; `callRegex([])` already answers `false`
+ * for every source.
+ */
 export function callsEntitlementGuard(
   source: string,
   entitlementGuards: readonly string[],

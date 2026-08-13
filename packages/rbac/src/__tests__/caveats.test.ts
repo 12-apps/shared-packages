@@ -128,26 +128,26 @@ describe('isActiveAssignment — temporal filter-not-delete', () => {
 describe('caveats through the engine (grant-level ABAC)', () => {
   const makeEngine = () =>
     createRbac({
-      permissions: definePermissions({ 'orders:refund': 'class' } as const),
+      permissions: definePermissions({ 'loans:waive': 'class' } as const),
       roles: [
         {
-          name: 'ACTING_MANAGER',
+          name: 'ACTING_LEAD',
           permissions: [
             {
-              permission: 'orders:refund',
+              permission: 'loans:waive',
               caveat: allOf(amountAtMost(5000), notExpired()),
             },
           ],
         },
       ],
-      resolver: () => [{ role: 'ACTING_MANAGER', scope: 'restaurant-1' }],
+      resolver: () => [{ role: 'ACTING_LEAD', scope: 'branch-1' }],
     });
 
   it('grants a small refund during the elevation window', async () => {
     const rbac = makeEngine();
     expect(
-      await rbac.can('u1', 'orders:refund', null, {
-        scope: 'restaurant-1',
+      await rbac.can('u1', 'loans:waive', null, {
+        scope: 'branch-1',
         amount: 1000,
         elevationExpiresAt: NOW + HOUR,
         now: NOW,
@@ -158,16 +158,16 @@ describe('caveats through the engine (grant-level ABAC)', () => {
   it('denies once the elevation lapsed or the amount exceeds the cap', async () => {
     const rbac = makeEngine();
     expect(
-      await rbac.can('u1', 'orders:refund', null, {
-        scope: 'restaurant-1',
+      await rbac.can('u1', 'loans:waive', null, {
+        scope: 'branch-1',
         amount: 1000,
         elevationExpiresAt: NOW - 1,
         now: NOW,
       }),
     ).toBe(false);
     expect(
-      await rbac.can('u1', 'orders:refund', null, {
-        scope: 'restaurant-1',
+      await rbac.can('u1', 'loans:waive', null, {
+        scope: 'branch-1',
         amount: 999999,
         elevationExpiresAt: NOW + HOUR,
         now: NOW,
@@ -177,6 +177,6 @@ describe('caveats through the engine (grant-level ABAC)', () => {
 
   it('denies when the call site forgot to populate the context', async () => {
     const rbac = makeEngine();
-    expect(await rbac.can('u1', 'orders:refund', null, { scope: 'restaurant-1' })).toBe(false);
+    expect(await rbac.can('u1', 'loans:waive', null, { scope: 'branch-1' })).toBe(false);
   });
 });

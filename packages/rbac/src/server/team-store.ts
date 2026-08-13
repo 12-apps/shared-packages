@@ -8,6 +8,7 @@ import {
   type RbacServerConfig,
   type RbacUserDirectory,
 } from './context';
+import { ownerRolesOf, type RbacActorTier } from './roster-policy';
 import { MEMBERSHIP_SELECT, ROLE_SELECT, type RbacDbClient, type RbacDbProvider } from './db';
 import {
   extraRolesOf,
@@ -35,7 +36,8 @@ export interface TeamStoreCtx {
   audit: RbacAuditSink | undefined;
   messages: RbacMessages;
   ownerRoles: ReadonlySet<string>;
-  customerRole: string;
+  /** The membership role the roster excludes, or `null` when the host has none. */
+  customerRole: string | null;
   directory: RbacUserDirectory;
 }
 
@@ -53,7 +55,11 @@ export interface TeamStore {
   grantCustomRoleToMember(tenantId: string, userId: string, roleName: string): Promise<void>;
   revokeCustomRoleFromMember(tenantId: string, userId: string, roleName: string): Promise<void>;
   setMembershipActive(tenantId: string, userId: string, active: boolean): Promise<void>;
-  removeTenantMemberGuarded(tenantId: string, userId: string, actorRole: string): Promise<void>;
+  removeTenantMemberGuarded(
+    tenantId: string,
+    userId: string,
+    actor: RbacActorTier,
+  ): Promise<void>;
 }
 
 /**
@@ -248,14 +254,19 @@ async function removeTenantMemberGuarded(
   ctx: TeamStoreCtx,
   tenantId: string,
   userId: string,
-  actorRole: string,
+  actor: RbacActorTier,
 ): Promise<void> {
   const db = await ctx.db();
   const target = await membershipOf(db, tenantId, userId);
   if (!target) throw new RbacApiError(404, ctx.messages.notAMember);
 
   if (ctx.ownerRoles.has(target.role)) {
-    if (!ctx.ownerRoles.has(actorRole) && actorRole !== 'SUPERADMIN') {
+    // Only an owner removes an owner — or the host's platform operator, who is
+    // recognized by the DISCRIMINATOR and never by a role name. Comparing
+    // against the literal `'SUPERADMIN'` here read a host's own vocabulary as
+    // a platform grant.
+    const actorIsOwner = actor.role !== null && ctx.ownerRoles.has(actor.role);
+    if (!actorIsOwner && !actor.isPlatformActor) {
       throw new RbacApiError(403, ctx.messages.onlyOwnerRemovesOwner);
     }
     const owners = await db.membership.count({
@@ -280,9 +291,19 @@ async function removeTenantMemberGuarded(
   });
 }
 
+/**
+ * `catalog` is IN the pick, and that is the point of this shape.
+ *
+ * Without it the store could not see `catalog.governance.ownerRoles` and fell
+ * back to the literal `['OWNER']` — so a host whose composed governance said
+ * `['OWNER', 'SUPERADMIN']` had the last-owner and owner-removal invariants
+ * running on a set its own catalog did not name. The screen and the endpoints
+ * were governed by different policies, which is exactly what one `catalog`
+ * argument exists to prevent.
+ */
 type TeamStoreConfig<P extends string> = Pick<
   RbacServerConfig<P>,
-  'db' | 'audit' | 'messages' | 'directory' | 'ownerRoles' | 'customerRole'
+  'db' | 'audit' | 'messages' | 'directory' | 'catalog' | 'ownerRoles' | 'customerRole'
 >;
 
 export function createTeamStore<P extends string>(config: TeamStoreConfig<P>): TeamStore {
@@ -290,8 +311,8 @@ export function createTeamStore<P extends string>(config: TeamStoreConfig<P>): T
     db: config.db,
     audit: fencedAudit(config.audit),
     messages: messagesOf(config),
-    ownerRoles: new Set(config.ownerRoles ?? ['OWNER']),
-    customerRole: config.customerRole ?? 'CUSTOMER',
+    ownerRoles: new Set(ownerRolesOf(config)),
+    customerRole: config.customerRole,
     directory: config.directory,
   };
   return {
@@ -316,7 +337,7 @@ export function createTeamStore<P extends string>(config: TeamStoreConfig<P>): T
       revokeCustomRoleFromMember(ctx, tenantId, userId, roleName),
     setMembershipActive: (tenantId, userId, active) =>
       setMembershipActive(ctx, tenantId, userId, active),
-    removeTenantMemberGuarded: (tenantId, userId, actorRole) =>
-      removeTenantMemberGuarded(ctx, tenantId, userId, actorRole),
+    removeTenantMemberGuarded: (tenantId, userId, actor) =>
+      removeTenantMemberGuarded(ctx, tenantId, userId, actor),
   };
 }

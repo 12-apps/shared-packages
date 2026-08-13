@@ -167,15 +167,15 @@ export function createGrantGovernance<P extends string>(
 ): GrantGovernance {
   const ctx: GovernanceCtx<P> = {
     db: config.db,
-    governance: config.governance,
+    governance: config.catalog.governance,
     guards,
     audit: fencedAudit(config.audit),
     messages: messagesOf(config),
   };
-  const templateNames = new Set(config.roleTemplates.map((role) => role.name));
+  const templateNames = new Set(config.catalog.roleTemplates.map((role) => role.name));
   const overridableNames = new Set(
-    config.roleTemplates
-      .filter((role) => !config.governance.ownerRoles.includes(role.name))
+    config.catalog.roleTemplates
+      .filter((role) => !config.catalog.governance.ownerRoles.includes(role.name))
       .map((role) => role.name),
   );
 

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 
 import {
+  assertGuardsConfigured,
   callsEntitlementGuard,
   entitlementGuardedSymbols,
   guardedSymbols,
@@ -49,41 +50,6 @@ export {
   walkRouteFiles,
 } from './surface-scan';
 
-/**
- * The RBAC guard identifiers the future-pay host accepts — the DEFAULT list,
- * overridable per host. Note what is deliberately ABSENT there: tenant/session
- * RESOLVERS for public storefront routes are not authorization gates.
- */
-export const FUTURE_PAY_RBAC_GUARDS: readonly string[] = [
-  'requireTenantAnyPermissionBySlug',
-  'requireTenantPermissionBySlug',
-  'requireTenantListBySlug',
-  'requireTenantStaffBySlug',
-  'requireTenantAdminBySlug',
-  'requireTenantOwnerBySlug',
-  'resolveAdminTenantId',
-  'requirePermission',
-  'requireTenantOwner',
-  'requireTenantAdmin',
-  'requireTenantRole',
-  'requireSessionUser',
-  'requireSuperadmin',
-  'assertCanGrantRole',
-  'canUploadImages',
-  'requireKitchenReadBySlug',
-  'authorizeTenantTopics',
-];
-
-/**
- * The throwing entitlement guards — recognized ONLY to enforce sequencing;
- * they NEVER count as RBAC protection (they carry no authenticated identity).
- */
-export const FUTURE_PAY_ENTITLEMENT_GUARDS: readonly string[] = [
-  'requireEntitlement',
-  'requireQuota',
-  'requireImpersonationPreview',
-];
-
 /** The protected escape hatch — the only way a surface stays ungated. */
 export interface RbacCoverageExclusions {
   /** Server actions intentionally public/unauthenticated, name → reason. */
@@ -99,10 +65,29 @@ export interface RbacCoverageOptions {
   webRoot?: string;
   /** Path to the exclusions JSON ({@link RbacCoverageExclusions}). */
   exclusionsPath: string;
-  /** Accepted RBAC guard identifiers. Default: the future-pay list. */
-  rbacGuards?: readonly string[];
-  /** Throwing entitlement guard identifiers. Default: the future-pay list. */
-  entitlementGuards?: readonly string[];
+  /**
+   * The identifiers this HOST accepts as an RBAC gate — its own guard helpers,
+   * by name. Required, and it used to default to a hard-coded list of
+   * future-pay's seventeen: a second host adopting the gate inherited another
+   * application's vocabulary, so every one of its own guards read as "not a
+   * guard" and every route it protects read as unprotected. There is no
+   * generic answer here — the gate greps the host's source for the host's
+   * names — so the field is the host's to state.
+   *
+   * What belongs on the list is a guard that carries an authenticated
+   * identity. A tenant/session RESOLVER on a public route is not one.
+   *
+   * `[]` is REFUSED, loudly: it is the one value that cannot mean anything —
+   * see {@link runRbacCoverage}.
+   */
+  rbacGuards: readonly string[];
+  /**
+   * Throwing entitlement guard identifiers — recognized ONLY to enforce the
+   * sequencing invariant (auth 401 → RBAC 403 → entitlement 402). They never
+   * count as RBAC protection: they carry no authenticated identity. Pass `[]`
+   * for a host with no billing tier.
+   */
+  entitlementGuards: readonly string[];
 }
 
 export interface RbacCoverageResult {
@@ -205,13 +190,22 @@ function actionFailures(ctx: GateContext): { failures: string[]; actionCount: nu
   return { failures, actionCount: allActions.size };
 }
 
-/** Run the gate and return every violation (empty = green). */
+/**
+ * Run the gate and return every violation (empty = green).
+ *
+ * @throws {Error} when `rbacGuards` is empty. A green run over a surface with
+ * NO accepted guard is the one result this gate must never produce: the whole
+ * verdict is "does this file call one of these names", so an empty list makes
+ * every answer meaningless. It fails loudly at the option rather than quietly
+ * at every file.
+ */
 export function runRbacCoverage(options: RbacCoverageOptions): RbacCoverageResult {
+  assertGuardsConfigured(options.rbacGuards);
   const ctx: GateContext = {
     appDir: options.appDir,
     webRoot: options.webRoot ?? options.appDir,
-    rbacGuards: options.rbacGuards ?? FUTURE_PAY_RBAC_GUARDS,
-    entitlementGuards: options.entitlementGuards ?? FUTURE_PAY_ENTITLEMENT_GUARDS,
+    rbacGuards: options.rbacGuards,
+    entitlementGuards: options.entitlementGuards,
     exclusions: JSON.parse(readFileSync(options.exclusionsPath, 'utf8')) as RbacCoverageExclusions,
   };
   const routes = routeFailures(ctx);

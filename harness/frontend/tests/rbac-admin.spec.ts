@@ -4,7 +4,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * `@12-apps/rbac` mounted the way a host mounts it (12-13): one call to
  * `createWebRbac({ apiBase })`, no route table, no screen imported by name —
  * driving the published package's own Hono router over a real Postgres
- * through the Vite proxy, as the seeded OWNER.
+ * through the Vite proxy, as the seeded DIRECTOR.
  *
  * The cases are the port of future-pay's `roles.e2e.ts`, `team.e2e.ts` and
  * `team-roles.e2e.ts` (FUT-146): the same test ids, the same affordances, the
@@ -39,8 +39,8 @@ test.describe('Roles admin (port of roles.e2e.ts)', () => {
 
     await expect(page.getByRole('heading', { name: 'Papéis' })).toBeVisible();
     // Seeded SYSTEM templates and the two seeded custom roles, side by side.
-    await expect(page.getByTestId('roles-grid').getByText('Barista')).toBeVisible();
-    await expect(page.getByTestId('roles-grid').getByText('Estoquista')).toBeVisible();
+    await expect(page.getByTestId('roles-grid').getByText('Voluntário')).toBeVisible();
+    await expect(page.getByTestId('roles-grid').getByText('Catalogador')).toBeVisible();
   });
 
   test('searching the catalog narrows it through the backend', async ({ page }) => {
@@ -50,12 +50,12 @@ test.describe('Roles admin (port of roles.e2e.ts)', () => {
     // backend with `q=` (the future-pay spec proved the same via the URL — the
     // packaged screen owns its state, so the proof here is the narrowed grid).
     const searchBox = page.getByTestId('roles-search-all');
-    await searchBox.fill('Barista');
+    await searchBox.fill('Voluntário');
     await searchBox.press('Enter');
 
-    await expect(searchBox).toHaveValue('Barista');
-    await expect(page.getByTestId('roles-grid').getByText('Barista')).toBeVisible();
-    await expect(page.getByTestId('roles-grid').getByText('Estoquista')).toHaveCount(0);
+    await expect(searchBox).toHaveValue('Voluntário');
+    await expect(page.getByTestId('roles-grid').getByText('Voluntário')).toBeVisible();
+    await expect(page.getByTestId('roles-grid').getByText('Catalogador')).toHaveCount(0);
   });
 
   test('composes a role in the "Novo papel" dialog and dismisses it with Cancelar', async ({
@@ -75,9 +75,9 @@ test.describe('Roles admin (port of roles.e2e.ts)', () => {
     await expect(nameField).toHaveValue('Papel E2E rascunho');
     await expect(dialog.getByTestId('role-submit')).toBeDisabled();
 
-    // `stock:read` is a plain class permission — no owner-marker, no SoD
+    // `copies:read` is a plain class permission — no owner-marker, no SoD
     // counterpart — so its checkbox is always togglable on a fresh form.
-    const stockRead = dialog.getByTestId('perm-stock:read');
+    const stockRead = dialog.getByTestId('perm-copies:read');
     await stockRead.click();
     await expect(stockRead.locator('input')).toBeChecked();
     await expect(dialog).toContainText('Permissões (1 selecionada)');
@@ -93,7 +93,7 @@ test.describe('Roles admin (port of roles.e2e.ts)', () => {
     await page.getByTestId('add-role-button').click();
     const dialog = page.getByTestId('role-dialog');
     await dialog.getByTestId('role-name').fill('Papel do Harness');
-    await dialog.getByTestId('perm-stock:read').click();
+    await dialog.getByTestId('perm-copies:read').click();
     await dialog.getByTestId('role-submit').click();
 
     // The write crossed the socket and came back through the list read.
@@ -127,12 +127,12 @@ test.describe('Team admin (port of team.e2e.ts)', () => {
 // not testid: a tenant custom role may share a system role's raw NAME, never
 // its translated label (the future-pay spec's own rationale).
 const SYSTEM_ROLE_LABELS: Record<string, string> = {
-  ADMIN: 'Administrador',
-  MANAGER: 'Gerente',
-  WAITER: 'Garçom',
-  CHEF: 'Cozinheiro',
-  FINANCIAL: 'Financeiro',
-  BUYER: 'Comprador',
+  HEAD_LIBRARIAN: 'Bibliotecário-chefe',
+  BRANCH_LEAD: 'Coordenação de unidade',
+  CLERK: 'Atendente de balcão',
+  CONSERVATOR: 'Restaurador',
+  TREASURER: 'Tesouraria',
+  SELECTOR: 'Seleção de acervo',
 };
 
 /** Set exactly `role` as the single checked system role in the open dialog. */
@@ -160,42 +160,42 @@ test.describe('Team role assignment (port of team-roles.e2e.ts)', () => {
     await expect(page.getByTestId('team-grid').getByText('Role Target')).toBeVisible();
     const row = page.getByTestId('team-grid').locator('tr', { hasText: 'Role Target' });
 
-    // CHEF (Cozinheiro) → MANAGER (Gerente): the roster row reflects the save.
+    // CONSERVATOR (Restaurador) → BRANCH_LEAD (Coordenação): the roster row reflects the save.
     const dialog = await openRoleDialog(page);
     await expect(dialog).toBeVisible();
-    await checkOnlyRole(dialog, 'MANAGER');
+    await checkOnlyRole(dialog, 'BRANCH_LEAD');
     await dialog.getByRole('button', { name: 'Salvar' }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(row.getByText('Gerente')).toBeVisible();
+    await expect(row.getByText('Coordenação de unidade')).toBeVisible();
 
-    // Restore CHEF so retries never see a drifted roster (the reset would fix
+    // Restore CONSERVATOR so retries never see a drifted roster (the reset would fix
     // it anyway; the restore keeps the spec honest about its own writes).
     const restoreDialog = await openRoleDialog(page);
     await expect(restoreDialog).toBeVisible();
-    await checkOnlyRole(restoreDialog, 'CHEF');
+    await checkOnlyRole(restoreDialog, 'CONSERVATOR');
     await restoreDialog.getByRole('button', { name: 'Salvar' }).click();
     await expect(restoreDialog).toHaveCount(0);
-    await expect(row.getByText('Cozinheiro')).toBeVisible();
+    await expect(row.getByText('Restaurador')).toBeVisible();
   });
 
   test('grants and revokes an additive custom role from the dialog', async ({ page }) => {
     await openTeam(page);
     const row = page.getByTestId('team-grid').locator('tr', { hasText: 'Role Target' });
 
-    // Grant: base CHEF stays, Barista rides along as a chip.
+    // Grant: base CONSERVATOR stays, Voluntário rides along as a chip.
     const dialog = await openRoleDialog(page);
-    await dialog.getByTestId('role-opt-Barista').click();
+    await dialog.getByTestId('role-opt-Voluntário').click();
     await dialog.getByRole('button', { name: 'Salvar' }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(row.getByText('Barista')).toBeVisible();
-    await expect(row.getByText('Cozinheiro')).toBeVisible();
+    await expect(row.getByText('Voluntário')).toBeVisible();
+    await expect(row.getByText('Restaurador')).toBeVisible();
 
     // Revoke: unchecking diffs back through the DELETE endpoint.
     const second = await openRoleDialog(page);
-    await second.getByTestId('role-opt-Barista').click();
+    await second.getByTestId('role-opt-Voluntário').click();
     await second.getByRole('button', { name: 'Salvar' }).click();
     await expect(second).toHaveCount(0);
-    await expect(row.getByText('Barista')).toHaveCount(0);
+    await expect(row.getByText('Voluntário')).toHaveCount(0);
   });
 
   test('the dialog blocks a save without exactly one system role', async ({ page }) => {

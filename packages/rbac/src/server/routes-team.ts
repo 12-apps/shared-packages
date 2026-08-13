@@ -10,6 +10,7 @@ import {
   type RbacRoute,
   type RbacServerConfig,
 } from './context';
+import type { RbacActorTier } from './roster-policy';
 import type { GrantGovernance } from './grant-governance';
 import type { RbacGuards } from './guards';
 import type { RolesStore } from './roles-store';
@@ -39,16 +40,20 @@ interface TeamRouteDeps<P extends string> {
 
 /**
  * The coarse admin tier — the outer boundary the whole roster sits behind
- * (future-pay's `requireTenantAdminBySlug`). Answers the actor's base role
- * for the ownership rules; a platform admin passes as `SUPERADMIN`.
+ * (future-pay's `requireTenantAdminBySlug`). Answers the caller's tier for the
+ * ownership rules: their REAL membership role, or the platform discriminator
+ * for a caller the host resolved as `isSuper`.
+ *
+ * It used to answer a bare string and synthesize `'SUPERADMIN'` for the
+ * platform case — see {@link RbacActorTier} for why that could not stay.
  */
 async function requireAdminTier<P extends string>(
   deps: TeamRouteDeps<P>,
   actor: RbacActor,
-): Promise<string> {
+): Promise<RbacActorTier> {
   const messages = messagesOf(deps.config);
-  const adminRoles = new Set(deps.config.adminRoles ?? ['OWNER', 'ADMIN']);
-  if (actor.isSuper) return 'SUPERADMIN';
+  const adminRoles = new Set(deps.config.adminRoles);
+  if (actor.isSuper) return { role: null, isPlatformActor: true };
   if (!actor.userId) throw new RbacApiError(403, messages.forbidden);
   // Always resolved from the membership row — never from the actor object.
   // The store's tier reader refuses a soft-disabled membership, so a
@@ -58,7 +63,7 @@ async function requireAdminTier<P extends string>(
   if (!role || !adminRoles.has(role)) {
     throw new RbacApiError(403, messages.forbidden);
   }
-  return role;
+  return { role, isPlatformActor: false };
 }
 
 function requirePermission<P extends string>(
@@ -243,8 +248,8 @@ function setMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute
         // governance, so its default must exclude everything governance would.
         const assignable =
           deps.config.assignableBaseRoles ??
-          deps.config.roleTemplates
-            .filter((role) => !deps.config.governance.ownerRoles.includes(role.name))
+          deps.config.catalog.roleTemplates
+            .filter((role) => !deps.config.catalog.governance.ownerRoles.includes(role.name))
             .map((role) => role.name);
         if (!assignable.includes(input.role)) {
           throw new RbacApiError(400, messages.baseRoleNotAssignable);
@@ -267,11 +272,11 @@ function removeMemberRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
     path: '/team/:userId',
     async handle({ actor, params }) {
       try {
-        const actorRole = await requireAdminTier(deps, actor);
+        const tier = await requireAdminTier(deps, actor);
         await deps.team.removeTenantMemberGuarded(
           actor.tenantId,
           requireParam(params, 'userId', messagesOf(deps.config)),
-          actorRole,
+          tier,
         );
         return ok({ status: 'removed' as const });
       } catch (error) {
