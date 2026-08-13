@@ -673,12 +673,11 @@ jobs:
       - name: Install Chromium
         working-directory: harness/frontend
         run: npx playwright install --with-deps chromium
-      - name: Build the harness app
-        working-directory: harness/frontend
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run build 2>&1 | tee harness-build.log
+      # No `npm run build` step: playwright.config.ts's webServer command builds
+      # the SPA before `vite preview` serves it, so the build is owned by the one
+      # thing every invocation has to go through. A step here would build it a
+      # second time and, worse, would mean CI never exercised the path a
+      # developer's `npx playwright test` takes.
       - name: Render the published packages in a browser
         working-directory: harness/frontend
         shell: bash
@@ -738,12 +737,7 @@ jobs:
       - name: Install Chromium
         working-directory: harness/frontend
         run: npx playwright install --with-deps chromium
-      - name: Build the harness app
-        working-directory: harness/frontend
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run build 2>&1 | tee harness-build.log
+      # No `npm run build` step here either — see `Frontend Harness` above.
       # FIRST, and it starts no browser — it compiles and inspects. It fails on
       # exactly the states a green suite would hide: a feature that produced no
       # spec, a step definition nobody speaks, a scenario with no Then, a
