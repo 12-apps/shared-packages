@@ -1,4 +1,4 @@
-import { alpha, keyframes } from '@mui/material';
+import { alpha, darken, keyframes, lighten } from '@mui/material';
 import type { CSSObject, Theme } from '@mui/material';
 
 // Define pulse animation globally
@@ -146,6 +146,25 @@ const gradientFor = (theme: Theme, color: string, palette: ColorPalette): string
   return `linear-gradient(135deg, ${from} 0%, ${to} 100%)`;
 };
 
+/**
+ * The label colour for the two variants that paint no background of their own.
+ *
+ * `ghost` and `text` used `palette.main` directly, which is the same mistake
+ * the Alert made with its body text: a palette's `main` is chosen to sit UNDER
+ * white — it is the fill of a solid button — and it is not chosen to be read AS
+ * text. `#6366F1`, the default primary, is 3.6:1 on white and worse on any
+ * tinted surface, so a "Cancelar" or an "Agora não" placed on a coloured panel
+ * turned into a smudge. That is precisely where these two variants belong: they
+ * exist to be the quiet option NEXT to a solid one, so they are the buttons
+ * most likely to be sitting on something other than plain paper.
+ *
+ * One step darker (lighter, on a dark theme) keeps the hue the caller asked for
+ * and buys the contrast back. `main` still drives the hover wash and every
+ * bordered variant, so nothing that was already legible moves.
+ */
+const quietInk = (theme: Theme, palette: ColorPalette): string =>
+  theme.palette.mode === 'dark' ? lighten(palette.main, 0.35) : darken(palette.main, 0.3);
+
 const VARIANT_STYLES: Record<
   string,
   (theme: Theme, palette: ColorPalette, color: string) => CSSObject
@@ -168,23 +187,23 @@ const VARIANT_STYLES: Record<
       borderColor: palette.dark,
     },
   }),
-  ghost: (_theme, palette) => ({
+  ghost: (theme, palette) => ({
     backgroundColor: 'transparent',
-    color: palette.main,
+    color: quietInk(theme, palette),
     '&:hover': {
       backgroundColor: alpha(palette.main, 0.1),
     },
   }),
-  text: (_theme, palette) => ({
+  text: (theme, palette) => ({
     backgroundColor: 'transparent',
-    color: palette.main,
+    color: quietInk(theme, palette),
     border: `none`,
     '&:hover': {
       backgroundColor: alpha(palette.main, 0.1),
     },
     '&.active': {
       backgroundColor: alpha(palette.main, 0.1),
-      color: palette.main,
+      color: quietInk(theme, palette),
     },
   }),
   glass: (theme, palette) => ({
