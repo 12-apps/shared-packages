@@ -4,6 +4,7 @@
    Mocking the socket would leave the suite asserting against a fake of the one thing under
    test. Each case starts its own gateway on an ephemeral port and closes it. */
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 
 import WebSocket from 'ws';
@@ -41,6 +42,7 @@ afterEach(async () => {
   running.gateway = null;
   await gateway?.close();
   resetRealtimeRuntime();
+  vi.unstubAllEnvs();
 });
 
 /** Start on port 0 — the OS picks a free one, so parallel runs cannot collide. */
@@ -55,6 +57,29 @@ async function start(): Promise<{ gateway: RealtimeGateway; port: number }> {
   const address = gateway.server.address();
   if (address === null || typeof address === 'string') throw new Error('the gateway did not listen');
   return { gateway, port: address.port };
+}
+
+/**
+ * A port the OS just told us was free.
+ *
+ * The bin is configured by the ENVIRONMENT, and `REALTIME_GATEWAY_PORT` must name a real
+ * port (`readGatewayConfig` refuses a non-positive integer rather than falling back
+ * silently, which is right) — so the child cannot be handed 0 the way every programmatic
+ * case here is. Asking the OS and closing is the next best thing: a hardcoded port is a
+ * flake the moment two of these suites share a runner, which they do.
+ */
+async function freePort(): Promise<number> {
+  const probe = createServer();
+  const port = await new Promise<number>((resolve, reject) => {
+    probe.once('error', reject);
+    probe.listen(0, HOST, () => {
+      const address = probe.address();
+      if (address === null || typeof address === 'string') reject(new Error('no port'));
+      else resolve(address.port);
+    });
+  });
+  await new Promise<void>((resolve) => probe.close(() => resolve()));
+  return port;
 }
 
 /** Open a socket and resolve once it is open, or reject with the HTTP refusal. */
@@ -203,6 +228,23 @@ describe('the programmatic entry', () => {
     ).rejects.toThrow();
   });
 
+  it('REFUSES to start when no bus is configured and none was asked for', async () => {
+    // The blocker this guard exists for: a gateway container missing REDIS_URL (a
+    // compose/Doppler omission) used to log one `warn` and serve sockets that report
+    // `connected` for ever on a bus with no publishers — while /health stayed green, so
+    // nothing took it out of rotation. Every other case in this file passes `redisUrl:
+    // null`, which IS the opt-in; this one names no bus at all.
+    vi.stubEnv('REDIS_URL', '');
+    vi.stubEnv('REALTIME_DRIVER', '');
+    await expect(
+      startRealtimeGateway({
+        port: 0,
+        ticketSecret: SECRET,
+        logger: { info: () => {}, warn: () => {}, error: () => {} },
+      }),
+    ).rejects.toThrow(/inline driver was not asked for/);
+  });
+
   it('closes every socket on shutdown, so clients see a clean EOF', async () => {
     const { port, gateway } = await start();
     const socket = await connect(port, mintRealtimeTicket(['tenant:t-1:kitchen'], SECRET));
@@ -219,13 +261,17 @@ describe('the shipped bin', () => {
     // THE proof the ticket asks for. `npx` is not used: the bin is resolved by PATH inside
     // node_modules/.bin, which is what an installed consumer gets.
     const binPath = fileURLToPath(new URL('.bin/realtime-gateway', new URL('../node_modules/', import.meta.url)));
-    const port = 34517;
+    const port = await freePort();
     const child = spawn(process.execPath, [binPath], {
       env: {
         ...process.env,
         REALTIME_TICKET_SECRET: SECRET,
         REALTIME_GATEWAY_PORT: String(port),
         REDIS_URL: '',
+        // The inline driver is now an EXPLICIT opt-in: an absent REDIS_URL makes the
+        // gateway refuse to start, because a gateway on the inline driver accepts every
+        // socket and delivers nothing. A single-process bin run says so out loud.
+        REALTIME_DRIVER: 'inline',
       },
       cwd: packageDir,
       stdio: ['ignore', 'pipe', 'pipe'],

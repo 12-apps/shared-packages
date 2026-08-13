@@ -82,7 +82,8 @@ export interface RealtimeGateway {
 export interface StartGatewayOptions extends GatewayConfigInput {
   /**
    * An explicit driver. When omitted the gateway builds one from `redisUrl`: Redis
-   * when configured, inline (loudly) when not.
+   * when configured, inline when inline was explicitly asked for, and otherwise it
+   * REFUSES TO START — see {@link createDriver}.
    */
   driver?: RealtimeDriver;
   /**
@@ -93,23 +94,58 @@ export interface StartGatewayOptions extends GatewayConfigInput {
   server?: Server;
 }
 
-/** Which driver a standalone gateway runs. */
+/**
+ * Which driver a standalone gateway runs — and the one refusal in this file.
+ *
+ * ## An absent `REDIS_URL` is not consent, and a `warn` is not a guardrail
+ *
+ * Inline delivery cannot cross a process boundary, so a publish from the API process
+ * never reaches a socket held here. What makes that worse than an outage is that
+ * NOTHING FAILS, so every liveness mechanism in the package is defeated at once:
+ * `/health` answers `{ok: true}` and the load balancer keeps the container in
+ * rotation; the upgrade is accepted; `subscriptions.add(topic)` really succeeds, on a
+ * bus with no publishers; the 25 s heartbeat carries the CORRECT, non-empty topic
+ * list, so `heartbeatProvesBroken` is false and the silence watch is fed; the client
+ * reports `connected` for ever and relaxes its poll from 5 s to 30 s; and because
+ * `everConnected` is now true, the ws→sse demotion is disabled for the channel's life
+ * — pinning every client to the dead wire while a working SSE endpoint sits beside it.
+ * A screen six times staler than before realtime existed, announcing the opposite.
+ * That is FUT-440/FUT-657 verbatim, and it is what the API half already refuses eighty
+ * lines away (`../server/resolve-driver.ts`: inline is refused in production and
+ * realtime is disabled instead).
+ *
+ * So inline needs an EXPLICIT opt-in (see {@link GatewayConfig.inlineConsent}), and
+ * without one this throws. Failing to start is the gateway's established honest answer
+ * for "I cannot do my job" — `resolveTicketSecret` already throws for a missing secret,
+ * for the same reason: a gateway that starts and then refuses (or lies to) every socket
+ * has no symptom anybody can act on.
+ */
 async function createDriver(
   config: GatewayConfig,
   logger: RealtimeLogger,
 ): Promise<RealtimeDriver> {
-  if (!config.redisUrl) {
-    // Inline delivery cannot cross a process boundary, so a publish from the API
-    // process would never reach a socket held here. Useful only for a
-    // single-process run (a test, the harness); loud so nobody mistakes it for a
-    // working deployment.
-    logger.warn(
-      "REDIS_URL is unset — using the inline driver. Publishes from other processes will NOT arrive.",
-    );
-    return createInlineRealtimeDriver({ logger });
+  if (config.redisUrl) {
+    const { createRedisRealtimeDriver } = await import("../drivers/redis");
+    return createRedisRealtimeDriver({ redisUrl: config.redisUrl, logger });
   }
-  const { createRedisRealtimeDriver } = await import("../drivers/redis");
-  return createRedisRealtimeDriver({ redisUrl: config.redisUrl, logger });
+
+  if (!config.inlineConsent) {
+    throw new Error(
+      "REDIS_URL is unset and the inline driver was not asked for. A gateway on the " +
+        "inline driver accepts every socket, heartbeats the right topic names and " +
+        "delivers nothing — so it is refused rather than started. Set REDIS_URL, or opt " +
+        "in explicitly with REALTIME_DRIVER=inline (or redisUrl/driver/inlineConsent in " +
+        "startRealtimeGateway's options).",
+    );
+  }
+
+  // Asked for: a single-process run — a test, the harness, or a host embedding the
+  // gateway on its own server. Still said out loud, because the one thing it cannot do
+  // is the thing a reader assumes a gateway does.
+  logger.warn(
+    "running the INLINE driver by explicit request. Publishes from other processes will NOT arrive.",
+  );
+  return createInlineRealtimeDriver({ logger });
 }
 
 /** Health, for a compose healthcheck and a reverse proxy — the only HTTP this serves. */
@@ -293,6 +329,15 @@ export async function runRealtimeGateway(
 
   return gateway;
 }
+
+/**
+ * Internals this package's own suite drives directly.
+ *
+ * `createDriver` is here so the gateway's driver decision is testable at the SAME
+ * granularity as the API half's (`resolveRealtimeDriver`, pinned by
+ * `../server/__tests__/surface-internals.test.ts`) — no port, no socket, no `ws`.
+ */
+export const __testables = { createDriver };
 
 export {
   readGatewayConfig,

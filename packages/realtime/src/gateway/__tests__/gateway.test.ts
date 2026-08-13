@@ -15,6 +15,7 @@ import {
 import { createInlineRealtimeDriver } from "../../drivers/inline";
 import { attachConnection, Subscriptions, __testables, type GatewaySocket } from "../connection";
 import { readGatewayConfig } from "../config";
+import { __testables as gatewayTestables } from "../index";
 import {
   INBOUND_BUCKET_CAPACITY,
   InboundRateLimiter,
@@ -470,5 +471,71 @@ describe("gateway config", () => {
     vi.stubEnv("AUTH_SECRET", "session");
     vi.stubEnv("REALTIME_GATEWAY_PORT", "");
     expect(readGatewayConfig()).toMatchObject({ socketPath: "/ws", healthPath: "/health" });
+  });
+
+  it("does NOT read an absent REDIS_URL as consent to run inline", () => {
+    vi.stubEnv("AUTH_SECRET", "session");
+    vi.stubEnv("REDIS_URL", "");
+    vi.stubEnv("REALTIME_DRIVER", "");
+    expect(readGatewayConfig()).toMatchObject({ redisUrl: null, inlineConsent: false });
+  });
+
+  it("takes the opt-in from the KEY being named, whatever its value", () => {
+    vi.stubEnv("AUTH_SECRET", "session");
+    vi.stubEnv("REDIS_URL", "");
+    vi.stubEnv("REALTIME_DRIVER", "");
+    // `redisUrl: null` is the harness's and `startRealtimeGateway`'s own spelling of
+    // "single process, inline is correct" — `??` cannot tell it from the key's absence.
+    expect(readGatewayConfig({ redisUrl: null })).toMatchObject({ inlineConsent: true });
+    expect(readGatewayConfig({ inlineConsent: true })).toMatchObject({ inlineConsent: true });
+  });
+
+  it("reads REALTIME_DRIVER=inline as the environment's opt-in", () => {
+    vi.stubEnv("AUTH_SECRET", "session");
+    vi.stubEnv("REDIS_URL", "");
+    vi.stubEnv("REALTIME_DRIVER", "inline");
+    expect(readGatewayConfig()).toMatchObject({ inlineConsent: true });
+  });
+});
+
+/**
+ * The gateway's driver decision, mirroring the API half's.
+ *
+ * `surface-internals.test.ts` pins this property for `resolveRealtimeDriver` ("refuses
+ * the inline driver in production — it cannot cross a process boundary") and no gateway
+ * case asserted it at all, which is how the two halves of one package came to disagree
+ * about the same misconfiguration. These call `createDriver` directly, at that same
+ * granularity: no port, no socket, no `ws`.
+ */
+describe("the gateway's driver", () => {
+  const configFor = (input: Parameters<typeof readGatewayConfig>[0] = {}) =>
+    readGatewayConfig({ ticketSecret: SECRET, ...input });
+
+  it("REFUSES to start on the inline driver nobody asked for", async () => {
+    vi.stubEnv("REDIS_URL", "");
+    vi.stubEnv("REALTIME_DRIVER", "");
+    // The whole failure in one line: with no Redis and no opt-in the old code logged a
+    // `warn` and served a socket that reports `connected` for ever and delivers nothing.
+    // Not keyed on NODE_ENV — a container missing REDIS_URL is a container that can just
+    // as easily be missing NODE_ENV.
+    await expect(gatewayTestables.createDriver(configFor(), silentLogger)).rejects.toThrow(
+      /REDIS_URL is unset and the inline driver was not asked for/,
+    );
+  });
+
+  it("runs inline when the options named the bus, so the harness costs nothing", async () => {
+    vi.stubEnv("REDIS_URL", "");
+    vi.stubEnv("REALTIME_DRIVER", "");
+    const driver = await gatewayTestables.createDriver(configFor({ redisUrl: null }), silentLogger);
+    expect(driver.kind).toBe("inline");
+    await driver.close();
+  });
+
+  it("runs inline when the ENVIRONMENT asked for it", async () => {
+    vi.stubEnv("REDIS_URL", "");
+    vi.stubEnv("REALTIME_DRIVER", "inline");
+    const driver = await gatewayTestables.createDriver(configFor(), silentLogger);
+    expect(driver.kind).toBe("inline");
+    await driver.close();
   });
 });
