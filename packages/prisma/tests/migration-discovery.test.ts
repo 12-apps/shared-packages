@@ -3,21 +3,22 @@ import { describe, expect, it } from "vitest";
 import { discoverMigrations } from "../prisma/migration-files";
 
 /**
- * Migration discovery must follow SYMLINKS.
+ * Migration discovery must see every PLUGIN-CONTRIBUTED migration.
  *
- * A package that owns part of the schema (`@12-apps/payments-backend`) contributes
- * its migrations as committed symlinks into `prisma/migrations`, because Prisma
- * has no cross-package import. The obvious filter — `readdirSync(..., {
- * withFileTypes: true })` + `Dirent.isDirectory()` — returns FALSE for a
- * symlink, so those migrations were silently skipped and the package's tables
- * never existed in any PGlite-backed run (e2e, the production API smoke).
+ * A package that owns part of the schema (`@12-apps/payments-backend`)
+ * contributes its migrations into `prisma/migrations` as committed copies,
+ * because Prisma has no cross-package import. They used to arrive as symlinks,
+ * and the obvious filter — `readdirSync(..., { withFileTypes: true })` +
+ * `Dirent.isDirectory()` — returns FALSE for a symlink, so those migrations were
+ * silently skipped and the package's tables never existed in any PGlite-backed
+ * run (e2e, the production API smoke).
  *
  * Nothing failed loudly: the schema was just quietly incomplete until something
  * queried those tables. That is the whole reason this is pinned against the
  * REAL migrations folder — a fixture would only prove the fixture.
  */
 describe("migration discovery", () => {
-  it("includes the migrations contributed as symlinks by the payments package", () => {
+  it("includes the migrations contributed by the payments package", () => {
     const discovered = discoverMigrations();
     expect(discovered).toContain("20260725150000_payments_platform_core");
     expect(discovered).toContain("20260725160000_payments_oauth_connections");

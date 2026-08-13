@@ -26,3 +26,17 @@ export const HARNESS_BACKEND_PORT = Number(
 
 /** The same thing a proxy target and a health check need spelled out. */
 export const HARNESS_BACKEND_ORIGIN = `http://localhost:${HARNESS_BACKEND_PORT}`;
+
+/**
+ * Where the realtime GATEWAY listens (12-16) — the SPA's port + 2.
+ *
+ * A third port because the gateway is a third process shape: `@12-apps/realtime/gateway`
+ * holds WebSockets and serves nothing else, and the whole point of the split is that it can
+ * be deployed and restarted independently of the API. Vite proxies `/ws` here with
+ * `ws: true`, so the browser's socket is same-origin exactly as it is in a real deployment.
+ */
+export const HARNESS_GATEWAY_PORT = Number(
+  process.env.HARNESS_GATEWAY_PORT ?? HARNESS_SPA_PORT + 2,
+);
+
+export const HARNESS_GATEWAY_ORIGIN = `http://localhost:${HARNESS_GATEWAY_PORT}`;

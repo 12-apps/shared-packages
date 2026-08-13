@@ -1,7 +1,9 @@
 import type { ComponentType } from 'react';
 
+import { AuditLogPage } from './audit-log';
 import { EntitlementsPlanPage } from './entitlements-plan';
 import { LifecycleAdminPage } from './lifecycle-admin';
+import { NotificationsCenterPage } from './notifications-center';
 import { PaymentsCheckoutApplePayPage } from './payments-checkout-apple-pay';
 import { PaymentsCheckoutBothPage } from './payments-checkout-both';
 import { PaymentsCheckoutBuyerFieldsPage } from './payments-checkout-buyer-fields';
@@ -27,8 +29,9 @@ import { OnboardingGuidedPage } from './onboarding-guided';
 import { PwaInstallPromptPage } from './pwa-install-prompt';
 import { PwaManifestPage } from './pwa-manifest';
 import { RbacAdminPage } from './rbac-admin';
-import { StorageUploadsPage } from './storage-uploads';
+import { RealtimeEventsPage } from './realtime-events';
 import { ReportBuilderPage } from './report-builder';
+import { StorageUploadsPage } from './storage-uploads';
 
 /**
  * One page per published surface, and the ONLY place a new one is registered.
@@ -328,10 +331,31 @@ export const PAGES: readonly HarnessPage[] = [
     Component: OnboardingGuidedPage,
   },
   {
+    slug: 'notifications-center',
+    title: 'Notifications',
+    pkg: '@12-apps/notifications',
+    group: 'backoffice',
+    Component: NotificationsCenterPage,
+  },
+  {
     slug: 'lifecycle-admin',
     title: 'Versions, drafts & bin',
     pkg: '@12-apps/entity-lifecycle',
     group: 'backoffice',
     Component: LifecycleAdminPage,
+  },
+  {
+    slug: 'realtime-events',
+    title: 'Live updates',
+    pkg: '@12-apps/realtime',
+    group: 'backoffice',
+    Component: RealtimeEventsPage,
+  },
+  {
+    slug: 'audit-log',
+    title: 'Audit log',
+    pkg: '@12-apps/audit',
+    group: 'backoffice',
+    Component: AuditLogPage,
   },
 ];

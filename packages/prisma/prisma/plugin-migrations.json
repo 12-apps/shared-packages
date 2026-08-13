@@ -28,6 +28,9 @@
     "20260812120000_add_retention_watermarks",
     "20260812150000_add_mcp_oauth_tables",
     "20260812150000_add_onboarding_states",
-    "20260813120000_add_entity_lifecycle_tables"
+    "20260813120000_add_audit_log",
+    "20260813120000_add_entity_lifecycle_tables",
+    "20260813140000_add_notification_tables",
+    "20260813180000_add_realtime_outbox"
   ]
 }

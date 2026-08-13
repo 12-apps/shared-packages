@@ -145,6 +145,33 @@ describe('roles — CRUD + governance against the published surface', () => {
     expect(restored.data.permissions.length).toBeGreaterThan(1);
   });
 
+  it('reset is governed: an ADMIN cannot restore what the owner withheld', async () => {
+    // Reset WRITES the seeded set, so it is governed exactly like the PUT.
+    // Narrowing ADMIN is the owner's only way to withhold a permission from an
+    // administrator; while reset ran no governance, the administrator undid it.
+    const owner = asUser('owner-1');
+    const withheld = await owner.send('PUT', '/roles/templates/ADMIN', {
+      // `roles:manage` stays, so the ADMIN still reaches the reset route.
+      permissions: ['roles:manage', 'team:read', 'config:read'],
+    });
+    expect(withheld.status).toBe(200);
+
+    const selfReset = await asUser('admin-1').send('DELETE', '/roles/templates/ADMIN');
+    expect(selfReset.status).toBe(400);
+    const stillWithheld = await json<{ data: { permissions: string[] } }>(
+      await asUser('admin-1').get('/permissions'),
+    );
+    expect(stillWithheld.data.permissions).not.toContain('payouts:manage');
+
+    // The owner holds '*', so THEIR reset works exactly as before.
+    const reset = await owner.send('DELETE', '/roles/templates/ADMIN');
+    expect(reset.status).toBe(200);
+    const restored = await json<{ data: { permissions: string[] } }>(
+      await asUser('admin-1').get('/permissions'),
+    );
+    expect(restored.data.permissions).toContain('payouts:manage');
+  });
+
   it('OWNER template is never editable, even by the owner', async () => {
     const response = await asUser('owner-1').send('PUT', '/roles/templates/OWNER', {
       permissions: ['products:read:all'],

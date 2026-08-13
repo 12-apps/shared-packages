@@ -1,0 +1,68 @@
+// @12-apps/audit (12-14) — the append-only action audit log, OWNED by the
+// package. A host adopts it with `node scripts/sync-audit-schema.mjs`, which
+// COPIES this file into the host's schema folder (never a symlink — Prisma
+// lstats a migrations folder, so a symlinked migration is silently skipped,
+// and `turbo prune` drops a partial whose owner is not a declared dependency).
+//
+// Deliberately NO foreign key into any host table (the payments/rbac doctrine):
+// `client_id`, `actor_user_id` and `on_behalf_of_user_id` are by-value scalars,
+// so the partial applies to a host whose tenant table is called anything at
+// all. A host that wants referential integrity adds the constraint in its own
+// migration — see ADOPTING.md.
+//
+// `action` and `resource_type` carry no CHECK constraint: the vocabulary is
+// HOST CONFIG (`AuditVocabulary`), validated in TypeScript at the write site,
+// so a newly instrumented feature adds an action without a migration.
+
+model AuditLog {
+  id       String  @id @default(uuid())
+  clientId String  @map("client_id")
+
+  /// The real human whose credentials authorized the write. NULL = a system
+  /// write (a provider webhook, a job). NEVER the identity an impersonated
+  /// session was rendering as — that is `onBehalfOfUserId`, below.
+  actorUserId String? @map("actor_user_id")
+  /// The role the request was AUTHORIZED under, and the scope the decision was
+  /// made in. Both describe the authorization the NAMED ACTOR used, so both are
+  /// NULL on a system write.
+  actorRole   String? @map("actor_role")
+  scope       String?
+
+  /// The identity the actor was ACTING AS (impersonation / "view as"), never
+  /// the actor themselves. Stored ALONGSIDE `actorUserId` rather than instead
+  /// of it: the trail has to answer "who really did this" and "who did the
+  /// screen claim to be" INDEPENDENTLY, and one column cannot. Conflating them
+  /// is unrecoverable after the fact — an entry that reads as though the
+  /// customer placed the order cannot later be told apart from one they really
+  /// placed, and this table is append-only, so nothing can correct it.
+  /// NULL for every ordinary write, which is why no backfill is possible.
+  onBehalfOfUserId String? @map("on_behalf_of_user_id")
+
+  action       String
+  resourceType String @map("resource_type")
+  resourceId   String @map("resource_id")
+
+  /// Allowlist-redacted state around the mutation: only the fields the
+  /// vocabulary names for this `resourceType` survive, and only flat JSON
+  /// scalars. `{}` for a pure create (no `before`).
+  before Json @default("{}")
+  after  Json @default("{}")
+
+  requestId String?  @map("request_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // The viewer's filters, always tenant-scoped: date (the default listing,
+  // newest first), actor, and resource.
+  @@index([clientId, createdAt])
+  @@index([clientId, actorUserId, createdAt])
+  @@index([clientId, resourceType, resourceId])
+  // Action-pinned reads (an `action_in` pill, a host's own reconciliation
+  // list): the three equality columns, then the sort column, so one index
+  // serves the page AND its count with no sort step. A rare action is the case
+  // that needs it — without the index the filtered scan reads the whole tenant
+  // partition to return an empty page, and pays it twice (findMany + count).
+  @@index([clientId, action, resourceType, createdAt])
+  // Serves the retention sweep ("entries older than N days").
+  @@index([createdAt])
+  @@map("audit_logs")
+}

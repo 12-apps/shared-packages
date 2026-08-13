@@ -13,10 +13,15 @@
     "@aws-sdk/client-s3": "^3.703.0",
     "@electric-sql/pglite": "^0.2.17",
     "@hono/node-server": "^1.14.0",
+    "@types/ws": "^8.5.13",
+    "hono": "^4.6.0",
     "tsx": "^4.19.0",
     "vitest": "^3.2.4",
-    "hono": "^4.6.0"
+    "web-push": "^3.6.7",
+    "ws": "^8.18.0"
   },
   "//s3": "@aws-sdk/client-s3 is @12-apps/storage's OPTIONAL peer (12-20), installed here on purpose: it is what a consumer that wants a bucket installs, and the only way `@12-apps/storage/s3` can be proven to resolve from the tarball. It arrived transitively via shared-helpers before, which is not a promise anything holds.",
-  "//server": "No longer tests-only: `src/` is a REAL server, mounting the package's own Hono router over a real PGlite, so the SPA's Save leaves the tab and survives a reload. `tsx` runs the TypeScript directly — the harness has no build step and should not grow one, because a `dist/` between the source and the server is one more thing that can explain a failure that is supposed to be about OUR packages."
+  "//server": "No longer tests-only: `src/` is a REAL server, mounting the package's own Hono router over a real PGlite, so the SPA's Save leaves the tab and survives a reload. `tsx` runs the TypeScript directly — the harness has no build step and should not grow one, because a `dist/` between the source and the server is one more thing that can explain a failure that is supposed to be about OUR packages.",
+  "//realtime": "ws + @types/ws are here because @12-apps/realtime/gateway declares ws as an OPTIONAL peer and only that entry imports it. tests/realtime-gateway.test.ts starts the published gateway and connects a real socket to it, which is the only way to prove the runnable entry is genuinely runnable from a tarball.",
+  "//notifications": "web-push is here for the same reason: @12-apps/notifications/web-push declares it as an OPTIONAL peer and only that entry imports it, so a host that never enables the channel never installs it. tests/notifications-entry-points.test.ts builds a real VAPID signer out of the tarball, which is what proves that subpath resolves at all."
 }

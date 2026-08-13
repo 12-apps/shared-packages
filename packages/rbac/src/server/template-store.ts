@@ -56,19 +56,37 @@ export async function upsertTemplateOverride(
 }
 
 /**
+ * The seeded catalog default a reset of `name` would WRITE, or undefined when
+ * nothing is seeded under that name (the reset is then a no-op).
+ *
+ * Exported because the reset ROUTE has to run governance against the exact
+ * permission set the write lands, and a second `find` at the call site could
+ * resolve a different seed than the write does. One lookup, so the check and
+ * the write can never disagree about what is being restored.
+ */
+export function templateSeedFor(
+  ctx: RolesStoreCtx,
+  name: string,
+): TenantRoleSeed | undefined {
+  return ctx.tenantRoleSeeds.find((role) => role.name === name);
+}
+
+/**
  * Restore a tenant's SYSTEM role `name` to the seeded catalog default. Reset
  * EDITS the row back in place rather than deleting it (deleting would strip
  * the tenant's role and every member's link to it). Tenant-scoped and
  * locked-safe via the `where`; idempotent — false when nothing matched.
+ *
+ * This WRITES a permission set, so it is governed like the override it is: the
+ * route runs `assertCanOverrideTemplateRole` against {@link templateSeedFor}
+ * before calling it.
  */
 export async function resetTemplateRole(
   ctx: RolesStoreCtx,
   tenantId: string,
   name: string,
 ): Promise<boolean> {
-  const seed: TenantRoleSeed | undefined = ctx.tenantRoleSeeds.find(
-    (role) => role.name === name,
-  );
+  const seed: TenantRoleSeed | undefined = templateSeedFor(ctx, name);
   if (!seed) return false;
   const db = await ctx.db();
   const reset = await db.$transaction(async (tx) => {
