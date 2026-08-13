@@ -15,6 +15,28 @@ Four features, each plug-and-play per collection:
 Versioning, drafts and approvals are **feature-flaggable per tenant** through a
 three-layer gate; the recycle bin is always on once a collection is plugged in.
 
+## The plug-and-play surfaces (12-17)
+
+The core below is the kernel; a host normally adopts the whole surface
+instead of wiring it:
+
+- `@12-apps/entity-lifecycle/server` — `createApiEntityLifecycle({ db,
+  entities, directory })`: the versions / restore / drafts / recycle-bin /
+  approvals endpoints, GENERATED per registered collection from one
+  declaration each, over the four tables the package owns.
+- `@12-apps/entity-lifecycle/hono` — `entityLifecycleRouter({ ...config,
+  resolveActor })`, a one-call mount (`hono` is an optional peer).
+- `@12-apps/entity-lifecycle/react` — `createWebEntityLifecycle({ apiBase })`:
+  the Lixeira + Aprovações page, plus the `VersionHistoryDialog` and
+  `DraftBanner` a host drops into its own editors.
+- `prisma/entity-lifecycle.prisma` + `prisma/migrations/*` — the model
+  partial and its migrations, COPIED into the host by `prisma:sync` and the
+  host's plugin-migration sync.
+
+The full adoption contract — config tables, endpoint list, the rules that
+bite, and the notes for a host that already has these tables — is in
+[ADOPTING.md](./ADOPTING.md).
+
 ## Concepts
 
 ### Snapshots and diffs
@@ -116,19 +138,21 @@ update / delete / restore / publish all park as pending change requests.
 
 ## Storage adapters
 
-Implement `VersionStore`, `RecycleBinStore`, `DraftStore`, `ApprovalStore`
-against your database. **Plug-and-play Prisma models ship with this package**:
-`prisma/entity-lifecycle.prisma` is the canonical partial for the four generic
-tables (`entity_versions`, `recycle_bin_entries`, `entity_drafts`,
-`change_requests`) — point your Prisma config at a multi-file schema FOLDER
-and sync the partial into it (reference sync step:
-`packages/prisma/scripts/sync-lifecycle-schema.mjs`, run before
-`prisma generate`, with a `--check` drift gate for CI). The partial is
-host-agnostic: tenancy is a by-value `client_id` scalar (add the FK in your
-migration) and closed sets are Strings (add CHECKs in your migration — see
-this repo's `20260722120000_add_entity_lifecycle`). Prisma-backed adapter
-implementations to copy: `apps/web/lib/lifecycle/store*.ts`. In-memory
-implementations ship for tests/prototyping: `createMemoryVersionStore()` etc.
+**The DB-backed adapters ship with the package**: pass any client satisfying
+the structural `LifecycleDb` seam (a Prisma client does directly) to
+`createDbLifecycleStores(db)` from `@12-apps/entity-lifecycle/server` — or let
+`createApiEntityLifecycle` build them for you. **The Prisma models and their
+migrations ship too**: `prisma/entity-lifecycle.prisma` is the canonical
+partial for the four generic tables (`entity_versions`, `recycle_bin_entries`,
+`entity_drafts`, `change_requests`); `pnpm --filter @12-apps/entity-lifecycle
+prisma:sync` copies it into a multi-file schema folder (with a `--check` drift
+gate for CI), and the migrations under `prisma/migrations/` are discovered
+structurally by the host's plugin-migration sync. The partial is
+host-agnostic: tenancy is a by-value `client_id` scalar (add an FK in your own
+migration if you want one) and closed sets are Strings with CHECK constraints
+in the shipped migration. For a custom store, implement `VersionStore`,
+`RecycleBinStore`, `DraftStore`, `ApprovalStore`; in-memory implementations
+ship for tests/prototyping: `createMemoryVersionStore()` etc.
 
 ## Testing
 
