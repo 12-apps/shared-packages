@@ -113,12 +113,15 @@ clients instead.
 `backend/prisma/payments.prisma` and `backend/prisma/migrations/` are OWNED
 by `@12-apps/payments-backend`: three FK-free tables scoped by
 `(merchant_kind, merchant_id)` — provider configs (encrypted credential
-blob), charges (idempotency uniques), webhook inbox (dedup triple). The
-host's prisma folders hold only SYMLINKS to these files (Prisma has no
-cross-package import; a committed symlink is the equivalent, and Prisma
-reads straight through it) — no payment model or migration ever lives in
-the application. `pnpm --filter @12-apps/payments-backend prisma:sync`
-creates/repairs the links; `prisma:sync:check` is the CI drift gate.
+blob), charges (idempotency uniques), webhook inbox (dedup triple). Prisma has
+no cross-package import, so the host's prisma folders hold committed **COPIES**
+of these files — never symlinks, which Prisma's migration walk skips, `turbo
+prune` dangles and `npm pack` drops. The package stays the only author: no
+payment model is hand-written into the application, and a copy that drifts is a
+red gate rather than a divergence.
+`pnpm --filter @12-apps/payments-backend prisma:sync` writes/repairs the
+partial; `prisma:sync:check` is the CI drift gate. Migrations are copied by the
+host, which finds them structurally under `backend/prisma/migrations/`.
 
 ## Guarantees the gateway owns
 

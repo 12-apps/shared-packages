@@ -15,16 +15,18 @@ kind.
 | **Server** | `@12-apps/report-builder/server` | Call `createApiReportBuilder(config)` and mount the `routes` it returns — the eight endpoints, their parsing, their statuses and their envelope all live here. The host supplies only what is its own: a `ReportActor` (auth + tenant + permission ids), a window-scoped adapter and a lazy DB provider. Also provides the domain catalog + system presets, the entity→permission policy and the **wire (zod) contract** the host's MCP registry imports. |
 | **Hono** | `@12-apps/report-builder/hono` | `app.route(prefix, reportBuilderRouter({ ...serverConfig, resolveActor }))`. A one-call mount for hosts on Hono; `hono` is an OPTIONAL peer, so importing the root or `/server` never resolves it. |
 | **React** | `@12-apps/report-builder/react` | Call `createWebReportBuilder({ tenantSlug })` and mount the `page` it returns. Screens, flows and the routes between them are all inside; the host writes no route table. Nest the built-ins in your menu from `SYSTEM_REPORT_NAV`. |
-| **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync` once: the model + migrations reach the host's schema folder as **committed symlinks**. Never copy them. |
+| **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma, a symlinked partial dangles under `turbo prune`, and `npm pack` drops it from the tarball). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 | **E2E journeys** | `@12-apps/report-builder/e2e` | Implement `defineReportsWorld({ ... })` in a module inside your own playwright-bdd `steps` glob, then add `reportsFeatures` / `reportsFeaturesRoot` / `reportsSteps` to `defineBddConfig`. The Gherkin ships HERE; nothing is copied, so a scenario added upstream runs on your next version bump. See *The journeys ship with the package* below. |
 
 ## Host wiring rules (the ones that bite)
 
 1. **Declare the dependency where the schema lands.** The host package owning
    the Prisma schema folder (here `@12-apps/prisma`) MUST declare this
-   package as a dependency: symlinks are invisible to the dependency graph, so
-   `turbo prune --docker` would otherwise drop the package and dangle every
-   link at deploy (see the #336 CD incident; `package.test.ts` gates this).
+   package as a dependency: the copy is invisible to the dependency graph, so
+   `turbo prune --docker` would otherwise drop this package from the build
+   context and the sync's `--check` would exit 1 on a missing source, on a
+   partial that is sitting right there, correct and committed (see the #336 CD
+   incident; `package.test.ts` gates this).
 2. **Duck-typed DB, never a generated client.** The server surface takes the
    host's Prisma client through structural interfaces (`ReportSourceDb`,
    `SavedReportDb`). The package never imports a generated client, so any

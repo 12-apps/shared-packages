@@ -5,25 +5,36 @@ How a host application wires `@12-apps/payments-backend` + `@12-apps/payments-fr
 
 ## 1. Database
 
-1. `pnpm --filter @12-apps/payments-backend prisma:sync` — creates SYMLINKS in
-   the host's `prisma/schema/` and `prisma/migrations/` folders pointing at
-   the package-owned `payments.prisma` and migration folders (commit the
-   symlinks; `prisma:sync:check` is the CI drift gate). No payment model or
-   migration is ever copied into the application.
+1. `pnpm --filter @12-apps/payments-backend prisma:sync -- <host schema dir>` —
+   writes `payments.prisma` into the host's `prisma/schema/` folder as a
+   byte-identical **COPY** of the package-owned partial, and never a symlink
+   (commit the copy; `prisma:sync:check` is the CI drift gate). The migrations
+   are copied too, by the host, which discovers them structurally under this
+   package's `prisma/migrations`.
+
+   **Never symlink either one.** A symlink loses three ways, all silent:
+   Prisma enumerates the migrations folder with `lstat`, so a linked migration
+   reports `isDirectory() === false` and is skipped — `migrate deploy` prints
+   "No pending migrations to apply", exits 0, and the deploy goes green having
+   changed no schema (five payments migrations sat unapplied in production
+   behind that hole); `turbo prune` drops an owner the dependency graph does
+   not reach and leaves the link dangling; and `npm pack` drops symlinked
+   entries from the tarball, so a published schema folder simply ships without
+   the model.
 2. Declare `@12-apps/payments-backend` as a dependency of the package that OWNS
-   the schema folder (here `@12-apps/prisma`). The links are invisible to
-   the dependency graph, so without this any tool that copies only the packages
-   the graph reaches — `turbo prune`, which is how the Docker images are built —
-   leaves the links dangling and `prisma generate` dies with
-   `ENOENT ... prisma/schema/payments.prisma`. That is a build-time relationship,
-   so `devDependencies` is enough. `package.test.ts` in the host package enforces
-   it for every symlinked partial.
-3. `prisma migrate deploy` and `prisma generate` work unchanged — Prisma
-   reads straight through the links.
+   the schema folder (here `@12-apps/prisma`). The copy is invisible to the
+   dependency graph, so without this any tool that copies only the packages the
+   graph reaches — `turbo prune`, which is how the Docker images are built —
+   drops this package and the sync's `--check` exits 1 on a missing source,
+   with the partial sitting right there, correct and committed. That is a
+   build-time relationship, so `devDependencies` is enough. `package.test.ts`
+   in the host package enforces it for every copied partial.
+3. `prisma migrate deploy` and `prisma generate` work unchanged — they read
+   ordinary files.
 
 The three tables are FK-free and merchant-scoped, so no host schema changes
-are needed — in another repo, point the link script's HOST_* paths at that
-repo's prisma folders (Windows checkouts need symlink support enabled).
+are needed — in another repo, pass that repo's schema folder to the sync script
+(or set `PAYMENTS_HOST_SCHEMA_DIR`).
 
 ## 2. Backend wiring
 
