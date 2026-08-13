@@ -125,8 +125,56 @@ function packOne(dir, destination) {
   return { name: packed.name, tarball: join(destination, packed.filename) };
 }
 
+/**
+ * Build first, because `npm pack` will not.
+ *
+ * Seven of these packages publish `./dist` and NONE of them has a `prepack`,
+ * `prepare` or `prepublishOnly` hook — so `npm pack` copies whatever `dist/`
+ * happens to be on disk. With no build at all that is loud (an absent dist
+ * fails the export-target checks below); with a STALE one it is silent, and the
+ * tarball carries last week's compiled code under this branch's version. Both
+ * harnesses and the consumer fixture then validate that, green — so the run
+ * proves something about a build nobody in it produced, which is the exact
+ * opposite of why they install from tarballs. CI escaped it only by running
+ * `pnpm build` as a separate step first, which is a convention, not a guarantee.
+ *
+ * Here rather than in seven `prepack` hooks, for three reasons:
+ *
+ *  1. **This is the chokepoint.** Every tarball this repo produces comes out of
+ *     `packAll` — `scripts/harness-install.mjs` for both harnesses,
+ *     `installConsumerFixture` for the consumer gate. One call covers all of
+ *     them, and a new package with a build script is covered on arrival.
+ *     Per-package hooks are a hand-kept list, and a hand-kept list failing here
+ *     is not a red build but a package quietly exempt from the rule.
+ *  2. **Order.** `npm pack` runs `prepack` per package, independently, in
+ *     whatever order the caller iterates — alphabetical, here. The builds are
+ *     not independent: `shared-helpers`'s `tsc` reads
+ *     `@12-apps/observability-backend`'s emitted `.d.ts` and fails outright
+ *     without it. `turbo.json` declares `build.dependsOn: ["^build"]`, so one
+ *     root build gets the order right by construction; alphabetical gets it
+ *     right by luck.
+ *  3. **Cost.** Turbo caches, so this is a second of `>>> FULL TURBO` when
+ *     nothing changed and one package's build when something did. Seven hooks
+ *     invoke tsup/tsc directly with no cache, rebuilding everything on every
+ *     pack — and `prepack` fires on `npm publish` too, so the release job would
+ *     build twice.
+ *
+ * BEFORE `withPublishManifests`, not inside it: that rewrites every
+ * `workspace:*` to a concrete range, and building under manifests that no longer
+ * describe this checkout's graph is its own way to produce a wrong artifact.
+ *
+ * What this deliberately does not cover is a human running `npm pack` by hand in
+ * a package directory. That produces no tarball a harness consumes.
+ */
+function buildWorkspace() {
+  // Inherited stdio: a build is the one step here whose progress a caller wants
+  // to watch, and whose failure has to be readable rather than a captured buffer.
+  execFileSync("pnpm", ["build"], { cwd: REPO_ROOT, stdio: "inherit" });
+}
+
 /** Tarballs for every given directory, keyed by package name. */
 export function packAll(dirs, destination) {
+  buildWorkspace();
   return withPublishManifests(() => new Map(dirs.map((dir) => Object.values(packOne(dir, destination)))));
 }
 

@@ -154,6 +154,20 @@ export default defineConfig({
    * first spec from racing the first migration: PGlite applies six migrations
    * on boot, and a spec that arrived early would see `relation saved_reports
    * does not exist` — a package failure, seemingly.
+   *
+   * THE SPA'S SERVER BUILDS THE SPA. `vite preview` serves `dist/`, and it
+   * serves a stale one without a word, so the build belongs to whatever starts
+   * the server rather than to the npm script that usually calls it. The three
+   * npm scripts owned it until now, which left exactly one invocation uncovered
+   * — and it is the one a person debugging a single failure reaches for.
+   * `npx playwright test --project=harness tests/shell.spec.ts` never built:
+   * with no `dist/` it fails loudly (preview answers 404 and this webServer
+   * times out), and with a stale one it goes green against the previous run's
+   * bundle. That has already cost a "164 passed" against a bundle predating the
+   * changes under test, and eleven specs hidden behind element-not-found
+   * timeouts after a merge added a page. Owning it here means no invocation can
+   * skip it — `npm test`, a bare `playwright test`, one spec, one `--grep`, an
+   * IDE's run button — because none of them can start the SPA any other way.
    */
   webServer: [
     {
@@ -164,10 +178,12 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: `npx vite preview --port ${HARNESS_SPA_PORT} --strictPort`,
+      command: `npm run build && npx vite preview --port ${HARNESS_SPA_PORT} --strictPort`,
       url: HARNESS_SPA_ORIGIN,
       reuseExistingServer: false,
-      timeout: 60_000,
+      // The build is inside this command now, so the window has to cover it:
+      // ~10s of vite on top of the moment `preview` needs to bind.
+      timeout: 120_000,
     },
   ],
 });

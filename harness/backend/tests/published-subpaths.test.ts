@@ -1,24 +1,216 @@
+/* eslint-disable test-flakiness/no-unmocked-fs -- the installed tree IS the
+   subject. Every path read below is inside harness/backend/node_modules, i.e.
+   inside the tarballs this harness was installed from; a mock would turn the
+   suite into a restatement of the manifests it is meant to check. */
 /**
- * Every published subpath RESOLVES from the packed tarball, and its headline
- * symbol is really there (12-23).
+ * Every published entry point RESOLVES to something the tarball actually
+ * contains — for every subpath of every installed package, generated (12-23).
  *
- * This suite exists because of how `@12-apps/rbac`'s `./coverage` shipped BROKEN:
- * nothing in the repo imported it, so nothing noticed. An export map entry is a
- * promise to a consumer, and the only thing that can check it is a consumer —
- * which is what the harness is. It installs from `npm pack` output (see
- * `scripts/harness-install.mjs`), so a subpath missing from `exports`, a file
- * excluded by `files`, or a transitive dependency that does not resolve once the
- * pnpm workspace links are gone all fail HERE rather than in someone's app.
+ * This suite exists because of how `@12-apps/rbac`'s `./coverage` shipped
+ * BROKEN: nothing in the repo imported it, so nothing noticed. An export map
+ * entry is a promise to a consumer, and the only thing that can check it is a
+ * consumer — which is what the harness is. It installs from `npm pack` output
+ * (see `scripts/harness-install.mjs`), so a subpath missing from `exports`, a
+ * file excluded by `files`, or a source folder a repo-wide `.gitignore` entry
+ * quietly kept out of the commit all fail HERE rather than in someone's app.
  *
- * `@12-apps/mcp/coverage` is the sharp one: it reaches
- * `@12-apps/rbac/coverage` transitively, so this asserts a cross-package hop
- * through two tarballs, not just one manifest.
+ * THE CASES ARE GENERATED, and that is the point of the rewrite. This file used
+ * to hand-list six of them — `@12-apps/mcp`'s five subpaths plus
+ * `@12-apps/rbac/coverage` — while the tarballs carry 25 packages and more than
+ * two hundred subpaths between them. A hand-list covers the subpath somebody
+ * remembered on the day it broke, which is exactly the shape of a check a NEW
+ * dead subpath walks straight past; and a dead one has now shipped twice.
+ * Reading each installed manifest instead means a subpath added upstream is
+ * covered on the next `harness-install`, with nothing to remember.
  *
- * Deliberately shallow. Behaviour is proven by each package's own suite and by the
- * other harness suites; all this asks is "does the door open".
+ * The reading of `exports` comes from `scripts/lib/export-map.mjs`, shared with
+ * `scripts/verify-package-consumers.mjs`. That is a repo TOOL, not a package
+ * under test, so importing it across the harness boundary breaks no isolation —
+ * and it is what keeps the two gates from coming to disagree about what a
+ * subpath is. Wildcards are where they would diverge first:
+ * `@12-apps/shared-helpers` exports `./*`, which Node expands against the files
+ * that are there, and the gate expanding fewer entries silently asserts less.
+ *
+ * Deliberately shallow, and deliberately about FILES rather than imports. Most
+ * of these subpaths are TypeScript source a consumer's bundler compiles;
+ * importing them from a vitest run in a backend harness would need React, MUI
+ * and a browser, and would be answering a different question. "Is the file this
+ * manifest promises really in the tarball" is the one question that can be asked
+ * of all 25 packages at once. The runtime half — does the door open, is the
+ * headline symbol there — is kept below for the two subpaths where a real
+ * `import()` proves something extra: a hop between two tarballs.
  */
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
+import {
+  exportEntries,
+  legacyEntries,
+  meaningfulFiles,
+  shippedFiles,
+  targetPath,
+} from '../../../scripts/lib/export-map.mjs';
+
+/** An `exports` subpath and the files its conditions point at. */
+interface ExportEntry {
+  subpath: string;
+  targets: string[];
+}
+
+/** A pre-`exports` entry field (`main`, `module`, `types`, …) and its target. */
+interface LegacyEntry {
+  field: string;
+  target: string;
+}
+
+interface InstalledPackage {
+  name: string;
+  files: string[];
+  shipped: Set<string>;
+  entries: ExportEntry[];
+  legacy: LegacyEntry[];
+}
+
+const HARNESS = fileURLToPath(new URL('..', import.meta.url));
+const SCOPE = join(HARNESS, 'node_modules', '@12-apps');
+
+/** The one package with neither an `exports` map nor a legacy entry field. */
+const ASSETS_ONLY = ['@12-apps/typescript-config'];
+
+function describePackage(dir: string): InstalledPackage {
+  const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf-8')) as { name: string };
+  const files = shippedFiles(dir) as string[];
+  return {
+    name: manifest.name,
+    files,
+    shipped: new Set(files),
+    entries: exportEntries(manifest, files) as ExportEntry[],
+    legacy: legacyEntries(manifest) as LegacyEntry[],
+  };
+}
+
+/**
+ * The packages the installer put here, read off disk rather than off a list.
+ *
+ * `harness/backend/package.json` is generated by `scripts/harness-install.mjs`
+ * with every tarball as a `file:` dependency, so the two should agree exactly —
+ * and the meta-suite below asserts they do. Discovering the directories is what
+ * makes the cases appear; comparing them against the manifest is what turns a
+ * package that failed to install into a red test rather than a shorter run.
+ */
+function installedPackages(): InstalledPackage[] {
+  return readdirSync(SCOPE, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => describePackage(join(SCOPE, entry.name)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** The declared targets that are not in the tarball — empty is the pass. */
+function missing(pkg: InstalledPackage, targets: string[]): string[] {
+  return [...new Set(targets.map((target) => targetPath(target) as string))].filter(
+    (path) => !pkg.shipped.has(path),
+  );
+}
+
+/** Every `@12-apps` name the installer wired into this harness. */
+function declaredDependencies(): string[] {
+  const manifest = JSON.parse(readFileSync(join(HARNESS, 'package.json'), 'utf-8')) as {
+    dependencies?: Record<string, string>;
+  };
+  return Object.keys(manifest.dependencies ?? {}).filter((name) => name.startsWith('@12-apps/'));
+}
+
+const packages = existsSync(SCOPE) ? installedPackages() : [];
+
+describe.each(packages)('$name published surface', (pkg) => {
+  /**
+   * A package that ships nothing at all still installs, still resolves as a
+   * name, and still fails every consumer — quietly, because npm reports success
+   * at every step. `typescript-config` was in exactly this state for three
+   * releases: three .json files, none of them matched by `files`.
+   *
+   * Unconditional, so a package with no `exports` map and no legacy entry field
+   * still contributes an assertion. A generated suite whose every case comes out
+   * of `exports` reports such a package as covered while asserting nothing about
+   * it at all — the failure mode of a generator, where a hand-list would at
+   * least have looked short.
+   */
+  it('ships files beyond its own manifest', () => {
+    expect(meaningfulFiles(pkg.files)).not.toHaveLength(0);
+  });
+
+  it.each(pkg.entries)('exports["$subpath"] is in the tarball', ({ targets }) => {
+    // A subpath with no target at all is `exports: { "./x": null }`, a
+    // deliberately blocked path. None of these packages has one; if one appears,
+    // this asserts nothing about it, and the meta-suite counts it.
+    expect(missing(pkg, targets)).toEqual([]);
+  });
+
+  /**
+   * `exports` wins wherever it is read, which is why a dead `main` / `module` /
+   * `types` is survivable — and why nobody notices one. They are still what a
+   * classic-resolution `tsc` and older bundlers read, and `@12-apps/ui` carried
+   * `module: ./dist/index.mjs` for as long as it has been dual-format, naming a
+   * file tsup has never emitted. Nothing anywhere had an opinion about it.
+   */
+  it.each(pkg.legacy)('$field is in the tarball', ({ target }) => {
+    expect(missing(pkg, [target])).toEqual([]);
+  });
+});
+
+/**
+ * What the generation itself is worth, asserted rather than assumed.
+ *
+ * Each of these re-reads the installed tree instead of closing over `packages`.
+ * The list above is read at COLLECTION time, which is the only moment a
+ * `describe.each` can be built from it; a test body reading it as well is shared
+ * state between tests, and the flakiness gate is right to say so — the reread
+ * costs a directory walk and owes nothing to test order.
+ */
+describe('the generated coverage itself', () => {
+  it('found the installed packages at all', () => {
+    // A wrong path here would generate no cases and pass, which is the one way
+    // a generated suite fails silently.
+    expect(installedPackages().map(({ name }) => name)).not.toHaveLength(0);
+  });
+
+  it('covers every @12-apps package the installer declared', () => {
+    const found = new Set(installedPackages().map(({ name }) => name));
+    expect(declaredDependencies().filter((name) => !found.has(name))).toEqual([]);
+  });
+
+  it('leaves no package resting on nothing but its file list', () => {
+    const bare = installedPackages().filter(
+      ({ entries, legacy }) => entries.length === 0 && legacy.length === 0,
+    );
+    // Not a failure — `typescript-config` is nothing but the JSON a `tsconfig`
+    // extends, and has no entry point to promise. Naming it is what makes the
+    // NEXT package to arrive in that state a decision rather than an omission.
+    expect(bare.map(({ name }) => name)).toEqual(ASSETS_ONLY);
+  });
+
+  it('promises no subpath it then asserts nothing about', () => {
+    const blocked = installedPackages().flatMap(({ name, entries }) =>
+      entries
+        .filter(({ targets }) => targets.length === 0)
+        .map(({ subpath }) => `${name} ${subpath}`),
+    );
+    expect(blocked).toEqual([]);
+  });
+});
+
+/**
+ * The runtime half, kept as it was: a file being present says nothing about the
+ * barrel above it exporting the symbol a consumer came for, and `import()` is
+ * the only thing that can say so.
+ *
+ * `@12-apps/mcp` is where this is worth the five cases — it is the package whose
+ * subpaths a HOST runs as gates rather than imports as a library, so a broken
+ * one surfaces in someone's CI rather than in their build.
+ */
 describe('@12-apps/mcp published subpaths', () => {
   it('exposes the MCP core from `.`', async () => {
     const mod = await import('@12-apps/mcp');

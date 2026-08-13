@@ -24,14 +24,24 @@
 // the tarball and resolvable by Node, that the entry points it ships can be
 // imported, and that everything they import is actually installed.
 //
-// Run after `pnpm build` (shared-helpers publishes ./dist, which tsc writes).
-import { existsSync, readdirSync } from "node:fs";
+// Needs no `pnpm build` first: `packAll` builds the workspace before it packs,
+// so the dist a tarball carries is this checkout's rather than whatever was left
+// on disk. It used to be the caller's job, guarded by a check that only asked
+// whether `dist/` EXISTED — which a stale one does.
+import { existsSync } from "node:fs";
 import { builtinModules, createRequire } from "node:module";
-import { dirname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { dirname, join, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import ts from "typescript";
 
+import {
+  exportEntries,
+  legacyEntries,
+  meaningfulFiles,
+  shippedFiles,
+  targetPath,
+} from "./lib/export-map.mjs";
 import {
   assertMatchesPublishList,
   installConsumerFixture,
@@ -39,7 +49,6 @@ import {
   readManifest,
 } from "./lib/pack-workspace.mjs";
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BUILTINS = new Set(builtinModules);
 
 // Source we scan for imports. Tests and stories are excluded because they are
@@ -47,79 +56,6 @@ const BUILTINS = new Set(builtinModules);
 // testing-library are meant to be absent from a consumer's tree.
 const SOURCE = /\.(?:[cm]?[jt]s|[jt]sx)$/;
 const TEST_FILE = /(?:\.(?:test|spec|stories|test-story)\.|(?:^|\/)(?:__tests__|tests)\/)/;
-
-// Files that carry no information about whether a package is usable.
-const BOILERPLATE = /^(?:package\.json|README|LICEN[CS]E|CHANGELOG)/i;
-
-/** Every file inside an installed package, as package-relative paths. */
-function shippedFiles(pkgDir) {
-  return readdirSync(pkgDir, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => relative(pkgDir, join(entry.parentPath, entry.name)).split(sep).join("/"))
-    .filter((path) => !path.startsWith("node_modules/"));
-}
-
-/** Every target an exports value points at, across all its conditions. */
-function targetsOf(value) {
-  if (typeof value === "string") return [value];
-  if (value === null || typeof value !== "object") return [];
-  return Object.values(value).flatMap(targetsOf);
-}
-
-/** Normalise the two shapes `exports` can take into subpath -> value pairs. */
-function exportPairs(exports) {
-  if (exports === undefined) return [];
-  if (typeof exports === "string") return [[".", exports]];
-  const keys = Object.keys(exports);
-  const subpaths = keys.filter((key) => key === "." || key.startsWith("./"));
-  // A bare conditions object ({ import, require, ... }) is the whole package.
-  return subpaths.length === keys.length ? Object.entries(exports) : [[".", exports]];
-}
-
-const escapeRegExp = (literal) => literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/**
- * What `*` stands for, read off the files the package actually ships.
- *
- * Node expands a wildcard against the filesystem, so a subpath pattern only
- * exists for the files that are there — which makes this the same question as
- * "did the tarball include them".
- *
- * A target may carry more than one `*`, and Node substitutes the SAME matched
- * value into all of them ("./dist/*\/*.js" is dist/<x>/<x>.js, not two
- * independent wildcards). So the first star captures and the rest backreference
- * it — a fresh `(.+)` each time would accept files Node never resolves.
- *
- * Splitting on `*` before escaping is also what keeps a second star out of the
- * regex as a quantifier: escaping the whole pattern and then substituting one
- * star left every later star raw, which is what CodeQL flagged.
- */
-function starValues(pattern, files) {
-  const [head, ...tail] = pattern.replace(/^\.\//, "").split("*");
-  if (tail.length === 0) return [];
-  const body = `${escapeRegExp(head)}(.+)${tail.map(escapeRegExp).join("\\1")}`;
-  const matcher = new RegExp(`^${body}$`);
-  return files.flatMap((file) => matcher.exec(file)?.slice(1, 2) ?? []);
-}
-
-function wildcardEntries(subpath, value, files) {
-  const [first] = targetsOf(value);
-  if (first === undefined) return [];
-  // replaceAll, per the same rule: every `*` takes the matched value.
-  return starValues(first, files).map((star) => ({
-    subpath: subpath.replaceAll("*", star),
-    targets: targetsOf(value).map((target) => target.replaceAll("*", star)),
-  }));
-}
-
-/** Concrete { subpath, targets } pairs, wildcards expanded. */
-function exportEntries(manifest, files) {
-  return exportPairs(manifest.exports).flatMap(([subpath, value]) =>
-    subpath.includes("*")
-      ? wildcardEntries(subpath, value, files)
-      : [{ subpath, targets: targetsOf(value) }],
-  );
-}
 
 // ---------------------------------------------------------------- checks ---
 
@@ -130,7 +66,7 @@ function exportEntries(manifest, files) {
  * releases: three .json files, none of them matched by `files`.
  */
 function checksShipsContent({ files }) {
-  const meaningful = files.filter((file) => !BOILERPLATE.test(file));
+  const meaningful = meaningfulFiles(files);
   return meaningful.length > 0 ? [] : ["publishes no files beyond package.json/README — the tarball is empty"];
 }
 
@@ -139,9 +75,24 @@ function checksExportTargets({ files, entries }) {
   const shipped = new Set(files);
   return entries.flatMap(({ subpath, targets }) =>
     targets
-      .filter((target) => !shipped.has(target.replace(/^\.\//, "")))
+      .filter((target) => !shipped.has(targetPath(target)))
       .map((target) => `exports["${subpath}"] points at ${target}, which is not in the tarball`),
   );
+}
+
+/**
+ * ...and so is every path the PRE-`exports` fields promise.
+ *
+ * `exports` wins wherever it is read, which is why a dead `main`/`module`/`types`
+ * is survivable — and why nobody notices one. It is still what a classic
+ * `moduleResolution` reads, and `@12-apps/ui`'s `module` named a `dist/index.mjs`
+ * tsup has never emitted for as long as the package has been dual-format.
+ */
+function checksLegacyEntryFields({ files, manifest }) {
+  const shipped = new Set(files);
+  return legacyEntries(manifest)
+    .filter(({ target }) => !shipped.has(targetPath(target)))
+    .map(({ field, target }) => `${field} points at ${target}, which is not in the tarball`);
 }
 
 /**
@@ -271,6 +222,7 @@ function isInstalled(name, from, root) {
 const CHECKS = [
   checksShipsContent,
   checksExportTargets,
+  checksLegacyEntryFields,
   checksNodeResolves,
   checksImportsAreDeclared,
   checksDependenciesInstalled,
@@ -291,20 +243,6 @@ function contextFor(name, root, requireFrom) {
   return { name, manifest, pkgDir, files, root, requireFrom, entries: exportEntries(manifest, files) };
 }
 
-/**
- * shared-helpers publishes ./dist, which only exists after tsc. Saying so here
- * beats letting every one of its exports report itself as missing from the
- * tarball, which is the same symptom as the bug this gate is named for.
- */
-function checkBuildArtifacts(dirs) {
-  return dirs.flatMap((dir) => {
-    const manifest = readManifest(join(REPO_ROOT, dir));
-    const needsDist = manifest.scripts?.build && (manifest.files ?? []).includes("dist");
-    const built = existsSync(join(REPO_ROOT, dir, "dist"));
-    return needsDist && !built ? [`${dir}/dist is missing — run \`pnpm build\` before this check`] : [];
-  });
-}
-
 function report(title, problems) {
   if (problems.length === 0) return false;
   console.log(`\n✗ ${title}`);
@@ -316,8 +254,7 @@ async function main() {
   const dirs = publishableDirs();
   const declared = (process.env.PUBLISH_DIRS ?? "").split(/\s+/).filter(Boolean);
   const drift = declared.length > 0 ? assertMatchesPublishList(dirs, declared) : [];
-  const unbuilt = checkBuildArtifacts(dirs);
-  if (report("release configuration", drift) || report("build artifacts", unbuilt)) process.exit(1);
+  if (report("release configuration", drift)) process.exit(1);
 
   console.log(`packing ${dirs.length} packages and installing them as a consumer would…`);
   const { root, names } = installConsumerFixture(dirs);

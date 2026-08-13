@@ -72,11 +72,24 @@ Only `@12-apps/payments-backend`'s ROOT entry is imported. The adapter subpaths
 ## Running it
 
 ```bash
-node scripts/harness-install.mjs          # from the repo root: pack + install
+node scripts/harness-install.mjs          # from the repo root: build + pack + install
 cd harness/frontend
-npm run build                             # the Playwright web server serves the build
 npm test                                  # bddgen, then both projects
 ```
+
+**Neither step needs a build in front of it any more, and that is the point.**
+Both halves of this harness used to validate stale artifacts when one was
+missing, silently:
+
+- `scripts/harness-install.mjs` packs the tarballs, and `npm pack` runs no build
+  — seven packages publish `./dist` and none of them has a `prepack` hook. Run
+  without a preceding `pnpm build` it shipped whatever `dist/` was on disk, so
+  both harnesses tested last week's package code. `packAll` builds the workspace
+  itself now (`scripts/lib/pack-workspace.mjs`).
+- `vite preview` serves `dist/`, and a stale one just as happily.
+  `playwright.config.ts`'s webServer command builds before it previews, so a
+  bare `npx playwright test tests/shell.spec.ts` — the invocation the npm
+  scripts could not cover — builds too.
 
 `npm test` runs two Playwright projects:
 
