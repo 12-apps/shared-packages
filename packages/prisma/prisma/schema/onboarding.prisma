@@ -1,0 +1,46 @@
+// ---------------------------------------------------------------------------
+// @12-apps/onboarding — CANONICAL Prisma model partial (plug-and-play).
+//
+// This file is the single source of truth for the guided-onboarding progress
+// table. A host project does NOT copy the model into its main schema by hand:
+// it uses Prisma's multi-file schema folder and SYNCS this file into it with
+// this package's `prisma:sync` script (a byte-for-byte COPY — never a symlink;
+// see scripts/sync-onboarding-schema.mjs for why). The migration ships
+// alongside, in prisma/migrations/, and is copied into the host's migrations
+// folder by the host's plugin-migration sync.
+//
+// Host-agnostic by design (the entity-lifecycle / report-builder doctrine):
+//   - `user_id` and `client_id` are by-value scalars, NOT relations — this
+//     package cannot know the name of the host's user or tenant model. The
+//     host's own migration may add the FK constraints (future-pay has both,
+//     ON DELETE CASCADE).
+//   - `status` is a String with a DB CHECK rather than a Prisma enum (the
+//     house String+CHECK pattern); the four values are the package's own
+//     `OnboardingStatus` union, so the closed set IS the package's contract.
+// ---------------------------------------------------------------------------
+
+// Reusable guided-onboarding progress for ANY feature, one row per
+// (user, tenant, featureKey). `featureKey` namespaces the flow
+// ("ai_integration" | "payments" | ...) so a single table backs every guided
+// setup. `step` is the resume point (which step the user stopped on); `data` is
+// an opaque per-feature JSON payload (e.g. the selected AI host) so features
+// evolve their own state with no schema change. Scoped to the host's DB user id
+// and the tenant. Indexed on (client, feature, status) for the "who is
+// mid-integration" reach-out query.
+model OnboardingState {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  clientId    String    @map("client_id")
+  featureKey  String    @map("feature_key")
+  status      String    @default("not_started")
+  step        String?
+  data        Json      @default("{}")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([userId, clientId, featureKey])
+  @@index([clientId, featureKey, status])
+  @@map("onboarding_states")
+}

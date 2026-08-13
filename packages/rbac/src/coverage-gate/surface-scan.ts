@@ -1,6 +1,8 @@
 import { readdirSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 
+import { stripCommentsAndStrings } from './detect';
+
 /**
  * Static-scan helpers for the RBAC coverage gate (12-13) — the discovery half
  * of future-pay's `scripts/lib/surface-scan.ts`, shipped with the package so
@@ -47,37 +49,95 @@ export function urlPathOf(routeFile: string, appDir: string): string {
   return `/${mapped.join('/')}`;
 }
 
+/** Any `\w+` run — the default `accept`, and what `readWord` can return. */
+const IDENTIFIER = /^\w+$/;
+
 /**
- * Exported server-action names in a `"use server"` module. Every runtime
- * export of a use-server module IS a server action. Returns [] for a
- * non-use-server file.
+ * How one caller's export heads differ. THE GRAMMAR IS THE ONLY THING TWO
+ * COVERAGE GATES MAY DISAGREE ABOUT — the walk itself is shared, so they can
+ * never disagree about what an export head IS.
+ */
+export interface ExportHeadGrammar {
+  /**
+   * Accept a bare `export function NAME`. Route handlers come in that form;
+   * server actions cannot (a use-server export must be async), so the actions
+   * grammar leaves this off and a sync `export function` is then not a match.
+   */
+  syncFunctions?: boolean;
+  /** Keep only the names this accepts. Default: any `\w+`. */
+  accept?: (name: string) => boolean;
+}
+
+/**
+ * Every name an `export` head declares, for the two forms a static coverage
+ * gate cares about: the single declarations (`export const NAME`,
+ * `export async function NAME`, and — with `syncFunctions` —
+ * `export function NAME`) and the brace lists (`export {A, B as C}` /
+ * `export const {A, B: C}`, where the exported name is each item's LAST
+ * identifier). An `export type { … }` head declares nothing.
  *
  * Hand-parsed from each `export` keyword outward, in linear time — the
  * `\s+`-joined regexes this replaces backtracked polynomially on adversarial
  * whitespace runs (CodeQL js/polynomial-redos), and a completeness gate must
- * stay O(n) on whatever source it is pointed at. The grammar is unchanged:
- * `export async function NAME`, `export const NAME`, and the brace lists
- * `export {A, B as C}` / `export const {A, B: C}` (a bare `export function`
- * cannot appear in a use-server module — actions must be async).
+ * stay O(n) on whatever source it is pointed at.
+ *
+ * Two costs used to repeat per head, which is why the regexes were quadratic in
+ * the number of OPENERS rather than in file length: the forward scan for `}`
+ * (memoized below — the first `}` at-or-after a position is shared by every head
+ * before it), and parsing a giant "list" slice that actually swallows LATER
+ * heads. The skip that avoids the second one asks "does another `export` keyword
+ * sit inside this list?", and it is only sound because comments and strings are
+ * BLANKED first: a list may legally carry a COMMENT that mentions `export`, and
+ * against raw source such a comment made the walk abandon a real list and lose
+ * every name in it (`export { // re-export the handlers` / `config, GET };`).
+ *
+ * Losing a list matters more than it sounds, so it is worth being exact about the
+ * direction: it fails **OPEN**, not closed. A method the scan misses is simply
+ * absent from the gate's `covered` set, so no "unregistered route" violation is
+ * raised and an unregistered route walks straight through. (The other half is
+ * noisy rather than dangerous — a REGISTERED entry whose route was missed reports
+ * "registry entry without a route".) Blanking comments and strings first is what
+ * keeps that from being reachable by legal code; what remains beyond it is
+ * genuinely malformed source, where a lost illegal list cannot hide a real
+ * standalone export.
+ */
+export function exportedNamesOf(source: string, grammar: ExportHeadGrammar = {}): string[] {
+  // Comments and strings become spaces (newlines kept) in ONE linear pass, so the
+  // `}` and next-`export` positions the walk reasons about are all real code. This
+  // also drops the pre-existing false positive where a method named only inside a
+  // comment or a string counted as a handler.
+  const code = stripCommentsAndStrings(source);
+  const walk: Walk = {
+    source: code,
+    names: new Set<string>(),
+    scan: { searchedFrom: Number.POSITIVE_INFINITY, close: -2 },
+    syncFunctions: grammar.syncFunctions ?? false,
+    accept: grammar.accept ?? ((name) => IDENTIFIER.test(name)),
+  };
+  const heads = [...code.matchAll(/\bexport\b/g)].map((m) => m.index ?? 0);
+  heads.forEach((index, k) => {
+    collectExport(walk, index + 'export'.length, heads[k + 1] ?? Number.POSITIVE_INFINITY);
+  });
+  return [...walk.names];
+}
+
+/**
+ * Exported server-action names in a `"use server"` module. Every runtime
+ * export of a use-server module IS a server action. Returns [] for a
+ * non-use-server file.
  */
 export function exportedActionsOf(source: string): string[] {
   if (!/^[\t ]*["']use server["']/m.test(source)) return [];
-  const names = new Set<string>();
-  // Linearity guards (CodeQL js/polynomial-redos, second round). Two costs
-  // used to repeat per head: the forward scan for `}` (memoized below — the
-  // first `}` at-or-after a position is shared by every head before it), and
-  // parsing a giant "list" slice that actually swallows LATER heads. A brace
-  // list containing another `export` keyword is not legal JS, so such a head
-  // contributes nothing and the later heads parse themselves — real modules
-  // are unaffected, and a malformed one can only lose the illegal list, never
-  // a real standalone export (the gate stays fail-closed).
-  const heads = [...source.matchAll(/\bexport\b/g)].map((m) => m.index ?? 0);
-  const scan: BraceScan = { searchedFrom: Number.POSITIVE_INFINITY, close: -2 };
-  heads.forEach((index, k) => {
-    const nextHead = heads[k + 1] ?? Number.POSITIVE_INFINITY;
-    collectExport(source, index + 'export'.length, names, scan, nextHead);
-  });
-  return [...names];
+  return exportedNamesOf(source);
+}
+
+/** One walk's mutable state: what it found, the `}` memo, and the grammar. */
+interface Walk {
+  source: string;
+  names: Set<string>;
+  scan: BraceScan;
+  syncFunctions: boolean;
+  accept: (name: string) => boolean;
 }
 
 /** Memo for the forward `}` search that keeps repeated list parsing linear. */
@@ -101,68 +161,61 @@ function memoClose(source: string, from: number, scan: BraceScan): number {
 }
 
 /** Parse one `export …` head starting just past the keyword. */
-function collectExport(
-  source: string,
-  after: number,
-  names: Set<string>,
-  scan: BraceScan,
-  nextHead: number,
-): void {
+function collectExport(walk: Walk, after: number, nextHead: number): void {
+  const { source } = walk;
   const i = skipWs(source, after);
   if (i === after) return; // `export` glued to what follows is not the keyword head
   if (source[i] === '{') {
-    collectBraceList(source, i + 1, names, scan, nextHead);
+    collectBraceList(walk, i + 1, nextHead);
     return;
   }
   const word = readWord(source, i);
-  if (word === 'const') collectAfterConst(source, i + word.length, names, scan, nextHead);
-  if (word === 'async') collectAsyncFunction(source, i + word.length, names);
+  // `export type { NAME }` is deliberately absent: a type declares no runtime
+  // export, so it is neither an action nor a handler.
+  if (word === 'const') collectAfterConst(walk, i + word.length, nextHead);
+  else if (word === 'async') collectAsyncFunction(walk, i + word.length);
+  else if (walk.syncFunctions && word === 'function') addNameAfterWs(walk, i + word.length);
 }
 
-function collectAfterConst(
-  source: string,
-  after: number,
-  names: Set<string>,
-  scan: BraceScan,
-  nextHead: number,
-): void {
-  const i = skipWs(source, after);
+/** `export const NAME = …` and `export const { A, B } = …`. */
+function collectAfterConst(walk: Walk, after: number, nextHead: number): void {
+  const i = skipWs(walk.source, after);
   if (i === after) return;
-  if (source[i] === '{') {
-    collectBraceList(source, i + 1, names, scan, nextHead);
+  if (walk.source[i] === '{') {
+    collectBraceList(walk, i + 1, nextHead);
     return;
   }
-  const name = readWord(source, i);
-  if (name !== '') names.add(name);
+  addName(walk, readWord(walk.source, i));
 }
 
-function collectAsyncFunction(source: string, after: number, names: Set<string>): void {
-  const i = skipWs(source, after);
-  if (i === after || readWord(source, i) !== 'function') return;
-  const j = skipWs(source, i + 'function'.length);
-  if (j === i + 'function'.length) return;
-  const name = readWord(source, j);
-  if (name !== '') names.add(name);
+/** `export async function NAME` — the `function` keyword must actually follow. */
+function collectAsyncFunction(walk: Walk, after: number): void {
+  const i = skipWs(walk.source, after);
+  if (i === after || readWord(walk.source, i) !== 'function') return;
+  addNameAfterWs(walk, i + 'function'.length);
+}
+
+/** The identifier after at least one space at `from` (`function‸ NAME`). */
+function addNameAfterWs(walk: Walk, from: number): void {
+  const i = skipWs(walk.source, from);
+  if (i === from) return;
+  addName(walk, readWord(walk.source, i));
+}
+
+/** Record `name` when the grammar accepts it. */
+function addName(walk: Walk, name: string): void {
+  if (walk.accept(name)) walk.names.add(name);
 }
 
 /** `{A, B as C, D: E}` — up to the FIRST `}`, as the regex it replaces did. */
-function collectBraceList(
-  source: string,
-  from: number,
-  names: Set<string>,
-  scan: BraceScan,
-  nextHead: number,
-): void {
-  const close = memoClose(source, from, scan);
+function collectBraceList(walk: Walk, from: number, nextHead: number): void {
+  const close = memoClose(walk.source, from, walk.scan);
   if (close === -1) return;
   // A "list" whose close sits past the next `export` keyword swallowed later
   // heads — illegal JS, and parsing it would re-walk their slices. Skip it;
   // the later heads parse themselves.
   if (close > nextHead) return;
-  for (const item of source.slice(from, close).split(',')) {
-    const name = itemName(item);
-    if (/^\w+$/.test(name)) names.add(name);
-  }
+  for (const item of walk.source.slice(from, close).split(',')) addName(walk, itemName(item));
 }
 
 /**
@@ -170,7 +223,7 @@ function collectBraceList(
  * whitespace-delimited `as` alias or `:` rename — the `.pop()` of the
  * original split on `\s+as\s+` / `\s*:\s*`, computed with backward scans.
  * An item carrying neither (e.g. `type Foo`) resolves to itself and is then
- * dropped by the caller's `^\w+$` filter, exactly as before.
+ * dropped by the grammar's `accept` — the default `^\w+$`, exactly as before.
  */
 function itemName(item: string): string {
   const trimmed = item.trim();
