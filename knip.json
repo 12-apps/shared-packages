@@ -89,6 +89,8 @@
         "@12-apps/entitlements",
         "@12-apps/entity-lifecycle",
         "@12-apps/jobs",
+        "@12-apps/mcp",
+        "@12-apps/onboarding",
         "@12-apps/payments-backend",
         "@12-apps/product-research",
         "@12-apps/rbac",

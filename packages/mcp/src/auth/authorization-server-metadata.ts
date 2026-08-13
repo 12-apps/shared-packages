@@ -21,6 +21,22 @@ export interface AuthorizationServerMetadataInput {
    * public PKCE clients (`none`) plus HTTP Basic client-secret auth.
    */
   tokenEndpointAuthMethods?: string[];
+  /**
+   * Where the endpoints are actually mounted, if not at the defaults below. A
+   * host that moves an endpoint MUST move it here too: this document is the only
+   * thing a connector reads before its first request, so a path that lies here is
+   * a flow that fails at the first hop (12-23 — `createApiMcpOauth` passes its
+   * resolved paths, so the two cannot disagree).
+   */
+  paths?: Partial<AuthorizationServerPaths>;
+}
+
+/** The endpoint paths this document advertises, relative to the issuer origin. */
+export interface AuthorizationServerPaths {
+  authorize: string;
+  token: string;
+  register: string;
+  jwks: string;
 }
 
 /** The RFC 8414 document served at `/.well-known/oauth-authorization-server`. */
@@ -37,10 +53,12 @@ export interface AuthorizationServerMetadata {
   token_endpoint_auth_methods_supported: string[];
 }
 
-const AUTHORIZE_PATH = "/api/oauth/authorize";
-const TOKEN_PATH = "/api/oauth/token";
-const REGISTRATION_PATH = "/api/oauth/register";
-const JWKS_PATH = "/.well-known/jwks.json";
+const DEFAULT_PATHS: AuthorizationServerPaths = {
+  authorize: "/api/oauth/authorize",
+  token: "/api/oauth/token",
+  register: "/api/oauth/register",
+  jwks: "/.well-known/jwks.json",
+};
 
 const DEFAULT_TOKEN_ENDPOINT_AUTH_METHODS = [
   "none",
@@ -57,12 +75,13 @@ export function buildAuthorizationServerMetadata(
   input: AuthorizationServerMetadataInput,
 ): AuthorizationServerMetadata {
   const origin = input.issuer;
+  const paths = { ...DEFAULT_PATHS, ...input.paths };
   return {
     issuer: origin,
-    authorization_endpoint: `${origin}${AUTHORIZE_PATH}`,
-    token_endpoint: `${origin}${TOKEN_PATH}`,
-    registration_endpoint: `${origin}${REGISTRATION_PATH}`,
-    jwks_uri: `${origin}${JWKS_PATH}`,
+    authorization_endpoint: `${origin}${paths.authorize}`,
+    token_endpoint: `${origin}${paths.token}`,
+    registration_endpoint: `${origin}${paths.register}`,
+    jwks_uri: `${origin}${paths.jwks}`,
     scopes_supported: input.scopesSupported,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],

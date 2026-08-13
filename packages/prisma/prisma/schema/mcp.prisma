@@ -1,0 +1,108 @@
+// ---------------------------------------------------------------------------
+// @12-apps/mcp — CANONICAL Prisma model partial (plug-and-play).
+//
+// The three tables behind an MCP surface's authorization server. A host project
+// does NOT copy these models into its main schema by hand: it uses Prisma's
+// multi-file schema folder and SYNCS this file into it with this package's
+// `prisma:sync` script (a byte-for-byte COPY — never a symlink; see
+// scripts/sync-mcp-schema.mjs for why). The migration ships alongside, in
+// prisma/migrations/, and is copied into the host's migrations folder by the
+// host's plugin-migration sync.
+//
+// Host-agnostic by design (the entity-lifecycle / rbac doctrine): `user_id` is a
+// by-value scalar with NO relation, because this package cannot know the name of
+// the host's user model. The host's own migration may add the FK (future-pay's
+// is ON DELETE CASCADE). Note there is deliberately no `oauth_codes` table:
+// authorization codes are STATELESS signed blobs, so there is nothing to store
+// and nothing to sweep.
+// ---------------------------------------------------------------------------
+
+// A registered external OAuth host — a Claude.ai / ChatGPT connector produced by
+// RFC 7591 dynamic client registration, or a static registration an operator
+// created out of band. This is the OAuth *client application*, NOT a
+// multi-tenant customer: namespaced `OAuth*` to avoid that collision, and with
+// no relation to any user (clients are apps, not people).
+//
+// `clientId` is the public, unique identifier; `clientSecretHash` is null for
+// public PKCE clients (which authenticate via `token_endpoint_auth_method =
+// "none"`) and holds a SHA-256 hash for confidential ones — the plaintext secret
+// is returned exactly once at registration and never persisted. `redirectUris`
+// is the EXACT-MATCH allowlist the authorization endpoint validates against for
+// open-redirect prevention. Array columns are Postgres `TEXT[]`.
+model OAuthClient {
+  id                      String   @id @default(uuid())
+  clientId                String   @unique @map("client_id")
+  clientSecretHash        String?  @map("client_secret_hash")
+  redirectUris            String[] @map("redirect_uris")
+  clientName              String?  @map("client_name")
+  // "none" (public PKCE) | "client_secret_basic" (confidential). String + CHECK
+  // (the house convention), not a Prisma enum; validated at the register route.
+  tokenEndpointAuthMethod String   @default("none") @map("token_endpoint_auth_method")
+  grantTypes              String[] @map("grant_types")
+  scopes                  String[]
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@map("oauth_clients")
+}
+
+// A rotating OAuth refresh token bound to a signed-in user + a registered
+// client. Stored HASHED (`tokenHash` = SHA-256 of the opaque token, never
+// plaintext) and rotated on every use. Identity is the user's EMAIL: the AS binds
+// to email and a host's guards resolve their user row by it, so this is a scalar
+// rather than a FK and the token store stays decoupled from the user table.
+// `userSub` is the original OAuth subject, carried so a rotated successor mints
+// an access token with the SAME stable `sub` as the initial one (RFC 6749 §5.1 /
+// OIDC §2) — without it a refreshed token's `sub` would fall back to the email
+// and diverge, breaking identity correlation after the first refresh.
+// `clientId` is a by-value link to `OAuthClient.clientId`. Rotation lineage:
+// `rotatedFrom` holds the prior token's hash so reuse of a rotated token is
+// detectable and revokes the whole lineage; `revokedAt` is the explicit revoke
+// path.
+model OAuthRefreshToken {
+  id          String    @id @default(uuid())
+  tokenHash   String    @unique @map("token_hash")
+  userEmail   String    @map("user_email")
+  userSub     String    @map("user_sub")
+  clientId    String    @map("client_id")
+  scopes      String[]
+  expiresAt   DateTime  @map("expires_at")
+  rotatedFrom String?   @map("rotated_from")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // `tokenHash` is already indexed by its `@unique` constraint — the
+  // lookup-on-presentation path — so no separate `@@index([tokenHash])` is added
+  // (it would be redundant). The composite index serves per-user/per-client
+  // enumeration and bulk revoke.
+  @@index([userEmail, clientId])
+  @@map("oauth_refresh_tokens")
+}
+
+// A live AI-assistant (MCP) connection a user has authorized. MCP auth is
+// auth-passthrough / per-user (a token is not tenant-scoped), so this is keyed by
+// the host's user id + the registered OAuth client — NOT by tenant. `clientName`
+// snapshots the client's display name for the UI (a registration can change it).
+// `lastActiveAt` is bumped (throttled, best-effort) on each token grant so a
+// config page can show "connected via Claude · active 2 min ago" and an operator
+// panel can tell an active connection from a stalled one. `host` is the AI
+// provider the connection is attributed to (claude / chatgpt / codex), derived
+// from the client's redirect URIs at grant time and confirmable by a self-report
+// tool; null for a pre-attribution connection. `revokedAt` is the explicit
+// disconnect path — and ending the connection is only half of a disconnect, since
+// a host holding a live refresh token would simply rotate its way back in.
+model McpConnection {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  oauthClientId String    @map("oauth_client_id")
+  clientName    String?   @map("client_name")
+  host          String?   @map("host")
+  connectedAt   DateTime  @default(now()) @map("connected_at")
+  lastActiveAt  DateTime  @default(now()) @map("last_active_at")
+  revokedAt     DateTime? @map("revoked_at")
+
+  @@unique([userId, oauthClientId])
+  @@index([userId])
+  @@index([lastActiveAt])
+  @@map("mcp_connections")
+}

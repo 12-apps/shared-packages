@@ -25,6 +25,13 @@ import { HARNESS_BACKEND_ORIGIN } from '../backend/src/port';
 const proxy = {
   '/api': { target: HARNESS_BACKEND_ORIGIN, changeOrigin: true },
   '/__harness': { target: HARNESS_BACKEND_ORIGIN, changeOrigin: true },
+  // @12-apps/pwa's two assets (12-23), and they belong HERE rather than under
+  // `/api`: a worker's directory bounds its scope and the manifest is linked from
+  // `index.html`, so both are served from the ORIGIN ROOT in every real
+  // deployment. Proxying them one level up is the same arrangement future-pay
+  // has, where the SPA's origin answers them and `apps/web` produces them.
+  '/manifest.webmanifest': { target: HARNESS_BACKEND_ORIGIN, changeOrigin: true },
+  '/sw.js': { target: HARNESS_BACKEND_ORIGIN, changeOrigin: true },
 };
 
 export default defineConfig({ plugins: [react()], server: { proxy }, preview: { proxy } });

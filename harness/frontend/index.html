@@ -3,6 +3,16 @@
   <head>
     <meta charset="utf-8" /><title>shared-packages frontend harness</title>
     <!--
+      @12-apps/pwa's manifest, linked the way a real SPA links it (12-23).
+
+      The href is a path at THIS origin, and what answers it is the package's
+      per-host ENDPOINT on harness/backend (through the Vite proxy) — never a file
+      in `public/`. That is the whole claim: a bundle has one `index.html` for
+      every tenant it serves, so the document naming the app has to be produced
+      per request or every tenant is the same app.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!--
       The host half of @12-apps/ui's install prompt, wired the way a real app
       must wire it (FUT-640 follow-up).
 

@@ -11,52 +11,57 @@ flows — one small system any app/page can adopt.
   and a **`GuidedSection`** UI that binds the state to `@12-apps/ui`'s
   `SectionOnboarding` + stepper.
 
+Both halves ship here (12-23): the screens AND the endpoints they persist
+through, one factory each. **[ADOPTING.md](./ADOPTING.md) is the adoption
+contract** — the config table, the wiring rules that bite, and the Phase B notes
+for a host that already has the table.
+
 ## Exports
 
-| Export | What |
-|--------|------|
-| `OnboardingProvider` / `useOnboarding` | Client state, mutations through an injected `OnboardingStore`. |
-| `GuidedSection` | Landing hero → per-step wizard (stepper) → completed summary, driven by the persisted state. |
-| `createOnboardingRepository(getPrisma)` | Optional Prisma read/write helper (data-merge + started/completed stamping). |
-| types | `OnboardingStore`, `OnboardingStateSnapshot`, `GuidedStep`, `GuidedNav`, … |
+| Entry | Export | What |
+|---|---|---|
+| `.` | `OnboardingProvider` / `useOnboarding` | Client state, mutations through an injected `OnboardingStore`. |
+| `.` | `GuidedSection` | Landing hero → per-step wizard (stepper) → completed summary, driven by the persisted state. |
+| `.` | `createOnboardingApiStore` / `fetchOnboardingState` | The store bound to the package's OWN endpoints, so the URL, the body shape and the date revival are stated once instead of in every host. |
+| `.` | types | `OnboardingStore`, `OnboardingStateSnapshot`, `GuidedStep`, `GuidedNav`, … |
+| `./server` | `createApiOnboarding({ db })` | The progress surface as framework-neutral route descriptors — `GET` and `PATCH` with `save` / `dismiss` / `reset`. |
+| `./server` | `createOnboardingRepository(getPrisma)` | The Prisma read/write helper under it (data-merge + started/completed stamping). |
+| `./hono` | `onboardingRouter({ db, resolveActor })` | The same surface as a mountable Hono router. `hono` is an OPTIONAL peer. |
+| `prisma/` | `onboarding.prisma` + its migration | The package OWNS the `OnboardingState` model — a host syncs it (below) rather than retyping it. |
 
-## Required data model (Prisma consumers)
+## The data model comes with the package
 
-Add this model to your schema (column names are what `createOnboardingRepository`
-expects via the `userId_clientId_featureKey` composite key):
+Do not copy the model into your schema by hand. Use Prisma's multi-file schema
+folder and sync the package's own partial into it — a byte-for-byte COPY, never a
+symlink (a symlinked migration is silently skipped by Prisma):
 
-```prisma
-model OnboardingState {
-  id          String    @id @default(uuid())
-  userId      String    @map("user_id")
-  clientId    String    @map("client_id")   // tenant
-  featureKey  String    @map("feature_key")
-  status      String    @default("not_started") // not_started|in_progress|completed|dismissed
-  step        String?
-  data        Json      @default("{}")
-  startedAt   DateTime? @map("started_at")
-  completedAt DateTime? @map("completed_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  @@unique([userId, clientId, featureKey])
-  @@index([clientId, featureKey, status])
-  @@map("onboarding_states")
-}
+```bash
+node node_modules/@12-apps/onboarding/scripts/sync-onboarding-schema.mjs prisma/schema
 ```
 
-## Wiring (Next server actions example)
+The migration ships in `prisma/migrations/`, and every statement in it is guarded
+— so a host that ALREADY has `onboarding_states` applies it as a no-op, with no
+`prisma migrate resolve` dance. See ADOPTING.md.
+
+## Wiring
 
 ```ts
-// repository (server): bind the factory to your Prisma client
-export const { getOnboardingState, upsertOnboardingState, listOnboardingByStatus } =
-  createOnboardingRepository(async () => (await getPrismaClient()) as unknown as OnboardingPrisma);
+// server: one mount. The host keeps only who is calling, and where data lives.
+const onboarding = onboardingRouter({
+  db: async () => (await getPrismaClient()) as unknown as OnboardingPrisma,
+  featureKeys: ['ai_integration'],
+  resolveActor: (c) => resolveActorFor(c), // → { userId, clientId } | null
+});
+app.route('/api/admin/:tenantSlug', onboarding.router);
 
-// store (client): implement OnboardingStore over your server actions
-export function makeOnboardingStore(tenantSlug: string, featureKey: string): OnboardingStore { … }
+// browser: the package's own store, against those endpoints
+const store = createOnboardingApiStore({ apiBase, featureKey: 'ai_integration' });
+const initial = await fetchOnboardingState({ apiBase, featureKey: 'ai_integration' });
 
-// page: compute initial state on the server, inject the store on the client
 <OnboardingProvider featureKey="ai_integration" store={store} initialState={initial}>
   <GuidedSection steps={steps} title="…" configuredSummary={…} />
 </OnboardingProvider>
 ```
+
+A host whose persistence is NOT these routes (localStorage, tRPC, server actions)
+still passes its own `OnboardingStore` — that seam is unchanged.

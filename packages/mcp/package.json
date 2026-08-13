@@ -2,10 +2,15 @@
   "name": "@12-apps/mcp",
   "version": "1.0.0",
   "type": "module",
-  "description": "App-agnostic MCP server core: generate one MCP tool per OpenAPI operation and proxy each call to the endpoint carrying the caller's bearer token (permission passthrough). Also ships the reusable AI-connect onboarding UI at @12-apps/mcp/react.",
+  "description": "App-agnostic MCP server core: generate one MCP tool per OpenAPI operation and proxy each call carrying the caller's bearer token (permission passthrough). Also ships the OAuth 2.1 authorization server (./oauth, ./hono: register/authorize/token, JWKS and both .well-known documents), the package-owned Prisma partial + migration for its three tables, the mcp:generate/mcp:check (./generate) and mcp:coverage (./coverage) gates, and the reusable AI-connect onboarding UI (./react).",
   "exports": {
     ".": "./src/index.ts",
-    "./react": "./src/react/index.ts"
+    "./react": "./src/react/index.ts",
+    "./oauth": "./src/oauth/index.ts",
+    "./hono": "./src/hono/index.ts",
+    "./coverage": "./src/coverage-gate/index.ts",
+    "./generate": "./src/generate/index.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "clean": "rm -rf node_modules coverage",
@@ -13,24 +18,32 @@
     "test:watch": "vitest watch",
     "lint": "eslint src --max-warnings 0",
     "check-types": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prisma:sync": "node scripts/sync-mcp-schema.mjs",
+    "prisma:sync:check": "node scripts/sync-mcp-schema.mjs --check"
   },
   "dependencies": {
-    "@mui/icons-material": "^6.5.0",
     "@12-apps/onboarding": "workspace:*",
+    "@12-apps/rbac": "workspace:*",
     "@12-apps/ui": "workspace:*",
+    "@mui/icons-material": "^6.5.0",
+    "jose": "^6.1.3",
     "react": "^19.2.0"
   },
   "peerDependencies": {
-    "react": ">=19.0.0"
+    "react": ">=19.0.0",
+    "hono": ">=4.0.0"
   },
   "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
     "@mui/material": "^6.5.0",
     "@testing-library/react": "^16.1.0",
-    "@12-apps/typescript-config": "workspace:*",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
     "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "hono": "^4.6.0",
     "jsdom": "^25.0.1",
     "react-dom": "^19.2.0",
     "typescript": "^5.8.2",
@@ -53,6 +66,7 @@
     "src",
     "dist",
     "prisma",
+    "scripts",
     "*.js",
     "*.mjs",
     "*.md",
@@ -64,5 +78,10 @@
     "!**/*.stories.*",
     "!**/*.test-story.*",
     "!**/test-helpers.*"
-  ]
+  ],
+  "peerDependenciesMeta": {
+    "hono": {
+      "optional": true
+    }
+  }
 }

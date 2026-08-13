@@ -18,3 +18,11 @@ export {
   type UseInstallPromptOptions,
 } from "./install-prompt";
 export { defaultMessages, resolveMessages, type PwaMessages } from "./messages";
+// Boot registration (12-23): a registered worker is a PRECONDITION for
+// installability, so it belongs on every visit rather than behind a settings
+// screen. Browser-side but React-free, hence the root rather than `./react`.
+export {
+  postToServiceWorker,
+  registerServiceWorker,
+  type RegisterServiceWorkerOptions,
+} from "./register";

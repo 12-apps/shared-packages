@@ -2,10 +2,13 @@
   "name": "@12-apps/pwa",
   "version": "1.0.0",
   "type": "module",
-  "description": "Making a web app installable, and telling people it is. Captures beforeinstallprompt without ever firing it, detects the iOS browsers where installation is a manual share-sheet action, and ships an invite that leads with the reason rather than the instruction. Host-agnostic: every string comes from an overridable pt-BR messages layer.",
+  "description": "Making a web app installable, and telling people it is: the beforeinstallprompt state machine + iOS share-sheet detection + overridable pt-BR copy (.), the install invite (./react), the PER-HOST manifest endpoint and the packaged network-first service worker (./server), and a Hono adapter (./hono).",
   "exports": {
     ".": "./src/index.ts",
-    "./react": "./src/react/index.ts"
+    "./react": "./src/react/index.ts",
+    "./server": "./src/server/index.ts",
+    "./hono": "./src/hono/index.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "clean": "rm -rf node_modules coverage dist",
@@ -20,7 +23,8 @@
   },
   "peerDependencies": {
     "react": ">=19.0.0",
-    "react-dom": ">=19.0.0"
+    "react-dom": ">=19.0.0",
+    "hono": ">=4.0.0"
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
@@ -33,15 +37,35 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "hono": "^4.6.0"
   },
-  "engines": { "node": ">=22.0.0" },
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "license": "MIT",
-  "publishConfig": { "registry": "https://registry.npmjs.org", "access": "public" },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/12-apps/shared-packages.git",
     "directory": "packages/pwa"
   },
-  "files": ["src", "dist", "*.js", "*.mjs", "*.md", "!eslint.config.js", "!**/__tests__/**", "!**/*.test.*"]
+  "files": [
+    "src",
+    "dist",
+    "*.js",
+    "*.mjs",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/*.test.*"
+  ],
+  "peerDependenciesMeta": {
+    "hono": {
+      "optional": true
+    }
+  }
 }
