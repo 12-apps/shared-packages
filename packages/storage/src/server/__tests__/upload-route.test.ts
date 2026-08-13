@@ -308,3 +308,104 @@ describe('the mount reports its own limits', () => {
     ).rejects.toThrow(/2 MB/);
   });
 });
+
+describe('the byte check belongs to the WRITER, not to an entrance', () => {
+  /**
+   * The regression for an adversarial finding: the endpoint checked the bytes and
+   * the base64 path got it from decoding, so the public `storeImage` — the one a
+   * host calls when it already holds bytes — was the entrance that forgot. A probe
+   * stored an HTML document under a `full.png` key, served as `image/png`.
+   *
+   * The stub pipeline here is exactly the shape the real one takes when a re-encode
+   * comes out no smaller: it hands back the ORIGINAL bytes and the DECLARED type,
+   * which is deliberate, and which is why `process` cannot be the thing that
+   * notices.
+   */
+  const passthroughProcess = (bytes: Uint8Array, contentType: string) =>
+    ({ ok: true, image: { bytes, contentType } }) as const;
+
+  function permissive(): ApiStorage {
+    return createApiStorage({
+      driver: memoryDriver(),
+      maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
+      imagePipeline: fakePipeline({ process: passthroughProcess }),
+      unscopedKeys: 'reject',
+    });
+  }
+
+  it('refuses arbitrary bytes through the public storeImage', async () => {
+    const html = new TextEncoder().encode('<html><script>alert(1)</script></html>');
+
+    await expect(
+      permissive().storeImage({ bytes: html, contentType: 'image/png', scope: SCOPE }),
+    ).rejects.toThrow(/não corresponde/);
+  });
+
+  it('stores NOTHING when it refuses', async () => {
+    const driver = memoryDriver();
+    const storage = createApiStorage({
+      driver,
+      maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
+      imagePipeline: fakePipeline({ process: passthroughProcess }),
+      unscopedKeys: 'reject',
+    });
+
+    await expect(
+      storage.storeImage({
+        bytes: new TextEncoder().encode('<svg/>'),
+        contentType: 'image/webp',
+        scope: SCOPE,
+      }),
+    ).rejects.toThrow();
+    expect(driver.objects.size).toBe(0);
+  });
+
+  it('refuses before the PIPELINE is reached at all', async () => {
+    // Attacker bytes must not get as far as a decoder: the allowlist is upstream of
+    // it, not a property of what the codec happens to accept.
+    const seen: string[] = [];
+    const storage = createApiStorage({
+      driver: memoryDriver(),
+      maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
+      imagePipeline: {
+        name: 'recording',
+        cutsRenditions: true,
+        process: async (bytes, contentType) => {
+          seen.push('process');
+          return passthroughProcess(bytes, contentType);
+        },
+        cut: async () => {
+          seen.push('cut');
+          return [];
+        },
+      },
+      unscopedKeys: 'reject',
+    });
+
+    await expect(
+      storage.storeImage({
+        bytes: new TextEncoder().encode('not an image'),
+        contentType: 'image/png',
+        scope: SCOPE,
+      }),
+    ).rejects.toThrow();
+    expect(seen).toEqual([]);
+  });
+
+  it('still refuses it through the inline (base64) path', async () => {
+    const encoded = Buffer.from('<html></html>').toString('base64');
+
+    await expect(
+      permissive().storeInlineImage({ contentType: 'image/png', contentBase64: encoded }, SCOPE),
+    ).rejects.toThrow();
+  });
+
+  it('and the endpoint answers the same refusal it always did', async () => {
+    const { post } = harness();
+
+    const response = await post(uploadRequest(new TextEncoder().encode('<html></html>')));
+
+    expect(response.status).toBe(400);
+    expect(bodyOf(response).error).toContain('não corresponde');
+  });
+});

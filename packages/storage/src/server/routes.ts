@@ -4,7 +4,7 @@ import { STORAGE_PATHS } from '../paths';
 import { isStorageProblem, type StorageMessages } from '../problems';
 import type { StorageDriver } from './driver';
 import { readBodyCapped } from './read-body';
-import { assertImageBytes, storeImage, type StoreImageDeps } from './store-image';
+import { storeImage, type StoreImageDeps } from './store-image';
 
 /**
  * The endpoints, as framework-neutral descriptors. There are exactly two, and
@@ -103,7 +103,8 @@ async function handleUpload(
     return { status: 413, body: { error: 'file_too_large' } };
   }
   try {
-    assertImageBytes(deps, bytes, contentType);
+    // No byte check here: `storeImage` owns it, so the endpoint and a host write
+    // holding raw bytes cannot disagree about whether it ran (see store-image.ts).
     const imageKey = await storeImage(deps, { bytes, contentType, scope: actor.scope });
     return { status: 200, body: { data: { imageKey } } };
   } catch (error) {

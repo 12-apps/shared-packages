@@ -135,6 +135,8 @@ export function createSharpImagePipeline(config: SharpPipelineConfig): ImagePipe
         },
       };
     },
-    cut: (bytes, specs) => cutRenditions(sharp, bytes, specs),
+    // The ceiling goes to BOTH halves: the writer runs them together, so a bound
+    // only `process` knew about bounded nothing (see sharp-renditions.ts).
+    cut: (bytes, specs) => cutRenditions(sharp, bytes, specs, maxPixels),
   };
 }

@@ -65,11 +65,23 @@ function refuse(deps: StoreImageDeps, problem: keyof StorageMessages): never {
 /**
  * Refuse bytes that are not really an image of `contentType`.
  *
- * Called on both entrances — the base64 decode does it as part of decoding, the
- * raw POST does it on the bytes it read — so neither can become a way to park
- * arbitrary content at a world-readable URL on the store's own domain.
+ * Called by {@link storeImage} ITSELF, which is the only arrangement that holds.
+ * It used to be each entrance's job — the endpoint called it before delegating,
+ * and the base64 path got it as part of decoding — and the public `storeImage` a
+ * host calls with raw bytes in hand was then the one that forgot. An adversarial
+ * probe stored `<html><script>alert(1)</script></html>` under a `full.png` key,
+ * served as `image/png`, straight through that gap.
+ *
+ * The gap was reachable with the REAL pipeline and not only with a stub: a
+ * re-encode that is not SMALLER deliberately keeps the original bytes and the
+ * DECLARED type (see `sharp.ts`), and libvips decodes plenty of formats this
+ * allowlist excludes — so `process` had no reason to object either.
+ *
+ * `payload.ts` already said this check must run on both entrances "because
+ * neither may be the one that forgets". The fix is to stop asking entrances: the
+ * writer verifies once, and no path to storage goes around it.
  */
-export function assertImageBytes(
+function assertImageBytes(
   deps: StoreImageDeps,
   bytes: Uint8Array,
   contentType: string,
@@ -118,6 +130,9 @@ export async function storeImage(
   deps: StoreImageDeps,
   input: StoreImageInput,
 ): Promise<string> {
+  // FIRST, and before a decoder sees anything: bytes that are not really an image
+  // of the declared type never reach the pipeline at all.
+  assertImageBytes(deps, input.bytes, input.contentType);
   const [processed, renditions] = await Promise.all([
     deps.pipeline.process(input.bytes, input.contentType),
     deps.pipeline.cut(input.bytes, deps.specs),

@@ -182,6 +182,61 @@ describe('cut', () => {
     );
   });
 
+  it('refuses a decompression bomb from the HEADER, before anything is decoded', async () => {
+    // The regression for an adversarial finding. `process` enforced the ceiling and
+    // the writer runs the two halves under one `Promise.all`, so the refusal arrived
+    // AFTER this path had read the corner pixel, trimmed the full image and encoded
+    // five crops — a probe on a 30000×30000 declared source reached `extract`, `trim`
+    // and five `webp`s before the 413. The ceiling bounded the status code, not the
+    // memory.
+    const stub = sharpStub({ metadata: { width: 30_000, height: 30_000, pages: 1 } });
+
+    const outputs = await createSharpImagePipeline({ sharp: stub.sharp }).cut(
+      SOURCE,
+      CATALOG_RENDITIONS,
+    );
+
+    expect(outputs).toEqual([]);
+    const ops = stub.calls.map((call) => call.op);
+    expect(ops).toEqual(['metadata']);
+    for (const forbidden of ['extract', 'trim', 'resize', 'webp']) {
+      expect(ops, forbidden).not.toContain(forbidden);
+    }
+  });
+
+  it('counts an animation frame by frame against that ceiling too', async () => {
+    // Declined for being animated as well, but the budget is what stops a 200-frame
+    // source that is only 1000x1000 per frame.
+    const stub = sharpStub({ metadata: { width: 8_000, height: 8_000, pages: 1 } });
+
+    expect(
+      await createSharpImagePipeline({ sharp: stub.sharp, maxPixels: 1_000_000 }).cut(
+        SOURCE,
+        CATALOG_RENDITIONS,
+      ),
+    ).toEqual([]);
+    expect(stub.calls.map((call) => call.op)).toEqual(['metadata']);
+  });
+
+  it('honors a raised ceiling rather than a constant of its own', async () => {
+    const stub = sharpStub({ metadata: { width: 9_000, height: 9_000, pages: 1 } });
+
+    expect(
+      await createSharpImagePipeline({ sharp: stub.sharp, maxPixels: 200_000_000 }).cut(
+        SOURCE,
+        CATALOG_RENDITIONS,
+      ),
+    ).toHaveLength(CATALOG_RENDITIONS.length);
+  });
+
+  it('refuses a source with no dimensions rather than trusting it', async () => {
+    const stub = sharpStub({ metadata: { width: 0, height: 0, pages: 1 } });
+
+    expect(
+      await createSharpImagePipeline({ sharp: stub.sharp }).cut(SOURCE, CATALOG_RENDITIONS),
+    ).toEqual([]);
+  });
+
   it('returns nothing for bytes it cannot read at all', async () => {
     const stub = sharpStub({ failOn: ['metadata'] });
 

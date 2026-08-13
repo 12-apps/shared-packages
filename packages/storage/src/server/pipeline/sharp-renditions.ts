@@ -1,6 +1,6 @@
 import { EXTENSION_BY_CONTENT_TYPE } from '../../content-types';
 import type { RenditionOutput, RenditionSpec } from '../../renditions';
-import type { Rgba, SharpImage, SharpModule } from './sharp-module';
+import type { Rgba, SharpImage, SharpMetadata, SharpModule } from './sharp-module';
 
 /**
  * Cutting the derived crops — the half of the sharp pipeline that decides what a
@@ -59,18 +59,50 @@ export function sharpFormatFor(contentType: string): string {
 }
 
 /**
- * Does the source carry more than one frame?
+ * The animated read's header — one probe, reused for the two questions that have
+ * to be answered before anything is decoded.
  *
- * Checked EXPLICITLY, and checked first, because the default read would not
- * notice: `sharp(bytes)` without `{ animated: true }` decodes frame one and hands
- * back a perfectly good still, so an animated GIF would silently become five
- * motionless WebPs.
+ * The ANIMATED read specifically: `sharp(bytes)` without `{ animated: true }`
+ * decodes frame one and hands back a perfectly good still, so a still read would
+ * report `pages: 1` for a GIF that has twenty and an animation would silently
+ * become five motionless WebPs.
  */
+async function animatedMetadata(
+  sharp: SharpModule,
+  bytes: Uint8Array,
+): Promise<SharpMetadata> {
+  return sharp(bytes, { animated: true }).metadata();
+}
+
+/** Does the source carry more than one frame? */
 export async function isAnimatedSource(
   sharp: SharpModule,
   bytes: Uint8Array,
 ): Promise<boolean> {
-  return ((await sharp(bytes, { animated: true }).metadata()).pages ?? 1) > 1;
+  return ((await animatedMetadata(sharp, bytes)).pages ?? 1) > 1;
+}
+
+/**
+ * Would decoding this source cost more than `maxPixels`?
+ *
+ * The cut path needs its OWN answer to this, which is the whole point of the
+ * function existing here. `process` enforces the ceiling and refuses a
+ * decompression bomb — but the writer runs the two halves under one
+ * `Promise.all`, so the refusal used to arrive AFTER this path had already read
+ * the corner pixel, trimmed the full image and encoded five crops. An adversarial
+ * probe on a 30000×30000 declared source reached `extract`, `trim` and five
+ * `webp` encodes before the 413. The ceiling therefore bounded the status code
+ * and not the memory, which is the one thing it exists to bound.
+ *
+ * Answered from the header alone, before a single pixel is allocated.
+ */
+function exceedsPixelBudget(metadata: SharpMetadata, maxPixels: number): boolean {
+  const width = metadata.width ?? 0;
+  const height = metadata.height ?? 0;
+  if (width <= 0 || height <= 0) return true;
+  // `pages` multiplies the cost: a 1000×1000 GIF with 200 frames allocates as
+  // much as a 200-megapixel still.
+  return width * height * (metadata.pages ?? 1) > maxPixels;
 }
 
 /**
@@ -161,11 +193,17 @@ export async function cutRenditions(
   sharp: SharpModule,
   bytes: Uint8Array,
   specs: readonly RenditionSpec[],
+  maxPixels: number,
 ): Promise<RenditionOutput[]> {
   let source: Uint8Array;
   let backdrop: Rgba;
   try {
-    if (await isAnimatedSource(sharp, bytes)) return [];
+    const metadata = await animatedMetadata(sharp, bytes);
+    if ((metadata.pages ?? 1) > 1) return [];
+    // Refused from the header, before `extract` or `trim` allocates anything. An
+    // empty list is the documented answer for "this source yields no crops", and
+    // `process` refuses the same source with the status the caller sees.
+    if (exceedsPixelBudget(metadata, maxPixels)) return [];
     backdrop = await backdropColor(sharp, bytes);
     source = await trimToSubject(sharp, bytes, backdrop);
   } catch {
