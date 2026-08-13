@@ -31,6 +31,7 @@ import { PwaManifestPage } from './pwa-manifest';
 import { RbacAdminPage } from './rbac-admin';
 import { RealtimeEventsPage } from './realtime-events';
 import { ReportBuilderPage } from './report-builder';
+import { StorageUploadsPage } from './storage-uploads';
 
 /**
  * One page per published surface, and the ONLY place a new one is registered.
@@ -307,6 +308,13 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/entitlements',
     group: 'backoffice',
     Component: EntitlementsPlanPage,
+  },
+  {
+    slug: 'storage-uploads',
+    title: 'Image uploads',
+    pkg: '@12-apps/storage',
+    group: 'backoffice',
+    Component: StorageUploadsPage,
   },
   {
     slug: 'rbac-admin',

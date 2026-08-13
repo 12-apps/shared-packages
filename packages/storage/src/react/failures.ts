@@ -1,0 +1,201 @@
+import { ACCEPTED_CONTENT_TYPES } from '../content-types';
+import { megabytes } from '../limits';
+
+/**
+ * Why an upload failed, in words the store owner can act on.
+ *
+ * Collapsing every cause into one "Falha ao enviar a imagem." is what made a
+ * failed upload unreportable: the owner saw a message that named no cause, could
+ * not tell a file they should shrink from a permission the operator had not
+ * granted, and had nothing to paste into a support request.
+ *
+ * The upload being a SINGLE same-origin POST is what let this shrink to one rule.
+ * A two-hop version had to explain a presign step, a signed grant that could age
+ * out, a bucket's own `<Code>` coming back to the browser, and — the honest but
+ * useless one — "rede ou CORS", because a blocked cross-origin PUT is deliberately
+ * indistinguishable from an offline network at the `fetch` layer. None of those
+ * can happen: the browser talks to our own origin, and the server is the only
+ * thing that talks to storage.
+ *
+ * What remains is one rule: **whatever the response DOES say is said out loud.**
+ *
+ * ## Why this table is overridable
+ *
+ * Every sentence here reaches a store owner, so it is product copy and it is
+ * pt-BR — but two of these refusals are decided by rules the PACKAGE does not
+ * know. `forbidden` is the sharp one: `mayUpload` is deliberately one host-computed
+ * boolean, and this file once answered it with *"é preciso ser OWNER ou ADMIN"* —
+ * naming a role model that belongs to one host. An adopter whose roles are
+ * `manager`/`staff`, or who gates on an `@12-apps/rbac` permission, would show an
+ * owner two role names that do not exist in their product, with no knob to change
+ * it. So the copy states the OUTCOME ("your account may not") and the host
+ * supplies the CAUSE if it wants one, through `messages` — the same escape hatch
+ * the server's refusals already have.
+ */
+
+/**
+ * The browser-side refusal copy, as one table a host may override.
+ *
+ * Mirrors the server's `StorageMessages` deliberately: same shape, same reason,
+ * so a host that overrides a sentence on one side can find the other.
+ *
+ * These are the refusals the browser has to phrase ITSELF — a bare code, or a
+ * status with no body at all. Anything the server states as a finished sentence is
+ * surfaced verbatim instead and never reaches this table (see {@link uploadFailure}).
+ */
+export interface WebStorageMessages {
+  /**
+   * 403. States the outcome only: the reason is the host's rule, and naming a
+   * role model here would be wrong for every host but the first.
+   */
+  forbidden: string;
+  unsupported_content_type: string;
+  /** Carries the ceiling, so a host overriding it states its own number. */
+  file_too_large: string;
+  invalid_key: string;
+  not_found: string;
+  /** 401 — the session went away between picking the file and sending it. */
+  session_expired: string;
+  /** `fetch` rejected outright; no response ever arrived. */
+  transport: string;
+}
+
+/** Copy that only makes sense with the configured ceiling in it. */
+export interface WebStorageMessageContext {
+  /** `8 MB`, already formatted. */
+  limit: string;
+}
+
+/**
+ * The default pt-BR copy. `limit` is interpolated rather than hard-coded for the
+ * same reason the server does it: a host that raises the ceiling must not end up
+ * with a message naming the old number.
+ */
+export function defaultWebStorageMessages(
+  context: WebStorageMessageContext,
+): WebStorageMessages {
+  return {
+    forbidden: 'Sua conta não tem permissão para enviar imagens nesta loja.',
+    unsupported_content_type: 'Formato não suportado. Envie PNG, JPG, WebP ou GIF.',
+    file_too_large: `Imagem muito grande. O limite é ${context.limit}.`,
+    invalid_key: 'Não foi possível localizar essa imagem.',
+    not_found: 'Essa imagem não está mais disponível.',
+    session_expired: 'Sua sessão expirou. Entre novamente e repita o envio.',
+    transport: 'Não foi possível falar com o servidor. Verifique sua conexão e tente de novo.',
+  };
+}
+
+function resolve(
+  maxBytes: number,
+  overrides: Partial<WebStorageMessages> | undefined,
+): WebStorageMessages {
+  return { ...defaultWebStorageMessages({ limit: megabytes(maxBytes) }), ...overrides };
+}
+
+/**
+ * The sentence for a refusal CODE, or `undefined` for a code with no entry.
+ *
+ * An own-property check rather than a bare `in`: the code arrives from a response
+ * body, so `constructor` or `toString` would otherwise resolve through the
+ * prototype and be shown to a store owner as an explanation.
+ */
+function sentenceFor(messages: WebStorageMessages, code: string): string | undefined {
+  if (!Object.prototype.hasOwnProperty.call(messages, code)) return undefined;
+  return messages[code as keyof WebStorageMessages];
+}
+
+/**
+ * Refuse a file before any request leaves the browser, or `null` to proceed.
+ *
+ * Measured against the bytes that would ACTUALLY be sent, which is why it runs
+ * after `optimizeImage` and not before: a 12 MB phone photo is a perfectly good
+ * product image once it is 1280px of WebP, and refusing it against the cap first
+ * was sending owners off to find an image editor for a file we can fix here.
+ *
+ * An empty `file.type` means the OS could not identify the file at all (an
+ * extensionless drop, most often) — worth its own sentence, because "formato não
+ * suportado" reads as an accusation about a file the owner knows is a PNG.
+ */
+export function rejectFileUpfront(file: File, maxBytes: number): string | null {
+  if (file.size === 0) {
+    return 'Arquivo vazio (0 bytes). Escolha a imagem novamente.';
+  }
+  if (file.size > maxBytes) {
+    return `Imagem muito grande: ${megabytes(file.size)}. O limite é ${megabytes(
+      maxBytes,
+    )} — reduza a imagem e tente de novo.`;
+  }
+  if (file.type === '') {
+    return 'Não foi possível identificar o tipo do arquivo. Envie um PNG, JPG ou WebP.';
+  }
+  if (!ACCEPTED_CONTENT_TYPES.includes(file.type)) {
+    return `Formato não suportado (${file.type}). Envie PNG, JPG, WebP ou GIF.`;
+  }
+  return null;
+}
+
+/** The `error` field of a JSON refusal, or `null` when there isn't one. */
+async function statedError(response: Response): Promise<string | null> {
+  try {
+    const parsed: unknown = JSON.parse(await response.text());
+    if (parsed && typeof parsed === 'object' && 'error' in parsed) {
+      const error = (parsed as { error: unknown }).error;
+      return typeof error === 'string' ? error : null;
+    }
+    return null;
+  } catch {
+    // An unreadable or non-JSON body tells us nothing extra; the status still does.
+    return null;
+  }
+}
+
+/**
+ * Explain a refusal from the upload endpoint.
+ *
+ * **The server's own sentence wins.** Every refusal the mount can phrase — an
+ * unreadable file, a format that contradicts the bytes, a ceiling, an unsupported
+ * type, storage not configured — arrives as a finished pt-BR sentence built from
+ * the mount's OWN `maxBytes` and through the mount's OWN `messages` overrides.
+ * Those are surfaced verbatim rather than re-worded here, so the two entrances
+ * cannot drift into telling one store owner two different things about one file,
+ * and so a limit named on screen is the limit something enforces.
+ *
+ * That last point is why the table below is a FALLBACK and not the primary path.
+ * The endpoint used to answer `file_too_large` as a bare code, and the browser
+ * re-derived the number from its own default: a mount capped at 4 MB refusing a
+ * 6 MB file produced *"o limite é 8 MB"* — a ceiling nothing applied. The codes
+ * that remain are the ones no `StorageMessages` entry exists for (`forbidden`,
+ * `invalid_key`, `not_found`) plus any older mount still answering a code.
+ */
+export async function uploadFailure(
+  response: Response,
+  maxBytes: number,
+  overrides?: Partial<WebStorageMessages>,
+): Promise<string> {
+  const messages = resolve(maxBytes, overrides);
+  if (response.status === 401) return messages.session_expired;
+  const stated = await statedError(response);
+  // A sentence rather than a code: the server already phrased it for the owner,
+  // with its own number and its own overrides in it. Checked BEFORE the table so a
+  // mount that states a limit is never second-guessed by a local default.
+  if (stated && /\s/.test(stated)) return stated;
+  const known = stated ? sentenceFor(messages, stated) : undefined;
+  if (known) return known;
+  // An unrecognised CODE is still the most useful string in the response — it is
+  // what turns a support request from "it failed" into something greppable — so it
+  // rides along with the status rather than being mapped away.
+  const detail = stated ? ` (${stated})` : '';
+  return `Não foi possível enviar a imagem (HTTP ${response.status}${detail}). Tente de novo em instantes.`;
+}
+
+/**
+ * `fetch` rejected outright — no response ever arrived.
+ *
+ * One sentence, and it can afford to be definite: the upload goes to our own
+ * origin, so there is no cross-origin case to hedge about.
+ */
+export function transportFailure(overrides?: Partial<WebStorageMessages>): string {
+  // No ceiling to interpolate on this one, so it is read without a limit rather
+  // than through a table built from a number that would be a lie.
+  return overrides?.transport ?? defaultWebStorageMessages({ limit: '' }).transport;
+}
