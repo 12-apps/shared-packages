@@ -9,51 +9,107 @@ import { fileURLToPath } from "node:url";
  * Proves scripts/publish.mjs CLASSIFIES what npm says (#166).
  *
  * The script's whole job is to read one npm invocation's output and decide
- * between three things that look alike in a log: an ordinary skip, a blip worth
+ * between things that look alike in a log: an ordinary skip, a blip worth
  * retrying, and a failure nobody can retry their way out of. Getting that wrong
  * is silent by construction — the wrong branch still exits, still prints npm's
  * own text, and only a human comparing runs would notice. `main` was red for a
  * day across five pushes (runs 31667899507 … 31682461784) because an ENEEDAUTH
- * from four packages with no npm Trusted Publisher fell through the generic
+ * from four packages npm could not authenticate for fell through the generic
  * throw and read as a transient credentials problem.
  *
  * So each classification gets a case here, run through the REAL script — spawned
  * exactly as the workflow spawns it, against a temp workspace, with npm's own
  * words as the input. The npm on PATH is a shim that plays a scripted plan and
- * RECORDS every call, which is what lets a case assert the thing a log cannot
- * show you: how many times a package was attempted.
+ * RECORDS every call and its arguments, which is what lets a case assert the
+ * things a log cannot show you: how many times a package was attempted, how npm
+ * was asked to run, and what the script handed to the step after it.
  *
- * The npm outputs below are verbatim from the Release job of run 31682461784
- * (and its healthy siblings) — a paraphrase would test this file's idea of what
- * npm prints rather than what it prints.
+ * PROVENANCE of the npm outputs below, because it is the difference between
+ * testing npm and testing this file's idea of npm: ENEEDAUTH and
+ * ALREADY_PUBLISHED are contiguous verbatim excerpts from the Release job of run
+ * 31682461784. TRANSIENT and the `npm verbose` blocks are CONSTRUCTED and say so
+ * at the point of use — that run contains no 409 and ran at npm's default
+ * loglevel, so there is nothing to copy for either.
+ *
+ * COST: three cases exercise a real retry, and the first backoff is a real 5s
+ * wait, so this takes ~17s wall. The wait is the thing under test in one of them
+ * and is left honest in all three rather than made configurable for the benefit
+ * of the test.
+ *
+ * Assertions on the diagnosis text deliberately match the FACTS a reader has to
+ * come away with (the package is named, the remedy's coordinates are given, a
+ * re-run is not the answer) rather than whole sentences. `release` needs this
+ * job, so an assertion on exact prose would let a wording edit halt publishing.
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLISH = join(HERE, "publish.mjs");
 
+// Verbatim, run 31682461784, `npm publish` of @12-apps/audit@1.0.0.
 const ENEEDAUTH = [
-  "npm notice Publishing to https://registry.npmjs.org/ with tag latest and public access",
+  "npm notice total files: 31",
+  "npm notice",
+  "npm notice npm tokens that bypass 2FA are being restricted for account changes and direct publishing. Learn how to prepare: https://gh.io/npm-gat-bypass2fa-deprecation",
   "npm error code ENEEDAUTH",
   "npm error need auth This command requires you to be logged in to https://registry.npmjs.org",
   "npm error need auth You need to authorize this machine using `npm login`",
-  "npm error A complete log of this run can be found in: /home/runner/.npm/_logs/run.log",
+  "npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-08-13T08_42_13_115Z-debug-0.log",
 ].join("\n");
 
+// Verbatim, same run, `npm publish` of @12-apps/eslint-config@1.0.1 — hence the
+// 1.0.1 in npm's text where the fixture package is at 1.0.0. The version is
+// npm's to print; nothing here reads it.
 const ALREADY_PUBLISHED = [
-  "npm error code E403",
-  "npm error 403 Forbidden - PUT https://registry.npmjs.org/@selftest%2fone",
-  "npm error 403 You cannot publish over the previously published versions: 1.0.0.",
+  "npm notice",
+  "npm notice npm tokens that bypass 2FA are being restricted for account changes and direct publishing. Learn how to prepare: https://gh.io/npm-gat-bypass2fa-deprecation",
+  "npm error You cannot publish over the previously published versions: 1.0.1.",
+  "npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-08-13T08_41_09_135Z-debug-0.log",
 ].join("\n");
 
+// CONSTRUCTED: no 409 occurred in the cited run. Shaped after npm's registry
+// error line (`npm error <status> <text> - <METHOD> <url> - <message>`) and
+// carrying the two markers TRANSIENT matches.
 const TRANSIENT = [
   "npm error code E409",
-  "npm error 409 Conflict - PUT https://registry.npmjs.org/@selftest%2fone",
-  "npm error 409 Failed to save packument",
+  "npm error 409 Conflict - PUT https://registry.npmjs.org/@selftest%2fone - Failed to save packument",
 ].join("\n");
 
 const OK = ["npm notice Publishing to https://registry.npmjs.org/", "+ @selftest/one@1.0.0"].join(
   "\n",
 );
+
+/**
+ * CONSTRUCTED: npm at `--loglevel verbose`, which is how publish.mjs now runs it.
+ *
+ * Two properties of the real thing are what this reproduces, and both are load
+ * bearing. The `oidc` line — the only place npm ever says WHY it has no
+ * credential — is printed long before the error block, so it falls outside any
+ * tail of the output. And it arrives buried in machine chatter that must not
+ * reach the job log, including one http line whose URL contains "oidc" and so
+ * would survive a filter written against the word rather than the log prefix.
+ */
+function verbose(oidcLine) {
+  return [
+    "npm verbose cli /opt/hostedtoolcache/node/24.0.0/x64/bin/node /usr/local/bin/npm",
+    "npm info using npm@11.5.1",
+    "npm info using node@v24.0.0",
+    `npm verbose oidc ${oidcLine}`,
+    "npm http fetch POST https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/@selftest%2frefused 401 214ms",
+    "npm verbose stack HttpErrorGeneral: 401 Unauthorized",
+    "npm verbose cwd /home/runner/work/shared-packages/shared-packages/packages/audit",
+    "npm verbose os Linux 6.11.0-1018-azure",
+    "npm verbose node v24.0.0",
+    "npm verbose npm  v11.5.1",
+    ENEEDAUTH,
+    "npm verbose exit 1",
+    "npm verbose code 1",
+  ].join("\n");
+}
+
+const REFUSAL = "package @selftest/refused does not have a trusted publisher configured";
+const REFUSED = verbose(`Failed token exchange request with body message: ${REFUSAL}`);
+const EXCHANGE_BROKE = verbose("Failed token exchange request with body message: Unknown error");
+const BOTH_TOKENS = `${TRANSIENT}\n${ENEEDAUTH}`;
 
 /**
  * The npm the script under test will find on PATH.
@@ -72,6 +128,7 @@ const log = process.env.FAKE_NPM_CALLS;
 const { name } = JSON.parse(readFileSync("package.json", "utf8"));
 const before = readFileSync(log, "utf8").split("\\n").filter((line) => line === name).length;
 appendFileSync(log, name + "\\n");
+appendFileSync(process.env.FAKE_NPM_ARGV, process.argv.slice(2).join(" ") + "\\n");
 const steps = plan[name] || [];
 const step = steps[Math.min(before, steps.length - 1)];
 process.stdout.write(step.out + "\\n");
@@ -102,9 +159,12 @@ function release(packages, plan) {
   const calls = join(root, "calls.log");
   const planFile = join(root, "plan.json");
   const summary = join(root, "summary.md");
-  writeFileSync(calls, "");
+  const argv = join(root, "argv.log");
+  // The runner's step-to-step channel. publish.mjs writes the names it did not
+  // get onto the registry here, and the tag check in the next step reads them.
+  const handoff = join(root, "github.env");
+  for (const file of [calls, summary, argv, handoff]) writeFileSync(file, "");
   writeFileSync(planFile, JSON.stringify(plan));
-  writeFileSync(summary, "");
 
   const result = spawnSync(process.execPath, [PUBLISH], {
     encoding: "utf8",
@@ -114,7 +174,9 @@ function release(packages, plan) {
       PUBLISH_DIRS: dirs.join(" "),
       FAKE_NPM_PLAN: planFile,
       FAKE_NPM_CALLS: calls,
+      FAKE_NPM_ARGV: argv,
       GITHUB_STEP_SUMMARY: summary,
+      GITHUB_ENV: handoff,
     },
   });
 
@@ -123,6 +185,8 @@ function release(packages, plan) {
     status: result.status,
     output: `${result.stdout ?? ""}${result.stderr ?? ""}`,
     summary: readFileSync(summary, "utf8"),
+    handoff: readFileSync(handoff, "utf8"),
+    argv: readFileSync(argv, "utf8").split("\n").filter(Boolean),
     attempts: (name) => logged.filter((line) => line === name).length,
   };
 }
@@ -137,42 +201,54 @@ function check(label, passed, detail) {
   failures.push(`${label}\n    ${detail}`);
 }
 
-// ── ENEEDAUTH: the package has no Trusted Publisher ─────────────────────────
+/** The `::error::` annotation only ever surfaces a message's FIRST line. */
+function annotation(output) {
+  return (output.split("\n").find((line) => line.startsWith("::error::")) ?? "").slice(9);
+}
+
+// ── ENEEDAUTH with npm saying nothing about why: run 31682461784 exactly ────
 const WEDGED = "@selftest/wedged";
 const eneedauth = release([{ name: WEDGED }], { [WEDGED]: [{ status: 1, out: ENEEDAUTH }] });
 
 check("ENEEDAUTH fails the run", eneedauth.status === 1, `expected exit 1, got ${eneedauth.status}`);
 check(
-  "ENEEDAUTH is diagnosed as a missing Trusted Publisher, not as npm's 'log in'",
-  eneedauth.output.includes(`no npm Trusted Publisher for ${WEDGED}`),
-  `the diagnosis is missing from:\n${eneedauth.output}`,
+  "npm is asked for the oidc lines in the first place",
+  eneedauth.argv.every((call) => /(^|\s)--loglevel[=\s]verbose(\s|$)/.test(call)),
+  `npm logs every OIDC outcome at verbose or silly and NOTHING at the default\n    loglevel, so a publish run at the default level throws away the only evidence\n    of why it had no credential. npm was invoked as:\n    ${eneedauth.argv.join("\n    ")}`,
+);
+check(
+  "the annotation states the evidence — npm got no credential — rather than a cause npm never reported",
+  /no credential/i.test(annotation(eneedauth.output)) &&
+    /trusted publisher/i.test(annotation(eneedauth.output)) &&
+    /id-token/i.test(annotation(eneedauth.output)),
+  `npm printed no oidc line, so the first line must name npm's outcome and offer\n    the candidate causes, not pick one. It said:\n    ${annotation(eneedauth.output)}`,
 );
 check(
   "the diagnosis says a token-based first publish creates the name but not the publisher",
-  /creates the NAME but not/i.test(eneedauth.output),
+  /creates\s+the\s+NAME\s+but\s+not/i.test(eneedauth.output),
   "nothing in the output explains how a package gets into this state",
 );
 check(
   "the diagnosis says the package can publish no further version until it is fixed",
-  /NO further version/i.test(eneedauth.output),
+  /no further\s+version/i.test(eneedauth.output),
   "the output does not say the package is wedged, only that it failed",
 );
 check(
-  "the diagnosis says where to configure it",
-  ["Settings", "Trusted Publisher", "GitHub Actions", "12-apps/shared-packages", "ci.yml"].every(
-    (part) => eneedauth.output.includes(part),
+  "the diagnosis gives the remedy's coordinates",
+  [/trusted publisher/i, /npmjs\.com/i, /12-apps\/shared-packages/, /ci\.yml/].every((part) =>
+    part.test(eneedauth.output),
   ),
-  "the remedy does not name npmjs.com → Settings → Trusted Publisher → GitHub Actions + repo + workflow",
+  "the remedy does not name the Trusted Publisher setting, npmjs.com, the repo and the workflow",
 );
 check(
-  "ENEEDAUTH is NOT retried",
+  "ENEEDAUTH with no retryable marker is NOT retried",
   eneedauth.attempts(WEDGED) === 1,
-  `npm was invoked ${eneedauth.attempts(WEDGED)} time(s) — a permanent failure must be attempted once`,
+  `npm was invoked ${eneedauth.attempts(WEDGED)} time(s) — nothing here suggests waiting would help`,
 );
 check(
   "ENEEDAUTH is not mistaken for TRANSIENT",
   !eneedauth.output.includes("transient registry error"),
-  "the script announced a backoff for a failure no wait can fix",
+  "the script announced a backoff for a failure with no transient marker in it",
 );
 check(
   "ENEEDAUTH is not mistaken for ALREADY_PUBLISHED",
@@ -180,9 +256,66 @@ check(
   "the package was reported as an ordinary skip — the exact way a red release goes unnoticed",
 );
 check(
-  "the run summary names the cause, not just the failure",
-  eneedauth.summary.includes("no npm Trusted Publisher") && eneedauth.summary.includes(WEDGED),
+  "the run summary names the outcome, not just the failure",
+  /no credential/i.test(eneedauth.summary) && eneedauth.summary.includes(WEDGED),
   `GITHUB_STEP_SUMMARY said:\n${eneedauth.summary}`,
+);
+check(
+  "the failure is handed to the tag check, which must not tell anyone to delete this package's tag",
+  eneedauth.handoff.includes(`PUBLISH_WEDGED=${WEDGED}`) &&
+    eneedauth.handoff.includes(`PUBLISH_INCOMPLETE=${WEDGED}`),
+  `verify-released.mjs's standing remedy is "delete the tag and re-run", which is\n    the opposite of this diagnosis. GITHUB_ENV got:\n${eneedauth.handoff}`,
+);
+
+// ── ENEEDAUTH with npm's oidc line saying the registry REFUSED the exchange ──
+const REFUSED_PKG = "@selftest/refused";
+const refused = release([{ name: REFUSED_PKG }], { [REFUSED_PKG]: [{ status: 1, out: REFUSED }] });
+
+check(
+  "the registry's own reason is surfaced, though npm printed it far from the end of its output",
+  refused.output.includes(REFUSAL),
+  `npm logs the exchange's outcome once, near the TOP of a verbose run — a tail of\n    the output loses it, and it is the only evidence there is. Output:\n${refused.output}`,
+);
+check(
+  "a refused exchange is still a permanent failure",
+  refused.status === 1 && refused.attempts(REFUSED_PKG) === 1,
+  `exit ${refused.status} after ${refused.attempts(REFUSED_PKG)} attempt(s)`,
+);
+check(
+  "npm's verbose chatter does not reach the job log, but its oidc line does",
+  !/npm verbose (cwd|exit|stack)/.test(refused.output) &&
+    !refused.output.includes("npm http fetch") &&
+    refused.output.includes("npm verbose oidc"),
+  "`--loglevel verbose` adds a few hundred lines per package, one of them an http\n    line whose URL contains `oidc`. Only npm's own oidc LOG lines are wanted.",
+);
+
+// ── ENEEDAUTH whose oidc line says the exchange itself broke ────────────────
+console.log("  …  three retry cases follow — each pays a real 5s first backoff");
+const BROKE_PKG = "@selftest/broke";
+const broke = release([{ name: BROKE_PKG }], {
+  [BROKE_PKG]: [
+    { status: 1, out: EXCHANGE_BROKE },
+    { status: 0, out: OK },
+  ],
+});
+check(
+  "an ENEEDAUTH whose oidc line says the exchange never got an answer IS retried",
+  broke.status === 0 && broke.attempts(BROKE_PKG) === 2,
+  `npm swallows network errors, timeouts and 5xx into the same credential-less\n    ENEEDAUTH as a genuinely unconfigured package. exit ${broke.status} after\n    ${broke.attempts(BROKE_PKG)} attempt(s)`,
+);
+
+// ── The one output where the two tests disagree: both markers at once ───────
+const BOTH_PKG = "@selftest/both";
+const both = release([{ name: BOTH_PKG }], {
+  [BOTH_PKG]: [
+    { status: 1, out: BOTH_TOKENS },
+    { status: 0, out: OK },
+  ],
+});
+check(
+  "an output carrying BOTH a transient marker and ENEEDAUTH is retried, not called permanent",
+  both.status === 0 && both.attempts(BOTH_PKG) === 2,
+  `the retry costs at most ~50s of backoff that was going to fail anyway; calling it\n    permanent costs a human a trip to a settings page that is already correct.\n    exit ${both.status} after ${both.attempts(BOTH_PKG)} attempt(s)`,
 );
 
 // ── The two classifications ENEEDAUTH must not have taken over ──────────────
@@ -195,8 +328,12 @@ check(
   skip.output,
 );
 check("a skip is attempted once", skip.attempts(ONE) === 1, `${skip.attempts(ONE)} attempt(s)`);
+check(
+  "a skip tells the tag check nothing — its version IS on the registry",
+  !skip.handoff.includes(ONE),
+  `an unremarkable skip must not suppress the tag check's remedy. GITHUB_ENV got:\n${skip.handoff}`,
+);
 
-console.log("  …  retrying the transient case — the first backoff is a real 5s wait");
 const retried = release([{ name: ONE }], {
   [ONE]: [
     { status: 1, out: TRANSIENT },
@@ -225,6 +362,11 @@ check(
   "and is reported as held back rather than failed on its own",
   cascade.output.includes(`not attempted, dependency failed: ${DEPENDENT}`),
   cascade.output,
+);
+check(
+  "the held-back package is handed to the tag check too — its version is not on the registry either",
+  new RegExp(`PUBLISH_INCOMPLETE=.*${DEPENDENT}`).test(cascade.handoff),
+  `GITHUB_ENV got:\n${cascade.handoff}`,
 );
 
 if (failures.length > 0) {
