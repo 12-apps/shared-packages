@@ -30,7 +30,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   roles: 'Papéis',
   payouts: 'Repasses',
   shift: 'Turnos',
-  impersonation: 'Ver como',
+  user: 'Usuários',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -51,7 +51,7 @@ const ACTION_LABELS: Record<string, string> = {
   open: 'Abrir',
   close: 'Fechar',
   end: 'Encerrar',
-  preview: 'Pré-visualizar',
+  impersonate: 'Ver como',
 };
 
 const NOUN_LABELS: Record<string, string> = {
@@ -68,6 +68,11 @@ const SCOPE_LABELS: Record<string, string> = {
   assigned: 'atribuídos',
   station: 'estação',
   operational: 'operacional',
+  // A SCOPE rather than an action, so `user:impersonate:configure` renders
+  // "Ver como (ativar/desativar)" — one row that reads as a narrower slice of
+  // the row above it. As an action it would compose to "Ver como Configurar",
+  // which names no recognisable thing.
+  configure: 'ativar/desativar',
 };
 
 /** pt-BR labels for the seeded staff roles; custom roles show their own name. */

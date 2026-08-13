@@ -84,6 +84,15 @@ export const DEFAULT_ROLE_TEMPLATES: readonly RoleDef<FuturePayPermission>[] = [
       'team:manage',
       'roles:manage',
       'roles:approve',
+      // "Ver como", both halves (FUT-460). An ADMIN configures the store's roles
+      // and its people, so an ADMIN is who needs to check the result — this used
+      // to be an owner marker they could not hold or be granted, which left the
+      // one person doing the work unable to verify it. Safe by the same property
+      // the feature has always turned on: a preview resolves the INTERSECTION
+      // with the previewer's own set, so an admin previewing an owner sees an
+      // admin's screen.
+      'user:impersonate',
+      'user:impersonate:configure',
     ],
     description: 'Administers a tenant; everything except owner-only actions.',
   },
@@ -258,17 +267,24 @@ export const FUTURE_PAY_GOVERNANCE: GovernanceCatalog = {
   permissions: FUTURE_PAY_PERMISSIONS,
   roles: DEFAULT_ROLE_TEMPLATES,
   ownerRoles: ['OWNER', 'SUPERADMIN'],
-  // `impersonation:preview` (FUT-460) is an owner MARKER, not just an
-  // unlisted permission. Leaving it merely absent from every template would
-  // make it OWNER-only by accident: nothing would stop a tenant from composing
-  // a custom role that holds it, and "Ver como" is the one grant that lets a
-  // human read the admin through someone else's permissions. Listing it here
-  // makes the restriction structural — `checkOwnerProtected` rejects an inline
-  // custom role carrying it, and `checkCuratedMarkers` rejects injecting it
-  // into a system template whose seed does not already have it (none does).
-  // OWNER and SUPERADMIN are unaffected: they hold '*', which is a wildcard
-  // marker `expandRole` short-circuits on, never an enumeration to extend.
-  ownerPermissions: ['roles:manage', 'payouts:manage', 'impersonation:preview'],
+  // THE "Ver como" GRANTS ARE DELIBERATELY NOT HERE (FUT-460).
+  //
+  // `impersonation:preview` — now `user:impersonate` — shipped as an owner
+  // MARKER on this list, which made the restriction structural:
+  // `checkOwnerProtected` rejected any inline custom role carrying it, and
+  // `checkCuratedMarkers` rejected injecting it into a system template. The
+  // effect was that "Ver como" could not be delegated AT ALL, to anyone, ever —
+  // not to the administrator who configures the store's roles, not through a
+  // custom role a store composed for exactly that purpose. The one person doing
+  // the permissions work was the one person who could not check it.
+  //
+  // What made it feel dangerous is handled elsewhere and always was: a preview
+  // resolves the INTERSECTION of the previewed subject's set with the
+  // previewer's own, so this grant can never widen anybody. Marking it here
+  // protected nothing that the ceiling does not, and cost the feature its
+  // audience. `roles:manage` and `payouts:manage` stay: those DO widen — one
+  // hands out permissions, the other moves money.
+  ownerPermissions: ['roles:manage', 'payouts:manage'],
   leafOnlyRoles: FUTURE_PAY_LEAF_ONLY_ROLES,
   sodPairs: FUTURE_PAY_SOD_PAIRS,
 };

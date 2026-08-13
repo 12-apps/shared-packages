@@ -97,8 +97,8 @@ describe('roles routes', () => {
   it('governance blocks an ADMIN composing a role above their own ceiling', async () => {
     const h = await host();
     enrolMember(h.state, TENANT, 'admin-1', 'ADMIN');
-    // ADMIN does not hold impersonation:preview (or whatever lies outside its
-    // template); payouts:manage is an owner-marker — always blocked.
+    // `payouts:manage` is an owner-marker — always blocked, whatever the
+    // granter's own template happens to enumerate.
     const response = await call(h, 'POST', '/roles', {
       actor: memberActor(TENANT, 'admin-1'),
       body: { name: 'Escalado', permissions: ['payouts:manage'] },
