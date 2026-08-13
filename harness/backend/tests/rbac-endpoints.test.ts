@@ -71,6 +71,46 @@ describe('permissions — the caller own resolved set', () => {
   });
 });
 
+describe('the composed catalog, over the tarball', () => {
+  /**
+   * The package ships no application catalog: this host assembles one from
+   * three owners (`rbac-catalog.ts`) and hands it over as a single `catalog`
+   * field. These cases prove the assembly reaches the RUNNING surface — the
+   * package's unit suites can only prove it reaches an object.
+   */
+  it('serves ids from every contributing source through one endpoint', async () => {
+    const admin = await json<{ data: { permissions: string[] } }>(
+      await asUser('admin-1').get('/permissions'),
+    );
+    // @12-apps/rbac's own, @harness/lifecycle's, and this host's domain.
+    expect(admin.data.permissions).toContain('roles:manage');
+    expect(admin.data.permissions).toContain('products:approve');
+    expect(admin.data.permissions).toContain('config:write');
+  });
+
+  it('enforces a duty pair whose two halves come from different sources', async () => {
+    // `products:approve` is declared by @harness/lifecycle with
+    // `separateFrom: ['products:write']`, an id it does not own. The pair only
+    // exists because composition resolved that counterpart against the whole
+    // assembled catalog — and this 400 is that resolution, enforced by the
+    // package's own governance over a real database.
+    const response = await asUser('owner-1').send('POST', '/roles', {
+      name: 'Autor e Aprovador',
+      permissions: ['products:write', 'products:approve'],
+    });
+    expect(response.status).toBe(400);
+    const body = await json<{ error: string }>(response);
+    expect(body.error.length).toBeGreaterThan(0);
+
+    // Either half alone composes fine — the PAIR is what is refused.
+    const single = await asUser('owner-1').send('POST', '/roles', {
+      name: 'Somente Aprovador',
+      permissions: ['products:approve'],
+    });
+    expect(single.status).toBe(200);
+  });
+});
+
 describe('roles — CRUD + governance against the published surface', () => {
   it('lists the seeded catalog, and q narrows it (Barista stays, Estoquista goes)', async () => {
     const all = await json<{ data: { name: string }[] }>(await asUser('owner-1').get('/roles'));

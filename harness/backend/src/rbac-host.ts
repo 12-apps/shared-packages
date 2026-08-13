@@ -4,20 +4,17 @@
  * What is genuinely the host's, and all that is here: who is calling (a
  * header-driven session stand-in — a browser cannot have a real one), which
  * tenant the slug names, what the user ids look like as people (the
- * directory), and where the five owned tables live (the PGlite-backed seam in
- * `rbac-db.ts`). Everything else — guards, governance, parsing, statuses, the
- * envelope — is the package's, which is the entire claim under test.
+ * directory), where the five owned tables live (the PGlite-backed seam in
+ * `rbac-db.ts`), and the permission CATALOG — assembled in `rbac-catalog.ts`
+ * from this host's own domain plus every package that owns a surface here.
+ * Everything else — guards, governance, parsing, statuses, the envelope — is
+ * the package's, which is the entire claim under test.
  */
 import type { PGlite } from '@electric-sql/pglite';
-import {
-  DEFAULT_ROLE_TEMPLATES,
-  FUTURE_PAY_GOVERNANCE,
-  FUTURE_PAY_PERMISSIONS,
-  futurePayTenantRoleSeeds,
-} from '@12-apps/rbac';
 import { rbacRouter } from '@12-apps/rbac/hono';
 import type { RbacUserIdentity } from '@12-apps/rbac/server';
 
+import { HARNESS_CATALOG } from './rbac-catalog';
 import { rbacDb } from './rbac-db';
 
 /** The mounted surface's type — inferred, so the guards keep their catalog. */
@@ -100,10 +97,9 @@ export async function reseedRbac(pg: PGlite, rbac: HarnessRbac): Promise<void> {
 export function rbacHost(pg: PGlite) {
   return rbacRouter({
     db: async () => rbacDb(pg),
-    permissions: FUTURE_PAY_PERMISSIONS,
-    roleTemplates: DEFAULT_ROLE_TEMPLATES,
-    governance: FUTURE_PAY_GOVERNANCE,
-    tenantRoleSeeds: futurePayTenantRoleSeeds(),
+    // The whole catalog, assembled by this host from three owners'
+    // contributions (see `rbac-catalog.ts`) — one field, not four.
+    catalog: HARNESS_CATALOG,
     directory: {
       getUsers: async (ids) =>
         ids.flatMap((id) => {

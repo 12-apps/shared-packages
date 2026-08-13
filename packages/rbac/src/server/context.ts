@@ -1,11 +1,5 @@
-import type { GovernanceCatalog } from '../governance';
-import type {
-  AuthzContext,
-  OwnershipPredicate,
-  PermissionRegistry,
-  RoleDef,
-} from '../core/types';
-import type { TenantRoleSeed } from '../tenant-role-seeds';
+import type { RbacCatalog } from '../core/compose';
+import type { AuthzContext, OwnershipPredicate } from '../core/types';
 
 import type { RbacDbProvider } from './db';
 
@@ -237,14 +231,17 @@ export const GLOBAL_SCOPE = 'GLOBAL' as const;
 export interface RbacServerConfig<P extends string = string> {
   /** Prisma-shaped client for the five owned models, through the seam. */
   db: RbacDbProvider;
-  /** The host's permission catalog — the engine and the wire validate against it. */
-  permissions: PermissionRegistry<P>;
-  /** The role TEMPLATES the engine's name index resolves (seeded catalog). */
-  roleTemplates: readonly RoleDef<P>[];
-  /** Governance catalog for grant/compose validation. */
-  governance: GovernanceCatalog;
-  /** The per-tenant rows `seedTenantRoles` materializes for a new tenant. */
-  tenantRoleSeeds: readonly TenantRoleSeed[];
+  /**
+   * The host's composed catalog: the permission registry the engine and the
+   * wire validate against, the seeded role templates, the governance catalog
+   * and the per-tenant seed rows — assembled once by
+   * `composePermissions(...).withRoles(...)`.
+   *
+   * ONE field, not four, on purpose. As four they could disagree: a registry
+   * from the host beside a governance catalog left on a package default is a
+   * config that type-checks and enforces the wrong policy.
+   */
+  catalog: RbacCatalog<P>;
   /** The host's user directory (roster identity). */
   directory: RbacUserDirectory;
   /**

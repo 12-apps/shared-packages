@@ -176,8 +176,8 @@ async function activeAssignmentIds(
 /** Build the shared engine for a config — one per `createApiRbac` call. */
 export function createDbEngine<P extends string>(config: RbacServerConfig<P>): Rbac<P> {
   return createRbac<P>({
-    permissions: config.permissions,
-    roles: config.roleTemplates,
+    permissions: config.catalog.permissions,
+    roles: config.catalog.roleTemplates,
     resolver: (actorId) => resolveAssignments(config, actorId),
     globalScope: GLOBAL_SCOPE,
     ...(config.scopeParent ? { scopeParent: config.scopeParent } : {}),

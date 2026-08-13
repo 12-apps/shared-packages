@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { canWith, permissionsFor, type CanContext } from '../core/can';
 import { buildRoleIndex } from '../core/roles';
 import type { RoleAssignment, RoleDef } from '../core/types';
-import { futurePayCtx } from './fixtures';
+import { demoCtx } from './fixtures';
 
-const ctx = futurePayCtx();
+const ctx = demoCtx();
 const TENANT_A = 'tenant-a';
 const TENANT_B = 'tenant-b';
 

@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FUTURE_PAY_GOVERNANCE, FUTURE_PAY_PERMISSIONS } from '../../templates';
+import { DEMO_CATALOG } from '../../__tests__/demo-catalog';
 
 import type { RbacApiClient } from '../api';
 import { RbacProvider } from '../context';
@@ -74,9 +74,9 @@ function mountRoles(api: RbacApiClient, permissions: string[]): void {
     <RbacProvider permissions={permissions}>
       <RolesScreen
         api={api}
-        permissions={FUTURE_PAY_PERMISSIONS}
-        governance={FUTURE_PAY_GOVERNANCE}
-        labels={createRbacLabels()}
+        permissions={DEMO_CATALOG.permissions}
+        governance={DEMO_CATALOG.governance}
+        labels={createRbacLabels(DEMO_CATALOG.labels)}
         managePermission="roles:manage"
       />
     </RbacProvider>,
@@ -88,7 +88,7 @@ function mountTeam(api: RbacApiClient, permissions: string[]): void {
     <RbacProvider permissions={permissions}>
       <TeamScreen
         api={api}
-        labels={createRbacLabels()}
+        labels={createRbacLabels(DEMO_CATALOG.labels)}
         systemRoles={['ADMIN', 'MANAGER', 'WAITER', 'CHEF']}
         managePermission="team:manage"
       />

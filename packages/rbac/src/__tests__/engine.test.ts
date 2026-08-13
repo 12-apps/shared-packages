@@ -2,19 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { createRbac } from '../core/engine';
 import { PermissionDeniedError } from '../core/errors';
 import type { AssignmentResolver, RoleAssignment } from '../core/types';
-import {
-  DEFAULT_ROLE_TEMPLATES,
-  FUTURE_PAY_PERMISSIONS,
-  type FuturePayPermission,
-} from '../templates';
+import { DEMO_CATALOG, type DemoPermission } from './demo-catalog';
 
 const TENANT_A = 'tenant-a';
 const TENANT_B = 'tenant-b';
 
 function makeEngine(resolver: AssignmentResolver) {
-  return createRbac<FuturePayPermission>({
-    permissions: FUTURE_PAY_PERMISSIONS,
-    roles: DEFAULT_ROLE_TEMPLATES,
+  return createRbac<DemoPermission>({
+    permissions: DEMO_CATALOG.permissions,
+    roles: DEMO_CATALOG.roleTemplates,
     resolver,
   });
 }
@@ -111,9 +107,9 @@ describe('createRbac — requirePermission', () => {
 describe('createRbac — instance permissions & the entity gate', () => {
   // WAITER holds orders:read:assigned (instance). Ownership + assignment gate.
   function mk() {
-    return createRbac<FuturePayPermission>({
-      permissions: FUTURE_PAY_PERMISSIONS,
-      roles: DEFAULT_ROLE_TEMPLATES,
+    return createRbac<DemoPermission>({
+      permissions: DEMO_CATALOG.permissions,
+      roles: DEMO_CATALOG.roleTemplates,
       resolver: (id) => assignments[id] ?? [],
       ownership: (_subject, type) =>
         type === 'orders' ? { kind: 'field', field: 'waiter_id' } : null,

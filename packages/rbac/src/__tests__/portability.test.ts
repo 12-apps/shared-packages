@@ -1,18 +1,35 @@
 /**
  * The TOY SECOND HOST (FUT-146 acceptance): a complete, runnable "blog"
- * application wired to the library with ONLY a permission catalog, roles-as-data,
- * a resolver and the entity-gate hooks — zero imports from the Future Pay
- * templates. If this suite compiles and passes, the core is portable: nothing in
- * it presumes restaurants, tenants named `Client`, Prisma, or Next.js.
+ * application wired to the library with ONLY a permission catalog,
+ * roles-as-data, a resolver and the entity-gate hooks. If this suite compiles
+ * and passes, the core is portable: nothing in it presumes restaurants,
+ * tenants named `Client`, Prisma, or Next.js.
+ *
+ * IT USED TO PROVE LESS THAN IT LOOKED LIKE IT DID. "Zero imports from the
+ * Future Pay templates" was the whole claim, and it held — because a suite
+ * chooses its own imports. What it could not see is that the package it
+ * vouched for SHIPPED those templates: a second host installing
+ * `@12-apps/rbac` received 61 ids and eight roles of somebody else's
+ * application, and `createWebRbac` fell back to them when the host said
+ * nothing. Portability was a discipline this file kept, not a property the
+ * package had.
+ *
+ * The last two blocks are what it was missing: the blog composing this
+ * package's OWN contribution beside its own (the arrangement a real host now
+ * uses), and an assertion about what the package contains rather than about
+ * what this suite imports.
  */
 import { describe, it, expect } from 'vitest';
+import { composePermissions } from '../core/compose';
 import { isActiveAssignment } from '../core/caveats';
+import { definePermissionContribution } from '../core/contribution';
 import { createRbac } from '../core/engine';
 import { definePermissions } from '../core/registry';
 import type { RoleAssignment, RoleDef } from '../core/types';
 import { validateGrant, type GovernanceCatalog } from '../governance';
+import { RBAC_PERMISSIONS } from '../permissions';
 
-// ── The blog's own catalog (nothing shared with Future Pay) ─────────────────
+// ── The blog's own catalog (nothing shared with any other host) ─────────────
 const BLOG_PERMISSIONS = definePermissions({
   'posts:read': 'class',
   'posts:write:own': 'instance',
@@ -189,5 +206,99 @@ describe('toy second host — governance with the blog catalog', () => {
       catalog: governance,
     });
     expect(result.ok).toBe(true);
+  });
+});
+
+// ── The blog as a REAL host: composing the package's ids with its own ───────
+
+/** The blog's contribution, declared the way a host declares one. */
+const BLOG_CONTRIBUTION = definePermissionContribution({
+  source: 'toy-blog',
+  permissions: {
+    'posts:read': { kind: 'class' },
+    'posts:write:own': { kind: 'instance' },
+    'posts:publish': { kind: 'class', separateFrom: ['posts:write:own'] },
+    'site:configure': { kind: 'class', ownerMarker: true },
+  },
+  labels: { domains: { posts: 'Posts', site: 'Site' } },
+});
+
+/** The blog's whole catalog: this package's ids plus the blog's own. */
+const blogCatalog = () =>
+  composePermissions(RBAC_PERMISSIONS, BLOG_CONTRIBUTION).withRoles({
+    roles: [
+      { name: 'AUTHOR', permissions: ['posts:read', 'posts:write:own'] },
+      { name: 'STAFF_ADMIN', permissions: ['team:read', 'team:manage'] },
+      { name: 'SITE_OWNER', permissions: '*' },
+    ],
+    ownerRoles: ['SITE_OWNER'],
+    leafOnlyRoles: ['AUTHOR'],
+  });
+
+describe('toy second host — composing this package beside its own domain', () => {
+  it('installs the package\'s own screens without adopting anyone\'s domain', () => {
+    const catalog = blogCatalog();
+    // The three ids the packaged roles/team surface gates itself with are the
+    // ONLY ones the blog inherits. Everything else on this list is the blog's.
+    expect(catalog.permissions.list).toEqual([
+      'roles:manage',
+      'team:read',
+      'team:manage',
+      'posts:read',
+      'posts:write:own',
+      'posts:publish',
+      'site:configure',
+    ]);
+    expect(catalog.sourceOf('team:read')).toBe('@12-apps/rbac');
+    expect(catalog.sourceOf('posts:publish')).toBe('toy-blog');
+  });
+
+  it('governs with both halves — the package\'s markers and the blog\'s roles', () => {
+    const catalog = blogCatalog();
+    expect(catalog.governance.ownerPermissions).toEqual([
+      'roles:manage',
+      'site:configure',
+    ]);
+    expect(catalog.governance.sodPairs).toEqual([['posts:publish', 'posts:write:own']]);
+
+    const composed = validateGrant({
+      granterPermissions: catalog.permissions.list,
+      roleBeingGranted: {
+        name: 'custom',
+        permissions: ['posts:write:own', 'posts:publish'],
+      },
+      targetScope: { isLeaf: true },
+      catalog: catalog.governance,
+    });
+    expect(composed.ok).toBe(false);
+    if (!composed.ok) expect(composed.reason).toMatch(/^SEPARATION_OF_DUTIES/);
+  });
+
+  it('seeds every blog tenant with the blog\'s own roles', () => {
+    const catalog = blogCatalog();
+    expect(catalog.tenantRoleSeeds.map((seed) => seed.name)).toEqual([
+      'AUTHOR',
+      'STAFF_ADMIN',
+      'SITE_OWNER',
+    ]);
+    expect(catalog.tenantRoleSeeds.find((seed) => seed.name === 'SITE_OWNER')).toMatchObject({
+      permissions: '*',
+      locked: true,
+    });
+  });
+});
+
+// ── The tripwire: what the PACKAGE ships, not what this suite imports ───────
+
+describe('the package ships no application catalog', () => {
+  it('contributes only the permissions guarding its own surfaces', () => {
+    // The regression this replaces: 61 ids of products, mesas, cozinha, stock
+    // and payments, exported from here under a header that already called
+    // itself "application DATA, not generic core". If a domain permission ever
+    // shows up in this list again, it is the same mistake and this fails.
+    expect(RBAC_PERMISSIONS.source).toBe('@12-apps/rbac');
+    expect(RBAC_PERMISSIONS.ids).toEqual(['roles:manage', 'team:read', 'team:manage']);
+    const domains = new Set(RBAC_PERMISSIONS.ids.map((id) => id.split(':')[0]));
+    expect([...domains].sort()).toEqual(['roles', 'team']);
   });
 });

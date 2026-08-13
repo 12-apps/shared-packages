@@ -65,7 +65,7 @@ export function createApiRbac<P extends string>(config: RbacServerConfig<P>): Ap
   const governance = createGrantGovernance(config, guards);
   const roles = createRolesStore(config);
   const team = createTeamStore(config);
-  const wire = buildWireSchemas(config.permissions);
+  const wire = buildWireSchemas(config.catalog.permissions);
   const messages = messagesOf(config);
   const customerRole = config.customerRole ?? 'CUSTOMER';
 
@@ -94,7 +94,7 @@ export function createApiRbac<P extends string>(config: RbacServerConfig<P>): Ap
     async seedTenantRoles(tenantId: string): Promise<void> {
       const db = await config.db();
       await db.role.createMany({
-        data: tenantRoleSeedRows(tenantId, config.tenantRoleSeeds),
+        data: tenantRoleSeedRows(tenantId, config.catalog.tenantRoleSeeds),
         skipDuplicates: true,
       });
     },

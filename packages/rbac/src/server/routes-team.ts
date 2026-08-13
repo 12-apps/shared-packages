@@ -243,8 +243,8 @@ function setMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute
         // governance, so its default must exclude everything governance would.
         const assignable =
           deps.config.assignableBaseRoles ??
-          deps.config.roleTemplates
-            .filter((role) => !deps.config.governance.ownerRoles.includes(role.name))
+          deps.config.catalog.roleTemplates
+            .filter((role) => !deps.config.catalog.governance.ownerRoles.includes(role.name))
             .map((role) => role.name);
         if (!assignable.includes(input.role)) {
           throw new RbacApiError(400, messages.baseRoleNotAssignable);

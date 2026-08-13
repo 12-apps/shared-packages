@@ -2,7 +2,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FUTURE_PAY_GOVERNANCE, FUTURE_PAY_PERMISSIONS } from '../../templates';
+import { DEMO_CATALOG } from '../../__tests__/demo-catalog';
 
 import { createRbacLabels, groupPermissions, sodCounterpart } from '../labels';
 import { RoleForm } from '../role-form';
@@ -17,32 +17,34 @@ import { splitRoleSelection } from '../team-screen';
 
 describe('labels', () => {
   it('translates a permission into pt-BR action + scope', () => {
-    const labels = createRbacLabels();
+    const labels = createRbacLabels(DEMO_CATALOG.labels);
     expect(labels.permissionActionLabel('products:read:all')).toBe('Ver (todos)');
     expect(labels.permissionActionLabel('stock:move')).toBe('Movimentar');
   });
 
   it('falls back to the raw segment for an unknown permission', () => {
-    expect(createRbacLabels().permissionActionLabel('foo:frobnicate')).toBe('frobnicate');
+    expect(
+      createRbacLabels(DEMO_CATALOG.labels).permissionActionLabel('foo:frobnicate'),
+    ).toBe('frobnicate');
   });
 
   it('labels roles with custom names passing through', () => {
-    const labels = createRbacLabels();
+    const labels = createRbacLabels(DEMO_CATALOG.labels);
     expect(labels.roleLabel('WAITER')).toBe('Garçom');
     expect(labels.roleLabel('Barista')).toBe('Barista');
   });
 
   it('groups the catalog by domain', () => {
-    const groups = groupPermissions(FUTURE_PAY_PERMISSIONS);
+    const groups = groupPermissions(DEMO_CATALOG.permissions);
     const domains = groups.map((group) => group.domain);
     expect(domains).toContain('products');
     expect(domains).toContain('roles');
   });
 
   it('finds the SoD counterpart from the governance catalog', () => {
-    for (const [a, b] of FUTURE_PAY_GOVERNANCE.sodPairs) {
-      expect(sodCounterpart(FUTURE_PAY_GOVERNANCE, a)).toBe(b);
-      expect(sodCounterpart(FUTURE_PAY_GOVERNANCE, b)).toBe(a);
+    for (const [a, b] of DEMO_CATALOG.governance.sodPairs) {
+      expect(sodCounterpart(DEMO_CATALOG.governance, a)).toBe(b);
+      expect(sodCounterpart(DEMO_CATALOG.governance, b)).toBe(a);
     }
   });
 });
@@ -70,13 +72,13 @@ describe('RoleForm', () => {
   // slowest case in the repo and timed a loaded CI runner out at the 5s
   // default (12-13). The form renders the same affordances over any catalog,
   // so mount exactly the permissions the four cases touch.
-  const SOD_PAIR = FUTURE_PAY_GOVERNANCE.sodPairs[0] as [string, string];
-  const OWNER_MARKER = (FUTURE_PAY_GOVERNANCE.ownerPermissions ?? [])[0] as string;
+  const SOD_PAIR = DEMO_CATALOG.governance.sodPairs[0] as [string, string];
+  const OWNER_MARKER = (DEMO_CATALOG.governance.ownerPermissions ?? [])[0] as string;
   const FORM_PERMISSIONS = {
-    list: FUTURE_PAY_PERMISSIONS.list.filter((permission) =>
+    list: DEMO_CATALOG.permissions.list.filter((permission) =>
       ['stock:read', OWNER_MARKER, ...SOD_PAIR].includes(permission),
     ),
-    kind: FUTURE_PAY_PERMISSIONS.kind,
+    kind: DEMO_CATALOG.permissions.kind,
   };
 
   function mountForm() {
@@ -84,8 +86,8 @@ describe('RoleForm', () => {
     render(
       <RoleForm
         permissions={FORM_PERMISSIONS}
-        governance={FUTURE_PAY_GOVERNANCE}
-        labels={createRbacLabels()}
+        governance={DEMO_CATALOG.governance}
+        labels={createRbacLabels(DEMO_CATALOG.labels)}
         initial={null}
         busy={false}
         error={null}
@@ -115,7 +117,7 @@ describe('RoleForm', () => {
 
   it('never lets an owner-marker permission be composed in', () => {
     mountForm();
-    const ownerMarker = (FUTURE_PAY_GOVERNANCE.ownerPermissions ?? [])[0];
+    const ownerMarker = (DEMO_CATALOG.governance.ownerPermissions ?? [])[0];
     expect(ownerMarker).toBeDefined();
     const checkbox = screen
       .getByTestId(`perm-${ownerMarker as string}`)
@@ -125,7 +127,7 @@ describe('RoleForm', () => {
 
   it('disables the SoD counterpart once one side is selected', () => {
     mountForm();
-    const [a, b] = FUTURE_PAY_GOVERNANCE.sodPairs[0] as [string, string];
+    const [a, b] = DEMO_CATALOG.governance.sodPairs[0] as [string, string];
     const first = screen.getByTestId(`perm-${a}`).querySelector('input');
     fireEvent.click(first as HTMLInputElement);
     const counterpart = screen
