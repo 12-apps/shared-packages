@@ -6,7 +6,7 @@
  * test of a hand-rolled second app would prove nothing about the one that
  * serves the SPA.
  *
- * Eleven surfaces, and the split between them is the point:
+ * Twelve surfaces, and the split between them is the point:
  *
  *  - `/api/admin/:tenantSlug/reports/**` is @12-apps/report-builder's, mounted
  *    whole;
@@ -29,6 +29,10 @@
  *  - `/manifest.webmanifest` and `/sw.js` are @12-apps/pwa's (12-23), also at
  *    the root — a worker's directory bounds its scope and the manifest is
  *    linked from a static `index.html` that cannot know a prefix;
+ *  - `/api/uploads/**` is @12-apps/storage's (12-20), and deliberately NOT under
+ *    `:tenantSlug`: an upload is scoped by the ACTOR the host resolves, never by
+ *    a path segment a caller can choose, and the serve route answers a public
+ *    `<img>` that carries no tenant at all;
  *  - `/api/admin/:tenantSlug/realtime` and `/api/account/realtime` are
  *    @12-apps/realtime's (12-16), mounted whole; the host keeps only its seams
  *    (realtime-host.ts) and the outbox's db adapter (realtime-db.ts). The
@@ -91,9 +95,12 @@ import { applyRealtimeMigrations, realtimeOutboxWriteDb } from './realtime-db';
 import { realtimeHost } from './realtime-host';
 import { reportsRouter } from './reports-host';
 import { openReportsDb, reseed, savedReportDb } from './saved-report-db';
+import { createStorageHost } from './storage-host';
 
 export interface HarnessBackend {
   app: Hono;
+  /** Where @12-apps/storage's driver keeps objects, so a suite can read files. */
+  storageRoot: string;
   /**
    * The database itself, for suites whose subject is the SQL — a delivery row's
    * status, a JSONB round trip, an index doing its job. Reading it through an
@@ -156,10 +163,15 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
   // created HERE and shared, for the reason on `HarnessBackend.realtimeDriver`.
   await applyRealtimeMigrations(pg);
   const realtimeDriver = createInlineRealtimeDriver({ logger: console });
+  // 12-20: no migrations — @12-apps/storage owns no models. What it needs from a
+  // host is the two tables its reference probes read (storage-host.ts) and a
+  // directory to keep objects in.
+  const storage = await createStorageHost(pg);
   return {
     rbac,
     audit,
     lifecycle,
+    storage,
     notifications,
     realtimeDriver,
     realtime: realtimeHost(pg, realtimeDriver),
@@ -182,6 +194,7 @@ interface Hosts {
   mcpOauth: ReturnType<typeof mcpOauthHost>;
   pwa: ReturnType<typeof pwaHost>;
   entitlements: ReturnType<typeof createEntitlementsHost>;
+  storage: Awaited<ReturnType<typeof createStorageHost>>;
 }
 
 /**
@@ -203,6 +216,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await reseedMcpOauth(pg);
     await reseedLifecycle(pg);
     await reseedNotifications(pg, hosts.notifications);
+    await hosts.storage.reset();
     hosts.entitlements.reset();
     return c.body(null, 204);
   });
@@ -331,19 +345,23 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   // mount above, deliberately: `/api` is the broader prefix of the two, and this file's
   // header rule is that the more specific mount goes on first.
   app.route('/api', hosts.realtime.events.router);
-  // The last two mount at the ROOT, and have to: `.well-known` documents and a
-  // service worker are read from the origin, never from under a prefix.
+  // The last three mount at the ROOT and have to — the header says why for each.
+  // `/` is the broadest prefix here, so they go on LAST by the same
+  // more-specific-first rule the two `/api` mounts above follow.
+  app.route('/', hosts.storage.router);
   app.route('/', hosts.mcpOauth.router);
   app.route('/', hosts.pwa.router);
 
   return {
     app,
+    storageRoot: hosts.storage.root,
     pg,
     realtimeDriver: hosts.realtimeDriver,
     close: async () => {
-      // Streams first, then the bus, then the database: a stream severed after its driver is
-      // gone throws into the sink rather than closing cleanly.
+      // Streams first, then the bus, then storage's temp dir, then the database: a stream
+      // severed after its driver is gone throws into the sink rather than closing cleanly.
       await hosts.realtime.events.stop();
+      hosts.storage.close();
       await pg.close();
     },
   };
