@@ -157,7 +157,7 @@ function buildRow(
   const impersonation = liveImpersonation(attribution);
   const actorUserId = resolveActorUserId(input.actorUserId, impersonation);
   // Who the actor was ACTING AS. Same explicit-beats-context precedence as
-  // `actorUserId` — and deliberately WITHOUT the `actorUserId !== null` gate that
+  // `actorUserId` — and deliberately OUTSIDE the `namesAnActor` gate that
   // suppresses `actorRole`/`scope` below. The asymmetry is the point:
   //
   // `actorRole`/`scope` describe the authorization the NAMED ACTOR used, so when

@@ -63,16 +63,16 @@ function resourceIdMatch(query: AuditLogQuery): Pick<AuditLogWhere, 'resourceId'
  * `AuditActor.tenantId: string` is a compile-time promise, and this package's
  * whole tenancy claim rests on it — so it is verified at the one seam where the
  * value crosses in from host code. `undefined` is the dangerous shape and the
- * plausible one: a `resolveActor` written the way this package's own README shows
- * (`const { tenantId, permissions } = await resolveTenant(slug, session)`) returns
- * it for a slug the caller is not a member of, and Prisma OMITS an `undefined`
- * clause — so `{ clientId: undefined }` would return every tenant's rows and
- * `count` would report the global total. `''` happens to fail closed, which only
+ * plausible one: a `resolveActor` written the obvious way —
+ * `const { tenantId, permissions } = await resolveTenant(slug, session)` — hands it
+ * over for a slug the caller is not a member of, and Prisma OMITS an `undefined`
+ * clause. `{ clientId: undefined }` would therefore return every tenant's rows,
+ * with `count` reporting the global total. `''` happens to fail closed, which only
  * makes the bug shape-dependent and harder to see in review.
  *
  * A plain `Error` on purpose: this is a host contract violation, not a caller's
  * bad request, so it must NOT be folded into a 4xx the host can shrug off. It
- * escapes {@link foldApiError} and surfaces as a 500. Same call, same reasoning,
+ * escapes `foldApiError` and surfaces as a 500. Same call, and the same reasoning,
  * as `purgeTenantWindow`'s empty-tenant refusal in `retention.ts`.
  */
 function requireTenantId(clientId: string): string {
