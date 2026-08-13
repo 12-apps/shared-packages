@@ -39,18 +39,66 @@ const StyledAlert = styled(MuiAlert, {
     animation: animate ? `${fadeInScale} 0.3s ease-out` : 'none',
     willChange: 'transform, opacity',
 
+    // ROOM TO READ.
+    //
+    // MUI's `6px 16px` is sized for one line of text and nothing else. This
+    // Alert routinely carries three things stacked — a sentence, a smaller
+    // explanation, then a control — and at 6px they touched top and bottom and
+    // ran together vertically, so the whole card read as one dense block
+    // instead of as a message with parts. The generosity is what makes the
+    // structure legible; it is not decoration.
+    //
+    // Padding stays overridable by an `sx` (a full-bleed strip legitimately
+    // wants it tight), because this is a default rather than a rule.
+    padding: theme.spacing(1.75, 2),
+
     // Enhanced base styles
     '.MuiAlert-message': {
       display: 'flex',
       flexDirection: 'column',
-      gap: theme.spacing(0.5),
+      // 0.5 put a title, its explanation and a button 4px apart, which reads as
+      // a spacing bug rather than as a group. 1 separates the lines; the extra
+      // margin below goes to whatever CONTROL sits at the end, because the gap
+      // between prose and a thing you press has to be bigger than the gap
+      // between two lines of prose or the button looks like part of the text.
+      gap: theme.spacing(1),
       fontSize: '0.95rem',
-      lineHeight: 1.5 },
+      lineHeight: 1.5,
+      // No padding of its own — the root's is now doing that job, and MUI's
+      // default `8px 0` on top of it would double the vertical space.
+      padding: 0,
+      // A CONTROL ON A TINTED PANEL NEEDS AN EDGE.
+      //
+      // `ghost` and `text` paint no background and no border — bare labels,
+      // which works on white where the surrounding page is obviously not
+      // clickable. Inside a coloured Alert it stops working: the label is one
+      // more coloured phrase among several, and a "Cancelar" beside two lines
+      // of prose reads as part of the prose.
+      //
+      // Only the BORDER is set, never the background or the colour, and that
+      // is what makes it safe to apply to every button rather than just the
+      // bare ones: a `solid` keeps its fill and its light label and gains a
+      // hairline in the same hue, while a `ghost` gains the whole affordance.
+      '.MuiButton-root': {
+        marginTop: theme.spacing(0.5),
+        border: `1px solid ${alpha(colorPalette.main, 0.45)}` },
+    },
 
     '.MuiAlert-icon': {
       transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       alignItems: 'center',
+      // Clear of the words rather than nearly touching them, and aligned to the
+      // FIRST line instead of centred on the whole block — an icon floating
+      // halfway down a three-line message points at nothing.
+      alignSelf: 'flex-start',
+      marginRight: theme.spacing(1.75),
+      paddingTop: theme.spacing(0.25),
       animation: animate ? `${iconRotate} 0.6s ease-out` : 'none' },
+
+    // The close button, kept off the text it sits beside.
+    '.MuiAlert-action': {
+      alignItems: 'flex-start',
+      paddingLeft: theme.spacing(2) },
 
     // Hover effects
     '&:hover': {

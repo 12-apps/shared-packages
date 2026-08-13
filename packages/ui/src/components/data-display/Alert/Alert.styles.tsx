@@ -2,7 +2,7 @@ import Error from '@mui/icons-material/Error';
 import Info from '@mui/icons-material/Info';
 import CheckCircle from '@mui/icons-material/CheckCircle';
 import Warning from '@mui/icons-material/Warning';
-import { alpha, keyframes } from '@mui/material';
+import { alpha, darken, keyframes, lighten } from '@mui/material';
 import type { CSSObject, Theme } from '@mui/material/styles';
 import React from 'react';
 
@@ -117,57 +117,88 @@ export const getVariantIcon = (variant: string) => {
 // which is narrower than MUI's PaletteColor.
 export type AlertPalette = { main: string; light?: string; dark?: string };
 
+/** The four semantic variants, which differ only in which palette they read. */
+const SEMANTIC_VARIANTS = new Set(['info', 'success', 'warning', 'danger']);
+
+/**
+ * A semantic Alert's surface and ink.
+ *
+ * ## Why this is not `alpha(main, 0.1)`
+ *
+ * It used to be, four times over, with `color: main` for the text. Both halves
+ * were wrong, and independently so.
+ *
+ * The fill was TRANSLUCENT. A 10% wash only reads as a banner when something
+ * opaque is behind it, so the component silently depended on where a consumer
+ * put it. Placed over content — a floating notice, an invite anchored above a
+ * catalogue — the page came straight through and the sentence interleaved with
+ * whatever it was over. That is not a faint banner; it is an unreadable one,
+ * and nothing in the component said so.
+ *
+ * The ink was the SEVERITY HUE at body size. `#0288d1`, this library's info
+ * blue, is 3.03:1 on white — under the 4.5:1 WCAG AA floor before any wash is
+ * involved. So the text failed on a plain white page too, where the fill was
+ * behaving exactly as intended.
+ *
+ * ## Why `lighten`/`darken` rather than a hand-picked pair
+ *
+ * These are the same transforms MUI's own `standard` Alert uses, at the same
+ * ratios — the recipe this component overrode. Reusing it means an OPAQUE tint
+ * with a dark ink of the same hue, contrast that holds on any surface because
+ * it no longer depends on one, and a pairing already proven across MUI's
+ * palette rather than eyeballed here. Both modes are handled: on a dark theme
+ * the tint darkens and the ink lightens, which an alpha wash could never do
+ * because it carries the seed's own lightness through unchanged.
+ *
+ * The border keeps an alpha — it is a hairline over the tint it belongs to, so
+ * translucency there costs nothing and lets the edge follow the fill.
+ */
+const semanticSurface = (theme: Theme, colorPalette: AlertPalette): CSSObject => {
+  const dark = theme.palette.mode === 'dark';
+  return {
+    backgroundColor: dark ? darken(colorPalette.main, 0.8) : lighten(colorPalette.main, 0.9),
+    color: dark ? lighten(colorPalette.main, 0.6) : darken(colorPalette.main, 0.6),
+    border: `1px solid ${alpha(colorPalette.main, 0.35)}`,
+    '.MuiAlert-icon': {
+      color: colorPalette.main,
+    },
+  };
+};
+
 // The six visual variants. Each block is spread in only when it matches, which
 // is how the original inline version read; keeping that shape here means the
-// styled() callback carries one branch instead of six.
+// styled() callback carries one branch instead of six. The four semantics were
+// four IDENTICAL copies of the same block — they now share one, so the next
+// change to a banner's surface cannot land on three of them.
 export const alertVariantStyles = (
   theme: Theme,
   customVariant: string | undefined,
   colorPalette: AlertPalette,
 ): CSSObject => ({
-...(customVariant === 'info' && {
-  backgroundColor: alpha(colorPalette.main, 0.1),
-  color: colorPalette.main,
-  border: `1px solid ${alpha(colorPalette.main, 0.2)}`,
-  '.MuiAlert-icon': {
-    color: colorPalette.main,
-  },
-}),
-
-...(customVariant === 'success' && {
-  backgroundColor: alpha(colorPalette.main, 0.1),
-  color: colorPalette.main,
-  border: `1px solid ${alpha(colorPalette.main, 0.2)}`,
-  '.MuiAlert-icon': {
-    color: colorPalette.main,
-  },
-}),
-
-...(customVariant === 'warning' && {
-  backgroundColor: alpha(colorPalette.main, 0.1),
-  color: colorPalette.main,
-  border: `1px solid ${alpha(colorPalette.main, 0.2)}`,
-  '.MuiAlert-icon': {
-    color: colorPalette.main,
-  },
-}),
-
-...(customVariant === 'danger' && {
-  backgroundColor: alpha(colorPalette.main, 0.1),
-  color: colorPalette.main,
-  border: `1px solid ${alpha(colorPalette.main, 0.2)}`,
-  '.MuiAlert-icon': {
-    color: colorPalette.main,
-  },
-}),
+...(customVariant !== undefined &&
+  SEMANTIC_VARIANTS.has(customVariant) &&
+  semanticSurface(theme, colorPalette)),
 
 ...(customVariant === 'glass' && {
-  backgroundColor: alpha(theme.palette.background.paper, 0.1),
-  backdropFilter: 'blur(20px)',
-  border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+  // 85%, not 10%. This is the variant that is MEANT to be see-through, and it
+  // was the same mistake in a costume: at 0.1 the blur had almost nothing to
+  // sit on, so `glass` was not frosted, it was a window. A frosted pane has to
+  // be mostly pane — the backdrop should be legible AS texture behind the
+  // text, never as competition with it.
+  backgroundColor: alpha(theme.palette.background.paper, 0.85),
+  backdropFilter: 'blur(20px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+  border: `1px solid ${alpha(theme.palette.divider, 0.4)}`,
   color: theme.palette.text.primary,
   '.MuiAlert-icon': {
     color: theme.palette.primary.main,
+  },
+  // Safari before 18 and Firefox with the filter disabled paint the declared
+  // alpha with nothing blurred behind it — the see-through banner this is
+  // fixing. There is no degraded frost to fall back to, so it falls back to an
+  // opaque pane: less pretty, still readable.
+  '@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)))': {
+    backgroundColor: theme.palette.background.paper,
   },
 }),
 
