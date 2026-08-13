@@ -207,6 +207,83 @@ describe("trusted origins", () => {
     ).toBe("http://127.0.0.1:3000");
   });
 
+  it("normalizes an allowlist entry EXACTLY as the regex it replaced did", () => {
+    // `normalizeOrigins` stopped using `replace(/\/+$/, "")` — quadratic on a run
+    // of slashes (CodeQL js/polynomial-redos) — in favour of a character walk.
+    //
+    // What that normalization decides is a SECURITY BOUNDARY: the canonical origin
+    // is the `iss`/`aud` a token is minted with and the `aud` bearer verification
+    // then expects, and it is the value a forwarded host must equal to be honored.
+    // A one-character drift there either mints tokens for the wrong origin or
+    // rejects valid ones. (It is NOT the redirect-URI comparison — a registered
+    // `redirect_uri` is matched exactly, upstream of this, and never normalized;
+    // see the authorize suite.) So "equivalent" has to mean byte-identical rather
+    // than close enough: hence a table of the values a real deployment carries,
+    // asserted against the old expression itself.
+    const fixtures = [
+      "https://app.example.com",
+      "https://app.example.com/",
+      "https://app.example.com//",
+      "https://app.example.com///",
+      "  https://app.example.com/  ",
+      "https://app.example.com:3000/",
+      "https://claude.ai/api/mcp/auth_callback",
+      "https://claude.ai/api/mcp/auth_callback/",
+      "http://localhost:4319",
+      "http://127.0.0.1:4320/",
+      // Embedded (not trailing) runs must survive untouched, doubled ones included.
+      "https://loja.exemplo.com.br/pedidos//",
+      "https://loja.exemplo.com.br//pedidos//itens",
+      "https://loja.exemplo.com.br//pedidos//itens//",
+      // Newlines, the one place `$` semantics could have diverged. They cannot,
+      // and for a reason worth pinning: `.trim()` runs FIRST, so a trailing
+      // newline never reaches either implementation, and an interior one leaves a
+      // non-slash last character that both leave untouched. (`$` in a non-`m`
+      // pattern anchors at end-of-input only anyway — there is no Perl-style
+      // final-newline exception in JS.)
+      "https://app.example.com//\n",
+      "https://app.example.com/\na",
+      "/",
+      "//",
+      "",
+      "   ",
+    ];
+    for (const raw of fixtures) {
+      const legacy = raw.trim().replace(/\/+$/, "");
+      // Reached through the public resolver: with a single entry, the canonical
+      // origin IS that entry, normalized. A blank one is dropped by the filter,
+      // leaving no allowlist at all — so the fallback answers, exactly as before.
+      expect(
+        resolveTrustedOrigin(() => null, "http://fallback.invalid", [raw]),
+        `entry ${JSON.stringify(raw)}`,
+      ).toBe(legacy === "" ? "http://fallback.invalid" : legacy);
+    }
+  });
+
+  it(
+    "normalizes a slash storm linearly (CodeQL js/polynomial-redos)",
+    { timeout: 5_000 },
+    () => {
+      // Here the pathological family IS one long run, because the pattern was
+      // ANCHORED (`/\/+$/`): a non-slash tail makes the anchor fail, and the engine
+      // retries from every position in the run. Measured: the old expression takes
+      // ~13.6s on this input, and ~1.4s at a third of it — the 9x-per-3x signature
+      // of a quadratic — well past the timeout declared above, which is pinned here
+      // rather than inherited so that raising the suite default cannot quietly turn
+      // this case into one that passes on the old code.
+      const stormy = `https://loja.exemplo.com.br${"/".repeat(180_000)}a`;
+      // Nothing to strip (the tail is not a slash), so the value passes through as
+      // the canonical entry.
+      expect(resolveTrustedOrigin(() => null, undefined, [stormy])).toBe(stormy);
+      // With the slashes AT the end, all of them go — in one pass.
+      expect(
+        resolveTrustedOrigin(() => null, undefined, [
+          `https://loja.exemplo.com.br${"/".repeat(180_000)}`,
+        ]),
+      ).toBe("https://loja.exemplo.com.br");
+    },
+  );
+
   it("reads an allowlist out of an env var without the package naming it", () => {
     // The variable name is the HOST's vocabulary — passed in, never hardcoded here
     // — which is the whole reason this helper takes an argument. Read/written

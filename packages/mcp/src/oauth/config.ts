@@ -43,9 +43,26 @@ export function resourceAudience(
 const HOST_ONLY =
   /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::\d{1,5})?$/i;
 
+/** ASCII `/`. */
+const SLASH = 0x2f;
+
+/**
+ * Strip trailing slashes by index, not by regex.
+ *
+ * `replace(/\/+$/, "")` is quadratic on a string of many slashes — the classic
+ * anchored-quantifier backtrack — and this function is reached from an operator's
+ * env var AND (through `resolveTrustedOrigin`) from values that arrive with a
+ * request. A backwards walk is linear and needs no reasoning about the engine.
+ */
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === SLASH) end -= 1;
+  return value.slice(0, end);
+}
+
 /** Normalize an allowlist entry (trailing `/` stripped, blanks dropped). */
 function normalizeOrigins(origins: readonly string[]): string[] {
-  return origins.map((origin) => origin.trim().replace(/\/+$/, "")).filter(Boolean);
+  return origins.map((origin) => stripTrailingSlashes(origin.trim())).filter(Boolean);
 }
 
 /**

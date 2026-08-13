@@ -76,6 +76,19 @@ export interface RefreshTokenStore {
    * Store the successor AND revoke its parent ATOMICALLY. A crash between the
    * two would leave a live parent and a live child — two usable tokens where the
    * rotation contract promises one.
+   *
+   * ⚠️ That atomicity covers the CRASH, not a RACE. `rotateRefreshToken` reads and
+   * validates the parent before calling this, so two rotations of the SAME parent
+   * arriving concurrently both pass their checks and both commit: one parent, two
+   * live successors, and no replay detected (the replay rule fires on a THIRD use
+   * of the parent, which never comes). The window is a request round trip, and the
+   * attacker who wins it is one already holding a stolen refresh token. Closing it
+   * needs a claim-once write here — revoke the parent CONDITIONALLY on it still
+   * being unrevoked and unrotated (`updateMany` where `revokedAt: null`, then
+   * require a count of 1) and fail the rotation otherwise — which is a change to
+   * what every host's implementation must guarantee, so it is called out rather
+   * than silently assumed. Documented here, at the contract, for the same reason
+   * `codeReplay` documents its multi-instance caveat where the swap happens.
    */
   rotate(successor: NewRefreshToken, parentHash: string, at: Date): Promise<void>;
   /**

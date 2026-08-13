@@ -39,8 +39,10 @@ export {
   isRbacProtected,
   stripCommentsAndStrings,
 } from './detect';
+export type { ExportHeadGrammar } from './surface-scan';
 export {
   exportedActionsOf,
+  exportedNamesOf,
   segmentPrefixMatch,
   urlPathOf,
   walkActionFiles,

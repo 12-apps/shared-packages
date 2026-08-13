@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   exportedActionsOf,
+  exportedNamesOf,
   guardedSymbols,
   isRbacProtected,
   runRbacCoverage,
@@ -80,6 +81,50 @@ describe('adversarial input stays linear (CodeQL js/polynomial-redos)', () => {
       'export async function realAction() {}',
     ].join('\n');
     expect(exportedActionsOf(source)).toEqual(['realAction']);
+  });
+});
+
+describe('exportedNamesOf grammar', () => {
+  // The walk is SHARED with `@12-apps/mcp`'s route-method gate (12-23), which was
+  // a copy of it until the copy drifted into a second ReDoS fix. Only the grammar
+  // differs, so only the grammar is a parameter — and these are the two knobs.
+  it('takes a sync `export function` only when the grammar allows it', () => {
+    const source = 'export function GET() {}';
+    // A server action must be async, so the default grammar sees nothing here…
+    expect(exportedNamesOf(source)).toEqual([]);
+    // …while a route handler may be sync.
+    expect(exportedNamesOf(source, { syncFunctions: true })).toEqual(['GET']);
+    // `async function` is taken either way, and still requires the keyword.
+    expect(exportedNamesOf('export async function POST() {}')).toEqual(['POST']);
+    expect(exportedNamesOf('export async notFunction() {}')).toEqual([]);
+  });
+
+  it('filters every discovered name through `accept`, whichever form found it', () => {
+    const onlyUpper = { accept: (name: string) => /^[A-Z]+$/.test(name) };
+    const source = [
+      'export const GET = h;',
+      'export const lower = h;',
+      'export const { POST, alsoLower } = h;',
+      'export { h as DELETE, h as nope };',
+      'export async function PUT() {}',
+    ].join('\n');
+    expect(exportedNamesOf(source, { ...onlyUpper, syncFunctions: true }).sort()).toEqual([
+      'DELETE',
+      'GET',
+      'POST',
+      'PUT',
+    ]);
+    // Default `accept` is any `\w+`, so the same source yields the lot — every
+    // form the walk understands, sync `export function` excepted.
+    expect(exportedNamesOf(source).sort()).toEqual([
+      'DELETE',
+      'GET',
+      'POST',
+      'PUT',
+      'alsoLower',
+      'lower',
+      'nope',
+    ]);
   });
 });
 

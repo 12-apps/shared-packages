@@ -58,6 +58,10 @@ describe("exportedMethodsOf", () => {
   it("sees every form a route file exports a handler in", () => {
     expect(exportedMethodsOf("export const GET = handler;")).toEqual(["GET"]);
     expect(exportedMethodsOf("export async function POST(req) {}")).toEqual(["POST"]);
+    // A SYNC `export function` — the `syncFunctions` grammar knob. A server action
+    // cannot take this form (it must be async), which is the whole reason the
+    // shared walk is parameterized rather than forked.
+    expect(exportedMethodsOf("export function PUT(req) {}")).toEqual(["PUT"]);
     expect(exportedMethodsOf("export const { GET, POST } = handlers;").sort()).toEqual([
       "GET",
       "POST",
@@ -65,6 +69,61 @@ describe("exportedMethodsOf", () => {
     expect(exportedMethodsOf("export { handler as DELETE };")).toEqual(["DELETE"]);
     // A type is never a handler.
     expect(exportedMethodsOf("export type { GET } from './x';")).toEqual([]);
+  });
+
+  it(
+    "stays linear on adversarial input (CodeQL js/polynomial-redos)",
+    { timeout: 5_000 },
+    () => {
+      // The pathological family for the replaced regexes is MANY UNCLOSED OPENERS,
+      // not one long run: every `export {` restarted a match attempt whose `[^}]+`
+      // scanned to end-of-file, so the old code was quadratic in the OPENER COUNT.
+      //
+      // The sizes are MEASURED, not guessed: on the pre-fix implementation this
+      // fixture takes ~19s, and ~2.1s at a third of it — the 9x-per-3x signature of
+      // a quadratic — so it blows well past the timeout declared above, while the
+      // linear walker finishes in milliseconds. A smaller fixture would pass on the
+      // old code and prove nothing, and the timeout is pinned HERE rather than
+      // inherited from the suite default so that raising the default can never
+      // quietly turn this case into one.
+      const braceNoise = `export {{${"export {{|".repeat(60_000)}`;
+      const spacedNoise = `export${" ".repeat(150_000)}notAMethodKeyword`;
+      // A close brace far past tens of thousands of heads: the memoized `}` search
+      // is what stops each head from re-walking the same tail.
+      const farClose = `${"export {".repeat(60_000)}GET}`;
+      const source = [braceNoise, spacedNoise, farClose, "export const DELETE = h;"].join("\n");
+
+      // And the answer is still right. `DELETE` is the ordinary export; `GET` comes
+      // from the LAST head of `farClose`, which is a legal `export {GET}` — the
+      // 59,999 heads before it each swallow a later head and contribute nothing,
+      // which is exactly the skip that keeps the walk linear.
+      expect(exportedMethodsOf(source).sort()).toEqual(["DELETE", "GET"]);
+    },
+  );
+
+  it("survives the shapes a scanner gets wrong where a regex did not", () => {
+    // The brace list is found by scanning rather than by an unbounded `[^}]+`
+    // regex (which was quadratic on adversarial input); these are the cases that
+    // distinguish the two.
+    expect(exportedMethodsOf("export   const   {\n  GET,\n  POST,\n} = handlers;").sort()).toEqual([
+      "GET",
+      "POST",
+    ]);
+    // A destructuring RENAME binds the local name, so nothing named GET is
+    // exported — "the last identifier" is right in both directions.
+    expect(exportedMethodsOf("export const { GET: handler } = handlers;")).toEqual([]);
+    // Neither a lowercase near-miss nor a word that merely contains a method name.
+    expect(exportedMethodsOf("export { get, POSTAL };")).toEqual([]);
+    // An unterminated list is not a handler list — and must not throw.
+    expect(exportedMethodsOf("export { GET")).toEqual([]);
+    // The word `export` elsewhere must not swallow the real one after it.
+    expect(
+      exportedMethodsOf("// exported earlier\nexport default h;\nexport { handler as PUT };"),
+    ).toEqual(["PUT"]);
+    // Several lists in one file, each read on its own.
+    expect(
+      exportedMethodsOf("export { handler as GET };\nexport { other as DELETE };").sort(),
+    ).toEqual(["DELETE", "GET"]);
   });
 });
 
