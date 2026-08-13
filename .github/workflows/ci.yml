@@ -45,6 +45,7 @@ env:
     packages/payments/frontend
     packages/payments/e2e
     packages/ui
+    packages/audit
     packages/entitlements
     packages/pwa
     packages/observability-frontend
