@@ -31,8 +31,8 @@ interface TenantRoleSeedInput {
   readonly roles: readonly RoleDef[];
   /** Owner roles — seeded, but `locked`. */
   readonly ownerRoles: readonly string[];
-  /** Platform-only roles — never seeded per tenant. */
-  readonly platformOnlyRoles?: readonly string[];
+  /** Platform-only roles — never seeded per tenant. Required, `[]` included. */
+  readonly platformOnlyRoles: readonly string[];
 }
 
 /** Serialize a template's permissions to the DB string ('*' or a JSON array). */
@@ -61,7 +61,7 @@ function serializeSeedPermissions(permissions: RoleDef['permissions']): string {
 export function tenantRoleSeeds(
   input: TenantRoleSeedInput,
 ): readonly TenantRoleSeed[] {
-  const platformOnly = new Set(input.platformOnlyRoles ?? []);
+  const platformOnly = new Set(input.platformOnlyRoles);
   return input.roles
     .filter((role) => !platformOnly.has(role.name))
     .map((role) => ({

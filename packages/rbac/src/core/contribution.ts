@@ -87,8 +87,20 @@ export interface RbacLabelVocabulary extends PermissionLabelVocabulary {
 /**
  * One source's contribution: who it is, what it declares, and the words its
  * ids read in. Build it with {@link definePermissionContribution}.
+ *
+ * `P` has NO default, and that is load-bearing. With `P extends string =
+ * string`, the natural-looking annotation `const X: PermissionContribution =
+ * definePermissionContribution({…})` erases the literal ids to `string` — and
+ * because {@link PermissionOf} distributes over the composed sources, ONE such
+ * branch absorbs every other (`'a' | 'b' | string` IS `string`). The whole
+ * catalog's union collapses, and `rbac.can(actor, 'totally:made:up')`
+ * type-checks again, which is the property composition exists to preserve.
+ *
+ * So annotate with `satisfies PermissionContribution<string>` (a check that
+ * leaves the inferred literals in place) or, better, do not annotate at all:
+ * the factory's return type is already exactly this interface.
  */
-export interface PermissionContribution<P extends string = string> {
+export interface PermissionContribution<P extends string> {
   /**
    * The owner, named in every composition error — a package name
    * (`@12-apps/rbac`) or a host domain (`future-pay`). It is diagnostics, not

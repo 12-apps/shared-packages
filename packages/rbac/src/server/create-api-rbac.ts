@@ -67,7 +67,9 @@ export function createApiRbac<P extends string>(config: RbacServerConfig<P>): Ap
   const team = createTeamStore(config);
   const wire = buildWireSchemas(config.catalog.permissions);
   const messages = messagesOf(config);
-  const customerRole = config.customerRole ?? 'CUSTOMER';
+  // Stated by the host, `null` included — never defaulted. A wrong answer here
+  // admits every shopper to the staff tier, which is why it is not guessable.
+  const { customerRole } = config;
 
   /** Any non-customer membership, or a platform admin — the shell's tier. */
   const requireStaffTier = async (actor: RbacActor): Promise<void> => {

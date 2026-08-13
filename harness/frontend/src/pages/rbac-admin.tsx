@@ -26,7 +26,7 @@ import { HARNESS_CATALOG } from '../../../backend/src/rbac-catalog';
  * `fetch`, Vite proxies `/api` to `harness/backend`, and so every click below
  * crosses a real socket into the package's own Hono router over a real
  * Postgres — the arrangement a real consumer has. The backend's actor seam
- * answers headerless requests as the seeded OWNER, which is who an admin
+ * answers headerless requests as the seeded DIRECTOR, which is who an admin
  * screen assumes is driving it.
  */
 const { page: RbacAdminSurface } = createWebRbac({

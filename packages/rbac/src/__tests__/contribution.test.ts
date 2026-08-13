@@ -104,6 +104,57 @@ describe('composePermissions — collisions fail loudly', () => {
   });
 });
 
+describe('composePermissions — ids and specs must name the same set', () => {
+  /**
+   * `PermissionContribution` is a PUBLIC interface, so a source may hand over
+   * an `ids` array it built itself rather than one derived from the map — the
+   * shape the next planned consumer (a `lifecycleApprovalPermissions([...])`
+   * factory) has. Both directions of the mismatch are refused, because both
+   * fail OPEN if they are not.
+   */
+  it('refuses an id with no spec', () => {
+    const missingSpec = {
+      source: 'drifted',
+      ids: ['a:read', 'a:write'] as const,
+      permissions: { 'a:read': { kind: 'class' } } as const,
+      labels: {},
+    };
+    try {
+      composePermissions(missingSpec);
+      expect.unreachable('an id with no spec must not compose');
+    } catch (error) {
+      const failure = error as RbacCatalogError;
+      expect(failure.code).toBe('UNKNOWN_PERMISSION');
+      expect(failure.message).toContain('a:write');
+    }
+  });
+
+  it('refuses a spec left out of the ids — the direction that used to pass', () => {
+    // Silently dropped, this loses the spec's `ownerMarker` (so an inline
+    // custom role may bundle it) and its `separateFrom` (so the duty pair is
+    // never derived). Both guards only ever REMOVE power, so their loss is
+    // invisible at every later layer.
+    const orphanSpec = {
+      source: 'drifted',
+      ids: ['a:read'] as const,
+      permissions: {
+        'a:read': { kind: 'class' },
+        'a:pay': { kind: 'class', ownerMarker: true, separateFrom: ['a:read'] },
+      } as const,
+      labels: {},
+    };
+    try {
+      composePermissions(orphanSpec);
+      expect.unreachable('a spec missing from ids must not compose');
+    } catch (error) {
+      const failure = error as RbacCatalogError;
+      expect(failure.code).toBe('UNKNOWN_PERMISSION');
+      expect(failure.message).toContain('a:pay');
+      expect(failure.message).toContain('drifted');
+    }
+  });
+});
+
 describe('composePermissions — separation of duties spans sources', () => {
   it('pairs a counterpart declared by another owner', () => {
     // `@demo/lifecycle` owns the approval surface and knows the pair; the
@@ -184,6 +235,7 @@ describe('withRoles — binding the host\'s role policy', () => {
     const catalog = composeAll().withRoles({
       roles: ROLES,
       ownerRoles: ['OWNER', 'PLATFORM'],
+      leafOnlyRoles: [],
       platformOnlyRoles: ['PLATFORM'],
     });
     expect(catalog.tenantRoleSeeds).toEqual([
@@ -200,7 +252,12 @@ describe('withRoles — binding the host\'s role policy', () => {
 
   it('refuses a policy naming a role that is not a template', () => {
     try {
-      composeAll().withRoles({ roles: ROLES, ownerRoles: ['OWNR'] });
+      composeAll().withRoles({
+        roles: ROLES,
+        ownerRoles: ['OWNR'],
+        leafOnlyRoles: [],
+        platformOnlyRoles: [],
+      });
       expect.unreachable('a typo\'d owner role must not compose');
     } catch (error) {
       const failure = error as RbacCatalogError;
@@ -220,6 +277,8 @@ describe('withRoles — binding the host\'s role policy', () => {
       untyped.withRoles({
         roles: [{ name: 'GHOST', permissions: ['posts:publish'] }],
         ownerRoles: [],
+        leafOnlyRoles: [],
+        platformOnlyRoles: [],
       });
       expect.unreachable('an off-catalog role permission must not compose');
     } catch (error) {

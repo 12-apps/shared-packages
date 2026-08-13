@@ -113,6 +113,8 @@ const badComposedRole: RoleDef<ComposedPerm> = { name: 'ghost', permissions: ['d
 const composedCatalog = COMPOSED.withRoles({
   roles: [okComposedRole],
   ownerRoles: [],
+  leafOnlyRoles: [],
+  platformOnlyRoles: [],
 });
 
 // @ts-expect-error the catalog's own registry still narrows to the union
@@ -122,6 +124,41 @@ const notAPermission: ComposedPerm = composedCatalog.permissions.list.includes(
   ? 'docs:publish'
   : 'docs:read';
 
+/**
+ * THE UNION IS NOT `string` — the assertion every `@ts-expect-error` above
+ * silently depends on.
+ *
+ * `PermissionOf` distributes over the contributed sources, and `string`
+ * ABSORBS every literal beside it (`'a' | 'b' | string` IS `string`). So one
+ * source typed `PermissionContribution<string>` collapses the WHOLE catalog's
+ * union — and the collapse is invisible in the failure direction: every
+ * `@ts-expect-error` above turns into an unused directive, which reports as
+ * "this line no longer errors", never as "the type is now string".
+ *
+ * That is exactly what `PermissionContribution<P extends string = string>`
+ * used to invite: `const X: PermissionContribution = definePermissionContribution({…})`
+ * is the annotation ADOPTING.md asked for, and it erased the ids. The default
+ * is gone; this pair of aliases is the tripwire that keeps it gone.
+ */
+type Eq<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+  ? true
+  : false;
+
+/** `never` if the union ever collapses to `string`; `true` while it holds. */
+type UnionSurvives = Eq<ComposedPerm, string> extends true ? never : true;
+const unionSurvives: UnionSurvives = true;
+
+/** …and it survives `withRoles` too, which is what the factories receive. */
+type CatalogUnionSurvives = Eq<
+  PermissionOf<typeof composedCatalog>,
+  string
+> extends true
+  ? never
+  : true;
+const catalogUnionSurvives: CatalogUnionSurvives = true;
+
+void unionSurvives;
+void catalogUnionSurvives;
 void okComposedRole;
 void badComposedRole;
 void notAPermission;

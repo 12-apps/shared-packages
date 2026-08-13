@@ -159,7 +159,7 @@ export interface RbacConfig<P extends string> {
    */
   adapter?: AuthzAdapter;
   /**
-   * Walk from a scope to its parent (org -> restaurant chains). A grant at a
+   * Walk from a scope to its parent (org -> site chains). A grant at a
    * parent scope satisfies checks at any descendant. Return `null` at the root.
    * The walk is cycle-guarded by the engine.
    */

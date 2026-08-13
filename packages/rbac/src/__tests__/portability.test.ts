@@ -28,6 +28,8 @@ import { definePermissions } from '../core/registry';
 import type { RoleAssignment, RoleDef } from '../core/types';
 import { validateGrant, type GovernanceCatalog } from '../governance';
 import { RBAC_PERMISSIONS } from '../permissions';
+import { createApiRbac } from '../server/create-api-rbac';
+import { createFakeRbacDb, enrolMember } from '../server/__tests__/fake-db';
 
 // ── The blog's own catalog (nothing shared with any other host) ─────────────
 const BLOG_PERMISSIONS = definePermissions({
@@ -229,10 +231,17 @@ const blogCatalog = () =>
     roles: [
       { name: 'AUTHOR', permissions: ['posts:read', 'posts:write:own'] },
       { name: 'STAFF_ADMIN', permissions: ['team:read', 'team:manage'] },
+      // A role the blog happens to spell `SUPERADMIN`, meaning nothing more
+      // than "senior moderator": an ordinary admin, deliberately NOT an owner.
+      // The package used to compare an actor's role against that exact string
+      // to recognise a PLATFORM operator, so this name — a host's own word —
+      // bought an owner-removal bypass. It is here to make that a red test.
+      { name: 'SUPERADMIN', permissions: ['team:read', 'team:manage'] },
       { name: 'SITE_OWNER', permissions: '*' },
     ],
     ownerRoles: ['SITE_OWNER'],
     leafOnlyRoles: ['AUTHOR'],
+    platformOnlyRoles: [],
   });
 
 describe('toy second host — composing this package beside its own domain', () => {
@@ -279,12 +288,178 @@ describe('toy second host — composing this package beside its own domain', () 
     expect(catalog.tenantRoleSeeds.map((seed) => seed.name)).toEqual([
       'AUTHOR',
       'STAFF_ADMIN',
+      'SUPERADMIN',
       'SITE_OWNER',
     ]);
     expect(catalog.tenantRoleSeeds.find((seed) => seed.name === 'SITE_OWNER')).toMatchObject({
       permissions: '*',
       locked: true,
     });
+  });
+});
+
+// ── The blog MOUNTS the server half, in its own words ──────────────────────
+//
+// Everything above this line is the engine, the governance validator and the
+// composition — halves a suite can exercise without ever constructing a
+// server config. That is why this file used to prove less about PORTABILITY
+// than its name claims: `ownerRoles`, `customerRole` and `adminRoles` live
+// only on the server config, so a suite that never calls `createApiRbac`
+// cannot reach them, and every one of them shipped a default in the extracted
+// application's vocabulary. A blog whose owner is `SITE_OWNER` is precisely
+// the host `['OWNER']` breaks; the suite said "portable" because it never
+// mounted the thing that breaks.
+
+/** The blog's server mount, over the in-memory seam. Its words, throughout. */
+function mountBlog() {
+  const { db, state } = createFakeRbacDb();
+  const identities = new Map(
+    [
+      { id: 'ada', email: 'ada@blog.test', name: 'Ada', image: null },
+      { id: 'bo', email: 'bo@blog.test', name: 'Bo', image: null },
+      { id: 'cy', email: 'cy@blog.test', name: 'Cy', image: null },
+      { id: 'dee', email: 'dee@blog.test', name: 'Dee', image: null },
+      { id: 'reader', email: 'reader@blog.test', name: 'Reader', image: null },
+    ].map((identity) => [identity.id, identity]),
+  );
+  const api = createApiRbac({
+    db: async () => db,
+    catalog: blogCatalog(),
+    // `ownerRoles` is deliberately ABSENT: it derives from the catalog's own
+    // `['SITE_OWNER']`. The other two have no catalog answer, so the blog
+    // states them — in words the package has never heard of.
+    adminRoles: ['SITE_OWNER', 'STAFF_ADMIN', 'SUPERADMIN'],
+    customerRole: 'SUBSCRIBER',
+    directory: {
+      getUsers: async (ids) =>
+        ids.flatMap((id) => {
+          const identity = identities.get(id);
+          return identity ? [identity] : [];
+        }),
+    },
+  });
+  return { api, state };
+}
+
+const blogSite = 'blog-1';
+
+/** Drive one route descriptor as a given member. */
+function asMember(
+  api: ReturnType<typeof mountBlog>['api'],
+  method: string,
+  path: string,
+  userId: string | null,
+  extra: { params?: Record<string, string>; body?: unknown; isSuper?: boolean } = {},
+) {
+  const route = api.routes.find((r) => r.method === method && r.path === path);
+  if (!route) throw new Error(`No route ${method} ${path}`);
+  return route.handle({
+    actor: { tenantId: blogSite, userId, isSuper: extra.isSuper ?? false },
+    params: extra.params ?? {},
+    query: {},
+    body: extra.body,
+  });
+}
+
+describe('toy second host — the SERVER half, in the blog\'s vocabulary', () => {
+  it('protects SITE_OWNER by the catalog, with no ownerRoles config at all', async () => {
+    const blog = mountBlog();
+    await blog.api.seedTenantRoles(blogSite);
+    enrolMember(blog.state, blogSite, 'ada', 'SITE_OWNER');
+    enrolMember(blog.state, blogSite, 'bo', 'STAFF_ADMIN');
+
+    // Last owner: neither demotable nor disableable nor removable. Under the
+    // old `ownerRoles ?? ['OWNER']` every one of these succeeded, because no
+    // membership in this host is ever spelled `OWNER`.
+    await expect(
+      blog.api.team.setMemberRole(blogSite, 'ada', 'STAFF_ADMIN'),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      blog.api.team.setMembershipActive(blogSite, 'ada', false),
+    ).rejects.toMatchObject({ status: 403 });
+    // Removal is refused twice over: a non-owner may not remove an owner…
+    await expect(
+      blog.api.team.removeTenantMemberGuarded(blogSite, 'ada', {
+        role: 'STAFF_ADMIN',
+        isPlatformActor: false,
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+    // …and the owner themself is still the LAST one.
+    await expect(
+      blog.api.team.removeTenantMemberGuarded(blogSite, 'ada', {
+        role: 'SITE_OWNER',
+        isPlatformActor: false,
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(blog.state.memberships.find((row) => row.userId === 'ada')?.role).toBe('SITE_OWNER');
+
+    // A SECOND owner lifts the last-owner rule, and only then does the removal
+    // land — for an owner, and still not for the admin.
+    enrolMember(blog.state, blogSite, 'cy', 'SITE_OWNER');
+    await expect(
+      blog.api.team.removeTenantMemberGuarded(blogSite, 'ada', {
+        role: 'STAFF_ADMIN',
+        isPlatformActor: false,
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+    await blog.api.team.removeTenantMemberGuarded(blogSite, 'ada', {
+      role: 'SITE_OWNER',
+      isPlatformActor: false,
+    });
+    expect(blog.state.memberships.some((row) => row.userId === 'ada')).toBe(false);
+  });
+
+  it('never reads a host role NAMED SUPERADMIN as a platform grant', async () => {
+    const blog = mountBlog();
+    await blog.api.seedTenantRoles(blogSite);
+    enrolMember(blog.state, blogSite, 'ada', 'SITE_OWNER');
+    enrolMember(blog.state, blogSite, 'cy', 'SITE_OWNER');
+    enrolMember(blog.state, blogSite, 'dee', 'SUPERADMIN');
+
+    // The blog's senior moderator is an admin, not an owner — and the string
+    // `'SUPERADMIN'` used to be the package's own sentinel for a platform
+    // operator, so this removal went through.
+    await expect(
+      blog.api.team.removeTenantMemberGuarded(blogSite, 'ada', {
+        role: 'SUPERADMIN',
+        isPlatformActor: false,
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+
+    // The genuine platform operator — recognised by the DISCRIMINATOR, and
+    // holding no membership row at all — still may.
+    await blog.api.team.removeTenantMemberGuarded(blogSite, 'ada', {
+      role: null,
+      isPlatformActor: true,
+    });
+    expect(blog.state.memberships.some((row) => row.userId === 'ada')).toBe(false);
+  });
+
+  it('keeps SUBSCRIBERs out of the roster and out of the staff tier', async () => {
+    const blog = mountBlog();
+    await blog.api.seedTenantRoles(blogSite);
+    enrolMember(blog.state, blogSite, 'ada', 'SITE_OWNER');
+    enrolMember(blog.state, blogSite, 'reader', 'SUBSCRIBER');
+
+    const roster = await blog.api.team.listTeamPage(blogSite, { page: 1, pageSize: 50 });
+    expect(roster.data.map((row) => row.userId)).toEqual(['ada']);
+
+    // …and the staff-tier read (`GET /permissions`) refuses them, which is the
+    // half that used to admit every shopper when the default said 'CUSTOMER'.
+    const denied = await asMember(blog.api, 'GET', '/permissions', 'reader');
+    expect(denied.status).toBe(403);
+    const allowed = await asMember(blog.api, 'GET', '/permissions', 'ada');
+    expect(allowed.status).toBe(200);
+  });
+
+  it('gates the roster on the blog\'s OWN admin tier', async () => {
+    const blog = mountBlog();
+    await blog.api.seedTenantRoles(blogSite);
+    enrolMember(blog.state, blogSite, 'ada', 'SITE_OWNER');
+    enrolMember(blog.state, blogSite, 'bo', 'AUTHOR');
+
+    expect((await asMember(blog.api, 'GET', '/team', 'bo')).status).toBe(403);
+    expect((await asMember(blog.api, 'GET', '/team', 'ada')).status).toBe(200);
   });
 });
 

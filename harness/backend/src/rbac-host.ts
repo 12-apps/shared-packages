@@ -36,14 +36,18 @@ export const RBAC_TENANT_B_ID = 'harness-b';
  * code, which is exactly what the directory port exists to allow.
  */
 export const RBAC_USERS: readonly (RbacUserIdentity & { baseRole: string; tenantId: string })[] = [
-  { id: 'owner-1', email: 'ana@harness.dev', name: 'Ana Proprietária', image: null, baseRole: 'OWNER', tenantId: RBAC_TENANT_ID },
-  { id: 'admin-1', email: 'otavio@harness.dev', name: 'Otávio Administrador', image: null, baseRole: 'ADMIN', tenantId: RBAC_TENANT_ID },
-  { id: 'chef-1', email: 'camila@harness.dev', name: 'Camila Barbosa', image: null, baseRole: 'CHEF', tenantId: RBAC_TENANT_ID },
-  { id: 'waiter-1', email: 'bruno@harness.dev', name: 'Bruno Carvalho', image: null, baseRole: 'WAITER', tenantId: RBAC_TENANT_ID },
-  { id: 'role-target', email: 'target@harness.dev', name: 'Role Target', image: null, baseRole: 'CHEF', tenantId: RBAC_TENANT_ID },
-  // The neighbour: one OWNER, so tenant B has a fully-entitled actor whose
+  { id: 'owner-1', email: 'ana@harness.dev', name: 'Ana Ribeiro', image: null, baseRole: 'DIRECTOR', tenantId: RBAC_TENANT_ID },
+  { id: 'admin-1', email: 'otavio@harness.dev', name: 'Otávio Nunes', image: null, baseRole: 'HEAD_LIBRARIAN', tenantId: RBAC_TENANT_ID },
+  { id: 'chef-1', email: 'camila@harness.dev', name: 'Camila Barbosa', image: null, baseRole: 'CONSERVATOR', tenantId: RBAC_TENANT_ID },
+  { id: 'waiter-1', email: 'bruno@harness.dev', name: 'Bruno Carvalho', image: null, baseRole: 'CLERK', tenantId: RBAC_TENANT_ID },
+  { id: 'role-target', email: 'target@harness.dev', name: 'Role Target', image: null, baseRole: 'CONSERVATOR', tenantId: RBAC_TENANT_ID },
+  // A reader, not staff. `customerRole: 'PATRON'` below is what keeps this row
+  // out of the roster and out of the staff tier — and `PATRON` is a word no
+  // package-side default could have guessed, which is the point of it.
+  { id: 'patron-1', email: 'lia@harness.dev', name: 'Lia Prado', image: null, baseRole: 'PATRON', tenantId: RBAC_TENANT_ID },
+  // The neighbour: one DIRECTOR, so tenant B has a fully-entitled actor whose
   // reach must still end at its own rows.
-  { id: 'owner-b', email: 'beatriz@harness-b.dev', name: 'Beatriz Vizinha', image: null, baseRole: 'OWNER', tenantId: RBAC_TENANT_B_ID },
+  { id: 'owner-b', email: 'beatriz@harness-b.dev', name: 'Beatriz Vizinha', image: null, baseRole: 'DIRECTOR', tenantId: RBAC_TENANT_B_ID },
 ];
 
 const DIRECTORY = new Map(RBAC_USERS.map((user) => [user.id, user]));
@@ -78,17 +82,17 @@ export async function reseedRbac(pg: PGlite, rbac: HarnessRbac): Promise<void> {
      ON CONFLICT DO NOTHING`,
   );
   // Two seeded custom roles, so the roles grid has a catalog the search spec
-  // can narrow (Barista stays, Estoquista goes).
+  // can narrow (Voluntário stays, Catalogador goes).
   await pg.query(
     `INSERT INTO roles (id, client_id, name, permissions, description, is_template, kind, locked, updated_at)
      VALUES
-       ('custom-barista', $1, 'Barista', $2, 'Prepara bebidas', FALSE, 'CUSTOM', FALSE, NOW()),
-       ('custom-estoquista', $1, 'Estoquista', $3, 'Cuida do estoque', FALSE, 'CUSTOM', FALSE, NOW())
+       ('custom-voluntario', $1, 'Voluntário', $2, 'Ajuda no balcão', FALSE, 'CUSTOM', FALSE, NOW()),
+       ('custom-catalogador', $1, 'Catalogador', $3, 'Cuida do acervo', FALSE, 'CUSTOM', FALSE, NOW())
      ON CONFLICT DO NOTHING`,
     [
       RBAC_TENANT_ID,
-      JSON.stringify(['products:read:all']),
-      JSON.stringify(['stock:read', 'stock:move']),
+      JSON.stringify(['titles:read:all']),
+      JSON.stringify(['copies:read', 'copies:move']),
     ],
   );
 }
@@ -100,6 +104,14 @@ export function rbacHost(pg: PGlite) {
     // The whole catalog, assembled by this host from three owners'
     // contributions (see `rbac-catalog.ts`) — one field, not four.
     catalog: HARNESS_CATALOG,
+    // The roster's own vocabulary, stated because this host's words are
+    // nobody else's. `ownerRoles` is deliberately NOT passed: it derives from
+    // `catalog.governance.ownerRoles` (DIRECTOR + NETWORK_OPS), so the
+    // disable/removal invariants run on exactly the set this host's composed
+    // governance already names, rather than on a package default that used to
+    // read `['OWNER']` and protected nothing here.
+    adminRoles: ['DIRECTOR', 'HEAD_LIBRARIAN'],
+    customerRole: 'PATRON',
     directory: {
       getUsers: async (ids) =>
         ids.flatMap((id) => {
@@ -121,7 +133,7 @@ export function rbacHost(pg: PGlite) {
       // here (a real host would 404 first).
       const tenantId = c.req.param('tenantSlug');
       if (tenantId !== RBAC_TENANT_ID && tenantId !== RBAC_TENANT_B_ID) return null;
-      // Who: the SPA sends no header and acts as the seeded OWNER — the
+      // Who: the SPA sends no header and acts as the seeded DIRECTOR — the
       // arrangement the admin screens assume. A spec that needs another
       // vantage sets the header; `anonymous` exercises the 401 path.
       const userId = c.req.header(ACTOR_HEADER) ?? 'owner-1';

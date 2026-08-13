@@ -18,8 +18,8 @@ import { splitRoleSelection } from '../team-screen';
 describe('labels', () => {
   it('translates a permission into pt-BR action + scope', () => {
     const labels = createRbacLabels(DEMO_CATALOG.labels);
-    expect(labels.permissionActionLabel('products:read:all')).toBe('Ver (todos)');
-    expect(labels.permissionActionLabel('stock:move')).toBe('Movimentar');
+    expect(labels.permissionActionLabel('titles:read:all')).toBe('Ver (todos)');
+    expect(labels.permissionActionLabel('copies:move')).toBe('Movimentar');
   });
 
   it('falls back to the raw segment for an unknown permission', () => {
@@ -30,14 +30,14 @@ describe('labels', () => {
 
   it('labels roles with custom names passing through', () => {
     const labels = createRbacLabels(DEMO_CATALOG.labels);
-    expect(labels.roleLabel('WAITER')).toBe('Garçom');
-    expect(labels.roleLabel('Barista')).toBe('Barista');
+    expect(labels.roleLabel('CLERK')).toBe('Atendente de balcão');
+    expect(labels.roleLabel('Voluntário')).toBe('Voluntário');
   });
 
   it('groups the catalog by domain', () => {
     const groups = groupPermissions(DEMO_CATALOG.permissions);
     const domains = groups.map((group) => group.domain);
-    expect(domains).toContain('products');
+    expect(domains).toContain('titles');
     expect(domains).toContain('roles');
   });
 
@@ -50,18 +50,18 @@ describe('labels', () => {
 });
 
 describe('splitRoleSelection', () => {
-  const system = new Set(['ADMIN', 'WAITER']);
+  const system = new Set(['HEAD_LIBRARIAN', 'CLERK']);
 
   it('splits one system role + customs', () => {
-    expect(splitRoleSelection(['WAITER', 'Barista'], system)).toEqual({
-      base: 'WAITER',
-      customRoles: ['Barista'],
+    expect(splitRoleSelection(['CLERK', 'Voluntário'], system)).toEqual({
+      base: 'CLERK',
+      customRoles: ['Voluntário'],
     });
   });
 
   it('answers no base for zero or two system roles', () => {
-    expect(splitRoleSelection(['Barista'], system).base).toBeNull();
-    expect(splitRoleSelection(['ADMIN', 'WAITER'], system).base).toBeNull();
+    expect(splitRoleSelection(['Voluntário'], system).base).toBeNull();
+    expect(splitRoleSelection(['HEAD_LIBRARIAN', 'CLERK'], system).base).toBeNull();
   });
 });
 
@@ -76,7 +76,7 @@ describe('RoleForm', () => {
   const OWNER_MARKER = (DEMO_CATALOG.governance.ownerPermissions ?? [])[0] as string;
   const FORM_PERMISSIONS = {
     list: DEMO_CATALOG.permissions.list.filter((permission) =>
-      ['stock:read', OWNER_MARKER, ...SOD_PAIR].includes(permission),
+      ['copies:read', OWNER_MARKER, ...SOD_PAIR].includes(permission),
     ),
     kind: DEMO_CATALOG.permissions.kind,
   };
@@ -108,7 +108,7 @@ describe('RoleForm', () => {
     });
     expect(submit.disabled).toBe(true);
 
-    const stockRead = screen.getByTestId('perm-stock:read').querySelector('input');
+    const stockRead = screen.getByTestId('perm-copies:read').querySelector('input');
     expect(stockRead).not.toBeNull();
     fireEvent.click(stockRead as HTMLInputElement);
     expect(screen.getByText('Permissões (1 selecionada)')).toBeTruthy();
@@ -139,16 +139,16 @@ describe('RoleForm', () => {
   it('submits the trimmed composition', () => {
     const { onSubmit } = mountForm();
     fireEvent.change(screen.getByTestId('role-name'), {
-      target: { value: '  Barista  ' },
+      target: { value: '  Voluntário  ' },
     });
     fireEvent.click(
-      screen.getByTestId('perm-stock:read').querySelector('input') as HTMLInputElement,
+      screen.getByTestId('perm-copies:read').querySelector('input') as HTMLInputElement,
     );
     fireEvent.click(screen.getByTestId('role-submit'));
     expect(onSubmit).toHaveBeenCalledWith({
-      name: 'Barista',
+      name: 'Voluntário',
       description: null,
-      permissions: ['stock:read'],
+      permissions: ['copies:read'],
     });
   });
 });

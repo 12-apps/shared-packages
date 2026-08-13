@@ -5,22 +5,22 @@ import { definePermissions } from '../core/registry';
 import type { RoleAssignment, RoleDef } from '../core/types';
 
 const PERMS = definePermissions({
-  'orders:read:all': 'class',
-  'orders:read:own': 'instance',
-  'orders:read:assigned': 'instance',
+  'loans:read:all': 'class',
+  'loans:read:own': 'instance',
+  'loans:read:assigned': 'instance',
 } as const);
 type P = (typeof PERMS.list)[number];
 
 const ROLES: readonly RoleDef<P>[] = [
-  { name: 'ADMIN', permissions: ['orders:read:all'] },
-  { name: 'OWNER_READER', permissions: ['orders:read:own'] },
-  { name: 'WAITER', permissions: ['orders:read:assigned'] },
+  { name: 'HEAD_LIBRARIAN', permissions: ['loans:read:all'] },
+  { name: 'SELF_READER', permissions: ['loans:read:own'] },
+  { name: 'CLERK', permissions: ['loans:read:assigned'] },
 ];
 
 const assignments: Record<string, RoleAssignment[]> = {
-  admin: [{ role: 'ADMIN', scope: 'S' }],
-  ownerReader: [{ role: 'OWNER_READER', scope: 'S' }],
-  waiter: [{ role: 'WAITER', scope: 'S' }],
+  admin: [{ role: 'HEAD_LIBRARIAN', scope: 'S' }],
+  ownerReader: [{ role: 'SELF_READER', scope: 'S' }],
+  waiter: [{ role: 'CLERK', scope: 'S' }],
 };
 
 function engine(over: Partial<Parameters<typeof createRbac<P>>[0]> = {}) {
@@ -35,15 +35,15 @@ function engine(over: Partial<Parameters<typeof createRbac<P>>[0]> = {}) {
 
 describe('resourceTypeOf', () => {
   it('takes the segment before the first colon', () => {
-    expect(resourceTypeOf('orders:read:own')).toBe('orders');
-    expect(resourceTypeOf('products')).toBe('products');
+    expect(resourceTypeOf('loans:read:own')).toBe('loans');
+    expect(resourceTypeOf('titles')).toBe('titles');
   });
 });
 
 describe('default adapter — class permission', () => {
   it('check() ignores resource id for a class permission', async () => {
     const rbac = engine();
-    await expect(rbac.can('admin', 'orders:read:all', 'anything')).resolves.toBe(
+    await expect(rbac.can('admin', 'loans:read:all', 'anything')).resolves.toBe(
       true,
     );
   });
@@ -51,14 +51,14 @@ describe('default adapter — class permission', () => {
   it('visible() returns all when the class permission is held', async () => {
     const rbac = engine();
     await expect(
-      rbac.visibleResources('admin', 'orders:read:all', 'orders'),
+      rbac.visibleResources('admin', 'loans:read:all', 'loans'),
     ).resolves.toEqual({ kind: 'all' });
   });
 
   it('visible() returns none when not held', async () => {
     const rbac = engine();
     await expect(
-      rbac.visibleResources('waiter', 'orders:read:all', 'orders'),
+      rbac.visibleResources('waiter', 'loans:read:all', 'loans'),
     ).resolves.toEqual({ kind: 'none' });
   });
 });
@@ -66,28 +66,28 @@ describe('default adapter — class permission', () => {
 describe('default adapter — instance permission via assignment relation', () => {
   function mk() {
     return engine({
-      assignmentResolver: (_s, type) => (type === 'orders' ? ['o1', 'o2'] : []),
+      assignmentResolver: (_s, type) => (type === 'loans' ? ['o1', 'o2'] : []),
     });
   }
 
   it('grants an assigned instance', async () => {
     const rbac = mk();
     await expect(
-      rbac.can('waiter', 'orders:read:assigned', 'o1'),
+      rbac.can('waiter', 'loans:read:assigned', 'o1'),
     ).resolves.toBe(true);
   });
 
   it('denies an unassigned instance', async () => {
     const rbac = mk();
     await expect(
-      rbac.can('waiter', 'orders:read:assigned', 'o9'),
+      rbac.can('waiter', 'loans:read:assigned', 'o9'),
     ).resolves.toBe(false);
   });
 
   it('visible() returns the assigned ids', async () => {
     const rbac = mk();
     await expect(
-      rbac.visibleResources('waiter', 'orders:read:assigned', 'orders'),
+      rbac.visibleResources('waiter', 'loans:read:assigned', 'loans'),
     ).resolves.toEqual({ kind: 'ids', ids: ['o1', 'o2'] });
   });
 });
@@ -96,7 +96,7 @@ describe('default adapter — instance permission via ownership', () => {
   function mk() {
     return engine({
       ownership: (_s, type) =>
-        type === 'orders'
+        type === 'loans'
           ? { kind: 'predicate', test: (id) => id.startsWith('mine-') }
           : null,
     });
@@ -105,14 +105,14 @@ describe('default adapter — instance permission via ownership', () => {
   it('grants an owned instance (predicate ownership)', async () => {
     const rbac = mk();
     await expect(
-      rbac.can('ownerReader', 'orders:read:own', 'mine-1'),
+      rbac.can('ownerReader', 'loans:read:own', 'mine-1'),
     ).resolves.toBe(true);
   });
 
   it('denies a non-owned instance', async () => {
     const rbac = mk();
     await expect(
-      rbac.can('ownerReader', 'orders:read:own', 'theirs-1'),
+      rbac.can('ownerReader', 'loans:read:own', 'theirs-1'),
     ).resolves.toBe(false);
   });
 
@@ -120,8 +120,8 @@ describe('default adapter — instance permission via ownership', () => {
     const rbac = mk();
     const v = await rbac.visibleResources(
       'ownerReader',
-      'orders:read:own',
-      'orders',
+      'loans:read:own',
+      'loans',
     );
     expect(v.kind).toBe('predicate');
   });
@@ -131,7 +131,7 @@ describe('default adapter — field ownership becomes a predicate for the LIST s
   function mk() {
     return engine({
       ownership: (_s, type) =>
-        type === 'orders' ? { kind: 'field', field: 'owner_id' } : null,
+        type === 'loans' ? { kind: 'field', field: 'owner_id' } : null,
       assignmentResolver: () => ['o1'],
     });
   }
@@ -140,8 +140,8 @@ describe('default adapter — field ownership becomes a predicate for the LIST s
     const rbac = mk();
     const v = await rbac.visibleResources(
       'ownerReader',
-      'orders:read:own',
-      'orders',
+      'loans:read:own',
+      'loans',
     );
     expect(v).toEqual({
       kind: 'predicate',
@@ -154,7 +154,7 @@ describe('default adapter — instance denied when RBAC denies', () => {
   it('no instance grant reached if the actor lacks the RBAC permission', async () => {
     const rbac = engine({ assignmentResolver: () => ['o1'] });
     await expect(
-      rbac.can('admin', 'orders:read:assigned', 'o1'),
+      rbac.can('admin', 'loans:read:assigned', 'o1'),
     ).resolves.toBe(false);
   });
 });

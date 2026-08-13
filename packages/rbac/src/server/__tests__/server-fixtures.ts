@@ -27,6 +27,13 @@ export function createTestHost(
   const api = createApiRbac<DemoPermission>({
     db: async () => db,
     catalog: DEMO_CATALOG,
+    // The demo host's OWN vocabulary — none of it a package default, and none
+    // of it a word the extracted application used. `ownerRoles` is left unset
+    // on purpose: it derives from `DEMO_CATALOG.governance.ownerRoles`
+    // (DIRECTOR + NETWORK_OPS), so these suites run the roster invariants on
+    // the set the composed catalog actually names.
+    adminRoles: ['DIRECTOR', 'HEAD_LIBRARIAN'],
+    customerRole: 'PATRON',
     directory: {
       getUsers: async (ids) =>
         ids.flatMap((id) => {

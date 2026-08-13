@@ -103,12 +103,10 @@ export const DEFAULT_SILENT_BASELINE = ".realtime-silent-domains.json";
  * future-pay's own declarations — an EXAMPLE, and deliberately not a default.
  *
  * It was a fallback for `declarations` in this gate's first version, for the same reason
- * `@12-apps/rbac/coverage` used to default its accepted guard names to future-pay's:
- * zero-configuration adoption for a host with that layout. That is exactly what made the
- * gate fail OPEN — a host that adds a domain to its registry and forgets the map got a
- * green run out of a seven-entry copy of somebody else's domains. A completeness gate
- * cannot supply its own subject, and rbac's gate has since reached the same conclusion:
- * `rbacGuards` / `entitlementGuards` are required options there now.
+ * `@12-apps/rbac/coverage` ships `FUTURE_PAY_RBAC_GUARDS`: zero-configuration adoption for
+ * a host with the future-pay layout. That is exactly what made the gate fail OPEN — a host
+ * that adds a domain to its registry and forgets the map got a green run out of a seven-
+ * entry copy of somebody else's domains. A completeness gate cannot supply its own subject.
  *
  * So it is exported to be READ (a shape to copy, and the harness's fixture material) and
  * nothing consumes it implicitly. The module paths are repo-relative and resolved against

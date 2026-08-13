@@ -26,9 +26,9 @@ function apiStub(overrides: Partial<RbacApiClient> = {}): RbacApiClient {
       data: [
         {
           id: 'r1',
-          name: 'Barista',
+          name: 'Voluntário',
           description: null,
-          permissions: ['stock:read'] as readonly string[],
+          permissions: ['copies:read'] as readonly string[],
           kind: 'CUSTOM',
           locked: false,
         },
@@ -44,7 +44,7 @@ function apiStub(overrides: Partial<RbacApiClient> = {}): RbacApiClient {
       data: [
         {
           userId: 'chef-1',
-          role: 'CHEF',
+          role: 'CONSERVATOR',
           email: 'camila@example.com',
           name: 'Camila Barbosa',
           image: null,
@@ -56,7 +56,7 @@ function apiStub(overrides: Partial<RbacApiClient> = {}): RbacApiClient {
     })),
     teamContext: vi.fn(async () => ({
       customRolesByMember: [],
-      assignableRoles: ['WAITER'],
+      assignableRoles: ['CLERK'],
       pendingInvites: [],
       invitesEnabled: false,
     })),
@@ -89,7 +89,8 @@ function mountTeam(api: RbacApiClient, permissions: string[]): void {
       <TeamScreen
         api={api}
         labels={createRbacLabels(DEMO_CATALOG.labels)}
-        systemRoles={['ADMIN', 'MANAGER', 'WAITER', 'CHEF']}
+        systemRoles={['HEAD_LIBRARIAN', 'BRANCH_LEAD', 'CLERK', 'CONSERVATOR']}
+        ownerRoles={DEMO_CATALOG.governance.ownerRoles}
         managePermission="team:manage"
       />
     </RbacProvider>,
@@ -98,15 +99,15 @@ function mountTeam(api: RbacApiClient, permissions: string[]): void {
 
 describe('affordance hiding (useCan)', () => {
   it('hides the write affordances from an actor without roles:manage', async () => {
-    mountRoles(apiStub(), ['products:read:all']);
+    mountRoles(apiStub(), ['titles:read:all']);
     // The grid is on screen (the read resolved), so the absences below are
     // the gate's verdict, not a not-yet-rendered race — asserted inside
     // waitFor per the flakiness gate's own rule.
     await waitFor(() => {
       expect(screen.getByTestId('roles-grid')).toBeTruthy();
       expect(screen.queryByTestId('add-role-button')).toBeNull();
-      expect(screen.queryByTestId('delete-role-Barista')).toBeNull();
-      expect(screen.queryByTestId('edit-role-Barista')).toBeNull();
+      expect(screen.queryByTestId('delete-role-Voluntário')).toBeNull();
+      expect(screen.queryByTestId('edit-role-Voluntário')).toBeNull();
     });
   });
 
@@ -115,7 +116,7 @@ describe('affordance hiding (useCan)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('add-role-button')).toBeTruthy();
     });
-    expect(screen.getByTestId('delete-role-Barista')).toBeTruthy();
+    expect(screen.getByTestId('delete-role-Voluntário')).toBeTruthy();
   });
 
   it('withholds the team row actions from an actor without team:manage', async () => {
@@ -139,14 +140,14 @@ describe('destructive writes sit behind a confirm step', () => {
     const api = apiStub();
     mountRoles(api, ['roles:manage']);
     await waitFor(() => {
-      expect(screen.getByTestId('delete-role-Barista')).toBeTruthy();
+      expect(screen.getByTestId('delete-role-Voluntário')).toBeTruthy();
     });
-    fireEvent.click(screen.getByTestId('delete-role-Barista'));
+    fireEvent.click(screen.getByTestId('delete-role-Voluntário'));
     expect(screen.getByText('Excluir o papel?')).toBeTruthy();
     fireEvent.click(screen.getByTestId('confirm-cancel'));
     expect(api.deleteRole).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByTestId('delete-role-Barista'));
+    fireEvent.click(screen.getByTestId('delete-role-Voluntário'));
     fireEvent.click(screen.getByTestId('confirm-accept'));
     await waitFor(() => {
       expect(api.deleteRole).toHaveBeenCalledWith('r1');
@@ -179,9 +180,9 @@ describe('a refused write surfaces its error', () => {
     });
     mountRoles(api, ['roles:manage']);
     await waitFor(() => {
-      expect(screen.getByTestId('delete-role-Barista')).toBeTruthy();
+      expect(screen.getByTestId('delete-role-Voluntário')).toBeTruthy();
     });
-    fireEvent.click(screen.getByTestId('delete-role-Barista'));
+    fireEvent.click(screen.getByTestId('delete-role-Voluntário'));
     fireEvent.click(screen.getByTestId('confirm-accept'));
     await waitFor(() => {
       expect(screen.getByTestId('roles-error')).toBeTruthy();

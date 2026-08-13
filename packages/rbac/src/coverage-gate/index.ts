@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 
 import {
+  assertGuardsConfigured,
   callsEntitlementGuard,
   entitlementGuardedSymbols,
   guardedSymbols,
@@ -75,6 +76,9 @@ export interface RbacCoverageOptions {
    *
    * What belongs on the list is a guard that carries an authenticated
    * identity. A tenant/session RESOLVER on a public route is not one.
+   *
+   * `[]` is REFUSED, loudly: it is the one value that cannot mean anything —
+   * see {@link runRbacCoverage}.
    */
   rbacGuards: readonly string[];
   /**
@@ -186,8 +190,17 @@ function actionFailures(ctx: GateContext): { failures: string[]; actionCount: nu
   return { failures, actionCount: allActions.size };
 }
 
-/** Run the gate and return every violation (empty = green). */
+/**
+ * Run the gate and return every violation (empty = green).
+ *
+ * @throws {Error} when `rbacGuards` is empty. A green run over a surface with
+ * NO accepted guard is the one result this gate must never produce: the whole
+ * verdict is "does this file call one of these names", so an empty list makes
+ * every answer meaningless. It fails loudly at the option rather than quietly
+ * at every file.
+ */
 export function runRbacCoverage(options: RbacCoverageOptions): RbacCoverageResult {
+  assertGuardsConfigured(options.rbacGuards);
   const ctx: GateContext = {
     appDir: options.appDir,
     webRoot: options.webRoot ?? options.appDir,

@@ -97,6 +97,13 @@ export {
   type TeamStore,
 } from './team-store';
 
+// The roster's two ROLE-NAME questions. `RbacActorTier` is part of
+// `TeamStore.removeTenantMemberGuarded`'s signature, so a host calling the
+// store directly needs it; `ownerRolesOf` answers "which roles does this
+// config protect" for a host wiring its own removal path beside the packaged
+// one.
+export { ownerRolesOf, type RbacActorTier } from './roster-policy';
+
 export {
   getTenantRolesByName,
   isOrgScope,
