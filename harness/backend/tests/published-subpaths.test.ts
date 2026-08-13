@@ -63,3 +63,46 @@ describe('the subpath @12-apps/mcp/coverage depends on', () => {
     expect(typeof mod.runRbacCoverage).toBe('function');
   });
 });
+
+describe('@12-apps/storage published subpaths', () => {
+  it('exposes the isomorphic core from `.`', async () => {
+    const mod = await import('@12-apps/storage');
+    expect(typeof mod.parseObjectKey).toBe('function');
+    expect(typeof mod.mintObjectSetKey).toBe('function');
+    expect(mod.DEFAULT_MAX_UPLOAD_BYTES).toBe(8 * 1024 * 1024);
+    expect(mod.STORAGE_PATHS.upload).toBe('/uploads/image');
+  });
+
+  it('exposes the backend factory and its ports from `./server`', async () => {
+    const mod = await import('@12-apps/storage/server');
+    expect(typeof mod.createApiStorage).toBe('function');
+    expect(typeof mod.createLocalDiskDriver).toBe('function');
+    expect(typeof mod.passthroughImagePipeline).toBe('function');
+    // The sharp adapter is on the published surface even though `sharp` is not a
+    // dependency: it takes the module as an argument, which is what lets a host
+    // with libvips use it and every other consumer install nothing.
+    expect(typeof mod.createSharpImagePipeline).toBe('function');
+  });
+
+  it('exposes the Hono adapter from `./hono`', async () => {
+    const mod = await import('@12-apps/storage/hono');
+    expect(typeof mod.storageRouter).toBe('function');
+  });
+
+  it('exposes the S3-compatible driver from `./s3`', async () => {
+    // The one subpath behind an OPTIONAL peer (`@aws-sdk/client-s3`). It resolves
+    // here because the harness installs the peer, which is exactly the situation of
+    // a consumer that wants a bucket — and `./server` importing it would drag the
+    // SDK into every consumer that does not.
+    const mod = await import('@12-apps/storage/s3');
+    expect(typeof mod.createS3Driver).toBe('function');
+    expect(mod.createS3Driver({ bucket: 'b', region: 'us-east-1' }).name).toBe('s3');
+  });
+
+  it('exposes the browser half from `./react`', async () => {
+    const mod = await import('@12-apps/storage/react');
+    expect(typeof mod.createWebStorage).toBe('function');
+    expect(typeof mod.optimizeImage).toBe('function');
+    expect(typeof mod.rejectFileUpfront).toBe('function');
+  });
+});

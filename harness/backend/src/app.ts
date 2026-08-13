@@ -6,7 +6,7 @@
  * test of a hand-rolled second app would prove nothing about the one that
  * serves the SPA.
  *
- * Eight surfaces, and the split between them is the point:
+ * Nine surfaces, and the split between them is the point:
  *
  *  - `/api/admin/:tenantSlug/reports/**` is @12-apps/report-builder's, mounted
  *    whole;
@@ -29,6 +29,10 @@
  *  - `/manifest.webmanifest` and `/sw.js` are @12-apps/pwa's (12-23), also at
  *    the root — a worker's directory bounds its scope and the manifest is
  *    linked from a static `index.html` that cannot know a prefix;
+ *  - `/api/uploads/**` is @12-apps/storage's (12-20), and deliberately NOT under
+ *    `:tenantSlug`: an upload is scoped by the ACTOR the host resolves, never by
+ *    a path segment a caller can choose, and the serve route answers a public
+ *    `<img>` that carries no tenant at all;
  *  - `/__harness/**` is the SUITE'S, and belongs to none of them.
  *
  * MOUNT ORDER is load-bearing for the lifecycle surface (ADOPTING rule 7).
@@ -61,9 +65,12 @@ import { applyRbacMigrations } from './rbac-db';
 import { rbacHost, reseedRbac } from './rbac-host';
 import { reportsRouter } from './reports-host';
 import { openReportsDb, reseed, savedReportDb } from './saved-report-db';
+import { createStorageHost } from './storage-host';
 
 export interface HarnessBackend {
   app: Hono;
+  /** Where @12-apps/storage's driver keeps objects, so a suite can read files. */
+  storageRoot: string;
   /** Closing it is the caller's job; the server itself never does. */
   close: () => Promise<void>;
 }
@@ -94,9 +101,14 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
   await createLifecycleDemoTables(pg);
   const lifecycle = lifecycleHost(pg);
   await reseedLifecycle(pg);
+  // 12-20: no migrations — @12-apps/storage owns no models. What it needs from a
+  // host is the two tables its reference probes read (storage-host.ts) and a
+  // directory to keep objects in.
+  const storage = await createStorageHost(pg);
   return {
     rbac,
     lifecycle,
+    storage,
     onboarding: onboardingHost(pg),
     mcpOauth: mcpOauthHost(pg),
     pwa: pwaHost(),
@@ -112,6 +124,7 @@ interface Hosts {
   mcpOauth: ReturnType<typeof mcpOauthHost>;
   pwa: ReturnType<typeof pwaHost>;
   entitlements: ReturnType<typeof createEntitlementsHost>;
+  storage: Awaited<ReturnType<typeof createStorageHost>>;
 }
 
 /**
@@ -131,6 +144,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await reseedOnboarding(pg);
     await reseedMcpOauth(pg);
     await reseedLifecycle(pg);
+    await hosts.storage.reset();
     hosts.entitlements.reset();
     return c.body(null, 204);
   });
@@ -188,10 +202,23 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
   app.route('/api/admin/:tenantSlug', hosts.rbac.router);
   app.route('/api/admin/:tenantSlug', hosts.onboarding.router);
+  // 12-20: mounted at the ROOT because it carries two prefixes of its own — the
+  // package's `/api/uploads/**` and the host's `/__harness/storage/**` writes.
+  // NOT under `/api/admin/:tenantSlug`: an upload is scoped by the actor the host
+  // resolves, never by a path segment a caller can choose, and the serve route
+  // answers a public `<img>`, which carries no tenant.
+  app.route('/', hosts.storage.router);
   // The last two mount at the ROOT, and have to: `.well-known` documents and a
   // service worker are read from the origin, never from under a prefix.
   app.route('/', hosts.mcpOauth.router);
   app.route('/', hosts.pwa.router);
 
-  return { app, close: () => pg.close() };
+  return {
+    app,
+    storageRoot: hosts.storage.root,
+    close: async () => {
+      hosts.storage.close();
+      await pg.close();
+    },
+  };
 }

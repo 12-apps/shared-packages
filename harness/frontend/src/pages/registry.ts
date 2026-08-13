@@ -27,6 +27,7 @@ import { OnboardingGuidedPage } from './onboarding-guided';
 import { PwaInstallPromptPage } from './pwa-install-prompt';
 import { PwaManifestPage } from './pwa-manifest';
 import { RbacAdminPage } from './rbac-admin';
+import { StorageUploadsPage } from './storage-uploads';
 import { ReportBuilderPage } from './report-builder';
 
 /**
@@ -304,6 +305,13 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/entitlements',
     group: 'backoffice',
     Component: EntitlementsPlanPage,
+  },
+  {
+    slug: 'storage-uploads',
+    title: 'Image uploads',
+    pkg: '@12-apps/storage',
+    group: 'backoffice',
+    Component: StorageUploadsPage,
   },
   {
     slug: 'rbac-admin',
