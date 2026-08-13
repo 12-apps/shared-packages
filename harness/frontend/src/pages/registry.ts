@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 
+import { AppShellPage } from './app-shell';
 import { AuditLogPage } from './audit-log';
 import { EntitlementsPlanPage } from './entitlements-plan';
 import { LifecycleAdminPage } from './lifecycle-admin';
@@ -260,6 +261,17 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/pwa',
     group: 'storefront',
     Component: PwaManifestPage,
+  },
+  // @12-apps/app-shell (12-18): the tower every one of these pages would otherwise
+  // sit in — theme, session, boundary, lazy routes and the consent gate. Filed under
+  // storefront because the two things it puts in front of a person are both a
+  // buyer's: the corrected tenant palette and the terms prompt.
+  {
+    slug: 'app-shell',
+    title: 'Shell & consent',
+    pkg: '@12-apps/app-shell',
+    group: 'storefront',
+    Component: AppShellPage,
   },
 
   // --- Backoffice: what the STORE sees ------------------------------------
