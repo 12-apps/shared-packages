@@ -72,7 +72,7 @@ export interface ExportHeadGrammar {
  * `export async function NAME`, and — with `syncFunctions` —
  * `export function NAME`) and the brace lists (`export {A, B as C}` /
  * `export const {A, B: C}`, where the exported name is each item's LAST
- * identifier). A `export type { … }` head declares nothing.
+ * identifier). An `export type { … }` head declares nothing.
  *
  * Hand-parsed from each `export` keyword outward, in linear time — the
  * `\s+`-joined regexes this replaces backtracked polynomially on adversarial

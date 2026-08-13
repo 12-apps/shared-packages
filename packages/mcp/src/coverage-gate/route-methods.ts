@@ -60,7 +60,7 @@ export interface RouteMethod {
  * action may not — it must be async), and only the seven HTTP methods count, where
  * every runtime export of a use-server module is an action.
  *
- * The shared walk is a linear hand-parse, not a regex: the `\\s+`-joined patterns
+ * The shared walk is a linear hand-parse, not a regex: the `\s+`-joined patterns
  * this gate first shipped with backtracked polynomially on adversarial input
  * (CodeQL js/polynomial-redos), and a COMPLETENESS gate must stay O(n) on whatever
  * source it is pointed at — it is run over files a contributor supplies.
