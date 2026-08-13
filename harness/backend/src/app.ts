@@ -6,7 +6,7 @@
  * test of a hand-rolled second app would prove nothing about the one that
  * serves the SPA.
  *
- * Eight surfaces, and the split between them is the point:
+ * Nine surfaces, and the split between them is the point:
  *
  *  - `/api/admin/:tenantSlug/reports/**` is @12-apps/report-builder's, mounted
  *    whole;
@@ -29,6 +29,11 @@
  *  - `/manifest.webmanifest` and `/sw.js` are @12-apps/pwa's (12-23), also at
  *    the root — a worker's directory bounds its scope and the manifest is
  *    linked from a static `index.html` that cannot know a prefix;
+ *  - `/api/admin/:tenantSlug/realtime` and `/api/account/realtime` are
+ *    @12-apps/realtime's (12-16), mounted whole; the host keeps only its seams
+ *    (realtime-host.ts) and the outbox's db adapter (realtime-db.ts). The
+ *    matching WebSocket gateway is a THIRD process shape and lives in
+ *    `server.ts`, on its own port, because that is where a port is bound;
  *  - `/__harness/**` is the SUITE'S, and belongs to none of them.
  *
  * MOUNT ORDER is load-bearing for the lifecycle surface (ADOPTING rule 7).
@@ -48,6 +53,13 @@ import { Hono } from 'hono';
 import type { PGlite } from '@electric-sql/pglite';
 
 import { entitlementDenialResponse, isEntitlementDenial } from '@12-apps/entitlements/server';
+import {
+  createInlineRealtimeDriver,
+  publishRealtimeEvent,
+  tenantTopic,
+  type RealtimeDriver,
+} from '@12-apps/realtime';
+import { enqueueRealtimeEvent } from '@12-apps/realtime/server';
 
 import { createEntitlementsHost, TENANT } from './entitlements-host';
 import { mcpProbeRouter } from './harness-mcp-probe';
@@ -59,11 +71,23 @@ import { applyOnboardingMigrations, onboardingHost, reseedOnboarding } from './o
 import { pwaHost } from './pwa-host';
 import { applyRbacMigrations } from './rbac-db';
 import { rbacHost, reseedRbac } from './rbac-host';
+import { applyRealtimeMigrations, realtimeOutboxWriteDb } from './realtime-db';
+import { realtimeHost } from './realtime-host';
 import { reportsRouter } from './reports-host';
 import { openReportsDb, reseed, savedReportDb } from './saved-report-db';
 
 export interface HarnessBackend {
   app: Hono;
+  /**
+   * The ONE realtime driver this process runs (12-16).
+   *
+   * Handed out so `server.ts` can give the same object to the gateway.
+   * `configureRealtime` installs one driver per process, so sharing it is what makes
+   * a publish on the API side observable by a subscription the gateway made — two
+   * separately-resolved inline drivers would each be their own bus, and the socket
+   * would sit open and silent, which is the failure the liveness watch exists for.
+   */
+  realtimeDriver: RealtimeDriver;
   /** Closing it is the caller's job; the server itself never does. */
   close: () => Promise<void>;
 }
@@ -94,9 +118,15 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
   await createLifecycleDemoTables(pg);
   const lifecycle = lifecycleHost(pg);
   await reseedLifecycle(pg);
+  // 12-16: the outbox table, again out of the package's own tarball. The driver is
+  // created HERE and shared, for the reason on `HarnessBackend.realtimeDriver`.
+  await applyRealtimeMigrations(pg);
+  const realtimeDriver = createInlineRealtimeDriver({ logger: console });
   return {
     rbac,
     lifecycle,
+    realtimeDriver,
+    realtime: realtimeHost(pg, realtimeDriver),
     onboarding: onboardingHost(pg),
     mcpOauth: mcpOauthHost(pg),
     pwa: pwaHost(),
@@ -108,6 +138,8 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
 interface Hosts {
   rbac: ReturnType<typeof rbacHost>;
   lifecycle: ReturnType<typeof lifecycleHost>;
+  realtime: ReturnType<typeof realtimeHost>;
+  realtimeDriver: RealtimeDriver;
   onboarding: ReturnType<typeof onboardingHost>;
   mcpOauth: ReturnType<typeof mcpOauthHost>;
   pwa: ReturnType<typeof pwaHost>;
@@ -155,6 +187,56 @@ function mountEntitlementDemo(app: Hono, hosts: Hosts): void {
   });
 }
 
+/**
+ * The suite's realtime controls — the stand-in for a domain mutation's publisher.
+ *
+ * Deliberately under `/__harness` rather than `/api`: nothing may mistake them for part of
+ * the package's surface. Deciding WHICH mutations a screen draws is exactly what stays in a
+ * host, so this is the one piece of the realtime story a harness cannot get from the package.
+ */
+function mountRealtimeControls(app: Hono, pg: PGlite, hosts: Hosts): void {
+  app.post('/__harness/realtime/publish', async (c) => {
+    const body = (await c.req.json()) as { tenantId?: string; domain?: string; type?: string };
+    const tenantId = body.tenantId ?? 'tenant-a';
+    // Fire-and-forget in a host; awaited here so the response means "it reached the bus".
+    const result = await publishRealtimeEvent(tenantTopic(tenantId, body.domain ?? 'kitchen'), {
+      type: body.type ?? 'kitchen.changed',
+      // Identifiers only — the payload rule the whole bus is built on.
+      data: {},
+    });
+    return c.json({ published: result.published, reason: result.reason ?? null });
+  });
+
+  /**
+   * Enqueue through the OUTBOX inside a transaction, then report what is pending.
+   *
+   * The transaction is the point: a host's domain write and its event commit together, so
+   * `fail` throws inside it to prove the pair is atomic in BOTH directions.
+   */
+  app.post('/__harness/realtime/outbox', async (c) => {
+    const body = (await c.req.json()) as { domain?: string; fail?: boolean };
+    const topic = tenantTopic('tenant-a', body.domain ?? 'kitchen');
+    const write = async (tx: unknown): Promise<void> => {
+      await enqueueRealtimeEvent(realtimeOutboxWriteDb(tx as never), {
+        topic,
+        type: 'kitchen.changed',
+      });
+      if (body.fail) throw new Error('the host write failed');
+    };
+    await pg.transaction(write).catch(() => undefined);
+    const { rows } = await pg.query<{ count: string }>(
+      'SELECT COUNT(*)::text AS count FROM realtime_outbox_events WHERE published_at IS NULL',
+    );
+    return c.json({ pending: Number(rows[0]?.count ?? '0') });
+  });
+
+  /** Drain the outbox once, so a spec can watch a durable event arrive on the wire. */
+  app.post('/__harness/realtime/drain', async (c) => {
+    const pass = await hosts.realtime.events.outbox?.drain();
+    return c.json(pass ?? { published: 0, failed: 0, contended: 0, more: false });
+  });
+}
+
 export async function createHarnessBackend(): Promise<HarnessBackend> {
   const pg: PGlite = await openReportsDb();
   const hosts = await provisionHosts(pg);
@@ -165,6 +247,11 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   // first spec never races the first migration.
   app.get('/health', (c) => c.json({ ok: true }));
   mountReset(app, pg, hosts);
+  mountRealtimeControls(app, pg, hosts);
+  // Installs the driver for THIS process, which is what lets a `/__harness/publish` reach a
+  // stream the SPA is holding open through Vite's proxy. No Redis: the harness is one
+  // process, so inline delivery is the whole bus.
+  await hosts.realtime.events.start();
 
   // The suite's own window onto what the authorization server wrote, and its
   // one-endpoint resource server (harness-mcp-probe.ts). Hashes and flags only.
@@ -188,10 +275,22 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
   app.route('/api/admin/:tenantSlug', hosts.rbac.router);
   app.route('/api/admin/:tenantSlug', hosts.onboarding.router);
+  // Mounted at the API root, not under the tenant prefix: the surface carries BOTH its
+  // paths, and the account one takes no tenant slug at all.
+  app.route('/api', hosts.realtime.events.router);
   // The last two mount at the ROOT, and have to: `.well-known` documents and a
   // service worker are read from the origin, never from under a prefix.
   app.route('/', hosts.mcpOauth.router);
   app.route('/', hosts.pwa.router);
 
-  return { app, close: () => pg.close() };
+  return {
+    app,
+    realtimeDriver: hosts.realtimeDriver,
+    close: async () => {
+      // Streams first, then the bus, then the database: a stream severed after its driver is
+      // gone throws into the sink rather than closing cleanly.
+      await hosts.realtime.events.stop();
+      await pg.close();
+    },
+  };
 }

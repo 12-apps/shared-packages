@@ -1,7 +1,7 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-import { HARNESS_BACKEND_ORIGIN } from '../backend/src/port';
+import { HARNESS_BACKEND_ORIGIN, HARNESS_GATEWAY_ORIGIN } from '../backend/src/port';
 
 /**
  * Deliberately bare: no aliases, no optimizeDeps, no ssr.noExternal.
@@ -21,6 +21,12 @@ import { HARNESS_BACKEND_ORIGIN } from '../backend/src/port';
  * Both `server` and `preview` carry it: `npm run build` is served by the
  * latter, which is what Playwright drives, and a proxy present in only one of
  * them fails as an app that works while you develop it and 404s in the suite.
+ *
+ * `/ws` needs `ws: true` — it is an UPGRADE, not a request (12-16). It reaches the realtime
+ * gateway on its own port, which is the arrangement a real deployment has: the browser only
+ * ever sees one origin, and the socket process is deployed and restarted independently of the
+ * API. Without the flag the upgrade is proxied as a plain GET, the handshake never completes,
+ * and the channel sits in `connecting` — open to nothing, reporting nothing.
  */
 const proxy = {
   '/api': { target: HARNESS_BACKEND_ORIGIN, changeOrigin: true },
@@ -32,6 +38,7 @@ const proxy = {
   // has, where the SPA's origin answers them and `apps/web` produces them.
   '/manifest.webmanifest': { target: HARNESS_BACKEND_ORIGIN, changeOrigin: true },
   '/sw.js': { target: HARNESS_BACKEND_ORIGIN, changeOrigin: true },
+  '/ws': { target: HARNESS_GATEWAY_ORIGIN, changeOrigin: true, ws: true },
 };
 
 export default defineConfig({ plugins: [react()], server: { proxy }, preview: { proxy } });
