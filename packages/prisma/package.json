@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "node scripts/sync-lifecycle-schema.mjs && node scripts/sync-research-schema.mjs && node scripts/sync-shift-schema.mjs --check && node scripts/sync-jobs-schema.mjs --check && node scripts/sync-entitlements-schema.mjs --check && node scripts/sync-payments-schema.mjs --check && node scripts/sync-report-builder-schema.mjs --check && node scripts/sync-rbac-schema.mjs --check && node scripts/sync-prisma-plugins.mjs --check && prisma generate && tsc",
+    "build": "node scripts/sync-lifecycle-schema.mjs && node scripts/sync-research-schema.mjs && node scripts/sync-shift-schema.mjs --check && node scripts/sync-jobs-schema.mjs --check && node scripts/sync-entitlements-schema.mjs --check && node scripts/sync-payments-schema.mjs --check && node scripts/sync-report-builder-schema.mjs --check && node scripts/sync-rbac-schema.mjs --check && node scripts/sync-notifications-schema.mjs --check && node scripts/sync-prisma-plugins.mjs --check && prisma generate && tsc",
     "clean": "rm -rf dist node_modules coverage",
     "test": "node ../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest watch",
@@ -20,7 +20,7 @@
     "lint": "pnpm run lint:files .",
     "lint:fix": "bash -c 'eslint \"${@:-.}\" --max-warnings 0 --fix' _",
     "typecheck": "tsc --noEmit",
-    "prisma:generate": "node scripts/sync-lifecycle-schema.mjs && node scripts/sync-research-schema.mjs && node scripts/sync-shift-schema.mjs --check && node scripts/sync-jobs-schema.mjs --check && node scripts/sync-entitlements-schema.mjs --check && node scripts/sync-payments-schema.mjs --check && node scripts/sync-report-builder-schema.mjs --check && node scripts/sync-rbac-schema.mjs --check && node scripts/sync-prisma-plugins.mjs --check && prisma generate",
+    "prisma:generate": "node scripts/sync-lifecycle-schema.mjs && node scripts/sync-research-schema.mjs && node scripts/sync-shift-schema.mjs --check && node scripts/sync-jobs-schema.mjs --check && node scripts/sync-entitlements-schema.mjs --check && node scripts/sync-payments-schema.mjs --check && node scripts/sync-report-builder-schema.mjs --check && node scripts/sync-rbac-schema.mjs --check && node scripts/sync-notifications-schema.mjs --check && node scripts/sync-prisma-plugins.mjs --check && prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
@@ -39,7 +39,9 @@
     "prisma:sync-plugins": "node scripts/sync-prisma-plugins.mjs",
     "prisma:sync-plugins:check": "node scripts/sync-prisma-plugins.mjs --check",
     "prisma:sync-rbac": "node scripts/sync-rbac-schema.mjs",
-    "prisma:sync-rbac:check": "node scripts/sync-rbac-schema.mjs --check"
+    "prisma:sync-rbac:check": "node scripts/sync-rbac-schema.mjs --check",
+    "prisma:sync-notifications": "node scripts/sync-notifications-schema.mjs",
+    "prisma:sync-notifications:check": "node scripts/sync-notifications-schema.mjs --check"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.2.17",
@@ -53,6 +55,7 @@
     "@12-apps/entity-lifecycle": "workspace:*",
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/jobs": "workspace:*",
+    "@12-apps/notifications": "workspace:*",
     "@12-apps/payments-backend": "workspace:*",
     "@12-apps/product-research": "workspace:*",
     "@12-apps/rbac": "workspace:*",

@@ -1,0 +1,367 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { createWebNotifications } from '../create-web-notifications';
+import type { NotificationsResult, NotificationsTransport } from '../transport';
+
+/**
+ * The published FRONTEND surface, driven through `createWebNotifications` —
+ * the only thing a host calls.
+ *
+ * The TRANSPORT is substituted rather than `globalThis.fetch`, which is what
+ * that seam exists for: the assertions are about the screens and the shared
+ * store, and every URL the packaged client builds is asserted directly.
+ */
+
+/** Fixed: nothing here asserts a relative timestamp, only the row's identity. */
+const SEEDED_AT = '2026-08-13T09:00:00.000Z';
+
+interface Recorded {
+  reads: string[];
+  writes: { path: string; method: string; body?: unknown }[];
+}
+
+function inboxPage(
+  count: number,
+  offset = 0,
+  nextCursor: string | null = null,
+): { items: unknown[]; nextCursor: string | null } {
+  return {
+    items: Array.from({ length: count }, (_, index) => ({
+      id: `n${offset + index}`,
+      type: 'order.paid',
+      category: 'orders',
+      title: `Pagamento ${offset + index}`,
+      body: 'Pedido pago.',
+      link: `/orders/${offset + index}`,
+      data: {},
+      readAt: null,
+      createdAt: SEEDED_AT,
+    })),
+    nextCursor,
+  };
+}
+
+const PREFERENCES = {
+  preferences: {
+    orders: { EMAIL: true, SMS: false, WHATSAPP: false, WEB_PUSH: true },
+    system: { EMAIL: true, SMS: false, WHATSAPP: false, WEB_PUSH: true },
+  },
+  availability: { EMAIL: true, SMS: false, WHATSAPP: false, WEB_PUSH: false },
+  categories: ['orders', 'system'],
+};
+
+function fakeTransport(
+  responses: Record<string, unknown>,
+  recorded: Recorded,
+): NotificationsTransport {
+  return {
+    get<T>(path: string): Promise<T> {
+      recorded.reads.push(path);
+      const match = Object.keys(responses).find((key) => path === key);
+      if (!match) return Promise.reject(new Error(`no stub for ${path}`));
+      return Promise.resolve(responses[match] as T);
+    },
+    send<T>(path: string, method: string, body?: unknown): Promise<NotificationsResult<T>> {
+      recorded.writes.push({ path, method, body });
+      return Promise.resolve({ ok: true, data: (responses[path] ?? {}) as T });
+    },
+  };
+}
+
+const bellLabel = (): string | null =>
+  screen.getByTestId('notifications-bell').getAttribute('aria-label');
+
+let recorded: Recorded;
+
+beforeEach(() => {
+  recorded = { reads: [], writes: [] };
+});
+
+afterEach(cleanup);
+
+describe('the bell and the badge', () => {
+  it('renders the unread count in the pt-BR accessible name', async () => {
+    const { BellButton } = createWebNotifications({
+      apiBase: '/api/account',
+      transport: fakeTransport(
+        { '/api/account/notifications/unread-count': { count: 3 } },
+        recorded,
+      ),
+    });
+    render(<BellButton onClick={() => undefined} />);
+
+    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (3 não lidas)'));
+  });
+
+  it('refetches on a hint from the host bus, and unsubscribes on unmount', async () => {
+    // The realtime seam. The hint carries NO count — it says only "ask again" —
+    // so the number on screen is always one the server just gave us, which is
+    // what keeps a dropped event a latency cost rather than a correctness one.
+    const bus = { counts: 1, hint: (): void => undefined, unsubscribed: 0 };
+    const { BellButton } = createWebNotifications({
+      apiBase: '/api/account',
+      transport: {
+        get: <T,>(path: string): Promise<T> => {
+          recorded.reads.push(path);
+          return Promise.resolve({ count: bus.counts } as T);
+        },
+        send: <T,>(): Promise<NotificationsResult<T>> =>
+          Promise.resolve({ ok: true, data: undefined as T }),
+      },
+      subscribe: (onHint) => {
+        bus.hint = onHint;
+        return () => {
+          bus.unsubscribed += 1;
+        };
+      },
+    });
+    const view = render(<BellButton onClick={() => undefined} />);
+
+    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (1 não lidas)'));
+    bus.counts = 7;
+    bus.hint();
+    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (7 não lidas)'));
+
+    view.unmount();
+    expect(bus.unsubscribed).toBe(1);
+  });
+
+  it('asks for nothing at all while disabled (a signed-out header)', async () => {
+    const { BellButton } = createWebNotifications({
+      apiBase: '/api/account',
+      transport: fakeTransport(
+        { '/api/account/notifications/unread-count': { count: 3 } },
+        recorded,
+      ),
+    });
+    render(<BellButton enabled={false} onClick={() => undefined} />);
+
+    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações'));
+    expect(recorded.reads).toEqual([]);
+  });
+});
+
+describe('the inbox panel', () => {
+  function mount(pages: Record<string, unknown>): ReturnType<typeof createWebNotifications> {
+    return createWebNotifications({
+      apiBase: '/api/account',
+      transport: fakeTransport(
+        { '/api/account/notifications/unread-count': { count: 2 }, ...pages },
+        recorded,
+      ),
+    });
+  }
+
+  it('lists the newest page, read through the packaged URL', async () => {
+    const { Panel } = mount({ '/api/account/notifications?limit=20': inboxPage(2) });
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('notification-n0')).toBeTruthy());
+    expect(recorded.reads).toContain('/api/account/notifications?limit=20');
+  });
+
+  it('shows the pt-BR empty state when there is nothing', async () => {
+    const { Panel } = mount({ '/api/account/notifications?limit=20': inboxPage(0) });
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('notifications-empty').textContent).toContain(
+        'Nenhuma notificação',
+      ),
+    );
+  });
+
+  it('shows the error state with a retry when the read fails', async () => {
+    const { Panel } = mount({});
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('notifications-error').textContent).toContain(
+        'Não foi possível carregar',
+      ),
+    );
+  });
+
+  it('marks a row read optimistically and moves the badge in the same tick', async () => {
+    const { Panel, BellButton } = mount({
+      '/api/account/notifications?limit=20': inboxPage(2),
+    });
+    render(
+      <>
+        <BellButton onClick={() => undefined} />
+        <Panel open onClose={() => undefined} />
+      </>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('notification-n0')).toBeTruthy());
+    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (2 não lidas)'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pagamento 0 (não lida)' }));
+
+    // The bell and the panel share ONE store, which is what makes this true.
+    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (1 não lidas)'));
+    expect(recorded.writes).toContainEqual({
+      path: '/api/account/notifications/mark-read',
+      method: 'POST',
+      body: { ids: ['n0'] },
+    });
+  });
+
+  it('marks all read and drops the badge to zero', async () => {
+    const { Panel, BellButton } = mount({
+      '/api/account/notifications?limit=20': inboxPage(2),
+    });
+    render(
+      <>
+        <BellButton onClick={() => undefined} />
+        <Panel open onClose={() => undefined} />
+      </>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('notifications-mark-all-read')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('notifications-mark-all-read'));
+
+    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações'));
+    expect(recorded.writes).toContainEqual({
+      path: '/api/account/notifications/mark-read',
+      method: 'POST',
+      body: { all: true },
+    });
+  });
+
+  it('soft-deletes a row and takes its unread place in the count with it', async () => {
+    const { Panel, BellButton } = mount({
+      '/api/account/notifications?limit=20': inboxPage(2),
+    });
+    render(
+      <>
+        <BellButton onClick={() => undefined} />
+        <Panel open onClose={() => undefined} />
+      </>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('notification-delete-n0')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('notification-delete-n0'));
+
+    await waitFor(() => expect(screen.queryByTestId('notification-n0')).toBeNull());
+    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (1 não lidas)'));
+    expect(recorded.writes).toContainEqual({
+      path: '/api/account/notifications/delete',
+      method: 'POST',
+      body: { ids: ['n0'] },
+    });
+  });
+
+  it('pages with the cursor the server handed back', async () => {
+    const { Panel } = mount({
+      '/api/account/notifications?limit=20': inboxPage(1, 0, 'c1'),
+      '/api/account/notifications?limit=20&cursor=c1': inboxPage(1, 20),
+    });
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('notifications-load-more')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('notifications-load-more'));
+
+    await waitFor(() => expect(screen.getByTestId('notification-n20')).toBeTruthy());
+    expect(recorded.reads).toContain('/api/account/notifications?limit=20&cursor=c1');
+  });
+
+  it('deep-links through the host router and closes the panel', async () => {
+    const navigated: string[] = [];
+    const closed = { count: 0 };
+    const { Panel } = mount({ '/api/account/notifications?limit=20': inboxPage(1) });
+    render(
+      <Panel
+        open
+        onClose={() => {
+          closed.count += 1;
+        }}
+        onNavigate={(link) => navigated.push(link)}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('notification-n0')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Pagamento 0 (não lida)' }));
+
+    await waitFor(() => expect(navigated).toEqual(['/orders/0']));
+    expect(closed.count).toBe(1);
+  });
+
+  it('reads NOTHING while closed, and reads on open', async () => {
+    const { Panel } = mount({ '/api/account/notifications?limit=20': inboxPage(1) });
+    const { rerender } = render(<Panel open={false} onClose={() => undefined} />);
+
+    // The gate is `open`, not "the list never loads": the same stub is read the
+    // moment the panel opens, which is what makes the empty array above mean
+    // something.
+    await waitFor(() => expect(recorded.reads).toEqual([]));
+    rerender(<Panel open onClose={() => undefined} />);
+    await waitFor(() =>
+      expect(recorded.reads).toEqual(['/api/account/notifications?limit=20']),
+    );
+  });
+});
+
+describe('the preferences screen', () => {
+  function mount(): ReturnType<typeof createWebNotifications> {
+    return createWebNotifications({
+      apiBase: '/api/account',
+      transport: fakeTransport(
+        {
+          '/api/account/notification-preferences': PREFERENCES,
+          '/api/account/push-subscriptions': { vapidPublicKey: null, count: 0 },
+        },
+        recorded,
+      ),
+    });
+  }
+
+  it('renders the HOST taxonomy, not a hardcoded four', async () => {
+    const { page: PreferencesPage } = mount();
+    render(<PreferencesPage />);
+
+    await waitFor(() => expect(screen.getByTestId('prefs-orders')).toBeTruthy());
+    expect(screen.getByTestId('prefs-system')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId('prefs-stock')).toBeNull());
+    expect(screen.getByTestId('prefs-orders').textContent).toContain('Pedidos');
+  });
+
+  it('disables an unreachable channel and says why, in pt-BR', async () => {
+    const { page: PreferencesPage } = mount();
+    render(<PreferencesPage />);
+
+    await waitFor(() => expect(screen.getByTestId('prefs-orders-SMS')).toBeTruthy());
+    expect((screen.getByTestId('prefs-orders-SMS') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByTestId('prefs-orders-EMAIL') as HTMLInputElement).disabled).toBe(false);
+    expect(screen.getByTestId('prefs-hint-SMS').textContent).toContain(
+      'Cadastre um telefone no seu perfil para receber SMS',
+    );
+  });
+
+  it('auto-saves one toggle as a single-key PUT', async () => {
+    const { page: PreferencesPage } = mount();
+    render(<PreferencesPage />);
+
+    await waitFor(() => expect(screen.getByTestId('prefs-orders-EMAIL')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('prefs-orders-EMAIL'));
+
+    await waitFor(() =>
+      expect(recorded.writes).toContainEqual({
+        path: '/api/account/notification-preferences',
+        method: 'PUT',
+        // One category, one channel: the whole reason the server MERGES a save
+        // rather than replacing the row.
+        body: { orders: { EMAIL: false } },
+      }),
+    );
+  });
+
+  it('hides the browser push step when the platform cannot send at all', async () => {
+    const { page: PreferencesPage } = mount();
+    render(<PreferencesPage />);
+    await waitFor(() => expect(screen.getByTestId('prefs-orders')).toBeTruthy());
+    await waitFor(() => expect(screen.queryByTestId('web-push-device-setup')).toBeNull());
+  });
+});

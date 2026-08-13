@@ -43,6 +43,12 @@ import { entitlementDenialResponse, isEntitlementDenial } from '@12-apps/entitle
 
 import { createEntitlementsHost, TENANT } from './entitlements-host';
 import { applyLifecycleMigrations } from './lifecycle-db';
+import { applyNotificationMigrations } from './notifications-db';
+import {
+  createNotificationHostTables,
+  notificationsHost,
+  reseedNotifications,
+} from './notifications-host';
 import { demoEntityRoutes } from './lifecycle-demo-crud';
 import { createLifecycleDemoTables, lifecycleHost, reseedLifecycle } from './lifecycle-host';
 import { applyRbacMigrations } from './rbac-db';
@@ -52,27 +58,52 @@ import { openReportsDb, reseed, savedReportDb } from './saved-report-db';
 
 export interface HarnessBackend {
   app: Hono;
+  /**
+   * The database itself, for suites whose subject is the SQL — a delivery row's
+   * status, a JSONB round trip, an index doing its job. Reading it through an
+   * endpoint the same suite would have to add is a longer way to assert less.
+   */
+  pg: PGlite;
   /** Closing it is the caller's job; the server itself never does. */
   close: () => Promise<void>;
 }
 
-export async function createHarnessBackend(): Promise<HarnessBackend> {
-  const pg: PGlite = await openReportsDb();
-  // The RBAC tables arrive the way a host deploy applies them: the package's
-  // own migrations, read out of the installed tarball (12-13). This also
-  // retires the `/roles` stub that used to answer the reports "Cargos
-  // específicos" picker with an empty page — the picker now reads the REAL
-  // roles endpoint, seeded catalog and all.
+/**
+ * Bring the schema up and mount the hosts over it.
+ *
+ * Every packaged surface's tables arrive the way a host DEPLOY applies them: that
+ * package's own migrations, read out of the installed tarball. The tables the
+ * HOST owns — the two demo entity tables, the fan-out's grant table — are created
+ * beside them, because a real adopter's schema already has its own.
+ */
+async function bringUp(pg: PGlite): Promise<{
+  rbac: ReturnType<typeof rbacHost>;
+  lifecycle: ReturnType<typeof lifecycleHost>;
+  notifications: ReturnType<typeof notificationsHost>;
+}> {
+  // 12-13. This also retired the `/roles` stub that used to answer the reports
+  // "Cargos específicos" picker with an empty page — the picker now reads the
+  // REAL roles endpoint, seeded catalog and all.
   await applyRbacMigrations(pg);
   const rbac = rbacHost(pg);
   await reseedRbac(pg, rbac);
-  // The lifecycle tables arrive the same way (12-17): the package's own
-  // migrations out of the installed tarball; the two DEMO entity tables are
-  // the host's (a real adopter's schema already has its own).
+  // 12-17.
   await applyLifecycleMigrations(pg);
   await createLifecycleDemoTables(pg);
   const lifecycle = lifecycleHost(pg);
   await reseedLifecycle(pg);
+  // 12-15. `notification_audience` is the HOST's — the authorization engine
+  // behind the permission fan-out.
+  await applyNotificationMigrations(pg);
+  await createNotificationHostTables(pg);
+  const notifications = notificationsHost(pg);
+  await reseedNotifications(pg, notifications);
+  return { rbac, lifecycle, notifications };
+}
+
+export async function createHarnessBackend(): Promise<HarnessBackend> {
+  const pg: PGlite = await openReportsDb();
+  const { rbac, lifecycle, notifications } = await bringUp(pg);
   const entitlements = createEntitlementsHost();
   const app = new Hono();
 
@@ -96,6 +127,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     await reseed(pg);
     await reseedRbac(pg, rbac);
     await reseedLifecycle(pg);
+    await reseedNotifications(pg, notifications);
     entitlements.reset();
     return c.body(null, 204);
   });
@@ -130,9 +162,13 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.delete('/api/admin/:tenantSlug/catalog-items/:id', demo.remove);
   app.delete('/api/admin/:tenantSlug/demo-suppliers/:id', demo.removeSupplier);
 
+  // Self-scoped and tenant-free: the account surface every signed-in user has.
+  app.route('/api/account', notifications.router);
+  app.route('/__harness/notifications', notifications.harnessRoutes);
+
   app.route('/api/admin/:tenantSlug', entitlements.router);
   app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
   app.route('/api/admin/:tenantSlug', rbac.router);
 
-  return { app, close: () => pg.close() };
+  return { app, pg, close: () => pg.close() };
 }

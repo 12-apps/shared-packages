@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 
 import { EntitlementsPlanPage } from './entitlements-plan';
 import { LifecycleAdminPage } from './lifecycle-admin';
+import { NotificationsCenterPage } from './notifications-center';
 import { PaymentsCheckoutApplePayPage } from './payments-checkout-apple-pay';
 import { PaymentsCheckoutBothPage } from './payments-checkout-both';
 import { PaymentsCheckoutBuyerFieldsPage } from './payments-checkout-buyer-fields';
@@ -298,6 +299,13 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/rbac',
     group: 'backoffice',
     Component: RbacAdminPage,
+  },
+  {
+    slug: 'notifications-center',
+    title: 'Notifications',
+    pkg: '@12-apps/notifications',
+    group: 'backoffice',
+    Component: NotificationsCenterPage,
   },
   {
     slug: 'lifecycle-admin',

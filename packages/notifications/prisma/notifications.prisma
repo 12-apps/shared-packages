@@ -1,0 +1,119 @@
+// @12-apps/notifications (12-15) — the four models the notification system
+// owns, COPIED into a host's schema folder by
+// `pnpm --filter @12-apps/notifications prisma:sync` (never symlinked: Prisma
+// lstats a migration directory, so a symlinked migration is silently skipped
+// and a green deploy applies no schema).
+//
+// Deliberately NO foreign keys into host tables (the payments-backend
+// doctrine): `user_id` and `client_id` are by-value scalars, and the host's own
+// migration may add FK constraints (recommended: both ON DELETE CASCADE, so a
+// deleted account takes its inbox with it). The relation INTERNAL to the
+// partial — notification_deliveries -> notifications — IS constrained, with a
+// cascade, so a purged notification can never leave orphan delivery rows.
+//
+// Do not edit a synced copy by hand: the next sync reverts it and
+// `prisma:sync:check` goes red in CI.
+
+// One inbox entry — the always-on channel. Written for EVERY emit, before any
+// transport is consulted, which is what makes "the user was told" true even
+// when every provider is down. `type` is an open dot-namespaced set validated
+// by the generator registry at the emit site (deliberately no CHECK, so a new
+// notification type ships without a migration); `category` is the closed
+// preference set and carries one.
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  clientId  String?   @map("client_id")
+  type      String
+  category  String
+  title     String
+  body      String
+  link      String?
+  data      Json      @default("{}")
+  readAt    DateTime? @map("read_at")
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  deliveries NotificationDelivery[]
+
+  // The inbox list (owner, not-deleted, newest first) and the unread-count
+  // badge (owner, not-deleted, unread) — both single-index scans.
+  @@index([userId, deletedAt, createdAt])
+  @@index([userId, deletedAt, readAt])
+  @@map("notifications")
+}
+
+// Per-channel delivery tracking for one Notification: one row per transport
+// channel the router fanned out to, carrying the channel lifecycle
+// (QUEUED -> SENT | FAILED, String + DB CHECK) and the provider error when a
+// send fails. `channel` is EMAIL | SMS | WHATSAPP | WEB_PUSH (CHECK in the
+// migration). `@@unique([notificationId, channel])` makes fan-out idempotent —
+// re-dispatching a notification can never enqueue a duplicate delivery, which
+// is what keeps transport sends retry-safe. Failures are isolated per row: one
+// channel failing never blocks the inbox record or the other channels.
+model NotificationDelivery {
+  id             String    @id @default(uuid())
+  notificationId String    @map("notification_id")
+  channel        String
+  status         String    @default("QUEUED")
+  error          String?
+  sentAt         DateTime? @map("sent_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, channel])
+  // Serves the retry sweep ("re-dispatch QUEUED/FAILED deliveries").
+  @@index([status, createdAt])
+  @@map("notification_deliveries")
+}
+
+// A user's channel choices for ONE notification category: which of the
+// transport channels may carry notifications of that category to them. One row
+// per (user, category); NO row = the code-level defaults apply (email + web
+// push on, the paid per-message channels off), so the table only ever stores
+// EXPLICIT choices. The inbox is NOT a channel here — it is always on and not
+// preference-gated.
+//
+// `channels` is a JSON map { "EMAIL": true, "SMS": false, … } rather than one
+// boolean column per channel: the channel set is open-ended, and a new
+// transport must not need a schema change — the open/closed rule the whole
+// pipeline is built on. A stored row missing a channel key falls back to that
+// channel's default, which is what makes the arrival of a channel a no-op for
+// every existing row.
+model NotificationPreference {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  category  String
+  channels  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, category])
+  @@map("notification_preferences")
+}
+
+// One browser push subscription registered by a user's device — the Web Push
+// transport's destination, exactly as `PushManager.subscribe()` returns it: the
+// push-service `endpoint` (globally unique per subscription, hence @unique —
+// re-registering the same browser upserts rather than duplicates) plus the
+// `p256dh`/`auth` client keys the RFC 8291 payload encryption needs. A user may
+// hold many rows (one per browser/device); the transport sends to all of them.
+// A subscription the push service reports GONE (404/410) is pruned by the
+// transport, so the table self-heals as browsers expire subscriptions.
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  // Free-form browser/device hint ("Chrome · Linux") for a device list.
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}

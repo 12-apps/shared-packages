@@ -89,6 +89,7 @@
         "@12-apps/entitlements",
         "@12-apps/entity-lifecycle",
         "@12-apps/jobs",
+        "@12-apps/notifications",
         "@12-apps/payments-backend",
         "@12-apps/product-research",
         "@12-apps/rbac",
@@ -137,6 +138,21 @@
         "src/server/index.ts",
         "src/react/index.ts",
         "src/hono/index.ts",
+        "scripts/*.mjs"
+      ]
+    },
+    "packages/notifications": {
+      "entry": [
+        "src/index.ts",
+        "// The published subpaths: the server surface, its Hono adapter, the",
+        "// React surface, and the VAPID sender (its own subpath because it is",
+        "// the only piece that needs the optional `web-push` peer). Plus the",
+        "// packaged schema-sync script a HOST runs with `node .../scripts/...`,",
+        "// reached by no import in this repo.",
+        "src/server/index.ts",
+        "src/hono/index.ts",
+        "src/react/index.ts",
+        "src/web-push/index.ts",
         "scripts/*.mjs"
       ]
     },
