@@ -65,9 +65,11 @@ model RealtimeOutboxEvent {
   /// row that ran out of attempts.
   lastError String?   @map("last_error")
 
-  /// The drain's own read: pending rows in commit order.
+  /// The drain's own read (pending rows oldest first), and the purge's
+  /// (published rows past a cutoff) — one composite serves both, because
+  /// `published_at` leads it. A separate `@@index([publishedAt])` is a
+  /// redundant PREFIX of this one: no query it could serve is unserved here,
+  /// and it costs a write amplification on every insert.
   @@index([publishedAt, createdAt])
-  /// The purge's read: published rows older than a cutoff.
-  @@index([publishedAt])
   @@map("realtime_outbox_events")
 }

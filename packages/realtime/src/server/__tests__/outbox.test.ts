@@ -6,8 +6,11 @@ import {
   createRealtimeOutbox,
   enqueueRealtimeEvent,
   OUTBOX_DEFAULT_MAX_ATTEMPTS,
+  type OutboxDrainResult,
+  type RealtimeOutbox,
   type RealtimeOutboxDrainDb,
   type RealtimeOutboxRow,
+  type RealtimeOutboxWriteDb,
 } from "../outbox";
 
 /**
@@ -86,6 +89,8 @@ function memoryStore() {
         } else {
           row.claimedAt = null;
           row.lastError = (data as { lastError: string }).lastError;
+          // The refund shape: a GLOBAL fault gives the claim's attempt back.
+          if ((data as { attempts?: { decrement: 1 } }).attempts) row.attempts -= 1;
         }
         return { count: 1 };
       },
@@ -143,6 +148,27 @@ function freezeClock(): void {
   vi.useFakeTimers({ now: T0 });
 }
 
+/**
+ * The exact drain loop `ADOPTING.md` prescribes — `while (pass.more) pass = await drain()` —
+ * plus how many ticks it took.
+ *
+ * A named helper with a container rather than two `let`s in a test body: the flakiness gate
+ * reads a reassigned binding as mutable shared state, and the tick COUNT is the assertion
+ * that matters (a global fault used to keep `more` true until every row had hit
+ * `maxAttempts`).
+ */
+async function drainToCompletion(
+  outbox: RealtimeOutbox,
+  limit = 50,
+): Promise<{ ticks: number; last: OutboxDrainResult }> {
+  const run = { ticks: 1, last: await outbox.drain() };
+  while (run.last.more && run.ticks < limit) {
+    run.last = await outbox.drain();
+    run.ticks += 1;
+  }
+  return run;
+}
+
 /** Install a bus that records what reached it. */
 function busThatWorks(): { published: { topic: string; id: string }[] } {
   const driver = createInlineRealtimeDriver({ logger: silentLogger });
@@ -151,6 +177,39 @@ function busThatWorks(): { published: { topic: string; id: string }[] } {
   driver.publish = async (topic, event) => {
     published.push({ topic, id: event.id });
     await original(topic, event);
+  };
+  configureRealtime({ driver, logger: silentLogger });
+  return { published };
+}
+
+/**
+ * Install a bus that is THERE and refuses — the `error` reason.
+ *
+ * Distinct from "no driver configured" in the one way that now matters: a driver whose
+ * publish throws is a bus that is unwell, so the attempt stands. A process with no driver
+ * at all never claims a row in the first place.
+ */
+function busThatRefuses(): void {
+  const driver = createInlineRealtimeDriver({ logger: silentLogger });
+  driver.publish = () => Promise.reject(new Error("redis is down"));
+  configureRealtime({ driver, logger: silentLogger });
+}
+
+/**
+ * Install a bus that DISAPPEARS after `afterPublishes` successful publishes.
+ *
+ * The only way `no-driver` is reachable inside a pass now that `drainOnce` checks first:
+ * a concurrent `stop()` between the check and a publish. Deterministic here rather than
+ * raced — `publishRealtimeEvent` re-reads the runtime per call, so the row after the reset
+ * gets `no-driver` while the ones before it succeeded.
+ */
+function busThatVanishes(afterPublishes: number): { published: string[] } {
+  const driver = createInlineRealtimeDriver({ logger: silentLogger });
+  const published: string[] = [];
+  driver.publish = async (_topic, event) => {
+    published.push(event.id);
+    if (published.length >= afterPublishes) resetRealtimeRuntime();
+    await Promise.resolve();
   };
   configureRealtime({ driver, logger: silentLogger });
   return { published };
@@ -192,7 +251,7 @@ describe("enqueueRealtimeEvent", () => {
 });
 
 describe("outbox drain — the happy path", () => {
-  it("publishes pending rows in commit order and marks them", async () => {
+  it("publishes pending rows in created_at order and marks them", async () => {
     const store = memoryStore();
     const bus = busThatWorks();
     for (const orderId of ["o-1", "o-2", "o-3"]) {
@@ -340,41 +399,89 @@ describe("outbox drain — TWO DRAINS, ONE ROW", () => {
 describe("outbox drain — failure and the attempt ceiling", () => {
   it("releases the claim and records the reason when the bus refuses", async () => {
     const store = memoryStore();
-    // No driver configured: `publishRealtimeEvent` reports `no-driver` and never throws.
+    // A driver that is THERE and throws: `publishRealtimeEvent` reports `error` and never
+    // throws onward. The attempt stands — that is what bounds a row that keeps failing.
+    busThatRefuses();
     await enqueueRealtimeEvent(store.writeDb, { topic: "tenant:t-1:orders", type: "x" });
     const outbox = createRealtimeOutbox({ db: () => store.db, logger: silentLogger });
 
     expect(await outbox.drain()).toMatchObject({ published: 0, failed: 1 });
     const row = store.row("row-1");
     expect(row.publishedAt).toBeNull();
-    expect(row.lastError).toBe("no-driver");
+    expect(row.lastError).toBe("error");
     // Released, so the next pass retries immediately; the attempt is already spent.
     expect(row.claimedAt).toBeNull();
     expect(row.attempts).toBe(1);
   });
 
-  it("stops picking a row up once it has burned its attempts", async () => {
+  it("stops picking a POISON row up once it has burned its attempts", async () => {
     const store = memoryStore();
-    await enqueueRealtimeEvent(store.writeDb, { topic: "tenant:t-1:orders", type: "x" });
+    busThatWorks();
+    // A malformed topic is the genuinely per-row fault: `publishRealtimeEvent` answers
+    // `invalid-topic` and will answer it again for ever. Reachable only from outside
+    // `enqueueRealtimeEvent`, which validates inside the caller's transaction — a legacy
+    // row, or hand-written SQL. Written straight into the store for that reason.
+    store.rows.push({
+      id: "poison",
+      topic: "tenant: t-1:orders",
+      type: "x",
+      data: {},
+      attempts: 0,
+      createdAt: 0,
+      publishedAt: null,
+      claimedAt: null,
+      claimedBy: null,
+      lastError: null,
+    });
     const outbox = createRealtimeOutbox({
       db: () => store.db,
       logger: silentLogger,
       maxAttempts: 3,
     });
     for (let pass = 0; pass < 3; pass += 1) await outbox.drain();
-    expect(store.row("row-1").attempts).toBe(3);
+    expect(store.row("poison").attempts).toBe(3);
 
-    // A fourth pass must find nothing — silent infinite retry would grind the drain on
-    // a poison row forever.
+    // A fourth pass must find nothing — silent infinite retry would grind the drain on a
+    // poison row forever. The exclusion is in the candidate READ (`attempts < maxAttempts`),
+    // i.e. in SQL, which is what keeps it from wedging the drain.
     expect(await outbox.drain()).toMatchObject({ published: 0, failed: 0, contended: 0 });
     // And the row STAYS, with its reason: silent deletion is the loss the outbox exists
     // to prevent.
     expect(store.rows).toHaveLength(1);
-    expect(store.row("row-1").lastError).toBe("no-driver");
+    expect(store.row("poison").lastError).toBe("invalid-topic");
+  });
+
+  it("keeps draining PAST a poison row — one bad row blocks nobody", async () => {
+    const store = memoryStore();
+    const bus = busThatWorks();
+    store.rows.push({
+      id: "poison",
+      topic: "tenant: t-1:orders",
+      type: "x",
+      data: {},
+      attempts: 0,
+      createdAt: 0,
+      publishedAt: null,
+      claimedAt: null,
+      claimedBy: null,
+      lastError: null,
+    });
+    // Behind it, and created later, so the poison row is claimed FIRST.
+    await enqueueRealtimeEvent(store.writeDb, { topic: "tenant:t-1:orders", type: "good" });
+
+    // The head-of-line property, in the same pass: `invalid-topic` is a property of that
+    // row alone, so the pass carries on rather than ending on the first failure.
+    expect(await outbox().drain()).toMatchObject({ published: 1, failed: 1, aborted: false });
+    expect(bus.published.map((entry) => entry.id)).toEqual(["row-1"]);
+
+    function outbox() {
+      return createRealtimeOutbox({ db: () => store.db, logger: silentLogger });
+    }
   });
 
   it("counts attempts as CLAIMS, so a drainer that never returns still burns one", async () => {
     const store = memoryStore();
+    busThatRefuses();
     await enqueueRealtimeEvent(store.writeDb, { topic: "tenant:t-1:orders", type: "x" });
     // A drain that dies right after claiming leaves the row claimed. The attempt was
     // already recorded by the claim itself, which is what stops a row that crashes its
@@ -391,6 +498,143 @@ describe("outbox drain — failure and the attempt ceiling", () => {
   it("uses a default ceiling rather than an unbounded retry", () => {
     expect(OUTBOX_DEFAULT_MAX_ATTEMPTS).toBeGreaterThan(1);
     expect(Number.isFinite(OUTBOX_DEFAULT_MAX_ATTEMPTS)).toBe(true);
+  });
+});
+
+/**
+ * The per-row budget is not charged for a deployment-wide fault.
+ *
+ * The failure being defended against: `REDIS_URL` unset is a DOCUMENTED, supported
+ * degradation (clients fall back to polling), and the drain loop `ADOPTING.md` prescribes
+ * is `while (pass.more) pass = await drain()`. Charging `no-driver` per row made that loop
+ * burn a whole backlog to `maxAttempts` inside one job tick, after which the candidate read
+ * excludes every one of those rows FOR EVER — exactly-once persistence preserved, and then
+ * the publish abandoned by a counter meant for poison rows.
+ */
+describe("outbox drain — a GLOBAL fault must not spend a per-ROW budget", () => {
+  it("claims NOTHING when this process has no bus at all", async () => {
+    const store = memoryStore();
+    for (let index = 0; index < 5; index += 1) {
+      await enqueueRealtimeEvent(store.writeDb, { topic: "tenant:t-1:orders", type: "x" });
+    }
+    const outbox = createRealtimeOutbox({ db: () => store.db, logger: silentLogger });
+
+    expect(await outbox.drain()).toEqual({
+      published: 0,
+      failed: 0,
+      contended: 0,
+      // `more: false` is the load-bearing half: it is what ends the prescribed loop.
+      more: false,
+      aborted: true,
+    });
+    // Untouched — not claimed, not charged, not released. "There is no bus to drain to"
+    // is a property of the PASS.
+    expect(store.rows.every((row) => row.attempts === 0 && row.claimedAt === null)).toBe(true);
+  });
+
+  it("does not hot-loop a backlog to the ceiling, however often it is drained", async () => {
+    const store = memoryStore();
+    for (let index = 0; index < 4; index += 1) {
+      await enqueueRealtimeEvent(store.writeDb, { topic: "tenant:t-1:orders", type: "x" });
+    }
+    const outbox = createRealtimeOutbox({
+      db: () => store.db,
+      logger: silentLogger,
+      batchSize: 2,
+      maxAttempts: 3,
+    });
+    // The prescribed drain loop, run to completion. Before the fix this terminated only
+    // because every row had reached `maxAttempts`.
+    const offline = await drainToCompletion(outbox);
+    expect(offline.ticks).toBe(1);
+    expect(store.rows.every((row) => row.attempts === 0)).toBe(true);
+
+    // And the backlog is still publishable the moment a bus arrives — which is the
+    // property the burn destroyed.
+    const bus = busThatWorks();
+    expect((await drainToCompletion(outbox)).last.aborted).toBe(false);
+    expect(bus.published).toHaveLength(4);
+    expect(store.rows.every((row) => row.publishedAt !== null)).toBe(true);
+  });
+
+  it("REFUNDS the attempt when the bus vanishes mid-pass, and stops the pass", async () => {
+    const store = memoryStore();
+    for (let index = 0; index < 4; index += 1) {
+      await enqueueRealtimeEvent(store.writeDb, { topic: "tenant:t-1:orders", type: "x" });
+    }
+    // A concurrent `stop()`: the driver is there when the pass starts and gone by row two.
+    const bus = busThatVanishes(1);
+    const outbox = createRealtimeOutbox({ db: () => store.db, logger: silentLogger });
+
+    expect(await outbox.drain()).toMatchObject({ published: 1, failed: 1, aborted: true });
+    expect(bus.published).toEqual(["row-1"]);
+    // Row two was claimed against a bus that had already gone, so its attempt is given
+    // back: the row did nothing wrong.
+    expect(store.row("row-2")).toMatchObject({
+      attempts: 0,
+      claimedAt: null,
+      lastError: "no-driver",
+      publishedAt: null,
+    });
+    // And rows three and four were never claimed at all — the pass stopped.
+    expect(store.row("row-3").attempts).toBe(0);
+    expect(store.row("row-4").attempts).toBe(0);
+  });
+
+  it("stops the pass on a bus that is unwell, rather than spending every row on it", async () => {
+    const store = memoryStore();
+    busThatRefuses();
+    for (let index = 0; index < 4; index += 1) {
+      await enqueueRealtimeEvent(store.writeDb, { topic: "tenant:t-1:orders", type: "x" });
+    }
+    const outbox = createRealtimeOutbox({ db: () => store.db, logger: silentLogger });
+
+    // `error` came out of the shared driver, so it is read as the bus rather than the row:
+    // the attempt stands (a row that keeps failing must still be bounded) and the other
+    // three keep their full budget for the pass after the outage.
+    expect(await outbox.drain()).toMatchObject({ published: 0, failed: 1, aborted: true });
+    expect(store.rows.map((row) => row.attempts)).toEqual([1, 0, 0, 0]);
+  });
+});
+
+/**
+ * The write seam refuses the BASE client at compile time.
+ *
+ * "Exactly-once PERSISTENCE" is stated as a structural property, and it only holds if the
+ * row is written on the transaction that causes it. `ADOPTING.md` rule 4 says so and a
+ * rule cannot be type-checked — this is the one place the compiler can hold it.
+ */
+describe("enqueueRealtimeEvent — the transaction client, structurally", () => {
+  /** The BASE Prisma client's distinguishing feature: it can open a transaction. */
+  interface BaseClientLike {
+    $transaction<T>(run: (tx: unknown) => Promise<T>): Promise<T>;
+    realtimeOutboxEvent: {
+      create(args: { data: { topic: string; type: string; data: unknown } }): Promise<unknown>;
+    };
+  }
+  /** A `Prisma.TransactionClient` has no `$transaction` — that is what makes it one. */
+  interface TxClientLike {
+    realtimeOutboxEvent: {
+      create(args: { data: { topic: string; type: string; data: unknown } }): Promise<unknown>;
+    };
+  }
+  type Fits<T> = T extends RealtimeOutboxWriteDb ? true : false;
+
+  it("accepts a transaction client and REJECTS the base client", async () => {
+    // Type-level, and it fails `check-types` rather than a run: if the guard regressed,
+    // `Fits<BaseClientLike>` would be `true` and this annotation would not compile.
+    const txFits: Fits<TxClientLike> = true;
+    const baseFits: Fits<BaseClientLike> = false;
+    expect([txFits, baseFits]).toEqual([true, false]);
+
+    const store = memoryStore();
+    const baseLike = { ...store.writeDb, $transaction: () => Promise.resolve(undefined) };
+    // @ts-expect-error — `$transaction?: never` is what turns `enqueueRealtimeEvent(prisma,
+    // …)` — the non-atomic pair the outbox exists to eliminate — into a compile error.
+    await enqueueRealtimeEvent(baseLike, { topic: "tenant:t-1:orders", type: "x" });
+    // It still works at RUNTIME, which is the point: the guarantee is the compiler's, and
+    // nothing here can tell whether a caller was inside a transaction.
+    expect(store.rows).toHaveLength(1);
   });
 });
 

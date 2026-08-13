@@ -93,7 +93,7 @@ describe('@12-apps/realtime — the prisma assets survive publication', () => {
     }
   });
 
-  it('creates the indexes the drain and the purge read through', async () => {
+  it('creates ONE composite index for both the drain and the purge', async () => {
     const db = new PGlite();
     try {
       await applyAll(db);
@@ -101,10 +101,11 @@ describe('@12-apps/realtime — the prisma assets survive publication', () => {
         `SELECT indexname FROM pg_indexes WHERE tablename = 'realtime_outbox_events'
            ORDER BY indexname`,
       );
+      // `published_at` leads the composite, so an index on it alone is a redundant PREFIX:
+      // nothing it could serve is unserved, and it costs a write amplification per insert.
       expect(rows.map((row) => row.indexname)).toEqual([
         'realtime_outbox_events_pkey',
         'realtime_outbox_events_published_at_created_at_idx',
-        'realtime_outbox_events_published_at_idx',
       ]);
     } finally {
       await db.close();

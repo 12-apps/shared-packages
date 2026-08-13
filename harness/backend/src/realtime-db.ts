@@ -11,11 +11,19 @@
  *
  * ## Why the SQL, not a fake, is the interesting part
  *
- * The drain's whole safety property is that a CLAIM is one conditional `UPDATE`, so
- * PostgreSQL decides which of two racing drains wins. A hand-rolled in-memory fake can
- * model that (the package's own unit tests do), but only a real database proves the SQL the
- * seam's argument shapes translate to actually behaves that way — the row lock, the
- * READ COMMITTED re-check, and `affectedRows` being 0 for the loser.
+ * The drain's whole safety property is that a CLAIM is one conditional `UPDATE`, so the
+ * DATABASE decides which of two racing drains wins. A hand-rolled in-memory fake can model
+ * that (the package's own unit tests do), but only a real database proves the SQL those
+ * argument shapes translate to is the SQL that was meant: the predicate really carries every
+ * clause, and `affectedRows` really is 0 for the loser.
+ *
+ * What it does NOT prove, and the docstring used to claim: PostgreSQL's row lock and its
+ * READ COMMITTED re-check. PGlite is single-backend and serializes queries, so no two
+ * statements are ever concurrently inside one. What the twenty-rows/six-drains case does
+ * prove is the INTERLEAVING hazard — all six `findMany`s complete before any claim, which a
+ * read-validate-write drain genuinely fails — and that is the bug class the shape exists to
+ * make unrepresentable. A real-Postgres service container would be needed for the lock
+ * itself.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -135,8 +143,14 @@ export function realtimeOutboxDrainDb(sql: SqlRunner): RealtimeOutboxDrainDb {
           assignments =
             `published_at = ${params.add(mark.publishedAt)}, claimed_at = NULL, last_error = NULL`;
         } else {
-          const release = data as { lastError: string };
+          const release = data as { lastError: string; attempts?: { decrement: 1 } };
           assignments = `claimed_at = NULL, last_error = ${params.add(release.lastError)}`;
+          // The REFUND shape: a global fault (no driver in this process) gives the
+          // claim's attempt back, because `attempts` is a per-row budget for a row nobody
+          // can publish — not a counter for a deployment-wide outage. An adapter that
+          // dropped this clause would be the silently-lost-clause failure the package's
+          // closed argument shapes exist to prevent.
+          if (release.attempts) assignments += ', attempts = attempts - 1';
         }
 
         const { affectedRows } = await sql.query(

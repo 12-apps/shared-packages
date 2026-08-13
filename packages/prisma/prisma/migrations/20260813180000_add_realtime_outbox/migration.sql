@@ -62,9 +62,14 @@ ALTER TABLE "realtime_outbox_events"
     ADD COLUMN IF NOT EXISTS "attempts" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "realtime_outbox_events" ADD COLUMN IF NOT EXISTS "last_error" TEXT;
 
--- The drain's own read: pending rows in commit order.
+-- The drain's own read (pending rows, oldest `created_at` first) and the purge's
+-- (published rows past a cutoff): ONE composite serves both, because
+-- `published_at` leads it. A separate index on `published_at` alone would be a
+-- redundant prefix — no query it could serve is unserved here — and it would
+-- cost a write amplification on every insert.
 CREATE INDEX IF NOT EXISTS "realtime_outbox_events_published_at_created_at_idx"
     ON "realtime_outbox_events"("published_at", "created_at");
--- The purge's read: published rows older than a cutoff.
-CREATE INDEX IF NOT EXISTS "realtime_outbox_events_published_at_idx"
-    ON "realtime_outbox_events"("published_at");
+-- Dropped rather than never created: an adopter that already applied an earlier
+-- copy of this migration HAS the redundant index, and `IF EXISTS` makes the
+-- removal replay-safe on a database that never did.
+DROP INDEX IF EXISTS "realtime_outbox_events_published_at_idx";

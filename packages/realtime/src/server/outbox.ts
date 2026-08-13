@@ -1,8 +1,14 @@
 import { randomUUID } from "node:crypto";
 
-import { publishRealtimeEvent } from "../core/runtime";
 import { isValidTopic } from "../core/topics";
 import type { RealtimeLogger } from "../core/types";
+
+import {
+  drainOnce,
+  type DrainSettings,
+  type OutboxDrainResult,
+  type RealtimeOutboxDrainDb,
+} from "./outbox-drain";
 
 /**
  * The transactional OUTBOX — the durable half of the event system (12-16).
@@ -43,7 +49,10 @@ import type { RealtimeLogger } from "../core/types";
  *   Polling stays the correctness floor on every consumer.
  * - **No total ORDER.** Rows are claimed in `created_at` order, but two drains
  *   running concurrently can publish out of order, and a retried row arrives
- *   after rows created later. Events carry identifiers and consumers re-read, so
+ *   after rows created later. Nor is `created_at` itself commit order:
+ *   `CURRENT_TIMESTAMP` is transaction-START time in PostgreSQL and the ordering
+ *   has no tiebreaker, so even one drainer can claim two rows in an order their
+ *   commits did not have. Events carry identifiers and consumers re-read, so
  *   order is not information anybody is entitled to here.
  *
  * A duplicate is harmless BY CONSTRUCTION rather than by luck: an event carries
@@ -59,9 +68,16 @@ import type { RealtimeLogger } from "../core/types";
  * ## The db seam is structural, like every store in this repo
  *
  * The package never imports a generated Prisma client. A host passes its own
- * client (or transaction client) through the interfaces below; any object with a
- * `realtimeOutboxEvent` delegate of this shape plugs in, which is what lets the
- * harness satisfy it over raw PGlite.
+ * client (or transaction client) through the interfaces here and in
+ * `./outbox-drain.ts`; any object with a `realtimeOutboxEvent` delegate of that
+ * shape plugs in, which is what lets the harness satisfy it over raw PGlite.
+ *
+ * ## Where the halves live
+ *
+ * This module owns the ENQUEUE side, the tuning constants and the factory. The
+ * claim protocol and one pass over it live in `./outbox-drain.ts` — same seam the
+ * text above describes, because a write happens inside a host's transaction and
+ * needs nothing the drain knows.
  *
  * ## Tenancy, and why there is no soft-delete filter here
  *
@@ -85,69 +101,31 @@ export interface RealtimeOutboxInput {
   data?: unknown;
 }
 
-/** One stored outbox row, as the drain reads it. */
-export interface RealtimeOutboxRow {
-  id: string;
-  topic: string;
-  type: string;
-  data: unknown;
-  attempts: number;
-}
-
-/** The transaction-client slice `enqueueRealtimeEvent` needs. */
+/**
+ * The transaction-client slice `enqueueRealtimeEvent` needs.
+ *
+ * ## `$transaction?: never` is the only enforcement this guarantee can have
+ *
+ * "Exactly-once PERSISTENCE" is stated as a STRUCTURAL property, and it only holds if
+ * the row is written on the same transaction as its cause. Without this field the shape
+ * is satisfied by the BASE client too, so
+ *
+ *     await prisma.order.update(…);
+ *     await enqueueRealtimeEvent(prisma, …);   // two independent transactions
+ *
+ * compiles, runs, and produces exactly the non-atomic pair the outbox exists to
+ * eliminate — no type error, no runtime error, green tests. A
+ * `Prisma.TransactionClient` has NO `$transaction` (that is what makes it a transaction
+ * client), so declaring it `never` here keeps every `tx` assignable and turns the base
+ * client into a compile error. `ADOPTING.md` rule 4 already tells hosts the right thing;
+ * a rule cannot be type-checked, and this is the one place the compiler can hold it.
+ */
 export interface RealtimeOutboxWriteDb {
+  $transaction?: never;
   realtimeOutboxEvent: {
     create(args: {
       data: { topic: string; type: string; data: unknown };
     }): Promise<unknown>;
-  };
-}
-
-/** A claim predicate: never claimed, or claimed so long ago the lease lapsed. */
-type ClaimableWhere = [{ claimedAt: null }, { claimedAt: { lt: Date } }];
-
-/**
- * The client slice the drain needs — closed shapes, so a SQL adapter is small
- * and a mismatch is a type error rather than a silently ignored clause.
- *
- * Note what is NOT here: no `update`, no `findUnique`, no `$transaction`. The
- * whole protocol is expressible as conditional `updateMany`s, which is what makes
- * it safe under concurrency without a lock the seam would have to model.
- */
-export interface RealtimeOutboxDrainDb {
-  realtimeOutboxEvent: {
-    /** Candidates: unpublished, under the attempt ceiling, unclaimed or stale. */
-    findMany(args: {
-      where: {
-        publishedAt: null;
-        attempts: { lt: number };
-        OR: ClaimableWhere;
-      };
-      orderBy: { createdAt: "asc" };
-      take: number;
-    }): Promise<RealtimeOutboxRow[]>;
-    /**
-     * The claim, the mark and the release, all as CONDITIONAL writes.
-     *
-     * `count` is the only thing the drain trusts: a claim that updated zero rows
-     * means somebody else got there first, and this drain must skip the row
-     * rather than publish it too.
-     */
-    updateMany(args: {
-      where: {
-        id: string;
-        publishedAt?: null;
-        claimedBy?: string;
-        OR?: ClaimableWhere;
-      };
-      data:
-        | { claimedAt: Date; claimedBy: string; attempts: { increment: 1 } }
-        | { publishedAt: Date; claimedAt: null; lastError: null }
-        | { claimedAt: null; lastError: string };
-    }): Promise<{ count: number }>;
-    deleteMany(args: {
-      where: { publishedAt: { not: null; lt: Date } };
-    }): Promise<{ count: number }>;
   };
 }
 
@@ -192,6 +170,12 @@ export const OUTBOX_DEFAULT_BATCH_SIZE = 100;
  * `attempts` counts CLAIMS, not failures, and that is deliberate: a drainer that
  * crashes mid-publish records nothing, so counting failures would let a row that
  * kills the process be retried for ever. Counting claims bounds it either way.
+ *
+ * What it is NOT charged for is a fault the row had no part in. This is a per-ROW
+ * budget; a deployment-wide fault (no driver in this process) spends none of it,
+ * and ends the pass instead — see `drainOnce` and `publishClaimedRow`. Without
+ * that distinction "the bus is off" parked an entire backlog permanently, which
+ * inverts what the outbox is for.
  */
 export const OUTBOX_DEFAULT_MAX_ATTEMPTS = 10;
 
@@ -220,153 +204,20 @@ export interface RealtimeOutboxOptions {
   drainerId?: string;
 }
 
-export interface OutboxDrainResult {
-  /**
-   * Rows this pass put ON THE BUS.
-   *
-   * Normally also marked. The one gap is the honest one: if this drainer's lease had already
-   * lapsed and another drainer re-claimed the row mid-publish, the mark's `claimedBy`
-   * predicate matches nothing and the row stays pending — so it will be published again.
-   * That is the at-least-once guarantee showing through, and counting the PUBLISH is the
-   * accurate reading of what this pass did.
-   */
-  published: number;
-  /** Rows claimed by this drain whose publish failed (they stay for retry). */
-  failed: number;
-  /** Rows another drain claimed first — skipped, not an error. */
-  contended: number;
-  /** Whether a full batch was read; the caller may want to drain again. */
-  more: boolean;
-}
-
 export interface RealtimeOutbox {
-  /** One pass: claim a batch of pending rows in commit order and publish each. */
+  /**
+   * One pass: claim a batch of pending rows in `created_at` order and publish each.
+   *
+   * Not literally commit order, and the difference is worth naming: `created_at`
+   * defaults to `CURRENT_TIMESTAMP`, which in PostgreSQL is transaction-START time, and
+   * the ordering carries no tiebreaker. So two rows can be claimed in an order their
+   * commits did not have. That is inside the stated guarantee — there is NO total order
+   * here, deliberately — and it is why the payload rule (identifiers, never state)
+   * matters.
+   */
   drain(): Promise<OutboxDrainResult>;
   /** Delete published rows older than `olderThanMs`. Returns how many went. */
   purgePublished(olderThanMs: number): Promise<number>;
-}
-
-/** Everything the pass functions below need, resolved once per factory. */
-interface DrainSettings {
-  logger: RealtimeLogger;
-  batchSize: number;
-  maxAttempts: number;
-  claimLeaseMs: number;
-  drainerId: string;
-}
-
-/** "Unclaimed, or claimed long enough ago that the lease lapsed." */
-function claimable(settings: DrainSettings, nowMs: number): ClaimableWhere {
-  return [{ claimedAt: null }, { claimedAt: { lt: new Date(nowMs - settings.claimLeaseMs) } }];
-}
-
-/**
- * Take exclusive ownership of one row, or answer `false`.
- *
- * A CLAIM-ONCE conditional write, deliberately not a read-then-write: the predicate and
- * the mutation are ONE statement, so PostgreSQL's row lock plus the re-check it performs
- * under READ COMMITTED means exactly one of two racing drains sees `count === 1`. A
- * drain that read `claimed_at IS NULL` and then wrote would have both drains publish the
- * row — the bug class this shape exists to make unrepresentable.
- *
- * The same statement bumps `attempts`, so a claim is always paid for even if the drainer
- * never comes back.
- */
-async function claimRow(
-  db: RealtimeOutboxDrainDb,
-  settings: DrainSettings,
-  row: RealtimeOutboxRow,
-  now: Date,
-): Promise<boolean> {
-  const { count } = await db.realtimeOutboxEvent.updateMany({
-    where: {
-      id: row.id,
-      // Re-asserted here rather than trusted from the read: the row may have been
-      // published by another drain in between.
-      publishedAt: null,
-      OR: claimable(settings, now.getTime()),
-    },
-    data: { claimedAt: now, claimedBy: settings.drainerId, attempts: { increment: 1 } },
-  });
-  return count === 1;
-}
-
-/** What happened to one claimed row. */
-type RowOutcome = "published" | "failed";
-
-/**
- * Publish one CLAIMED row and record the result.
- *
- * The ordinary publish path, deliberately: the outbox is not a second bus, it is a
- * durable feeder of the one that exists. `publish` never throws — a failure comes back
- * as a reason. The row id travels as the event id so a re-publish is recognisable rather
- * than merely repeated.
- */
-async function publishClaimedRow(
-  db: RealtimeOutboxDrainDb,
-  settings: DrainSettings,
-  row: RealtimeOutboxRow,
-): Promise<RowOutcome> {
-  const result = await publishRealtimeEvent(row.topic, {
-    type: row.type,
-    data: row.data,
-    id: row.id,
-  });
-
-  if (result.published) {
-    // `claimedBy` in the predicate keeps a drainer whose lease expired mid-publish from
-    // stamping a row a second drainer now owns.
-    await db.realtimeOutboxEvent.updateMany({
-      where: { id: row.id, publishedAt: null, claimedBy: settings.drainerId },
-      data: { publishedAt: new Date(), claimedAt: null, lastError: null },
-    });
-    return "published";
-  }
-
-  const reason = result.reason ?? "error";
-  // Release the claim so the next pass retries immediately; `attempts` was already spent
-  // at claim time, so this cannot loop for ever.
-  await db.realtimeOutboxEvent.updateMany({
-    where: { id: row.id, claimedBy: settings.drainerId },
-    data: { claimedAt: null, lastError: reason },
-  });
-  if (row.attempts + 1 >= settings.maxAttempts) {
-    settings.logger.error(
-      `outbox row ${row.id} ("${row.type}" on ${row.topic}) reached ` +
-        `${settings.maxAttempts} attempts and will not be retried: ${reason}`,
-    );
-  }
-  return "failed";
-}
-
-/** One drain pass: read a batch of candidates, then claim and publish each. */
-async function drainOnce(
-  db: RealtimeOutboxDrainDb,
-  settings: DrainSettings,
-): Promise<OutboxDrainResult> {
-  const rows = await db.realtimeOutboxEvent.findMany({
-    where: {
-      publishedAt: null,
-      attempts: { lt: settings.maxAttempts },
-      OR: claimable(settings, Date.now()),
-    },
-    orderBy: { createdAt: "asc" },
-    take: settings.batchSize,
-  });
-
-  const tally = { published: 0, failed: 0, contended: 0 };
-  for (const row of rows) {
-    // Re-timed per row: a long batch must not hand out leases that were already half
-    // spent when the pass started.
-    if (!(await claimRow(db, settings, row, new Date()))) {
-      tally.contended += 1;
-      continue;
-    }
-    const outcome = await publishClaimedRow(db, settings, row);
-    tally[outcome] += 1;
-  }
-
-  return { ...tally, more: rows.length === settings.batchSize };
 }
 
 export function createRealtimeOutbox(options: RealtimeOutboxOptions): RealtimeOutbox {
@@ -376,6 +227,7 @@ export function createRealtimeOutbox(options: RealtimeOutboxOptions): RealtimeOu
     maxAttempts: options.maxAttempts ?? OUTBOX_DEFAULT_MAX_ATTEMPTS,
     claimLeaseMs: options.claimLeaseMs ?? OUTBOX_DEFAULT_CLAIM_LEASE_MS,
     drainerId: options.drainerId ?? randomUUID(),
+    noDriver: { warned: false },
   };
 
   return {
@@ -393,3 +245,13 @@ export function createRealtimeOutbox(options: RealtimeOutboxOptions): RealtimeOu
     },
   };
 }
+
+/**
+ * The drain's own surface, re-exported so `./index.ts` and every consumer name ONE module
+ * for the outbox. The split is an internal size boundary, not a change to the API.
+ */
+export {
+  type OutboxDrainResult,
+  type RealtimeOutboxDrainDb,
+  type RealtimeOutboxRow,
+} from "./outbox-drain";

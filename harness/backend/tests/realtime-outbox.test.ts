@@ -53,6 +53,21 @@ function recordingBus(): { published: { topic: string; id: string }[] } {
   return { published };
 }
 
+/**
+ * Install a bus that is THERE and refuses every publish.
+ *
+ * The distinction the SQL below has to honour: a driver that throws is a bus that is
+ * unwell, so the row keeps its attempt. A process with NO driver never claims a row at
+ * all, and a row claimed just as the driver went away has its attempt REFUNDED — which is
+ * an `attempts = attempts - 1` clause the seam's release shape carries and an adapter
+ * could silently drop.
+ */
+function refusingBus(): void {
+  const driver = createInlineRealtimeDriver({ logger: silentLogger });
+  driver.publish = () => Promise.reject(new Error('redis is down'));
+  configureRealtime({ driver, logger: silentLogger });
+}
+
 /** A drain over `pg`, named so a test can run two of them. */
 function drainerOver(pg: PGlite, drainerId: string, options: { claimLeaseMs?: number } = {}): RealtimeOutbox {
   return createRealtimeOutbox({
@@ -107,7 +122,7 @@ describe('the outbox row commits with its cause', () => {
 });
 
 describe('the drain, on a real Postgres', () => {
-  it('publishes pending rows in commit order and marks them', async () => {
+  it('publishes pending rows in created_at order and marks them', async () => {
     const pg = await openRealtimeDb();
     const bus = recordingBus();
     try {
@@ -252,10 +267,10 @@ describe('TWO DRAINS, ONE ROW — the claim is atomic in the database', () => {
 });
 
 describe('failure, and the attempt ceiling', () => {
-  it('releases the claim and records the reason when the bus is dead', async () => {
+  it('releases the claim and records the reason when the bus refuses', async () => {
     const pg = await openRealtimeDb();
     try {
-      // No driver configured: `publishRealtimeEvent` reports `no-driver` and never throws.
+      refusingBus();
       await enqueue(pg, 'a');
       const [id] = await pendingOutboxIds(pg);
       if (!id) throw new Error('no pending row');
@@ -263,7 +278,7 @@ describe('failure, and the attempt ceiling', () => {
       expect(await readOutboxRow(pg, id)).toMatchObject({
         publishedAt: null,
         claimedAt: null,
-        lastError: 'no-driver',
+        lastError: 'error',
         attempts: 1,
       });
     } finally {
@@ -274,6 +289,7 @@ describe('failure, and the attempt ceiling', () => {
   it('stops picking a row up once it has burned its attempts, and KEEPS it', async () => {
     const pg = await openRealtimeDb();
     try {
+      refusingBus();
       await enqueue(pg, 'a');
       const [id] = await pendingOutboxIds(pg);
       if (!id) throw new Error('no pending row');
@@ -286,9 +302,10 @@ describe('failure, and the attempt ceiling', () => {
       await drain.drain();
       await drain.drain();
       // Silent infinite retry would grind the drain on a poison row; silent deletion would
-      // be the exact loss the outbox exists to prevent.
+      // be the exact loss the outbox exists to prevent. The exclusion is in the candidate
+      // read — `attempts < maxAttempts`, i.e. in SQL — so a burned row cannot wedge a pass.
       expect(await drain.drain()).toMatchObject({ published: 0, failed: 0, contended: 0 });
-      expect(await readOutboxRow(pg, id)).toMatchObject({ attempts: 2, lastError: 'no-driver' });
+      expect(await readOutboxRow(pg, id)).toMatchObject({ attempts: 2, lastError: 'error' });
     } finally {
       await pg.close();
     }
@@ -297,13 +314,76 @@ describe('failure, and the attempt ceiling', () => {
   it('drains a row that failed once, on the next pass', async () => {
     const pg = await openRealtimeDb();
     try {
+      // Pass one: the bus is there and refusing, so the attempt is genuinely spent.
+      refusingBus();
       await enqueue(pg, 'a');
-      // Pass one: no bus.
       await drainerOver(pg, 'solo').drain();
       // Pass two: the bus is back. `attempts` already spent one, so the retry is bounded.
       const bus = recordingBus();
       expect(await drainerOver(pg, 'solo').drain()).toMatchObject({ published: 1 });
       expect(bus.published).toHaveLength(1);
+    } finally {
+      await pg.close();
+    }
+  });
+});
+
+/**
+ * A GLOBAL fault must not spend a per-ROW budget — on real SQL.
+ *
+ * `REDIS_URL` unset is a documented, supported degradation, and the drain loop ADOPTING.md
+ * prescribes is `while (pass.more) pass = await drain()`. Charging `no-driver` per row made
+ * that loop burn a whole backlog to `maxAttempts` inside ONE job tick, after which the
+ * candidate read excludes every one of those rows for ever. The unit suite pins the rule;
+ * this pins the SQL — including the `attempts = attempts - 1` refund clause, which an
+ * adapter could translate away without any test noticing.
+ */
+describe('a deployment-wide fault, on a real Postgres', () => {
+  it('claims nothing at all when this process has no bus', async () => {
+    const pg = await openRealtimeDb();
+    try {
+      for (let index = 0; index < 5; index += 1) await enqueue(pg, `e-${index}`);
+      const ids = await pendingOutboxIds(pg);
+
+      expect(await drainerOver(pg, 'solo').drain()).toMatchObject({
+        published: 0,
+        failed: 0,
+        contended: 0,
+        // The load-bearing half: `more: false` is what ends the prescribed loop.
+        more: false,
+        aborted: true,
+      });
+      for (const id of ids) {
+        expect(await readOutboxRow(pg, id)).toMatchObject({ attempts: 0, claimedAt: null });
+      }
+      // Still publishable the moment a bus arrives — the property the burn destroyed.
+      const bus = recordingBus();
+      let pass = await drainerOver(pg, 'solo').drain();
+      while (pass.more) pass = await drainerOver(pg, 'solo').drain();
+      expect(bus.published).toHaveLength(5);
+      expect(await pendingOutboxIds(pg)).toEqual([]);
+    } finally {
+      await pg.close();
+    }
+  });
+
+  it('stops the pass on the first bus failure instead of charging the whole batch', async () => {
+    const pg = await openRealtimeDb();
+    try {
+      refusingBus();
+      for (let index = 0; index < 4; index += 1) await enqueue(pg, `e-${index}`);
+      const ids = await pendingOutboxIds(pg);
+
+      expect(await drainerOver(pg, 'solo').drain()).toMatchObject({
+        published: 0,
+        failed: 1,
+        aborted: true,
+        more: false,
+      });
+      const attempts = [];
+      for (const id of ids) attempts.push((await readOutboxRow(pg, id))?.attempts);
+      // One row paid; the other three keep their full budget for the pass after the outage.
+      expect(attempts).toEqual([1, 0, 0, 0]);
     } finally {
       await pg.close();
     }
