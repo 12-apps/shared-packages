@@ -56,6 +56,18 @@ describe("isValidTopic", () => {
     expect(isValidTopic("tenant::kitchen")).toBe(false);
     expect(isValidTopic("tenant:c1:")).toBe(false);
   });
+
+  it("rejects GLOB metacharacters, which a client-supplied qualifier could carry", () => {
+    // Inert while every driver subscribes by exact match; a cross-tenant wildcard the day
+    // one reaches for `PSUBSCRIBE`. A qualifier is the ONE part of a resolved topic that
+    // comes from the client, so this is where it is cheapest to make impossible.
+    expect(isValidTopic("tenant:c1:kitchen:*")).toBe(false);
+    expect(isValidTopic("tenant:c1:kitchen:st?")).toBe(false);
+    expect(isValidTopic("tenant:c1:kitchen:[ab]")).toBe(false);
+    expect(isValidTopic("tenant:c1:kitchen:a\\b")).toBe(false);
+    // And still accepts everything a real qualifier is.
+    expect(isValidTopic("tenant:ckv9v2x0000008l3g1h2i3j4:kitchen:st-01_A")).toBe(true);
+  });
 });
 
 /**

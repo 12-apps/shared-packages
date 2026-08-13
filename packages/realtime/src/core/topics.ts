@@ -15,8 +15,20 @@
 /** Leading marker of every tenant-scoped topic. */
 const TENANT_PREFIX = "tenant";
 
-/** One topic path segment: non-empty, no separator, no whitespace. */
-const SEGMENT_RE = /^[^\s:]+$/;
+/**
+ * One topic path segment: non-empty, no separator, no whitespace — and no GLOB
+ * metacharacter.
+ *
+ * That last clause is about the one part of a resolved topic a CLIENT controls. A
+ * qualifier arrives as text in `?topics=kitchen:<stationId>`, and `^[^\s:]+$` on its own
+ * accepted `kitchen:*`: a literal segment today, because every driver subscribes by exact
+ * match (`SUBSCRIBE`, and the inline driver keys a `Map`) — and a cross-tenant wildcard
+ * the day one reaches for `PSUBSCRIBE`. Excluding `* ? [ ] \` costs nothing, since every
+ * real segment is a cuid, a uuid or a lowercase domain name, and it means the hazard
+ * cannot be reintroduced by a change made in a driver two files away for an unrelated
+ * reason. A comment could not have promised that.
+ */
+const SEGMENT_RE = /^[^\s:*?[\]\\]+$/;
 
 /** Thrown for a malformed segment — always a programming error at the call site. */
 export class InvalidTopicError extends Error {
