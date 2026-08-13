@@ -11,11 +11,11 @@ import React from 'react';
 
 import {
   alertEmphasisStyles,
+  alertLayoutStyles,
   alertVariantStyles,
   fadeInScale,
   getColorFromTheme,
-  getVariantIcon,
-  iconRotate } from './Alert.styles';
+  getVariantIcon } from './Alert.styles';
 import type { AlertColor } from '@mui/material';
 import type { AlertProps } from './Alert.types';
 
@@ -39,18 +39,7 @@ const StyledAlert = styled(MuiAlert, {
     animation: animate ? `${fadeInScale} 0.3s ease-out` : 'none',
     willChange: 'transform, opacity',
 
-    // Enhanced base styles
-    '.MuiAlert-message': {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: theme.spacing(0.5),
-      fontSize: '0.95rem',
-      lineHeight: 1.5 },
-
-    '.MuiAlert-icon': {
-      transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      alignItems: 'center',
-      animation: animate ? `${iconRotate} 0.6s ease-out` : 'none' },
+    ...alertLayoutStyles(theme, colorPalette, animate),
 
     // Hover effects
     '&:hover': {
