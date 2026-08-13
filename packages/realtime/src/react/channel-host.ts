@@ -5,7 +5,12 @@ import type {
   RealtimeTransportConfig,
   WireSourceFactory,
 } from "./types";
-import { ALIVE_EVERY_MS, type TabMessage, type WorkerMessage } from "./worker/protocol";
+import {
+  ALIVE_EVERY_MS,
+  WORKER_READY_MS,
+  type TabMessage,
+  type WorkerMessage,
+} from "./worker/protocol";
 
 /**
  * Where the connection actually lives (FUT-660).
@@ -104,41 +109,148 @@ export function createLocalHost(
 }
 
 /**
+ * The tab's liveness chatter: the `alive` timer and the `pagehide` goodbye.
+ *
+ * A SharedWorker is never told a port went away — closing a tab, navigating it, or
+ * discarding it under memory pressure all leave a port that looks exactly like an idle one.
+ * So a tab announces itself on a timer and says goodbye when it can. `pagehide` rather than
+ * `beforeunload`: it is the one that fires on iOS and on a bfcache navigation.
+ */
+function keepPortAlive(send: (message: TabMessage) => void): {
+  farewell: () => void;
+  detach: () => void;
+} {
+  const alive = setInterval(() => send({ type: "alive" }), ALIVE_EVERY_MS);
+  const farewell = (): void => send({ type: "bye" });
+  const canListen = typeof window !== "undefined";
+  if (canListen) window.addEventListener("pagehide", farewell);
+  return {
+    farewell,
+    detach: () => {
+      clearInterval(alive);
+      if (canListen) window.removeEventListener("pagehide", farewell);
+    },
+  };
+}
+
+/**
+ * Route the worker's frames to the tab's handlers, and report that it spoke at all.
+ *
+ * ANY recognised frame is proof of life, not just `ready`: a stale cached worker chunk from
+ * before that verb existed still answers with a `status` the moment a tab subscribes, and
+ * treating only `ready` as evidence would demote a worker that is demonstrably working.
+ */
+function forwardWorkerFrames(
+  port: MessagePort,
+  handlers: ChannelHostHandlers,
+  onAnswer: () => void,
+): void {
+  port.onmessage = (event: MessageEvent) => {
+    const data = event.data as WorkerMessage;
+    if (!data?.type) return;
+    onAnswer();
+    if (data.type === "status") handlers.onStatusChange(data.status);
+    else if (data.type === "event") handlers.onMessage(data.message);
+  };
+  port.start();
+}
+
+export interface SharedWorkerHostOptions {
+  /** Where the connection goes if the worker never answers. */
+  fallback: () => ChannelHost;
+  /**
+   * Told when the arrangement changed UNDER the caller (worker → page), so a health
+   * readout and `useTopics().host` report what is actually carrying the connection.
+   */
+  onHostChange?: (kind: ChannelHost["kind"]) => void;
+  /** Test seam; defaults to {@link WORKER_READY_MS}. */
+  readyMs?: number;
+}
+
+/**
  * The connection in a SharedWorker, shared with every other tab on this endpoint.
  * `null` when no connector was configured or the platform will not give us one.
+ *
+ * ## A worker that starts and never answers is DETECTED, not assumed away
+ *
+ * `connect()` yielding a port proves nothing: `new SharedWorker(…)` succeeds even when the
+ * script it names is not a script. That is measured, not hypothetical — Vite once inlined
+ * the worker module as a `data:video/mp2t` URI of raw TypeScript, so the worker never
+ * executed and its port never answered. The dangerous half of that bug is already
+ * structurally impossible (`status` only advances when the worker posts one, so nothing
+ * reports `connected`), but the subsystem was still silently lost for that host: permanent
+ * `disconnected`, no error, no warning, and no degradation anywhere a person would look.
+ *
+ * So the worker posts `ready` on `onconnect` and this waits for ANY frame from it. If none
+ * arrives, the port is closed and `options.fallback()` — the in-page host, which is fully
+ * functional — takes over with the topics already asked for. An optimisation may never be
+ * the reason a screen stops working, and "may never" is worth more as a timeout than as a
+ * sentence in a docstring.
  */
 export function createSharedWorkerHost(
   endpoint: string,
   handlers: ChannelHostHandlers,
   connect: WorkerConnector,
+  options: SharedWorkerHostOptions,
 ): ChannelHost | null {
   const port = connect();
   if (!port) return null;
 
-  const send = (message: TabMessage): void => port.postMessage(message);
-  port.onmessage = (event: MessageEvent) => {
-    const data = event.data as WorkerMessage;
-    if (data?.type === "status") handlers.onStatusChange(data.status);
-    else if (data?.type === "event") handlers.onMessage(data.message);
+  // Container properties rather than closed-over `let`s: the flakiness gate is right that a
+  // reassigned capture is hard to reason about, and these are read from three callbacks.
+  const state = {
+    answered: false,
+    closed: false,
+    /** The in-page host, once the worker has been given up on. */
+    local: null as ChannelHost | null,
+    /** The last union asked for, so a fallback starts where the worker left off. */
+    topics: [] as readonly string[],
   };
-  port.start();
 
-  // The worker is never told a port went away, so a tab says so on its way out and
-  // announces itself on a timer in case it cannot. `pagehide` rather than
-  // `beforeunload`: it is the one that fires on iOS and on a bfcache navigation.
-  const alive = setInterval(() => send({ type: "alive" }), ALIVE_EVERY_MS);
-  const farewell = (): void => send({ type: "bye" });
-  const canListen = typeof window !== "undefined";
-  if (canListen) window.addEventListener("pagehide", farewell);
+  const send = (message: TabMessage): void => port.postMessage(message);
+  const { farewell, detach } = keepPortAlive(send);
+
+  /** Give up on the worker and run the connection in this page instead. */
+  const fallBack = (): void => {
+    if (state.answered || state.closed || state.local) return;
+    detach();
+    port.onmessage = null;
+    port.close();
+    const local = options.fallback();
+    state.local = local;
+    // Whatever was asked for while the worker was still being waited on. Replaying it is
+    // the difference between a fallback and a restart.
+    local.setTopics(state.topics);
+    options.onHostChange?.(local.kind);
+  };
+
+  const readyTimer = setTimeout(fallBack, options.readyMs ?? WORKER_READY_MS);
+  forwardWorkerFrames(port, handlers, () => {
+    state.answered = true;
+    clearTimeout(readyTimer);
+  });
 
   return {
-    kind: "shared-worker",
+    // A getter, because this can change once: the contract is `readonly`, not constant.
+    get kind(): ChannelHost["kind"] {
+      return state.local?.kind ?? "shared-worker";
+    },
     setTopics(topics) {
+      state.topics = topics;
+      if (state.local) {
+        state.local.setTopics(topics);
+        return;
+      }
       send({ type: "subscribe", endpoint, topics: [...topics] });
     },
     close() {
-      clearInterval(alive);
-      if (canListen) window.removeEventListener("pagehide", farewell);
+      state.closed = true;
+      clearTimeout(readyTimer);
+      if (state.local) {
+        state.local.close();
+        return;
+      }
+      detach();
       farewell();
       port.close();
     },

@@ -21,9 +21,11 @@ import { resolveRealtimeDriver } from "./resolve-driver";
 import { createEventStreamResponse } from "./sse";
 import { createTicketSecretResolver, type TicketSecretSource } from "./ticket-secret";
 import {
+  DEFAULT_EVENTS_MESSAGES,
   EventsDenial,
   isEventsDenial,
   type EventsAuthorization,
+  type EventsMessages,
   type EventsRequestContext,
   type EventsRoute,
   type EventsRouteResult,
@@ -75,8 +77,26 @@ export interface EventsServerConfig {
    * fallback chain `REALTIME_TICKET_SECRET` → `AUTH_SECRET`.
    */
   ticketSecret?: TicketSecretSource;
-  /** Per-subject connection cap; default 20, env-overridable. */
+  /**
+   * Per-subject connection cap; default 20, env-overridable.
+   *
+   * **It covers the SSE path only, and SSE is not the wire a working deployment uses.**
+   * `streamRoute` takes a ledger slot; `ticketRoute` cannot, because a ticket carries no
+   * subject on purpose (`../core/ticket.ts` — the gateway must decide nothing), so the
+   * gateway can only enforce its own GLOBAL `maxConnections`. The browser client starts on
+   * `ws` and demotes to `sse` only on failure, so where the socket works this cap is never
+   * reached: one authenticated subject capped at 20 SSE streams can still hold up to
+   * `maxConnections` sockets on a gateway process. Making it real would mean an opaque
+   * subject hash in the ticket and a per-subject ledger in the gateway — accounting, not
+   * authorization — which is a deliberate non-goal here rather than an oversight.
+   */
   connectionCap?: number;
+  /**
+   * Override the strings this surface puts on the wire. Defaults are today's pt-BR,
+   * unchanged — see {@link EventsMessages}, which explains why they are the contract and
+   * why they are nonetheless overridable.
+   */
+  messages?: Partial<EventsMessages>;
   /** Enable the transactional outbox by saying where its rows live. */
   outbox?: Omit<RealtimeOutboxOptions, "logger">;
   /**
@@ -107,9 +127,6 @@ export interface EventsApi {
   outbox: RealtimeOutbox | null;
 }
 
-/** The pt-BR unavailability message — wire-stable, the SPAs read it. */
-const UNAVAILABLE = "Atualizações em tempo real indisponíveis.";
-
 function denialResult(error: unknown): EventsRouteResult {
   if (isEventsDenial(error)) {
     return { status: error.status, body: { error: error.message } };
@@ -121,14 +138,16 @@ function denialResult(error: unknown): EventsRouteResult {
 function specsFor(
   surface: EventsSurfaceConfig,
   query: Record<string, string | undefined>,
+  messages: EventsMessages,
 ): EventsTopicSpec[] {
   if (surface.topicsQuery === false) return [];
   const raw = query.topics;
-  if (!raw) throw new EventsDenial(400, "Tópicos inválidos.");
+  if (!raw) throw new EventsDenial(400, messages.invalidTopics);
   return parseTopicList(
     raw,
     { domains: surface.domains, qualifiedDomains: surface.qualifiedDomains },
     surface.maxTopicsPerConnection ?? DEFAULT_MAX_TOPICS_PER_CONNECTION,
+    messages,
   );
 }
 
@@ -141,6 +160,7 @@ interface RouteDeps {
   logger: RealtimeLogger;
   connections: ConnectionLedger;
   ticketSecret: () => string | null;
+  messages: EventsMessages;
 }
 
 /**
@@ -151,8 +171,9 @@ interface RouteDeps {
 async function authorizeRequest(
   surface: EventsSurfaceConfig,
   context: EventsRequestContext,
+  messages: EventsMessages,
 ): Promise<EventsAuthorization> {
-  const specs = specsFor(surface, context.query);
+  const specs = specsFor(surface, context.query, messages);
   return surface.authorize({ params: context.params, specs, request: context.request });
 }
 
@@ -165,14 +186,14 @@ function streamRoute(surface: EventsSurfaceConfig, deps: RouteDeps): EventsRoute
     handle: async (context): Promise<EventsRouteResult> => {
       let granted: EventsAuthorization;
       try {
-        granted = await authorizeRequest(surface, context);
+        granted = await authorizeRequest(surface, context, deps.messages);
       } catch (error) {
         return denialResult(error);
       }
 
       // After auth, deliberately: "realtime is off" is not information an unauthorized
       // caller should be able to collect.
-      if (!getRealtimeDriver()) return { status: 503, body: { error: UNAVAILABLE } };
+      if (!getRealtimeDriver()) return { status: 503, body: { error: deps.messages.unavailable } };
 
       // A stream subscribed to nothing is the LYING channel FUT-657 exists to prevent: it
       // opens, reports `connected`, heartbeats an empty topic list and the consumer
@@ -180,14 +201,14 @@ function streamRoute(surface: EventsSurfaceConfig, deps: RouteDeps): EventsRoute
       // client's own heartbeat check would reach the same conclusion a beat later anyway.
       if (granted.topics.length === 0) {
         deps.logger.error(`surface "${surface.name}" authorized zero topics; refusing the stream.`);
-        return { status: 503, body: { error: UNAVAILABLE } };
+        return { status: 503, body: { error: deps.messages.unavailable } };
       }
 
       const release = deps.connections.acquire(granted.subjectId);
       if (!release) {
         return {
           status: 429,
-          body: { error: surface.tooManyMessage ?? "Muitas conexões simultâneas." },
+          body: { error: surface.tooManyMessage ?? deps.messages.tooMany },
         };
       }
 
@@ -219,19 +240,19 @@ function ticketRoute(surface: EventsSurfaceConfig, deps: RouteDeps): EventsRoute
       try {
         // The identical authorization the stream route performs, so the two transports
         // can never disagree about who may watch what.
-        granted = await authorizeRequest(surface, context);
+        granted = await authorizeRequest(surface, context, deps.messages);
       } catch (error) {
         return denialResult(error);
       }
 
       const secret = deps.ticketSecret();
-      if (!secret) return { status: 503, body: { error: UNAVAILABLE } };
+      if (!secret) return { status: 503, body: { error: deps.messages.unavailable } };
 
       // A ticket travels in a query string, so the signed payload caps its topic list
       // (`MAX_TICKET_TOPICS`). `maxTopicsPerConnection` bounds the SPECS, not the resolved
       // names — a host whose `authorize` fans one spec out into several topics can exceed
       // it — and `mintRealtimeTicket` throws on that. Answered here rather than allowed to
-      // become a 500 out of a crypto helper, and answered as `UNAVAILABLE`: the honest
+      // become a 500 out of a crypto helper, and answered as `unavailable`: the honest
       // thing to tell a client is "no socket for you", which is exactly the state its SSE
       // fallback handles.
       if (granted.topics.length === 0 || granted.topics.length > MAX_TICKET_TOPICS) {
@@ -240,7 +261,7 @@ function ticketRoute(surface: EventsSurfaceConfig, deps: RouteDeps): EventsRoute
             `carries 1..${MAX_TICKET_TOPICS}. The WebSocket transport is unavailable for ` +
             `this connection; the client falls back to SSE.`,
         );
-        return { status: 503, body: { error: UNAVAILABLE } };
+        return { status: 503, body: { error: deps.messages.unavailable } };
       }
 
       return {
@@ -276,6 +297,9 @@ export function createApiEvents(config: EventsServerConfig): EventsApi {
     logger,
     connections,
     ticketSecret: createTicketSecretResolver(config.ticketSecret, logger),
+    // Resolved ONCE, and per field, so a host overriding one string keeps the defaults for
+    // the other three rather than having to restate the wire contract to change a word.
+    messages: { ...DEFAULT_EVENTS_MESSAGES, ...config.messages },
   };
   const outbox = config.outbox ? createRealtimeOutbox({ ...config.outbox, logger }) : null;
   const state = { started: false };

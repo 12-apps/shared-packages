@@ -3,7 +3,7 @@ import { SharedRealtimeChannel } from "../shared-channel";
 import type { RealtimeTransportConfig } from "../types";
 
 import { WorkerHub } from "./hub";
-import { SWEEP_EVERY_MS } from "./protocol";
+import { SWEEP_EVERY_MS, type WorkerMessage } from "./protocol";
 
 /**
  * `@12-apps/realtime/worker` — the SharedWorker body (FUT-660). Wiring only: every rule
@@ -95,6 +95,10 @@ export function startRealtimeWorker(options: RealtimeWorkerOptions = {}): Worker
     hub.connect(port, Date.now());
     port.onmessage = (message: MessageEvent) => hub.handle(port, message.data, Date.now());
     port.start();
+    // Proof of life, before the tab has asked for anything. A worker script that never
+    // executes leaves a port that looks exactly like a healthy idle one, so the tab needs
+    // something to wait FOR — see `WorkerMessage`'s `ready` and `createSharedWorkerHost`.
+    port.postMessage({ type: "ready" } satisfies WorkerMessage);
   };
 
   setInterval(() => hub.sweep(Date.now()), SWEEP_EVERY_MS);

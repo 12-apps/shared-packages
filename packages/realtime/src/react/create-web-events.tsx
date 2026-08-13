@@ -198,18 +198,26 @@ function useEventsConnection(
       onMessage: (message: RealtimeMessage) => registry.deliver(message),
       onStatusChange: setStatus,
     };
-    // The SharedWorker first, and only when nothing has asked for a specific wire:
-    // `createSource` is an in-page seam, so a caller that passes one is asking for the
-    // connection to be here where it can drive it.
-    const channel =
-      (createSource || !connectWorker
-        ? null
-        : createSharedWorkerHost(endpoint, handlers, connectWorker)) ??
+    const inPage = (): ChannelHost =>
       createLocalHost(endpoint, handlers, {
         transport: shared.transport,
         createSource,
         random,
       });
+    // The SharedWorker first, and only when nothing has asked for a specific wire:
+    // `createSource` is an in-page seam, so a caller that passes one is asking for the
+    // connection to be here where it can drive it.
+    //
+    // `inPage` is handed over as the FALLBACK too, for the worker that starts and never
+    // answers: `setHost` then reports what is really carrying the connection rather than
+    // leaving `shared-worker` beside a permanent `disconnected`.
+    const channel =
+      (createSource || !connectWorker
+        ? null
+        : createSharedWorkerHost(endpoint, handlers, connectWorker, {
+            fallback: inPage,
+            onHostChange: setHost,
+          })) ?? inPage();
     channelRef.current = channel;
     setHost(channel.kind);
     // Adopt whatever is already registered: screens mount before this effect runs, and on

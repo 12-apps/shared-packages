@@ -37,6 +37,44 @@ export function isEventsDenial(error: unknown): error is EventsDenial {
   return error instanceof EventsDenial;
 }
 
+/**
+ * The four strings this surface puts on the wire.
+ *
+ * ## Why the defaults are pt-BR, and why they are not "fixed" here
+ *
+ * They ARE the wire contract: future-pay's SPAs read these exact bodies today, so changing
+ * one is a breaking change to every open tab. That justifies the strings; it does not
+ * justify a generic package having no way to override them, which is what a
+ * non-Brazilian adopter met — Portuguese error bodies out of `@12-apps/realtime` with no
+ * seam. This is the seam, and its defaults are today's strings byte for byte.
+ *
+ * Nothing here is translated. A host that wants another language passes its own.
+ */
+export interface EventsMessages {
+  /** 503 — no driver, no ticket secret, an empty grant, or one a ticket cannot carry. */
+  unavailable: string;
+  /** 400 — an empty `?topics=`, or more entries than the surface allows. */
+  invalidTopics: string;
+  /**
+   * 400 — one entry this surface does not serve, given the rejected name.
+   *
+   * ONE message for "unknown domain" and for "that domain takes no qualifier", and a host
+   * overriding this must keep that property: both are "this surface does not serve that
+   * name", and spelling out which half failed only tells a prober which one to vary.
+   */
+  unknownTopic: (name: string) => string;
+  /** 429 — the subject is at its connection cap. */
+  tooMany: string;
+}
+
+/** Today's strings, unchanged — see {@link EventsMessages}. */
+export const DEFAULT_EVENTS_MESSAGES: EventsMessages = {
+  unavailable: "Atualizações em tempo real indisponíveis.",
+  invalidTopics: "Tópicos inválidos.",
+  unknownTopic: (name) => `Tópico desconhecido: ${name}.`,
+  tooMany: "Muitas conexões simultâneas.",
+};
+
 /** What the host's `authorize` seam receives, per connection attempt. */
 export interface EventsAuthorizeContext {
   /** Route params in the host adapter's spelling (e.g. `tenantSlug`). */

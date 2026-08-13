@@ -45,6 +45,7 @@ export {
   sharedWorkerConnector,
   type ChannelHost,
   type LocalHostOptions,
+  type SharedWorkerHostOptions,
   type WorkerConnector,
 } from "./channel-host";
 

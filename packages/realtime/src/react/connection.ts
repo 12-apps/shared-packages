@@ -329,7 +329,16 @@ export class RealtimeChannel {
     // deploy-restart case, where the gateway is coming back.
     //
     // One-way and once: SSE is fully functional, so a demoted channel is degraded in
-    // no way a consumer can observe. A fresh page load tries `ws` again.
+    // no way a consumer can observe.
+    //
+    // The escape hatch is "a NEW CHANNEL tries `ws` again", and that is not the same as
+    // "a fresh page load" on the arrangement this package now prefers. In the in-page
+    // host the two coincide. Under the SharedWorker the channel lives in the WORKER,
+    // which survives as long as any port is attached — so one tab parked open keeps a
+    // demoted channel across reloads of every other tab, and only closing the last tab
+    // on that endpoint retries the socket. Bounded (SSE is fully functional, and the
+    // union is then maintained by reopening rather than by `subscribe` frames), but it
+    // is a real difference and it belongs stated rather than implied.
     if (this.transport === "ws" && !this.everConnected) {
       this.transport = "sse";
       this.retryMs = INITIAL_RETRY_MS;

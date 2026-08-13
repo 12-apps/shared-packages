@@ -69,10 +69,12 @@ export {
 } from "./outbox";
 
 export {
+  DEFAULT_EVENTS_MESSAGES,
   EventsDenial,
   isEventsDenial,
   type EventsAuthorization,
   type EventsAuthorizeContext,
+  type EventsMessages,
   type EventsRequestContext,
   type EventsRoute,
   type EventsRouteResult,

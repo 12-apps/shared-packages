@@ -1,6 +1,11 @@
 import { isValidTopic } from "../core/topics";
 
-import { EventsDenial, type EventsTopicSpec } from "./types";
+import {
+  DEFAULT_EVENTS_MESSAGES,
+  EventsDenial,
+  type EventsMessages,
+  type EventsTopicSpec,
+} from "./types";
 
 /**
  * `?topics=` parsing for a subscribe surface — the deny-by-default half the
@@ -52,17 +57,21 @@ export function toTopicSpec(
 
 /**
  * Parse and validate a comma-separated topic list. Throws {@link EventsDenial}
- * (400) on an empty list, a list over `max`, or any refused entry — the pt-BR
- * messages are the wire contract future-pay's SPAs already read.
+ * (400) on an empty list, a list over `max`, or any refused entry.
+ *
+ * The default messages are the pt-BR wire contract future-pay's SPAs already read;
+ * `messages` is the seam a differently-localised host overrides them through (see
+ * {@link EventsMessages}).
  */
 export function parseTopicList(
   raw: string,
   registry: TopicRegistry,
   max: number = DEFAULT_MAX_TOPICS_PER_CONNECTION,
+  messages: EventsMessages = DEFAULT_EVENTS_MESSAGES,
 ): EventsTopicSpec[] {
   const names = [...new Set(raw.split(",").map((name) => name.trim()))].filter(Boolean);
   if (names.length === 0 || names.length > max) {
-    throw new EventsDenial(400, "Tópicos inválidos.");
+    throw new EventsDenial(400, messages.invalidTopics);
   }
   const specs: EventsTopicSpec[] = [];
   for (const name of names) {
@@ -70,7 +79,7 @@ export function parseTopicList(
     // One message for "unknown domain" and for "that domain takes no qualifier":
     // both are "this surface does not serve that name", and spelling out which
     // half failed only tells a prober which one to vary.
-    if (!spec) throw new EventsDenial(400, `Tópico desconhecido: ${name}.`);
+    if (!spec) throw new EventsDenial(400, messages.unknownTopic(name));
     specs.push(spec);
   }
   return specs;

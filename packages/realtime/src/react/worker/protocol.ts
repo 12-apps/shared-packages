@@ -41,8 +41,30 @@ export type TabMessage =
 
 /** Sent by the worker. */
 export type WorkerMessage =
+  /**
+   * "The script is running and this port is attached." Posted on `onconnect`, before the
+   * tab has said anything.
+   *
+   * It exists because a SharedWorker that never EXECUTES is indistinguishable from a
+   * healthy idle one: `new SharedWorker(…)` succeeds, `port` is an object, and a bundler
+   * that mis-emits the chunk (measured: Vite inlining the raw TypeScript as a `data:`
+   * URI) leaves a port nothing will ever answer. Without a frame to wait for, the tab's
+   * only symptom is a permanent `disconnected` beside `host === "shared-worker"` — no
+   * error, no console warning, and the whole subsystem silently lost for that host.
+   */
+  | { type: "ready" }
   | { type: "status"; status: RealtimeStatus }
   | { type: "event"; message: RealtimeMessage };
+
+/**
+ * How long a SharedWorker has to answer before the page takes the connection back.
+ *
+ * A real worker answers in the same task it is connected in, so this is not a latency
+ * budget — it is the gap between "starting" and "will never start". Generous enough that a
+ * cold script compile on a slow device is not mistaken for a dead one, short enough that a
+ * host whose bundler mis-emits the chunk loses one second rather than every event.
+ */
+export const WORKER_READY_MS = 1_000;
 
 /** How often a tab announces itself. */
 export const ALIVE_EVERY_MS = 15_000;

@@ -85,9 +85,26 @@ const web    = createWebEvents({ apiBase: "/api" });    // frontend
 | `driver` | no | resolved from the env | pass one explicitly in a test or an embedded harness |
 | `logger` | no | `console` | structurally satisfied by a winston logger |
 | `ticketSecret` | no | env chain | a literal, a resolver, or `REALTIME_TICKET_SECRET` → `AUTH_SECRET` |
-| `connectionCap` | no | 20, env-overridable | per SUBJECT, per process (`REALTIME_TENANT_CONNECTION_CAP`) |
+| `connectionCap` | no | 20, env-overridable | per SUBJECT, per process (`REALTIME_TENANT_CONNECTION_CAP`) — **SSE only**, see below |
+| `messages` | no | pt-BR (today's strings) | override the 400/429/503 bodies; per field, so changing one keeps the rest |
 | `outbox` | no | off | `{ db }` — enabling it is saying where the rows live |
 | `installSignalHooks` | no | `true` | SIGTERM/SIGINT end open streams cleanly; turn off if the host owns shutdown |
+
+**`connectionCap` covers the SSE path only, and SSE is not the wire a working deployment
+uses.** The stream route takes a ledger slot; the ticket route cannot, because a ticket
+carries no subject on purpose (the gateway must decide nothing), so the gateway can only
+enforce its own GLOBAL `REALTIME_GATEWAY_MAX_CONNECTIONS`. The client starts on `ws` and
+demotes to `sse` only on failure — so where the socket works, one authenticated subject can
+hold up to that global cap of sockets on a gateway process. Making it real would mean an
+opaque subject hash in the ticket plus a per-subject ledger in the gateway (accounting, not
+authorization); that is a deliberate non-goal today, not an oversight.
+
+**The wire's pt-BR strings are overridable.** They are defaults rather than constants
+because they ARE the wire contract — future-pay's SPAs read those exact bodies, so changing
+one breaks every open tab — and because a generic package must not force Portuguese on an
+adopter. Pass `messages: { unavailable, invalidTopics, unknownTopic, tooMany }` (partial is
+fine). If you override `unknownTopic`, keep ONE message for "unknown domain" and for "that
+domain takes no qualifier": naming which half failed only tells a prober which to vary.
 
 ### `EventsSurfaceConfig`
 
@@ -154,6 +171,8 @@ Drain it from a worker — `@12-apps/jobs` is the natural driver:
 const jobs = createApiJobs({
   handlers: {
     "realtime.outbox.drain": async () => {
+      // `more` is false whenever a pass gave up (`aborted`), so this loop cannot spin on a
+      // deployment-wide fault. See "attempts is a per-ROW budget" below.
       let pass = await events.outbox!.drain();
       while (pass.more) pass = await events.outbox!.drain();
     },
@@ -178,7 +197,10 @@ const jobs = createApiJobs({
   so a subscriber offline at publish time misses the event forever. Polling stays the
   correctness floor on every consumer.
 - **No total ORDER.** Rows are claimed in `created_at` order, but concurrent drains can
-  publish out of order and a retried row arrives after rows created later.
+  publish out of order and a retried row arrives after rows created later. Nor is
+  `created_at` commit order: `CURRENT_TIMESTAMP` is transaction-START time in PostgreSQL and
+  the ordering has no tiebreaker, so even one drainer can claim two rows in an order their
+  commits did not have.
 
 Duplicates are harmless **by construction** rather than by luck: an event carries
 identifiers, so acting on it twice means re-reading twice. The publish additionally reuses
@@ -189,6 +211,16 @@ key instead of two indistinguishable emissions.
 failure, so a failure counter would let a poison row retry for ever. After
 `maxAttempts` the row is left for a human with its `last_error`: not deleted (that is the
 loss the outbox exists to prevent) and not retried (that would grind the drain).
+
+**`attempts` is a per-ROW budget, and a deployment-wide fault does not spend it.** Running
+with no `REDIS_URL` is a supported degradation (clients poll), so a drain in a process with
+no driver claims NOTHING and reports `aborted: true` with `more: false` — rather than
+charging one attempt per row against an answer no row can change, which the loop above would
+have turned into a whole backlog reaching `maxAttempts` inside one job tick, permanently
+excluded by the candidate read from then on. A publish the driver REFUSES ends the pass for
+the same reason and does keep its attempt (that is what bounds a row that keeps failing),
+while a malformed topic — a fault of that row and nothing else — burns only its own budget
+and lets the pass carry on, so one bad row never holds up the rows behind it.
 
 The table is INFRASTRUCTURE, not a tenant-scoped domain table: no `client_id`, no
 `archived_at`, and the drain reads it unscoped because it fans out for the whole
@@ -214,12 +246,47 @@ REALTIME_GATEWAY_PORT=3100 REDIS_URL=redis://redis:6379 npx realtime-gateway
 | --- | --- | --- |
 | `REALTIME_TICKET_SECRET` | falls back to `AUTH_SECRET` | must match the API side |
 | `REALTIME_GATEWAY_PORT` | `3100` | |
-| `REALTIME_GATEWAY_MAX_CONNECTIONS` | `2000` | per process; over it, upgrades get 503 |
-| `REDIS_URL` | — | unset uses the inline driver, LOUDLY: a publish from another process never arrives |
+| `REALTIME_GATEWAY_MAX_CONNECTIONS` | `2000` | per process; over it, upgrades get 503. GLOBAL, not per subject — see the `connectionCap` caveat above |
+| `REDIS_URL` | — | **required.** Unset, the gateway REFUSES TO START unless inline was explicitly asked for |
+| `REALTIME_DRIVER` | — | `inline` is the explicit opt-in to running with no cross-process bus |
+
+### The gateway refuses to start rather than run inline by accident
+
+An absent `REDIS_URL` is not consent. A gateway on the inline driver is the LYING transport
+this package exists to prevent, and nothing catches it because nothing fails: `/health`
+answers `{ok: true}` so the load balancer keeps the container in rotation, the upgrade
+succeeds, the subscription really is live (on a bus with no publishers), the 25 s heartbeat
+carries the CORRECT topic list so the client's liveness watch is satisfied, every client
+reports `connected` for ever and relaxes its poll from 5 s to 30 s — and since the socket
+DID open, the ws→sse demotion is disabled for that channel's life, pinning every client to
+the dead wire while a working SSE endpoint sits beside it. A screen six times staler than
+before realtime existed, announcing the opposite. The API half refuses the same
+configuration (`REALTIME_DRIVER=inline` in production) for the same reason.
+
+So inline needs saying out loud, in any one of three ways:
+
+```
+REDIS_URL=redis://redis:6379 npx realtime-gateway   # the normal deployment
+REALTIME_DRIVER=inline       npx realtime-gateway   # single process, on purpose
+startRealtimeGateway({ redisUrl: null })            # or `driver:`, or `inlineConsent: true`
+```
+
+Naming `redisUrl` in the options AT ALL is the opt-in, whatever its value — so a host
+embedding the gateway on its own server (which passes `server:` and `driver:`) needs nothing
+extra. Anything else with no `REDIS_URL` throws, which is this process's established honest
+answer for "I cannot do my job": a missing ticket secret already throws for the same reason.
 
 The bin needs `tsx` (an optional peer) because every `@12-apps/*` package publishes
 TypeScript source and plain `node` cannot load a `.ts` entry. A host that already compiles
 its own server imports `startRealtimeGateway` instead and needs nothing extra.
+
+**The ticket replay guard is PER PROCESS.** A ticket is burned on first use, so a captured
+one is worthless the moment its owner connects — but the set of burned tickets lives in
+memory, so N gateway instances behind a load balancer grant up to N uses of one ticket in
+its 30 s life. That is deliberate: a ticket authorizes SUBSCRIPTION to topics its owner was
+already granted, for 30 s, and nothing else anywhere — while a shared guard would make every
+handshake depend on Redis being reachable, converting a hardening measure into an outage
+path. Scale the gateway freely; just do not read the guard as a global one.
 
 **It performs NO authorization.** No session, no database, no RBAC — the API surface
 decides and signs the resolved topic names into a ticket. A bug in the gateway can break
@@ -265,7 +332,17 @@ takes a spawn thunk rather than a URL.
 
 Without a connector the connection lives in the page, which is fully functional — this is an
 optimisation, and an optimisation may never be the reason a screen stops working.
-`useTopics().host` reports which arrangement you got.
+`useTopics().host` reports which arrangement you got. A worker that STARTS but never answers
+is detected too: it posts a `ready` frame on connect, and if none arrives within a second the
+port is closed and the in-page host takes over with the topics already asked for (`host` then
+reports `in-page`). Bundlers have mis-emitted this chunk before, and the failure was silent.
+
+**One caveat on the ws→sse demotion.** A channel that never managed to open a socket demotes
+to SSE once, permanently for that CHANNEL's life. In the page, a reload is a new channel. In
+the worker the channel outlives page loads — the worker survives as long as any port is
+attached — so one tab parked open keeps a demoted channel across reloads of every other tab,
+and only closing the last tab on that endpoint retries the socket. SSE is fully functional,
+so the impact is bounded; it is simply not "a fresh page load tries `ws` again" here.
 
 ## Minimal host (Hono)
 
@@ -336,9 +413,22 @@ The host keeps its publisher map (that is domain config) and the gate comes from
 // scripts/realtime/publisher-gate.ts
 import { publisherParityCli } from "@12-apps/realtime/parity";
 import { allPublisherDeclarations } from "../../lib/realtime/publishers";
+import { REALTIME_DOMAINS } from "../../lib/realtime/domains";
 
-publisherParityCli({ root: REPO_ROOT, declarations: allPublisherDeclarations() });
+publisherParityCli({
+  root: REPO_ROOT,
+  declarations: allPublisherDeclarations(),
+  // REQUIRED, and the reason is the failure this gate exists for: a domain is authorizable
+  // the moment it is registered, so the gate has to be told what IS registered. Given only
+  // an array of declarations, a domain missing from the map is not a violation — it is
+  // silence, and the run is green while the screen says "Ao vivo" and receives nothing.
+  domains: { tenant: REALTIME_DOMAINS.tenant, user: REALTIME_DOMAINS.user },
+});
 ```
+
+Both are inputs with no fallback. `FUTURE_PAY_PUBLISHER_DECLARATIONS` is still exported, as
+an EXAMPLE to copy — it was a default once, and that is precisely what let the gate run
+against somebody else's seven domains and report green.
 
 with the ratchet beside it:
 
@@ -348,8 +438,8 @@ with the ratchet beside it:
 
 in `.realtime-silent-domains.json`. The list may only **SHRINK** — a new silent domain is
 refused, and an entry that now publishes must be deleted in the same PR, so adding the
-publisher is never enough on its own. `FUTURE_PAY_PUBLISHER_DECLARATIONS` is the shipped
-default for a host with the future-pay layout.
+publisher is never enough on its own. Declaring a domain `silent` and ratcheting it is a
+legitimate answer to "this has no emitter yet"; declaring NOTHING is the hole.
 
 ## Phase B — adopting into a host that ALREADY has these tables (future-pay)
 
@@ -370,9 +460,9 @@ default for a host with the future-pay layout.
    or the bin; `packages/spa-shared/src/realtime/` becomes one `createWebEvents`. What
    stays is the domain map, the RBAC tiers, the publisher hint modules and the route files
    a coverage gate forces to exist — pure declarations.
-5. **Point the host's `realtime:publisher-gate` script at `/parity`** and leave
-   `.realtime-silent-domains.json` where it is; the CI job shells out to the package
-   script and needs no change.
+5. **Point the host's `realtime:publisher-gate` script at `/parity`**, pass it both
+   `declarations` AND `domains` (see above), and leave `.realtime-silent-domains.json` where
+   it is; the CI job shells out to the package script and needs no change.
 6. **Static imports only** for the new subpaths: these packages publish TS source, and a
    dynamic non-literal `import()` crashes a bundled server.
 

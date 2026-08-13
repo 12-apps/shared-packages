@@ -339,7 +339,14 @@ describe("createApiEvents — connection accounting", () => {
     expect(api.connections.openCount("loja-a")).toBe(0);
   });
 
-  it("caps per SUBJECT, so one tenant cannot exhaust another's budget", async () => {
+  it("caps per SUBJECT on the SSE path, so one tenant's STREAMS cannot exhaust another's", async () => {
+    // Scoped to SSE deliberately, because that is all the ledger covers. `ticketRoute` takes
+    // no slot — a ticket carries no subject on purpose, so the gateway can only enforce its
+    // own GLOBAL `maxConnections` — and the client starts on `ws`, demoting to `sse` only on
+    // failure. So on the default transport of a WORKING deployment this cap is never
+    // reached, and a title claiming "one tenant cannot exhaust another's budget" outright
+    // would be asserting a property the shipped wire does not have. See
+    // `EventsServerConfig.connectionCap`.
     const { stream, api } = await harness({ connectionCap: 1 });
     const first = await stream({ topics: "kitchen" }, "loja-a");
     const second = await stream({ topics: "kitchen" }, "loja-b");

@@ -14,8 +14,13 @@ import { describe, expect, it } from 'vitest';
  *
  * So this is a COMPLETENESS guard rather than a behaviour test, and its value is that it
  * fails on the day an `exports` entry stops resolving — including transitively, which is
- * how #150 actually broke. Each import is STATIC and each name is touched, so a bundler
- * cannot tree-shake the check away.
+ * how #150 actually broke.
+ *
+ * The guard is the `expect()` on a SYMBOL out of each subpath, not the import: every import
+ * below is `await import(...)`, deliberately, so one dead entry is one failing case rather
+ * than a whole file that will not load. Touching a name is what makes the check
+ * un-tree-shakeable — an import whose bindings are never read is exactly what a bundler is
+ * allowed to drop.
  */
 
 describe('@12-apps/realtime — every published subpath resolves', () => {
