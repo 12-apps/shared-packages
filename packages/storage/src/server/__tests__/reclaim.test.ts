@@ -47,7 +47,9 @@ function harness(
     maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
     imagePipeline: fakePipeline(),
     unscopedKeys: options.unscopedKeys ?? 'accept',
-    ...(options.probes ? { references: options.probes } : {}),
+    // Written out and not omitted: `references` is required, and `[]` is a decision
+    // ("nothing in this host copies a key") rather than the absence of one.
+    references: options.probes ?? [],
     logger: sink,
   });
   return { api: mounted, driver: memory, logs: sink.lines };
@@ -248,5 +250,69 @@ describe('objectKeysFor', () => {
 
     expect(api.reclaim.objectKeysFor(KEY)).toHaveLength(CATALOG_RENDITIONS.length + 1);
     expect(api.reclaim.objectKeysFor(FLAT)).toEqual([FLAT]);
+  });
+});
+
+describe('the probe→purge window is reported rather than silent', () => {
+  /**
+   * The reclaim is read-validate-write with no claim-once and no transaction, so a
+   * request that ATTACHES the key between the last probe and the delete loses its
+   * object. That window cannot be closed here — closing it needs refcounting in the
+   * host's own tables — but it must not be INVISIBLE: "the reclaim deleted the image
+   * I just attached" is otherwise a data-loss bug with no log line anywhere.
+   */
+
+  /** A probe that says "not referenced" first and "referenced" afterwards. */
+  function attachesDuringPurge(): StorageReferenceProbe {
+    // A container property, never a reassigned closed-over `let` — the pattern the
+    // flakiness gate rejects.
+    const state = { asked: 0 };
+    return {
+      name: 'duplicated-rows',
+      referenced: async () => {
+        state.asked += 1;
+        return state.asked > 1;
+      },
+    };
+  }
+
+  it('logs the race, naming the probe that now claims the key', async () => {
+    const { api, driver, logs } = harness({ probes: [attachesDuringPurge()] });
+
+    await api.reclaim.deleteIfOrphaned(SCOPE, KEY);
+
+    // The delete still happened — this is detection, not prevention, and claiming
+    // otherwise would be worse than the window.
+    expect(driver.deleted).toContain(KEY);
+    expect(logs.join('\n')).toContain('duplicated-rows');
+    expect(logs.join('\n')).toContain('no longer exist');
+  });
+
+  it('stays silent on the ordinary path, where nothing raced', async () => {
+    const { api, driver, logs } = harness({ probes: [probe('live-rows', false)] });
+
+    await api.reclaim.deleteIfOrphaned(SCOPE, KEY);
+
+    expect(driver.deleted).toContain(KEY);
+    expect(logs).toEqual([]);
+  });
+
+  it('asks nothing extra when the host declared no probes', async () => {
+    // `references: []` has no window to detect, so it pays nothing for the check.
+    const { api, driver, logs } = harness({ probes: [] });
+
+    await api.reclaim.deleteIfOrphaned(SCOPE, KEY);
+
+    expect(driver.deleted).toContain(KEY);
+    expect(logs).toEqual([]);
+  });
+
+  it('does not run the check when a probe kept the object', async () => {
+    const { api, driver, logs } = harness({ probes: [probe('pending', true)] });
+
+    await api.reclaim.deleteIfOrphaned(SCOPE, KEY);
+
+    expect(driver.deleted).toEqual([]);
+    expect(logs).toEqual([]);
   });
 });

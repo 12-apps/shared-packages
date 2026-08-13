@@ -24,6 +24,7 @@ function serve(driver: StorageDriver): (key: string) => Promise<StorageRouteResp
     maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
     imagePipeline: fakePipeline(),
     unscopedKeys: 'accept',
+    references: [],
   });
   const route = api.routes.find(
     (candidate: StorageRoute) => candidate.method === 'GET',

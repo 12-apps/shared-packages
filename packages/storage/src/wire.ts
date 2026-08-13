@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { ACCEPTED_CONTENT_TYPES } from './content-types';
+import { DEFAULT_KEY_PREFIX, isObjectKey } from './keys';
 import { maxBase64Length } from './limits';
 
 /**
@@ -30,6 +31,38 @@ export function inlineImageSchema(
 export interface InlineImage {
   contentType: string;
   contentBase64: string;
+}
+
+/**
+ * A key this scheme actually minted — the schema an `imageKey` FIELD should use.
+ *
+ * Ships beside {@link inlineImageSchema} because the pair is what a host's write
+ * body is made of, and because `z.string()` is the wrong answer in a way that is
+ * not obvious. An `imageKey` is not free text: it is a key the server minted, it is
+ * rendered straight into an `<img src>` by `objectUrl`, and `objectUrl`
+ * deliberately returns an ALREADY-ABSOLUTE value unchanged (a documented migration
+ * affordance for a host moving off a URL column).
+ *
+ * Compose those two and a recipe that accepts any string accepts
+ * `imageKey: 'https://tracker.example/p.png'` from anyone who may edit the row —
+ * after which every buyer loading that storefront page sends their IP and
+ * user-agent to a third party. No upload, no bucket and no driver is involved, so
+ * nothing on the storage path can catch it; the only place to refuse it is where
+ * the value arrives.
+ *
+ * The cross-tenant variant (`products/<otherTenant>/<uuid>/full.webp`) parses here
+ * and is refused later by the reclaim's `keyInScope` — but a host that wants it
+ * refused on the WRITE should pair this with `keyInScope(key, scope, …)`, which
+ * this schema cannot do because it does not know the caller.
+ *
+ * A `javascript:`-shaped value is already inert: `objectUrl` only passes through
+ * `^https?://`, so `javascript:alert(1)` is handed to the driver and comes back as
+ * a path under the mount. Inert is not the same as valid, and it is refused here too.
+ */
+export function objectKeySchema(prefix: string = DEFAULT_KEY_PREFIX): z.ZodString {
+  return z.string().refine((key) => isObjectKey(key, prefix), {
+    message: 'Not an object key minted by this storage mount.',
+  });
 }
 
 /** The pair of fields an image-bearing write body carries. */

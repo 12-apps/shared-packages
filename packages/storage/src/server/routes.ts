@@ -90,17 +90,28 @@ async function handleUpload(
 ): Promise<StorageRouteResponse> {
   const actor = context.actor;
   if (!actor?.mayUpload) {
+    // Stays a CODE, unlike the refusals below, and deliberately: `mayUpload` is the
+    // host's own boolean, so the package cannot phrase WHY without asserting a role
+    // model it does not have. The browser half owns that sentence and lets the host
+    // override it (`WebStorageMessages.forbidden`).
     return { status: 403, body: { error: 'forbidden' } };
   }
   const contentType = acceptedContentTypeOf(context.request.headers.get('content-type'));
   if (!contentType) {
-    return { status: 400, body: { error: 'unsupported_content_type' } };
+    return { status: 400, body: { error: deps.messages.unsupported_content_type } };
   }
   // Capped WHILE STREAMING, so an oversize body is refused without ever being
   // held whole in memory.
   const bytes = await readBodyCapped(context.request, deps.maxBytes);
   if (bytes === null) {
-    return { status: 413, body: { error: 'file_too_large' } };
+    // The configured SENTENCE, not the code `file_too_large`. These two refusals
+    // are decided before the write path runs, so they used to be the only ones the
+    // endpoint stated as a bare code — and the browser then re-derived the number
+    // from its OWN default. A mount capped at 4 MB refusing a 6 MB file produced
+    // "o limite é 8 MB": a ceiling nothing enforced, in the one package whose
+    // headline claim is that there is exactly ONE number. The sentence is built
+    // from this mount's `maxBytes` and carries this mount's `messages` overrides.
+    return { status: 413, body: { error: deps.messages.file_too_large } };
   }
   try {
     // No byte check here: `storeImage` owns it, so the endpoint and a host write

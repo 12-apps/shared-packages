@@ -109,6 +109,46 @@ describe('createWebStorage', () => {
     await waitFor(() => expect(screen.queryByTestId('storage-image-field-preview')).toBeNull());
     expect(changes).toEqual([]);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview');
+    // States the OUTCOME only. This sentence used to assert one host's role model.
+    for (const role of ['OWNER', 'ADMIN']) {
+      expect(text('storage-image-field-error')).not.toContain(role);
+    }
+  });
+
+  it('lets the host replace that refusal with its OWN role vocabulary', async () => {
+    installBrowserGaps();
+    const { fetchImpl } = stubFetch(
+      () => new Response(JSON.stringify({ error: 'forbidden' }), { status: 403 }),
+    );
+    const storage = createWebStorage({
+      apiBase: '/api',
+      fetchImpl,
+      messages: { forbidden: 'Peça a um gerente para enviar a foto.' },
+    });
+    render(<storage.ImageField onChange={() => undefined} />);
+
+    pick(png());
+
+    await waitFor(() => expect(text('storage-image-field-error')).toContain('Peça a um gerente'));
+  });
+
+  it("shows the mount's own ceiling when the server refuses, not its local default", async () => {
+    // The mount is capped below this surface's default, so the only correct number on
+    // screen is the one the server sent. Re-deriving it locally was the finding.
+    installBrowserGaps();
+    const { fetchImpl } = stubFetch(
+      () =>
+        new Response(JSON.stringify({ error: 'A imagem enviada é maior que o limite de 4 MB.' }), {
+          status: 413,
+        }),
+    );
+    const storage = createWebStorage({ apiBase: '/api', fetchImpl });
+    render(<storage.ImageField onChange={() => undefined} />);
+
+    pick(png());
+
+    await waitFor(() => expect(text('storage-image-field-error')).toContain('4 MB'));
+    expect(text('storage-image-field-error')).not.toContain('8 MB');
   });
 
   it('refuses an oversize file before any request leaves the browser', async () => {

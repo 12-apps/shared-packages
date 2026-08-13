@@ -33,9 +33,27 @@ import { sharpStub } from './sharp-stub';
  *   - `process` reports a PROBLEM rather than inventing an image.
  *
  * What this suite deliberately does NOT claim: that the pixels are right. No
- * implementation here decodes a real image (see the README's note on the injected
- * module), so "the crop is 320×240 of the product" is not asserted anywhere in this
- * repository. It is stated as a gap rather than implied by a green run.
+ * implementation here decodes a real image — the sharp adapter is driven against a
+ * chain-recording stub module, because `sharp` is injected and this package does not
+ * depend on it (see the README's note on the port). So "the crop is 320×240 of the
+ * product" is NOT asserted by anything in this repository's suite, and a green run
+ * here is not evidence of it.
+ *
+ * It HAS been verified out of band against real libvips 8.17.3, and the numbers are
+ * recorded here so the gap is a known size rather than an unknown one: `process`
+ * takes a 2000×1500 PNG to a 1280×960 WebP and does not enlarge a 300×200 source;
+ * `cut` produces all five catalog crops at exactly their spec dimensions in real
+ * WebP; a real two-frame GIF yields no crops and keeps `image/gif`. Making that
+ * permanent needs `sharp` as a devDependency of this package — a native build in
+ * every install of it, which is a decision on its own rather than something to
+ * acquire as a side effect of a test.
+ *
+ * One thing the out-of-band run found that no stub could: EXIF orientation is not
+ * applied. A JPEG tagged `orientation: 6` is stored with its pixels unrotated and
+ * the tag dropped, so a phone photo taken in portrait is served sideways. That is
+ * pre-existing behaviour, not something this suite's absence caused, and fixing it
+ * is a pipeline change (`rotate()` is not even on the `SharpImage` port) rather than
+ * a test change — so it is named here and left for its own ticket.
  */
 
 const GARBAGE = new TextEncoder().encode('<html>not an image at all</html>');

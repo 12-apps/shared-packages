@@ -95,14 +95,29 @@ export async function isAnimatedSource(
  * and not the memory, which is the one thing it exists to bound.
  *
  * Answered from the header alone, before a single pixel is allocated.
+ *
+ * ## Why there is no `× pages` here, unlike in `process`
+ *
+ * This reads the ANIMATED metadata, and libvips models an animation as a vertical
+ * filmstrip: under `{ animated: true }` the reported `height` is **every frame
+ * stacked**, not one frame. Measured against real libvips 8.17.3 with a two-frame
+ * 64×64 GIF — the still read answers `height: 64, pages: 2`, the animated read
+ * answers `height: 128, pages: 2`. So `width × height` here ALREADY covers all
+ * frames, and multiplying by `pages` on top of it would over-count the cost by a
+ * factor of `pages` — refusing a modest animation as a decompression bomb.
+ *
+ * `rejectUnprocessable` in `sharp.ts` does multiply, and is right to: it reads the
+ * STILL metadata, where `height` is one frame and `pages` is the count.
+ *
+ * In practice this function only ever sees a still, because `cutRenditions`
+ * returns on `pages > 1` before calling it. The arithmetic is written to be correct
+ * either way rather than to depend on that ordering.
  */
 function exceedsPixelBudget(metadata: SharpMetadata, maxPixels: number): boolean {
   const width = metadata.width ?? 0;
   const height = metadata.height ?? 0;
   if (width <= 0 || height <= 0) return true;
-  // `pages` multiplies the cost: a 1000×1000 GIF with 200 frames allocates as
-  // much as a 200-megapixel still.
-  return width * height * (metadata.pages ?? 1) > maxPixels;
+  return width * height > maxPixels;
 }
 
 /**

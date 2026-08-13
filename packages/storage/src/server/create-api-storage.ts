@@ -4,7 +4,7 @@ import { megabytes } from '../limits';
 import { defaultStorageMessages, type StorageMessages } from '../problems';
 import { CATALOG_RENDITIONS, type RenditionSpec } from '../renditions';
 import { imageSources, objectUrl, versionedObjectUrl, type ImageSources } from '../urls';
-import { inlineImageSchema, type InlineImage } from '../wire';
+import { inlineImageSchema, objectKeySchema, type InlineImage } from '../wire';
 import type { StorageDriver } from './driver';
 import type { ImagePipeline } from './pipeline/port';
 import {
@@ -30,14 +30,23 @@ import { storeImage, storeInlineImage, type StoreImageDeps } from './store-image
  *
  * ## Nothing here defaults to a value only one deployment can survive
  *
- * `driver`, `maxBytes`, `imagePipeline` and `unscopedKeys` are all REQUIRED, and
- * each for the same reason: the safe value is host-specific, so a default would
- * be a decision made by whoever typed the first host, silently inherited by
- * every one after it. A defaulted driver writes to a container's ephemeral disk
- * in production and reports success. A defaulted ceiling is whatever number this
- * file happens to carry. A defaulted pipeline decides whether crops exist at all.
- * A defaulted `unscopedKeys` decides whether one tenant's reclaim can reach
- * another tenant's bytes.
+ * `driver`, `maxBytes`, `imagePipeline`, `unscopedKeys` and `references` are all
+ * REQUIRED, and each for the same reason: the safe value is host-specific, so a
+ * default would be a decision made by whoever typed the first host, silently
+ * inherited by every one after it. A defaulted driver writes to a container's
+ * ephemeral disk in production and reports success. A defaulted ceiling is
+ * whatever number this file happens to carry. A defaulted pipeline decides
+ * whether crops exist at all. A defaulted `unscopedKeys` decides whether one
+ * tenant's reclaim can reach another tenant's bytes. A defaulted `references`
+ * decides whether a restored row still has its photo.
+ *
+ * `references` joined that list last, and it is the one worth explaining: it DID
+ * default, to `[]`, and `[]` is not the absence of a decision — it means *reclaim
+ * everything immediately*. Two fail-open defaults in this series became findings
+ * before this one was noticed, and the argument the other four are made of applies
+ * to it verbatim. `logger` still defaults, and that is a different case: a reclaim
+ * can only report, so the worst a defaulted logger costs is silence. A defaulted
+ * `references` DESTROYS.
  */
 
 export interface ApiStorageConfig {
@@ -63,10 +72,22 @@ export interface ApiStorageConfig {
   unscopedKeys: 'accept' | 'reject';
   /**
    * The host tables that can still need an object after the row stopped pointing
-   * at it. Empty means a replaced object is reclaimed immediately — correct only
-   * if nothing in the host copies a key.
+   * at it — a duplicated row sharing one photo, a soft-deleted row whose "restore"
+   * is expected to bring it back, a draft or a pending approval holding a key.
+   *
+   * REQUIRED, and the fifth knob for the same reason as the other four. This one
+   * used to default to `[]`, which is not a neutral default: it means *reclaim
+   * everything immediately*. An adopter wired the mount, got working uploads and
+   * shipped; weeks later a store owner restored a product from the recycle bin and
+   * the row came back with its photo gone, because the write that replaced the
+   * photo had correctly found no probe claiming the old key. Nothing logged
+   * anything — the reclaim did exactly what it was told.
+   *
+   * Pass `[]` to mean it: nothing in this host copies a key, so a replaced object
+   * is safe to delete at once. Written out, by a host that has checked, rather than
+   * inherited from whoever typed the first mount.
    */
-  references?: readonly StorageReferenceProbe[];
+  references: readonly StorageReferenceProbe[];
   /** Where a best-effort reclaim's failures go. Default: no-op, and say so. */
   logger?: StorageLogger;
   /** The derived sizes to cut. Default {@link CATALOG_RENDITIONS}. */
@@ -96,8 +117,21 @@ export interface ApiStorage {
   storeImage(input: { bytes: Uint8Array; contentType: string; scope: string }): Promise<string>;
   /** Store base64 bytes carried inside a write body — an agent's only path. */
   storeInlineImage(image: InlineImage, scope: string): Promise<string>;
-  /** Schemas built from THIS mount's ceiling, for a host's tool definitions. */
-  schemas: { inlineImage: ReturnType<typeof inlineImageSchema> };
+  /**
+   * Schemas built from THIS mount's own config, for a host's write bodies and tool
+   * definitions — `inlineImage`'s base64 ceiling IS `maxBytes`, and `objectKey`'s
+   * grammar IS `keyPrefix`. Read them off the mount so neither can advertise
+   * something the endpoint does not enforce.
+   */
+  schemas: {
+    inlineImage: ReturnType<typeof inlineImageSchema>;
+    /**
+     * For the `imageKey` field beside it. `z.string()` there accepts an absolute
+     * URL, which `objectUrl` renders verbatim into an `<img src>` — see
+     * {@link objectKeySchema}.
+     */
+    objectKey: ReturnType<typeof objectKeySchema>;
+  };
   /** Resolve a stored key for display, through the active driver. */
   urls: {
     objectUrl(key: string | null): string | null;
@@ -147,7 +181,7 @@ export function createApiStorage(config: ApiStorageConfig): ApiStorage {
   };
   const reclaimDeps: ReclaimDeps = {
     driver: config.driver,
-    probes: config.references ?? [],
+    probes: config.references,
     logger: config.logger ?? SILENT,
     unscopedKeys: config.unscopedKeys,
     specs,
@@ -167,7 +201,10 @@ export function createApiStorage(config: ApiStorageConfig): ApiStorage {
     },
     storeImage: (input) => storeImage(writeDeps, input),
     storeInlineImage: (image, scope) => storeInlineImage(writeDeps, image, scope),
-    schemas: { inlineImage: inlineImageSchema(config.maxBytes) },
+    schemas: {
+      inlineImage: inlineImageSchema(config.maxBytes),
+      objectKey: objectKeySchema(keyPrefix),
+    },
     urls: {
       objectUrl: (key) => objectUrl(key, resolve),
       imageSources: (key) => imageSources(key, resolve, { specs, prefix: keyPrefix }),

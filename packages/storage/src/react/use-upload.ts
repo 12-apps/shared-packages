@@ -1,7 +1,12 @@
 import { useState } from 'react';
 
 import { STORAGE_PATHS } from '../paths';
-import { rejectFileUpfront, transportFailure, uploadFailure } from './failures';
+import {
+  rejectFileUpfront,
+  transportFailure,
+  uploadFailure,
+  type WebStorageMessages,
+} from './failures';
 import { optimizeImage, type ImageProfile } from './optimize-image';
 
 /**
@@ -50,6 +55,8 @@ export interface UseUploadConfig {
   profile?: ImageProfile;
   /** How the request is made. Default: same-origin `fetch`. */
   fetchImpl?: typeof fetch;
+  /** pt-BR refusal copy overrides, for the codes only the host can explain. */
+  messages?: Partial<WebStorageMessages>;
 }
 
 export function useUpload(config: UseUploadConfig): UploadState {
@@ -70,11 +77,11 @@ export function useUpload(config: UseUploadConfig): UploadState {
         body: file,
       });
     } catch {
-      setError(transportFailure());
+      setError(transportFailure(config.messages));
       return null;
     }
     if (!response.ok) {
-      setError(await uploadFailure(response, config.maxBytes));
+      setError(await uploadFailure(response, config.maxBytes, config.messages));
       return null;
     }
     const payload = (await response.json()) as { data?: { imageKey?: string } };

@@ -90,6 +90,62 @@ describe('uploadFailure', () => {
   });
 });
 
+describe("the server's own number wins over the browser's default", () => {
+  /**
+   * The regression for an adversarial finding, from the browser's side.
+   *
+   * The endpoint now states `file_too_large` as a finished sentence built from the
+   * MOUNT's ceiling. This half must relay it rather than mapping it back through
+   * its own default — which is what produced "o limite é 8 MB" about a 6 MB file
+   * refused by a 4 MB mount.
+   */
+  it("relays the mount's sentence verbatim even though the local default disagrees", async () => {
+    const fromServer = 'A imagem enviada é maior que o limite de 4 MB.';
+
+    // MAX here is the 8 MiB default: the browser's number is deliberately WRONG for
+    // this mount, and must not appear.
+    const message = await uploadFailure(refusal(413, { error: fromServer }), MAX);
+
+    expect(message).toBe(fromServer);
+    expect(message).not.toContain('8 MB');
+  });
+
+  it('falls back to the local table only for a code with no sentence', async () => {
+    expect(await uploadFailure(refusal(413, { error: 'file_too_large' }), MAX)).toContain('8 MB');
+  });
+});
+
+describe('the copy a host can override', () => {
+  it('states a 403 as an outcome, naming no role model of its own', async () => {
+    // `mayUpload` is one host-computed boolean; this file used to answer it with
+    // "é preciso ser OWNER ou ADMIN", asserting one host's roles for every adopter.
+    const message = await uploadFailure(refusal(403, { error: 'forbidden' }), MAX);
+
+    expect(message).toContain('permissão');
+    for (const role of ['OWNER', 'ADMIN']) expect(message).not.toContain(role);
+  });
+
+  it('lets the host name its OWN reason for a 403', async () => {
+    const message = await uploadFailure(refusal(403, { error: 'forbidden' }), MAX, {
+      forbidden: 'Only a store manager may add photos.',
+    });
+
+    expect(message).toBe('Only a store manager may add photos.');
+  });
+
+  it('overrides one entry without discarding the rest of the table', async () => {
+    const overrides = { forbidden: 'Sem permissão.' };
+
+    expect(await uploadFailure(refusal(404, { error: 'not_found' }), MAX, overrides)).toContain(
+      'não está mais disponível',
+    );
+  });
+
+  it('keeps the copy pt-BR by default — it is product copy, not a developer string', () => {
+    expect(transportFailure()).toContain('conexão');
+  });
+});
+
 describe('transportFailure', () => {
   it('points at the connection, the only thing left to check on one origin', () => {
     // A two-hop upload had to hedge with "rede ou CORS", because a blocked
@@ -97,5 +153,11 @@ describe('transportFailure', () => {
     // layer. Same-origin, the sentence can be definite.
     expect(transportFailure()).toContain('conexão');
     expect(transportFailure()).not.toContain('CORS');
+  });
+
+  it('is overridable too, so a host is not stuck with one voice', () => {
+    expect(transportFailure({ transport: 'Sem conexão com o servidor.' })).toBe(
+      'Sem conexão com o servidor.',
+    );
   });
 });

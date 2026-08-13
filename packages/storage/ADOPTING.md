@@ -17,6 +17,26 @@ changes**. The contract is the one `@12-apps/report-builder`, `@12-apps/rbac` an
 | **React** | `@12-apps/storage/react` | Call `createWebStorage({ apiBase })` and render `page`, drop `ImageField` into a form, or build your own affordance on `useUpload`. |
 | **Prisma** | — none | This package owns **no models**. See "Why there is no Prisma partial" below. |
 
+## The five values you must decide, and why none of them defaults
+
+`createApiStorage` requires `driver`, `maxBytes`, `imagePipeline`, `unscopedKeys`
+and `references`. The reason is the same for all five and it is not tidiness:
+**each one fails quietly when it is wrong.** A loud wrong default gets fixed on
+the first deploy. These produce a green deploy, successful uploads, and a
+consequence weeks later that no log line explains — so the only place the
+decision can be made correctly is the host, in the open, once.
+
+| Config | What a default would cost you, specifically |
+|---|---|
+| `driver` | Uploads succeed onto a container's ephemeral disk. One container holds the object, the others 404, the next deploy discards it. `writeFile` returned success every time, so nothing is logged. |
+| `maxBytes` | Your tool schemas advertise one ceiling and the endpoint enforces another; an agent's upload is refused for a size its own schema accepted. |
+| `imagePipeline` | Whether crops exist at all. Discovered from the shape of a key, in production, by a card that renders the uncropped photo. |
+| `unscopedKeys` | Whether one tenant's reclaim can reach another tenant's bytes. Wrong in either direction and silent in both. |
+| `references` | Whether a restored row still has its photo. `[]` is not "no opinion" — it means *reclaim everything immediately*. |
+
+`logger` is the one that legitimately defaults: a reclaim may only report, never
+raise, so the worst a defaulted logger costs is silence. Pass yours anyway.
+
 ## Host wiring rules (the ones that bite)
 
 1. **The host resolves WHO and WHERE; the package decides WHAT HAPPENS TO THE
@@ -34,12 +54,12 @@ changes**. The contract is the one `@12-apps/report-builder`, `@12-apps/rbac` an
    only `references` stands between one tenant and another's objects. A fresh
    host passes `'reject'`, and then every key it will ever touch is scoped.
    There is no default because the wrong one is silent in both directions.
-3. **`references` are YOUR tables.** A key can outlive the row that pointed at
-   it, and some of those states are ones a person is about to act on — a
-   duplicated row sharing one object, a soft-deleted row whose "restore" is
-   expected to bring the photo back, a draft or a pending approval holding a key
-   waiting to be published. Deleting the object would break the very next thing
-   they do. Each of those is a probe:
+3. **`references` are YOUR tables, and the parameter is REQUIRED.** A key can
+   outlive the row that pointed at it, and some of those states are ones a person
+   is about to act on — a duplicated row sharing one object, a soft-deleted row
+   whose "restore" is expected to bring the photo back, a draft or a pending
+   approval holding a key waiting to be published. Deleting the object would break
+   the very next thing they do. Each of those is a probe:
 
    ```ts
    references: [
@@ -54,6 +74,32 @@ changes**. The contract is the one `@12-apps/report-builder`, `@12-apps/rbac` an
    time. And think hard before adding **version history** as a probe: versioning
    is usually on by default, so counting a version as a reference pins the object
    for the whole retention window and "replace a photo" reclaims nothing, ever.
+
+   `references: []` is a legal answer and you must write it out. It says "nothing
+   in this host copies a key", and it is the value that made this parameter
+   required: it used to be the DEFAULT, so a host that had never thought about the
+   question got *reclaim everything immediately* — and found out weeks later, when
+   a store owner restored a product and the row came back without its photo.
+
+   **WHEN to call the reclaim: after commit, and after any copy-on-write path has
+   landed.** The probes are read OUTSIDE your transaction, and `deleteIfOrphaned`
+   is read-validate-write with no claim-once — it consults every probe, then
+   deletes. So there is a window, and it is real:
+
+   1. user B replaces product P's photo; the reclaim probes key `K`, nothing holds it;
+   2. concurrently user A duplicates P from a stale tab, and the duplicate row is
+      written with `imageKey: K`;
+   3. the purge runs. `K` and its five crops are gone, and A's new row points at
+      six objects that do not exist.
+
+   Closing that window needs refcounting, which would live in your tables beside
+   the keys — it is not something the package can do for you. What you can do is
+   order the call so the window is empty: **commit first, then reclaim**, and never
+   reclaim from inside a transaction or before a duplicate/restore path has
+   written. The package makes the failure discoverable rather than silent: if a
+   probe claims the key immediately after the purge, it logs through your `logger`
+   naming the probe — which is the only warning you will get, and the reason rule 4
+   matters.
 4. **`logger` is how you hear about a bucket that stopped accepting deletes.**
    The reclaim runs after the write it follows and can only report, never raise —
    a store owner who successfully changed a photo must not see an error because a
@@ -85,20 +131,43 @@ tables. There is nothing to sync, no migration to replay, and no
 
 ## A worked mount (Hono + local disk + sharp)
 
+This is a **fresh host**: no rows predate the scope segment, so `unscopedKeys` is
+`'reject'`. See the note after it if that is not you.
+
+Read the `root` line before you copy it. There is **no `??`** on it deliberately:
+`process.env.UPLOADS_DIR ?? \`${process.cwd()}/.uploads\`` in this position is
+precisely the fail-open default the table above refuses to have, and it is the one
+mistake this document used to hand you ready-made.
+
 ```ts
 import sharp from 'sharp';
 import { DEFAULT_MAX_UPLOAD_BYTES, STORAGE_PATHS } from '@12-apps/storage';
 import { createLocalDiskDriver, createSharpImagePipeline } from '@12-apps/storage/server';
 import { storageRouter } from '@12-apps/storage/hono';
 
+/**
+ * Fail at BOOT for a missing value, not at the next deploy.
+ *
+ * `UPLOADS_DIR` must be a MOUNTED VOLUME. A container path "works" in every test
+ * you will run and loses every object the first time the app is redeployed.
+ */
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is required (a mounted volume, not a container path)`);
+  return value;
+}
+
 const storage = storageRouter({
   driver: createLocalDiskDriver({
-    root: process.env.UPLOADS_DIR ?? `${process.cwd()}/.uploads`,
+    root: requireEnv('UPLOADS_DIR'),
     publicPathPrefix: `/api${STORAGE_PATHS.serve}`,
   }),
   maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
   imagePipeline: createSharpImagePipeline({ sharp }),
-  unscopedKeys: 'accept',
+  // A fresh host: every key it will ever mint is scoped, so a key WITHOUT a scope
+  // can only be someone else's or nobody's. See rule 2 before changing this.
+  unscopedKeys: 'reject',
+  // Your tables. `[]` only if you have checked that nothing here copies a key.
   references: [
     { name: 'live-rows', referenced: liveRowHoldsKey },
     { name: 'pending-state', referenced: pendingStateHoldsKey },
@@ -112,6 +181,21 @@ const storage = storageRouter({
 });
 
 app.route('/api', storage.router);
+```
+
+**If your host already has image keys**, they were minted before the scope segment
+existed, so they carry no tenant and `'reject'` would refuse to touch every one of
+them. Pass `unscopedKeys: 'accept'` instead — and understand what you are taking
+on: for those legacy keys the tenant boundary on reclaim is your `references`
+probes ALONE, because there is no scope in the key for the structural guard to
+check. That makes rule 3 sharper for you than for a greenfield host, not looser.
+
+**In development**, and only there, the `??` is fine — a lost object on a laptop
+costs nothing:
+
+```ts
+// DEV ONLY. Never in the mount above.
+root: process.env.UPLOADS_DIR ?? `${process.cwd()}/.uploads`,
 ```
 
 Switching to a bucket is a driver swap and nothing else:
@@ -131,18 +215,54 @@ driver: createS3Driver({
 ## Feeding a tool schema without drifting
 
 A host that lets an agent send bytes inside a write needs the same ceiling in
-its tool schema. Read it off the mount, not off a constant:
+its tool schema. Read **both** fields off the mount, not off a constant:
 
 ```ts
-const imageField = storage.schemas.inlineImage;          // ceiling === maxBytes
-const body = z.object({ imageKey: z.string().nullish(), image: imageField.optional() })
-  .superRefine(refineImageInput);
+const body = z.object({
+  imageKey: storage.schemas.objectKey.nullish(),   // grammar === this mount's keyPrefix
+  image: storage.schemas.inlineImage.optional(),   // ceiling  === this mount's maxBytes
+}).superRefine(refineImageInput);
 ```
 
 `refineImageInput` refuses a body stating BOTH an existing key and new bytes.
 They mean opposite things — "keep pointing at this object" versus "store these
 bytes and point at the result" — so silently preferring one discards an upload
 the caller cannot see was discarded.
+
+### `imageKey` is not a string field, and this recipe used to say it was
+
+It said `imageKey: z.string().nullish()`, which accepts **any** string. Combine
+that with `objectUrl`, which deliberately returns an already-absolute value
+unchanged (a documented affordance for a host migrating off a URL column), and an
+adopter following this page ends up accepting an arbitrary URL on a write and
+rendering it into an `<img src>`:
+
+```ts
+updateProduct({ imageKey: 'https://tracker.example/p.png' })
+```
+
+Any actor who may edit a product can then make every buyer loading that
+storefront page send their IP and user-agent to a third party. No upload, no
+bucket and no driver is involved, so **nothing on the storage path can catch
+it** — the only place to refuse it is where the value arrives.
+`storage.schemas.objectKey` is that refusal, and it is built from the mount's own
+`keyPrefix` so it cannot drift from what the mount actually mints.
+
+Two things it does not do, and you may want both:
+
+- **It does not check the tenant.** `products/<otherTenant>/<uuid>/full.webp` is a
+  well-formed key, so it parses. The reclaim refuses to delete it (`keyInScope`),
+  but it is still a key you never minted sitting in your own catalog, and it makes
+  one store display another's photo. Pair the schema with
+  `keyInScope(key, scope, unscopedKeys)` in the handler, which the schema cannot do
+  because it does not know who is calling.
+- **It does not verify the object EXISTS.** A well-formed key for an object that was
+  never stored passes; the `<img>` 404s. That is a cheap `driver` read if you care.
+
+For the record, a `javascript:`-shaped value is already inert without the schema —
+`objectUrl` only passes through `^https?://`, so it is handed to the driver and
+comes back as a path under your mount rather than as an executable href. Inert is
+not the same as valid; the schema refuses it too.
 
 ## What the host keeps
 

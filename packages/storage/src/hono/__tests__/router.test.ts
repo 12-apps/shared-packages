@@ -39,6 +39,7 @@ function mount(actor: StorageActor | null = { scope: SCOPE, mayUpload: true }): 
     maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
     imagePipeline: fakePipeline(),
     unscopedKeys: 'reject',
+    references: [],
     resolveActor: () => actor,
   });
   const server = new Hono();
@@ -130,6 +131,7 @@ describe('storageRouter', () => {
       maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
       imagePipeline: fakePipeline(),
       unscopedKeys: 'reject',
+      references: [],
       resolveActor: () => null,
     });
 

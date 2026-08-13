@@ -89,6 +89,7 @@ export {
 
 export {
   inlineImageSchema,
+  objectKeySchema,
   refineImageInput,
   uploadAcceptedSchema,
   type ImageFields,

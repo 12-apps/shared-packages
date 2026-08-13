@@ -4,6 +4,7 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import { DEFAULT_MAX_UPLOAD_BYTES, megabytes } from '../limits';
+import type { WebStorageMessages } from './failures';
 import { ImageField, type ImageFieldProps } from './image-field';
 import type { ImageProfile } from './optimize-image';
 import { useUpload, type UploadState, type UseUploadConfig } from './use-upload';
@@ -31,6 +32,14 @@ export interface WebStorageConfig {
   profile?: ImageProfile;
   /** How requests are made. Default: same-origin `fetch`. */
   fetchImpl?: typeof fetch;
+  /**
+   * pt-BR refusal copy overrides, mirroring the server mount's `messages`.
+   *
+   * Override `forbidden` to name YOUR reason: the package states only that the
+   * account may not upload, because `mayUpload` is one host-computed boolean and a
+   * package that named a role model would be wrong for every host but the first.
+   */
+  messages?: Partial<WebStorageMessages>;
 }
 
 export interface WebStorage {
@@ -51,6 +60,7 @@ export function createWebStorage(config: WebStorageConfig): WebStorage {
     maxBytes,
     ...(config.profile ? { profile: config.profile } : {}),
     ...(config.fetchImpl ? { fetchImpl: config.fetchImpl } : {}),
+    ...(config.messages ? { messages: config.messages } : {}),
   };
   const useBoundUpload = (): UploadState => useUpload(uploadConfig);
 

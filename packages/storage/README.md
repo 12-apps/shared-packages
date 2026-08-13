@@ -7,7 +7,7 @@ implementations, and an image-pipeline port so a native dependency stays the
 host's choice.
 
 > **Adopting this?** This README is the API reference; **[`ADOPTING.md`](./ADOPTING.md)**
-> is the step-by-step wiring, including the four required config values and why
+> is the step-by-step wiring, including the five required config values and why
 > each of them has no default.
 
 ## The rule the whole package is built around
@@ -82,12 +82,13 @@ consulting any reference probe. A scheme without it can only answer "may this
 tenant delete this object?" by proving no row of **theirs** points at it — which
 is true of every other tenant's objects too.
 
-## The four values with no default
+## The five values with no default
 
-`createApiStorage` requires `driver`, `maxBytes`, `imagePipeline` and
-`unscopedKeys`. Each safe value is host-specific, so a default would be a
-decision made by whoever typed the first host and silently inherited by every one
-after it:
+`createApiStorage` requires `driver`, `maxBytes`, `imagePipeline`,
+`unscopedKeys` and `references`. Each safe value is host-specific, so a default
+would be a decision made by whoever typed the first host and silently inherited
+by every one after it — and each of these fails **quietly**, which is the actual
+argument. A loud wrong default gets fixed on the first deploy; these do not:
 
 | Config | What a default would cost |
 | --- | --- |
@@ -95,23 +96,59 @@ after it:
 | `maxBytes` | Whatever number this file happens to carry, in a host whose tool schemas advertise something else. |
 | `imagePipeline` | Whether crops exist at all — discovered from the shape of a key in production. |
 | `unscopedKeys` | Whether one tenant's reclaim can reach another tenant's bytes. |
+| `references` | Whether a restored row still has its photo. `[]` is not neutral: it means *reclaim everything immediately*. |
+
+`logger` still defaults, and it is the one that legitimately can: a reclaim may
+only report, never raise, so the worst a defaulted logger costs is silence.
+`references` defaulted too, until it didn't — because its default **destroys**.
 
 ## Backend, in full
+
+**Note the absence of `??`.** Every value below either comes from the
+environment and must be there, or is written out. That is deliberate: a
+`process.env.UPLOADS_DIR ?? \`${process.cwd()}/.uploads\`` in this position is
+exactly the fail-open default the table above refuses to have. `UPLOADS_DIR`
+unset in production means uploads succeed, one container holds the object, the
+other 404s half the `<img>` requests, and the next deploy discards both — with
+nothing in any log, because `writeFile` succeeded every time.
 
 ```ts
 import { createApiStorage } from '@12-apps/storage/server';
 import { createLocalDiskDriver, passthroughImagePipeline } from '@12-apps/storage/server';
 import { DEFAULT_MAX_UPLOAD_BYTES, STORAGE_PATHS } from '@12-apps/storage';
 
+/** Fail at BOOT for a missing value, rather than at the next deploy. */
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is required — it must be a MOUNTED VOLUME, not a container path.`);
+  return value;
+}
+
 const storage = createApiStorage({
   driver: createLocalDiskDriver({
-    root: process.env.UPLOADS_DIR ?? `${process.cwd()}/.uploads`,
+    root: requireEnv('UPLOADS_DIR'),
     publicPathPrefix: `/api${STORAGE_PATHS.serve}`,
   }),
   maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
   imagePipeline: passthroughImagePipeline(),
+  // 'reject' because this host is fresh: every key it will ever mint is scoped, so
+  // a key without a scope can only be someone else's or nobody's. A host with rows
+  // that predate the scope segment passes 'accept' — see ADOPTING.md rule 2.
   unscopedKeys: 'reject',
+  // Which of YOUR tables can still need an object after the row stopped pointing at
+  // it. `[]` says "nothing here copies a key" — write it only if you have checked.
+  references: [
+    { name: 'live-rows', referenced: (scope, key) => rowPointsAt(scope, key) },
+  ],
 });
+```
+
+For **development** the `??` is fine, and only here, because a lost object on a
+laptop costs nothing:
+
+```ts
+// DEV ONLY. Never in the block above.
+root: process.env.UPLOADS_DIR ?? `${process.cwd()}/.uploads`,
 ```
 
 `storage` carries everything else a host needs:
@@ -121,9 +158,26 @@ const storage = createApiStorage({
 | `routes` | Framework-neutral descriptors. `@12-apps/storage/hono` mounts them. |
 | `limits` | What this mount enforces — feed a tool schema from it, never from a constant of your own. |
 | `schemas.inlineImage` | A zod schema whose base64 ceiling **is** `maxBytes`. |
+| `schemas.objectKey` | The schema for an `imageKey` field. **Not `z.string()`** — see below. |
 | `storeImage` / `storeInlineImage` | The write path for a host write that carries bytes (an agent's only option). |
 | `urls.objectUrl` / `urls.imageSources` / `urls.versionedObjectUrl` | Key → URL, through the active driver. |
 | `reclaim.*` | Reclaiming a replaced object, a superseded set, or keys a failed write just minted. |
+
+### An `imageKey` field is not a string field
+
+`objectUrl` returns an already-absolute value **unchanged** — a deliberate
+affordance for a host migrating off a URL column. So a write body that accepts
+`imageKey: z.string()` accepts `https://tracker.example/p.png`, and every buyer
+loading that storefront page then sends their IP and user-agent to a third
+party. No upload, no bucket and no driver is involved, so nothing on the storage
+path can catch it. Use the mount's own schema:
+
+```ts
+const body = z.object({
+  imageKey: storage.schemas.objectKey.nullish(),
+  image: storage.schemas.inlineImage.optional(),
+}).superRefine(refineImageInput);
+```
 
 ## Frontend, in full
 
@@ -152,9 +206,18 @@ imagePipeline: createSharpImagePipeline({ sharp });
 
 `passthroughImagePipeline()` is the other choice: the bytes are stored as they
 arrived, no crops, flat keys — which is exactly what every catalog image was
-before crops existed. It still verifies the magic number, because that check is
-what stops an upload surface being a way to park arbitrary content at a
-world-readable URL on the store's own domain.
+before crops existed.
+
+**The magic-number check is not the pipeline's job**, and this README used to say
+it was. It belongs to the WRITER: `storeImage` verifies the bytes against the
+declared type as its first statement, before any pipeline sees them. That
+placement is deliberate, because the two implementations cannot both be trusted
+with it — `passthrough` verifies as part of doing nothing, while `sharp` cannot:
+"did libvips decode this" and "is this the format that was declared" are
+different questions, and libvips decodes plenty of formats this allowlist
+excludes. Putting the check in the writer means no path to storage goes around
+it, whichever pipeline a host injected and whether the bytes arrived at the
+endpoint, base64 inside a write, or through a direct `storeImage` call.
 
 ## A second vendor is a config entry
 

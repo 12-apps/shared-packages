@@ -32,6 +32,31 @@ import type { StorageDriver } from './driver';
  * Cleanup is best-effort BY CONSTRUCTION: it runs after the write it follows, and
  * a failure is logged rather than raised. A store owner who successfully changed a
  * photo must not see an error because a bucket delete timed out.
+ *
+ * ## The probe→purge window, stated plainly
+ *
+ * {@link deleteIfOrphaned} is read-validate-write: it consults every probe, then
+ * deletes. There is no claim-once and no transaction, so a concurrent request that
+ * ATTACHES the key between the last probe and the delete loses its object:
+ *
+ *   1. user B replaces product P's photo; the reclaim probes key `K` and finds
+ *      nothing referencing it;
+ *   2. concurrently user A, whose tab still shows `K`, duplicates P — the duplicate
+ *      row is written with `imageKey: K`;
+ *   3. the purge runs. `K` and its five crops are gone, and A's brand-new row points
+ *      at six objects that do not exist.
+ *
+ * This is inherent to ANY probe-based orphan reclaim; closing it needs refcounting,
+ * which is a different design and a host-side one (the count would live in the
+ * host's tables, beside the keys). What the package can do is two things, and it
+ * does both:
+ *
+ *   - the probes are read OUTSIDE the host's transaction, so the host has to order
+ *     the call correctly — after commit, and after any copy-on-write path has
+ *     landed. That rule is `ADOPTING.md` rule 3, and it is the actual fix;
+ *   - the window is made DISCOVERABLE rather than silent (see `confirmStillOrphaned`).
+ *     "The reclaim deleted the image I just attached" is otherwise a bug with no
+ *     log line anywhere, which is the worst shape a data-loss bug can have.
  */
 
 /**
@@ -113,11 +138,46 @@ export async function deleteIfOrphaned(
       if (await probe.referenced(scope, key)) return;
     }
     await purge(deps, key);
+    await confirmStillOrphaned(deps, scope, key);
   } catch (error) {
     // The write this followed already succeeded. Logged through the host's own
     // logger so a bucket that starts refusing deletes is discoverable rather than
     // silently accumulating objects.
     deps.logger.error(`[storage] could not reclaim ${key}: ${errorText(error)}`);
+  }
+}
+
+/**
+ * Re-ask the probes AFTER the purge, and log if the answer changed.
+ *
+ * This does NOT close the probe→purge window — nothing here can undelete an
+ * object, and pretending otherwise would be worse than the window itself. What it
+ * does is convert the failure from silent to reported: a row now points at six
+ * objects that no longer exist, and without this line the only trace anywhere is a
+ * store owner eventually noticing a broken image.
+ *
+ * That is the same bargain the rest of this file makes — a reclaim can only report
+ * — applied to the one hazard the design cannot remove.
+ *
+ * Cheap by construction, and deliberately so: it runs only when a purge ACTUALLY
+ * happened (the branch where the key was orphaned AND deleted, not the common one
+ * where a probe claimed it or the key was null), and not at all for a host that
+ * passes `references: []`, which has no window to detect.
+ */
+async function confirmStillOrphaned(
+  deps: ReclaimDeps,
+  scope: string,
+  key: string,
+): Promise<void> {
+  for (const probe of deps.probes) {
+    if (await probe.referenced(scope, key)) {
+      deps.logger.error(
+        `[storage] reclaimed ${key} but ${probe.name} references it now: ` +
+          'it was attached between the probe and the delete, so that row points at ' +
+          'objects that no longer exist',
+      );
+      return;
+    }
   }
 }
 

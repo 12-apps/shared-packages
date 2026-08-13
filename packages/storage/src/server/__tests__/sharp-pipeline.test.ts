@@ -204,9 +204,7 @@ describe('cut', () => {
     }
   });
 
-  it('counts an animation frame by frame against that ceiling too', async () => {
-    // Declined for being animated as well, but the budget is what stops a 200-frame
-    // source that is only 1000x1000 per frame.
+  it('measures the budget against the ceiling it was handed, not a constant', async () => {
     const stub = sharpStub({ metadata: { width: 8_000, height: 8_000, pages: 1 } });
 
     expect(
@@ -215,6 +213,47 @@ describe('cut', () => {
         CATALOG_RENDITIONS,
       ),
     ).toEqual([]);
+    expect(stub.calls.map((call) => call.op)).toEqual(['metadata']);
+  });
+
+  it('declines an animation on the FRAME COUNT, before the budget is consulted', async () => {
+    // This is the metadata shape REAL libvips answers for an animated source under
+    // `{ animated: true }`: `height` is the whole FILMSTRIP (2 frames × 64), not one
+    // frame. Measured against libvips 8.17.3 with a hand-built two-frame GIF — the
+    // still read says `height: 64, pages: 2`, the animated read says
+    // `height: 128, pages: 2`.
+    //
+    // Which is why the budget must NOT multiply by `pages`: width × height already
+    // covers every frame here, so a `× pages` would over-count by a factor of
+    // `pages` and refuse a modest animation as a decompression bomb.
+    const stub = sharpStub({ metadata: { width: 64, height: 128, pages: 2 } });
+
+    const outputs = await createSharpImagePipeline({
+      sharp: stub.sharp,
+      maxPixels: 50_000_000,
+    }).cut(SOURCE, CATALOG_RENDITIONS);
+
+    expect(outputs).toEqual([]);
+    expect(stub.calls.map((call) => call.op)).toEqual(['metadata']);
+    // The ANIMATED read is the one asked, which is what makes `pages` trustworthy at
+    // all: a still read reports `pages: 1` for a GIF that has twenty.
+    expect(stub.constructions).toEqual([true]);
+  });
+
+  it('does not treat a many-framed animation as a decompression bomb', async () => {
+    // A 200-frame 100×100 GIF: the filmstrip is 100 × 20000 = 2 MP, comfortably
+    // inside the default ceiling. If the budget multiplied by `pages` this would be
+    // scored as 400 MP and refused for the wrong reason — so the ceiling here is
+    // deliberately BELOW that product and above the true cost.
+    const stub = sharpStub({ metadata: { width: 100, height: 20_000, pages: 200 } });
+
+    expect(
+      await createSharpImagePipeline({ sharp: stub.sharp, maxPixels: 10_000_000 }).cut(
+        SOURCE,
+        CATALOG_RENDITIONS,
+      ),
+    ).toEqual([]);
+    // Declined as ANIMATED, which is the flat-key path, not as oversize.
     expect(stub.calls.map((call) => call.op)).toEqual(['metadata']);
   });
 

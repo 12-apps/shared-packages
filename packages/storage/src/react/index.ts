@@ -34,4 +34,11 @@ export {
   type ImageProfile,
 } from './optimize-image';
 
-export { rejectFileUpfront, transportFailure, uploadFailure } from './failures';
+export {
+  defaultWebStorageMessages,
+  rejectFileUpfront,
+  transportFailure,
+  uploadFailure,
+  type WebStorageMessageContext,
+  type WebStorageMessages,
+} from './failures';

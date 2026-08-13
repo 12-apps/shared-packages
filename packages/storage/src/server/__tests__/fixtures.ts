@@ -10,7 +10,8 @@ import type { ImagePipeline, ProcessResult } from '../pipeline/port';
  * PIPELINE is a double because the real one is `sharp`, and a package that made a
  * native module a test dependency would be exactly the coupling `imagePipeline`
  * exists to avoid — its own behaviour is covered against a stub module in
- * `pipeline/__tests__/sharp.test.ts`.
+ * `sharp-pipeline.test.ts`, beside this file, and the invariants EVERY
+ * implementation owes its callers are in `pipeline-contract.test.ts`.
  */
 
 export interface MemoryDriver extends StorageDriver {

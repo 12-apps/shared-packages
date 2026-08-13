@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_MAX_UPLOAD_BYTES } from '../../limits';
+import { defaultStorageMessages } from '../../problems';
 import { CATALOG_RENDITIONS } from '../../renditions';
 import { createApiStorage, type ApiStorage } from '../create-api-storage';
 import type { StorageRoute, StorageRouteResponse } from '../routes';
@@ -40,6 +41,7 @@ function harness(pipelineCuts = true): Harness {
     maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
     imagePipeline: fakePipeline({ cuts: pipelineCuts }),
     unscopedKeys: 'reject',
+    references: [],
   });
   const entry = mounted.routes.find(
     (candidate: StorageRoute) => candidate.method === 'POST',
@@ -113,6 +115,7 @@ describe('POST /uploads/image', () => {
       maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
       imagePipeline: fakePipeline(),
       unscopedKeys: 'reject',
+      references: [],
     });
 
     const key = await storage.storeImage({
@@ -151,7 +154,10 @@ describe('POST /uploads/image', () => {
     const response = await post(uploadRequest(PNG_BYTES, 'application/zip'));
 
     expect(response.status).toBe(400);
-    expect(bodyOf(response).error).toBe('unsupported_content_type');
+    // The configured SENTENCE, not the bare code — see "one number, stated once".
+    expect(bodyOf(response).error).toBe(
+      defaultStorageMessages({ limit: '8 MB' }).unsupported_content_type,
+    );
   });
 
   it('rejects bytes whose magic number contradicts the declared type', async () => {
@@ -185,7 +191,9 @@ describe('POST /uploads/image', () => {
     const response = await post(request);
 
     expect(response.status).toBe(413);
-    expect(bodyOf(response).error).toBe('file_too_large');
+    expect(bodyOf(response).error).toBe(
+      defaultStorageMessages({ limit: '8 MB' }).file_too_large,
+    );
   });
 
   it('cancels a chunked oversize stream at the cap instead of buffering it all', async () => {
@@ -224,6 +232,7 @@ describe('POST /uploads/image', () => {
       maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
       imagePipeline: fakePipeline({ process: () => ({ ok: false, problem: 'image_unreadable' }) }),
       unscopedKeys: 'reject',
+      references: [],
     });
     const refusedRoute = refusing.routes[0] as StorageRoute;
 
@@ -278,6 +287,7 @@ describe('the mount reports its own limits', () => {
       maxBytes: 1024,
       imagePipeline: fakePipeline(),
       unscopedKeys: 'reject',
+      references: [],
     });
 
     const parsed = tight.schemas.inlineImage.safeParse({
@@ -298,6 +308,7 @@ describe('the mount reports its own limits', () => {
       maxBytes: 2 * 1024 * 1024,
       imagePipeline: fakePipeline(),
       unscopedKeys: 'reject',
+      references: [],
     });
 
     await expect(
@@ -306,6 +317,90 @@ describe('the mount reports its own limits', () => {
         SCOPE,
       ),
     ).rejects.toThrow(/2 MB/);
+  });
+});
+
+describe('one number, stated once — the ROUTE says it too', () => {
+  /**
+   * The regression for an adversarial finding, and the gap the case above could not
+   * cover: it exercises `storeInlineImage`, so it cannot fail for the route.
+   *
+   * The endpoint used to answer the two refusals decided BEFORE the write path with
+   * bare codes (`file_too_large`, `unsupported_content_type`) while every byte-level
+   * refusal answered a finished sentence. The browser then mapped the code through
+   * its OWN default ceiling, so a mount capped at 4 MB refusing a 6 MB file said
+   * "o limite é 8 MB" — a number nothing applied, in the package whose headline
+   * claim is that there is exactly ONE of them.
+   */
+  function mount(config: { maxBytes: number; messages?: Record<string, string> }) {
+    const api = createApiStorage({
+      driver: memoryDriver(),
+      maxBytes: config.maxBytes,
+      imagePipeline: fakePipeline(),
+      unscopedKeys: 'reject',
+      references: [],
+      ...(config.messages ? { messages: config.messages } : {}),
+    });
+    const entry = api.routes.find(
+      (candidate: StorageRoute) => candidate.method === 'POST',
+    ) as StorageRoute;
+    return (request: Request) =>
+      entry.handle({ actor: { scope: SCOPE, mayUpload: true }, params: {}, request });
+  }
+
+  function oversize(maxBytes: number): Request {
+    return new Request('http://host.test/api/uploads/image', {
+      method: 'POST',
+      body: PNG_BYTES,
+      headers: { 'content-type': 'image/png', 'content-length': String(maxBytes + 1) },
+    });
+  }
+
+  it("names THIS mount's ceiling in the 413, not the package default", async () => {
+    const post = mount({ maxBytes: 4 * 1024 * 1024 });
+
+    const response = await post(oversize(4 * 1024 * 1024));
+
+    expect(response.status).toBe(413);
+    expect(bodyOf(response).error).toContain('4 MB');
+    // The exact wrong answer the finding described: the browser's own default.
+    expect(bodyOf(response).error).not.toContain('8 MB');
+  });
+
+  it('carries the mount messages override into the 413', async () => {
+    const post = mount({
+      maxBytes: 1024,
+      messages: { file_too_large: 'A foto passou do limite combinado com a loja.' },
+    });
+
+    const response = await post(oversize(1024));
+
+    expect(bodyOf(response).error).toBe('A foto passou do limite combinado com a loja.');
+  });
+
+  it('carries the override into the unsupported-type 400 as well', async () => {
+    const post = mount({
+      maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
+      messages: { unsupported_content_type: 'Só aceitamos PNG nesta loja.' },
+    });
+
+    const response = await post(uploadRequest(PNG_BYTES, 'application/zip'));
+
+    expect(response.status).toBe(400);
+    expect(bodyOf(response).error).toBe('Só aceitamos PNG nesta loja.');
+  });
+
+  it('answers a SENTENCE rather than a code, which is what the browser relays', async () => {
+    const post = mount({ maxBytes: 4 * 1024 * 1024 });
+
+    // The browser's rule is "a stated value containing whitespace is a finished
+    // sentence, relay it verbatim" — so this whitespace IS the contract between the
+    // halves, not an incidental property of the copy.
+    for (const request of [oversize(4 * 1024 * 1024), uploadRequest(PNG_BYTES, 'text/plain')]) {
+      const error = bodyOf(await post(request)).error;
+      expect(typeof error).toBe('string');
+      expect(error as string).toMatch(/\s/);
+    }
   });
 });
 
@@ -330,6 +425,7 @@ describe('the byte check belongs to the WRITER, not to an entrance', () => {
       maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
       imagePipeline: fakePipeline({ process: passthroughProcess }),
       unscopedKeys: 'reject',
+      references: [],
     });
   }
 
@@ -348,6 +444,7 @@ describe('the byte check belongs to the WRITER, not to an entrance', () => {
       maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
       imagePipeline: fakePipeline({ process: passthroughProcess }),
       unscopedKeys: 'reject',
+      references: [],
     });
 
     await expect(
@@ -380,6 +477,7 @@ describe('the byte check belongs to the WRITER, not to an entrance', () => {
         },
       },
       unscopedKeys: 'reject',
+      references: [],
     });
 
     await expect(
