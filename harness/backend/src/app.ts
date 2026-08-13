@@ -77,7 +77,7 @@ import {
 } from '@12-apps/realtime';
 import { enqueueRealtimeEvent } from '@12-apps/realtime/server';
 
-import { appShellHost } from './app-shell-host';
+import { appShellHost, mountAppShellControls } from './app-shell-host';
 import { applyAuditMigrations } from './audit-db';
 import { auditHost, reseedAudit } from './audit-host';
 import { createEntitlementsHost, TENANT } from './entitlements-host';
@@ -233,33 +233,6 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
 }
 
 /**
- * The shell's suite controls — a terms-version BUMP, which in production is a deploy.
- *
- * Under `/__harness` and not `/api`, like every other control here: deciding when a
- * host's legal documents change is exactly what stays in a host, so this is the one
- * piece of the consent story the harness cannot get from the package.
- */
-function mountAppShellControls(app: Hono, hosts: Hosts): void {
-  app.post('/__harness/app-shell/bump', async (c) => {
-    const body = (await c.req.json()) as { version?: string };
-    hosts.appShell.controls.bump(body.version ?? `bumped-${Date.now()}`);
-    return c.json({ version: hosts.appShell.controls.version() });
-  });
-
-  /** Make the host's own `record` fail, so the 500 path is reachable from a browser. */
-  app.post('/__harness/app-shell/fail-writes', async (c) => {
-    const body = (await c.req.json()) as { fails?: boolean };
-    hosts.appShell.controls.failWrites(body.fails !== false);
-    return c.body(null, 204);
-  });
-
-  /** What `onAccepted` was called with — a real host would have published a hint. */
-  app.get('/__harness/app-shell/published', (c) =>
-    c.json({ published: hosts.appShell.controls.published() }),
-  );
-}
-
-/**
  * A HOST endpoint standing behind the package's guard — the arrangement every
  * gated host route has. What it proves is the denial WIRE: the free tenant answers
  * 402 here with the body the react half's 402 interceptor parses into an upsell
@@ -345,7 +318,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.get('/health', (c) => c.json({ ok: true }));
   mountReset(app, pg, hosts);
   mountRealtimeControls(app, pg, hosts);
-  mountAppShellControls(app, hosts);
+  mountAppShellControls(app, hosts.appShell);
   // Installs the driver for THIS process, which is what lets a `/__harness/publish` reach a
   // stream the SPA is holding open through Vite's proxy. No Redis: the harness is one
   // process, so inline delivery is the whole bus.

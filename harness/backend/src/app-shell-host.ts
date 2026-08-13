@@ -25,6 +25,8 @@
  * rather than when the router is built. A router rebuilt on every bump would have to
  * be re-mounted, and Hono registers a sub-router's handlers at `route()` time.
  */
+import type { Hono } from 'hono';
+
 import { appShellRouter } from '@12-apps/app-shell/hono';
 import type { AppShellServerConfig, ConsentActor } from '@12-apps/app-shell/server';
 
@@ -133,7 +135,7 @@ export function appShellHost() {
       state.published = [];
       state.recordFails = false;
     },
-    /** The suite's controls, mounted under `/__harness` in `app.ts`. */
+    /** The suite's controls, mounted by {@link mountAppShellControls}. */
     controls: {
       version: (): string => state.version,
       bump: (version: string): void => {
@@ -145,4 +147,35 @@ export function appShellHost() {
       },
     },
   };
+}
+
+/**
+ * The shell's suite controls — a terms-version BUMP, which in production is a deploy.
+ *
+ * Under `/__harness` and not `/api`, like every other control in this harness: deciding
+ * when a host's legal documents change is exactly what stays in a host, so this is the
+ * one piece of the consent story the harness cannot get from the package.
+ *
+ * It lives HERE rather than in `app.ts` because it reaches for nothing else — only the
+ * `controls` object above — and `app.ts` is the file every package in this series adds
+ * to, so it is the one that keeps meeting the size gate.
+ */
+export function mountAppShellControls(app: Hono, host: ReturnType<typeof appShellHost>): void {
+  app.post('/__harness/app-shell/bump', async (c) => {
+    const body = (await c.req.json()) as { version?: string };
+    host.controls.bump(body.version ?? `bumped-${Date.now()}`);
+    return c.json({ version: host.controls.version() });
+  });
+
+  /** Make the host's own `record` fail, so the 500 path is reachable from a browser. */
+  app.post('/__harness/app-shell/fail-writes', async (c) => {
+    const body = (await c.req.json()) as { fails?: boolean };
+    host.controls.failWrites(body.fails !== false);
+    return c.body(null, 204);
+  });
+
+  /** What `onAccepted` was called with — a real host would have published a hint. */
+  app.get('/__harness/app-shell/published', (c) =>
+    c.json({ published: host.controls.published() }),
+  );
 }
