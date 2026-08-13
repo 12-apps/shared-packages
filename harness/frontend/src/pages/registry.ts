@@ -28,6 +28,7 @@ import { OnboardingGuidedPage } from './onboarding-guided';
 import { PwaInstallPromptPage } from './pwa-install-prompt';
 import { PwaManifestPage } from './pwa-manifest';
 import { RbacAdminPage } from './rbac-admin';
+import { RealtimeEventsPage } from './realtime-events';
 import { ReportBuilderPage } from './report-builder';
 
 /**
@@ -326,6 +327,13 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/entity-lifecycle',
     group: 'backoffice',
     Component: LifecycleAdminPage,
+  },
+  {
+    slug: 'realtime-events',
+    title: 'Live updates',
+    pkg: '@12-apps/realtime',
+    group: 'backoffice',
+    Component: RealtimeEventsPage,
   },
   {
     slug: 'audit-log',

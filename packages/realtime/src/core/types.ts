@@ -48,11 +48,25 @@ export interface RealtimeEvent<TData = unknown> {
   id: string;
 }
 
-/** What a publisher provides — the runtime stamps `ts` and `id`. */
-export type RealtimeEventInput<TData = unknown> = Pick<
-  RealtimeEvent<TData>,
-  "type" | "data"
->;
+/**
+ * What a publisher provides — the runtime stamps `ts`, and `id` unless the
+ * publisher supplies one.
+ */
+export interface RealtimeEventInput<TData = unknown> {
+  type: string;
+  data: TData;
+  /**
+   * Override the generated emission id.
+   *
+   * Exactly one caller has a reason to: the transactional OUTBOX
+   * (`../server/outbox.ts`), whose publish is AT-LEAST-ONCE. A re-published row
+   * is the SAME event, so it must carry the same id — otherwise a duplicate is
+   * indistinguishable from a second, real change and a consumer that wanted to
+   * de-duplicate has nothing stable to key on. Every other publisher leaves it
+   * unset and gets a fresh per-process id.
+   */
+  id?: string;
+}
 
 /** A subscriber callback. Errors thrown here are caught and logged, never propagated to the publisher. */
 export type RealtimeHandler = (topic: string, event: RealtimeEvent) => void;
