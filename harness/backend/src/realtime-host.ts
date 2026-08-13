@@ -16,7 +16,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { tenantTopic, userTopic, type RealtimeDriver } from '@12-apps/realtime';
 import { eventsRouter, type EventsHono } from '@12-apps/realtime/hono';
-import { EventsDenial } from '@12-apps/realtime/server';
+import { EventsDenial, type EventsTopicSpec } from '@12-apps/realtime/server';
 
 import { realtimeOutboxDrainDb } from './realtime-db';
 import type { SqlRunner } from './rbac-db-shared';
@@ -104,6 +104,26 @@ function tenantIdOf(slug: string | undefined): string | null {
   return (slug && TENANTS[slug]) || null;
 }
 
+/**
+ * May this caller watch ONE requested spec?
+ *
+ * Extracted from `authorize` because the two questions are different: the seam above decides
+ * WHO and WHICH STORE, this decides WHAT — and the kitchen's qualifier check is the reason
+ * `qualifiedDomains` lists that domain at all. A class-tier caller watches any station,
+ * including the unqualified firehose; an instance-tier one must NAME a station they hold, and
+ * the firehose is refused outright because it is the class tier by another name.
+ */
+function assertMayWatch(actor: HarnessActor, spec: EventsTopicSpec): void {
+  if (!actor.domains.includes(spec.domain)) {
+    throw new EventsDenial(403, `Sem permissão para o tópico: ${spec.domain}.`);
+  }
+  if (spec.domain !== 'kitchen' || actor.stations === 'all') return;
+  const [station, ...rest] = spec.qualifiers;
+  if (station === undefined || rest.length > 0 || !actor.stations.includes(station)) {
+    throw new EventsDenial(403, `Sem permissão para o tópico: ${spec.domain}.`);
+  }
+}
+
 export interface RealtimeHost {
   events: EventsHono;
   /** The db the enqueue side writes through, for the suite's own transactions. */
@@ -142,20 +162,7 @@ export function realtimeHost(pg: PGlite, driver: RealtimeDriver): RealtimeHost {
             throw new EventsDenial(403, 'Sem acesso a esta loja.');
           }
 
-          for (const spec of specs) {
-            if (!actor.domains.includes(spec.domain)) {
-              throw new EventsDenial(403, `Sem permissão para o tópico: ${spec.domain}.`);
-            }
-            // The qualifier check the `qualifiedDomains` declaration promises exists. A
-            // class-tier caller watches any station (including the unqualified firehose);
-            // an instance-tier one must NAME a station they hold.
-            if (spec.domain === 'kitchen' && actor.stations !== 'all') {
-              const [station, ...rest] = spec.qualifiers;
-              if (station === undefined || rest.length > 0 || !actor.stations.includes(station)) {
-                throw new EventsDenial(403, `Sem permissão para o tópico: ${spec.domain}.`);
-              }
-            }
-          }
+          for (const spec of specs) assertMayWatch(actor, spec);
 
           return {
             subjectId: tenantId,
