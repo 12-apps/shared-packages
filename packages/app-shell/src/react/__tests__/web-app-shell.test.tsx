@@ -16,6 +16,22 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createWebAppShell } from '../create-web-app-shell';
 
+/** The crashes a host's reporter saw, in a container the test owns. */
+function reporter(): { seen: unknown[]; onCrash: (error: unknown) => void } {
+  const seen: unknown[] = [];
+  return { seen, onCrash: (error: unknown) => seen.push(error) };
+}
+
+/** React logs every caught error itself; silence it so a passing run is quiet. */
+function quietReactErrors(): void {
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+}
+
+/** A page that throws on render — a crashed chunk, or a page bug. */
+function BadPage(): JSX.Element {
+  throw new Error('a routed page exploded');
+}
+
 /** A session endpoint that answers signed-out, and a consent status of `stale`. */
 function server(options: { stale?: boolean } = {}): string[] {
   const calls: string[] = [];
@@ -34,14 +50,22 @@ function server(options: { stale?: boolean } = {}): string[] {
   return calls;
 }
 
-/** The minimum a host must pass — every one of these has no safe default. */
+/**
+ * The minimum a host must pass — every one of these has no safe default.
+ *
+ * `consent: false` is part of the minimum on purpose: it is the DECLARATION that this
+ * app has no terms flow, and it is required so that silence cannot be the way a host
+ * with a terms flow ends up with no gate.
+ */
 const REQUIRED = {
   brand: { name: 'Harness' },
   onCrash: (): void => {},
+  consent: false,
 } as const;
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   window.history.replaceState({}, '', '/');
 });
 
@@ -92,23 +116,29 @@ describe('createWebAppShell', () => {
     await waitFor(() => expect(screen.getByTestId('same-client').textContent).toBe('true'));
 
     // With no client the provider is absent, so `useQueryClient` throws rather than
-    // resolving to something the host never made.
-    const bare = createWebAppShell(REQUIRED);
-    expect(() =>
-      render(
-        <bare.Provider>
-          <Probe />
-        </bare.Provider>,
-      ),
-    ).toThrow(/QueryClientProvider/);
+    // resolving to something the host never made. Read off the REPORTER rather than off
+    // `render`: the tower now carries a boundary, so the throw is caught and reported
+    // instead of escaping — which is the whole point of the boundary and does not change
+    // what is being claimed here.
+    quietReactErrors();
+    const host = reporter();
+    const bare = createWebAppShell({ ...REQUIRED, onCrash: host.onCrash });
+    render(
+      <bare.Provider>
+        <Probe />
+      </bare.Provider>,
+    );
+    expect((host.seen[0] as Error | undefined)?.message).toMatch(/QueryClientProvider/);
   });
 
   /**
-   * The consent gate is mounted only when the host declares a terms flow. A gate that
+   * The consent gate is mounted unless the host declares `consent: false`. A gate that
    * polled an endpoint nobody implemented would be the noisier failure, and a host
-   * with no such flow has nothing for it to ask about.
+   * with no such flow has nothing for it to ask about — but that declaration is now
+   * something a host has to WRITE, so forgetting the key cannot be how an app with a
+   * terms flow ends up ungated.
    */
-  it('mounts the consent gate only when consent is configured', async () => {
+  it('mounts the consent gate unless the host opted out with `false`', async () => {
     const withoutConsent = server({ stale: true });
     const bare = createWebAppShell(REQUIRED);
     render(
@@ -195,6 +225,19 @@ describe('createWebAppShell', () => {
     await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/roles'));
   });
 
+  /**
+   * `{ base, fetch }` can only mean a `fetch` that goes THROUGH `base`. Unbound, it was
+   * bare `apiFetch`, so `api.fetch('/consent/status')` sitting beside a base of
+   * `/backend` hit `/consent/status` — an invitation the grouping itself extends.
+   */
+  it('sends `api.fetch` through `api.base`', async () => {
+    const calls = server();
+    const shell = createWebAppShell({ ...REQUIRED, apiBase: '/backend/' });
+    await shell.api.fetch('/consent/status');
+    // The base's trailing slash is not doubled either — `joinApiPath` owns that.
+    expect(calls).toContain('GET /backend/consent/status');
+  });
+
   it('hands back the seams a host composes with', () => {
     const shell = createWebAppShell({ ...REQUIRED, apiBase: '/backend' });
     expect(shell.api.base).toBe('/backend');
@@ -205,6 +248,92 @@ describe('createWebAppShell', () => {
     // One theme object, built once: a theme rebuilt per render is a new object
     // identity and re-runs every `styled` cache below it.
     expect(shell.theme).toBe(shell.theme);
+  });
+
+  /**
+   * The failure the package exists to prevent, reached through the DOCUMENTED wiring
+   * and nothing else.
+   *
+   * `onCrash` is required, and for a long time it was only ever called from a
+   * `RouteErrorBoundary` the host had to mount itself — which the quick-start never
+   * told it to. So an adopter who followed the docs got the exact outcome
+   * `chunk-recovery.ts` describes: a routed page throws, React unmounts the root, and
+   * the required reporter is never reached. A required knob the documented path cannot
+   * reach is not a guarantee, so the Provider mounts the boundary itself.
+   *
+   * This case is deliberately the quick-start shape verbatim — no boundary in the
+   * host's tree — and it fails against a Provider that does not mount one: the throw
+   * escapes `render` instead of becoming an error state.
+   */
+  it('catches a routed crash and reports it without a host-mounted boundary', async () => {
+    quietReactErrors();
+    server();
+    const host = reporter();
+    const shell = createWebAppShell({
+      brand: { name: 'Harness' },
+      onCrash: host.onCrash,
+      queryClient: new QueryClient(),
+      consent: {},
+    });
+
+    const view = render(
+      <shell.Provider router={{}}>
+        <Routes>
+          <Route path="/" element={<BadPage />} />
+        </Routes>
+      </shell.Provider>,
+    );
+
+    // An error state, not a blank root — the `route-error` id every host's e2e
+    // specs select on.
+    expect(await screen.findByTestId('route-error')).toBeDefined();
+    expect(view.container.innerHTML).not.toBe('');
+    // …and the crash reached the reporter the host passed, which is the half that
+    // `window.onerror` can never see.
+    expect(host.seen).toHaveLength(1);
+    expect((host.seen[0] as Error).message).toBe('a routed page exploded');
+  });
+
+  /**
+   * Double-wrapping has to be HARMLESS, because per-route placement is legitimate: a
+   * host wants the boundary below its own chrome so a crashed page keeps the sidebar.
+   * React gives the nearest boundary the error, so the host's inner one catches and the
+   * Provider's net never sees it — one fallback, one report. Asserted rather than
+   * assumed: a second report would double every crash in a host's issue tracker.
+   */
+  it('lets a host-mounted boundary catch first, reporting once', async () => {
+    quietReactErrors();
+    server();
+    const host = reporter();
+    const shell = createWebAppShell({
+      brand: { name: 'Harness' },
+      onCrash: host.onCrash,
+      consent: false,
+    });
+
+    render(
+      <shell.Provider router={{}}>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <>
+                <p data-testid="host-chrome">chrome</p>
+                <shell.RouteErrorBoundary resetKey="a">
+                  <BadPage />
+                </shell.RouteErrorBoundary>
+              </>
+            }
+          />
+        </Routes>
+      </shell.Provider>,
+    );
+
+    // The inner boundary caught it, so the chrome beside it survived — which is the
+    // whole reason a host places one of these by hand.
+    expect(await screen.findByTestId('host-chrome')).toBeDefined();
+    expect(screen.getAllByTestId('route-error')).toHaveLength(1);
+    expect(host.seen).toHaveLength(1);
   });
 
   it('takes the tenant palette seed through to the theme', () => {

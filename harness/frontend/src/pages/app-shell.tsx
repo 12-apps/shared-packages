@@ -119,6 +119,13 @@ function FormatProbe(): JSX.Element {
  * The boundary wraps only the crashing panel, which is the honest analogue of what it
  * does in an app: a crashed PAGE stays a crashed page, with the chrome around it still
  * working. Wrapping every probe would mean one click erased the whole screen.
+ *
+ * It is a SECOND boundary — `shell.Provider` already mounts one around everything as the
+ * last resort — and that is exactly the composition an adopter with its own chrome
+ * performs. React hands the error to the nearest boundary, so the inner one below
+ * catches and the outer never sees it: the spec's `crash-count` of exactly 1, and the
+ * single `route-error` that Playwright's strict mode would fail on if there were two,
+ * are the proof in a real browser that double-wrapping doubles neither.
  */
 function Controls(): JSX.Element {
   const [crashed, setCrashed] = useState(false);
