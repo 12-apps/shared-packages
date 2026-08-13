@@ -203,6 +203,29 @@ describe('scope isolation', () => {
     ]);
   });
 
+  it('keeps its store under the key @12-apps/prisma uses', () => {
+    // The key is a cross-package contract (see the comment on it): the copy of
+    // this module in `@12-apps/prisma` — which a host's existing `setActor` call
+    // sites import — keys to `__futurePayActorStore`, so a rename here silently
+    // forks the store and every audit row lands with no actor at all.
+    //
+    // Interop itself is proven end to end, in both directions, by
+    // `packages/prisma/tests/actor-context-audit-interop.test.ts` (the only test
+    // that imports both copies). This case is the cheap half of that pin, in the
+    // suite of the package that publishes the key.
+    const globals = globalThis as unknown as {
+      __futurePayActorStore?: { getStore(): { userId: string } | undefined };
+    };
+
+    runWithActorScope(() => {
+      setActor('user-7', { role: 'ADMIN' });
+      expect(globals.__futurePayActorStore?.getStore()).toEqual({
+        userId: 'user-7',
+        role: 'ADMIN',
+      });
+    });
+  });
+
   it('reports no actor outside any scope', () => {
     // Every read is `?.`-guarded, so code that runs before a request boundary
     // (module init, a script) sees a system context rather than throwing.

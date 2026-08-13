@@ -42,7 +42,17 @@ function row(seed: SeedEntry, sequence: number): StoredRow {
 }
 
 const matches = (stored: StoredRow, where: AuditLogWhere): boolean => {
-  if (stored.clientId !== where.clientId) return false;
+  // `undefined` means NOT PROVIDED, exactly as Prisma reads it — so an omitted
+  // (or `undefined`) `clientId` matches EVERY row rather than none.
+  //
+  // The lenient version of this line (`stored.clientId !== where.clientId`) was a
+  // silent safety net pointing the wrong way: it made a missing tenant scope
+  // return zero rows here while real Prisma returned every tenant's, so the one
+  // class of tenancy bug this fake exists to catch was the one it could not. The
+  // cast is deliberate — `AuditLogWhere.clientId` is typed `string`, and the point
+  // of the check is that types are erased at the host seam.
+  const scope = where.clientId as string | undefined;
+  if (scope !== undefined && stored.clientId !== scope) return false;
   if (where.actorUserId !== undefined && stored.actorUserId !== where.actorUserId) return false;
   if (where.action && !where.action.in.includes(stored.action)) return false;
   if (where.resourceType && !where.resourceType.in.includes(stored.resourceType)) return false;

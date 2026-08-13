@@ -105,6 +105,45 @@ describe('tenancy', () => {
     for (const where of h.fake.wheres) expect(where.clientId).toBe(TENANT);
   });
 
+  it('REFUSES a read when the host resolved no tenant id — both shapes', async () => {
+    // The one seam the package does not control. `AuditActor.tenantId: string` is
+    // erased at runtime, and `undefined` fails OPEN under Prisma: it OMITS an
+    // undefined clause, so `{ clientId: undefined }` returns every tenant's rows
+    // and `count` reports the global total. A `resolveActor` written the way the
+    // README shows produces exactly that for a slug the caller is not a member of.
+    //
+    // `''` happens to fail closed, which is worse for a reviewer, not better — so
+    // both are refused, loudly. A host contract violation must NOT arrive as a
+    // 4xx the host can shrug off: the throw escapes `foldApiError` as a 500.
+    for (const tenantId of [undefined as unknown as string, '']) {
+      const h = harness({ actor: { tenantId, userId: 'u-owner', permissions: ['audit:read'] } });
+      h.fake.seed({ clientId: TENANT }, { clientId: OTHER });
+
+      await expect(h.get('/audit-logs')).rejects.toThrow(/require a tenant id/);
+      await expect(h.get('/audit-logs/actors')).rejects.toThrow(/require a tenant id/);
+      // Nothing was asked of the database.
+      expect(h.fake.wheres).toEqual([]);
+    }
+  });
+
+  it('would have leaked every tenant had the guard not fired', async () => {
+    // The counter-test that keeps the guard honest, and the reason `fake-db` now
+    // reads `undefined` the way Prisma does: drive the store's predicate builder's
+    // output straight at the seam with no tenant in it, and the fake answers with
+    // the neighbour's rows too. This is the query the route WOULD have issued.
+    const fake = fakeAuditDb();
+    fake.seed({ clientId: TENANT, resourceId: 'mine' }, { clientId: OTHER, resourceId: 'theirs' });
+
+    const rows = await fake.db.auditLog.findMany({
+      where: { clientId: undefined as unknown as string },
+      orderBy: { createdAt: 'desc' },
+      skip: 0,
+      take: 20,
+    });
+
+    expect(rows.map((row) => row.resourceId)).toEqual(['mine', 'theirs']);
+  });
+
   it('scopes the actor options to the tenant too', async () => {
     const listActors = vi.fn().mockResolvedValue([{ id: 'u-1', name: 'Ana' }]);
 
@@ -262,6 +301,29 @@ describe('filters', () => {
     expect(nonsense.pagination).toMatchObject({ page: 1, pageSize: 20 });
   });
 
+  it('caps `page` too — an OFFSET is a scan a caller can ask for in a URL', async () => {
+    // `page` was unbounded while `pageSize` was capped, so `?page=999999999`
+    // became `OFFSET 19999999980`: Postgres counts and discards every one of those
+    // rows on a table that only grows.
+    const h = harness();
+    seedThree(h);
+
+    const far = page((await h.get('/audit-logs', { page: '999999999' })).body);
+
+    expect(far.pagination.page).toBe(10_000);
+    expect(far.data).toEqual([]);
+  });
+
+  it('reads an EMPTY pill filter as no filter, not as an impossible one', async () => {
+    // `?action_in=` used to become `action: { in: [] }` — zero rows, which reads
+    // as "this store has no such entries" rather than "you filtered on nothing".
+    const h = harness();
+    seedThree(h);
+
+    expect((await ids(h, { action_in: '' })).length).toBe(3);
+    expect((await ids(h, { resourceType_in: ',, ,' })).length).toBe(3);
+  });
+
   it('answers 400 for a malformed date or an unknown filter value', async () => {
     const h = harness();
 
@@ -338,6 +400,23 @@ describe('identity resolution', () => {
     const [entry] = page((await h.get('/audit-logs')).body).data;
 
     expect(entry).toMatchObject({ actorName: null, onBehalfOfName: null });
+  });
+
+  it('degrades to raw ids when the directory throws, rather than 500ing', async () => {
+    // The names are an affordance over rows the package already has. A host whose
+    // user table is briefly unreachable must still be able to read its security
+    // log — refusing the whole page for a cosmetic reason denies exactly the
+    // reading a dispute needs.
+    const getUsers = vi.fn().mockRejectedValue(new Error('directory offline'));
+    const h = harness({ directory: { getUsers } });
+    h.fake.seed({ clientId: TENANT, actorUserId: 'u-real', resourceId: 'still-here' });
+
+    const response = await h.get('/audit-logs');
+
+    expect(response.status).toBe(200);
+    expect(page(response.body).data).toMatchObject([
+      { resourceId: 'still-here', actorUserId: 'u-real', actorName: null },
+    ]);
   });
 
   it('answers an empty option list when the host wired no roster', async () => {

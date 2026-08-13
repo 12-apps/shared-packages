@@ -39,7 +39,17 @@ export interface AuditWebConfig {
   labels?: AuditLabelOverrides;
   /** Stamp formatter. Default: pt-BR short date + short time. */
   formatDate?: (iso: string) => string;
-  /** Filters the host pins; the operator cannot change them. */
+  /**
+   * Filters pinned IN THE UI — merged over the operator's own on every request, so
+   * an embedded screen always shows the slice the host framed it for (an order page
+   * passing `{ resourceId: order.id }`, say).
+   *
+   * **Not an authorization boundary.** The server has no notion of them: the wire
+   * schema does not declare them, no descriptor sees them, and a user holding the
+   * read permission can `GET /audit-logs` directly and read the whole tenant's
+   * trail. If an operator must not see the rest of it, gate them with a PERMISSION
+   * (`gatePermissions.read`) — pinning a filter here hides nothing.
+   */
   fixedFilters?: AuditLogFilters;
 }
 

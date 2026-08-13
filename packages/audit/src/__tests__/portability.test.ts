@@ -267,6 +267,49 @@ describe('toy second host — the rest of the seam', () => {
   });
 });
 
+/**
+ * The packages the root + server halves must never reach, and the shapes a
+ * specifier can name them in.
+ *
+ * SUBPATHS count (`hono/cookie`, `react/jsx-runtime`, `@12-apps/ui/foo`): a
+ * subpath resolves the same package, so it fails a consumer's install for the same
+ * reason the bare name does.
+ *
+ * TYPE-ONLY imports count too, DELIBERATELY — `import type { Context } from 'hono'`
+ * is erased at runtime, but it is still an unavoidable `devDependency`/peer for
+ * anyone type-checking against this package's published source, which is what this
+ * package ships. (Before, they were caught only by accident: the old regex matched
+ * the `from` clause and never looked at what preceded it.)
+ */
+const FORBIDDEN_PACKAGES = ['hono', 'react', 'react-dom', '@12-apps/ui'];
+
+/**
+ * The RELATIVE reach into a forbidden half, which is the hole this check had.
+ *
+ * The walk covers `index.ts` + `core/` + `server/` and matched a package name
+ * against an exact-string list — so `server/foo.ts → '../react/labels'` passed
+ * twice over: the specifier is not a package name, and the file it names is not in
+ * the walked set, so nothing ever looked at ITS imports. That chain reaches
+ * `@12-apps/ui` and `react` exactly as a direct import would; a transitive
+ * resolution would be the thorough fix, and forbidding the one-hop specifier is
+ * the cheap one that closes the reachable case.
+ */
+const FORBIDDEN_RELATIVE = /(?:^|\/)\.\.\/(react|hono)(?:\/|$)/;
+
+/** Every module specifier in a source file, whatever quote or form it uses. */
+function specifiersOf(source: string): string[] {
+  const found: string[] = [];
+  // `from '…'` / `from "…"`, bare `import '…'`, `import('…')` and `require('…')`.
+  for (const match of source.matchAll(/(?:from|import|require)\s*\(?\s*['"]([^'"]+)['"]/g)) {
+    if (match[1]) found.push(match[1]);
+  }
+  return found;
+}
+
+const isForbidden = (specifier: string): boolean =>
+  FORBIDDEN_PACKAGES.some((name) => specifier === name || specifier.startsWith(`${name}/`)) ||
+  FORBIDDEN_RELATIVE.test(specifier);
+
 describe('the optional peers stay optional', () => {
   it('never imports hono or react from the root or the server half', () => {
     // `hono`, `react` and `react-dom` are OPTIONAL peers, and `@12-apps/ui` is a
@@ -277,7 +320,6 @@ describe('the optional peers stay optional', () => {
     // one thing it cannot see, because it installs every package at once.
     const roots = ['index.ts', 'core', 'server'];
     const offenders: string[] = [];
-    const forbidden = ['hono', 'react', 'react-dom', '@12-apps/ui'];
     const walk = (relative: string): void => {
       const full = join(SRC, relative);
       if (statSync(full).isDirectory()) {
@@ -288,12 +330,42 @@ describe('the optional peers stay optional', () => {
         return;
       }
       if (!full.endsWith('.ts') && !full.endsWith('.tsx')) return;
-      const source = readFileSync(full, 'utf-8');
-      for (const match of source.matchAll(/from '([^']+)'/g)) {
-        if (forbidden.includes(match[1] ?? '')) offenders.push(`${relative} → ${match[1]}`);
+      for (const specifier of specifiersOf(readFileSync(full, 'utf-8'))) {
+        if (isForbidden(specifier)) offenders.push(`${relative} → ${specifier}`);
       }
     };
     roots.forEach(walk);
     expect(offenders).toEqual([]);
+  });
+
+  it('catches the shapes the exact-string check used to miss', () => {
+    // The check above passes on today's tree either way, so its STRENGTH is
+    // asserted here rather than assumed: a subpath, a double-quoted specifier, a
+    // type-only import and the relative hop through `../react` are each a real way
+    // to pull an optional peer into the server half.
+    const caught = [
+      "import { Hono } from 'hono';",
+      'import { getCookie } from "hono/cookie";',
+      "import type { Context } from 'hono';",
+      "import { Button } from '@12-apps/ui';",
+      "import { jsx } from 'react/jsx-runtime';",
+      "import { auditLabels } from '../react/labels';",
+      "import { toAuditRequest } from '../../hono/index';",
+      "const { Hono } = require('hono');",
+    ].map((line) => specifiersOf(line).filter(isForbidden));
+
+    expect(caught.every((hits) => hits.length === 1)).toBe(true);
+    // …and the legitimate neighbours are NOT caught: `zod` is a hard dependency,
+    // `node:async_hooks` is the platform, and the package's own halves are fine.
+    const allowed = [
+      "import { z } from 'zod';",
+      "import { AsyncLocalStorage } from 'node:async_hooks';",
+      "import { createApiAudit } from '../server/create-api-audit';",
+      "import type { AuditVocabulary } from '../core/vocabulary';",
+      // Not a reach into the react half — a file that happens to sit beside one.
+      "import { labels } from '../reactive-labels';",
+    ].map((line) => specifiersOf(line).filter(isForbidden));
+
+    expect(allowed).toEqual([[], [], [], [], []]);
   });
 });

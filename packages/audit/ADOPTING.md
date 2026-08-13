@@ -68,17 +68,39 @@ Editing 60 call sites fixes one tree and rots at the 61st. Instead:
 
 ### What the writer refuses
 
-`write(tx, { actorUserId })` keeps its precedence — a caller may deliberately
-attribute an entry to the owner of the row it changed — with exactly ONE value
-ruled out: the subject of a live impersonation. That value is vector 2 wearing a
-different hat, and it produces the one row that cannot be corrected.
+**While a live impersonation is in scope, `actor_user_id` is ALWAYS the real
+human.** Not "unless the caller says otherwise" — there is no third column to hold
+them, the table is append-only, and support impersonation is only defensible
+because the trail names the staff member who used it. So `write(tx, { actorUserId })`
+is inert there, in four cases:
 
-Deliberately asymmetric: `actorUserId: null` (a webhook forcing a system write)
-drops `actor_role`/`scope`, because those describe the authorization the NAMED
-actor used — but it KEEPS `on_behalf_of_user_id`, because "someone was being
-impersonated" is a fact about the SESSION and stays true whoever the caller chose
-to name. Gate it like the other two and any helper hard-coding
-`actorUserId: null` launders the impersonation out of the trail.
+| `actorUserId` you pass | What lands | Why |
+|---|---|---|
+| omitted | the real human | the stamped context id is the SUBJECT's while a session is live (vector 2 above) |
+| the subject's own id | the real human | the id a caller reaches by accident, off a row the guard loaded for the effective subject |
+| the real human's id | the real human | you were already right; no-op |
+| **any third party** | **throws** | you are one field from being right, and rewriting it silently would hide a bug in your code |
+| `null` (forced system write) | the real human | a human IS driving the session and is answerable; see the asymmetry below |
+
+The throw (`AuditActorConflictError`) happens inside YOUR transaction, so the
+mutation it described rolls back with it. **A caller that wants to record who owns
+the row it changed puts that id in the DIFF**, where the allowlist already carries
+`userId` / `endedByUserId` — that is what the diff is for, and it does not
+overwrite the answer to "who is answerable".
+
+Outside a session the override keeps full precedence, third parties and `null`
+included: with no real human in scope there is nobody to erase.
+
+Deliberately asymmetric, in two places, and both drops are the point:
+
+- `actorUserId: null` drops `actor_role`/`scope`, because those describe the
+  authorization the caller just declined to claim. That is what carries the
+  "system" character of the write — **not** an absent human. So a forced system
+  write inside a session still names the real human, with no role and no scope.
+- It KEEPS `on_behalf_of_user_id`, because "someone was being impersonated" is a
+  fact about the SESSION and stays true whoever the caller chose to name. Gate it
+  like the other two and any helper hard-coding `actorUserId: null` launders the
+  impersonation out of the trail.
 
 Ticket 12-24 (impersonation) consumes this contract. `resolveActor` returns
 `onBehalfOfUserId`; the host never touches the columns.
@@ -91,6 +113,17 @@ Ticket 12-24 (impersonation) consumes this contract. `resolveActor` returns
    host vocabulary. The package never reads a tenant identifier off the request —
    not from a path param, not from the query string — so the listing cannot be
    widened past its tenant by any request shape.
+
+   **`tenantId` must be a non-empty string, and it is CHECKED.** This is the one
+   seam the package does not control, and `AuditActor.tenantId: string` is erased at
+   runtime. A `resolveActor` that destructures — `const { tenantId, permissions } =
+   await resolveTenant(slug, session)` — returns `undefined` when the caller is not
+   a member of that slug, and `undefined` fails OPEN under Prisma: it OMITS the
+   clause, so the listing would answer with EVERY tenant's rows and `count` would
+   report the global total. (`''` happens to fail closed, which only makes the bug
+   shape-dependent.) Both are refused with a 500 — a host contract violation must
+   be loud, not a 4xx you can shrug off. Return `null` from `resolveActor` for a
+   caller you cannot scope; that is the 401.
 2. **`permissions` is REQUIRED and fails closed.** There is deliberately no "the
    host already checked" mode: that mode is indistinguishable from a host that
    forgot, and this surface reads a security log. Pass `['*']` for an
@@ -179,6 +212,50 @@ A guard whose limits are undocumented gets trusted past them:
   and the host owns both.
 - **Another connection is unaffected.** psql, a migration, a second client built
   without the extensions. This is a client-layer discipline, not a constraint.
+- **Nested relation writes bypass BOTH extensions.** Prisma's `query.$allModels`
+  hooks fire for the TOP-LEVEL model and operation only, so a write reached through
+  a parent's relation payload is invisible to them.
+  `prisma.account.update({ where, data: { entries: { deleteMany: {} } } })` deletes
+  `entries` rows with no `AppendOnlyViolationError` — the hook saw `Account` +
+  `update` — and a nested `create` on a TRACKED model leaves `created_by` NULL with
+  no error, looking exactly like a system write. `AuditLog` itself is out of reach
+  this way (the package's partial declares no `@relation`, Prisma requires both
+  sides of one, and the partial carries a drift `--check`, so a host cannot add one
+  without failing its own build), but **whatever you add through
+  `appendOnlyModels` is not**: an immutable table of your own almost certainly has
+  a parent. Guard those at the database, or keep their writes off the parent's
+  payload.
+- **A SECOND actor-context store makes every row say "Sistema", silently.** The
+  actor is per-request state in an AsyncLocalStorage instance kept on `globalThis`
+  under a fixed key. If your tree ends up with two of them — the usual way is a
+  second copy of the context module keyed differently, e.g. an older in-house
+  `setActor` your ~60 call sites still import while your WRITES now go through
+  `write()` — then the writer reads a store nothing ever stamped. Every entry lands
+  with `actor_user_id`, `actor_role`, `scope` and `on_behalf_of_user_id` NULL, the
+  viewer renders `Sistema` for every human action, and `audit_logs` is append-only:
+  the attribution is gone permanently. Nothing fails on the way — the rows are
+  structurally valid, and each half's own tests stamp through their own store. So
+  after wiring, WRITE ONE ENTRY AS A KNOWN USER AND LOOK AT IT: an all-`Sistema`
+  trail with no system-only explanation is this bug and not a configuration detail.
+  Import `setActor` / `runWithActor` from `@12-apps/audit/server` and nowhere else,
+  or make your existing module re-export them.
+- **`fixedFilters` is a UI pin, not a boundary.** The React surface merges them
+  over the operator's filters, but the server has no notion of them: a user holding
+  the read permission can `GET /audit-logs` directly and read the whole tenant's
+  trail. Gate with a permission if that matters.
+- **`q` is a scan.** It becomes `resource_id ILIKE '%…%'`, which none of the five
+  shipped indexes can serve, and every request also runs a `count` over the tenant's
+  partition. `page` is capped at 10 000 and `pageSize` at 100 so a URL cannot ask
+  for an unbounded `OFFSET`, but a keyword search over a large trail is a sequential
+  read of that tenant's slice — narrow it with `from`/`to`, or add a trigram index
+  in your own migration.
+- **Retention compares an app clock against a DB-clock column, so run the database
+  in UTC.** The cutoff is computed in the app (`Date.now()`) while `created_at`
+  defaults to `CURRENT_TIMESTAMP` into a `TIMESTAMP(3)` *without* time zone, so a
+  session `TimeZone` behind UTC stores local time and the sweep deletes rows up to
+  that offset newer than intended. At the 365-day floor that is hours on a year —
+  immaterial, and it is the Prisma-wide convention; it stops being immaterial if you
+  set a floor measured in hours.
 - **A missing allowlist entry is silent.** Deny-by-default means a field the
   vocabulary does not name is dropped without a word, and the row records that
   something changed without recording what to. Unknown ACTIONS and unknown

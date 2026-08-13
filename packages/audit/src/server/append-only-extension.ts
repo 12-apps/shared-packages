@@ -24,6 +24,21 @@
  *
  * **Another connection.** psql, a migration, a second client without the
  * extension: all unaffected. This is a client-layer discipline, not a constraint.
+ *
+ * **NESTED relation writes.** Prisma's `query.$allModels` hooks fire for the
+ * TOP-LEVEL model and operation only, so a guarded model reached through a
+ * parent's relation payload is invisible here:
+ *
+ *     prisma.account.update({ where, data: { entries: { deleteMany: {} } } })
+ *
+ * deletes guarded `entries` rows with no {@link AppendOnlyViolationError} — the
+ * hook saw `Account` + `update`, both unguarded. This does NOT apply to
+ * `AuditLog`: the package's partial declares no `@relation`, Prisma requires both
+ * sides of one, and the partial is package-owned with a drift `--check`, so a host
+ * cannot reach the audit table this way without failing its own build. It DOES
+ * apply to whatever a host adds through `appendOnlyModels`, where an immutable
+ * table almost certainly has a parent. Guard those at the database (privileges or
+ * a trigger), or keep their writes off the parent's payload.
  */
 
 /** Thrown when code attempts to mutate an append-only model. */

@@ -68,13 +68,28 @@ export function auditRouter(config: AuditHonoConfig): AuditHono {
   // Mounted IN DESCRIPTOR ORDER — `/audit-logs/actors` before `/audit-logs` is a
   // rule of the surface, not of the host (see routes.ts).
   for (const route of api.routes) {
-    router.get(route.path, async (c: Context) => {
+    const handler = async (c: Context): Promise<Response> => {
       const response = await route.handle(toAuditRequest(c));
       if (response.body === undefined) return c.body(null, response.status as 204);
       // The status travels with the body the handler chose; the adapter never
       // reinterprets either.
       return c.json(response.body as Record<string, unknown>, response.status as 200);
-    });
+    };
+    // Switched on the descriptor's METHOD rather than hardcoding `router.get`.
+    // `AuditRoute.method` is a one-member union today, so the `default` is
+    // unreachable — and that is the point: widening the union later would
+    // otherwise mount a POST as a GET, silently, and the surface's "no write
+    // endpoint" property would be broken by an adapter nobody re-read.
+    switch (route.method) {
+      case 'GET':
+        router.get(route.path, handler);
+        break;
+      default:
+        throw new Error(
+          `@12-apps/audit/hono cannot mount ${String(route.method)} ${route.path}: ` +
+            'the adapter has no case for that method. Add one.',
+        );
+    }
   }
 
   const actorContext: MiddlewareHandler = (c, next) =>

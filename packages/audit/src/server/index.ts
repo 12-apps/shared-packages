@@ -62,4 +62,9 @@ export type {
 export { createAuditRetention, type AuditRetention } from './retention';
 export { buildAuditWhere, createAuditStore, paginationMeta, type AuditStore } from './store';
 export { auditLogQuerySchema, parseAuditLogQuery, type AuditLogQuery } from './wire';
-export { createAuditWriter, type AuditEntryInput, type AuditWriter } from './writer';
+export {
+  AuditActorConflictError,
+  createAuditWriter,
+  type AuditEntryInput,
+  type AuditWriter,
+} from './writer';

@@ -10,6 +10,22 @@
  * The model set is CONFIG. In future-pay it was a `TRACKED_MODELS` constant
  * inside this file — five restaurant model names hard-coded in otherwise generic
  * machinery, which is exactly the thing that made the file unportable.
+ *
+ * ## What this does NOT cover
+ *
+ * **NESTED relation writes**, the same blind spot the append-only guard has and
+ * for the same reason: Prisma's `query.$allModels` hooks fire for the TOP-LEVEL
+ * model and operation only. A tracked model created through a parent's relation
+ * payload —
+ *
+ *     prisma.order.create({ data: { …, items: { create: [{ … }] } } })
+ *
+ * — never reaches the hook, so its `created_by`/`updated_by` stay NULL with no
+ * error. Silent, and it looks exactly like a system write. A tracked model whose
+ * attribution must always be present is written at the TOP level, or the columns
+ * are filled by the caller.
+ *
+ * **Raw SQL.** `$executeRaw*` / `$queryRaw*` never reach a model delegate.
  */
 import { getActorUserId } from './actor-context';
 

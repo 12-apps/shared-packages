@@ -44,6 +44,10 @@ const audit = auditRouter({
     const session = await auth(request.raw);
     if (!session) return null;
     const { tenantId, permissions } = await resolveTenant(request.params.tenantSlug, session);
+    // Return null — the 401 — rather than an actor with no tenant. An `undefined`
+    // tenantId is a cross-tenant read waiting to happen, so the package refuses it
+    // with a 500 (ADOPTING.md rule 1).
+    if (!tenantId) return null;
     return {
       tenantId,
       userId: session.user.id,

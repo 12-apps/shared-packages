@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AuditVocabularyError, FUTURE_PAY_AUDIT_VOCABULARY, indexVocabulary } from '../../index';
 import { getActorAttribution, runWithActorScope, setActor } from '../actor-context';
 import type { AuditWriteClient } from '../db';
-import { createAuditWriter } from '../writer';
+import { AuditActorConflictError, createAuditWriter } from '../writer';
 
 /**
  * The audit writer (12-14) — ported from future-pay's
@@ -203,19 +203,59 @@ describe('impersonation attribution', () => {
     });
   });
 
-  it('still honors an explicit actorUserId naming somebody else', async () => {
-    // The override keeps its precedence: only the subject's own id is ruled out,
-    // because only that id makes the row read as the target's doing.
+  it('REFUSES an explicit actorUserId naming a third party mid-session', async () => {
+    // The legitimate pattern outside a session — `audit(tx, { actorUserId:
+    // shift.userId })`, attributing an entry to the owner of the row it changed —
+    // destroys the trail inside one: the row would read "closing-cook, on behalf
+    // of shop-owner", and the support agent who actually force-closed the comanda
+    // is unrecoverable on an append-only table. There is no third column for
+    // them, so the write is refused rather than reinterpreted: the caller is one
+    // field from being right, and silently moving their id would hide the bug.
     const { tx, create } = makeTx();
 
     await runWithActorScope(async () => {
       stampImpersonatedSession();
+      await expect(audit(tx, { ...base, actorUserId: 'closing-cook' })).rejects.toThrow(
+        AuditActorConflictError,
+      );
+    });
+
+    // Thrown before the insert, and inside the caller's transaction — so the
+    // mutation it described rolls back with it.
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('keeps the override outside a session, including a third party', async () => {
+    // The affordance the rule above narrows, and only there: with no session live
+    // there is no real human to erase, so a caller may still name whoever owns
+    // the row it changed.
+    const { tx, create } = makeTx();
+
+    await runWithActorScope(async () => {
+      setActor('user-7', { role: 'ADMIN', scope: 'tenant-1' });
       await audit(tx, { ...base, actorUserId: 'closing-cook' });
     });
 
     expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ actorUserId: 'closing-cook', onBehalfOfUserId: null }),
+    });
+  });
+
+  it('accepts an explicit actorUserId that already names the real human', async () => {
+    // Same rule, seen from the caller who got it right: naming the real human is
+    // a no-op rather than a conflict.
+    const { tx, create } = makeTx();
+
+    await runWithActorScope(async () => {
+      stampImpersonatedSession();
+      await audit(tx, { ...base, actorUserId: REAL });
+    });
+
+    expect(create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        actorUserId: 'closing-cook',
+        actorUserId: REAL,
+        actorRole: 'OWNER',
+        scope: 'tenant-1',
         onBehalfOfUserId: TARGET,
       }),
     });
@@ -248,10 +288,16 @@ describe('impersonation attribution', () => {
     });
   });
 
-  it('keeps the impersonation on a forced SYSTEM write, where role/scope are dropped', async () => {
-    // The deliberate asymmetry with the role/scope suppression above. Gate this
-    // field the same way and any helper that hard-codes `actorUserId: null`
-    // launders the impersonation out of an append-only trail.
+  it('keeps the real human on a forced SYSTEM write, and still drops role/scope', async () => {
+    // A forced `actorUserId: null` inside a live session cannot make the write
+    // authorless: a human IS driving it, they are answerable, and no other column
+    // can hold them. So the real human stays in `actor_user_id` — and the
+    // "system" character of the write is carried by the DROPPED role/scope
+    // instead, which is what the caller actually declined to claim.
+    //
+    // The impersonation survives too, which is the deliberate asymmetry: gate
+    // that field the same way and any helper hard-coding `actorUserId: null`
+    // launders the session out of an append-only trail.
     const { tx, create } = makeTx();
 
     await runWithActorScope(async () => {
@@ -261,7 +307,7 @@ describe('impersonation attribution', () => {
 
     expect(create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        actorUserId: null,
+        actorUserId: REAL,
         actorRole: null,
         scope: null,
         onBehalfOfUserId: TARGET,

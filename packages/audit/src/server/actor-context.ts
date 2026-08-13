@@ -80,12 +80,34 @@ export interface ActorContext extends ActorAttributionSnapshot {
 // Kept on globalThis so a dev server that re-evaluates this module (hot reload)
 // cannot create a second store whose context is invisible to closures captured
 // against the first.
+//
+// THE KEY IS A CROSS-PACKAGE CONTRACT, not a private detail, and that is why it
+// keeps a host-flavoured name in a generic package. `@12-apps/prisma` ships the
+// copy of this module that this one was ported from, keyed to
+// `__futurePayActorStore`, and re-exports `setActor`/`getActorUserId`/
+// `runWithActor` bound to it. A host adopting this package keeps those ~60
+// existing `setActor(...)` call sites and routes its WRITES through `write()`
+// (ADOPTING.md rule 3) — so a different key here means the writer reads a store
+// nothing ever stamped: every row lands actor_user_id/actor_role/scope/
+// on_behalf_of_user_id NULL, the viewer says "Sistema" for every human action,
+// and the table is append-only, so the attribution is gone for good. Nothing
+// fails on the way: the rows are structurally valid and each package's own
+// suites stamp through their own store.
+//
+// The two context shapes are structurally identical, so sharing the instance is
+// safe (a `realUserId` forged through the older copy's spread is inert in this
+// package's writer, which requires BOTH halves of the pair). The prettier
+// `__12appsActorStore` would have to change `@12-apps/prisma` too, and that is
+// the de-duplication PR — one module in one package — that this key is holding
+// the door open for. Interop is pinned by
+// `packages/prisma/tests/actor-context-audit-interop.test.ts`, the only test
+// that imports both copies.
 const globalStore = globalThis as unknown as {
-  __12appsAuditActorStore?: AsyncLocalStorage<ActorContext>;
+  __futurePayActorStore?: AsyncLocalStorage<ActorContext>;
 };
 
 const store = (): AsyncLocalStorage<ActorContext> =>
-  (globalStore.__12appsAuditActorStore ??= new AsyncLocalStorage<ActorContext>());
+  (globalStore.__futurePayActorStore ??= new AsyncLocalStorage<ActorContext>());
 
 /**
  * The REAL human behind `onBehalfOfUserId`, DERIVED (never accepted) from the

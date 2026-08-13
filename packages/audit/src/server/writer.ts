@@ -33,11 +33,12 @@ export interface AuditEntryInput {
    * Explicit actor override. Omit to take the request's actor context; pass
    * `null` to force a system write (a provider webhook, say).
    *
-   * There is exactly ONE value it cannot take: the identity a live impersonation
-   * is rendering as, which {@link resolveActorUserId} replaces with the real
-   * human. A caller that resolved this id from a row the guard loaded for the
-   * effective subject is naming the target without meaning to, and the row it
-   * would write is the unrecoverable one.
+   * INERT while a live impersonation is in scope. There, `actor_user_id` is
+   * ALWAYS the real human — the subject's own id and `null` both resolve to them,
+   * and any THIRD-party id throws (see {@link resolveActorUserId}): the caller is
+   * one field away from being right, and rewriting it silently would hide their
+   * bug. A caller that wants to name the row's owner puts that id in the diff,
+   * where the allowlist already carries `userId` / `endedByUserId`.
    */
   actorUserId?: string | null;
   /**
@@ -83,10 +84,29 @@ function liveImpersonation(attribution: ActorAttributionSnapshot): LiveImpersona
 }
 
 /**
- * WHO the row names as its actor, with the impersonation invariant applied.
+ * Thrown when a caller names a third party as the actor of a write made INSIDE a
+ * live impersonation. Carries both ids so the offending call site is findable.
+ */
+export class AuditActorConflictError extends Error {
+  constructor(explicit: string, realUserId: string) {
+    super(
+      `Cannot attribute an audit entry to "${explicit}" while impersonating: ` +
+        `actor_user_id must be the real human ("${realUserId}"). ` +
+        'Put the id you meant to record in the diff instead.',
+    );
+    this.name = 'AuditActorConflictError';
+    Object.setPrototypeOf(this, AuditActorConflictError.prototype);
+  }
+}
+
+/**
+ * WHO the row names as its actor.
  *
- * Two vectors would otherwise put the impersonated SUBJECT in `actorUserId`, and
- * both are silent — no call site looks wrong:
+ * **The rule: while a live impersonation exists, `actor_user_id` is ALWAYS the
+ * real human.** Not "unless the caller says otherwise" — there is no third column
+ * to hold them, the table is append-only, and support impersonation is only
+ * defensible because the trail names the staff member who used it. Every way of
+ * losing that name is silent, and no call site looks wrong:
  *
  * 1. **The stamped context id.** Route bodies call `setActor(grant.userId, …)`
  *    themselves, and while a session is impersonated the tenant guard resolves
@@ -95,26 +115,37 @@ function liveImpersonation(attribution: ActorAttributionSnapshot): LiveImpersona
  *    and the stamped id is not consulted at all: anyone can re-stamp the context,
  *    nobody can re-stamp `realUserId`.
  *
- * 2. **An explicit `actorUserId`.** It keeps its precedence — a caller may
- *    deliberately attribute an entry to the owner of the row it changed — with
- *    exactly one value ruled out: the subject of a live impersonation. That is
- *    vector 1 wearing a different hat, and it yields the one row that cannot be
- *    corrected: a write that reads as though the impersonated person made it.
+ * 2. **An explicit `actorUserId` naming the SUBJECT.** Vector 1 wearing a
+ *    different hat — an id read off a row the guard loaded for the effective
+ *    subject, handed over in good faith. Resolved to the real human.
  *
- * A third-party id and an explicit `null` (a webhook forcing a system write) are
- * both honored verbatim: neither claims the subject acted, and the session is
- * recorded beside them in `onBehalfOfUserId` either way.
+ * 3. **An explicit `actorUserId` naming a THIRD PARTY.** The pattern is
+ *    legitimate outside a session (`audit(tx, { actorUserId: shift.userId })`
+ *    attributing an entry to the owner of the row it changed) and destroys the
+ *    trail inside one: the row then reads "closing-cook, on behalf of owner-1",
+ *    and the support agent who actually did it is unrecoverable. So it THROWS —
+ *    inside the caller's transaction, which therefore rolls back. Not silently
+ *    rewritten: the caller is one field from being right, and quietly moving
+ *    their id would hide a real bug in their code.
+ *
+ * 4. **An explicit `null`** (a webhook or a helper forcing a system write).
+ *    Resolved to the real human too. A human IS driving this session, so the row
+ *    must say who; the "system" character of the write is carried by the absent
+ *    role/scope in {@link buildRow}, not by an absent human.
  */
 function resolveActorUserId(
   explicit: string | null | undefined,
   impersonation: LiveImpersonation | null,
 ): string | null {
-  if (explicit === undefined) {
-    return impersonation ? impersonation.realUserId : (getActorUserId() ?? null);
+  if (!impersonation) {
+    // No session: the override keeps full precedence, `null` included.
+    return explicit === undefined ? (getActorUserId() ?? null) : explicit;
   }
-  return impersonation && explicit === impersonation.subjectUserId
-    ? impersonation.realUserId
-    : explicit;
+  if (explicit === undefined || explicit === null) return impersonation.realUserId;
+  if (explicit === impersonation.subjectUserId || explicit === impersonation.realUserId) {
+    return impersonation.realUserId;
+  }
+  throw new AuditActorConflictError(explicit, impersonation.realUserId);
 }
 
 /** The row the writer builds, before it reaches the seam. */
@@ -145,11 +176,21 @@ function buildRow(
     input.onBehalfOfUserId !== undefined
       ? input.onBehalfOfUserId
       : (attribution.onBehalfOfUserId ?? null);
+  // Whether the row NAMES an actor whose authority these two columns describe.
+  //
+  // Read from the INPUT, not from the resolved id: a caller forcing
+  // `actorUserId: null` inside a live impersonation still gets the real human in
+  // the column (they are answerable, and there is nowhere else to record them),
+  // and the "system" character of that write has to be carried by something. It
+  // is carried here — role/scope describe the authorization the caller declined
+  // to claim, so they are dropped exactly as they are for a system write outside
+  // a session.
+  const namesAnActor = input.actorUserId !== null && actorUserId !== null;
   return {
     clientId: input.clientId,
     actorUserId,
-    actorRole: actorUserId !== null ? (attribution.role ?? null) : null,
-    scope: actorUserId !== null ? (attribution.scope ?? null) : null,
+    actorRole: namesAnActor ? (attribution.role ?? null) : null,
+    scope: namesAnActor ? (attribution.scope ?? null) : null,
     onBehalfOfUserId,
     action: input.action,
     resourceType: input.resourceType,

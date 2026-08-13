@@ -11,6 +11,11 @@
  * and zod strips what it does not declare), so there is no request shape that
  * widens a read past its tenant — the predicate is built here, from the actor,
  * every time.
+ *
+ * The one seam the package does not control is the VALUE the host hands over, and
+ * types are erased at runtime — so it is checked here too. See
+ * {@link requireTenantId}: `undefined` is the shape that fails OPEN, and it is the
+ * shape a plausible `resolveActor` produces.
  */
 import type { AuditLogPageWire, AuditLogWire, AuditPagination } from '../core/types';
 
@@ -52,9 +57,38 @@ function resourceIdMatch(query: AuditLogQuery): Pick<AuditLogWhere, 'resourceId'
   return {};
 }
 
+/**
+ * The tenant id the host resolved, or a LOUD throw.
+ *
+ * `AuditActor.tenantId: string` is a compile-time promise, and this package's
+ * whole tenancy claim rests on it — so it is verified at the one seam where the
+ * value crosses in from host code. `undefined` is the dangerous shape and the
+ * plausible one: a `resolveActor` written the way this package's own README shows
+ * (`const { tenantId, permissions } = await resolveTenant(slug, session)`) returns
+ * it for a slug the caller is not a member of, and Prisma OMITS an `undefined`
+ * clause — so `{ clientId: undefined }` would return every tenant's rows and
+ * `count` would report the global total. `''` happens to fail closed, which only
+ * makes the bug shape-dependent and harder to see in review.
+ *
+ * A plain `Error` on purpose: this is a host contract violation, not a caller's
+ * bad request, so it must NOT be folded into a 4xx the host can shrug off. It
+ * escapes {@link foldApiError} and surfaces as a 500. Same call, same reasoning,
+ * as `purgeTenantWindow`'s empty-tenant refusal in `retention.ts`.
+ */
+function requireTenantId(clientId: string): string {
+  if (typeof clientId !== 'string' || clientId === '') {
+    throw new Error(
+      'Audit reads require a tenant id: resolveActor returned an actor whose ' +
+        `tenantId is ${JSON.stringify(clientId)}. An unscoped audit read would ` +
+        'cross tenants, so it is refused.',
+    );
+  }
+  return clientId;
+}
+
 export function buildAuditWhere(clientId: string, query: AuditLogQuery): AuditLogWhere {
   return {
-    clientId,
+    clientId: requireTenantId(clientId),
     ...(query.actorUserId ? { actorUserId: query.actorUserId } : {}),
     ...resourceIdMatch(query),
     ...(query.actionIn ? { action: { in: query.actionIn } } : {}),
@@ -98,6 +132,13 @@ const displayName = (identity: AuditUserIdentity): string =>
  * Resolving them in a second call, or not at all, would leave "X on behalf of
  * <uuid>" on screen: a row that names the real human and reduces the person they
  * were rendering as to an id nobody can read.
+ *
+ * A FAILING directory DEGRADES to raw ids rather than taking the listing down. The
+ * names are an affordance layered over rows the package already has; a host whose
+ * user table is briefly unreachable should still be able to read its security log
+ * (a 500 there is the reading a dispute needs, refused for a cosmetic reason).
+ * The same call already degrades in the viewer's actor-options fetch, and the same
+ * reasoning gives an absent directory raw ids instead of a 501.
  */
 async function resolveNames(
   directory: AuditDirectory | undefined,
@@ -110,8 +151,12 @@ async function resolveNames(
     if (row.onBehalfOfUserId) ids.add(row.onBehalfOfUserId);
   }
   if (ids.size === 0) return new Map();
-  const identities = await directory.getUsers([...ids]);
-  return new Map(identities.map((identity) => [identity.id, displayName(identity)]));
+  try {
+    const identities = await directory.getUsers([...ids]);
+    return new Map(identities.map((identity) => [identity.id, displayName(identity)]));
+  } catch {
+    return new Map();
+  }
 }
 
 export interface AuditStore {
@@ -127,6 +172,10 @@ export function createAuditStore(
 ): AuditStore {
   return {
     async listPage(clientId: string, query: AuditLogQuery): Promise<AuditLogPageWire> {
+      // Before the connection, not after: an unscoped read is refused rather than
+      // issued. (`buildAuditWhere` checks again — it is exported, so a host
+      // building its own predicate gets the same guard.)
+      requireTenantId(clientId);
       const client = await db();
       const where = buildAuditWhere(clientId, query);
       // Both halves of the page against the SAME predicate, in parallel.
@@ -146,6 +195,10 @@ export function createAuditStore(
       };
     },
     async listActors(clientId: string): Promise<{ id: string; label: string }[]> {
+      // Guarded even though the roster is the HOST's query: handing `undefined`
+      // to `directory.listActors` asks the host for "every actor", and the answer
+      // names who works at somebody else's store.
+      requireTenantId(clientId);
       if (!directory?.listActors) return [];
       const identities = await directory.listActors(clientId);
       return identities.map((identity) => ({ id: identity.id, label: displayName(identity) }));

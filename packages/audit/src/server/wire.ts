@@ -20,6 +20,19 @@ import { AuditApiError, type AuditMessages } from './config';
 
 const PAGE_SIZE_DEFAULT = 20;
 const PAGE_SIZE_MAX = 100;
+/**
+ * A ceiling on `page`, for the same reason `pageSize` has one: the store turns it
+ * into `OFFSET (page - 1) * pageSize`, and Postgres COUNTS AND DISCARDS every one
+ * of those rows before returning any. `?page=999999999` is `OFFSET 19999999980`
+ * against a table that only grows — a scan a caller can ask for in a URL.
+ *
+ * Ten thousand pages is past the end of any trail a human is paging through (at
+ * the default size, 200k entries), and a caller who genuinely wants the far end
+ * of a big tenant's trail should be narrowing with `from`/`to` instead. Clamped
+ * rather than rejected, matching how every other nonsense paging value here is
+ * treated — an out-of-range page answers an empty last page, not a 400.
+ */
+const PAGE_MAX = 10_000;
 
 /** A calendar date (`YYYY-MM-DD`), interpreted at UTC midnight by the API. */
 const isoDate = z
@@ -27,16 +40,26 @@ const isoDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use o formato AAAA-MM-DD.')
   .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)), 'Data inválida.');
 
-/** Comma-separated pill values, validated against a closed vocabulary. */
+/**
+ * Comma-separated pill values, validated against a closed vocabulary.
+ *
+ * An empty result becomes `undefined` — NO FILTER — rather than `[]`. `?action_in=`
+ * (and `?action_in=,,`) would otherwise reach `buildAuditWhere` as a truthy empty
+ * array and emit `action: { in: [] }`, which matches nothing: a hand-built URL, or
+ * a second client that serializes a cleared multi-select as an empty value, gets a
+ * blank page that reads as "this tenant has no such entries" instead of "no filter
+ * applied". The packaged viewer never sends it (`react/api.ts` drops falsy
+ * values), which is exactly why it would have gone unnoticed.
+ */
 const commaList = (allowed: readonly string[]): z.ZodType<string[] | undefined> =>
   z
     .string()
     .optional()
-    .transform((raw) =>
-      raw === undefined
-        ? undefined
-        : [...new Set(raw.split(',').map((value) => value.trim()).filter(Boolean))],
-    )
+    .transform((raw) => {
+      if (raw === undefined) return undefined;
+      const values = [...new Set(raw.split(',').map((value) => value.trim()).filter(Boolean))];
+      return values.length > 0 ? values : undefined;
+    })
     .refine(
       (values) => values === undefined || values.every((value) => allowed.includes(value)),
       'Valor de filtro desconhecido.',
@@ -76,7 +99,7 @@ export function auditLogQuerySchema(index: AuditVocabularyIndex) {
     resourceId: z.string().min(1).optional(),
     from: isoDate.optional(),
     to: isoDate.optional(),
-    page: positiveInt(1),
+    page: positiveInt(1, PAGE_MAX),
     pageSize: positiveInt(PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX),
   });
 }
