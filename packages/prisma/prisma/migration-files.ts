@@ -11,20 +11,23 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** The folder holding every committed migration, including symlinked ones. */
+/** The folder holding every committed migration, host-owned and plugin alike. */
 const MIGRATIONS_DIR = join(HERE, 'migrations');
 
 /**
  * Every migration directory under `dir`, in timestamp order.
  *
- * `statSync` rather than `Dirent.isDirectory()` on purpose: a package that OWNS
- * part of the schema contributes its migrations as committed SYMLINKS into this
- * folder (Prisma has no cross-package import), and `Dirent.isDirectory()` is
- * FALSE for a symlink. That silently dropped those migrations and left the
- * package's tables missing from every PGlite-backed run — with nothing failing
- * loudly, because the schema was merely incomplete until something queried
- * them. `statSync` follows the link, so an owned migration replays like any
- * other.
+ * A package that OWNS part of the schema contributes its migrations here as
+ * committed COPIES (Prisma has no cross-package import), and `package.test.ts`
+ * gates that nothing under `prisma/` is a symlink.
+ *
+ * `statSync` rather than `Dirent.isDirectory()` even so, because the two differ
+ * exactly where it hurt: these migrations USED to arrive as symlinks, and
+ * `Dirent.isDirectory()` is FALSE for a symlink even when it resolves. That
+ * silently dropped them and left the package's tables missing from every
+ * PGlite-backed run — nothing failed loudly, because the schema was merely
+ * incomplete until something queried them. `statSync` follows a link, so should
+ * one ever reappear here this replay includes it rather than skipping it.
  */
 export function discoverMigrations(dir: string = MIGRATIONS_DIR): string[] {
   return readdirSync(dir)

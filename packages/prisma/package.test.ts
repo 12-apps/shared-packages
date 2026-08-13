@@ -245,6 +245,61 @@ describe('prisma assets — no symlinks anywhere', () => {
 });
 
 /**
+ * …and no sync script may PUT one there.
+ *
+ * The walk above checks the tree; this checks the machinery that writes it.
+ * Two owning-side scripts kept the pre-#153 symlink shape long after the
+ * copies landed — `packages/payments/backend/scripts/sync-payments-schema.mjs`
+ * and `packages/report-builder/scripts/sync-report-builder-schema.mjs` — and
+ * nothing was red, because no gate and no workflow ran an owning-side
+ * `prisma:sync:check`. Worse than a stale script: its `--check` failure told
+ * the reader to run `prisma:sync`, which recreated the link. A gate on the
+ * artifact alone cannot see an instruction to break the artifact.
+ *
+ * So: every `sync-*-schema.mjs` in the workspace, on BOTH sides of the copy,
+ * must copy. `symlinkSync` creates the bug; `readlinkSync` is how a `--check`
+ * demands it — no copy-based sync has a use for either.
+ */
+const syncScripts = syncScriptsUnder(join(repoRoot, 'packages'));
+
+/** Every `scripts/sync-*-schema.mjs` under `dir`, repo-relative. */
+function syncScriptsUnder(dir: string): string[] {
+  const skip = new Set(['node_modules', 'dist', '.turbo', 'coverage']);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (skip.has(entry.name) || entry.isSymbolicLink()) return [];
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return syncScriptsUnder(path);
+    return /^sync-.*-schema\.mjs$/.test(entry.name) ? [relative(repoRoot, path)] : [];
+  });
+}
+
+describe('prisma doctrine — every sync script copies, never links', () => {
+  it('finds the scripts on both sides of the copy', () => {
+    // Non-vacuity, and proof the locator reaches a NESTED owner: payments
+    // lives at packages/payments/backend, which a flat glob would miss —
+    // exactly the script that stayed symlinked.
+    for (const script of [
+      'packages/payments/backend/scripts/sync-payments-schema.mjs',
+      'packages/report-builder/scripts/sync-report-builder-schema.mjs',
+      'packages/prisma/scripts/sync-payments-schema.mjs',
+      'packages/prisma/scripts/sync-report-builder-schema.mjs',
+    ]) {
+      expect(syncScripts).toContain(script);
+    }
+  });
+
+  it.each(syncScripts)('%s creates no symlink and demands none', (script) => {
+    const code = readFileSync(join(repoRoot, script), 'utf-8');
+    // Comments explain the doctrine and legitimately name the trap, so only
+    // the calls that would implement it are forbidden.
+    expect(code).not.toMatch(/\bsymlinkSync\s*\(/);
+    expect(code).not.toMatch(/\breadlinkSync\s*\(/);
+    expect(code).toMatch(/\bcopyFileSync\s*\(/);
+  });
+});
+
+/**
  * COPIED partials need the same declaration, and for a sharper reason.
  *
  * A symlinked partial at least dangles loudly. A copied one is committed, so

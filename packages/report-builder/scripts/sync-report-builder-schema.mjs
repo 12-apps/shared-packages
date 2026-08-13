@@ -1,36 +1,35 @@
 #!/usr/bin/env node
 /* global console, process */
 /**
- * Link this package's Prisma model PARTIAL into the host's schema folder. Same
- * machinery as packages/payments/backend/scripts/sync-payments-schema.mjs — see
- * that file's header for the full rationale.
+ * Copy this package's Prisma model PARTIAL into the host's schema folder.
  *
- *   node scripts/sync-report-builder-schema.mjs          # create/repair
- *   node scripts/sync-report-builder-schema.mjs --check  # CI gate (exit 1)
+ *   node scripts/sync-report-builder-schema.mjs [--check] [<host-schema-dir>]
  *
- * Only the schema partial. MIGRATIONS ARE NOT HANDLED HERE — the host discovers
- * and copies them structurally, by looking for a `migrations` directory inside
- * every workspace package and every installed `@12-apps/*` package. See
- * packages/prisma/scripts/prisma-plugins.mjs.
+ * The partial is COPIED, never symlinked (the entity-lifecycle doctrine, and
+ * the prisma-partials-are-copied-never-symlinked memory): `turbo prune` copies
+ * only what the dependency graph reaches, so a committed symlink dangles the
+ * moment the owning package is not a declared workspace dependency; `npm pack`
+ * SILENTLY DROPS symlinked entries from the tarball, so a linked partial ships
+ * a published schema folder with the model missing; and a SYMLINKED MIGRATION
+ * is silently skipped by Prisma (`readdir` + `isDirectory()` is false for a
+ * link), so a green deploy applies no schema. This script used to CREATE the
+ * link and its `--check` used to demand one — following its own failure message
+ * reintroduced all three (#153).
  *
- * A partial is one FILE opened by path, so a symlink is read through and the
- * model is never duplicated into the app. A migration is a DIRECTORY that
- * Prisma finds by enumerating the migrations folder with
- * readdir({ withFileTypes: true }), keeping entries whose isDirectory() is
- * true — false for a symlink even when it resolves, so a linked migration is
- * skipped and `migrate deploy` exits 0 having applied nothing.
+ * Only the schema partial. MIGRATIONS ARE NOT HANDLED HERE — the host
+ * discovers and copies them structurally, by looking for a `prisma/migrations`
+ * directory inside every installed `@12-apps/*` package (see
+ * packages/prisma/scripts/sync-prisma-plugins.mjs).
  *
  * The host package that owns the schema folder MUST also declare this package
- * as a dependency: the link is invisible to the dependency graph, so
- * `turbo prune` would otherwise drop this package from the Docker build context
- * and leave it dangling (see the payments ADOPTING.md §1 and the @12-apps/prisma
- * package.test.ts gate).
+ * as a dependency, so the source of the copy is present in every build
+ * context.
  *
- * Another repo adopts the machinery by pointing HOST_SCHEMA_LINK at its own
- * schema folder. Windows checkouts need symlink support (developer mode /
- * `git config core.symlinks true`).
+ * Default host path follows the future-pay layout
+ * (`packages/prisma/prisma/schema/`); another repo passes its own schema
+ * folder as the positional argument, or sets REPORT_BUILDER_HOST_SCHEMA_DIR.
  */
-import { lstatSync, readlinkSync, rmSync, symlinkSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -38,31 +37,37 @@ const LABEL = '[report-builder-schema]';
 const RESYNC = 'pnpm --filter @12-apps/report-builder prisma:sync';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-// Workspace-relative host paths; adopting repos change these two lines.
-const HOST_SCHEMA_LINK = join(HERE, '../../prisma/prisma/schema/report-builder.prisma');
-const HOST_SCHEMA_TARGET = '../../../report-builder/prisma/report-builder.prisma';
+const SOURCE = join(HERE, '../prisma/report-builder.prisma');
 
-function safeLstat(path) {
-  try {
-    return lstatSync(path);
-  } catch {
-    return null;
-  }
-}
-
+const args = process.argv.slice(2).filter((arg) => arg !== '--check');
 const check = process.argv.includes('--check');
-const stat = safeLstat(HOST_SCHEMA_LINK);
-const current = stat?.isSymbolicLink() ? readlinkSync(HOST_SCHEMA_LINK) : null;
+const hostSchemaDir =
+  args[0] ??
+  process.env.REPORT_BUILDER_HOST_SCHEMA_DIR ??
+  join(HERE, '../../prisma/prisma/schema');
+const TARGET = join(hostSchemaDir, 'report-builder.prisma');
 
-if (current !== HOST_SCHEMA_TARGET) {
-  if (check) {
-    console.error(`${LABEL} ${HOST_SCHEMA_LINK} is not a symlink to ${HOST_SCHEMA_TARGET}`);
-    console.error(`${LABEL} run "${RESYNC}" and commit the result.`);
-    process.exit(1);
-  }
-  if (stat) rmSync(HOST_SCHEMA_LINK, { recursive: true, force: true });
-  symlinkSync(HOST_SCHEMA_TARGET, HOST_SCHEMA_LINK);
-  console.log(`${LABEL} linked ${HOST_SCHEMA_LINK} → ${HOST_SCHEMA_TARGET}`);
+const source = readFileSync(SOURCE, 'utf8');
+// `lstat` first: a leftover symlink from the pre-#153 script must be REPLACED,
+// not read through. Reading through it would report "in sync" for a link whose
+// bytes match — and a link is exactly what `npm pack` drops.
+const stat = existsSync(TARGET) ? lstatSync(TARGET) : null;
+const isPlainCopy = stat !== null && stat.isFile() && !stat.isSymbolicLink();
+const target = isPlainCopy ? readFileSync(TARGET, 'utf8') : null;
+
+if (source === target) {
+  console.log(`${LABEL} in sync.`);
+} else if (check) {
+  console.error(
+    `${LABEL} DRIFT: ${TARGET} is not a byte-identical COPY of the ` +
+      `@12-apps/report-builder partial. Run "${RESYNC}" and commit the result.`,
+  );
+  process.exit(1);
+} else {
+  mkdirSync(hostSchemaDir, { recursive: true });
+  // Unconditional: a DANGLING symlink reports existsSync=false, and copying
+  // through a live one would land the bytes at the link's target instead.
+  rmSync(TARGET, { force: true });
+  copyFileSync(SOURCE, TARGET);
+  console.log(`${LABEL} copied ${SOURCE} -> ${TARGET}.`);
 }
-
-console.log(check ? `${LABEL} in sync.` : `${LABEL} done.`);
