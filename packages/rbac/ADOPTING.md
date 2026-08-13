@@ -134,7 +134,7 @@ exactly as their permissions already resolve to nothing.
 | PATCH | `/roles/:id` | `roles:manage` + governance | `{ data: role }`, 404 stale/foreign id |
 | DELETE | `/roles/:id` | `roles:manage` | `{ data: { status: 'deleted' } }` — an ARCHIVE (`archived_at` stamped): grants stop at once, the row and its member links survive for a restore surface (12-17); repeat is 404 |
 | PUT | `/roles/templates/:name` | `roles:manage` + curated governance | `{ data: role }` (copy-on-write override) |
-| DELETE | `/roles/templates/:name` | `roles:manage` | `{ data: { status: 'reset' } }` (idempotent) |
+| DELETE | `/roles/templates/:name` | `roles:manage` + curated governance | `{ data: { status: 'reset' } }` (idempotent) — governance judges the SEED the reset would write, so a resetter can never restore a permission they do not themselves hold |
 | GET | `/permissions` | staff tier | `{ data: { permissions, ...permissionsExtras } }` |
 | GET | `/team` | admin tier (ACTIVE membership) | `{ data, pagination }` — `q`, `role_in`, `status_in`, `sort`, paging |
 | POST | `/team` | admin tier + invites port | `{ data: { status: 'added' \| 'invited' } }`, 501 without the port |
