@@ -8,7 +8,7 @@
  * sentences (which roles say which verbs). They also change for different
  * reasons and at different rates: a new surface adds one catalog line and edits
  * several role arrays, and a re-cut of the role matrix touches no catalog line
- * at all. The seam existed; adding `impersonation:preview` to a 388-line file
+ * at all. The seam existed; adding the "Ver como" grants to a 388-line file
  * with a 400-line ceiling is only what forced us to draw it.
  *
  * `templates.ts` re-exports both symbols, so every existing import path
@@ -157,8 +157,14 @@ export const FUTURE_PAY_PERMISSIONS = definePermissions({
   // Entity-lifecycle approvals (@12-apps/entity-lifecycle): decide (apply/reject)
   // pending custom-role change requests; mirrors `products:approve`.
   'roles:approve': 'class',
-  // "Ver como" (FUT-460): open a read-only preview of the admin as one of the
-  // tenant's own roles, or as one of its own team members.
+  // "Ver como" (FUT-460), as TWO grants: USING the preview, and ARMING it for
+  // the store. They are separate because they are separate decisions — the
+  // second is the store's consent to being viewed as at all, and a tenant has to
+  // be able to say "you may look" and "you may decide whether anyone looks" to
+  // different people.
+  //
+  // Open a read-only preview of the admin as one of the tenant's own roles, or
+  // as one of its own team members.
   //
   // CLASS, not instance, and the distinction is the whole point of the grant.
   // What is being gated is ENTERING a preview at all — a capability of the
@@ -171,9 +177,31 @@ export const FUTURE_PAY_PERMISSIONS = definePermissions({
   // The grant answers "may you look through someone else's eyes"; the ceiling
   // answers "how far can you see while doing it".
   //
-  // Owner-only in practice — see DEFAULT_ROLE_TEMPLATES in `./templates`, where
-  // it is deliberately absent from ADMIN's enumeration.
-  'impersonation:preview': 'class',
+  // NOT AN OWNER MARKER, and it used to be. It shipped as `impersonation:preview`
+  // in `FUTURE_PAY_GOVERNANCE.ownerPermissions` — held by OWNER's wildcard alone,
+  // absent from every enumeration, refused inside a custom role by
+  // `checkOwnerProtected`. That made "Ver como" undelegable: a store could not
+  // give it to the administrator who actually configures its roles, which is the
+  // person the feature was built for. It is now an ordinary catalog permission,
+  // seeded into ADMIN and grantable to anyone the store chooses — a MANAGER, a
+  // custom "Supervisão" role. The ceiling is what keeps that safe, and it always
+  // was: whoever previews sees the INTERSECTION with their own set, so handing
+  // this to a manager lets them look through a narrower pair of eyes than their
+  // own, never a wider one.
+  'user:impersonate': 'class',
+  // ARM (or disarm) the store's "Ver como" switch — the tenant-layer consent
+  // that decides whether anyone may preview here at all.
+  //
+  // Its own permission rather than a tier check on the config route, which is
+  // what it replaced. The old rule asked for OWNER on that one field, on the
+  // reasoning that arming a capability must not sit wider than the capability;
+  // once `user:impersonate` is delegable that reasoning inverts — the pair now
+  // moves together, and a store that trusts someone to preview can trust them to
+  // decide whether previewing is on. Separate from `config:write` because it is
+  // the one config field that is a consent decision about the store's own people
+  // rather than a setting, so a store must be able to withhold it from an
+  // administrator who holds every other switch on that page.
+  'user:impersonate:configure': 'class',
 } as const satisfies Record<string, PermissionKind>);
 
 /** Permission union derived from the Future Pay registry. */

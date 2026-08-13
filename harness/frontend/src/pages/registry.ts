@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 
+import { AuditLogPage } from './audit-log';
 import { EntitlementsPlanPage } from './entitlements-plan';
 import { LifecycleAdminPage } from './lifecycle-admin';
 import { PaymentsCheckoutApplePayPage } from './payments-checkout-apple-pay';
@@ -333,5 +334,12 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/realtime',
     group: 'backoffice',
     Component: RealtimeEventsPage,
+  },
+  {
+    slug: 'audit-log',
+    title: 'Audit log',
+    pkg: '@12-apps/audit',
+    group: 'backoffice',
+    Component: AuditLogPage,
   },
 ];
