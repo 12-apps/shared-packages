@@ -806,6 +806,46 @@ jobs:
           set -o pipefail
           npm test 2>&1 | tee harness-test.log
 
+  # scripts/publish.mjs decides, from one npm invocation's output, whether a
+  # package was skipped, hit a blip worth retrying, or failed for good. Nothing
+  # else in this pipeline can check that: `release` runs on push to main ONLY, so
+  # a misclassification is discovered as a red main rather than as a red PR — and
+  # a wrong branch is quiet, because it still exits and still prints npm's text.
+  # This job runs the classification against npm's own words at PR time.
+  #
+  # Deliberately no `pnpm install`: the self-test is plain node and supplies its
+  # own npm on PATH, so the whole job is a checkout and ~20s of node — 15s of
+  # which is three real retry backoffs the self-test deliberately does not fake.
+  #
+  # `release` NEEDS this job, which is the point (a misclassification must not
+  # reach a publish) and also the sharp edge: a red self-test stops ALL
+  # publishing. Its assertions on the diagnosis therefore match the facts a
+  # reader must come away with rather than exact sentences, so that rewording an
+  # error message cannot halt releases.
+  release-scripts:
+    name: Release Scripts
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).code
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # The package script, not `node scripts/…` spelled out again — same reason
+      # the portability job calls `pnpm quality:portability`: one command, so what
+      # CI runs and what a developer runs cannot drift apart.
+      - name: Publish-outcome classification self-test
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm quality:release 2>&1 | tee release-scripts.log
+
   # Tokenless publish to npm via OIDC Trusted Publishing. Only on push to main,
   # after the gates pass. No NPM_TOKEN: npm exchanges the GitHub OIDC id-token
   # for a short-lived credential (requires a one-time Trusted Publisher on npm
@@ -815,7 +855,7 @@ jobs:
   # ahead of it, which is the only place a token is ever used.
   release:
     name: Release
-    needs: [lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, backend-harness, portability]
+    needs: [lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, backend-harness, portability, release-scripts]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -921,7 +961,34 @@ jobs:
       # LAST, and deliberately not first: a stuck package must report itself
       # without holding every healthy package's release hostage. The publishes
       # above have already happened by the time this fails.
+      #
+      # `always()` is what makes "LAST" safe, and it is not a nicety. A step with
+      # no `if:` defaults to `success()`, so this one was SKIPPED exactly when a
+      # publish failed — i.e. in the one situation that MAKES orphaned tags.
+      # semantic-release has already written the tag by then; a failed publish is
+      # therefore the single most likely way to arrive here with a tag npm never
+      # received, and the guard was switching itself off precisely then. Measured:
+      # run 31682461784 failed `Publish to npm (OIDC, tokenless)` and reported
+      # this step `skipped`, which is why `auth-v1.22.0` went unreported for three
+      # days across five red runs.
+      #
+      # `always()` and `!cancelled()` differ ONLY on cancellation, and nothing is
+      # riding on that difference here: `cancel-in-progress` is
+      # `github.event_name != 'push'` — false on push — and this job is
+      # push-only, so concurrency cannot cancel a running release. (The hazard
+      # the concurrency block at the top of this file documents is a PENDING run
+      # being dropped, which never starts a job and therefore writes no tag
+      # either.) Cancelling this job takes a human or a timeout. `always()` is
+      # simply the plainer of two conditions that behave identically for the case
+      # that matters, and the check only reads git and the registry — it writes
+      # nothing, so running it in a doomed job costs ~20s and can break nothing.
+      #
+      # It reads PUBLISH_INCOMPLETE / PUBLISH_WEDGED from the step above, which
+      # is the other reason it must stay AFTER it: those name the orphans THIS
+      # run just made, and an orphan whose publish failed ten lines earlier needs
+      # the opposite of the standing "delete the tag and re-run" remedy.
       - name: Verify every release tag reached the registry
+        if: always()
         shell: bash
         run: node scripts/verify-released.mjs
 
@@ -977,7 +1044,7 @@ jobs:
     #
     # On a pull request `release` is skipped, which this aggregation already
     # treats as fine — so this costs PRs nothing.
-    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, gherkin-journeys, backend-harness, portability, release]
+    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, gherkin-journeys, backend-harness, portability, release-scripts, release]
     steps:
       - name: Verify all required jobs passed
         shell: bash

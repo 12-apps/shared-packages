@@ -18,13 +18,27 @@
 // at 1.21.0 while every subsequent release reported success. A consumer found
 // it, two repositories away, as `Cannot find module '@12-apps/auth/react'`.
 //
-// The remedy is always the same and the message below prints it: delete the
-// orphaned tag (and its GitHub Release) so the next run re-cuts that version.
+// The remedy for an orphan left by an EARLIER run is always the same and the
+// message below prints it: delete the orphaned tag (and its GitHub Release) so
+// the next run re-cuts that version.
+//
+// It is the wrong remedy for an orphan THIS run just made, and this step now
+// runs on failure (`if: always()`) precisely so it sees those. Deleting the tag
+// of a package whose publish failed minutes ago only re-cuts the version into
+// the same failure — and when the failure was "npm obtained no credential",
+// nothing about a re-run changes it. scripts/publish.mjs therefore hands over
+// the names it did not get onto the registry (PUBLISH_INCOMPLETE, and the
+// no-credential subset PUBLISH_WEDGED) and those orphans get the remedy in the
+// right ORDER: fix the publish first, delete the tag second.
 import { spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { join, resolve, basename } from "node:path";
 
 const DIRS = (process.env.PUBLISH_DIRS ?? "").split(/\s+/).filter(Boolean);
+
+const names = (variable) => new Set((process.env[variable] ?? "").split(/\s+/).filter(Boolean));
+const INCOMPLETE = names("PUBLISH_INCOMPLETE");
+const WEDGED = names("PUBLISH_WEDGED");
 
 function run(cmd, args) {
   const result = spawnSync(cmd, args, { encoding: "utf8" });
@@ -103,14 +117,42 @@ if (unpublished.length > 0) {
   lines.push(`not yet on the registry, skipped: ${unpublished.join(", ")}`);
 }
 
+/**
+ * What to do about one orphan — which depends on whether THIS run made it.
+ *
+ * The tag deletion is the last move in every case; what changes is what has to
+ * happen before it, and saying "delete the tag and re-run" to someone whose
+ * publish step failed ten lines above sends them round the same loop.
+ */
+function remedy(name, tag) {
+  const del = `git push origin --delete ${tag}`;
+  if (WEDGED.has(name)) {
+    return (
+      `This run's publish could not authenticate for ${name} at all, which is what ` +
+      `left the tag behind — see the Publish step's annotation for what npm ` +
+      `reported. Deleting the tag now only re-cuts the version into the same ` +
+      `failure, and a plain re-run will not fix it either. Fix the credential ` +
+      `first; then delete the orphaned tag and its GitHub Release: ${del}`
+    );
+  }
+  if (INCOMPLETE.has(name)) {
+    return (
+      `This run's publish did not get ${name} onto the registry, which is what left ` +
+      `the tag behind. Fix that failure first; then delete the orphaned tag and its ` +
+      `GitHub Release: ${del}`
+    );
+  }
+  return `Delete the orphaned tag and its GitHub Release, then re-run: ${del}`;
+}
+
 for (const { name, tag, version } of orphans) {
   console.log(
     `::error::${name} is tagged ${tag} but ${version} is not on the registry. ` +
       `Releases for this package are STUCK: semantic-release sees the tag and ` +
-      `cuts nothing. Delete the orphaned tag and its GitHub Release, then ` +
-      `re-run: git push origin --delete ${tag}`,
+      `cuts nothing. ${remedy(name, tag)}`,
   );
-  lines.push(`**stuck**: ${name} tagged ${tag}, ${version} absent from the registry`);
+  const caveat = WEDGED.has(name) || INCOMPLETE.has(name) ? " (this run's publish failed for it)" : "";
+  lines.push(`**stuck**: ${name} tagged ${tag}, ${version} absent from the registry${caveat}`);
 }
 
 report(lines);
