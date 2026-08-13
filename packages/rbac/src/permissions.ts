@@ -1,209 +1,70 @@
 /**
- * THE FUTURE PAY PERMISSION CATALOG — application DATA, not generic core.
+ * THIS PACKAGE'S OWN PERMISSION CONTRIBUTION.
  *
- * Split out of `templates.ts` (FUT-460) so that file stays what its own header
- * claims: the ROLE matrix. The two have always been separate concerns that
- * merely happened to share a file — the catalog is the vocabulary (which verbs
- * exist, and whether each is decided by RBAC alone), the templates are the
- * sentences (which roles say which verbs). They also change for different
- * reasons and at different rates: a new surface adds one catalog line and edits
- * several role arrays, and a re-cut of the role matrix touches no catalog line
- * at all. The seam existed; adding the "Ver como" grants to a 388-line file
- * with a 400-line ceiling is only what forced us to draw it.
+ * `@12-apps/rbac` ships screens and endpoints of its own — the roles catalog
+ * and its compose/edit dialog, the team roster, the template-override
+ * governance — so it owns the permissions that guard them, and exports them
+ * the same way any other package exports its contribution. Three ids, and
+ * they are the three already named in `DEFAULT_GATE_PERMISSIONS`: everything
+ * this surface gates, it gates with one of these.
  *
- * `templates.ts` re-exports both symbols, so every existing import path
- * (`@12-apps/rbac`, `../templates`) keeps working unchanged.
+ * WHAT USED TO BE HERE, and why it left (12-13 follow-up): a 61-id catalog of
+ * Future Pay's products, orders, mesas, kitchen, stock and payments, plus that
+ * host's eight role templates and its governance policy — under a header that
+ * called itself "application DATA, not generic core" while sitting inside the
+ * package every other host installs. A permission belongs to whoever owns the
+ * surface it guards; `products:write` guards no screen in here. So the domain
+ * catalog moved to the host, the approval grants (`products:approve`,
+ * `categories:approve`, …) are queued to move to `@12-apps/entity-lifecycle`,
+ * and the host assembles the whole thing with `composePermissions` — which is
+ * also how it gets these three, rather than by this package assuming them.
  *
- * Permission scope-kind: [C] class (RBAC alone decides), [I] instance (RBAC
- * gate THEN entity gate on ownership/assignment).
+ * A host may still spell them differently: `gatePermissions` on the server
+ * config and the web config maps each surface onto whatever id its own
+ * catalog uses. The contribution below is the default, not a requirement.
  */
-import { definePermissions } from './core/registry';
-import type { PermissionKind } from './core/types';
+import {
+  definePermissionContribution,
+  type PermissionOf,
+} from './core/contribution';
 
-/**
- * The Future Pay permission registry (drives the typed permission union and the
- * class/instance scope-kind used by the default adapter's entity gate).
- */
-export const FUTURE_PAY_PERMISSIONS = definePermissions({
-  // Products
-  'products:read:all': 'class',
-  'products:read:published': 'instance',
-  'products:write': 'class',
-  'products:delete': 'class',
-  // Entity-lifecycle approvals (@12-apps/entity-lifecycle): decide (apply/reject)
-  // pending product change requests; actors WITHOUT it have their writes parked
-  // for approval when the tenant's approvals feature is on. Mirrors
-  // `purchasing:approve`.
-  'products:approve': 'class',
-  'categories:write': 'class',
-  // Entity-lifecycle approvals (@12-apps/entity-lifecycle): decide (apply/reject)
-  // pending category change requests; mirrors `products:approve`.
-  'categories:approve': 'class',
-  // Discounts & promotions (FUT-235). Read is granted separately from write so
-  // "see which promos are running" is expressible without "change what the store
-  // charges". There is no `discounts:approve`: a discount is a pricing rule with
-  // a live redemption counter, not versioned catalog content, so it is
-  // deliberately NOT plugged into @12-apps/entity-lifecycle — and with no approval
-  // gate there is no author-cannot-approve pair to add to FUTURE_PAY_SOD_PAIRS.
-  'discounts:read': 'class',
-  'discounts:write': 'class',
-  // Ingredients (insumos) — RAW/PREP stock products, granted separately from the
-  // sellable catalog so "manage ingredients but not products" is expressible.
-  'ingredients:read': 'class',
-  'ingredients:write': 'class',
-  'ingredients:delete': 'class',
-  // Stock
-  'stock:read': 'class',
-  'stock:move': 'class',
-  'stock:count': 'class',
-  // Suppliers
-  'suppliers:write': 'class',
-  // Entity-lifecycle approvals (@12-apps/entity-lifecycle): decide (apply/reject)
-  // pending supplier change requests; mirrors `products:approve`.
-  'suppliers:approve': 'class',
-  // Purchasing
-  'purchasing:read:all': 'class',
-  'purchasing:read:own': 'instance',
-  'purchasing:write': 'class',
-  'purchasing:approve': 'class',
-  // Product research (FUT-390). Read is "see runs and ranked offers"; write
-  // starts researches / configures sources (spends outbound calls and, later,
-  // paid-API budget). No `research:approve`: a run produces information, not a
-  // catalog/pricing change, so no lifecycle gate and no SoD pair.
-  'research:read': 'class',
-  'research:write': 'class',
-  // Orders
-  'orders:read:all': 'class',
-  'orders:read:assigned': 'instance',
-  'orders:read:own': 'instance',
-  'orders:create': 'class',
-  'orders:edit:assigned': 'instance',
-  'orders:void': 'class',
-  'orders:refund': 'class',
-  // Tables
-  'tables:read:all': 'class',
-  'tables:read:assigned': 'instance',
-  'tables:assign': 'class',
-  'tables:manage': 'class',
-  // Entity-lifecycle approvals (@12-apps/entity-lifecycle): decide (apply/reject)
-  // pending mesa change requests; mirrors `products:approve`.
-  'tables:approve': 'class',
-  // Kitchen
-  'kitchen:read:all': 'class',
-  'kitchen:read:station': 'instance',
-  'kitchen:update': 'class',
-  // Kitchen stations (FUT-448): create/rename/reorder/retire the places dishes
-  // are prepared. Split out of the blanket admin gate because a MANAGER runs the
-  // floor — "the fryer is down, route nothing there tonight" is an operations
-  // decision, not a config-owner one — while the rest of Configuração is not
-  // theirs. Reading stations is NOT gated on it (the queue and the product form
-  // both need the list).
-  'kitchen-stations:manage': 'class',
-  // Entity-lifecycle approvals (@12-apps/entity-lifecycle): decide (apply/reject)
-  // pending kitchen-station change requests; mirrors `products:approve`.
-  'kitchen-stations:approve': 'class',
-  // Work shifts (FUT-446). `manage:own` is deliberately CLASS-scoped: the
-  // package has no host actor model, so the host checks actor === target user.
-  'shift:manage:own': 'class',
-  'shift:read:all': 'class',
-  'shift:end:any': 'class',
-  // Payments
-  'payments:take': 'class',
-  // Reports
-  'reports:sales:read': 'class',
-  'reports:financial:read': 'class',
-  // Cozinha analytics (FUT-454). Its OWN tier, deliberately not folded into
-  // `reports:sales:read` and deliberately NOT held by CHEF: the reports carry
-  // per-cook timings, and a cook must not be able to read the ranking they
-  // appear in just because they can read the kitchen board.
-  'reports:kitchen:read': 'class',
-  // Audit trail viewer (FUT-152): read the tenant's append-only audit log.
-  'audit:read': 'class',
-  // Till
-  'till:open': 'class',
-  'till:close': 'class',
-  // Payouts
-  'payouts:manage': 'class',
-  // Config
-  'config:read': 'class',
-  'config:write': 'class',
-  // The STAFF-SAFE slice of the tenant's configuration (FUT-354): the
-  // operational feature switches a service screen needs to decide whether it
-  // exists at all (mesas on/off, comanda mode, order notes) — and NOTHING that
-  // makes `config:read` an admin grant (address, coordinates, costing method,
-  // lifecycle/plan state). It is a SEPARATE key rather than a widening of
-  // `config:read` precisely so granting a cook "can you see whether this store
-  // runs comandas" never grants "can you read where this store is".
-  //
-  // Read surfaces take it as a TIER alongside `config:read` (any-of), the same
-  // shape the LIST reads use, so an ADMIN who already holds the wide read needs
-  // no second grant.
-  'config:read:operational': 'class',
-  // Entity-lifecycle approvals (@12-apps/entity-lifecycle): decide (apply/reject)
-  // pending stock-location change requests; mirrors `products:approve`. Location
-  // config writes are admin-gated (no dedicated write permission), so there is no
-  // author-cannot-approve SoD pair — only this decider grant.
-  'stock-locations:approve': 'class',
-  // Entity-lifecycle approvals (@12-apps/entity-lifecycle): decide (apply/reject)
-  // pending loss-reason change requests; mirrors `products:approve`. Reason config
-  // writes are admin-gated (no dedicated write permission), so there is no
-  // author-cannot-approve SoD pair — only this decider grant.
-  'loss-reasons:approve': 'class',
-  // Team
-  'team:read': 'class',
-  'team:manage': 'class',
-  // Roles admin
-  'roles:manage': 'class',
-  // Entity-lifecycle approvals (@12-apps/entity-lifecycle): decide (apply/reject)
-  // pending custom-role change requests; mirrors `products:approve`.
-  'roles:approve': 'class',
-  // "Ver como" (FUT-460), as TWO grants: USING the preview, and ARMING it for
-  // the store. They are separate because they are separate decisions — the
-  // second is the store's consent to being viewed as at all, and a tenant has to
-  // be able to say "you may look" and "you may decide whether anyone looks" to
-  // different people.
-  //
-  // Open a read-only preview of the admin as one of the tenant's own roles, or
-  // as one of its own team members.
-  //
-  // CLASS, not instance, and the distinction is the whole point of the grant.
-  // What is being gated is ENTERING a preview at all — a capability of the
-  // actor, decided before any target exists. It is NOT "may preview THIS
-  // member", which would be an instance decision needing a resource assignment
-  // per colleague, a table nobody writes. The target is not policed by RBAC at
-  // this seam because it does not need to be: the preview session applies a
-  // never-widen INTERSECTION ceiling against the actor's own permission set, so
-  // previewing a colleague can only ever show LESS than the actor already sees.
-  // The grant answers "may you look through someone else's eyes"; the ceiling
-  // answers "how far can you see while doing it".
-  //
-  // NOT AN OWNER MARKER, and it used to be. It shipped as `impersonation:preview`
-  // in `FUTURE_PAY_GOVERNANCE.ownerPermissions` — held by OWNER's wildcard alone,
-  // absent from every enumeration, refused inside a custom role by
-  // `checkOwnerProtected`. That made "Ver como" undelegable: a store could not
-  // give it to the administrator who actually configures its roles, which is the
-  // person the feature was built for. It is now an ordinary catalog permission,
-  // seeded into ADMIN and grantable to anyone the store chooses — a MANAGER, a
-  // custom "Supervisão" role. The ceiling is what keeps that safe, and it always
-  // was: whoever previews sees the INTERSECTION with their own set, so handing
-  // this to a manager lets them look through a narrower pair of eyes than their
-  // own, never a wider one.
-  'user:impersonate': 'class',
-  // ARM (or disarm) the store's "Ver como" switch — the tenant-layer consent
-  // that decides whether anyone may preview here at all.
-  //
-  // Its own permission rather than a tier check on the config route, which is
-  // what it replaced. The old rule asked for OWNER on that one field, on the
-  // reasoning that arming a capability must not sit wider than the capability;
-  // once `user:impersonate` is delegable that reasoning inverts — the pair now
-  // moves together, and a store that trusts someone to preview can trust them to
-  // decide whether previewing is on. Separate from `config:write` because it is
-  // the one config field that is a consent decision about the store's own people
-  // rather than a setting, so a store must be able to withhold it from an
-  // administrator who holds every other switch on that page.
-  'user:impersonate:configure': 'class',
-} as const satisfies Record<string, PermissionKind>);
+/** The permissions guarding this package's own screens and endpoints. */
+export const RBAC_PERMISSIONS = definePermissionContribution({
+  source: '@12-apps/rbac',
+  permissions: {
+    /**
+     * Role CRUD, per-tenant template overrides, and the additive grant/revoke
+     * of a custom role on a member.
+     *
+     * An OWNER MARKER, and the one policy claim this package makes about its
+     * own ids for every host: a role that hands out permissions is owner-level
+     * power, so it is never composable into an inline custom role and never
+     * injectable into a template override that its seed did not already carry.
+     * Escalation alone would not cover it — that guard asks whether the granter
+     * holds the permission, not whether handing it on is delegation of the
+     * granting power itself.
+     */
+    'roles:manage': { kind: 'class', ownerMarker: true },
+    /**
+     * The roster and member-detail reads. CLASS: what is gated is reaching the
+     * team surface at all, decided before any member is named. Row-level reach
+     * is the tenant boundary's job, not an entity gate's.
+     */
+    'team:read': { kind: 'class' },
+    /** Member base-role set, enable/disable, invite cancel. */
+    'team:manage': { kind: 'class' },
+  },
+  /**
+   * pt-BR, matching `DEFAULT_MESSAGES` and the tab labels the screens already
+   * ship — and overridable per host, the same way those are. Only the segments
+   * THESE three ids use: a host's own vocabulary arrives with its own
+   * contribution, and an unlabelled segment still renders as its raw text.
+   */
+  labels: {
+    domains: { roles: 'Papéis', team: 'Equipe' },
+    actions: { read: 'Ver', manage: 'Gerenciar' },
+  },
+});
 
-/** Permission union derived from the Future Pay registry. */
-export type FuturePayPermission =
-  (typeof FUTURE_PAY_PERMISSIONS.list)[number];
+/** The permission union this package contributes. */
+export type RbacPermission = PermissionOf<typeof RBAC_PERMISSIONS>;

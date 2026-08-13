@@ -61,7 +61,7 @@ describe('permissions — the caller own resolved set', () => {
     const waiter = await json<{ data: { permissions: string[] } }>(
       await asUser('waiter-1').get('/permissions'),
     );
-    expect(waiter.data.permissions).toContain('orders:read:assigned');
+    expect(waiter.data.permissions).toContain('loans:read:assigned');
     expect(waiter.data.permissions).not.toContain('config:write');
   });
 
@@ -71,37 +71,77 @@ describe('permissions — the caller own resolved set', () => {
   });
 });
 
+describe('the composed catalog, over the tarball', () => {
+  /**
+   * The package ships no application catalog: this host assembles one from
+   * three owners (`rbac-catalog.ts`) and hands it over as a single `catalog`
+   * field. These cases prove the assembly reaches the RUNNING surface — the
+   * package's unit suites can only prove it reaches an object.
+   */
+  it('serves ids from every contributing source through one endpoint', async () => {
+    const admin = await json<{ data: { permissions: string[] } }>(
+      await asUser('admin-1').get('/permissions'),
+    );
+    // @12-apps/rbac's own, @harness/lifecycle's, and this host's domain.
+    expect(admin.data.permissions).toContain('roles:manage');
+    expect(admin.data.permissions).toContain('titles:approve');
+    expect(admin.data.permissions).toContain('config:write');
+  });
+
+  it('enforces a duty pair whose two halves come from different sources', async () => {
+    // `titles:approve` is declared by @harness/lifecycle with
+    // `separateFrom: ['titles:write']`, an id it does not own. The pair only
+    // exists because composition resolved that counterpart against the whole
+    // assembled catalog — and this 400 is that resolution, enforced by the
+    // package's own governance over a real database.
+    const response = await asUser('owner-1').send('POST', '/roles', {
+      name: 'Autor e Aprovador',
+      permissions: ['titles:write', 'titles:approve'],
+    });
+    expect(response.status).toBe(400);
+    const body = await json<{ error: string }>(response);
+    expect(body.error.length).toBeGreaterThan(0);
+
+    // Either half alone composes fine — the PAIR is what is refused.
+    const single = await asUser('owner-1').send('POST', '/roles', {
+      name: 'Somente Aprovador',
+      permissions: ['titles:approve'],
+    });
+    expect(single.status).toBe(200);
+  });
+});
+
 describe('roles — CRUD + governance against the published surface', () => {
-  it('lists the seeded catalog, and q narrows it (Barista stays, Estoquista goes)', async () => {
+  it('lists the seeded catalog, and q narrows it (Voluntário stays, Catalogador goes)', async () => {
     const all = await json<{ data: { name: string }[] }>(await asUser('owner-1').get('/roles'));
     const names = all.data.map((row) => row.name);
-    expect(names).toContain('Barista');
-    expect(names).toContain('Estoquista');
-    expect(names).toContain('WAITER');
+    expect(names).toContain('Voluntário');
+    expect(names).toContain('Catalogador');
+    expect(names).toContain('CLERK');
 
     const narrowed = await json<{ data: { name: string }[] }>(
-      await asUser('owner-1').get('/roles?q=Barista'),
+      await asUser('owner-1').get('/roles?q=Voluntário'),
     );
-    expect(narrowed.data.map((row) => row.name)).toEqual(['Barista']);
+    expect(narrowed.data.map((row) => row.name)).toEqual(['Voluntário']);
   });
 
   it('a custom role grants EXACTLY its set at runtime, and deletion revokes it', async () => {
     const owner = asUser('owner-1');
     const created = await json<{ data: { id: string } }>(
       await owner.send('POST', '/roles', {
-        name: 'Visitante de Estoque',
-        permissions: ['stock:read'],
+        name: 'Visitante do Acervo',
+        permissions: ['copies:read'],
       }),
     );
     const grant = await owner.send('POST', '/team/waiter-1/roles', {
-      role: 'Visitante de Estoque',
+      role: 'Visitante do Acervo',
     });
     expect(grant.status).toBe(200);
 
     const withGrant = await json<{ data: { permissions: string[] } }>(
       await asUser('waiter-1').get('/permissions'),
     );
-    expect(withGrant.data.permissions).toContain('stock:read');
+    expect(withGrant.data.permissions).toContain('copies:read');
 
     const deleted = await owner.send('DELETE', `/roles/${created.data.id}`);
     expect(deleted.status).toBe(200);
@@ -110,34 +150,34 @@ describe('roles — CRUD + governance against the published surface', () => {
     const afterDelete = await json<{ data: { permissions: string[] } }>(
       await asUser('waiter-1').get('/permissions'),
     );
-    expect(afterDelete.data.permissions).not.toContain('stock:read');
+    expect(afterDelete.data.permissions).not.toContain('copies:read');
   });
 
   it('governance blocks escalation and owner markers with a user-safe 400', async () => {
-    // ADMIN composing power they do not hold: payouts:manage is an
+    // HEAD_LIBRARIAN composing power they do not hold: budget:manage is an
     // owner-marker permission.
     const response = await asUser('admin-1').send('POST', '/roles', {
       name: 'Golpe',
-      permissions: ['payouts:manage'],
+      permissions: ['budget:manage'],
     });
     expect(response.status).toBe(400);
     const body = await json<{ error: string }>(response);
     expect(body.error.length).toBeGreaterThan(0);
   });
 
-  it('template override narrows what WAITER grants, reset restores the seed', async () => {
+  it('template override narrows what CLERK grants, reset restores the seed', async () => {
     const owner = asUser('owner-1');
-    const overridden = await owner.send('PUT', '/roles/templates/WAITER', {
-      permissions: ['orders:read:assigned'],
+    const overridden = await owner.send('PUT', '/roles/templates/CLERK', {
+      permissions: ['loans:read:assigned'],
     });
     expect(overridden.status).toBe(200);
 
     const narrowed = await json<{ data: { permissions: string[] } }>(
       await asUser('waiter-1').get('/permissions'),
     );
-    expect(narrowed.data.permissions).toEqual(['orders:read:assigned']);
+    expect(narrowed.data.permissions).toEqual(['loans:read:assigned']);
 
-    const reset = await owner.send('DELETE', '/roles/templates/WAITER');
+    const reset = await owner.send('DELETE', '/roles/templates/CLERK');
     expect(reset.status).toBe(200);
     const restored = await json<{ data: { permissions: string[] } }>(
       await asUser('waiter-1').get('/permissions'),
@@ -145,36 +185,36 @@ describe('roles — CRUD + governance against the published surface', () => {
     expect(restored.data.permissions.length).toBeGreaterThan(1);
   });
 
-  it('reset is governed: an ADMIN cannot restore what the owner withheld', async () => {
+  it('reset is governed: a HEAD_LIBRARIAN cannot restore what the owner withheld', async () => {
     // Reset WRITES the seeded set, so it is governed exactly like the PUT.
-    // Narrowing ADMIN is the owner's only way to withhold a permission from an
+    // Narrowing HEAD_LIBRARIAN is the owner's only way to withhold a permission from an
     // administrator; while reset ran no governance, the administrator undid it.
     const owner = asUser('owner-1');
-    const withheld = await owner.send('PUT', '/roles/templates/ADMIN', {
-      // `roles:manage` stays, so the ADMIN still reaches the reset route.
+    const withheld = await owner.send('PUT', '/roles/templates/HEAD_LIBRARIAN', {
+      // `roles:manage` stays, so the HEAD_LIBRARIAN still reaches the reset route.
       permissions: ['roles:manage', 'team:read', 'config:read'],
     });
     expect(withheld.status).toBe(200);
 
-    const selfReset = await asUser('admin-1').send('DELETE', '/roles/templates/ADMIN');
+    const selfReset = await asUser('admin-1').send('DELETE', '/roles/templates/HEAD_LIBRARIAN');
     expect(selfReset.status).toBe(400);
     const stillWithheld = await json<{ data: { permissions: string[] } }>(
       await asUser('admin-1').get('/permissions'),
     );
-    expect(stillWithheld.data.permissions).not.toContain('payouts:manage');
+    expect(stillWithheld.data.permissions).not.toContain('budget:manage');
 
     // The owner holds '*', so THEIR reset works exactly as before.
-    const reset = await owner.send('DELETE', '/roles/templates/ADMIN');
+    const reset = await owner.send('DELETE', '/roles/templates/HEAD_LIBRARIAN');
     expect(reset.status).toBe(200);
     const restored = await json<{ data: { permissions: string[] } }>(
       await asUser('admin-1').get('/permissions'),
     );
-    expect(restored.data.permissions).toContain('payouts:manage');
+    expect(restored.data.permissions).toContain('budget:manage');
   });
 
-  it('OWNER template is never editable, even by the owner', async () => {
-    const response = await asUser('owner-1').send('PUT', '/roles/templates/OWNER', {
-      permissions: ['products:read:all'],
+  it('DIRECTOR template is never editable, even by the owner', async () => {
+    const response = await asUser('owner-1').send('PUT', '/roles/templates/DIRECTOR', {
+      permissions: ['titles:read:all'],
     });
     expect(response.status).toBe(400);
   });
@@ -182,46 +222,46 @@ describe('roles — CRUD + governance against the published surface', () => {
   it('duplicate and reserved names are 409', async () => {
     const owner = asUser('owner-1');
     const reserved = await owner.send('POST', '/roles', {
-      name: 'WAITER',
-      permissions: ['stock:read'],
+      name: 'CLERK',
+      permissions: ['copies:read'],
     });
     expect(reserved.status).toBe(409);
     const duplicate = await owner.send('POST', '/roles', {
-      name: 'Barista',
-      permissions: ['stock:read'],
+      name: 'Voluntário',
+      permissions: ['copies:read'],
     });
     expect(duplicate.status).toBe(409);
   });
 });
 
 describe('tenant isolation — the neighbour tenant reaches nothing', () => {
-  it('a fully-entitled OWNER of tenant B cannot read or write tenant A rows', async () => {
+  it('a fully-entitled DIRECTOR of tenant B cannot read or write tenant A rows', async () => {
     const ownerA = asUser('owner-1');
     const ownerB = asUser('owner-b', RBAC_TENANT_B_ID);
 
-    // B sees only its own catalog (no Barista/Estoquista — those are A's)…
+    // B sees only its own catalog (no Voluntário/Catalogador — those are A's)…
     const catalog = await json<{ data: { name: string }[] }>(await ownerB.get('/roles'));
-    expect(catalog.data.map((row) => row.name)).not.toContain('Barista');
+    expect(catalog.data.map((row) => row.name)).not.toContain('Voluntário');
     // …and only its own roster.
     const roster = await json<{ data: { userId: string }[] }>(await ownerB.get('/team'));
     expect(roster.data.map((row) => row.userId)).toEqual(['owner-b']);
 
     // A role id from tenant A is a 404 for B — on edit AND on delete.
-    const barista = await json<{ data: { id: string; name: string }[] }>(
-      await ownerA.get('/roles?q=Barista'),
+    const voluntario = await json<{ data: { id: string; name: string }[] }>(
+      await ownerA.get('/roles?q=Voluntário'),
     );
-    const foreignId = barista.data[0]?.id as string;
+    const foreignId = voluntario.data[0]?.id as string;
     const edited = await ownerB.send('PATCH', `/roles/${foreignId}`, {
       name: 'Roubo',
-      permissions: ['stock:read'],
+      permissions: ['copies:read'],
     });
     expect(edited.status).toBe(404);
     const deleted = await ownerB.send('DELETE', `/roles/${foreignId}`);
     expect(deleted.status).toBe(404);
 
     // A member of tenant A is a 404 for B, never a cross-tenant write.
-    const grant = await ownerB.send('POST', '/team/chef-1/roles', { role: 'Barista' });
-    expect(grant.status).toBe(400); // UNKNOWN_ROLE: B has no Barista at all
+    const grant = await ownerB.send('POST', '/team/chef-1/roles', { role: 'Voluntário' });
+    expect(grant.status).toBe(400); // UNKNOWN_ROLE: B has no Voluntário at all
     const removed = await ownerB.send('DELETE', '/team/chef-1');
     expect(removed.status).toBe(404);
     // And nothing moved on A's side.
@@ -243,7 +283,7 @@ describe('team — the roster over the directory seam', () => {
       await asUser('owner-1').get('/team'),
     );
     const target = page.data.find((row) => row.userId === 'role-target');
-    expect(target).toMatchObject({ email: 'target@harness.dev', role: 'CHEF' });
+    expect(target).toMatchObject({ email: 'target@harness.dev', role: 'CONSERVATOR' });
   });
 
   it('q narrows the roster through the directory (Camila stays, Bruno goes)', async () => {
@@ -253,28 +293,28 @@ describe('team — the roster over the directory seam', () => {
     expect(page.data.map((row) => row.userId)).toEqual(['chef-1']);
   });
 
-  it('a CHEF cannot reach the roster (admin tier)', async () => {
+  it('a CONSERVATOR cannot reach the roster (admin tier)', async () => {
     const response = await asUser('chef-1').get('/team');
     expect(response.status).toBe(403);
   });
 
   it('reassigns a base role and the member permissions follow', async () => {
     const owner = asUser('owner-1');
-    const updated = await owner.send('PATCH', '/team/role-target', { role: 'MANAGER' });
+    const updated = await owner.send('PATCH', '/team/role-target', { role: 'BRANCH_LEAD' });
     expect(updated.status).toBe(200);
 
     const permissions = await json<{ data: { permissions: string[] } }>(
       await asUser('role-target').get('/permissions'),
     );
-    expect(permissions.data.permissions).toContain('products:write');
+    expect(permissions.data.permissions).toContain('titles:write');
 
     // Restore, as the future-pay spec did, so ordering never matters.
-    await owner.send('PATCH', '/team/role-target', { role: 'CHEF' });
+    await owner.send('PATCH', '/team/role-target', { role: 'CONSERVATOR' });
   });
 
-  it('never demotes the last OWNER (409) and never disables one (403)', async () => {
+  it('never demotes the last DIRECTOR (409) and never disables one (403)', async () => {
     const owner = asUser('owner-1');
-    const demoted = await owner.send('PATCH', '/team/owner-1', { role: 'ADMIN' });
+    const demoted = await owner.send('PATCH', '/team/owner-1', { role: 'HEAD_LIBRARIAN' });
     expect(demoted.status).toBe(409);
     const disabled = await owner.send('PATCH', '/team/owner-1/status', { active: false });
     expect(disabled.status).toBe(403);
@@ -296,7 +336,7 @@ describe('team — the roster over the directory seam', () => {
     expect(on.data.permissions.length).toBeGreaterThan(0);
   });
 
-  it('a soft-disabled ADMIN loses the roster tier (BLOCKER-1 regression)', async () => {
+  it('a soft-disabled HEAD_LIBRARIAN loses the roster tier (BLOCKER-1 regression)', async () => {
     const owner = asUser('owner-1');
     await owner.send('PATCH', '/team/admin-1/status', { active: false });
     const roster = await asUser('admin-1').get('/team');
@@ -313,15 +353,15 @@ describe('team — the roster over the directory seam', () => {
     const context = await json<{
       data: { assignableRoles: string[]; invitesEnabled: boolean };
     }>(await asUser('owner-1').get('/team/context'));
-    expect(context.data.assignableRoles).toContain('Barista');
-    expect(context.data.assignableRoles).toContain('WAITER');
-    expect(context.data.assignableRoles).not.toContain('OWNER');
+    expect(context.data.assignableRoles).toContain('Voluntário');
+    expect(context.data.assignableRoles).toContain('CLERK');
+    expect(context.data.assignableRoles).not.toContain('DIRECTOR');
     expect(context.data.invitesEnabled).toBe(false);
   });
 
   it('removes a member and their grants; a stranger id is 404', async () => {
     const owner = asUser('owner-1');
-    await owner.send('POST', '/team/waiter-1/roles', { role: 'Barista' });
+    await owner.send('POST', '/team/waiter-1/roles', { role: 'Voluntário' });
     const removed = await owner.send('DELETE', '/team/waiter-1');
     expect(removed.status).toBe(200);
     const roster = await json<{ data: { userId: string }[] }>(await owner.get('/team'));

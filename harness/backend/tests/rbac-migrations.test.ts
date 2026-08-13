@@ -101,17 +101,17 @@ describe('@12-apps/rbac — the prisma assets survive publication', () => {
       // TEMPLATE rows may not share a name, while two tenants may.
       await db.query(
         `INSERT INTO roles (id, client_id, name, permissions, updated_at)
-         VALUES ('t1', NULL, 'SUPERADMIN', '*', NOW())`,
+         VALUES ('t1', NULL, 'NETWORK_OPS', '*', NOW())`,
       );
       await expect(
         db.query(
           `INSERT INTO roles (id, client_id, name, permissions, updated_at)
-           VALUES ('t2', NULL, 'SUPERADMIN', '*', NOW())`,
+           VALUES ('t2', NULL, 'NETWORK_OPS', '*', NOW())`,
         ),
       ).rejects.toThrow(/unique|duplicate/i);
       await db.query(
         `INSERT INTO roles (id, client_id, name, permissions, updated_at)
-         VALUES ('a1', 'tenant-a', 'WAITER', '[]', NOW()), ('b1', 'tenant-b', 'WAITER', '[]', NOW())`,
+         VALUES ('a1', 'tenant-a', 'CLERK', '[]', NOW()), ('b1', 'tenant-b', 'CLERK', '[]', NOW())`,
       );
     } finally {
       await db.close();
@@ -155,9 +155,9 @@ describe('@12-apps/rbac — the prisma assets survive publication', () => {
       }
       await db.exec(`
         INSERT INTO roles (id, client_id, name, permissions, updated_at)
-          VALUES ('r1', 't1', 'Barista', '[]', NOW());
+          VALUES ('r1', 't1', 'Voluntário', '[]', NOW());
         INSERT INTO memberships (id, user_id, client_id, role, updated_at)
-          VALUES ('m1', 'u1', 't1', 'WAITER', NOW());
+          VALUES ('m1', 'u1', 't1', 'CLERK', NOW());
         INSERT INTO membership_roles (id, membership_id, role_id)
           VALUES ('mr1', 'm1', 'r1');
       `);

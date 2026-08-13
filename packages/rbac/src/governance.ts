@@ -48,7 +48,7 @@ export interface ValidateGrantInput {
   roleBeingGranted: string | RoleDef;
   /** The scope the role would be assigned at. */
   targetScope: {
-    /** Is this a leaf scope (a restaurant), or an org/parent scope? */
+    /** Is this a leaf scope (one site), or an org/parent scope? */
     isLeaf: boolean;
   };
   catalog: GovernanceCatalog;

@@ -14,7 +14,7 @@ all host-supplied data.
 
 | Import | Contents |
 | --- | --- |
-| `@12-apps/rbac` | core + governance + Future Pay templates (data) |
+| `@12-apps/rbac` | core + composition (`composePermissions`) + governance + this package's own `RBAC_PERMISSIONS` |
 | `@12-apps/rbac/react` | `RbacProvider`, `useCan`, `<Can>` |
 | `@12-apps/rbac/next` | `createRbacGuards` (framework-neutral server guards) |
 
@@ -184,13 +184,13 @@ surface (who may create/assign which role, at which scope). It is NOT an
 authorization check — it decides whether a grant is *allowed to be made*.
 
 ```ts
-import { validateGrant, FUTURE_PAY_GOVERNANCE } from '@12-apps/rbac';
+import { validateGrant } from '@12-apps/rbac';
 
 const verdict = validateGrant({
   granterPermissions: myPermissions, // the granter's ceiling ('*' allowed)
   roleBeingGranted: 'MANAGER',        // a catalog role name or an inline RoleDef
-  targetScope: { isLeaf: true },      // leaf (restaurant) vs org/parent
-  catalog: FUTURE_PAY_GOVERNANCE,
+  targetScope: { isLeaf: true },      // leaf (a single site) vs org/parent
+  catalog: CATALOG.governance,        // from your composed catalog (see above)
 });
 // { ok: true } | { ok: false, reason: 'ESCALATION: ...' }
 ```
@@ -206,15 +206,70 @@ Enforced rules (stable `reason` prefixes):
   configured mutually-exclusive pair (e.g. `purchasing:write` +
   `purchasing:approve`).
 
-## Future Pay templates (data, not core)
+## Composing a catalog (the host is the assembler)
 
-`FUTURE_PAY_PERMISSIONS`, `DEFAULT_ROLE_TEMPLATES` (OWNER, ADMIN, MANAGER, WAITER,
-CHEF, FINANCIAL, BUYER, SUPERADMIN), `FUTURE_PAY_GOVERNANCE`,
-`FUTURE_PAY_SOD_PAIRS`, `FUTURE_PAY_LEAF_ONLY_ROLES`, and `CLIENT_CAPABILITIES`
-ship as importable data. `CLIENT_CAPABILITIES` is a **population capability set**
-(`products:read:published`, `orders:read:own`, `orders:create`) — what a
-logged-in customer can do — applied by capability, **never** as a staff role
-assignment. A different host imports none of this and supplies its own.
+The package ships **no application catalog**. It declares the three permissions
+guarding its own screens and endpoints — `roles:manage`, `team:read`,
+`team:manage`, exported as `RBAC_PERMISSIONS` — and a host composes those with
+every other owner's contribution.
+
+```ts
+import {
+  composePermissions,
+  definePermissionContribution,
+  RBAC_PERMISSIONS,
+  type PermissionOf,
+} from '@12-apps/rbac';
+import { LIFECYCLE_PERMISSIONS } from '@12-apps/entity-lifecycle';
+
+/** Your domain declares its own ids, with everything true about each. */
+export const SHOP_PERMISSIONS = definePermissionContribution({
+  source: 'shop',
+  permissions: {
+    'products:write': { kind: 'class' },
+    'orders:read:own': { kind: 'instance' },
+    'payouts:manage': { kind: 'class', ownerMarker: true },
+  },
+  labels: { domains: { products: 'Produtos' }, actions: { write: 'Editar' } },
+});
+
+export const CATALOG = composePermissions(
+  RBAC_PERMISSIONS,        // this package's own surfaces
+  LIFECYCLE_PERMISSIONS,   // another package's surfaces
+  SHOP_PERMISSIONS,        // your domain
+).withRoles({
+  roles: SHOP_ROLES,       // typed against the composed union
+  ownerRoles: ['OWNER'],
+  leafOnlyRoles: ['MANAGER'],
+  platformOnlyRoles: ['SUPERADMIN'],
+  roleLabels: { OWNER: 'Proprietário' },
+});
+
+/** The union your guards are checked against — it survives composition. */
+export type ShopPermission = PermissionOf<typeof CATALOG>;
+```
+
+`CATALOG` is the ONE object `createApiRbac` / `createWebRbac` take. It carries
+the registry, the role templates, the governance catalog, the per-tenant seed
+rows and the merged labels, so a host cannot wire the registry from one place
+and the governance from another and have them disagree.
+
+**A contribution is one coherent unit.** Each id travels with its scope-kind
+(`class` / `instance`), its owner-marker flag, its separation-of-duties
+counterparts and its label. An id registered without its scope-kind resolves to
+`class` and skips the entity gate — the half-wiring that fails open — so there
+is no shape of the declaration that omits it.
+
+**Collisions are loud.** Two sources contributing the same id throw an
+`RbacCatalogError` (`PERMISSION_COLLISION`) naming both, in either order. There
+is no last-write-wins: a silent overwrite is how one package's `instance`
+becomes another's `class`. Composition also refuses an SoD counterpart nothing
+contributes, a role granting an unknown id, and a policy naming an unknown role.
+
+**A pair may span sources.** `separateFrom` is resolved against the whole
+assembled catalog, so an approvals package can declare
+`'products:approve': { separateFrom: ['products:write'] }` without owning
+`products:write`.
 
 ## Server guards
 
@@ -255,12 +310,12 @@ const permissions = await rbac.getPermissions(userId, tenantId);
 
 ## Portability: a toy second host (a blog)
 
-The same core powers a completely different domain — no Future Pay concept leaks
-in, and an OpenFGA adapter could replace the default engine without touching any
-of this. This is not just prose: `src/__tests__/portability.test.ts` is the
-RUNNABLE version of this host — its own catalog, roles, scope chain, ownership,
-temporal review assignments and governance policy, exercised end-to-end with
-zero imports from the Future Pay templates:
+The same core powers a completely different domain, and an OpenFGA adapter
+could replace the default engine without touching any of this. Not just prose:
+`src/__tests__/portability.test.ts` is the RUNNABLE version of this host — its
+own catalog, roles, scope chain, ownership, temporal review assignments and
+governance policy — plus the tripwire that asserts what the PACKAGE contains,
+which is what "portable" used to mean here and did not check:
 
 ```ts
 import { definePermissions, createRbac, type RoleDef } from '@12-apps/rbac';

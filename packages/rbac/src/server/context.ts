@@ -1,11 +1,5 @@
-import type { GovernanceCatalog } from '../governance';
-import type {
-  AuthzContext,
-  OwnershipPredicate,
-  PermissionRegistry,
-  RoleDef,
-} from '../core/types';
-import type { TenantRoleSeed } from '../tenant-role-seeds';
+import type { RbacCatalog } from '../core/compose';
+import type { AuthzContext, OwnershipPredicate } from '../core/types';
 
 import type { RbacDbProvider } from './db';
 
@@ -195,7 +189,7 @@ export const DEFAULT_MESSAGES: RbacMessages = {
   duplicateRoleName: 'Já existe um papel com esse nome.',
   reservedRoleName:
     'Esse nome é reservado para um papel do sistema. Edite o papel do sistema.',
-  lastOwner: 'A loja precisa de ao menos um proprietário.',
+  lastOwner: 'É necessário manter ao menos um proprietário.',
   onlyOwnerRemovesOwner: 'Apenas o proprietário pode remover outro proprietário.',
   ownerNotDisableable: 'Não é possível desativar um proprietário.',
   templateNotEditable: 'Este papel do sistema não pode ser editado.',
@@ -237,14 +231,17 @@ export const GLOBAL_SCOPE = 'GLOBAL' as const;
 export interface RbacServerConfig<P extends string = string> {
   /** Prisma-shaped client for the five owned models, through the seam. */
   db: RbacDbProvider;
-  /** The host's permission catalog — the engine and the wire validate against it. */
-  permissions: PermissionRegistry<P>;
-  /** The role TEMPLATES the engine's name index resolves (seeded catalog). */
-  roleTemplates: readonly RoleDef<P>[];
-  /** Governance catalog for grant/compose validation. */
-  governance: GovernanceCatalog;
-  /** The per-tenant rows `seedTenantRoles` materializes for a new tenant. */
-  tenantRoleSeeds: readonly TenantRoleSeed[];
+  /**
+   * The host's composed catalog: the permission registry the engine and the
+   * wire validate against, the seeded role templates, the governance catalog
+   * and the per-tenant seed rows — assembled once by
+   * `composePermissions(...).withRoles(...)`.
+   *
+   * ONE field, not four, on purpose. As four they could disagree: a registry
+   * from the host beside a governance catalog left on a package default is a
+   * config that type-checks and enforces the wrong policy.
+   */
+  catalog: RbacCatalog<P>;
   /** The host's user directory (roster identity). */
   directory: RbacUserDirectory;
   /**
@@ -257,13 +254,38 @@ export interface RbacServerConfig<P extends string = string> {
   /**
    * The coarse admin tier — the base roles whose members may reach this
    * surface at all (the outer boundary; the permission gates do the fine
-   * work). Default `['OWNER', 'ADMIN']`.
+   * work).
+   *
+   * REQUIRED, and nothing in the catalog can answer it: "which roles are
+   * administrators" is not a property of the permissions or of the role
+   * policy. It used to default to `['OWNER', 'ADMIN']`, which is one
+   * application's vocabulary — closed for a host that spells its tiers
+   * otherwise (every admin locked out), and merely wrong for a host that
+   * happens to have a role called `ADMIN` meaning something else.
    */
-  adminRoles?: readonly string[];
-  /** Roles protected from disable/removal invariants. Default `['OWNER']`. */
+  adminRoles: readonly string[];
+  /**
+   * Roles protected from the disable/removal invariants (last owner, "only an
+   * owner removes an owner"). Defaults to the composed
+   * `catalog.governance.ownerRoles` — the host already had to state that set
+   * to assemble its catalog, so the two cannot silently disagree.
+   *
+   * Set it only to NARROW the protected set below the grant-protected one
+   * (future-pay protects grants for `OWNER` + `SUPERADMIN` but runs the roster
+   * invariants on `OWNER` alone). It used to default to `['OWNER']`, so a host
+   * spelling its owner tier any other way lost both invariants outright.
+   */
   ownerRoles?: readonly string[];
-  /** The storefront/no-op membership role excluded from the roster. */
-  customerRole?: string;
+  /**
+   * The storefront/no-op membership role excluded from the roster and from the
+   * staff tier, or `null` for a host whose memberships are all staff.
+   *
+   * REQUIRED — and `null` has to be written out — because both effects fail
+   * OPEN when it is wrong: `requireStaffTier` admits every shopper, and the
+   * roster stops excluding customers, so their names and e-mails appear in a
+   * staff list. It used to default to `'CUSTOMER'`.
+   */
+  customerRole: string | null;
   /** Optional audit sink; every write and governance denial reports here. */
   audit?: RbacAuditSink;
   /** Optional invites seam — see {@link RbacInvitesPort}. */

@@ -24,7 +24,6 @@ export {
   groupPermissions,
   sodCounterpart,
   type PermissionGroup,
-  type RbacLabelOverrides,
   type RbacLabels,
 } from './labels';
 export { RoleForm, type RoleFormProps, type RoleFormValue } from './role-form';

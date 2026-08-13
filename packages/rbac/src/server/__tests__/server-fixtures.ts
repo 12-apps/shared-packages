@@ -1,10 +1,4 @@
-import {
-  DEFAULT_ROLE_TEMPLATES,
-  FUTURE_PAY_GOVERNANCE,
-  FUTURE_PAY_PERMISSIONS,
-  type FuturePayPermission,
-} from '../../templates';
-import { futurePayTenantRoleSeeds } from '../../tenant-role-seeds';
+import { DEMO_CATALOG, type DemoPermission } from '../../__tests__/demo-catalog';
 
 import type { RbacAuditEntry, RbacServerConfig, RbacUserIdentity } from '../context';
 import { createApiRbac, type ApiRbac } from '../create-api-rbac';
@@ -13,29 +7,33 @@ import { createFakeRbacDb, type FakeRbacState } from './fake-db';
 
 /**
  * The shared test host (12-13): `createApiRbac` over the in-memory seam with
- * the Future Pay catalog — the same wiring the harness proves over real SQL
- * and future-pay will pass from Prisma in Phase B.
+ * the DEMO host's composed catalog — the same wiring the harness proves over
+ * real SQL, and the same one-object `catalog` seam a real host passes.
  */
 
 export interface TestHost {
-  api: ApiRbac<FuturePayPermission>;
+  api: ApiRbac<DemoPermission>;
   state: FakeRbacState;
   audits: RbacAuditEntry[];
   directory: Map<string, RbacUserIdentity>;
 }
 
 export function createTestHost(
-  overrides: Partial<RbacServerConfig<FuturePayPermission>> = {},
+  overrides: Partial<RbacServerConfig<DemoPermission>> = {},
 ): TestHost {
   const { db, state } = createFakeRbacDb();
   const audits: RbacAuditEntry[] = [];
   const directory = new Map<string, RbacUserIdentity>();
-  const api = createApiRbac<FuturePayPermission>({
+  const api = createApiRbac<DemoPermission>({
     db: async () => db,
-    permissions: FUTURE_PAY_PERMISSIONS,
-    roleTemplates: DEFAULT_ROLE_TEMPLATES,
-    governance: FUTURE_PAY_GOVERNANCE,
-    tenantRoleSeeds: futurePayTenantRoleSeeds(),
+    catalog: DEMO_CATALOG,
+    // The demo host's OWN vocabulary — none of it a package default, and none
+    // of it a word the extracted application used. `ownerRoles` is left unset
+    // on purpose: it derives from `DEMO_CATALOG.governance.ownerRoles`
+    // (DIRECTOR + NETWORK_OPS), so these suites run the roster invariants on
+    // the set the composed catalog actually names.
+    adminRoles: ['DIRECTOR', 'HEAD_LIBRARIAN'],
+    customerRole: 'PATRON',
     directory: {
       getUsers: async (ids) =>
         ids.flatMap((id) => {

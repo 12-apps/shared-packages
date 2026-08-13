@@ -5,17 +5,14 @@ import { Box } from '@12-apps/ui/mui/Box';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import {
-  DEFAULT_ROLE_TEMPLATES,
-  FUTURE_PAY_GOVERNANCE,
-  FUTURE_PAY_PERMISSIONS,
-} from '../templates';
+import type { RbacCatalog } from '../core/compose';
+import { mergeLabelVocabulary, type RbacLabelVocabulary } from '../core/contribution';
 import type { GovernanceCatalog } from '../governance';
-import type { PermissionRegistry, RoleDef } from '../core/types';
+import type { PermissionRegistry } from '../core/types';
 
 import { createRbacApiClient, type RbacApiClient } from './api';
 import { RbacProvider } from './context';
-import { createRbacLabels, type RbacLabelOverrides, type RbacLabels } from './labels';
+import { createRbacLabels, type RbacLabels } from './labels';
 import { RolesScreen } from './roles-screen';
 import { TeamScreen } from './team-screen';
 import { httpRbacTransport, type RbacTransport } from './transport';
@@ -34,19 +31,20 @@ import { httpRbacTransport, type RbacTransport } from './transport';
  * affordance the same way the endpoints gate every write.
  */
 
-export interface RbacWebConfig {
+export interface RbacWebConfig<P extends string = string> {
   /** The admin mount the routes live under, e.g. `/api/admin/minha-loja`. */
   apiBase: string;
-  /** The host's permission catalog. Defaults to the Future Pay registry. */
-  permissions?: PermissionRegistry<string>;
-  /** The governance catalog (owner markers, SoD pairs). Future Pay default. */
-  governance?: GovernanceCatalog;
-  /** The seeded role templates (system roles). Future Pay default. */
-  roleTemplates?: readonly RoleDef[];
+  /**
+   * The host's composed catalog — registry, role templates, governance and the
+   * merged labels, as ONE object. It used to be three optional fields
+   * defaulting to a catalog this package shipped, which meant a host could
+   * pass its own registry and silently keep somebody else's governance.
+   */
+  catalog: RbacCatalog<P>;
   /** How the surface reaches its data. Default: same-origin fetch. */
   transport?: RbacTransport;
-  /** pt-BR label overrides/extensions. */
-  labels?: RbacLabelOverrides;
+  /** Label overrides layered over the catalog's own. */
+  labels?: RbacLabelVocabulary;
   /** Gate permission ids, when the host's catalog spells them differently. */
   gatePermissions?: { manageRoles?: string; manageTeam?: string };
 }
@@ -72,9 +70,7 @@ interface SurfaceParts {
 }
 
 function surfaceParts(config: RbacWebConfig): SurfaceParts {
-  const permissions = config.permissions ?? FUTURE_PAY_PERMISSIONS;
-  const governance = config.governance ?? FUTURE_PAY_GOVERNANCE;
-  const roleTemplates = config.roleTemplates ?? DEFAULT_ROLE_TEMPLATES;
+  const { permissions, governance, roleTemplates, labels } = config.catalog;
   // The assignable SYSTEM roles — every template except the owner tier,
   // which is never assignable from the roster.
   const systemRoles = roleTemplates
@@ -84,7 +80,7 @@ function surfaceParts(config: RbacWebConfig): SurfaceParts {
     api: createRbacApiClient(config.apiBase, config.transport ?? httpRbacTransport()),
     permissions,
     governance,
-    labels: createRbacLabels(config.labels),
+    labels: createRbacLabels(mergeLabelVocabulary(labels, config.labels)),
     systemRoles,
     ownerRoles: [...governance.ownerRoles],
     manageRoles: config.gatePermissions?.manageRoles ?? 'roles:manage',
@@ -179,7 +175,9 @@ function RbacAdminTabs({ parts }: { parts: SurfaceParts }): JSX.Element {
   );
 }
 
-export function createWebRbac(config: RbacWebConfig): WebRbac {
+export function createWebRbac<P extends string = string>(
+  config: RbacWebConfig<P>,
+): WebRbac {
   const parts = surfaceParts(config);
   return {
     page: () => (

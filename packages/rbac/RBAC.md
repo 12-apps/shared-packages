@@ -5,65 +5,108 @@ A step-by-step **integration playbook**. For the API reference (adapter seams,
 [`README.md`](./README.md); this doc is the "how do I wire it into my app, my DB,
 and my CI" guide.
 
-The library is **framework-free and DB-free**. You supply four things — a
-permission catalog, role definitions, a `resolver` that maps an actor id to their
-role assignments, and (optionally) the entity gate — and you get point/list
-authorization plus a governance validator. Nothing about the host app leaks into
-the core.
+The library is **framework-free, DB-free and application-free**. You supply four
+things — a permission catalog, role definitions, a `resolver` that maps an actor
+id to their role assignments, and (optionally) the entity gate — and you get
+point/list authorization plus a governance validator. Nothing about the host app
+leaks into the core, and the package ships no application's catalog: it declares
+only the three permissions guarding its own roles/team surface
+(`RBAC_PERMISSIONS`) and you COMPOSE yours with them.
 
 ---
 
-## 1. Decide your permission catalog
+## 1. Declare your domain's permission contribution
 
-Model every guarded capability as a permission string, and flag whether it is
-**class** (RBAC alone decides) or **instance** (RBAC first, then an entity gate —
-ownership / assignment / caveat).
+Model every guarded capability as a permission string carrying everything true
+about it: whether it is **class** (RBAC alone decides) or **instance** (RBAC
+first, then an entity gate — ownership / assignment / caveat), whether it is an
+owner marker, which permissions it may never share a role with, and how it
+reads on screen.
 
 ```ts
 // lib/authz/permissions.ts
-import { definePermissions } from "@12-apps/rbac";
+import { definePermissionContribution } from "@12-apps/rbac";
 
-export const PERMISSIONS = definePermissions({
-  "products:write": "class",
-  "orders:read:all": "class",
-  "orders:read:own": "instance",   // a buyer sees only their own orders
-  "roles:manage": "class",         // owner-marker (see governance below)
-} as const);
-
-export type AppPermission = (typeof PERMISSIONS.list)[number];
+export const SHOP_PERMISSIONS = definePermissionContribution({
+  source: "shop",                            // named in composition errors
+  permissions: {
+    "products:write": { kind: "class" },
+    "orders:read:all": { kind: "class" },
+    "orders:read:own": { kind: "instance" },  // a buyer sees only their own
+    "purchasing:write": { kind: "class" },
+    "purchasing:approve": {
+      kind: "class",
+      separateFrom: ["purchasing:write"],     // separation of duties
+    },
+    "payouts:manage": { kind: "class", ownerMarker: true },
+  },
+  labels: {
+    domains: { products: "Produtos", orders: "Pedidos" },
+    actions: { write: "Editar", read: "Ver", approve: "Aprovar" },
+    scopes: { own: "próprios", all: "todos" },
+  },
+});
 ```
 
 Rules of thumb:
-- A permission string is a wire to a **code gate**. Custom roles can only *compose*
-  existing permissions — they can't invent new strings.
+- A permission string is a wire to a **code gate**. Custom roles can only
+  *compose* existing permissions — they can't invent new strings.
 - `instance` permissions require you to also provide `ownership` and/or
   `assignmentResolver` when building the engine (step 3).
+- Declare a permission where the surface it guards lives. If another package
+  owns the screen, that package owns the id and exports its own contribution.
 
-## 2. Define role templates + the governance catalog
+## 2. Compose the catalog and bind your role policy
 
-Roles are **data**. Ship a fixed set of template roles, and a `GovernanceCatalog`
-that describes the guard-rails for who may grant/compose which role.
+Roles are **data**, and they are always the HOST's — no package can know your
+role matrix. `composePermissions` unions every source's ids (keeping the literal
+union), and `withRoles` binds the role half.
 
 ```ts
-// lib/authz/roles.ts
-import type { RoleDef } from "@12-apps/rbac";
-import { PERMISSIONS, type AppPermission } from "./permissions";
+// lib/authz/catalog.ts
+import {
+  composePermissions,
+  RBAC_PERMISSIONS,
+  type PermissionOf,
+  type RoleDef,
+} from "@12-apps/rbac";
+import { LIFECYCLE_PERMISSIONS } from "@12-apps/entity-lifecycle";
+import { SHOP_PERMISSIONS } from "./permissions";
 
-export const ROLE_TEMPLATES: readonly RoleDef<AppPermission>[] = [
+const PERMISSIONS = composePermissions(
+  RBAC_PERMISSIONS,        // the packaged roles/team surface's own three ids
+  LIFECYCLE_PERMISSIONS,   // another package's surfaces
+  SHOP_PERMISSIONS,        // your domain
+);
+
+export type AppPermission = PermissionOf<typeof PERMISSIONS>;
+
+const ROLE_TEMPLATES: readonly RoleDef<AppPermission>[] = [
   { name: "OWNER", permissions: "*" },
   { name: "MANAGER", permissions: ["products:write", "orders:read:all"] },
   { name: "STAFF", permissions: ["orders:read:own"] },
 ];
 
-export const GOVERNANCE = {
-  permissions: PERMISSIONS,
+export const CATALOG = PERMISSIONS.withRoles({
   roles: ROLE_TEMPLATES,
-  ownerRoles: ["OWNER"],                    // never grantable via a custom role
-  ownerPermissions: ["roles:manage"],       // owner-marker perms
-  leafOnlyRoles: ["MANAGER"],               // assignable only at a leaf scope
-  sodPairs: [["purchasing:write", "purchasing:approve"]], // separation of duties
-} as const;
+  ownerRoles: ["OWNER"],            // never grantable via a custom role
+  leafOnlyRoles: ["MANAGER"],       // assignable only at a leaf scope
+  platformOnlyRoles: [],            // never seeded per tenant
+  roleLabels: { OWNER: "Proprietário" },
+});
 ```
+
+`CATALOG` carries the registry, the templates, the governance catalog, the
+per-tenant seed rows and the merged labels. It is the single `catalog` field
+`createApiRbac`, `rbacRouter` and `createWebRbac` take — one object rather than
+four, so the screen and the endpoints can never be governed by different
+policies. Owner markers and SoD pairs come from the contributions, so a package
+that owns an approval gate ships its own duty pair rather than asking every host
+to remember it.
+
+Composition throws `RbacCatalogError` on a duplicated id (naming both sources),
+an SoD counterpart nothing contributes, a role granting an unknown id, or a
+policy naming an unknown role.
 
 ## 3. Build the engine (the DB seam)
 
@@ -74,8 +117,7 @@ per-tenant membership table and a free-form role-assignment table.
 ```ts
 // lib/authz/rbac.ts
 import { createRbac, type RoleAssignment } from "@12-apps/rbac";
-import { PERMISSIONS } from "./permissions";
-import { ROLE_TEMPLATES } from "./roles";
+import { CATALOG, type AppPermission } from "./catalog";
 import { db } from "../db";
 
 async function resolver(actorId: string): Promise<RoleAssignment[]> {
@@ -90,8 +132,8 @@ async function resolver(actorId: string): Promise<RoleAssignment[]> {
 }
 
 export const rbac = createRbac<AppPermission>({
-  permissions: PERMISSIONS,
-  roles: ROLE_TEMPLATES,
+  permissions: CATALOG.permissions,
+  roles: CATALOG.roleTemplates,
   resolver,
   globalScope: "GLOBAL",   // a grant here satisfies any requested scope (superadmin)
   // scopeParent, ownership, assignmentResolver — see README for the entity gate
@@ -198,8 +240,9 @@ can't include an owner-marker permission, and can't bundle an SoD pair.
 
 - **Create/edit a role** → `validateGrant({ roleBeingGranted: { name, permissions }, ... })`
   before writing the `Role` row. Build the permission-picker UI from
-  `PERMISSIONS.list`, grouped by domain, disabling owner-marker perms and the SoD
-  counterpart of any selected permission.
+  `CATALOG.permissions.list`, grouped by domain, disabling owner-marker perms and
+  the SoD counterpart of any selected permission (or mount the packaged
+  `createWebRbac` surface, which already does both).
 - **Assign a role to a member.** ⚠️ **Gotcha:** if your membership table pins the
   base role with a DB CHECK constraint (a fixed template enum), a custom role name
   **cannot** be stored there. Grant it as an **additive `RoleAssignment`**

@@ -34,7 +34,7 @@ export interface CanContext {
   /** Full registry list, returned when a wildcard grant is in effect. */
   allPermissions: readonly string[];
   /**
-   * Walk from a scope to its parent (org -> restaurant chains). A grant at a
+   * Walk from a scope to its parent (org -> site chains). A grant at a
    * parent scope reaches all descendants. Cycle-guarded here. Omit for a flat
    * scope model.
    */

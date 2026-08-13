@@ -302,7 +302,7 @@ export interface RolesStore {
 
 type RolesStoreConfig<P extends string> = Pick<
   RbacServerConfig<P>,
-  'db' | 'audit' | 'messages' | 'tenantRoleSeeds' | 'roleTemplates'
+  'db' | 'audit' | 'messages' | 'catalog'
 >;
 
 export function createRolesStore<P extends string>(config: RolesStoreConfig<P>): RolesStore {
@@ -310,8 +310,8 @@ export function createRolesStore<P extends string>(config: RolesStoreConfig<P>):
     db: config.db,
     audit: fencedAudit(config.audit),
     messages: messagesOf(config),
-    templateNames: new Set(config.roleTemplates.map((role) => role.name)),
-    tenantRoleSeeds: config.tenantRoleSeeds,
+    templateNames: new Set(config.catalog.roleTemplates.map((role) => role.name)),
+    tenantRoleSeeds: config.catalog.tenantRoleSeeds,
   };
   return {
     listRolesPage: (tenantId, query) => listRolesPage(ctx, tenantId, query),

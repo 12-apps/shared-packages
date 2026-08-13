@@ -34,6 +34,15 @@ describe('guard detection', () => {
     expect(isRbacProtected('import { requirePermission } from "x";', GUARDS)).toBe(false);
   });
 
+  it('accepts NOTHING when the guard list is empty (never an empty alternation)', () => {
+    // `new RegExp('\\b(?:)\\s*\\(')` matches ANY `identifier(`, so an empty
+    // list used to make every file read as guarded — the whole gate green over
+    // a surface with zero coverage. Both entry points must answer "unguarded".
+    expect(isRbacProtected('await requirePermission("x", {});', [])).toBe(false);
+    expect(isRbacProtected('export const GET = () => fetchThing();', [])).toBe(false);
+    expect(guardedSymbols('export async function a() { anything(); }', []).size).toBe(0);
+  });
+
   it('attributes guards per exported symbol, transitively', () => {
     const source = [
       '"use server";',
@@ -167,15 +176,37 @@ describe('runRbacCoverage', () => {
     return path;
   }
 
-  function run(exclusions: object = { actions: {}, routes: {} }) {
+  function run(
+    exclusions: object = { actions: {}, routes: {} },
+    rbacGuards: readonly string[] = GUARDS,
+  ) {
     return runRbacCoverage({
       appDir: join(dir, 'app'),
       webRoot: dir,
       exclusionsPath: writeExclusions(exclusions),
-      rbacGuards: GUARDS,
+      rbacGuards,
       entitlementGuards: ['requireEntitlement'],
     });
   }
+
+  it('refuses an empty rbacGuards rather than passing over an unguarded surface', () => {
+    writeRoute('api/naked/route.ts', 'export const GET = () => 1;');
+    // The blocker this replaces: `[]` compiled to an empty alternation, every
+    // route file read as protected, and the CLI exited 0 with no coverage at
+    // all — as a PRE-PUSH gate in the adopting host.
+    expect(() => run({ actions: {}, routes: {} }, [])).toThrow(/rbacGuards/);
+  });
+
+  it('reports an unguarded route as unprotected under the never-matching regex', () => {
+    // The regex backstop, reached past the option assertion: even if a future
+    // caller bypasses `runRbacCoverage`, detection with no accepted guard says
+    // "unguarded" rather than "guarded".
+    writeRoute('api/naked/route.ts', 'export const GET = () => 1;');
+    const source = 'export const GET = () => 1;';
+    expect(isRbacProtected(source, [])).toBe(false);
+    const { failures } = run();
+    expect(failures.some((failure) => failure.includes('unprotected route'))).toBe(true);
+  });
 
   it('passes a guarded route and fails an unguarded one', () => {
     writeRoute('api/safe/route.ts', 'export const GET = () => requirePermission("x", {});');

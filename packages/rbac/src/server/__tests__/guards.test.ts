@@ -25,9 +25,9 @@ async function seededHost() {
 }
 
 describe('rbac foundation (FUT-146 port)', () => {
-  it('(a) a membership OWNER passes config:write in their tenant', async () => {
+  it('(a) a membership DIRECTOR passes config:write in their tenant', async () => {
     const host = await seededHost();
-    enrolMember(host.state, TENANT_A, 'owner-1', 'OWNER');
+    enrolMember(host.state, TENANT_A, 'owner-1', 'DIRECTOR');
     await expect(
       host.api.guards.requirePermission(
         { userId: 'owner-1', isSuper: false },
@@ -37,9 +37,9 @@ describe('rbac foundation (FUT-146 port)', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('(b) a WAITER is denied config:write', async () => {
+  it('(b) a CLERK is denied config:write', async () => {
     const host = await seededHost();
-    enrolMember(host.state, TENANT_A, 'waiter-1', 'WAITER');
+    enrolMember(host.state, TENANT_A, 'waiter-1', 'CLERK');
     await expect(
       host.api.guards.requirePermission(
         { userId: 'waiter-1', isSuper: false },
@@ -60,38 +60,38 @@ describe('rbac foundation (FUT-146 port)', () => {
       (
         await host.api.guards.visibleResources(
           { userId: null, isSuper: true },
-          'orders:read:all',
+          'loans:read:all',
           'order',
         )
       ).kind,
     ).toBe('all');
   });
 
-  it('(d) getActorPermissions returns the expected set for a MANAGER', async () => {
+  it('(d) getActorPermissions returns the expected set for a BRANCH_LEAD', async () => {
     const host = await seededHost();
-    enrolMember(host.state, TENANT_A, 'manager-1', 'MANAGER');
+    enrolMember(host.state, TENANT_A, 'manager-1', 'BRANCH_LEAD');
     const perms = await host.api.guards.getActorPermissions(
       { userId: 'manager-1', isSuper: false },
       TENANT_A,
     );
-    expect(perms.has('products:write')).toBe(true);
-    expect(perms.has('orders:read:all')).toBe(true);
+    expect(perms.has('titles:write')).toBe(true);
+    expect(perms.has('loans:read:all')).toBe(true);
     expect(perms.has('team:read')).toBe(true);
-    // MANAGER must NOT hold owner/admin-only powers.
+    // BRANCH_LEAD must NOT hold owner/admin-only powers.
     expect(perms.has('config:write')).toBe(false);
     expect(perms.has('roles:manage')).toBe(false);
-    expect(perms.has('payouts:manage')).toBe(false);
+    expect(perms.has('budget:manage')).toBe(false);
   });
 
   it('(e) the assignment relation is tenant-scoped — no cross-tenant leak', async () => {
     const host = await seededHost();
-    enrolMember(host.state, TENANT_A, 'waiter-1', 'WAITER');
-    assignRole(host.state, 'waiter-1', 'WAITER', TENANT_B);
+    enrolMember(host.state, TENANT_A, 'waiter-1', 'CLERK');
+    assignRole(host.state, 'waiter-1', 'CLERK', TENANT_B);
     host.state.resourceAssignments.push({
       id: 'ra-1',
       userId: 'waiter-1',
       clientId: TENANT_A,
-      resourceType: 'orders',
+      resourceType: 'loans',
       resourceId: 'order-a1',
       // Fixed and in the past relative to any run — the resolver's temporal
       // filter compares against the wall clock, so "long ago, never revoked"
@@ -101,15 +101,15 @@ describe('rbac foundation (FUT-146 port)', () => {
     });
     const inA = await host.api.guards.visibleResources(
       { userId: 'waiter-1', isSuper: false },
-      'orders:read:assigned',
-      'orders',
+      'loans:read:assigned',
+      'loans',
       { scope: TENANT_A },
     );
     expect(inA).toEqual({ kind: 'ids', ids: ['order-a1'] });
     const inB = await host.api.guards.visibleResources(
       { userId: 'waiter-1', isSuper: false },
-      'orders:read:assigned',
-      'orders',
+      'loans:read:assigned',
+      'loans',
       { scope: TENANT_B },
     );
     expect(inB).toEqual({ kind: 'ids', ids: [] });
@@ -117,7 +117,7 @@ describe('rbac foundation (FUT-146 port)', () => {
 
   it('a soft-disabled membership resolves to no permissions', async () => {
     const host = await seededHost();
-    enrolMember(host.state, TENANT_A, 'off-1', 'MANAGER', { active: false });
+    enrolMember(host.state, TENANT_A, 'off-1', 'BRANCH_LEAD', { active: false });
     const perms = await host.api.guards.getActorPermissions(
       { userId: 'off-1', isSuper: false },
       TENANT_A,
@@ -127,13 +127,13 @@ describe('rbac foundation (FUT-146 port)', () => {
 
   it('a permission ceiling only ever narrows', async () => {
     const host = await seededHost();
-    enrolMember(host.state, TENANT_A, 'owner-1', 'OWNER');
-    const ceiling = new Set(['products:read:all']);
+    enrolMember(host.state, TENANT_A, 'owner-1', 'DIRECTOR');
+    const ceiling = new Set(['titles:read:all']);
     const perms = await host.api.guards.getActorPermissions(
       { userId: 'owner-1', isSuper: false, permissionCeiling: ceiling },
       TENANT_A,
     );
-    expect([...perms]).toEqual(['products:read:all']);
+    expect([...perms]).toEqual(['titles:read:all']);
     await expect(
       host.api.guards.requirePermission(
         { userId: 'owner-1', isSuper: false, permissionCeiling: ceiling },
@@ -145,7 +145,7 @@ describe('rbac foundation (FUT-146 port)', () => {
 });
 
 describe('tenant custom-role runtime enforcement (FUT-146 port)', () => {
-  const CUSTOM_PERMISSIONS = ['products:read:all', 'stock:read'] as const;
+  const CUSTOM_PERMISSIONS = ['titles:read:all', 'copies:read'] as const;
 
   it('(a) a custom role grants EXACTLY its permission set — and nothing more', async () => {
     const host = await seededHost();
@@ -157,10 +157,10 @@ describe('tenant custom-role runtime enforcement (FUT-146 port)', () => {
     assignRole(host.state, 'custom-1', 'STOCK_VIEWER', TENANT_A);
     const actor = { userId: 'custom-1', isSuper: false };
     await expect(
-      host.api.guards.requirePermission(actor, 'products:read:all', { scope: TENANT_A }),
+      host.api.guards.requirePermission(actor, 'titles:read:all', { scope: TENANT_A }),
     ).resolves.toBeUndefined();
     await expect(
-      host.api.guards.requirePermission(actor, 'stock:move', { scope: TENANT_A }),
+      host.api.guards.requirePermission(actor, 'copies:move', { scope: TENANT_A }),
     ).rejects.toBeInstanceOf(RbacApiError);
     const perms = await host.api.guards.getActorPermissions(actor, TENANT_A);
     expect([...perms].sort()).toEqual([...CUSTOM_PERMISSIONS].sort());
@@ -206,15 +206,15 @@ describe('tenant custom-role runtime enforcement (FUT-146 port)', () => {
 
   it('(e) a same-named role only applies at its own tenant', async () => {
     const host = await seededHost();
-    seedRole(host.state, { clientId: TENANT_A, name: 'OPS', permissions: ['products:read:all'] });
-    seedRole(host.state, { clientId: TENANT_B, name: 'OPS', permissions: ['stock:read'] });
+    seedRole(host.state, { clientId: TENANT_A, name: 'OPS', permissions: ['titles:read:all'] });
+    seedRole(host.state, { clientId: TENANT_B, name: 'OPS', permissions: ['copies:read'] });
     assignRole(host.state, 'custom-1', 'OPS', TENANT_A);
     const perms = await host.api.guards.getActorPermissions(
       { userId: 'custom-1', isSuper: false },
       TENANT_A,
     );
-    expect([...perms]).toEqual(['products:read:all']);
-    expect(perms.has('stock:read')).toBe(false);
+    expect([...perms]).toEqual(['titles:read:all']);
+    expect(perms.has('copies:read')).toBe(false);
   });
 
   it('an ARCHIVED custom role stops granting at runtime', async () => {
@@ -245,15 +245,15 @@ describe('the super/ceiling belt (a ceiling is authoritative)', () => {
     const actor = {
       userId: null,
       isSuper: true,
-      permissionCeiling: new Set(['products:read:all']),
+      permissionCeiling: new Set(['titles:read:all']),
     };
     await expect(
-      host.api.guards.requirePermission(actor, 'payouts:manage', { scope: TENANT_A }),
+      host.api.guards.requirePermission(actor, 'budget:manage', { scope: TENANT_A }),
     ).rejects.toBeInstanceOf(RbacApiError);
     const perms = await host.api.guards.getActorPermissions(actor, TENANT_A);
     expect(perms.size).toBeLessThanOrEqual(1);
     expect(
-      (await host.api.guards.visibleResources(actor, 'orders:read:all', 'orders')).kind,
+      (await host.api.guards.visibleResources(actor, 'loans:read:all', 'loans')).kind,
     ).toBe('none');
   });
 });
@@ -263,9 +263,9 @@ describe('archived roles on the MEMBERSHIP-JOIN path', () => {
     // The roleAssignment path is covered above; this pins the join path the
     // resolver reads for ordinary staff (engine.ts fromMemberships).
     const host = await seededHost();
-    enrolMember(host.state, TENANT_A, 'waiter-1', 'WAITER');
+    enrolMember(host.state, TENANT_A, 'waiter-1', 'CLERK');
     const waiterRow = host.state.roles.find(
-      (row) => row.clientId === TENANT_A && row.name === 'WAITER',
+      (row) => row.clientId === TENANT_A && row.name === 'CLERK',
     );
     expect(waiterRow).toBeDefined();
     if (waiterRow) waiterRow.archivedAt = new Date('2026-01-01T00:00:00Z');
@@ -280,7 +280,7 @@ describe('archived roles on the MEMBERSHIP-JOIN path', () => {
 describe('actor helpers', () => {
   it('memberActor/superActor build the route actor shapes', async () => {
     const host = await seededHost();
-    enrolMember(host.state, TENANT_A, 'owner-1', 'OWNER');
+    enrolMember(host.state, TENANT_A, 'owner-1', 'DIRECTOR');
     expect(memberActor(TENANT_A, 'owner-1').isSuper).toBe(false);
     expect(superActor(TENANT_A).userId).toBeNull();
   });

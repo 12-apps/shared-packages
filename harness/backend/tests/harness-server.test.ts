@@ -108,7 +108,7 @@ describe('the harness backend serves the package over a real Postgres', () => {
 
     expect(roles.status).toBe(200);
     expect(page.pagination.hasNextPage).toBe(false);
-    expect(page.data.map((row) => row.name)).toContain('Barista');
+    expect(page.data.map((row) => row.name)).toContain('Voluntário');
   });
 
   it('keeps a created document, and stamps it from the FROZEN clock', async () => {

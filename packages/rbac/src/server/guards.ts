@@ -132,7 +132,7 @@ export function intersectPermissions<P extends string>(
 
 interface GuardCtx<P extends string> {
   engine: Rbac<P>;
-  permissions: RbacServerConfig<P>['permissions'];
+  permissions: RbacServerConfig<P>['catalog']['permissions'];
   warmScope: RbacServerConfig<P>['warmScope'];
   messages: RbacMessages;
 }
@@ -232,7 +232,7 @@ async function listVisibility<P extends string>(
 
 type GuardConfig<P extends string> = Pick<
   RbacServerConfig<P>,
-  'permissions' | 'warmScope' | 'messages'
+  'catalog' | 'warmScope' | 'messages'
 >;
 
 export function createRbacGuards<P extends string>(
@@ -241,7 +241,7 @@ export function createRbacGuards<P extends string>(
 ): RbacGuards<P> {
   const ctx: GuardCtx<P> = {
     engine,
-    permissions: config.permissions,
+    permissions: config.catalog.permissions,
     warmScope: config.warmScope,
     messages: messagesOf(config),
   };

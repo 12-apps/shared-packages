@@ -41,26 +41,26 @@ describe('definePermissions', () => {
 describe('definePermissions — object-map form', () => {
   function mk() {
     return definePermissions({
-      'orders:read:own': 'instance',
-      'products:write': 'class',
+      'loans:read:own': 'instance',
+      'titles:write': 'class',
     } as const);
   }
 
   it('derives the list from the map keys', () => {
     const reg = mk();
-    expect([...reg.list].sort()).toEqual(['orders:read:own', 'products:write']);
+    expect([...reg.list].sort()).toEqual(['loans:read:own', 'titles:write']);
   });
 
   it('has() reflects the declared keys', () => {
     const reg = mk();
-    expect(reg.has('orders:read:own')).toBe(true);
+    expect(reg.has('loans:read:own')).toBe(true);
     expect(reg.has('nope')).toBe(false);
   });
 
   it('kind() reports the declared scope-kind', () => {
     const reg = mk();
-    expect(reg.kind('orders:read:own')).toBe('instance');
-    expect(reg.kind('products:write')).toBe('class');
+    expect(reg.kind('loans:read:own')).toBe('instance');
+    expect(reg.kind('titles:write')).toBe('class');
   });
 
   it('kind() defaults unknown permissions to class', () => {
