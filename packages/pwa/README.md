@@ -22,11 +22,43 @@ import { reportWarning } from "@12-apps/observability-frontend";
 
 | entry | what it is |
 |---|---|
-| `@12-apps/pwa` | `useInstallPrompt`, `isIosInstallable`, `isStandalone`, `isHandheld`, the messages layer |
+| `@12-apps/pwa` | `useInstallPrompt`, `isIosInstallable`, `isStandalone`, `isHandheld`, the messages layer, and `registerServiceWorker` / `postToServiceWorker` |
 | `@12-apps/pwa/react` | `InstallInvite`, `ShareIcon` |
+| `@12-apps/pwa/server` | `createApiPwa({ resolveApp })` — the per-host **manifest endpoint** and the packaged service worker; also `buildWebAppManifest` and `pwaServiceWorkerSource` |
+| `@12-apps/pwa/hono` | `pwaRouter({ resolveApp })`, mounted at the origin root. `hono` is an OPTIONAL peer |
 
 The root entry is framework-free, so a host that only needs "can this be
 installed" does not pull React in through a barrel it did not ask for.
+
+**[ADOPTING.md](./ADOPTING.md) is the adoption contract** — the config table and
+the five wiring rules that bite.
+
+## What makes an app installABLE (12-23)
+
+The invite above only *asks*. Two things have to exist first, and both ship here:
+
+1. **A manifest, as an ENDPOINT — never a static file.** A PWA's identity IS its
+   origin, and a bundle has exactly one `index.html` for every tenant it serves,
+   so a static `manifest.webmanifest` cannot vary by the store the visitor is
+   looking at. `resolveApp` returning `null` is a 404, and that 404 is the whole
+   installability gate.
+2. **A REGISTERED service worker, on every visit.** `registerServiceWorker()`
+   belongs at app boot, not behind a settings screen: future-pay registered its
+   worker only from `enableWebPush()`, so a visitor who never opened notification
+   preferences had no worker — and the browser never offered to install the store.
+
+```ts
+const pwa = pwaRouter({ resolveApp: ({ host }) => appForHost(host) });
+app.route('/', pwa.router);           // the manifest, at the ORIGIN ROOT
+registerServiceWorker();              // in the SPA's entry, once
+```
+
+**The packaged worker is network-first for documents, and that is not a
+preference.** Every hashed filename in a bundled SPA dies with the deploy that
+produced it, and a history fallback answers a vanished chunk with `index.html` —
+which fails on the MIME type, reaches `React.lazy`, and renders the page blank. A
+naive cache-first worker pins that old shell and makes the blank page PERMANENT;
+on an installed app "force-refresh" is advice the user cannot follow.
 
 ## Two platforms that share nothing
 

@@ -24,7 +24,9 @@ import { PaymentsProviderChainPage } from './payments-provider-chain';
 import { PaymentsProviderConnectPage } from './payments-provider-connect';
 import { PaymentsProviderCredentialsPage } from './payments-provider-credentials';
 import { PaymentsProviderSettingsPage } from './payments-provider-settings';
+import { OnboardingGuidedPage } from './onboarding-guided';
 import { PwaInstallPromptPage } from './pwa-install-prompt';
+import { PwaManifestPage } from './pwa-manifest';
 import { RbacAdminPage } from './rbac-admin';
 import { ReportBuilderPage } from './report-builder';
 
@@ -245,6 +247,17 @@ export const PAGES: readonly HarnessPage[] = [
     group: 'storefront',
     Component: PwaInstallPromptPage,
   },
+  // @12-apps/pwa's REQUEST-TIME half (12-23): the per-host manifest endpoint and
+  // the packaged worker, asked for from a real browser. The install prompt above
+  // is @12-apps/ui's component; this is the package that makes the app installable
+  // in the first place.
+  {
+    slug: 'pwa-manifest',
+    title: 'Manifest & worker',
+    pkg: '@12-apps/pwa',
+    group: 'storefront',
+    Component: PwaManifestPage,
+  },
 
   // --- Backoffice: what the STORE sees ------------------------------------
   // Titles name only what VARIES; the parent row already says "Provider
@@ -299,6 +312,13 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/rbac',
     group: 'backoffice',
     Component: RbacAdminPage,
+  },
+  {
+    slug: 'onboarding-guided',
+    title: 'Guided onboarding',
+    pkg: '@12-apps/onboarding',
+    group: 'backoffice',
+    Component: OnboardingGuidedPage,
   },
   {
     slug: 'notifications-center',

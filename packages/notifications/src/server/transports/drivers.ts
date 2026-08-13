@@ -20,6 +20,13 @@
  * own), and the router, the registry and the other transports are untouched.
  */
 
+import { normalizePhoneE164 } from '../../phone';
+import type {
+  NotificationContent,
+  NotificationTransport,
+  TransportRecipient,
+} from '../../types';
+
 /** Every HTTP call a built-in driver makes goes through this, so a test can. */
 export type FetchImpl = (
   input: string,
@@ -103,4 +110,41 @@ export function absoluteLink(link: string | undefined, appUrl: string | undefine
   } catch {
     return null;
   }
+}
+
+/**
+ * The two PHONE channels' shared skeleton.
+ *
+ * SMS and WhatsApp differ in their vendor, their message shape and their
+ * formatter — and in nothing else: both are unavailable for a recipient whose
+ * number will not normalize, both normalize before the vendor ever sees the
+ * destination, and both refuse rather than send when it cannot be. Stating that
+ * rule twice is how the two drift, which is exactly what happened to the
+ * transports' `supports()` gates before they funnelled through one helper.
+ */
+export function phoneChannel<TMessage>(
+  channel: 'SMS' | 'WHATSAPP',
+  options: {
+    /** Country calling code for a bare local number. */
+    defaultCountryCode?: string;
+    format: (content: NotificationContent) => TMessage;
+    send: (toE164: string, message: TMessage) => Promise<void>;
+  },
+): NotificationTransport<TMessage> {
+  const toE164 = (recipient: TransportRecipient): string | null =>
+    normalizePhoneE164(recipient.phone, {
+      ...(options.defaultCountryCode !== undefined
+        ? { defaultCountryCode: options.defaultCountryCode }
+        : {}),
+    });
+  return {
+    channel,
+    supports: (recipient) => toE164(recipient) !== null,
+    format: options.format,
+    async send(message, recipient) {
+      const to = toE164(recipient);
+      if (!to) throw new Error('Recipient has no usable phone number.');
+      await options.send(to, message);
+    },
+  };
 }

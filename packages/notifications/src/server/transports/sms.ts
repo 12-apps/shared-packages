@@ -1,13 +1,12 @@
-import { normalizePhoneE164 } from '../../phone';
 import type {
   NotificationContent,
   NotificationLogger,
   NotificationTransport,
-  TransportRecipient,
 } from '../../types';
 
 import {
   absoluteLink,
+  phoneChannel,
   postOrThrow,
   resolveDriver,
   type DriverDeclarationBase,
@@ -108,20 +107,11 @@ export function smsTransport(
   extraDrivers: Record<string, (d: SmsDriverDeclaration) => SmsDriver> = {},
 ): NotificationTransport<SmsMessage> {
   const driver = resolveDriver('SMS', declaration, { ...SMS_DRIVERS, ...extraDrivers });
-  const toE164 = (recipient: TransportRecipient): string | null =>
-    normalizePhoneE164(recipient.phone, {
-      ...(declaration.defaultCountryCode !== undefined
-        ? { defaultCountryCode: declaration.defaultCountryCode }
-        : {}),
-    });
-  return {
-    channel: 'SMS',
-    supports: (recipient) => toE164(recipient) !== null,
+  return phoneChannel<SmsMessage>('SMS', {
+    ...(declaration.defaultCountryCode !== undefined
+      ? { defaultCountryCode: declaration.defaultCountryCode }
+      : {}),
     format: (content) => formatSms(content, declaration),
-    async send(message, recipient) {
-      const to = toE164(recipient);
-      if (!to) throw new Error('Recipient has no usable phone number.');
-      await driver.send(to, message);
-    },
-  };
+    send: (toE164, message) => driver.send(toE164, message),
+  });
 }

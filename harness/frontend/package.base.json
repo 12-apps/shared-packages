@@ -1,14 +1,15 @@
 {
   "name": "@12-apps/frontend-harness",
+  "$comment:build-before-test": "playwright.config.ts serves dist/ with `vite preview`, so a run WITHOUT a preceding build silently validates a STALE bundle \u2014 green on code that is no longer there. That is not hypothetical: it hid a page added by a merge (12-17's lifecycle-admin) behind 11 'element not found' timeouts, and before that it let a run report 164 passed against a bundle predating the changes under test. So every test entrypoint builds first; it costs ~10s and removes a whole class of false green.",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "description": "Consumer harness: a real app built against the PUBLISHED tarballs, never against the workspace. scripts/harness-install.mjs turns this into package.json by adding the @12-apps dependencies as file: tarballs \u2014 which is why the @12-apps names are absent here rather than pinned to a version nobody would remember to bump.",
   "scripts": {
     "build": "vite build",
-    "test": "bddgen && playwright test",
-    "test:harness": "bddgen && playwright test --project=harness",
-    "test:journeys": "bddgen && playwright test --project=journeys",
+    "test": "vite build && bddgen && playwright test",
+    "test:harness": "vite build && bddgen && playwright test --project=harness",
+    "test:journeys": "vite build && bddgen && playwright test --project=journeys",
     "bdd:gen": "bddgen"
   },
   "devDependencies": {

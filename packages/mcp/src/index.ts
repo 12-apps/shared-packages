@@ -73,4 +73,5 @@ export {
   buildAuthorizationServerMetadata,
   type AuthorizationServerMetadata,
   type AuthorizationServerMetadataInput,
+  type AuthorizationServerPaths,
 } from "./auth/authorization-server-metadata";
