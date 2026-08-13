@@ -119,8 +119,16 @@ const OIDC_OUTCOMES = [
 const BACKOFF_MS = [5_000, 15_000, 30_000];
 const ATTEMPTS = BACKOFF_MS.length + 1;
 
+// `maxBuffer` explicitly, because the default is 1 MB and exceeding it does not
+// merely truncate: spawnSync KILLS the child and returns `status: null`, so a
+// publish that actually reached the registry comes back looking like a failure
+// with a half-written explanation. A tarball notice is one line per file and
+// `--loglevel verbose` adds a few hundred more per package, which moves that
+// ceiling from theoretical to somewhere a big package could reach.
+const MAX_OUTPUT = 64 * 1024 * 1024;
+
 function npm(args, cwd = process.cwd()) {
-  const run = spawnSync("npm", args, { cwd, encoding: "utf8" });
+  const run = spawnSync("npm", args, { cwd, encoding: "utf8", maxBuffer: MAX_OUTPUT });
   return {
     ok: run.status === 0,
     output: `${run.stdout ?? ""}${run.stderr ?? ""}`,

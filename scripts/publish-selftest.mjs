@@ -4,6 +4,16 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  ALREADY_PUBLISHED,
+  BOTH_TOKENS,
+  ENEEDAUTH,
+  EXCHANGE_BROKE,
+  OK,
+  REFUSAL,
+  REFUSED,
+  TRANSIENT,
+} from "./publish-selftest-fixtures.mjs";
 
 /**
  * Proves scripts/publish.mjs CLASSIFIES what npm says (#166).
@@ -24,92 +34,21 @@ import { fileURLToPath } from "node:url";
  * things a log cannot show you: how many times a package was attempted, how npm
  * was asked to run, and what the script handed to the step after it.
  *
- * PROVENANCE of the npm outputs below, because it is the difference between
- * testing npm and testing this file's idea of npm: ENEEDAUTH and
- * ALREADY_PUBLISHED are contiguous verbatim excerpts from the Release job of run
- * 31682461784. TRANSIENT and the `npm verbose` blocks are CONSTRUCTED and say so
- * at the point of use — that run contains no 409 and ran at npm's default
- * loglevel, so there is nothing to copy for either.
+ * The npm outputs live in ./publish-selftest-fixtures.mjs, where each one states
+ * whether it was copied from run 31682461784 or constructed — the difference
+ * between testing npm and testing this repo's idea of npm.
  *
- * COST: three cases exercise a real retry, and the first backoff is a real 5s
- * wait, so this takes ~17s wall. The wait is the thing under test in one of them
- * and is left honest in all three rather than made configurable for the benefit
- * of the test.
+ * COST: three cases exercise a real retry at a real 5s first backoff, so this
+ * takes ~17s wall. The wait is left honest rather than made configurable for the
+ * test's convenience.
  *
- * Assertions on the diagnosis text deliberately match the FACTS a reader has to
- * come away with (the package is named, the remedy's coordinates are given, a
- * re-run is not the answer) rather than whole sentences. `release` needs this
- * job, so an assertion on exact prose would let a wording edit halt publishing.
+ * Assertions on the diagnosis match the FACTS a reader must come away with
+ * rather than whole sentences: `release` needs this job, so an assertion on
+ * exact prose would let a wording edit halt publishing.
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLISH = join(HERE, "publish.mjs");
-
-// Verbatim, run 31682461784, `npm publish` of @12-apps/audit@1.0.0.
-const ENEEDAUTH = [
-  "npm notice total files: 31",
-  "npm notice",
-  "npm notice npm tokens that bypass 2FA are being restricted for account changes and direct publishing. Learn how to prepare: https://gh.io/npm-gat-bypass2fa-deprecation",
-  "npm error code ENEEDAUTH",
-  "npm error need auth This command requires you to be logged in to https://registry.npmjs.org",
-  "npm error need auth You need to authorize this machine using `npm login`",
-  "npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-08-13T08_42_13_115Z-debug-0.log",
-].join("\n");
-
-// Verbatim, same run, `npm publish` of @12-apps/eslint-config@1.0.1 — hence the
-// 1.0.1 in npm's text where the fixture package is at 1.0.0. The version is
-// npm's to print; nothing here reads it.
-const ALREADY_PUBLISHED = [
-  "npm notice",
-  "npm notice npm tokens that bypass 2FA are being restricted for account changes and direct publishing. Learn how to prepare: https://gh.io/npm-gat-bypass2fa-deprecation",
-  "npm error You cannot publish over the previously published versions: 1.0.1.",
-  "npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-08-13T08_41_09_135Z-debug-0.log",
-].join("\n");
-
-// CONSTRUCTED: no 409 occurred in the cited run. Shaped after npm's registry
-// error line (`npm error <status> <text> - <METHOD> <url> - <message>`) and
-// carrying the two markers TRANSIENT matches.
-const TRANSIENT = [
-  "npm error code E409",
-  "npm error 409 Conflict - PUT https://registry.npmjs.org/@selftest%2fone - Failed to save packument",
-].join("\n");
-
-const OK = ["npm notice Publishing to https://registry.npmjs.org/", "+ @selftest/one@1.0.0"].join(
-  "\n",
-);
-
-/**
- * CONSTRUCTED: npm at `--loglevel verbose`, which is how publish.mjs now runs it.
- *
- * Two properties of the real thing are what this reproduces, and both are load
- * bearing. The `oidc` line — the only place npm ever says WHY it has no
- * credential — is printed long before the error block, so it falls outside any
- * tail of the output. And it arrives buried in machine chatter that must not
- * reach the job log, including one http line whose URL contains "oidc" and so
- * would survive a filter written against the word rather than the log prefix.
- */
-function verbose(oidcLine) {
-  return [
-    "npm verbose cli /opt/hostedtoolcache/node/24.0.0/x64/bin/node /usr/local/bin/npm",
-    "npm info using npm@11.5.1",
-    "npm info using node@v24.0.0",
-    `npm verbose oidc ${oidcLine}`,
-    "npm http fetch POST https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/@selftest%2frefused 401 214ms",
-    "npm verbose stack HttpErrorGeneral: 401 Unauthorized",
-    "npm verbose cwd /home/runner/work/shared-packages/shared-packages/packages/audit",
-    "npm verbose os Linux 6.11.0-1018-azure",
-    "npm verbose node v24.0.0",
-    "npm verbose npm  v11.5.1",
-    ENEEDAUTH,
-    "npm verbose exit 1",
-    "npm verbose code 1",
-  ].join("\n");
-}
-
-const REFUSAL = "package @selftest/refused does not have a trusted publisher configured";
-const REFUSED = verbose(`Failed token exchange request with body message: ${REFUSAL}`);
-const EXCHANGE_BROKE = verbose("Failed token exchange request with body message: Unknown error");
-const BOTH_TOKENS = `${TRANSIENT}\n${ENEEDAUTH}`;
 
 /**
  * The npm the script under test will find on PATH.
@@ -120,9 +59,15 @@ const BOTH_TOKENS = `${TRANSIENT}\n${ENEEDAUTH}`;
  * appends that name to a call log, and replays the plan entry for this attempt —
  * the LAST entry repeats, so a plan of one failing step keeps failing however
  * often it is retried. That is what makes "was it retried?" answerable.
+ *
+ * A step's optional `pad` prefixes that many lines of chatter, which is how a
+ * case can be about the SIZE of npm's output rather than its wording. It writes
+ * with `writeSync` rather than `process.stdout.write`, because writes to a pipe
+ * are async and `process.exit` does not flush them — at these sizes the shim
+ * would silently drop most of its own output and the case would prove nothing.
  */
 const FAKE_NPM = `#!/usr/bin/env node
-const { appendFileSync, readFileSync } = require("node:fs");
+const { appendFileSync, readFileSync, writeSync } = require("node:fs");
 const plan = JSON.parse(readFileSync(process.env.FAKE_NPM_PLAN, "utf8"));
 const log = process.env.FAKE_NPM_CALLS;
 const { name } = JSON.parse(readFileSync("package.json", "utf8"));
@@ -131,7 +76,8 @@ appendFileSync(log, name + "\\n");
 appendFileSync(process.env.FAKE_NPM_ARGV, process.argv.slice(2).join(" ") + "\\n");
 const steps = plan[name] || [];
 const step = steps[Math.min(before, steps.length - 1)];
-process.stdout.write(step.out + "\\n");
+if (step.pad) writeSync(1, "npm verbose padding for the buffer case\\n".repeat(step.pad));
+writeSync(1, step.out + "\\n");
 process.exit(step.status);
 `;
 
@@ -335,6 +281,20 @@ check(
   "a skip tells the tag check nothing — its version IS on the registry",
   !skip.handoff.includes(ONE),
   `an unremarkable skip must not suppress the tag check's remedy. GITHUB_ENV got:\n${skip.handoff}`,
+);
+
+// ── Output too big for spawnSync's 1 MB default ─────────────────────────────
+// Exceeding maxBuffer does not truncate, it KILLS npm and returns status null,
+// so a publish that reached the registry comes back looking like a failure.
+// `--loglevel verbose` is what makes that ceiling reachable for a big package.
+const BIG = "@selftest/big";
+const big = release([{ name: BIG }], {
+  [BIG]: [{ status: 1, out: ALREADY_PUBLISHED, pad: 40_000 }],
+});
+check(
+  "2 MB of npm output is still classified, not cut off mid-stream",
+  big.status === 0 && big.output.includes(`skipped ${BIG}`),
+  `exit ${big.status} — spawnSync needs an explicit maxBuffer or it kills npm here`,
 );
 
 const retried = release([{ name: ONE }], {
