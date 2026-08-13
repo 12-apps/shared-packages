@@ -6,6 +6,7 @@ import { Dialog, DialogActions, DialogContent } from '@12-apps/ui/feedback/Dialo
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
+import { stripTrailingSlashes } from '../../core/paths';
 import { messagesOf, type AppShellMessages } from '../messages';
 import { useTermsConsent } from './use-terms-consent';
 
@@ -71,9 +72,12 @@ const noSignal: ConsentSignalHook = () => ({ connected: false });
  */
 function isReadingTheDocuments(hrefs: readonly string[]): boolean {
   if (typeof window === 'undefined') return false;
-  const path = window.location.pathname.replace(/\/+$/, '');
+  // `stripTrailingSlashes`, not `replace(/\/+$/, '')`: the anchored form is quadratic
+  // on a slash run with a non-slash tail, and `location.pathname` is attacker-supplied
+  // — a link is enough to hand it one. See `../../core/paths.ts`.
+  const path = stripTrailingSlashes(window.location.pathname);
   return hrefs.some((href) => {
-    const target = href.split(/[?#]/)[0]?.replace(/\/+$/, '') ?? '';
+    const target = stripTrailingSlashes(href.split(/[?#]/)[0] ?? '');
     return target !== '' && path === target;
   });
 }

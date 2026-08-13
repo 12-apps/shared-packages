@@ -14,7 +14,7 @@ could install.
 
 | Surface | Export | What the host does |
 |---|---|---|
-| **Core** | `@12-apps/app-shell` | Nothing to wire — framework-free: `apiFetch` + `ApiError`, the WCAG brand-palette correction, the pt-BR formatters, the stale-chunk recovery and the consent wire. Importable from a worker, a build script or the backend half. |
+| **Core** | `@12-apps/app-shell` | Nothing to wire — framework-free: `apiFetch` + `ApiError`, `joinApiPath` / `stripTrailingSlashes`, the WCAG brand-palette correction, the pt-BR formatters, the stale-chunk recovery and the consent wire. Importable from a worker, a build script or the backend half. |
 | **React** | `@12-apps/app-shell/react` | Call `createWebAppShell(config)` **once, at module scope**, and render `shell.Provider` around your routes. |
 | **Server** | `@12-apps/app-shell/server` | Call `createApiAppShell(config)` and mount the `routes` it returns. |
 | **Hono** | `@12-apps/app-shell/hono` | `app.route('/api', appShellRouter(config).router)`. A one-call mount; `hono` is an OPTIONAL peer, so importing the root, `/react` or `/server` never resolves it. |
@@ -218,3 +218,12 @@ sync, no migration to replay, and no `prisma:sync-*:check` for this package.
   normal case; a getter works too, so a host can move the version without rebuilding
   its router. That is what `harness/backend/src/app-shell-host.ts` does to reproduce a
   deploy's bump.
+- **Normalise paths with `stripTrailingSlashes`, never `replace(/\/+$/, '')`.** The
+  anchored regex is polynomial ReDoS: on a slash run followed by anything else the
+  engine backtracks through every length from every position — 647 ms at 20 000
+  characters, 37 s at 160 000, against 0.01 ms for the walk. It reached this package's
+  first push as two HIGH CodeQL alerts, and `location.pathname` is enough of an input
+  path that a link can supply one. `src/core/paths.ts` has the measurements and
+  `__tests__/paths.test.ts` pins the two implementations against each other, so the
+  replacement is byte-identical — slash look-alikes (`／` U+FF0F, `∕` U+2215) and
+  trailing newlines included.

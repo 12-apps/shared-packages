@@ -20,12 +20,9 @@
  *  - The Web Push subscribe flow belongs to `@12-apps/notifications` (12-15),
  *    which ships it beside the preferences screen that needs it.
  */
-export {
-  ApiError,
-  apiFetch,
-  joinApiPath,
-  type ApiFetchOptions,
-} from './core/api';
+export { ApiError, apiFetch, type ApiFetchOptions } from './core/api';
+
+export { joinApiPath, stripTrailingSlashes } from './core/paths';
 
 export { formatBRL, formatMinutesLabel, formatMoney, type MoneyFormat } from './core/format';
 

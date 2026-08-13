@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { CONSENT_ACCEPT_PATH, CONSENT_STATUS_PATH } from '../../core/consent-wire';
 import type { ConsentStatus } from '../../core/consent-wire';
-import { joinApiPath } from '../../core/api';
+import { joinApiPath } from '../../core/paths';
 
 /**
  * Is this user overdue to accept the terms, and can they do it here?

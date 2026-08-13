@@ -14,7 +14,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, apiFetch, joinApiPath } from '../api';
+import { ApiError, apiFetch } from '../api';
 
 /** A `fetch` that answers exactly once, recording what it was called with. */
 function stubFetch(response: Partial<Response> & { json?: () => Promise<unknown> }): {
@@ -113,13 +113,7 @@ describe('apiFetch', () => {
   });
 });
 
-describe('joinApiPath', () => {
-  it.each([
-    ['/api', '/consent/status', '/api/consent/status'],
-    ['/api/', '/consent/status', '/api/consent/status'],
-    ['/api', 'consent/status', '/api/consent/status'],
-    ['', '/consent/status', '/consent/status'],
-  ])('joins %s + %s', (base, path, expected) => {
-    expect(joinApiPath(base, path)).toBe(expected);
-  });
-});
+/*
+ * `joinApiPath` moved to `./paths.test.ts` with the trailing-slash strip it is built
+ * on — the differential table there covers this surface and a great deal more.
+ */

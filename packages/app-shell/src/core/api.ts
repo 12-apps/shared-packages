@@ -90,14 +90,9 @@ export async function apiFetch<T = unknown>(
 }
 
 /**
- * Join a mount base with a surface-relative path, without doubling the slash.
- *
- * Small, and shared on purpose: the browser half and the wire module both build
- * URLs off the host's `apiBase`, and two spellings of "does the base end in a
- * slash" is how a surface starts answering 404 for one of them.
+ * URL building lives in `./paths` — `joinApiPath` and `stripTrailingSlashes`. It moved
+ * there rather than being re-exported from here, because a re-export is a second name
+ * for the same thing and the point of that module is that there is exactly ONE
+ * implementation of "strip the trailing slashes": the anchored regex it replaces is
+ * polynomial ReDoS, and a second copy is how one of them stays that way.
  */
-export function joinApiPath(base: string, path: string): string {
-  const trimmedBase = base.replace(/\/+$/, '');
-  const trimmedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${trimmedBase}${trimmedPath}`;
-}
