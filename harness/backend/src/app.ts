@@ -6,7 +6,7 @@
  * test of a hand-rolled second app would prove nothing about the one that
  * serves the SPA.
  *
- * Eight surfaces, and the split between them is the point:
+ * Nine surfaces, and the split between them is the point:
  *
  *  - `/api/admin/:tenantSlug/reports/**` is @12-apps/report-builder's, mounted
  *    whole;
@@ -29,6 +29,10 @@
  *  - `/manifest.webmanifest` and `/sw.js` are @12-apps/pwa's (12-23), also at
  *    the root — a worker's directory bounds its scope and the manifest is
  *    linked from a static `index.html` that cannot know a prefix;
+ *  - `/api/admin/:tenantSlug/audit-logs/**` is @12-apps/audit's (12-14),
+ *    mounted whole, with its actor-context middleware wrapped around EVERY
+ *    route below — which is where a host puts it, because the stamp is what
+ *    attributes the writes of every other surface too;
  *  - `/__harness/**` is the SUITE'S, and belongs to none of them.
  *
  * MOUNT ORDER is load-bearing for the lifecycle surface (ADOPTING rule 7).
@@ -49,6 +53,8 @@ import type { PGlite } from '@electric-sql/pglite';
 
 import { entitlementDenialResponse, isEntitlementDenial } from '@12-apps/entitlements/server';
 
+import { applyAuditMigrations } from './audit-db';
+import { auditHost, reseedAudit } from './audit-host';
 import { createEntitlementsHost, TENANT } from './entitlements-host';
 import { mcpProbeRouter } from './harness-mcp-probe';
 import { applyLifecycleMigrations } from './lifecycle-db';
@@ -85,6 +91,12 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
   await applyRbacMigrations(pg);
   const rbac = rbacHost(pg);
   await reseedRbac(pg, rbac);
+  // 12-14: the audit table arrives the same way. Its migration is REPLAY-SAFE, so
+  // applying it over a database that already has an `audit_logs` table is a no-op
+  // rather than a failure — `tests/audit-migrations.test.ts` is what pins that.
+  await applyAuditMigrations(pg);
+  const audit = auditHost(pg);
+  await reseedAudit(pg, audit);
   // 12-23: onboarding, the OAuth 2.1 authorization server, and the PWA endpoints.
   await applyOnboardingMigrations(pg);
   await applyMcpMigrations(pg);
@@ -96,6 +108,7 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
   await reseedLifecycle(pg);
   return {
     rbac,
+    audit,
     lifecycle,
     onboarding: onboardingHost(pg),
     mcpOauth: mcpOauthHost(pg),
@@ -107,6 +120,7 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
 /** The mounted hosts one harness server is assembled from. */
 interface Hosts {
   rbac: ReturnType<typeof rbacHost>;
+  audit: ReturnType<typeof auditHost>;
   lifecycle: ReturnType<typeof lifecycleHost>;
   onboarding: ReturnType<typeof onboardingHost>;
   mcpOauth: ReturnType<typeof mcpOauthHost>;
@@ -128,6 +142,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
   app.post('/__harness/reset', async (c) => {
     await reseed(pg);
     await reseedRbac(pg, hosts.rbac);
+    await reseedAudit(pg, hosts.audit);
     await reseedOnboarding(pg);
     await reseedMcpOauth(pg);
     await reseedLifecycle(pg);
@@ -160,6 +175,12 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   const hosts = await provisionHosts(pg);
   const app = new Hono();
 
+  // The actor-context middleware (12-14), around EVERYTHING and before every
+  // mount below. A host puts it here rather than in front of the audit routes
+  // alone: the stamp is what the writer and the created_by/updated_by extension
+  // read, so every surface's writes need it in scope.
+  app.use('*', hosts.audit.actorContext);
+
   // Liveness, and what Playwright's `webServer` waits on before starting the
   // SPA: the database is migrated and seeded by the time this answers, so the
   // first spec never races the first migration.
@@ -187,6 +208,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.route('/api/admin/:tenantSlug', hosts.entitlements.router);
   app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
   app.route('/api/admin/:tenantSlug', hosts.rbac.router);
+  app.route('/api/admin/:tenantSlug', hosts.audit.router);
   app.route('/api/admin/:tenantSlug', hosts.onboarding.router);
   // The last two mount at the ROOT, and have to: `.well-known` documents and a
   // service worker are read from the origin, never from under a prefix.
