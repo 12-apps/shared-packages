@@ -213,7 +213,10 @@ const eneedauth = release([{ name: WEDGED }], { [WEDGED]: [{ status: 1, out: ENE
 check("ENEEDAUTH fails the run", eneedauth.status === 1, `expected exit 1, got ${eneedauth.status}`);
 check(
   "npm is asked for the oidc lines in the first place",
-  eneedauth.argv.every((call) => /(^|\s)--loglevel[=\s]verbose(\s|$)/.test(call)),
+  // `.length > 0` because `.every` on no invocations at all is vacuously true,
+  // and "npm was never run" must not read as "npm was run correctly".
+  eneedauth.argv.length > 0 &&
+    eneedauth.argv.every((call) => /(^|\s)--loglevel[=\s]verbose(\s|$)/.test(call)),
   `npm logs every OIDC outcome at verbose or silly and NOTHING at the default\n    loglevel, so a publish run at the default level throws away the only evidence\n    of why it had no credential. npm was invoked as:\n    ${eneedauth.argv.join("\n    ")}`,
 );
 check(
