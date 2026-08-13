@@ -17,6 +17,7 @@ import {
   noContent,
   ok,
   parseRejectBody,
+  requireAuthorized,
   resolveActorNames,
   writeOutcome,
   LifecycleApiError,
@@ -67,12 +68,23 @@ function entityOf(deps: SharedRouteDeps, entityType: string): RegisteredEntity {
   return entry;
 }
 
-const dispatchContext = (
+/**
+ * Resolve the entry/request's own collection and build its context — AWAITING
+ * that collection's `authorize` gate first. These paths carry no collection
+ * prefix (the collection is known only after reading the row), so this is the
+ * only place its plan gate can run: without it, a tenant whose `suppliers`
+ * plan is off could still purge a binned supplier or decide its requests.
+ * `routePermission` deliberately does NOT apply here — parity with
+ * future-pay, where the bin and the inbox require the admin tier, never the
+ * collection's route permission.
+ */
+const dispatchContext = async (
   deps: SharedRouteDeps,
   entityType: string,
   actor: LifecycleActor,
-): { entity: RegisteredEntity; ctx: ReturnType<typeof contextOf> } => {
+): Promise<{ entity: RegisteredEntity; ctx: ReturnType<typeof contextOf> }> => {
   const entity = entityOf(deps, entityType);
+  await requireAuthorized(actor, entity.registration.authorize, deps.messages);
   return { entity, ctx: contextOf(actor, entity.registration.approvePermission) };
 };
 
@@ -82,15 +94,23 @@ const dispatchContext = (
  * root with its registered dependent tree so the page can show what a restore
  * brings back. Only DELETED entries are listed — restored/purged rows stay in
  * the table as an audit trail but leave the bin.
+ *
+ * The list is deliberately NOT run through a collection's `authorize` gate: it
+ * spans every registered collection at once, and future-pay's twin gates it
+ * the same way (the admin tier for the page, nothing per collection). The
+ * per-collection gate lands on the item routes below, where the row names the
+ * collection.
  */
 function binListRoute(deps: SharedRouteDeps): LifecycleRoute {
   return route('GET', '/recycle-bin', async ({ actor, query }) => {
+    // An EMPTY `?entityType=` is a malformed filter, not an absent one —
+    // future-pay's `z.string().min(1).optional()` answers 400 rather than
+    // silently listing every collection.
+    if (query.entityType === '') throw new LifecycleApiError(400, deps.messages.invalidBody);
     const roots = await deps.recycleBin.list(actor.tenantId, {
       status: 'DELETED',
       rootsOnly: true,
-      ...(query.entityType !== undefined && query.entityType !== ''
-        ? { entityType: query.entityType }
-        : {}),
+      ...(query.entityType !== undefined ? { entityType: query.entityType } : {}),
     });
     const names = await resolveActorNames(deps.directory, roots.map((entry) => entry.deletedBy));
     const entries = await Promise.all(
@@ -136,13 +156,13 @@ function binItemRoutes(deps: SharedRouteDeps): LifecycleRoute[] {
   return [
     route('POST', '/recycle-bin/:entryId/restore', async ({ actor, params }) => {
       const root = await rootOf(actor.tenantId, params.entryId);
-      const { entity, ctx } = dispatchContext(deps, root.entityType, actor);
+      const { entity, ctx } = await dispatchContext(deps, root.entityType, actor);
       await foldLifecycle(messages, () => entity.lifecycle.restoreDeleted(ctx, root.id));
       return noContent();
     }),
     route('DELETE', '/recycle-bin/:entryId', async ({ actor, params }) => {
       const root = await rootOf(actor.tenantId, params.entryId);
-      const { entity, ctx } = dispatchContext(deps, root.entityType, actor);
+      const { entity, ctx } = await dispatchContext(deps, root.entityType, actor);
       await foldLifecycle(messages, () => entity.lifecycle.purgeDeleted(ctx, root.id));
       return noContent();
     }),
@@ -214,7 +234,7 @@ function approvalItemRoutes(deps: SharedRouteDeps): LifecycleRoute[] {
   return [
     route('POST', '/approvals/:requestId/approve', async ({ actor, params }) => {
       const request = await requestOf(actor.tenantId, params.requestId);
-      const { entity, ctx } = dispatchContext(deps, request.entityType, actor);
+      const { entity, ctx } = await dispatchContext(deps, request.entityType, actor);
       const result = await foldLifecycle(messages, () =>
         entity.lifecycle.approveChange(ctx, request.id),
       );
@@ -223,7 +243,7 @@ function approvalItemRoutes(deps: SharedRouteDeps): LifecycleRoute[] {
     route('POST', '/approvals/:requestId/reject', async ({ actor, params, body }) => {
       const note = parseRejectBody(body, messages);
       const request = await requestOf(actor.tenantId, params.requestId);
-      const { entity, ctx } = dispatchContext(deps, request.entityType, actor);
+      const { entity, ctx } = await dispatchContext(deps, request.entityType, actor);
       await foldLifecycle(messages, () => entity.lifecycle.rejectChange(ctx, request.id, note));
       return noContent();
     }),

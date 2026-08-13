@@ -20,6 +20,8 @@ export {
   messagesOf,
   writeOutcome,
   type LifecycleActor,
+  type LifecycleAuthorization,
+  type LifecycleAuthorizeGate,
   type LifecycleMessages,
   type LifecycleRequest,
   type LifecycleResponse,

@@ -18,9 +18,23 @@
  *    a host stub answering an empty page and is now the real seeded catalog;
  *  - `/api/admin/:tenantSlug/{catalog-items,demo-suppliers}/{drafts,:id/…}`
  *    plus `{recycle-bin,approvals}/**` is @12-apps/entity-lifecycle's (12-17),
- *    GENERATED from two registrations; the host keeps only the demo-entity
- *    CRUD (lifecycle-host.ts), which is the glue a real adopter already has;
+ *    GENERATED from two registrations; the host keeps only its seams
+ *    (lifecycle-host.ts) and the demo-entity CRUD (lifecycle-demo-crud.ts),
+ *    which is the glue a real adopter already has;
  *  - `/__harness/**` is the SUITE'S, and belongs to neither.
+ *
+ * MOUNT ORDER is load-bearing for the lifecycle surface (ADOPTING rule 7).
+ * Hono resolves by REGISTRATION order, mounted sub-routers included, and a
+ * host route shaped `/:slug/:id` is two segments — exactly like the package's
+ * literal `GET /:slug/drafts`. Registered first, the host's route captures it
+ * and the drafts endpoint starts answering the host's "not found" while every
+ * other lifecycle endpoint keeps working, which is what makes it a silent
+ * breakage. So `lifecycle.router` goes on BEFORE the demo CRUD below. It is
+ * safe in that direction: the package emits no 2-segment `:id` GET under a
+ * collection slug, so a real id still falls through to the host. The demo host
+ * carries a `GET /catalog-items/:id` for the sole purpose of making a
+ * violation red rather than silent (`tests/lifecycle-endpoints.test.ts`,
+ * "mount order").
  */
 import { Hono } from 'hono';
 import type { PGlite } from '@electric-sql/pglite';
@@ -29,12 +43,8 @@ import { entitlementDenialResponse, isEntitlementDenial } from '@12-apps/entitle
 
 import { createEntitlementsHost, TENANT } from './entitlements-host';
 import { applyLifecycleMigrations } from './lifecycle-db';
-import {
-  createLifecycleDemoTables,
-  demoEntityRoutes,
-  lifecycleHost,
-  reseedLifecycle,
-} from './lifecycle-host';
+import { demoEntityRoutes } from './lifecycle-demo-crud';
+import { createLifecycleDemoTables, lifecycleHost, reseedLifecycle } from './lifecycle-host';
 import { applyRbacMigrations } from './rbac-db';
 import { rbacHost, reseedRbac } from './rbac-host';
 import { reportsRouter } from './reports-host';
@@ -107,12 +117,15 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     }
   });
 
-  // The host's OWN demo-entity CRUD (12-17) — the glue a real adopter already
-  // has — registered BEFORE the packaged router so its literal paths cannot
-  // be captured by a packaged `:slug` route.
+  // FIRST — before the host's `/catalog-items/:id` CRUD below. See the header:
+  // reversing these two blocks is a red test, not a silent 404.
+  app.route('/api/admin/:tenantSlug', lifecycle.router);
+
+  // The host's OWN demo-entity CRUD (12-17) — the glue a real adopter has.
   const demo = demoEntityRoutes(lifecycle, pg);
   app.get('/api/admin/:tenantSlug/catalog-items', demo.list);
   app.post('/api/admin/:tenantSlug/catalog-items', demo.save);
+  app.get('/api/admin/:tenantSlug/catalog-items/:id', demo.getOne);
   app.put('/api/admin/:tenantSlug/catalog-items/:id', demo.save);
   app.delete('/api/admin/:tenantSlug/catalog-items/:id', demo.remove);
   app.delete('/api/admin/:tenantSlug/demo-suppliers/:id', demo.removeSupplier);
@@ -120,7 +133,6 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.route('/api/admin/:tenantSlug', entitlements.router);
   app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
   app.route('/api/admin/:tenantSlug', rbac.router);
-  app.route('/api/admin/:tenantSlug', lifecycle.router);
 
   return { app, close: () => pg.close() };
 }

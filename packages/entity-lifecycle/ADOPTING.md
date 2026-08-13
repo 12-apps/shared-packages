@@ -32,11 +32,13 @@ declaration per collection rather than hand-written per entity.
    state the host owns (future-pay keeps them as two JSON columns on its
    tenant row); the package never reads a tenant table it cannot know the
    shape of. `null` → 401 before any handler runs.
-2. **A registration is a DECLARATION.** future-pay wrote ~7 route files and a
-   registration module per collection (eleven collections, 2.8k LOC); here a
-   collection is one `LifecycleEntityRegistration` object and the endpoints
-   are generated. A second collection is a second entry in `entities` and
-   **zero** new host routes.
+2. **A registration is a DECLARATION.** future-pay wrote six route files and a
+   registration module per collection (ten collections in its dispatch
+   registry, eight of them with per-entity routes: 54 route files including the
+   six shared, ~1.8k LOC of registrations beside them); here a collection is one
+   `LifecycleEntityRegistration` object and the endpoints are generated. A
+   second collection is a second entry in `entities` and **zero** new host
+   routes.
 3. **Entity writes stay the host's, through `EntityOps`.** The package owns
    everything recorded ABOUT an entity (versions, bin entries, drafts,
    requests); the host owns the entity tables themselves. `readSnapshot` /
@@ -55,21 +57,68 @@ declaration per collection rather than hand-written per entity.
    Reads on the owned tables are deliberate about visibility: the bin list
    filters `status = 'DELETED'` explicitly, drafts filter `status = 'OPEN'`
    explicitly — nothing relies on a host client's default filters.
-5. **Billing stays outside.** future-pay's per-collection plan gate
-   (`requireEntitlement(tenant, 'suppliers')`) is answered in the host BEFORE
-   a request reaches a descriptor — wrap the mount per path prefix, exactly
-   like the rbac adoption does. The feature layers on the actor are the
-   *lifecycle-feature* gate (versioning/drafts/approvals per tenant), not the
+5. **Billing stays outside, but its GATE is declared per collection.** The
+   money logic is the host's — this package never learns what a plan is. What
+   it does own is *where the answer is asked for*: `registration.authorize`,
+   an async `(actor) => { ok: true } | { ok: false; status?, error? }` that
+   future-pay fills with `requireEntitlement(tenant, 'suppliers')`. It is
+   awaited before every collection-scoped route AND inside the shared
+   recycle-bin / approvals dispatch, after the row has named its collection. A
+   denial crosses the wire unmodified (the host's `status` and `error`; default
+   403 + the feature-off copy).
+
+   **Wrapping the mount per path prefix is NOT sufficient, and this is the one
+   rule worth reading twice.** It works for `/:slug/**` — but
+   `POST /recycle-bin/:entryId/restore`, `DELETE /recycle-bin/:entryId`,
+   `POST /approvals/:requestId/approve` and `.../reject` carry **no collection
+   prefix at all**. Which collection is being restored, permanently purged or
+   decided is known only after reading the row (`entry.entityType` /
+   `request.entityType`), so no prefix-based wrapper can gate them. Skip
+   `authorize` and a tenant whose `suppliers` feature is off can still purge a
+   binned supplier for good and decide its parked writes — which is exactly the
+   hole future-pay closes by putting the gate in its context builder rather
+   than in its routes.
+
+   Distinct from it: the feature layers on the actor are the
+   *lifecycle-feature* gate (versioning/drafts/approvals per tenant), never the
    collection's billing gate.
 6. **Approvals authorize against the actor's permission ids.** Each
    registration names its `approvePermission` ("products:approve"); the
    package narrows against `actor.permissions` and `isSuper` bypasses. Omit
    it and only `isSuper` can decide. The package never computes permissions —
    that is `@12-apps/rbac`'s job (or the host's).
-7. **Route order is part of the surface.** The literal `/drafts` routes are
-   emitted BEFORE the `/:id` ones so an adapter that mounts in array order can
-   never capture "drafts" as an entity id. The Hono adapter preserves
-   descriptor order; another framework's adapter must too.
+
+   A collection whose whole surface needs a permission — future-pay's `roles`,
+   gated on `roles:manage` where its nine siblings need only the mount's admin
+   tier — declares `routePermission`, checked on every collection-scoped route
+   (`isSuper` bypasses). It deliberately does NOT gate the shared bin and
+   inbox: those require the mount's own tier plus the collection's `authorize`,
+   which is the split future-pay ships.
+7. **Mount the packaged router BEFORE any host route shaped `/:slug/:id`.**
+   Hono resolves by REGISTRATION order, mounted sub-routers included, so this
+   is the host's call and nothing in the package can make it for you:
+
+   ```ts
+   app.route('/api/admin/:tenantSlug', lifecycle.router);   // ← first
+   app.get('/api/admin/:tenantSlug/products/:id', readOne); // ← then the host's CRUD
+   ```
+
+   Reversed, `GET /products/:id` captures the package's literal
+   `GET /products/drafts` — two segments each — and the drafts endpoint starts
+   answering the host's "not found" while every other lifecycle endpoint keeps
+   working, which is what makes it a silent breakage. Putting the package first
+   is safe in both directions: it emits no 2-segment `:id` GET under a
+   collection slug, so a real id still falls through to the host. The harness
+   host carries a `GET /catalog-items/:id` for the sole purpose of failing if
+   this order is reversed (`harness/backend/tests/lifecycle-endpoints.test.ts`,
+   "mount order").
+
+   Inside the package the literal `/drafts` routes are still emitted before the
+   `/:id` ones and the Hono adapter preserves that order — but treat it as a
+   stability guarantee of the descriptor array, not a collision guard: no two
+   emitted paths can shadow each other (`/x/drafts` is two segments,
+   `/x/:id/draft` is three). Another framework's adapter should preserve the
+   order anyway; the order that decides a winner in practice is the host's.
 8. **Identity crosses a directory port.** History, bin and approvals lists
    show "who", not a UUID: `directory.getUsers(ids)` hands names over by
    value. Optional — without it every actor renders as the system fallback.
@@ -102,8 +151,10 @@ declaration per collection rather than hand-written per entity.
 | `diff` | no | ignored fields etc. (`DiffOptions`) |
 | `retention` | no | version auto-clean (`{ maxVersions, maxAgeDays }`) with safe compaction |
 | `approvePermission` | no | the permission id that may DECIDE this collection's approvals; omitted = only `isSuper` |
+| `authorize` | no | the collection's own gate — `(actor) => { ok }`, async, the host's plan/billing answer (rule 5). Awaited before every collection-scoped route AND inside the shared bin/approvals dispatch; a denial's `status`/`error` pass through unmodified (default 403 + `featureDisabled`). Omitted = always authorized |
+| `routePermission` | no | a permission id required for every collection-scoped route (future-pay's `roles:manage`); `isSuper` bypasses; denial is 403 `routeNotAllowed`. Does not gate the shared bin/inbox (rule 6) |
 | `ops` | yes | the host's `EntityOps` (rule 3) |
-| `publishedVersion` | no | read back a mirrored version column for the history dialog's "Versão atual"; defaults to the highest recorded version |
+| `publishedVersion` | no | read back a mirrored version column for the history dialog's "Versão atual". The host is then the authority on it, `null` included → **0** (an archived entity, whose read filters `archived_at IS NULL`, so every row keeps its Restaurar button). Omit the callback entirely and the highest recorded version is used |
 
 ### `createWebEntityLifecycle` config
 
@@ -139,7 +190,7 @@ Shared, dispatched across every registered collection by the record's own
 
 | Method | Path | Answers |
 |---|---|---|
-| GET | `/recycle-bin` | `{ data: { entries } }` — DELETED roots, newest first, each with its dependent tree; `?entityType=` narrows |
+| GET | `/recycle-bin` | `{ data: { entries } }` — DELETED roots, newest first, each with its dependent tree; `?entityType=` narrows (an EMPTY value is a malformed filter → 400, not "unfiltered") |
 | POST | `/recycle-bin/:entryId/restore` | bodyless 204 — un-archives the record, flips the tree to RESTORED |
 | DELETE | `/recycle-bin/:entryId` | bodyless 204 — hard delete; the row is kept, flipped to PURGED (audit trail) |
 | GET | `/approvals` | `{ data: { requests } }` — default PENDING; `?status=` for the decided lists |
@@ -147,8 +198,12 @@ Shared, dispatched across every registered collection by the record's own
 | POST | `/approvals/:requestId/reject` | bodyless 204 — body `{ note? }` (≤500 chars); record untouched, kept as REJECTED |
 
 Errors are the pt-BR product copy over `{ error }` — 404s per resource, 403
-for a feature that is off for the tenant or a denied approval, 422 for an
-entry/request whose collection is not registered, 400 for a malformed body.
+for a feature that is off for the tenant, a denied approval or a missing
+`routePermission`, 422 for an entry/request whose collection is not registered,
+400 for a malformed body, a `:version` that is not a positive integer (`1.5`,
+`1abc` and `0` are rejected, never truncated) or an empty `?entityType=`. A
+collection's `authorize` denial answers whatever the host returned (403 by
+default).
 
 ## Minimal host (Hono)
 
@@ -167,8 +222,22 @@ const lifecycle = entityLifecycleRouter({
       approvePermission: 'products:approve',
       ops: productOps,                    // the host's tables, its rules
       publishedVersion: (tenantId, id) => readPublishedVersion(tenantId, id),
+      // The plan gate, per collection (rule 5) — the only place that can also
+      // guard the shared bin/approvals routes, which learn their collection
+      // from the row. Money logic stays in the host; this returns a verdict.
+      authorize: async (actor) => {
+        try {
+          await requireEntitlement(actor.tenantId, 'products');
+          return { ok: true };
+        } catch (error) {
+          if (!isEntitlementDenial(error)) throw error;
+          const denial = entitlementDenialResponse(error);   // 402 + upsell copy
+          return { ok: false, status: denial.status, error: denial.body.error };
+        }
+      },
     },
-    // a second collection = a second entry; zero new host routes
+    // a second collection = a second entry; zero new host routes. One whose
+    // whole surface needs a permission adds `routePermission: 'roles:manage'`.
   ],
   directory: { getUsers: (ids) => users.byIds(ids) },
   resolveActor: async (c) => {
@@ -186,7 +255,9 @@ const lifecycle = entityLifecycleRouter({
   },
 });
 
+// FIRST — before any host route shaped `/:slug/:id` (rule 7).
 app.route('/api/admin/:tenantSlug', lifecycle.router);
+app.get('/api/admin/:tenantSlug/products/:id', readOne);
 
 // The host's own entity routes funnel through the same machinery:
 const products = lifecycle.entity('product');
@@ -226,12 +297,25 @@ before the next `migrate deploy`. Then reconcile the deliberate deltas:
   `products.published_version` mirror column in future-pay's original
   migration are host vocabulary too — the mirror is fed through
   `ops.onVersionRecorded` and read back through `publishedVersion`.
-- **The eleven registration modules collapse into declarations.** Each
+- **The registration modules collapse into declarations.** Each
   `apps/web/lib/lifecycle/<collection>.ts` becomes one `entities` entry; the
   per-collection route files under `app/api/admin/[tenantSlug]/**` are
   deleted or, where a coverage gate forces them to exist (the MCP tool → route
   map), kept as pure declarations that re-export from the mounted router —
   with a comment naming the gate.
+- **`entitledLifecycleContext` becomes an `authorize` per collection.** The
+  seven collections that route through it (`ingredients`, `kitchen-stations`,
+  `loss-reasons`, `roles`, `sectors`, `suppliers`, `tables`) each declare
+  `authorize: (actor) => requireEntitlement(actor.tenantId, '<feature>')`
+  folded into a verdict. Keeping it in a mount wrapper instead would drop the
+  gate on the recycle-bin and approvals item routes, which future-pay gates
+  today *because* its context builder is where the gate lives (rule 5).
+- **`roles` keeps its route permission** — `requireTenantPermissionBySlug(slug,
+  'roles:manage')`, which its four route files carry and its nine siblings do
+  not, becomes `routePermission: 'roles:manage'` on that one registration
+  (rule 6). Without it the generated endpoints would be strictly more
+  permissive than the files they replace: a tenant admin lacking it could read
+  every role's permission history and publish a staged privilege change.
 - **Snapshot shape is unchanged** — the version/draft/request payloads the
   package reads and writes are the same loose JSON future-pay recorded, so
   existing history replays without conversion.
@@ -247,7 +331,10 @@ before the next `migrate deploy`. Then reconcile the deliberate deltas:
 
 ## What deliberately did NOT move into the package
 
-- **Per-collection entitlement/billing gates** — host (rule 5).
+- **Per-collection entitlement/billing LOGIC** — the host's, and the package
+  stays money-free: it knows nothing of plans, features or upsells. What did
+  move is the *seam* where the verdict is asked for (`authorize`, rule 5),
+  because the shared bin/approvals routes have no other place to ask.
 - **Snapshotting host entities** (future-pay's `product-snapshot.ts` etc.) —
   that is `EntityOps.readSnapshot` / `applySnapshot`: the host's schema, the
   host's write model, including reference re-validation on restore (the

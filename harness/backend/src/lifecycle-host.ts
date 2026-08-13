@@ -15,12 +15,15 @@
  * Two collections are registered on purpose: the recycle bin and the
  * approvals inbox are CROSS-collection surfaces, and a harness with one
  * entity type could never exercise their dispatch.
+ *
+ * The demo host's own products/suppliers ROUTES are not seams and live next
+ * door, in `lifecycle-demo-crud.ts`.
  */
 import { randomUUID } from 'node:crypto';
 
 import type { PGlite } from '@electric-sql/pglite';
 import type { Context } from 'hono';
-import type { EntityOps, FeatureFlagMap, Snapshot, WriteResult } from '@12-apps/entity-lifecycle';
+import type { EntityOps, FeatureFlagMap, Snapshot } from '@12-apps/entity-lifecycle';
 import type { LifecycleActor } from '@12-apps/entity-lifecycle/server';
 import { entityLifecycleRouter } from '@12-apps/entity-lifecycle/hono';
 
@@ -109,7 +112,8 @@ export async function reseedLifecycle(pg: PGlite): Promise<void> {
   );
 }
 
-interface ProductSqlRow {
+/** The products table's raw row — shared with the host's own CRUD module. */
+export interface ProductSqlRow {
   id: string;
   name: string;
   price_cents: number;
@@ -266,9 +270,15 @@ export function lifecycleHost(pg: PGlite) {
         retention: { maxVersions: 50, maxAgeDays: 365 },
         approvePermission: 'products:approve',
         ops: productOps(pg),
+        // Soft-delete visibility is the HOST's job on every read it owns
+        // (ADOPTING rule 3), this one included: future-pay's twin reads the
+        // mirror column through its soft-delete-filtered client, so an
+        // ARCHIVED entity answers nothing and the dialog offers Restaurar on
+        // every row. `null` is that answer, and the package renders it as 0.
         publishedVersion: async (tenantId, entityId) => {
           const { rows } = await pg.query<{ published_version: number }>(
-            `SELECT published_version FROM demo_products WHERE id = $1 AND client_id = $2`,
+            `SELECT published_version FROM demo_products
+             WHERE id = $1 AND client_id = $2 AND archived_at IS NULL`,
             [entityId, tenantId],
           );
           return rows[0]?.published_version ?? null;
@@ -295,86 +305,4 @@ export function lifecycleHost(pg: PGlite) {
     },
     resolveActor: resolveLifecycleActor,
   });
-}
-
-interface ListedProduct {
-  id: string;
-  name: string;
-  priceCents: number;
-  publishedVersion: number;
-}
-
-/**
- * The host's OWN demo-entity routes — the glue a real adopter already has
- * (its products CRUD), funnelled through the packaged lifecycle handle so a
- * delete lands in the bin and an update records a version / parks for
- * approval. Everything below `entity('product')` is host vocabulary.
- */
-export function demoEntityRoutes(lifecycle: HarnessLifecycle, pg: PGlite) {
-  const products = lifecycle.entity('product');
-  const suppliers = lifecycle.entity('supplier');
-
-  const outcome = (result: WriteResult) =>
-    result.status === 'applied'
-      ? { applied: true, entityId: result.entityId, requestId: null }
-      : { applied: false, entityId: null, requestId: result.requestId };
-
-  return {
-    async list(c: Context) {
-      const actor = resolveLifecycleActor(c);
-      if (!actor) return c.json({ error: 'Não autenticado.' }, 401);
-      const { rows } = await pg.query<{
-        id: string;
-        name: string;
-        price_cents: number;
-        published_version: number;
-      }>(
-        `SELECT id, name, price_cents, published_version FROM demo_products
-         WHERE client_id = $1 AND archived_at IS NULL ORDER BY name`,
-        [actor.tenantId],
-      );
-      const items: ListedProduct[] = rows.map((row) => ({
-        id: row.id,
-        name: row.name,
-        priceCents: row.price_cents,
-        publishedVersion: row.published_version,
-      }));
-      return c.json({ data: { items } });
-    },
-    async save(c: Context) {
-      const actor = resolveLifecycleActor(c);
-      if (!actor) return c.json({ error: 'Não autenticado.' }, 401);
-      const body = (await c.req.json().catch(() => null)) as {
-        name?: unknown;
-        priceCents?: unknown;
-      } | null;
-      if (!body || typeof body.name !== 'string' || body.name.length === 0) {
-        return c.json({ error: 'Dados inválidos.' }, 400);
-      }
-      const snapshot: Snapshot = {
-        name: body.name,
-        priceCents: typeof body.priceCents === 'number' ? body.priceCents : 0,
-      };
-      const id = c.req.param('id') ?? null;
-      const ctx = products.context(actor);
-      const result = id
-        ? await products.lifecycle.update(ctx, id, snapshot)
-        : await products.lifecycle.create(ctx, snapshot);
-      return c.json({ data: outcome(result) }, result.status === 'applied' ? 200 : 202);
-    },
-    async remove(c: Context) {
-      const actor = resolveLifecycleActor(c);
-      if (!actor) return c.json({ error: 'Não autenticado.' }, 401);
-      const id = c.req.param('id');
-      const result = await products.lifecycle.softDelete(products.context(actor), id);
-      return c.json({ data: outcome(result) }, result.status === 'applied' ? 200 : 202);
-    },
-    async removeSupplier(c: Context) {
-      const actor = resolveLifecycleActor(c);
-      if (!actor) return c.json({ error: 'Não autenticado.' }, 401);
-      const id = c.req.param('id');
-      const result = await suppliers.lifecycle.softDelete(suppliers.context(actor), id);
-      return c.json({ data: outcome(result) }, result.status === 'applied' ? 200 : 202);
-    },
-  };
 }

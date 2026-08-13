@@ -117,6 +117,42 @@ describe('versions — history and restore through the generated endpoints', () 
     expect(history.data.versions[0]?.kind).toBe('RESTORE');
   });
 
+  it('answers publishedVersion 0 for an ARCHIVED entity, so every row can restore', async () => {
+    // The host's mirror-column read filters `archived_at IS NULL` like every
+    // other read it owns (ADOPTING rule 3), so a binned entity answers `null`
+    // — which the surface renders as 0. That is what makes the dialog offer
+    // Restaurar on the newest row too, instead of labelling it "Versão atual"
+    // on a record that is no longer live.
+    await ownerEdits('prod-agua', 'Água com gás 500ml');
+    await ownerEdits('prod-agua', 'Água com gás 1L', 700);
+    expect((await asUser('owner-1').send('DELETE', '/catalog-items/prod-agua')).status).toBe(200);
+
+    const response = await asUser('owner-1').get('/catalog-items/prod-agua/versions');
+    expect(response.status).toBe(200);
+    const { data } = await json<{
+      data: { versions: { version: number }[]; publishedVersion: number };
+    }>(response);
+    expect(data.versions.map((v) => v.version)).toEqual([2, 1]);
+    expect(data.publishedVersion).toBe(0);
+  });
+
+  it('rejects a non-integer version id rather than restoring the truncated one', async () => {
+    await ownerEdits('prod-suco', 'Suco de uva');
+    for (const version of ['1.5', '1abc', '0']) {
+      const response = await asUser('owner-1').send(
+        'POST',
+        `/catalog-items/prod-suco/versions/${version}/restore`,
+      );
+      expect(response.status).toBe(400);
+      expect((await json<{ error: string }>(response)).error).toBe('Dados inválidos.');
+    }
+    // Untouched: a client that formatted a float restored nothing.
+    const items = await json<{ data: { items: { id: string; name: string }[] } }>(
+      await asUser('owner-1').get('/catalog-items'),
+    );
+    expect(items.data.items.find((item) => item.id === 'prod-suco')?.name).toBe('Suco de uva');
+  });
+
   it('is feature-gated per tenant: the un-entitled tenant gets the pt-BR 403', async () => {
     const response = await asUser('owner-1', LIFECYCLE_TENANT_OFF_ID).get(
       '/catalog-items/prod-agua/versions',
@@ -130,6 +166,51 @@ describe('versions — history and restore through the generated endpoints', () 
   it('401s an unauthenticated caller before any handler runs', async () => {
     const response = await asUser('anonymous').get('/catalog-items/prod-agua/versions');
     expect(response.status).toBe(401);
+  });
+});
+
+/**
+ * ADOPTING rule 7, made falsifiable. The host owns an ordinary
+ * `GET /catalog-items/:id` — two segments, the same shape as the package's
+ * literal `GET /catalog-items/drafts` — and Hono resolves by REGISTRATION
+ * order, so which of the two answers `/catalog-items/drafts` is decided by
+ * `app.ts` alone. Nothing inside the package can protect it: its own
+ * descriptor order only orders paths within its router.
+ *
+ * Move `app.route(prefix, lifecycle.router)` after the host's CRUD block and
+ * the first case below fails with the host's 404 — the exact silent breakage
+ * a first adoption would ship, since every other endpoint keeps working.
+ */
+describe('mount order — the host route that can swallow a packaged endpoint', () => {
+  it('serves the packaged /drafts, not the host route of the same shape', async () => {
+    const response = await asUser('owner-1').get('/catalog-items/drafts');
+    expect(response.status).toBe(200);
+    // The drafts LIST envelope. The host's read-one answers `{ data: { item } }`
+    // (or a 404 for the id "drafts"), so this key is the discriminator.
+    const body = await json<{ data: { drafts?: unknown[]; item?: unknown } }>(response);
+    expect(body.data.drafts).toEqual([]);
+    expect(body.data.item).toBeUndefined();
+  });
+
+  it('still routes a REAL id to the host, which is why the order is safe', async () => {
+    const response = await asUser('owner-1').get('/catalog-items/prod-agua');
+    expect(response.status).toBe(200);
+    const body = await json<{ data: { item: { id: string; name: string } } }>(response);
+    expect(body.data.item.id).toBe('prod-agua');
+    expect(body.data.item.name).toBe('Água com gás');
+  });
+
+  it('leaves the host owning the 3-segment shapes it registered', async () => {
+    // `PUT /catalog-items/:id` (host) and `PUT /catalog-items/:id/draft`
+    // (package) differ in segment count, so both survive the same order.
+    expect((await asUser('owner-1').send('PUT', '/catalog-items/prod-agua', {
+      name: 'Água mineral',
+      priceCents: 500,
+    })).status).toBe(200);
+    const draft = await asUser('owner-1').send('PUT', '/catalog-items/prod-agua/draft', {
+      data: { name: 'Água mineral com gás', priceCents: 600 },
+    });
+    expect(draft.status).toBe(200);
   });
 });
 

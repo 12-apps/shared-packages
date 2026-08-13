@@ -70,6 +70,22 @@ export interface LifecycleUserDirectory {
   getUsers(ids: readonly string[]): Promise<{ id: string; name: string | null }[]>;
 }
 
+/**
+ * The answer of a collection's `authorize` gate (see
+ * `LifecycleEntityRegistration.authorize`). A denial crosses the wire
+ * unmodified — the host's `status` and `error` pass through (future-pay's
+ * entitlement denial is a 402 with its own copy); omitted, the denial is the
+ * 403 feature-off message.
+ */
+export type LifecycleAuthorization =
+  | { ok: true }
+  | { ok: false; status?: number; error?: string };
+
+/** The collection `authorize` gate's shape, shared by registration + helpers. */
+export type LifecycleAuthorizeGate = (
+  actor: LifecycleActor,
+) => Promise<LifecycleAuthorization> | LifecycleAuthorization;
+
 /** The user-facing copy this surface emits (pt-BR product copy by default). */
 export interface LifecycleMessages {
   entityNotFound: string;
@@ -80,13 +96,14 @@ export interface LifecycleMessages {
   requestAlreadyDecided: string;
   featureDisabled: string;
   notAuthorized: string;
+  routeNotAllowed: string;
   operationFailed: string;
   unknownEntityType: string;
   invalidBody: string;
   unauthenticated: string;
 }
 
-/** future-pay's exact copy (lib/lifecycle/api.ts) — the product default. */
+/** future-pay's exact copy (lib/lifecycle/api.ts + auth/tenant.ts) — the product default. */
 export const DEFAULT_MESSAGES: LifecycleMessages = {
   entityNotFound: 'Este item não existe mais — ele pode ter sido excluído.',
   versionNotFound: 'Esta versão não existe mais.',
@@ -96,6 +113,7 @@ export const DEFAULT_MESSAGES: LifecycleMessages = {
   requestAlreadyDecided: 'Esta solicitação já foi decidida.',
   featureDisabled: 'Este recurso não está ativo para esta loja.',
   notAuthorized: 'Você não tem permissão para aprovar alterações.',
+  routeNotAllowed: 'Você não tem permissão para gerenciar esta loja.',
   operationFailed: 'Não foi possível concluir a operação.',
   unknownEntityType: 'Este tipo de item não está habilitado para o ciclo de vida.',
   invalidBody: 'Dados inválidos.',
@@ -224,15 +242,51 @@ export async function resolveActorNames(
   return new Map(users.map((user) => [user.id, user.name]));
 }
 
+/** The actor's permission ids as a set (either accepted input form). */
+function permissionSetOf(actor: LifecycleActor): ReadonlySet<string> {
+  return actor.permissions instanceof Set
+    ? (actor.permissions as ReadonlySet<string>)
+    : new Set(actor.permissions ?? []);
+}
+
+/**
+ * Gate a collection-scoped route on the registration's `routePermission`
+ * (future-pay's `roles:manage`). `isSuper` bypasses, mirroring `contextOf`.
+ */
+export function requireRoutePermission(
+  actor: LifecycleActor,
+  routePermission: string | undefined,
+  messages: LifecycleMessages,
+): void {
+  if (routePermission === undefined || actor.isSuper === true) return;
+  if (!permissionSetOf(actor).has(routePermission)) {
+    throw new LifecycleApiError(403, messages.routeNotAllowed);
+  }
+}
+
+/**
+ * Await the collection's `authorize` gate (the host's plan/billing answer).
+ * A denial becomes the wire response unmodified — the host's status/error
+ * pass through; defaults are 403 + the feature-off copy.
+ */
+export async function requireAuthorized(
+  actor: LifecycleActor,
+  authorize: LifecycleAuthorizeGate | undefined,
+  messages: LifecycleMessages,
+): Promise<void> {
+  if (!authorize) return;
+  const result = await authorize(actor);
+  if (!result.ok) {
+    throw new LifecycleApiError(result.status ?? 403, result.error ?? messages.featureDisabled);
+  }
+}
+
 /** The per-request feature/approval context for one registered collection. */
 export function contextOf(
   actor: LifecycleActor,
   approvePermission: string | undefined,
 ): LifecycleContext {
-  const permissions =
-    actor.permissions instanceof Set
-      ? (actor.permissions as ReadonlySet<string>)
-      : new Set(actor.permissions ?? []);
+  const permissions = permissionSetOf(actor);
   return {
     tenantId: actor.tenantId,
     actorId: actor.userId || null,

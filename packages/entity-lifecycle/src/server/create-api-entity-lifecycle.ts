@@ -1,9 +1,10 @@
 /**
  * The one thing this package exposes to a BACKEND host (12-17).
  *
- * The endpoints used to live in the host: ~7 hand-written route files PER
- * COLLECTION (eleven collections, 2.8k LOC of registrations beside them),
- * each parsing a request, building a context, calling the lifecycle service
+ * The endpoints used to live in the host: six hand-written route files PER
+ * COLLECTION (54 files across the eight collections with per-entity routes,
+ * ~1.8k LOC of registrations beside them), each parsing a request, building a
+ * context, calling the lifecycle service
  * and shaping a response. Only "who is calling, on which tenant, with which
  * feature layers" was ever the host's business; the rest is this surface's
  * contract, and the frontend half (`createWebEntityLifecycle`) lives here
@@ -18,8 +19,11 @@
  *    {@link LifecycleActor} (tenant id, user id, permission ids, the tenant's
  *    two feature layers).
  *  - **Entitlements/billing** — the plan gate on a collection's whole surface
- *    (future-pay's `requireEntitlement(tenant, 'suppliers')`) is answered in
- *    the host BEFORE a request reaches a descriptor.
+ *    (future-pay's `requireEntitlement(tenant, 'suppliers')`) is the host's
+ *    answer, supplied per collection as `registration.authorize` and awaited
+ *    here. It cannot be a wrapper around the mount: the recycle-bin and
+ *    approvals item routes carry no collection prefix, so which collection is
+ *    being restored, purged or decided is known only after reading the row.
  *  - **Entity writes** — each registration's {@link EntityOps} owns the host
  *    tables; the package owns everything recorded ABOUT them.
  *  - **Where the four owned tables live** — the structural db seam.

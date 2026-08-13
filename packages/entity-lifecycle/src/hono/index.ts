@@ -30,8 +30,10 @@ import { messagesOf, type LifecycleActor } from '../server/context';
 
 /**
  * Resolve the caller. Returning `null` means unauthenticated, which answers
- * 401 before any handler runs. Billing gates (future-pay's per-collection
- * plan entitlement) belong HERE too — answered before delegating.
+ * 401 before any handler runs. A PER-COLLECTION billing gate (future-pay's
+ * plan entitlement) does NOT belong here — it belongs on the registration
+ * (`authorize`), because the shared recycle-bin/approvals routes only learn
+ * their collection from the row they read.
  */
 export type ResolveLifecycleActor = (
   c: Context,
@@ -62,8 +64,11 @@ export function entityLifecycleRouter(config: EntityLifecycleHonoConfig): Entity
   const messages = messagesOf(config);
   const router = new Hono();
 
-  // Mounted IN DESCRIPTOR ORDER — the literal `/drafts` routes precede the
-  // `/:id` ones, a rule of the surface, not of the host (see routes-entity.ts).
+  // Mounted IN DESCRIPTOR ORDER, which any adapter must preserve. Hono
+  // resolves by registration order, so the order that actually decides a
+  // winner is the HOST's: `app.route(prefix, lifecycle.router)` must come
+  // BEFORE any host route shaped `/:slug/:id`, or that route captures
+  // `GET /:slug/drafts` (ADOPTING rule 7).
   for (const route of api.routes) {
     const handler = async (c: Context) => {
       const actor = await config.resolveActor(c);
