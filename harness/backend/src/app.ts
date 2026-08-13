@@ -38,6 +38,10 @@
  *    (realtime-host.ts) and the outbox's db adapter (realtime-db.ts). The
  *    matching WebSocket gateway is a THIRD process shape and lives in
  *    `server.ts`, on its own port, because that is where a port is bound;
+ *  - `/api/consent/{status,terms}` is @12-apps/app-shell's (12-18), mounted whole;
+ *    the host keeps only its seams (app-shell-host.ts) and owns no table for it,
+ *    because the package owns no model — "has this user accepted version X" is a
+ *    fact about the HOST's identity row, so here it is a Map;
  *  - `/api/admin/:tenantSlug/audit-logs/**` is @12-apps/audit's (12-14),
  *    mounted whole, with its actor-context middleware wrapped around EVERY
  *    route below — which is where a host puts it, because the stamp is what
@@ -73,6 +77,7 @@ import {
 } from '@12-apps/realtime';
 import { enqueueRealtimeEvent } from '@12-apps/realtime/server';
 
+import { appShellHost, mountAppShellControls } from './app-shell-host';
 import { applyAuditMigrations } from './audit-db';
 import { auditHost, reseedAudit } from './audit-host';
 import { createEntitlementsHost, TENANT } from './entitlements-host';
@@ -179,6 +184,9 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
     mcpOauth: mcpOauthHost(pg),
     pwa: pwaHost(),
     entitlements: createEntitlementsHost(),
+    // 12-18: no migration and no table — the shell owns no model, so its state is a
+    // Map here exactly as it is a column on `users` in a real adopter.
+    appShell: appShellHost(),
   };
 }
 
@@ -194,6 +202,7 @@ interface Hosts {
   mcpOauth: ReturnType<typeof mcpOauthHost>;
   pwa: ReturnType<typeof pwaHost>;
   entitlements: ReturnType<typeof createEntitlementsHost>;
+  appShell: ReturnType<typeof appShellHost>;
   storage: Awaited<ReturnType<typeof createStorageHost>>;
 }
 
@@ -218,6 +227,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await reseedNotifications(pg, hosts.notifications);
     await hosts.storage.reset();
     hosts.entitlements.reset();
+    hosts.appShell.reset();
     return c.body(null, 204);
   });
 }
@@ -308,6 +318,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.get('/health', (c) => c.json({ ok: true }));
   mountReset(app, pg, hosts);
   mountRealtimeControls(app, pg, hosts);
+  mountAppShellControls(app, hosts.appShell);
   // Installs the driver for THIS process, which is what lets a `/__harness/publish` reach a
   // stream the SPA is holding open through Vite's proxy. No Redis: the harness is one
   // process, so inline delivery is the whole bus.
@@ -345,9 +356,12 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   // mount above, deliberately: `/api` is the broader prefix of the two, and this file's
   // header rule is that the more specific mount goes on first.
   app.route('/api', hosts.realtime.events.router);
+  // 12-18, also at the API root and for the same reason: consent is a fact about the
+  // CALLER, so neither of its two paths carries a tenant slug.
+  app.route('/api', hosts.appShell.router);
   // The last three mount at the ROOT and have to — the header says why for each.
   // `/` is the broadest prefix here, so they go on LAST by the same
-  // more-specific-first rule the two `/api` mounts above follow.
+  // more-specific-first rule the `/api` mounts above follow.
   app.route('/', hosts.storage.router);
   app.route('/', hosts.mcpOauth.router);
   app.route('/', hosts.pwa.router);
