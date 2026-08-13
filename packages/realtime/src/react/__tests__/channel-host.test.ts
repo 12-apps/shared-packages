@@ -7,7 +7,12 @@ import {
   type ChannelHost,
 } from "../channel-host";
 import type { RealtimeMessage, RealtimeStatus } from "../types";
-import { WORKER_READY_MS, type TabMessage, type WorkerMessage } from "../worker/protocol";
+import {
+  ALIVE_EVERY_MS,
+  WORKER_READY_MS,
+  type TabMessage,
+  type WorkerMessage,
+} from "../worker/protocol";
 
 /**
  * The SharedWorker host, and the one thing it cannot afford to assume.
@@ -48,6 +53,11 @@ function fakePort() {
     /** Whether the host is still listening to this port at all. */
     listening: (): boolean => port.onmessage !== null,
   };
+}
+
+/** Every frame of one verb the tab has posted, in order. */
+function framesOf(posted: readonly TabMessage[], type: TabMessage["type"]): TabMessage[] {
+  return posted.filter((message) => message.type === type);
 }
 
 /** A stand-in for the in-page host, recording what it was handed. */
@@ -224,5 +234,82 @@ describe("createSharedWorkerHost — a worker that never answers", () => {
     expect(local.calls.built).toBe(0);
     expect(wire.state.closed).toBe(true);
     expect(wire.posted.at(-1)).toEqual({ type: "bye" });
+  });
+});
+
+/**
+ * The tab's half of the liveness protocol.
+ *
+ * A SharedWorker is never told a port went away: closing a tab, navigating it, or
+ * discarding it under memory pressure all leave a port that looks exactly like an idle one.
+ * The hub's side of that — sweeping whatever stopped answering — is covered in
+ * `registry.test.ts`; what a sweep needs to be SAFE is that a live tab keeps speaking, which
+ * only this side can prove. A tab that stops announcing loses its topics mid-service, and a
+ * tab that never says goodbye holds a subscription open after it is gone.
+ */
+describe("createSharedWorkerHost — the tab's liveness chatter", () => {
+  /** A tab on an ANSWERING worker, which is the only state where the chatter survives. */
+  function announcingTab(): { wire: ReturnType<typeof fakePort>; host: ChannelHost } {
+    const wire = fakePort();
+    const local = fakeLocalHost();
+    const host = createSharedWorkerHost(
+      "/api/admin/loja-a/realtime",
+      { onStatusChange: () => {}, onMessage: () => {} },
+      () => wire.port,
+      { fallback: local.build },
+    );
+    if (!host) throw new Error("expected a host");
+    // The worker answering is what keeps the connection ON it — the ready timeout would
+    // otherwise fall back to the page and detach the chatter along with it.
+    wire.answer({ type: "ready" });
+    return { wire, host };
+  }
+
+  /** The page going away — the browser firing, not the user. */
+  function hidePage(): void {
+    window.dispatchEvent(new Event("pagehide"));
+  }
+
+  it("keeps announcing itself, because a closed tab announces nothing", () => {
+    vi.useFakeTimers();
+    const tab = announcingTab();
+
+    vi.advanceTimersByTime(ALIVE_EVERY_MS * 2 + 1);
+
+    // Silence is the ONLY signal the worker has, so silence has to mean gone. A tab that
+    // stopped announcing while still on screen would have its topics swept out from under
+    // it — the kitchen tablet the browser throttled, mid-service.
+    expect(framesOf(tab.wire.posted, "alive")).toHaveLength(2);
+  });
+
+  it("says goodbye and stops announcing when it closes", () => {
+    vi.useFakeTimers();
+    const tab = announcingTab();
+
+    tab.host.close();
+    vi.advanceTimersByTime(ALIVE_EVERY_MS * 3);
+
+    // The goodbye releases the port's topics at once rather than after three missed
+    // announcements; the silence afterwards is what makes it true.
+    expect(tab.wire.posted.at(-1)).toEqual({ type: "bye" });
+    expect(framesOf(tab.wire.posted, "alive")).toEqual([]);
+    expect(tab.wire.state.closed).toBe(true);
+  });
+
+  it("says goodbye on `pagehide`, and stops listening once it has closed", () => {
+    vi.useFakeTimers();
+    const tab = announcingTab();
+
+    // `pagehide` rather than `beforeunload`: it is the one that fires on iOS and on a
+    // bfcache navigation, which is most of how a tab actually goes away.
+    hidePage();
+    expect(framesOf(tab.wire.posted, "bye")).toHaveLength(1);
+
+    tab.host.close();
+    const settled = framesOf(tab.wire.posted, "bye").length;
+    hidePage();
+    // The listener goes with the timer — a page that hides after this host closed is no
+    // longer its business, and the port it would speak through is already gone.
+    expect(framesOf(tab.wire.posted, "bye")).toHaveLength(settled);
   });
 });
