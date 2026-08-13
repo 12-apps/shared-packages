@@ -6,7 +6,8 @@ import { resolve } from "node:path";
  * future-pay's `apps/web/scripts/realtime/publisher-gate.ts` so a host's own script is a
  * one-line re-export and the CI job that shells out to a package script keeps working
  * unchanged. Packaged the same way `@12-apps/rbac/coverage` is: a library plus a CLI
- * wrapper, with the host's lists as DEFAULTS.
+ * wrapper — except that the host's lists are INPUTS here rather than defaults, for the
+ * reason under "What this checks" below.
  *
  * ## Why a publisher seam needs a gate at all
  *
@@ -22,17 +23,27 @@ import { resolve } from "node:path";
  * The screen ends up six times staler than before it adopted realtime, while announcing
  * the opposite. It shipped for real once (FUT-440) and two domains sat silent for months.
  *
- * ## What this checks that a compiler cannot
+ * ## What this checks
  *
- * A host declares its publishers as `Record<Domain, PublisherDeclaration>`, so the
- * COMPILER already forces every domain to appear. This checks the declarations are TRUE:
- *
- *   1. A `publishes` module must exist and actually call `publishRealtimeEvent`.
+ *   1. **COMPLETENESS.** Every domain a host says is subscribable must have a
+ *      declaration. See {@link PublisherParityOptions.domains} for why this is an input
+ *      of the gate rather than a property the compiler is trusted to hold.
+ *   2. A `publishes` module must exist and actually call `publishRealtimeEvent`.
  *      Otherwise the declaration is just a second place to be wrong.
- *   2. The set of `silent` domains may only SHRINK against the baseline file — the same
+ *   3. The set of `silent` domains may only SHRINK against the baseline file — the same
  *      ratchet as `.quality-exceptions`. Debt can be paid down, never grown. It fails in
  *      BOTH directions: a new silent domain is refused, and a baseline entry that now
  *      publishes must be deleted, so paying the debt is permanent.
+ *
+ * A completeness gate whose own completeness is assumed is not one, which is what this
+ * module got wrong on its first pass: it took an ARRAY of declarations, defaulted it to a
+ * copy of future-pay's, and rested on "a host declares its publishers as
+ * `Record<Domain, PublisherDeclaration>`, so the COMPILER already forces every domain to
+ * appear". That property does not survive the array boundary and it did not survive the
+ * package boundary either — add a domain to the host's registry and the gate stayed green
+ * while the screen said "Ao vivo" and received nothing, i.e. FUT-440 again, past the gate
+ * built to prevent it. When a completeness gate's filter misses, the result is not a red
+ * run but NO run.
  */
 
 /** How one domain accounts for its emitter. */
@@ -64,19 +75,42 @@ export interface PublisherEntry {
  * envelope's generic — `publishRealtimeEvent<ResearchRunWireEvent["data"]>(…)` — is
  * missed by a literal `"publishRealtimeEvent("` match, and that declared a working
  * publisher absent on this gate's very first run.
+ *
+ * Tested against {@link stripComments}, never raw text: a docstring saying
+ * `publishRealtimeEvent(topic, …)` is not a publisher, and in this codebase's docstring
+ * style it is the LIKELY residue of a module whose emit was refactored out. Same
+ * fail-open class as the comment-defeated brace scan this repo has already shipped twice.
  */
 const EMIT_CALL = /\bpublishRealtimeEvent\s*(?:<[^>]*>)?\s*\(/;
+
+/**
+ * Blank out `//` and block comments, keeping the rest byte-for-byte.
+ *
+ * A local ~15-line stripper rather than `@12-apps/rbac`'s `stripCommentsAndStrings`: that
+ * one is real and hardened, and reaching it would mean this package depending on the RBAC
+ * package to read a file — a dependency the wrong way round for a realtime gate. Strings
+ * are deliberately LEFT INTACT: nothing here needs them gone, and a stripper that eats
+ * quotes has to get escapes and template literals right to avoid swallowing live code.
+ */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
 
 /** Where the ratchet lives, relative to the repo root. */
 export const DEFAULT_SILENT_BASELINE = ".realtime-silent-domains.json";
 
 /**
- * future-pay's own declarations — the DEFAULT set, overridable per host.
+ * future-pay's own declarations — an EXAMPLE, and deliberately not a default.
  *
- * Shipped for the same reason `@12-apps/rbac/coverage` ships `FUTURE_PAY_RBAC_GUARDS`: a
- * host with the future-pay layout adopts the gate with no configuration, and a host with
- * a different one passes its own `declarations`. The module paths are repo-relative and
- * resolved against the caller's `root`.
+ * It was a fallback for `declarations` in this gate's first version, for the same reason
+ * `@12-apps/rbac/coverage` ships `FUTURE_PAY_RBAC_GUARDS`: zero-configuration adoption for
+ * a host with the future-pay layout. That is exactly what made the gate fail OPEN — a host
+ * that adds a domain to its registry and forgets the map got a green run out of a seven-
+ * entry copy of somebody else's domains. A completeness gate cannot supply its own subject.
+ *
+ * So it is exported to be READ (a shape to copy, and the harness's fixture material) and
+ * nothing consumes it implicitly. The module paths are repo-relative and resolved against
+ * the caller's `root`.
  */
 export const FUTURE_PAY_PUBLISHER_DECLARATIONS: readonly PublisherEntry[] = [
   {
@@ -124,11 +158,43 @@ export const FUTURE_PAY_PUBLISHER_DECLARATIONS: readonly PublisherEntry[] = [
   },
 ];
 
+/** Every domain a host's subscribe surfaces will authorize, per topic scheme. */
+export interface PublisherParityDomains {
+  readonly tenant: readonly string[];
+  readonly user: readonly string[];
+}
+
 export interface PublisherParityOptions {
   /** Repo root every declared module path is resolved against. */
   root: string;
-  /** The host's declarations. Defaults to {@link FUTURE_PAY_PUBLISHER_DECLARATIONS}. */
-  declarations?: readonly PublisherEntry[];
+  /**
+   * The host's declarations, one per subscribable domain.
+   *
+   * REQUIRED, with no shipped fallback: a default meant this gate could run against
+   * somebody else's domain list and report green — see
+   * {@link FUTURE_PAY_PUBLISHER_DECLARATIONS}. Build it from the host's own
+   * `Record<Domain, PublisherDeclaration>` so the compiler keeps forcing every domain to
+   * appear THERE too; `domains` below is what makes the gate assert it rather than assume
+   * it.
+   */
+  declarations: readonly PublisherEntry[];
+  /**
+   * Every domain that can be SUBSCRIBED to — the host's own registry, the list its
+   * `createApiEvents` surfaces are configured with.
+   *
+   * REQUIRED, and the reason is the whole finding: a domain is AUTHORIZABLE the moment it
+   * is registered, and nothing requires it to have an emitter. Handing the gate an array
+   * of declarations and nothing else means a missing declaration is not a violation, it is
+   * SILENCE — the screen connects, is told it is live, relaxes its poll to 30 s and hears
+   * nothing. Passing the registry restores the completeness check INSIDE the gate, where
+   * it cannot be dropped by a host that builds its array a different way.
+   *
+   * Note the asymmetry: a domain here with no declaration is a violation, and a
+   * declaration for a domain not here is NOT. Publishing to a topic nobody can subscribe
+   * to is legitimate (an internal or system topic); being subscribable with nothing to
+   * hear is the failure.
+   */
+  domains: PublisherParityDomains;
   /** The ratchet file, relative to `root`. Defaults to {@link DEFAULT_SILENT_BASELINE}. */
   baselineFile?: string;
 }
@@ -197,7 +263,7 @@ function declarationProblems(
       );
       continue;
     }
-    if (!EMIT_CALL.test(readFileSync(modulePath, "utf8"))) {
+    if (!EMIT_CALL.test(stripComments(readFileSync(modulePath, "utf8")))) {
       problems.push(
         `${scheme}:${domain} declares publisher "${declaration.module}", ` +
           `but that module never calls publishRealtimeEvent`,
@@ -207,8 +273,38 @@ function declarationProblems(
   return problems;
 }
 
+/**
+ * Every subscribable domain that declares nothing at all — the COMPLETENESS half.
+ *
+ * The one check the package boundary took away. A declaration array cannot report what is
+ * missing from it, so the registry has to be handed in and compared against.
+ */
+function coverageProblems(
+  declarations: readonly PublisherEntry[],
+  domains: PublisherParityDomains,
+): string[] {
+  const declared = new Set(declarations.map(({ scheme, domain }) => `${scheme}:${domain}`));
+  const missing = (["tenant", "user"] as const).flatMap((scheme) =>
+    domains[scheme]
+      .map((domain) => `${scheme}:${domain}`)
+      .filter((entry) => !declared.has(entry)),
+  );
+  if (missing.length === 0) return [];
+  return [
+    `these domains are subscribable and declare no publisher at all: ${missing.join(", ")}. ` +
+      `A domain nobody declared is a screen that connects, is told it is live, slows its ` +
+      `poll and hears nothing — declare its publisher, or declare it silent and ratchet it.`,
+  ];
+}
+
 export function runPublisherParity(options: PublisherParityOptions): PublisherParityResult {
-  const declarations = options.declarations ?? FUTURE_PAY_PUBLISHER_DECLARATIONS;
+  // Both are REQUIRED in the type. Coalesced anyway, and coalesced to EMPTY, for a host
+  // whose gate script is plain JavaScript: nothing to check then trips the vacuous-pass
+  // guard below, which is a red run with an actionable message. The default this replaced
+  // was a seven-entry copy of future-pay's domains, and that failed OPEN — which is the
+  // difference that matters, not whether there is a default at all.
+  const declarations = options.declarations ?? [];
+  const domains = options.domains ?? { tenant: [], user: [] };
   const baselinePath = resolve(options.root, options.baselineFile ?? DEFAULT_SILENT_BASELINE);
 
   const silent = declarations
@@ -222,6 +318,7 @@ export function runPublisherParity(options: PublisherParityOptions): PublisherPa
     ...(declarations.length === 0
       ? ["no publisher declarations were provided — is the host's map intact?"]
       : []),
+    ...coverageProblems(declarations, domains),
     ...declarationProblems(declarations, options.root),
     ...ratchetProblems(silent, baselinePath),
   ];
