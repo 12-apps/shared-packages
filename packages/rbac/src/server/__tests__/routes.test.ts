@@ -222,6 +222,96 @@ describe('roles routes', () => {
     expect(restored.size).toBeGreaterThan(1);
   });
 
+  /** Narrow ADMIN to a set that still carries the route's own `roles:manage`. */
+  async function withheldPayouts(h: TestHost): Promise<void> {
+    const narrowed = await call(h, 'PUT', '/roles/templates/:name', {
+      actor: memberActor(TENANT, 'owner-1'),
+      params: { name: 'ADMIN' },
+      // `roles:manage` stays, so the ADMIN still reaches the reset route at
+      // all — what happens once they do is the whole point.
+      body: { permissions: ['roles:manage', 'team:read', 'config:read'] },
+    });
+    expect(narrowed.status).toBe(200);
+  }
+
+  it('refuses a reset that would restore a permission the resetter lacks', async () => {
+    // Reset WRITES the seeded set into the tenant's live row, so it is an
+    // override and is governed like one. Narrowing a system template through
+    // the governed PUT is the only mechanism the product offers an owner for
+    // withholding a permission from an administrator; while the reset ran no
+    // governance, the ADMIN could throw that narrowing away and restore the
+    // code's seed — handing their OWN role back exactly what the owner removed,
+    // as often as the owner re-narrowed it.
+    const h = await host();
+    enrolMember(h.state, TENANT, 'owner-1', 'OWNER');
+    enrolMember(h.state, TENANT, 'admin-1', 'ADMIN');
+    await withheldPayouts(h);
+
+    const reset = await call(h, 'DELETE', '/roles/templates/:name', {
+      actor: memberActor(TENANT, 'admin-1'),
+      params: { name: 'ADMIN' },
+    });
+    expect(reset.status).toBe(400);
+    // The ESCALATION guard is what refused — not owner-protection, not SoD,
+    // not UNKNOWN_ROLE. Any of those refusing for the wrong reason would leave
+    // the escalation path untested.
+    expect(
+      h.audits.filter(
+        (entry) =>
+          entry.action === 'governance.reject' &&
+          (entry.after as { code?: string } | undefined)?.code === 'ESCALATION',
+      ),
+    ).toHaveLength(1);
+    // The owner's narrowing SURVIVES — the row was never rewritten.
+    const perms = await h.api.guards.getActorPermissions(
+      { userId: 'admin-1', isSuper: false },
+      TENANT,
+    );
+    expect([...perms].sort()).toEqual(['config:read', 'roles:manage', 'team:read']);
+  });
+
+  it('still lets an OWNER reset a narrowed template back to the seed', async () => {
+    // The legitimate path: OWNER/SUPERADMIN hold '*', so escalation is
+    // satisfied and the governed reset behaves exactly as it always did.
+    const h = await host();
+    enrolMember(h.state, TENANT, 'owner-1', 'OWNER');
+    enrolMember(h.state, TENANT, 'admin-1', 'ADMIN');
+    await withheldPayouts(h);
+
+    const reset = await call(h, 'DELETE', '/roles/templates/:name', {
+      actor: memberActor(TENANT, 'owner-1'),
+      params: { name: 'ADMIN' },
+    });
+    expect(reset.status).toBe(200);
+    expect(data(reset)).toEqual({ status: 'reset' });
+    const perms = await h.api.guards.getActorPermissions(
+      { userId: 'admin-1', isSuper: false },
+      TENANT,
+    );
+    expect(perms.has('payouts:manage')).toBe(true);
+    expect(h.audits.some((entry) => entry.action === 'governance.reject')).toBe(false);
+  });
+
+  it('a reset with nothing to restore is still an idempotent reset', async () => {
+    // The route's contract: a no-op answers `reset`. Governance must not turn
+    // a second (or a never-overridden) reset into a refusal.
+    const h = await host();
+    enrolMember(h.state, TENANT, 'owner-1', 'OWNER');
+    const actor = memberActor(TENANT, 'owner-1');
+    const untouched = await call(h, 'DELETE', '/roles/templates/:name', {
+      actor,
+      params: { name: 'ADMIN' },
+    });
+    expect(untouched.status).toBe(200);
+    expect(data(untouched)).toEqual({ status: 'reset' });
+    const again = await call(h, 'DELETE', '/roles/templates/:name', {
+      actor,
+      params: { name: 'ADMIN' },
+    });
+    expect(again.status).toBe(200);
+    expect(data(again)).toEqual({ status: 'reset' });
+  });
+
   it('rejects overriding an owner template by name', async () => {
     const h = await host();
     enrolMember(h.state, TENANT, 'owner-1', 'OWNER');

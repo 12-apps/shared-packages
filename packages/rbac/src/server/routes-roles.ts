@@ -178,6 +178,18 @@ function overrideTemplateRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRo
   };
 }
 
+/**
+ * Reset is an OVERRIDE whose permission set happens to be the seed's, so it is
+ * governed exactly like the `PUT` above and in the same order — gate, then
+ * name, then governance, then write. It used to run only the first two, and
+ * that asymmetry was an escalation: narrowing a system template through the
+ * governed `PUT` is the only mechanism the product offers an owner for
+ * withholding a permission from an administrator, and an ungoverned reset threw
+ * that narrowing away and restored the code's seed — so any holder of
+ * `roles:manage` (an ADMIN, by seed) could hand their own role back whatever
+ * the owner had removed, repeatedly. The check is against the set the write
+ * LANDS, not against the row's current one.
+ */
 function resetTemplateRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
   return {
     method: 'DELETE',
@@ -187,6 +199,15 @@ function resetTemplateRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute
         await requireManageRoles(deps, actor);
         const name = requireParam(params, 'name', messagesOf(deps.config));
         deps.governance.assertEditableTemplateName(name);
+        const seedPermissions = deps.roles.templateSeedPermissions(name);
+        // An unseeded name writes nothing, so there is nothing to govern: it
+        // stays the idempotent no-op below rather than becoming a refusal.
+        if (seedPermissions !== null) {
+          await deps.governance.assertCanOverrideTemplateRole(actor, {
+            name,
+            permissions: seedPermissions,
+          });
+        }
         await deps.roles.resetTemplateRole(actor.tenantId, name);
         // Reset is idempotent — a no-op still answers `reset`.
         return ok({ status: 'reset' as const });
