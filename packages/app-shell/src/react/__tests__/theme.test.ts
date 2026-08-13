@@ -7,8 +7,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { contrastRatio, MIN_TEXT_CONTRAST } from '../../core/brand-palette';
-import { createAppTheme, DEFAULT_THEME_TOKENS } from '../theme';
+import { contrastRatio, DEFAULT_SURFACE, MIN_TEXT_CONTRAST } from '../../core/brand-palette';
+import { createAppTheme, DEFAULT_SURFACES, DEFAULT_THEME_TOKENS } from '../theme';
 
 describe('createAppTheme semantics (FUT-810 rule 9)', () => {
   it('never derives a semantic from the tenant brand', () => {
@@ -79,5 +79,42 @@ describe('createAppTheme palette', () => {
     expect(createAppTheme('dark', { tokens }).palette.primary.main).toBe(
       DEFAULT_THEME_TOKENS.dark.primary,
     );
+  });
+
+  /**
+   * The surface is the hex the legibility correction is computed AGAINST, so a host
+   * whose page is a dark card and whose theme thinks it is white gets a seed corrected
+   * to 4.5:1 against a background it never paints — the guarantee holding on paper and
+   * not on screen. The default is the core's own `DEFAULT_SURFACE`, not a second copy
+   * of the same white.
+   */
+  it('corrects the seed against the surface the host says it paints', () => {
+    expect(DEFAULT_SURFACES.light).toBe(DEFAULT_SURFACE);
+
+    const seed = '#7ED957';
+    const onWhite = createAppTheme('light', { override: { primary: seed } });
+    const onSlate = createAppTheme('light', {
+      override: { primary: seed },
+      surface: { light: '#1F2933' },
+    });
+
+    // A different surface is a different answer, and each clears the floor against the
+    // surface it was told about.
+    expect(onSlate.palette.primary.main).not.toBe(onWhite.palette.primary.main);
+    expect(contrastRatio(onSlate.palette.primary.main, '#1F2933')).toBeGreaterThanOrEqual(
+      MIN_TEXT_CONTRAST,
+    );
+    expect(contrastRatio(onWhite.palette.primary.main, DEFAULT_SURFACE)).toBeGreaterThanOrEqual(
+      MIN_TEXT_CONTRAST,
+    );
+    // The exact swatch still survives for decoration, whatever the surface.
+    expect(onSlate.palette.primary.light).toBe(seed);
+  });
+
+  it('takes a surface for one mode without losing the other', () => {
+    const surface = { dark: '#000000' };
+    const light = createAppTheme('light', { override: { primary: '#7ED957' }, surface });
+    const bare = createAppTheme('light', { override: { primary: '#7ED957' } });
+    expect(light.palette.primary.main).toBe(bare.palette.primary.main);
   });
 });

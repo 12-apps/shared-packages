@@ -174,6 +174,10 @@ describe(`POST /api${CONSENT_ACCEPT_PATH}`, () => {
     expect(header).toContain('harness-signature');
     expect(header).toContain('HttpOnly');
     expect(header).toContain('SameSite=Lax');
+    // The host opted OUT of `Secure` because this harness is plain HTTP — the package's
+    // own default is on. Asserted so the flag stays a decision the wiring makes rather
+    // than one it inherits by omission.
+    expect(header).not.toContain('Secure');
   });
 });
 

@@ -46,6 +46,7 @@ export {
 
 export {
   createAppTheme,
+  DEFAULT_SURFACES,
   DEFAULT_THEME_TOKENS,
   type AppThemeOptions,
   type ModeTokens,

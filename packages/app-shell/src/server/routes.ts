@@ -83,7 +83,13 @@ function handoffCookie(config: AppShellServerConfig): AppShellCookie[] {
       // keeps the sign-in gate's consent check trustworthy.
       httpOnly: true,
       sameSite: 'lax',
-      secure: cookie.secure ?? false,
+      // Secure by DEFAULT. A package cannot read a host's `NODE_ENV`, so the only
+      // question is which way silence points, and a security flag defaulting off means
+      // an adopter who omits it ships a plaintext consent token to production. The
+      // opposite mistake is loud and local: on a plain-HTTP dev box the browser simply
+      // refuses to store it, the sign-up handoff visibly breaks on the first try, and
+      // `secure: false` is the one-word opt-out.
+      secure: cookie.secure ?? true,
     },
   ];
 }

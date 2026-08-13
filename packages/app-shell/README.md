@@ -28,10 +28,15 @@ const shell        = createWebAppShell({ /* config */ });   // browser
 const { routes }   = createApiAppShell({ /* config */ });    // backend
 ```
 
+`shell.Provider` around your routes is the whole browser wiring — the route error
+boundary is **inside** it, so `onCrash` is reached without you mounting anything.
+Place a second boundary below your own chrome if you want a crashed page to keep the
+sidebar; the nearest one catches, so nothing doubles.
+
 | Subpath | What is in it |
 |---|---|
 | `.` | Framework-free: `apiFetch` / `ApiError`, `joinApiPath` / `stripTrailingSlashes`, the WCAG brand-palette correction, pt-BR money and duration formatters, the stale-chunk recovery, the consent wire. |
-| `./react` | `createWebAppShell` — the provider tower, the theme, the boundary, `lazyRoute`, the consent gate, `useDeviceDetection`. |
+| `./react` | `createWebAppShell` — the provider tower (boundary included), the theme, `lazyRoute`, the consent gate, `useDeviceDetection`. |
 | `./server` | `createApiAppShell` — the consent status/accept descriptors, framework-neutral. |
 | `./hono` | The forty-line adapter. `hono` is an optional peer. |
 | `./vite` | `appShellOptimizeDeps()` — the dependency pre-bundling preset. Compiled, and it has to be. |
@@ -46,8 +51,10 @@ by a test for that reason.
 **Nothing here reports success it cannot back.** The consent endpoint propagates a
 failed write as a 500 rather than answering 204, because a 204 over a failed write
 tells the user they accepted while every guard keeps refusing them. `onCrash`,
-`isCurrent` and `brand.name` are required rather than defaulted, because each of
-their plausible defaults fails silently in exactly the direction nobody checks.
+`isCurrent`, `consent` and `brand.name` are required rather than defaulted, because
+each of their plausible defaults fails silently in exactly the direction nobody
+checks — and the boundary `onCrash` is reported from is mounted rather than
+documented, for the same reason.
 
 **A colour a tenant TYPED is not a colour you can paint.** A brand hex is chosen to
 look good on a sign, not to be legible as 14px text on a white card: one real seeded

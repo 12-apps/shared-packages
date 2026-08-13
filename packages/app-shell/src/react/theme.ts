@@ -1,6 +1,6 @@
 import { createTheme, type Theme } from '@12-apps/ui/mui/styles';
 
-import { brandHex, readableInk, separateFromBrand } from '../core/brand-palette';
+import { brandHex, DEFAULT_SURFACE, readableInk, separateFromBrand } from '../core/brand-palette';
 
 /** Supported color-scheme modes for the app theme. */
 export type ThemeMode = 'light' | 'dark';
@@ -33,8 +33,21 @@ export interface PaletteOverride {
   secondary?: string | null;
 }
 
-/** The page a tenant's text is read against, per mode. */
-const SURFACE: Record<ThemeMode, string> = { light: '#FFFFFF', dark: '#121212' };
+/**
+ * The page a tenant's text is read against, per mode — the DEFAULT, not a rule.
+ *
+ * Replaceable through {@link AppThemeOptions.surface}, and it has to be: the WCAG
+ * correction in `brandRole` is computed against this hex, so a host whose page is a
+ * tinted card gets a tenant seed corrected to ≥4.5:1 against a background it does not
+ * use — and the guarantee `brandRole` advertises as structural quietly stops holding.
+ * The core already parameterizes it (`readableInk(hex, surface, min)`), so hardcoding
+ * it here was also a second spelling of a constant that already has an owner: the light
+ * value IS `DEFAULT_SURFACE`, imported rather than retyped.
+ */
+export const DEFAULT_SURFACES: Record<ThemeMode, string> = {
+  light: DEFAULT_SURFACE,
+  dark: '#121212',
+};
 
 /**
  * One palette role, from a tenant seed or the platform token.
@@ -112,6 +125,15 @@ export interface AppThemeOptions {
   override?: PaletteOverride | null;
   /** The host's own platform tokens. Defaults to {@link DEFAULT_THEME_TOKENS}. */
   tokens?: Partial<Record<ThemeMode, ModeTokens>>;
+  /**
+   * The page a tenant's text is actually read against, per mode. Defaults to
+   * {@link DEFAULT_SURFACES}.
+   *
+   * Pass it if your app's background is not white in light mode (or not `#121212` in
+   * dark): it is the hex the legibility correction is computed against, so a wrong one
+   * lands the tenant's text under the 4.5:1 floor on the surface you really paint.
+   */
+  surface?: Partial<Record<ThemeMode, string>>;
 }
 
 /**
@@ -124,7 +146,7 @@ export interface AppThemeOptions {
  */
 export function createAppTheme(mode: ThemeMode = 'light', options: AppThemeOptions = {}): Theme {
   const tokens = options.tokens?.[mode] ?? DEFAULT_THEME_TOKENS[mode];
-  const surface = SURFACE[mode];
+  const surface = options.surface?.[mode] ?? DEFAULT_SURFACES[mode];
   const { override } = options;
 
   return createTheme({

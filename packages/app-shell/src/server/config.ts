@@ -98,7 +98,15 @@ export interface ConsentCookieConfig {
   sign(version: string, expiresAtMs: number): string;
   /** Lifetime in ms. Long enough for an OAuth round trip; short overall. */
   ttlMs?: number;
-  /** `Secure` flag. The host decides — dev is plain HTTP. */
+  /**
+   * `Secure` flag. Defaults to **true** — pass `false` only for a plain-HTTP dev box.
+   *
+   * The package cannot read a host's `NODE_ENV`, so silence has to point somewhere, and
+   * a security flag whose default is off means the adopter who never thought about it
+   * ships a plaintext consent token. The opt-out fails loudly and locally instead: over
+   * HTTP the browser refuses to store a `Secure` cookie, so the sign-up handoff breaks
+   * on the developer's first try rather than in production.
+   */
   secure?: boolean;
 }
 

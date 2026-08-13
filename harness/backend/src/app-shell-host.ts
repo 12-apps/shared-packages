@@ -114,6 +114,10 @@ export function appShellHost() {
         // is that `document.cookie` cannot forge it.
         sign: (version, expiresAt) => `${version}.${expiresAt}.harness-signature`,
         ttlMs: 60_000,
+        // The package defaults this to `true`; the harness is served over plain HTTP,
+        // where a `Secure` cookie is one the browser silently declines to store. This is
+        // what the opt-out looks like for a dev box — deliberate, not omitted.
+        secure: false,
       },
     },
   };

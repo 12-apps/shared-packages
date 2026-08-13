@@ -206,6 +206,31 @@ describe(`POST ${CONSENT_ACCEPT_PATH}`, () => {
     expect(signed[0]?.[0]).toBe(VERSION);
   });
 
+  /**
+   * `Secure` is on unless the host says otherwise. The package cannot read a host's
+   * `NODE_ENV`, so silence has to point somewhere, and off means the adopter who never
+   * thought about it ships a plaintext consent token to production. This is the case
+   * that would go red if the default were flipped back.
+   */
+  it('marks the handoff cookie Secure when the host said nothing', async () => {
+    const { config } = host({
+      actor: null,
+      cookie: { name: 'signup_terms', sign: (version) => `${version}.sig` },
+    });
+    const response = await routeFor(config, CONSENT_ACCEPT_PATH).handle(request());
+    expect(response.cookies?.[0]?.secure).toBe(true);
+  });
+
+  /** …and the opt-out is one word, for a dev box on plain HTTP. */
+  it('honours an explicit opt-out for a plain-HTTP host', async () => {
+    const { config } = host({
+      actor: null,
+      cookie: { name: 'signup_terms', sign: (version) => `${version}.sig`, secure: false },
+    });
+    const response = await routeFor(config, CONSENT_ACCEPT_PATH).handle(request());
+    expect(response.cookies?.[0]?.secure).toBe(false);
+  });
+
   it('sets no cookie at all when the host configured none', async () => {
     const { config } = host();
     const response = await routeFor(config, CONSENT_ACCEPT_PATH).handle(request());

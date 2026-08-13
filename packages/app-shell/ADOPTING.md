@@ -15,7 +15,7 @@ could install.
 | Surface | Export | What the host does |
 |---|---|---|
 | **Core** | `@12-apps/app-shell` | Nothing to wire — framework-free: `apiFetch` + `ApiError`, `joinApiPath` / `stripTrailingSlashes`, the WCAG brand-palette correction, the pt-BR formatters, the stale-chunk recovery and the consent wire. Importable from a worker, a build script or the backend half. |
-| **React** | `@12-apps/app-shell/react` | Call `createWebAppShell(config)` **once, at module scope**, and render `shell.Provider` around your routes. |
+| **React** | `@12-apps/app-shell/react` | Call `createWebAppShell(config)` **once, at module scope**, and render `shell.Provider` around your routes. The error boundary is inside it — you do not mount one to make `onCrash` work. |
 | **Server** | `@12-apps/app-shell/server` | Call `createApiAppShell(config)` and mount the `routes` it returns. |
 | **Hono** | `@12-apps/app-shell/hono` | `app.route('/api', appShellRouter(config).router)`. A one-call mount; `hono` is an OPTIONAL peer, so importing the root, `/react` or `/server` never resolves it. |
 | **Vite** | `@12-apps/app-shell/vite` | `optimizeDeps: appShellOptimizeDeps()` in your `vite.config.ts`. |
@@ -46,7 +46,7 @@ export const shell = createWebAppShell({
   brand: { name: 'Paladira' },
   onCrash: reportRouteCrash,
   queryClient,
-  consent: {},
+  consent: {},          // or `false` if your app has no terms flow — see rule 3
 });
 ```
 
@@ -60,8 +60,42 @@ export function App() {
 }
 ```
 
+That is the whole wiring. In particular **you do not mount an error boundary** to
+make `onCrash` work — `shell.Provider` carries one.
+
 `shell.Provider` is, innermost first: your query client (only if you gave one) →
-the theme + `CssBaseline` → the session → `wrap` → the consent gate → your routes.
+the theme + `CssBaseline` → **the route error boundary** → the session → `wrap` →
+the consent gate → your routes.
+
+### The boundary is mounted for you, and a second one is still welcome
+
+The boundary inside `Provider` is the **last resort**: nothing under the shell can
+blank the document, and every crash reaches your `onCrash`. Its `resetKey` is a
+constant, which is the honest value in that position — the router is below it, so
+once it has caught there is no navigation left to reset on and the fallback's
+`reload` is the only retry that can help.
+
+The *good* boundary is still yours to place, below your own chrome, so a crashed
+page keeps the sidebar and the user can navigate out of it:
+
+```tsx
+function PageSlot() {
+  const { key } = useLocation();          // reset on every navigation
+  return (
+    <shell.RouteErrorBoundary resetKey={key}>
+      <Suspense fallback={<LoadingState />}>
+        <Outlet />
+      </Suspense>
+    </shell.RouteErrorBoundary>
+  );
+}
+```
+
+Double-wrapping is **harmless and expected**: React hands an error to the nearest
+boundary, so yours catches, the shell's never sees it, and `onCrash` fires exactly
+once. There is deliberately no opt-out from the mounted one — composition already
+gives a host everything an opt-out would, and a `boundary: false` knob would put
+the blank page back one option away.
 
 ### `wrap` exists because the ordering is two-sided
 
@@ -126,42 +160,54 @@ app.route('/api', shell.router);
    `@12-apps/observability-frontend`, past the noise classifiers your app
    registers — so a crashed page can file an issue for a routine 404. Import the
    reporter from your own observability module, which is what loads those
-   classifiers.
+   classifiers. It is reached from the boundary `shell.Provider` mounts, so wiring
+   it is all you do — this used to require a boundary of your own and no document
+   said so, which made a required reporter unreachable for anyone following this
+   page.
 2. **`isCurrent` must be the predicate your guards already use.** A second
    predicate here is how the prompt comes to disagree with the thing actually
    blocking the caller: the user is told they are fine and every guarded action
    keeps refusing them, or the reverse — a prompt that can never be cleared.
-3. **Let `record` throw.** The descriptor turns a failure into a 500 on purpose,
+3. **`consent` is required — pass `false` to declare you have no terms flow.**
+   Silence used to mean the same as `false`, and that is the original dead end for
+   a host that *does* have a terms flow and forgot the key: the surface answers,
+   nobody asks it, and a version bump strands every consented user. Nothing fails
+   loudly enough to find that. The server half's `isCurrent` has no default for
+   this exact reason, and the two halves are now symmetric. Note the asymmetry
+   that remains and is deliberate: the mounted gate is a **notification**, and the
+   host's own guards are the enforcement — so a browser with no gate is
+   over-blocking, never over-admitting.
+4. **Let `record` throw.** The descriptor turns a failure into a 500 on purpose,
    and the browser gate trusts the status. A host that catches the error and
    resolves anyway answers 204 over a failed write: the prompt clears, the user
    believes they accepted, and every guard keeps refusing them with no signal to
    retry. That is the original dead end, one level deeper.
-4. **`brand.name` is required.** A package-supplied default would put a different
+5. **`brand.name` is required.** A package-supplied default would put a different
    product's name on your screens. Three kinds of place cannot import it and must
    be kept in sync by hand on a rebrand: a SPA's static `index.html` `<title>`, a
    service worker's push-fallback title, and any lowercase protocol identifier
    (an MCP server id), which is deliberately not display text.
-5. **Bring your own `queryClient`, or get no provider.** The shell never invents a
+6. **Bring your own `queryClient`, or get no provider.** The shell never invents a
    cache: a host's query cache is where a 402→upsell interceptor lives, and a
    shell-created client would silently drop that interception. Omit the option and
    `QueryClientProvider` is simply not mounted.
-6. **Use `lazyRoute` for every routed page, not `React.lazy`.** A deploy replaces
+7. **Use `lazyRoute` for every routed page, not `React.lazy`.** A deploy replaces
    the whole `assets/` directory, so an open tab asks for a chunk that no longer
    exists the moment the user clicks a nav item. `lazyRoute` reloads once onto the
    current build; a second failure inside 15s is rethrown for the boundary.
    Keep your static server's history fallback **off** asset paths, or a stale
    chunk 404s as `200 text/html` and `import()` fails in a way nothing can read.
-7. **`messages` is the only place to change copy.** Defaults are pt-BR. Do not
+8. **`messages` is the only place to change copy.** Defaults are pt-BR. Do not
    fork a component to retype a string.
-8. **Static imports only.** This package publishes TypeScript source, except
+9. **Static imports only.** This package publishes TypeScript source, except
    `./vite`. A dynamic non-literal `import()` of a subpath crashes a bundled
    server.
-9. **`./vite` is the one COMPILED entry, and it has to be.** Vite bundles a
-   `vite.config.ts` with esbuild while leaving bare specifiers external, so that
-   import is resolved and executed by **Node** — which refuses to strip types below
-   `node_modules` (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`). It does not
-   refuse while the package is a workspace sibling, so this failure appears only
-   after publishing.
+10. **`./vite` is the one COMPILED entry, and it has to be.** Vite bundles a
+    `vite.config.ts` with esbuild while leaving bare specifiers external, so that
+    import is resolved and executed by **Node** — which refuses to strip types below
+    `node_modules` (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`). It does not
+    refuse while the package is a workspace sibling, so this failure appears only
+    after publishing.
 
 ## Why there is no Prisma partial
 
@@ -192,10 +238,26 @@ sync, no migration to replay, and no `prisma:sync-*:check` for this package.
   bright lime comes back as a deeper lime, because one tone has to serve both text
   and background; `palette.primary.light` keeps their exact hex for decoration.
   Your own tokens are design decisions already made and are painted as given.
-- **The consent gate is mounted only when you pass `consent`.** Omitting it is a
-  declaration that your app has no terms flow. If you have one and forget the key,
-  nothing fails: the surface answers, nobody asks it, and a version bump strands
-  every consented user exactly as it did before this package existed.
+- **Tell the theme what your page's background actually is.** The correction is
+  computed against `theme.surface` (defaulting to `DEFAULT_SURFACES`: white in
+  light mode, `#121212` in dark). If your app reads text on a tinted card, pass
+  `theme: { surface: { light: '#F7F7F5' } }` — otherwise the seed is corrected to
+  ≥4.5:1 against a background you never paint, and the tenant's text lands under
+  the floor on the surface you do.
+- **`shell.api.fetch` is bound to `shell.api.base`.** `fetch('/consent/status')`
+  hits `${base}/consent/status`; pass surface-relative paths, not absolute ones.
+  It is `apiFetch` + `joinApiPath`, both of which you can also import directly from
+  the root entry if you want the unbound version.
+- **The signed consent cookie is `Secure` by default.** `cookie.secure` defaults to
+  `true`; pass `false` for a plain-HTTP dev box. The package cannot read your
+  `NODE_ENV`, so this is the direction silence points — and the wrong one here is
+  loud and local (the browser declines the cookie over HTTP) rather than a
+  plaintext token in production.
+- **The consent gate is mounted unless you pass `consent: false`.** That is a
+  declaration, and it is required rather than defaulted precisely because silence
+  used to be the way an app WITH a terms flow ended up ungated — nothing failed:
+  the surface answered, nobody asked it, and a version bump stranded every
+  consented user exactly as it did before this package existed.
 - **`stale: false` for an anonymous caller is deliberate.** A signed-out visitor is
   not overdue for anything; conflating the two is what made the original `401`
   unreadable.
