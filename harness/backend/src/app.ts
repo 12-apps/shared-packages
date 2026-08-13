@@ -42,6 +42,10 @@
  *    mounted whole, with its actor-context middleware wrapped around EVERY
  *    route below — which is where a host puts it, because the stamp is what
  *    attributes the writes of every other surface too;
+ *  - `/api/account/{notifications,notification-preferences,push-subscriptions}`
+ *    is @12-apps/notifications' (12-15) — the only surface here that is
+ *    TENANT-FREE, because every one of its endpoints is scoped to the signed-in
+ *    user rather than to a store;
  *  - `/__harness/**` is the SUITE'S, and belongs to none of them.
  *
  * MOUNT ORDER is load-bearing for the lifecycle surface (ADOPTING rule 7).
@@ -78,6 +82,12 @@ import { applyLifecycleMigrations } from './lifecycle-db';
 import { demoEntityRoutes } from './lifecycle-demo-crud';
 import { createLifecycleDemoTables, lifecycleHost, reseedLifecycle } from './lifecycle-host';
 import { applyMcpMigrations, mcpOauthHost, reseedMcpOauth } from './mcp-oauth-host';
+import { applyNotificationMigrations } from './notifications-db';
+import {
+  createNotificationHostTables,
+  notificationsHost,
+  reseedNotifications,
+} from './notifications-host';
 import { applyOnboardingMigrations, onboardingHost, reseedOnboarding } from './onboarding-host';
 import { pwaHost } from './pwa-host';
 import { applyRbacMigrations } from './rbac-db';
@@ -89,6 +99,12 @@ import { openReportsDb, reseed, savedReportDb } from './saved-report-db';
 
 export interface HarnessBackend {
   app: Hono;
+  /**
+   * The database itself, for suites whose subject is the SQL — a delivery row's
+   * status, a JSONB round trip, an index doing its job. Reading it through an
+   * endpoint the same suite would have to add is a longer way to assert less.
+   */
+  pg: PGlite;
   /**
    * The ONE realtime driver this process runs (12-16).
    *
@@ -135,6 +151,12 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
   await createLifecycleDemoTables(pg);
   const lifecycle = lifecycleHost(pg);
   await reseedLifecycle(pg);
+  // 12-15: the notification tables the same way. `notification_audience` is the
+  // HOST's — the authorization engine behind the permission fan-out.
+  await applyNotificationMigrations(pg);
+  await createNotificationHostTables(pg);
+  const notifications = notificationsHost(pg);
+  await reseedNotifications(pg, notifications);
   // 12-16: the outbox table, again out of the package's own tarball. The driver is
   // created HERE and shared, for the reason on `HarnessBackend.realtimeDriver`.
   await applyRealtimeMigrations(pg);
@@ -143,6 +165,7 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
     rbac,
     audit,
     lifecycle,
+    notifications,
     realtimeDriver,
     realtime: realtimeHost(pg, realtimeDriver),
     onboarding: onboardingHost(pg),
@@ -160,6 +183,7 @@ interface Hosts {
   rbac: ReturnType<typeof rbacHost>;
   audit: ReturnType<typeof auditHost>;
   lifecycle: ReturnType<typeof lifecycleHost>;
+  notifications: ReturnType<typeof notificationsHost>;
   realtime: ReturnType<typeof realtimeHost>;
   realtimeDriver: RealtimeDriver;
   onboarding: ReturnType<typeof onboardingHost>;
@@ -187,6 +211,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await reseedOnboarding(pg);
     await reseedMcpOauth(pg);
     await reseedLifecycle(pg);
+    await reseedNotifications(pg, hosts.notifications);
     hosts.entitlements.reset();
     hosts.appShell.reset();
     return c.body(null, 204);
@@ -335,8 +360,14 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.route('/api/admin/:tenantSlug', hosts.rbac.router);
   app.route('/api/admin/:tenantSlug', hosts.audit.router);
   app.route('/api/admin/:tenantSlug', hosts.onboarding.router);
+  // Self-scoped and TENANT-FREE (12-15): the account surface every signed-in
+  // user has, wherever their stores are.
+  app.route('/api/account', hosts.notifications.router);
+  app.route('/__harness/notifications', hosts.notifications.harnessRoutes);
   // Mounted at the API root, not under the tenant prefix: the surface carries BOTH its
-  // paths, and the account one takes no tenant slug at all.
+  // paths, and the account one takes no tenant slug at all. AFTER the notification
+  // mount above, deliberately: `/api` is the broader prefix of the two, and this file's
+  // header rule is that the more specific mount goes on first.
   app.route('/api', hosts.realtime.events.router);
   // 12-18, also at the API root and for the same reason: consent is a fact about the
   // CALLER, so neither of its two paths carries a tenant slug.
@@ -348,6 +379,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
 
   return {
     app,
+    pg,
     realtimeDriver: hosts.realtimeDriver,
     close: async () => {
       // Streams first, then the bus, then the database: a stream severed after its driver is

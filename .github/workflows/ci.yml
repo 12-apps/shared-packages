@@ -53,6 +53,7 @@ env:
     packages/onboarding
     packages/product-research-ui
     packages/report-builder
+    packages/notifications
     packages/mcp
     packages/prisma
     packages/shared-helpers
