@@ -59,12 +59,14 @@ updates with **no app changes**. Same contract `@12-apps/report-builder` and
      asset URL;
    - `neverCachePrefixes` (default `/api/`) → never cached, because a stale cart
      is a wrong total at checkout.
-6. **The worker is a script, not a module.** The browser fetches it from your
-   origin at a path whose directory bounds its scope, so either let
-   `createApiPwa` serve it (`Service-Worker-Allowed: /`, `Cache-Control:
-   no-cache`) or write `pwaServiceWorkerSource(...)` to `public/sw.js` in a build
-   step. `importScripts` is the seam for a host's own layers (error reporting,
-   push) and accepts **same-origin absolute paths only** — a scheme or `//` throws
+6. **The worker is a script, not a module — and it is behind `resolveApp` too.**
+   The browser fetches it from your origin at a path whose directory bounds its
+   scope, so either let `createApiPwa` serve it (`Service-Worker-Allowed: /`,
+   `Cache-Control: no-cache`, and a 404 wherever `resolveApp` returns `null`, so
+   the gate means the same thing on both routes) or write
+   `pwaServiceWorkerSource(...)` to `public/sw.js` in a build step.
+   `importScripts` is the seam for a host's own layers (error reporting, push) and
+   accepts **same-origin absolute paths only** — a scheme or `//` throws
    at generation time, because a worker may only load scripts from its own origin.
 7. **Two head tags the manifest cannot supply.** `theme-color` must be static in
    `index.html` (the browser paints the address bar before any JS runs), and
@@ -85,7 +87,11 @@ updates with **no app changes**. Same contract `@12-apps/report-builder` and
     for a long time. `beforeinstallprompt` is captured and HELD — show the invite
     where the visitor already knows what they would be installing.
 11. **The answer varies by host, so the cache key must too.** The Hono adapter
-    sends `Vary: X-Forwarded-Host` on every response it serves, because one
+    sends `Vary: X-Forwarded-Host` on every response it serves — and an adapter you
+    write yourself MUST do the same, which is why the requirement is also stated on
+    `PwaRouteResponse`, the framework-neutral descriptor. It is not in the
+    descriptor's own headers because only the adapter knows which header its
+    `resolveApp` keys the tenant off. One
     cacheable path serves every tenant: a cache keyed on the URL alone hands tenant
     A's name and icon to tenant B, and that gets INSTALLED on a home screen, which
     outlives any cache entry. This was found in the harness, in one page — two
@@ -98,7 +104,7 @@ updates with **no app changes**. Same contract `@12-apps/report-builder` and
 
 | Field | Required | Default | Notes |
 |---|---|---|---|
-| `resolveApp` | yes | — | `{ request, host }` → `PwaApp \| null`; `null` is the 404 gate |
+| `resolveApp` | yes | — | `{ request, host }` → `PwaApp \| null`; `null` is the 404 gate, on the WORKER route as well as the manifest |
 | `defaults` | no | theme `#6366F1`, background `#FFFFFF`, scope `/`, display `standalone`, short name ≤12 | per-host, set once |
 | `manifestPath` | no | `/manifest.webmanifest` | future-pay uses `/api/storefront-manifest` |
 | `manifestCacheControl` | no | `public, max-age=300, must-revalidate` | version the ICONS, don't shorten this |
