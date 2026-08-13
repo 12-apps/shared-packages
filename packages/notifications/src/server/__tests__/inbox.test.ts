@@ -65,6 +65,37 @@ describe('listing', () => {
     expect(seen).toEqual(expect.arrayContaining(ids));
   });
 
+  it('does not skip a row when the anchor was DELETED between the two pages', async () => {
+    // The bottom visible row is the one carrying the delete button, so this is
+    // the ordinary case, not an edge one. Under Prisma's positional cursor the
+    // `skip: 1` is an OFFSET applied AFTER the `where` — once the anchor stops
+    // matching `deletedAt: null`, that offset eats the first SURVIVING row, which
+    // then never appears in the list while still counting toward the badge.
+    const ids = await seedInbox('u1', 5);
+    const page1 = await api.inbox.list('u1', { limit: 2 });
+    const anchor = page1.nextCursor as string;
+    expect(anchor).toBe(page1.items[1]?.id);
+
+    expect(await api.inbox.softDelete('u1', [anchor])).toBe(1);
+
+    const page2 = await api.inbox.list('u1', { limit: 2, cursor: anchor });
+    const seen = [...page1.items, ...page2.items].map((item) => item.id);
+    // Four distinct rows across the two pages, and the survivor immediately
+    // below the deleted anchor is one of them.
+    expect(new Set(seen).size).toBe(4);
+    expect(seen).toContain(ids[2]);
+  });
+
+  it('answers an empty page for a cursor that is not the caller’s', async () => {
+    await seedInbox('u1', 3);
+    const [foreign] = await seedInbox('u2', 1);
+    const page = await api.inbox.list('u1', { cursor: foreign as string });
+    // Not page one: a foreign id names no position in this user's list, and
+    // silently restarting would repeat rows the caller has already seen.
+    expect(page).toEqual({ items: [], nextCursor: null });
+    expect((await api.inbox.list('u1', { cursor: 'invented' })).items).toEqual([]);
+  });
+
   it('clamps the page size instead of trusting the caller', async () => {
     await seedInbox('u1', 3);
     expect((await api.inbox.list('u1', { limit: 0 })).items).toHaveLength(1);

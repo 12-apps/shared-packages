@@ -23,16 +23,29 @@ export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
  * generator.
  *
  * A host may replace the set entirely (`categories` on the server config): it
- * is product vocabulary, not machinery. These four are the future-pay set and
- * the value the DB CHECK in the packaged migration allows, so a host adding a
- * fifth adds a migration of its own that widens the CHECK — the same
- * arrangement the delivery `channel` CHECK has.
+ * is product vocabulary, not machinery. These four are the future-pay set, and
+ * the packaged migration deliberately puts **no CHECK** on
+ * `notifications.category` — a closed set in the schema would be wrong for
+ * every host but the first. Unlike `channel` and `status`, which ARE the
+ * library's own closed sets and do carry one.
  */
 export const NOTIFICATION_CATEGORIES = ['orders', 'payments', 'stock', 'system'] as const;
 export type NotificationCategory = string;
 
-/** Per-channel delivery lifecycle (DB CHECK mirrors this). */
-export type DeliveryStatus = 'QUEUED' | 'SENT' | 'FAILED';
+/**
+ * Per-channel delivery lifecycle (DB CHECK mirrors this).
+ *
+ * `SENDING` is the CLAIM: exactly one dispatcher moves a row out of `QUEUED`,
+ * so two dispatchers can never both send the same delivery. A row left
+ * `SENDING` is a dispatcher that died mid-send, and the sweep reclaims it once
+ * it is older than the cutoff.
+ *
+ * `DEAD` is terminal: the attempt ceiling was reached (or the recipient no
+ * longer exists), and no sweep will pick the row up again. Without it a
+ * permanently invalid destination is a billed provider call on every sweep,
+ * forever, and the sweep's working set only grows.
+ */
+export type DeliveryStatus = 'QUEUED' | 'SENDING' | 'SENT' | 'FAILED' | 'DEAD';
 
 /**
  * Channel-agnostic content a generator produces. This is what the inbox stores

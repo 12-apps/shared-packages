@@ -35,23 +35,44 @@ export interface NotificationCreateData {
   data: Record<string, unknown>;
 }
 
+/**
+ * One page boundary, as an explicit KEYSET rather than Prisma's positional
+ * cursor.
+ *
+ * `cursor` + `skip: 1` was the obvious translation and it is wrong in exactly
+ * one case, which the inbox reaches routinely: `skip` is an OFFSET applied
+ * AFTER the `where`, so once the anchor row stops matching — the user deleted
+ * the bottom visible row, which is the one carrying the delete button — the
+ * offset consumes the first SURVIVING row instead of the anchor and that row
+ * never appears in the list. Stated as a keyset comparison on the same order
+ * key, the anchor's own membership is irrelevant, so nothing can be skipped or
+ * repeated. It also gives the two non-Prisma implementations of this seam
+ * something they can satisfy exactly instead of approximately.
+ */
+export interface NotificationPageAfter {
+  createdAt: Date;
+  id: string;
+}
+
 /** The inbox read filter. `deletedAt: null` is on every read, always. */
 export interface NotificationWhere {
   userId?: string;
   id?: string | { in: string[] };
   deletedAt: null;
   readAt?: null;
+  /** The keyset half of `(createdAt, id) < (anchor.createdAt, anchor.id)`. */
+  OR?: [{ createdAt: { lt: Date } }, { createdAt: Date; id: { lt: string } }];
 }
 
 export interface NotificationDelegate {
   create(args: { data: NotificationCreateData }): Promise<NotificationRow>;
+  /** Deliberately NOT `deletedAt`-filtered: the pager anchors on a row the
+   *  user may have just soft-deleted, and its position is still valid. */
   findUnique(args: { where: { id: string } }): Promise<NotificationRow | null>;
   findMany(args: {
     where: NotificationWhere;
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }];
     take: number;
-    cursor?: { id: string };
-    skip?: number;
   }): Promise<NotificationRow[]>;
   count(args: { where: NotificationWhere }): Promise<number>;
   updateMany(args: {
@@ -71,19 +92,28 @@ export interface NotificationDeliveryRow {
   status: string;
   error: string | null;
   sentAt: Date | null;
+  /** How many times a dispatcher has CLAIMED this row (the retry ceiling). */
+  attempts: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
+/**
+ * The delivery filter, and it is deliberately small: four shapes, all of which
+ * are either a claim's precondition or the sweep's selection.
+ *
+ * `updatedAt` and never `createdAt`. The sweep's job is "this row has not moved
+ * in a while", and `created_at` cannot express that — a row the sweep re-queued
+ * one second ago still carries a `created_at` from days back, so it reads as
+ * stale again immediately and the sweep re-dispatches its own work on every
+ * tick. Every write here advances `updatedAt`, which is what makes the cutoff
+ * mean what it says.
+ */
 export interface NotificationDeliveryWhere {
-  id?: string | { in: string[] };
+  id?: string;
   notificationId?: string;
-  status?: DeliveryStatus;
-  OR?: {
-    status: DeliveryStatus;
-    updatedAt?: { lt: Date };
-    createdAt?: { lt: Date };
-  }[];
+  status?: DeliveryStatus | { in: DeliveryStatus[] };
+  updatedAt?: { lt: Date };
 }
 
 export interface NotificationDeliveryDelegate {
@@ -91,7 +121,12 @@ export interface NotificationDeliveryDelegate {
     data: { notificationId: string; channel: NotificationChannel }[];
     skipDuplicates: true;
   }): Promise<{ count: number }>;
-  findMany(args: { where: NotificationDeliveryWhere }): Promise<NotificationDeliveryRow[]>;
+  findMany(args: {
+    where: NotificationDeliveryWhere;
+    /** Oldest-stalest first, so a bounded sweep drains a backlog in order. */
+    orderBy?: { updatedAt: 'asc' };
+    take?: number;
+  }): Promise<NotificationDeliveryRow[]>;
   update(args: {
     where: { id: string };
     data: {
@@ -100,9 +135,15 @@ export interface NotificationDeliveryDelegate {
       error?: string | null;
     };
   }): Promise<NotificationDeliveryRow>;
+  /**
+   * THE CLAIM, and the only reason this is `updateMany` rather than `update`:
+   * `where` carries the precondition ("this row is still QUEUED"), so the
+   * returned `count` answers "did I win it" — one statement, atomic in the
+   * database, and never a read the caller then validates in application code.
+   */
   updateMany(args: {
     where: NotificationDeliveryWhere;
-    data: { status: DeliveryStatus };
+    data: { status: DeliveryStatus; attempts?: { increment: number } };
   }): Promise<{ count: number }>;
 }
 
@@ -144,6 +185,13 @@ export interface PushSubscriptionRow {
 
 export interface PushSubscriptionDelegate {
   count(args: { where: { userId: string } }): Promise<number>;
+  /**
+   * The row holding one endpoint, whoever owns it. Read BEFORE an upsert so a
+   * re-own (the same browser profile, a different signed-in user) is a logged
+   * event rather than a silent transfer, and so the settings screen can be told
+   * whether THIS browser's subscription is still the caller's.
+   */
+  findUnique(args: { where: { endpoint: string } }): Promise<PushSubscriptionRow | null>;
   findMany(args: { where: { userId: string } }): Promise<PushSubscriptionRow[]>;
   upsert(args: {
     where: { endpoint: string };

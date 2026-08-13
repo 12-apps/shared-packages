@@ -55,6 +55,13 @@ const PREFERENCES = {
 function fakeTransport(
   responses: Record<string, unknown>,
   recorded: Recorded,
+  /**
+   * How writes answer. `ok` by default; the other two are what the honesty claim
+   * is ABOUT — an optimistic edit is only honest if a rejected or failed write
+   * puts the server's answer back on screen, and with an always-`ok` transport an
+   * implementation that swallowed the failure would pass every case here.
+   */
+  writes: 'ok' | 'denied' | 'throws' = 'ok',
 ): NotificationsTransport {
   return {
     get<T>(path: string): Promise<T> {
@@ -65,6 +72,8 @@ function fakeTransport(
     },
     send<T>(path: string, method: string, body?: unknown): Promise<NotificationsResult<T>> {
       recorded.writes.push({ path, method, body });
+      if (writes === 'throws') return Promise.reject(new Error('network down'));
+      if (writes === 'denied') return Promise.resolve({ ok: false, error: 'Não foi possível.' });
       return Promise.resolve({ ok: true, data: (responses[path] ?? {}) as T });
     },
   };
@@ -287,6 +296,66 @@ describe('the inbox panel', () => {
 
     await waitFor(() => expect(navigated).toEqual(['/orders/0']));
     expect(closed.count).toBe(1);
+  });
+
+  describe('optimistic edits are honest about a write that did not land', () => {
+    /** Same stubs, but every write fails — one by denial, one by rejection. */
+    function mountFailing(
+      writes: 'denied' | 'throws',
+    ): ReturnType<typeof createWebNotifications> {
+      return createWebNotifications({
+        apiBase: '/api/account',
+        transport: fakeTransport(
+          {
+            '/api/account/notifications/unread-count': { count: 2 },
+            '/api/account/notifications?limit=20': inboxPage(2),
+          },
+          recorded,
+          writes,
+        ),
+      });
+    }
+
+    it.each(['denied', 'throws'] as const)(
+      'REFETCHES the server truth when a mark-read comes back %s',
+      async (writes) => {
+        // The claim under test is invalidate-on-error, and with an always-`ok`
+        // transport an implementation that swallowed the failure and left the row
+        // showing "read" would pass every other case in this file. The refetch —
+        // not a local rollback — is what makes the screen stop asserting
+        // something the database does not say.
+        const { Panel, BellButton } = mountFailing(writes);
+        render(
+          <>
+            <BellButton onClick={() => undefined} />
+            <Panel open onClose={() => undefined} />
+          </>,
+        );
+        await waitFor(() => expect(screen.getByTestId('notification-n0')).toBeTruthy());
+        await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (2 não lidas)'));
+        const readsBefore = recorded.reads.length;
+
+        fireEvent.click(screen.getByRole('button', { name: 'Pagamento 0 (não lida)' }));
+
+        // The badge went back to the server's 2, and the row is unread again —
+        // both because page one was reloaded, not because a local undo guessed.
+        await waitFor(() => expect(recorded.reads.length).toBeGreaterThan(readsBefore));
+        await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (2 não lidas)'));
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: 'Pagamento 0 (não lida)' })).toBeTruthy(),
+        );
+      },
+    );
+
+    it('brings a deleted row BACK when the delete did not land', async () => {
+      const { Panel } = mountFailing('denied');
+      render(<Panel open onClose={() => undefined} />);
+      await waitFor(() => expect(screen.getByTestId('notification-delete-n0')).toBeTruthy());
+
+      fireEvent.click(screen.getByTestId('notification-delete-n0'));
+
+      await waitFor(() => expect(screen.getByTestId('notification-n0')).toBeTruthy());
+    });
   });
 
   it('reads NOTHING while closed, and reads on open', async () => {

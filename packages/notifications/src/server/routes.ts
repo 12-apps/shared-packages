@@ -9,6 +9,7 @@ import {
   parseMarkReadBody,
   parsePreferencesBody,
   parsePushEndpointBody,
+  parsePushEndpointQuery,
   parsePushSubscriptionBody,
   type NotificationsRoute,
 } from './context';
@@ -21,7 +22,7 @@ import type { TransportRegistry } from './transports/registry';
 /**
  * The endpoints, as framework-neutral descriptors (12-15).
  *
- * Eight routes, and the paths are the PACKAGE's: the shipped react client
+ * Nine routes, and the paths are the PACKAGE's: the shipped react client
  * builds these URLs, so a host that renamed one would be a host whose own bell
  * stopped working. The host names only where the whole block is mounted
  * (future-pay: `/api/account`).
@@ -169,13 +170,20 @@ function pushRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
     {
       method: 'GET',
       path: '/push-subscriptions',
-      handle: guarded(async ({ actor }) =>
-        ok({
+      handle: guarded(async ({ actor, query }) => {
+        const endpoint = parsePushEndpointQuery(query, deps.messages);
+        return ok({
           // null = web push is not configured on this deployment.
           vapidPublicKey: deps.transports.webPushPublicKey(),
           count: await deps.pushSubscriptions.count(actor.userId),
-        }),
-      ),
+          // Only when asked. `registered` is what lets the settings screen stop
+          // trusting the browser alone: a re-owned or pruned row answers false,
+          // so the screen offers *Ativar* again instead of claiming all is well.
+          ...(endpoint !== undefined
+            ? { registered: await deps.pushSubscriptions.isRegisteredTo(actor.userId, endpoint) }
+            : {}),
+        });
+      }),
     },
     {
       method: 'POST',

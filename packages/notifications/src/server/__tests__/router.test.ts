@@ -35,6 +35,41 @@ function fakeTransport(
   };
 }
 
+/**
+ * A transport whose `send` BLOCKS until the test lets it go, counting how many
+ * senders are inside the window at once.
+ *
+ * This is the only way to test a claim. The window a claim closes is "between
+ * reading a QUEUED row and writing SENT", and a fake that returns immediately
+ * closes that window itself — so a read-validate-write implementation passes,
+ * which is exactly how the equivalent double-send survived a full suite
+ * elsewhere in this estate.
+ */
+function latchedTransport(channel: NotificationChannel): NotificationTransport<{ text: string }> & {
+  sent: string[];
+  inside: () => number;
+  release: () => void;
+} {
+  const sent: string[] = [];
+  const state = { inside: 0, open: null as (() => void) | null };
+  const gate = new Promise<void>((resolve) => {
+    state.open = resolve;
+  });
+  return {
+    channel,
+    sent,
+    inside: () => state.inside,
+    release: () => state.open?.(),
+    supports: () => true,
+    format: (content) => ({ text: `${content.title}|${content.body}` }),
+    async send(message) {
+      state.inside += 1;
+      await gate;
+      sent.push(message.text);
+    },
+  };
+}
+
 const ORDER_PAID = {
   type: 'order.paid',
   category: 'orders',
@@ -45,6 +80,11 @@ const ORDER_PAID = {
     data: { code: payload.code },
   }),
 };
+
+/** Push a row's `updatedAt` past the sweep's cutoff, relative to its own stamp. */
+function age(row: { updatedAt: Date }, minutes = 10): void {
+  row.updatedAt = new Date(row.updatedAt.getTime() - minutes * 60_000);
+}
 
 const silentLogger = { info: () => undefined, error: () => undefined };
 
@@ -220,7 +260,7 @@ describe('notify — routing and fan-out', () => {
     const row = db.rows.deliveries[0];
     // Age the row past the sweep cutoff. Relative to the row's OWN stamp rather
     // than to a fixed date, because the sweep compares against `Date.now()`.
-    if (row) row.updatedAt = new Date(row.updatedAt.getTime() - 10 * 60_000);
+    if (row) age(row);
 
     const { dispatched } = await api.drainPending(5 * 60_000);
     expect(dispatched).toBe(1);
@@ -238,6 +278,158 @@ describe('notify — routing and fan-out', () => {
 
     await api.dispatchDeliveries(notificationId);
     expect(email.sent).toHaveLength(1);
+  });
+});
+
+describe('the claim: one delivery, one send, however many dispatchers', () => {
+  /** Commit the rows without dispatching, so a test owns every send. */
+  function mountQueued(
+    overrides: Partial<Parameters<typeof createApiNotifications>[0]> = {},
+  ): ApiNotifications {
+    return mount({ scheduleDispatch: () => Promise.resolve(), ...overrides });
+  }
+
+  async function queueOne(api: ApiNotifications, code: string): Promise<string> {
+    const { notificationId } = await api.notify({
+      type: 'order.paid',
+      recipient: { userId: 'u1' },
+      payload: { code },
+    });
+    expect(db.rows.deliveries[0]?.status).toBe('QUEUED');
+    return notificationId;
+  }
+
+  it('sends ONCE when two dispatchers race the same QUEUED delivery', async () => {
+    const api = mountQueued();
+    const email = latchedTransport('EMAIL');
+    withTransports(api, email);
+    const notificationId = await queueOne(api, 'R1');
+
+    // Both dispatchers are started before either can finish, which is the state
+    // a sweep that outlived its own cron interval is permanently in — and the
+    // state two app containers are in during every zero-downtime rollout.
+    const both = Promise.all([
+      api.dispatchDeliveries(notificationId),
+      api.dispatchDeliveries(notificationId),
+    ]);
+    // One sender is inside the window; the other has, by now, either claimed the
+    // row or been refused it. Releasing here is what makes the difference
+    // OBSERVABLE: without the claim both are inside and both push.
+    await vi.waitFor(() => expect(email.inside()).toBeGreaterThan(0));
+    email.release();
+    await both;
+
+    expect(email.inside()).toBe(1);
+    expect(email.sent).toEqual(['Pagamento confirmado|Pedido R1 pago.']);
+    expect(db.rows.deliveries).toHaveLength(1);
+    expect(db.rows.deliveries[0]).toMatchObject({ status: 'SENT', attempts: 1 });
+  });
+
+  it('never drags a committed SENT row back to QUEUED, even under two sweeps', async () => {
+    const api = mountQueued();
+    const email = latchedTransport('EMAIL');
+    withTransports(api, email);
+    await queueOne(api, 'R2');
+    // A stale QUEUED stray — what a process that died mid-dispatch leaves.
+    const row = db.rows.deliveries[0];
+    if (row) age(row);
+
+    const both = Promise.all([api.drainPending(5 * 60_000), api.drainPending(5 * 60_000)]);
+    await vi.waitFor(() => expect(email.inside()).toBeGreaterThan(0));
+    email.release();
+    const [first, second] = await both;
+
+    // Exactly one sweep did the work, and the row is not a lie in either
+    // direction: the unguarded requeue used to force a SENT row back to QUEUED
+    // while `sent_at` stayed populated, and then send it a second time.
+    expect(first.dispatched + second.dispatched).toBe(1);
+    expect(email.sent).toHaveLength(1);
+    expect(db.rows.deliveries[0]?.status).toBe('SENT');
+    expect(db.rows.deliveries[0]?.sentAt).toBeInstanceOf(Date);
+  });
+
+  it('judges staleness by updatedAt, so a just-requeued row is not instantly stray', async () => {
+    const api = mountQueued();
+    const email = fakeTransport('EMAIL');
+    withTransports(api, email);
+    await queueOne(api, 'R3');
+    const row = db.rows.deliveries[0];
+    // ANCIENT `created_at`, FRESH `updated_at` (the stamp the row was written
+    // with) — exactly the row a sweep leaves behind when it re-queues a delivery
+    // that has been failing for days. Selecting on `created_at` makes it eligible
+    // again on the very next tick, so a 2 000-row outage backlog loops and
+    // re-sends every row in it. Both dates are derived from the row's OWN stamp,
+    // never from the clock.
+    if (row) row.createdAt = new Date(row.updatedAt.getTime() - 24 * 60 * 60_000);
+
+    expect((await api.drainPending(5 * 60_000)).dispatched).toBe(0);
+    expect(email.sent).toEqual([]);
+  });
+
+  it('is BOUNDED by `take`, so one run cannot outlive its own interval', async () => {
+    const api = mountQueued();
+    const email = fakeTransport('EMAIL');
+    withTransports(api, email);
+    for (const code of ['R4', 'R5', 'R6', 'R7', 'R8']) {
+      await api.notify({ type: 'order.paid', recipient: { userId: 'u1' }, payload: { code } });
+    }
+    for (const row of db.rows.deliveries) age(row);
+
+    expect((await api.drainPending(5 * 60_000, 2)).dispatched).toBe(2);
+    expect(email.sent).toHaveLength(2);
+    // The remainder is still there, and the NEXT tick takes the next two.
+    expect(db.rows.deliveries.filter((row) => row.status === 'QUEUED')).toHaveLength(3);
+  });
+});
+
+describe('nothing is retried forever', () => {
+  it('gives up at the attempt ceiling, writes DEAD, and never sweeps it again', async () => {
+    const api = mount({ maxDeliveryAttempts: 2 });
+    withTransports(api, fakeTransport('EMAIL', { fail: true }));
+    await api.notify(
+      { type: 'order.paid', recipient: { userId: 'u1' }, payload: { code: 'D1' } },
+      { sync: true },
+    );
+    const row = db.rows.deliveries[0];
+    expect(row).toMatchObject({ status: 'FAILED', attempts: 1 });
+
+    if (row) age(row);
+    expect((await api.drainPending(5 * 60_000)).dispatched).toBe(1);
+    expect(row).toMatchObject({ status: 'DEAD', attempts: 2 });
+    expect(row?.error).toMatch(/gave up after 2 attempts/);
+
+    // Terminal, however old the row gets. Without this, a permanently invalid
+    // destination is a billed provider call on every sweep for the life of the
+    // row — and the sweep's working set only grows.
+    if (row) age(row, 600);
+    expect((await api.drainPending(5 * 60_000)).dispatched).toBe(0);
+    expect(row?.attempts).toBe(2);
+  });
+
+  it('marks the rows DEAD when the recipient no longer exists at dispatch time', async () => {
+    // The row used to be left QUEUED here, which means every sweep forever picks
+    // up a delivery for a deleted account and cannot deliver it.
+    const people: Record<string, { email: string | null; phone: string | null } | undefined> = {
+      u1: { email: 'buyer@example.com', phone: null },
+    };
+    const api = mount({
+      contacts: { getContact: (userId) => Promise.resolve(people[userId] ?? null) },
+      scheduleDispatch: () => Promise.resolve(),
+    });
+    const email = fakeTransport('EMAIL');
+    withTransports(api, email);
+    const { notificationId } = await api.notify({
+      type: 'order.paid',
+      recipient: { userId: 'u1' },
+      payload: { code: 'D2' },
+    });
+
+    delete people.u1;
+    await api.dispatchDeliveries(notificationId);
+
+    expect(email.sent).toEqual([]);
+    expect(db.rows.deliveries[0]).toMatchObject({ status: 'DEAD' });
+    expect(db.rows.deliveries[0]?.error).toMatch(/no longer knows this recipient/);
   });
 });
 
@@ -273,19 +465,33 @@ describe('the host seams around the router', () => {
     expect(result.channels).toEqual(['EMAIL']);
   });
 
-  it('fails OPEN when the policy throws — an extra notification beats none', async () => {
+  it('degrades to the FREE channels when the policy throws — never to the paid ones', async () => {
+    // "An extra notification beats a silent one" is why this does not fail
+    // CLOSED entirely: the dunning e-mail this system carries is how payment
+    // gets collected. But that argument only ever covered the free channels.
+    // Failing fully open billed the host for SMS and WhatsApp on a transient
+    // entitlements error — the exact two channels its own gate was about to
+    // refuse, and the only two that cost money per message.
     const api = mount({
       channelPolicy: () => {
         throw new Error('entitlements unavailable');
       },
     });
-    withTransports(api, fakeTransport('EMAIL'));
+    withTransports(
+      api,
+      fakeTransport('EMAIL'),
+      fakeTransport('SMS'),
+      fakeTransport('WHATSAPP'),
+      fakeTransport('WEB_PUSH'),
+    );
+    await api.preferences.save('u1', { orders: { SMS: true, WHATSAPP: true } });
 
     const result = await api.notify(
       { type: 'order.paid', recipient: { userId: 'u1', clientId: 'c1' }, payload: { code: 'B3' } },
       { sync: true },
     );
-    expect(result.channels).toEqual(['EMAIL']);
+    expect(result.channels).toEqual(['EMAIL', 'WEB_PUSH']);
+    expect(db.rows.deliveries.map((row) => row.channel).sort()).toEqual(['EMAIL', 'WEB_PUSH']);
   });
 
   it('tells the commit observer AFTER the row exists, with the tenant', async () => {

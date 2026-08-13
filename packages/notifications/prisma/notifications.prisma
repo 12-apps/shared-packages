@@ -18,8 +18,12 @@
 // transport is consulted, which is what makes "the user was told" true even
 // when every provider is down. `type` is an open dot-namespaced set validated
 // by the generator registry at the emit site (deliberately no CHECK, so a new
-// notification type ships without a migration); `category` is the closed
-// preference set and carries one.
+// notification type ships without a migration). `category` has NO CHECK either,
+// and for a stronger reason: the category set is HOST vocabulary (`categories`
+// on the server config), so a closed set in the schema would be wrong for every
+// adopter but the first. A host that wants its own taxonomy enforced adds the
+// CHECK in a migration of its own — future-pay does. Only `channel` and `status`
+// on the delivery row are closed here, because those two are the LIBRARY's.
 model Notification {
   id        String    @id @default(uuid())
   userId    String    @map("user_id")
@@ -45,19 +49,34 @@ model Notification {
 }
 
 // Per-channel delivery tracking for one Notification: one row per transport
-// channel the router fanned out to, carrying the channel lifecycle
-// (QUEUED -> SENT | FAILED, String + DB CHECK) and the provider error when a
-// send fails. `channel` is EMAIL | SMS | WHATSAPP | WEB_PUSH (CHECK in the
-// migration). `@@unique([notificationId, channel])` makes fan-out idempotent —
-// re-dispatching a notification can never enqueue a duplicate delivery, which
-// is what keeps transport sends retry-safe. Failures are isolated per row: one
-// channel failing never blocks the inbox record or the other channels.
+// channel the router fanned out to, carrying the channel lifecycle and the
+// provider error when a send fails. `channel` is EMAIL | SMS | WHATSAPP |
+// WEB_PUSH (CHECK in the migration).
+//
+// The lifecycle is QUEUED -> SENDING -> SENT | FAILED | DEAD (String + DB
+// CHECK), and the two states beyond the obvious three each remove a way to send
+// somebody a duplicate paid message:
+//
+//   - SENDING is the CLAIM. A dispatcher moves the row out of QUEUED with one
+//     conditional UPDATE and sends only if it moved exactly one row, so two
+//     dispatchers racing the same delivery make exactly one provider call.
+//     `attempts` is incremented by that same claim.
+//   - DEAD is TERMINAL, reached at the `attempts` ceiling. Without it a
+//     permanently invalid destination is a billed provider call on every sweep
+//     for the life of the row.
+//
+// `@@unique([notificationId, channel])` makes fan-out idempotent — re-dispatching
+// a notification can never enqueue a duplicate delivery. Failures are isolated
+// per row: one channel failing never blocks the inbox record or the others.
 model NotificationDelivery {
   id             String    @id @default(uuid())
   notificationId String    @map("notification_id")
   channel        String
   status         String    @default("QUEUED")
   error          String?
+  /// Claims spent on this row. The retry ceiling counts these, not failures, so
+  /// a dispatcher that dies mid-send still spends one and cannot loop forever.
+  attempts       Int       @default(0)
   sentAt         DateTime? @map("sent_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
@@ -65,8 +84,11 @@ model NotificationDelivery {
   notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 
   @@unique([notificationId, channel])
-  // Serves the retry sweep ("re-dispatch QUEUED/FAILED deliveries").
-  @@index([status, createdAt])
+  // Serves the retry sweep: `status IN (…) AND updated_at < cutoff`. On
+  // `updatedAt`, because "stale" is a question about the last write and
+  // `createdAt` cannot answer it — a row re-queued a second ago has an ancient
+  // `created_at` and would read as stale again immediately.
+  @@index([status, updatedAt])
   @@map("notification_deliveries")
 }
 

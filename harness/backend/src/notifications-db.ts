@@ -23,8 +23,10 @@ import type {
   NotificationDelegate,
   NotificationDeliveryDelegate,
   NotificationDeliveryRow,
+  NotificationDeliveryWhere,
   NotificationsDb,
   NotificationsDbClient,
+  NotificationWhere,
 } from '@12-apps/notifications/server';
 import type { NotificationRow } from '@12-apps/notifications';
 
@@ -77,15 +79,7 @@ const notificationRow = (row: NotificationSqlRow): NotificationRow => ({
 });
 
 /** The inbox filter, translated. `deleted_at IS NULL` is on every read. */
-function notificationWhere(
-  where: {
-    userId?: string;
-    id?: string | { in: string[] };
-    deletedAt: null;
-    readAt?: null;
-  },
-  params: Params,
-): string {
+function notificationWhere(where: NotificationWhere, params: Params): string {
   const conditions = ['deleted_at IS NULL'];
   if (where.userId !== undefined) conditions.push(`user_id = ${params.add(where.userId)}`);
   if (where.readAt === null) conditions.push('read_at IS NULL');
@@ -93,6 +87,18 @@ function notificationWhere(
   else if (where.id !== undefined) {
     if (where.id.in.length === 0) return 'FALSE';
     conditions.push(`id IN (${where.id.in.map((value) => params.add(value)).join(', ')})`);
+  }
+  if (where.OR !== undefined) {
+    // The package hands over the page boundary as a KEYSET, so this is a literal
+    // row-value comparison rather than a translation of a positional cursor.
+    // That is the whole reason it changed: `cursor` + `skip: 1` is an OFFSET
+    // applied after the filter, and this suite's SQL had to diverge from Prisma
+    // deliberately to avoid skipping a row once the anchor stopped matching. Now
+    // there is nothing to diverge from.
+    const [older, sameInstant] = where.OR;
+    conditions.push(
+      `(created_at, id) < (${params.add(older.createdAt.lt)}, ${params.add(sameInstant.id.lt)})`,
+    );
   }
   return conditions.join(' AND ');
 }
@@ -123,18 +129,9 @@ function notificationDelegate(sql: SqlRunner): NotificationDelegate {
       const row = rows[0];
       return row ? notificationRow(row) : null;
     },
-    async findMany({ where, take, cursor, skip }) {
+    async findMany({ where, take }) {
       const params = new Params();
-      // The cursor is Prisma's: "start AT this id", and `skip: 1` moves past it.
-      // Translated as a keyset comparison on the SAME order key, which is the
-      // only translation that cannot skip or repeat a row.
-      let clause = notificationWhere(where, params);
-      if (cursor) {
-        const anchor = params.add(cursor.id);
-        clause +=
-          ` AND (created_at, id) ${skip === 1 ? '<' : '<='} ` +
-          `((SELECT created_at FROM notifications WHERE id = ${anchor}), ${anchor})`;
-      }
+      const clause = notificationWhere(where, params);
       const { rows } = await sql.query<NotificationSqlRow>(
         `SELECT * FROM notifications WHERE ${clause}
          ORDER BY created_at DESC, id DESC LIMIT ${params.add(take)}`,
@@ -172,6 +169,7 @@ interface DeliverySqlRow {
   channel: string;
   status: string;
   error: string | null;
+  attempts: number;
   sent_at: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -183,38 +181,28 @@ const deliveryRow = (row: DeliverySqlRow): NotificationDeliveryRow => ({
   channel: row.channel,
   status: row.status,
   error: row.error,
+  attempts: Number(row.attempts),
   sentAt: row.sent_at,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
 
-function deliveryWhere(
-  where: {
-    id?: string | { in: string[] };
-    notificationId?: string;
-    status?: string;
-    OR?: { status: string; updatedAt?: { lt: Date }; createdAt?: { lt: Date } }[];
-  },
-  params: Params,
-): string {
+function deliveryWhere(where: NotificationDeliveryWhere, params: Params): string {
   const conditions: string[] = [];
-  if (typeof where.id === 'string') conditions.push(`id = ${params.add(where.id)}`);
-  else if (where.id !== undefined) {
-    if (where.id.in.length === 0) return 'FALSE';
-    conditions.push(`id IN (${where.id.in.map((value) => params.add(value)).join(', ')})`);
-  }
+  if (where.id !== undefined) conditions.push(`id = ${params.add(where.id)}`);
   if (where.notificationId !== undefined) {
     conditions.push(`notification_id = ${params.add(where.notificationId)}`);
   }
-  if (where.status !== undefined) conditions.push(`status = ${params.add(where.status)}`);
-  if (where.OR !== undefined) {
-    const branches = where.OR.map((clause) => {
-      const parts = [`status = ${params.add(clause.status)}`];
-      if (clause.updatedAt) parts.push(`updated_at < ${params.add(clause.updatedAt.lt)}`);
-      if (clause.createdAt) parts.push(`created_at < ${params.add(clause.createdAt.lt)}`);
-      return `(${parts.join(' AND ')})`;
-    });
-    conditions.push(`(${branches.join(' OR ')})`);
+  if (typeof where.status === 'string') {
+    conditions.push(`status = ${params.add(where.status)}`);
+  } else if (where.status !== undefined) {
+    if (where.status.in.length === 0) return 'FALSE';
+    conditions.push(
+      `status IN (${where.status.in.map((value) => params.add(value)).join(', ')})`,
+    );
+  }
+  if (where.updatedAt !== undefined) {
+    conditions.push(`updated_at < ${params.add(where.updatedAt.lt)}`);
   }
   return conditions.length > 0 ? conditions.join(' AND ') : 'TRUE';
 }
@@ -240,11 +228,14 @@ function deliveryDelegate(sql: SqlRunner): NotificationDeliveryDelegate {
       );
       return { count: affectedRows ?? 0 };
     },
-    async findMany({ where }) {
+    async findMany({ where, orderBy, take }) {
       const params = new Params();
+      const clause = deliveryWhere(where, params);
+      const order = orderBy ? 'updated_at ASC, id' : 'created_at, id';
+      const limit = take === undefined ? '' : ` LIMIT ${params.add(take)}`;
       const { rows } = await sql.query<DeliverySqlRow>(
-        `SELECT * FROM notification_deliveries WHERE ${deliveryWhere(where, params)}
-         ORDER BY created_at, id`,
+        `SELECT * FROM notification_deliveries WHERE ${clause}
+         ORDER BY ${order}${limit}`,
         params.values,
       );
       return rows.map(deliveryRow);
@@ -263,12 +254,20 @@ function deliveryDelegate(sql: SqlRunner): NotificationDeliveryDelegate {
       if (!row) throw new Error(`no delivery ${where.id}`);
       return deliveryRow(row);
     },
+    // The CLAIM, over real SQL: one statement whose WHERE carries the
+    // precondition, so `affectedRows` is the answer to "did I win it". Two
+    // callers racing the same row cannot both get 1 — the second re-evaluates
+    // the predicate against the row the first committed.
     async updateMany({ where, data }) {
       const params = new Params();
-      const assignment = `status = ${params.add(data.status)}`;
+      const assignments = [`status = ${params.add(data.status)}`];
+      if (data.attempts) {
+        assignments.push(`attempts = attempts + ${params.add(data.attempts.increment)}`);
+      }
       const clause = deliveryWhere(where, params);
       const { affectedRows } = await sql.query(
-        `UPDATE notification_deliveries SET ${assignment}, updated_at = NOW() WHERE ${clause}`,
+        `UPDATE notification_deliveries SET ${assignments.join(', ')}, updated_at = NOW()
+         WHERE ${clause}`,
         params.values,
       );
       return { count: affectedRows ?? 0 };

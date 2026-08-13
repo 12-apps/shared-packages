@@ -75,7 +75,7 @@ beforeEach(() => {
 });
 
 describe('the route table', () => {
-  it('is the eight endpoints, in mount order', () => {
+  it('is the nine endpoints, in mount order', () => {
     expect(api.routes.map((entry) => `${entry.method} ${entry.path}`)).toEqual([
       'GET /notifications',
       'GET /notifications/unread-count',
@@ -321,6 +321,55 @@ describe('the push-subscription endpoints', () => {
     await call('POST', '/push-subscriptions', { body: subscription, userId: 'u-nophone' });
     expect(db.rows.subscriptions).toHaveLength(1);
     expect(db.rows.subscriptions[0]?.userId).toBe('u-nophone');
+  });
+
+  it('LOGS a re-own, naming both users and never the endpoint', async () => {
+    // A silent transfer is what makes "user X stopped getting web push on the
+    // counter PC" unanswerable. The endpoint stays out of it: it is a bearer
+    // capability for that browser and must not reach logs.
+    const errors: string[] = [];
+    mount({ logger: { info: () => undefined, error: (message) => errors.push(message) } });
+    await call('POST', '/push-subscriptions', { body: subscription });
+    expect(errors).toEqual([]);
+
+    await call('POST', '/push-subscriptions', { body: subscription, userId: 'u-nophone' });
+    expect(errors.join('\n')).toMatch(/push endpoint re-owned: user u1 lost .* to user u-nophone/);
+    expect(errors.join('\n')).not.toContain(subscription.endpoint);
+  });
+
+  it('answers `registered: false` once the row is somebody ELSE\'s', async () => {
+    // The whole point of the flag. Ana's browser still holds the subscription
+    // object, so a browser-only check says "receiving alerts" forever while the
+    // row belongs to Otávio — a healthy UI over a channel that is gone.
+    await call('POST', '/push-subscriptions', { body: subscription });
+    const mine = data<{ registered?: boolean }>(
+      await call('GET', '/push-subscriptions', { query: { endpoint: subscription.endpoint } }),
+    );
+    expect(mine.registered).toBe(true);
+
+    await call('POST', '/push-subscriptions', { body: subscription, userId: 'u-nophone' });
+    const stolen = data<{ registered?: boolean }>(
+      await call('GET', '/push-subscriptions', { query: { endpoint: subscription.endpoint } }),
+    );
+    expect(stolen.registered).toBe(false);
+  });
+
+  it('answers `registered: false` for an endpoint nobody registered, and omits it unasked', async () => {
+    // Same answer for "no such row" and "not yours", so the flag tells a caller
+    // holding a foreign endpoint nothing about who owns it.
+    const unknown = data<{ registered?: boolean; count: number }>(
+      await call('GET', '/push-subscriptions', { query: { endpoint: 'https://push.example.com/x' } }),
+    );
+    expect(unknown.registered).toBe(false);
+
+    const plain = data<{ registered?: boolean }>(await call('GET', '/push-subscriptions'));
+    expect('registered' in plain).toBe(false);
+  });
+
+  it('refuses a junk `endpoint` query rather than looking it up', async () => {
+    for (const endpoint of ['not-a-url', 'javascript:alert(1)', 'a'.repeat(2001)]) {
+      expect((await call('GET', '/push-subscriptions', { query: { endpoint } })).status).toBe(400);
+    }
   });
 
   it('removes by endpoint, owner-scoped', async () => {

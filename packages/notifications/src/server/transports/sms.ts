@@ -40,8 +40,13 @@ export interface SmsDriverDeclaration extends DriverDeclarationBase {
   authToken?: string;
   from?: string;
   appUrl?: string;
-  /** Country calling code for a bare local number. Default `55`. */
-  defaultCountryCode?: string;
+  /**
+   * Country calling code for a bare local number, digits only (`'55'`, `'1'`).
+   * REQUIRED: this package assumes no country, because the one it used to
+   * assume turned a US number into a plausible Brazilian mobile and texted a
+   * stranger the customer's order (see `../../phone.ts`).
+   */
+  defaultCountryCode: string;
   logger?: NotificationLogger;
 }
 
@@ -108,9 +113,7 @@ export function smsTransport(
 ): NotificationTransport<SmsMessage> {
   const driver = resolveDriver('SMS', declaration, { ...SMS_DRIVERS, ...extraDrivers });
   return phoneChannel<SmsMessage>('SMS', {
-    ...(declaration.defaultCountryCode !== undefined
-      ? { defaultCountryCode: declaration.defaultCountryCode }
-      : {}),
+    defaultCountryCode: declaration.defaultCountryCode,
     format: (content) => formatSms(content, declaration),
     send: (toE164, message) => driver.send(toE164, message),
   });

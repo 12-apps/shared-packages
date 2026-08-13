@@ -1,6 +1,11 @@
 import { inboxWire, type ListNotificationsResult } from '../wire';
 
-import type { NotificationsDbProvider } from './db';
+import type {
+  NotificationDelegate,
+  NotificationPageAfter,
+  NotificationsDbProvider,
+  NotificationWhere,
+} from './db';
 
 /**
  * Notification-centre inbox reads/writes. Every function is scoped to the
@@ -13,7 +18,13 @@ import type { NotificationsDbProvider } from './db';
 export interface ListNotificationsInput {
   /** `unread` narrows to unread rows; default lists all non-deleted. */
   filter?: 'all' | 'unread';
-  /** Cursor = the `id` of the last item of the previous page. */
+  /**
+   * Cursor = the `id` of the last item of the previous page. Resolved to a
+   * KEYSET position, so a row the user soft-deleted between the two requests —
+   * routinely the bottom one, since that is the row with the delete button —
+   * still anchors the next page instead of costing it a row. Owner-checked: an
+   * id that is not the caller's names no position and answers an empty page.
+   */
   cursor?: string;
   /** Page size (server-clamped 1..100, default 20). */
   limit?: number;
@@ -30,22 +41,63 @@ export interface NotificationInboxStore {
   softDelete(userId: string, ids: readonly string[]): Promise<number>;
 }
 
+/**
+ * Resolve a cursor into a keyset anchor, or refuse it.
+ *
+ * OWNERSHIP-CHECKED, which the positional cursor never was: `cursor` is a raw
+ * client value, and while the `where` kept the ROWS the caller's own, the
+ * anchor's position leaked the `created_at` of whatever row the id named.
+ * `undefined` here means "this cursor names no position in your list" and the
+ * caller answers an empty page — the anchor is not `deletedAt`-filtered, so the
+ * only way to reach that is a foreign or invented id.
+ */
+async function resolveAnchor(
+  notifications: NotificationDelegate,
+  userId: string,
+  cursor: string,
+): Promise<NotificationPageAfter | undefined> {
+  const anchor = await notifications.findUnique({ where: { id: cursor } });
+  if (!anchor || anchor.userId !== userId) return undefined;
+  return { createdAt: anchor.createdAt, id: anchor.id };
+}
+
+/** The whole read filter for one page: owner, live, filter, page boundary. */
+function pageWhere(
+  userId: string,
+  filter: ListNotificationsInput['filter'],
+  anchor: NotificationPageAfter | undefined,
+): NotificationWhere {
+  return {
+    userId,
+    deletedAt: null,
+    ...(filter === 'unread' ? { readAt: null } : {}),
+    // `(createdAt, id) < (anchor.createdAt, anchor.id)`, as a portable `where`.
+    ...(anchor
+      ? {
+          OR: [
+            { createdAt: { lt: anchor.createdAt } },
+            { createdAt: anchor.createdAt, id: { lt: anchor.id } },
+          ] as NonNullable<NotificationWhere['OR']>,
+        }
+      : {}),
+  };
+}
+
 export function createInboxStore(db: NotificationsDbProvider): NotificationInboxStore {
   return {
-    /** The owner's inbox, newest first, cursor-paginated, deleted excluded. */
+    /** The owner's inbox, newest first, keyset-paginated, deleted excluded. */
     async list(userId, input = {}) {
       const client = await db();
       const limit = Math.min(Math.max(input.limit ?? DEFAULT_PAGE, 1), MAX_PAGE);
+      const anchor = input.cursor
+        ? await resolveAnchor(client.notification, userId, input.cursor)
+        : undefined;
+      if (input.cursor && !anchor) return { items: [], nextCursor: null };
       const rows = await client.notification.findMany({
-        where: {
-          userId,
-          deletedAt: null,
-          ...(input.filter === 'unread' ? { readAt: null } : {}),
-        },
-        // `id` tie-breaks equal timestamps so cursor pages never skip/repeat.
+        where: pageWhere(userId, input.filter, anchor),
+        // `id` tie-breaks equal timestamps so pages never skip/repeat.
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: limit + 1,
-        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
       });
       const page = rows.slice(0, limit);
       return {

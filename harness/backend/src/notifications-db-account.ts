@@ -99,6 +99,15 @@ export function subscriptionDelegate(sql: SqlRunner): PushSubscriptionDelegate {
       );
       return Number(rows[0]?.count ?? 0);
     },
+    async findUnique({ where }) {
+      const params = new Params();
+      const { rows } = await sql.query<SubscriptionSqlRow>(
+        `SELECT * FROM push_subscriptions WHERE endpoint = ${params.add(where.endpoint)}`,
+        params.values,
+      );
+      const row = rows[0];
+      return row ? subscriptionRow(row) : null;
+    },
     async findMany({ where }) {
       const params = new Params();
       const { rows } = await sql.query<SubscriptionSqlRow>(

@@ -28,6 +28,13 @@ import {
  * free-form text, and a send outside the session window FAILS with the
  * provider's error recorded on the delivery row — the documented fallback
  * behaviour, visible instead of silent.
+ *
+ * The window cannot be TRACKED from here (only Meta knows when the customer
+ * last wrote), so a host that declares WHATSAPP with no `templateName` and then
+ * emits business-initiated notifications has every send rejected. That is
+ * visible on the delivery rows, but only once they exist — so the mount warns
+ * about the combination the moment the declaration is read, which is the one
+ * moment a misconfiguration is cheap to notice.
  */
 
 /** The channel message the WhatsApp formatter produces. */
@@ -52,7 +59,11 @@ export interface WhatsAppDriverDeclaration extends DriverDeclarationBase {
   /** Graph API base, so a host can pin a version. */
   graphApiBase?: string;
   appUrl?: string;
-  defaultCountryCode?: string;
+  /**
+   * Country calling code for a bare local number, digits only (`'55'`, `'1'`).
+   * REQUIRED for the same reason SMS requires it — see `../../phone.ts`.
+   */
+  defaultCountryCode: string;
   logger?: NotificationLogger;
 }
 
@@ -148,15 +159,24 @@ export function formatWhatsApp(
 export function whatsAppTransport(
   declaration: WhatsAppDriverDeclaration,
   extraDrivers: Record<string, (d: WhatsAppDriverDeclaration) => WhatsAppDriver> = {},
+  logger?: NotificationLogger,
 ): NotificationTransport<WhatsAppMessage> {
   const driver = resolveDriver('WHATSAPP', declaration, {
     ...WHATSAPP_DRIVERS,
     ...extraDrivers,
   });
+  if (!declaration.templateName) {
+    // Not a throw: free-form IS correct for a host that only replies inside the
+    // 24h window. It is a warning because the other reading — business-initiated
+    // alerts with no template — is a channel that never delivers anything.
+    logger?.error(
+      '[notifications] WHATSAPP is declared with no `templateName`: only free-form ' +
+        'replies inside the 24h customer-service window will be accepted, and every ' +
+        'business-initiated send will be rejected by the Graph API.',
+    );
+  }
   return phoneChannel<WhatsAppMessage>('WHATSAPP', {
-    ...(declaration.defaultCountryCode !== undefined
-      ? { defaultCountryCode: declaration.defaultCountryCode }
-      : {}),
+    defaultCountryCode: declaration.defaultCountryCode,
     format: (content) => formatWhatsApp(content, declaration),
     send: (toE164, message) => driver.send(toE164, message),
   });

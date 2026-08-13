@@ -25,6 +25,7 @@ import type { NotificationGenerator } from '@12-apps/notifications';
 import { notificationsRouter } from '@12-apps/notifications/hono';
 
 import { notificationsDb } from './notifications-db';
+import { createOutboxLatch, type OutboxLatch } from './notifications-latch';
 
 /** The mounted surface's type — inferred, so the host keeps its exact shape. */
 export type HarnessNotifications = ReturnType<typeof notificationsHost>;
@@ -135,6 +136,9 @@ export async function reseedNotifications(
   pg: PGlite,
   notifications: HarnessNotifications,
 ): Promise<void> {
+  // Before the truncate: a case that failed while holding the latch would
+  // otherwise wedge every send after it, in this run and in the reset itself.
+  notifications.latch.release();
   await pg.exec(
     `TRUNCATE TABLE notification_deliveries, notifications, notification_preferences,
      push_subscriptions, notification_audience`,
@@ -185,10 +189,16 @@ export async function reseedNotifications(
  * which is what makes "it was actually sent on this channel, with this body" an
  * assertion rather than an assumption.
  */
-function recorder(outbox: OutboxEntry[]) {
-  const record = (channel: string, destination: string, payload: unknown): Promise<void> => {
+function recorder(outbox: OutboxEntry[], latch: OutboxLatch) {
+  const record = async (
+    channel: string,
+    destination: string,
+    payload: unknown,
+  ): Promise<void> => {
+    // Held only when a test is holding it; a plain `await` on a resolved promise
+    // otherwise, so every other case still records synchronously-ish.
+    await latch.wait();
     outbox.push({ channel, destination, payload: JSON.stringify(payload) });
-    return Promise.resolve();
   };
   // All four channels declared against ONE host driver key. A real host writes
   // `driver: 'resend'` here and nothing else changes — which is the claim.
@@ -236,11 +246,30 @@ function audienceDirectory(pg: PGlite) {
  * published surface.
  */
 function harnessControls(
-  surface: Pick<HarnessNotifications, 'notify' | 'notifyByPermission' | 'drainPending'>,
+  surface: Pick<
+    HarnessNotifications,
+    'notify' | 'notifyByPermission' | 'drainPending' | 'dispatchDeliveries'
+  >,
   outbox: OutboxEntry[],
+  latch: OutboxLatch,
 ): Hono {
   const routes = new Hono();
   routes.get('/outbox', (c) => c.json({ data: { entries: outbox } }));
+  // The dispatcher, addressable one notification at a time — so the suite can
+  // start TWO of them against the same row and assert that only one send comes
+  // out. Paired with hold/release, which is what keeps both inside the window.
+  routes.post('/dispatch', async (c) => {
+    await surface.dispatchDeliveries(c.req.query('id') ?? '');
+    return c.json({ data: { ok: true } });
+  });
+  routes.post('/hold', (c) => {
+    latch.hold();
+    return c.json({ data: { held: true } });
+  });
+  routes.post('/release', (c) => {
+    latch.release();
+    return c.json({ data: { held: false } });
+  });
   routes.post('/emit', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as {
       type?: string;
@@ -261,12 +290,19 @@ function harnessControls(
     );
     return c.json({ data: result });
   });
-  routes.post('/drain', async (c) =>
+  routes.post('/drain', async (c) => {
     // The retry sweep a host puts on a cron, reachable from the suite and from
     // the page — the delivery rows are the durable record, so this is what turns
-    // a failed send into a delivered one.
-    c.json({ data: await surface.drainPending(Number(c.req.query('olderThanMs') ?? 0)) }),
-  );
+    // a failed send into a delivered one. `take` is exposed so the suite can
+    // assert the bound over real SQL rather than only against the fake.
+    const take = c.req.query('take');
+    return c.json({
+      data: await surface.drainPending(
+        Number(c.req.query('olderThanMs') ?? 0),
+        take === undefined ? undefined : Number(take),
+      ),
+    });
+  });
   routes.post('/fan-out', async (c) =>
     c.json({
       data: await surface.notifyByPermission(
@@ -282,6 +318,7 @@ function harnessControls(
 /** The mounted surface: the package's router behind this host's seams. */
 export function notificationsHost(pg: PGlite) {
   const outbox: OutboxEntry[] = [];
+  const latch = createOutboxLatch();
 
   const surface = notificationsRouter({
     db: () => Promise.resolve(notificationsDb(pg)),
@@ -294,11 +331,25 @@ export function notificationsHost(pg: PGlite) {
     },
     transports: [
       { channel: 'EMAIL', driver: 'harness', appUrl: 'https://harness.test' },
-      { channel: 'SMS', driver: 'harness', appUrl: 'https://harness.test' },
-      { channel: 'WHATSAPP', driver: 'harness', appUrl: 'https://harness.test' },
+      // `defaultCountryCode` is REQUIRED on both phone channels, and this is what
+      // that requirement looks like from a host: one line, stated once, instead
+      // of a package-level guess that turns a foreign number into a local one.
+      {
+        channel: 'SMS',
+        driver: 'harness',
+        appUrl: 'https://harness.test',
+        defaultCountryCode: '55',
+      },
+      {
+        channel: 'WHATSAPP',
+        driver: 'harness',
+        appUrl: 'https://harness.test',
+        templateName: 'harness_alert',
+        defaultCountryCode: '55',
+      },
       { channel: 'WEB_PUSH', driver: 'harness', publicKey: 'BHarnessVapidPublicKey' },
     ],
-    drivers: recorder(outbox),
+    drivers: recorder(outbox, latch),
     // The plan gate: the free tenant pays for the inbox and nothing else, so a
     // tenant-scoped emit there DEGRADES to zero channels rather than vanishing.
     channelPolicy: (clientId, channels) =>
@@ -313,5 +364,10 @@ export function notificationsHost(pg: PGlite) {
     },
   });
 
-  return { ...surface, harnessRoutes: harnessControls(surface, outbox), outbox };
+  return {
+    ...surface,
+    harnessRoutes: harnessControls(surface, outbox, latch),
+    outbox,
+    latch,
+  };
 }

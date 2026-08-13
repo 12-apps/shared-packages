@@ -3,12 +3,15 @@
    design (an UPDATE mutates the stored row exactly as a table would), and
    `new Date()` stamps rows the way a column default does — no assertion ever
    reads a wall-clock value. */
+import type { DeliveryStatus } from '../../types';
 import type { NotificationRow } from '../../wire';
 import type {
   NotificationDeliveryRow,
+  NotificationDeliveryWhere,
   NotificationPreferenceRow,
   NotificationsDb,
   NotificationsDbClient,
+  NotificationWhere,
   PushSubscriptionRow,
 } from '../db';
 
@@ -33,7 +36,29 @@ export interface MemoryDb extends NotificationsDb {
   };
 }
 
-function live(rows: NotificationRow[], where: { deletedAt: null; userId?: string; id?: string | { in: string[] }; readAt?: null }): NotificationRow[] {
+/**
+ * A row as a READ returns it: a snapshot, never the stored object.
+ *
+ * Handing back the live object is the subtlest way a fake can disagree with a
+ * database, and it disagrees precisely where the claim lives: code that reads a
+ * row, then issues an UPDATE, then consults the value it read would see the
+ * UPDATE's own effect through the alias. A real `SELECT` cannot do that, so the
+ * fake must not either — the retry ceiling counted one attempt too many under
+ * exactly this aliasing.
+ */
+const snapshot = <T extends object>(row: T): T => ({ ...row });
+
+/** `(createdAt, id) < (anchor.createdAt, anchor.id)` — the keyset half. */
+function afterAnchor(row: NotificationRow, or: NonNullable<NotificationWhere['OR']>): boolean {
+  const [older, sameInstant] = or;
+  if (row.createdAt.getTime() < older.createdAt.lt.getTime()) return true;
+  return (
+    row.createdAt.getTime() === sameInstant.createdAt.getTime() &&
+    row.id < sameInstant.id.lt
+  );
+}
+
+function live(rows: NotificationRow[], where: NotificationWhere): NotificationRow[] {
   return rows.filter((row) => {
     if (row.deletedAt !== null) return false;
     if (where.userId !== undefined && row.userId !== where.userId) return false;
@@ -42,8 +67,33 @@ function live(rows: NotificationRow[], where: { deletedAt: null; userId?: string
     if (where.id !== undefined && typeof where.id !== 'string' && !where.id.in.includes(row.id)) {
       return false;
     }
+    if (where.OR !== undefined && !afterAnchor(row, where.OR)) return false;
     return true;
   });
+}
+
+/**
+ * One delivery `where`, evaluated exactly as the SQL would.
+ *
+ * It matters that this is TOTAL over the shape rather than "the clauses the
+ * caller happens to pass": the version this replaced ignored `status` in
+ * `updateMany` entirely, which made the double unable to distinguish a guarded
+ * requeue from an unguarded one — so the whole class of claim bug was invisible
+ * to every unit test by construction.
+ */
+function matchesDelivery(row: NotificationDeliveryRow, where: NotificationDeliveryWhere): boolean {
+  if (where.id !== undefined && row.id !== where.id) return false;
+  if (where.notificationId !== undefined && row.notificationId !== where.notificationId) {
+    return false;
+  }
+  if (typeof where.status === 'string' && row.status !== where.status) return false;
+  if (where.status !== undefined && typeof where.status !== 'string') {
+    if (!where.status.in.includes(row.status as DeliveryStatus)) return false;
+  }
+  if (where.updatedAt !== undefined && row.updatedAt.getTime() >= where.updatedAt.lt.getTime()) {
+    return false;
+  }
+  return true;
 }
 
 export function createMemoryDb(): MemoryDb {
@@ -71,15 +121,15 @@ export function createMemoryDb(): MemoryDb {
       findUnique({ where }) {
         return Promise.resolve(notifications.find((row) => row.id === where.id) ?? null);
       },
-      findMany({ where, take, cursor, skip }) {
+      findMany({ where, take }) {
+        // The keyset lives in `where` now, so paging here is a filter plus a
+        // sort — the same two operations the SQL does, and with no index
+        // arithmetic that could disagree with either real implementation.
         const ordered = [...live(notifications, where)].sort((a, b) => {
           const byDate = b.createdAt.getTime() - a.createdAt.getTime();
           return byDate !== 0 ? byDate : (a.id < b.id ? 1 : -1);
         });
-        const start = cursor
-          ? ordered.findIndex((row) => row.id === cursor.id) + (skip ?? 0)
-          : 0;
-        return Promise.resolve(ordered.slice(start, start + take));
+        return Promise.resolve(ordered.slice(0, take));
       },
       count({ where }) {
         return Promise.resolve(live(notifications, where).length);
@@ -106,6 +156,7 @@ export function createMemoryDb(): MemoryDb {
             channel: entry.channel,
             status: 'QUEUED',
             error: null,
+            attempts: 0,
             sentAt: null,
             createdAt: now,
             updatedAt: now,
@@ -114,37 +165,29 @@ export function createMemoryDb(): MemoryDb {
         }
         return Promise.resolve({ count });
       },
-      findMany({ where }) {
-        return Promise.resolve(
-          deliveries.filter((row) => {
-            if (where.notificationId !== undefined && row.notificationId !== where.notificationId) {
-              return false;
-            }
-            if (where.status !== undefined && row.status !== where.status) return false;
-            if (where.OR !== undefined) {
-              return where.OR.some((clause) => {
-                if (row.status !== clause.status) return false;
-                if (clause.updatedAt && row.updatedAt >= clause.updatedAt.lt) return false;
-                if (clause.createdAt && row.createdAt >= clause.createdAt.lt) return false;
-                return true;
-              });
-            }
-            return true;
-          }),
-        );
+      findMany({ where, orderBy, take }) {
+        const matched = deliveries.filter((row) => matchesDelivery(row, where));
+        if (orderBy) matched.sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime());
+        const page = take === undefined ? matched : matched.slice(0, take);
+        return Promise.resolve(page.map(snapshot));
       },
       update({ where, data }) {
         const row = deliveries.find((entry) => entry.id === where.id);
         if (!row) throw new Error(`no delivery ${where.id}`);
         Object.assign(row, data, { updatedAt: new Date() });
-        return Promise.resolve(row);
+        return Promise.resolve(snapshot(row));
       },
+      // ATOMIC, and that is the point: the predicate is evaluated and the rows
+      // are written with no `await` in between, so an interleaved second caller
+      // sees the finished result exactly as it would see a committed UPDATE.
+      // A claim is only a claim if this cannot be split.
       updateMany({ where, data }) {
-        const ids = where.id;
-        const matched = deliveries.filter((row) =>
-          typeof ids === 'string' ? row.id === ids : (ids?.in.includes(row.id) ?? true),
-        );
-        for (const row of matched) Object.assign(row, data, { updatedAt: new Date() });
+        const { attempts, ...rest } = data;
+        const matched = deliveries.filter((row) => matchesDelivery(row, where));
+        for (const row of matched) {
+          Object.assign(row, rest, { updatedAt: new Date() });
+          if (attempts) row.attempts += attempts.increment;
+        }
         return Promise.resolve({ count: matched.length });
       },
     },
@@ -182,6 +225,11 @@ export function createMemoryDb(): MemoryDb {
       },
       findMany({ where }) {
         return Promise.resolve(subscriptions.filter((row) => row.userId === where.userId));
+      },
+      findUnique({ where }) {
+        return Promise.resolve(
+          subscriptions.find((row) => row.endpoint === where.endpoint) ?? null,
+        );
       },
       upsert({ where, create, update }) {
         const existing = subscriptions.find((row) => row.endpoint === where.endpoint);

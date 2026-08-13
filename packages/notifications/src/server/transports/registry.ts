@@ -1,4 +1,8 @@
-import type { NotificationChannel, NotificationTransport } from '../../types';
+import type {
+  NotificationChannel,
+  NotificationLogger,
+  NotificationTransport,
+} from '../../types';
 
 import type { EmailDriver, EmailDriverDeclaration } from './email';
 import { emailTransport } from './email';
@@ -51,6 +55,7 @@ function build(
   declaration: TransportDeclaration,
   subscriptions: WebPushSubscriptionSource,
   extra: ExtraDrivers,
+  logger?: NotificationLogger,
 ): NotificationTransport<never> {
   switch (declaration.channel) {
     case 'EMAIL':
@@ -61,6 +66,7 @@ function build(
       return whatsAppTransport(
         declaration,
         extra.whatsapp ?? {},
+        logger,
       ) as NotificationTransport<never>;
     case 'WEB_PUSH':
       return webPushTransport(
@@ -75,6 +81,8 @@ export function createTransportRegistry(
   declarations: readonly TransportDeclaration[],
   subscriptions: WebPushSubscriptionSource,
   extra: ExtraDrivers = {},
+  /** The mount's logger, for a declaration that is legal but probably wrong. */
+  logger?: NotificationLogger,
 ): TransportRegistry {
   const transports = new Map<NotificationChannel, NotificationTransport<never>>();
   let publicKey: string | null = null;
@@ -85,7 +93,7 @@ export function createTransportRegistry(
       );
     }
     if (declaration.channel === 'WEB_PUSH') publicKey = declaration.publicKey ?? null;
-    transports.set(declaration.channel, build(declaration, subscriptions, extra));
+    transports.set(declaration.channel, build(declaration, subscriptions, extra, logger));
   }
   return {
     get: (channel) => transports.get(channel) ?? null,

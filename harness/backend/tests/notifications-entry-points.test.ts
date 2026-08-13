@@ -55,7 +55,12 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
     expect(core.NOTIFICATION_CHANNELS).toEqual(['EMAIL', 'SMS', 'WHATSAPP', 'WEB_PUSH']);
     expect(core.NOTIFICATION_CATEGORIES).toContain('orders');
     expect(core.DEFAULT_NOTIFICATION_MESSAGES.panelTitle).toBe('Notificações');
-    expect(core.normalizePhoneE164('31999998888')).toBe('+5531999998888');
+    // The country is the CALLER's, always: this package assumes none, so a US
+    // adopter that forgets it cannot text a Brazilian stranger their customer's
+    // order. That makes the second argument required, which is the shape below.
+    expect(core.normalizePhoneE164('31999998888', { defaultCountryCode: '55' })).toBe(
+      '+5531999998888',
+    );
     expect(core.defaultChannelMatrix(['orders']).orders?.EMAIL).toBe(true);
     expect(typeof core.createGeneratorRegistry).toBe('function');
     expect(typeof core.inboxWire).toBe('function');

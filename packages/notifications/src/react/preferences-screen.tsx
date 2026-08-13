@@ -145,13 +145,22 @@ function usePreferences(api: NotificationsApiClient): {
           preferences: { ...current.preferences, [category]: { ...row, [channel]: enabled } },
         };
       });
-      void api.savePreference(category, channel, enabled).then((result) => {
-        // The PUT answers with the whole matrix, so a success REPLACES the
-        // optimistic guess with the server's own row — which is what catches a
-        // save the server merged differently from the way the screen assumed.
-        if (result.ok) setPayload(result.data);
-        else void api.getPreferences().then(setPayload).catch(() => undefined);
-      });
+      const reconcile = (): void => {
+        void api.getPreferences().then(setPayload).catch(() => undefined);
+      };
+      void api
+        .savePreference(category, channel, enabled)
+        .then((result) => {
+          // The PUT answers with the whole matrix, so a success REPLACES the
+          // optimistic guess with the server's own row — which is what catches a
+          // save the server merged differently from the way the screen assumed.
+          if (result.ok) setPayload(result.data);
+          else reconcile();
+        })
+        // The packaged transport never rejects (it folds a failure into
+        // `ok: false`), but a HOST transport may — and an unhandled rejection
+        // would leave the toggle showing a choice the server never took.
+        .catch(reconcile);
     },
     [api],
   );

@@ -125,17 +125,15 @@ export function absoluteLink(link: string | undefined, appUrl: string | undefine
 export function phoneChannel<TMessage>(
   channel: 'SMS' | 'WHATSAPP',
   options: {
-    /** Country calling code for a bare local number. */
-    defaultCountryCode?: string;
+    /** Country calling code for a bare local number. Required — see `phone.ts`. */
+    defaultCountryCode: string;
     format: (content: NotificationContent) => TMessage;
     send: (toE164: string, message: TMessage) => Promise<void>;
   },
 ): NotificationTransport<TMessage> {
   const toE164 = (recipient: TransportRecipient): string | null =>
     normalizePhoneE164(recipient.phone, {
-      ...(options.defaultCountryCode !== undefined
-        ? { defaultCountryCode: options.defaultCountryCode }
-        : {}),
+      defaultCountryCode: options.defaultCountryCode,
     });
   return {
     channel,

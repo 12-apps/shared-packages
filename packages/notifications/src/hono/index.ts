@@ -50,9 +50,29 @@ export interface NotificationsHono extends ApiNotifications {
   router: Hono;
 }
 
-/** Reads the JSON body, tolerating an absent or malformed one. */
+/**
+ * Reads the JSON body, tolerating an absent or malformed one — and only when
+ * the caller SAID it was JSON.
+ *
+ * The content-type check is a CSRF speed bump, not a defence (see ADOPTING rule
+ * 13, which names the actual one). `text/plain`, `multipart/form-data` and
+ * `application/x-www-form-urlencoded` are the three types a cross-site `fetch`
+ * or a plain `<form>` can send with NO preflight, so parsing a body regardless
+ * of its type is what lets such a request reach these handlers at all. Refusing
+ * them means a cross-site write has to earn a preflight first, which the browser
+ * will then refuse on its own. The price is nil: every client of this surface,
+ * the packaged one included, sends `application/json`.
+ */
+function saysJson(c: Context): boolean {
+  const type = c.req.header('content-type');
+  if (!type) return false;
+  const mime = (type.split(';')[0] ?? '').trim().toLowerCase();
+  return mime === 'application/json' || mime.endsWith('+json');
+}
+
 async function readBody(c: Context): Promise<unknown> {
   if (c.req.method === 'GET') return undefined;
+  if (!saysJson(c)) return undefined;
   try {
     return await c.req.json();
   } catch {

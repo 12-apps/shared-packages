@@ -51,10 +51,18 @@ export interface NotificationAudienceDirectory {
   ): Promise<ReadonlySet<string> | readonly string[]>;
 }
 
-/** One candidate that did not receive it, and why. */
+/**
+ * One candidate that did not receive it, and why.
+ *
+ * `audience-error` is deliberately its own reason rather than folded into
+ * `missing-permission`: "this user does not hold the pair" is a configuration
+ * fact, while "we could not find out whether they hold it" is an outage, and
+ * they need opposite responses. Collapsing them would report a database timeout
+ * as a tenant that simply has nobody to tell.
+ */
 export interface PermissionNotificationSkip {
   userId: string;
-  reason: 'missing-permission' | 'dispatch-failed';
+  reason: 'missing-permission' | 'dispatch-failed' | 'audience-error';
 }
 
 /**
@@ -91,7 +99,9 @@ interface OutcomeReport {
  */
 function reportOutcome(logger: NotificationLogger, report: OutcomeReport): void {
   const { type, clientId, permissions, candidateCount, result } = report;
-  const failed = result.skipped.filter((skip) => skip.reason === 'dispatch-failed').length;
+  // Both non-configuration reasons count as "not reached": a candidate whose
+  // authorization query threw is as un-notified as one whose dispatch threw.
+  const failed = result.skipped.filter((skip) => skip.reason !== 'missing-permission').length;
   if (failed > 0) {
     logger.error(
       `[notifications] ${type}: ${failed} of ${failed + result.notified.length} matching ` +
@@ -135,43 +145,77 @@ export type NotifyByPermission = <TPayload>(
  *   - Recipients are DEDUPLICATED: candidates are a set, and holding the
  *     permissions through two roles is one notification.
  *   - Zero matching users is a NORMAL outcome — logged, never thrown.
- *   - Recipients are ISOLATED: `notify` throws on an unknown recipient or an
- *     unregistered type, so each dispatch gets its own try/catch and one bad
- *     recipient cannot cost the others their notification.
+ *   - Recipients are ISOLATED, in BOTH host queries: the authorization lookup
+ *     and the dispatch each get their own try/catch, so neither a candidate the
+ *     engine cannot answer for nor a recipient `notify` throws on can cost the
+ *     others their notification — or cost the caller the outcome log.
  *
  * Cost: one `getPermissions` per candidate, run sequentially. That is only
  * affordable because the candidate set is bounded (see the directory docs).
  * Callers run this fire-and-forget, off whatever path produced the event.
  */
-export function createNotifyByPermission(deps: {
+/** What the two isolated per-candidate steps need. */
+interface FanOutDeps {
   router: NotificationRouter;
   directory: NotificationAudienceDirectory;
   logger: NotificationLogger;
-}): NotifyByPermission {
-  /**
-   * One recipient's dispatch, isolated. Resolves `true` when the notification
-   * committed and `false` when it did not — the failure is contained here so
-   * the loop can carry on, which is the whole point of per-recipient isolation.
-   *
-   * The log names the USER ID and never an address: an e-mail in a log is PII.
-   */
-  async function dispatchOne<TPayload>(
-    clientId: string,
-    userId: string,
-    event: Omit<NotificationEvent<TPayload>, 'recipient'>,
-  ): Promise<boolean> {
-    try {
-      await deps.router.notify<TPayload>({ ...event, recipient: { userId, clientId } });
-      return true;
-    } catch (error) {
-      deps.logger.error(
-        `[notifications] ${event.type} dispatch failed for user ${userId} at client ${clientId}:`,
-        error,
-      );
-      return false;
-    }
-  }
+}
 
+/**
+ * One recipient's dispatch, isolated. Resolves `true` when the notification
+ * committed and `false` when it did not — the failure is contained here so the
+ * loop can carry on, which is the whole point of per-recipient isolation.
+ *
+ * The log names the USER ID and never an address: an e-mail in a log is PII.
+ */
+async function dispatchTo<TPayload>(
+  deps: FanOutDeps,
+  clientId: string,
+  userId: string,
+  event: Omit<NotificationEvent<TPayload>, 'recipient'>,
+): Promise<boolean> {
+  try {
+    await deps.router.notify<TPayload>({ ...event, recipient: { userId, clientId } });
+    return true;
+  } catch (error) {
+    deps.logger.error(
+      `[notifications] ${event.type} dispatch failed for user ${userId} at client ${clientId}:`,
+      error,
+    );
+    return false;
+  }
+}
+
+/**
+ * One candidate's permissions, isolated. `null` means the host's engine could
+ * not answer.
+ *
+ * This await used to sit bare in the loop while only `notify` was guarded, which
+ * made the documented per-recipient isolation half true: an ordinary
+ * connection-pool timeout on candidate #3 of 30 propagated out of
+ * `notifyByPermission`, so #4..#30 were never evaluated, `reportOutcome` never
+ * ran, and the only trace was a rejection in whatever `.catch` the
+ * fire-and-forget caller happened to attach. For a short-payment alert that is
+ * nobody being told that money is missing, with nothing in the log saying so.
+ */
+async function heldBy(
+  deps: FanOutDeps,
+  clientId: string,
+  userId: string,
+): Promise<ReadonlySet<string> | null> {
+  try {
+    const granted = await deps.directory.getPermissions(userId, clientId);
+    return granted instanceof Set ? granted : new Set(granted);
+  } catch (error) {
+    deps.logger.error(
+      `[notifications] audience lookup failed for user ${userId} at client ${clientId}:`,
+      error,
+    );
+    return null;
+  }
+}
+
+export function createNotifyByPermission(deps: FanOutDeps): NotifyByPermission {
   return async function notifyByPermission(clientId, permissions, event) {
     if (permissions.length === 0) {
       throw new Error(
@@ -183,8 +227,11 @@ export function createNotifyByPermission(deps: {
     const result: PermissionNotificationResult = { notified: [], skipped: [] };
 
     for (const userId of candidates) {
-      const granted = await deps.directory.getPermissions(userId, clientId);
-      const held = granted instanceof Set ? granted : new Set(granted);
+      const held = await heldBy(deps, clientId, userId);
+      if (!held) {
+        result.skipped.push({ userId, reason: 'audience-error' });
+        continue;
+      }
       // THE AND. `held` folds every role the user has at this tenant, so this
       // one line is the whole authorization question — and a single-element
       // list needs no special case.
@@ -192,7 +239,7 @@ export function createNotifyByPermission(deps: {
         result.skipped.push({ userId, reason: 'missing-permission' });
         continue;
       }
-      if (await dispatchOne(clientId, userId, event)) result.notified.push(userId);
+      if (await dispatchTo(deps, clientId, userId, event)) result.notified.push(userId);
       else result.skipped.push({ userId, reason: 'dispatch-failed' });
     }
 

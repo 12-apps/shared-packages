@@ -15,6 +15,7 @@ import {
 } from './by-permission';
 import type { NotificationsRoute } from './context';
 import type { NotificationContactDirectory, NotificationsDbProvider } from './db';
+import { DEFAULT_MAX_DELIVERY_ATTEMPTS } from './dispatch';
 import { createInboxStore, type NotificationInboxStore } from './inbox';
 import { createPreferenceStore, type NotificationPreferenceStore } from './preferences';
 import {
@@ -83,6 +84,12 @@ export interface NotificationsServerConfig {
   channelPolicy?: NotificationChannelPolicy;
   /** Hand dispatch to a real queue instead of the in-process detached send. */
   scheduleDispatch?: NotificationDispatchScheduler;
+  /**
+   * Claims one delivery gets before the sweep gives up on it and writes DEAD.
+   * Default 5. There is no "unlimited": a permanently invalid destination would
+   * be a billed provider call on every sweep for the life of the row.
+   */
+  maxDeliveryAttempts?: number;
   /** Told the moment an inbox record commits (a realtime bus, typically). */
   onCommitted?: NotificationCommittedListener;
   /** Told when a mark-read/delete actually changed something. */
@@ -146,11 +153,12 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
     taxonomy,
     config.channelDefaults ?? {},
   );
-  const pushSubscriptions = createPushSubscriptionStore(config.db);
+  const pushSubscriptions = createPushSubscriptionStore(config.db, logger);
   const transports = createTransportRegistry(
     config.transports ?? [],
     pushSubscriptions,
     config.drivers ?? {},
+    logger,
   );
 
   const router = createNotificationRouter({
@@ -161,6 +169,7 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
     pushSubscriptions,
     contacts: config.contacts,
     logger,
+    maxAttempts: config.maxDeliveryAttempts ?? DEFAULT_MAX_DELIVERY_ATTEMPTS,
     // `exactOptionalPropertyTypes` is on, so an absent host seam must be an
     // ABSENT key rather than an explicit `undefined`.
     ...present({

@@ -25,6 +25,11 @@ export interface PushRegistrationPayload {
   /** null = web push is not configured on this deployment. */
   vapidPublicKey: string | null;
   count: number;
+  /**
+   * Whether the endpoint asked about is still registered to the caller. Present
+   * only when one was passed — see {@link NotificationsApiClient.getPushRegistration}.
+   */
+  registered?: boolean;
 }
 
 export interface NotificationsApiClient {
@@ -43,7 +48,14 @@ export interface NotificationsApiClient {
     channel: NotificationChannel,
     enabled: boolean,
   ): Promise<NotificationsResult<PreferencesPayload>>;
-  getPushRegistration(): Promise<PushRegistrationPayload>;
+  /**
+   * The deployment's VAPID key and the caller's device count — and, when an
+   * `endpoint` is passed, whether the SERVER still has that exact subscription
+   * under the caller's id. The browser holding a subscription object is not
+   * evidence of that: a re-own or a 404/410 prune drops the row and leaves the
+   * browser's object in place.
+   */
+  getPushRegistration(input?: { endpoint?: string }): Promise<PushRegistrationPayload>;
   savePushSubscription(input: {
     endpoint: string;
     keys: { p256dh: string; auth: string };
@@ -84,8 +96,14 @@ export function createNotificationsApiClient(
       transport.send(url('/notification-preferences'), 'PUT', {
         [category]: { [channel]: enabled },
       }),
-    getPushRegistration: () =>
-      transport.get<PushRegistrationPayload>(url('/push-subscriptions')),
+    getPushRegistration: ({ endpoint } = {}) =>
+      transport.get<PushRegistrationPayload>(
+        url(
+          endpoint
+            ? `/push-subscriptions?endpoint=${encodeURIComponent(endpoint)}`
+            : '/push-subscriptions',
+        ),
+      ),
     savePushSubscription: (input) => transport.send(url('/push-subscriptions'), 'POST', input),
     removePushSubscription: (endpoint) =>
       transport.send(url('/push-subscriptions'), 'DELETE', { endpoint }),

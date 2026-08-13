@@ -30,6 +30,7 @@ export type {
   NotificationDeliveryDelegate,
   NotificationDeliveryRow,
   NotificationDeliveryWhere,
+  NotificationPageAfter,
   NotificationPreferenceDelegate,
   NotificationPreferenceRow,
   NotificationWhere,

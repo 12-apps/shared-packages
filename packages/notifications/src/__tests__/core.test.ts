@@ -89,32 +89,47 @@ describe('the copy table', () => {
 });
 
 describe('phone normalization', () => {
+  // The country is the CALLER's, always — there is no default to fall back on,
+  // which is the whole point (see `../phone.ts`).
+  const BR = { defaultCountryCode: '55' };
+  const US = { defaultCountryCode: '1' };
+
   it('trusts an explicit international prefix', () => {
-    expect(normalizePhoneE164('+55 31 99999-8888')).toBe('+5531999998888');
-    expect(normalizePhoneE164('+1 415 555 2671')).toBe('+14155552671');
+    expect(normalizePhoneE164('+55 31 99999-8888', BR)).toBe('+5531999998888');
+    expect(normalizePhoneE164('+1 415 555 2671', BR)).toBe('+14155552671');
   });
 
-  it('assumes the default country for a bare local number', () => {
-    expect(normalizePhoneE164('31999998888')).toBe('+5531999998888');
-    expect(normalizePhoneE164('(31) 3333-4444')).toBe('+553133334444');
+  it('assumes the DECLARED country for a bare local number', () => {
+    expect(normalizePhoneE164('31999998888', BR)).toBe('+5531999998888');
+    expect(normalizePhoneE164('(31) 3333-4444', BR)).toBe('+553133334444');
   });
 
   it('takes the host country code when it is not Brazil', () => {
-    expect(normalizePhoneE164('4155552671', { defaultCountryCode: '1' })).toBe('+14155552671');
+    expect(normalizePhoneE164('4155552671', US)).toBe('+14155552671');
+  });
+
+  it('never sends a local number to the country the package used to assume', () => {
+    // The hazard the required knob removes: with `55` as a DEFAULT, a US adopter
+    // that never set it turned `4155552671` into `+554155552671` — a plausible
+    // Brazilian mobile, and a stranger reading a customer's order. There is no
+    // call site left that can omit the country, so that string is now reachable
+    // only by having asked for Brazil.
+    expect(normalizePhoneE164('4155552671', US)).toBe('+14155552671');
+    expect(normalizePhoneE164('4155552671', BR)).toBe('+554155552671');
   });
 
   it('keeps a bare number that already carries the country code', () => {
-    expect(normalizePhoneE164('5531999998888')).toBe('+5531999998888');
+    expect(normalizePhoneE164('5531999998888', BR)).toBe('+5531999998888');
   });
 
   it('refuses what it cannot infer, which makes the channel unavailable', () => {
     for (const raw of [null, undefined, '', '   ', '123', '+123', 'não tenho']) {
-      expect(normalizePhoneE164(raw)).toBeNull();
+      expect(normalizePhoneE164(raw, BR)).toBeNull();
     }
   });
 
   it('refuses an over-long international number (E.164 caps at 15 digits)', () => {
-    expect(normalizePhoneE164('+1234567890123456')).toBeNull();
+    expect(normalizePhoneE164('+1234567890123456', BR)).toBeNull();
   });
 });
 

@@ -117,6 +117,42 @@ describe('the wire', () => {
     expect((await json<{ data: { count: number } }>(response)).data.count).toBe(0);
   });
 
+  it('refuses to parse a body the caller did not declare as JSON', async () => {
+    // The three types a cross-site `fetch` or a plain `<form>` can send with NO
+    // preflight. Parsing regardless of content-type is what lets such a request
+    // reach a handler at all; refusing them makes the browser demand a preflight
+    // first, and then refuse it. A speed bump, not the defence — ADOPTING rule 13
+    // names that. The price is nil: every client of this surface sends JSON.
+    for (const contentType of [
+      'text/plain',
+      'application/x-www-form-urlencoded',
+      'multipart/form-data; boundary=x',
+    ]) {
+      const response = await app.request('/api/account/push-subscriptions', {
+        method: 'POST',
+        headers: { 'x-user': 'u1', 'content-type': contentType },
+        body: JSON.stringify({
+          endpoint: 'https://push.attacker.example/x',
+          keys: { p256dh: 'p', auth: 'a' },
+        }),
+      });
+      expect(response.status).toBe(400);
+    }
+    expect(db.rows.subscriptions).toEqual([]);
+
+    // …and the charset-bearing form every real client sends still works.
+    const ok = await app.request('/api/account/push-subscriptions', {
+      method: 'POST',
+      headers: { 'x-user': 'u1', 'content-type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({
+        endpoint: 'https://push.example.com/z',
+        keys: { p256dh: 'p', auth: 'a' },
+      }),
+    });
+    expect(ok.status).toBe(200);
+    expect(db.rows.subscriptions).toHaveLength(1);
+  });
+
   it('passes the user-agent through as the device hint', async () => {
     await app.request('/api/account/push-subscriptions', {
       method: 'POST',

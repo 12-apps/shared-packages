@@ -119,6 +119,101 @@ describe('@12-apps/notifications — the prisma assets survive publication', () 
            VALUES ('d2', 'n1', 'EMAIL', 'MAYBE', NOW())`,
         ),
       ).rejects.toThrow(/check/i);
+      // …and every value the delivery lifecycle actually uses is accepted. The
+      // claim's own UPDATE writes SENDING, so a CHECK that predates it does not
+      // reject a bad row — it rejects the mechanism that stops a double-send.
+      for (const status of ['QUEUED', 'SENDING', 'SENT', 'FAILED', 'DEAD']) {
+        // Inserted and removed one at a time: the unique (notification, channel)
+        // key is doing its job and would refuse the second row otherwise.
+        await pg.query(
+          `INSERT INTO notification_deliveries (id, notification_id, channel, status, updated_at)
+           VALUES ('d-status', 'n1', 'EMAIL', $1, NOW())`,
+          [status],
+        );
+        await pg.query(`DELETE FROM notification_deliveries WHERE id = 'd-status'`);
+      }
+    } finally {
+      await pg.close();
+    }
+  });
+
+  it('CONVERGES the status CHECK on a host that already has the narrow one', async () => {
+    // The first adopters created these tables by hand before the package existed,
+    // so they hold a `notification_deliveries_status_check` listing only QUEUED |
+    // SENT | FAILED. A `pg_constraint` existence guard — the shape every other
+    // constraint here uses — would find it, skip, and leave the claim's own
+    // `SENDING` write rejected at runtime by a CHECK older than the claim. So the
+    // status CHECK is DROPped and re-added, and this is the case that says so.
+    const pg = new PGlite();
+    try {
+      // Both tables, and a parent row: the migration adds the internal FK, and
+      // `ADD CONSTRAINT` validates the rows already there.
+      await pg.exec(`
+        CREATE TABLE "notifications" (
+          "id" TEXT NOT NULL,
+          "user_id" TEXT NOT NULL,
+          "type" TEXT NOT NULL,
+          "category" TEXT NOT NULL,
+          "title" TEXT NOT NULL,
+          "body" TEXT NOT NULL,
+          CONSTRAINT "notifications_pkey" PRIMARY KEY ("id")
+        );
+        CREATE TABLE "notification_deliveries" (
+          "id" TEXT NOT NULL,
+          "notification_id" TEXT NOT NULL,
+          "channel" TEXT NOT NULL,
+          "status" TEXT NOT NULL DEFAULT 'QUEUED',
+          CONSTRAINT "notification_deliveries_pkey" PRIMARY KEY ("id"),
+          CONSTRAINT "notification_deliveries_status_check"
+            CHECK ("status" IN ('QUEUED', 'SENT', 'FAILED'))
+        );
+      `);
+      await pg.query(
+        `INSERT INTO notifications (id, user_id, type, category, title, body)
+         VALUES ('n-legacy', 'u1', 'order.paid', 'orders', 'T', 'B')`,
+      );
+      await pg.query(
+        `INSERT INTO notification_deliveries (id, notification_id, channel, status)
+         VALUES ('legacy', 'n-legacy', 'EMAIL', 'SENT')`,
+      );
+
+      await applyAll(pg);
+
+      // The retry ceiling's column arrived, at 0 for the pre-existing row.
+      expect(await columnsOf(pg, 'notification_deliveries')).toContain('attempts');
+      const { rows } = await pg.query<{ attempts: number }>(
+        `SELECT attempts FROM notification_deliveries WHERE id = 'legacy'`,
+      );
+      expect(Number(rows[0]?.attempts)).toBe(0);
+
+      // And the two new statuses are now accepted where they were not.
+      await pg.query(
+        `UPDATE notification_deliveries SET status = 'SENDING' WHERE id = 'legacy'`,
+      );
+      await pg.query(`UPDATE notification_deliveries SET status = 'DEAD' WHERE id = 'legacy'`);
+      // Still closed, though — convergence is not the same as opening it up.
+      await expect(
+        pg.query(`UPDATE notification_deliveries SET status = 'MAYBE' WHERE id = 'legacy'`),
+      ).rejects.toThrow(/check/i);
+    } finally {
+      await pg.close();
+    }
+  });
+
+  it('moves the sweep index onto (status, updated_at)', async () => {
+    // The sweep asks "has this row moved lately", which `created_at` cannot
+    // answer. The index moves with the predicate, and the old one is dropped
+    // rather than left behind to cost every write.
+    const pg = new PGlite();
+    try {
+      await applyAll(pg);
+      const { rows } = await pg.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+         WHERE tablename = 'notification_deliveries' ORDER BY indexname`,
+      );
+      const names = rows.map((row) => row.indexname);
+      expect(names).toContain('notification_deliveries_status_updated_at_idx');
+      expect(names).not.toContain('notification_deliveries_status_created_at_idx');
     } finally {
       await pg.close();
     }

@@ -251,3 +251,19 @@ export function parsePushSubscriptionBody(
 export function parsePushEndpointBody(body: unknown, messages: NotificationMessages): string {
   return parseEndpoint(asRecord(body, messages).endpoint, messages);
 }
+
+/**
+ * `GET <mount>/push-subscriptions?endpoint=…` — the browser asking "is the
+ * subscription I am holding still MINE on the server?".
+ *
+ * Optional: with no `endpoint` the route answers the key and the count as it
+ * always has. Validated by the same rules as the write, so a junk value is a 400
+ * rather than a lookup.
+ */
+export function parsePushEndpointQuery(
+  query: Record<string, string | undefined>,
+  messages: NotificationMessages,
+): string | undefined {
+  if (query.endpoint === undefined || query.endpoint === '') return undefined;
+  return parseEndpoint(query.endpoint, messages);
+}

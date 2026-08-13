@@ -14,6 +14,14 @@
 -- vocabulary (`categories` on the server config), so a closed set here would be
 -- wrong for every host but the first. A host that wants its own CHECK adds one.
 --
+-- The `status` set is QUEUED | SENDING | SENT | FAILED | DEAD. `SENDING` is the
+-- dispatcher's CLAIM and `DEAD` is terminal (see `src/server/dispatch.ts`), and
+-- both are newer than the first adopters' hand-made tables — which is why the
+-- status CHECK below is DROPPED and re-added rather than guarded by a
+-- `pg_constraint` lookup like the others. An existence guard would find the
+-- three-value constraint an early adopter already has, skip, and leave the claim
+-- rejected at runtime by a CHECK that predates it.
+--
 -- ============================ REPLAY SAFETY ================================
 -- Every statement is guarded, because the first adopters ALREADY HAVE these
 -- tables: future-pay created them by hand before the package existed, so this
@@ -28,7 +36,13 @@
 -- already holds rows.
 --
 -- CHECK constraints have no `IF NOT EXISTS` form, so they are guarded by a
--- `pg_constraint` lookup instead (plpgsql, which PGlite has).
+-- `pg_constraint` lookup instead (plpgsql, which PGlite has) — EXCEPT the
+-- delivery status CHECK, which must CONVERGE rather than be skipped and so is
+-- `DROP CONSTRAINT IF EXISTS` + `ADD`. Same for the sweep's index, which moved
+-- key: `DROP INDEX IF EXISTS` + `CREATE INDEX IF NOT EXISTS`. Both are
+-- idempotent, which is the property replay safety actually needs — "guarded" was
+-- only ever the usual way to get it, and it is the wrong way when the definition
+-- itself has changed under an existing adopter.
 
 -- ---------------------------------------------------------------------------
 -- notifications — the always-on inbox. One row per emit, written before any
@@ -80,6 +94,7 @@ CREATE TABLE IF NOT EXISTS "notification_deliveries" (
     "channel" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'QUEUED',
     "error" TEXT,
+    "attempts" INTEGER NOT NULL DEFAULT 0,
     "sent_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -91,6 +106,10 @@ ALTER TABLE "notification_deliveries" ADD COLUMN IF NOT EXISTS "notification_id"
 ALTER TABLE "notification_deliveries" ADD COLUMN IF NOT EXISTS "channel" TEXT NOT NULL DEFAULT 'EMAIL';
 ALTER TABLE "notification_deliveries" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'QUEUED';
 ALTER TABLE "notification_deliveries" ADD COLUMN IF NOT EXISTS "error" TEXT;
+-- The retry ceiling's counter (12-15). An adopter whose table predates it gets
+-- it at 0, which reads as "never claimed" — the correct starting point for a row
+-- that has, in the new lifecycle's terms, spent no attempts.
+ALTER TABLE "notification_deliveries" ADD COLUMN IF NOT EXISTS "attempts" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "notification_deliveries" ADD COLUMN IF NOT EXISTS "sent_at" TIMESTAMP(3);
 ALTER TABLE "notification_deliveries" ADD COLUMN IF NOT EXISTS "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE "notification_deliveries" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
@@ -106,22 +125,31 @@ BEGIN
       ADD CONSTRAINT "notification_deliveries_channel_check"
       CHECK ("channel" IN ('EMAIL', 'SMS', 'WHATSAPP', 'WEB_PUSH'));
   END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'notification_deliveries_status_check'
-  ) THEN
-    ALTER TABLE "notification_deliveries"
-      ADD CONSTRAINT "notification_deliveries_status_check"
-      CHECK ("status" IN ('QUEUED', 'SENT', 'FAILED'));
-  END IF;
 END $$;
+
+-- The status set, DROP-and-re-ADD rather than guarded (see the header): the
+-- values widened in 12-15, so an adopter already holding a constraint under this
+-- name holds the OLD three, and a guard would keep it — rejecting the claim's
+-- own UPDATE. Idempotent, and re-running it converges rather than accumulating.
+ALTER TABLE "notification_deliveries"
+    DROP CONSTRAINT IF EXISTS "notification_deliveries_status_check";
+ALTER TABLE "notification_deliveries"
+    ADD CONSTRAINT "notification_deliveries_status_check"
+    CHECK ("status" IN ('QUEUED', 'SENDING', 'SENT', 'FAILED', 'DEAD'));
 
 -- Idempotent fan-out: re-dispatching a notification can never duplicate a
 -- channel's delivery row. This is what makes transport sends retry-safe.
 CREATE UNIQUE INDEX IF NOT EXISTS "notification_deliveries_notification_id_channel_key"
     ON "notification_deliveries"("notification_id", "channel");
--- Serves the retry sweep ("re-dispatch QUEUED/FAILED deliveries").
-CREATE INDEX IF NOT EXISTS "notification_deliveries_status_created_at_idx"
-    ON "notification_deliveries"("status", "created_at");
+-- Serves the retry sweep, which selects `status IN (…) AND updated_at < cutoff`.
+-- On `updated_at`, not `created_at`: the sweep asks "has this row moved lately",
+-- and `created_at` cannot answer that — a row re-queued a second ago still
+-- carries a `created_at` from days back, so it reads as stale again immediately.
+-- The `(status, created_at)` index this replaces served the earlier, wrong
+-- predicate and is dropped rather than left behind to cost every write.
+DROP INDEX IF EXISTS "notification_deliveries_status_created_at_idx";
+CREATE INDEX IF NOT EXISTS "notification_deliveries_status_updated_at_idx"
+    ON "notification_deliveries"("status", "updated_at");
 
 DO $$
 BEGIN

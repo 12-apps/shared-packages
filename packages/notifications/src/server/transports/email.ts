@@ -128,7 +128,10 @@ export function emailTransport(
   const driver = resolveDriver('EMAIL', declaration, { ...EMAIL_DRIVERS, ...extraDrivers });
   return {
     channel: 'EMAIL',
-    supports: (recipient: TransportRecipient) => recipient.email !== null,
+    // Truthiness, not `!== null`: an EMPTY STRING is a very ordinary DB value
+    // for a nullable column, and it used to pass this gate, earn a delivery row
+    // and then fail forever against `send`'s own `!recipient.email` check.
+    supports: (recipient: TransportRecipient) => Boolean(recipient.email),
     format: (content) => formatEmail(content, declaration),
     async send(message, recipient) {
       if (!recipient.email) throw new Error('Recipient has no email address.');

@@ -71,13 +71,47 @@ interface OutboxEntry {
 }
 
 /** The retry sweep, through the harness endpoint a host would put on a cron. */
-async function drain(olderThanMs: number): Promise<{ dispatched: number }> {
+async function drain(olderThanMs: number, take?: number): Promise<{ dispatched: number }> {
   const response = await backend.app.request(
-    `/__harness/notifications/drain?olderThanMs=${olderThanMs}`,
+    `/__harness/notifications/drain?olderThanMs=${olderThanMs}` +
+      (take === undefined ? '' : `&take=${take}`),
     { method: 'POST' },
   );
   expect(response.status).toBe(200);
   return (await json<{ data: { dispatched: number } }>(response)).data;
+}
+
+/** One dispatcher, addressable — so the suite can start two of them at once. */
+function dispatch(notificationId: string): Promise<Response> {
+  return backend.app.request(`/__harness/notifications/dispatch?id=${notificationId}`, {
+    method: 'POST',
+  });
+}
+
+/** Hold every send open, so two dispatchers are inside the window together. */
+async function holdSends(held: boolean): Promise<void> {
+  const response = await backend.app.request(
+    `/__harness/notifications/${held ? 'hold' : 'release'}`,
+    { method: 'POST' },
+  );
+  expect(response.status).toBe(200);
+}
+
+/** The delivery rows of one notification, as the database has them. */
+async function deliveries(
+  notificationId: string,
+): Promise<{ status: string; attempts: number; sent_at: Date | null; error: string | null }[]> {
+  const { rows } = await backend.pg.query<{
+    status: string;
+    attempts: number;
+    sent_at: Date | null;
+    error: string | null;
+  }>(
+    `SELECT status, attempts, sent_at, error FROM notification_deliveries
+     WHERE notification_id = $1 ORDER BY channel`,
+    [notificationId],
+  );
+  return rows;
 }
 
 async function outbox(): Promise<OutboxEntry[]> {
@@ -277,7 +311,7 @@ describe('the retry sweep over real rows', () => {
     const { notificationId } = await emit({ payload: { code: 'C-3' } });
     await backend.pg.query(
       `UPDATE notification_deliveries
-       SET status = 'QUEUED', sent_at = NULL, created_at = NOW() - INTERVAL '10 minutes'
+       SET status = 'QUEUED', sent_at = NULL, updated_at = NOW() - INTERVAL '10 minutes'
        WHERE notification_id = $1`,
       [notificationId],
     );
@@ -287,6 +321,171 @@ describe('the retry sweep over real rows', () => {
       [notificationId],
     );
     expect(rows[0]?.status).toBe('SENT');
+  });
+
+  it('reclaims a SENDING stray — a dispatcher that died between claim and send', async () => {
+    const { notificationId } = await emit({ payload: { code: 'C-4' } });
+    await backend.pg.query(
+      `UPDATE notification_deliveries
+       SET status = 'SENDING', sent_at = NULL, attempts = 1,
+           updated_at = NOW() - INTERVAL '10 minutes'
+       WHERE notification_id = $1`,
+      [notificationId],
+    );
+    expect((await drain(5 * 60_000)).dispatched).toBe(1);
+    expect((await deliveries(notificationId))[0]).toMatchObject({ status: 'SENT', attempts: 2 });
+  });
+
+  it('leaves a FRESH SENDING row alone — that dispatcher is still working', async () => {
+    // The cutoff is the entire difference between "recover a dead dispatcher" and
+    // "send the message a live one is sending right now".
+    const { notificationId } = await emit({ payload: { code: 'C-5' } });
+    await backend.pg.query(
+      `UPDATE notification_deliveries SET status = 'SENDING', sent_at = NULL, updated_at = NOW()
+       WHERE notification_id = $1`,
+      [notificationId],
+    );
+    expect((await drain(5 * 60_000)).dispatched).toBe(0);
+    expect((await deliveries(notificationId))[0]?.status).toBe('SENDING');
+  });
+
+  it('never selects a row it has already given up on (DEAD is terminal)', async () => {
+    const { notificationId } = await emit({ payload: { code: 'C-6' } });
+    await backend.pg.query(
+      `UPDATE notification_deliveries
+       SET status = 'DEAD', attempts = 5, updated_at = NOW() - INTERVAL '30 days'
+       WHERE notification_id = $1`,
+      [notificationId],
+    );
+    expect((await drain(5 * 60_000)).dispatched).toBe(0);
+    expect((await deliveries(notificationId))[0]?.attempts).toBe(5);
+  });
+
+  it('judges staleness by updated_at, so a just-requeued row is not instantly stray', async () => {
+    // The predicate defect, over real SQL: an ancient `created_at` with a fresh
+    // `updated_at` is exactly the row a sweep leaves behind when it re-queues a
+    // long-failing delivery. On `created_at` it is eligible again on the next
+    // tick, so a 2 000-row outage backlog loops and re-sends all of it.
+    const { notificationId } = await emit({ payload: { code: 'C-7' } });
+    await backend.pg.query(
+      `UPDATE notification_deliveries
+       SET status = 'QUEUED', sent_at = NULL,
+           created_at = NOW() - INTERVAL '3 days', updated_at = NOW()
+       WHERE notification_id = $1`,
+      [notificationId],
+    );
+    const before = (await outbox()).length;
+    expect((await drain(5 * 60_000)).dispatched).toBe(0);
+    expect((await outbox()).length).toBe(before);
+  });
+});
+
+describe('two dispatchers, one delivery, over a real Postgres', () => {
+  /**
+   * The contract the in-memory seam cannot establish on its own.
+   *
+   * A single-threaded fake will happily agree with a read-validate-write
+   * implementation, which is precisely how the equivalent double-send survived a
+   * full suite elsewhere in this estate. Here the predicate is evaluated by
+   * Postgres, in one statement, against the row version the other dispatcher
+   * committed — so what passes is the claim and not the test's idea of it.
+   *
+   * Every case holds the sends open first: without that the first dispatcher
+   * finishes before the second reads, and there is no race left to lose.
+   */
+  it('sends ONCE when two dispatchers race the same QUEUED delivery', async () => {
+    const { notificationId } = await emit({ payload: { code: 'F-1' } });
+    // Back to QUEUED, as a queue hand-off or a dead process would leave it.
+    await backend.pg.query(
+      `UPDATE notification_deliveries SET status = 'QUEUED', sent_at = NULL, attempts = 0
+       WHERE notification_id = $1`,
+      [notificationId],
+    );
+    const before = (await outbox()).length;
+
+    await holdSends(true);
+    const both = Promise.all([dispatch(notificationId), dispatch(notificationId)]);
+    // Both dispatchers are past their reads by now; one is inside `send` and the
+    // other has either claimed the row or been refused it.
+    await holdSends(false);
+    for (const response of await both) expect(response.status).toBe(200);
+
+    // One provider call, one SENT row, one attempt spent.
+    expect((await outbox()).length).toBe(before + 1);
+    expect(await deliveries(notificationId)).toHaveLength(1);
+    expect((await deliveries(notificationId))[0]).toMatchObject({ status: 'SENT', attempts: 1 });
+  });
+
+  it('never drags a committed SENT row back to QUEUED, even under two sweeps', async () => {
+    const { notificationId } = await emit({ payload: { code: 'F-2' } });
+    // A stale FAILED row: what a provider outage leaves for the sweep to find.
+    await backend.pg.query(
+      `UPDATE notification_deliveries
+       SET status = 'FAILED', error = 'provider down', sent_at = NULL,
+           updated_at = NOW() - INTERVAL '10 minutes'
+       WHERE notification_id = $1`,
+      [notificationId],
+    );
+    const before = (await outbox()).length;
+
+    await holdSends(true);
+    const both = Promise.all([
+      backend.app.request('/__harness/notifications/drain?olderThanMs=300000', { method: 'POST' }),
+      backend.app.request('/__harness/notifications/drain?olderThanMs=300000', { method: 'POST' }),
+    ]);
+    await holdSends(false);
+    const counts = await Promise.all(
+      (await both).map(async (response) =>
+        (await json<{ data: { dispatched: number } }>(response)).data.dispatched,
+      ),
+    );
+
+    // Exactly one sweep did the work — the requeue's `status` predicate is what
+    // stops the second one forcing a SENT row back to QUEUED while `sent_at`
+    // stays populated, and then sending a second billed message.
+    expect(counts.reduce((total, count) => total + count, 0)).toBe(1);
+    expect((await outbox()).length).toBe(before + 1);
+    const [row] = await deliveries(notificationId);
+    expect(row).toMatchObject({ status: 'SENT', error: null });
+    expect(row?.sent_at).toBeTruthy();
+  });
+
+  it('bounds one sweep by `take`, leaving the remainder for the next tick', async () => {
+    // Unbounded, a 2 000-row backlog is one run of sequential provider round
+    // trips that outlives its own cron interval — so the next tick starts while
+    // it is still working. The claim makes that harmless; the bound makes it rare.
+    for (const code of ['F-3', 'F-4', 'F-5']) await emit({ payload: { code } });
+    // Every delivery in the database, aged past the cutoff: the reset's own
+    // seeded rows included, so the backlog is bigger than one tick's bound.
+    await backend.pg.query(
+      `UPDATE notification_deliveries
+       SET status = 'FAILED', sent_at = NULL, updated_at = NOW() - INTERVAL '10 minutes'`,
+    );
+    const { rows: sizeRows } = await backend.pg.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM notification_deliveries`,
+    );
+    const backlog = Number(sizeRows[0]?.count);
+    expect(backlog).toBeGreaterThan(2);
+    const before = (await outbox()).length;
+
+    const ticks: number[] = [];
+    for (let tick = 0; tick < 10; tick += 1) {
+      const { dispatched } = await drain(5 * 60_000, 2);
+      ticks.push(dispatched);
+      if (dispatched === 0) break;
+    }
+
+    // No tick exceeded the bound…
+    expect(Math.max(...ticks)).toBe(2);
+    // …the backlog drained exactly once over, and nothing was sent twice on the
+    // way — which is the pair of properties the bound and the claim provide
+    // together, and neither one alone.
+    expect(ticks.reduce((total, count) => total + count, 0)).toBe(backlog);
+    expect((await outbox()).length).toBe(before + backlog);
+    const { rows } = await backend.pg.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM notification_deliveries WHERE status <> 'SENT'`,
+    );
+    expect(rows[0]?.count).toBe('0');
   });
 });
 
@@ -307,6 +506,42 @@ describe('the inbox over real SQL', () => {
     expect(seen).toHaveLength(5);
     expect(new Set(seen).size).toBe(5);
     expect(page3.nextCursor).toBeNull();
+  });
+
+  it('does not skip a row when the anchor was DELETED between the two pages', async () => {
+    // The keyset, over the SQL that actually runs it. Under Prisma's positional
+    // cursor `skip: 1` is an OFFSET applied AFTER the filter, so once the anchor
+    // stops matching `deleted_at IS NULL` the offset eats the first SURVIVING row
+    // — which then never appears in the list while still counting toward the
+    // badge. The bottom visible row is the one carrying the delete button, so
+    // this is the ordinary case rather than an edge one.
+    await emit({ payload: { code: 'D-5' } });
+    await emit({ payload: { code: 'D-6' } });
+
+    const page1 = await inbox('owner-1', '?limit=2');
+    const anchor = page1.nextCursor as string;
+    const deleted = await send('owner-1', '/notifications/delete', { ids: [anchor] });
+    expect((await json<{ data: { deleted: number } }>(deleted)).data.deleted).toBe(1);
+
+    const page2 = await inbox('owner-1', `?limit=2&cursor=${anchor}`);
+    const page3 = await inbox('owner-1', `?limit=2&cursor=${page2.nextCursor}`);
+    const seen = [...page1.items, ...page2.items, ...page3.items].map((item) => item.id);
+
+    // Five seeded rows, one deleted, and the four survivors are all reachable.
+    expect(new Set(seen).size).toBe(seen.length);
+    expect(seen.filter((id) => id !== anchor)).toHaveLength(4);
+  });
+
+  it('answers an empty page for a cursor that is not the caller’s', async () => {
+    await emit({ userId: 'admin-1', payload: { code: 'D-7' } });
+    const foreign = (await inbox('admin-1')).items[0]?.id as string;
+
+    const mine = await inbox('owner-1', `?limit=2&cursor=${foreign}`);
+    // Not page one: silently restarting would repeat rows already seen, and the
+    // anchor's position would otherwise leak another user's `created_at` to the
+    // resolution of the caller's own timestamps.
+    expect(mine.items).toEqual([]);
+    expect(mine.nextCursor).toBeNull();
   });
 
   it('is owner-scoped in every direction', async () => {
@@ -415,6 +650,38 @@ describe('preferences and push subscriptions over real rows', () => {
 
     const removed = await send('owner-1', '/push-subscriptions', { endpoint: body.endpoint }, 'DELETE');
     expect((await json<{ data: { count: number } }>(removed)).data.count).toBe(0);
+  });
+
+  it('tells a browser whether the server still has ITS subscription', async () => {
+    // What the settings screen reads instead of trusting the browser alone. Two
+    // users on one machine: `PushManager` hands out the same endpoint for the same
+    // browser profile, so the second *Ativar* re-owns the row and the first user's
+    // is gone — while their browser keeps the subscription object and a
+    // browser-only check keeps saying "recebendo alertas", with no button to fix
+    // it. The 404/410 prune reaches the same state from the other side.
+    const endpoint = 'https://push.harness.test/shared-counter';
+    const body = { endpoint, keys: { p256dh: 'p', auth: 'a' } };
+    await send('owner-1', '/push-subscriptions', body);
+
+    const asked = `/api/account/push-subscriptions?endpoint=${encodeURIComponent(endpoint)}`;
+    const mine = await backend.app.request(asked, { headers: headers('owner-1') });
+    expect((await json<{ data: { registered?: boolean } }>(mine)).data.registered).toBe(true);
+
+    // The second user on the same browser takes it over.
+    await send('admin-1', '/push-subscriptions', body);
+    const stolen = await backend.app.request(asked, { headers: headers('owner-1') });
+    expect((await json<{ data: { registered?: boolean } }>(stolen)).data.registered).toBe(false);
+    // And the new owner is told the truth too — same answer, opposite direction.
+    const theirs = await backend.app.request(asked, { headers: headers('admin-1') });
+    expect((await json<{ data: { registered?: boolean } }>(theirs)).data.registered).toBe(true);
+
+    // An endpoint nobody registered answers exactly like a foreign one, so a
+    // caller holding somebody else's endpoint learns nothing about who owns it.
+    const unknown = await backend.app.request(
+      `/api/account/push-subscriptions?endpoint=${encodeURIComponent('https://push.harness.test/nope')}`,
+      { headers: headers('owner-1') },
+    );
+    expect((await json<{ data: { registered?: boolean } }>(unknown)).data.registered).toBe(false);
   });
 
   it('serves the deployment VAPID public key the browser needs', async () => {

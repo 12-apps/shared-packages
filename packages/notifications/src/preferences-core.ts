@@ -49,6 +49,14 @@ export function defaultChannelMatrix(
  * gaps from `base`. A stored row that predates a channel keeps that channel's
  * default rather than reading as "off", which is what lets a new transport ship
  * without a data migration.
+ *
+ * The consequence, and the rule it implies: a channel ADDED later turns itself
+ * ON for a user who had explicitly switched every channel in that category off,
+ * because their stored row has no key for it. That is harmless for the four
+ * shipped channels — the two that cost money default off — so **a new channel
+ * must be added with a `false` default** unless the user's existing consent
+ * already covers it. The alternative (reading a missing key as "off") would need
+ * a data migration for every existing row on every channel that ever ships.
  */
 export function mergeStoredRow(stored: unknown, base: ChannelRow): ChannelRow {
   const row = { ...base };

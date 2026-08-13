@@ -63,6 +63,32 @@ function InstallFirstHint({ hint }: { hint: WebPushPlatformHint }): JSX.Element 
 
 type SetupState = 'idle' | 'checking' | 'on' | 'busy' | 'failed' | 'denied';
 
+/**
+ * "Is this browser receiving alerts?" — asked of the browser AND of the server.
+ *
+ * The browser alone is not enough, and answering from it alone is how a real
+ * person is silenced while being told they are fine. Two users share a counter
+ * PC: Ana enables push, then Otávio signs in on the same browser and enables it
+ * too. `PushManager` hands out the SAME endpoint for the same browser profile,
+ * so the POST re-owns the row and Ana's is gone. Ana signs back in, her browser
+ * still holds the subscription object, and a browser-only check renders "Este
+ * navegador está recebendo alertas." with no button to fix it — forever. The
+ * 404/410 prune reaches the same state from the other direction.
+ *
+ * So the server is asked whether it still has THIS endpoint under THIS user. A
+ * `false` (or an unreachable server) shows *Ativar* again, and one click
+ * re-registers the row — which is the same request the happy path makes, so the
+ * recovery costs nothing to maintain.
+ */
+async function resolveState(api: NotificationsApiClient): Promise<SetupState> {
+  const subscription = await getExistingPushSubscription();
+  if (!subscription) return 'idle';
+  const registration = await api
+    .getPushRegistration({ endpoint: subscription.endpoint })
+    .catch(() => null);
+  return registration?.registered ? 'on' : 'idle';
+}
+
 function statusText(state: SetupState, messages: NotificationMessages): string {
   if (state === 'on') return messages.devicePushOn;
   if (state === 'denied') return messages.devicePushDenied;
@@ -87,13 +113,13 @@ export function WebPushDeviceSetup({
 
   useEffect(() => {
     let cancelled = false;
-    void getExistingPushSubscription().then((subscription) => {
-      if (!cancelled) setState(subscription ? 'on' : 'idle');
+    void resolveState(api).then((next) => {
+      if (!cancelled) setState(next);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [api]);
 
   if (!available) return null;
   if (needsInstall && config.installHint) return <InstallFirstHint hint={config.installHint} />;

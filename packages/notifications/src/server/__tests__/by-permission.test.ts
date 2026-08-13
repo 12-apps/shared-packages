@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import type { NotificationLogger } from '../../types';
 import { createApiNotifications, type ApiNotifications } from '../create-api-notifications';
 import type { NotificationAudienceDirectory } from '../by-permission';
 
@@ -9,8 +10,9 @@ import { createMemoryDb, memoryContacts, type MemoryDb } from './memory-db';
  * The permission fan-out's FOLD — the part the package owns: the AND, the
  * deduplication, the empty-list refusal, the per-recipient isolation and the
  * tenant stamp. The host's two queries are a fixture here; the same claims run
- * against a real seeded directory over Postgres in
- * `harness/backend/tests/notifications-fanout.test.ts`.
+ * against a real seeded grant table over Postgres in
+ * `harness/backend/tests/notifications-pipeline.test.ts`
+ * ("the permission fan-out against a real grant table").
  */
 
 const ALERT = {
@@ -42,13 +44,14 @@ function mount(
     'u-view': { email: 'view@example.com', phone: null },
     'u-double': { email: 'double@example.com', phone: null },
   }),
+  logger: NotificationLogger = { info: () => undefined, error: () => undefined },
 ): ApiNotifications {
   return createApiNotifications({
     db: () => Promise.resolve(db),
     contacts,
     generators: [ALERT as never],
     audience,
-    logger: { info: () => undefined, error: () => undefined },
+    logger,
   });
 }
 
@@ -184,6 +187,39 @@ describe('notifyByPermission', () => {
     // outage under "this tenant is not configured".
     expect(errors.join('\n')).toMatch(/could not be reached/);
     expect(infos.join('\n')).not.toMatch(/no recipient at client/);
+  });
+
+  it('isolates a candidate whose AUTHORIZATION lookup throws, and carries on', async () => {
+    // The documented isolation used to cover `notify` only, so this await —
+    // an ordinary DB read on a busy box — took the whole fan-out with it. At a
+    // tenant with 30 role-holders, candidate #3 timing out meant #4..#30 were
+    // never evaluated and nobody was told that money was missing.
+    const errors: string[] = [];
+    const api = mount(
+      {
+        listCandidates: () => Promise.resolve(['u-both', 'u-refund', 'u-double']),
+        getPermissions: (userId) =>
+          userId === 'u-refund'
+            ? Promise.reject(new Error('connection pool timeout'))
+            : Promise.resolve(PAIR),
+      },
+      undefined,
+      { info: () => undefined, error: (message) => errors.push(message) },
+    );
+
+    const result = await api.notifyByPermission('t-1', PAIR, {
+      type: 'payment.short',
+      payload: { note: 'faltam R$ 18,00' },
+    });
+
+    // The candidate AFTER the failing one is still reached…
+    expect(result.notified).toEqual(['u-both', 'u-double']);
+    // …the reason is its own, not "missing-permission" (a config fact)…
+    expect(result.skipped).toEqual([{ userId: 'u-refund', reason: 'audience-error' }]);
+    expect(inboxCount('u-double')).toBe(1);
+    // …and the outcome log ran at all, which a propagated throw prevented.
+    expect(errors.join('\n')).toMatch(/audience lookup failed for user u-refund/);
+    expect(errors.join('\n')).toMatch(/could not be reached/);
   });
 
   it('rejects loudly when the host configured no audience directory', async () => {

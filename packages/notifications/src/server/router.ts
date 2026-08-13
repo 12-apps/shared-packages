@@ -1,16 +1,17 @@
 import { UnknownNotificationRecipientError } from '../errors';
 import type { NotificationGeneratorRegistry } from '../generators';
-import type {
-  NotificationChannel,
-  NotificationEvent,
-  NotificationLogger,
-  TransportRecipient,
-} from '../types';
+import { DEFAULT_CHANNEL_ROW, enabledChannelsOf } from '../preferences-core';
+import type { NotificationChannel, NotificationEvent, TransportRecipient } from '../types';
 
-import type { NotificationContactDirectory, NotificationsDbProvider } from './db';
+import {
+  dispatchOne,
+  drainPending,
+  loadRecipient,
+  DEFAULT_SWEEP_CUTOFF_MS,
+  DEFAULT_SWEEP_TAKE,
+  type NotificationDispatchDeps,
+} from './dispatch';
 import type { NotificationPreferenceStore } from './preferences';
-import type { PushSubscriptionStore } from './push-subscriptions';
-import type { TransportRegistry } from './transports/registry';
 
 /**
  * The channel router + the `notify` emit API — the single front door into the
@@ -26,16 +27,23 @@ import type { TransportRegistry } from './transports/registry';
  *      with…
  *   3. …one QUEUED delivery per channel that is (a) enabled by the recipient's
  *      preferences for the generator's category and (b) supported by its
- *      transport for this recipient (destination exists + channel declared).
+ *      transport for this recipient.
  *   4. Hands the deliveries to the transports ASYNCHRONOUSLY (fire-and-forget
  *      by default) so emit sites never block on provider I/O.
+ *
+ * The TRANSACTION IS THIS PACKAGE'S OWN, and a host cannot enlist in it: step 2
+ * opens `client.$transaction` itself, and a Prisma `TransactionClient` has no
+ * `$transaction` to nest. So `notify` must be called AFTER the caller's own
+ * transaction commits — called from inside one, it commits an inbox row and
+ * dispatches an e-mail for a payment that then rolls back.
  *
  * Failure isolation: each delivery is sent in its own try/catch — one channel
  * failing marks only its row FAILED (error recorded) and never blocks the
  * inbox record or the other channels. Delivery is at-least-once: the unique
- * (notification, channel) row makes fan-out idempotent, and a re-dispatch of a
- * QUEUED/FAILED row may re-send if a crash landed between the provider call
- * and the SENT flip — transports are required to tolerate that.
+ * (notification, channel) row makes fan-out idempotent, and every send is
+ * CLAIMED before it happens (`./dispatch.ts`), so the remaining re-send window
+ * is the unavoidable one — a crash between the provider call and the SENT flip.
+ * Transports are required to tolerate that.
  *
  * Queueing: in-process async dispatch by default, or a real queue when the
  * host passes `scheduleDispatch`. The QUEUED status + the drain sweep are what
@@ -96,14 +104,9 @@ export interface NotifyResult {
   channels: NotificationChannel[];
 }
 
-interface NotificationRouterDeps {
-  db: NotificationsDbProvider;
+interface NotificationRouterDeps extends NotificationDispatchDeps {
   generators: NotificationGeneratorRegistry;
-  transports: TransportRegistry;
   preferences: NotificationPreferenceStore;
-  pushSubscriptions: PushSubscriptionStore;
-  contacts: NotificationContactDirectory;
-  logger: NotificationLogger;
   channelPolicy?: NotificationChannelPolicy;
   scheduleDispatch?: NotificationDispatchScheduler;
   onCommitted?: NotificationCommittedListener;
@@ -115,14 +118,29 @@ export interface NotificationRouter {
     options?: NotifyOptions,
   ): Promise<NotifyResult>;
   dispatchDeliveries(notificationId: string): Promise<void>;
-  drainPending(olderThanMs?: number): Promise<{ dispatched: number }>;
+  drainPending(olderThanMs?: number, take?: number): Promise<{ dispatched: number }>;
 }
 
 /**
- * Apply the host's policy. Fail-open by design: a policy error must cost at
- * worst an extra notification, never silently drop a whole emit — the dunning
- * e-mail this system carries is how payment gets collected.
+ * The channels that survive a plan gate this package could not consult.
+ *
+ * A policy error degrades to the FREE defaults (`DEFAULT_CHANNEL_ROW`, i.e.
+ * e-mail + web push) intersected with what the other gates allowed — not to
+ * everything. Failing fully open was the original reading, and the rationale
+ * given for it only ever argued for the free channels: the dunning e-mail this
+ * system carries is how payment gets collected, so a transient entitlements
+ * error must not silence it. That argument says nothing about SMS and WhatsApp,
+ * which are billed per message and are exactly what the host's own gate was
+ * about to refuse. So the free channels stay (an extra notification beats none)
+ * and the paid ones do not (the host is not billed for a channel it did not
+ * authorize).
  */
+function policyFallback(channels: NotificationChannel[]): NotificationChannel[] {
+  const free = new Set(enabledChannelsOf(DEFAULT_CHANNEL_ROW));
+  return channels.filter((channel) => free.has(channel));
+}
+
+/** Apply the host's policy, degrading to the free channels on an error. */
 async function applyPolicy(
   deps: NotificationRouterDeps,
   clientId: string | null | undefined,
@@ -131,24 +149,14 @@ async function applyPolicy(
   if (!deps.channelPolicy || clientId === null || clientId === undefined) return channels;
   try {
     return await deps.channelPolicy(clientId, channels);
-  } catch {
-    return channels;
+  } catch (error) {
+    deps.logger.error(
+      `[notifications] channelPolicy failed for client ${clientId}; ` +
+        'degrading to the free channels:',
+      error,
+    );
+    return policyFallback(channels);
   }
-}
-
-/** Load the recipient's destinations once, for every transport's gate. */
-async function loadRecipient(
-  deps: NotificationRouterDeps,
-  userId: string,
-): Promise<TransportRecipient | null> {
-  const contact = await deps.contacts.getContact(userId);
-  if (!contact) return null;
-  return {
-    userId,
-    email: contact.email,
-    phone: contact.phone,
-    pushSubscriptionCount: await deps.pushSubscriptions.count(userId),
-  };
 }
 
 /** Run the commit observer without ever letting it reach the caller. */
@@ -163,50 +171,6 @@ function announce(deps: NotificationRouterDeps, notification: CommittedNotificat
       `[notifications] commit listener failed for ${notification.notificationId}:`,
       error,
     );
-  }
-}
-
-/**
- * Send every still-QUEUED delivery of one notification through its transport,
- * flipping each row to SENT (with `sentAt`) or FAILED (with the provider error).
- * Safe to call repeatedly — already-SENT rows are skipped.
- */
-async function dispatchOne(deps: NotificationRouterDeps, notificationId: string): Promise<void> {
-  const client = await deps.db();
-  const notification = await client.notification.findUnique({ where: { id: notificationId } });
-  if (!notification) return;
-  const queued = await client.notificationDelivery.findMany({
-    where: { notificationId, status: 'QUEUED' },
-  });
-  if (queued.length === 0) return;
-
-  const recipient = await loadRecipient(deps, notification.userId);
-  if (!recipient) return;
-
-  const content = {
-    title: notification.title,
-    body: notification.body,
-    ...(notification.link !== null ? { link: notification.link } : {}),
-    data: (notification.data ?? {}) as Record<string, unknown>,
-  };
-
-  // Sequential on purpose: one recipient's channels (2–4 sends) gain little
-  // from parallelism, and providers rate-limit per sender anyway.
-  for (const delivery of queued) {
-    const transport = deps.transports.get(delivery.channel as NotificationChannel);
-    try {
-      if (!transport) throw new Error(`No transport declared for ${delivery.channel}.`);
-      await transport.send(transport.format(content) as never, recipient);
-      await client.notificationDelivery.update({
-        where: { id: delivery.id },
-        data: { status: 'SENT', sentAt: new Date(), error: null },
-      });
-    } catch (error) {
-      await client.notificationDelivery.update({
-        where: { id: delivery.id },
-        data: { status: 'FAILED', error: error instanceof Error ? error.message : String(error) },
-      });
-    }
   }
 }
 
@@ -261,47 +225,13 @@ async function commit(
   });
 }
 
-/**
- * Retry sweep for a cron/admin trigger: re-dispatch FAILED deliveries and QUEUED
- * strays older than `olderThanMs` (a QUEUED row that old means its emitting
- * process died mid-dispatch). FAILED rows are flipped back to QUEUED first so the
- * per-notification dispatcher picks them up.
- */
-async function drainPending(
-  deps: NotificationRouterDeps,
-  olderThanMs: number,
-): Promise<{ dispatched: number }> {
-  const client = await deps.db();
-  const cutoff = new Date(Date.now() - olderThanMs);
-  const pending = await client.notificationDelivery.findMany({
-    where: {
-      OR: [
-        { status: 'FAILED', updatedAt: { lt: cutoff } },
-        { status: 'QUEUED', createdAt: { lt: cutoff } },
-      ],
-    },
-  });
-  if (pending.length === 0) return { dispatched: 0 };
-
-  const failedIds = pending.filter((row) => row.status === 'FAILED').map((row) => row.id);
-  if (failedIds.length > 0) {
-    await client.notificationDelivery.updateMany({
-      where: { id: { in: failedIds } },
-      data: { status: 'QUEUED' },
-    });
-  }
-
-  const notificationIds = [...new Set(pending.map((row) => row.notificationId))];
-  for (const id of notificationIds) {
-    await dispatchOne(deps, id);
-  }
-  return { dispatched: pending.length };
-}
-
 export function createNotificationRouter(deps: NotificationRouterDeps): NotificationRouter {
   return {
-    dispatchDeliveries: (notificationId) => dispatchOne(deps, notificationId),
-    drainPending: (olderThanMs = 5 * 60_000) => drainPending(deps, olderThanMs),
+    dispatchDeliveries: async (notificationId) => {
+      await dispatchOne(deps, notificationId);
+    },
+    drainPending: (olderThanMs = DEFAULT_SWEEP_CUTOFF_MS, take = DEFAULT_SWEEP_TAKE) =>
+      drainPending(deps, olderThanMs, take),
 
     async notify(event, options = {}) {
       const generator = deps.generators.resolve(event.type);

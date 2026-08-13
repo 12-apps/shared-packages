@@ -128,10 +128,17 @@ describe('the email transport', () => {
     ).rejects.toThrow(/Resend rejected the message \(422 invalid from\)/);
   });
 
-  it('is unavailable for a recipient with no address', () => {
+  it('is unavailable for a recipient with no address, EMPTY STRING included', async () => {
+    // `!== null` passed an empty string — a very ordinary value for a nullable
+    // column — so the channel earned a delivery row and then failed forever
+    // against `send`'s own truthiness check. Two gates, one answer.
     const transport = emailTransport({ channel: 'EMAIL', driver: 'log' });
     expect(transport.supports({ ...reachable, email: null })).toBe(false);
+    expect(transport.supports({ ...reachable, email: '' })).toBe(false);
     expect(transport.supports(reachable)).toBe(true);
+    await expect(
+      transport.send(formatEmail(CONTENT, declaration), { ...reachable, email: '' }),
+    ).rejects.toThrow(/no email address/);
   });
 
   it('logs no destination address on the log driver — an inbox address is PII', () => {
@@ -152,6 +159,7 @@ describe('the sms transport', () => {
     authToken: 'tok',
     from: '+15550000000',
     appUrl: 'https://loja.example.com',
+    defaultCountryCode: '55',
   } as const;
 
   it('formats one plain body and caps it at three billed segments', () => {
@@ -178,7 +186,7 @@ describe('the sms transport', () => {
   });
 
   it('is unavailable for a recipient whose phone cannot be normalized', () => {
-    const transport = smsTransport({ channel: 'SMS', driver: 'log' });
+    const transport = smsTransport({ channel: 'SMS', driver: 'log', defaultCountryCode: '55' });
     expect(transport.supports({ ...reachable, phone: null })).toBe(false);
     expect(transport.supports({ ...reachable, phone: '123' })).toBe(false);
     expect(transport.supports(reachable)).toBe(true);
@@ -192,6 +200,7 @@ describe('the whatsapp transport', () => {
     accessToken: 'tok',
     phoneNumberId: '1234',
     appUrl: 'https://loja.example.com',
+    defaultCountryCode: '55',
   } as const;
 
   it('formats bold title + body + absolute link, and the two template params', () => {
@@ -235,6 +244,24 @@ describe('the whatsapp transport', () => {
       { type: 'text', text: 'Pagamento confirmado' },
       { type: 'text', text: 'Pedido A1 pago.' },
     ]);
+  });
+
+  it('WARNS at mount when no template is named — every business send is rejected', () => {
+    // The 24h session window cannot be tracked from here, so a host that
+    // declares WHATSAPP with no template and emits business-initiated alerts has
+    // every send refused by Meta. The delivery rows record it, but only once they
+    // exist; at mount it costs one line to notice. Not a throw: free-form is
+    // correct for a host that only replies inside the window.
+    const error = vi.fn();
+    whatsAppTransport(base, {}, { info: vi.fn(), error });
+    expect(String(error.mock.calls[0]?.[0])).toMatch(/no `templateName`/);
+
+    error.mockClear();
+    whatsAppTransport({ ...base, templateName: 'aviso_pagamento' }, {}, {
+      info: vi.fn(),
+      error,
+    });
+    expect(error).not.toHaveBeenCalled();
   });
 });
 
