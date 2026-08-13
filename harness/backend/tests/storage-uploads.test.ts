@@ -168,7 +168,10 @@ describe('POST /api/uploads/image', () => {
     const result = await upload(PNG, { contentType: 'application/zip' });
 
     expect(result.status).toBe(400);
-    expect(result.error).toBe('unsupported_content_type');
+    // A finished pt-BR sentence, not the code `unsupported_content_type`: the
+    // browser half relays whatever the mount states, so a bare code here makes it
+    // fall back to copy built from its OWN config instead.
+    expect(result.error).toContain('Formato não suportado');
   });
 
   it('rejects bytes whose magic number contradicts the declared type', async () => {
@@ -191,7 +194,11 @@ describe('POST /api/uploads/image', () => {
     const result = await upload(oversize);
 
     expect(result.status).toBe(413);
-    expect(result.error).toBe('file_too_large');
+    // And it NAMES that ceiling. This mount is 1 MB while the browser half defaults
+    // to 8 MB, so a bare code here is exactly what let a store owner read
+    // "o limite é 8 MB" about a file a 1 MB mount had refused.
+    expect(result.error).toContain('1 MB');
+    expect(result.error).not.toContain('8 MB');
   });
 });
 
