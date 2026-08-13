@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { isValidTopic } from "./topics";
 
@@ -49,8 +49,12 @@ import { isValidTopic } from "./topics";
  */
 export const TICKET_TTL_SECONDS = 30;
 
-/** Guard against a pathological list smuggled past the caller's own cap. */
-const MAX_TICKET_TOPICS = 16;
+/**
+ * Guard against a pathological list smuggled past the caller's own cap. Also
+ * the paging unit the browser client widens a subscription in, so it is part
+ * of the wire contract rather than a private guardrail.
+ */
+export const MAX_TICKET_TOPICS = 16;
 
 /** The signed body. Short keys: this travels in a query string. */
 interface TicketPayload {
@@ -58,12 +62,33 @@ interface TicketPayload {
   t: string[];
   /** Expiry, epoch seconds. */
   e: number;
+  /**
+   * A per-mint nonce, and the only reason it exists is SINGLE USE (12-16).
+   *
+   * Without it the payload is a pure function of `(topics, expirySecond)`, so
+   * two mints for the same topics in the same second produce a
+   * byte-identical ticket — which makes "has this ticket been used already?"
+   * unanswerable: a verifier remembering used tickets would refuse the second
+   * tab's perfectly legitimate handshake as a replay. With a nonce every mint
+   * is distinguishable, so {@link TicketReplayGuard} can burn one on use.
+   *
+   * Optional in the TYPE because a ticket minted by an older publisher of
+   * this package carries no `n`; verification then falls back to the
+   * signature as the identity, which is exactly as unique as the payload was.
+   */
+  n?: string;
 }
 
 /** A verified ticket's contents. */
 export interface RealtimeTicket {
   topics: string[];
   expiresAt: number;
+  /**
+   * This ticket's identity, for single-use enforcement — the mint's nonce, or
+   * the signature for a legacy ticket that has none. Never an identity of the
+   * CALLER: the ticket carries none, by design.
+   */
+  id: string;
 }
 
 function base64url(input: Buffer | string): string {
@@ -106,6 +131,7 @@ export function mintRealtimeTicket(
   const payload: TicketPayload = {
     t: [...topics],
     e: nowSeconds + TICKET_TTL_SECONDS,
+    n: randomBytes(12).toString("base64url"),
   };
   const body = base64url(JSON.stringify(payload));
   return `${body}.${sign(body, secret)}`;
@@ -169,5 +195,83 @@ export function verifyRealtimeTicket(
   const payload = decodePayload(parts.body);
   if (!payload || !isUsablePayload(payload, nowSeconds)) return null;
 
-  return { topics: payload.t, expiresAt: payload.e };
+  return {
+    topics: payload.t,
+    expiresAt: payload.e,
+    // A legacy ticket without a nonce is identified by its signature, which is
+    // exactly as unique as its payload was — so single-use enforcement is no
+    // WEAKER for it, only coarser.
+    id: typeof payload.n === "string" && payload.n ? payload.n : parts.signature,
+  };
+}
+
+/**
+ * One ticket, one use — the replay half of the handshake (12-16).
+ *
+ * ## What replay actually buys an attacker, and what this removes
+ *
+ * A ticket travels in a query string (the browser's `WebSocket` constructor
+ * cannot set headers), so it can land in a proxy log or a shell history. It
+ * expires in {@link TICKET_TTL_SECONDS} and authorizes ONE subscription to a
+ * fixed, already-authorized topic list — so the worst a replay ever bought was
+ * a second read-only stream of events the ticket's owner was entitled to, for
+ * the rest of that window.
+ *
+ * "Small" is not "nothing", and the window was wide enough to be worth
+ * closing: a leaked ticket could be used repeatedly for 30 s, and each use
+ * spends a connection slot belonging to the subject rather than to the
+ * attacker. Burning the id on first use makes a captured ticket worthless the
+ * moment its legitimate owner connects — which, since the mint is followed by
+ * exactly one round trip, is immediately.
+ *
+ * ## The guarantee is PER PROCESS, and that is stated rather than hidden
+ *
+ * The set lives in memory, so N gateway instances grant N uses in the worst
+ * case. Sharing it (Redis `SET NX` on the id, TTL = the ticket's) is a
+ * three-line change a deployment can make; it is deliberately not the default
+ * because it would make the socket handshake depend on Redis being reachable,
+ * turning a hardening measure into an outage path. Fan-out already crosses
+ * processes through the bus, so no client is pinned to an instance and the
+ * common case — a client reconnecting to a different instance — mints a fresh
+ * ticket anyway.
+ *
+ * Bounded by construction: entries are dropped once the ticket they name could
+ * no longer be verified, so the set never holds more than one TTL's worth of
+ * handshakes and a flood of forged ids cannot grow it (a forgery fails the
+ * signature check before it ever reaches here).
+ */
+export class TicketReplayGuard {
+  /** ticket id → the epoch second after which the ticket is dead anyway. */
+  private readonly used = new Map<string, number>();
+  private lastSweepSecond = 0;
+
+  /**
+   * Claim `ticket`. `true` the first time, `false` for every replay of it.
+   *
+   * Takes the VERIFIED ticket, so a forged or expired one never reaches the
+   * set: the caller has already refused it.
+   */
+  consume(
+    ticket: RealtimeTicket,
+    nowSeconds: number = Math.floor(Date.now() / 1000),
+  ): boolean {
+    this.sweep(nowSeconds);
+    if (this.used.has(ticket.id)) return false;
+    this.used.set(ticket.id, ticket.expiresAt);
+    return true;
+  }
+
+  /** How many live ids are remembered — for tests and health readouts. */
+  get size(): number {
+    return this.used.size;
+  }
+
+  /** Drop ids whose tickets have expired; at most once per second. */
+  private sweep(nowSeconds: number): void {
+    if (nowSeconds === this.lastSweepSecond) return;
+    this.lastSweepSecond = nowSeconds;
+    for (const [id, expiresAt] of this.used) {
+      if (expiresAt <= nowSeconds) this.used.delete(id);
+    }
+  }
 }

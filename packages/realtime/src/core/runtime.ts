@@ -45,14 +45,20 @@ export function getRealtimeDriver(): RealtimeDriver | null {
   return driver;
 }
 
-/** Stamp the envelope: unique-enough id (per-process monotonic) + timestamp. */
+/**
+ * Stamp the envelope: unique-enough id (per-process monotonic) + timestamp.
+ *
+ * A publisher-supplied `id` wins — see `RealtimeEventInput.id`. Only the
+ * transactional outbox uses that, because its publish is at-least-once and a
+ * re-publish has to be recognisable as the same event.
+ */
 function toEvent<TData>(input: RealtimeEventInput<TData>): RealtimeEvent<TData> {
   sequence += 1;
   return {
     type: input.type,
     data: input.data,
     ts: Date.now(),
-    id: `${Date.now().toString(36)}-${sequence.toString(36)}`,
+    id: input.id ?? `${Date.now().toString(36)}-${sequence.toString(36)}`,
   };
 }
 
