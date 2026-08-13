@@ -95,6 +95,13 @@ function routeFailures(ctx: GateContext): { failures: string[]; routeMethodCount
     ctx.endpoints.map((endpoint) => `${endpoint.method.toUpperCase()} ${endpoint.path}`),
   );
 
+  // NOTE which way this loop fails, because it is the opposite of the instinct a
+  // gate invites: a method the SCAN misses is simply absent from `covered`, so no
+  // violation is raised at all and that route ships unregistered. Under-detection
+  // here is fail-OPEN — which is why `exportedNamesOf` blanks comments and strings
+  // before it looks for an export head instead of trusting raw source. (The loop
+  // after this one is the merely noisy half: a REGISTERED entry whose route was
+  // missed reports `registry entry without a route`.)
   const covered = routeMethods.filter(({ urlPath }) => !segmentPrefixMatch(urlPath, infraPrefixes));
   for (const { urlPath, method, file } of covered) {
     if (!registered.has(`${method} ${urlPath}`)) {

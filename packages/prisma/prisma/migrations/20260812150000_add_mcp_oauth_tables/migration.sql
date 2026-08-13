@@ -30,6 +30,17 @@
 -- the CHECK, which has no IF NOT EXISTS form). That is what makes adoption by a
 -- host that ALREADY has these tables a no-op instead of a failed deploy — and
 -- what lets the PGlite provisioner replay it into an existing schema.
+--
+-- Guarding every STATEMENT is not the same as guarding every COLUMN, though, and
+-- the difference bites exactly the host this file is written for: `CREATE TABLE IF
+-- NOT EXISTS` skips the whole table, columns included, so a host holding an OLDER
+-- shape of one of these tables silently keeps it. Each table below is therefore
+-- followed by a guarded `ADD COLUMN` for every column that reached future-pay in a
+-- LATER migration than its own CREATE. The full audit: `oauth_refresh_tokens
+-- .user_sub` (`20260713150000_add_oauth_refresh_user_sub`) and `mcp_connections
+-- .host` (`20260720120000_add_mcp_connection_host`). `oauth_clients` needs none —
+-- it arrived complete, CHECK and all, and was never altered afterwards. A column
+-- added to this file later needs the same treatment.
 
 -- Registered OAuth client (host app). Array columns are Postgres TEXT[]:
 -- redirect_uris is the exact-match allowlist for open-redirect prevention;
@@ -97,6 +108,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS "oauth_refresh_tokens_token_hash_key"
 -- the disconnect path).
 CREATE INDEX IF NOT EXISTS "oauth_refresh_tokens_user_email_client_id_idx"
   ON "oauth_refresh_tokens"("user_email", "client_id");
+
+-- `CREATE TABLE IF NOT EXISTS` skips the WHOLE table, so a host that already holds
+-- `oauth_refresh_tokens` in an OLDER SHAPE gets none of the columns declared above
+-- — statement-level guarding is not the same as column-level guarding. That is
+-- precisely how future-pay's own history ran: `user_sub` arrived in a SECOND
+-- migration (FUT-105, `20260713150000_add_oauth_refresh_user_sub`), so a host
+-- frozen before it would adopt this file, skip the CREATE, never get the column,
+-- and then fail on every refresh the package serves. Mirror future-pay's pair
+-- verbatim — guarded add with a backfill default to satisfy NOT NULL, then drop
+-- the default so the column matches the Prisma schema (`String`, no default).
+-- Both statements are no-ops on a fresh host and on a replay.
+ALTER TABLE "oauth_refresh_tokens"
+  ADD COLUMN IF NOT EXISTS "user_sub" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "oauth_refresh_tokens"
+  ALTER COLUMN "user_sub" DROP DEFAULT;
 
 -- A user's live AI connections. `host` is nullable: a connection can exist before
 -- any provider attribution is derivable (a CLI callback with no public domain).

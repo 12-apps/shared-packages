@@ -75,31 +75,53 @@ describe("exportedMethodsOf", () => {
     "stays linear on adversarial input (CodeQL js/polynomial-redos)",
     { timeout: 5_000 },
     () => {
-      // The pathological family for the replaced regexes is MANY UNCLOSED OPENERS,
-      // not one long run: every `export {` restarted a match attempt whose `[^}]+`
-      // scanned to end-of-file, so the old code was quadratic in the OPENER COUNT.
+      // ONE fixture, because only one of the three this case used to carry actually
+      // cost anything. Measured against the pre-fix regex pair: 150k spaces took
+      // 1ms and 60k `export {` openers followed by `GET}` took 2ms — ~360KB of
+      // fixture carrying no ReDoS signal at all — while the shape below took
+      // 15,398ms. The pathological family is MANY UNCLOSED OPENERS: every `export {`
+      // restarted a match whose `[^}]+` ran to end-of-file, so the cost was
+      // quadratic in the OPENER COUNT, not in file length. 20k openers: 1,647ms.
+      // 60k: 15,424ms — 9.4x for 3x the input, which is the quadratic signature.
+      // The shared linear walk does the same fixture in 69ms.
       //
-      // The sizes are MEASURED, not guessed: on the pre-fix implementation this
-      // fixture takes ~19s, and ~2.1s at a third of it — the 9x-per-3x signature of
-      // a quadratic — so it blows well past the timeout declared above, while the
-      // linear walker finishes in milliseconds. A smaller fixture would pass on the
-      // old code and prove nothing, and the timeout is pinned HERE rather than
-      // inherited from the suite default so that raising the default can never
-      // quietly turn this case into one.
-      const braceNoise = `export {{${"export {{|".repeat(60_000)}`;
-      const spacedNoise = `export${" ".repeat(150_000)}notAMethodKeyword`;
-      // A close brace far past tens of thousands of heads: the memoized `}` search
-      // is what stops each head from re-walking the same tail.
-      const farClose = `${"export {".repeat(60_000)}GET}`;
-      const source = [braceNoise, spacedNoise, farClose, "export const DELETE = h;"].join("\n");
+      // What makes this FAIL pre-fix is therefore the 5s bound alone, and that is
+      // the honest reason: the expectation below is the answer BOTH implementations
+      // give, so nothing here can pass by accident on a semantic difference. (An
+      // earlier version asserted `["DELETE","GET"]`, which is only the new walk's
+      // answer — the case failed pre-fix on that assertion rather than on time,
+      // while its comment claimed otherwise.) vitest does fail a synchronous
+      // overrun: it reports the timeout once the body returns, which is verified
+      // behaviour, not an assumption. The bound is pinned on the case rather than
+      // inherited from the suite default so that raising the default cannot quietly
+      // neuter it.
+      const source = [
+        `export {{${"export {{|".repeat(60_000)}`,
+        "export const DELETE = h;",
+      ].join("\n");
 
-      // And the answer is still right. `DELETE` is the ordinary export; `GET` comes
-      // from the LAST head of `farClose`, which is a legal `export {GET}` — the
-      // 59,999 heads before it each swallow a later head and contribute nothing,
-      // which is exactly the skip that keeps the walk linear.
-      expect(exportedMethodsOf(source).sort()).toEqual(["DELETE", "GET"]);
+      expect(exportedMethodsOf(source)).toEqual(["DELETE"]);
     },
   );
+
+  it("still sees a list whose COMMENT mentions export (the fail-open one)", () => {
+    // A brace list may legally carry a comment, and the linearity skip asks "does
+    // another `export` keyword sit inside this list?" — so before comments were
+    // blanked, a comment saying the word `export` made the walk abandon the whole
+    // list. That direction is fail-OPEN for this gate, not fail-closed: a method the
+    // scan misses is simply absent from `covered`, so NO `unregistered route`
+    // violation is raised and the route ships unregistered.
+    expect(exportedMethodsOf("export {  // re-export the handlers\n  config, GET };")).toEqual([
+      "GET",
+    ]);
+    expect(
+      exportedMethodsOf("export { /* export these two */ POST, DELETE };").sort(),
+    ).toEqual(["DELETE", "POST"]);
+    // Blanking also removes a false positive that used to run the other way: a
+    // method named only inside a comment or a string is not a handler.
+    expect(exportedMethodsOf("/* export { GET } */ export const POST = h;")).toEqual(["POST"]);
+    expect(exportedMethodsOf('const sql = "export { GET }";')).toEqual([]);
+  });
 
   it("survives the shapes a scanner gets wrong where a regex did not", () => {
     // The brace list is found by scanning rather than by an unbounded `[^}]+`

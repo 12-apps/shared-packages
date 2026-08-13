@@ -2,6 +2,7 @@ import { mintCode } from "./authorization-code";
 import { matchesRedirectUri } from "./clients";
 import type { McpOauthContext } from "./context";
 import { SUPPORTED_CHALLENGE_METHOD } from "./pkce";
+import type { StoredOAuthClient } from "./stores";
 
 /**
  * The OAuth 2.1 Authorization Code + PKCE authorization endpoint (12-23, ported
@@ -33,6 +34,8 @@ type AuthorizeErrorCode =
   | "invalid_request"
   | "unsupported_response_type"
   | "invalid_scope"
+  /** The resource owner said no — or nobody was asked and nobody approved. */
+  | "access_denied"
   | "server_error";
 
 /** The parsed, still-untrusted query parameters of an authorize request. */
@@ -115,7 +118,7 @@ function scopeIsSupported(scope: string | null, allowed: readonly string[]): boo
 async function validateClientAndRedirect(
   context: McpOauthContext,
   params: AuthorizeParams,
-): Promise<{ redirectUri: string; clientScopes: string[] } | Response> {
+): Promise<{ client: StoredOAuthClient; redirectUri: string } | Response> {
   if (!params.clientId) return badRequest("invalid_request: missing client_id");
   if (!params.redirectUri) return badRequest("invalid_request: missing redirect_uri");
 
@@ -125,7 +128,7 @@ async function validateClientAndRedirect(
     return badRequest("invalid_request: redirect_uri is not registered");
   }
 
-  return { redirectUri: params.redirectUri, clientScopes: client.scopes };
+  return { client, redirectUri: params.redirectUri };
 }
 
 /**
@@ -155,6 +158,8 @@ function validateAuthorizeRequest(
 
 /** The already-validated inputs an authorize request resolves to before minting. */
 interface ValidatedAuthorize {
+  /** The registered client — needed by the approval seam, not just its id. */
+  client: StoredOAuthClient;
   clientId: string;
   redirectUri: string;
   codeChallenge: string;
@@ -184,6 +189,20 @@ async function authenticateAndMint(
     const loginUrl = new URL(context.loginPath, origin);
     loginUrl.searchParams.set(context.loginCallbackParam, url.pathname + url.search);
     return redirectTo(loginUrl.toString());
+  }
+
+  // CONSENT. A session proves WHO is asking; it never proves they agreed to THIS
+  // client holding THESE scopes. Registration is open (RFC 7591), so without this
+  // step anyone may register a client carrying their own redirect URI and their own
+  // scope ceiling, send a signed-in admin a single link, and have that admin's
+  // browser mint them a code — and the two guards that look like they would stop it,
+  // exact redirect-URI matching and the per-client scope ceiling, are both checked
+  // against the ATTACKER'S OWN registration. Refuses by default; see
+  // `resolveApproval` / `preApprovedClientIds`.
+  const scopes = validated.scope.split(/\s+/).filter(Boolean);
+  if (!(await context.approve(request, validated.client, scopes))) {
+    // The answer a human refusal gives, at the URI validated further up.
+    return errorRedirect(redirectUri, "access_denied", state);
   }
 
   const code = await mintCode(context.signingKey, {
@@ -223,14 +242,15 @@ export async function authorizeEndpoint(
   // --- Validate client + redirect_uri FIRST (the open-redirect guard) --------
   const clientResult = await validateClientAndRedirect(context, params);
   if (clientResult instanceof Response) return clientResult;
-  const { redirectUri, clientScopes } = clientResult;
+  const { client, redirectUri } = clientResult;
 
   // --- Validate the rest (scope checked against the CLIENT's own registration)
-  const requestError = validateAuthorizeRequest(params, redirectUri, clientScopes);
+  const requestError = validateAuthorizeRequest(params, redirectUri, client.scopes);
   if (requestError) return requestError;
 
   // The guards above guarantee a present client_id + PKCE challenge; narrow them.
   return authenticateAndMint(context, request, url, origin, {
+    client,
     clientId: params.clientId as string,
     redirectUri,
     codeChallenge: params.codeChallenge as string,

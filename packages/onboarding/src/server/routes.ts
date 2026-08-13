@@ -152,6 +152,11 @@ async function applyOperation(
   }
   // `reset` — DEV-only: refuse in production even if a caller reaches the route
   // (future-pay also compiles the UI affordance out of prod builds).
+  //
+  // DIVERGENCE from future-pay, deliberate: this answers 403 where the host's
+  // `ActionError` mapping made it 400. 403 is the accurate code for "you may not do
+  // this here", and no caller branches on it (the affordance is compiled out), but
+  // it IS a changed status rather than a pure move.
   if (!resetAllowed(deps.config)) {
     throw new OnboardingApiError(403, messagesOf(deps.config).resetUnavailable);
   }

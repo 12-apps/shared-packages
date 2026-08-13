@@ -97,6 +97,23 @@ describe("the manifest endpoint", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
 
+  it("404s the WORKER too where the host is not an app", async () => {
+    // Both routes or the claim is only about the manifest. The worker source is
+    // byte-identical for every tenant, so a 200 here never leaked anything — but a
+    // served worker under a 404 manifest reads to an adopter as "the worker is
+    // public", and `resolveApp` is meant to be the one gate.
+    const app = mounted((host) => (host === "loja.exemplo.com.br" ? STORE : null));
+
+    const refused = await app.request("http://plataforma.exemplo.com/sw.js");
+    expect(refused.status).toBe(404);
+    expect(await refused.text()).toBe("");
+
+    // …and it is still served where the host IS an app.
+    const served = await app.request("http://loja.exemplo.com.br/sw.js");
+    expect(served.status).toBe(200);
+    expect(served.headers.get("service-worker-allowed")).toBe("/");
+  });
+
   it("resolves the app per HOST, so two origins are two apps", async () => {
     const app = mounted((host) =>
       host === "a.exemplo.com" ? STORE : { ...STORE, id: "/outra/", name: "Outra Loja" },

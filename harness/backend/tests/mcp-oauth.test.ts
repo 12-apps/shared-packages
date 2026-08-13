@@ -12,6 +12,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
 import {
+  APPROVAL_HEADER,
   MCP_SIGNING_KID,
   MCP_USER_B_EMAIL,
   MCP_USER_EMAIL,
@@ -131,6 +132,8 @@ interface AuthorizeOptions {
   state?: string;
   responseType?: string;
   challengeMethod?: string;
+  /** `false` makes the HOST's consent decision a refusal (see `resolveApproval`). */
+  approve?: boolean;
 }
 
 function authorize(options: AuthorizeOptions): Promise<Response> {
@@ -145,7 +148,10 @@ function authorize(options: AuthorizeOptions): Promise<Response> {
   });
   const email = options.email === undefined ? MCP_USER_EMAIL : options.email;
   return backend.app.request(`/api/oauth/authorize?${query.toString()}`, {
-    headers: email ? { 'x-mcp-user': email } : {},
+    headers: {
+      ...(email ? { 'x-mcp-user': email } : {}),
+      ...(options.approve === false ? { [APPROVAL_HEADER]: 'deny' } : {}),
+    },
   });
 }
 
@@ -289,6 +295,25 @@ describe('authorize — identity and the open-redirect guard', () => {
       expect(location.searchParams.get('error')).toBe('invalid_request');
       expect(location.searchParams.get('state')).toBe('xyz');
     }
+  });
+
+  it('mints nothing when the HOST refuses consent', async () => {
+    // The endpoint has no consent screen of its own and registration is open, so
+    // the host's approval decision is the only thing standing between "attacker
+    // registers a client with their own redirect_uri and scope" and "a signed-in
+    // admin's browser hands them a code". Refusal is an `access_denied` redirect,
+    // and — the actual property — no code.
+    const clientId = await publicClient();
+    const { challenge } = pkcePair();
+    const response = await authorize({ clientId, challenge, approve: false, state: 'xyz' });
+
+    expect(response.status).toBe(302);
+    const location = new URL(response.headers.get('location') as string);
+    expect(location.searchParams.get('error')).toBe('access_denied');
+    expect(location.searchParams.get('state')).toBe('xyz');
+    expect(location.searchParams.get('code')).toBeNull();
+    // Nothing was recorded either: no grant, so no connection.
+    expect((await state()).tokens).toHaveLength(0);
   });
 
   it('refuses a scope the CLIENT did not register for', async () => {
@@ -448,6 +473,33 @@ describe('the refresh_token grant', () => {
     const child = rows.find((row) => row.rotated_from === parent?.token_hash);
     expect(parent?.revoked).toBe(true);
     expect(child?.revoked).toBe(false);
+  });
+
+  it('hands CONCURRENT rotations to exactly one caller, over the real table', async () => {
+    // The claim-once contract, proven against a REAL database rather than a map —
+    // this store is raw SQL (`UPDATE … WHERE revoked_at IS NULL`, count must be 1),
+    // so what is under test here is a NON-Prisma host meeting the same requirement.
+    // Before the claim existed both requests answered 200 and one parent ended up
+    // with two LIVE successors, which defeats OAuth 2.1 §4.3.1 replay protection by
+    // winning a race instead of arriving second.
+    const { clientId, tokens } = await grant();
+    const refresh = () =>
+      token({
+        grant_type: 'refresh_token',
+        refresh_token: tokens.refresh_token,
+        client_id: clientId,
+      });
+
+    const statuses = (await Promise.all([refresh(), refresh()]))
+      .map((response) => response.status)
+      .sort();
+    expect(statuses).toEqual([200, 400]);
+
+    // Exactly ONE successor row was written — two would mean the claim leaked — and
+    // the loser is treated as the replay it is, so the whole lineage is revoked.
+    const rows = (await state()).tokens;
+    expect(rows.filter((row) => row.rotated_from !== null)).toHaveLength(1);
+    expect(rows.every((row) => row.revoked)).toBe(true);
   });
 
   it('treats reuse as a replay and revokes the WHOLE lineage', async () => {

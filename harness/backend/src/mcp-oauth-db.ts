@@ -161,10 +161,20 @@ function refreshTokenStore(pg: PGlite): RefreshTokenStore {
     },
 
     async rotate(successor, parentHash, at) {
-      // Both writes or neither: a crash between them leaves a live parent AND a
-      // live child, i.e. two usable tokens where rotation promises one. Prisma
-      // gives the package `$transaction`; here it is the real thing.
-      await pg.transaction(async (tx) => {
+      // The port's CLAIM-ONCE contract, in SQL rather than Prisma — a non-Prisma
+      // host satisfying the same requirement by hand, which is why the harness
+      // fills these ports itself. The parent revoke is CONDITIONAL on the row still
+      // being live, and the successor is inserted only when that claim took effect;
+      // one transaction covers the crash case as before.
+      return pg.transaction(async (tx) => {
+        const claim = await tx.query(
+          `UPDATE oauth_refresh_tokens SET revoked_at = $1
+             WHERE token_hash = $2 AND revoked_at IS NULL`,
+          [at, parentHash],
+        );
+        // Lost the claim (a concurrent rotation got there, or the parent was already
+        // revoked): write NOTHING and say so.
+        if ((claim.affectedRows ?? 0) !== 1) return false;
         await tx.query(
           `INSERT INTO oauth_refresh_tokens
              (id, token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, created_at)
@@ -179,10 +189,7 @@ function refreshTokenStore(pg: PGlite): RefreshTokenStore {
             successor.rotatedFrom,
           ],
         );
-        await tx.query(`UPDATE oauth_refresh_tokens SET revoked_at = $1 WHERE token_hash = $2`, [
-          at,
-          parentHash,
-        ]);
+        return true;
       });
     },
 

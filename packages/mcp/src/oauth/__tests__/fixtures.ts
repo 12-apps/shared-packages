@@ -94,9 +94,16 @@ function memoryRefreshTokenStore(): RefreshTokenStore & {
       }
     },
     async rotate(successor, parentHash, at) {
-      put(successor);
+      // Claim-once, as the port requires. A JS map has no interleaving WITHIN this
+      // synchronous block, so reading `revokedAt` and writing it back is atomic
+      // here — which is exactly what the SQL stores buy with a conditional
+      // `updateMany`. Two awaited callers therefore see one claim each way round,
+      // and the loser writes nothing.
       const parent = rows.get(parentHash);
-      if (parent) rows.set(parentHash, { ...parent, revokedAt: at });
+      if (!parent || parent.revokedAt) return false;
+      rows.set(parentHash, { ...parent, revokedAt: at });
+      put(successor);
+      return true;
     },
     async revokeLiveForClient(userEmail, clientId) {
       // A container's property rather than a closed-over binding: the same reason
@@ -205,6 +212,13 @@ export async function asHarness(
     resolveSession: () => session.current,
     signingKey: await testSigningKey(),
     connections: { resolveUserId: (email) => (email ? "user-1" : null) },
+    // One instance, said out loud — the field has no default on purpose.
+    codeReplay: "in-process",
+    // This harness stands in for a host that HAS a consent screen and whose user
+    // approved. Without a seam the package refuses every dynamically registered
+    // client, which is the right default and is covered by its own cases in
+    // surface.test.ts — but it is not the state the other ~40 cases are about.
+    resolveApproval: () => true,
     ...overrides,
   });
   return { api, stores, session };

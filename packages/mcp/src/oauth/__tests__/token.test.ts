@@ -253,6 +253,35 @@ describe("refresh_token grant", () => {
     expect(afterReplay.status).toBe(400);
   });
 
+  it("hands CONCURRENT rotations of one token to exactly one caller", async () => {
+    const { api, stores, clientId, first } = await withRefreshToken();
+    const refresh = () =>
+      token(api, {
+        grant_type: "refresh_token",
+        refresh_token: first.refresh_token,
+        client_id: clientId,
+      });
+
+    // The validate-then-write in `rotateRefreshToken` is a READ, so both of these
+    // pass their checks; `store.rotate` is the serialization point and its
+    // claim-once write is what decides between them. Before that claim existed BOTH
+    // answered 200 and one parent ended up with two LIVE successors — replay
+    // protection defeated by winning the race rather than by arriving second, which
+    // is the one attack rotation exists to stop (OAuth 2.1 §4.3.1).
+    const statuses = (await Promise.all([refresh(), refresh()]))
+      .map((response) => response.status)
+      .sort();
+    expect(statuses).toEqual([200, 400]);
+
+    // And the loser is treated as the replay it is: same answer as the sequential
+    // case, so the whole lineage goes — including the winner's fresh successor.
+    // Rejecting without revoking would leave a race-winning attacker holding a live
+    // family, which is exactly what lineage revocation is for.
+    expect(stores.refreshTokens.rows().every((row) => row.revokedAt !== null)).toBe(true);
+    // Exactly one successor was ever written. Two rows would mean the claim leaked.
+    expect(stores.refreshTokens.rows().filter((row) => row.rotatedFrom !== null)).toHaveLength(1);
+  });
+
   it("refuses another client's refresh token and leaves it usable by its owner", async () => {
     const { api, clientId, first } = await withRefreshToken();
     const other = await registerTestClient(api, {

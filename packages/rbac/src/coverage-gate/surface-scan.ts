@@ -1,6 +1,8 @@
 import { readdirSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 
+import { stripCommentsAndStrings } from './detect';
+
 /**
  * Static-scan helpers for the RBAC coverage gate (12-13) — the discovery half
  * of future-pay's `scripts/lib/surface-scan.ts`, shipped with the package so
@@ -83,21 +85,36 @@ export interface ExportHeadGrammar {
  * the number of OPENERS rather than in file length: the forward scan for `}`
  * (memoized below — the first `}` at-or-after a position is shared by every head
  * before it), and parsing a giant "list" slice that actually swallows LATER
- * heads. A brace list containing another `export` keyword is not legal JS, so
- * such a head contributes nothing and the later heads parse themselves — real
- * modules are unaffected, and a malformed one can only lose the illegal list,
- * never a real standalone export. That direction is deliberate: a completeness
- * gate that loses a declaration fails CLOSED (more work reported, never less).
+ * heads. The skip that avoids the second one asks "does another `export` keyword
+ * sit inside this list?", and it is only sound because comments and strings are
+ * BLANKED first: a list may legally carry a COMMENT that mentions `export`, and
+ * against raw source such a comment made the walk abandon a real list and lose
+ * every name in it (`export { // re-export the handlers` / `config, GET };`).
+ *
+ * Losing a list matters more than it sounds, so it is worth being exact about the
+ * direction: it fails **OPEN**, not closed. A method the scan misses is simply
+ * absent from the gate's `covered` set, so no "unregistered route" violation is
+ * raised and an unregistered route walks straight through. (The other half is
+ * noisy rather than dangerous — a REGISTERED entry whose route was missed reports
+ * "registry entry without a route".) Blanking comments and strings first is what
+ * keeps that from being reachable by legal code; what remains beyond it is
+ * genuinely malformed source, where a lost illegal list cannot hide a real
+ * standalone export.
  */
 export function exportedNamesOf(source: string, grammar: ExportHeadGrammar = {}): string[] {
+  // Comments and strings become spaces (newlines kept) in ONE linear pass, so the
+  // `}` and next-`export` positions the walk reasons about are all real code. This
+  // also drops the pre-existing false positive where a method named only inside a
+  // comment or a string counted as a handler.
+  const code = stripCommentsAndStrings(source);
   const walk: Walk = {
-    source,
+    source: code,
     names: new Set<string>(),
     scan: { searchedFrom: Number.POSITIVE_INFINITY, close: -2 },
     syncFunctions: grammar.syncFunctions ?? false,
     accept: grammar.accept ?? ((name) => IDENTIFIER.test(name)),
   };
-  const heads = [...source.matchAll(/\bexport\b/g)].map((m) => m.index ?? 0);
+  const heads = [...code.matchAll(/\bexport\b/g)].map((m) => m.index ?? 0);
   heads.forEach((index, k) => {
     collectExport(walk, index + 'export'.length, heads[k + 1] ?? Number.POSITIVE_INFINITY);
   });

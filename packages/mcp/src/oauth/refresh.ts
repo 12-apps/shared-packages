@@ -19,6 +19,11 @@ import type { NewRefreshToken, RefreshTokenStore, StoredRefreshToken } from "./s
  *   - reuse of an already-rotated/revoked token is a REPLAY: rejected, AND the
  *     whole lineage (every ancestor + descendant reachable through `rotatedFrom`)
  *     is revoked — the OAuth 2.1 refresh-token replay rule;
+ *   - CONCURRENT reuse is the same event and gets the same answer. The store's
+ *     `rotate` is a claim-once write, so of two simultaneous rotations of one
+ *     parent exactly one is issued a successor and the other is treated as the
+ *     replay it is. Without that, replay protection would be bypassable by
+ *     WINNING a race instead of arriving second (see `RefreshTokenStore.rotate`);
  *   - rotate may only NARROW scope (new ⊆ original); broadening is rejected and
  *     nothing new is stored.
  */
@@ -214,16 +219,12 @@ export async function rotateRefreshToken(
   // Already revoked OR already used as the parent of a rotation → REPLAY. Revoke
   // the whole lineage and reject.
   if (current.revokedAt || (await context.store.hasSuccessor(tokenHash))) {
-    await revokeLineage(context, current, tokenHash);
-    throw new RefreshTokenError(
-      "invalid_grant",
-      "refresh token already used (replay) — lineage revoked",
-    );
+    await replay(context, current, tokenHash);
   }
 
   const scopes = narrowedScopes(current, newScopes);
   const successorPlaintext = generateToken();
-  await context.store.rotate(
+  const claimed = await context.store.rotate(
     {
       tokenHash: hashToken(successorPlaintext),
       userEmail: current.userEmail,
@@ -236,8 +237,30 @@ export async function rotateRefreshToken(
     tokenHash,
     new Date(),
   );
+  // The checks above are a READ, so a concurrent rotation of the same parent can
+  // pass them too; `rotate` is the serialization point and it hands the claim to
+  // exactly one caller. Losing it is the SAME event as the replay branch above —
+  // one token used twice — so it gets the same answer, deliberately: reject, and
+  // revoke the lineage including the winner's fresh successor. Rejecting without
+  // revoking would leave a race-winning attacker holding a live family, which is
+  // the whole attack; and a client that legitimately double-submits already loses
+  // its family in the sequential case, so this is consistent rather than harsher.
+  if (!claimed) await replay(context, current, tokenHash);
 
   return { refreshToken: successorPlaintext, scopes };
+}
+
+/** Detected reuse: revoke the whole lineage and reject. Never returns. */
+async function replay(
+  context: RefreshTokenContext,
+  current: StoredRefreshToken,
+  tokenHash: string,
+): Promise<never> {
+  await revokeLineage(context, current, tokenHash);
+  throw new RefreshTokenError(
+    "invalid_grant",
+    "refresh token already used (replay) — lineage revoked",
+  );
 }
 
 /** The stable identity a refresh token is bound to. */

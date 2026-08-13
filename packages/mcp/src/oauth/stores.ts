@@ -73,24 +73,31 @@ export interface RefreshTokenStore {
   /** Revoke exactly these hashes (idempotent). */
   revokeHashes(tokenHashes: readonly string[], at: Date): Promise<void>;
   /**
-   * Store the successor AND revoke its parent ATOMICALLY. A crash between the
-   * two would leave a live parent and a live child — two usable tokens where the
-   * rotation contract promises one.
+   * CLAIM the parent and store the successor, atomically. The whole of OAuth 2.1
+   * §4.3.1 replay protection rests on this one method, so read the contract before
+   * implementing it.
    *
-   * ⚠️ That atomicity covers the CRASH, not a RACE. `rotateRefreshToken` reads and
-   * validates the parent before calling this, so two rotations of the SAME parent
-   * arriving concurrently both pass their checks and both commit: one parent, two
-   * live successors, and no replay detected (the replay rule fires on a THIRD use
-   * of the parent, which never comes). The window is a request round trip, and the
-   * attacker who wins it is one already holding a stolen refresh token. Closing it
-   * needs a claim-once write here — revoke the parent CONDITIONALLY on it still
-   * being unrevoked and unrotated (`updateMany` where `revokedAt: null`, then
-   * require a count of 1) and fail the rotation otherwise — which is a change to
-   * what every host's implementation must guarantee, so it is called out rather
-   * than silently assumed. Documented here, at the contract, for the same reason
-   * `codeReplay` documents its multi-instance caveat where the swap happens.
+   * Returns `true` when THIS call is the one that consumed `parentHash`, `false`
+   * when another call already had. `false` MUST mean nothing was written: no
+   * successor row, no second revocation.
+   *
+   * An implementation MUST revoke the parent CONDITIONALLY on it still being
+   * unrevoked — `updateMany({ where: { tokenHash: parentHash, revokedAt: null } })`,
+   * requiring a count of exactly 1 — and create the successor in the SAME
+   * transaction. An unconditional `update` is NOT enough: two concurrent rotations
+   * of one parent would both succeed, leaving two live successors of one token with
+   * no replay ever detected, because the replay rule fires on a THIRD use of the
+   * parent that then never comes. That is replay protection defeated by WINNING a
+   * race rather than by arriving second — precisely the attack rotation exists to
+   * stop, since an attacker holding a stolen refresh token need only fire it
+   * alongside the legitimate client to walk away with a live, independently
+   * rotating family.
+   *
+   * Atomicity against a CRASH is necessary too (a half-applied rotation leaves a
+   * live parent AND a live child) but it is not sufficient, and it is the easier
+   * half to satisfy by accident.
    */
-  rotate(successor: NewRefreshToken, parentHash: string, at: Date): Promise<void>;
+  rotate(successor: NewRefreshToken, parentHash: string, at: Date): Promise<boolean>;
   /**
    * Revoke every LIVE token a user holds for one client; returns how many were
    * actually ended (already-revoked rows are skipped, so a repeat reports 0).

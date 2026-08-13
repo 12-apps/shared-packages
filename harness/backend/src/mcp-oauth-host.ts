@@ -29,6 +29,9 @@ const MIGRATIONS_DIR = fileURLToPath(
 /** The header a spec sets to sign in as somebody; absent means the owner. */
 const SESSION_HEADER = 'x-mcp-user';
 
+/** `deny` makes the host's consent decision a refusal; anything else approves. */
+export const APPROVAL_HEADER = 'x-mcp-approve';
+
 /** The signed-in user most specs drive. */
 export const MCP_USER_EMAIL = 'ana@harness.dev';
 
@@ -104,6 +107,21 @@ export function mcpOauthHost(pg: PGlite) {
       // consecutive grants to be visible, so liveness is recorded every time.
       activityThrottleMs: 0,
     },
+    /**
+     * One process, acknowledged out loud. The field has no default, and the harness
+     * is where that requirement has to be shown to be real: a host cannot mount
+     * this surface without deciding whether its code-replay guard is shared, because
+     * a silent in-process default is the one setting here that fails OPEN the day a
+     * deployment grows a second pod.
+     */
+    codeReplay: 'in-process',
+    /**
+     * The host's consent decision. A real host shows a screen; here it is a header,
+     * so a spec can drive both answers — including the refusal, which is what
+     * protects an OPEN registration endpoint from minting a code for a client the
+     * signed-in user never agreed to.
+     */
+    resolveApproval: (request) => request.headers.get(APPROVAL_HEADER) !== 'deny',
   });
 }
 

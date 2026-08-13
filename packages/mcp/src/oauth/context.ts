@@ -11,7 +11,7 @@ import { ACCESS_TOKEN_TTL_SECONDS } from "./access-token";
 import { REFRESH_TOKEN_TTL_MS } from "./refresh";
 import { loadSigningKeyFromEnv, type McpSigningKeyProvider } from "./keys";
 import type { ProviderAttributionRule } from "./clients";
-import type { McpOauthStores } from "./stores";
+import type { McpOauthStores, StoredOAuthClient } from "./stores";
 
 /**
  * The config seam of the authorization server, and its resolved form (12-23).
@@ -109,8 +109,48 @@ export interface McpOauthConfig {
   loginCallbackParam?: string;
   accessTokenTtlSeconds?: number;
   refreshTokenTtlMs?: number;
-  /** Single-use code guard. Default in-process — read its multi-instance caveat. */
-  codeReplay?: CodeReplayStore;
+  /**
+   * The single-use guard for authorization codes — REQUIRED, and required on
+   * purpose. Pass a shared atomic store, or the literal `'in-process'` to accept
+   * the single-instance limitation explicitly.
+   *
+   * There is deliberately NO default, because a default here would be the only one
+   * in this config that fails OPEN. Every other one fails closed: no signing key
+   * mints nothing and answers JWKS 503; `enabled: false` is 404 everywhere; an
+   * empty `trustedOrigins` never trusts a forwarded host. An in-process default
+   * instead silently permits cross-instance code replay — against an OAuth 2.1
+   * MUST, on the very deployment shape a reusable package exists for (two pods
+   * behind one load balancer), with nothing in the types to notice. Scaling out
+   * must not be able to weaken the guard without somebody having typed something.
+   */
+  codeReplay: CodeReplayStore | "in-process";
+  /**
+   * Approve an authorize request before a code is minted — the CONSENT step.
+   *
+   * Registration is open whenever `enabled` is true (RFC 7591), so without an
+   * approval step anyone may register a client carrying their OWN redirect URI and
+   * their OWN scope ceiling, send a signed-in admin one link, and have the endpoint
+   * mint them a code with no interaction: the redirect URI is exact-matched against
+   * the attacker's own registration and the scope ceiling is the attacker's too, so
+   * every other guard here holds and none of them helps.
+   *
+   * Until a host supplies this, `authorize` REFUSES any client it cannot see the
+   * operator behind — i.e. any client not named in {@link preApprovedClientIds}.
+   * Return `false` to deny (the caller gets an `access_denied` redirect, exactly as
+   * a human refusal would).
+   */
+  resolveApproval?: (
+    request: Request,
+    client: StoredOAuthClient,
+    scopes: readonly string[],
+  ) => Promise<boolean> | boolean;
+  /**
+   * Client ids the OPERATOR registered, exempt from the approval gate above — the
+   * escape hatch for a host that ships its own first-party clients and has no
+   * consent screen to offer. Anything NOT listed here is treated as dynamically
+   * registered, i.e. as attacker-controllable.
+   */
+  preApprovedClientIds?: readonly string[];
   /** Liveness recording on a grant; omit to record nothing. */
   connections?: McpConnectionRecording;
 }
@@ -130,6 +170,16 @@ export interface McpOauthContext {
   accessTokenTtlSeconds: number;
   refreshTokenTtlMs: number;
   codeReplay: CodeReplayStore;
+  /**
+   * The resolved consent decision for one authorize request. Always present: with
+   * no host seam it refuses every client the operator did not pre-approve, so the
+   * handler has no "unset" case to forget.
+   */
+  approve: (
+    request: Request,
+    client: StoredOAuthClient,
+    scopes: readonly string[],
+  ) => Promise<boolean>;
   connections?: McpConnectionRecording;
   /** The trusted public origin for THIS request (issuance and verification agree). */
   originOf: (request: Request) => string;
@@ -173,9 +223,27 @@ export function resolveMcpOauthConfig(config: McpOauthConfig): McpOauthContext {
     signingKey: config.signingKey ?? loadSigningKeyFromEnv(),
     trustedOrigins,
     ...resolveSurface(config),
-    codeReplay: config.codeReplay ?? inProcessCodeReplayStore(),
+    // `'in-process'` is an ACKNOWLEDGEMENT, not a default — see the field's docs.
+    codeReplay:
+      config.codeReplay === "in-process" ? inProcessCodeReplayStore() : config.codeReplay,
+    approve: resolveApprover(config),
     ...(config.connections ? { connections: config.connections } : {}),
     originOf: (request) => originFromRequest(request, trustedOrigins),
+  };
+}
+
+/**
+ * The consent decision, resolved once. A host seam wins; otherwise only a client
+ * the OPERATOR named may proceed, so an open registration endpoint cannot mint a
+ * code for a client nobody approved.
+ */
+function resolveApprover(config: McpOauthConfig): McpOauthContext["approve"] {
+  const preApproved = new Set(config.preApprovedClientIds ?? []);
+  const { resolveApproval } = config;
+  return async (request, client, scopes) => {
+    if (preApproved.has(client.clientId)) return true;
+    if (!resolveApproval) return false;
+    return resolveApproval(request, client, scopes);
   };
 }
 

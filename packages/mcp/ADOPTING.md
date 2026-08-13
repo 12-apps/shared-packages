@@ -57,31 +57,66 @@ library updates, every host updates with **no app changes**. Same contract
    non-Prisma host implements `OAuthClientStore` / `RefreshTokenStore` /
    `McpConnectionStore` directly — the shapes are CLOSED and documented in
    `src/oauth/stores.ts`, and the harness fills exactly them with SQL.
-7. **`rotate` must be atomic.** The port's contract is "store the successor AND
-   revoke its parent, or neither": a crash between the two leaves two usable
-   tokens where rotation promises one. The Prisma adapter uses `$transaction`.
-8. **Single-use codes are only as strong as the replay store.** The default
-   remembers redeemed `jti`s IN THIS PROCESS, which is exact on one instance and
-   best-effort across several — a code could be replayed against a pod that has not
-   seen the `jti`, inside the ≤60s code lifetime. **Before running on more than one
-   instance, pass a shared atomic `codeReplay`** (a short-TTL row with a unique
-   constraint, or a distributed cache). The port exists so that is config, not a
-   patch to the grant handler.
-9. **Connections are per USER, not per tenant** — an MCP bearer is
-   auth-passthrough. `connections.resolveUserId(email)` maps the token's email to
-   the host's user id (future-pay resolves it by email because `session.user.id` is
-   the OAuth `sub`); returning `null` records nothing. Recording is best-effort and
-   FENCED: a failing directory can never turn a valid grant into a 500, and nothing
-   about the attempt is logged, because the only values in hand are an email and a
-   client id.
-10. **Disconnecting means BOTH halves.** `connections.revokeByHost(...)` returns the
+7. **`rotate` must CLAIM the parent, not just revoke it.** The port's contract is
+   "revoke the parent CONDITIONALLY on it still being live, require a count of
+   exactly 1, and create the successor in the same transaction — otherwise write
+   nothing and return `false`". Atomicity alone (both writes or neither) covers a
+   crash and NOT a race: with an unconditional `update`, two concurrent rotations of
+   one token both succeed, leaving two live successors and replay detection silently
+   defeated, because the replay rule waits for a third use of the parent that now
+   never comes. That is OAuth 2.1 §4.3.1 bypassed by WINNING a race instead of
+   arriving second, which is the whole attack rotation exists to stop. The Prisma
+   adapter does it with `updateMany({ where: { tokenHash, revokedAt: null } })`
+   inside an interactive `$transaction`; the harness does the same in raw SQL, on
+   purpose, as the worked example of a non-Prisma host meeting the contract.
+8. **`codeReplay` is REQUIRED, and that is the point.** Single-use codes are only as
+   strong as the replay store, and the in-process one remembers redeemed `jti`s IN
+   THIS PROCESS: exact on one instance, and on several a code can be replayed
+   against a pod that has not seen the `jti`, inside the ≤60s code lifetime. So
+   there is no default. Pass a shared atomic store (a short-TTL row with a unique
+   constraint, or a distributed cache), or pass the literal `'in-process'` to
+   acknowledge the single-instance limit out loud:
+
+   ```ts
+   codeReplay: 'in-process',              // one pod, and you have said so
+   codeReplay: myRedisSetIfAbsentStore,   // more than one pod
+   ```
+
+   Every other default in this config fails CLOSED — no signing key mints nothing
+   and answers JWKS 503, `enabled: false` is 404 everywhere, an empty
+   `trustedOrigins` never trusts a forwarded host. An in-process default would be
+   the only one that fails OPEN, on the very topology a reusable package exists for.
+   Scaling out must not be able to weaken the guard by silence.
+9. **`authorize` has NO consent screen, so it refuses clients nobody approved.**
+   Registration is open whenever `enabled` is true (RFC 7591), and a cookie session
+   proves who is asking, never that they AGREED. Without a gate the chain is one
+   click: an attacker registers a client carrying their own `redirect_uris` and
+   their own `scope`, sends a signed-in admin a link to `authorize`, and the
+   endpoint mints them a code — and the two guards that look like they would stop
+   it, exact redirect-URI matching and the per-client scope ceiling, are both
+   checked against the ATTACKER'S OWN registration. So:
+
+   - pass **`resolveApproval(request, client, scopes)`** — your approval screen or
+     policy; returning `false` gives the caller `access_denied`;
+   - or list first-party client ids in **`preApprovedClientIds`** if you register
+     your own clients and have no screen to show;
+   - with neither, every dynamically registered client is refused. That is the
+     default, and it is deliberately the inconvenient one.
+10. **Connections are per USER, not per tenant** — an MCP bearer is
+    auth-passthrough. `connections.resolveUserId(email)` maps the token's email to
+    the host's user id (future-pay resolves it by email because `session.user.id` is
+    the OAuth `sub`); returning `null` records nothing. Recording is best-effort and
+    FENCED: a failing directory can never turn a valid grant into a 500, and nothing
+    about the attempt is logged, because the only values in hand are an email and a
+    client id.
+11. **Disconnecting means BOTH halves.** `connections.revokeByHost(...)` returns the
     OAuth client ids it revoked, and the caller must then
     `refreshTokens.revokeLiveForClient(email, clientId)` for each — a host holding a
     live refresh token simply rotates its way back in and the card lights green on
     the next grant. Neither half invalidates an outstanding ACCESS token: those are
     self-contained JWTs, so a disconnected host keeps working for at most their
     15-minute TTL and can then obtain nothing further.
-11. **These bodies are NOT the `{ data }` envelope.** A 302 with a `Location`, RFC
+12. **These bodies are NOT the `{ data }` envelope.** A 302 with a `Location`, RFC
     6749 §5.1/§5.2 JSON, an RFC 8414/9728 document — every shape here is fixed by
     specification, and `Cache-Control: no-store` is on every credential-bearing
     response. Wrapping any of it would break every client. That is why the adapters
@@ -102,7 +137,9 @@ library updates, every host updates with **no app changes**. Same contract
 | `loginPath` / `loginCallbackParam` | no | `/login` / `callbackUrl` | Auth.js's names |
 | `accessTokenTtlSeconds` | no | 900 | 15 minutes |
 | `refreshTokenTtlMs` | no | 30 days | |
-| `codeReplay` | no | in-process | see rule 8 |
+| `codeReplay` | **yes** | — (no default, on purpose) | a shared atomic store, or `'in-process'` to acknowledge one pod — rule 8 |
+| `resolveApproval` | no | refuse unapproved clients | the consent seam — rule 9 |
+| `preApprovedClientIds` | no | `[]` | first-party client ids exempt from the approval gate — rule 9 |
 | `connections` | no | — | `resolveUserId`, `providerRules`, `activityThrottleMs` |
 
 ## The endpoints

@@ -99,6 +99,23 @@ describe('exportedNamesOf grammar', () => {
     expect(exportedNamesOf('export async notFunction() {}')).toEqual([]);
   });
 
+  it('reads a list whose COMMENT mentions export, in BOTH grammars', () => {
+    // The linearity skip asks whether another `export` keyword sits inside the list,
+    // so a comment saying so used to make the walk drop the whole list. Legal JS,
+    // and for the route-method gate the loss direction is fail-OPEN. Comments and
+    // strings are blanked before the walk, so both grammars see the real names.
+    const withComment = "'use server';\nexport { // export the two below\n  a, b };";
+    expect(exportedActionsOf(withComment).sort()).toEqual(['a', 'b']);
+    expect(exportedNamesOf('export { /* export */ GET, POST };').sort()).toEqual(['GET', 'POST']);
+    // And the converse: a name only ever mentioned inside a comment or a string is
+    // not an export, which the raw-source walk used to claim it was.
+    expect(exportedNamesOf('/* export { GET } */ export const POST = h;')).toEqual(['POST']);
+    expect(exportedNamesOf('const sql = "export { GET }";')).toEqual([]);
+    // A use-server module still needs its directive on the RAW source: the strip
+    // blanks string literals, so the check has to run before it (and does).
+    expect(exportedActionsOf("'use server';\nexport const a = 1;")).toEqual(['a']);
+  });
+
   it('filters every discovered name through `accept`, whichever form found it', () => {
     const onlyUpper = { accept: (name: string) => /^[A-Z]+$/.test(name) };
     const source = [

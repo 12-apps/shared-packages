@@ -29,7 +29,20 @@ export interface PwaRequest {
   host: string;
 }
 
-/** What a handler answers with — a body, a status and headers. */
+/**
+ * What a handler answers with — a body, a status and headers.
+ *
+ * ⚠️ AN ADAPTER MUST ADD `Vary: X-Forwarded-Host` — or whichever header its
+ * `resolveApp` keys the tenant off — TO EVERY RESPONSE IT RETURNS FROM THESE
+ * ROUTES. It is absent here deliberately rather than by oversight: this descriptor
+ * cannot know which header the host's proxy uses to say which tenant is being
+ * asked for, so only the adapter can name it. Omit it and ONE cacheable manifest
+ * URL serves every tenant — a shared cache answers store B's visitor with store
+ * A's name and icon, and they INSTALL it on a home screen, which outlives any
+ * cache entry. `./hono` applies it in its route loop, so every path and every
+ * status carries it; `ADOPTING.md` rule 11 is the same requirement written out for
+ * an Express/Next/other adapter.
+ */
 export interface PwaRouteResponse {
   status: number;
   /** `null` means an EMPTY body (the 404 has nothing to say and nothing to leak). */
@@ -128,7 +141,15 @@ export function createApiPwa(config: PwaServerConfig): ApiPwa {
     routes.push({
       method: "GET",
       path: worker.path ?? DEFAULT_WORKER_PATH,
-      async handle() {
+      async handle(request) {
+        // Behind `resolveApp` for the same reason the manifest is: a host this
+        // deployment does not serve is not an app here, and "resolveApp returning
+        // null is a 404, and that 404 is the whole installability gate" has to be
+        // true of BOTH routes or it is just true of the manifest. The worker source
+        // is identical for every tenant, so nothing leaked while it answered 200 —
+        // but a 200 worker under a 404 manifest is an inconsistency an adopter would
+        // reasonably read as "the worker is public".
+        if (!(await config.resolveApp(request))) return notAnApp();
         return {
           status: 200,
           body: workerSource,

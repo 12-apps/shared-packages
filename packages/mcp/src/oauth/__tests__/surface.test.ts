@@ -235,6 +235,15 @@ describe("trusted origins", () => {
       "https://loja.exemplo.com.br/pedidos//",
       "https://loja.exemplo.com.br//pedidos//itens",
       "https://loja.exemplo.com.br//pedidos//itens//",
+      // Unicode, including the slash LOOK-ALIKES that must survive: `／` (U+FF0F)
+      // and `∕` (U+2215) are not `/` and neither implementation may strip them. A
+      // `charCodeAt` walk and a regex could in principle part company on multi-byte
+      // input, so the property is pinned where it is documented rather than only in
+      // a fuzz run that no longer exists.
+      "https://loja.exemplo.com.br/pedidos／",
+      "https://loja.exemplo.com.br/pedidos∕/",
+      "https://ção.exemplo.com.br/",
+      "https://日本.example/パス//",
       // Newlines, the one place `$` semantics could have diverged. They cannot,
       // and for a reason worth pinning: `.trim()` runs FIRST, so a trailing
       // newline never reaches either implementation, and an interior one leaves a

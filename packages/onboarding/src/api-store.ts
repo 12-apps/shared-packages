@@ -90,6 +90,12 @@ export async function fetchOnboardingState(
   config: OnboardingApiStoreConfig,
 ): Promise<OnboardingStateSnapshot | null> {
   const doFetch = config.fetchImpl ?? fetch;
+  // DIVERGENCE from future-pay, deliberate: a failed READ resolves to `null` — "no
+  // progress recorded yet" — where the host's action returned the error to its
+  // caller. A checklist that cannot be loaded should not block the screen it
+  // decorates, and `null` is already the pre-progress state every consumer renders.
+  // The cost is that a broken endpoint is indistinguishable from a new user, so a
+  // host that needs to tell them apart wants its own store rather than this one.
   try {
     const response = await doFetch(statePath(config), { credentials: "same-origin" });
     if (!response.ok) return null;

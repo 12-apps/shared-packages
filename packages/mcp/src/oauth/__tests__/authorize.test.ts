@@ -223,3 +223,100 @@ describe("identity and minting", () => {
     ).rejects.toThrow(/verification failed/);
   });
 });
+
+describe("consent: the approval gate on an OPEN registration endpoint", () => {
+  /** The authorize query a registered client would send. */
+  async function askFor(
+    api: Awaited<ReturnType<typeof asHarness>>["api"],
+    clientId: string,
+    scope?: string,
+  ) {
+    const { challenge } = await pkcePair();
+    return authorize(api, {
+      response_type: "code",
+      client_id: clientId,
+      redirect_uri: CALLBACK,
+      code_challenge: challenge,
+      code_challenge_method: "S256",
+      ...(scope === undefined ? {} : { scope }),
+    });
+  }
+
+  /** `?error=` on the redirect, or `null` when a code was minted instead. */
+  function errorOf(response: Response): string | null {
+    const location = new URL(response.headers.get("location") as string);
+    return location.searchParams.get("error");
+  }
+
+  it("REFUSES a dynamically registered client when the host offers no approval seam", async () => {
+    // The default, and the whole point of it. Registration is open whenever the
+    // surface is enabled, and a cookie session proves who is asking — never that
+    // they agreed. So without a seam the chain would be: attacker registers a client
+    // with their OWN redirect_uri and scope, sends a signed-in admin one link, and
+    // the admin's browser hands them a code. Both guards that look like they would
+    // stop it are checked against the attacker's own registration.
+    const { api } = await asHarness({ resolveApproval: undefined });
+    const { clientId } = await registerTestClient(api);
+
+    const response = await askFor(api, clientId);
+    expect(response.status).toBe(302);
+    expect(errorOf(response)).toBe("access_denied");
+    // Nothing was minted — that is the property, not the status code.
+    expect(new URL(response.headers.get("location") as string).searchParams.get("code")).toBeNull();
+  });
+
+  it("lets an OPERATOR-registered client through with no seam at all", async () => {
+    // The escape hatch for a host that registers its own first-party clients and has
+    // no screen to show — future-pay's shape. Approval is implied by the operator
+    // having named the id in config, which an attacker cannot do.
+    const { api, stores } = await asHarness({ resolveApproval: undefined });
+    const { clientId } = await registerTestClient(api);
+    const approved = await asHarness({
+      resolveApproval: undefined,
+      preApprovedClientIds: [clientId],
+      stores,
+    });
+
+    expect(errorOf(await askFor(api, clientId))).toBe("access_denied");
+    expect(codeFrom(await askFor(approved.api, clientId))).toBeTruthy();
+  });
+
+  it("passes the client and the REQUESTED scopes to the seam, and honours a refusal", async () => {
+    const seen: { clientName: string | null; scopes: readonly string[] }[] = [];
+    const { api } = await asHarness({
+      resolveApproval: (_request, client, scopes) => {
+        seen.push({ clientName: client.clientName, scopes });
+        // A host screen approves read and refuses write — the decision is per-scope
+        // and per-client, which is why both are arguments.
+        return !scopes.includes("mcp:write");
+      },
+    });
+    const { clientId } = await registerTestClient(api, { client_name: "Some Connector" });
+
+    expect(codeFrom(await askFor(api, clientId, "mcp:read"))).toBeTruthy();
+    expect(errorOf(await askFor(api, clientId, "mcp:read mcp:write"))).toBe("access_denied");
+    expect(seen).toEqual([
+      { clientName: "Some Connector", scopes: ["mcp:read"] },
+      { clientName: "Some Connector", scopes: ["mcp:read", "mcp:write"] },
+    ]);
+  });
+
+  it("asks for approval only AFTER a session exists", async () => {
+    // Order matters: an unauthenticated caller goes to sign-in, and the seam is
+    // never consulted for a request with nobody behind it — there is no user whose
+    // approval it could represent.
+    const asked = { count: 0 };
+    const harness = await asHarness({
+      resolveApproval: () => {
+        asked.count += 1;
+        return true;
+      },
+    });
+    const { clientId } = await registerTestClient(harness.api);
+    harness.session.current = null;
+
+    const response = await askFor(harness.api, clientId);
+    expect(new URL(response.headers.get("location") as string).pathname).toBe("/login");
+    expect(asked.count).toBe(0);
+  });
+});
