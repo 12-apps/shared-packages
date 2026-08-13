@@ -20,7 +20,7 @@ import {
   type RoleWhere,
 } from './db';
 import { parseRolePermissions, serializeRolePermissions } from './permissions-format';
-import { resetTemplateRole, upsertTemplateOverride } from './template-store';
+import { resetTemplateRole, templateSeedFor, upsertTemplateOverride } from './template-store';
 
 /**
  * The tenant role store (12-13) — ported from future-pay's
@@ -290,6 +290,14 @@ export interface RolesStore {
     input: { description: string | null; permissions: readonly string[] | '*' },
   ): Promise<RoleRecord>;
   resetTemplateRole(tenantId: string, name: string): Promise<boolean>;
+  /**
+   * The permission set {@link RolesStore.resetTemplateRole} would WRITE for
+   * template `name` — the seeded catalog default, parsed — or null when nothing
+   * is seeded under it (the reset is then the idempotent no-op). Read by the
+   * reset route so governance judges the exact set the write lands, and by any
+   * host surface that wants to show what "restore default" would do.
+   */
+  templateSeedPermissions(name: string): readonly string[] | '*' | null;
 }
 
 type RolesStoreConfig<P extends string> = Pick<
@@ -327,5 +335,9 @@ export function createRolesStore<P extends string>(config: RolesStoreConfig<P>):
         permissions: serializeRolePermissions(input.permissions),
       }),
     resetTemplateRole: (tenantId, name) => resetTemplateRole(ctx, tenantId, name),
+    templateSeedPermissions: (name) => {
+      const seed = templateSeedFor(ctx, name);
+      return seed ? parseRolePermissions(seed.permissions) : null;
+    },
   };
 }
