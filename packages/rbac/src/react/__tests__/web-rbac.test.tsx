@@ -64,11 +64,26 @@ describe('splitRoleSelection', () => {
 });
 
 describe('RoleForm', () => {
+  // The form cases assert BEHAVIOR — unlock, owner-marker lock, SoD, trim —
+  // not catalog completeness (the pure label/grouping tests above cover the
+  // real catalog). Mounting all ~60 permissions made the first mount the
+  // slowest case in the repo and timed a loaded CI runner out at the 5s
+  // default (12-13). The form renders the same affordances over any catalog,
+  // so mount exactly the permissions the four cases touch.
+  const SOD_PAIR = FUTURE_PAY_GOVERNANCE.sodPairs[0] as [string, string];
+  const OWNER_MARKER = (FUTURE_PAY_GOVERNANCE.ownerPermissions ?? [])[0] as string;
+  const FORM_PERMISSIONS = {
+    list: FUTURE_PAY_PERMISSIONS.list.filter((permission) =>
+      ['stock:read', OWNER_MARKER, ...SOD_PAIR].includes(permission),
+    ),
+    kind: FUTURE_PAY_PERMISSIONS.kind,
+  };
+
   function mountForm() {
     const onSubmit = vi.fn();
     render(
       <RoleForm
-        permissions={FUTURE_PAY_PERMISSIONS}
+        permissions={FORM_PERMISSIONS}
         governance={FUTURE_PAY_GOVERNANCE}
         labels={createRbacLabels()}
         initial={null}

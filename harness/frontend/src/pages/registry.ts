@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 
 import { EntitlementsPlanPage } from './entitlements-plan';
+import { LifecycleAdminPage } from './lifecycle-admin';
 import { PaymentsCheckoutApplePayPage } from './payments-checkout-apple-pay';
 import { PaymentsCheckoutBothPage } from './payments-checkout-both';
 import { PaymentsCheckoutBuyerFieldsPage } from './payments-checkout-buyer-fields';
@@ -317,5 +318,12 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/onboarding',
     group: 'backoffice',
     Component: OnboardingGuidedPage,
+  },
+  {
+    slug: 'lifecycle-admin',
+    title: 'Versions, drafts & bin',
+    pkg: '@12-apps/entity-lifecycle',
+    group: 'backoffice',
+    Component: LifecycleAdminPage,
   },
 ];
