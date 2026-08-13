@@ -6,7 +6,7 @@
  * test of a hand-rolled second app would prove nothing about the one that
  * serves the SPA.
  *
- * Ten surfaces, and the split between them is the point:
+ * Eleven surfaces, and the split between them is the point:
  *
  *  - `/api/admin/:tenantSlug/reports/**` is @12-apps/report-builder's, mounted
  *    whole;
@@ -34,6 +34,10 @@
  *    (realtime-host.ts) and the outbox's db adapter (realtime-db.ts). The
  *    matching WebSocket gateway is a THIRD process shape and lives in
  *    `server.ts`, on its own port, because that is where a port is bound;
+ *  - `/api/consent/{status,terms}` is @12-apps/app-shell's (12-18), mounted whole;
+ *    the host keeps only its seams (app-shell-host.ts) and owns no table for it,
+ *    because the package owns no model — "has this user accepted version X" is a
+ *    fact about the HOST's identity row, so here it is a Map;
  *  - `/api/admin/:tenantSlug/audit-logs/**` is @12-apps/audit's (12-14),
  *    mounted whole, with its actor-context middleware wrapped around EVERY
  *    route below — which is where a host puts it, because the stamp is what
@@ -65,6 +69,7 @@ import {
 } from '@12-apps/realtime';
 import { enqueueRealtimeEvent } from '@12-apps/realtime/server';
 
+import { appShellHost } from './app-shell-host';
 import { applyAuditMigrations } from './audit-db';
 import { auditHost, reseedAudit } from './audit-host';
 import { createEntitlementsHost, TENANT } from './entitlements-host';
@@ -144,6 +149,9 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
     mcpOauth: mcpOauthHost(pg),
     pwa: pwaHost(),
     entitlements: createEntitlementsHost(),
+    // 12-18: no migration and no table — the shell owns no model, so its state is a
+    // Map here exactly as it is a column on `users` in a real adopter.
+    appShell: appShellHost(),
   };
 }
 
@@ -158,6 +166,7 @@ interface Hosts {
   mcpOauth: ReturnType<typeof mcpOauthHost>;
   pwa: ReturnType<typeof pwaHost>;
   entitlements: ReturnType<typeof createEntitlementsHost>;
+  appShell: ReturnType<typeof appShellHost>;
 }
 
 /**
@@ -179,8 +188,36 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await reseedMcpOauth(pg);
     await reseedLifecycle(pg);
     hosts.entitlements.reset();
+    hosts.appShell.reset();
     return c.body(null, 204);
   });
+}
+
+/**
+ * The shell's suite controls — a terms-version BUMP, which in production is a deploy.
+ *
+ * Under `/__harness` and not `/api`, like every other control here: deciding when a
+ * host's legal documents change is exactly what stays in a host, so this is the one
+ * piece of the consent story the harness cannot get from the package.
+ */
+function mountAppShellControls(app: Hono, hosts: Hosts): void {
+  app.post('/__harness/app-shell/bump', async (c) => {
+    const body = (await c.req.json()) as { version?: string };
+    hosts.appShell.controls.bump(body.version ?? `bumped-${Date.now()}`);
+    return c.json({ version: hosts.appShell.controls.version() });
+  });
+
+  /** Make the host's own `record` fail, so the 500 path is reachable from a browser. */
+  app.post('/__harness/app-shell/fail-writes', async (c) => {
+    const body = (await c.req.json()) as { fails?: boolean };
+    hosts.appShell.controls.failWrites(body.fails !== false);
+    return c.body(null, 204);
+  });
+
+  /** What `onAccepted` was called with — a real host would have published a hint. */
+  app.get('/__harness/app-shell/published', (c) =>
+    c.json({ published: hosts.appShell.controls.published() }),
+  );
 }
 
 /**
@@ -269,6 +306,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   app.get('/health', (c) => c.json({ ok: true }));
   mountReset(app, pg, hosts);
   mountRealtimeControls(app, pg, hosts);
+  mountAppShellControls(app, hosts);
   // Installs the driver for THIS process, which is what lets a `/__harness/publish` reach a
   // stream the SPA is holding open through Vite's proxy. No Redis: the harness is one
   // process, so inline delivery is the whole bus.
@@ -300,6 +338,9 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   // Mounted at the API root, not under the tenant prefix: the surface carries BOTH its
   // paths, and the account one takes no tenant slug at all.
   app.route('/api', hosts.realtime.events.router);
+  // 12-18, also at the API root and for the same reason: consent is a fact about the
+  // CALLER, so neither of its two paths carries a tenant slug.
+  app.route('/api', hosts.appShell.router);
   // The last two mount at the ROOT, and have to: `.well-known` documents and a
   // service worker are read from the origin, never from under a prefix.
   app.route('/', hosts.mcpOauth.router);

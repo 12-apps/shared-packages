@@ -186,6 +186,20 @@
         "src/react/*.{ts,tsx}"
       ]
     },
+    "packages/app-shell": {
+      "entry": [
+        "src/index.ts",
+        "// The published subpaths. Each is reached by a CONSUMER import and never",
+        "// from the root entry, which is framework-free on purpose — so without",
+        "// naming them here the whole browser and backend surface reads as unused.",
+        "src/react/index.ts",
+        "src/server/index.ts",
+        "src/hono/index.ts",
+        "// `./vite` resolves to dist/, which does not exist in a checkout, so the",
+        "// source has to be named (the report-builder `./e2e` shape).",
+        "src/vite/index.ts"
+      ]
+    },
     "packages/jobs": {
       "entry": [
         "src/index.ts",
