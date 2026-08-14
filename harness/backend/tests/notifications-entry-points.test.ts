@@ -53,7 +53,11 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
 
   it('the ROOT entry carries the framework-free core', () => {
     expect(core.NOTIFICATION_CHANNELS).toEqual(['EMAIL', 'SMS', 'WHATSAPP', 'WEB_PUSH']);
-    expect(core.NOTIFICATION_CATEGORIES).toContain('orders');
+    // No `NOTIFICATION_CATEGORIES`: the preference categories are the HOST's
+    // product vocabulary and this package ships none. Asserted as an absence,
+    // beside the sets it DOES own — `NOTIFICATION_CHANNELS` is the library's
+    // own closed set and stays.
+    expect(core).not.toHaveProperty('NOTIFICATION_CATEGORIES');
     expect(core.DEFAULT_NOTIFICATION_MESSAGES.panelTitle).toBe('Notificações');
     // The country is the CALLER's, always: this package assumes none, so a US
     // adopter that forgets it cannot text a Brazilian stranger their customer's
