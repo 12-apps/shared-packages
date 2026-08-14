@@ -162,10 +162,16 @@ describe('PaymentProviderSettings — the OAuth branch layout (FUT-691)', () => 
 
   /**
    * The same contract on the shipped stripe adapter: a connected store's guide
-   * opens on the WEBHOOK section — the one that was unreachable, carrying the
-   * store's notification URL — not stuck on step 1, and outside the accordion.
+   * opens on the DASHBOARD section — the one carrying the store's notification
+   * URL — not stuck on step 1, and outside the accordion.
+   *
+   * The adapter now reports the last, sectionless stage for a connected store
+   * and the renderer clamps back to this one until the owner confirms
+   * (FUT-799); it used to report this stage directly, which is what left the
+   * activation card with nowhere to go. What the owner SEES here is unchanged,
+   * which is the point of asserting it from the outside.
    */
-  it('opens stripe on the webhook section for a connected store, outside the accordion', async () => {
+  it('opens stripe on the dashboard section for a connected store, outside the accordion', async () => {
     const adapter = stripeProvider();
     const descriptor = {
       name: adapter.name,
@@ -185,7 +191,7 @@ describe('PaymentProviderSettings — the OAuth branch layout (FUT-691)', () => 
       guide: guide ?? null,
     });
 
-    const section = await screen.findByTestId('payments-setup-section-webhook');
+    const section = await screen.findByTestId('payments-setup-section-dashboard');
     expect(insideAccordion(section)).toBeNull();
     expect(section.textContent).toContain('URL de notificação');
     // Past step 1: the connect section is not the open one.

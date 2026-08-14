@@ -26,6 +26,18 @@ import { ProviderSetupGuide } from './ProviderSetupGuide';
  */
 export const CHECKOUT_CONFIRM_ACTION = 'checkout-integrado-confirmado';
 
+/**
+ * The confirm button's copy when a section does not author its own.
+ *
+ * InfinitePay's wording, because it was the only confirmable guide when this
+ * was a constant — and a constant is what made it wrong everywhere else: Stripe
+ * and Stone both own a step no API can report, and neither of them has a
+ * "Checkout Integrado" to have enabled. Sections say what they are asking about
+ * via `SetupSection.confirmLabel`; this fallback keeps InfinitePay's rendered
+ * guide identical.
+ */
+const CONFIRM_LABEL_FALLBACK = 'Já habilitei o Checkout Integrado';
+
 /** Does this section end in a question only the owner can answer? */
 function isConfirmable(section: SetupSection): boolean {
   return section.steps.some((step) => step.action === CHECKOUT_CONFIRM_ACTION);
@@ -133,6 +145,28 @@ function ConfirmedRow({ section, onReopen }: { section: SetupSection; onReopen: 
   );
 }
 
+/**
+ * Everything the owner's confirmation contributes to this screen: the button's
+ * copy, and the one-line row the step collapses into once the walkthrough is
+ * past it.
+ *
+ * One function because both read the SAME section — the one that ASKS, which is
+ * not necessarily the one that is open. Deriving them apart is how a screen
+ * ends up captioning one step and collapsing another.
+ */
+function confirmationOf(
+  guide: Guide,
+  { stage, confirmed, editing }: { stage: number; confirmed: boolean; editing: boolean },
+): { label: string; settledSection: SetupSection | null } {
+  const asking = confirmableStage(guide);
+  const section = asking >= 0 ? sectionAt(guide, asking) : null;
+  const settled = confirmed && !editing && asking >= 0 && stage > asking;
+  return {
+    label: section?.confirmLabel ?? CONFIRM_LABEL_FALLBACK,
+    settledSection: settled ? section : null,
+  };
+}
+
 export function SetupGuideSection({
   guide,
   confirmed,
@@ -159,12 +193,7 @@ export function SetupGuideSection({
 
   const stage = effectiveStage(guide, confirmed, editing, stored);
   const open = sectionAt(guide, stage);
-  // The confirmed step keeps a row of its own once the walkthrough has moved
-  // past it — it is the claim step 3 is about to test, and when the provider
-  // refuses to mint a link the owner needs somewhere to press Revisar.
-  const settledStage = confirmableStage(guide);
-  const settled = confirmed && !editing && settledStage >= 0 && stage > settledStage;
-  const settledSection = settled ? sectionAt(guide, settledStage) : null;
+  const { label, settledSection } = confirmationOf(guide, { stage, confirmed, editing });
 
   return (
     <Box data-testid="payments-setup">
@@ -172,10 +201,7 @@ export function SetupGuideSection({
         guide={{ ...guide, sections: open ? [open] : [] }}
         activeStage={stage}
         actions={{
-          [CHECKOUT_CONFIRM_ACTION]: {
-            label: 'Já habilitei o Checkout Integrado',
-            run: onConfirm,
-          },
+          [CHECKOUT_CONFIRM_ACTION]: { label, run: onConfirm },
         }}
         beforeSections={
           <>

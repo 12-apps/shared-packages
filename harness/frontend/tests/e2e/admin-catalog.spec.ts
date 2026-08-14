@@ -117,12 +117,16 @@ test('a provider that ships a guide renders it; one that ships none gets the for
 
 /**
  * The guide is a function of the store's PROGRESS (FUT-691): the case seeds
- * stripe as `connected`, and the walkthrough must open on the once-dead
- * webhook section — the notification URL and its copy button — with the
- * stepper past "Conectar conta", not stuck on step 1 as it used to be when
- * the adapter reported no stage at all.
+ * stripe as `connected`, and the walkthrough must open on the dashboard
+ * section — the notification URL and its copy button — with the stepper past
+ * "Conectar conta", not stuck on step 1 as it used to be when the adapter
+ * reported no stage at all.
+ *
+ * The adapter now reports the last, sectionless stage and the renderer clamps
+ * back to this one until the owner confirms (FUT-799). What the owner sees is
+ * unchanged; what changed is that there is now somewhere left to go.
  */
-test('stripe: a connected store opens on the webhook section, stepper past step 1', async ({
+test('stripe: a connected store opens on the dashboard section, stepper past step 1', async ({
   page,
 }) => {
   await openPage(page, 'payments-provider-settings');
@@ -130,9 +134,9 @@ test('stripe: a connected store opens on the webhook section, stepper past step 
   await openProvider(page, 'stripe');
 
   await expect(page.getByTestId('payments-setup-guide')).toBeVisible();
-  // The section the stage resolves: webhook (stage 3 of 4), not connect.
-  await expect(page.getByTestId('payments-setup-section-webhook')).toBeVisible();
-  await expect(page.getByTestId('payments-setup-section-webhook')).toContainText(
+  // The section the stage resolves: dashboard (stage 2 of 3), not connect.
+  await expect(page.getByTestId('payments-setup-section-dashboard')).toBeVisible();
+  await expect(page.getByTestId('payments-setup-section-dashboard')).toContainText(
     'URL de notificação',
   );
   await expect(page.getByTestId('payments-setup-section-connect')).toBeHidden();
