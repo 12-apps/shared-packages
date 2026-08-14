@@ -156,7 +156,7 @@ export function filterCategoryGroups(groups: CategoryGroup[], query: string): Ca
 }
 
 /** A run of text, flagged when it is the part that matched the query. */
-export interface HighlightSegment {
+interface HighlightSegment {
   text: string;
   match: boolean;
 }
