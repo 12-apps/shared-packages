@@ -59,6 +59,13 @@ export function setupContextFor(
     const schema = registry.get(provider).credentialSchema;
     const fields = row ? row.environments[row.environment] : {};
     return {
+      // The ADOPTER's own platform name, supplied by the adopter — the fact
+      // this harness exists to prove. Guides that address the platform by
+      // name ("é assim que o {brandName} confirma…") used to say one specific
+      // adopter's brand whoever installed the package, and a consumer built
+      // against the published TARBALL is the only place the substitution can
+      // be observed end to end. Deliberately a name no adopter is called.
+      brandName: 'Plataforma Harness',
       webhookUrl: `https://loja.exemplo/api/pagamentos/webhooks/${provider}`,
       publicKeyUrl: 'https://loja.exemplo/api/pagamentos/chave-publica',
       merchantName: 'Loja Harness',

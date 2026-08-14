@@ -6,8 +6,8 @@ import { providerFetch } from './http';
 import { NAME } from './pagbank-http';
 
 /**
- * PagBank Connect — the OAuth2 flow that lets a store authorize Future Pay on
- * their EXISTING PagBank account instead of pasting a token.
+ * PagBank Connect — the OAuth2 flow that lets a store authorize the host
+ * platform on their EXISTING PagBank account instead of pasting a token.
  *
  * Of the four providers this package integrates, PagBank is one of only two
  * with a genuine merchant-authorization flow (Stripe is the other), so this is

@@ -181,6 +181,7 @@ describe('PaymentProviderSettings — the OAuth branch layout (FUT-691)', () => 
       credentialSchema: adapter.credentialSchema,
     } as unknown as ProviderDescriptor;
     const guide = adapter.setupGuide?.({
+      brandName: 'Plataforma Exemplo',
       webhookUrl: 'https://loja.example/api/webhooks/stripe',
       progress: { configured: { publishableKey: true }, connected: true, proven: false },
     });
