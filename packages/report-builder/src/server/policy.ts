@@ -1,35 +1,21 @@
 /**
- * Reporting authorization + guardrail policy (FUT-138), shared by the run
- * endpoints, the saved-report routes and the field-catalog listing. Prisma-free.
- */
-
-type ReportEntityPermission =
-  | "reports:sales:read"
-  | "stock:read"
-  | "reports:kitchen:read";
-
-/**
- * The permission required to QUERY each catalog entity — the same split the
- * built-in presets use: sales-side entities ride the sales report tier,
- * stock-side entities the stock tier. A spec's entity decides what running it
- * requires; there is no way to reach an entity outside this map.
+ * The one guardrail this surface sets for every host (FUT-138). Prisma-free.
  *
- * The kitchen entities ride their OWN tier (FUT-454) rather than the sales
- * one: they carry per-cook timings, and a cook must not be able to read the
- * ranking they appear in just because they can read the kitchen board.
+ * `REPORT_ENTITY_PERMISSION` used to live here too: a seven-line map from
+ * future-pay's entities to future-pay's permission ids (`orders →
+ * reports:sales:read`, `stock_movements → stock:read`, `kitchen_ticket_items →
+ * reports:kitchen:read`), typed against a union of those three ids, and
+ * installed as the DEFAULT for any host that named none. That is the host's
+ * policy over the host's data; it is now a required config field —
+ * `ReportBuilderServerConfig.entityPermission` — checked against the catalog at
+ * assembly.
  */
-export const REPORT_ENTITY_PERMISSION: Record<string, ReportEntityPermission> = {
-  orders: "reports:sales:read",
-  order_items: "reports:sales:read",
-  payments: "reports:sales:read",
-  stock_movements: "stock:read",
-  loss_events: "stock:read",
-  kitchen_ticket_items: "reports:kitchen:read",
-  kitchen_shifts: "reports:kitchen:read",
-};
 
 /**
  * Hard cap on rows returned by a report run (Tabwoah's QUERY_DATASOURCE cap
  * pattern): protects the API and keeps LLM-facing responses bounded.
+ *
+ * This one genuinely IS the package's: a property of the response envelope this
+ * surface promises, not of any host's data. A host may lower it with `maxRows`.
  */
 export const REPORT_RUN_MAX_ROWS = 500;

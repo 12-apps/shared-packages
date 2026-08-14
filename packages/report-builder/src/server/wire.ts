@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 import { dashboardSpecSchema, reportDocumentSchema, reportSpecSchema } from '../spec';
-import { SYSTEM_REPORT_KEYS } from './presets';
 import { REPORT_DEFAULT_RANGES, REPORT_MAX_RANGE_DAYS, REPORT_RANGE_PRESETS } from './range';
 import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
 import { reportWorkingCopySchema } from './working-copy';
@@ -38,9 +37,27 @@ export const reportsParams = z.object({
   tenantSlug: z.string().min(1),
 });
 
+/**
+ * A built-in's path params.
+ *
+ * `key` is a plain string here, and used to be `z.enum(SYSTEM_REPORT_KEYS)` —
+ * an enum of future-pay's seven preset keys, baked into the schema every host's
+ * MCP registry advertises and every handler validates with. For any other host
+ * that is a contract that rejects its OWN reports and offers an agent a menu of
+ * seven it does not have. An unknown key is answered by the route with 404,
+ * before any permission check, which is where "this report does not exist"
+ * belongs.
+ *
+ * A host that wants its keys ENUMERATED in its MCP surface — worth doing, since
+ * it is what lets an agent pick one without guessing — narrows it over its own
+ * definitions, which is three lines and needs nothing from here:
+ *
+ *     const keys = MY_SYSTEM_REPORTS.map((report) => report.key) as [string, ...string[]];
+ *     const myParams = z.object({ tenantSlug: z.string().min(1), key: z.enum(keys) });
+ */
 export const systemReportParams = z.object({
   tenantSlug: z.string().min(1),
-  key: z.enum(SYSTEM_REPORT_KEYS),
+  key: z.string().min(1),
 });
 
 export const savedReportParams = z.object({

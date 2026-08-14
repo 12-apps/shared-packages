@@ -16,7 +16,7 @@ Feature: Composing a report and handing it to the team
 
   Scenario: A report starts private, and only a deliberate act publishes it
     When she starts a new report
-    And she picks the "Receita por dia" template
+    And she picks the first block template
     Then the block draws its figures
     And the report is a draft only she can see
 
@@ -27,8 +27,8 @@ Feature: Composing a report and handing it to the team
 
   Scenario: A second block goes in beside the first, and both survive publishing
     When she starts a new report
-    And she picks the "Receita por dia" template
-    And she adds a "Formas de pagamento" block beside it
+    And she picks the first block template
+    And she adds a second block template beside it
     Then the report holds two blocks, and both draw their figures
 
     When she calls it "Fechamento do mês"

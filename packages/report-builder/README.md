@@ -12,8 +12,13 @@ ReportSpec (JSON) ──parse──▶ zod ──compile──▶ CompiledQuery 
                         FieldCatalog          ReportDataSource (host, tenant-scoped)
 ```
 
-Portability contract: **zero imports from apps/\***, no Prisma, no Next.js.
-The only workspace dependency is `@12-apps/ui/charts` (type-only, for `ChartSpec`).
+Portability contract: **zero imports from apps/\***, no Prisma, no Next.js —
+and, since 4.0.0, **no host DATA**. The catalog, the built-in reports, the
+starters, the block templates, the entity→permission map, the adapter and the
+tenant clock are all the host's and arrive as config; this package ships the
+pipeline, the endpoints, the screens, the period, the document lifecycle and
+one permission (`reports:manage`) for its own editor. The only workspace
+dependency is `@12-apps/ui/charts` (type-only, for `ChartSpec`).
 
 ## Security model
 
@@ -129,8 +134,10 @@ else is a table.
 - **Money is integer centavos** end to end; rendering maps `money` fields to
   the `brl` number format of `@12-apps/ui/charts`.
 - **Date buckets use the tenant's IANA zone** (`spec.timeZone` →
-  `CompileOptions.timeZone` → `DEFAULT_REPORT_TIME_ZONE`, i.e.
-  `America/Sao_Paulo`), resolved onto `CompiledQuery.timeZone`. The conversion
+  `CompileOptions.timeZone` → UTC), resolved onto `CompiledQuery.timeZone`.
+  The last rung used to be `America/Sao_Paulo`: one country's trading day for
+  every caller who named none. The mounted surface never reaches it —
+  `ReportBuilderServerConfig.timeZone` is required. The conversion
   is pure `Intl`, not SQL, because the pipeline fetches rows and folds them in
   process — identical buckets on PostgreSQL, PGlite and in memory. Range
   WINDOWS stay UTC half-open `[from, toExclusive)`. `truncateDateToGrain` is
@@ -139,10 +146,36 @@ else is a table.
 - `executeCompiledQuery(rows, query)` is exported as the semantic reference:
   host adapters must match its filter/group/aggregate behavior.
 
-## Future Pay wiring
+## The mounted surface
 
-Future Pay implements the adapter + catalog in `apps/web/lib/reporting/`
-(tenant-scoped Prisma reads) and persists specs in the `SavedReport` model;
-built-in admin reports are hardcoded spec presets over this same engine
-(FUT-133), and the MCP tools (`listReportFields`, `runReport`, `saveReport`,
-`listSavedReports`) expose authoring to LLMs (FUT-138).
+The engine above is the library half. `@12-apps/report-builder/server` mounts
+the ENDPOINTS and `/react` mounts the SCREENS, and both take the host's
+vocabulary as required config:
+
+```ts
+const { routes } = createApiReportBuilder({
+  catalog,                                   // yours
+  adapter: ({ actor, window }) => …,         // yours, tenant + window scoped
+  db: () => getSavedReportDb(),              // yours, through the structural seam
+  timeZone: 'Europe/Lisbon',                 // yours — required, no fallback
+  entityPermission: { loans: 'library:lending:read' },   // yours, every entity
+  systemReports: [],                         // yours; `[]` is a complete answer
+  starters: { loans: … },                    // yours; `{}` is a complete answer
+});
+
+const { page } = createWebReportBuilder({
+  tenantSlug,
+  surface: { systemReports, systemDashboards, sections, blockTemplates, timeZone },
+});
+```
+
+Both throw at ASSEMBLY on a wiring mistake — an unmapped entity, a built-in that
+does not compile against your catalog, a dashboard block naming a report nobody
+declared, a zone this runtime cannot resolve — rather than serving a surface
+that is quietly missing a piece. `ADOPTING.md` has the full contract and the
+3.0.1 → 4.0.0 migration table.
+
+A host also composes `REPORT_BUILDER_PERMISSIONS` into its own RBAC catalog: one
+id, `reports:manage`, which gates this package's editor and its
+`/reports/custom/**` writes. Reading is decided by the host's own
+`entityPermission` tiers.

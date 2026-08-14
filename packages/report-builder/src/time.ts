@@ -15,8 +15,13 @@ import type { TimeGrain } from './types';
  * behaviour, which is what the naked helper has always documented.
  */
 
-/** The tenant zone assumed when neither the spec nor the host names one. */
-export const DEFAULT_REPORT_TIME_ZONE = 'America/Sao_Paulo';
+/*
+ * `DEFAULT_REPORT_TIME_ZONE = 'America/Sao_Paulo'` used to live here, and was
+ * the last rung of compile's zone chain: a caller that named no zone got a
+ * Brazilian trading day. It is gone. Omitting `timeZone` means UTC — the
+ * absence of a guess — and the mounted surface never reaches that rung, because
+ * `ReportBuilderServerConfig.timeZone` is required.
+ */
 
 interface CivilDate {
   year: number;

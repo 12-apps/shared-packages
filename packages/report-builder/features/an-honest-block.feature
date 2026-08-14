@@ -17,7 +17,7 @@ Feature: A block may only be drawn a way that tells the truth
 
   Background:
     Given the reports area is open on the store's saved reports
-    And she is building a new block from the "Receita por dia" template
+    And she is building a new block from the first block template
 
   Scenario: A line is refused over a grouping whose values have no order
     Then a line is offered, because the block is grouped by date

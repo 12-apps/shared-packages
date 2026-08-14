@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { createWebReportBuilder } from '../create-report-builder';
+import { TEST_SURFACE } from './surface-fixture';
+import type { BlockTemplateGroup } from '../../server/block-templates';
 import type {
   ReportEntityFields,
   SavedReportSummary,
@@ -50,6 +52,39 @@ const ENTITY: ReportEntityFields = {
     { field: 'revenueCents', label: 'Receita', type: 'money', role: 'measure' },
   ],
 };
+
+/**
+ * A host's own block templates — the picker's whole content, from config.
+ *
+ * Deliberately in a vocabulary this repo's hosts do not use: if these render,
+ * the picker is showing what it was given rather than what it used to ship.
+ */
+const HOST_TEMPLATES: BlockTemplateGroup[] = [
+  {
+    id: 'fleet',
+    title: 'Frota',
+    templates: [
+      {
+        id: 'trips-per-day',
+        title: 'Viagens por dia',
+        description: 'Quantas viagens saíram a cada dia',
+        spec: null,
+      },
+    ],
+  },
+  {
+    id: 'maintenance',
+    title: 'Manutenção',
+    templates: [
+      {
+        id: 'downtime',
+        title: 'Parado por oficina',
+        description: 'Horas paradas em cada oficina',
+        spec: null,
+      },
+    ],
+  },
+];
 
 const SUMMARY: SavedReportSummary = {
   id: REPORT_ID,
@@ -128,6 +163,7 @@ function stubTransport(view: SavedReportView): ReportBuilderTransport {
 /** Mount the routed surface at a path and wait for the editor to be up. */
 async function openEditor(path: string, view: SavedReportView = savedView(1)): Promise<void> {
   const { page: Surface } = createWebReportBuilder({
+    surface: { ...TEST_SURFACE, blockTemplates: HOST_TEMPLATES },
     tenantSlug: TENANT,
     transport: stubTransport(view),
     standalone: true,
@@ -211,17 +247,26 @@ describe('dismissing the picker on a new report', () => {
 });
 
 describe('what the picker offers', () => {
-  it('groups the templates under eyebrow headings', async () => {
+  /**
+   * The groups are the HOST's, and these two cases are what that means.
+   *
+   * They used to assert `vendas` / `movimento` / `pagamentos-e-perdas` — the
+   * three groups future-pay's `block-templates.ts` shipped from inside this
+   * package, rendered to every consumer that mounted the editor. The picker's
+   * contract is not those words; it is "your groups, in your order, then the
+   * blank one". So the fixture declares two groups of its own and the cases
+   * check that they arrive, alongside the blank group this package does own.
+   */
+  it('renders the groups the host declared, and appends the blank one', async () => {
     await openEditor(`/${TENANT}/reports/new`);
-    for (const group of ['vendas', 'movimento', 'pagamentos-e-perdas', 'em-branco']) {
+    for (const group of ['fleet', 'maintenance', 'em-branco']) {
       expect(screen.getByTestId(`block-template-picker-group-${group}`)).toBeTruthy();
     }
   });
 
-  it('names each group in the words the picker uses', async () => {
+  it('names each group in the words the HOST gave it', async () => {
     await openEditor(`/${TENANT}/reports/new`);
-    const headings = ['Vendas', 'Movimento', 'Pagamentos e perdas', 'Do zero'];
-    for (const heading of headings) {
+    for (const heading of ['Frota', 'Manutenção', 'Do zero']) {
       expect(screen.getByRole('heading', { name: heading })).toBeTruthy();
     }
   });

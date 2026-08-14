@@ -3,12 +3,14 @@
  *
  * A frontend host writes one line:
  *
- *   const { page } = createWebReportBuilder({ tenantSlug });
+ *   const { page } = createWebReportBuilder({ tenantSlug, surface });
  *
  * Everything the feature is — the list, the viewer, the editor, the config
- * panel, the filter rows, the pickers, the templates, and the ROUTES between
- * them — lives inside this package. The host supplies only what is genuinely
- * its own: which tenant, and how to reach the API.
+ * panel, the filter rows, the pickers, and the ROUTES between them — lives
+ * inside this package. The host supplies only what is genuinely its own: which
+ * tenant, how to reach the API, and its own VOCABULARY (`surface`) — the
+ * built-in reports, the dashboards, the menu sections they hang off, the block
+ * templates its picker offers and the clock its tenants keep.
  *
  * This entry deliberately does NOT export the screens individually. It used
  * to, and the cost showed up immediately: hosts hand-wrote the route table, so
@@ -24,18 +26,29 @@ export { createWebReportBuilder, type ReportBuilderConfig } from './create-repor
 export { httpTransport, type ReportBuilderTransport } from './transport';
 
 /**
- * The built-in dashboards a host mounts in its OWN lateral menu — the one
- * genuine integration point beyond the surface itself, because only the host
- * knows where its menu lives and which permission gates a row.
+ * The vocabulary a host declares, and the types it declares it in.
+ *
+ * This export used to be `SYSTEM_DASHBOARDS`, `SYSTEM_REPORT_KEYS` and
+ * `SYSTEM_REPORT_NAV` — future-pay's seven built-ins and two dashboards, as
+ * VALUES, out of a package every other host installs. A host's menu built rows
+ * from them and got another product's reports. What crosses this boundary now
+ * is the shape they are declared in; the entries themselves are the host's, and
+ * travel INTO the surface rather than out of it.
  */
+export type { ReportBuilderSurface } from './transport-context';
+export type {
+  SystemDashboardDef,
+  SystemReportDef,
+  SystemReportNavEntry,
+  SystemReportSection,
+} from '../server/system-reports';
+export { systemReportNav } from '../server/system-reports';
 export {
-  SYSTEM_DASHBOARDS,
-  SYSTEM_REPORT_KEYS,
-  SYSTEM_REPORT_NAV,
-  type SystemDashboardDef,
-  type SystemReportNavEntry,
-  type SystemReportSection,
-} from '../server/presets';
+  BLANK_BLOCK_TEMPLATE,
+  blockTemplateGroups,
+  type BlockTemplate,
+  type BlockTemplateGroup,
+} from '../server/block-templates';
 
 /**
  * Wire types, for a host that persists or proxies these payloads. Types only —

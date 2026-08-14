@@ -1,10 +1,11 @@
 import { ReportBuilderError } from '../errors';
+import type { ReportSpec } from '../spec';
 import type { FieldCatalog, ReportDataSource } from '../types';
 
 import type { ReportWindow } from './adapter-shared';
-import { REPORT_ENTITY_PERMISSION, REPORT_RUN_MAX_ROWS } from './policy';
-import type { SystemReportDef } from './preset-types';
-import { SYSTEM_REPORTS } from './presets';
+import { DEFAULT_AUTHOR_PERMISSION } from './contribution';
+import { REPORT_RUN_MAX_ROWS } from './policy';
+import type { SystemReportDef } from './system-reports';
 import {
   rangeFromQuery,
   resolveReportRange,
@@ -31,14 +32,17 @@ export interface ReportActor {
   userId: string | null;
   /** Role ids, for `visibility: 'roles'`. */
   roleIds: string[];
-  /** OWNER/ADMIN — sees every saved report regardless of visibility. */
-  isAdmin: boolean;
-  /** Whether this actor may author (create/update/delete) saved reports. */
-  canAuthor: boolean;
   /**
-   * The permission ids this actor holds on the tenant, e.g.
-   * `reports:sales:read`. Every entity, preset and saved document is narrowed
-   * against this set.
+   * The tenant's admin tier — sees every saved report regardless of its
+   * visibility. A host FACT about the caller, not a permission: it is the
+   * "reads everything in this tenant" rung, which every host spells in its own
+   * role names.
+   */
+  isAdmin: boolean;
+  /**
+   * The permission ids this actor holds on the tenant. Every entity, preset and
+   * saved document is narrowed against this set, and authoring is decided by
+   * it too (see `gatePermissions`).
    *
    * Required, and deliberately not defaulted: a host that forgot to pass it
    * gets an empty surface (fail closed), never the whole catalog.
@@ -95,28 +99,72 @@ export type ReportAdapterFactory = (context: {
 }) => ReportDataSource | Promise<ReportDataSource>;
 
 export interface ReportBuilderServerConfig {
+  /** The semantic model every spec is validated against. The host's. */
   catalog: FieldCatalog;
   /** How rows are read. The host owns the database; this owns the query. */
   adapter: ReportDataSource | ReportAdapterFactory;
   /** Prisma-shaped client for saved reports, through the structural seam. */
   db: () => Promise<SavedReportDb>;
-  /** Tenant IANA zone for date buckets AND for the window's day boundaries. */
-  timeZone?: string;
+  /**
+   * Tenant IANA zone for date buckets AND for the window's day boundaries.
+   *
+   * REQUIRED. It used to be optional and fall through to the engine's
+   * `America/Sao_Paulo`, so a host that never mentioned a clock ran every
+   * report on a Brazilian trading day: "hoje" opened at 03:00 UTC and a
+   * midnight sale landed in yesterday's report. There is no neutral answer
+   * here — only the host knows what its tenants call a day — so it is asked
+   * for rather than guessed, and validated as an IANA name at assembly.
+   */
+  timeZone: string;
   /** Hard row cap for a single run. Defaults to {@link REPORT_RUN_MAX_ROWS}. */
   maxRows?: number;
   /**
-   * Permission required to query each catalog entity. Defaults to the Future
-   * Pay policy. An entity ABSENT from the map is queryable by nobody — the
-   * narrowing fails closed, so a catalog that grows an entity does not
-   * silently expose it.
+   * Permission required to query each catalog entity — the host's ids, for the
+   * host's data.
+   *
+   * REQUIRED, and every catalog entity must appear (checked at assembly). It
+   * used to default to future-pay's map, which meant a silent host's `orders`
+   * entity was gated by `reports:sales:read` — an id belonging to another
+   * application's catalog — while an entity that map did not name was
+   * queryable by nobody at all. Both halves were policy nobody had stated.
    */
-  entityPermission?: Record<string, string>;
+  entityPermission: Record<string, string>;
   /**
-   * The built-in reports offered at `/reports/system`. Defaults to the Future
-   * Pay presets; pass `[]` to serve none (a host on its own catalog, whose
-   * fields the presets do not name).
+   * The built-in reports offered at `/reports/system`. Pass `[]` to serve none.
+   *
+   * REQUIRED, including the empty case: it used to default to future-pay's
+   * seven presets, so a host that named none advertised `vendas-resumo` and
+   * `cozinha-por-cozinheiro` over its own catalog. Each is compile-validated
+   * against `catalog` at assembly.
    */
-  systemReports?: readonly SystemReportDef[];
+  systemReports: readonly SystemReportDef[];
+  /**
+   * The known-good spec each entity opens with, keyed by entity, served on
+   * `/reports/fields` so the builder prefills a runnable report and MCP authors
+   * start from something that already compiles.
+   *
+   * REQUIRED, including the empty case, for the same reason `systemReports` is:
+   * this was the last field of the host's vocabulary still `?? {}`-defaultable,
+   * and a defaultable vocabulary field is exactly what this surface stopped
+   * having. `{}` is a complete answer — every entity is then served without a
+   * `starter` — but it is one the host has to give. Each entry is
+   * compile-validated against `catalog` at assembly, and its spec's own
+   * `entity` must be the key it is filed under.
+   */
+  starters: Readonly<Record<string, ReportSpec>>;
+  /**
+   * How this host spells the permissions guarding THIS package's own surface.
+   *
+   * Optional, because the default is this package's own contributed id
+   * (`reports:manage`, see {@link REPORT_BUILDER_PERMISSIONS}) rather than
+   * another application's: a host that says nothing inherits the policy of the
+   * package whose screens these are. A host whose catalog spells it differently
+   * maps it here.
+   */
+  gatePermissions?: {
+    /** Create/update/delete a saved report, and every working-copy write. */
+    manage: string;
+  };
   /** Clock, injectable so a test can pin the window a rolling preset resolves. */
   now?: () => Date;
 }
@@ -147,18 +195,17 @@ export function isDuplicateName(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2002';
 }
 
-/** The entity→permission map in force, defaulted to the Future Pay policy. */
-export function entityPermissionMap(
-  config: ReportBuilderServerConfig,
-): Record<string, string> {
-  return config.entityPermission ?? REPORT_ENTITY_PERMISSION;
-}
-
-/** The built-in presets in force, defaulted to the Future Pay ones. */
-export function systemReportsOf(
-  config: ReportBuilderServerConfig,
-): readonly SystemReportDef[] {
-  return config.systemReports ?? SYSTEM_REPORTS;
+/**
+ * Whether the actor may AUTHOR — every write behind the editor.
+ *
+ * A permission check, not the `canAuthor` boolean it replaces. That boolean
+ * made each host derive an answer this package's own surface decides, and the
+ * derivation was invisible from here: future-pay computed it from a hardcoded
+ * set of role names, so "who may build a report" was not expressible as a grant
+ * in the very role editor that grants everything else.
+ */
+export function mayAuthor(config: ReportBuilderServerConfig, actor: ReportActor): boolean {
+  return actor.permissions.includes(config.gatePermissions?.manage ?? DEFAULT_AUTHOR_PERMISSION);
 }
 
 /** Whether the actor may query this entity. An unmapped entity: nobody may. */
@@ -167,7 +214,7 @@ export function mayQueryEntity(
   actor: ReportActor,
   entity: string,
 ): boolean {
-  const required = entityPermissionMap(config)[entity];
+  const required = config.entityPermission[entity];
   return required !== undefined && actor.permissions.includes(required);
 }
 
@@ -240,7 +287,7 @@ export async function runOptions(
 ): Promise<{
   catalog: FieldCatalog;
   adapter: ReportDataSource;
-  timeZone?: string;
+  timeZone: string;
   maxRows: number;
 }> {
   const window: ReportWindow = { from: range.from, toExclusive: range.toExclusive };
@@ -249,7 +296,7 @@ export async function runOptions(
   return {
     catalog: config.catalog,
     adapter,
-    ...(config.timeZone ? { timeZone: config.timeZone } : {}),
+    timeZone: config.timeZone,
     maxRows: config.maxRows ?? REPORT_RUN_MAX_ROWS,
   };
 }

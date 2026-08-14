@@ -65,8 +65,9 @@ function actor(overrides: Partial<ReportActor> = {}): ReportActor {
     userId: 'user-1',
     roleIds: [],
     isAdmin: false,
-    canAuthor: true,
-    permissions: ['sales:read'],
+    // Authoring rides `reports:manage`, this package's own contributed id, in
+    // place of the `canAuthor` boolean each host used to compute for itself.
+    permissions: ['sales:read', 'reports:manage'],
     ...overrides,
   };
 }
@@ -129,6 +130,8 @@ function setup(seed: SavedReportRecord = record()): Harness {
     db: () => Promise.resolve(db),
     entityPermission: ENTITY_PERMISSION,
     systemReports: [],
+    starters: {},
+    timeZone: 'America/Sao_Paulo',
     now: () => new Date('2026-08-10T12:00:00Z'),
   });
 
@@ -230,7 +233,7 @@ describe('parking an edit beside a published report', () => {
     const harness = setup();
 
     const response = await harness.call('PUT', PARK, {
-      actor: actor({ canAuthor: false }),
+      actor: actor({ permissions: ['sales:read'] }),
       body: WORKING_COPY,
     });
 
@@ -291,7 +294,7 @@ describe('publishing the edit', () => {
     const harness = setup(record({ workingCopy: WORKING_COPY }));
 
     const response = await harness.call('POST', PUBLISH, {
-      actor: actor({ canAuthor: false }),
+      actor: actor({ permissions: ['sales:read'] }),
       body: { name: 'Vendas', spec: EDITED_SPEC },
     });
 
@@ -326,7 +329,7 @@ describe('discarding the edit', () => {
   it('refuses a caller who may not author', async () => {
     const harness = setup(record({ workingCopy: WORKING_COPY }));
 
-    const response = await harness.call('DELETE', PARK, { actor: actor({ canAuthor: false }) });
+    const response = await harness.call('DELETE', PARK, { actor: actor({ permissions: ['sales:read'] }) });
 
     expect(response.status).toBe(403);
     expect(harness.row().workingCopy).toMatchObject({ spec: EDITED_SPEC });
@@ -350,7 +353,7 @@ describe('what the rest of the surface says about a parked edit', () => {
     const harness = setup(record({ workingCopy: WORKING_COPY }));
 
     const response = await harness.call('GET', '/reports/custom/:id', {
-      actor: actor({ canAuthor: false }),
+      actor: actor({ permissions: ['sales:read'] }),
     });
 
     const view = data<{ spec: unknown; workingCopy: unknown }>(response);

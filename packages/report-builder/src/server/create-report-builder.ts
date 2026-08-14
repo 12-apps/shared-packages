@@ -1,3 +1,4 @@
+import { assertReportBuilderConfig } from './config';
 import { createSavedReportStore } from './saved';
 
 import { catalogRoute } from './routes-catalog';
@@ -34,10 +35,19 @@ import type { ReportBuilderServerConfig, ReportRoute } from './context';
  *  - **Entitlements and quota** — whether the plan includes reports at all,
  *    and whether the tenant may save another. Those are billing questions, and
  *    a host answers them before the request ever reaches a descriptor.
+ *  - **The vocabulary** — the field catalog, the permission each of its
+ *    entities requires, the built-in reports, the starters and the tenant
+ *    clock. All REQUIRED, none defaulted: this package used to ship one
+ *    application's answers to all five and hand them to any host that stayed
+ *    quiet, which is a silent host running another store's policy.
+ *
+ * Throws {@link ReportBuilderConfigError} on a wiring mistake — at assembly,
+ * where the call site is, rather than on the one endpoint nobody exercised.
  */
 export function createApiReportBuilder(config: ReportBuilderServerConfig): {
   routes: ReportRoute[];
 } {
+  assertReportBuilderConfig(config);
   const store = createSavedReportStore(config.db);
   return {
     routes: [

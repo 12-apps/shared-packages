@@ -3,7 +3,8 @@
  *
  * The old hub was a wall of cards mixing three unrelated things: fixed built-in
  * reports, saved single reports and saved dashboards. Built-ins moved to the
- * lateral menu (they belong to the area they analyse — see `SYSTEM_REPORT_NAV`),
+ * lateral menu (they belong to the area they analyse — see the host's
+ * `surface.systemReports`),
  * and what is left is what the tenant AUTHORED.
  *
  * What replaced it was still one screen: the picker on top, the selected report
@@ -27,7 +28,6 @@ import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
-import { SYSTEM_REPORT_KEYS } from "../server/presets";
 import { useSavedReports, type SavedReportSummary } from "./custom-reports-api";
 import { NO_PRINT_CLASS, PrintStyles } from "./lib/print-export";
 import { PAGE_TITLE_SX, useReportSurfaceSx } from "./lib/report-surface";
@@ -36,6 +36,7 @@ import { ArchiveFromListDialog } from "./report-list-archive";
 import type { ReportScope } from "./report-list-filters";
 import { ReportScreen } from "./report-screen";
 import type { ReportRangeSelection, ReportRollingRange } from "./reports-api";
+import { useReportSurface } from "./transport-context";
 
 /** What a report opens on when it stores no "Período padrão ao abrir". */
 const FALLBACK_RANGE: ReportRollingRange = "30d";
@@ -219,6 +220,7 @@ export function ReportsPage({ tenantSlug }: { tenantSlug: string }): JSX.Element
   const query = useSavedReports(tenantSlug);
   // Above the early returns — a hook cannot sit behind a conditional.
   const surfaceSx = useReportSurfaceSx();
+  const surface = useReportSurface();
   const reports = query.data?.reports ?? [];
   // No auto-selection any more (FUT-755). Choosing IS navigating now, so a
   // default pick would make `/reports` bounce straight into the first report
@@ -228,7 +230,7 @@ export function ReportsPage({ tenantSlug }: { tenantSlug: string }): JSX.Element
 
   // A pre-FUT-391 deep link to a built-in report (`/reports/<key>`): built-ins
   // now live under `/reports/system/<key>`, reached from the lateral menu.
-  if (reportId !== undefined && SYSTEM_REPORT_KEYS.includes(reportId)) {
+  if (reportId !== undefined && surface.systemReports.some((entry) => entry.key === reportId)) {
     return <Navigate to={`/${tenantSlug}/reports/system/${reportId}`} replace />;
   }
   if (query.isError) {

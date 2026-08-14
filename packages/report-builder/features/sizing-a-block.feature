@@ -15,7 +15,7 @@ Feature: Sizing a block, and getting the size that was asked for
 
   Background:
     Given the reports area is open on the store's saved reports
-    And she is building a new block from the "Receita por dia" template
+    And she is building a new block from the first block template
 
   Scenario: A width narrower than the canvas is the width the block gets
     When she sets the block to a third of the canvas
