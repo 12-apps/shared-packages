@@ -2,6 +2,11 @@ import { relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { defineConfig } from '@playwright/test';
+import {
+  impersonationFeatures,
+  impersonationFeaturesRoot,
+  impersonationSteps,
+} from '@12-apps/impersonation/e2e';
 import { paymentsFeatures, paymentsFeaturesRoot, paymentsSteps } from '@12-apps/payments-e2e';
 import { reportsFeatures, reportsFeaturesRoot, reportsSteps } from '@12-apps/report-builder/e2e';
 import { defineBddConfig } from 'playwright-bdd';
@@ -12,11 +17,11 @@ import { HARNESS_BACKEND_ORIGIN, HARNESS_SPA_ORIGIN, HARNESS_SPA_PORT } from '..
 const BACKEND_DIR = fileURLToPath(new URL('../backend', import.meta.url));
 
 /**
- * The one directory both packaged suites' features sit under (FUT-755).
+ * The one directory every packaged suite's features sits under.
  *
  * `defineBddConfig` takes exactly ONE `featuresRoot` and mirrors each feature's
- * path relative to it under `outputDir`, so two packages shipping journeys need
- * a root that covers both. Computed rather than written down: each package
+ * path relative to it under `outputDir`, so several packages shipping
+ * journeys need a root that covers all of them. Computed rather than written down: each package
  * resolves its own feature directory (see its `globs.ts`), and where those land
  * is the installer's business, not this file's.
  *
@@ -83,14 +88,18 @@ function journeysRoot(...featureDirs: string[]): string {
  * scenario and its compiled spec drift.
  */
 const journeys = defineBddConfig({
-  features: [paymentsFeatures, reportsFeatures],
+  features: [paymentsFeatures, reportsFeatures, impersonationFeatures],
   // Without this the compiled specs mirror each package's node_modules path and
   // Playwright's default testIgnore drops every one of them — bddgen reports
   // the features compiled and the journeys project collects nothing, green.
-  featuresRoot: journeysRoot(paymentsFeaturesRoot, reportsFeaturesRoot),
+  featuresRoot: journeysRoot(
+    paymentsFeaturesRoot,
+    reportsFeaturesRoot,
+    impersonationFeaturesRoot,
+  ),
   // This app's own steps glob stays: it is where the two `define…World` calls
   // live, and playwright-bdd imports every step file before the first Given.
-  steps: [paymentsSteps, reportsSteps, 'tests/e2e/steps/**/*.ts'],
+  steps: [paymentsSteps, reportsSteps, impersonationSteps, 'tests/e2e/steps/**/*.ts'],
   outputDir: '.features-gen',
 });
 
