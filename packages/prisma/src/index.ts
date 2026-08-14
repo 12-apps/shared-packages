@@ -34,6 +34,13 @@ import { applyAuditStamps } from './audit-extension';
 // Append-only guard for the audit log (FUT-209): mutating the AuditLog model
 // throws. Re-exported so tests can assert on the error type.
 export { AppendOnlyViolationError } from './append-only-extension';
+/**
+ * Declare which models carry attribution, and which keep a normalised search
+ * column. Call once at the composition root, before the first client is built —
+ * nothing is stamped until you do. See `audit-extension.ts` for why this is the
+ * host's to say rather than a list this package guesses.
+ */
+export { configureAuditStamps, auditStampConfig, type AuditStampConfig } from './audit-extension';
 
 // Change-attribution context helpers (FUT-168): the auth layer calls `setActor`
 // once a request is authorized; the audit extension applied below reads it to
