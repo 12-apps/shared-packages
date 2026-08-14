@@ -62,7 +62,14 @@ describe('createWebEntityLifecycle', () => {
         ],
       },
     });
-    const { page: Page } = createWebEntityLifecycle({ apiBase: '/api/admin/loja', transport });
+    // `entityTypeLabels` is supplied the way a HOST supplies it. The package
+    // no longer ships a catalog to fall back on, so the chip below renders this
+    // map's word or the raw key — never a word this package chose.
+    const { page: Page } = createWebEntityLifecycle({
+      apiBase: '/api/admin/loja',
+      transport,
+      entityTypeLabels: { product: 'Produto' },
+    });
     render(<Page />);
 
     await waitFor(() => expect(screen.getByTestId('recycle-bin-list')).toBeTruthy());

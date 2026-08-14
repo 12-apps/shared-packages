@@ -19,7 +19,25 @@ import type { DraftWire } from '@12-apps/entity-lifecycle/react';
  *    through the packaged lifecycle, so an editor's save parks for approval
  *    and a delete lands in the Lixeira).
  */
-const lifecycle = createWebEntityLifecycle({ apiBase: '/api/admin/harness' });
+/**
+ * The HOST's entity vocabulary, supplied by the host — which is the whole of
+ * what changed in `@12-apps/entity-lifecycle@3`. The package used to ship one
+ * adopter's catalog and merge it UNDER whatever a host passed, so a host that
+ * named only some of its collections silently inherited another product's word
+ * for the rest. It ships none now; an unlabelled type renders as its raw key.
+ *
+ * Both seeded collections are named, because this harness stands in for a
+ * CORRECT adopter and the bin's contract is that each collection shows its own
+ * chip. The raw-key fallback for an unnamed type is worth proving too, but it
+ * belongs in the package's own suite (`entity-type-labels.test.ts`) rather than
+ * here, where leaving a type out would just look like the wiring is unfinished.
+ */
+const ENTITY_TYPE_LABELS = { product: 'Produto', supplier: 'Fornecedor' };
+
+const lifecycle = createWebEntityLifecycle({
+  apiBase: '/api/admin/harness',
+  entityTypeLabels: ENTITY_TYPE_LABELS,
+});
 const { page: LifecycleSurface, VersionHistoryDialog, DraftBanner, api } = lifecycle;
 
 interface ItemWire {

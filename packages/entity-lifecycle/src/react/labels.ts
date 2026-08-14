@@ -1,25 +1,27 @@
 /**
- * pt-BR vocabulary of the lifecycle screens (12-17). The entity-type labels
- * default to future-pay's catalog — the same posture as rbac's default
- * templates: future-pay adopts with zero config, any other host merges its
- * own map in. An unknown type renders as its raw key, never crashes.
+ * Vocabulary of the lifecycle screens (12-17).
+ *
+ * WHAT USED TO BE HERE. A `DEFAULT_ENTITY_TYPE_LABELS` map of one host's
+ * collections — `table: 'Mesa'`, `ingredient: 'Insumo'`,
+ * `'kitchen-station': 'Estação'`, `'loss-reason': 'Motivo de perda'` — under a
+ * header that called it "the same posture as rbac's default templates". That
+ * posture is exactly what `@12-apps/rbac` removed: a host catalog does not
+ * become generic by being the fallback.
+ *
+ * It was also the SUBTLE shape of the mistake rather than the loud one. The
+ * factory merged it as the BASE layer (`{ ...DEFAULT, ...config }`), so a host
+ * passing its own map got its entries laid on top and silently kept the other
+ * host's word for every key it did not restate. A host with a `table` entity
+ * that means a database table, or a pricing table, rendered "Mesa" — and had
+ * supplied a labels map, so nothing about the API suggested it had not been
+ * heard.
+ *
+ * The labels are the host's, whole. An entity type with no label renders as its
+ * RAW KEY, which is honest, never crashes, and is the zero-config behaviour: a
+ * host that passes nothing sees `kitchen-station`, not somebody else's noun.
  */
 
 export type EntityTypeLabels = Record<string, string>;
-
-/** future-pay's known collections (recycle-bin + approvals pages, verbatim). */
-export const DEFAULT_ENTITY_TYPE_LABELS: EntityTypeLabels = {
-  product: 'Produto',
-  category: 'Categoria',
-  supplier: 'Fornecedor',
-  ingredient: 'Insumo',
-  table: 'Mesa',
-  role: 'Papel',
-  sector: 'Setor',
-  'kitchen-station': 'Estação',
-  'stock-location': 'Local de estoque',
-  'loss-reason': 'Motivo de perda',
-};
 
 export function entityTypeLabel(labels: EntityTypeLabels, entityType: string): string {
   return labels[entityType] ?? entityType;
