@@ -26,6 +26,7 @@ let app: Hono;
 beforeEach(() => {
   db = createMemoryDb();
   const notifications = notificationsRouter({
+    categories: ['orders', 'payments', 'stock', 'system'],
     db: () => Promise.resolve(db),
     contacts: memoryContacts({ u1: { email: 'buyer@example.com', phone: null } }),
     generators: [ORDER_PAID as never],
