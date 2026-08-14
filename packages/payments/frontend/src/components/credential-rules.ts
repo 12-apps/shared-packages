@@ -18,27 +18,9 @@ import type { PendingSave } from './ConfirmCredentialSave';
  */
 
 /**
- * Is there actually something stored to probe?
- *
- * Read from the SERVER's answer to the save rather than from the form: blank
- * fields are preserved rather than cleared, so what the browser just typed does
- * not describe what is now on record.
- */
-export function allRequiredStored(
-  descriptor: ProviderDescriptor,
-  config: MaskedProviderConfig,
-  environment: PaymentEnvironment,
-): boolean {
-  const stored = config.environments[environment] ?? {};
-  return descriptor.credentialSchema
-    .filter((spec) => spec.required)
-    .every((spec) => stored[spec.key]?.configured === true);
-}
-
-/**
  * Is the credential set COMPLETE — every field on record or in the box?
  *
- * `allRequiredStored` cannot answer this, and Stripe is why: every field in its
+ * A required-field test cannot answer this, and Stripe is why: every field in its
  * schema is `required: false`, because under authorization the access token
  * fulfils the secret key and nothing needs typing at all. On the credentials
  * path that makes the required-field test vacuously true, so a save with one

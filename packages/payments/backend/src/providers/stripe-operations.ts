@@ -132,11 +132,43 @@ export const verifyCredentials: PaymentProviderAdapter['verifyCredentials'] = as
     if (unreachable) return unreachable;
     const status = error instanceof ProviderRequestError ? error.options.httpStatus : undefined;
     if (status === 401 || status === 403) {
-      return { ok: false, fault: 'REFUSED', message: 'Credenciais recusadas pela Stripe.' };
+      // Stripe's OWN sentence, when it sent one. "Credenciais recusadas" alone
+      // names neither the credential nor the reason, and on this path there are
+      // four of them — the owner is left re-checking all four against a screen
+      // that knows which one failed and will not say. Stripe answers with
+      // things like "Invalid API Key provided: sk_test_***…***4242" or "The
+      // provided key does not have access to account acct_…", each of which
+      // points straight at the box to fix. Only the `message` string is taken:
+      // the rest of the body is the provider's, and this error type retains it
+      // whole (see the PII note on ProviderRequestError).
+      const detail = refusalDetail(error);
+      return {
+        ok: false,
+        fault: 'REFUSED',
+        message: detail
+          ? `Credenciais recusadas pela Stripe: ${detail}`
+          : 'Credenciais recusadas pela Stripe.',
+      };
     }
     return { ok: false, message: error instanceof Error ? error.message : String(error) };
   }
 };
+
+/**
+ * What Stripe said when it refused, or null when it said nothing usable.
+ *
+ * Narrowed by hand rather than cast: the body is whatever the provider sent,
+ * and a probe that throws while explaining a refusal reports the wrong fault.
+ */
+function refusalDetail(error: unknown): string | null {
+  if (!(error instanceof ProviderRequestError)) return null;
+  const body: unknown = error.options.body;
+  if (typeof body !== 'object' || body === null) return null;
+  const inner: unknown = (body as { error?: unknown }).error;
+  if (typeof inner !== 'object' || inner === null) return null;
+  const message: unknown = (inner as { message?: unknown }).message;
+  return typeof message === 'string' && message.trim() !== '' ? message.trim() : null;
+}
 
 /** Fetch an intent and normalize it; shared by `getCharge` and `cancelCharge`. */
 async function intentOperation(
