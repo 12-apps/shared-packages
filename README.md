@@ -22,7 +22,7 @@ lives here is the machinery.
 | `@12-apps/realtime` | Typed topic/event envelopes and a publish/subscribe bus behind a swappable driver port (Redis pub/sub in production). |
 | `@12-apps/report-builder` | Reporting plugin: spec engine, host-mounted endpoints and screens, the saved-report lifecycle and the period. The catalog, the built-ins and the adapter are the host's and arrive as config. |
 | `@12-apps/shift` | Headless tenant-scoped work shifts with resource bindings and audit ports. |
-| `@12-apps/stock-domain` | The stock-movement vocabulary — the closed value sets the reason taxonomy is built on. |
+| `@12-apps/stock-domain` | Closed vocabularies for a stock-movement reason taxonomy: the two-axis shape, one shared membership predicate for reads and writes, and the assembly guards. The values are the host's and arrive as config. |
 | `@12-apps/ui` | ~90 MUI-based components with stories and interaction tests. |
 | `@12-apps/auth` | NextAuth wrapper plus an env-var admin allowlist. |
 | `@12-apps/onboarding` | Guided-onboarding context and progress repository. |
