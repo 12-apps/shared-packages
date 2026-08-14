@@ -48,8 +48,12 @@ function git(args) {
   return { ok: run.status === 0, out: `${run.stdout ?? ""}`.trim(), err: `${run.stderr ?? ""}`.trim() };
 }
 
+// Set on every Actions runner, and different on Enterprise Server — so reading
+// it is both more correct than a hard-coded host and what makes this testable.
+const API = process.env.GITHUB_API_URL ?? "https://api.github.com";
+
 async function api(path, init = {}) {
-  const response = await fetch(`https://api.github.com/repos/${REPO}${path}`, {
+  const response = await fetch(`${API}/repos/${REPO}${path}`, {
     ...init,
     headers: {
       accept: "application/vnd.github+json",

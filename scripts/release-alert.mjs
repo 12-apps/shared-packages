@@ -30,13 +30,20 @@ const JOB_STATUS = process.env.RELEASE_JOB_STATUS ?? "";
 
 const RUN_URL = RUN_ID ? `${SERVER}/${REPO}/actions/runs/${RUN_ID}` : "";
 
+// GitHub Actions sets GITHUB_API_URL on every runner (it differs on Enterprise
+// Server), so honouring it is both more correct than hard-coding the host and
+// what lets scripts/release-alert-selftest.mjs point this at a local server —
+// the only way to assert that a second failing run EDITS the open issue rather
+// than filing another one.
+const API = process.env.GITHUB_API_URL ?? "https://api.github.com";
+
 // How the issue recognises itself on the next run. In the body rather than the
 // title so the title stays free to say what is currently wrong.
 const MARKER = "<!-- release-alert:shared-packages -->";
 const TITLE = "Release pipeline is not delivering to npm";
 
 async function api(path, init = {}) {
-  return fetch(`https://api.github.com/repos/${REPO}${path}`, {
+  return fetch(`${API}/repos/${REPO}${path}`, {
     ...init,
     headers: {
       accept: "application/vnd.github+json",
