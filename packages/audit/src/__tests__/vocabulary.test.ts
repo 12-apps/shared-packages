@@ -185,12 +185,16 @@ describe('defineAuditVocabulary — the shape it hands back', () => {
 });
 
 describe('defineAuditVocabulary — what it refuses at assembly', () => {
-  // `specField`, not `path`: the flakiness lane reads `path.replace(...)` as a
-  // filesystem call on the variable's NAME, and it is right often enough to be
-  // worth writing around. Nothing here touches a disk.
+  // The field is matched as a PLAIN STRING, which `toThrow` already treats as
+  // "the message contains this". It used to build a `RegExp` from an escape
+  // that covered `[`, `]`, `"` and `.` — the metacharacters these field names
+  // actually contain (`resources["thing"].fields`) — but not the backslash that
+  // does the escaping, so a field carrying one would have produced a pattern
+  // matching something else entirely. No field does today; the fix is to stop
+  // building a pattern at all rather than to lengthen the character class.
   const refuse = (build: () => unknown, specField: string) => {
     expect(build).toThrow(AuditConfigError);
-    expect(build).toThrow(new RegExp(specField.replace(/[[\]".]/g, '\\$&')));
+    expect(build).toThrow(specField);
   };
 
   it('refuses an empty actions map', () => {
