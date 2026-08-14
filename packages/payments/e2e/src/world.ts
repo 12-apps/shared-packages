@@ -105,7 +105,20 @@ export type PaymentsStore =
   /** Declares no screen — the capability default answers. */
   | 'screen-undeclared'
   /** Declares a screen id this bundle has never shipped. */
-  | 'screen-unknown';
+  | 'screen-unknown'
+  /**
+   * A provider whose WALKTHROUGH addresses the platform by name (FUT-760/761)
+   * — the admin settings surface, on a vendor that ships a setup guide.
+   *
+   * The journey behind it asserts that the name the owner reads is the HOST's,
+   * arriving through `SetupGuideContext.brandName`, rather than one adopter's
+   * brand compiled into the package. A host satisfies this by opening a
+   * settings screen for a provider with a guide; what the platform is called
+   * there is the host's own answer, which is the whole point — so the scenario
+   * asks for it through {@link PaymentsFixtures.platformBrand} rather than
+   * naming anyone.
+   */
+  | 'setup-guide';
 
 /**
  * Facts about the host's own fixtures that the assertions have to name.
@@ -127,6 +140,16 @@ export interface PaymentsFixtures {
   payableRef: string;
   /** The CPF the buyer types, as the provider should receive it. */
   taxId: string;
+  /**
+   * What the HOST platform calls itself — the value it passes as
+   * `SetupGuideContext.brandName`.
+   *
+   * Parameterised for the same reason `headProvider` is, and for one more: a
+   * feature file that spelled a brand would be asserting that one adopter's
+   * copy shipped, which is the defect rather than the fix. The scenario says
+   * "the platform's own name"; only the host can say what that is.
+   */
+  platformBrand: string;
 }
 
 /**

@@ -102,6 +102,7 @@ function viewFor({ adapter, stored }: Case, chargeVerifiedAt: string | null): Me
  */
 function guideFor(adapter: PaymentProviderAdapter, proven: boolean) {
   return adapter.setupGuide?.({
+    brandName: 'Plataforma Exemplo',
     webhookUrl: `https://host.example/api/webhooks/payments/acme/${adapter.name}`,
     progress: { configured: {}, connected: true, proven },
   });

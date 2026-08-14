@@ -37,6 +37,58 @@ export function providerExchangeReport(context: string, error: unknown): string 
   ].join('\n');
 }
 
+/** One validation reason, as a provider's `error_messages` array carries it. */
+export interface ProviderRejectionReason {
+  /** The provider's own code, e.g. PagBank's `40002`. */
+  code?: string;
+  /** The provider's own description, in the provider's own language. */
+  description?: string;
+  /** Which request field the reason is about, e.g. `customer.email`. */
+  parameterName?: string;
+}
+
+/**
+ * The provider's validation reasons, read STRUCTURALLY off `options.body`.
+ *
+ * Exported because every host branches on these to turn a rejection into a
+ * sentence the buyer can act on ("that e-mail is the store's own merchant
+ * account", "the CPF was not accepted"), and hosts were re-deriving them the
+ * same WRONG way: by regexing the JSON back out of `error.message`.
+ *
+ * That is not a style difference, it is a defect. An adapter CAPS the message
+ * — PagBank's is `PagBank <status> <statusText>: <text.slice(0, 300)>` —
+ * precisely because the message is matched on and shown, while the full
+ * payload travels separately in `options.body`. So a rejection whose body runs
+ * past the cap parses to NOTHING when read from the message, and every
+ * specific, actionable sentence collapses into the generic refusal — failing
+ * worst exactly when the provider was most talkative about what was wrong.
+ *
+ * `parameter_name` is renamed to `parameterName` on the way out: the wire
+ * spelling is the provider's, and a host branching on it should be reading
+ * this package's vocabulary rather than one vendor's snake_case.
+ *
+ * Answers `[]` for anything that is not a provider rejection carrying a
+ * structured body — never throws, and never guesses.
+ */
+export function providerRejectionReasons(error: unknown): ProviderRejectionReason[] {
+  if (!(error instanceof ProviderRequestError)) return [];
+  const body = error.options.body;
+  if (typeof body !== 'object' || body === null) return [];
+  const reasons = (body as { error_messages?: unknown }).error_messages;
+  if (!Array.isArray(reasons)) return [];
+  return reasons.flatMap((entry) => {
+    if (typeof entry !== 'object' || entry === null) return [];
+    const { code, description, parameter_name: parameterName } = entry as Record<string, unknown>;
+    return [
+      {
+        ...(typeof code === 'string' ? { code } : {}),
+        ...(typeof description === 'string' ? { description } : {}),
+        ...(typeof parameterName === 'string' ? { parameterName } : {}),
+      },
+    ];
+  });
+}
+
 /**
  * True when the provider rejected the merchant's ACCOUNT or credentials
  * rather than this particular request: 401 (token rejected) or 403 (access

@@ -18,7 +18,27 @@ export {
   type PaymentFlowsBEConfig,
 } from './factory';
 export { CHECKOUT_ROUTES } from './route-table';
-export { defaultCheckoutCopyPtBR, type CheckoutCopy } from './copy';
+export type { CheckoutCopy } from './copy';
+/**
+ * THE REFUSAL PIPELINE, reachable by a host at last (FUT-760).
+ *
+ * `checkoutRefusalFor` has always been the library's answer to "a charge
+ * failed — what is the buyer told, with what status, in what order", and that
+ * order is itself a money-safety rule (see `failure.ts`). It was simply never
+ * exported, so every adopting host wrote the pipeline again: future-pay's
+ * `lib/payments/charge-failure.ts` is 352 lines re-deriving this one decision
+ * for decision, and drifted from it — which is exactly the duplication the
+ * payment LOC budget kept measuring without being able to fix.
+ *
+ * Exporting it is what makes that host code deletable rather than merely over
+ * budget.
+ */
+export {
+  checkoutRefusalFor,
+  chargeMismatchRefusal,
+  type CheckoutRefusal,
+  type FailureContext,
+} from './failure';
 export {
   buyerCheckoutConfig,
   usesHostedCheckout,
