@@ -21,9 +21,10 @@ import type { JobsRoute } from "../server/create-api-jobs";
  * must call `start()` on the same instance whose routes report health, and a
  * router that built its own would answer for a runtime nobody started.
  *
- * Auth stays the host's: mount this under whatever guard the deployment's
- * internal probes live behind (future-pay's `/api/internal/*` is answered
- * only machine-to-machine; the reverse proxy 404s it from the internet).
+ * Auth stays the host's: mount it under whatever guard the deployment's
+ * internal probes live behind — a prefix answered only machine-to-machine,
+ * with the reverse proxy refusing it from the internet, is the usual shape.
+ * This package holds zero authorization logic.
  */
 export function jobsRouter(api: { routes: JobsRoute[] }): Hono {
   const app = new Hono();

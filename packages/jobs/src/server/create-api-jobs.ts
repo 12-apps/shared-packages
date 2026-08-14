@@ -1,4 +1,5 @@
-import { listJobs } from "../core/registry";
+import { assertJobsRegistered, listJobs } from "../core/registry";
+import { assertValidRetention } from "../core/retention";
 import {
   configureJobs,
   getJobDriver,
@@ -13,6 +14,7 @@ import {
 } from "../lease/sweep-lease";
 
 import {
+  assertJobsDeclared,
   isWorkerProcess,
   resolveConfig,
   type JobsServerConfig,
@@ -59,16 +61,23 @@ import { resolveDriver } from "./resolve-driver";
  * with no Redis container. That is the default a fresh host is supposed to
  * boot in.
  *
+ * ## `jobs` is refused when it names nothing
+ *
+ * "Fail closed, never fail loud" is about the QUEUE. It does not extend to the
+ * wiring: `jobs: []`, or a thunk that registers nothing because its import was
+ * dropped, produces a process that resolves a driver, consumes no queue,
+ * installs no schedule and answers `/health` with `ok`. Every scheduled job in
+ * the deployment stops and nothing reports it. So an empty `jobs` throws — at
+ * the factory for the array form, and after registration for the thunk form.
+ *
  * ## The environment is read at `start()`, not at the factory
  *
- * future-pay's `bootstrapJobs()` read the whole matrix — `JOBS_DRIVER`,
- * `REDIS_URL`, `NODE_ENV`, `JOBS_WORKER`, `JOBS_QUEUE_PREFIX` — at the moment
- * it ran, and the recommended host shape is factory-at-module-scope +
- * `await jobsApi.start()` at process start. Reading part of the matrix at
- * factory time would honour a late-arriving `JOBS_DRIVER` and silently
- * ignore a late-arriving `REDIS_URL` (a host whose config module loads after
- * the module that built the api), so the factory reads nothing and `start()`
- * resolves everything at one single moment.
+ * The recommended host shape is factory-at-module-scope + `await
+ * jobsApi.start()` at process start. Reading part of the matrix at factory
+ * time would honour a late-arriving `JOBS_DRIVER` and silently ignore a
+ * late-arriving `REDIS_URL` (a host whose config module loads after the module
+ * that built the api), so the factory reads nothing and `start()` resolves
+ * everything at one single moment.
  */
 
 /** What a route handler answers; the host maps it onto its response type. */
@@ -77,7 +86,7 @@ export interface JobsResponse {
   body: unknown;
 }
 
-/** A framework-neutral route descriptor, the same shape report-builder mounts. */
+/** A framework-neutral route descriptor. */
 export interface JobsRoute {
   method: "GET";
   /** Path relative to the host's jobs mount, e.g. `/health`. */
@@ -178,9 +187,8 @@ function bindSweepLease(db: SweepLeaseDbProvider | undefined): WithSweepLease {
 /** What one `start()`/`stop()` cycle has actually done in this process. */
 interface RuntimeState {
   /**
-   * `start()` has been ENTERED — the idempotency latch, exactly future-pay's
-   * `bootstrapped` flag: a second call is a no-op, and a start that threw is
-   * not retried by calling it again.
+   * `start()` has been ENTERED — the idempotency latch: a second call is a
+   * no-op, and a start that threw is not retried by calling it again.
    */
   starting: boolean;
   /**
@@ -282,9 +290,11 @@ async function startRuntime(
   if (stopped()) return;
   state.deliberatelyOff = deliberatelyOff;
   if (!driver) {
-    // Fail closed, by design: "no driver" is a completed start (future-pay's
-    // bootstrapJobs returned normally here too). Health still reports it —
-    // the driver check is null — so the probe sees what the log line said.
+    // Fail closed, by design: "no driver" is a completed start. Health still
+    // reports it — the driver check is null — so the probe sees what the log
+    // line said. Registration is deliberately skipped: a process with jobs
+    // disabled must not install seams whose enqueues would all report
+    // `no-driver`.
     state.started = true;
     return;
   }
@@ -295,6 +305,11 @@ async function startRuntime(
   // whatever is registered — a worker cannot consume a job it has never heard
   // of, and a producer cannot enqueue one.
   await registerJobs(config.jobs);
+  // The thunk form's half of the empty-`jobs` refusal (the array form was
+  // refused at the factory). It runs for BOTH roles: a producer that
+  // registered nothing enqueues nothing, which is the same silent stop as a
+  // worker that consumes nothing.
+  assertJobsRegistered("createApiJobs().start()");
   if (stopped()) return;
 
   if (!worker) {
@@ -315,6 +330,16 @@ async function startRuntime(
 }
 
 export function createApiJobs(config: JobsServerConfig): JobsApi {
+  // At ASSEMBLY, before anything else: a `jobs` that names nothing is a wiring
+  // error, and the factory is where the stack trace still points at the host
+  // module that wrote it.
+  assertJobsDeclared(config?.jobs);
+  // The same class of failure, one knob over: a retention window that is NaN
+  // or negative does not shrink retention, it stops bounding the backend at
+  // all — silently, weeks before anyone notices. The driver re-checks it, for
+  // a host that builds one directly off `@12-apps/jobs/bullmq`.
+  assertValidRetention(config?.retention);
+
   const state: RuntimeState = {
     starting: false,
     started: false,
@@ -340,9 +365,8 @@ export function createApiJobs(config: JobsServerConfig): JobsApi {
 
     async start(): Promise<void> {
       // The latch, not the success flag: a second call is a no-op, and a
-      // start that threw is not silently retried — future-pay's bootstrapJobs
-      // latched `bootstrapped` the same way. Success is `startRuntime`'s to
-      // declare, as its last statement.
+      // start that threw is not silently retried. Success is `startRuntime`'s
+      // to declare, as its last statement.
       if (state.starting) return;
       state.starting = true;
       // The whole env matrix is read HERE, at the same moment the driver
