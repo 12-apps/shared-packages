@@ -19,7 +19,7 @@ export {
   runWithActor,
   runWithActorScope,
   setActor,
-  useActorContextKey,
+  declareActorContextKey,
   type ActorAttribution,
   type ActorAttributionSnapshot,
   type ActorContext,

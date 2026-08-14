@@ -92,7 +92,7 @@ export interface ActorContext extends ActorAttributionSnapshot {
  * setting: a host that already has an in-house actor-context module keyed to
  * something else, and dozens of `setActor(...)` call sites importing it, needs
  * BOTH modules on ONE store. It declares that with
- * {@link useActorContextKey}.
+ * {@link declareActorContextKey}.
  *
  * What happens if the two disagree is the reason this is worth a knob rather
  * than a fork: the writer reads a store nothing ever stamped, so every entry
@@ -126,8 +126,16 @@ const storeKey: { declared: string | symbol; created?: string | symbol } = {
  *
  * Passing the key already in force is a no-op, so a module that declares it
  * defensively at import time is safe to load twice.
+ *
+ * NAMED `declare…` RATHER THAN `use…`, and that is not a style preference.
+ * `react-hooks/rules-of-hooks` keys off the identifier alone: a `use`-prefixed
+ * call at module scope is reported as a hook called outside a component, in ANY
+ * file a React-aware config lints. This function belongs at module scope — that
+ * is the only place it can run before a store exists — and this package ships a
+ * React entry, so its adopters lint with that rule on. The old name cost the
+ * first adopter a red `--max-warnings 0` lane for a call that was correct.
  */
-export function useActorContextKey(key: string | symbol): void {
+export function declareActorContextKey(key: string | symbol): void {
   if (typeof key !== 'string' && typeof key !== 'symbol') {
     throw new AuditConfigError('actorContextKey', 'must be a string or a symbol.');
   }

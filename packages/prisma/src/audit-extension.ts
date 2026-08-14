@@ -56,7 +56,7 @@ export interface AuditStampConfig {
  * A module-level declaration rather than a parameter on `getPrismaClient()`
  * because that function is called bare from hundreds of call sites in an
  * adopting host, and threading config through all of them would be a migration
- * out of proportion to the fix. Same shape as `useActorContextKey` in
+ * out of proportion to the fix. Same shape as `declareActorContextKey` in
  * `@12-apps/audit`, for the same reason.
  */
 const declared: { config: AuditStampConfig } = { config: { trackedModels: [] } };

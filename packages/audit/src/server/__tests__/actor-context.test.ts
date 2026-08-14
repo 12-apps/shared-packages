@@ -15,7 +15,7 @@ import {
   runWithActor,
   runWithActorScope,
   setActor,
-  useActorContextKey,
+  declareActorContextKey,
 } from '../actor-context';
 
 /**
@@ -210,7 +210,7 @@ describe('scope isolation', () => {
     // WHERE the store lives is a cross-package contract, and it is CONFIG: a
     // host with an in-house actor-context module and dozens of `setActor(...)`
     // call sites importing it needs both modules on ONE store, and declares
-    // that with `useActorContextKey`. A key this package chose for that host
+    // that with `declareActorContextKey`. A key this package chose for that host
     // would be the same host vocabulary compiled in that the rest of this
     // release removes.
     //
@@ -240,9 +240,9 @@ describe('scope isolation', () => {
     // DIFFERENT key after the store was created is refused: contexts already
     // captured against the old instance keep flowing to it while every later
     // read goes elsewhere — the same silent fork, made intermittent.
-    expect(() => useActorContextKey(DEFAULT_ACTOR_STORE_KEY)).not.toThrow();
-    expect(() => useActorContextKey('__someHostActorStore')).toThrow(AuditConfigError);
-    expect(() => useActorContextKey('')).toThrow(AuditConfigError);
+    expect(() => declareActorContextKey(DEFAULT_ACTOR_STORE_KEY)).not.toThrow();
+    expect(() => declareActorContextKey('__someHostActorStore')).toThrow(AuditConfigError);
+    expect(() => declareActorContextKey('')).toThrow(AuditConfigError);
     // …and the store did not move.
     expect(actorContextKey()).toBe(DEFAULT_ACTOR_STORE_KEY);
   });
