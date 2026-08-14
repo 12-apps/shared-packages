@@ -14,7 +14,7 @@ import type {
   BuyerField,
   BuyerInfo,
   CheckoutCartView,
-  ComandaCheckout,
+  SettlementCheckout,
   CreateOrderRequest,
   CreateOrderResult,
 } from "../index";
@@ -83,7 +83,7 @@ function payableOf(view: PayableView, method: CreateOrderRequest["method"]) {
 /** Everything a story may vary about the HOST, as opposed to the store. */
 export interface StoryHost {
   cart?: Partial<CheckoutCartView>;
-  comanda?: ComandaCheckout | null;
+  settlement?: SettlementCheckout | null;
   /** The host's veto + remedy. Omitted ⇒ payable, no remedy. */
   availability?: CheckoutAvailability;
   /** What the buyer form opens pre-filled with. */
@@ -159,7 +159,7 @@ export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
     useScope: () => ({ tenantSlug: host.tenantSlug ?? "loja-1" }),
     useCart: () => cartOf(amountCents, host.cart),
     useBuyerDefaults: () => ({ buyer: host.buyer, taxIdOnFile: host.taxIdOnFile ?? false }),
-    useComanda: () => host.comanda ?? null,
+    useSettlement: () => host.settlement ?? null,
     components: host.components,
     copy: host.copy,
     confirmation: host.confirmationExtra ? { extra: host.confirmationExtra } : undefined,

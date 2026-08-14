@@ -31,7 +31,7 @@ import type {
   ChargeOutcome,
   CheckoutOrder,
   CheckoutProviderConfig,
-  ComandaCheckout,
+  SettlementCheckout,
   CreateOrderRequest,
   CreateOrderResult,
   OrderStatus,
@@ -100,8 +100,8 @@ export interface PaymentFlowsConfig {
   useCart(): CheckoutCartView;
   /** The buyer's saved details, and whether a CPF is already on file. */
   useBuyerDefaults?(): { buyer?: BuyerInfo; taxIdOnFile?: boolean; pending?: boolean };
-  /** Present ⇒ this checkout settles a comanda rather than the cart. */
-  useComanda?(): ComandaCheckout | null;
+  /** Present ⇒ this checkout settles a settlement rather than the cart. */
+  useSettlement?(): SettlementCheckout | null;
 
   /** Design-system slots, filled ONCE instead of per screen. */
   components?: Partial<CheckoutComponents>;
@@ -187,7 +187,7 @@ export interface CheckoutConfigState {
 /** What `createPaymentFlows` returns. */
 export interface PaymentFlows {
   /** THE mount: a complete buyer checkout in one line. */
-  Checkout: ComponentType<{ comanda?: ComandaCheckout | null }>;
+  Checkout: ComponentType<{ settlement?: SettlementCheckout | null }>;
   /** Slots + transport + scope + the fetched config, for a nesting host. */
   Provider: ComponentType<{ children: ReactNode; config?: CheckoutProviderConfig | null }>;
   screens: CheckoutScreens;
