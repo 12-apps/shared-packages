@@ -18,15 +18,15 @@ function snapshotWith(decision: Partial<EntitlementDecision<string>>): Entitleme
   return {
     tenantId: 't1',
     status: 'active',
-    planKey: 'free',
+    planKey: 'hobby',
     features: {
-      audit: {
-        feature: 'audit',
+      'forecast.history': {
+        feature: 'forecast.history',
         enabled: false,
         reason: 'not-entitled',
         policy: 'hide',
         limit: null,
-        requiredPlan: 'pro',
+        requiredPlan: 'network',
         ...decision,
       },
     },
@@ -37,7 +37,7 @@ function ThePage(): JSX.Element {
   return <div data-testid="the-page">conteúdo</div>;
 }
 
-function renderGated(decision: Partial<EntitlementDecision<string>>, feature = 'audit') {
+function renderGated(decision: Partial<EntitlementDecision<string>>, feature = 'forecast.history') {
   const Gated = withEntitlement(feature, ThePage);
   return render(
     <EntitlementsProvider snapshot={snapshotWith(decision)}>
@@ -72,7 +72,7 @@ describe('withEntitlement', () => {
     renderGated({ enabled: false, reason: 'not-entitled' });
     await waitFor(() => expect(screen.queryByTestId('the-page')).toBeNull());
     const lock = screen.getByTestId('page-locked');
-    expect(lock.getAttribute('data-feature')).toBe('audit');
+    expect(lock.getAttribute('data-feature')).toBe('forecast.history');
     expect(screen.getByText(/não incluído no seu plano/i)).toBeDefined();
   });
 
@@ -85,9 +85,9 @@ describe('withEntitlement', () => {
     const raised: UpsellPrompt[] = [];
     const unsubscribe = subscribeToUpsell((prompt) => raised.push(prompt));
     try {
-      renderGated({ enabled: false, reason: 'not-entitled', requiredPlan: 'pro' });
+      renderGated({ enabled: false, reason: 'not-entitled', requiredPlan: 'network' });
       fireEvent.click(screen.getByTestId('page-locked-upsell'));
-      expect(raised).toEqual([{ feature: 'audit', requiredPlan: 'pro', reason: 'not-entitled' }]);
+      expect(raised).toEqual([{ feature: 'forecast.history', requiredPlan: 'network', reason: 'not-entitled' }]);
     } finally {
       unsubscribe();
     }

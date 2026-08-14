@@ -191,6 +191,16 @@ async function checkQuotaOne<F extends string>(
  * Build the entitlements engine — a module singleton, like `@12-apps/rbac`'s
  * `createRbac`. The only app-specific parts are the two ports.
  *
+ * Throws for an EMPTY feature catalog, at the point the hazard lives. An engine
+ * over `list: []` answers `not-supported` for every key, and `withEntitlement`
+ * renders `not-supported` UNLOCKED on purpose (a stale client must never
+ * paywall a page the tenant owns) — so "declare no features" opens every
+ * plan-gated page instead of closing one. `defineFeatures` refuses to BUILD an
+ * empty registry, which closes the ordinary path; this closes the other, since
+ * `FeatureRegistry` is a published interface a host can implement itself. The
+ * backend surface's `assertApiEntitlementsConfig` covers neither — this factory
+ * is exported from the package ROOT and never runs it.
+ *
  * @example
  * export const entitlements = createEntitlements({
  *   features: FEATURES,
@@ -203,6 +213,14 @@ async function checkQuotaOne<F extends string>(
 export function createEntitlements<F extends string, K extends string = string>(
   config: EntitlementsConfig<F, K>,
 ): EntitlementsEngine<F> {
+  if (config.features.list.length === 0) {
+    throw new Error(
+      'createEntitlements: `features` declares no feature keys. An empty catalog does ' +
+        'not gate anything — every key resolves `not-supported`, which the page gate ' +
+        'renders UNLOCKED, so it opens every plan-gated page instead of closing one. ' +
+        'Build the catalog with defineFeatures().',
+    );
+  }
   const prefix = config.cacheKeyPrefix ?? 'entitlements';
   const ctx: EngineCtx<F> = {
     features: config.features,

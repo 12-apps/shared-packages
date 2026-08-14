@@ -20,7 +20,7 @@
  * What a plan grants for one feature.
  *
  * - `boolean` — a plain on/off capability.
- * - `number`  — a quota (max stock locations, max members, MCP calls/month).
+ * - `number`  — a quota (included seats, saved projects, API calls a month).
  *               `0` is a real value meaning "entitled to none", i.e. OFF.
  * - `'unlimited'` — an uncapped quota. Kept as a sentinel rather than
  *               `Infinity` so a map survives `JSON.stringify` on the wire.
@@ -69,9 +69,9 @@ export type LifecycleStatus = 'active' | 'restricted' | 'suspended';
  *
  * - `hide`     — the surface disappears; rows are untouched (e.g. audit log).
  * - `readonly` — existing rows stay visible and usable, `create`/`update`
- *                refuse (e.g. stock locations).
+ *                refuse (e.g. included seats, once the ceiling shrinks).
  * - `disable`  — existing rows are deactivated but retained, and reactivate on
- *                re-entitlement (e.g. MCP connections).
+ *                re-entitlement (e.g. outbound webhooks).
  */
 export type RevokePolicy = 'hide' | 'readonly' | 'disable';
 

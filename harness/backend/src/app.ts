@@ -239,9 +239,9 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
  * prompt.
  */
 function mountEntitlementDemo(app: Hono, hosts: Hosts): void {
-  app.get('/api/admin/:tenantSlug/audit-demo', async (c) => {
+  app.get('/api/admin/:tenantSlug/jury-demo', async (c) => {
     try {
-      await hosts.entitlements.requireEntitlement(TENANT, 'audit');
+      await hosts.entitlements.requireEntitlement(TENANT, 'jury.deliberation');
       return c.json({ entries: [] });
     } catch (error) {
       if (!isEntitlementDenial(error)) throw error;

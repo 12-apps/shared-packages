@@ -10,7 +10,9 @@
  * `@12-apps/entitlements/hono` (or forty lines of any other framework).
  */
 export {
+  assertApiEntitlementsConfig,
   createApiEntitlements,
+  EntitlementsConfigError,
   type ApiEntitlements,
   type ApiEntitlementsConfig,
   type EntitlementsActor,
@@ -20,6 +22,17 @@ export {
   type UsageRegistryLike,
 } from './create-api-entitlements';
 export {
+  definePermissionContribution,
+  ENTITLEMENTS_PERMISSIONS,
+  PLAN_REQUEST_PERMISSION,
+  type EntitlementPermissionContribution,
+  type EntitlementPermissionKind,
+  type EntitlementPermissionLabels,
+  type EntitlementPermissionOf,
+  type EntitlementPermissionSpec,
+  type EntitlementsPermission,
+} from './contribution';
+export {
   entitlementDenialResponse,
   isEntitlementDenial,
   PAYMENT_REQUIRED_MESSAGE,
@@ -27,7 +40,6 @@ export {
 } from './wire';
 export {
   buildTenantPlanView,
-  formatPrice,
   type PricingRow,
   type QuotaUsageView,
   type TenantFeatureView,

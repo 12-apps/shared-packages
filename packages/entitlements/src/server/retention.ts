@@ -5,10 +5,30 @@
  *
  * ## "Downgrade never deletes", made mechanical
  *
- * A tenant who spent a year on Pro accumulated 90 days of audit history they
- * were entitled to keep. Dropping to Basic (30 days) must not vaporize the
- * other 60 the next time the sweep runs — that would be the pruning-job
- * version of a downgrade deleting data.
+ * A tenant who spent a year on a tier granting a 90-day window accumulated 90
+ * days of audit history they were entitled to keep. Moving to a tier granting
+ * 30 must not vaporize the other 60 the next time the sweep runs — that would
+ * be the pruning-job version of a downgrade deleting data.
+ *
+ * ## A window of zero is not a window
+ *
+ * `retentionWindowDays` answers `null` — keep everything — for any ceiling
+ * that is not a positive number. `prunableRange` mirrors it, and that symmetry
+ * is the module's second invariant: read and write must agree about what a bad
+ * window MEANS, or the read's fail-safe answer arrives at the write as an
+ * instruction to delete everything.
+ *
+ * `0` is the sharp case. The cutoff would be `now`, every watermark's `since`
+ * lies in the past, so `cutoff > since` passes and the range handed back is
+ * the tenant's entire history. A negative window puts the cutoff in the
+ * FUTURE, which is worse; `NaN` and `Infinity` answered `null` only by
+ * accident of comparing an Invalid Date. And the check has to run before the
+ * db access, because the watermark is written before the cutoff is computed —
+ * so a bad window used to persist ITSELF, recorded as the tenant's current
+ * window, even on the calls that returned nothing. The next sweep then found
+ * a window that had not "changed", kept the stored `since`, and pruned from it.
+ *
+ * The host-side corollary: never write `retentionWindowDays(...) ?? 0`.
  *
  * The `RetentionWatermark` row (this package's own Prisma model — see
  * `prisma/entitlements.prisma`) makes the rule mechanical: it records when the
@@ -81,6 +101,12 @@ export interface Retention {
    * `windowDays` after a window change nothing has both been written under
    * the current window AND aged past it.
    *
+   * Also `null`, and without touching the watermark, when `windowDays` is not
+   * a positive finite number. That is the same answer `retentionWindowDays`
+   * gives for such a ceiling, and the reason a host must never write
+   * `retentionWindowDays(...) ?? 0`: `0` is a full-history purge, not "prune
+   * nothing".
+   *
    * Reads AND advances the watermark: a changed window (either direction)
    * resets `since` to now.
    */
@@ -94,6 +120,16 @@ export interface Retention {
 
 export function createRetention<F extends string>(config: RetentionConfig<F>): Retention {
   const { engine, features, retentionFeatures } = config;
+  // An empty list is refused rather than read as "prune nothing": every call
+  // would throw, so a sweep wired against it fails on its first tenant — but
+  // only in whatever environment runs the sweep, which may be none of them
+  // until production.
+  if (retentionFeatures.length === 0) {
+    throw new Error(
+      'createRetention: `retentionFeatures` is empty. Name the quota keys whose ceiling ' +
+        'is a window of days, or do not build a retention sweep.',
+    );
+  }
 
   return {
     async retentionWindowDays(tenantId, feature) {
@@ -109,6 +145,19 @@ export function createRetention<F extends string>(config: RetentionConfig<F>): R
     },
 
     async prunableRange(tenantId, feature, windowDays, now) {
+      // Gate 1, mirroring the read: the key must be a declared retention
+      // quota. A throw, because pruning by a count of rows is a programming
+      // error rather than a runtime condition.
+      if (!retentionFeatures.includes(feature)) {
+        throw new Error(`"${feature}" is not a retention quota — nothing should prune by it.`);
+      }
+      // Gate 2, mirroring the read's non-positive-limit branch: `null`, and
+      // BEFORE any db access, so a bad window cannot persist itself as the
+      // tenant's current one. See the header — `0` here is a full purge.
+      if (!Number.isFinite(windowDays) || windowDays <= 0) return null;
+      // The read's other two gates (`features.has`, the entitlement lookup)
+      // are deliberately NOT mirrored: the caller already applied both to get
+      // this window, and re-resolving costs an engine round-trip per tenant.
       const db = await config.getDb();
       const key = { clientId: tenantId, feature };
       const existing = await db.retentionWatermark.findUnique({

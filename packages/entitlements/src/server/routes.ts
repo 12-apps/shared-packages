@@ -18,12 +18,21 @@ export interface EntitlementsActor {
   /** The host's user id, kept opaque. Empty string reads as "no user row". */
   userId?: string | null;
   /**
-   * May this caller file a plan-change request? A WRITE that puts the store
-   * on a sales call is an admin decision; the read routes are deliberately
-   * open to every staff member — explaining a denial to whoever hit it is the
-   * whole point of a plan screen.
+   * Every permission id this caller holds, resolved by the host's RBAC.
+   *
+   * REQUIRED, and a list rather than a boolean: the write on this surface is
+   * gated by an id this package OWNS and exports (`ENTITLEMENTS_PERMISSIONS`),
+   * so it can be granted, revoked, audited and shown in a role editor like any
+   * other. It used to be `canRequestPlanChange?: boolean`, which meant every
+   * host spelled this package's own decision in a permission of its own — and
+   * an omitted field silently refused every ask with no way to tell that from
+   * a genuine denial.
+   *
+   * The READ routes take no permission at all: explaining a denial to whoever
+   * hit it is the whole point of a plan screen. Only the ask, which puts the
+   * tenant on a sales call, is gated.
    */
-  canRequestPlanChange?: boolean;
+  permissions: readonly string[];
 }
 
 /** What a descriptor receives from the adapter. */
@@ -40,17 +49,17 @@ export interface EntitlementsRoute {
 }
 
 /**
- * The host's plan-change lead store. The model behind it (future-pay's
- * `PlanChangeRequest`) is a BILLING table and stays in the host — this port
- * is the whole coupling. Create must be idempotent: a repeat press returns
- * the open request with `created: false`, because from where the store is
- * standing "we already have your request" is simply true.
+ * The host's plan-change lead store. The model behind it is a BILLING table
+ * and stays in the host — this port is the whole coupling. Create must be
+ * idempotent: a repeat press returns the open request with `created: false`,
+ * because from where the tenant is standing "we already have your request" is
+ * simply true.
  */
 export interface PlanChangeRequestPort {
   getOpen(tenantId: string): Promise<OpenPlanRequest | null>;
   /**
-   * Returns `{ id, status }` only — the write's contract (what future-pay's
-   * MCP response schema declares). The read route is where the details live.
+   * Returns `{ id, status }` only — the write's contract. The read route next
+   * door is where the details live.
    */
   create(input: {
     tenantId: string;
@@ -110,11 +119,10 @@ function parseRequestBody(raw: unknown, isKnownPlan: (key: string) => boolean): 
 }
 
 /**
- * The SUCCESS envelope: every 2xx body ships as `{ data: … }`, matching both
- * the report-builder reference (`ok()` in its descriptors) and future-pay's
- * documented `/api/admin/**` invariant — its client unwraps `{ data }`, and
- * its MCP response schemas declare it. Denials and refusals are NEVER
- * wrapped: they mirror the host's error shape byte for byte.
+ * The SUCCESS envelope: every 2xx body ships as `{ data: … }`, matching the
+ * report-builder reference (`ok()` in its descriptors). The packaged react
+ * half unwraps it. Denials and refusals are NEVER wrapped: they are plain
+ * `{ error }` bodies.
  */
 const ok = (data: Record<string, unknown>): WireResponse => ({ status: 200, body: { data } });
 
@@ -132,6 +140,7 @@ function askRoute(
   service: PlanService,
   leads: PlanChangeRequestPort,
   isKnownPlan: (key: string) => boolean,
+  requestPermission: string,
 ): EntitlementsRoute {
   return {
     // "I want a bigger plan." Writes a LEAD, never a plan: moving a tenant
@@ -142,7 +151,7 @@ function askRoute(
     path: '/plan/request',
     handle: ({ actor, body }) =>
       answering(async () => {
-        if (actor.canRequestPlanChange !== true) {
+        if (!actor.permissions.includes(requestPermission)) {
           return {
             status: 403,
             body: { error: 'Sem permissão para solicitar mudança de plano.' },
@@ -153,7 +162,7 @@ function askRoute(
           return { status: 400, body: { error: 'Pedido inválido.' } };
         }
         // From the engine, not the caller: a client that could name its own
-        // current tier could file a lead saying the store is on a tier it is
+        // current tier could file a lead saying the tenant is on a tier it is
         // not.
         const view = await service.getPlanView(actor.tenantId);
         const userId = actor.userId ?? null;
@@ -180,6 +189,8 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
   service: PlanService;
   leads: PlanChangeRequestPort | null;
   isKnownPlan: (key: string) => boolean;
+  /** The permission id `POST /plan/request` requires of the actor. */
+  requestPermission: string;
 }): EntitlementsRoute[] {
   const { engine, service, leads } = deps;
 
@@ -193,10 +204,10 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
         answering(async () => ok({ snapshot: await engine.toSnapshot(actor.tenantId) })),
     },
     {
-      // What plan this store is on. READ-ONLY, staff-wide, and it deliberately
-      // never 402s: it is the screen a store reads BECAUSE something was
-      // denied, so gating it would hide the explanation exactly when it is
-      // needed.
+      // What plan this tenant is on. READ-ONLY, permissionless, and it
+      // deliberately never 402s: it is the screen somebody opens BECAUSE
+      // something was denied, so gating it would hide the explanation exactly
+      // when it is needed.
       method: 'GET',
       path: '/plan',
       handle: ({ actor }) =>
@@ -207,15 +218,15 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
   if (leads !== null) {
     routes.push(
       {
-        // Is an ask already in flight? Staff-wide like the plan read: a
-        // waiter who can see that a feature is withheld should also see that
-        // somebody already asked, rather than being invited to ask again.
+        // Is an ask already in flight? Staff-wide like the plan read: somebody
+        // who can see that a feature is withheld should also see that a
+        // colleague already asked, rather than being invited to ask again.
         method: 'GET',
         path: '/plan/request',
         handle: ({ actor }) =>
           answering(async () => ok({ request: await leads.getOpen(actor.tenantId) })),
       },
-      askRoute(service, leads, deps.isKnownPlan),
+      askRoute(service, leads, deps.isKnownPlan, deps.requestPermission),
     );
   }
 

@@ -1,10 +1,10 @@
 /**
  * The tenant's own view of their plan.
  *
- * Until a screen like this exists, a store can only learn what plan it is on
- * by walking into walls: a disabled toggle saying "Não incluído no seu plano"
- * on one screen, an upsell line on another. Nothing says which tier they are
- * on, what else it includes, or what would change if they moved.
+ * Until a screen like this exists, a tenant can only learn what plan they are
+ * on by walking into walls: a disabled toggle saying "Não incluído no seu
+ * plano" on one screen, an upsell line on another. Nothing says which tier
+ * they are on, what else it includes, or what would change if they moved.
  *
  * The two distinctions this view exists to preserve:
  *
@@ -16,8 +16,10 @@
  *      there is a straightforward lie.
  *
  * Pricing arrives as DISPLAY DATA (`{ key, name, priceCents }` rows the host's
- * billing computed). This module never stores or computes money — it words a
- * number it was handed, which is presentation, not billing.
+ * billing computed) and is WORDED by a `priceLabel` the host supplies. This
+ * module never stores, computes or formats money: it used to ship a BRL
+ * formatter as the default, which is a currency — a fact about the host's
+ * product, not about entitlements — and every silent host inherited it.
  */
 import type { EntitlementDecision } from '../core/types';
 import type { TenantFeatureReason, TenantPlanView } from '../plan-wire';
@@ -45,13 +47,15 @@ const NOTE: Record<TenantFeatureReason, string> = {
   // Their own switch. Saying "not included" here would send them to buy a tier
   // that changes nothing. Deliberately does NOT name a screen — the precise
   // destination is a route, so the SPA that owns the routes names it, keyed
-  // off `reason`.
-  'disabled-by-tenant': 'Desligado por você nas configurações da loja',
+  // off `reason` — and deliberately does not name what the tenant IS, because
+  // this package does not know whether its tenants are shops, clinics or
+  // observatories.
+  'disabled-by-tenant': 'Desligado por você nas configurações',
   restricted: 'Suspenso enquanto houver pendência financeira',
   suspended: 'Suspenso — fale com o suporte',
 };
 
-/** A row worth showing a store at all. */
+/** A row worth showing a tenant at all. */
 function isVisible(decision: EntitlementDecision<string>): boolean {
   return decision.reason !== 'not-supported';
 }
@@ -67,12 +71,12 @@ export interface QuotaUsageView {
 }
 
 /**
- * Is this row a quota the store has OUTGROWN — entitled, but holding more than
- * the ceiling (grandfathered rows, or a downgrade)?
+ * Is this row a quota the tenant has OUTGROWN — entitled, but holding more
+ * than the ceiling (grandfathered rows, or a downgrade)?
  *
  * A distinct state on purpose: the feature IS in their plan, so the
  * `not-entitled` wording would be false, and the `enabled` wording would hide
- * that creates refuse. Only `used > limit` counts — a store exactly AT its
+ * that creates refuse. Only `used > limit` counts — a tenant exactly AT its
  * ceiling is simply full, and says so through `used`/`limit`, not a banner.
  */
 function isOverQuota(
@@ -98,7 +102,7 @@ function overQuotaNote(
   usage: QuotaUsageView,
   pricing: readonly { key: string; name: string }[],
 ): string {
-  const kept = `Seu plano inclui ${limit} e sua loja tem ${usage.used}. Todos continuam ativos`;
+  const kept = `Seu plano inclui ${limit} e você tem ${usage.used}. Todos continuam ativos`;
   const nextLabel = labelFor(usage.nextPlan, pricing);
   if (nextLabel === null) return `${kept}.`;
   return `${kept} — para criar novos, assine o ${nextLabel}.`;
@@ -107,7 +111,7 @@ function overQuotaNote(
 /**
  * The tier that would fix this, or `null` when upgrading would not.
  *
- * Only `not-entitled` is a plan problem. A feature the store turned off, or
+ * Only `not-entitled` is a plan problem. A feature the tenant turned off, or
  * one suspended for non-payment, is not fixed by spending more — and the
  * engine already says so by returning `requiredPlan: null` for those. This
  * narrows it further rather than trusting that, because a wrong upsell is the
@@ -128,7 +132,7 @@ function labelFor(
 }
 
 /**
- * Assemble the store's view.
+ * Assemble the tenant's view.
  *
  * Pure: it takes decisions the engine already resolved rather than resolving
  * anything itself, so the screen cannot disagree with the gate — and so this
@@ -140,13 +144,16 @@ export function buildTenantPlanView(
   pricing: readonly PricingRow[],
   describe: (feature: string) => string | null,
   /** Live usage per quota feature, when the caller measured it. */
-  usage: Readonly<Record<string, QuotaUsageView>> = {},
+  usage: Readonly<Record<string, QuotaUsageView>>,
   /**
-   * How a price in cents reads on the wire. Defaults to {@link formatPrice}
-   * (BRL) — the injection point for a host in another currency, since the
-   * package words money it is handed but must not dictate whose money it is.
+   * How a price in cents reads on the wire.
+   *
+   * REQUIRED, and the reason this parameter exists at all: it used to default
+   * to a BRL formatter that lived in this file, so the package decided the
+   * host's currency for it. A number is presentation; WHOSE money it is, is
+   * not this package's to say.
    */
-  priceLabel: (priceCents: number | null) => string | null = formatPrice,
+  priceLabel: (priceCents: number | null) => string | null,
 ): TenantPlanView {
   const priced = pricing.find((plan) => plan.key === planKey) ?? null;
 
@@ -155,7 +162,7 @@ export function buildTenantPlanView(
     .map((decision) => {
       const quota = usage[decision.feature];
       // Over-quota is the one state where the upsell hangs off an ENABLED row:
-      // the plan includes the feature, the store outgrew the ceiling, and the
+      // the plan includes the feature, the tenant outgrew the ceiling, and the
       // honest remedy is the tier that raises it.
       const over = isOverQuota(decision, quota);
       const requiredPlan = over ? quota.nextPlan : upsellFor(decision);
@@ -175,8 +182,9 @@ export function buildTenantPlanView(
         requiredPlanLabel: labelFor(requiredPlan, pricing),
       };
     })
-    // What they HAVE first, then what they do not — a store reading this wants
-    // "here is your plan", not a list of denials with the good news buried.
+    // What they HAVE first, then what they do not — a tenant reading this
+    // wants "here is your plan", not a list of denials with the good news
+    // buried.
     .sort((a, b) => {
       if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
       return a.feature.localeCompare(b.feature);
@@ -192,9 +200,3 @@ export function buildTenantPlanView(
   };
 }
 
-/** `R$ 59,00` — the price as a store expects to read it, or `null` if unpriced. */
-export function formatPrice(priceCents: number | null): string | null {
-  if (priceCents === null) return null;
-  if (priceCents === 0) return 'Grátis';
-  return `R$ ${(priceCents / 100).toFixed(2).replace('.', ',')}`;
-}

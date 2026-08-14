@@ -6,25 +6,25 @@ import { FEATURES, PLANS } from './fixtures';
 
 describe('definePlans', () => {
   it('flattens extends chains into a single map', () => {
-    const pro = PLANS.get('pro').entitlements;
-    // inherited from basic, through plus
-    expect(pro['orders.read']).toBe(true);
-    // inherited from plus
-    expect(pro.mcp).toBe(true);
+    const network = PLANS.get('network').entitlements;
+    // inherited from hobby, through station
+    expect(network['readings.read']).toBe(true);
+    // inherited from station
+    expect(network['alerts.webhook']).toBe(true);
     // own
-    expect(pro.audit).toBe(true);
+    expect(network['forecast.history']).toBe(true);
   });
 
   it('lets a richer tier override an inherited value in either direction', () => {
-    expect(PLANS.get('basic').entitlements['stock.locations']).toBe(1);
-    expect(PLANS.get('plus').entitlements['stock.locations']).toBe(5);
-    expect(PLANS.get('pro').entitlements['stock.locations']).toBe('unlimited');
+    expect(PLANS.get('hobby').entitlements['stations.online']).toBe(1);
+    expect(PLANS.get('station').entitlements['stations.online']).toBe(5);
+    expect(PLANS.get('network').entitlements['stations.online']).toBe('unlimited');
 
     const plans = definePlans(FEATURES, {
-      a: { entitlements: { mcp: true } },
-      b: { extends: 'a', entitlements: { mcp: false } },
+      a: { entitlements: { 'alerts.webhook': true } },
+      b: { extends: 'a', entitlements: { 'alerts.webhook': false } },
     } as const);
-    expect(plans.get('b').entitlements.mcp).toBe(false);
+    expect(plans.get('b').entitlements['alerts.webhook']).toBe(false);
   });
 
   it('rejects a plan referencing an undeclared feature, naming the plan', () => {
@@ -42,16 +42,16 @@ describe('definePlans', () => {
     // at boot, where the catalog is authored.
     expect(() =>
       definePlans(FEATURES, {
-        oops: { entitlements: { 'stock.locations': true } },
+        oops: { entitlements: { 'stations.online': true } },
       } as const),
-    ).toThrow(/quota feature "stock.locations" the boolean true/);
+    ).toThrow(/quota feature "stations.online" the boolean true/);
   });
 
   it('still accepts a number or unlimited on a quota feature', () => {
     expect(() =>
       definePlans(FEATURES, {
-        ok: { entitlements: { 'stock.locations': 0 } },
-        big: { entitlements: { 'stock.locations': 'unlimited' } },
+        ok: { entitlements: { 'stations.online': 0 } },
+        big: { entitlements: { 'stations.online': 'unlimited' } },
       } as const),
     ).not.toThrow();
   });
@@ -67,38 +67,38 @@ describe('definePlans', () => {
   });
 
   it('throws on an unknown plan key', () => {
-    expect(() => PLANS.get('enterprise' as 'pro')).toThrow(/Unknown plan/);
+    expect(() => PLANS.get('enterprise' as 'network')).toThrow(/Unknown plan/);
   });
 
   it('preserves declaration order as rank', () => {
-    expect(PLANS.list).toEqual(['basic', 'plus', 'pro']);
-    expect(PLANS.get('basic').rank).toBe(0);
-    expect(PLANS.get('pro').rank).toBe(2);
+    expect(PLANS.list).toEqual(['hobby', 'station', 'network']);
+    expect(PLANS.get('hobby').rank).toBe(0);
+    expect(PLANS.get('network').rank).toBe(2);
   });
 });
 
 describe('cheapestWith — the upsell target', () => {
   it('returns the lowest-ranked plan granting a feature', () => {
-    expect(PLANS.cheapestWith('mcp')?.key).toBe('plus');
-    expect(PLANS.cheapestWith('audit')?.key).toBe('pro');
-    expect(PLANS.cheapestWith('orders.read')?.key).toBe('basic');
+    expect(PLANS.cheapestWith('alerts.webhook')?.key).toBe('station');
+    expect(PLANS.cheapestWith('forecast.history')?.key).toBe('network');
+    expect(PLANS.cheapestWith('readings.read')?.key).toBe('hobby');
   });
 
   it('returns null when no plan grants it', () => {
     const plans = definePlans(FEATURES, {
       free: { entitlements: {} },
     } as const);
-    expect(plans.cheapestWith('audit')).toBeNull();
+    expect(plans.cheapestWith('forecast.history')).toBeNull();
   });
 
   it('respects minLimit so a spent quota upsells past the current ceiling', () => {
-    // A tenant already on 1 location must be offered plus (5), not basic (1).
-    expect(PLANS.cheapestWith('stock.locations', 1)?.key).toBe('plus');
-    // A tenant on 5 must be offered pro (unlimited).
-    expect(PLANS.cheapestWith('stock.locations', 5)?.key).toBe('pro');
+    // A tenant already on 1 station must be offered station (5), not hobby (1).
+    expect(PLANS.cheapestWith('stations.online', 1)?.key).toBe('station');
+    // A tenant on 5 must be offered network (unlimited).
+    expect(PLANS.cheapestWith('stations.online', 5)?.key).toBe('network');
     // Nothing beats unlimited.
     expect(
-      PLANS.cheapestWith('stock.locations', Number.POSITIVE_INFINITY),
+      PLANS.cheapestWith('stations.online', Number.POSITIVE_INFINITY),
     ).toBeNull();
   });
 });
