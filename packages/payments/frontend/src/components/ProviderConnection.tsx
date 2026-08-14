@@ -81,6 +81,47 @@ function ExpiryNote(props: { expiresAt: string }) {
   );
 }
 
+/**
+ * A failed connect, in the owner's terms.
+ *
+ * The one case worth naming is the deployment that has registered no OAuth
+ * application for this provider. It surfaced as
+ * `{"error":"CredentialsError","message":"No platform OAuth application
+ * credentials configured for stripe/SANDBOX"}` in a red box under the connect
+ * button — an error class, a slash-joined pair of internal identifiers, and not
+ * one word about what to do. It is not a failure the owner caused or can fix,
+ * and it is not a dead end either: the credentials path works, and it is right
+ * there on the same screen. So it reads as a warning that names the way round.
+ *
+ * Anything else is passed through. The adapter's own sentence beats a generic
+ * one, and inventing copy for a failure we have not seen is how a screen ends
+ * up confidently misdescribing an outage.
+ */
+function connectFailure(
+  message: string,
+  displayName: string,
+): { severity: 'error' | 'warning'; text: string } {
+  if (/no platform oauth application credentials/i.test(message)) {
+    return {
+      severity: 'warning',
+      text:
+        `A conexão automática com ${displayName} não está disponível nesta instalação — ` +
+        'o aplicativo de autorização não foi cadastrado. Para conectar agora, abra ' +
+        '“Prefiro informar as credenciais manualmente” abaixo e cole as suas próprias chaves.',
+    };
+  }
+  return { severity: 'error', text: message };
+}
+
+function ConnectError({ message, displayName }: { message: string; displayName: string }) {
+  const { severity, text } = connectFailure(message, displayName);
+  return (
+    <Alert severity={severity} data-testid="payments-connect-failure">
+      {text}
+    </Alert>
+  );
+}
+
 function connectLabel(displayName: string, connected: boolean, busy: string | null) {
   if (busy === 'connect') return <CircularProgress size={18} />;
   return connected ? 'Reconectar' : `Conectar com ${displayName}`;
@@ -299,7 +340,7 @@ export function ProviderConnection(props: ProviderConnectionProps) {
         connectedAccount={config?.connectedAccount ?? null}
       />
 
-      {error ? <Alert severity="error">{error}</Alert> : null}
+      {error ? <ConnectError message={error} displayName={descriptor.displayName} /> : null}
 
       <ConnectionActions
         displayName={descriptor.displayName}

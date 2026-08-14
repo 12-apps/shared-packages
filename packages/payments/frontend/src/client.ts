@@ -60,6 +60,36 @@ export interface PaymentsClientOptions {
   fetchImpl?: typeof fetch;
 }
 
+/**
+ * The sentence a failed request carries, rather than the response body.
+ *
+ * The body is a JSON envelope, and throwing it verbatim put
+ * `{"error":"CredentialsError","message":"No platform OAuth application
+ * credentials configured for stripe/SANDBOX"}` on a store owner's settings
+ * screen, inside a red alert, as the entire explanation of why a button did
+ * nothing. Unwrapping `message` is the floor: it is the only field written to
+ * be read, and an error class name is never the owner's problem.
+ *
+ * That message may still be developer English — the surfaces that can do better
+ * translate it (see `ProviderConnection`). This function's job is only to stop
+ * shipping the envelope.
+ */
+function failureMessage(body: string, status: number): string {
+  const fallback = `Payments request failed (${status})`;
+  if (!body) return fallback;
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (parsed !== null && typeof parsed === 'object' && 'message' in parsed) {
+      const { message } = parsed as { message?: unknown };
+      if (typeof message === 'string' && message.trim() !== '') return message;
+    }
+  } catch {
+    // Not JSON — a proxy's HTML error page, a gateway timeout. The raw text is
+    // still the most informative thing available.
+  }
+  return body;
+}
+
 function makeRequest(options: PaymentsClientOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
   return async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -69,7 +99,7 @@ function makeRequest(options: PaymentsClientOptions) {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new PaymentsClientError(res.status, body || `Payments request failed (${res.status})`);
+      throw new PaymentsClientError(res.status, failureMessage(body, res.status));
     }
     return (await res.json()) as T;
   };

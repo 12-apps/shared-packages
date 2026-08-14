@@ -120,8 +120,18 @@ describe('PaymentProviderSettings — the OAuth branch layout (FUT-691)', () => 
     const section = await screen.findByTestId('payments-setup-section-habilitar');
     expect(insideAccordion(section)).toBeNull();
     expect(insideAccordion(screen.getByTestId('payments-setup-guide'))).toBeNull();
+
     // The form itself stays behind the disclosure — that fallback is real.
-    expect(insideAccordion(screen.getByTestId('payments-save'))).not.toBeNull();
+    //
+    // It now has to be OPENED to be asserted, where it used to be queryable
+    // while collapsed. Not a weakening of FUT-691: that bug was the guide being
+    // buried in here, which the two assertions above still pin unchanged. The
+    // disclosure holds a whole path block now — its own stepper included — so
+    // it unmounts when closed rather than keeping a second walkthrough in the
+    // DOM behind a collapsed panel.
+    fireEvent.click(screen.getByText(/Prefiro informar as credenciais manualmente/i));
+    const save = await screen.findByTestId('payments-save');
+    expect(insideAccordion(save)).not.toBeNull();
   });
 
   it('surfaces "Testar conexão" outside the accordion for a connected store', async () => {

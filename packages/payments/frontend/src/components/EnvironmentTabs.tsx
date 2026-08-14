@@ -72,10 +72,23 @@ export function EnvironmentSelector({
 export function EnvironmentNotice({
   environment,
   active,
+  band = true,
 }: {
   environment: PaymentEnvironment;
   /** The environment this store's real checkout uses, when it has one. */
   active: PaymentEnvironment | null;
+  /**
+   * Rendered as the card's full-bleed strip (the default), or as an ordinary
+   * inset alert.
+   *
+   * The band geometry — square corners, and `px: 3` matching the card's own
+   * padding so the text lines up with the content above and below — only reads
+   * correctly when the strip actually spans the card. Stacked INSIDE the manual
+   * disclosure, where it is already inset by the accordion, the same values
+   * indent the text a second time and square off a box that is visibly not
+   * touching either edge.
+   */
+  band?: boolean;
 }) {
   const elsewhere = active !== null && active !== environment ? ENVIRONMENT_LABELS[active] : null;
   const production = environment === 'PRODUCTION';
@@ -83,9 +96,9 @@ export function EnvironmentNotice({
     <Alert
       severity={production ? 'warning' : 'info'}
       variant="standard"
-      square
+      square={band}
       data-testid={`payments-environment-notice-${environment}`}
-      sx={{ borderRadius: 0, py: 0.5, px: 3 }}
+      sx={band ? { borderRadius: 0, py: 0.5, px: 3 } : { py: 0.5 }}
     >
       <strong>
         {production ? 'Produção — dinheiro real.' : 'Sandbox — ambiente de teste.'}

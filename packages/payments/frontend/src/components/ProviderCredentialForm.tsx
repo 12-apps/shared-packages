@@ -16,7 +16,7 @@ import { ConfirmCredentialSave, type PendingSave } from './ConfirmCredentialSave
 import { isConnected } from './connection-state';
 import { CredentialField, DoneRow } from './CredentialFields';
 import {
-  allRequiredStored,
+  credentialsComplete,
   fieldsWellFormed,
   needsConfirmation,
   saveLabel,
@@ -131,6 +131,8 @@ interface ProviderFormProps {
      * imply work has been done.
      */
     stored: boolean;
+    /** Which connection path these steps describe — see `ActivePanelProps`. */
+    path: 'oauth' | 'credentials';
   }) => ReactNode;
 }
 
@@ -228,7 +230,13 @@ function useCredentialForm(props: ProviderFormProps) {
         // no credential to probe, and asking anyway makes the adapter answer
         // "Handle não configurado" — a store that has entered nothing has not
         // failed at anything; it is simply NÃO VERIFICADO.
-        return allRequiredStored(descriptor, next, environment) ? probeNow() : undefined;
+        //
+        // The same holds one step further along: a set with fields still empty
+        // is not a connection yet, and probing it reports the provider's
+        // rejection of an incomplete request as a verdict on what the owner
+        // typed. Read from `next` — the server's answer — because blank fields
+        // PRESERVE what is stored, so the form does not know what is on record.
+        return credentialsComplete(descriptor, next, environment, {}) ? probeNow() : undefined;
       });
 
   useRetireOnEnvironmentChange(environment, onEditingChange, setProbe, setValues);
@@ -244,6 +252,8 @@ function useCredentialForm(props: ProviderFormProps) {
     // the connection to UNVERIFIED, drops the proof and switches it OFF.
     nothingEdited: Object.keys(values).length === 0,
     valid: fieldsWellFormed(descriptor, values),
+    // Every field either on record or in the box — see `credentialsComplete`.
+    complete: credentialsComplete(descriptor, config, environment, values),
     summary: summaryOf(descriptor, config, environment),
     edit: (spec: string, value: string) => {
       setValues((v) => ({ ...v, [spec]: value }));
@@ -330,7 +340,7 @@ function CredentialFields({
       ))}
       <FormActions
         busy={form.busy}
-        label={saveLabel(descriptor)}
+        label={saveLabel(descriptor, form.complete)}
         disabled={form.nothingEdited || !form.valid}
         onSave={form.requestSave}
       />
@@ -369,6 +379,10 @@ export function ProviderForm(props: ProviderFormProps) {
             sectionFooter: fields,
             editing: form.editing && !summary,
             stored: storedHere(descriptor, form.masked),
+            // This branch IS the credentials path: it renders only when the
+            // provider has no working connect button, so pasted keys are the
+            // only way in.
+            path: 'credentials',
           })
         : (rows ?? fields)}
 
