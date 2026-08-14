@@ -10,8 +10,7 @@ import {
 
 import {
   AI_CAPABILITIES,
-  AI_CONNECT_PROMPT,
-  AI_HOST_GUIDES,
+  aiHostGuides,
   AI_PERMISSION_MODEL,
   type AiCapability,
   type AiHostGuide,
@@ -44,14 +43,33 @@ export interface AiIntegrationOnboardingProps {
   featureKey?: string;
   /** Show the dev-only "reset onboarding" button. @default false */
   devReset?: boolean;
-  /** Assistants offered in the flow. @default the shared AI_HOST_GUIDES */
+  /**
+   * The platform operating this MCP server, as its OAuth consent button names
+   * it. REQUIRED, and it is the reason `hosts` can have a default at all: one
+   * ChatGPT step tells the owner which "Sign in with …" button to click, and
+   * that button carries whoever runs the server. It used to be a hard-coded
+   * name — of a single STORE on one deployment, not even the product — so every
+   * other adopter pointed its owners at a button that does not exist.
+   */
+  platformName: string;
+  /** Assistants offered in the flow. @default aiHostGuides(platformName) */
   hosts?: readonly AiHostGuide[];
   /** Capability cards on the landing. @default the shared AI_CAPABILITIES */
   capabilities?: readonly AiCapability[];
   /** Permission reassurance copy on the landing. @default AI_PERMISSION_MODEL */
   permissionModel?: string;
-  /** Message pasted into the assistant on the Conectar step. @default AI_CONNECT_PROMPT */
-  connectPrompt?: string;
+  /**
+   * Message the owner pastes into the assistant on the Conectar step.
+   *
+   * REQUIRED, with no default, because the useful version of it names TOOLS —
+   * one to register the connection, one to read something real — and this
+   * package neither defines nor serves any. It shipped a constant naming two
+   * tools from one adopter's surface, so another host handed its owner a prompt
+   * that called two things that did not exist, and the confirm step then waited
+   * forever for a registration that could never happen. Build it with
+   * `aiConnectPrompt({ … })`.
+   */
+  connectPrompt: string;
   /**
    * Re-check the live connection on the verify step's "Testar conexão" button —
    * apps pass a router refresh (e.g. Next's `router.refresh`). @default a full
@@ -100,10 +118,19 @@ function AiOnboardingFlow(props: FlowProps): React.JSX.Element {
     devReset,
   } = props;
   const { state } = useOnboarding();
-  const selectedHost = hosts.find((h) => h.id === state.data.selectedHost) ?? hosts[0]!;
+  const selectedHost =
+    hosts.find((h) => h.id === state.data.selectedHost) ?? hosts[0]!;
 
-  const steps = buildFlowSteps({ host: selectedHost, hosts, endpointUrl, connectPrompt, connections, onRetest });
-  const connectedHostId = (state.data.connectedHost ?? state.data.selectedHost) as string | undefined;
+  const steps = buildFlowSteps({
+    host: selectedHost,
+    hosts,
+    endpointUrl,
+    connectPrompt,
+    connections,
+    onRetest,
+  });
+  const connectedHostId = (state.data.connectedHost ??
+    state.data.selectedHost) as string | undefined;
 
   return (
     <GuidedSection
@@ -111,13 +138,22 @@ function AiOnboardingFlow(props: FlowProps): React.JSX.Element {
       title="Conecte assistentes de IA à sua loja"
       startLabel="Ver como conectar"
       renderLanding={(start) => (
-        <AiLanding onStart={start} permissionModel={permissionModel} capabilities={capabilities} />
+        <AiLanding
+          onStart={start}
+          permissionModel={permissionModel}
+          capabilities={capabilities}
+        />
       )}
       configuredTitle={connectedTitle(connections, hosts, connectedHostId)}
       configuredSummary={connectedSummary(connections)}
       editLabel="Conectar IA"
       completedContent={(nav) => (
-        <StatusBoard nav={nav} connections={connections} hosts={hosts} onDisconnect={onDisconnect} />
+        <StatusBoard
+          nav={nav}
+          connections={connections}
+          hosts={hosts}
+          onDisconnect={onDisconnect}
+        />
       )}
       devReset={devReset}
       dataTestId="ai-onboarding"
@@ -143,17 +179,22 @@ export function AiIntegrationOnboarding({
   connections,
   featureKey = DEFAULT_FEATURE_KEY,
   devReset = false,
-  hosts = AI_HOST_GUIDES,
+  platformName,
+  hosts = aiHostGuides(platformName),
   capabilities = AI_CAPABILITIES,
   permissionModel = AI_PERMISSION_MODEL,
-  connectPrompt = AI_CONNECT_PROMPT,
+  connectPrompt,
   onRetest = () => {
     if (typeof window !== "undefined") window.location.reload();
   },
   onDisconnect,
 }: AiIntegrationOnboardingProps): React.JSX.Element {
   return (
-    <OnboardingProvider featureKey={featureKey} store={store} initialState={initialState}>
+    <OnboardingProvider
+      featureKey={featureKey}
+      store={store}
+      initialState={initialState}
+    >
       <AiOnboardingFlow
         endpointUrl={endpointUrl}
         connections={connections}
