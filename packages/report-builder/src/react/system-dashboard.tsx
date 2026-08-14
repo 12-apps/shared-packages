@@ -23,7 +23,7 @@ import { ErrorState } from "@12-apps/ui/data-display/ErrorState";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
 import { Stack } from "@12-apps/ui/mui/Stack";
 
-import { getSystemDashboard, SYSTEM_REPORT_NAV } from "../server/presets";
+import { findSystemDashboard } from "../server/system-reports";
 import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
 import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
@@ -31,6 +31,7 @@ import { ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
 import { ReportRenderView } from "./report-render";
 import { widenAction } from "./lib/widen-range";
 import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
+import { useReportSurface } from "./transport-context";
 
 interface BlockProps {
   tenantSlug: string;
@@ -66,7 +67,7 @@ function DashboardBlock({
   const testId = `system-dashboard-block-${reportKey}`;
   // The catalog title, so the frame is labelled while the run is still in
   // flight — a canvas of anonymous spinners says nothing about what is coming.
-  const navEntry = SYSTEM_REPORT_NAV.find((entry) => entry.key === reportKey);
+  const navEntry = useReportSurface().systemReports.find((entry) => entry.key === reportKey);
   const title = navEntry?.title ?? reportKey;
   const report = query.data;
   const tableView = useBlockTableView(report?.render);
@@ -118,7 +119,8 @@ export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX
   const { dashboardKey = "" } = useParams();
   const [range, setRange] = useState<ReportRange>("30d");
   const [grain, setGrain] = useState<ReportGrain>("day");
-  const dashboard = getSystemDashboard(dashboardKey);
+  const surface = useReportSurface();
+  const dashboard = findSystemDashboard(surface.systemDashboards, dashboardKey);
 
   if (!dashboard) {
     return (
@@ -134,14 +136,14 @@ export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX
   // blocks and leaves the rest untouched.
   const supportsGrain = dashboard.blocks.some(
     (block) =>
-      SYSTEM_REPORT_NAV.find((entry) => entry.key === block.reportKey)?.supportsGrain ?? false,
+      surface.systemReports.find((entry) => entry.key === block.reportKey)?.supportsGrain ?? false,
   );
 
   return (
     <Stack spacing={3} data-testid="page-system-dashboard" {...{ [PRINT_REGION_ATTR]: "" }}>
       <PrintStyles />
       <ReportPageHeader
-        back={sectionBackTarget(tenantSlug, dashboard.section)}
+        back={sectionBackTarget(tenantSlug, surface.sections, dashboard.section)}
         title={dashboard.title}
         description={dashboard.description}
         titleTestId="system-dashboard-title"

@@ -19,13 +19,13 @@ import { ErrorState } from "@12-apps/ui/data-display/ErrorState";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
 import { Stack } from "@12-apps/ui/mui/Stack";
 
-import { SYSTEM_REPORT_NAV } from "../server/presets";
 import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
 import { exportRows } from "./lib/export-rows";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
 import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
 import { exportColumnsFor, ReportRenderView } from "./report-render";
 import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
+import { useReportSurface } from "./transport-context";
 
 export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.Element {
   const { reportKey = "" } = useParams();
@@ -35,6 +35,7 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
   // Before the early returns below, so the hook order cannot depend on whether
   // the run has resolved. `undefined` simply means "no tools yet".
   const tableView = useBlockTableView(query.data?.render);
+  const surface = useReportSurface();
 
   if (query.isError) {
     return (
@@ -54,12 +55,12 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
   }
 
   const report = query.data;
-  const section = SYSTEM_REPORT_NAV.find((entry) => entry.key === reportKey)?.section;
+  const section = surface.systemReports.find((entry) => entry.key === reportKey)?.section;
   return (
     <Stack spacing={3} data-testid="page-system-report" {...{ [PRINT_REGION_ATTR]: "" }}>
       <PrintStyles />
       <ReportPageHeader
-        back={sectionBackTarget(tenantSlug, section)}
+        back={sectionBackTarget(tenantSlug, surface.sections, section)}
         title={report.title}
         description={report.description}
         titleTestId="system-report-title"

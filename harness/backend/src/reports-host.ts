@@ -12,15 +12,18 @@
  * same actor, same built-ins, same frozen clock. What changed is that they are
  * now supplied by a process the browser has to reach over HTTP.
  *
- * What is genuinely the HOST's, and all that is left here: which tenant, who
- * is calling, where the rows come from, and where documents are stored.
+ * What is genuinely the HOST's, and all that is left here: which tenant, who is
+ * calling, where the rows come from, where documents are stored — and, since
+ * the package stopped shipping one application's answers, the VOCABULARY: which
+ * permission reaches each entity, which built-ins exist, which starter each
+ * entity opens with, and which clock a day is measured on.
  */
-import { createMemoryDataSource } from '@12-apps/report-builder';
+import { createMemoryDataSource, reportSpecSchema, type ReportSpec } from '@12-apps/report-builder';
 import { reportBuilderRouter } from '@12-apps/report-builder/hono';
 import {
-  REPORT_ENTITY_PERMISSION,
   type ReportActor,
   type SavedReportDb,
+  type SystemReportDef,
 } from '@12-apps/report-builder/server';
 import type { Hono } from 'hono';
 
@@ -29,47 +32,50 @@ import { fixtureTables } from './fixtures/report-fixture-tables';
 import { HARNESS_TIME_ZONE, NOW } from './fixtures/report-fixture-window';
 import { HARNESS_CLIENT_ID } from './saved-report-db';
 
-/** The permission tier the shipped policy assigns to `orders`. */
+/** This host's own tiers, over this host's own entities. */
 const SALES = 'reports:sales:read';
+const STOCK = 'stock:read';
+const KITCHEN = 'reports:kitchen:read';
+
+/** The package's own id, the one it gates authoring with by default. */
+const AUTHOR = 'reports:manage';
 
 /**
- * What the harness user may query, DERIVED from the shipped policy rather than
- * typed out: every tier the catalog's own entities require, and nothing else.
+ * Which permission reaches each entity — this host's map, REQUIRED by the mount
+ * and checked against the catalog when the router is built.
  *
- * Typing the list is how the old fixture would have failed. An entity absent
- * from an actor's permissions is indistinguishable from an entity that does not
- * exist — both answer *Acesso negado* — so a catalog that grew an entity while
- * this list stayed still would look exactly like the bug being fixed.
+ * It used to be imported: `REPORT_ENTITY_PERMISSION`, seven entries the package
+ * shipped, and the actor's grants were derived from it so that "a catalog that
+ * grew an entity" could not silently fall out of the fixture. The derivation
+ * was sound and the source was not — a package cannot own the policy over a
+ * host's tables. The completeness property it protected is now the package's
+ * own assembly check, which refuses a catalog entity this map does not name.
  */
-const PERMISSIONS: string[] = [
-  ...new Set(
-    Object.keys(HARNESS_CATALOG.entities).map((entity) => {
-      const permission = REPORT_ENTITY_PERMISSION[entity];
-      if (!permission) throw new Error(`No shipped permission tier for entity "${entity}".`);
-      return permission;
-    }),
-  ),
-];
+const ENTITY_PERMISSION: Record<string, string> = {
+  orders: SALES,
+  order_items: SALES,
+  payments: SALES,
+  stock_movements: STOCK,
+  loss_events: STOCK,
+  kitchen_ticket_items: KITCHEN,
+  kitchen_shifts: KITCHEN,
+};
+
+/** Every tier this host's catalog requires, plus the right to author. */
+const PERMISSIONS: string[] = [...new Set(Object.values(ENTITY_PERMISSION)), AUTHOR];
 
 /**
- * A built-in's type, derived from the router's own config rather than imported.
- * `SystemReportDef` lives in the package's internal `preset-types` and its
- * server barrel does not re-export it, so naming it directly is a type error.
+ * A built-in defined over THIS host's catalog — the only kind there is now that
+ * the package ships none. `SystemReportDef` is exported from the server barrel;
+ * it used to be internal to `preset-types`, which is why this was a derived
+ * type before.
  */
-type SystemReport = NonNullable<Parameters<typeof reportBuilderRouter>[0]['systemReports']>[number];
-
-/**
- * A built-in defined over THIS catalog rather than the shipped `SYSTEM_REPORTS`.
- * The catalog is now the product's, but a SUBSET of it — the shipped presets
- * reach for plan and promise measures this fixture deliberately leaves out, and
- * a preset that 400s is a worse fixture than one that is absent.
- */
-const SYSTEM_REPORTS: SystemReport[] = [
+const SYSTEM_REPORTS: SystemReportDef[] = [
   {
     key: 'receita-por-forma',
     title: 'Receita por forma de pagamento',
     description: 'Quanto entrou por PIX, cartão e garçom no período.',
-    permission: SALES as SystemReport['permission'],
+    permission: SALES,
     section: 'orders',
     supportsGrain: false,
     presentation: 'chart',
@@ -85,6 +91,76 @@ const SYSTEM_REPORTS: SystemReport[] = [
 ];
 
 /**
+ * The known-good spec each entity opens with, served on `/reports/fields`.
+ *
+ * The package used to ship one per future-pay entity (`REPORT_ENTITY_STARTERS`)
+ * and serve them to any catalog whose entity names happened to match. A host
+ * declares its own; the mount compile-checks them against this catalog, so a
+ * starter naming a field this fixture does not have fails at boot.
+ */
+const HARNESS_STARTERS: Record<string, ReportSpec> = Object.fromEntries(
+  Object.entries({
+    orders: {
+      entity: 'orders',
+      dimensions: [{ field: 'createdAt', timeGrain: 'day' }],
+      measures: [{ field: 'revenueCents', aggregation: 'sum', alias: 'receita' }],
+      filters: [{ field: 'status', operator: 'eq', value: 'PAID' }],
+      presentation: { kind: 'chart', chartType: 'line' },
+    },
+    order_items: {
+      entity: 'order_items',
+      dimensions: [{ field: 'productName' }],
+      measures: [{ field: 'revenueCents', aggregation: 'sum', alias: 'receita' }],
+      sort: [{ by: 'receita', direction: 'desc' }],
+      limit: 10,
+      presentation: { kind: 'chart', chartType: 'bar' },
+    },
+    payments: {
+      entity: 'payments',
+      dimensions: [{ field: 'method' }],
+      measures: [{ field: 'amountCents', aggregation: 'sum', alias: 'valor' }],
+      filters: [{ field: 'status', operator: 'eq', value: 'PAID' }],
+      presentation: { kind: 'chart', chartType: 'pie' },
+    },
+    stock_movements: {
+      entity: 'stock_movements',
+      dimensions: [{ field: 'type' }],
+      measures: [{ field: 'quantityDelta', aggregation: 'sum', alias: 'quantidade' }],
+      presentation: { kind: 'chart', chartType: 'bar' },
+    },
+    loss_events: {
+      entity: 'loss_events',
+      dimensions: [{ field: 'reasonName' }],
+      measures: [{ field: 'lossValueCents', aggregation: 'sum', alias: 'valor_perdido' }],
+      presentation: { kind: 'chart', chartType: 'bar' },
+    },
+    // Starts on the STATION, never on the cook: grouping by an identity
+    // dimension is refused unless every measure declares a suppression floor,
+    // so a per-cook starter would open with a spec the compiler rejects.
+    kitchen_ticket_items: {
+      entity: 'kitchen_ticket_items',
+      dimensions: [{ field: 'stationName' }],
+      measures: [
+        { field: 'prepSeconds', aggregation: 'p90', alias: 'preparo_p90' },
+        { field: 'lines', aggregation: 'sum', alias: 'linhas' },
+      ],
+      sort: [{ by: 'linhas', direction: 'desc' }],
+      presentation: { kind: 'table' },
+    },
+    kitchen_shifts: {
+      entity: 'kitchen_shifts',
+      dimensions: [{ field: 'stationName' }],
+      measures: [
+        { field: 'laborSeconds', aggregation: 'sum', alias: 'horas' },
+        { field: 'outputLines', aggregation: 'sum', alias: 'linhas' },
+      ],
+      sort: [{ by: 'horas', direction: 'desc' }],
+      presentation: { kind: 'table' },
+    },
+  }).map(([entity, input]) => [entity, reportSpecSchema.parse(input)]),
+);
+
+/**
  * The one caller this harness has: an owner of the `harness` tenant.
  *
  * `clientId` is what every stored document is scoped by, so it has to be the
@@ -96,7 +172,6 @@ const ACTOR: ReportActor = {
   userId: 'u1',
   roleIds: [],
   isAdmin: true,
-  canAuthor: true,
   permissions: PERMISSIONS,
 };
 
@@ -116,7 +191,9 @@ export function reportsRouter(db: SavedReportDb): Hono {
     db: () => Promise.resolve(db),
     timeZone: HARNESS_TIME_ZONE,
     now: () => NOW,
+    entityPermission: ENTITY_PERMISSION,
     systemReports: SYSTEM_REPORTS,
+    starters: HARNESS_STARTERS,
     resolveActor: () => ACTOR,
   });
 }

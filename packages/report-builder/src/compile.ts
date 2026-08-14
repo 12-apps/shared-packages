@@ -1,7 +1,7 @@
 import { invalidSpecError, unknownEntityError, unknownFieldError } from './errors';
 import { assertChartShape, assertKpiShape } from './presentation-shape';
 import type { ReportDimension, ReportFilter, ReportMeasure, ReportSpec } from './spec';
-import { DEFAULT_REPORT_TIME_ZONE, isValidTimeZone } from './time';
+import { isValidTimeZone } from './time';
 import { PERCENTILE_AGGREGATIONS } from './types';
 import type {
   Aggregation,
@@ -21,8 +21,8 @@ export interface CompileOptions {
   /** Hard host-side row cap; clamps whatever the spec asks for. */
   maxRows?: number;
   /**
-   * The calling tenant's IANA zone, used for date buckets unless the spec
-   * names its own. Defaults to {@link DEFAULT_REPORT_TIME_ZONE}.
+   * The calling tenant's IANA zone, used for date buckets unless the spec names
+   * its own. Absent from both, buckets are UTC — see `resolveTimeZone`.
    */
   timeZone?: string;
   /**
@@ -299,15 +299,27 @@ function compileSort(
 
 /**
  * The zone date buckets are computed on, most specific first: the spec, then
- * the host's execution context, then São Paulo. Validated here so an unknown
- * zone is a 400 with a fixable message, never a silent fallback to UTC that
- * would shift every bucket by three hours.
+ * the host's execution context, then UTC.
+ *
+ * The last rung used to be `America/Sao_Paulo`, exported as
+ * `DEFAULT_REPORT_TIME_ZONE`. That is one country's trading day handed to
+ * every caller who did not name one — a report run without a zone bucketed a
+ * midnight sale in Lisbon into the previous day, and nothing in the output said
+ * so. UTC is not a better guess at anyone's business day; it is the absence of
+ * a guess, and it is what `truncateDateToGrain` has always documented for a
+ * caller that names no zone. The mounted SURFACE does not reach this rung at
+ * all: `ReportBuilderServerConfig.timeZone` is required, so a host states its
+ * clock once and every run carries it.
+ *
+ * An unknown zone is still a 400 with a fixable message rather than a silent
+ * fallback that would shift every bucket.
  */
-function resolveTimeZone(spec: ReportSpec, options: CompileOptions): string {
-  const timeZone = spec.timeZone ?? options.timeZone ?? DEFAULT_REPORT_TIME_ZONE;
+function resolveTimeZone(spec: ReportSpec, options: CompileOptions): string | undefined {
+  const timeZone = spec.timeZone ?? options.timeZone;
+  if (timeZone === undefined) return undefined;
   if (!isValidTimeZone(timeZone)) {
     throw invalidSpecError(
-      `Unknown time zone "${timeZone}". Use an IANA name such as "${DEFAULT_REPORT_TIME_ZONE}".`,
+      `Unknown time zone "${timeZone}". Use an IANA name such as "America/Sao_Paulo".`,
     );
   }
   return timeZone;

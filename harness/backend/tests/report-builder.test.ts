@@ -8,15 +8,12 @@ import {
   isClosedSet,
   listCatalogFields,
   operatorsFor,
+  reportSpecSchema,
   runDashboard,
   runReport,
   specSentence,
 } from '@12-apps/report-builder';
-import {
-  BLANK_BLOCK_TEMPLATE,
-  blockTemplateGroups,
-  reportCatalog,
-} from '@12-apps/report-builder/server';
+import { BLANK_BLOCK_TEMPLATE, blockTemplateGroups } from '@12-apps/report-builder/server';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -107,24 +104,44 @@ describe('the published report-builder runs a spec end to end', () => {
 });
 
 describe('the block templates the picker offers', () => {
-  it('ships groups whose every template carries a runnable spec', async () => {
-    const groups = blockTemplateGroups();
-    expect(groups.length).toBeGreaterThan(1);
+  /**
+   * The templates are the HOST's now, so what is under test is the composition
+   * rather than a shipped list. This used to call `blockTemplateGroups()` with
+   * no arguments and assert "more than four runnable templates" — the four
+   * being future-pay's, compiled against future-pay's catalog, both of which
+   * the package shipped. A consumer with its own catalog inherited a picker of
+   * blocks it could not run.
+   */
+  it('keeps a host group whose templates compile against the host catalog', () => {
+    const groups = blockTemplateGroups([
+      {
+        id: 'vendas',
+        title: 'Vendas',
+        templates: [
+          {
+            id: 'receita-por-dia',
+            title: 'Receita por dia',
+            description: 'Quanto a loja faturou a cada dia do período',
+            spec: reportSpecSchema.parse({
+              entity: 'orders',
+              dimensions: [{ field: 'createdAt', timeGrain: 'day' }],
+              measures: [{ field: 'totalCents' }],
+              presentation: { kind: 'chart', chartType: 'line' },
+            }),
+          },
+        ],
+      },
+    ]);
 
-    const templates = groups.flatMap((group) => group.templates);
-    const runnable = templates.filter((template) => template.spec !== null);
-    expect(runnable.length).toBeGreaterThan(4);
-
-    // Every non-blank template compiles against the PUBLISHED catalog. A picker
-    // entry that yields a spec the compiler rejects is worse than no picker:
-    // the owner made a reasonable choice and got an error they cannot act on.
+    const runnable = groups.flatMap((group) => group.templates).filter((one) => one.spec !== null);
+    expect(runnable).toHaveLength(1);
     for (const template of runnable) {
-      expect(() => compileReport(template.spec, reportCatalog)).not.toThrow();
+      expect(() => compileReport(template.spec, catalog)).not.toThrow();
     }
   });
 
-  it('always offers the blank escape hatch, last', () => {
-    const last = blockTemplateGroups().at(-1);
+  it('always offers the blank escape hatch, last, even with no host groups', () => {
+    const last = blockTemplateGroups([]).at(-1);
     expect(last?.templates).toEqual([BLANK_BLOCK_TEMPLATE]);
     expect(BLANK_BLOCK_TEMPLATE.spec).toBeNull();
   });

@@ -6,8 +6,8 @@ import {
   openEditorOfPublishedReport,
   openPublishedReport,
   openReportId,
+  pickBlockTemplate,
   reportsList,
-  templateId,
 } from '../helpers/surface.js';
 import { reportsWorld } from '../world.js';
 
@@ -66,29 +66,21 @@ async function startNewReport(page: Page): Promise<void> {
   await expect(page.getByTestId('page-report-editor')).toBeVisible();
 }
 
-/** One template out of the picker, waited on until its block exists. */
-async function pickTemplate(page: Page, title: string, position = 1): Promise<void> {
-  await page.getByTestId(`block-template-picker-${templateId(title)}`).click();
-  await expect(page.getByTestId(`report-block-bloco-${position}`)).toBeVisible({
-    timeout: BLOCK_RENDER_TIMEOUT_MS,
-  });
-}
-
 When(new RegExp(`^${THEY} starts a new report$`), async ({ page }) => {
   await startNewReport(page);
 });
 
-When(new RegExp(`^${THEY} picks the "(.+)" template$`), async ({ page }, title: string) => {
-  await pickTemplate(page, title);
+// The templates come from the host's fixtures, not from the feature: a picker's
+// entries are the host's product, and a scenario that named one would only run
+// in the store that has it.
+When(new RegExp(`^${THEY} picks the first block template$`), async ({ page }) => {
+  await pickBlockTemplate(page, reportsWorld().fixtures.blockTemplates.first);
 });
 
-When(
-  new RegExp(`^${THEY} adds a "(.+)" block beside it$`),
-  async ({ page }, title: string) => {
-    await page.getByTestId('report-editor-add-block').click();
-    await pickTemplate(page, title, 2);
-  },
-);
+When(new RegExp(`^${THEY} adds a second block template beside it$`), async ({ page }) => {
+  await page.getByTestId('report-editor-add-block').click();
+  await pickBlockTemplate(page, reportsWorld().fixtures.blockTemplates.second, 2);
+});
 
 When(new RegExp(`^${THEY} calls it "(.+)"$`), async ({ page }, name: string) => {
   await page.getByTestId('report-editor-name').fill(name);

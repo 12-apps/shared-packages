@@ -7,13 +7,12 @@ import {
   forbidden,
   ok,
   runOptions,
-  systemReportsOf,
   toReportRangeView,
   windowOf,
   type ReportBuilderServerConfig,
   type ReportRoute,
 } from './context';
-import type { SystemReportDef } from './preset-types';
+import type { SystemReportDef } from './system-reports';
 import { REPORT_GRAINS } from './wire';
 
 /**
@@ -54,7 +53,7 @@ function systemListRoute(config: ReportBuilderServerConfig): ReportRoute {
     method: 'GET',
     path: '/reports/system',
     handle({ actor }) {
-      const presets = systemReportsOf(config);
+      const presets = config.systemReports;
       const reports = presets
         .filter((report) => actor.permissions.includes(report.permission))
         .map(toSystemSummary);
@@ -73,7 +72,7 @@ function systemRunRoute(config: ReportBuilderServerConfig): ReportRoute {
     method: 'GET',
     path: '/reports/system/:key',
     async handle({ actor, params, query }) {
-      const report = systemReportsOf(config).find((candidate) => candidate.key === params.key);
+      const report = config.systemReports.find((candidate) => candidate.key === params.key);
       // An unknown key is 404 before the permission check: there is no id to
       // disclose here, and a 403 on a key that does not exist reads as "you
       // nearly had it".

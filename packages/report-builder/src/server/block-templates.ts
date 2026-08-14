@@ -1,36 +1,32 @@
 import type { ReportSpec } from '../spec';
 
-import { REPORT_ENTITY_STARTERS } from './starters';
-
 /**
- * The blocks someone can add without composing a query (FUT-391).
+ * The "Adicionar bloco" picker's CONTENTS are the host's; its SHAPE is ours.
  *
- * "Adicionar bloco" used to create an EMPTY block, which then had to be decoded
- * through a config panel before it showed anything. That asks a store owner to
- * know the shape of their own data model before they can see a number.
+ * "Adicionar bloco" used to create an empty block, which then had to be decoded
+ * through a config panel before it showed anything — asking a store owner to
+ * know the shape of their own data model before they could see a number. The
+ * templates fix that, and each one is a sentence about the host's product
+ * ("Quanto a loja faturou a cada dia do período"), grouped by what someone is
+ * trying to LOOK AT rather than by entity name.
  *
- * Every template's spec is a {@link REPORT_ENTITY_STARTERS} entry rather than a
- * new literal. Those are already compile-validated against the live catalog by
- * the starter test, so a catalog rename breaks the SUITE rather than a tenant's
- * first click — inventing specs here would create a second set with no such
- * guarantee.
+ * Which is exactly why they cannot live here. This module used to hold seven of
+ * them — receita por dia, produtos mais vendidos, tempo de preparo por estação,
+ * horas por estação, formas de pagamento, perdas por motivo, movimentações de
+ * estoque — built from future-pay's starter specs, imported at module scope by
+ * the editor canvas, and rendered to every host that mounted the surface. A
+ * picker offering "Horas trabalhadas por estação" to a store with no kitchen is
+ * not a default; it is another product's menu.
  *
- * The grouping is by what someone is trying to LOOK AT, not by entity name: an
- * owner asking "how are sales doing" does not know whether that lives in
- * `orders` or `order_items`.
+ * The host passes its own groups to `createWebReportBuilder`. The blank
+ * template below is this surface's own, and is always appended.
  */
-
-export interface BlockTemplateGroup {
-  id: string;
-  title: string;
-  templates: BlockTemplate[];
-}
 
 export interface BlockTemplate {
   /** Stable id — what a picker returns and a test addresses. */
   id: string;
   title: string;
-  /** What the block will show, in the owner's words rather than the schema's. */
+  /** What the block will show, in the reader's words rather than the schema's. */
   description: string;
   /**
    * The block's spec, or null for the blank template. Null is the escape hatch
@@ -40,83 +36,16 @@ export interface BlockTemplate {
   spec: ReportSpec | null;
 }
 
-/**
- * `entity` here names a STARTER key. A template whose starter is missing is
- * dropped rather than shipped broken — see {@link blockTemplateGroups}.
- */
-const DEFINITIONS: Array<{
+export interface BlockTemplateGroup {
   id: string;
   title: string;
-  templates: Array<{ id: string; title: string; description: string; entity: string }>;
-}> = [
-  {
-    id: 'vendas',
-    title: 'Vendas',
-    templates: [
-      {
-        id: 'receita-por-dia',
-        title: 'Receita por dia',
-        description: 'Quanto a loja faturou a cada dia do período',
-        entity: 'orders',
-      },
-      {
-        id: 'produtos-mais-vendidos',
-        title: 'Produtos mais vendidos',
-        description: 'Os dez produtos que mais renderam',
-        entity: 'order_items',
-      },
-    ],
-  },
-  {
-    id: 'movimento',
-    title: 'Movimento',
-    templates: [
-      {
-        id: 'preparo-por-estacao',
-        title: 'Tempo de preparo por estação',
-        description: 'Onde a cozinha demora, sem apontar para uma pessoa',
-        entity: 'kitchen_ticket_items',
-      },
-      {
-        id: 'horas-por-estacao',
-        title: 'Horas trabalhadas por estação',
-        description: 'Horas lançadas e linhas produzidas em cada estação',
-        entity: 'kitchen_shifts',
-      },
-    ],
-  },
-  {
-    id: 'pagamentos-e-perdas',
-    title: 'Pagamentos e perdas',
-    templates: [
-      {
-        id: 'formas-de-pagamento',
-        title: 'Formas de pagamento',
-        description: 'Quanto entrou por PIX, cartão e garçom',
-        entity: 'payments',
-      },
-      {
-        id: 'perdas-por-motivo',
-        title: 'Perdas por motivo',
-        description: 'Quanto foi perdido, e por quê',
-        entity: 'loss_events',
-      },
-      {
-        id: 'movimentacoes-de-estoque',
-        title: 'Movimentações de estoque',
-        description: 'Entradas e saídas por tipo de movimento',
-        entity: 'stock_movements',
-      },
-    ],
-  },
-];
+  templates: BlockTemplate[];
+}
 
 /**
- * The blank template, always offered, always last.
- *
- * The description is the picker's own words for it (`prototype.html`, the
- * `Do zero` group): what you are choosing is to pick the data and the measures
- * yourself, which is the one thing every other entry does for you.
+ * The blank template, always offered, always last — the one entry that is about
+ * the BUILDER rather than about any host's data, which is why it is the one
+ * this package still ships.
  */
 export const BLANK_BLOCK_TEMPLATE: BlockTemplate = {
   id: 'blank',
@@ -125,38 +54,22 @@ export const BLANK_BLOCK_TEMPLATE: BlockTemplate = {
   spec: null,
 };
 
+/** The blank template's own group. */
+const BLANK_GROUP: BlockTemplateGroup = {
+  id: 'em-branco',
+  title: 'Do zero',
+  templates: [BLANK_BLOCK_TEMPLATE],
+};
+
 /**
- * The picker's contents: every group whose templates resolve to a starter,
- * then the blank one on its own.
+ * The picker's contents: the host's groups, then the blank one on its own.
  *
- * A template naming a starter that no longer exists is DROPPED, not rendered
- * disabled or shipped with an empty spec — a picker entry that does nothing
- * when clicked is worse than one that is absent, and this is the failure mode
- * of a catalog losing an entity.
+ * A group with no templates is dropped rather than rendered empty — a heading
+ * over nothing reads as a loading failure — and a host that passes none still
+ * gets a working picker, because the blank template needs no catalog.
  */
-export function blockTemplateGroups(): BlockTemplateGroup[] {
-  const groups = DEFINITIONS.map((group) => ({
-    id: group.id,
-    title: group.title,
-    templates: group.templates
-      .filter((template) => REPORT_ENTITY_STARTERS[template.entity] !== undefined)
-      .map((template) => ({
-        id: template.id,
-        title: template.title,
-        description: template.description,
-        spec: REPORT_ENTITY_STARTERS[template.entity] as ReportSpec,
-      })),
-  })).filter((group) => group.templates.length > 0);
-
-  return [
-    ...groups,
-    { id: 'em-branco', title: 'Do zero', templates: [BLANK_BLOCK_TEMPLATE] },
-  ];
-}
-
-/** Look one up by id, for a picker returning an id rather than a whole spec. */
-export function findBlockTemplate(id: string): BlockTemplate | undefined {
-  return blockTemplateGroups()
-    .flatMap((group) => group.templates)
-    .find((template) => template.id === id);
+export function blockTemplateGroups(
+  groups: readonly BlockTemplateGroup[],
+): BlockTemplateGroup[] {
+  return [...groups.filter((group) => group.templates.length > 0), BLANK_GROUP];
 }

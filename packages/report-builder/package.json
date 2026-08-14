@@ -2,7 +2,7 @@
   "name": "@12-apps/report-builder",
   "version": "1.0.0",
   "type": "module",
-  "description": "Plug-and-play reporting plugin (FUT-302): spec engine (.), host-mounted backend surface (./server: catalog, presets, policy, duck-typed Prisma adapter/stores, wire schemas) and reports UI (./react), plus the package-owned Prisma fragment synced into the host schema. Standardized adoption contract in ADOPTING.md.",
+  "description": "Plug-and-play reporting plugin (FUT-302): spec engine (.), host-mounted backend surface (./server: endpoints, period, lifecycle, SavedReport store seam, wire schemas) and reports UI (./react), plus the package-owned Prisma fragment synced into the host schema. The catalog, the built-ins and the adapter are the host's and arrive as config. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server/index.ts",
@@ -26,7 +26,6 @@
     "prisma:sync:check": "node scripts/sync-report-builder-schema.mjs --check"
   },
   "dependencies": {
-    "@12-apps/stock-domain": "workspace:*",
     "@12-apps/ui": "workspace:*",
     "zod": "^4.3.5"
   },

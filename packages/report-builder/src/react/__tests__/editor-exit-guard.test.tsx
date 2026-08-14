@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { createWebReportBuilder } from '../create-report-builder';
+import { TEST_SURFACE } from './surface-fixture';
 import type {
   ReportEntityFields,
   SavedReportSummary,
@@ -148,6 +149,7 @@ afterEach(() => {
 
 async function openEditor(status: 'published' | 'draft' = 'published'): Promise<void> {
   const { page: Surface } = createWebReportBuilder({
+    surface: TEST_SURFACE,
     tenantSlug: TENANT,
     transport: stubTransport(savedView(status)),
     standalone: true,

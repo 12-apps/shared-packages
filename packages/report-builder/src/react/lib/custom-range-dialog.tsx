@@ -39,7 +39,7 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { REPORT_MAX_RANGE_DAYS } from "../../server/range";
-import { DEFAULT_REPORT_TIME_ZONE } from "../../time";
+import { useReportSurface } from "../transport-context";
 
 /** A custom period, as two INCLUSIVE calendar days on the tenant's clock. */
 export interface CustomRangeWindow {
@@ -193,9 +193,13 @@ interface CustomRangeDialogProps {
   onClose: () => void;
   dataTestId: string;
   /**
-   * The clock "hoje" is read on. Defaults to the same zone the report engine
-   * falls back to when neither the spec nor the host names one, so the picker
-   * and the numbers it produces agree about which day it is.
+   * The clock "hoje" is read on. Omitted, it comes from the surface the host
+   * configured — which is the only place that knows it.
+   *
+   * It used to default to `America/Sao_Paulo`, the engine's own fallback: a
+   * picker in Lisbon offered "hoje" on a Brazilian day and disagreed with the
+   * figures beside it by three hours, with nothing in any host's config able to
+   * say otherwise.
    */
   timeZone?: string;
 }
@@ -206,8 +210,9 @@ export function CustomRangeDialog({
   onApply,
   onClose,
   dataTestId,
-  timeZone = DEFAULT_REPORT_TIME_ZONE,
+  timeZone,
 }: CustomRangeDialogProps): JSX.Element {
+  const surface = useReportSurface();
   const picker = usePickerDraft(open, seed);
   const status = resolveDayRange(picker.draft, REPORT_MAX_RANGE_DAYS);
 
@@ -233,7 +238,7 @@ export function CustomRangeDialog({
           <DateRangePicker
             value={picker.draft}
             onChange={picker.change}
-            timeZone={timeZone}
+            timeZone={timeZone ?? surface.timeZone}
             // The server's own ceiling, so an over-long window is refused by
             // the control that offers it rather than by a 400 the reader meets
             // as "não foi possível carregar o relatório".

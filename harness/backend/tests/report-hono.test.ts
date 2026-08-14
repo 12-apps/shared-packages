@@ -99,8 +99,10 @@ const OWNER: ReportActor = {
   userId: 'u1',
   roleIds: [],
   isAdmin: true,
-  canAuthor: true,
-  permissions: ['reports:sales:read'],
+  // The data tier this host grants over `orders`, plus the package's own
+  // `reports:manage`, which is what authoring is gated on now that no host
+  // computes a `canAuthor` boolean for itself.
+  permissions: ['reports:sales:read', 'reports:manage'],
 };
 
 function seedRows(): Row[] {
@@ -149,6 +151,10 @@ function setup(actor: ReportActor | null = OWNER): {
         return createMemoryDataSource({ orders: ORDERS });
       },
       db: () => Promise.resolve(db),
+      entityPermission: { orders: 'reports:sales:read' },
+      systemReports: [],
+      starters: {},
+      timeZone: 'America/Sao_Paulo',
       resolveActor: () => actor,
     }),
   );

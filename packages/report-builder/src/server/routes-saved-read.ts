@@ -5,6 +5,7 @@ import {
   fail,
   foldSpecError,
   forbidden,
+  mayAuthor,
   mayQueryAll,
   mayQueryAnything,
   NOT_FOUND,
@@ -45,6 +46,7 @@ import { readWorkingCopy, type ReportWorkingCopy } from './working-copy';
 function lifecycleOf(
   record: SavedReportRecord,
   actor: ReportActor,
+  config: ReportBuilderServerConfig,
 ): {
   status: string;
   visibility: string;
@@ -56,7 +58,7 @@ function lifecycleOf(
     status: record.status,
     visibility: record.visibility,
     visibilityRoles: visibilityRoleIds(record.visibilityRoles),
-    workingCopy: actor.canAuthor ? readWorkingCopy(record.workingCopy) : null,
+    workingCopy: mayAuthor(config, actor) ? readWorkingCopy(record.workingCopy) : null,
     // Resolved rather than echoed: a row written before the column existed
     // carries NULL, and the client should be told the period it will actually
     // open on rather than left to re-derive the fallback (FUT-755).
@@ -102,7 +104,7 @@ async function renderSaved(
     id: record.id,
     name: record.name,
     description: record.description,
-    ...lifecycleOf(record, actor),
+    ...lifecycleOf(record, actor, config),
     range: toReportRangeView(range),
   };
 

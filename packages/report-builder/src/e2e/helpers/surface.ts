@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
-import { reportsWorld } from '../world.js';
+import { reportsWorld, type ReportsBlockTemplate } from '../world.js';
 
 /**
  * The gestures the packaged report journeys are built from — every one of them
@@ -30,27 +30,32 @@ export const BLOCK_RENDER_TIMEOUT_MS = 15_000;
 export const NEW_BLOCK = 'bloco-1';
 
 /**
- * The picker's templates, by the name an author reads on the card.
+ * Take one template out of the picker, and wait until the block it creates is
+ * on the canvas AND carries the template's own name.
  *
- * A scenario says "the Receita por dia template" because that is what is
- * printed on the tile; the picker addresses it by id. One map, so the feature
- * files stay in the author's words and no step has to spell a slug.
+ * The host supplies the template — its `id` addresses the tile, its `title` is
+ * what the editor titles the new block with — because a picker's entries are
+ * the host's product. This used to go through a title → id map inside the
+ * package holding seven slugs of the application it was extracted from, which
+ * threw for any title that map had never heard of: the features had stopped
+ * naming a template out loud, and the journeys still could not run anywhere
+ * else.
+ *
+ * The title assertion is what makes this a wait rather than a sleep: a block
+ * frame appears before its template has been applied, so waiting on the frame
+ * alone would let the next step type into an editor that is still settling.
  */
-const TEMPLATE_IDS: Record<string, string> = {
-  'Receita por dia': 'receita-por-dia',
-  'Produtos mais vendidos': 'produtos-mais-vendidos',
-  'Tempo de preparo por estação': 'preparo-por-estacao',
-  'Horas trabalhadas por estação': 'horas-por-estacao',
-  'Formas de pagamento': 'formas-de-pagamento',
-  'Perdas por motivo': 'perdas-por-motivo',
-  'Movimentações de estoque': 'movimentacoes-de-estoque',
-};
-
-/** The picker id behind a template's printed name. */
-export function templateId(title: string): string {
-  const id = TEMPLATE_IDS[title];
-  if (!id) throw new Error(`unknown block template "${title}"`);
-  return id;
+export async function pickBlockTemplate(
+  page: Page,
+  template: ReportsBlockTemplate,
+  position = 1,
+): Promise<void> {
+  await page.getByTestId(`block-template-picker-${template.id}`).click();
+  const created = page.getByTestId(`report-block-bloco-${position}`);
+  await expect(created).toBeVisible({ timeout: BLOCK_RENDER_TIMEOUT_MS });
+  await expect(page.getByTestId(`report-block-bloco-${position}-title`)).toHaveValue(
+    template.title,
+  );
 }
 
 /** The rolling periods, by the word on their pill. */

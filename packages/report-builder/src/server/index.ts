@@ -32,42 +32,63 @@ export { compileDocument } from './compile-document';
 export { toSummary, type SavedReportSummary } from './summary';
 /**
  * `@12-apps/report-builder/server` — the host-mounted backend surface
- * (plug-and-play, payments-backend doctrine): the domain field catalog and
- * system-report presets, the entity→permission policy, the duck-typed
- * tenant-scoped DataSource and SavedReport store, and the wire (zod) contract
- * the host's routes and MCP registry import. The host owns AUTH and tenant
- * attribution; nothing here reads sessions or imports a generated client.
- * See ADOPTING.md for the standardized adoption contract.
+ * (plug-and-play, payments-backend doctrine): the endpoints, the period, the
+ * lifecycle/visibility rules, the SavedReport store seam and the wire (zod)
+ * contract the host's routes and MCP registry import.
+ *
+ * What it does NOT ship, and used to: a field catalog, a set of built-in
+ * reports, a starter per entity, a picker of block templates, an
+ * entity→permission map and a tenant-scoped Prisma DataSource — all of them
+ * future-pay's, in pt-BR, over `orders` / `stock_movements` /
+ * `kitchen_ticket_items`, and half of them wired in as DEFAULTS so a host that
+ * declared none inherited all of them. Those are the host's, and arrive as
+ * config. See ADOPTING.md for the migration.
+ *
+ * The host owns AUTH and tenant attribution; nothing here reads sessions or
+ * imports a generated client.
  */
-export { REPORT_ENTITY_DATE_FIELD, reportCatalog } from './catalog';
+
 /**
- * The per-cook suppression floor (FUT-454), exported so a host surface can
- * STATE the policy with the same number the server enforces it with, rather
- * than restating "20" in prose that can drift away from the constant.
+ * The permission guarding THIS package's own surface, as a contribution the
+ * host composes into its catalog (`composePermissions` in `@12-apps/rbac`, or
+ * the equivalent) and wires back via `gatePermissions`.
  */
-export { KITCHEN_CHEF_MIN_SAMPLE } from './adapter-kitchen-source';
 export {
-  getSystemReport,
-  SYSTEM_REPORT_KEYS,
-  SYSTEM_REPORT_NAV,
-  SYSTEM_REPORTS,
+  definePermissionContribution,
+  DEFAULT_AUTHOR_PERMISSION,
+  REPORT_BUILDER_PERMISSIONS,
+  type ReportBuilderPermission,
+  type ReportPermissionContribution,
+  type ReportPermissionKind,
+  type ReportPermissionLabels,
+  type ReportPermissionOf,
+  type ReportPermissionSpec,
+} from './contribution';
+/** The wiring check every mount runs, and the error it throws. */
+export { assertReportBuilderConfig, ReportBuilderConfigError } from './config';
+/** The SHAPE of a host's built-in reports, and the projections over them. */
+export {
+  findSystemDashboard,
+  findSystemReport,
+  systemReportNav,
+  type SystemDashboardBlockDef,
+  type SystemDashboardDef,
+  type SystemReportDef,
   type SystemReportNavEntry,
   type SystemReportSection,
-} from './presets';
-export { REPORT_ENTITY_PERMISSION, REPORT_RUN_MAX_ROWS } from './policy';
+} from './system-reports';
+export { REPORT_RUN_MAX_ROWS } from './policy';
 /**
- * The "Adicionar bloco" picker's contents (FUT-391). Server-side because every
- * template's spec IS a starter, and the starters are compile-validated against
- * the live catalog here — a client-side copy would carry no such guarantee.
+ * The block picker's SHAPE. Its contents are the host's, and travel into
+ * `createWebReportBuilder({ surface })`; this module ships only the blank
+ * template and the composition that always appends it.
  */
 export {
   BLANK_BLOCK_TEMPLATE,
   blockTemplateGroups,
-  findBlockTemplate,
   type BlockTemplate,
   type BlockTemplateGroup,
 } from './block-templates';
-export { REPORT_ENTITY_STARTERS } from './starters';
 export {
   canViewSavedReport,
   REPORT_STATUSES,
@@ -78,13 +99,12 @@ export {
   type ReportVisibilityActor,
   type ReportVisibilityFields,
 } from './visibility';
-export { dayOfWeekSaoPaulo, hourOfDaySaoPaulo } from './local-time';
-export {
-  createTenantReportDataSource,
-  type ReportSourceDb,
-  type ReportSourceDbProvider,
-  type ReportWindow,
-} from './adapter';
+/**
+ * The reporting window, and the Prisma-shaped filter a host adapter applies it
+ * with. The adapter itself is the host's — this package no longer ships one,
+ * because an adapter is a set of reads against one application's tables.
+ */
+export { windowWhere, type DateWindowWhere, type ReportWindow } from './adapter-shared';
 export {
   createSavedReportStore,
   isUniqueNameViolation,

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { createWebReportBuilder } from '../create-report-builder';
+import { TEST_SURFACE } from './surface-fixture';
 import type {
   ReportEntityFields,
   ReportSpecWire,
@@ -152,6 +153,7 @@ function stubTransport(): ReportBuilderTransport {
 /** The editor, opened on the saved five-block report. */
 function renderEditor(): void {
   const { page: Surface } = createWebReportBuilder({
+    surface: TEST_SURFACE,
     tenantSlug: TENANT,
     transport: stubTransport(),
     standalone: true,

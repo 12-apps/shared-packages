@@ -296,8 +296,15 @@ export interface CompiledQuery {
    * The tenant's IANA zone, resolved at compile time (FUT-454). Date buckets
    * are computed on THIS clock, so a 02:00Z sale lands on the previous day in
    * `America/Sao_Paulo`. Adapters that group in SQL must convert with it.
+   *
+   * `undefined` when NOBODY named a zone — neither the spec nor the execution
+   * context — and buckets are then UTC. It used to be `string` because the
+   * compiler filled the gap with one country's zone; the field is optional now
+   * so "no clock was stated" is a value an adapter can see and act on, rather
+   * than one silently spelled `America/Sao_Paulo`. The mounted surface always
+   * carries one (`ReportBuilderServerConfig.timeZone` is required).
    */
-  timeZone: string;
+  timeZone?: string;
   /**
    * The hour the tenant's trading day begins, 0-23, resolved at compile time
    * (FUT-755). 0 is the civil day. Anything earlier than this hour buckets to

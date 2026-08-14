@@ -20,7 +20,7 @@ lives here is the machinery.
 | `@12-apps/product-research-ui` | Host-agnostic research screens for the engine above. |
 | `@12-apps/rbac` | Role-Based Access Control: framework-free core plus optional React and server adapters. |
 | `@12-apps/realtime` | Typed topic/event envelopes and a publish/subscribe bus behind a swappable driver port (Redis pub/sub in production). |
-| `@12-apps/report-builder` | Reporting plugin: spec engine plus a host-mounted backend surface (catalog, presets, policy, duck-typed Prisma adapter). |
+| `@12-apps/report-builder` | Reporting plugin: spec engine, host-mounted endpoints and screens, the saved-report lifecycle and the period. The catalog, the built-ins and the adapter are the host's and arrive as config. |
 | `@12-apps/shift` | Headless tenant-scoped work shifts with resource bindings and audit ports. |
 | `@12-apps/stock-domain` | The stock-movement vocabulary — the closed value sets the reason taxonomy is built on. |
 | `@12-apps/ui` | ~90 MUI-based components with stories and interaction tests. |

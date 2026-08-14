@@ -18,7 +18,7 @@
  * The shifts are derived FROM the same plan as the lines, so a station's
  * "linhas produzidas" cannot disagree with the lines that produced them.
  */
-import { dayOfWeekSaoPaulo, hourOfDaySaoPaulo } from '@12-apps/report-builder/server';
+import { localDayOfWeek, localHourOfDay } from './report-local-time';
 
 import { saoPauloInstant, secondsBefore, type FixtureRow } from './report-fixture-window';
 
@@ -112,11 +112,11 @@ function lineRow(plan: StationPlan, day: string, index: number, ordinal: number)
   return {
     readyAt,
     sentAt: secondsBefore(readyAt, prepSeconds + waitSeconds),
-    // Derived with the package's own `local-time` helpers, so the encodings
-    // that make these sort correctly as strings cannot drift from the ones the
-    // product produces.
-    completionHourOfDay: hourOfDaySaoPaulo(new Date(readyAt)),
-    completionDayOfWeek: dayOfWeekSaoPaulo(new Date(readyAt)),
+    // Derived with THIS host's own local-time helpers, so the encodings that
+    // make these sort correctly as strings are stated once, beside the catalog
+    // that declares the dimensions `ordered`.
+    completionHourOfDay: localHourOfDay(new Date(readyAt)),
+    completionDayOfWeek: localDayOfWeek(new Date(readyAt)),
     stationName: plan.station,
     productName: plan.products[index % 2] ?? plan.products[0],
     // One line is ONE observation whatever the quantity: the quantity weighs

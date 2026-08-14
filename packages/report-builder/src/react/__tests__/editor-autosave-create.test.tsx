@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { createWebReportBuilder } from '../create-report-builder';
+import { TEST_SURFACE } from './surface-fixture';
 import { defaultPublishDraft } from '../lib/publish-section';
 import type {
   ReportEntityFields,
@@ -165,6 +166,7 @@ afterEach(() => {
 
 async function openNewReport(sent: { calls: SentCall[] }): Promise<void> {
   const { page: Surface } = createWebReportBuilder({
+    surface: TEST_SURFACE,
     tenantSlug: TENANT,
     transport: stubTransport(sent),
     standalone: true,
