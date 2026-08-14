@@ -143,7 +143,7 @@ export {
   type CheckoutOrder,
   type CheckoutProviderConfig,
   type CheckoutWalletType,
-  type ComandaCheckout,
+  type SettlementCheckout,
   type CreateOrderRequest,
   type CreateOrderResult,
   type OrderStatus,

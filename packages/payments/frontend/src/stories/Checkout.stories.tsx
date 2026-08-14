@@ -243,27 +243,27 @@ export const MissingBuyerFieldFromServer: StoryObj = scene(
 );
 
 // ---------------------------------------------------------------------------
-// Cart, comanda and the returning buyer
+// Cart, settlement and the returning buyer
 // ---------------------------------------------------------------------------
 
 /** Nothing to check out. Cart mode only. */
 export const EmptyCartFlow: StoryObj = scene({}, { cart: { empty: true, totalItems: 0 } });
 
-/** A comanda settlement — legitimately an empty cart, with the mesa's total. */
+/** A settlement settlement — legitimately an empty cart, with the mesa's total. */
 export const ComandaTable: StoryObj = scene(
   {},
   {
     cart: { empty: true, totalItems: 0 },
-    comanda: { scope: "TABLE", totalLabel: "R$ 214,00", totalItems: 7 },
+    settlement: { scope: "TABLE", totalLabel: "R$ 214,00", totalItems: 7 },
   },
 );
 
-/** The buyer's own share of a shared comanda. */
+/** The buyer's own share of a shared settlement. */
 export const ComandaMine: StoryObj = scene(
   {},
   {
     cart: { empty: true, totalItems: 0 },
-    comanda: { scope: "MINE", totalLabel: "R$ 62,50", totalItems: 3 },
+    settlement: { scope: "MINE", totalLabel: "R$ 62,50", totalItems: 3 },
   },
 );
 

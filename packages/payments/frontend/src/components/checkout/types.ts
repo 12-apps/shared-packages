@@ -92,7 +92,7 @@ export interface CheckoutOrder {
   totalCents: number;
   /**
    * GROSS total before discounts, or null when the discount engine never ran
-   * for this order (every order predating FUT-235, and the comanda path): the
+   * for this order (every order predating FUT-235, and the settlement path): the
    * subtotal then simply IS {@link totalCents}.
    */
   subtotalCents: number | null;
@@ -117,13 +117,25 @@ export interface CheckoutOrder {
 }
 
 /**
- * Comanda settlement context for the checkout (FUT-comandas): the scope plus
- * the host-resolved totals shown in place of the cart total when settling a
- * comanda. HOW a comanda is resolved is the host's business; the flow only
- * renders the answer.
+ * SETTLEMENT context: this checkout pays an already-open balance rather than
+ * the cart.
+ *
+ * Named for what it does, not for the one product it came from. It was
+ * `SettlementCheckout` with `scope: "MINE" | "TABLE"` — a restaurant tab and its
+ * two ways of splitting one — which is a real concept but that host's, and it
+ * arrived in every adopter's type surface. The shape underneath is general: a
+ * host has resolved SOME balance, by whatever rule it likes, and the flow shows
+ * that total in place of the cart's.
+ *
+ * `scope` is an opaque string the library only echoes back. It exists so a host
+ * can tell its own two settlement modes apart in the events it receives; this
+ * package neither reads it nor enumerates it, which is exactly why it must not
+ * publish a closed set of somebody else's words.
+ *
+ * HOW a balance is resolved is the host's business; the flow renders the answer.
  */
-export interface ComandaCheckout {
-  scope: "MINE" | "TABLE";
+export interface SettlementCheckout {
+  scope: string;
   totalLabel: string;
   totalItems: number;
 }
@@ -153,7 +165,7 @@ export type CreateOrderResult =
 
 /**
  * What the flow hands the host's `createOrder` port. Everything else an order
- * needs — WHICH cart, WHICH comanda scope, WHICH tenant — is the host's own
+ * needs — WHICH cart, WHICH settlement scope, WHICH tenant — is the host's own
  * context, closed over by its port implementation.
  */
 export interface CreateOrderRequest {

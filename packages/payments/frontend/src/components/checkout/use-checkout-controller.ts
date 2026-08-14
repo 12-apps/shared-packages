@@ -35,15 +35,15 @@ const CPF_ONLY: readonly CheckoutCustomerField[] = [
 export interface CheckoutHostPorts {
   /**
    * Raise the order (and its first charge). The host closes over everything
-   * the flow must not know: WHICH cart, WHICH tenant, WHICH comanda scope.
-   */
+   * the flow must not know: WHICH cart, WHICH tenant, WHICH settlement scope.
+ */
   createOrder: (input: CreateOrderRequest) => Promise<CreateOrderResult>;
   /**
    * Persist the buyer's contact when they press "Continuar" on Dados — the
    * host's account surface owns the write (and the blank-CPF-never-clears
    * rule). Fire-and-forget by contract: the flow advances regardless of the
    * outcome, and only calls this under the "salvar meus dados" consent.
-   */
+ */
   saveBuyerContact?: (contact: BuyerContact) => void;
   /** Leave checkout for the host's menu/catalog. */
   onExitToMenu: () => void;
@@ -52,7 +52,7 @@ export interface CheckoutHostPorts {
    * server emptied it inside the confirmation transaction (FUT-601) and
    * nothing else tells the SPA. Never fired for FAILED/EXPIRED: that shopper
    * still has a basket to retry with.
-   */
+ */
   onPaid?: () => void;
 }
 

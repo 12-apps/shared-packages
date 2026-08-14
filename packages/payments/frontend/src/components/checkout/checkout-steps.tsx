@@ -113,8 +113,8 @@ export function EmptyCart({ onBack }: { onBack: () => void }): JSX.Element {
 }
 
 /**
- * The totals shown on the pay bar: the comanda scope's when settling a comanda
- * (FUT-comandas), otherwise the cart's own — both supplied by the host, which
+ * The totals shown on the pay bar: the settled balance's when settling a settlement
+ * one, otherwise the cart's own — both supplied by the host, which
  * is the only side that knows either.
  */
 function displayTotals(
@@ -184,9 +184,9 @@ export function DadosStep({
    * (FUT-246) — RENDERED BY THE HOST from its cart (the storefront passes its
    * cart footer's money block), never re-implemented here, so the two surfaces
    * can never word the same discount differently.
-   */
+ */
   discountLines?: ReactNode;
-  /** Comanda settlement (FUT-comandas): totals come from the comanda, not the cart. */
+  /** Settling an open balance: totals come from the settlement, not the cart. */
   totalOverride?: { label: string; items: number };
 }): JSX.Element {
   const { Checkbox } = useCheckoutComponents();
@@ -215,7 +215,7 @@ export function DadosStep({
         createError={createError}
         onContinue={onContinue}
       >
-        {/* Suppressed while settling a comanda: those totals come from the
+        {/* Suppressed while settling a balance: those totals come from the
             frozen ticket, not the cart. */}
         {totalOverride ? null : discountLines}
       </DadosPayBar>
@@ -275,21 +275,21 @@ interface PaymentStepProps {
   /**
    * The refusal's machine code (FUT-563). An UNRESOLVED charge is not a failed
    * one — the panel below must not offer to raise a second.
-   */
+ */
   errorCode?: string | null;
   onGenerate: (method: PaymentMethod) => void;
   onUseEmail: (email: string) => void;
   /**
    * Present ⇒ the buyer reached this step without a Dados step (FUT-465), so
    * the payer block states who is being charged and reopens Dados to change it.
-   */
+ */
   onEditBuyer?: () => void;
   /**
    * The store's active payment protocol (`GET /api/checkout/config`, FUT-697).
    * `null` while loading or on a transient fetch failure — methods then render
    * as before and the card path degrades to the PagBank per-order key refresh,
    * WITHOUT mock permission (fail-open for the UI, fail-closed for the money).
-   */
+ */
   providerConfig?: CheckoutProviderConfig | null;
   /** Scopes the saved-card list to the store being paid (host routing owns it). */
   tenantSlug?: string;
