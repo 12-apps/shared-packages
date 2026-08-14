@@ -4,7 +4,7 @@ import type { WalletInstrument, WalletType } from './wallet-types';
 
 export type { SettlementHints };
 /** The probe verdict types, re-exported so `core/types` stays the one door. */
-export type { ProbeFault, ProbeOutcome } from './probe';
+export type { ProbeCheck, ProbeFault, ProbeOutcome } from './probe';
 /**
  * Domain types for the vendor-agnostic payments core.
  *
