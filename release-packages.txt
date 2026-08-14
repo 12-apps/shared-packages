@@ -1,0 +1,40 @@
+# The publishable packages, in TOPOLOGICAL order (dependencies first).
+#
+# The single source of truth for what this repo releases. ci.yml loads it into
+# PUBLISH_DIRS; release-watchdog.yml lets the scripts read it directly; and
+# scripts/lib/release-state.mjs falls back to it whenever PUBLISH_DIRS is unset.
+#
+# Order is load-bearing for PUBLISHING and irrelevant to verifying: a package is
+# released only after everything it depends on, so prepare-publish.mjs always
+# resolves workspace:* interdeps to a version that already exists.
+#
+# Paths rather than names because payments ships as a nested workspace.
+packages/eslint-config
+packages/typescript-config
+packages/observability-backend
+packages/auth
+packages/entity-lifecycle
+packages/forms-core
+packages/jobs
+packages/payments/backend
+packages/product-research
+packages/rbac
+packages/realtime
+packages/shift
+packages/stock-domain
+packages/payments/frontend
+packages/payments/e2e
+packages/ui
+packages/audit
+packages/storage
+packages/entitlements
+packages/pwa
+packages/observability-frontend
+packages/app-shell
+packages/onboarding
+packages/product-research-ui
+packages/report-builder
+packages/notifications
+packages/mcp
+packages/prisma
+packages/shared-helpers

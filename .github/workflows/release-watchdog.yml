@@ -1,0 +1,69 @@
+name: Release watchdog
+
+# Ask the one question the release job can only ask when someone merges: is every
+# package's newest tag actually on the registry?
+#
+# WHY a schedule is not redundant with the checks inside `release`. Those run on
+# push to main, so a repo that goes quiet stops checking — and a stuck package is
+# SILENT by construction. `semantic-release` sees its own tag, concludes there is
+# nothing new, and reports success forever; nothing goes red on its own. That is
+# precisely how `auth-v1.22.0` survived four days and five red runs unnoticed,
+# and was found by a consumer in another repository rather than by anyone here.
+#
+# It is also the only check that still fires when the release job cannot run at
+# all — a workflow syntax error, a revoked credential, an outage that eats the
+# push event. A watchdog that shares its subject's failure modes is not a
+# watchdog.
+#
+# Cheap by construction: a checkout, `git tag --list` and one `npm view` per
+# package. No install, no build, nothing published, nothing written to the repo.
+
+on:
+  schedule:
+    # 09:00 UTC daily — inside the working day for this team, so an alert raised
+    # by this run is read the same morning rather than at 3am.
+    - cron: '0 9 * * *'
+  # So a human who suspects a stuck package can ask immediately instead of
+  # waiting for tomorrow, and so this workflow is testable without a merge.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write # the alert issue this raises, updates and closes
+
+concurrency:
+  group: release-watchdog
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify released tags
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth 0 for the TAGS: this check is entirely a comparison between
+      # the tags in git and the versions on the registry, and a shallow clone
+      # brings none of them. It would report "0 packages verified" and pass.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+
+      # No PUBLISH_DIRS here on purpose. The scripts fall back to
+      # release-packages.txt, which IS the list — and ci.yml's copy is asserted
+      # identical to it by scripts/release-tags-selftest.mjs, so this cannot
+      # quietly watch a different set of packages than the one being released.
+      - name: Verify every release tag reached the registry
+        run: node scripts/verify-released.mjs
+
+      # `always()`, because the run this most needs to report on is the one the
+      # step above just failed.
+      - name: Alert on a package that is stuck
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_JOB_STATUS: ${{ job.status }}
+          RELEASE_ALERT_WEBHOOK: ${{ secrets.RELEASE_ALERT_WEBHOOK }}
+        run: node scripts/release-alert.mjs

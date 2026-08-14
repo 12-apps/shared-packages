@@ -30,54 +30,14 @@
 // the names it did not get onto the registry (PUBLISH_INCOMPLETE, and the
 // no-credential subset PUBLISH_WEDGED) and those orphans get the remedy in the
 // right ORDER: fix the publish first, delete the tag second.
-import { spawnSync } from "node:child_process";
-import { appendFileSync, readFileSync } from "node:fs";
-import { join, resolve, basename } from "node:path";
+import { appendFileSync } from "node:fs";
 
-const DIRS = (process.env.PUBLISH_DIRS ?? "").split(/\s+/).filter(Boolean);
+import { handedOver, publishDirs, releaseState } from "./lib/release-state.mjs";
 
-const names = (variable) => new Set((process.env[variable] ?? "").split(/\s+/).filter(Boolean));
-const INCOMPLETE = names("PUBLISH_INCOMPLETE");
-const WEDGED = names("PUBLISH_WEDGED");
+const DIRS = publishDirs();
 
-function run(cmd, args) {
-  const result = spawnSync(cmd, args, { encoding: "utf8" });
-  return { ok: result.status === 0, out: `${result.stdout ?? ""}`.trim() };
-}
-
-function manifestName(dir) {
-  return JSON.parse(readFileSync(join(resolve(dir), "package.json"), "utf8")).name;
-}
-
-/**
- * The newest `<prefix>-v*` tag, as a bare version.
- *
- * `--sort=-v:refname` is version-aware, which matters: lexically `v1.9.0` sorts
- * after `v1.22.0` and the check would compare against the wrong tag.
- */
-function newestTag(prefix) {
-  const { ok, out } = run("git", ["tag", "--list", `${prefix}-v*`, "--sort=-v:refname"]);
-  if (!ok || out === "") return null;
-  const tag = out.split("\n")[0];
-  return { tag, version: tag.slice(`${prefix}-v`.length) };
-}
-
-/**
- * Every version on the registry, or `null` when the package is not there at all.
- *
- * A name the registry has never seen is NOT this check's business — that is a
- * first publish, which `scripts/first-publish.mjs` owns.
- */
-function registryVersions(name) {
-  const { ok, out } = run("npm", ["view", name, "versions", "--json"]);
-  if (!ok) return null;
-  try {
-    const parsed = JSON.parse(out);
-    return Array.isArray(parsed) ? parsed : [parsed];
-  } catch {
-    return null;
-  }
-}
+const INCOMPLETE = handedOver("PUBLISH_INCOMPLETE");
+const WEDGED = handedOver("PUBLISH_WEDGED");
 
 function report(lines) {
   console.log(lines.join("\n"));
@@ -90,31 +50,15 @@ function report(lines) {
 
 if (DIRS.length === 0) throw new Error("PUBLISH_DIRS is empty — nothing to verify");
 
-const orphans = [];
-const checked = [];
-const unpublished = [];
+const { orphans, unpublished, healthy } = releaseState(DIRS);
 
-for (const dir of DIRS) {
-  const prefix = basename(dir);
-  const name = manifestName(dir);
-  const tag = newestTag(prefix);
-  if (!tag) continue;
-
-  const versions = registryVersions(name);
-  if (versions === null) {
-    unpublished.push(`${name} (tagged ${tag.tag}, not on the registry yet)`);
-    continue;
-  }
-
-  checked.push(name);
-  if (!versions.includes(tag.version)) {
-    orphans.push({ name, tag: tag.tag, version: tag.version });
-  }
-}
-
-const lines = [`${checked.length} package(s) verified against the registry`];
+const lines = [`${healthy.length + orphans.length} package(s) verified against the registry`];
 if (unpublished.length > 0) {
-  lines.push(`not yet on the registry, skipped: ${unpublished.join(", ")}`);
+  lines.push(
+    `not yet on the registry, skipped: ${unpublished
+      .map(({ name, tag }) => `${name} (tagged ${tag}, not on the registry yet)`)
+      .join(", ")}`,
+  );
 }
 
 /**
