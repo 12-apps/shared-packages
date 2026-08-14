@@ -146,6 +146,22 @@ export interface SetupSection {
    * that still reads as a command looks like a step outstanding.
    */
   doneSummary?: { label: string; value: string };
+  /**
+   * The confirm button's copy, for a section ending in a question only the
+   * owner can answer (the step carrying the confirmation `action`).
+   *
+   * The label used to be a constant in the renderer — "Já habilitei o Checkout
+   * Integrado" — written for the one guide that had a confirmable section, and
+   * NAMING ANOTHER VENDOR'S PRODUCT on every other provider's screen. That
+   * confirmation is the only mechanism a guide has for advancing past a step no
+   * API can report, so every provider with such a step needs one, and each is
+   * asking about something different: Stripe's dashboard, Stone's webhook
+   * registration, InfinitePay's Checkout Integrado.
+   *
+   * Absent, the renderer falls back to that original string — so InfinitePay's
+   * guide is unchanged, byte for byte.
+   */
+  confirmLabel?: string;
 }
 
 /** One stage of the provider onboarding stepper (connect → verify → sell). */

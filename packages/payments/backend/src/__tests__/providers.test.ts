@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { WebhookVerificationError } from '../core/errors';
 import { createPaymentsGateway } from '../core/gateway';
-import type { WebhookDelivery } from '../core/types';
+import type { PaymentProviderAdapter } from '../core/provider';
+import type { SetupProgress, WebhookDelivery } from '../core/types';
 import { guardedWebhook, json } from '../http/responses';
 import {
   createMemoryAttemptLedger,
@@ -178,53 +179,136 @@ describe('provider skeletons (stub mode)', () => {
   });
 
   /**
-   * Stripe's guide used to declare a `webhook` section no stage pointed at.
+   * ── The guide shape invariant ──────────────────────────────────────────────
    *
-   * The renderer shows ONE section — the one whose id matches the active
-   * stage — so the store's notification URL and its copy button were
-   * unreachable from every state, and the `activate` stage resolved to no
-   * section at all. The fix is Stone's shape: a section per stage (FUT-691).
+   * Asserted for EVERY guide, because this defect has now shipped three times
+   * in three spellings and each one was found by a store owner, not by CI.
+   *
+   * A walkthrough renders ONE section: the one paired with the stage the store
+   * is on. Two rules follow, and they pull against each other — which is why
+   * both belong in a single test rather than one each:
+   *
+   *  - **No section may be unpaired with a stage.** Nothing can ever select it,
+   *    so its content is dead. Stripe shipped a `webhook` section no stage
+   *    pointed at, and a store's own notification URL was unreachable from
+   *    every state (FUT-691).
+   *  - **The LAST stage may not carry a section.** That slot belongs to the
+   *    host's activation card, which appears only once the guide has run out of
+   *    sections. Stripe (FUT-799) and Stone (FUT-800) both paired it, and for a
+   *    provider declaring `activationCharge` the result is not cosmetic: that
+   *    card is the only control that stamps `chargeVerifiedAt`, `proofMissing`
+   *    refuses to enable without it, and no store could be switched on at all.
+   *
+   * Fixing the first by pairing every stage 1:1 is what caused the second. A
+   * test pinning one direction and not the other defends the bug.
    */
-  it('stripe pairs every stage with a section, 1:1 and in order', () => {
+  it('no guide ships an unpaired section, nor a section on its last stage', () => {
+    const ctx = { webhookUrl: 'https://host.example/api/webhooks/x' };
+    for (const adapter of [stoneProvider(), infinitePayProvider(), stripeProvider()]) {
+      const guide = adapter.setupGuide?.(ctx);
+      const stageIds = guide?.stages.map((s) => s.id) ?? [];
+      const sectionIds = guide?.sections.map((s) => s.id) ?? [];
+
+      expect(sectionIds.filter((id) => !stageIds.includes(id))).toEqual([]);
+      expect(sectionIds).not.toContain(stageIds.at(-1));
+    }
+  });
+
+  /**
+   * The other half of the deadlock, and the half a shape check cannot see: a
+   * guide has to REACH its empty stage under its own steam.
+   *
+   * Stripe's `activeStageOf` returned 0, 2 or `stages.length` and never 3, so a
+   * connected store sat on a middle stage only `proven` could leave — while
+   * `proven` is stamped by the charge living on the stage it never reached
+   * (FUT-799). Stone answered with no `activeStage` at all, pinning the stepper
+   * on step 1 over a store that had done every step (FUT-800). Neither shows up
+   * in the stages/sections arrays; both are fatal the same way.
+   *
+   * The renderer clamps BACK to an owner-confirmable section by itself
+   * (`effectiveStage`), so reporting the last stage here is not a claim that the
+   * store is finished — it is what lets the walkthrough finish at all.
+   */
+  it('every provable guide reaches its empty last stage once connected', () => {
+    const at = (adapter: PaymentProviderAdapter, progress: SetupProgress) =>
+      adapter.setupGuide?.({ webhookUrl: 'https://host.example/w', progress });
+
+    for (const adapter of [stoneProvider(), infinitePayProvider(), stripeProvider()]) {
+      // Only a provider that CAN prove itself by charging is held to this: the
+      // empty stage is reserved for the activation card.
+      expect(adapter.capabilities.activationCharge).toBe(true);
+
+      const fresh = at(adapter, { configured: {}, connected: false, proven: false });
+      expect(fresh?.activeStage).toBe(0);
+
+      const connected = at(adapter, { configured: {}, connected: true, proven: false });
+      expect(connected?.activeStage).toBe((connected?.stages.length ?? 0) - 1);
+
+      // Charged: past the last stage, so every step reads as complete.
+      const proven = at(adapter, { configured: {}, connected: true, proven: true });
+      expect(proven?.activeStage).toBe(proven?.stages.length);
+    }
+  });
+
+  /**
+   * A stage the owner can only leave by saying so needs a button that names
+   * what they are agreeing to. The label was a constant in the renderer —
+   * InfinitePay's "Já habilitei o Checkout Integrado" — which names another
+   * vendor's product on Stripe's and Stone's screens (FUT-799).
+   */
+  it('a confirmable section authors its own confirm label, per vendor', () => {
+    const ctx = { webhookUrl: 'https://host.example/w' };
+    const asking = (adapter: PaymentProviderAdapter) =>
+      adapter.setupGuide?.(ctx)?.sections.find((section) =>
+        section.steps.some((step) => step.action === 'checkout-integrado-confirmado'),
+      );
+
+    for (const adapter of [stoneProvider(), stripeProvider()]) {
+      const label = asking(adapter)?.confirmLabel;
+      expect(label).toBeTruthy();
+      expect(label).not.toContain('Checkout Integrado');
+    }
+    // InfinitePay authors none, so the renderer's fallback leaves its guide
+    // exactly as it shipped — the one screen that constant was written for.
+    expect(asking(infinitePayProvider())?.confirmLabel).toBeUndefined();
+  });
+
+  /**
+   * Stripe's two dashboard stages collapsed into one: `methods` and `webhook`
+   * both happen on Stripe's own screens and no API can tell them apart, so no
+   * fact could ever have advanced the walkthrough between them — and with a
+   * connected store sent straight to `webhook`, `methods` was unreachable too
+   * (FUT-799).
+   */
+  it('stripe asks for one visit to the dashboard, carrying the notification URL', () => {
     const ctx = { webhookUrl: 'https://host.example/api/webhooks/x' };
     const guide = stripeProvider().setupGuide?.(ctx);
 
-    expect(guide?.stages.map((s) => s.id)).toEqual(['connect', 'methods', 'webhook', 'activate']);
-    expect(guide?.sections.map((s) => s.id)).toEqual(['connect', 'methods', 'webhook', 'activate']);
-    // The once-dead section is the one carrying the per-store fact.
-    const webhook = guide?.sections.find((s) => s.id === 'webhook');
-    expect(JSON.stringify(webhook)).toContain(ctx.webhookUrl);
+    expect(guide?.stages.map((s) => s.id)).toEqual(['connect', 'dashboard', 'activate']);
+    expect(guide?.sections.map((s) => s.id)).toEqual(['connect', 'dashboard']);
+
+    const dashboard = guide?.sections.find((s) => s.id === 'dashboard');
+    expect(JSON.stringify(dashboard)).toContain(ctx.webhookUrl);
+    // Named in the step's own sentence, not only in the copy button's label —
+    // that label reaches screen readers alone (`CopyRow`).
+    expect(dashboard?.steps.some((step) => step.text?.includes('URL de notificação'))).toBe(true);
     // A host that reports no progress gets no stage claim — renders as step 1.
     expect(guide?.activeStage).toBeUndefined();
   });
 
   /**
-   * And it used to return no `activeStage` at all, so the stepper sat on
-   * "Conectar conta" forever — over a store that had already connected. Same
-   * contract as InfinitePay's above: the adapter reports the stage the server
-   * can PROVE, from `ctx.progress` (FUT-691).
+   * The manual path is not a second-class citizen: a store pasting its own
+   * `sk_`/`pk_` walks the same three stages, so the connect section has to say
+   * where that door is (FUT-796). Every credential field is optional precisely
+   * so either mode satisfies the schema.
    */
-  it('stripe reports the stage it can prove from the host progress', () => {
-    const guide = (progress: {
-      configured: Record<string, boolean>;
-      connected: boolean;
-      proven: boolean;
-    }) => stripeProvider().setupGuide?.({ webhookUrl: 'https://host.example/w', progress });
+  it('stripe points a store at the manual-credentials path too', () => {
+    const guide = stripeProvider().setupGuide?.({ webhookUrl: 'https://host.example/w' });
 
-    const fresh = guide({ configured: {}, connected: false, proven: false });
-    expect(fresh?.activeStage).toBe(0);
-
-    // Connected moves it to the webhook stage — the dashboard steps in the
-    // middle cannot be told apart by any API, and this is the last stage with
-    // a per-store fact to show. Not step 1, which is what the stepper was
-    // stuck on before.
-    const connected = guide({ configured: { publishableKey: true }, connected: true, proven: false });
-    expect(connected?.activeStage).toBe(2);
-    expect(connected?.stages[2]?.id).toBe('webhook');
-
-    // Charged: past the last stage, so every step reads as complete.
-    const proven = guide({ configured: { publishableKey: true }, connected: true, proven: true });
-    expect(proven?.activeStage).toBe(proven?.stages.length);
+    expect(guide?.sections.find((s) => s.id === 'connect')?.intro).toContain(
+      'credenciais manualmente',
+    );
+    expect(stripeProvider().credentialSchema.every((field) => !field.required)).toBe(true);
   });
 
   it('declares an auth mode per provider: OAuth where the vendor supports it', () => {
