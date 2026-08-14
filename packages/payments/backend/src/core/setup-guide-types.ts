@@ -68,6 +68,24 @@ export interface CredentialFieldSpec {
    * bridge; no consumer has to know a provider's token vocabulary.
    */
   fulfilledBy?: string;
+  /**
+   * An EXTRA most stores must leave empty — not merely "not required".
+   *
+   * `required: false` is a claim about enablement, and it is true of every
+   * Stripe field (under OAuth the access token fulfils the secret key, so
+   * nothing has to be typed at all). That makes a required-field test vacuous
+   * on the credentials path, and a completeness rule built on it asked for
+   * every box in the schema — which turned Stripe's `connectedAccountId` into
+   * a field owners dutifully filled with their OWN account id. That value sends
+   * `Stripe-Account: acct_...`, which is for a PLATFORM charging on behalf of a
+   * separately-onboarded account; sent with that same account's own key, Stripe
+   * refuses the call. The screen then reported "Credenciais recusadas" over
+   * four correctly-filled boxes.
+   *
+   * So a field the ordinary store does not use says so, and completeness skips
+   * it. The form still renders it — the platforms that need it are real.
+   */
+  advanced?: boolean;
 }
 
 /** A labelled external link rendered inline within a setup step. */

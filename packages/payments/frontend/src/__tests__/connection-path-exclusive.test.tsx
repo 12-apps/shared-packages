@@ -46,6 +46,7 @@ function stripeDescriptor(): ProviderDescriptor {
 
 function stripeGuide(connected: boolean): ProviderSetupGuide {
   const guide = stripeProvider().setupGuide?.({
+    brandName: 'Quitanda Digital',
     webhookUrl: 'https://loja.example/api/webhooks/payments/stripe/x',
     progress: { configured: {}, connected, proven: false },
   });
@@ -203,6 +204,29 @@ describe('the two connection paths are mutually exclusive', () => {
    * Stripe" over a form with two boxes still empty — a rejection of a request
    * not worth making, reading as a verdict on what had been typed.
    */
+  it('leaves an advanced field out of what "filled" means', async () => {
+    // `connectedAccountId` sends `Stripe-Account:`, which is for a PLATFORM
+    // charging on behalf of an account it onboarded. Counting it toward
+    // completeness told owners to fill it, and their own account id there makes
+    // Stripe refuse every call — the refusal this gate exists to avoid.
+    renderPanel(true);
+    await openManual();
+
+    const boxes = screen.getAllByRole('textbox');
+    for (const box of boxes) {
+      const advanced = /Connected account/i.test(box.getAttribute('aria-label') ?? box.id ?? '');
+      if (!advanced) fireEvent.change(box, { target: { value: 'x' } });
+    }
+    for (const secret of document.querySelectorAll('input[type="password"]')) {
+      fireEvent.change(secret, { target: { value: 'x' } });
+    }
+
+    await waitFor(() => {
+      // Complete WITHOUT the advanced box — the owner is never pushed to fill it.
+      expect(screen.getByTestId('payments-save').textContent).toContain('Salvar e testar conexão');
+    });
+  });
+
   it('promises a test only once every field is filled', async () => {
     renderPanel(false);
     await openManual();

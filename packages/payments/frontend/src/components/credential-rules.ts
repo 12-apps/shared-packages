@@ -46,9 +46,12 @@ export function allRequiredStored(
  * "Credenciais recusadas pela Stripe." — a rejection reported for a request
  * that was never worth making, blaming the owner mid-way through typing.
  *
- * So completeness is measured over the WHOLE schema. A partial save is still a
- * perfectly good save — blank fields preserve what is stored — it simply is not
- * yet a connection worth testing.
+ * So completeness is measured over the schema MINUS its `advanced` fields.
+ * Not the whole schema: that asked for Stripe's `connectedAccountId`, which
+ * ordinary stores must leave empty, and owners filled it with their own account
+ * id to satisfy the button — producing exactly the refusal this was meant to
+ * prevent. A partial save is still a perfectly good save (blank fields preserve
+ * what is stored); it simply is not yet a connection worth testing.
  */
 export function credentialsComplete(
   descriptor: ProviderDescriptor,
@@ -58,6 +61,7 @@ export function credentialsComplete(
 ): boolean {
   const stored = config?.environments[environment] ?? {};
   return descriptor.credentialSchema.every((spec) => {
+    if (spec.advanced) return true;
     const typed = values[spec.key];
     if (typed !== undefined && typed.trim() !== '') return true;
     return stored[spec.key]?.configured === true;

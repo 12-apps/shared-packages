@@ -269,7 +269,7 @@ describe('provider skeletons (stub mode)', () => {
    * to add a variant is held to it without anyone remembering to.
    */
   it('every credentialsPath variant mirrors its base guide shape', () => {
-    const ctx = { webhookUrl: 'https://host.example/api/webhooks/x' };
+    const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x' };
     const confirmableIndex = (guide: {
       stages: readonly { id: string }[];
       sections: readonly { id: string; steps: readonly { action?: string }[] }[];

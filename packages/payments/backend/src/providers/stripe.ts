@@ -222,6 +222,12 @@ export function stripeProvider(): PaymentProviderAdapter {
         label: 'Connected account (acct_...)',
         secret: false,
         required: false,
+        // Sends `Stripe-Account:` — only meaningful for a platform charging on
+        // behalf of an account it onboarded. A store using its own key must
+        // leave this empty; its own id here makes Stripe refuse every call.
+        advanced: true,
+        helperText:
+          'Deixe em branco. Só preencha se você é uma plataforma Connect cobrando em nome de outra conta — com as suas próprias chaves, este campo faz a Stripe recusar a conexão.',
       },
     ],
     customerSchema,
