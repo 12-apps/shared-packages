@@ -18,13 +18,13 @@
 import { Box } from "@mui/material";
 import { useState } from "react";
 
-import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 
 import { ClearAllControl, CloseSearchControl } from "./data-views-bar-controls";
 import type { GridFilterPanelProps } from "./data-views-filter-panel";
 import { MoreFilters } from "./data-views-more-filters";
 import type { OverflowField, OverflowSplit } from "./data-views-overflow";
 import { CollapsedSearch, InlineKeyword } from "./data-views-search";
+import { PillControl } from "./data-views-category-pill";
 import { RangePill } from "./data-views-range-pill";
 import type { RangeValue } from "./data-views-types";
 
@@ -116,19 +116,14 @@ function InlineControl<T extends Record<string, unknown>>({
 }): React.JSX.Element | null {
   if (field.group === "pill" && field.pill) {
     return (
-      <MultiSelectDropdown
-        label={field.pill.label}
-        options={field.pill.options}
-        selected={new Set(pills[field.id] ?? [])}
-        onToggle={(value, checked) => onTogglePill(field.id, value, checked)}
-        onClear={() => onClearField(field.id)}
-        allLabel="Todas"
-        searchable={field.pill.searchEnabled ? true : undefined}
-        searchPlaceholder="Buscar…"
-        noResultsLabel="Nenhum resultado"
-        layout="pill"
+      <PillControl
+        fieldId={field.id}
+        pill={field.pill}
+        selected={pills[field.id] ?? []}
+        onTogglePill={onTogglePill}
+        onClearField={onClearField}
         onOpenChange={onOpenChange}
-        data-testid={`${testIdPrefix}-filter-${field.id}`}
+        testIdPrefix={testIdPrefix}
       />
     );
   }

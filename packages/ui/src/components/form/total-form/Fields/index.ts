@@ -1,3 +1,5 @@
+export { CategoryField } from './CategoryField';
+export type { CategoryFieldProps } from './CategoryField';
 export { CepField } from './CepField';
 export type { CepFieldProps, CepFills } from './CepField';
 export { TextField } from './TextField';

@@ -8,5 +8,5 @@ export { SubmitButton } from './SubmitButton';
 export type { SubmitButtonProps } from './SubmitButton';
 
 export * as Fields from './Fields';
-export { TextField, SelectField } from './Fields';
-export type { TextFieldProps, SelectFieldProps } from './Fields';
+export { CategoryField, TextField, SelectField } from './Fields';
+export type { CategoryFieldProps, TextFieldProps, SelectFieldProps } from './Fields';

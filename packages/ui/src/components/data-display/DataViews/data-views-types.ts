@@ -87,6 +87,11 @@ export const CARD_ASPECT_RATIOS: Record<CardAspectRatio, number> = {
 export interface FilterOption {
   value: string;
   label: string;
+  /**
+   * Parent option's `value`, for a hierarchical field (`control: "category"`).
+   * Ignored by the flat controls, so one option list serves both.
+   */
+  parentId?: string | null;
 }
 
 /** A typed, multi-select filter pill's configuration for a table. */
@@ -98,9 +103,12 @@ export interface FilterFieldConfig<T extends Record<string, unknown>> {
   /**
    * How the field renders in the filter panel. `checkboxes` (default) is best for
    * a few fixed options; `multiselect` is a compact dropdown for long option
-   * lists (e.g. many categories).
+   * lists; `category` is the hierarchical picker, for an option set that nests
+   * via {@link FilterOption.parentId} — it renders parents as headings and
+   * their children as the selectable rows, rather than flattening the tree into
+   * one indistinguishable list.
    */
-  control?: "checkboxes" | "multiselect";
+  control?: "checkboxes" | "multiselect" | "category";
   /**
    * Forces this filter to render as a searchable multi-select dropdown with the
    * search box always shown, regardless of how many options are currently

@@ -3,9 +3,9 @@
 import { Box, Link } from "@mui/material";
 
 import { StackedModal, StackedModalContent } from "../../feedback/StackedModal";
-import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 import { TableFilter } from "../../layout/TableFilter";
 
+import { PillControl } from "./data-views-category-pill";
 import { PanelRangeField } from "./data-views-range-pill";
 import type {
   FilterFieldConfig,
@@ -45,21 +45,18 @@ function PillField<T extends Record<string, unknown>>({
 }): React.JSX.Element {
   const testId = `${testIdPrefix}-filter-${field.id}`;
   // `searchEnabled` forces the searchable multi-select; a plain `multiselect`
-  // keeps the auto "search only when the list is long" rule.
-  if (field.searchEnabled || field.control === "multiselect") {
+  // keeps the auto "search only when the list is long" rule. `category` is the
+  // hierarchical tree — see PillControl.
+  if (field.searchEnabled || field.control === "multiselect" || field.control === "category") {
     return (
-      <MultiSelectDropdown
-        label={field.label}
-        options={field.options}
-        selected={new Set(selected)}
-        onToggle={(value, checked) => onTogglePill(field.id, value, checked)}
-        onClear={() => onClearField(field.id)}
-        allLabel="Todas"
-        searchable={field.searchEnabled ? true : undefined}
-        searchPlaceholder="Buscar…"
-        noResultsLabel="Nenhum resultado"
+      <PillControl
+        fieldId={field.id}
+        pill={field}
+        selected={selected}
+        onTogglePill={onTogglePill}
+        onClearField={onClearField}
+        testIdPrefix={testIdPrefix}
         layout="stacked"
-        data-testid={testId}
       />
     );
   }
