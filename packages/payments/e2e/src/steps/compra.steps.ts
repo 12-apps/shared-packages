@@ -238,8 +238,13 @@ Then('o pedido foi guardado antes da navegação', async ({ page }) => {
   // Reading storage is the only way to see "BEFORE". The navigation may tear
   // the application down at any point after it starts, so a write that happens
   // afterwards never happens at all.
+  // The literal, not an import: this package deliberately does not depend on
+  // `@12-apps/payments-frontend` — it is a portable corpus a host runs against
+  // whatever it mounted. So the key is asserted the way an outside observer
+  // sees it, which is also what makes it a real contract test. It is exported
+  // as `HOSTED_ORDER_STORAGE_KEY` there, and the two must move together.
   const parked = await page.evaluate(() =>
-    window.sessionStorage.getItem('futurepay.checkout.hostedOrder'),
+    window.sessionStorage.getItem('payments.checkout.hostedOrder'),
   );
   expect(parked).toContain(paymentsWorld().fixtures.payableRef);
 });
