@@ -29,10 +29,11 @@ export { McpEndpointUrl } from "./mcp-endpoint-url";
 export { HostBrandAvatar, CapabilityIcon } from "./ai-icons";
 export { FeatureBadge, type FeatureBadgeItem } from "./feature-badge";
 export {
-  AI_HOST_GUIDES,
+  aiHostGuides,
   AI_CAPABILITIES,
   AI_PERMISSION_MODEL,
-  AI_CONNECT_PROMPT,
+  aiConnectPrompt,
+  type AiConnectPromptSpec,
   providerForHostId,
   type AiHostBrand,
   type AiHostLink,

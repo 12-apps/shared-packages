@@ -13,10 +13,11 @@ export * from "./types";
 // truth for BOTH the `@12-apps/mcp/react` onboarding UI and the server-side connect
 // tools, so what an agent reads via MCP cannot drift from what owners see.
 export {
-  AI_HOST_GUIDES,
+  aiHostGuides,
   AI_CAPABILITIES,
   AI_PERMISSION_MODEL,
-  AI_CONNECT_PROMPT,
+  aiConnectPrompt,
+  type AiConnectPromptSpec,
   providerForHostId,
   type AiHostBrand,
   type AiHostLink,
