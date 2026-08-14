@@ -2,9 +2,10 @@
   "name": "@12-apps/stock-domain",
   "version": "1.0.0",
   "type": "module",
-  "description": "The stock-movement domain vocabulary — the closed value sets the reason taxonomy is built on, owned in one place.",
+  "description": "Closed, assembly-validated vocabularies for a stock-movement reason taxonomy. The values are the adopting application's and arrive as config.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "clean": "rm -rf node_modules coverage",
@@ -18,6 +19,7 @@
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   },
