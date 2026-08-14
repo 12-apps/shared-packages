@@ -3,6 +3,7 @@ import type { ComponentType } from 'react';
 import { AppShellPage } from './app-shell';
 import { AuditLogPage } from './audit-log';
 import { EntitlementsPlanPage } from './entitlements-plan';
+import { ImpersonationPage } from './impersonation';
 import { LifecycleAdminPage } from './lifecycle-admin';
 import { NotificationsCenterPage } from './notifications-center';
 import { PaymentsCheckoutApplePayPage } from './payments-checkout-apple-pay';
@@ -327,6 +328,13 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/storage',
     group: 'backoffice',
     Component: StorageUploadsPage,
+  },
+  {
+    slug: 'impersonation',
+    title: 'Desk sessions',
+    pkg: '@12-apps/impersonation',
+    group: 'backoffice',
+    Component: ImpersonationPage,
   },
   {
     slug: 'rbac-admin',

@@ -81,9 +81,9 @@ import { appShellHost, mountAppShellControls } from './app-shell-host';
 import { applyAuditMigrations } from './audit-db';
 import { auditHost, reseedAudit } from './audit-host';
 import { createEntitlementsHost, TENANT } from './entitlements-host';
+import { impersonationHost, mountImpersonationDemo } from './impersonation-host';
 import { mcpProbeRouter } from './harness-mcp-probe';
 import { applyLifecycleMigrations } from './lifecycle-db';
-import { demoEntityRoutes } from './lifecycle-demo-crud';
 import { createLifecycleDemoTables, lifecycleHost, reseedLifecycle } from './lifecycle-host';
 import { applyMcpMigrations, mcpOauthHost, reseedMcpOauth } from './mcp-oauth-host';
 import { applyNotificationMigrations } from './notifications-db';
@@ -98,8 +98,8 @@ import { applyRbacMigrations } from './rbac-db';
 import { rbacHost, reseedRbac } from './rbac-host';
 import { applyRealtimeMigrations, realtimeOutboxWriteDb } from './realtime-db';
 import { realtimeHost } from './realtime-host';
-import { reportsRouter } from './reports-host';
-import { openReportsDb, reseed, savedReportDb } from './saved-report-db';
+import { mountSurfaces } from './mount-surfaces';
+import { openReportsDb, reseed } from './saved-report-db';
 import { createStorageHost } from './storage-host';
 
 export interface HarnessBackend {
@@ -184,6 +184,10 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
     mcpOauth: mcpOauthHost(pg),
     pwa: pwaHost(),
     entitlements: createEntitlementsHost(),
+    // No migrations and no table: @12-apps/impersonation owns no model. The
+    // session IS the cookie, and the trail is a port the host implements —
+    // an array here, an append-only table in a real adopter.
+    impersonation: impersonationHost(),
     // 12-18: no migration and no table — the shell owns no model, so its state is a
     // Map here exactly as it is a column on `users` in a real adopter.
     appShell: appShellHost(),
@@ -191,7 +195,7 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
 }
 
 /** The mounted hosts one harness server is assembled from. */
-interface Hosts {
+export interface Hosts {
   rbac: ReturnType<typeof rbacHost>;
   audit: ReturnType<typeof auditHost>;
   lifecycle: ReturnType<typeof lifecycleHost>;
@@ -202,6 +206,7 @@ interface Hosts {
   mcpOauth: ReturnType<typeof mcpOauthHost>;
   pwa: ReturnType<typeof pwaHost>;
   entitlements: ReturnType<typeof createEntitlementsHost>;
+  impersonation: ReturnType<typeof impersonationHost>;
   appShell: ReturnType<typeof appShellHost>;
   storage: Awaited<ReturnType<typeof createStorageHost>>;
 }
@@ -228,6 +233,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await hosts.storage.reset();
     hosts.entitlements.reset();
     hosts.appShell.reset();
+    hosts.impersonation.reset();
     return c.body(null, 204);
   });
 }
@@ -316,6 +322,9 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   // SPA: the database is migrated and seeded by the time this answers, so the
   // first spec never races the first migration.
   app.get('/health', (c) => c.json({ ok: true }));
+  // The impersonation write gate (12-24), in front of EVERY api route and
+  // before any body is read — where a host puts it.
+  app.use('/api/*', hosts.impersonation.writeGate);
   mountReset(app, pg, hosts);
   mountRealtimeControls(app, pg, hosts);
   mountAppShellControls(app, hosts.appShell);
@@ -328,43 +337,10 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   // one-endpoint resource server (harness-mcp-probe.ts). Hashes and flags only.
   app.route('/', mcpProbeRouter(pg, hosts.mcpOauth));
   mountEntitlementDemo(app, hosts);
+  // The host endpoints that stand BEHIND the gate above.
+  mountImpersonationDemo(app, hosts.impersonation);
 
-  // FIRST — before the host's `/catalog-items/:id` CRUD below. See the header:
-  // reversing these two blocks is a red test, not a silent 404.
-  app.route('/api/admin/:tenantSlug', hosts.lifecycle.router);
-
-  // The host's OWN demo-entity CRUD (12-17) — the glue a real adopter has.
-  const demo = demoEntityRoutes(hosts.lifecycle, pg);
-  app.get('/api/admin/:tenantSlug/catalog-items', demo.list);
-  app.post('/api/admin/:tenantSlug/catalog-items', demo.save);
-  app.get('/api/admin/:tenantSlug/catalog-items/:id', demo.getOne);
-  app.put('/api/admin/:tenantSlug/catalog-items/:id', demo.save);
-  app.delete('/api/admin/:tenantSlug/catalog-items/:id', demo.remove);
-  app.delete('/api/admin/:tenantSlug/demo-suppliers/:id', demo.removeSupplier);
-
-  app.route('/api/admin/:tenantSlug', hosts.entitlements.router);
-  app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
-  app.route('/api/admin/:tenantSlug', hosts.rbac.router);
-  app.route('/api/admin/:tenantSlug', hosts.audit.router);
-  app.route('/api/admin/:tenantSlug', hosts.onboarding.router);
-  // Self-scoped and TENANT-FREE (12-15): the account surface every signed-in
-  // user has, wherever their stores are.
-  app.route('/api/account', hosts.notifications.router);
-  app.route('/__harness/notifications', hosts.notifications.harnessRoutes);
-  // Mounted at the API root, not under the tenant prefix: the surface carries BOTH its
-  // paths, and the account one takes no tenant slug at all. AFTER the notification
-  // mount above, deliberately: `/api` is the broader prefix of the two, and this file's
-  // header rule is that the more specific mount goes on first.
-  app.route('/api', hosts.realtime.events.router);
-  // 12-18, also at the API root and for the same reason: consent is a fact about the
-  // CALLER, so neither of its two paths carries a tenant slug.
-  app.route('/api', hosts.appShell.router);
-  // The last three mount at the ROOT and have to — the header says why for each.
-  // `/` is the broadest prefix here, so they go on LAST by the same
-  // more-specific-first rule the `/api` mounts above follow.
-  app.route('/', hosts.storage.router);
-  app.route('/', hosts.mcpOauth.router);
-  app.route('/', hosts.pwa.router);
+  mountSurfaces(app, hosts, pg);
 
   return {
     app,

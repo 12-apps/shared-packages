@@ -69,6 +69,25 @@ So what is stubbed here is only what a browser genuinely cannot have:
 Only `@12-apps/payments-backend`'s ROOT entry is imported. The adapter subpaths
 (`./providers/*`) reach for `node:crypto` and would not survive bundling.
 
+## The desk-session page (`impersonation`)
+
+`@12-apps/impersonation` is mounted the way a real host mounts it, and the split
+is the point: the BANNER lives in `src/shell/harness-shell.tsx`, once, so it is
+on every page in this app — the package refuses to start a session in a document
+with no banner host, so a page-level mount would make that guarantee a question
+of which screen you happened to be on. The page itself carries only what a host
+owns: a directory row that opens the packaged dialog, a "look as" picker over
+this app's own roles and people, and five probes that call HOST endpoints
+standing behind the packaged write gate.
+
+Those probes are the only way to see the gate from a browser, and there is one
+per rule: an ordinary write, a money write, an allowlisted money read, an
+unlisted money GET (the case where the verb lies) and a write to a borrower's own
+record. `harness/backend/src/impersonation-host.ts` holds the other half — the
+AES-GCM codec, the four path tables in this app's URLs, the roster, the trail
+(an array, where a real adopter has an append-only table) and the branch switch a
+spec flips to prove a live revocation.
+
 ## Running it
 
 ```bash

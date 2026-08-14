@@ -88,7 +88,7 @@
       ],
       "ignoreDependencies": [
         "// Declared so `turbo prune` keeps each partial's OWNING package in the",
-        "// build context — see packages/prisma/package.test.ts. The edge is a",
+        "// build context \u2014 see packages/prisma/package.test.ts. The edge is a",
         "// file COPY (or a symlink) made by scripts/sync-*-schema.mjs, never an",
         "// import, so knip cannot see it.",
         "@12-apps/audit",
@@ -142,7 +142,7 @@
         "src/index.ts",
         "// The published subpaths (server surface, hono adapter, react",
         "// bindings), plus the packaged coverage-gate script a HOST runs",
-        "// with `node .../scripts/entitlements-coverage.mjs` — reached by",
+        "// with `node .../scripts/entitlements-coverage.mjs` \u2014 reached by",
         "// no import in this repo.",
         "src/server/index.ts",
         "src/react/index.ts",
@@ -165,6 +165,23 @@
         "scripts/*.mjs"
       ]
     },
+    "packages/impersonation": {
+      "entry": [
+        "src/index.ts",
+        "// The published subpaths. Each is reached by a CONSUMER import and never",
+        "// from the root entry, which is framework-free on purpose.",
+        "src/server/index.ts",
+        "src/hono/index.ts",
+        "src/react/index.ts",
+        "// `./e2e` has to be named as SOURCE: its `exports` target is built output,",
+        "// which does not exist in a checkout, so knip would read the whole journey",
+        "// subtree as unused. The step definitions are reached by playwright-bdd's",
+        "// `steps` GLOB and never by an import.",
+        "src/e2e/index.ts",
+        "src/e2e/steps/**/*.ts"
+      ],
+      "ignoreDependencies": ["playwright-bdd"]
+    },
     "packages/report-builder": {
       "entry": [
         "src/index.ts",
@@ -172,7 +189,7 @@
         "// named as SOURCE: its `exports` target is built output, which does",
         "// not exist in a checkout, so knip would read the whole journey",
         "// subtree as unused. The step definitions are reached by",
-        "// playwright-bdd's `steps` GLOB and never by an import — a host points",
+        "// playwright-bdd's `steps` GLOB and never by an import \u2014 a host points",
         "// at dist/e2e/steps/**/*.js and bddgen loads each file for its",
         "// registration side effect, the same shape as payments/e2e below.",
         "src/server/index.ts",
@@ -211,7 +228,7 @@
       "entry": [
         "src/index.ts",
         "// The published subpaths. Each is reached by a CONSUMER import and never",
-        "// from the root entry, which is framework-free on purpose — so without",
+        "// from the root entry, which is framework-free on purpose \u2014 so without",
         "// naming them here the whole browser and backend surface reads as unused.",
         "src/react/index.ts",
         "src/server/index.ts",
@@ -242,6 +259,27 @@
         "src/hono/index.ts",
         "src/drivers/bullmq.ts",
         "src/drivers/inline.ts"
+      ]
+    },
+    "packages/impersonation": {
+      "entry": [
+        "src/index.ts",
+        "// The published subpaths. Each is reached by a CONSUMER import and never",
+        "// from the root entry, which is framework-free on purpose.",
+        "src/server/index.ts",
+        "src/hono/index.ts",
+        "src/react/index.ts",
+        "// `./e2e` has to be named as SOURCE: its `exports` target is built output,",
+        "// which does not exist in a checkout, so knip would read the whole journey",
+        "// subtree as unused. The step definitions are reached by playwright-bdd's",
+        "// `steps` GLOB and never by an import \u2014 a host points at",
+        "// dist/e2e/steps/**/*.js and bddgen loads each file for its registration",
+        "// side effect.",
+        "src/e2e/index.ts",
+        "src/e2e/steps/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "playwright-bdd"
       ]
     }
   },

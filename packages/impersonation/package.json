@@ -1,0 +1,100 @@
+{
+  "name": "@12-apps/impersonation",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Generic, portable impersonation / preview sessions. An operator previews as a tenant user: reads are scoped, writes are refused unless opted in, money paths are always refused, and revoking the entitlement ends the session live. Framework-free core (cookie codec, path rules, per-kind write rule, permission vocabulary), host-mounted backend surface (./server: start/stop/describe descriptors, the per-request write gate, the audit and directory ports), Hono adapter (./hono), React banner + start dialog (./react), and the packaged Gherkin journeys (./e2e). Standardized adoption contract in ADOPTING.md.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server/index.ts",
+    "./hono": "./src/hono/index.ts",
+    "./react": "./src/react/index.ts",
+    "./e2e": {
+      "types": "./dist/e2e/index.d.ts",
+      "default": "./dist/e2e/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.e2e.json",
+    "clean": "rm -rf node_modules coverage dist",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.40.0",
+    "hono": ">=4.0.0",
+    "playwright-bdd": ">=8.0.0",
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    },
+    "playwright-bdd": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@playwright/test": "^1.56.1",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "hono": "^4.6.0",
+    "jsdom": "^25.0.1",
+    "playwright-bdd": "^8.4.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/impersonation"
+  },
+  "files": [
+    "src",
+    "dist",
+    "features",
+    "*.js",
+    "*.mjs",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*",
+    "!**/*.stories.*",
+    "!**/*.test-story.*",
+    "!**/test-helpers.*"
+  ],
+  "dependencies": {
+    "@12-apps/ui": "workspace:*",
+    "zod": "^4.3.5"
+  }
+}
