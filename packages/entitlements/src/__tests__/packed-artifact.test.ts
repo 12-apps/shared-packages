@@ -27,7 +27,7 @@ const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
  * reimplementation of the `files` field — a second copy of those globs would
  * rot in the direction of not looking.
  */
-function packedFiles(): string[] {
+function readPackedFiles(): readonly string[] {
   const raw = execFileSync('npm', ['pack', '--dry-run', '--json'], {
     cwd: PACKAGE_ROOT,
     encoding: 'utf8',
@@ -35,6 +35,28 @@ function packedFiles(): string[] {
   });
   const [tarball] = JSON.parse(raw) as [{ files: { path: string }[] }];
   return tarball.files.map((file) => file.path);
+}
+
+/**
+ * The pack, computed at most once per file.
+ *
+ * Each case used to call {@link readPackedFiles} for itself, which ran npm
+ * three times — ~26s apiece on a runner building 31 packages at once. Every
+ * case stayed inside its own budget and passed, but the FILE took 79.8s, which
+ * outlived vitest's worker RPC; the resulting unhandled error failed the run
+ * while the suite reported `26 passed / 303 passed`, and because `Release`
+ * needs that job, the whole repo stopped publishing.
+ *
+ * Memoised HERE rather than in a `beforeAll`, because a describe-scoped binding
+ * reassigned from a hook is shared mutable state and reads as an order
+ * dependency (`test-flakiness/no-test-isolation`). The cache is module-private
+ * and write-once, and the pack is a pure read of the working tree, so no case
+ * can observe another having run first.
+ */
+const packCache: { entries?: readonly string[] } = {};
+function packedFiles(): readonly string[] {
+  packCache.entries ??= readPackedFiles();
+  return packCache.entries;
 }
 
 /**
