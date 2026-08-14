@@ -65,7 +65,7 @@ test('the provider tower mounts: session, brand and the host query client', asyn
   // auth surface, so a signed-out app is the honest state — and it is still the claim
   // that `useSession` resolved at all, which it cannot do outside its provider.
   await expect(page.getByTestId('session-status')).toHaveText('unauthenticated');
-  await expect(page.getByTestId('brand-name')).toHaveText('Paladira');
+  await expect(page.getByTestId('brand-name')).toHaveText('Ferragens Norte');
 });
 
 test('a tenant colour nobody can read comes back legible, hue intact', async ({ page }) => {

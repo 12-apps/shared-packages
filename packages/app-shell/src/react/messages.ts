@@ -1,13 +1,25 @@
 /**
- * Every string the shell renders, in one overridable table.
+ * Every string the shell renders, stated by the HOST.
  *
- * pt-BR by default, because that is the product these screens were extracted
- * from and product copy is never "translated" while tidying code. A host in
- * another language passes a partial override; a host in this one passes nothing.
+ * THE pt-BR TABLE THAT USED TO SIT BELOW THIS INTERFACE IS GONE, and the reason
+ * is that its own docstring made the argument against it: "pt-BR by default,
+ * because that is the product these screens were extracted from". That is a
+ * description of one adopter, shipped inside the package every other adopter
+ * installs — and reached by saying nothing, which is the one thing a host does
+ * by accident.
  *
- * The consent copy is deliberately SPECIFIC rather than reassuring-and-vague. The
- * whole failure it replaces was a user being stopped without being told why, and
- * a generic "não foi possível continuar" here would just move the dead end.
+ * What it cost was not a translation problem. `messagesOf` spread the host's
+ * override ON TOP, so a host that stated four of these nine got the extraction
+ * origin's wording for the other five, mixed into its own screens, with nothing
+ * anywhere reporting a gap. An all-or-nothing default is at least visible; a
+ * partial one is invisible by construction.
+ *
+ * So `messages` is REQUIRED and whole. The interface is the checklist, and the
+ * compiler names the sentences a host has not written yet.
+ *
+ * Write the consent copy SPECIFIC rather than reassuring-and-vague. The failure
+ * it exists to replace was a user being stopped without being told why, and a
+ * generic "something went wrong" here just moves the dead end.
  */
 export interface AppShellMessages {
   /** Route error boundary. */
@@ -23,20 +35,14 @@ export interface AppShellMessages {
   consentAccept: string;
 }
 
-export const DEFAULT_MESSAGES: AppShellMessages = {
-  routeErrorTitle: 'Não foi possível abrir esta página',
-  routeErrorRetry: 'Recarregar',
-  consentTitle: 'Atualizamos nossos termos',
-  consentBody:
-    'Precisamos do seu aceite na versão mais recente dos Termos de Uso e da Política de Privacidade para continuar.',
-  consentWhyTitle: 'Por que isso apareceu agora',
-  consentWhyBody:
-    'Sua conta segue ativa. Só o aceite está desatualizado — e é ele que bloqueia finalizar uma compra.',
-  consentTermsLink: 'Ler os Termos de Uso',
-  consentPrivacyLink: 'Ler a Política de Privacidade',
-  consentAccept: 'Li e aceito',
-};
-
-export function messagesOf(override?: Partial<AppShellMessages>): AppShellMessages {
-  return { ...DEFAULT_MESSAGES, ...override };
+/**
+ * The messages in force.
+ *
+ * A pass-through rather than a merge: there is nothing left to merge WITH, and
+ * that is the point of the change. Kept as a function because both callers read
+ * it off a config object and because a later rule (a blank-string refusal, say)
+ * belongs in one place.
+ */
+export function messagesOf(messages: AppShellMessages): AppShellMessages {
+  return messages;
 }
