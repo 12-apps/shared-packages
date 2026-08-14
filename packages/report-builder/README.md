@@ -160,7 +160,7 @@ const { routes } = createApiReportBuilder({
   timeZone: 'Europe/Lisbon',                 // yours — required, no fallback
   entityPermission: { loans: 'library:lending:read' },   // yours, every entity
   systemReports: [],                         // yours; `[]` is a complete answer
-  starters: { loans: … },                    // yours, compile-checked here
+  starters: { loans: … },                    // yours; `{}` is a complete answer
 });
 
 const { page } = createWebReportBuilder({

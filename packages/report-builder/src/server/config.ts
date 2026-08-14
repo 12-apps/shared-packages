@@ -87,11 +87,29 @@ function assertSystemReports(config: ReportBuilderServerConfig): void {
   }
 }
 
-/** A starter belongs to a catalog entity and must run on it. */
+/** A starter belongs to a catalog entity, IS that entity's, and must run on it. */
 function assertStarters(config: ReportBuilderServerConfig): void {
-  for (const [entity, starter] of Object.entries(config.starters ?? {})) {
+  // Named rather than left to `Object.entries` — a host on plain JS, or one
+  // building the config from a partial, gets "`starters` is missing" instead of
+  // "Cannot convert undefined or null to object" thrown from inside a library.
+  if (config.starters === undefined || config.starters === null) {
+    fail('`starters` is missing. Give each entity its starter spec, or `{}` for none.');
+  }
+  for (const [entity, starter] of Object.entries(config.starters)) {
     if (!config.catalog.entities[entity]) {
       fail(`\`starters\` names "${entity}", which is not an entity of this catalog.`);
+    }
+    // The KEY is what `/reports/fields` files the starter under, and the spec's
+    // own `entity` is what the builder then runs. A mismatch compiles happily —
+    // both entities are in the catalog — and serves one entity's prefilled
+    // report as another's, so the builder opens on the wrong collection with
+    // fields the reader never picked. Two sources of one fact; this is the
+    // check that keeps them one.
+    if (starter.entity !== entity) {
+      fail(
+        `Starter filed under "${entity}" is a spec for "${starter.entity}". A starter is ` +
+          'served as its key\'s prefilled report, so the two have to be the same entity.',
+      );
     }
     try {
       compileReport(starter, config.catalog);

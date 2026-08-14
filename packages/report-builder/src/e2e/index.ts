@@ -42,6 +42,7 @@
 export {
   defineReportsWorld,
   reportsWorld,
+  type ReportsBlockTemplate,
   type ReportsFixtures,
   type ReportsWorld,
 } from './world.js';

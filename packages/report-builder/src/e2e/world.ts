@@ -21,6 +21,27 @@ import type { Browser, Page } from '@playwright/test';
  */
 
 /**
+ * One entry of the host's block-template picker, as a scenario has to address
+ * it: by the `id` the tile's test id is built from, and by the `title` printed
+ * on it.
+ *
+ * BOTH, and the `id` especially, because the alternative was a map: the package
+ * used to carry a title → id table so a host could name titles alone, and that
+ * table held the seven templates of the application this package was extracted
+ * from — inside the published tarball, `src/e2e/**` being published — and threw
+ * `unknown block template` for any title not in it. Every journey was therefore
+ * unrunnable for any host but that one, while the features above it had already
+ * stopped naming a title out loud. A host states its own id; there is nothing
+ * left to keep a list of.
+ */
+export interface ReportsBlockTemplate {
+  /** The picker's own id — `block-template-picker-<id>` is the tile. */
+  id: string;
+  /** What the tile prints, and what the block it creates is titled. */
+  title: string;
+}
+
+/**
  * Facts about the host's own seed that the assertions have to name.
  *
  * These exist because a journey has to talk about SOMETHING — a report that is
@@ -32,13 +53,13 @@ import type { Browser, Page } from '@playwright/test';
  */
 export interface ReportsFixtures {
   /**
-   * Two entries of the host's own block-template picker, by TITLE.
+   * Two entries of the host's own block-template picker.
    *
    * A scenario has to start a block from something, and what a picker offers is
    * the host's product: this package ships only the blank template. The
    * features used to name `"Receita por dia"` and `"Formas de pagamento"` out
    * loud — one store's menu, written into a journey every other store runs — so
-   * they say "the first template" and "a second template" and read the titles
+   * they say "the first template" and "a second template" and read the entries
    * from here.
    *
    * They must be DIFFERENT templates: the scenario that puts two blocks on one
@@ -47,9 +68,9 @@ export interface ReportsFixtures {
    */
   blockTemplates: {
     /** The one a scenario builds its first block from. */
-    first: string;
+    first: ReportsBlockTemplate;
     /** A different one, added beside it. */
-    second: string;
+    second: ReportsBlockTemplate;
   };
   /** A report the whole team can already read — the one a reader opens. */
   publishedReport: {

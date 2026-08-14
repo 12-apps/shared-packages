@@ -23,7 +23,7 @@ export function catalogRoute(config: ReportBuilderServerConfig): ReportRoute {
     path: '/reports/fields',
     handle({ actor }) {
       const listing = listCatalogFields(config.catalog);
-      const starters = config.starters ?? {};
+      const starters = config.starters;
       const entities = listing.entities
         .filter((entity) => mayQueryEntity(config, actor, entity.entity))
         // Each entity carries its known-good starter spec — the host's, from

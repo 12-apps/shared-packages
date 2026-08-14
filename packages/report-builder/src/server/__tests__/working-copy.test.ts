@@ -130,6 +130,7 @@ function setup(seed: SavedReportRecord = record()): Harness {
     db: () => Promise.resolve(db),
     entityPermission: ENTITY_PERMISSION,
     systemReports: [],
+    starters: {},
     timeZone: 'America/Sao_Paulo',
     now: () => new Date('2026-08-10T12:00:00Z'),
   });

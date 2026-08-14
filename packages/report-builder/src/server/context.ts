@@ -139,12 +139,19 @@ export interface ReportBuilderServerConfig {
    */
   systemReports: readonly SystemReportDef[];
   /**
-   * The known-good spec each entity opens with, served on `/reports/fields` so
-   * the builder prefills a runnable report and MCP authors start from something
-   * that already compiles. Optional — a host with none serves entities without
-   * a `starter` — and compile-validated against `catalog` at assembly.
+   * The known-good spec each entity opens with, keyed by entity, served on
+   * `/reports/fields` so the builder prefills a runnable report and MCP authors
+   * start from something that already compiles.
+   *
+   * REQUIRED, including the empty case, for the same reason `systemReports` is:
+   * this was the last field of the host's vocabulary still `?? {}`-defaultable,
+   * and a defaultable vocabulary field is exactly what this surface stopped
+   * having. `{}` is a complete answer — every entity is then served without a
+   * `starter` — but it is one the host has to give. Each entry is
+   * compile-validated against `catalog` at assembly, and its spec's own
+   * `entity` must be the key it is filed under.
    */
-  starters?: Readonly<Record<string, ReportSpec>>;
+  starters: Readonly<Record<string, ReportSpec>>;
   /**
    * How this host spells the permissions guarding THIS package's own surface.
    *

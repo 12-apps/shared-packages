@@ -14,13 +14,26 @@ import {
 } from './context';
 import type { SavedReportInput, SavedReportRecord, SavedReportStore } from './saved';
 import { toSummary } from './summary';
-import { visibilityRoleIds } from './visibility';
+import { canViewSavedReport, visibilityRoleIds } from './visibility';
 import { saveReportBody } from './wire';
 
 /**
  * Writing saved documents. Separate from the reads because every route here is
  * gated on the authoring permission, and a reader reviewing authorization wants
  * that in one place.
+ *
+ * Authoring is only HALF of what a write on an existing document needs, and the
+ * missing half was invisible while `canAuthor` was a role tier: the hosts that
+ * computed it named the same roles their admin tier named, and
+ * `canViewSavedReport` short-circuits on `isAdmin`, so "may author" implied "may
+ * see everything" by coincidence rather than by rule. Authoring is a grantable
+ * class permission now (`reports:manage`), and a store may hand it to a member
+ * who is not an admin — at which point that member could overwrite, re-share or
+ * DELETE a private draft whose `GET` answers them 404. So every write on an
+ * existing document re-asks the READ question first: the write surface is never
+ * wider than the read surface, and it says so with the same 404, because a 403
+ * here would confirm the existence of a document the reader is told does not
+ * exist.
  */
 
 const DUPLICATE_NAME = 'Já existe um relatório com esse nome.';
@@ -117,7 +130,10 @@ function updateRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
         const input = parseSaveBody(body);
         compileDocument(parseReportDocument(input.spec), config.catalog);
         const current = await store.get(actor.clientId, id);
-        if (!current) return fail(404, NOT_FOUND);
+        // Absent, or present-but-invisible: the same 404 the reader gets, so an
+        // author-permission holder learns nothing here they could not learn
+        // from `GET /reports/custom/:id`.
+        if (!current || !canViewSavedReport(current, actor)) return fail(404, NOT_FOUND);
         const record = await store.update(actor.clientId, id, toInput(input, current));
         return record ? ok(toSummary(record, actor.userId)) : fail(404, NOT_FOUND);
       } catch (error) {
@@ -138,7 +154,14 @@ function deleteRoute(
     authoring: true,
     async handle({ actor, params }) {
       if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para remover relatórios.');
-      const removed = await store.remove(actor.clientId, params.id ?? '');
+      const id = params.id ?? '';
+      // READ BEFORE DELETE. The store's `remove` is tenant-scoped and would
+      // happily destroy a document this actor may not open, which is the widest
+      // possible version of the fail-open: the only feedback is that the row is
+      // gone.
+      const current = await store.get(actor.clientId, id);
+      if (!current || !canViewSavedReport(current, actor)) return fail(404, NOT_FOUND);
+      const removed = await store.remove(actor.clientId, id);
       // 204 with NO body: there is nothing to say about a document that no
       // longer exists, and an envelope here would be the only write on this
       // surface answering with one.

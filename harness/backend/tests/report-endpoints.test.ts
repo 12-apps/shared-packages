@@ -221,6 +221,7 @@ function setup(options: { maxRows?: number } = {}): {
     db: () => Promise.resolve(db),
     entityPermission: ENTITY_PERMISSION,
     systemReports: HARNESS_PRESETS,
+    starters: {},
     timeZone: 'America/Sao_Paulo',
     ...(options.maxRows === undefined ? {} : { maxRows: options.maxRows }),
   });

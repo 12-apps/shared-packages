@@ -61,9 +61,15 @@ const BLOCK_TEMPLATES: BlockTemplateGroup[] = [
     title: 'Vendas',
     templates: [
       {
-        id: 'receita-por-dia',
-        title: 'Receita por dia',
-        description: 'Quanto a loja faturou a cada dia do período',
+        // Deliberately NOT named the way the package's own deleted title→id map
+        // named it ("Receita por dia" / `receita-por-dia`). The journeys read
+        // this id and title out of `reports-world.ts`, so a harness that kept
+        // the exact strings that map held would have run green against a
+        // package still carrying it — which is how the map survived the branch
+        // that de-literalised the features.
+        id: 'serie-cronologica',
+        title: 'Série cronológica',
+        description: 'O valor liquidado a cada data, em ordem',
         spec: spec({
           entity: 'orders',
           dimensions: [{ field: 'createdAt', timeGrain: 'day' }],
@@ -128,9 +134,10 @@ const BLOCK_TEMPLATES: BlockTemplateGroup[] = [
     title: 'Pagamentos e perdas',
     templates: [
       {
-        id: 'formas-de-pagamento',
-        title: 'Formas de pagamento',
-        description: 'Quanto entrou por PIX, cartão e garçom',
+        // The second half of the same pair — see `serie-cronologica` above.
+        id: 'reparticao-por-canal',
+        title: 'Repartição por canal',
+        description: 'Como o valor liquidado se reparte entre os canais',
         spec: spec({
           entity: 'payments',
           dimensions: [{ field: 'method' }],

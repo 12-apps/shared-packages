@@ -417,8 +417,36 @@ describe('a wiring mistake is refused at assembly, not at request time', () => {
     ).toThrow(/starters/);
   });
 
+  /**
+   * Both entities are real, so the spec compiles and the mistake is invisible
+   * at every later gate: `/reports/fields` serves the fines report as the
+   * `loans` prefill, and the builder opens on the wrong collection.
+   */
+  it('refuses a starter filed under an entity that is not its own', () => {
+    expect(() =>
+      createApiReportBuilder(
+        config({ starters: { loans: reportSpecSchema.parse(FINES_BY_BRANCH) } }),
+      ),
+    ).toThrow(/filed under "loans" is a spec for "fines"/);
+  });
+
   it('accepts a host with NO built-ins at all', () => {
     expect(() => createApiReportBuilder(config({ systemReports: [] }))).not.toThrow();
+  });
+
+  /**
+   * `starters` was the last field of the vocabulary that a host could leave
+   * out — `?? {}` in three places — which is the exact construct this branch
+   * exists to remove. `{}` is now something the host SAYS.
+   */
+  it('accepts a host with NO starters at all, and requires it to say so', () => {
+    expect(() => createApiReportBuilder(config({ starters: {} }))).not.toThrow();
+
+    const withoutStarters: Partial<ReportBuilderServerConfig> = config();
+    delete withoutStarters.starters;
+    expect(() =>
+      createApiReportBuilder(withoutStarters as ReportBuilderServerConfig),
+    ).toThrow(/`starters` is missing/);
   });
 });
 
@@ -558,6 +586,45 @@ describe('the web factory refuses an incoherent vocabulary', () => {
         },
       }),
     ).toThrow(/nao-existe/);
+  });
+
+  /**
+   * The dashboard half of the section rule. Its blocks were checked and its own
+   * `section` was not — yet `system-dashboard.tsx` builds its back-link from it
+   * exactly as the built-in screen does, so an undeclared one renders a "Voltar"
+   * to a page this host may not have.
+   */
+  it('refuses a dashboard whose section nobody declared', () => {
+    expect(() =>
+      createWebReportBuilder({
+        tenantSlug: TENANT,
+        surface: {
+          ...SURFACE,
+          systemDashboards: [
+            {
+              key: 'painel-sem-secao',
+              title: 'Painel sem secção',
+              description: 'Um painel pendurado em nada.',
+              permission: LENDING,
+              section: 'arquivo-morto',
+              blocks: [{ reportKey: 'emprestimos-por-estante', span: 12 }],
+            },
+          ],
+        },
+      }),
+    ).toThrow(/section "arquivo-morto"/);
+  });
+
+  /** The key IS the URL segment, so a duplicate makes one of them unreachable. */
+  it('refuses two dashboards sharing a key', () => {
+    const twin = SURFACE.systemDashboards[0];
+    if (!twin) throw new Error('the fixture must declare a dashboard');
+    expect(() =>
+      createWebReportBuilder({
+        tenantSlug: TENANT,
+        surface: { ...SURFACE, systemDashboards: [twin, twin] },
+      }),
+    ).toThrow(/share the key/);
   });
 
   it('refuses a zone this runtime cannot resolve', () => {

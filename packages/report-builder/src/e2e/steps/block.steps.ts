@@ -7,7 +7,7 @@ import {
   block,
   blockRows,
   NEW_BLOCK,
-  templateId,
+  pickBlockTemplate,
 } from '../helpers/surface.js';
 import { reportsWorld } from '../world.js';
 
@@ -63,9 +63,7 @@ Given(
   async ({ page }) => {
     await page.getByTestId('reports-new').click();
     await expect(page.getByTestId('page-report-editor')).toBeVisible();
-    await page
-      .getByTestId(`block-template-picker-${templateId(reportsWorld().fixtures.blockTemplates.first)}`)
-      .click();
+    await pickBlockTemplate(page, reportsWorld().fixtures.blockTemplates.first);
     await expect(page.getByTestId(`report-block-${NEW_BLOCK}-render`)).toBeVisible({
       timeout: BLOCK_RENDER_TIMEOUT_MS,
     });

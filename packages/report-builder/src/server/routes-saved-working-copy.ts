@@ -9,12 +9,13 @@ import {
   mayAuthor,
   NOT_FOUND,
   ok,
+  type ReportActor,
   type ReportBuilderServerConfig,
   type ReportRoute,
 } from './context';
 import type { SavedReportRecord, SavedReportStore } from './saved';
 import { toSummary } from './summary';
-import { visibilityRoleIds } from './visibility';
+import { canViewSavedReport, visibilityRoleIds } from './visibility';
 import { parksEditsInWorkingCopy, reportWorkingCopySchema } from './working-copy';
 
 /**
@@ -37,14 +38,24 @@ const NOT_PUBLISHED =
 const NO_WORKING_COPY = 'Este relatório não tem alterações não publicadas.';
 const DUPLICATE_NAME = 'Já existe um relatório com esse nome.';
 
-/** The stored row, or the 404 every route on this surface answers with. */
+/**
+ * The stored row, or the 404 every route on this surface answers with.
+ *
+ * Three gates in a deliberate order. Absent is 404; VISIBLE-TO-THIS-ACTOR is
+ * the same 404, because `reports:manage` is a grantable class permission and
+ * nothing else on this surface would stop its holder from parking an edit on —
+ * or publishing over — a private draft their own `GET` answers 404 for. Only
+ * then does the lifecycle answer 400: a "this report is not published" told to
+ * someone who may not see the report at all is itself a disclosure.
+ */
 async function loadPublished(
   store: SavedReportStore,
-  clientId: string,
+  actor: ReportActor,
   id: string,
 ): Promise<SavedReportRecord | { error: ReturnType<typeof fail> }> {
-  const record = await store.get(clientId, id);
+  const record = await store.get(actor.clientId, id);
   if (!record) return { error: fail(404, NOT_FOUND) };
+  if (!canViewSavedReport(record, actor)) return { error: fail(404, NOT_FOUND) };
   if (!parksEditsInWorkingCopy(record.status)) return { error: fail(400, NOT_PUBLISHED) };
   return record;
 }
@@ -78,7 +89,7 @@ function saveRoute(config: ReportBuilderServerConfig, store: SavedReportStore): 
         const first = parsed.error.issues[0];
         return fail(400, first ? `${first.path.join('.') || 'body'}: ${first.message}` : 'Corpo inválido.');
       }
-      const record = await loadPublished(store, actor.clientId, params.id ?? '');
+      const record = await loadPublished(store, actor, params.id ?? '');
       if (isFailure(record)) return record.error;
       const saved = await store.saveWorkingCopy(actor.clientId, record.id, parsed.data);
       return saved ? ok({ saved: true }) : fail(404, NOT_FOUND);
@@ -102,7 +113,7 @@ function publishRoute(config: ReportBuilderServerConfig, store: SavedReportStore
     authoring: true,
     async handle({ actor, params, body }) {
       if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
-      const record = await loadPublished(store, actor.clientId, params.id ?? '');
+      const record = await loadPublished(store, actor, params.id ?? '');
       if (isFailure(record)) return record.error;
       try {
         const input = parsePublishBody(body, record);
@@ -125,7 +136,7 @@ function discardRoute(config: ReportBuilderServerConfig, store: SavedReportStore
     authoring: true,
     async handle({ actor, params }) {
       if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
-      const record = await loadPublished(store, actor.clientId, params.id ?? '');
+      const record = await loadPublished(store, actor, params.id ?? '');
       if (isFailure(record)) return record.error;
       // A 404 rather than a silent 200: "discard" that discarded nothing would
       // tell the editor to reset to a published version it is already showing,

@@ -123,6 +123,28 @@ function assertSurface(surface: ReportBuilderSurface): void {
       );
     }
   }
+  // A DASHBOARD's section was unchecked while its blocks' reports were, which
+  // is the same defect one level up: `system-dashboard.tsx` builds its back-link
+  // from `dashboard.section` exactly as `system-report.tsx` does from a
+  // report's, so an undeclared one renders a "Voltar" pointing at a page that
+  // may not exist — a bug that reads as this package's from every seat but the
+  // call site.
+  const dashboardKeys = new Set<string>();
+  for (const dashboard of surface.systemDashboards) {
+    if (dashboardKeys.has(dashboard.key)) {
+      throw new ReportBuilderError(
+        "invalid_config",
+        `Two system dashboards share the key "${dashboard.key}". The key is the URL segment, so one of them is unreachable.`,
+      );
+    }
+    dashboardKeys.add(dashboard.key);
+    if (!sections.has(dashboard.section)) {
+      throw new ReportBuilderError(
+        "invalid_config",
+        `Dashboard "${dashboard.key}" names section "${dashboard.section}", which surface.sections does not declare.`,
+      );
+    }
+  }
   // Flattened rather than nested, so the block carries the dashboard it came
   // from: the gate reads a loop inside a loop as a suspected hot path, and a
   // one-pass `flatMap` is the honest shape for a check that visits each block

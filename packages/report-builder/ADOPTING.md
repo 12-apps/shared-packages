@@ -46,7 +46,7 @@ its editor.
 | `REPORT_ENTITY_DATE_FIELD` | Your adapter's own map — only your adapter ever read it. |
 | `REPORT_ENTITY_PERMISSION` | Required config `entityPermission`. Every catalog entity must appear; assembly throws naming the ones that do not. |
 | `SYSTEM_REPORTS`, `SYSTEM_REPORT_KEYS`, `SYSTEM_REPORT_NAV`, `SYSTEM_DASHBOARDS`, `getSystemReport`, `getSystemDashboard` | Your own `SystemReportDef[]` / `SystemDashboardDef[]`, passed as `systemReports` (server) and `surface` (react). Projections: `systemReportNav(reports)`, `findSystemReport(reports, key)`, `findSystemDashboard(dashboards, key)`. |
-| `REPORT_ENTITY_STARTERS` | Optional config `starters`, compile-checked against your catalog at assembly. |
+| `REPORT_ENTITY_STARTERS` | Required config `starters` (`{}` for none), compile-checked against your catalog at assembly. |
 | `blockTemplateGroups()` (no args), `findBlockTemplate` | `blockTemplateGroups(yourGroups)` — still appends the blank template. `findBlockTemplate` is gone; nothing consumed it. |
 | `createTenantReportDataSource`, `ReportSourceDb`, `ReportSourceDbProvider` | Your own `ReportDataSource`. `ReportWindow`, `DateWindowWhere` and `windowWhere(window)` stay, so the half-open window is still stated once. |
 | `dayOfWeekSaoPaulo`, `hourOfDaySaoPaulo` | Your adapter's own derivations, on your own zone. |
@@ -64,21 +64,42 @@ its editor.
 ### Changed shapes
 
 - **`ReportBuilderServerConfig`** gains four required fields — `timeZone`,
-  `entityPermission`, `systemReports` — and one optional pair, `starters` and
+  `entityPermission`, `systemReports`, `starters` — and one optional one,
   `gatePermissions`. `createApiReportBuilder` now THROWS
   (`ReportBuilderConfigError`) on a wiring mistake: an unmapped catalog entity,
   an empty `entityPermission`, a zone this runtime cannot resolve, two built-ins
   sharing a key, a built-in or starter that does not compile against your
-  catalog. All at assembly, none per request.
+  catalog, a starter filed under an entity that is not its own. All at assembly,
+  none per request.
+- **`starters` is required, and `{}` is the answer for "none".** It was the last
+  vocabulary field with a `??` behind it, which is the construct this release
+  exists to remove: a host that says nothing about its starters should be told
+  so at the call site, not served entities without one and left to wonder.
 - **`ReportActor.canAuthor` is gone.** Authoring is decided by a permission the
   actor holds: `reports:manage` by default, or whatever
   `gatePermissions.manage` names. Drop the boolean and make sure the id reaches
   `actor.permissions`.
+- **A write is never wider than a read.** `PUT` / `DELETE
+  /reports/custom/:id` and all three working-copy routes now re-apply the
+  visibility rule `GET /reports/custom/:id` applies, and answer the same **404**
+  when it refuses. This is a real behaviour change for a host granting
+  `reports:manage` to non-admins: such a member can no longer overwrite,
+  re-share or delete a document they cannot open. Admins (`ReportActor.isAdmin`)
+  and authors are unaffected, which is every actor who could author under
+  `canAuthor`.
 - **`createWebReportBuilder` requires `surface`** —
   `{ systemReports, systemDashboards, sections, blockTemplates, timeZone }`.
   Every field is required; `[]` is a meaningful, complete answer for the first
-  four. It throws on a built-in whose `section` is undeclared, a dashboard block
-  naming an unknown report, or an unresolvable zone.
+  four. It throws on a built-in or a dashboard whose `section` is undeclared,
+  two dashboards sharing a key, a dashboard block naming an unknown report, or
+  an unresolvable zone.
+- **`ReportsFixtures.blockTemplates` entries are `{ id, title }`,** not a title
+  string. The `id` is the picker's own — `block-template-picker-<id>` is the
+  tile — and it is stated rather than derived because the package used to derive
+  it from a seven-entry title→id map of the application it was extracted from,
+  and threw `unknown block template` for every title that map had never heard
+  of. If you already implement `defineReportsWorld`, this is a one-line change
+  in your world file.
 - **`systemReportParams`'s `key` is a plain string**, not an enum of one
   product's preset keys. Narrow it to YOUR keys for your MCP surface in three
   lines, over your own definitions:
@@ -143,7 +164,7 @@ because your host computed `canAuthor` from a role tier now needs the id in
    reaches a descriptor.
 4. **The adapter is a FACTORY, not an instance.** `adapter` may be a plain
    `ReportDataSource` (fixtures that do not move), but a real host passes
-   `({ actor, window }) => createTenantReportDataSource(actor.clientId, window)`.
+   `({ actor, window }) => myReportDataSource(actor.clientId, window)`.
    The window has to reach the database, or "last 7 days" quietly reads all of
    history and filters it in memory.
 5. **The period is the package's; the CLOCK is the host's.**
@@ -175,42 +196,69 @@ Mounted under whatever prefix the host chooses (future-pay uses
 | GET | `/reports/custom` | Saved documents, narrowed by lifecycle AND by entity. |
 | GET | `/reports/custom/:id` | Opens AND runs it. 404 — never 403 — when the actor may not see it. |
 | POST | `/reports/custom` | 200 with the summary; 409 on a duplicate name. |
-| PUT | `/reports/custom/:id` | Omitted lifecycle fields keep their stored values. Leaves a parked working copy alone. |
-| DELETE | `/reports/custom/:id` | 204, with no body. |
-| PUT | `/reports/custom/:id/working-copy` | Park an in-progress edit. `spec` is NOT written. 400 unless the report is published. |
+| PUT | `/reports/custom/:id` | Omitted lifecycle fields keep their stored values. Leaves a parked working copy alone. 404 when the actor may not SEE it. |
+| DELETE | `/reports/custom/:id` | 204, with no body. 404 when the actor may not see it. |
+| PUT | `/reports/custom/:id/working-copy` | Park an in-progress edit. `spec` is NOT written. 404 when the actor may not see it; 400 unless the report is published. |
 | POST | `/reports/custom/:id/working-copy/publish` | Make the edit live AND drop the parked copy, in one write. |
 | DELETE | `/reports/custom/:id/working-copy` | Discard the parked edit; the published document is untouched. 404 when there is none. |
+
+Every write on an EXISTING document answers the visibility question `GET
+/reports/custom/:id` answers, with the same 404 — `reports:manage` says the
+actor may author, never that they may reach a document their own `GET` hides.
 | POST | `/reports/run` | Dry run. The entity check happens before the spec reaches the adapter. |
 
 ## Host wiring, end to end
+
+Everything below is the HOST's — the catalog, the permission each of its
+entities requires, the built-ins, the starters, the adapter and the clock. None
+of it has a default any more, and `createApiReportBuilder` /
+`createWebReportBuilder` throw at assembly naming whichever field is missing or
+incoherent.
 
 ```ts
 // backend (Hono)
 app.route(
   '/api/admin/:tenantSlug',
   reportBuilderRouter({
-    catalog: reportCatalog,
-    adapter: ({ actor, window }) => createTenantReportDataSource(actor.clientId, window),
+    catalog: MY_CATALOG,                       // your defineCatalog({...})
+    entityPermission: MY_ENTITY_PERMISSION,    // every catalog entity, no exceptions
+    systemReports: MY_SYSTEM_REPORTS,          // or []
+    starters: MY_STARTERS,                     // or {}
+    // Your own ReportDataSource, scoped to the window this package resolved.
+    adapter: ({ actor, window }) => myReportDataSource(actor.clientId, window),
     db: () => getSavedReportDb(),
-    timeZone: PLATFORM_TIME_ZONE,
+    timeZone: MY_TIME_ZONE,
+    // Only if your catalog spells the authoring permission its own way.
+    gatePermissions: { manage: 'relatorios:editar' },
     resolveActor: (c) => resolveReportActor(c),   // auth + RBAC: the host's
   }),
 );
 
 // frontend
-const { page } = createWebReportBuilder({ tenantSlug });
+const { page } = createWebReportBuilder({
+  tenantSlug,
+  surface: {
+    systemReports: MY_SYSTEM_REPORTS,   // key/title/description/permission/section
+    systemDashboards: MY_DASHBOARDS,    // or []
+    sections: MY_SECTIONS,              // { key, label, path } — every section named above
+    blockTemplates: MY_BLOCK_TEMPLATES, // or []
+    timeZone: MY_TIME_ZONE,
+  },
+});
 ```
 
-Everything else — MCP registry paths/summaries, the nav entries built from
-`SYSTEM_REPORT_NAV` — remains host-owned.
+Everything else — MCP registry paths/summaries, and the nav entries you build
+from your own `SystemReportDef[]` (`systemReportNav(reports)` groups them for
+you) — remains host-owned.
 
 ## The two kinds of report (FUT-391)
 
 - **Built-in ("system") reports** are fixed views OF an admin area. They are
   NOT listed in the Relatórios area: the host nests them in its lateral menu
-  under the matching section (`SYSTEM_REPORT_NAV[].section`), gated by each
-  entry's own `permission`, and mounts `SystemReportPage` at
-  `/{tenantSlug}/reports/system/{key}`.
+  under the matching section (each definition's own `section`, grouped for you
+  by `systemReportNav(yourReports)`), gated by each entry's own `permission`.
+  The surface routes `/{tenantSlug}/reports/system/{key}` itself — there is no
+  page component left to mount by hand.
 - **Authored reports** are dashboard documents: N blocks on a 12-column
   canvas, composed inline on the canvas they are read on. Widths are clamped
   per presentation (`minSpanForPresentation`) so a block is never narrower
@@ -232,8 +280,8 @@ Two states that sound alike and must never be conflated in code or in copy:
 
 The editor autosaves into the working copy on a debounce, resumes it when the
 report is reopened, and offers "descartar alterações" to drop it and return to
-the published version. `GET /reports/custom/:id` echoes it only to a caller with
-`canAuthor`; every other reader gets the published document. The list summary
+the published version. `GET /reports/custom/:id` echoes it only to a caller who
+may author (`reports:manage`); every other reader gets the published document. The list summary
 carries `hasUnpublishedChanges`, which is a boolean about the document, never
 its content.
 

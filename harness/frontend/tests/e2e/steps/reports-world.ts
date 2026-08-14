@@ -67,7 +67,17 @@ defineReportsWorld({
   fixtures: {
     // The two picker entries this app declares in `src/pages/report-builder.tsx`
     // — its own product, named here because the journeys stopped naming them.
-    blockTemplates: { first: 'Receita por dia', second: 'Formas de pagamento' },
+    //
+    // The `id` is what the tile's test id is built from, and it is supplied
+    // rather than derived: the package used to derive it from the title through
+    // a seven-entry map of the application it was extracted from, so a host
+    // whose picker offered anything else got `unknown block template`. Neither
+    // of these two shares a word with that map, which is what makes them a test
+    // of the port rather than of a coincidence.
+    blockTemplates: {
+      first: { id: 'serie-cronologica', title: 'Série cronológica' },
+      second: { id: 'reparticao-por-canal', title: 'Repartição por canal' },
+    },
     // `r1` is the two-block dashboard published to the whole team: a bar chart
     // over payment methods, and a day-bucketed table beside it.
     publishedReport: {

@@ -195,6 +195,9 @@ function setup(
     now: () => new Date('2026-07-14T23:00:00Z'),
     entityPermission: ENTITY_PERMISSION,
     systemReports: options.systemReports ?? SYSTEM,
+    // Required, including the empty case — this surface has no defaultable
+    // vocabulary field left.
+    starters: {},
   });
 
   return {

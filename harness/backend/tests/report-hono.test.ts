@@ -153,6 +153,7 @@ function setup(actor: ReportActor | null = OWNER): {
       db: () => Promise.resolve(db),
       entityPermission: { orders: 'reports:sales:read' },
       systemReports: [],
+      starters: {},
       timeZone: 'America/Sao_Paulo',
       resolveActor: () => actor,
     }),

@@ -375,7 +375,7 @@ async function addTemplate(page: import('@playwright/test').Page, template: stri
 test('“Coleção” offers the product’s real collections, with the product’s labels', async ({
   page,
 }) => {
-  await addTemplate(page, 'receita-por-dia');
+  await addTemplate(page, 'serie-cronologica');
 
   await page.getByTestId(`report-block-${NEW_REPORT_BLOCK}-editor-entity`).click();
 
@@ -400,11 +400,11 @@ test('every template in the picker resolves and runs', async ({ page }) => {
   await expect(page.getByTestId('block-template-picker')).toBeVisible();
 
   const templates = [
-    'receita-por-dia',
+    'serie-cronologica',
     'produtos-mais-vendidos',
     'preparo-por-estacao',
     'horas-por-estacao',
-    'formas-de-pagamento',
+    'reparticao-por-canal',
     'perdas-por-motivo',
     'movimentacoes-de-estoque',
   ];
@@ -503,7 +503,7 @@ test('a losses template draws the ledger’s own reasons', async ({ page }) => {
  * dimension at all.
  */
 test('line is offered on an ordered axis and refused on an unordered one', async ({ page }) => {
-  await addTemplate(page, 'receita-por-dia');
+  await addTemplate(page, 'serie-cronologica');
 
   const axis = page.getByTestId('builder-dimension-0');
   const line = page.getByTestId('builder-chart-type-line');
