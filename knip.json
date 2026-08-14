@@ -46,7 +46,12 @@
         "// a release is scoped to the one package's directory. knip reads the",
         "// `plugins` of a semantic-release config but does not follow `extends`,",
         "// so the only reference to it is invisible from here.",
-        "semantic-release-monorepo"
+        "semantic-release-monorepo",
+        "// Spawned by scripts/release-tags.mjs as `pnpm exec semantic-release`.",
+        "// It used to be an inline `run:` step in ci.yml, where knip's GitHub",
+        "// Actions plugin could see the binary; now the only reference is an",
+        "// argument string inside a spawn, which no static analysis can follow.",
+        "semantic-release"
       ]
     },
     "packages/ui": {

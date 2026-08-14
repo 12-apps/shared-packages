@@ -885,45 +885,51 @@ jobs:
         run: |
           set -o pipefail
           pnpm build 2>&1 | tee build.log
+      # BEFORE anything is released, un-stick anything a previous run left stuck.
+      #
+      # A tag for a version npm never received does not merely record a past
+      # failure — it STOPS the package releasing, because semantic-release reads
+      # that tag and concludes there is nothing new. Deleting it here means the
+      # step below re-cuts the version in this same job and the publish step
+      # uploads it, so one merge is enough to recover. Doing it after the release
+      # instead would need a further merge, and "a further merge" is how
+      # auth-v1.22.0 stayed broken for four days.
+      #
+      # `continue-on-error` because recovery must never be able to WITHHOLD a
+      # release. Every step below defaults to `success()`, so without it a repo
+      # whose rules forbid deleting a tag — or any crash in this script — would
+      # skip semantic-release entirely and stop every healthy package releasing,
+      # which is a strictly worse failure than the one being recovered from. The
+      # step still goes red and says why, and the orphan it could not clear is
+      # caught again by the verification step at the end of this job, which is
+      # where the run actually fails.
+      - name: Recover tags an earlier run left orphaned
+        continue-on-error: true
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/recover-orphans.mjs
+      # Directory paths, not bare names: payments ships as a nested workspace
+      # (packages/payments/{backend,frontend}). Order is topological — a package
+      # is released only after everything it depends on, so prepare-publish.mjs
+      # always resolves workspace:* interdeps to a version that already exists.
+      #
+      # This was an inline `for` loop until run 31427350698. Under `set -e` the
+      # first package semantic-release failed for ended the step, which skipped
+      # every package after it AND the publish step below — stranding everything
+      # already tagged as a tag npm never received. It died on `realtime` (11th
+      # of 30) over a TLS blip that a retry would have cleared, and took the
+      # already-tagged `auth-v1.22.0` down with it. The script retries transient
+      # git failures and, when one is genuinely broken, keeps going so the rest
+      # still release.
       - name: Version + tag + release (semantic-release)
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -o pipefail
-          # Directory paths, not bare names: payments ships as a nested
-          # workspace (packages/payments/{backend,frontend}). Order is
-          # topological — a package is released only after everything it
-          # depends on, so prepare-publish.mjs always resolves workspace:*
-          # interdeps to a version that already exists.
-          #
-          # Each iteration is an independent release, and what bounds it to ONE
-          # package is `extends: semantic-release-monorepo` in every
-          # .releaserc.json: it filters the commit range down to the commits
-          # that touched this directory. Without it every run analysed the whole
-          # repo history, so a single `feat(payments)` merge cut a release for
-          # all 24 packages — 24 tags, 24 GitHub releases and 24 PR comments per
-          # merge, for 23 packages whose files had not changed at all.
-          #
-          # `pnpm exec`, not `pnpm dlx`: the config `extends` a module, so
-          # semantic-release has to run with the workspace's node_modules on its
-          # resolution path. Pinning it in package.json also means a release is
-          # no longer built by whatever version was latest that morning.
-          #
-          # --tag-format keeps the tag scheme this repo already has (`ui-v1.2.3`,
-          # 700+ tags deep). It deliberately overrides the `@12-apps/ui-v1.2.3`
-          # that semantic-release-monorepo would otherwise impose — under that
-          # scheme no package would find its own last tag, every one would look
-          # unreleased, and they would all reset to 1.0.0.
-          for dir in $PUBLISH_DIRS; do
-            pkg="$(basename "$dir")"
-            echo "::group::semantic-release $pkg"
-            ( cd "$dir" \
-                && pnpm exec semantic-release --tag-format "$pkg-v\${version}" )
-            echo "::endgroup::"
-          done
+        run: node scripts/release-tags.mjs
       # OIDC trusted publishing needs npm >= 11.5.1 (Node 24 ships an older npm).
       - name: Upgrade npm for OIDC
+        if: ${{ !cancelled() }}
         run: npm install -g npm@latest
       # A package's FIRST publish cannot go through OIDC — a Trusted Publisher is
       # configured on a package that does not exist yet — so it is the one thing
@@ -931,6 +937,7 @@ jobs:
       # and no more: it publishes names the registry does not have and skips
       # every package it does. Without an NPM_TOKEN secret it is a no-op.
       - name: First publish for packages not yet on the registry
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           # setup-node's npmrc reads this variable, so the bootstrap publish is
@@ -942,7 +949,16 @@ jobs:
           # npm cannot resolve workspace:* — rewrite interdeps to concrete versions.
           node scripts/prepare-publish.mjs
           node scripts/first-publish.mjs 2>&1 | tee first-publish.log
+      # `!cancelled()` rather than the default `success()`, and this is the single
+      # change that would have prevented the auth-v1.22.0 incident outright.
+      # Tagging happens per package and publishing happens once at the end, so a
+      # tag step that dies part-way has ALREADY pushed tags — and under
+      # `success()` this step then refused to run, which is precisely how those
+      # tags became versions npm never received. Publishing is idempotent
+      # (publish.mjs reports an already-published version as "skipped"), so
+      # running it after a partial tag step can only ever help.
       - name: Publish to npm (OIDC, tokenless)
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -o pipefail
@@ -991,6 +1007,27 @@ jobs:
         if: always()
         shell: bash
         run: node scripts/verify-released.mjs
+
+      # Everything above reports into this run's log and summary, which is where
+      # nobody looks: a release runs on push to main long after its author moved
+      # on, and one red Release job sits in a list of green ones. auth-v1.22.0
+      # went unreported for four days across five red runs, and was found by a
+      # consumer in another repository rather than by anyone here.
+      #
+      # LAST, so it can see every handoff the steps above wrote to GITHUB_ENV,
+      # and `always()` for the same reason the check above it is: the runs worth
+      # alerting on are exactly the ones that failed. It maintains ONE issue —
+      # reopened, rewritten and finally CLOSED BY ITSELF once every package's
+      # newest tag is on the registry — so an open issue always means a live
+      # problem, and a fixed pipeline needs nobody to tidy up after it.
+      - name: Alert on a release that did not deliver
+        if: always()
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_JOB_STATUS: ${{ job.status }}
+          RELEASE_ALERT_WEBHOOK: ${{ secrets.RELEASE_ALERT_WEBHOOK }}
+        run: node scripts/release-alert.mjs
 
   # What this PR's CI has cost, as one comment that is edited in place on every
   # push rather than a new comment per run.
