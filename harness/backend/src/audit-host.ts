@@ -141,6 +141,50 @@ export async function reseedAudit(pg: PGlite, audit: HarnessAudit): Promise<void
     resourceId: 'order-b-1',
     actorUserId: 'owner-b',
   });
+  await spreadSeedInstants(pg);
+}
+
+/**
+ * The seed order, oldest first — the sequence the writes above happen in.
+ *
+ * Read back newest-first, the reverse of this IS the trail, which is what
+ * `audit-endpoints.test.ts` asserts. That claim held only by luck until now:
+ * see {@link spreadSeedInstants}.
+ */
+const SEED_ORDER = ['order-1001', 'item-carne', 'order-1002', 'mesa-7', 'order-b-1'];
+
+/**
+ * Give the seeded rows distinct instants, in seed order.
+ *
+ * `created_at` is `timestamp(3)` and takes the statement's own clock, so five
+ * writes into an in-process PGlite routinely land in the SAME millisecond. The
+ * delegate's total order is `created_at DESC, id DESC` (`audit-db.ts:145`) and
+ * `id` is a random `uuid()` — so on a tie the trail comes back in an order
+ * chosen by a random number, and "newest first" was asserted against whichever
+ * draw the run happened to get. It passes on a slow machine, where the writes
+ * straddle a millisecond, and fails on a fast one.
+ *
+ * Not hypothetical: it went red on `main`, and because `Release` needs this
+ * job, `@12-apps/stock-domain@2.0.0` did not publish.
+ *
+ * Stamping makes the ordering claim true by construction rather than by timing.
+ * Each row keeps its own DAY — one case filters `?from=<today>&to=<today>` and
+ * expects all four — and moves to midday, so a seed that straddles midnight
+ * cannot change which day that is. Raw SQL for the same reason the `TRUNCATE`
+ * above is raw: the trail is append-only at the model layer, and this is
+ * fixture setup rather than something the writer should be able to do.
+ */
+async function spreadSeedInstants(pg: PGlite): Promise<void> {
+  for (const [index, resourceId] of SEED_ORDER.entries()) {
+    await pg.query(
+      `UPDATE audit_logs
+          SET created_at = date_trunc('day', created_at)
+                         + INTERVAL '12 hours'
+                         + make_interval(secs => $1)
+        WHERE resource_id = $2`,
+      [index, resourceId],
+    );
+  }
 }
 
 /** A request shaped like the one the middleware receives, for the seed writes. */
