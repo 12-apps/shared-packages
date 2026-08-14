@@ -630,3 +630,169 @@ describe('the mint policy hook', () => {
     );
   });
 });
+
+describe('the live-authority hook — the revocation path', () => {
+  /**
+   * An operator session's payload names its target at mint time and depends on
+   * nothing about the actor's live rights. Without this hook someone removed
+   * from a host's allowlist keeps acting as the tenant's owner for the rest of
+   * the time box, and there is no other way to end it.
+   */
+  it('makes a de-authorised session stop existing for EVERY reader at once', async () => {
+    const authorized = { value: true };
+    const harness = mount({
+      stillAuthorized: (state) => state.kind !== 'operator' || authorized.value,
+    });
+    const started = await drive(harness, 'POST', 'platform', {
+      actor: operator(),
+      body: startBody(),
+    });
+    const cookie = cookieFrom(started);
+
+    // While authorized: the banner sees it, and so does the host's own reader.
+    expect(
+      dataOf<ImpersonationBannerState>(
+        await drive(harness, 'GET', 'platform', { actor: operator(), cookieValue: cookie }),
+      ).active,
+    ).toBe(true);
+
+    authorized.value = false;
+
+    // The banner now answers "no session"…
+    expect(
+      dataOf<ImpersonationBannerState>(
+        await drive(harness, 'GET', 'platform', { actor: operator(), cookieValue: cookie }),
+      ),
+    ).toEqual({ active: false });
+    // …and a start is no longer refused as nested, because there is nothing to
+    // nest inside. The three readers agree, which is the point of one reader.
+    await expect(
+      drive(harness, 'POST', 'platform', {
+        actor: operator(),
+        body: startBody({ targetUserId: 'u-member' }),
+        cookieValue: cookie,
+      }),
+    ).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('leaves the preview kinds alone — their ceiling degrades on its own', async () => {
+    const seen: string[] = [];
+    const harness = mount({
+      stillAuthorized: (state) => {
+        seen.push(state.kind);
+        return true;
+      },
+    });
+    await drive(harness, 'POST', 'tenant', {
+      actor: actor({ permissions: ['user:impersonate'] }),
+      params: { tenantSlug: 'acme' },
+      body: { as: 'role', roleName: 'FLOOR' },
+    });
+    // Asked about nothing yet: there was no session to check on the way in.
+    expect(seen).toEqual([]);
+  });
+});
+
+describe('a refusal that cannot be written down still REFUSES', () => {
+  /**
+   * The opposite trade from a START. A start whose trail write fails must not
+   * happen at all; a refusal whose trail write fails must still refuse, or a
+   * caller could convert a denial into an outage by breaking the log.
+   */
+  it('answers the refusal, loses the row, and reports the loss', async () => {
+    const onError = vi.fn();
+    const { directory, state } = createTestDirectory();
+    state.tenants.set('t-1', { id: 't-1', slug: 'acme', name: 'Acme' });
+    state.users.set('u-operator', {
+      id: 'u-operator',
+      email: 'operator@example.test',
+      name: null,
+      isPlatformAdmin: true,
+    });
+    const api = createApiImpersonation(
+      testServerConfig({
+        directory,
+        onError,
+        audit: {
+          started: async () => undefined,
+          ended: async () => undefined,
+          refused: async () => {
+            throw new Error('trail unavailable');
+          },
+        },
+      }),
+    );
+    const endpoint = api.routes.find((r) => r.method === 'POST' && r.surface === 'platform');
+
+    await expect(
+      endpoint?.handle({
+        actor: operator(),
+        params: {},
+        body: startBody({ targetUserId: 'u-operator' }),
+      }),
+    ).rejects.toMatchObject({ status: 403, message: TEST_MESSAGES.targetIsPlatformAdmin });
+    expect(onError).toHaveBeenCalledOnce();
+  });
+});
+
+describe('what the trail records about writability', () => {
+  it('records a ROLE preview as NOT read-only, though it is minted allowWrites:false', async () => {
+    const harness = mount();
+    await drive(harness, 'POST', 'tenant', {
+      actor: actor({ permissions: ['user:impersonate'] }),
+      params: { tenantSlug: 'acme' },
+      body: { as: 'role', roleName: 'FLOOR' },
+    });
+    // The two are NOT the same answer, which is why both are on the entry: a
+    // role preview substitutes nobody and may write.
+    expect(harness.trail.started[0]).toMatchObject({ allowWrites: false, readOnly: false });
+  });
+
+  it('records a MEMBER preview as read-only', async () => {
+    const harness = mount();
+    await drive(harness, 'POST', 'tenant', {
+      actor: actor({ permissions: ['user:impersonate'] }),
+      params: { tenantSlug: 'acme' },
+      body: { as: 'member', memberUserId: 'u-member' },
+    });
+    expect(harness.trail.started[0]).toMatchObject({ allowWrites: false, readOnly: true });
+  });
+
+  it("records the entitlement denial under the HOST's own code", async () => {
+    const denial = new Error('the tenant switched it off');
+    const harness = mount({
+      previewEntitlement: {
+        require: async () => {
+          throw denial;
+        },
+        isDenial: (error) => error === denial,
+        denialResponse: () => ({ status: 409, message: 'turn it on first' }),
+        refusalCode: () => 'disabled_by_tenant',
+      },
+    });
+    await expect(
+      drive(harness, 'POST', 'tenant', {
+        actor: actor({ permissions: ['user:impersonate'] }),
+        params: { tenantSlug: 'acme' },
+        body: { as: 'role', roleName: 'FLOOR' },
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    // The one denial a tenant can undo THEMSELVES, distinguishable a year later
+    // from the one that needs a purchase.
+    expect(harness.trail.refused).toMatchObject([{ refusal: 'disabled_by_tenant' }]);
+  });
+
+  it('keys a PERMISSION denial to the code alone — no unvalidated subject, no address', async () => {
+    const harness = mount();
+    await expect(
+      drive(harness, 'POST', 'tenant', {
+        actor: actor(),
+        params: { tenantSlug: 'acme' },
+        body: { as: 'member', memberUserId: 'u-not-validated-yet' },
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(harness.trail.refused).toMatchObject([
+      { refusal: 'not_authorized', targetUserId: null, actorEmail: null, previewOf: null },
+    ]);
+  });
+});

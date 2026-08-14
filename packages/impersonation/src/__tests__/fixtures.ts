@@ -134,6 +134,7 @@ export function actor(overrides: Partial<ImpersonationActor> = {}): Impersonatio
     email: 'actor@example.test',
     isPlatformAdmin: false,
     permissions: [],
+    isMachineToken: false,
     ...overrides,
   };
 }

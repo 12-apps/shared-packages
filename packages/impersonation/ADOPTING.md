@@ -1,6 +1,8 @@
 # Adopting `@12-apps/impersonation`
 
-Seven steps. Five of them are config; two are a mount.
+Nine steps. Five are config, two are a mount, and the **last two are the ones
+that decide whether the feature is safe** — they are the host's alone, because
+they need your permission engine.
 
 ## 1. Decide the cookie, the cipher and the time box
 
@@ -114,6 +116,53 @@ test keeps the resolution off the traffic that is not impersonated.
 `assertAllowed` throws `ImpersonationRefusedError` (`.code`, `.status = 403`,
 `.message` your own copy). Map it explicitly rather than letting it fall into a
 generic handler.
+
+## 8. Narrow the impersonated actor — the CEILING and the TENANT BOUND
+
+Neither ships here, and skipping either is silent.
+
+```ts
+// wherever you resolve an authorization decision
+if (outsideBoundedTenant(state, scope, (s) => s === GLOBAL || isOrgScope(s))) {
+  return NOTHING;                       // a session reaches ONE tenant, ever
+}
+switch (previewCeilingKind(state)) {
+  case 'none':  return null;            // an operator IS the target
+  case 'role':  return rolePermissions(state.tenantId, state.previewRoleName);
+  case 'actor': return engine.getPermissions(state.realUserId, scope);
+}
+```
+
+…then INTERSECT that ceiling with the set you would otherwise grant. A preview
+may only ever narrow.
+
+Two rules for the role case: an unknown or archived role resolves to the EMPTY
+set (deny by default, visibly wrong to the operator, rather than a fallback that
+grants more than the row says), and resolve the ceiling WITHOUT the caller's
+attribute bag, so an omitted attribute drops a permission from the ceiling rather
+than adding one. A ceiling that errs is required to err narrow.
+
+And force your platform-admin flag FALSE while a session is in force. That is
+what stops an operator keeping their own authority while wearing someone else's
+account.
+
+## 9. Wire `stillAuthorized`
+
+```ts
+stillAuthorized: (state, actor) =>
+  state.kind !== 'operator' || isPlatformOperator(actor.email),
+```
+
+An operator session's payload names its target at mint time and depends on
+nothing about the actor's live rights, so without this someone removed from your
+allowlist keeps acting as the tenant's owner for the rest of the time box — and
+there is no other way to end it, because the only exit clears a cookie held by
+the one browser nobody can reach any more. The preview kinds degrade on their own
+through step 8's ceiling; only the unbounded one needs this.
+
+Answering `false` makes the session stop existing for every reader at once — the
+routes, the banner, the nesting refusal and the end audit all resolve through the
+same reader, so none of them can disagree.
 
 ## And on the browser
 

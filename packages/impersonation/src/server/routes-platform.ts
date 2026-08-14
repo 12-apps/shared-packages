@@ -11,7 +11,7 @@ import {
   type ImpersonationRoute,
   type ImpersonationServerConfig,
 } from './context';
-import { liveSession } from './live-session';
+import { authorizedSession } from './live-session';
 import { attemptOf, type AttemptContext, type Refusals } from './refusals';
 import { recordEnd } from './session-end';
 import { startOperatorBody, type StartOperatorBody } from './wire';
@@ -82,7 +82,7 @@ async function refuseNesting(
   request: ImpersonationRequest,
   body: StartOperatorBody,
 ): Promise<ImpersonationApiError | null> {
-  const live = liveSession(parts.codec, request);
+  const live = await authorizedSession(parts.codec, parts.config, request);
   if (!live) return null;
   return parts.refusals.refuse(
     'already_impersonating',
@@ -223,6 +223,7 @@ async function handleStart(
     reason: body.reason,
     previewOf: null,
     allowWrites: body.allowWrites,
+    readOnly: !body.allowWrites,
     expiresAt: session.expiresAt,
   });
 
@@ -249,7 +250,7 @@ async function handleStop(
   parts: PlatformParts,
   request: ImpersonationRequest,
 ): Promise<ImpersonationResponse> {
-  const live = liveSession(parts.codec, request);
+  const live = await authorizedSession(parts.codec, parts.config, request);
   await recordEnd(parts.config, live);
   return ok({ ended: live !== null }, parts.codec.end());
 }
@@ -265,7 +266,7 @@ async function handleDescribe(
   parts: PlatformParts,
   request: ImpersonationRequest,
 ): Promise<ImpersonationResponse> {
-  const live = liveSession(parts.codec, request);
+  const live = await authorizedSession(parts.codec, parts.config, request);
   if (!live) return ok(NO_SESSION);
   const [subject, tenant] = await Promise.all([
     parts.config.directory.findUser(live.state.subjectUserId),

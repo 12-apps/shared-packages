@@ -10,7 +10,7 @@ import {
   type ImpersonationRoute,
   type ImpersonationServerConfig,
 } from './context';
-import { liveSession } from './live-session';
+import { authorizedSession } from './live-session';
 import { attemptOf, type AttemptContext, type Refusals } from './refusals';
 import { recordEnd } from './session-end';
 import { startPreviewBody, type StartPreviewBody } from './wire';
@@ -129,7 +129,10 @@ async function requireEntitlement(
     await gate.require(attempt.tenantId);
   } catch (error) {
     if (!gate.isDenial(error)) throw error;
-    await parts.refusals.recordUnauthorized('not_entitled', attempt);
+    // Recorded UNCONDITIONALLY, unlike the permission denial above: reaching
+    // this gate means the caller already passed gate 1, so they are no stranger
+    // to this tenant and the standing question is already answered.
+    await parts.refusals.record(gate.refusalCode?.(error) ?? 'not_entitled', attempt);
     const denial = gate.denialResponse(error);
     throw new ImpersonationApiError(denial.status, denial.message);
   }
@@ -154,7 +157,7 @@ async function requireStartableActor(
   request: ImpersonationRequest,
   attempt: AttemptContext,
 ): Promise<string> {
-  if (liveSession(parts.codec, request)) {
+  if (await authorizedSession(parts.codec, parts.config, request)) {
     throw await parts.refusals.refuse('already_impersonating', attempt);
   }
   if (!attempt.actorUserId) {
@@ -212,12 +215,15 @@ async function handleStartPreview(
   const previewOf = parseBody(parts, request.body);
   const attempt = attemptOf(tenant.id, {
     actorUserId: actor.userId,
-    actorEmail: actor.email,
     previewOf,
     targetUserId: previewOf.as === 'member' ? previewOf.memberUserId : null,
   });
 
-  await requirePermission(parts, actor, attempt);
+  // The AUTHORIZATION denial is keyed to the code and the caller alone. The
+  // subject is still caller-supplied at this point and nothing has validated it,
+  // so writing it into an indexed column would put an unvalidated value there;
+  // and this trail records no contact data, so no address either.
+  await requirePermission(parts, actor, attemptOf(tenant.id, { actorUserId: actor.userId }));
   await requireEntitlement(parts, attempt);
   const realUserId = await requireStartableActor(parts, request, attempt);
   await assertSubjectAllowed(parts, previewOf, attempt);
@@ -249,6 +255,7 @@ async function handleStartPreview(
     reason: null,
     previewOf,
     allowWrites: false,
+    readOnly,
     expiresAt: session.expiresAt,
   });
 
@@ -274,7 +281,7 @@ async function handleStopPreview(
   request: ImpersonationRequest,
 ): Promise<ImpersonationResponse> {
   await requireTenant(parts, request.params);
-  const live = liveSession(parts.codec, request);
+  const live = await authorizedSession(parts.codec, parts.config, request);
   await recordEnd(parts.config, live);
   return ok({ ended: live !== null }, parts.codec.end());
 }

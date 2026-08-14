@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createPathRules } from '../core/paths';
 import type { ImpersonationState } from '../core/types';
-import { impersonationPermitsWrites } from '../core/write-rules';
+import {
+  impersonationPermitsWrites,
+  outsideBoundedTenant,
+  previewCeilingKind,
+} from '../core/write-rules';
 import type {
   PreviewEntitlementPort,
 } from '../server/ports';
@@ -313,5 +317,37 @@ describe('the refusal', () => {
     await expect(
       guard().assertAllowed({ impersonation: state(), pathname: '/api/widgets', method: 'GET' }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('THE TENANT BOUND — a session reaches ONE tenant, ever', () => {
+  /**
+   * Shipped rather than left to each host because getting it wrong is silent:
+   * the gate above checks the PATH and the KIND and never the scope, so a
+   * session bounded to one tenant would read another with nothing in any log.
+   */
+  it('refuses a scope that is not the session\'s', () => {
+    expect(outsideBoundedTenant({ tenantId: 't-1' }, 't-1')).toBe(false);
+    expect(outsideBoundedTenant({ tenantId: 't-1' }, 't-2')).toBe(true);
+  });
+
+  it("exempts the scopes that are not a tenant at all", () => {
+    const exempt = (scope: string) => scope === 'GLOBAL' || scope.startsWith('org:');
+    // The app shell's own reads resolve against the SUBJECT's grants like
+    // everything else; refusing them would break the chrome around a valid
+    // session.
+    expect(outsideBoundedTenant({ tenantId: 't-1' }, 'GLOBAL', exempt)).toBe(false);
+    expect(outsideBoundedTenant({ tenantId: 't-1' }, 'org:acme', exempt)).toBe(false);
+    // …and a real tenant scope is still bounded, so the exemption is never
+    // taken on the path that matters.
+    expect(outsideBoundedTenant({ tenantId: 't-1' }, 't-2', exempt)).toBe(true);
+  });
+});
+
+describe('WHICH CEILING a host must apply', () => {
+  it('names one per kind, so a host cannot silently skip the narrowing', () => {
+    expect(previewCeilingKind({ kind: 'operator', previewRoleName: null })).toBe('none');
+    expect(previewCeilingKind({ kind: 'preview', previewRoleName: 'FLOOR' })).toBe('role');
+    expect(previewCeilingKind({ kind: 'preview', previewRoleName: null })).toBe('actor');
   });
 });

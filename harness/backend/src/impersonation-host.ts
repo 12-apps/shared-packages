@@ -86,6 +86,8 @@ const DIRECTORY = new Map(PEOPLE.map((person) => [person.id, person]));
 
 /** The header a spec sets to act as someone else — the rbac host's convention. */
 const ACTOR_HEADER = 'x-rbac-user';
+/** Who the SPA is when it sets no header: a system librarian, who may start
+ * operator sessions AND (through the platform short-circuit) previews. */
 /** The header a spec sets to arrive as an integration key rather than a person. */
 const MACHINE_HEADER = 'x-machine-token';
 
@@ -198,6 +200,23 @@ function resolveActor(c: Context): ImpersonationActor {
 }
 
 /**
+ * Is the real human behind an OPERATOR session still a system librarian?
+ *
+ * The revocation path. A real host re-reads its own allowlist; the harness reads
+ * the same in-memory set, and `/__harness/impersonation/revoke` takes an id out
+ * of it so a spec can watch a live session stop being one.
+ */
+const revoked = new Set<string>();
+
+function stillAuthorized(
+  state: { kind: string; realUserId: string },
+  actor: ImpersonationActor,
+): boolean {
+  if (state.kind !== 'operator') return true;
+  return !revoked.has(state.realUserId) && actor.isPlatformAdmin;
+}
+
+/**
  * WHERE THIS APP'S OWN SURFACES ARE — the four tables the write gate consults.
  *
  * The package has no idea, and a default here would be somebody else's URL
@@ -253,6 +272,7 @@ export function impersonationHost() {
       }),
     },
     messages: MESSAGES,
+    stillAuthorized,
     resolveActor,
   });
 
@@ -261,7 +281,12 @@ export function impersonationHost() {
     tenant: surface.tenant,
     writeGate: writeGate(surface),
     trail,
+    revoke(userId: string, value: boolean): void {
+      if (value) revoked.add(userId);
+      else revoked.delete(userId);
+    },
     reset(): void {
+      revoked.clear();
       trail.started.length = 0;
       trail.ended.length = 0;
       trail.refused.length = 0;
@@ -340,6 +365,11 @@ export function mountImpersonationDemo(app: Hono, harness: HarnessImpersonation)
   });
 
   app.get('/__harness/impersonation/trail', (c) => c.json(harness.trail));
+  app.post('/__harness/impersonation/revoke', async (c) => {
+    const body = (await c.req.json()) as { userId?: string; revoked?: boolean };
+    harness.revoke(body.userId ?? SYSTEM_LIBRARIAN.id, body.revoked !== false);
+    return c.body(null, 204);
+  });
   app.post('/__harness/impersonation/entitlement', async (c) => {
     const body = (await c.req.json()) as { tenantId?: string; enabled?: boolean };
     harness.setEntitled(body.tenantId ?? RBAC_TENANT_ID, body.enabled !== false);

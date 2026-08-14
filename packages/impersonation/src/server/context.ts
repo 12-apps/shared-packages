@@ -1,6 +1,6 @@
 import type { ImpersonationPathRules } from '../core/paths';
 import type { ImpersonationCodec, ImpersonationTimeBoxConfig } from '../core/session';
-import type { ImpersonationCookie } from '../core/types';
+import type { ImpersonationCookie, ImpersonationState } from '../core/types';
 
 import type {
   ImpersonationAuditPort,
@@ -50,10 +50,15 @@ export interface ImpersonationActor {
   permissions: readonly string[];
   /**
    * True when this request authenticated with a machine/agent token rather than
-   * a browser session. Such a caller may neither inherit nor MINT a session —
-   * see {@link ImpersonationMessages.machineTokenRefused}.
+   * a browser session. Such a caller may neither inherit nor MINT a session.
+   *
+   * REQUIRED, and `false` has to be written out. It was optional, and optional
+   * failed OPEN in the worst possible direction: a host that never set it let an
+   * agent token both inherit and mint a session, silently, with every test
+   * green. A host with no machine identity at all writes `false` once and a
+   * reader can see that it was decided.
    */
-  isMachineToken?: boolean;
+  isMachineToken: boolean;
 }
 
 /* ────────────────────────────── the request ───────────────────────────── */
@@ -178,6 +183,33 @@ export interface ImpersonationServerConfig {
   previewPermission: string;
   /** The tenant's plan/consent gate, when the host has one. */
   previewEntitlement?: PreviewEntitlementPort;
+  /**
+   * Does the real human behind this session STILL hold the authority it was
+   * minted under?
+   *
+   * THE REVOCATION PATH, and the reason it cannot live in the codec: a session's
+   * payload names its target at mint time and depends on nothing about the
+   * actor's live rights, so without this an operator removed from the host's
+   * platform allowlist keeps acting as the tenant's owner for the rest of the
+   * time box — and there is no other way to end it, because the only exit clears
+   * a cookie held by the one browser nobody can reach any more.
+   *
+   * Contrast the PREVIEW kinds, which degrade on their own: their ceiling is
+   * re-read from the host's engine on every request. Only a session with an
+   * unbounded ceiling needs a check of its own, which is why the state is passed
+   * in — a host typically answers `true` for everything except `kind ===
+   * 'operator'`.
+   *
+   * Answer FALSE and the session stops existing for every reader at once: the
+   * guards, the banner, the nesting refusal and the end audit all resolve
+   * through the same reader, so none of them can disagree about whether a
+   * session is in force. Omit it only when the host's authority cannot be
+   * revoked.
+   */
+  stillAuthorized?(
+    state: ImpersonationState,
+    actor: ImpersonationActor,
+  ): boolean | Promise<boolean>;
   /** Every user-facing sentence, in the host's own voice. */
   messages: ImpersonationMessages;
   /**

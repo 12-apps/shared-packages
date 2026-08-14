@@ -74,8 +74,16 @@ export type ImpersonationRefusal =
   | 'target_not_found'
   /** The named subject is not an active member of this tenant. */
   | 'not_a_member'
-  /** The tenant may not use previews (plan, or its own switch). */
+  /**
+   * The tenant may not use previews.
+   *
+   * A host that distinguishes its denials — a plan the tenant has not bought
+   * versus a switch they turned off themselves — supplies its own code through
+   * {@link PreviewEntitlementPort.refusalCode}. The distinction matters twelve
+   * months later, because only one of the two is something the tenant can undo.
+   */
   | 'not_entitled'
+  | (string & {})
   /**
    * A session is ALREADY in force and this request would have replaced it.
    *
@@ -106,6 +114,17 @@ export interface ImpersonationStartEntry extends ImpersonationAuditBase {
   /** The previewed subject, for a preview; `null` for an operator session. */
   previewOf: PreviewSubject | null;
   allowWrites: boolean;
+  /**
+   * Whether this session could change anything, recorded rather than left to be
+   * re-derived from the fields above at read time.
+   *
+   * They are NOT the same answer: a ROLE preview is minted with
+   * `allowWrites: false` and may still write, because it substitutes nobody. And
+   * the rule connecting them lives in the write gate and may be tightened, so
+   * what the record has to preserve is what was TRUE of this session, not what a
+   * later rule would say about it.
+   */
+  readOnly: boolean;
   /** The absolute end of the time box, so the entry states the window it opened. */
   expiresAt: number;
 }
@@ -238,4 +257,14 @@ export interface PreviewEntitlementPort {
    * session does not need an upsell, it needs to stop.
    */
   denialResponse(error: unknown): { status: number; message: string };
+  /**
+   * The refusal code this denial is recorded under. Defaults to `not_entitled`.
+   *
+   * Worth supplying whenever the host's engine distinguishes its denials,
+   * because only one of them is something the tenant can undo themselves — and
+   * that is the difference an operator filters a year of history on, and the one
+   * a route test has to assert SPECIFICALLY: a test that merely checks "not 200"
+   * passes on the plan denial and would hide a completely broken tenant switch.
+   */
+  refusalCode?(error: unknown): string;
 }

@@ -2,7 +2,8 @@
 
 An operator previews as a tenant user. Reads are scoped, writes are refused
 unless opted in, money paths are always refused, and revoking the entitlement
-ends the session live.
+refuses every request under the session — including the reads — while leaving
+the exit reachable, so the operator is told to leave rather than locked in.
 
 Both halves ship here, each behind a single factory that takes a config object:
 
@@ -13,11 +14,18 @@ const { banner, dialog } = createWebImpersonation({ … }); // @12-apps/imperson
 
 ## The two kinds of session
 
-| kind | who it resolves as | ceiling | writes |
+| kind | who it resolves as | ceiling (**the host's**) | writes |
 | --- | --- | --- | --- |
 | `operator` | the TARGET user | none — be exactly them | only with `allowWrites`, asked for at start |
 | `preview`, member | the previewed MEMBER | the actor's own set | never |
 | `preview`, role | the actor themselves | the previewed ROLE's set | allowed |
+
+**The ceiling column is the host's obligation, not this package's.** Enforcing it
+needs the host's permission engine, its role storage and its scope vocabulary,
+none of which ship here — so the package states the rule (`previewCeilingKind`,
+`outsideBoundedTenant`) and ADOPTING makes it step 8. A host that skips it gets a
+member preview granting the previewer their OWN full rights while the banner says
+otherwise, and nothing here would notice.
 
 The role row is not a hole. A role preview substitutes no one: the subject stays
 the actor and the previewed role only ever INTERSECTS their own rights, so every
@@ -31,6 +39,9 @@ a caller could set.
 - **The cookie.** Minting, reading, ending. There is no sliding renewal, and
   that is structural rather than un-implemented: a decoded session is not
   assignable to the mint's input, so no expression can re-stamp a live window.
+- **The tenant bound.** `outsideBoundedTenant` — three lines every host must get
+  right, and silent when wrong: the write gate checks the path and the kind,
+  never the scope.
 - **The write gate.** The branch order is the feature — the exit first (a
   session that cannot be stopped is worse than any write it might make), then the
   live revocation, then money, then accounts, then the read shortcut, then the

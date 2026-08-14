@@ -28,12 +28,13 @@ export type {
 export { createPathRules, READ_METHODS } from './core/paths';
 export type { ImpersonationPathRules, PathRules } from './core/paths';
 
-export { impersonationPermitsWrites } from './core/write-rules';
-
 export {
-  IMPERSONATION_PERMISSION_IDS,
-  IMPERSONATION_PERMISSIONS,
-} from './core/permissions';
+  impersonationPermitsWrites,
+  outsideBoundedTenant,
+  previewCeilingKind,
+} from './core/write-rules';
+
+export { IMPERSONATION_PERMISSIONS } from './core/permissions';
 
 export type {
   ImpersonationBannerState,

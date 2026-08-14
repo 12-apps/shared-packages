@@ -23,19 +23,15 @@ export const IMPERSONATION_PERMISSIONS = {
    * the job.
    */
   preview: 'user:impersonate',
-  /**
-   * Arm the tenant's own consent switch — the separate right to decide that this
-   * tenant may be viewed as at all.
-   *
-   * Separate from {@link IMPERSONATION_PERMISSIONS.preview} on purpose:
-   * consenting to be looked through is a decision about the tenant, and using
-   * the feature is a decision about a session.
-   */
-  configure: 'user:impersonate:configure',
 } as const;
 
-/** Every id this package declares, for a host composing a catalog. */
-export const IMPERSONATION_PERMISSION_IDS: readonly string[] = [
-  IMPERSONATION_PERMISSIONS.preview,
-  IMPERSONATION_PERMISSIONS.configure,
-];
+/**
+ * The tenant's own CONSENT switch — "may this tenant be viewed as at all" — is
+ * deliberately NOT here.
+ *
+ * This package ships no route that arms it: the switch lives on whatever
+ * settings surface the host already has, and it is gated by whatever id that
+ * host's catalog uses. A package declares the permissions guarding its OWN
+ * screens and endpoints; declaring one for somebody else's screen is how a
+ * package ends up shipping an application's catalog.
+ */

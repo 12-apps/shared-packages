@@ -30,7 +30,7 @@ export interface AttemptContext {
   previewOf: PreviewSubject | null;
 }
 
-const REFUSAL_STATUS: Record<ImpersonationRefusal, number> = {
+const REFUSAL_STATUS: Record<string, number> = {
   not_authorized: 403,
   actor_not_recorded: 403,
   target_is_platform_admin: 403,
@@ -46,9 +46,7 @@ const REFUSAL_STATUS: Record<ImpersonationRefusal, number> = {
   already_impersonating: 403,
 };
 
-const REFUSAL_MESSAGE_KEYS: Partial<
-  Record<ImpersonationRefusal, keyof ImpersonationMessages>
-> = {
+const REFUSAL_MESSAGE_KEYS: Record<string, keyof ImpersonationMessages> = {
   not_authorized: 'notAuthorized',
   actor_not_recorded: 'actorNotRecorded',
   target_is_platform_admin: 'targetIsPlatformAdmin',
@@ -61,16 +59,20 @@ interface RefusalParts {
   audit: ImpersonationAuditPort;
   directory: ImpersonationDirectory;
   messages: ImpersonationMessages;
+  onError?(message: string, error: unknown): void;
 }
 
 export interface Refusals {
   /**
    * Record the refusal and build the error.
    *
-   * The audit write comes FIRST and is NOT fenced: if the trail cannot be
-   * written the caller gets a 500 rather than a tidy 403, which is the right
-   * trade for an append-only log — a refusal nobody can see is barely a refusal.
-   * (Ending a session is the one place that trade flips.)
+   * FENCED, and the reasoning is the opposite of the START's. A start whose
+   * trail write fails must not happen at all — an unrecorded session is the
+   * outcome this mechanism exists to prevent. But a REFUSAL whose trail write
+   * fails must still REFUSE: the security outcome has already happened (no
+   * session), and letting the failure surface would turn a 403 into a 500,
+   * which hands a caller a way to convert a denial into an outage. The row is
+   * lost and reported; the denial stands.
    */
   refuse(
     refusal: ImpersonationRefusal,
@@ -113,13 +115,17 @@ export interface Refusals {
     refusal: ImpersonationRefusal,
     attempt: AttemptContext,
   ): Promise<void>;
+  /** Record a refusal with no standing check — the caller is already known. */
+  record(refusal: ImpersonationRefusal, attempt: AttemptContext): Promise<void>;
 }
 
 export function createRefusals(parts: RefusalParts): Refusals {
   const errorFor = (refusal: ImpersonationRefusal): ImpersonationApiError => {
+    // A host-supplied entitlement code lands on the 403 fallback; it never
+    // reaches here, because that gate answers with the host's own status.
     const key = REFUSAL_MESSAGE_KEYS[refusal];
     return new ImpersonationApiError(
-      REFUSAL_STATUS[refusal],
+      REFUSAL_STATUS[refusal] ?? 403,
       key ? parts.messages[key] : parts.messages.notAuthorized,
     );
   };
@@ -129,18 +135,31 @@ export function createRefusals(parts: RefusalParts): Refusals {
     return parts.directory.isActiveMember(attempt.actorUserId, attempt.tenantId);
   };
 
+  /** Write the row, or lose it — see {@link Refusals.refuse}. */
+  const record = async (
+    refusal: ImpersonationRefusal,
+    attempt: AttemptContext,
+  ): Promise<void> => {
+    try {
+      await parts.audit.refused({ ...attempt, refusal });
+    } catch (error) {
+      parts.onError?.(`could not record the ${refusal} refusal`, error);
+    }
+  };
+
   const recordUnauthorized = async (
     refusal: ImpersonationRefusal,
     attempt: AttemptContext,
   ): Promise<void> => {
     if (!(await concernsTenant(attempt))) return;
-    await parts.audit.refused({ ...attempt, refusal });
+    await record(refusal, attempt);
   };
 
   return {
+    record,
     recordUnauthorized,
     async refuse(refusal, attempt) {
-      await parts.audit.refused({ ...attempt, refusal });
+      await record(refusal, attempt);
       return errorFor(refusal);
     },
     async refuseUnauthorized(refusal, attempt) {

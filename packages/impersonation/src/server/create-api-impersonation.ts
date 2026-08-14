@@ -70,6 +70,9 @@ export function createApiImpersonation(
     audit: config.audit,
     directory: config.directory,
     messages: config.messages,
+    // A refusal whose trail write fails must still refuse, so the loss is
+    // reported rather than raised — see `createRefusals`.
+    onError: config.onError,
   });
   const parts = { config, codec, refusals };
 

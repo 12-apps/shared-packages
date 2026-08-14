@@ -2,7 +2,7 @@ import type { ImpersonationSessionCodec } from '../core/session';
 import { toImpersonationState } from '../core/session';
 import type { ImpersonationSession, ImpersonationState } from '../core/types';
 
-import type { ImpersonationRequest } from './context';
+import type { ImpersonationRequest, ImpersonationServerConfig } from './context';
 
 /** A session that decoded, authenticated, and belongs to THIS caller. */
 export interface LiveSession {
@@ -39,4 +39,24 @@ export function liveSession(
   if (!session) return null;
   const state = toImpersonationState(session, request.actor.userId);
   return state ? { session, state } : null;
+}
+
+/**
+ * The same reader, plus the host's live-authority check.
+ *
+ * Used by every ROUTE, so the banner, the nesting refusal and the end audit all
+ * agree with the guards about whether a session exists. `liveSession` above
+ * stays synchronous because a host's own actor resolution runs on every request
+ * and must not be made async by a check most hosts answer from memory — such a
+ * host applies {@link ImpersonationServerConfig.stillAuthorized} itself there,
+ * exactly as it does here.
+ */
+export async function authorizedSession(
+  codec: ImpersonationSessionCodec,
+  config: Pick<ImpersonationServerConfig, 'stillAuthorized'>,
+  request: Pick<ImpersonationRequest, 'actor' | 'cookieValue'>,
+): Promise<LiveSession | null> {
+  const live = liveSession(codec, request);
+  if (!live || !config.stillAuthorized) return live;
+  return (await config.stillAuthorized(live.state, request.actor)) ? live : null;
 }

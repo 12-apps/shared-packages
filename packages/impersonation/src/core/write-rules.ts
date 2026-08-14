@@ -44,3 +44,67 @@ export function impersonationPermitsWrites(impersonation: {
     impersonation.kind === 'preview' && impersonation.previewRoleName !== null;
   return isRolePreview || impersonation.allowWrites;
 }
+
+/**
+ * THE TENANT BOUND — is this decision being made in a DIFFERENT tenant than the
+ * one the session was started (and audited) for?
+ *
+ * A host asks this wherever it resolves an authorization scope, and refuses
+ * everything when it answers true. Acting as someone in a tenant nobody
+ * consented to and nothing audited is the capability the cookie's mandatory
+ * `tenantId` exists to withhold — impersonating in a second tenant is a second
+ * start.
+ *
+ * It ships here rather than being left to each host because it is three lines
+ * that every host must get right, and getting it wrong is silent: the write gate
+ * checks the PATH and the KIND, never the scope, so a session bounded to tenant
+ * A reads tenant B with nothing to see in a log.
+ *
+ * `exemptScopes` are the scopes that are not a tenant at all — a host's global
+ * or organisation scope, used by the app shell's own reads ("which tenants does
+ * this person belong to"). Those resolve against the SUBJECT's own grants like
+ * everything else, and refusing them would break the chrome around an otherwise
+ * valid session. A tenant-level decision always passes a real tenant id, so the
+ * exemption is never taken on that path.
+ */
+export function outsideBoundedTenant(
+  impersonation: { tenantId: string },
+  scope: string,
+  exemptScopes: (scope: string) => boolean = () => false,
+): boolean {
+  if (exemptScopes(scope)) return false;
+  return scope !== impersonation.tenantId;
+}
+
+/**
+ * WHAT THE PACKAGE CANNOT DO FOR YOU: the permission CEILING.
+ *
+ * A preview may only ever NARROW. The host resolves the ceiling from its own
+ * engine and intersects it with the permission set it would otherwise grant:
+ *
+ *   kind                | ceiling
+ *   --------------------|----------------------------------------------------
+ *   operator            | none — be exactly the target
+ *   preview, member     | the ACTOR's own set, re-read on every request
+ *   preview, role       | the previewed ROLE's set, from the tenant's own row
+ *
+ * This is not shipped because it needs the host's engine, its role storage and
+ * its scope vocabulary — none of which this package has. It is stated here, and
+ * in ADOPTING, because a host that skips it gets a member preview granting the
+ * previewer their OWN full rights while the banner says otherwise, and nothing
+ * in this package would notice.
+ *
+ * Two rules for whoever writes it: an unknown or archived role must resolve to
+ * the EMPTY set (deny by default, visibly wrong to the operator, rather than a
+ * fallback that grants more than the row says), and the ceiling must be resolved
+ * WITHOUT the caller's attribute bag, so an omitted attribute drops a permission
+ * from the ceiling rather than adding one. A ceiling that errs is required to
+ * err narrow.
+ */
+export function previewCeilingKind(impersonation: {
+  kind: ImpersonationKind;
+  previewRoleName: string | null;
+}): 'none' | 'role' | 'actor' {
+  if (impersonation.kind === 'operator') return 'none';
+  return impersonation.previewRoleName !== null ? 'role' : 'actor';
+}

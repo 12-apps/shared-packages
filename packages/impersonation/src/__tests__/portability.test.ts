@@ -122,6 +122,7 @@ const librarian: ImpersonationActor = {
   email: 'librarian@library.test',
   isPlatformAdmin: true,
   permissions: [],
+  isMachineToken: false,
 };
 
 type LibraryApi = ReturnType<typeof mountLibrary>['api'];
@@ -195,6 +196,7 @@ describe('a second host, in a vocabulary this package has never heard of', () =>
       email: 'clerk@library.test',
       isPlatformAdmin: false,
       permissions: ['desk:look-as'],
+      isMachineToken: false,
     };
     await expect(
       drive(library, 'POST', 'tenant', {
@@ -279,6 +281,9 @@ describe('a second host, in a vocabulary this package has never heard of', () =>
 /* ── the tripwire: what the PACKAGE ships, not what this suite imports ──── */
 
 const SOURCE_ROOT = fileURLToPath(new URL('..', import.meta.url));
+/** The package root — `features/` and the docs ship too, and are exactly where a
+ * product name survives a `src/`-only scan. */
+const PACKAGE_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
 /**
  * Every file that actually SHIPS.
@@ -297,17 +302,29 @@ function sourceFiles(directory: string): string[] {
     const full = join(directory, entry);
     // eslint-disable-next-line test-flakiness/no-unmocked-fs
     if (statSync(full).isDirectory()) return sourceFiles(full);
-    return /\.tsx?$/.test(entry) ? [full] : [];
+    return /\.(tsx?|md|feature)$/.test(entry) ? [full] : [];
   });
 }
 
+/** Every published directory, per the manifest's `files`. */
+function shippedFiles(): string[] {
+  return [
+    ...sourceFiles(SOURCE_ROOT),
+    ...sourceFiles(join(PACKAGE_ROOT, 'features')),
+    join(PACKAGE_ROOT, 'README.md'),
+    join(PACKAGE_ROOT, 'ADOPTING.md'),
+  ];
+}
+
 function offendingLines(pattern: RegExp): string[] {
-  return sourceFiles(SOURCE_ROOT).flatMap((file) =>
+  return shippedFiles().flatMap((file) =>
     // eslint-disable-next-line test-flakiness/no-unmocked-fs
     readFileSync(file, 'utf8')
       .split('\n')
       .flatMap((line, index) =>
-        pattern.test(line) ? [`${file.slice(SOURCE_ROOT.length)}:${index + 1}: ${line.trim()}`] : [],
+        pattern.test(line)
+          ? [`${file.slice(PACKAGE_ROOT.length)}:${index + 1}: ${line.trim()}`]
+          : [],
       ),
   );
 }
@@ -336,10 +353,9 @@ describe('the package knows which product it serves: it does not', () => {
   });
 
   it('declares only the permissions guarding its OWN surface', () => {
-    expect(Object.values(IMPERSONATION_PERMISSIONS)).toEqual([
-      'user:impersonate',
-      'user:impersonate:configure',
-    ]);
+    // ONE id, because this package ships exactly one gated route. The tenant's
+    // own consent switch is the HOST's screen and the host's catalog entry.
+    expect(Object.values(IMPERSONATION_PERMISSIONS)).toEqual(['user:impersonate']);
     const domains = new Set(
       Object.values(IMPERSONATION_PERMISSIONS).map((id) => id.split(':')[0]),
     );
