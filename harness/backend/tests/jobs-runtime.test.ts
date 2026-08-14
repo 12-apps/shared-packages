@@ -16,7 +16,9 @@ import {
   clearJobs,
   createSweepLease,
   defineJob,
+  enqueueJob,
   resetJobRuntime,
+  type RegisteredJob,
   type SweepLeaseDb,
 } from '@12-apps/jobs';
 import { createApiJobs } from '@12-apps/jobs/server';
@@ -48,6 +50,18 @@ afterEach(() => {
 
 const silent = { info: () => undefined, warn: () => undefined, error: () => undefined };
 
+/**
+ * One declared job — the minimum a host may mount the package with.
+ *
+ * `jobs: []` used to stand in for "this case is about something else", and it
+ * is exactly what the published factory now refuses at assembly: a process
+ * that declares nothing consumes no queue, installs no schedule and still
+ * answers /health with `ok`. Passing one job is also what a real host does.
+ */
+function oneJob(name = 'harness.declared'): RegisteredJob<never>[] {
+  return [defineJob({ name, handle: async () => undefined }) as RegisteredJob<never>];
+}
+
 describe('createApiJobs — zero config, no Redis', () => {
   it('starts green on the inline driver and runs a handler in-process', async () => {
     stubBareEnv();
@@ -72,7 +86,7 @@ describe('createApiJobs — zero config, no Redis', () => {
 
   it('serves 200 ok from /health through the packaged Hono adapter', async () => {
     stubBareEnv();
-    const api = createApiJobs({ jobs: [], logger: silent });
+    const api = createApiJobs({ jobs: oneJob(), logger: silent });
     await api.start();
 
     // The one-call mount a host writes.
@@ -92,7 +106,7 @@ describe('createApiJobs — zero config, no Redis', () => {
 
   it('reports degraded (503) when production has no queue', async () => {
     stubBareEnv();
-    const api = createApiJobs({ jobs: [], logger: silent, production: true });
+    const api = createApiJobs({ jobs: oneJob(), logger: silent, production: true });
     await api.start();
 
     const app = new Hono();
@@ -103,6 +117,63 @@ describe('createApiJobs — zero config, no Redis', () => {
     const body = (await response.json()) as { status: string; checks: { driver: null } };
     expect(body.status).toBe('degraded');
     expect(body.checks.driver).toBeNull();
+  });
+});
+
+/**
+ * The refusals, driven out of the PUBLISHED tarball rather than the source.
+ *
+ * Each one guards a state that looks healthy: a process that declares no jobs
+ * probes green while every schedule in the deployment has stopped, and an
+ * enqueue nobody can consume reports success and dead-letters minutes later.
+ * A consumer must inherit those guards from the package it installed, which is
+ * what this suite — and only this suite — actually proves.
+ */
+describe('the published package refuses what would fail silently', () => {
+  it('refuses an empty `jobs` at the factory, before start() is reached', () => {
+    stubBareEnv();
+
+    expect(() => createApiJobs({ jobs: [], logger: silent })).toThrow(
+      /declares no work/,
+    );
+  });
+
+  it('refuses a thunk that registers nothing, at start()', async () => {
+    stubBareEnv();
+    const api = createApiJobs({ jobs: () => undefined, logger: silent });
+
+    await expect(api.start()).rejects.toThrow(/no jobs are registered/);
+
+    // And the probe reports the failed boot rather than a green empty runtime.
+    const app = new Hono().route('/api/internal/jobs', jobsRouter(api));
+    const response = await app.request('/api/internal/jobs/health');
+    expect(response.status).toBe(503);
+  });
+
+  it('refuses a definition whose cron pattern would never fire', () => {
+    expect(() =>
+      defineJob({
+        name: 'harness.never',
+        schedule: { pattern: '@daily' },
+        handle: async () => undefined,
+      }),
+    ).toThrow(/schedule.pattern/);
+  });
+
+  it('refuses an enqueue of a job the registry does not hold', async () => {
+    stubBareEnv();
+    const api = createApiJobs({ jobs: oneJob(), logger: silent });
+    await api.start();
+
+    // Same name as a registered job, different object: the payload would reach
+    // a handler that never agreed to it, so identity is what the gate checks.
+    await expect(
+      enqueueJob(
+        { name: 'harness.declared', handle: () => Promise.resolve() },
+        { spoofed: true },
+        {},
+      ),
+    ).resolves.toEqual({ enqueued: false, reason: 'unregistered' });
   });
 });
 
@@ -243,7 +314,7 @@ describe('createSweepLease — against the shipped sweep_leases table', () => {
 
   it('binds the same lease through createApiJobs({ db })', async () => {
     stubBareEnv();
-    const api = createApiJobs({ jobs: [], logger: silent, db });
+    const api = createApiJobs({ jobs: oneJob(), logger: silent, db });
     await api.start();
 
     const held = createSweepLease({ db, holder: 'other-worker' });

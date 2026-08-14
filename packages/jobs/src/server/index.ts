@@ -7,8 +7,10 @@
  * internal probes live.
  *
  *     const jobsApi = createApiJobs({
- *       jobs: () => import("./lib/jobs"),      // defineJob modules
+ *       jobs: () => import("./lib/jobs"),      // defineJob modules — required,
+ *                                             // and refused if it names nothing
  *       db: () => getPrismaClient(),           // the sweep_leases table
+ *       events: { onJobFailed: … },            // dead-letters, for YOUR notifier
  *     });
  *     await jobsApi.start();                   // at process start
  *     app.route("/api/internal/jobs", jobsRouter(jobsApi));   // ./hono
@@ -24,4 +26,10 @@ export type {
   JobsResponse,
   JobsRoute,
 } from "./create-api-jobs";
+export { JobsConfigError } from "./config";
 export type { JobsDriverChoice, JobsServerConfig, JobsSource } from "./config";
+// Re-exported so a host that only imports `/server` can catch what the factory
+// and `start()` throw without also reaching for the root entry point.
+export { NoJobsRegisteredError } from "../core/registry";
+export { InvalidJobRetentionError } from "../core/retention";
+export type { JobEvents, JobRetention } from "../core/types";

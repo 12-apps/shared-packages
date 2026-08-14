@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clearJobs } from "../../core/registry";
+import { clearJobs, defineJob, type RegisteredJob } from "../../core/registry";
 import { resetJobRuntime } from "../../core/runtime";
 import { createApiJobs } from "../../server/create-api-jobs";
 import { jobsRouter } from "../index";
@@ -18,13 +18,18 @@ afterEach(() => {
 
 const silent = { info: () => undefined, warn: () => undefined, error: () => undefined };
 
+/** One declared job — `createApiJobs` refuses a config that names none. */
+function oneJob(name = "test.declared"): RegisteredJob<never>[] {
+  return [defineJob({ name, handle: async () => undefined }) as RegisteredJob<never>];
+}
+
 describe("jobsRouter", () => {
   it("serves the health route with the handler's status and body", async () => {
     vi.stubEnv("REDIS_URL", "");
     vi.stubEnv("JOBS_DRIVER", "");
     vi.stubEnv("JOBS_WORKER", "");
     vi.stubEnv("NODE_ENV", "development");
-    const api = createApiJobs({ jobs: [], logger: silent });
+    const api = createApiJobs({ jobs: oneJob(), logger: silent });
     await api.start();
 
     const app = jobsRouter(api);
@@ -37,7 +42,7 @@ describe("jobsRouter", () => {
   });
 
   it("answers 503 for a runtime nobody started", async () => {
-    const api = createApiJobs({ jobs: [], logger: silent });
+    const api = createApiJobs({ jobs: oneJob(), logger: silent });
 
     const app = jobsRouter(api);
     const response = await app.request("/health");
