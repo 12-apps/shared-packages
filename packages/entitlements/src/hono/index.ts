@@ -37,7 +37,8 @@ export type ResolveEntitlementsActor = (
   c: Context,
 ) => Promise<EntitlementsActor | null> | EntitlementsActor | null;
 
-export interface EntitlementsHonoConfig<F extends string> extends ApiEntitlementsConfig<F> {
+export interface EntitlementsHonoConfig<F extends string, K extends string>
+  extends ApiEntitlementsConfig<F, K> {
   resolveActor: ResolveEntitlementsActor;
 }
 
@@ -53,11 +54,11 @@ async function readBody(c: Context): Promise<unknown> {
   }
 }
 
-export function entitlementsRouter<F extends string>(
-  config: EntitlementsHonoConfig<F>,
+export function entitlementsRouter<F extends string, K extends string>(
+  config: EntitlementsHonoConfig<F, K>,
 ): { app: Hono; api: ApiEntitlements<F> } {
   const { resolveActor, ...apiConfig } = config;
-  const api = createApiEntitlements(apiConfig);
+  const api = createApiEntitlements<F, K>(apiConfig);
   const app = new Hono();
 
   for (const route of api.routes) {

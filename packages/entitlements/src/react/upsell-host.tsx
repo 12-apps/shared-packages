@@ -41,15 +41,15 @@ const COPY: Record<UpsellReason, { title: string; body: string }> = {
   },
   restricted: {
     title: 'Pagamento pendente',
-    body: 'Há uma pendência de pagamento na assinatura da loja, por isso este recurso está temporariamente indisponível. Regularize o pagamento para voltar a usá-lo.',
+    body: 'Há uma pendência de pagamento na assinatura, por isso este recurso está temporariamente indisponível. Regularize o pagamento para voltar a usá-lo.',
   },
   suspended: {
     title: 'Assinatura suspensa',
-    body: 'A assinatura da loja está suspensa e este recurso ficou indisponível. Regularize a assinatura ou fale com o nosso suporte.',
+    body: 'A assinatura está suspensa e este recurso ficou indisponível. Regularize a assinatura ou fale com o nosso suporte.',
   },
   'disabled-by-tenant': {
     title: 'Recurso desativado',
-    body: 'Este recurso está desativado nas configurações da loja — não é uma questão de plano.',
+    body: 'Este recurso está desativado nas configurações — não é uma questão de plano.',
   },
 };
 
@@ -59,9 +59,9 @@ function isUpgradeable(reason: UpsellReason): boolean {
 }
 
 /**
- * The ask-for-the-plan action. Mirrors the plan page's gate: the WRITE is
- * admin-only server-side, so a caller without the permission gets told which
- * plan unlocks the feature and to talk to whoever runs the store — never a
+ * The ask-for-the-plan action. Mirrors the plan page's gate: the WRITE requires
+ * `plan:request` server-side, so a caller without it gets told which plan
+ * unlocks the feature and to talk to whoever holds that permission — never a
  * button that answers 403.
  */
 function UpgradeCta({
@@ -83,7 +83,7 @@ function UpgradeCta({
   if (!config.canRequestPlanChange) {
     return (
       <Text as="div" size="sm" color="secondary" data-testid="upsell-ask-admin">
-        Peça a quem administra a loja para solicitar a mudança de plano.
+        Peça a quem administra a conta para solicitar a mudança de plano.
       </Text>
     );
   }

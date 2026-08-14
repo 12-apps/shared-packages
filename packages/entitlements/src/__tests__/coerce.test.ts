@@ -8,8 +8,8 @@ import { asRecord, toEntitlementMap, toSettingsMap } from '../coerce';
 import { defineFeatures } from '../core/registry';
 
 const FEATURES = defineFeatures({
-  audit: { onRevoke: 'hide' },
-  'stock.locations': { kind: 'quota', onRevoke: 'readonly' },
+  'forecast.history': { onRevoke: 'hide' },
+  'stations.online': { kind: 'quota', onRevoke: 'readonly' },
 } as const);
 
 describe('asRecord', () => {
@@ -25,22 +25,22 @@ describe('toEntitlementMap', () => {
   it('keeps only DECLARED keys carrying well-typed values', () => {
     expect(
       toEntitlementMap(FEATURES, {
-        audit: true,
-        'stock.locations': 'unlimited',
+        'forecast.history': true,
+        'stations.online': 'unlimited',
         ghost: true, // retired or typo'd key: dropped, would resolve not-supported anyway
       }),
-    ).toEqual({ audit: true, 'stock.locations': 'unlimited' });
+    ).toEqual({ 'forecast.history': true, 'stations.online': 'unlimited' });
   });
 
   it('drops a garbage value rather than reading it as a ceiling', () => {
     expect(
-      toEntitlementMap(FEATURES, { 'stock.locations': 'lots', audit: 'yes' }),
+      toEntitlementMap(FEATURES, { 'stations.online': 'lots', 'forecast.history': 'yes' }),
     ).toEqual({});
   });
 
   it('keeps zero — a real value meaning "entitled to none"', () => {
-    expect(toEntitlementMap(FEATURES, { 'stock.locations': 0 })).toEqual({
-      'stock.locations': 0,
+    expect(toEntitlementMap(FEATURES, { 'stations.online': 0 })).toEqual({
+      'stations.online': 0,
     });
   });
 });
@@ -48,7 +48,7 @@ describe('toEntitlementMap', () => {
 describe('toSettingsMap', () => {
   it('keeps only declared keys carrying booleans', () => {
     expect(
-      toSettingsMap(FEATURES, { audit: false, 'stock.locations': 1, ghost: true }),
-    ).toEqual({ audit: false });
+      toSettingsMap(FEATURES, { 'forecast.history': false, 'stations.online': 1, ghost: true }),
+    ).toEqual({ 'forecast.history': false });
   });
 });

@@ -5,12 +5,10 @@ import { expect, test } from '@playwright/test';
  * surface in the browser against the REAL `entitlementsRouter` mount in
  * harness/backend, through the same Vite proxy a production SPA uses.
  *
- * Ported from future-pay's Planos e2e (`planos-admin.e2e.ts`) and the upsell
- * modal / page-gate suites: the seeded tenant is on the free tier, which makes
- * it the exact shape the plan screen was written for — something IS withheld,
- * so both ways the screen could mislead a store are reachable in one load:
- * naming a tier that would not fix the problem, and printing a raw plan key
- * at a customer.
+ * The seeded tenant is on the cheapest tier, which makes it the exact shape
+ * the plan screen was written for — something IS withheld, so both ways the
+ * screen could mislead a customer are reachable in one load: naming a tier
+ * that would not fix the problem, and printing a raw plan key at them.
  */
 test.beforeEach(async ({ request }) => {
   /* eslint-disable-next-line test-flakiness/no-unmocked-network --
@@ -28,15 +26,15 @@ test('the whole surface mounts from one factory call and names the plan commerci
   await page.goto('#/entitlements-plan');
 
   await expect(page.getByTestId('plan-page')).toBeVisible();
-  // The comparison is the page — the cards, the store's own marked.
+  // The comparison is the page — the cards, the tenant's own marked.
   await expect(page.getByTestId('tier-cards')).toBeVisible();
-  await expect(page.getByTestId('tier-badge-free')).toHaveText('SEU PLANO');
-  await expect(page.getByTestId('plan-name')).toHaveText('Gratuito');
+  await expect(page.getByTestId('tier-badge-shorts')).toHaveText('SEU PLANO');
+  await expect(page.getByTestId('plan-name')).toHaveText('Shorts');
 
-  // White-label is the free tier's canonical denial, and this line is the
-  // load-bearing one: it must name "Pro", the tier's COMMERCIAL name from the
-  // pricing catalog — never the raw key.
-  await expect(page.getByTestId('plan-upsell-branding.white_label')).toContainText('Pro');
+  // The printed catalogue is the cheapest tier's canonical denial, and this
+  // line is the load-bearing one: it must name "Feature", the tier's
+  // COMMERCIAL name from the pricing catalog — never the raw key.
+  await expect(page.getByTestId('plan-upsell-catalogue.print')).toContainText('Feature');
 
   // And the endpoint itself, so a narrowing of the read guard fails here
   // rather than only in whatever the SPA happens to render.
@@ -48,56 +46,56 @@ test('the whole surface mounts from one factory call and names the plan commerci
 test("the tenant's own switch earns the way back to it — never a sale", async ({ page }) => {
   await page.goto('#/entitlements-plan');
 
-  const row = page.getByTestId('plan-feature-storefront.tables');
+  const row = page.getByTestId('plan-feature-submissions.notes');
   await expect(row).toContainText('Desligado por você');
   // The useful thing to hand them is the screen holding the switch…
-  await expect(page.getByTestId('plan-switch-storefront.tables')).toContainText(
-    'Configuração › Mesas',
+  await expect(page.getByTestId('plan-switch-submissions.notes')).toContainText(
+    'Ajustes › Curadoria',
   );
   // …not an upgrade that would change nothing.
-  await expect(page.getByTestId('plan-upsell-storefront.tables')).toHaveCount(0);
+  await expect(page.getByTestId('plan-upsell-submissions.notes')).toHaveCount(0);
 });
 
 test('an outgrown quota says everything keeps working', async ({ page }) => {
   await page.goto('#/entitlements-plan');
 
-  // Four locations held against free's ceiling of three: the feature IS in
+  // Four curators held against Shorts' ceiling of three: the feature IS in
   // the plan, so neither "not included" nor a bare "included" is honest.
-  const row = page.getByTestId('plan-feature-stock.locations');
-  await expect(row).toContainText('Seu plano inclui 3 e sua loja tem 4');
+  const row = page.getByTestId('plan-feature-screeners.invited');
+  await expect(row).toContainText('Seu plano inclui 3 e você tem 4');
   await expect(row).toContainText('Todos continuam ativos');
 });
 
 test('asking for a tier files ONE lead, and it survives a reload', async ({ page }) => {
   await page.goto('#/entitlements-plan');
 
-  await page.getByTestId('tier-cta-pro').click();
+  await page.getByTestId('tier-cta-feature').click();
   await expect(page.getByTestId('plan-request-open')).toBeVisible();
-  // One conversation per store: the ask button is gone, not re-offered.
-  await expect(page.getByTestId('tier-cta-pro')).toHaveCount(0);
+  // One conversation per tenant: the ask button is gone, not re-offered.
+  await expect(page.getByTestId('tier-cta-feature')).toHaveCount(0);
 
   // A real server holds the lead — the banner is still there after a reload,
   // which is exactly what an in-browser fixture could never prove.
   await page.reload();
   await expect(page.getByTestId('plan-request-open')).toBeVisible();
-  await expect(page.getByTestId('tier-cta-pro')).toHaveCount(0);
+  await expect(page.getByTestId('tier-cta-feature')).toHaveCount(0);
 });
 
 test('a plan-gated page locks in-shell and funnels into the upgrade prompt', async ({ page }) => {
   await page.goto('#/entitlements-plan');
 
-  // The free tier does not include audit, so the gated host area renders the
-  // package's lock — with the chrome intact — instead of the page.
+  // The cheapest tier does not include the jury room, so the gated host area
+  // renders the package's lock — chrome intact — instead of the page.
   const lock = page.getByTestId('page-locked');
   await expect(lock).toBeVisible();
-  await expect(lock).toHaveAttribute('data-feature', 'audit');
-  await expect(page.getByTestId('audit-area')).toHaveCount(0);
+  await expect(lock).toHaveAttribute('data-feature', 'jury.deliberation');
+  await expect(page.getByTestId('jury-area')).toHaveCount(0);
 
   // "Saiba mais" raises the single upsell surface every trigger lands on.
   await page.getByTestId('page-locked-upsell').click();
   await expect(page.getByTestId('upsell-modal')).toBeVisible();
   // The pitch names the commercial tier, resolved from the pricing cards.
-  await expect(page.getByTestId('upsell-plan-name')).toContainText('Pro');
+  await expect(page.getByTestId('upsell-plan-name')).toContainText('Feature');
 
   // The CTA files the same lead the plan screen files.
   await page.getByTestId('upsell-cta').click();
@@ -108,13 +106,13 @@ test('a gated HOST endpoint answers 402 with the body the interceptor parses', a
   request,
 }) => {
   /* eslint-disable-next-line test-flakiness/no-unmocked-network -- see beforeEach */
-  const denial = await request.get('/api/admin/harness/audit-demo');
+  const denial = await request.get('/api/admin/harness/jury-demo');
   expect(denial.status()).toBe(402);
   const body = (await denial.json()) as Record<string, unknown>;
   expect(body).toMatchObject({
     code: 'entitlement_required',
-    feature: 'audit',
+    feature: 'jury.deliberation',
     reason: 'not-entitled',
-    requiredPlan: 'pro',
+    requiredPlan: 'feature',
   });
 });

@@ -16,9 +16,9 @@ import type {
  *
  * @example
  * const FEATURES = defineFeatures({
- *   'mcp':             { onRevoke: 'disable' },
- *   'audit':           { onRevoke: 'hide' },
- *   'stock.locations': { kind: 'quota', onRevoke: 'readonly' },
+ *   'webhooks.outbound': { onRevoke: 'disable' },
+ *   'exports.bulk':      { onRevoke: 'hide' },
+ *   'seats.included':    { kind: 'quota', onRevoke: 'readonly' },
  * } as const);
  *
  * type AppFeature = (typeof FEATURES.list)[number];

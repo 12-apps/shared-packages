@@ -53,17 +53,17 @@ const LOCK_COPY: Record<UpsellReason, { title: string; body: string }> = {
   },
   restricted: {
     title: 'Pagamento pendente',
-    body: 'Há uma pendência de pagamento na assinatura da loja, por isso esta área está temporariamente indisponível.',
+    body: 'Há uma pendência de pagamento na assinatura, por isso esta área está temporariamente indisponível.',
   },
   suspended: {
     title: 'Assinatura suspensa',
-    body: 'A assinatura da loja está suspensa e esta área ficou indisponível.',
+    body: 'A assinatura está suspensa e esta área ficou indisponível.',
   },
   // Never reached (disabled-by-tenant passes through) — present so the record
   // stays total over UpsellReason and the type system keeps it that way.
   'disabled-by-tenant': {
     title: 'Recurso desativado',
-    body: 'Este recurso está desativado nas configurações da loja.',
+    body: 'Este recurso está desativado nas configurações.',
   },
 };
 

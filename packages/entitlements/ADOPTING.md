@@ -23,11 +23,11 @@ revoked**.
 import { defineFeatures } from '@12-apps/entitlements';
 
 export const FEATURES = defineFeatures({
-  audit:             { onRevoke: 'hide',     description: 'Audit trail' },
-  mcp:               { onRevoke: 'disable',  description: 'AI integration' },
-  'stock.locations': { kind: 'quota', onRevoke: 'readonly' },
-  approvals:         { onRevoke: 'disable',  defaultWhenEntitled: false },
-  'orders.read':     { retainWhenRestricted: true },
+  'exports.bulk':      { onRevoke: 'hide',    description: 'Bulk export' },
+  'webhooks.outbound': { onRevoke: 'disable', description: 'Outbound webhooks' },
+  'seats.included':    { kind: 'quota', onRevoke: 'readonly' },
+  approvals:           { onRevoke: 'disable', defaultWhenEntitled: false },
+  'records.read':      { retainWhenRestricted: true },
 } as const);
 
 export type AppFeature = (typeof FEATURES.list)[number];
@@ -50,10 +50,11 @@ import { definePlans } from '@12-apps/entitlements';
 import { FEATURES } from './features';
 
 export const PLANS = definePlans(FEATURES, {
-  basic: { entitlements: { 'orders.read': true, 'stock.locations': 1 } },
-  plus:  { extends: 'basic', entitlements: { mcp: true, 'stock.locations': 5 } },
-  pro:   { extends: 'plus',  entitlements: { audit: true, approvals: true,
-                                             'stock.locations': 'unlimited' } },
+  solo:  { entitlements: { 'records.read': true, 'seats.included': 1 } },
+  team:  { extends: 'solo', entitlements: { 'webhooks.outbound': true,
+                                            'seats.included': 5 } },
+  scale: { extends: 'team', entitlements: { 'exports.bulk': true, approvals: true,
+                                            'seats.included': 'unlimited' } },
 } as const);
 ```
 
@@ -277,19 +278,20 @@ import { entitlementsRouter } from '@12-apps/entitlements/hono';
 
 const { app: entitlements, api } = entitlementsRouter({
   features: FEATURES,
-  plans: PLANS,
+  plans: PLANS,                               // or `null`, explicitly, for no ladder
   source: { load: loadTenantState },          // your DB seam (step 3)
   usage: usageRegistry,                       // createUsageRegistry(...) — audited at boot
-  defaultPlanKey: 'free',
+  defaultPlanKey: 'solo',                     // must be a tier the ladder declares
   pricing: PRICING_ROWS,                      // display data from YOUR billing
-  comparison: buildTierComparison,            // your pricing cards
+  formatPrice: moneyInYourCurrency,           // REQUIRED — your currency, your wording
+  comparison: buildTierComparison,            // your pricing cards (each with `priceNote`)
   planChangeRequests: planRequestPort,        // your lead table, behind the port
   resolveActor: async (c) => {
     const grant = await requireTenantStaff(c);      // YOUR auth + RBAC
     return grant && {
       tenantId: grant.tenantId,
       userId: grant.userId,
-      canRequestPlanChange: grant.can('config:write'),
+      permissions: grant.permissions,               // must contain `plan:request` to ask
     };
   },
 });
@@ -302,8 +304,8 @@ app.route('/api/admin/:tenantSlug', entitlements);
 import { createWebEntitlements } from '@12-apps/entitlements/react';
 
 const { page: PlanPage, UpsellHost, withEntitlement } = createWebEntitlements({
-  apiBase: `/api/admin/${tenantSlug}`,
-  canRequestPlanChange: can('config:write'), // resolved by YOUR RBAC
+  apiBase: `/api/admin/${tenantSlug}`,       // REQUIRED, and refused when blank
+  canRequestPlanChange: can('plan:request'), // REQUIRED — resolved by YOUR RBAC
   switchLocation: tenantSwitchLocation,      // feature -> { path, label } in YOUR routes
   plansPath: `/${tenantSlug}/planos`,
   LinkComponent: RouterLink,                 // your router's Link
@@ -316,16 +318,34 @@ provider renders from), `GET /plan` (view + pricing cards), and — only when
 
 **The wire contract, explicitly.** Every SUCCESS body ships in the
 `{ data: … }` envelope (`{ data: { plan } }`, `{ data: { snapshot } }`,
-`{ data: { request, created } }`) — the same invariant future-pay documents
-for its whole `/api/admin/**` surface, and the shape its MCP response schemas
-declare. Denials and refusals are NEVER wrapped: 402/409/404 mirror the
-host's `paymentRequired` error shape byte for byte, and 400/403 are plain
-`{ error }` bodies. The packaged react half unwraps the envelope for you.
-The POST answers `request: { id, status }` only — the lead's details
+`{ data: { request, created } }`). Denials and refusals are NEVER wrapped:
+402/409/404 carry `{ error, code, feature, reason, requiredPlan }` and 400/403
+are plain `{ error }` bodies. The packaged react half unwraps the envelope for
+you. The POST answers `request: { id, status }` only — the lead's details
 (`requestedPlanKey`, `createdAt`) live on the read next door, so the
 `PlanChangeRequestPort.create` you implement returns exactly that pair.
-`TenantPlanView.price` defaults to BRL wording (`"R$ 59,00"` / `"Grátis"`);
-pass `formatPrice` in the config to word another currency.
+`TenantPlanView.price` is whatever your `formatPrice` returns: the package
+holds no currency of its own.
+
+**Wiring is checked at ASSEMBLY.** `createApiEntitlements` calls
+`assertApiEntitlementsConfig` before it builds anything, and throws an
+`EntitlementsConfigError` naming the field. A required option nobody validates
+is still fail-open, so it also refuses EMPTY collections rather than reading
+them as a deliberate lockout:
+
+| refused | why it is not a lockout |
+|---|---|
+| an empty `features` registry | every key resolves `not-supported`, and `withEntitlement` renders a `not-supported` page UNLOCKED — an empty catalog opens every gated page rather than closing it |
+| `plans` present but empty | every denial silently becomes unsellable (`requiredPlan: null`) while the surface claims to have tiers; pass `plans: null` to mean it |
+| a `defaultPlanKey` outside the ladder | every unrecognised tenant lands on a tier nothing can score |
+| a tier with no `pricing` row | the plan screen falls back to the raw plan key, which this surface promises a customer never sees |
+| a declared quota with no `usage` | the ceiling reads `used = 0` forever and is never enforced |
+| a missing `formatPrice` | the package would have to pick a currency |
+
+`createPlanImpact` and `createRetention` do the same for their own empty
+collections — an empty `surfaces` map made the grandfathering report answer
+"nobody loses anything, move the whole fleet to the cheapest tier" about a
+fleet it never measured.
 
 ### The money boundary, drawn precisely
 
@@ -394,3 +414,107 @@ Note the file itself still imports nothing, but running it from
 `node_modules` means the CI lane must install first — a caller of 12-apps/ci's
 `entitlements-coverage.yml` that passed `install: false` for the vendored copy
 flips that input when adopting the packaged one.
+
+---
+
+## 11. Migrating from 1.20.1 — the app-agnostic release
+
+1.20.1 shipped one application's commercial policy inside a package published
+as generic: its currency, its billing interval, its top tier's name, and copy
+naming its own word for a tenant. Every one of those reached a silent host
+through a default, so upgrading is a set of things you now have to **say**.
+
+### What was removed
+
+| removed | replace it with |
+|---|---|
+| `formatPrice` (export from `./server`) | your own function, passed as the required `formatPrice` config. The old body worded Brazilian Reais and said "free" in pt-BR at zero — reproduce it in your host verbatim if that is genuinely your currency. |
+| `buildTenantPlanView(…)`'s defaulted `usage` and `priceLabel` parameters | both are positional and REQUIRED now: `buildTenantPlanView(planKey, decisions, pricing, describe, usage, priceLabel)`. Pass `{}` for no measured usage. |
+| `EntitlementsActor.canRequestPlanChange` | `EntitlementsActor.permissions: readonly string[]`, which must contain `plan:request` (or whatever `planRequestPermission` names). |
+| the pricing card's hardcoded `/mês` | `ComparisonTier.priceNote: string \| null` — your interval, per card, or `null`. |
+| the hardcoded top-tier name in `formatTierBreakdown` | nothing: the ladder's own richest tier is read off `plans.list`. |
+
+### What became required
+
+| field | where | what happens if you omit it |
+|---|---|---|
+| `formatPrice` | `ApiEntitlementsConfig` | `EntitlementsConfigError` at assembly |
+| `pricing` | `ApiEntitlementsConfig` | same — and it must name every tier in the ladder |
+| `plans` | `ApiEntitlementsConfig` | same — pass `null` explicitly for hand-assigned maps |
+| `usage` | `ApiEntitlementsConfig`, when the catalog declares a quota | same |
+| `canRequestPlanChange` | `WebEntitlementsConfig` | throws from `createWebEntitlements` |
+| `apiBase` non-blank | `WebEntitlementsConfig` | same |
+| `priceNote` | every `ComparisonTier` your `comparison` builds | typecheck failure |
+| `permissions` | every `EntitlementsActor` your `resolveActor` returns | typecheck failure |
+
+### What this package now contributes back
+
+```ts
+import { ENTITLEMENTS_PERMISSIONS } from '@12-apps/entitlements/server';
+
+export const PERMISSIONS = composePermissions(
+  ENTITLEMENTS_PERMISSIONS,   // `plan:request` — this surface's own write
+  YOUR_OWN_PERMISSIONS,
+  …,
+);
+```
+
+`ENTITLEMENTS_PERMISSIONS` is plain data in `@12-apps/rbac`'s
+`PermissionContribution` shape, declared locally so this package takes no
+dependency on your RBAC. Compose it, grant it to whichever role may commit the
+tenant to a price conversation, and hand the resolved answer to both halves:
+`permissions` on the server actor, `canRequestPlanChange` in the browser.
+
+Annotate it with `satisfies`, never with an explicit
+`EntitlementPermissionContribution` annotation carrying a `string` type
+argument: the interface deliberately has **no** `= string` default, because one
+`string` branch absorbs every literal id in a composed union.
+
+### Two behaviour changes, not just types
+
+- **`createFeatureSettings(...).set()` now refuses a feature the tenant is not
+  entitled to**, throwing `EntitlementRequiredError` — the same condition
+  `describe()` already reported as `entitled: false` and your config panel
+  already renders as a dead Switch. Map it through your existing denial
+  handler. Before this, a tenant could store `true` for a feature they did not
+  have; the value changed no decision while they stayed unentitled, and then
+  the feature came up already ON the moment a plan change granted it — which
+  is exactly what `defaultWhenEntitled: false` exists to prevent.
+- **`createRetention(...).prunableRange()` now refuses a feature that is not in
+  `retentionFeatures`**, matching `retentionWindowDays`. The read half always
+  refused; the half that hands back a range to prune BY did not.
+
+### Things to check on your side
+
+- Any host code importing `formatPrice` from `@12-apps/entitlements/server`.
+- Every `ComparisonTier` your billing assembles (the `priceNote` field).
+- Every `resolveActor` and every direct `route.handle({ actor })` call.
+- Your `entitlements-coverage` config: the gate now FAILS rather than passes
+  when it parses zero feature keys out of `featuresFile`, or zero destinations
+  out of `tenantSwitchFile`. Both were vacuous-pass paths.
+
+### Cross-package wiring this package does NOT do for you
+
+It exports the seam and stops there, deliberately — but the seams exist, and a
+host that leaves them unwired gets silence rather than an error:
+
+- **Notifications.** `createChannelEntitlementFilter(engine, channelFeature)`
+  is the entitlements half of a per-send channel policy; install it in your
+  notification router. Declare the always-on channel's feature
+  `retainWhenRestricted`, or the dunning message that collects payment gates
+  itself off. There is **no** packaged event for "quota exhausted" or "plan
+  changed" — if you want to tell somebody, emit it from your own writer.
+- **Audit.** No write on this surface is audited by the package. The plan-change
+  lead is written through YOUR port, so stamp it there; a platform override or
+  a tenant switch is written by YOUR repository, so stamp it there.
+- **Cache invalidation.** `engine.invalidate(tenantId)` is a call the package
+  cannot make for you on a plan, override or status write — only
+  `createFeatureSettings.set()` invalidates, because it is the one writer this
+  package owns.
+- **Jobs.** Monthly quota windows need no reset job: `monthWindowStart(now, tz)`
+  makes usage reset by EXCLUSION, so last month's rows simply fall out of the
+  window. Retention pruning IS a job, and it is yours — the package supplies
+  `retentionWindowDays` and `prunableRange`, never a sweep.
+- **Realtime.** Nothing is published when a plan changes. A tenant's open tab
+  keeps its snapshot until it re-reads `GET /entitlements`; if that matters,
+  push your own event and have the SPA refetch.

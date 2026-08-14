@@ -15,29 +15,29 @@ import { createMemorySource } from '../../memory';
 import { createRetention, type RetentionWatermarkDb } from '../retention';
 
 const FEATURES = defineFeatures({
-  'audit.retention_days': { kind: 'quota', onRevoke: 'readonly' },
-  'lifecycle.recycle_bin_days': { kind: 'quota', onRevoke: 'readonly' },
-  'catalog.products': { kind: 'quota', onRevoke: 'readonly' },
+  'readings.retention_days': { kind: 'quota', onRevoke: 'readonly' },
+  'archive.bin_days': { kind: 'quota', onRevoke: 'readonly' },
+  'stations.online': { kind: 'quota', onRevoke: 'readonly' },
 } as const);
 
 const PLANS = definePlans(FEATURES, {
   free: {
     entitlements: {
-      'audit.retention_days': 30,
-      'lifecycle.recycle_bin_days': 7,
-      'catalog.products': 20,
+      'readings.retention_days': 30,
+      'archive.bin_days': 7,
+      'stations.online': 20,
     },
   },
   max: {
     extends: 'free',
-    entitlements: { 'audit.retention_days': 'unlimited' },
+    entitlements: { 'readings.retention_days': 'unlimited' },
   },
 } as const);
 
-const RETENTION_FEATURES = ['audit.retention_days', 'lifecycle.recycle_bin_days'];
+const RETENTION_FEATURES = ['readings.retention_days', 'archive.bin_days'];
 
 const TENANT = 'client-1';
-const FEATURE = 'audit.retention_days';
+const FEATURE = 'readings.retention_days';
 const DAY = 24 * 60 * 60 * 1000;
 /** A fresh instant per test — a Date is mutable, and a shared module-level
  *  clock is exactly the order dependence the flakiness lint exists to catch. */
@@ -82,7 +82,7 @@ describe('retentionWindowDays', () => {
     source.set(TENANT, { plan: PLANS.get('free').entitlements });
     await expect(retention.retentionWindowDays(TENANT, FEATURE)).resolves.toBe(30);
     await expect(
-      retention.retentionWindowDays(TENANT, 'lifecycle.recycle_bin_days'),
+      retention.retentionWindowDays(TENANT, 'archive.bin_days'),
     ).resolves.toBe(7);
   });
 
@@ -97,10 +97,10 @@ describe('retentionWindowDays', () => {
   });
 
   it('refuses to answer for a feature that is not a retention quota', async () => {
-    // `catalog.products` has a COUNT for usage; pruning by it would be
+    // `stations.online` has a COUNT for usage; pruning by it would be
     // deleting a tenant's products. The type of mistake worth a throw.
     const { retention } = harness();
-    await expect(retention.retentionWindowDays(TENANT, 'catalog.products')).rejects.toThrow(
+    await expect(retention.retentionWindowDays(TENANT, 'stations.online')).rejects.toThrow(
       /not a retention quota/,
     );
   });

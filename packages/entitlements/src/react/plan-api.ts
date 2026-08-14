@@ -19,10 +19,9 @@ interface PlanApi {
 }
 
 /**
- * Every SUCCESS body arrives as the `{ data: … }` envelope (the same
- * invariant future-pay documents for its whole `/api/admin/**` surface) and
- * is unwrapped here; error bodies are never enveloped, so the failure path
- * reads `error` off the bare body.
+ * Every SUCCESS body arrives as the `{ data: … }` envelope this surface's own
+ * descriptors produce, and is unwrapped here; error bodies are never
+ * enveloped, so the failure path reads `error` off the bare body.
  */
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {

@@ -1,5 +1,5 @@
 /**
- * The plan reads behind the surface: what the store is on, with live quota
+ * The plan reads behind the surface: what the tenant is on, with live quota
  * usage measured through the host's counters — assembled here so the routes
  * and any host-side caller resolve the SAME view the gate enforces.
  */
@@ -11,7 +11,7 @@ import type {
   UsageCounter,
 } from '../core/types';
 import type { ComparisonTier, TenantPlanPayload, TenantPlanView } from '../plan-wire';
-import { buildTenantPlanView, formatPrice, type PricingRow, type QuotaUsageView } from './plan-view';
+import { buildTenantPlanView, type PricingRow, type QuotaUsageView } from './plan-view';
 
 interface PlanServiceConfig<F extends string> {
   engine: EntitlementsEngine<F>;
@@ -21,7 +21,8 @@ interface PlanServiceConfig<F extends string> {
   defaultPlanKey: string;
   pricing: readonly PricingRow[];
   comparison?: ((currentPlanKey: string) => ComparisonTier[]) | undefined;
-  formatPrice?: ((priceCents: number | null) => string | null) | undefined;
+  /** Required — the host's currency wording. See `plan-view.ts`. */
+  formatPrice: (priceCents: number | null) => string | null;
 }
 
 export interface PlanService {
@@ -46,10 +47,10 @@ export function createPlanService<F extends string>(config: PlanServiceConfig<F>
     const snapshot = await engine.toSnapshot(tenantId);
 
     // Live usage for every ENABLED quota row, so the screen can show the
-    // store where they stand — and, when they hold more than the ceiling
+    // tenant where they stand — and, when they hold more than the ceiling
     // (grandfathered or downgraded), offer the tier whose ceiling clears what
     // they HOLD (`cheapestWith(feature, used)`), not merely the one above
-    // their plan: a store with 340 products must not be sold the 200 tier.
+    // their plan: a tenant holding 340 units must not be sold the 200 tier.
     const usage: Record<string, QuotaUsageView> = {};
     const decisions = Object.values(snapshot.features) as EntitlementDecision<F>[];
     await Promise.all(
@@ -71,10 +72,10 @@ export function createPlanService<F extends string>(config: PlanServiceConfig<F>
       config.pricing,
       // `def` throws on an unknown key, and the snapshot only ever contains
       // declared ones — but guard anyway rather than let a catalog change
-      // take the store's plan screen down.
+      // take the tenant's plan screen down.
       (feature) => (features.has(feature) ? features.def(feature).description : null),
       usage,
-      config.formatPrice ?? formatPrice,
+      config.formatPrice,
     );
   }
 

@@ -94,6 +94,16 @@ export interface Retention {
 
 export function createRetention<F extends string>(config: RetentionConfig<F>): Retention {
   const { engine, features, retentionFeatures } = config;
+  // An empty list is refused rather than read as "prune nothing": every call
+  // would throw, so a sweep wired against it fails on its first tenant — but
+  // only in whatever environment runs the sweep, which may be none of them
+  // until production.
+  if (retentionFeatures.length === 0) {
+    throw new Error(
+      'createRetention: `retentionFeatures` is empty. Name the quota keys whose ceiling ' +
+        'is a window of days, or do not build a retention sweep.',
+    );
+  }
 
   return {
     async retentionWindowDays(tenantId, feature) {
@@ -109,6 +119,15 @@ export function createRetention<F extends string>(config: RetentionConfig<F>): R
     },
 
     async prunableRange(tenantId, feature, windowDays, now) {
+      // The same gate the READ applies. Without it the pair was asymmetric:
+      // `retentionWindowDays` refuses a feature that is not a retention quota,
+      // while this — the half that actually hands back a range to prune BY,
+      // and writes a watermark for it — accepted any string with any window.
+      // A caller reaching it directly could prune a feature the entitlement
+      // layer never put a window on.
+      if (!retentionFeatures.includes(feature)) {
+        throw new Error(`"${feature}" is not a retention quota — nothing should prune by it.`);
+      }
       const db = await config.getDb();
       const key = { clientId: tenantId, feature };
       const existing = await db.retentionWatermark.findUnique({
