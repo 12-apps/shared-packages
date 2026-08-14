@@ -40,7 +40,7 @@ interface WebhookIngestDeps {
 }
 
 /**
- * Observability for the LIVE inbound path (ported from the future-pay host,
+ * Observability for the LIVE inbound path (ported from the first adopting host,
  * FUT-761). Verification runs BEFORE the durable inbox, so a refused delivery
  * otherwise leaves no trace of any kind — a silence that reads exactly like
  * "the provider never called us", and that hid a real defect (FUT-463)

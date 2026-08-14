@@ -16,13 +16,12 @@ import type { CustomerFieldKey, PaymentMethodKind } from '../core/types';
  * situations it is being asked to word.
  *
  * THE pt-BR TABLE THAT USED TO SIT BELOW THIS INTERFACE IS GONE, and the
- * docstring above is why. `defaultCheckoutCopyPtBR` shipped one storefront's
- * sentences — its own header said "the strings future-pay's checkout serves
- * today, verbatim" — inside the package every other adopter installs. It was
- * never read by anything in here, so it cost nothing to remove and bought
- * nothing while it stayed: an export that only ever hands a second host a
- * first host's product voice. Copy is the HOST's, entire; the port above is
- * how it arrives, and there is now no way to skip supplying it.
+ * docstring above is why. It shipped one storefront's sentences verbatim —
+ * its own header said so — inside the package every other adopter installs.
+ * Nothing in here ever read it, so it cost nothing to remove and bought
+ * nothing while it stayed: an export whose only effect was handing a second
+ * host a first host's product voice. Copy is the HOST's, entire; the port
+ * above is how it arrives, and there is now no way to skip supplying it.
  */
 export interface CheckoutCopy {
   /** No provider is connected — the merchant cannot take payment at all. */

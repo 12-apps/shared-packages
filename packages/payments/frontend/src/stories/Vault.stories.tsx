@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { JSX } from "react";
 
 import type { BuyerVaultSession } from "../components/checkout/transport";
-import { DEFAULT_CHECKOUT_COPY_FE } from "../flows/copy";
+import { STORY_CHECKOUT_COPY } from "./demo-copy";
 import { AddCardView } from "../flows/screens-vault";
 import type { AddCardController, AddCardPhase } from "../flows/use-add-card";
 
@@ -74,7 +74,7 @@ function stagedController(
 }
 
 function StagedAddCard({ controller }: { controller: AddCardController }): JSX.Element {
-  return <AddCardView controller={controller} copy={DEFAULT_CHECKOUT_COPY_FE} />;
+  return <AddCardView controller={controller} copy={STORY_CHECKOUT_COPY} />;
 }
 
 // ---------------------------------------------------------------------------

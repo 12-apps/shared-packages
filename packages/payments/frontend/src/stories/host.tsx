@@ -19,6 +19,7 @@ import type {
   CreateOrderResult,
 } from "../index";
 
+import { STORY_CHECKOUT_COPY } from "./demo-copy";
 import { brlLabel, createStoryStore, type StorySpec, type StoryWorld } from "./store";
 
 /** The envelope every checkout route answers with. */
@@ -91,8 +92,14 @@ export interface StoryHost {
   /** The store already holds this buyer's CPF ⇒ Dados is skipped (FUT-465). */
   taxIdOnFile?: boolean;
   components?: PaymentFlowsConfig["components"];
-  /** Overrides for the factory-owned sentences (`DEFAULT_CHECKOUT_COPY_FE`). */
-  copy?: PaymentFlowsConfig["copy"];
+  /**
+   * Overrides over the demo host's own {@link STORY_CHECKOUT_COPY}.
+   *
+   * Still PARTIAL here, and only here: `copy` is required on the real config,
+   * so this is a story affordance for changing one sentence, resolved against
+   * this host's full table below rather than against a package default.
+   */
+  copy?: Partial<PaymentFlowsConfig["copy"]>;
   /** Where a hosted handover would have taken the buyer. Recorded, not followed. */
   onNavigate?: (url: string) => void;
   confirmationExtra?: ReactNode;
@@ -161,7 +168,7 @@ export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
     useBuyerDefaults: () => ({ buyer: host.buyer, taxIdOnFile: host.taxIdOnFile ?? false }),
     useSettlement: () => host.settlement ?? null,
     components: host.components,
-    copy: host.copy,
+    copy: { ...STORY_CHECKOUT_COPY, ...host.copy },
     confirmation: host.confirmationExtra ? { extra: host.confirmationExtra } : undefined,
     ports: {
       createPayable: (input) => raisePayable(world, input),
