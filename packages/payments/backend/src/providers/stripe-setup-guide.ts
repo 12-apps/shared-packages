@@ -175,6 +175,20 @@ function dashboardSection(
         },
       },
       {
+        // The step 3 charge dies without this, and Stripe's refusal names a
+        // dashboard toggle rather than anything the owner did here: "This
+        // integration surface is unsupported for publishable key tokenization."
+        // Newer accounts ship it OFF, so a store can pass every credential
+        // check, reach the activation charge, and be stopped by a setting no
+        // step ever mentioned — on the one screen whose job is to list the
+        // settings only the owner can change.
+        text: 'Abra “Configurações › Integração” e ative a tokenização de cartão com chave publicável. Contas novas vêm com isso desligado, e sem ele a Stripe recusa a cobrança de teste do Passo 3 com “integration surface is unsupported”.',
+        button: {
+          label: 'Abrir configurações de integração',
+          url: 'https://dashboard.stripe.com/settings/integration',
+        },
+      },
+      {
         text: 'Confirme que sua conta está habilitada para receber pagamentos — a Stripe pede documentos da empresa antes de liberar repasses.',
         button: {
           label: 'Abrir o painel da Stripe',
