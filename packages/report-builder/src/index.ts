@@ -116,7 +116,7 @@ export {
   type ReportSpec,
   type ReportSpecInput,
 } from './spec';
-export { DEFAULT_REPORT_TIME_ZONE, isValidTimeZone, truncateDateToGrain } from './time';
+export { isValidTimeZone, truncateDateToGrain } from './time';
 export type {
   Aggregation,
   CompiledDimension,

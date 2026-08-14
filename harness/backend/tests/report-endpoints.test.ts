@@ -113,20 +113,30 @@ function memoryDb(seed: Row[]) {
 }
 
 /**
- * The permission this harness grants over its one entity. It is the Future Pay
- * tier the default `entityPermission` map already assigns to `orders`, so the
- * actors below are narrowed by the SHIPPED policy rather than by one this test
- * invented for itself.
+ * The permission this harness grants over its one entity — DECLARED here and
+ * handed to the mount below, because there is nowhere else it could come from
+ * any more.
+ *
+ * It used to be justified the other way round: "the Future Pay tier the default
+ * `entityPermission` map already assigns to `orders`", narrowing "by the
+ * SHIPPED policy rather than by one this test invented". That default is gone.
+ * A package cannot ship the policy over a host's data, and a harness that took
+ * one could not tell a value it stated from a value it inherited.
  */
 const SALES = 'reports:sales:read';
+
+/** This package's own id: what authoring is gated on when nothing remaps it. */
+const AUTHOR = 'reports:manage';
+
+/** The map the mount requires, over the one entity this harness's catalog has. */
+const ENTITY_PERMISSION = { orders: SALES };
 
 const OWNER: ReportActor = {
   clientId: 'c1',
   userId: 'u1',
   roleIds: [],
   isAdmin: true,
-  canAuthor: true,
-  permissions: [SALES],
+  permissions: [SALES, AUTHOR],
 };
 
 const STAFF: ReportActor = {
@@ -134,7 +144,6 @@ const STAFF: ReportActor = {
   userId: 'u2',
   roleIds: [],
   isAdmin: false,
-  canAuthor: false,
   permissions: [SALES],
 };
 
@@ -210,7 +219,9 @@ function setup(options: { maxRows?: number } = {}): {
     // real host passes, and `report-hono.test.ts` drives that one.
     adapter,
     db: () => Promise.resolve(db),
+    entityPermission: ENTITY_PERMISSION,
     systemReports: HARNESS_PRESETS,
+    timeZone: 'America/Sao_Paulo',
     ...(options.maxRows === undefined ? {} : { maxRows: options.maxRows }),
   });
   return {

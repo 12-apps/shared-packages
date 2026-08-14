@@ -7,6 +7,7 @@ import {
   foldSpecError,
   isDuplicateName,
   NOT_FOUND,
+  mayAuthor,
   ok,
   type ReportBuilderServerConfig,
   type ReportRoute,
@@ -18,8 +19,8 @@ import { saveReportBody } from './wire';
 
 /**
  * Writing saved documents. Separate from the reads because every route here is
- * gated on `canAuthor`, and a reader reviewing authorization wants that in one
- * place.
+ * gated on the authoring permission, and a reader reviewing authorization wants
+ * that in one place.
  */
 
 const DUPLICATE_NAME = 'Já existe um relatório com esse nome.';
@@ -87,7 +88,7 @@ function createRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
     path: '/reports/custom',
     authoring: true,
     async handle({ actor, body }) {
-      if (!actor.canAuthor) return fail(403, 'Sem permissão para criar relatórios.');
+      if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para criar relatórios.');
       try {
         const input = parseSaveBody(body);
         compileDocument(parseReportDocument(input.spec), config.catalog);
@@ -110,7 +111,7 @@ function updateRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
     path: '/reports/custom/:id',
     authoring: true,
     async handle({ actor, params, body }) {
-      if (!actor.canAuthor) return fail(403, 'Sem permissão para editar relatórios.');
+      if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
       const id = params.id ?? '';
       try {
         const input = parseSaveBody(body);
@@ -127,13 +128,16 @@ function updateRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
   };
 }
 
-function deleteRoute(store: SavedReportStore): ReportRoute {
+function deleteRoute(
+  config: ReportBuilderServerConfig,
+  store: SavedReportStore,
+): ReportRoute {
   return {
     method: 'DELETE',
     path: '/reports/custom/:id',
     authoring: true,
     async handle({ actor, params }) {
-      if (!actor.canAuthor) return fail(403, 'Sem permissão para remover relatórios.');
+      if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para remover relatórios.');
       const removed = await store.remove(actor.clientId, params.id ?? '');
       // 204 with NO body: there is nothing to say about a document that no
       // longer exists, and an envelope here would be the only write on this
@@ -147,5 +151,5 @@ export function savedWriteRoutes(
   config: ReportBuilderServerConfig,
   store: SavedReportStore,
 ): ReportRoute[] {
-  return [createRoute(config, store), updateRoute(config, store), deleteRoute(store)];
+  return [createRoute(config, store), updateRoute(config, store), deleteRoute(config, store)];
 }

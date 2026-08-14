@@ -18,6 +18,8 @@ import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
+import type { SystemReportSection } from "../../server/system-reports";
+
 import {
   REPORT_GRAIN_LABELS,
   REPORT_GRAINS,
@@ -114,27 +116,29 @@ export function ReportControls({
   );
 }
 
-/** The host's label for each section a built-in surface can belong to. */
-const SECTION_LABELS: Record<string, string> = {
-  orders: "Pedidos",
-  inventory: "Estoque",
-  // FUT-454. The href `/{slug}/kitchen` is already the Cozinha route, so only
-  // the label was missing — and without it "back" reads as the generic
-  // "Voltar" rather than naming where it goes.
-  kitchen: "Cozinha",
-};
-
 /**
  * Where "back" goes from a built-in surface: the SECTION it analyses, not the
- * Relatórios area (which no longer lists the built-ins). The host mounts each
- * section at `/{tenantSlug}/{section}`, so the section key is the path segment.
+ * Relatórios area (which no longer lists the built-ins).
+ *
+ * Both halves are the HOST's and both are now declared rather than guessed. The
+ * label was a hardcoded `{ orders: "Pedidos", inventory: "Estoque", kitchen:
+ * "Cozinha" }` — one product's vocabulary, in one language, for three sections
+ * only that product has. The href was `/{tenantSlug}/{section}`, which quietly
+ * asserted that a section key IS a host's URL segment; it is not, for any host
+ * whose stock area lives at `/inventory/movements`.
+ *
+ * An unknown section falls back to THIS surface's own root, which is the one
+ * path that is guaranteed to exist — never the host's `/dashboard`, which this
+ * package has no reason to believe in.
  */
 export function sectionBackTarget(
   tenantSlug: string,
+  sections: readonly SystemReportSection[],
   section: string | undefined,
 ): { href: string; label: string } {
-  if (!section) return { href: `/${tenantSlug}/dashboard`, label: "Início" };
-  return { href: `/${tenantSlug}/${section}`, label: SECTION_LABELS[section] ?? "Voltar" };
+  const declared = sections.find((candidate) => candidate.key === section);
+  if (!declared) return { href: `/${tenantSlug}/reports`, label: "Relatórios" };
+  return { href: `/${tenantSlug}/${declared.path}`, label: declared.label };
 }
 
 /** The heading block every built-in surface opens with: back link, title, blurb. */

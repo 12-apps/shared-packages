@@ -2,11 +2,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useMemo, type JSX } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { ReportBuilderError } from "../errors";
+import { isValidTimeZone } from "../time";
+
 import { ReportEditorPage } from "./report-editor";
 import { ReportsPage } from "./reports-page";
 import { SystemDashboardPage } from "./system-dashboard";
 import { SystemReportPage } from "./system-report";
-import { TransportProvider } from "./transport-context";
+import { ReportBuilderProvider, type ReportBuilderSurface } from "./transport-context";
 import { httpTransport, type ReportBuilderTransport } from "./transport";
 
 /**
@@ -26,6 +29,20 @@ import { httpTransport, type ReportBuilderTransport } from "./transport";
 export interface ReportBuilderConfig {
   /** Whose reports these are. Threaded to every screen and query key. */
   tenantSlug: string;
+  /**
+   * The HOST's vocabulary for this surface: its built-in reports, its
+   * dashboards, the menu sections they hang off, the block templates its
+   * picker offers, and the clock its tenants keep.
+   *
+   * REQUIRED, every field of it, including the empty cases. Each one used to be
+   * a module-scope import of future-pay's answer, which meant a host mounting
+   * this surface published that store's built-ins under its own menu — and had
+   * no field to decline them with. `{ systemReports: [], systemDashboards: [],
+   * sections: [], blockTemplates: [], timeZone: 'Europe/Lisbon' }` is a
+   * complete, meaningful configuration: the authored-reports surface, no
+   * built-ins.
+   */
+  surface: ReportBuilderSurface;
   /**
    * How to reach the backend. Omit for same-origin `fetch`, which is what a
    * real host wants; supply one to mount the surface against something else —
@@ -80,6 +97,50 @@ function ReportBuilderRoutes({ tenantSlug }: { tenantSlug: string }): JSX.Elemen
 }
 
 /**
+ * Check the host's vocabulary, or throw naming the field that is wrong.
+ *
+ * At the factory call, where the wiring is, rather than on the screen that
+ * happens to read the broken entry: a dashboard naming a report nobody
+ * declared renders a canvas of empty frames, and a built-in whose section
+ * nobody declared renders a back-link labelled "Voltar" pointing at a page that
+ * may not exist. Both read as bugs in this package from every seat but this
+ * one.
+ */
+function assertSurface(surface: ReportBuilderSurface): void {
+  if (!isValidTimeZone(surface.timeZone)) {
+    throw new ReportBuilderError(
+      "invalid_config",
+      `surface.timeZone is not an IANA zone this runtime knows: "${surface.timeZone}".`,
+    );
+  }
+  const keys = new Set(surface.systemReports.map((report) => report.key));
+  const sections = new Set(surface.sections.map((section) => section.key));
+  for (const report of surface.systemReports) {
+    if (!sections.has(report.section)) {
+      throw new ReportBuilderError(
+        "invalid_config",
+        `System report "${report.key}" names section "${report.section}", which surface.sections does not declare.`,
+      );
+    }
+  }
+  // Flattened rather than nested, so the block carries the dashboard it came
+  // from: the gate reads a loop inside a loop as a suspected hot path, and a
+  // one-pass `flatMap` is the honest shape for a check that visits each block
+  // exactly once anyway.
+  const blocks = surface.systemDashboards.flatMap((dashboard) =>
+    dashboard.blocks.map((block) => ({ dashboard: dashboard.key, reportKey: block.reportKey })),
+  );
+  for (const block of blocks) {
+    if (!keys.has(block.reportKey)) {
+      throw new ReportBuilderError(
+        "invalid_config",
+        `Dashboard "${block.dashboard}" renders "${block.reportKey}", which surface.systemReports does not declare.`,
+      );
+    }
+  }
+}
+
+/**
  * Build the reports surface for a host.
  *
  * Returns a single component under the name `page`, mirroring the backend
@@ -92,8 +153,9 @@ function ReportBuilderRoutes({ tenantSlug }: { tenantSlug: string }): JSX.Elemen
 export function createWebReportBuilder(config: ReportBuilderConfig): {
   page: () => JSX.Element;
 } {
-  const { tenantSlug, transport, standalone = false } = config;
+  const { tenantSlug, transport, surface, standalone = false } = config;
   const initialPath = config.initialPath ?? surfaceRoot(tenantSlug);
+  assertSurface(surface);
 
   function ReportBuilder(): JSX.Element {
     // One client per mount, not per render: a client rebuilt on each render
@@ -102,13 +164,13 @@ export function createWebReportBuilder(config: ReportBuilderConfig): {
     const client = useMemo(() => new QueryClient(), []);
     const resolved = useMemo(() => transport ?? httpTransport(), []);
 
-    const surface = (
-      <TransportProvider transport={resolved} tenantSlug={tenantSlug}>
+    const tree = (
+      <ReportBuilderProvider transport={resolved} tenantSlug={tenantSlug} surface={surface}>
         <ReportBuilderRoutes tenantSlug={tenantSlug} />
-      </TransportProvider>
+      </ReportBuilderProvider>
     );
 
-    if (!standalone) return surface;
+    if (!standalone) return tree;
 
     return (
       <QueryClientProvider client={client}>
@@ -117,7 +179,7 @@ export function createWebReportBuilder(config: ReportBuilderConfig): {
            * standalone behaves identically. Without it the surface renders
            * once and then vanishes on the first navigation. */}
           <Routes>
-            <Route path={`${surfaceRoot(tenantSlug)}/*`} element={surface} />
+            <Route path={`${surfaceRoot(tenantSlug)}/*`} element={tree} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>

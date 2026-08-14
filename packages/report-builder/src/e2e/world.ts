@@ -31,6 +31,26 @@ import type { Browser, Page } from '@playwright/test';
  * happens to find, which is not an assertion at all.
  */
 export interface ReportsFixtures {
+  /**
+   * Two entries of the host's own block-template picker, by TITLE.
+   *
+   * A scenario has to start a block from something, and what a picker offers is
+   * the host's product: this package ships only the blank template. The
+   * features used to name `"Receita por dia"` and `"Formas de pagamento"` out
+   * loud — one store's menu, written into a journey every other store runs — so
+   * they say "the first template" and "a second template" and read the titles
+   * from here.
+   *
+   * They must be DIFFERENT templates: the scenario that puts two blocks on one
+   * canvas is about two blocks, and picking the same one twice would still pass
+   * while proving less.
+   */
+  blockTemplates: {
+    /** The one a scenario builds its first block from. */
+    first: string;
+    /** A different one, added beside it. */
+    second: string;
+  };
   /** A report the whole team can already read — the one a reader opens. */
   publishedReport: {
     id: string;

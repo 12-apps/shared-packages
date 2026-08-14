@@ -6,6 +6,7 @@ import {
   fail,
   foldSpecError,
   isDuplicateName,
+  mayAuthor,
   NOT_FOUND,
   ok,
   type ReportBuilderServerConfig,
@@ -65,13 +66,13 @@ function isFailure(
  * work never saved. The compile still happens where it decides something: on
  * publish, before anything reaches a reader.
  */
-function saveRoute(store: SavedReportStore): ReportRoute {
+function saveRoute(config: ReportBuilderServerConfig, store: SavedReportStore): ReportRoute {
   return {
     method: 'PUT',
     path: '/reports/custom/:id/working-copy',
     authoring: true,
     async handle({ actor, params, body }) {
-      if (!actor.canAuthor) return fail(403, 'Sem permissão para editar relatórios.');
+      if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
       const parsed = reportWorkingCopySchema.safeParse(body);
       if (!parsed.success) {
         const first = parsed.error.issues[0];
@@ -100,7 +101,7 @@ function publishRoute(config: ReportBuilderServerConfig, store: SavedReportStore
     path: '/reports/custom/:id/working-copy/publish',
     authoring: true,
     async handle({ actor, params, body }) {
-      if (!actor.canAuthor) return fail(403, 'Sem permissão para editar relatórios.');
+      if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
       const record = await loadPublished(store, actor.clientId, params.id ?? '');
       if (isFailure(record)) return record.error;
       try {
@@ -117,13 +118,13 @@ function publishRoute(config: ReportBuilderServerConfig, store: SavedReportStore
 }
 
 /** Throw the parked edit away; the published document was never touched. */
-function discardRoute(store: SavedReportStore): ReportRoute {
+function discardRoute(config: ReportBuilderServerConfig, store: SavedReportStore): ReportRoute {
   return {
     method: 'DELETE',
     path: '/reports/custom/:id/working-copy',
     authoring: true,
     async handle({ actor, params }) {
-      if (!actor.canAuthor) return fail(403, 'Sem permissão para editar relatórios.');
+      if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
       const record = await loadPublished(store, actor.clientId, params.id ?? '');
       if (isFailure(record)) return record.error;
       // A 404 rather than a silent 200: "discard" that discarded nothing would
@@ -182,5 +183,5 @@ export function savedWorkingCopyRoutes(
   config: ReportBuilderServerConfig,
   store: SavedReportStore,
 ): ReportRoute[] {
-  return [saveRoute(store), publishRoute(config, store), discardRoute(store)];
+  return [saveRoute(config, store), publishRoute(config, store), discardRoute(config, store)];
 }

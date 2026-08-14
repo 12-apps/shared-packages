@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 import { createWebReportBuilder } from '../create-report-builder';
+import { TEST_SURFACE } from './surface-fixture';
 import type {
   ReportEntityFields,
   SavedReportSummary,
@@ -160,6 +161,7 @@ function stubTransport(): ReportBuilderTransport {
 /** The routed surface as a host mounts it, opened at one of its own URLs. */
 function renderSurfaceAt(url: string): void {
   const { page: Surface } = createWebReportBuilder({
+    surface: TEST_SURFACE,
     tenantSlug: TENANT,
     transport: stubTransport(),
     standalone: true,

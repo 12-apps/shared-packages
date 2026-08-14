@@ -12,7 +12,7 @@
  * Only the ORDERS are hand-dated. Everything else is derived from them, so a
  * date moved here moves the whole world with it.
  */
-import { dayOfWeekSaoPaulo, hourOfDaySaoPaulo } from '@12-apps/report-builder/server';
+import { localDayOfWeek, localHourOfDay } from './report-local-time';
 
 import type { FixtureRow } from './report-fixture-window';
 
@@ -137,14 +137,14 @@ const revenueOf = (orderId: string): number =>
  * filter the starter carries, not a hole in the data.
  *
  * `hourOfDay` and `dayOfWeek` are DERIVED here with the package's own
- * `local-time` helpers, so the encodings ("09", "1-seg") that make them sort
- * correctly as strings cannot drift from the ones the product produces.
+ * host's own local-time helpers, so the encodings ("09", "1-seg") that make
+ * them sort correctly as strings are stated once for this fixture.
  */
 export const ORDERS: FixtureRow[] = ORDER_FACTS.map((order) => ({
   id: order.id,
   createdAt: order.createdAt,
-  hourOfDay: hourOfDaySaoPaulo(new Date(order.createdAt)),
-  dayOfWeek: dayOfWeekSaoPaulo(new Date(order.createdAt)),
+  hourOfDay: localHourOfDay(new Date(order.createdAt)),
+  dayOfWeek: localDayOfWeek(new Date(order.createdAt)),
   status: order.status,
   method: order.method,
   revenueCents: revenueOf(order.id),

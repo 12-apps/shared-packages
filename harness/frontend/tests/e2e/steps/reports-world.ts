@@ -65,6 +65,9 @@ defineReportsWorld({
    * the frozen clock the custom window is stated against.
    */
   fixtures: {
+    // The two picker entries this app declares in `src/pages/report-builder.tsx`
+    // — its own product, named here because the journeys stopped naming them.
+    blockTemplates: { first: 'Receita por dia', second: 'Formas de pagamento' },
     // `r1` is the two-block dashboard published to the whole team: a bar chart
     // over payment methods, and a day-bucketed table beside it.
     publishedReport: {

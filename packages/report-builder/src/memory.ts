@@ -56,7 +56,7 @@ function matchesFilter(row: SourceRow, filter: CompiledFilter): boolean {
 function bucketValue(
   row: SourceRow,
   dimension: CompiledDimension,
-  timeZone: string,
+  timeZone: string | undefined,
   dayStartsAt: number,
 ): Comparable | null {
   const raw = row[dimension.field];

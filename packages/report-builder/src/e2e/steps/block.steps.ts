@@ -59,11 +59,13 @@ async function boxOf(locator: Locator, what: string): Promise<{ width: number; h
 // ---------------------------------------------------------------------------
 
 Given(
-  new RegExp(`^${THEY} is building a new block from the "(.+)" template$`),
-  async ({ page }, title: string) => {
+  new RegExp(`^${THEY} is building a new block from the first block template$`),
+  async ({ page }) => {
     await page.getByTestId('reports-new').click();
     await expect(page.getByTestId('page-report-editor')).toBeVisible();
-    await page.getByTestId(`block-template-picker-${templateId(title)}`).click();
+    await page
+      .getByTestId(`block-template-picker-${templateId(reportsWorld().fixtures.blockTemplates.first)}`)
+      .click();
     await expect(page.getByTestId(`report-block-${NEW_BLOCK}-render`)).toBeVisible({
       timeout: BLOCK_RENDER_TIMEOUT_MS,
     });

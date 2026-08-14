@@ -78,17 +78,17 @@ When(new RegExp(`^${THEY} starts a new report$`), async ({ page }) => {
   await startNewReport(page);
 });
 
-When(new RegExp(`^${THEY} picks the "(.+)" template$`), async ({ page }, title: string) => {
-  await pickTemplate(page, title);
+// The template TITLES come from the host's fixtures, not from the feature: a
+// picker's entries are the host's product, and a scenario that named one would
+// only run in the store that has it.
+When(new RegExp(`^${THEY} picks the first block template$`), async ({ page }) => {
+  await pickTemplate(page, reportsWorld().fixtures.blockTemplates.first);
 });
 
-When(
-  new RegExp(`^${THEY} adds a "(.+)" block beside it$`),
-  async ({ page }, title: string) => {
-    await page.getByTestId('report-editor-add-block').click();
-    await pickTemplate(page, title, 2);
-  },
-);
+When(new RegExp(`^${THEY} adds a second block template beside it$`), async ({ page }) => {
+  await page.getByTestId('report-editor-add-block').click();
+  await pickTemplate(page, reportsWorld().fixtures.blockTemplates.second, 2);
+});
 
 When(new RegExp(`^${THEY} calls it "(.+)"$`), async ({ page }, name: string) => {
   await page.getByTestId('report-editor-name').fill(name);

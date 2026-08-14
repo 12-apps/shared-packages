@@ -9,7 +9,7 @@ import {
   type ReportResponse,
   type ReportRoute,
 } from '../create-report-builder';
-import type { SystemReportDef } from '../preset-types';
+import type { SystemReportDef } from '../system-reports';
 import type { SavedReportDb, SavedReportRecord } from '../saved';
 
 /**
@@ -63,7 +63,7 @@ const SYSTEM: SystemReportDef[] = [
     key: 'vendas',
     title: 'Vendas',
     description: 'Receita por forma de pagamento.',
-    permission: 'sales:read' as SystemReportDef['permission'],
+    permission: 'sales:read',
     section: 'orders',
     supportsGrain: false,
     presentation: 'table',
@@ -73,7 +73,7 @@ const SYSTEM: SystemReportDef[] = [
     key: 'perdas',
     title: 'Perdas',
     description: 'Unidades perdidas por motivo.',
-    permission: 'stock:read' as SystemReportDef['permission'],
+    permission: 'stock:read',
     section: 'inventory',
     supportsGrain: false,
     presentation: 'table',
@@ -87,8 +87,10 @@ function actor(overrides: Partial<ReportActor> = {}): ReportActor {
     userId: 'user-1',
     roleIds: [],
     isAdmin: false,
-    canAuthor: true,
-    permissions: ['sales:read', 'stock:read'],
+    // `reports:manage` is this PACKAGE's own id, the one authoring is gated on
+    // when the host maps no other. Before this it was a `canAuthor` boolean the
+    // host computed for itself.
+    permissions: ['sales:read', 'stock:read', 'reports:manage'],
     ...overrides,
   };
 }
@@ -137,7 +139,7 @@ function setup(
   options: {
     seed?: SavedReportRecord[];
     duplicateName?: boolean;
-    useDefaults?: boolean;
+    systemReports?: SystemReportDef[];
   } = {},
 ): Harness {
   const state = { rows: options.seed ?? [record()], next: 1 };
@@ -191,9 +193,8 @@ function setup(
     db: () => Promise.resolve(db),
     timeZone: 'America/Sao_Paulo',
     now: () => new Date('2026-07-14T23:00:00Z'),
-    ...(options.useDefaults
-      ? {}
-      : { entityPermission: ENTITY_PERMISSION, systemReports: SYSTEM }),
+    entityPermission: ENTITY_PERMISSION,
+    systemReports: options.systemReports ?? SYSTEM,
   });
 
   return {
@@ -307,16 +308,17 @@ describe('the built-in reports', () => {
     expect(response.status).toBe(403);
   });
 
-  it('serves the Future Pay presets when the host names none', async () => {
-    const { call } = setup({ useDefaults: true });
+  it('serves no built-ins at all when the host declares none', async () => {
+    // The case that used to serve future-pay's seven presets to a silent host.
+    // An empty list is now the only thing "I have no built-ins" can mean, and
+    // it is an empty LIST rather than a 403: refusing here would say "you may
+    // not", when what is true is "there are none".
+    const { call } = setup({ systemReports: [] });
 
-    const response = await call('GET', '/reports/system', {
-      actor: actor({ permissions: ['reports:sales:read'] }),
-    });
+    const response = await call('GET', '/reports/system', { actor: actor() });
 
-    const listing = data<{ reports: Array<{ key: string }> }>(response);
-    expect(listing.reports.length).toBeGreaterThan(0);
-    expect(listing.reports.map((report) => report.key)).toContain('vendas-resumo');
+    expect(response.status).toBe(200);
+    expect(data<{ reports: unknown[] }>(response).reports).toEqual([]);
   });
 });
 
@@ -502,7 +504,7 @@ describe('writing a saved document', () => {
     const { call, stored } = setup({ seed: [] });
 
     const response = await call('POST', '/reports/custom', {
-      actor: actor({ canAuthor: false }),
+      actor: actor({ permissions: ['sales:read', 'stock:read'] }),
       body,
     });
 

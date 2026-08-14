@@ -2,7 +2,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useRef, type JSX } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
-import { createWebReportBuilder } from '@12-apps/report-builder/react';
+import { reportSpecSchema, type ReportSpec } from '@12-apps/report-builder';
+import {
+  createWebReportBuilder,
+  type BlockTemplateGroup,
+  type ReportBuilderSurface,
+} from '@12-apps/report-builder/react';
 
 /**
  * The whole wiring a frontend host performs for this package.
@@ -38,8 +43,161 @@ const TENANT_SLUG = 'harness';
  */
 const SURFACE_ROOT = `/${TENANT_SLUG}/reports`;
 
-const { page: ReportBuilderSurface } = createWebReportBuilder({
+/** A template spec, parsed the way a host's own config would be. */
+const spec = (input: unknown): ReportSpec => reportSpecSchema.parse(input);
+
+/**
+ * The block templates this host offers — its product, in its words.
+ *
+ * They used to come from inside the package: `blockTemplateGroups()` returned
+ * three groups of future-pay's own reports, built from future-pay's starters,
+ * and every consumer that mounted the editor got them. The picker's contract is
+ * "your groups, then the blank one", so the groups are declared here, over the
+ * catalog `harness/backend` actually serves.
+ */
+const BLOCK_TEMPLATES: BlockTemplateGroup[] = [
+  {
+    id: 'vendas',
+    title: 'Vendas',
+    templates: [
+      {
+        id: 'receita-por-dia',
+        title: 'Receita por dia',
+        description: 'Quanto a loja faturou a cada dia do período',
+        spec: spec({
+          entity: 'orders',
+          dimensions: [{ field: 'createdAt', timeGrain: 'day' }],
+          measures: [{ field: 'revenueCents', aggregation: 'sum', alias: 'receita' }],
+          filters: [{ field: 'status', operator: 'eq', value: 'PAID' }],
+          presentation: { kind: 'chart', chartType: 'line' },
+        }),
+      },
+      {
+        id: 'produtos-mais-vendidos',
+        title: 'Produtos mais vendidos',
+        description: 'Os dez produtos que mais renderam',
+        spec: spec({
+          entity: 'order_items',
+          dimensions: [{ field: 'productName' }],
+          measures: [{ field: 'revenueCents', aggregation: 'sum', alias: 'receita' }],
+          sort: [{ by: 'receita', direction: 'desc' }],
+          limit: 10,
+          presentation: { kind: 'chart', chartType: 'bar' },
+        }),
+      },
+    ],
+  },
+  {
+    id: 'movimento',
+    title: 'Movimento',
+    templates: [
+      {
+        id: 'preparo-por-estacao',
+        title: 'Tempo de preparo por estação',
+        description: 'Onde a cozinha demora, sem apontar para uma pessoa',
+        spec: spec({
+          entity: 'kitchen_ticket_items',
+          dimensions: [{ field: 'stationName' }],
+          measures: [
+            { field: 'prepSeconds', aggregation: 'p90', alias: 'preparo_p90' },
+            { field: 'lines', aggregation: 'sum', alias: 'linhas' },
+          ],
+          sort: [{ by: 'linhas', direction: 'desc' }],
+          presentation: { kind: 'table' },
+        }),
+      },
+      {
+        id: 'horas-por-estacao',
+        title: 'Horas trabalhadas por estação',
+        description: 'Horas lançadas e linhas produzidas em cada estação',
+        spec: spec({
+          entity: 'kitchen_shifts',
+          dimensions: [{ field: 'stationName' }],
+          measures: [
+            { field: 'laborSeconds', aggregation: 'sum', alias: 'horas' },
+            { field: 'outputLines', aggregation: 'sum', alias: 'linhas' },
+          ],
+          sort: [{ by: 'horas', direction: 'desc' }],
+          presentation: { kind: 'table' },
+        }),
+      },
+    ],
+  },
+  {
+    id: 'pagamentos-e-perdas',
+    title: 'Pagamentos e perdas',
+    templates: [
+      {
+        id: 'formas-de-pagamento',
+        title: 'Formas de pagamento',
+        description: 'Quanto entrou por PIX, cartão e garçom',
+        spec: spec({
+          entity: 'payments',
+          dimensions: [{ field: 'method' }],
+          measures: [{ field: 'amountCents', aggregation: 'sum', alias: 'valor' }],
+          filters: [{ field: 'status', operator: 'eq', value: 'PAID' }],
+          presentation: { kind: 'chart', chartType: 'pie' },
+        }),
+      },
+      {
+        id: 'perdas-por-motivo',
+        title: 'Perdas por motivo',
+        description: 'Quanto foi perdido, e por quê',
+        spec: spec({
+          entity: 'loss_events',
+          dimensions: [{ field: 'reasonName' }],
+          measures: [{ field: 'lossValueCents', aggregation: 'sum', alias: 'valor_perdido' }],
+          presentation: { kind: 'chart', chartType: 'bar' },
+        }),
+      },
+      {
+        id: 'movimentacoes-de-estoque',
+        title: 'Movimentações de estoque',
+        description: 'Entradas e saídas por tipo de movimento',
+        spec: spec({
+          entity: 'stock_movements',
+          dimensions: [{ field: 'type' }],
+          measures: [{ field: 'quantityDelta', aggregation: 'sum', alias: 'quantidade' }],
+          presentation: { kind: 'chart', chartType: 'bar' },
+        }),
+      },
+    ],
+  },
+];
+
+/**
+ * The host's vocabulary, REQUIRED by the factory.
+ *
+ * Every field of it used to be a module-scope constant inside the package —
+ * `SYSTEM_REPORT_NAV`, `SYSTEM_DASHBOARDS`, a `{ orders: 'Pedidos' }` label map
+ * and `America/Sao_Paulo`. A harness that inherited them could not tell a
+ * default from a decision, which is the whole reason the package's own
+ * portability suite now speaks a language nothing here uses.
+ *
+ * `receita-por-forma` is the one built-in `harness/backend` serves, so the two
+ * halves name the same key; the sections are where its back-link goes in THIS
+ * app's hash router.
+ */
+const SURFACE: ReportBuilderSurface = {
+  systemReports: [
+    {
+      key: 'receita-por-forma',
+      title: 'Receita por forma de pagamento',
+      description: 'Quanto entrou por PIX, cartão e garçom no período.',
+      permission: 'reports:sales:read',
+      section: 'orders',
+      supportsGrain: false,
+    },
+  ],
+  systemDashboards: [],
+  sections: [{ key: 'orders', label: 'Pedidos', path: 'orders' }],
+  blockTemplates: BLOCK_TEMPLATES,
+  timeZone: 'America/Sao_Paulo',
+};
+
+const { page: ReportSurface } = createWebReportBuilder({
   tenantSlug: TENANT_SLUG,
+  surface: SURFACE,
   // NOT standalone. `standalone` wraps the surface in a `MemoryRouter`, which
   // is what a host with no router at all needs — and a memory router keeps its
   // location in a variable, so opening a report changed the screen and left the
@@ -113,7 +271,7 @@ export function ReportBuilderPage(): JSX.Element {
       <HashRouter basename={`/${PAGE_SLUG}`}>
         <FollowShellHash />
         <Routes>
-          <Route path={`${SURFACE_ROOT}/*`} element={<ReportBuilderSurface />} />
+          <Route path={`${SURFACE_ROOT}/*`} element={<ReportSurface />} />
           {/* `#/report-builder` on its own is the PAGE, not one of its screens.
               Replaced rather than pushed, so Back leaves the harness page it
               landed on instead of bouncing off this redirect. */}

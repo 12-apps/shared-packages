@@ -344,17 +344,20 @@ test('the editor is reachable, and “new” is not read as a report id', async 
 });
 
 /**
- * The block picker's eight templates, and the catalog they need behind them.
+ * The block picker's templates, and the catalog they need behind them.
  *
- * The picker is served from the PACKAGE and lists every template whose starter
- * exists — it never asks the host's catalog what it can actually run. So a
- * harness with one entity offered all eight and five of them created a block
- * that answered *Acesso negado*, because an entity absent from the catalog is
- * an entity nobody holds the permission for. The failure was silent from the
- * package's side and looked, from the browser, exactly like a broken template.
+ * The picker used to be served from the PACKAGE: it listed every template whose
+ * starter existed and never asked the host's catalog what it could actually
+ * run, so a harness with one entity was offered all eight and five of them
+ * created a block that answered *Acesso negado* — an entity absent from the
+ * catalog is an entity nobody holds the permission for. The failure was silent
+ * from the package's side and looked, from the browser, exactly like a broken
+ * template.
  *
- * These are the cases that make the catalog the acceptance surface it is meant
- * to be: every template runs, and each one draws ITS OWN entity.
+ * The templates are this app's own now (`src/pages/report-builder.tsx`), which
+ * removes the class of failure rather than the instance: a host can only offer
+ * templates over the catalog it also declares. These cases still hold it to
+ * that — every template runs, and each one draws ITS OWN entity.
  */
 const NEW_REPORT_BLOCK = 'bloco-1';
 
