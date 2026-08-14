@@ -321,6 +321,9 @@ export function notificationsHost(pg: PGlite) {
   const latch = createOutboxLatch();
 
   const surface = notificationsRouter({
+    // The harness declares its OWN categories, because the package no longer
+    // ships any — this is the wiring every adopter now performs.
+    categories: ['orders', 'payments', 'stock', 'system'],
     db: () => Promise.resolve(notificationsDb(pg)),
     generators: GENERATORS,
     contacts: {
@@ -345,6 +348,10 @@ export function notificationsHost(pg: PGlite) {
         driver: 'harness',
         appUrl: 'https://harness.test',
         templateName: 'harness_alert',
+        // Stated even though this harness driver never sends to Meta: a
+        // template is registered under exactly one language, so the channel
+        // declaration is where that belongs regardless of who delivers it.
+        templateLanguage: 'pt_BR',
         defaultCountryCode: '55',
       },
       { channel: 'WEB_PUSH', driver: 'harness', publicKey: 'BHarnessVapidPublicKey' },

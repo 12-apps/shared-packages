@@ -7,7 +7,6 @@ import {
   mergeChoices,
   mergeStoredRow,
 } from '../preferences-core';
-import { NOTIFICATION_CATEGORIES } from '../types';
 
 /**
  * The preference POLICY, with no storage in it — the half a browser also runs.
@@ -23,7 +22,8 @@ describe('the default matrix', () => {
   });
 
   it('covers every category of the taxonomy it is given', () => {
-    const matrix = defaultChannelMatrix(NOTIFICATION_CATEGORIES);
+    // A host's own categories, supplied here as one would supply them.
+    const matrix = defaultChannelMatrix(['orders', 'payments', 'stock', 'system']);
     expect(Object.keys(matrix).sort()).toEqual(['orders', 'payments', 'stock', 'system']);
     expect(matrix.orders).toEqual(DEFAULT_CHANNEL_ROW);
   });

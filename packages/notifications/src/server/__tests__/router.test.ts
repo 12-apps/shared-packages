@@ -94,6 +94,7 @@ function mount(
   overrides: Partial<Parameters<typeof createApiNotifications>[0]> = {},
 ): ApiNotifications {
   return createApiNotifications({
+    categories: ['orders', 'payments', 'stock', 'system'],
     db: () => Promise.resolve(db),
     contacts: memoryContacts({
       u1: { email: 'buyer@example.com', phone: '+5531999998888' },

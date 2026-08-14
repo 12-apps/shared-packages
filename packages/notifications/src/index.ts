@@ -21,7 +21,6 @@
  */
 
 export {
-  NOTIFICATION_CATEGORIES,
   NOTIFICATION_CHANNELS,
   taxonomyOf,
   type DeliveryStatus,

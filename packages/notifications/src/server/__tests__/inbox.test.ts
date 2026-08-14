@@ -24,6 +24,7 @@ let api: ApiNotifications;
 beforeEach(() => {
   db = createMemoryDb();
   api = createApiNotifications({
+    categories: ['orders', 'payments', 'stock', 'system'],
     db: () => Promise.resolve(db),
     contacts: memoryContacts({
       u1: { email: 'buyer@example.com', phone: null },

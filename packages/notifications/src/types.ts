@@ -18,18 +18,25 @@ export const NOTIFICATION_CHANNELS = ['EMAIL', 'SMS', 'WHATSAPP', 'WEB_PUSH'] as
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 
 /**
- * The DEFAULT preference categories — the granularity at which a user chooses
- * channels. Every notification `type` belongs to exactly one category via its
- * generator.
+ * The preference categories are the HOST's, and required.
  *
- * A host may replace the set entirely (`categories` on the server config): it
- * is product vocabulary, not machinery. These four are the future-pay set, and
- * the packaged migration deliberately puts **no CHECK** on
- * `notifications.category` — a closed set in the schema would be wrong for
- * every host but the first. Unlike `channel` and `status`, which ARE the
- * library's own closed sets and do carry one.
+ * There used to be a `NOTIFICATION_CATEGORIES = ['orders','payments','stock',
+ * 'system']` here — one product's set — and `taxonomyOf` fell back to it
+ * whenever a host passed none. The docstring argued the case itself: "it is
+ * product vocabulary, not machinery", and then shipped the vocabulary anyway as
+ * the default, which is the only part a forgetful host would ever see.
+ *
+ * The consequence was quiet rather than loud: the settings screen renders four
+ * rows a foreign host never chose, its own categories are absent, and every
+ * preference a user sets is filed against a taxonomy nothing else in that
+ * system uses. Nothing throws, because `category` is deliberately a free string
+ * — the packaged migration puts **no CHECK** on it, precisely because a closed
+ * set would be wrong for every host but the first. That freedom is what made
+ * the default undetectable.
+ *
+ * `channel` and `status` are different and keep their CHECKs: those ARE this
+ * library's own closed sets.
  */
-export const NOTIFICATION_CATEGORIES = ['orders', 'payments', 'stock', 'system'] as const;
 export type NotificationCategory = string;
 
 /**
@@ -140,13 +147,22 @@ export interface NotificationTaxonomy {
   categories: readonly NotificationCategory[];
 }
 
-/** The taxonomy in force, defaulted to the four future-pay categories. */
+/**
+ * The taxonomy in force. `categories` is REQUIRED — see above.
+ *
+ * The empty check was already here and stays: an empty list and a missing one
+ * are the same mistake, and both now fail at assembly rather than rendering an
+ * empty settings screen or somebody else's four rows.
+ */
 export function taxonomyOf(config: {
-  categories?: readonly NotificationCategory[];
+  categories: readonly NotificationCategory[];
 }): NotificationTaxonomy {
-  const categories = config.categories ?? NOTIFICATION_CATEGORIES;
-  if (categories.length === 0) {
-    throw new Error('@12-apps/notifications: `categories` must not be empty.');
+  const categories = config.categories;
+  if (!categories || categories.length === 0) {
+    throw new Error(
+      '@12-apps/notifications: `categories` is required and must not be empty — ' +
+        'the preference categories are the host\'s product vocabulary.',
+    );
   }
   return { categories: [...categories] };
 }

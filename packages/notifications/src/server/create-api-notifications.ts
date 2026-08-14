@@ -76,8 +76,16 @@ export interface NotificationsServerConfig {
   drivers?: ExtraDrivers;
   /** The domain events this mount can emit. */
   generators?: readonly NotificationGenerator<never>[];
-  /** Preference categories. Default: orders / payments / stock / system. */
-  categories?: readonly NotificationCategory[];
+  /**
+   * Preference categories — the granularity at which a user chooses channels.
+   *
+   * REQUIRED. This defaulted to one product's four (`orders`, `payments`,
+   * `stock`, `system`), which is the host's vocabulary and not this library's:
+   * a host that omitted it rendered four rows it never chose, with its own
+   * categories absent, and nothing failed — `category` is a free string by
+   * design, so there was no layer left to notice.
+   */
+  categories: readonly NotificationCategory[];
   /** Override which channels a never-touched category defaults to. */
   channelDefaults?: Partial<ChannelRow>;
   /** The tenant plan gate, answered per emit. */
