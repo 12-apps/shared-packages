@@ -17,9 +17,30 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-/** The publishable package directories, as the workflow's PUBLISH_DIRS lists them. */
+/** The repo-root file that IS the list, for anything running without the workflow's env. */
+const PACKAGE_LIST = new URL("../../release-packages.txt", import.meta.url);
+
+/** The package list as written in release-packages.txt, comments and blanks stripped. */
+export function declaredDirs(file = PACKAGE_LIST) {
+  return readFileSync(file, "utf8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("#"));
+}
+
+/**
+ * The publishable package directories.
+ *
+ * PUBLISH_DIRS when the workflow set it, and release-packages.txt otherwise —
+ * which is what lets the scheduled watchdog run these same checks without
+ * restating the list. ci.yml's copy and the file are held identical by
+ * scripts/release-tags-selftest.mjs, so the fallback can never be a second,
+ * quietly diverging answer: a package present in one and missing from the other
+ * would be released but never verified, or verified but never released.
+ */
 export function publishDirs(env = process.env) {
-  return (env.PUBLISH_DIRS ?? "").split(/\s+/).filter(Boolean);
+  const fromEnv = (env.PUBLISH_DIRS ?? "").split(/\s+/).filter(Boolean);
+  return fromEnv.length > 0 ? fromEnv : declaredDirs();
 }
 
 function manifest(dir) {

@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { declaredDirs } from "./lib/release-state.mjs";
+
 /**
  * Proves scripts/release-tags.mjs SURVIVES the two things that broke this repo's
  * releases, and keeps the tag scheme that 700+ existing tags depend on.
@@ -284,6 +286,26 @@ check(
   clean.argv.some((call) => call.startsWith("auth :: ") && call.includes("--tag-format auth-v${version}")) &&
     clean.argv.some((call) => call.startsWith("ui :: ") && call.includes("--tag-format ui-v${version}")),
   `--tag-format keeps the scheme 700+ existing tags use. Without it\n    semantic-release-monorepo imposes @12-apps/ui-v1.2.3, under which no package\n    finds its own last tag and every one resets to 1.0.0. Calls:\n    ${clean.argv.join("\n    ")}`,
+);
+
+// ── The two copies of the package list must be the same list ───────────────
+//
+// ci.yml carries PUBLISH_DIRS so its shell steps can read it; release-packages.txt
+// is what everything running OUTSIDE the release job reads, the scheduled
+// watchdog above all. Two lists that can drift are the failure this repo already
+// warns about in ci.yml's own comment — a package in one and not the other is
+// released but never verified, or verified but never released. Neither is
+// visible until the day it matters, so it is asserted rather than trusted.
+const workflow = readFileSync(join(HERE, "..", ".github", "workflows", "ci.yml"), "utf8");
+const inWorkflow = (workflow.match(/PUBLISH_DIRS: >-\n([\s\S]*?)\n\n/) ?? ["", ""])[1]
+  .split(/\s+/)
+  .filter(Boolean);
+const inFile = declaredDirs();
+
+check(
+  "ci.yml's PUBLISH_DIRS and release-packages.txt are the same list, in the same order",
+  inWorkflow.length > 0 && inWorkflow.join(",") === inFile.join(","),
+  `the two must not drift.\n    ci.yml (${inWorkflow.length}): ${inWorkflow.join(" ")}\n    release-packages.txt (${inFile.length}): ${inFile.join(" ")}`,
 );
 
 if (failures.length > 0) {
