@@ -26,11 +26,13 @@ import type { DraftWire } from '@12-apps/entity-lifecycle/react';
  * named only some of its collections silently inherited another product's word
  * for the rest. It ships none now; an unlabelled type renders as its raw key.
  *
- * `supplier` is deliberately left out even though the seed creates one: its
- * chip then reads `supplier` rather than a noun this package chose, which is
- * the zero-config behaviour a host gets before it names anything.
+ * Both seeded collections are named, because this harness stands in for a
+ * CORRECT adopter and the bin's contract is that each collection shows its own
+ * chip. The raw-key fallback for an unnamed type is worth proving too, but it
+ * belongs in the package's own suite (`entity-type-labels.test.ts`) rather than
+ * here, where leaving a type out would just look like the wiring is unfinished.
  */
-const ENTITY_TYPE_LABELS = { product: 'Produto' };
+const ENTITY_TYPE_LABELS = { product: 'Produto', supplier: 'Fornecedor' };
 
 const lifecycle = createWebEntityLifecycle({
   apiBase: '/api/admin/harness',
