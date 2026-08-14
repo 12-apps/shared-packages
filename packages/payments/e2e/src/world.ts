@@ -118,7 +118,21 @@ export type PaymentsStore =
    * asks for it through {@link PaymentsFixtures.platformBrand} rather than
    * naming anyone.
    */
-  | 'setup-guide';
+  | 'setup-guide'
+  /**
+   * An OAuth provider whose GRANT IS DEAD — the merchant's connection is out
+   * of rotation while the owner never switched it off (FUT-683).
+   *
+   * The one money-path state a store cannot reach on purpose: the provider
+   * refused to renew, so `enabled` stays true (reconnecting must restore
+   * rotation by itself) while `RECONNECT_REQUIRED` alone keeps every new
+   * charge off a dead token. A host produces it however it can — this
+   * package's `config/enablement.ts` decides what it MEANS either way.
+   *
+   * The journey lands on that provider's own panel, where the reconnect
+   * banner and the expiry warning are the package's own screens.
+   */
+  | 'reconnect-required';
 
 /**
  * Facts about the host's own fixtures that the assertions have to name.
@@ -150,6 +164,16 @@ export interface PaymentsFixtures {
    * "the platform's own name"; only the host can say what that is.
    */
   platformBrand: string;
+  /**
+   * The provider the `reconnect-required` shape is about — the one whose OAuth
+   * grant the host declared dead.
+   *
+   * Named for the same reason `headProvider` is: the reconnection assertions
+   * are about a SPECIFIC connection's status and the rotation it fell out of,
+   * so they have to address one row. Which row is the host's invented cast,
+   * never this package's, and never a real acquirer's.
+   */
+  oauthProvider: string;
 }
 
 /**
