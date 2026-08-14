@@ -11,7 +11,7 @@ import { savedReportDb } from './saved-report-db';
  * Every package's surface, in MOUNT ORDER — the half of `createHarnessBackend`
  * whose ordering is load-bearing (see the header).
  */
-function mountSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
+export function mountSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
   // FIRST — before the host's `/catalog-items/:id` CRUD below. See the header:
   // reversing these two blocks is a red test, not a silent 404.
   app.route('/api/admin/:tenantSlug', hosts.lifecycle.router);
