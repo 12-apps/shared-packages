@@ -4,7 +4,7 @@ import { UnknownNotificationTypeError } from '../errors';
 import { createGeneratorRegistry } from '../generators';
 import { DEFAULT_NOTIFICATION_MESSAGES, messagesOf } from '../messages';
 import { normalizePhoneE164 } from '../phone';
-import { NOTIFICATION_CATEGORIES, taxonomyOf } from '../types';
+import { taxonomyOf } from '../types';
 import { inboxWire, type NotificationRow } from '../wire';
 
 /** The framework-free core: registry, taxonomy, copy table, phones, the wire. */
@@ -50,7 +50,11 @@ describe('the generator registry', () => {
 
 describe('the taxonomy', () => {
   it('defaults to the four product categories', () => {
-    expect(taxonomyOf({}).categories).toEqual([...NOTIFICATION_CATEGORIES]);
+    // No default to fall back to: the categories are the host's product
+    // vocabulary, so omitting them is a config error rather than an invitation
+    // to render somebody else's four rows.
+    // @ts-expect-error — `categories` is required; this is the omission case.
+    expect(() => taxonomyOf({})).toThrow(/required and must not be empty/);
   });
 
   it('takes the host set verbatim', () => {
@@ -58,7 +62,7 @@ describe('the taxonomy', () => {
   });
 
   it('refuses an empty set rather than rendering a preferences screen of nothing', () => {
-    expect(() => taxonomyOf({ categories: [] })).toThrow(/must not be empty/);
+    expect(() => taxonomyOf({ categories: [] })).toThrow(/required and must not be empty/);
   });
 });
 

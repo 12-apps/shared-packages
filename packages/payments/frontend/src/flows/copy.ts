@@ -9,8 +9,13 @@
  * keep it; moving all of it here in the same change that introduces the factory
  * would be a copy rewrite disguised as an API.
  *
- * Every default below is today's pt-BR, verbatim — a host that passes no `copy`
- * reads exactly what a buyer reads now.
+ * THE DEFAULTS ARE GONE (FUT-760). `DEFAULT_CHECKOUT_COPY_FE` held one
+ * product's RESTAURANT vocabulary — "Pagamento com o garçom", "Chame o garçom
+ * para fechar a conta na mesa", "Ver cardápio" — and was spread into every
+ * adopter that passed no `copy`. A host selling insurance got a waiter, and
+ * nothing failed, because saying nothing is exactly how a host silently adopts
+ * another product's voice. `copy` is required on the config now; this file is
+ * the port and nothing else.
  */
 
 /** Every buyer-facing string the factory's own screens render. */
@@ -49,33 +54,3 @@ export interface CheckoutCopyFE {
   manageCardsEmpty: string;
   manageCardsAdd: string;
 }
-
-export const DEFAULT_CHECKOUT_COPY_FE: CheckoutCopyFE = {
-  unavailableTitle: "Pagamento online indisponível",
-  unavailableBody:
-    "Esta loja não recebe pagamentos pelo site. Combine o pagamento diretamente com a loja para concluir seu pedido.",
-  unavailableWithRemedyTitle: "Pagamento com o garçom",
-  unavailableWithRemedyBody:
-    "Esta loja não recebe pagamentos pelo site. Chame o garçom para fechar a conta na mesa.",
-  handoffTitle: "Você será levado ao pagamento",
-  handoffBody:
-    "Estamos abrindo a página segura do meio de pagamento. Se ela não abrir sozinha, use o link abaixo.",
-  handoffLink: "Abrir a página de pagamento",
-  handoffCancel: "Voltar",
-  returnPending: "Confirmando seu pagamento…",
-  returnUnknown:
-    "Não encontramos um pagamento em andamento nesta sessão. Verifique seus pedidos em instantes.",
-  emptyCartTitle: "Seu carrinho está vazio.",
-  emptyCartAction: "Ver cardápio",
-  continueAction: "Continuar",
-  addCardTitle: "Adicionar cartão",
-  addCardAction: "Salvar cartão",
-  addCardPreparing: "Preparando o formulário…",
-  addCardSavedTitle: "Cartão salvo",
-  addCardSavedBody: "Você poderá usá-lo nas próximas compras.",
-  addCardFailedTitle: "Não foi possível salvar o cartão",
-  addCardUnavailable: "Esta loja não aceita salvar cartões no momento.",
-  manageCardsTitle: "Meus cartões",
-  manageCardsEmpty: "Você ainda não tem cartões salvos.",
-  manageCardsAdd: "Adicionar cartão",
-};

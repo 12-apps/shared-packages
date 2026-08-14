@@ -41,7 +41,7 @@ export function infinitePaySetupGuide(ctx: SetupGuideContext): ProviderSetupGuid
     { id: 'activate', label: 'Ativar vendas' },
   ];
 
-  const sections = [handleSection(), enableSection(ctx)];
+  const sections = [handleSection(ctx), enableSection(ctx)];
   if (!ctx.progress) return { stages, sections };
   return { stages, sections, activeStage: activeStageOf(ctx.progress) };
 }
@@ -105,7 +105,7 @@ function enableSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'][n
  * had just exposed them to only on the way back. A warning below the action it
  * warns about is a post-mortem.
  */
-function handleSection(): ProviderSetupGuide['sections'][number] {
+function handleSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'][number] {
   return {
     id: 'handle',
     title: 'Passo 1 · Informe sua InfiniteTag',
@@ -122,7 +122,7 @@ function handleSection(): ProviderSetupGuide['sections'][number] {
       },
       {
         tone: 'warning',
-        text: 'A InfiniteTag define para **qual conta** o dinheiro vai. Uma tag errada envia os pagamentos desta loja para outra pessoa, e não há como reverter pelo Future Pay — confira caractere por caractere.',
+        text: `A InfiniteTag define para **qual conta** o dinheiro vai. Uma tag errada envia os pagamentos desta loja para outra pessoa, e não há como reverter por ${ctx.brandName} — confira caractere por caractere.`,
       },
       {
         // No prose: the button says what it does, and the field under it says

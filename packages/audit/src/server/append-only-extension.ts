@@ -1,6 +1,6 @@
 /**
  * Prisma client extension that makes the audit log physically append-only at the
- * client layer (12-14).
+ * client layer.
  *
  * The trail's value rests on immutability: an entry that can be edited or deleted
  * after the fact proves nothing. There is no code path that should ever mutate
@@ -41,6 +41,8 @@
  * a trigger), or keep their writes off the parent's payload.
  */
 
+import { AuditConfigError } from '../core/errors';
+
 /** Thrown when code attempts to mutate an append-only model. */
 export class AppendOnlyViolationError extends Error {
   constructor(model: string, operation: string) {
@@ -74,6 +76,16 @@ const GUARDED_OPERATIONS = [
   'deleteMany',
 ] as const;
 
+/**
+ * The model this package owns, and the one the guard is FOR.
+ *
+ * Fixed rather than configurable: the db seam reaches the table through a
+ * delegate literally named `auditLog`, so the Prisma model name a hook sees is
+ * this one. A host that maps the TABLE elsewhere does it with `retention.table`
+ * and `@@map`, neither of which moves the model name.
+ */
+export const AUDIT_LOG_MODEL = 'AuditLog';
+
 export interface AppendOnlyConfig {
   /** Prisma model names that must never be updated or deleted via the model API. */
   models: readonly string[];
@@ -85,6 +97,19 @@ export interface AppendOnlyConfig {
  */
 export function applyAppendOnlyGuard<T>(client: T, config: AppendOnlyConfig): T {
   const guarded = new Set(config.models);
+  if (guarded.size === 0) {
+    // A guard over no models is a guard that is off, and it is off SILENTLY:
+    // every write succeeds, the extension is installed, `$extends` reports a
+    // hook, and the only symptom is an audit row that changed. `createApiAudit`
+    // always includes AUDIT_LOG_MODEL so it cannot reach this — the refusal is
+    // here because this function is exported, and a host composing its own
+    // client calls it directly.
+    throw new AuditConfigError(
+      'appendOnlyModels',
+      'must name at least one model — a guard over an empty set installs a hook ' +
+        'that permits every mutation, and nothing about it looks disabled.',
+    );
+  }
   const hook =
     (operation: string) =>
     ({ model, args, query }: QueryHookArgs): unknown => {

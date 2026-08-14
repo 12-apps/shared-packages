@@ -49,6 +49,18 @@ const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string 
   'screen-handoff': { slug: 'payments-checkout-provider-screens', caseId: 'screen-handoff' },
   'screen-undeclared': { slug: 'payments-checkout-provider-screens', caseId: 'screen-undeclared' },
   'screen-unknown': { slug: 'payments-checkout-provider-screens', caseId: 'screen-unknown' },
+  // The setup walkthrough (FUT-760/761) — the PUBLISHED vendor catalog, so the
+  // guide under assertion is a real shipped one rather than a harness
+  // invention. `open` walks onto Stone's panel below. The case seeds Stone
+  // CONNECTED on purpose: the sentence that addresses the platform by name is
+  // in the webhook section, and a guide renders the section of the stage it
+  // opens on, so a fresh row would leave that text out of the DOM entirely.
+  'setup-guide': { slug: 'payments-provider-settings', caseId: 'guide-brand' },
+  // The dead OAuth grant (FUT-683). The connect page already seeds it: its
+  // `reconnect` case declares the OAuth provider's refresh as failing, which
+  // is the only way the state is reachable — a real provider refusing to renew
+  // is not something a scenario can ask for.
+  'reconnect-required': { slug: 'payments-provider-connect', caseId: 'reconnect' },
 };
 
 /**
@@ -70,6 +82,13 @@ definePaymentsWorld({
       // The admin shape lands ON the provider's panel: the journey's subject
       // is one provider's switch and activation step, not the landing list.
       await page.getByTestId('payments-provider-card-aurora').click();
+      await expect(page.getByTestId('payments-provider-back')).toBeVisible();
+    }
+    if (store === 'setup-guide') {
+      // Same reason, one vendor over: the walkthrough is on the panel, not on
+      // the catalog. Stone rather than the harness's own provider because the
+      // sentence under assertion is one the PACKAGE ships.
+      await page.getByTestId('payments-provider-card-stone').click();
       await expect(page.getByTestId('payments-provider-back')).toBeVisible();
     }
   },
@@ -99,6 +118,14 @@ definePaymentsWorld({
     hostedUrlFragment: 'infinito.example',
     payableRef: 'inv_harness_0043',
     taxId: '529.982.247-25',
+    // The same word `admin-ports.ts` passes as `SetupGuideContext.brandName`.
+    // Deliberately a name no real adopter uses: if the guide were still
+    // carrying a compiled-in brand, this would not appear and the journey
+    // fails — which is the whole assertion.
+    platformBrand: 'Plataforma Harness',
+    // The OAuth member of this harness's invented cast — the row whose grant
+    // the `reconnect` case declares dead.
+    oauthProvider: 'cerrado',
   },
 
   wire: {

@@ -1,5 +1,5 @@
 /**
- * The audit WRITER (12-14): the thin, transactional "who did what" append.
+ * The audit WRITER: the thin, transactional "who did what" append.
  *
  * Every audited mutation calls it with the transaction client it is already
  * running in, so "it happened" and "it was logged" commit or roll back together
@@ -14,8 +14,8 @@
  * otherwise end up named as the actor, and why neither can be left to a call
  * site to remember.
  */
-import type { AuditVocabularyIndex } from '../core/vocabulary';
-import { AuditVocabularyError, redactDiff } from '../core/vocabulary';
+import { AuditVocabularyError } from '../core/errors';
+import { assertAuditVocabulary, redactDiff, type AuditVocabulary } from '../core/vocabulary';
 
 import { getActorAttribution, getActorUserId, type ActorAttributionSnapshot } from './actor-context';
 import type { AuditWriteClient } from './db';
@@ -150,7 +150,7 @@ function resolveActorUserId(
 
 /** The row the writer builds, before it reaches the seam. */
 function buildRow(
-  index: AuditVocabularyIndex,
+  vocabulary: AuditVocabulary,
   input: AuditEntryInput,
   attribution: ActorAttributionSnapshot,
 ): Parameters<AuditWriteClient['auditLog']['create']>[0]['data'] {
@@ -195,8 +195,8 @@ function buildRow(
     action: input.action,
     resourceType: input.resourceType,
     resourceId: input.resourceId,
-    before: redactDiff(index, input.resourceType, input.before),
-    after: redactDiff(index, input.resourceType, input.after),
+    before: redactDiff(vocabulary, input.resourceType, input.before),
+    after: redactDiff(vocabulary, input.resourceType, input.after),
     requestId: input.requestId ?? null,
   };
 }
@@ -211,11 +211,17 @@ export type AuditWriter = (tx: AuditWriteClient, input: AuditEntryInput) => Prom
  * passes redaction untouched and lands as a row no filter can select and no
  * viewer can label. On an append-only table that is permanent, so it is a throw
  * — inside the caller's transaction, which therefore rolls back.
+ *
+ * The vocabulary is checked HERE and not only in `createApiAudit`, because this
+ * is an exported entry point in its own right: a host that writes entries from
+ * a job or a script and never mounts the read surface reaches the writer
+ * directly, and that path must not be the one with fewer guards.
  */
-export function createAuditWriter(index: AuditVocabularyIndex): AuditWriter {
+export function createAuditWriter(vocabulary: AuditVocabulary): AuditWriter {
+  const guarded = assertAuditVocabulary(vocabulary);
   return async function audit(tx: AuditWriteClient, input: AuditEntryInput): Promise<void> {
-    if (!index.hasAction(input.action)) throw new AuditVocabularyError('action', input.action);
-    const row = buildRow(index, input, getActorAttribution());
+    if (!guarded.hasAction(input.action)) throw new AuditVocabularyError('action', input.action);
+    const row = buildRow(guarded, input, getActorAttribution());
     await tx.auditLog.create({ data: row });
   };
 }

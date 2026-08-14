@@ -204,9 +204,22 @@ function ConnectionSummary(props: {
           />
         </Stack>
       ) : null}
+      {/*
+        The connected sentence names NO platform. It used to open with one
+        adopter's product name, hard-coded — so every other host installing this
+        package told its own merchants that somebody else's product was creating
+        their charges, with no prop to change it. The tell that it was an
+        oversight rather than a decision is the branch right below, which already
+        templates the provider from props.
+
+        Nothing was lost by removing it. The sentence exists to answer ONE
+        question — why no API key had to be copied — and the answer is the OAuth
+        grant, not whose logo is on the page. The subject is the connection
+        itself, which is true for every host and needs no new configuration.
+      */}
       <Typography variant="body2" color="text.secondary">
         {props.connected
-          ? 'Sua conta está conectada. O Future Pay cria as cobranças em seu nome — nenhuma chave precisa ser copiada.'
+          ? 'Sua conta está conectada. As cobranças são criadas em seu nome — nenhuma chave precisa ser copiada.'
           : `Conecte sua conta ${props.displayName} autorizando o acesso no site do provedor. Nenhuma chave precisa ser copiada.`}
       </Typography>
       {props.connected && props.connectedAccount ? (

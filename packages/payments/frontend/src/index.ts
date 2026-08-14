@@ -57,7 +57,6 @@ export {
 // ---------------------------------------------------------------------------
 export { createPaymentFlows } from './flows/create-payment-flows';
 export {
-  DEFAULT_CHECKOUT_COPY_FE,
   type CheckoutCopyFE,
 } from './flows/copy';
 export {
@@ -87,6 +86,13 @@ export {
 export { type CheckoutHostPorts } from './components/checkout/use-checkout-controller';
 export { PaymentsUnavailable } from './components/checkout/payments-unavailable';
 export { fetchCheckoutConfig } from './components/checkout/client';
+/**
+ * The `sessionStorage` key the hosted-checkout return leg parks the raised
+ * order under. Public because it is already observable — a spec asserting the
+ * handover, or a host clearing storage on sign-out, otherwise retypes the
+ * literal and silently drifts when it changes.
+ */
+export { HOSTED_ORDER_STORAGE_KEY } from './components/checkout/hosted-return';
 // ---------------------------------------------------------------------------
 // Digital wallets (FUT-471/472) — the Google-branded button and the capability
 // read it is gated on. `CheckoutFlow` wires these automatically; they are
@@ -136,7 +142,7 @@ export {
   type CheckoutOrder,
   type CheckoutProviderConfig,
   type CheckoutWalletType,
-  type ComandaCheckout,
+  type SettlementCheckout,
   type CreateOrderRequest,
   type CreateOrderResult,
   type OrderStatus,

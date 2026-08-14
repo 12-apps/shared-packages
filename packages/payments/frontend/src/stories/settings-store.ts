@@ -224,6 +224,7 @@ function settingsHttp(
       throw new Error("settings stories never charge");
     },
     setupContextFor: async (_merchant, provider) => ({
+      brandName: "Plataforma Exemplo",
       webhookUrl: `https://loja.exemplo/api/payments/webhooks/${provider}`,
       merchantName: "Loja Exemplo",
       storefrontUrl: "https://loja.exemplo/cardapio",

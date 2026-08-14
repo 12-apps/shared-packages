@@ -32,6 +32,7 @@ let changed: string[];
 function mount(overrides: Partial<Parameters<typeof createApiNotifications>[0]> = {}): void {
   changed = [];
   api = createApiNotifications({
+    categories: ['orders', 'payments', 'stock', 'system'],
     db: () => Promise.resolve(db),
     contacts: memoryContacts({
       u1: { email: 'buyer@example.com', phone: '+5531999998888' },

@@ -1,5 +1,5 @@
 /**
- * Per-request "who is acting" context (12-14), backed by Node's
+ * Per-request "who is acting" context, backed by Node's
  * AsyncLocalStorage. The host stamps the authorized actor once; the audit writer
  * and the `created_by`/`updated_by` Prisma extension read it, so no repository
  * signature or call site has to thread an actor through by hand.
@@ -18,6 +18,8 @@
  * runtime.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
+
+import { AuditConfigError } from '../core/errors';
 
 /** Role/scope/impersonation attribution a caller may STAMP. */
 export interface ActorAttribution {
@@ -77,37 +79,89 @@ export interface ActorContext extends ActorAttributionSnapshot {
   userId: string;
 }
 
-// Kept on globalThis so a dev server that re-evaluates this module (hot reload)
-// cannot create a second store whose context is invisible to closures captured
-// against the first.
-//
-// THE KEY IS A CROSS-PACKAGE CONTRACT, not a private detail, and that is why it
-// keeps a host-flavoured name in a generic package. `@12-apps/prisma` ships the
-// copy of this module that this one was ported from, keyed to
-// `__futurePayActorStore`, and re-exports `setActor`/`getActorUserId`/
-// `runWithActor` bound to it. A host adopting this package keeps those ~60
-// existing `setActor(...)` call sites and routes its WRITES through `write()`
-// (ADOPTING.md rule 3) — so a different key here means the writer reads a store
-// nothing ever stamped: every row lands actor_user_id/actor_role/scope/
-// on_behalf_of_user_id NULL, the viewer says "Sistema" for every human action,
-// and the table is append-only, so the attribution is gone for good. Nothing
-// fails on the way: the rows are structurally valid and each package's own
-// suites stamp through their own store.
-//
-// The two context shapes are structurally identical, so sharing the instance is
-// safe (a `realUserId` forged through the older copy's spread is inert in this
-// package's writer, which requires BOTH halves of the pair). The prettier
-// `__12appsActorStore` would have to change `@12-apps/prisma` too, and that is
-// the de-duplication PR — one module in one package — that this key is holding
-// the door open for. Interop is pinned by
-// `packages/prisma/tests/actor-context-audit-interop.test.ts`, the only test
-// that imports both copies.
-const globalStore = globalThis as unknown as {
-  __futurePayActorStore?: AsyncLocalStorage<ActorContext>;
+/**
+ * WHERE the store lives, and why that is CONFIG.
+ *
+ * The AsyncLocalStorage instance is kept on `globalThis` so a dev server that
+ * re-evaluates this module (hot reload) cannot create a second store whose
+ * context is invisible to closures captured against the first.
+ *
+ * The KEY it lives under is a cross-package contract rather than a private
+ * detail, and it used to be a host-flavoured literal compiled into this generic
+ * package — the exact shape this package now exists to refuse. It is a host
+ * setting: a host that already has an in-house actor-context module keyed to
+ * something else, and dozens of `setActor(...)` call sites importing it, needs
+ * BOTH modules on ONE store. It declares that with
+ * {@link declareActorContextKey}.
+ *
+ * What happens if the two disagree is the reason this is worth a knob rather
+ * than a fork: the writer reads a store nothing ever stamped, so every entry
+ * lands with `actor_user_id`, `actor_role`, `scope` and `on_behalf_of_user_id`
+ * NULL, the viewer renders the system label for every human action, and the
+ * table is append-only — the attribution is gone for good. Nothing fails on the
+ * way; the rows are structurally valid, and each module's own suites stamp
+ * through their own store.
+ */
+export const DEFAULT_ACTOR_STORE_KEY = '__12appsAuditActorStore';
+
+const globalStore = globalThis as unknown as Record<
+  string | symbol,
+  AsyncLocalStorage<ActorContext> | undefined
+>;
+
+/** The key in force, and the key the live store (if any) was created under. */
+const storeKey: { declared: string | symbol; created?: string | symbol } = {
+  declared: DEFAULT_ACTOR_STORE_KEY,
 };
 
-const store = (): AsyncLocalStorage<ActorContext> =>
-  (globalStore.__futurePayActorStore ??= new AsyncLocalStorage<ActorContext>());
+/**
+ * Share the actor context with another module, by naming its `globalThis` key.
+ *
+ * Call it ONCE, at wiring time, before anything stamps or reads an actor — a
+ * host's composition root, beside `createApiAudit`. Changing the key after the
+ * store exists is REFUSED rather than honoured: the contexts already captured
+ * against the old instance would keep flowing to it while every later read went
+ * elsewhere, which is precisely the silent fork the key exists to prevent, with
+ * the additional charm of being intermittent.
+ *
+ * Passing the key already in force is a no-op, so a module that declares it
+ * defensively at import time is safe to load twice.
+ *
+ * NAMED `declare…` RATHER THAN `use…`, and that is not a style preference.
+ * `react-hooks/rules-of-hooks` keys off the identifier alone: a `use`-prefixed
+ * call at module scope is reported as a hook called outside a component, in ANY
+ * file a React-aware config lints. This function belongs at module scope — that
+ * is the only place it can run before a store exists — and this package ships a
+ * React entry, so its adopters lint with that rule on. The old name cost the
+ * first adopter a red `--max-warnings 0` lane for a call that was correct.
+ */
+export function declareActorContextKey(key: string | symbol): void {
+  if (typeof key !== 'string' && typeof key !== 'symbol') {
+    throw new AuditConfigError('actorContextKey', 'must be a string or a symbol.');
+  }
+  if (typeof key === 'string' && key.trim() === '') {
+    throw new AuditConfigError('actorContextKey', 'must not be blank.');
+  }
+  if (key === storeKey.declared) return;
+  if (storeKey.created !== undefined) {
+    throw new AuditConfigError(
+      'actorContextKey',
+      `cannot change to ${String(key)}: the actor context store already exists under ` +
+        `${String(storeKey.created)}. Declare the key once, before anything stamps an ` +
+        'actor — moving it later forks the store, and a forked store loses every ' +
+        'attribution silently onto an append-only table.',
+    );
+  }
+  storeKey.declared = key;
+}
+
+/** The key the store is (or would be) created under — diagnostics and tests. */
+export const actorContextKey = (): string | symbol => storeKey.declared;
+
+const store = (): AsyncLocalStorage<ActorContext> => {
+  storeKey.created = storeKey.declared;
+  return (globalStore[storeKey.declared] ??= new AsyncLocalStorage<ActorContext>());
+};
 
 /**
  * The REAL human behind `onBehalfOfUserId`, DERIVED (never accepted) from the

@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { defineAuditVocabulary } from '@12-apps/audit';
 import {
   createApiAudit,
   getActorAttribution as auditGetActorAttribution,
   runWithActorScope as auditRunWithActorScope,
   setActor as auditSetActor,
+  declareActorContextKey,
   type AuditWriteClient,
 } from '@12-apps/audit/server';
 
@@ -17,7 +19,7 @@ import {
 } from '../src/actor-context';
 
 /**
- * ONE actor context, two packages (12-14).
+ * ONE actor context, two packages.
  *
  * `@12-apps/audit/server` ships its own copy of this module — the port that will
  * eventually replace this one — and both copies keep their AsyncLocalStorage
@@ -25,23 +27,35 @@ import {
  * KEY a cross-package contract rather than an implementation detail, and it is
  * the one difference between the copies that is not cosmetic.
  *
+ * As of `@12-apps/audit@2.0.0` that key is CONFIG rather than a literal compiled
+ * into the shared package. It used to be this package's key, hard-coded there —
+ * one host's vocabulary shipping as another package's constant, which is exactly
+ * what that release removed. A host (or, here, a test) that needs the two
+ * modules on ONE store declares it, ONCE, before anything stamps an actor:
+ * `declareActorContextKey(...)` below.
+ *
  * What breaks if they diverge, and why nothing else would catch it: a host keeps
- * its existing `setActor(...)` call sites (imported from `@12-apps/prisma` —
- * there are ~60 of them in future-pay) and routes its audit WRITES through
- * `@12-apps/audit`'s `write()`, as that package's ADOPTING.md rule 3 tells it to.
- * The writer then reads a store nothing ever stamped: every row lands with
- * `actor_user_id`, `actor_role`, `scope` and `on_behalf_of_user_id` NULL, the
- * viewer renders "Sistema" for every human action, and `audit_logs` is
- * append-only — so the attribution is gone for good. The rows are structurally
- * valid and no suite fails, because each package's own tests stamp through their
- * own store.
+ * its existing `setActor(...)` call sites (imported from `@12-apps/prisma`) and
+ * routes its audit WRITES through `@12-apps/audit`'s `write()`, as that
+ * package's ADOPTING.md rule 3 tells it to. The writer then reads a store
+ * nothing ever stamped: every row lands with `actor_user_id`, `actor_role`,
+ * `scope` and `on_behalf_of_user_id` NULL, the viewer renders the system label
+ * for every human action, and `audit_logs` is append-only — so the attribution
+ * is gone for good. The rows are structurally valid and no suite fails, because
+ * each package's own tests stamp through their own store.
  *
  * Hence this file, which is deliberately the ONLY test in either package that
  * imports both copies: it drives one and asserts through the other, in both
- * directions, so a rename of either key fails here instead of at a host's
+ * directions, so a break in the sharing fails here instead of at a host's
  * adoption. The de-duplication (one module, one package) is a later PR; until
  * then, interoperability is the property under test.
  */
+// The declaration a host makes, at module scope so it runs before any case
+// stamps an actor — moving the key after the store exists is refused, which is
+// the guard that keeps this from being a way to fork the store rather than share
+// it. `'__futurePayActorStore'` is THIS package's key; the audit package no
+// longer knows it.
+declareActorContextKey('__futurePayActorStore');
 const REAL = 'support-agent';
 const TARGET = 'shop-owner';
 
@@ -64,10 +78,10 @@ function auditWriter() {
         $executeRawUnsafe: () => Promise.resolve(0),
       }),
     resolveActor: () => null,
-    vocabulary: {
-      actions: [{ id: 'order.cancel', label: 'Pedido cancelado' }],
-      resources: [{ id: 'order', label: 'Pedido', fields: ['fulfillmentStatus'] }],
-    },
+    vocabulary: defineAuditVocabulary({
+      actions: { 'order.cancel': { label: 'Order cancelled' } },
+      resources: { order: { label: 'Order', fields: ['fulfillmentStatus'] } },
+    }),
   }).write;
 }
 

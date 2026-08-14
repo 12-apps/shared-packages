@@ -228,6 +228,21 @@ export type SetupPathVariant = Omit<ProviderSetupGuide, 'credentialsPath'>;
  * provider's onboarding to render it.
  */
 export interface SetupGuideContext {
+  /**
+   * What the HOST PLATFORM is called, in the owner's own words — the name a
+   * store owner would recognise on the screen they are reading.
+   *
+   * REQUIRED, and deliberately not defaulted. Two guides address the platform
+   * by name in the middle of an instruction ("é assim que o {brandName}
+   * confirma que a notificação veio mesmo da Stone"), and until this existed
+   * those sentences carried ONE adopter's product name, shipped inside a
+   * package every other adopter installs. A default would preserve that
+   * failure rather than fix it: a host that says nothing would silently ship
+   * a stranger's brand to its own store owners, and nothing would fail. A
+   * required field makes a new host answer the question once, loudly, at the
+   * single call site that knows the answer.
+   */
+  brandName: string;
   /** This merchant's webhook/notification URL for the provider. */
   webhookUrl: string;
   /** Optional extra URL some providers require (e.g. public-key service). */

@@ -1,16 +1,22 @@
 /**
- * Everything `@12-apps/audit` needs from a HOST, in one object (12-14).
+ * Everything `@12-apps/audit` needs from a HOST, in one object.
  *
- * What is genuinely the host's, and all that is here: who is calling (a
+ * What is genuinely the host's, and all that is here: the VOCABULARY (what this
+ * application audits, and what its rows may say), who is calling (a
  * header-driven session stand-in — a browser cannot have a real one), which
  * tenant the slug names, what the user ids look like as people (the directory),
  * and where the one owned table lives (the PGlite-backed seam in `audit-db.ts`).
  * Everything else — the writer, the gate, the parsing, the statuses, the
- * envelope, the retention predicates — is the package's, which is the entire
- * claim under test.
+ * envelope, the retention predicates, the total order — is the package's, which
+ * is the entire claim under test.
+ *
+ * The harness is a NEUTRAL second consumer and reads like one: a lighthouse
+ * authority, in a domain the package was not extracted from. It used to seed the
+ * origin application's own actions and resource ids against the vocabulary the
+ * package itself exported, which made the consumer proof circular.
  */
 import type { PGlite } from '@electric-sql/pglite';
-import { FUTURE_PAY_AUDIT_VOCABULARY } from '@12-apps/audit';
+import { defineAuditVocabulary } from '@12-apps/audit';
 import { auditRouter } from '@12-apps/audit/hono';
 import type { AuditUserIdentity } from '@12-apps/audit/server';
 
@@ -18,6 +24,24 @@ import { auditDb } from './audit-db';
 
 /** The mounted surface's type — inferred, so nothing here restates it. */
 export type HarnessAudit = ReturnType<typeof auditHost>;
+
+/**
+ * THE host vocabulary. Declared here, in the host, and passed to both halves —
+ * the package ships none and defaults to none.
+ */
+export const AUDIT_VOCABULARY = defineAuditVocabulary({
+  actions: {
+    'lamp.extinguish': { label: 'Lamp extinguished' },
+    'lamp.relight': { label: 'Lamp relit' },
+    'supply.deliver': { label: 'Supply run delivered' },
+    'keeper.assign': { label: 'Keeper assigned' },
+  },
+  resources: {
+    lamp: { label: 'Lamp', fields: ['state', 'lumens', 'characteristic'] },
+    supply: { label: 'Supply run', fields: ['crates', 'vessel', 'status'] },
+    keeper: { label: 'Keeper', fields: ['watch', 'previousWatch', 'note'] },
+  },
+});
 
 /** The primary tenant — the one the SPA page and most specs drive. */
 export const AUDIT_TENANT_ID = 'audit-harness';
@@ -32,11 +56,11 @@ export const AUDIT_TENANT_B_ID = 'audit-harness-b';
 
 /** The people. A real host joins its user table; this one holds the roster. */
 export const AUDIT_USERS: readonly (AuditUserIdentity & { tenantId: string })[] = [
-  { id: 'owner-1', name: 'Ana Proprietária', email: 'ana@harness.dev', tenantId: AUDIT_TENANT_ID },
-  { id: 'chef-1', name: 'Camila Barbosa', email: 'camila@harness.dev', tenantId: AUDIT_TENANT_ID },
+  { id: 'owner-1', name: 'Ada Keeper', email: 'ada@harness.dev', tenantId: AUDIT_TENANT_ID },
+  { id: 'chef-1', name: 'Cora Wick', email: 'cora@harness.dev', tenantId: AUDIT_TENANT_ID },
   // No `name`: the directory falls back to the e-mail, which is still a person.
-  { id: 'support-1', email: 'suporte@futurepay.dev', tenantId: AUDIT_TENANT_ID },
-  { id: 'owner-b', name: 'Beatriz Vizinha', email: 'beatriz@b.dev', tenantId: AUDIT_TENANT_B_ID },
+  { id: 'support-1', email: 'relief@harness.dev', tenantId: AUDIT_TENANT_ID },
+  { id: 'owner-b', name: 'Bram Neighbour', email: 'bram@b.dev', tenantId: AUDIT_TENANT_B_ID },
 ];
 
 const DIRECTORY = new Map(AUDIT_USERS.map((user) => [user.id, user]));
@@ -53,7 +77,7 @@ const tenantFor = (slug: string | undefined): string =>
 export function auditHost(pg: PGlite) {
   return auditRouter({
     db: () => Promise.resolve(auditDb(pg)),
-    vocabulary: FUTURE_PAY_AUDIT_VOCABULARY,
+    vocabulary: AUDIT_VOCABULARY,
     trackedModels: ['Product'],
     retention: { floorDays: 365 },
     directory: {
@@ -96,49 +120,49 @@ export async function reseedAudit(pg: PGlite, audit: HarnessAudit): Promise<void
   await audit.withActorContext(stampedAs('owner-1'), async () => {
     await write({
       clientId: AUDIT_TENANT_ID,
-      action: 'order.cancel',
-      resourceType: 'order',
-      resourceId: 'order-1001',
-      before: { fulfillmentStatus: 'PENDING', totalCents: 4200 },
-      after: { fulfillmentStatus: 'CANCELED' },
+      action: 'lamp.extinguish',
+      resourceType: 'lamp',
+      resourceId: 'lamp-1001',
+      before: { state: 'LIT', lumens: 4200 },
+      after: { state: 'DARK' },
     });
   });
   await audit.withActorContext(stampedAs('chef-1'), async () => {
     await write({
       clientId: AUDIT_TENANT_ID,
-      action: 'stock.loss',
-      resourceType: 'inventory_item',
-      resourceId: 'item-carne',
-      after: { quantityDelta: -3, reason: 'Quebra' },
+      action: 'keeper.assign',
+      resourceType: 'keeper',
+      resourceId: 'keeper-north',
+      after: { watch: 'MIDDLE', note: 'Storm relief' },
     });
   });
   // A SYSTEM entry: the webhook path, which names nobody.
   await write({
     clientId: AUDIT_TENANT_ID,
-    action: 'payment.capture',
-    resourceType: 'order',
-    resourceId: 'order-1002',
+    action: 'supply.deliver',
+    resourceType: 'supply',
+    resourceId: 'lamp-1002',
     actorUserId: null,
-    after: { status: 'PAID', method: 'PIX', amountCents: 990 },
+    after: { status: 'LANDED', vessel: 'TENDER', crates: 9 },
   });
-  // An IMPERSONATED entry: support acting as the owner. The pair is what the
-  // viewer must render, and what a spec asserts on.
+  // An IMPERSONATED entry: relief staff acting as the keeper. The pair is what
+  // the viewer must render, and what a spec asserts on.
   await audit.withActorContext(stampedAs('support-1', 'owner-1'), async () => {
     await write({
       clientId: AUDIT_TENANT_ID,
-      action: 'comanda.force_close',
-      resourceType: 'table_session',
-      resourceId: 'mesa-7',
-      before: { status: 'OPEN' },
-      after: { status: 'CLOSED' },
+      action: 'lamp.relight',
+      resourceType: 'lamp',
+      resourceId: 'beacon-7',
+      before: { state: 'DARK' },
+      after: { state: 'LIT' },
     });
   });
   // The neighbour's row, which must never appear in tenant A's trail.
   await write({
     clientId: AUDIT_TENANT_B_ID,
-    action: 'order.cancel',
-    resourceType: 'order',
-    resourceId: 'order-b-1',
+    action: 'lamp.extinguish',
+    resourceType: 'lamp',
+    resourceId: 'lamp-b-1',
     actorUserId: 'owner-b',
   });
   await spreadSeedInstants(pg);
@@ -148,31 +172,32 @@ export async function reseedAudit(pg: PGlite, audit: HarnessAudit): Promise<void
  * The seed order, oldest first — the sequence the writes above happen in.
  *
  * Read back newest-first, the reverse of this IS the trail, which is what
- * `audit-endpoints.test.ts` asserts. That claim held only by luck until now:
- * see {@link spreadSeedInstants}.
+ * `audit-endpoints.test.ts` asserts. That claim held only by luck until the
+ * stamping below: see {@link spreadSeedInstants}.
  */
-const SEED_ORDER = ['order-1001', 'item-carne', 'order-1002', 'mesa-7', 'order-b-1'];
+const SEED_ORDER = ['lamp-1001', 'keeper-north', 'lamp-1002', 'beacon-7', 'lamp-b-1'];
 
 /**
  * Give the seeded rows distinct instants, in seed order.
  *
  * `created_at` is `timestamp(3)` and takes the statement's own clock, so five
- * writes into an in-process PGlite routinely land in the SAME millisecond. The
- * delegate's total order is `created_at DESC, id DESC` (`audit-db.ts:145`) and
- * `id` is a random `uuid()` — so on a tie the trail comes back in an order
- * chosen by a random number, and "newest first" was asserted against whichever
- * draw the run happened to get. It passes on a slow machine, where the writes
- * straddle a millisecond, and fails on a fast one.
+ * writes into an in-process PGlite routinely land in the SAME millisecond, and
+ * `id` is a random `uuid()`. Before the package's listing carried an `id`
+ * tie-break, a tie came back in an order chosen by a random number, and "newest
+ * first" was asserted against whichever draw the run happened to get: it passed
+ * on a slow machine, where the writes straddle a millisecond, and failed on a
+ * fast one. It went red on `main`, and because `Release` needs this job, a
+ * sibling package's major never published.
  *
- * Not hypothetical: it went red on `main`, and because `Release` needs this
- * job, `@12-apps/stock-domain@2.0.0` did not publish.
- *
- * Stamping makes the ordering claim true by construction rather than by timing.
+ * The package now asks for a TOTAL order, so a tie is resolved deterministically
+ * rather than by the engine's discretion — but this fixture keeps stamping,
+ * because the claim these cases make is about SEED ORDER specifically, and
+ * `id DESC` over random uuids is deterministic without being the seed's order.
  * Each row keeps its own DAY — one case filters `?from=<today>&to=<today>` and
  * expects all four — and moves to midday, so a seed that straddles midnight
  * cannot change which day that is. Raw SQL for the same reason the `TRUNCATE`
- * above is raw: the trail is append-only at the model layer, and this is
- * fixture setup rather than something the writer should be able to do.
+ * above is raw: the trail is append-only at the model layer, and this is fixture
+ * setup rather than something the writer should be able to do.
  */
 async function spreadSeedInstants(pg: PGlite): Promise<void> {
   for (const [index, resourceId] of SEED_ORDER.entries()) {

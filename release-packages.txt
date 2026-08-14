@@ -24,6 +24,7 @@ packages/shift
 packages/payments/frontend
 packages/payments/e2e
 packages/ui
+packages/impersonation
 packages/audit
 packages/storage
 packages/entitlements
