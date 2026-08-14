@@ -5,7 +5,7 @@ import { buyerFieldsFor } from "./buyer-fields";
 import { DadosStep, EmptyCart, PaymentStep } from "./checkout-steps";
 import { ArrowBackIcon } from "./icons";
 import { PaymentStatus } from "./payment-status";
-import type { BuyerInfo, CheckoutProviderConfig, ComandaCheckout } from "./types";
+import type { BuyerInfo, CheckoutProviderConfig, SettlementCheckout } from "./types";
 import { CheckoutComponentsProvider, useCheckoutComponents, type CheckoutComponents } from "./ui";
 import { useCheckoutController, type CheckoutHostPorts } from "./use-checkout-controller";
 
@@ -17,7 +17,7 @@ const STEPPER_STEPS = [
 
 /** What the flow reads off the host's cart — display facts, never money math. */
 export interface CheckoutCartView {
-  /** Nothing to check out (cart mode only; a comanda settlement ignores it). */
+  /** Nothing to check out (cart mode only; a settlement settlement ignores it). */
   empty: boolean;
   totalLabel: string;
   totalItems: number;
@@ -30,7 +30,7 @@ export interface CheckoutCartView {
  * three-step flow — Dados → Pagamento → Confirmação — with the payment step
  * speaking the store's ACTIVE provider protocol (PagBank PIX + card, Stone
  * card, InfinitePay hosted redirect) against the host-mounted `/api/checkout*`
- * surface. Cart, catalog, comanda and order CREATION stay in the host and
+ * surface. Cart, catalog, settlement and order CREATION stay in the host and
  * arrive through {@link CheckoutHostPorts} + {@link CheckoutCartView};
  * pixels render through the slot contract (`components`, see `ui.tsx`).
  */
@@ -38,8 +38,8 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
   /** The host's cart, reduced to what the flow displays. */
   cart: CheckoutCartView;
   defaultBuyer?: BuyerInfo;
-  /** Present ⇒ this checkout settles a comanda, not the cart (FUT-comandas). */
-  comanda?: ComandaCheckout | null;
+  /** Present ⇒ this checkout settles an open balance, not the cart . */
+  settlement?: SettlementCheckout | null;
   /** The buyer has a CPF saved ⇒ open on Pagamento, skipping Dados (FUT-465). */
   taxIdOnFile?: boolean;
   /** The store's active payment protocol (FUT-697); absent while loading. */
@@ -51,7 +51,7 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
    * session's `validationURL` for an Apple merchant session, SERVER-SIDE.
    * Optional — without it the Apple Pay sheet cannot start, and the card form
    * remains the way to pay.
-   */
+ */
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
   /** Host content shown on the paid confirmation (the storefront's install invite). */
   confirmationExtra?: ReactNode;
@@ -59,11 +59,11 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
   components?: Partial<CheckoutComponents>;
 }
 
-/** The pay-bar total override when settling a comanda (else the cart's own totals). */
-function comandaTotalOverride(
-  comanda: ComandaCheckout | null | undefined,
+/** The pay-bar total override when settling a settlement (else the cart's own totals). */
+function settlementTotalOverride(
+  settlement: SettlementCheckout | null | undefined,
 ): { label: string; items: number } | undefined {
-  return comanda ? { label: comanda.totalLabel, items: comanda.totalItems } : undefined;
+  return settlement ? { label: settlement.totalLabel, items: settlement.totalItems } : undefined;
 }
 
 /**
@@ -78,13 +78,13 @@ function confirmationFacts(
   return { orderId: order?.orderId, buyerEmail: buyer.email };
 }
 
-/** The confirmation total: the created order's, else the comanda scope's, else the cart's. */
+/** The confirmation total: the created order's, else the settlement scope's, else the cart's. */
 function statusTotalLabel(
   order: { totalLabel: string } | null,
-  comanda: ComandaCheckout | null | undefined,
+  settlement: SettlementCheckout | null | undefined,
   cart: { totalLabel: string },
 ): string {
-  return order?.totalLabel ?? comanda?.totalLabel ?? cart.totalLabel;
+  return order?.totalLabel ?? settlement?.totalLabel ?? cart.totalLabel;
 }
 
 /**
@@ -125,7 +125,7 @@ function ProgressHeader({ step, completed }: { step: string; completed: Set<stri
  * card public key are loaded lazily by the card path (order-scoped REST).
  */
 function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Element {
-  const { cart, defaultBuyer, comanda, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, validateApplePayMerchant, ...ports } = props;
+  const { cart, defaultBuyer, settlement, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, validateApplePayMerchant, ...ports } = props;
   // Resolved for NO method on purpose (FUT-595): the Dados step opens before
   // the picker, and the form is filled once — so it asks for the union of what
   // any chain member may need rather than re-opening after the choice. A chain
@@ -133,14 +133,14 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
   const buyerFields = useMemo(() => buyerFieldsFor(providerConfig?.chain, null), [providerConfig]);
   const c = useCheckoutController(ports, defaultBuyer, taxIdOnFile, buyerFields);
 
-  // A comanda settlement pays already-sent kitchen items — the cart is
+  // A settlement settlement pays already-sent kitchen items — the cart is
   // legitimately empty here, so the empty-cart guard only applies to cart mode.
   //
   // The guard cannot key on the Dados step any more: skipping it (FUT-465) makes
   // Pagamento the first screen, so an empty cart would otherwise reach the
   // method picker. It holds until an order exists — once one does, its lines are
   // snapshotted server-side and the cart no longer speaks for it.
-  if (!comanda && cart.empty && !c.order && c.step !== "status") {
+  if (!settlement && cart.empty && !c.order && c.step !== "status") {
     return <EmptyCart onBack={c.goToMenu} />;
   }
 
@@ -162,7 +162,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
           cartTotals={cart}
           buyerFields={buyerFields}
           discountLines={cart.discountLines}
-          totalOverride={comandaTotalOverride(comanda)}
+          totalOverride={settlementTotalOverride(settlement)}
         />
       ) : null}
 
@@ -191,7 +191,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
       {c.step === "status" ? (
         <PaymentStatus
           status={c.finalStatus}
-          totalLabel={statusTotalLabel(c.order, comanda, cart)}
+          totalLabel={statusTotalLabel(c.order, settlement, cart)}
           {...confirmationFacts(c.order, c.buyer)}
           onRetry={c.retry}
           onRegenerate={() => { c.setStep("payment"); void c.startPayment("PIX"); }}
