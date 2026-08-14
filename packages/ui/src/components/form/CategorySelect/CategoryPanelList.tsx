@@ -33,7 +33,7 @@ interface PanelListProps {
   onActivateCategory: (group: CategoryGroup) => void;
   onActivateSubcategory: (id: string) => void;
   onClearQuery: () => void;
-  onCreateCategory?: () => void;
+  onCreateCategory?: (name?: string) => void;
   listRef: React.RefObject<HTMLDivElement | null>;
   dataTestId: string;
 }
@@ -53,7 +53,7 @@ function EmptyCatalogue({
   onCreateCategory,
   dataTestId,
 }: {
-  onCreateCategory?: () => void;
+  onCreateCategory?: (name?: string) => void;
   dataTestId: string;
 }): React.JSX.Element {
   return (
@@ -61,7 +61,7 @@ function EmptyCatalogue({
       <strong>Nenhuma categoria ainda</strong>
       <p>Categorias organizam o cardápio e os filtros da loja.</p>
       {onCreateCategory && (
-        <Button variant="contained" size="small" sx={SENTENCE_CASE} onClick={onCreateCategory}>
+        <Button variant="contained" size="small" sx={SENTENCE_CASE} onClick={() => onCreateCategory()}>
           Criar categoria
         </Button>
       )}
@@ -69,23 +69,38 @@ function EmptyCatalogue({
   );
 }
 
-/** The search found nothing — offer the way back rather than a dead end. */
+/** The search found nothing — offer creation, or the way back. */
 function NoResults({
   query,
   onClearQuery,
+  onCreateCategory,
   dataTestId,
 }: {
   query: string;
   onClearQuery: () => void;
+  onCreateCategory?: (name?: string) => void;
   dataTestId: string;
 }): React.JSX.Element {
   return (
     <Box sx={emptySx} data-testid={`${dataTestId}-no-results`}>
       <strong>Nada encontrado para “{query}”</strong>
       <p>Tente outro termo ou verifique a grafia.</p>
-      <Button variant="outlined" size="small" sx={SENTENCE_CASE} onClick={onClearQuery}>
-        Limpar busca
-      </Button>
+      <Box sx={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+        <Button variant="outlined" size="small" sx={SENTENCE_CASE} onClick={onClearQuery}>
+          Limpar busca
+        </Button>
+        {onCreateCategory && (
+          <Button
+            variant="contained"
+            size="small"
+            sx={SENTENCE_CASE}
+            data-testid={`${dataTestId}-create`}
+            onClick={() => onCreateCategory(query.trim())}
+          >
+            Criar “{query.trim()}”
+          </Button>
+        )}
+      </Box>
     </Box>
   );
 }
@@ -152,7 +167,12 @@ export function CategoryPanelList(props: PanelListProps): React.JSX.Element {
     if (loading) return <LoadingRows />;
     if (groups.length === 0 && query.trim().length > 0) {
       return (
-        <NoResults query={query} onClearQuery={props.onClearQuery} dataTestId={dataTestId} />
+        <NoResults
+          query={query}
+          onClearQuery={props.onClearQuery}
+          onCreateCategory={props.onCreateCategory}
+          dataTestId={dataTestId}
+        />
       );
     }
     if (groups.length === 0) {

@@ -64,8 +64,16 @@ export interface CategorySelectBaseProps {
    * parent or the group?" ambiguity.
    */
   allowParentSelection?: boolean;
-  /** Empty-catalogue call to action (e.g. navigate to category creation). */
-  onCreateCategory?: () => void;
+  /**
+   * Category creation, offered two ways when provided: as the empty-catalogue
+   * call to action, and as a `Criar "<termo>"` row when a search matches
+   * nothing — called with the typed text in that case.
+   *
+   * The second is what lets this replace a creatable combobox without losing
+   * create-as-you-type: an admin who searches for a category that does not
+   * exist yet is exactly the admin who wants to add it.
+   */
+  onCreateCategory?: (name?: string) => void;
   /** Base test id; the trigger is `<dataTestId>-trigger`, the panel `-panel`. */
   dataTestId?: string;
 }
