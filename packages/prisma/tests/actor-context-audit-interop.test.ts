@@ -6,7 +6,7 @@ import {
   getActorAttribution as auditGetActorAttribution,
   runWithActorScope as auditRunWithActorScope,
   setActor as auditSetActor,
-  useActorContextKey,
+  declareActorContextKey,
   type AuditWriteClient,
 } from '@12-apps/audit/server';
 
@@ -32,7 +32,7 @@ import {
  * one host's vocabulary shipping as another package's constant, which is exactly
  * what that release removed. A host (or, here, a test) that needs the two
  * modules on ONE store declares it, ONCE, before anything stamps an actor:
- * `useActorContextKey(...)` below.
+ * `declareActorContextKey(...)` below.
  *
  * What breaks if they diverge, and why nothing else would catch it: a host keeps
  * its existing `setActor(...)` call sites (imported from `@12-apps/prisma`) and
@@ -55,7 +55,7 @@ import {
 // the guard that keeps this from being a way to fork the store rather than share
 // it. `'__futurePayActorStore'` is THIS package's key; the audit package no
 // longer knows it.
-useActorContextKey('__futurePayActorStore');
+declareActorContextKey('__futurePayActorStore');
 const REAL = 'support-agent';
 const TARGET = 'shop-owner';
 
