@@ -11,6 +11,12 @@ export default defineConfig({
     // "// @vitest-environment jsdom" comment at the top of the file.
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
+    setupFiles: ['./src/__tests__/setup.ts'],
+    // Above the 15s `asyncUtilTimeout` that setup file installs, so a query
+    // that never resolves reports as Testing Library's error — naming the
+    // selector and dumping the DOM — rather than as vitest's generic 5s
+    // "Test timed out", which says nothing about what was being waited for.
+    testTimeout: 30_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
