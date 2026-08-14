@@ -67,7 +67,7 @@ export function stoneSetupGuide(ctx: SetupGuideContext): ProviderSetupGuide {
             copy: { label: 'URL de notificação', text: ctx.webhookUrl },
           },
           {
-            text: `Ao cadastrar, o painel pede um usuário e uma senha para autenticar as notificações. Defina os dois e informe exatamente os mesmos valores no formulário acima — é assim que o ${ctx.brandName} confirma que a notificação veio mesmo da Stone.`,
+            text: `Ao cadastrar, o painel pede um usuário e uma senha para autenticar as notificações. Defina os dois e informe exatamente os mesmos valores no formulário acima — é assim que ${ctx.brandName} confirma que a notificação veio mesmo da Stone.`,
           },
           {
             text: 'Assine ao menos os eventos de cobrança: charge.paid, charge.payment_failed e charge.refunded.',

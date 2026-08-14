@@ -25,10 +25,11 @@ export type { CheckoutCopy } from './copy';
  * `checkoutRefusalFor` has always been the library's answer to "a charge
  * failed — what is the buyer told, with what status, in what order", and that
  * order is itself a money-safety rule (see `failure.ts`). It was simply never
- * exported, so every adopting host wrote the pipeline again: future-pay's
- * `lib/payments/charge-failure.ts` is 352 lines re-deriving this one decision
- * for decision, and drifted from it — which is exactly the duplication the
- * payment LOC budget kept measuring without being able to fix.
+ * exported, so every adopting host wrote the pipeline again. One of them
+ * carries a 352-line `charge-failure.ts` — 162 lines of logic under 190 of
+ * comment — re-deriving this one decision for decision, and drifted from it.
+ * That is the duplication a host's payment LOC budget can measure but cannot
+ * fix on its own.
  *
  * Exporting it is what makes that host code deletable rather than merely over
  * budget.
