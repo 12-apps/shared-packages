@@ -6,11 +6,11 @@ import type { PaymentsHttpHandlers, PaymentsRequestContext } from './handlers';
 import { guarded, json } from './responses';
 
 /**
- * The card-vault HTTP surface (FUT-761, ported from the future-pay host).
+ * The card-vault HTTP surface (FUT-761, ported from the first adopting host).
  *
  * The gateway has exposed `beginVault`/`completeVault`/`forgetVault` since the
  * adapters grew standalone vaulting, but the mount never served them — so
- * every host hand-wrote the same three routes (future-pay:
+ * every host hand-wrote the same three routes (the first adopting host:
  * `/subscription/card` + `card/session`), which is exactly the "second
  * acquirer adds zero host code" promise going false.
  *

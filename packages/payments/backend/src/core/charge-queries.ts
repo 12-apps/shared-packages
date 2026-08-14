@@ -6,7 +6,7 @@ import type { StoredCharge } from './ports';
  * The reads a CHECKOUT needs, which `ChargeStore` never exposed (FUT-740).
  *
  * Every host that mounted this library re-implemented these against the
- * package-OWNED charge table — future-pay ran `prisma.paymentCharge`
+ * package-OWNED charge table — an adopting host ran `prisma.paymentCharge`
  * `count`/`findFirst`/`findMany` directly, reaching around the port into the
  * library's own storage, because the port could not answer "how many attempts
  * has this payable had" or "is there still a payable charge on it". Those are

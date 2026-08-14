@@ -233,7 +233,7 @@ function handleGuide(ctx: SetupGuideContext): ProviderSetupGuide {
           // out of the published package. Rendered here so the spec can
           // assert against the real DOM that the host's word arrives, and
           // that no other adopter's does.
-          { text: `É assim que o ${ctx.brandName} confirma que a cobrança saiu desta conta.` },
+          { text: `É assim que ${ctx.brandName} confirma que a cobrança saiu desta conta.` },
         ],
       },
       {

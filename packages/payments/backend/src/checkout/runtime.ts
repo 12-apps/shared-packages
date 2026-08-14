@@ -79,7 +79,7 @@ export interface PaymentFlowsBEConfig<Caller, View extends object, Display = unk
   mapProviderError?: (error: unknown) => CheckoutErrorBody | null;
   /**
    * See a THROWN charge failure raw, before it is worded (FUT-490) — the
-   * account-bookkeeping seam. future-pay flips the merchant's connection to
+   * account-bookkeeping seam. an adopting host flips the merchant's connection to
    * FAILED on an account-level rejection (401/403), so its settings screen
    * surfaces the outage instead of a stale VERIFIED. Fired from both money
    * paths' catch; a guard refusal (an identity mismatch) is an outcome, not an
@@ -130,7 +130,7 @@ const defaultResponder: CheckoutResponder = {
  * The fallback logger writes NOTHING. Silence is the honest default: a library
  * that reaches for `console.error` is invisible to a host whose server-side
  * error reporting hangs off its own logger, which is exactly the trap
- * future-pay documents. A host that wants these lines passes `logger`.
+ * an adopting host documents. A host that wants these lines passes `logger`.
  */
 const silentLogger: CheckoutLogger = {
   warn: () => undefined,

@@ -57,7 +57,6 @@ export {
 // ---------------------------------------------------------------------------
 export { createPaymentFlows } from './flows/create-payment-flows';
 export {
-  DEFAULT_CHECKOUT_COPY_FE,
   type CheckoutCopyFE,
 } from './flows/copy';
 export {

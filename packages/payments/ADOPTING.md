@@ -103,6 +103,12 @@ and the credential lifecycle under `settings/providers/:provider`
 (`""`/`enabled`/`verify`/`oauth/begin|complete|disconnect`). Shape the mount
 with:
 
+- `setupContextFor` — the merchant facts a walkthrough cannot know, including
+  **`brandName`: what YOUR platform is called**. Required, and not defaulted.
+  Two guides address the platform by name mid-instruction ("… é assim que
+  {brandName} confirma que a notificação veio mesmo da Stone"), and until this
+  was config those sentences carried one adopter's product name to every other
+  adopter's store owners. A default would have preserved exactly that.
 - `prefix` — mount a SUBTREE: a catch-all at `.../settings/providers/*`
   passes `['settings', 'providers']` and the table matches the remainder
   (this repo's admin mount does exactly that).
@@ -238,8 +244,12 @@ requires it when your own payable row has no column to keep one in.
   `vault/:provider/forget`.
 - `browserKey` — re-mint a PUBLIC key on demand. This is the only place a
   provider NAME belongs on the checkout path, and it belongs to you.
-- `copy` — every buyer-facing sentence. `defaultCheckoutCopyPtBR` ships the
-  strings future-pay serves today.
+- `copy` — every buyer-facing sentence, and **required**. There is deliberately
+  no default any more: a shipped one is how a host silently adopts another
+  product's voice, and nothing fails to tell it so. Both halves work this way —
+  `CheckoutCopy` on the backend mount, `CheckoutCopyFE` on
+  `createPaymentFlows`. The types enumerate every sentence, so your compiler
+  names the ones you have not written yet.
 - `respond` / `logger` / `mapProviderError` — optional; the response envelope
   defaults to the `{ data }` / `{ error, code, field }` shape
   `@12-apps/payments-frontend`'s client already parses.

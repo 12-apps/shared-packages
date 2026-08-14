@@ -4,7 +4,7 @@ import type { ProviderConfigStore, StoredProviderConfig } from './types';
 
 /**
  * Seed the PLATFORM merchant's credentials from deployment configuration
- * (FUT-761, ported from the future-pay host).
+ * (FUT-761, ported from the first adopting host).
  *
  * ## Seeding NEVER overwrites a stored credential set (FUT-409)
  *

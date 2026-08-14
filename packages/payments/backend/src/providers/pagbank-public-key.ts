@@ -1,6 +1,6 @@
 /**
  * PagBank's card-encryption public key, minted on demand (FUT-761, ported
- * from the future-pay host — FUT-174's per-store key rule).
+ * from the first adopting host — FUT-174's per-store key rule).
  *
  * The key handed to the browser SDK MUST belong to the same merchant account
  * the charge lands in: PagBank rejects a card encrypted under another

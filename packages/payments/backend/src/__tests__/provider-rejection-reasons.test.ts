@@ -80,3 +80,25 @@ describe('providerRejectionReasons', () => {
     expect(parsed[0]).toMatchObject({ code: '40002', parameterName: 'customer.email' });
   });
 });
+
+/**
+ * THE EXPORT ITSELF IS THE DELIVERABLE (FUT-760).
+ *
+ * `checkoutRefusalFor` and `providerRejectionReasons` were both already
+ * implemented and both already used INTERNALLY — what this change ships is
+ * that a host can reach them. A later tidy-up of `index.ts` or
+ * `checkout/index.ts` could drop either line and every behavioural test in
+ * this package would stay green, which is precisely the regression a barrel
+ * has no other guard against.
+ *
+ * Imported from the package ENTRY, not the module, so the assertion is about
+ * the public surface rather than about the file.
+ */
+describe('the public barrel carries what hosts were told to import', () => {
+  it('exports the refusal pipeline and the rejection reader', async () => {
+    const entry: Record<string, unknown> = await import('../index');
+    expect(typeof entry['checkoutRefusalFor']).toBe('function');
+    expect(typeof entry['chargeMismatchRefusal']).toBe('function');
+    expect(typeof entry['providerRejectionReasons']).toBe('function');
+  });
+});

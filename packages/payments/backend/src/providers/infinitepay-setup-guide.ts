@@ -122,7 +122,7 @@ function handleSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'][n
       },
       {
         tone: 'warning',
-        text: `A InfiniteTag define para **qual conta** o dinheiro vai. Uma tag errada envia os pagamentos desta loja para outra pessoa, e não há como reverter pelo ${ctx.brandName} — confira caractere por caractere.`,
+        text: `A InfiniteTag define para **qual conta** o dinheiro vai. Uma tag errada envia os pagamentos desta loja para outra pessoa, e não há como reverter por ${ctx.brandName} — confira caractere por caractere.`,
       },
       {
         // No prose: the button says what it does, and the field under it says

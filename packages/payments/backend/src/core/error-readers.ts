@@ -1,7 +1,7 @@
 import { PaymentsError, ProviderRequestError } from './errors';
 
 /**
- * Readers of the error taxonomy, ported from the future-pay host (FUT-761)
+ * Readers of the error taxonomy, ported from the first adopting host (FUT-761)
  * so no adopter re-derives them. Their own module rather than `errors.ts`
  * because that file holds the taxonomy itself and sits at its size budget —
  * and because these are consumers of the classes, not part of the contract
@@ -13,7 +13,7 @@ import { PaymentsError, ProviderRequestError } from './errors';
  * carries no captured request — i.e. it is not a provider rejection at all,
  * or came from an adapter that builds no snapshot.
  *
- * Ported from the future-pay host (FUT-489 → FUT-761): provider support asks
+ * Ported from the first adopting host (FUT-489 → FUT-761): provider support asks
  * for "the full log", and a host that keeps only the response answers by
  * reconstructing the payload from source — weaker evidence, produced slowly,
  * at the moment a live store cannot take money. The response is rendered from
@@ -112,7 +112,7 @@ export function isAccountAccessError(error: unknown): error is ProviderRequestEr
  * that is not a `PaymentsError` at all is a fault on the caller's side of the
  * seam and must never be read as a provider verdict.
  *
- * Ported from the future-pay card-vault detach policy (FUT-761). What to DO
+ * Ported from the first adopting host's card-vault detach policy (FUT-761). What to DO
  * with the answer — drop a stored pointer, keep a row, alert someone — stays
  * the host's policy; whether the refusal is final is this taxonomy's property.
  */

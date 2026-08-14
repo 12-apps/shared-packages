@@ -57,7 +57,7 @@ interface RaiseChargeRequest {
  * The payable is the base and the request is the overlay, because the two know
  * different things and neither is complete on its own. The CPF is the case that
  * proves it: `@12-apps/payments-frontend` asks for it on the card form and
- * sends it with the charge, and future-pay's `Order` row has no column to keep
+ * sends it with the charge, and an adopting host's order row may have no column to keep
  * it in — so a payable loaded back from the host's storage cannot carry it, and
  * a charge sourced from the payable alone reaches PagBank's required-field gate
  * with nothing. The buyer is then asked, at the moment they press Pay, for the

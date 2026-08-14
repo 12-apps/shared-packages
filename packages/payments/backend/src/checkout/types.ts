@@ -19,7 +19,7 @@ import type {
  *
  * The admin half of this package has been mountable for a while; the buyer's
  * half — create a checkout, charge a card, poll it, re-mint the browser key —
- * lived in whichever host wrote it, ~5,500 lines of it in future-pay alone, and
+ * lived in whichever host wrote it, ~5,500 lines of it in one adopter alone, and
  * every money rule inside it was re-derived per host. These are the types that
  * let it move: a `Payable` the library can charge without knowing what an order
  * is, and one port per fact only the host can answer.
@@ -57,7 +57,7 @@ export interface Payable {
    * `OPEN` is chargeable. Anything else is terminal and refuses a new charge.
    *
    * Three flat values on purpose, and NOT the host's own vocabulary
-   * (`AWAITING_PAYMENT | PAID | FAILED | EXPIRED` in future-pay). The library
+   * (`AWAITING_PAYMENT | PAID | FAILED | EXPIRED` in one adopter). The library
    * only ever has to know "may I raise a charge on this"; if a fourth value is
    * ever added to satisfy some host, this abstraction has leaked and the port
    * has become an order.
@@ -72,7 +72,7 @@ export interface Payable {
  * amount). Buyer IDENTITY is not: `customer` carries the fields the payment step
  * itself collected, which is the only place some of them exist. The CPF is the
  * case that forced it — `@12-apps/payments-frontend` asks for it on the card
- * form and sends it with the charge, and future-pay's `Order` row has no column
+ * form and sends it with the charge, and an adopting host's order row may have no column
  * for it, so a payable read back from the host's storage can never carry it.
  *
  * Two wire shapes produce this (see `checkout/draft.ts`), and the flat one is
@@ -185,7 +185,7 @@ export interface AttachedCharge {
  * inside their auth callback — which is how a boundary rots.
  *
  * So the request travels, PARSED. A host that ignores it keeps the old
- * behaviour; a host that reads it can refuse in its own terms (future-pay's
+ * behaviour; a host that reads it can refuse in its own terms (one adopter's
  * replaced route 404s a charge whose order is not a card order) without the
  * library having to grow a second port for every fact a route needs.
  */
@@ -243,7 +243,7 @@ export interface PayablePort<Caller, View extends object> {
  * Writing a charge back onto the payable.
  *
  * Every method is the host's because confirming a payment is a TRANSACTION only
- * the host can compose — future-pay's writes the payment row, decrements stock
+ * the host can compose — one adopter's writes the payment row, decrements stock
  * with exact COGS, rolls the payable onto the customer profile, emits the
  * buyer's notification and closes a fully-paid table session, all at once, with
  * a shortfall guard that parks a short payment for reconciliation. What the
@@ -346,7 +346,7 @@ export interface CheckoutResponder {
 
 /**
  * The host's logger. It must be the host's for two reasons that are not style:
- * a `console.error` is invisible to future-pay's server-side Sentry, and
+ * a `console.error` is invisible to an adopting host's server-side Sentry, and
  * `ProviderRequestError` retains the provider's parsed body — buyer CPF and all
  * — so WHAT gets written down is a host policy, not a library one.
  */

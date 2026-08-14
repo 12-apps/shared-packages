@@ -1,8 +1,8 @@
 import type { PaymentProviderAdapter } from './provider';
 
 /**
- * Readers of adapter-declared field ROLES (FUT-761, ported from the
- * future-pay host).
+ * Readers of adapter-declared field ROLES (FUT-761, ported from the first
+ * adopting host).
  *
  * The host kept a hand-written provider→field table
  * (`pagbank → webhookToken`, `stripe → webhookSecret`) to know where each

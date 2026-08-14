@@ -22,7 +22,6 @@ import { createCheckoutClient } from "../components/checkout/transport";
 import type { CheckoutProviderConfig, SettlementCheckout } from "../components/checkout/types";
 import { useCheckoutController } from "../components/checkout/use-checkout-controller";
 
-import { DEFAULT_CHECKOUT_COPY_FE } from "./copy";
 import { FlowsProvider, useResolvedConfig, type FlowsRuntime } from "./runtime";
 import { buyerScreens } from "./screens-buyer";
 import { hostedScreens } from "./screens-hosted";
@@ -50,7 +49,7 @@ function buildRuntime(config: PaymentFlowsConfig): FlowsRuntime {
   return {
     config,
     client,
-    copy: { ...DEFAULT_CHECKOUT_COPY_FE, ...config.copy },
+    copy: config.copy,
     navigate,
     // Both of these are HOOKS. They are called from a component body on every
     // render, so the slug follows the host's router and the availability vote

@@ -4,7 +4,7 @@ import type { ChargeSnapshot, MerchantRef } from './types';
 
 /**
  * Ask the provider about charges still waiting — the reconciliation nothing
- * else performs (FUT-761, ported from the future-pay host).
+ * else performs (FUT-761, ported from the first adopting host).
  *
  * Three things can settle a charge, and only one runs on its own: the
  * provider's webhook; a status poll driven by the BUYER'S OPEN TAB; and a
