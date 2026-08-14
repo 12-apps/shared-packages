@@ -25,7 +25,7 @@ export {
 } from './api';
 export type { DraftBannerProps } from './draft-banner';
 export type { VersionHistoryDialogProps } from './version-history-dialog';
-export { DEFAULT_ENTITY_TYPE_LABELS, type EntityTypeLabels } from './labels';
+export { type EntityTypeLabels } from './labels';
 export {
   httpLifecycleTransport,
   LifecycleHttpError,
