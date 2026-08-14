@@ -1,8 +1,7 @@
 import type { ComponentType, JSX } from 'react';
 
 import type { AuditLogFilters } from '../core/types';
-import { indexVocabulary, type AuditVocabulary } from '../core/vocabulary';
-import { FUTURE_PAY_AUDIT_VOCABULARY } from '../core/future-pay-vocabulary';
+import { assertAuditVocabulary, type AuditVocabulary } from '../core/vocabulary';
 
 import { createAuditApiClient, type AuditApiClient } from './api';
 import { createAuditLabels, type AuditLabelOverrides, type AuditLabels } from './labels';
@@ -10,35 +9,51 @@ import { httpAuditTransport, type AuditTransport } from './transport';
 import { AuditViewer } from './viewer';
 
 /**
- * The one thing this package exposes to a FRONTEND host (12-14).
+ * The one thing this package exposes to a FRONTEND host.
  *
  * Everything the audit viewer IS — the filter bar, the pills, the day bounds, the
  * table, the diff summary, the pagination, the impersonation PAIR — lives inside
- * this package. The host names where the API is mounted, and that is the whole
- * wiring:
+ * this package. The host names where the API is mounted and what its own words
+ * are:
  *
- *   const { page: AuditLog } = createWebAudit({ apiBase: '/api/admin/my-store' });
+ *   const { page: AuditLog } = createWebAudit({ apiBase, vocabulary });
  *
- * The vocabulary is shared with the backend half, so the actions the writer can
- * emit and the labels this screen renders are ONE list. In future-pay they were
- * two files in two apps, and nine actions had no label at all.
+ * The vocabulary is the SAME value the backend half is given, so the actions the
+ * writer can emit and the labels this screen renders are one list.
  */
 
 export interface AuditWebConfig {
-  /** The admin mount the routes live under, e.g. `/api/admin/minha-loja`. */
+  /** The admin mount the routes live under, e.g. `/api/admin/acme`. */
   apiBase: string;
   /**
-   * The action/resource vocabulary — the SAME value the backend half is given.
-   * Defaults to the Future Pay vocabulary (the `@12-apps/rbac` precedent for
-   * shipping a host's catalog beside generic machinery).
+   * The action/resource vocabulary — the value `defineAuditVocabulary()`
+   * returned, and the SAME value passed to `createApiAudit`.
+   *
+   * REQUIRED, and there used to be a default: this surface fell back to the
+   * extraction origin's catalog, so a host that forgot to pass its own rendered
+   * a filter bar of another product's actions, labelled in another product's
+   * language, over its own rows — and every one of its own actions fell through
+   * to a raw dotted id. Nothing failed; the screen simply described somebody
+   * else's application.
    */
-  vocabulary?: AuditVocabulary;
+  vocabulary: AuditVocabulary;
   /** How the surface reaches its data. Default: same-origin fetch. */
   transport?: AuditTransport;
-  /** pt-BR label overrides. */
+  /** Label overrides — the host's copy. See `labels.ts` for the defaults. */
   labels?: AuditLabelOverrides;
-  /** Stamp formatter. Default: pt-BR short date + short time. */
+  /**
+   * How a timestamp is written. Default: the RUNTIME's own locale, short date
+   * and short time.
+   *
+   * The default used to be one market's locale, which put that market's date
+   * order on every adopter's screen. `undefined` as the `Intl` locale means
+   * "whatever this browser is set to", which is the only neutral answer a
+   * package has; a host that wants its own passes `locale`, and one that wants
+   * full control passes `formatDate`.
+   */
   formatDate?: (iso: string) => string;
+  /** BCP-47 tag for the default stamp formatter. Default: the runtime's. */
+  locale?: string;
   /**
    * Filters pinned IN THE UI — merged over the operator's own on every request, so
    * an embedded screen always shows the slice the host framed it for (an order page
@@ -70,22 +85,31 @@ export interface WebAudit {
 interface SurfaceParts {
   api: AuditApiClient;
   labels: AuditLabels;
-  vocabulary: ReturnType<typeof indexVocabulary>;
+  vocabulary: AuditVocabulary;
   formatDate: (iso: string) => string;
   fixedFilters?: AuditLogFilters;
 }
 
-const DEFAULT_DATE_TIME = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'short',
-  timeStyle: 'short',
-});
-
 function surfaceParts(config: AuditWebConfig): SurfaceParts {
+  // Assembly refuses here exactly as it does on the server half: this is a
+  // published entry point, and a host that mounts only the viewer never calls
+  // `createApiAudit` at all.
+  const vocabulary = assertAuditVocabulary(config.vocabulary);
+  const labels = createAuditLabels(config.labels);
+  const formatter = new Intl.DateTimeFormat(config.locale, {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
   return {
-    api: createAuditApiClient(config.apiBase, config.transport ?? httpAuditTransport()),
-    labels: createAuditLabels(config.labels),
-    vocabulary: indexVocabulary(config.vocabulary ?? FUTURE_PAY_AUDIT_VOCABULARY),
-    formatDate: config.formatDate ?? ((iso) => DEFAULT_DATE_TIME.format(new Date(iso))),
+    api: createAuditApiClient(
+      config.apiBase,
+      // The transport's own fallback sentence comes from the host's labels, so
+      // there is one place the screen's words are declared.
+      config.transport ?? httpAuditTransport({ fallbackMessage: labels.requestFailed }),
+    ),
+    labels,
+    vocabulary,
+    formatDate: config.formatDate ?? ((iso) => formatter.format(new Date(iso))),
     ...(config.fixedFilters ? { fixedFilters: config.fixedFilters } : {}),
   };
 }

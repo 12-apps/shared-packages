@@ -5,19 +5,19 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { AuditLogWire } from '../core/types';
-import type { AuditVocabularyIndex } from '../core/vocabulary';
+import type { AuditVocabulary } from '../core/vocabulary';
 
 import { formatLabel, type AuditLabels } from './labels';
 
 /**
- * The audit trail's rows (12-14) — a plain table, split from the screen so both
+ * The audit trail's rows — a plain table, split from the screen so both
  * stay inside the size gate. Read-only by construction: there is no affordance
  * here, because there is no endpoint that could act on an entry.
  *
  * The ACTOR cell is the interesting one. It renders the attribution PAIR as one
- * line naming BOTH people — "Ana em nome de Bruno" — and never collapses them.
- * future-pay's viewer showed only the actor: the API had carried
- * `onBehalfOfUserId`/`onBehalfOfName` since FUT-458 and the screen dropped them
+ * line naming BOTH people — "Ada on behalf of Brendan" — and never collapses them.
+ * The viewer this was extracted from showed only the actor: its API had carried
+ * `onBehalfOfUserId`/`onBehalfOfName` for two releases and the screen dropped them
  * on the floor, so a support session was indistinguishable on screen from the
  * store owner working alone. That is the exact fact the column pair exists to
  * keep, and losing it in the last five pixels of the pipeline wastes the whole
@@ -84,7 +84,7 @@ function ActorCell({
 export interface AuditEntriesTableProps {
   entries: readonly AuditLogWire[];
   labels: AuditLabels;
-  vocabulary: AuditVocabularyIndex;
+  vocabulary: AuditVocabulary;
   /** Stamp formatter — the host's locale, defaulting to pt-BR date + time. */
   formatDate: (iso: string) => string;
 }

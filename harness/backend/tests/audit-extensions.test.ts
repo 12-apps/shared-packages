@@ -16,16 +16,13 @@ import {
   setActor,
   type AuditWriteClient,
 } from '@12-apps/audit/server';
-import { FUTURE_PAY_AUDIT_VOCABULARY, indexVocabulary } from '@12-apps/audit';
+
 
 import { applyAuditMigrations, auditDb } from '../src/audit-db';
+import { AUDIT_VOCABULARY } from '../src/audit-host';
 
 /**
- * The two published Prisma extensions, and the writer, against a REAL database
- * (12-14) — the port of the parts of future-pay's audit integration suites that
- * were about the MECHANISM rather than about its money paths:
- * `audit-log.integration.test.ts`'s append-only and roll-back cases, and the
- * `created_by`/`updated_by` stamping its repository tests relied on.
+ * The two published Prisma extensions, and the writer, against a REAL database.
  *
  * The package's own unit suite pins the extensions' semantics against a fake
  * client. What only a database can show is what this file shows: that the stamped
@@ -38,7 +35,9 @@ import { applyAuditMigrations, auditDb } from '../src/audit-db';
  * composition, `{ model, args, query }` hooks, the delegate names — and everything
  * under it is real SQL.
  */
-const index = indexVocabulary(FUTURE_PAY_AUDIT_VOCABULARY);
+// The HOST's vocabulary, from the host module — the same value the mounted
+// router is given, so these cases and the endpoints agree about what exists.
+const index = AUDIT_VOCABULARY;
 const TENANT = 'client-1';
 
 interface HookArgs {
@@ -198,10 +197,10 @@ describe('append-only, against the real table', () => {
         setActor('user-7', { role: 'OWNER', scope: TENANT });
         await audit(prisma, {
           clientId: TENANT,
-          action: 'order.cancel',
-          resourceType: 'order',
+          action: 'lamp.extinguish',
+          resourceType: 'lamp',
           resourceId: 'o1',
-          after: { fulfillmentStatus: 'CANCELED' },
+          after: { state: 'DARK' },
         });
       });
 
@@ -216,9 +215,9 @@ describe('append-only, against the real table', () => {
       expect(rows[0]).toMatchObject({
         actor_user_id: 'user-7',
         actor_role: 'OWNER',
-        action: 'order.cancel',
+        action: 'lamp.extinguish',
       });
-      expect(rows[0]?.after).toEqual({ fulfillmentStatus: 'CANCELED' });
+      expect(rows[0]?.after).toEqual({ state: 'DARK' });
 
       // …and every mutating delegate throws BEFORE the database is reached (the
       // delegates under the guard reject with "reached the database" if it is not).
@@ -247,8 +246,8 @@ describe('append-only, against the real table', () => {
       const audit = createAuditWriter(index);
       await audit(prisma, {
         clientId: TENANT,
-        action: 'order.cancel',
-        resourceType: 'order',
+        action: 'lamp.extinguish',
+        resourceType: 'lamp',
         resourceId: 'o1',
       });
 
@@ -265,7 +264,7 @@ describe('append-only, against the real table', () => {
 
 describe('the writer is transactional, not fire-and-forget', () => {
   it('propagates a failed insert so the caller transaction rolls back', async () => {
-    // future-pay proved this by renaming the table out from under the writer. Same
+    // The origin application proved this by renaming the table under the writer. Same
     // trick: the mutation and the entry are in ONE transaction, so a broken audit
     // insert must undo the mutation rather than leaving money moved with no trail.
     await withDb(async (pg) => {
@@ -281,8 +280,8 @@ describe('the writer is transactional, not fire-and-forget', () => {
             { auditLog: auditDb(tx as unknown as PGlite).auditLog },
             {
               clientId: TENANT,
-              action: 'order.cancel',
-              resourceType: 'order',
+              action: 'lamp.extinguish',
+              resourceType: 'lamp',
               resourceId: 'o1',
             },
           );
@@ -311,8 +310,8 @@ describe('the writer is transactional, not fire-and-forget', () => {
           { auditLog: auditDb(tx as unknown as PGlite).auditLog },
           {
             clientId: TENANT,
-            action: 'order.cancel',
-            resourceType: 'order',
+            action: 'lamp.extinguish',
+            resourceType: 'lamp',
             resourceId: 'o1',
           },
         );

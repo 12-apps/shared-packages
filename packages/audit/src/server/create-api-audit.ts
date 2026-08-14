@@ -1,16 +1,8 @@
 /**
- * The one thing this package exposes to a BACKEND host (12-14).
+ * The one thing this package exposes to a BACKEND host.
  *
- * What used to be stranded in future-pay: the writer, the role-audit helper, the
- * retention sweep and the listing route in `apps/web/lib/audit` + one route file
- * (612 LOC), plus three modules inside its private Prisma package — the
- * AsyncLocalStorage actor context (218), the `created_by`/`updated_by` stamping
- * extension (121, with five restaurant model names hard-coded in it) and the
- * append-only guard (75). None of that was ever future-pay's business except the
- * answers to "who is calling" and "where does the data live".
- *
- * Routes are FRAMEWORK-NEUTRAL descriptors, not a Hono/Express router — the
- * report-builder doctrine. `@12-apps/audit/hono` adapts them in forty lines.
+ * Routes are FRAMEWORK-NEUTRAL descriptors, not a Hono/Express router;
+ * `@12-apps/audit/hono` adapts them in forty lines.
  *
  * What stays the HOST's, and is passed in rather than guessed at:
  *
@@ -18,19 +10,32 @@
  *    tenant id, the user id, the caller's permission ids and, when a session is
  *    impersonating, the subject it is rendering as.
  *  - **Identity** — name/e-mail for a user id, through the directory port.
- *  - **The vocabulary** — which actions and resources exist, and which fields a
- *    diff may carry.
+ *  - **The vocabulary** — which actions and resources exist, what they are
+ *    called, and which fields a diff may carry. There is no default: a
+ *    package-supplied vocabulary is one application's, and a host that inherited
+ *    it would have every diff field its own writers emit dropped by an allowlist
+ *    written for somebody else's columns.
+ *  - **The user-facing copy, the gate permission ids and the paging numbers** —
+ *    defaults exist for all three, and all three are the package's own rather
+ *    than one market's.
  *  - **Where the data lives** — the one owned model through the db seam.
  *  - **Entitlements and quota** — billing questions, answered in `resolveActor`
  *    (or by the host's own gate) before a request reaches a descriptor; and the
  *    retention WINDOW, which is why the sweep takes a range instead of a plan.
+ *
+ * ASSEMBLY IS WHERE THIS SURFACE REFUSES. Every guard the config has runs here,
+ * at boot, before a single route exists — a vocabulary that was not built by
+ * `defineAuditVocabulary`, a blank message or gate id, a page size that bounds
+ * nothing, a retention floor that would sweep the whole trail, a model name with
+ * a trailing space. A host that starts the process has met all of them.
  */
-import { indexVocabulary, type AuditVocabularyIndex } from '../core/vocabulary';
+import { assertAuditVocabulary, type AuditVocabulary } from '../core/vocabulary';
 
-import { applyAppendOnlyGuard } from './append-only-extension';
+import { applyAppendOnlyGuard, AUDIT_LOG_MODEL } from './append-only-extension';
 import { applyAuditStamps } from './audit-extension';
 import { runWithActorScope, setActor } from './actor-context';
 import type { AuditRequest, AuditRoute, AuditServerConfig } from './config';
+import { gatesOf, messagesOf, modelNamesOf, pagingOf } from './policy';
 import { auditRoutes } from './routes';
 import { createAuditRetention, type AuditRetention } from './retention';
 import { createAuditStore, type AuditStore } from './store';
@@ -71,24 +76,38 @@ export interface ApiAudit {
   retention: AuditRetention;
   /** The read store, for a host surface that reads the same rows (an MCP tool…). */
   store: AuditStore;
-  /** The indexed vocabulary — labels and validation, shared with the wire. */
-  vocabulary: AuditVocabularyIndex;
+  /** The vocabulary in force — the guarded value the host declared. */
+  vocabulary: AuditVocabulary;
 }
 
 export function createApiAudit(config: AuditServerConfig): ApiAudit {
-  const index = indexVocabulary(config.vocabulary);
+  // Every refusal, before anything is built. `assertAuditVocabulary` first,
+  // because a vocabulary that never went through `defineAuditVocabulary` is the
+  // one failure that would otherwise be discovered by a hollow row.
+  const vocabulary = assertAuditVocabulary(config.vocabulary);
+  const messages = messagesOf(config);
+  const gates = gatesOf(config);
+  const paging = pagingOf(config);
+  const trackedModels = modelNamesOf('trackedModels', config.trackedModels);
+  const hostAppendOnly = modelNamesOf('appendOnlyModels', config.appendOnlyModels);
+
   const store = createAuditStore(config.db, config.directory);
-  const write = createAuditWriter(index);
+  const write = createAuditWriter(vocabulary);
   const retention = createAuditRetention(config.db, config.retention);
-  const trackedModels = config.trackedModels ?? [];
-  const appendOnlyModels = config.appendOnlyModels ?? ['AuditLog'];
+
+  // This package's own model is ALWAYS guarded, and a host's names ADD to it.
+  // It used to be the DEFAULT value of `appendOnlyModels`, which meant the
+  // obvious way to guard a second table — `appendOnlyModels: ['MyLedger']` —
+  // silently switched the audit log's own immutability off, and `[]` switched
+  // the guard off entirely while reading like the default written out.
+  const appendOnlyModels = [AUDIT_LOG_MODEL, ...hostAppendOnly];
 
   const auditStamps = <T,>(client: T): T => applyAuditStamps(client, { trackedModels });
   const appendOnly = <T,>(client: T): T =>
     applyAppendOnlyGuard(client, { models: appendOnlyModels });
 
   return {
-    routes: auditRoutes({ config, index, store }),
+    routes: auditRoutes({ config, vocabulary, store, messages, gates, paging }),
     write,
     extendPrismaClient: <T,>(client: T): T => appendOnly(auditStamps(client)),
     extensions: { auditStamps, appendOnly },
@@ -115,6 +134,6 @@ export function createApiAudit(config: AuditServerConfig): ApiAudit {
     },
     retention,
     store,
-    vocabulary: index,
+    vocabulary,
   };
 }

@@ -5,7 +5,7 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { AuditActorOptionWire, AuditLogFilters, AuditLogPageWire } from '../core/types';
-import type { AuditVocabularyIndex } from '../core/vocabulary';
+import type { AuditVocabulary } from '../core/vocabulary';
 
 import type { AuditApiClient } from './api';
 import { AuditEntriesTable } from './entries-table';
@@ -13,10 +13,7 @@ import { AuditFilterBar } from './filter-bar';
 import { formatLabel, type AuditLabels } from './labels';
 
 /**
- * The audit-log viewer (12-14) — ported from future-pay's
- * `apps/admin/src/pages/audit-log/index.tsx`, with the same test ids the e2e
- * spec drove (`audit-log-grid`, `audit-log-from`, `audit-log-to`) so the
- * coverage moved with the screen.
+ * The audit-log viewer.
  *
  * Server-driven, like the page it came from: every filter, the ordering and the
  * pagination run in the database. The screen holds the filter state and turns it
@@ -28,7 +25,7 @@ import { formatLabel, type AuditLabels } from './labels';
 export interface AuditViewerProps {
   api: AuditApiClient;
   labels: AuditLabels;
-  vocabulary: AuditVocabularyIndex;
+  vocabulary: AuditVocabulary;
   formatDate: (iso: string) => string;
   /** Controlled filter state, for a host that mirrors it into its URL. */
   filters?: AuditLogFilters;
@@ -93,7 +90,7 @@ function ViewerBody({
 }: {
   state: LoadState;
   labels: AuditLabels;
-  vocabulary: AuditVocabularyIndex;
+  vocabulary: AuditVocabulary;
   formatDate: (iso: string) => string;
   onRetry: () => void;
   onPage: (next: number) => void;
