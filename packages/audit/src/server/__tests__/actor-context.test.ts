@@ -5,19 +5,22 @@
    the scheduler runs the other request in the gap. */
 import { describe, expect, it } from 'vitest';
 
+import { AuditConfigError } from '../../core/errors';
 import type { ActorAttribution } from '../actor-context';
 import {
+  actorContextKey,
+  DEFAULT_ACTOR_STORE_KEY,
   getActorAttribution,
   getActorUserId,
   runWithActor,
   runWithActorScope,
   setActor,
+  useActorContextKey,
 } from '../actor-context';
 
 /**
- * The per-request actor context (12-14) — ported from future-pay's
- * `packages/prisma/src/actor-context.test.ts`, plus the two properties that
- * suite never asserted and an adversarial reader asks for first: that concurrent
+ * The per-request actor context, plus the two properties an adversarial reader
+ * asks for first: that concurrent
  * requests cannot see each other's actor, and that the impersonation pair cannot
  * be forged from outside.
  *
@@ -203,27 +206,45 @@ describe('scope isolation', () => {
     ]);
   });
 
-  it('keeps its store under the key @12-apps/prisma uses', () => {
-    // The key is a cross-package contract (see the comment on it): the copy of
-    // this module in `@12-apps/prisma` — which a host's existing `setActor` call
-    // sites import — keys to `__futurePayActorStore`, so a rename here silently
-    // forks the store and every audit row lands with no actor at all.
+  it('keeps its store under the key it was told to, and no other', () => {
+    // WHERE the store lives is a cross-package contract, and it is CONFIG: a
+    // host with an in-house actor-context module and dozens of `setActor(...)`
+    // call sites importing it needs both modules on ONE store, and declares
+    // that with `useActorContextKey`. A key this package chose for that host
+    // would be the same host vocabulary compiled in that the rest of this
+    // release removes.
     //
-    // Interop itself is proven end to end, in both directions, by
-    // `packages/prisma/tests/actor-context-audit-interop.test.ts` (the only test
-    // that imports both copies). This case is the cheap half of that pin, in the
-    // suite of the package that publishes the key.
-    const globals = globalThis as unknown as {
-      __futurePayActorStore?: { getStore(): { userId: string } | undefined };
-    };
+    // The failure it prevents is silent: a forked store means the writer reads
+    // one nothing ever stamped, so every entry lands with no actor at all, the
+    // viewer renders the system label for every human action, and the table is
+    // append-only.
+    const globals = globalThis as unknown as Record<
+      string,
+      { getStore(): { userId: string } | undefined } | undefined
+    >;
+
+    expect(actorContextKey()).toBe(DEFAULT_ACTOR_STORE_KEY);
 
     runWithActorScope(() => {
       setActor('user-7', { role: 'ADMIN' });
-      expect(globals.__futurePayActorStore?.getStore()).toEqual({
+      expect(globals[DEFAULT_ACTOR_STORE_KEY]?.getStore()).toEqual({
         userId: 'user-7',
         role: 'ADMIN',
       });
     });
+  });
+
+  it('refuses to move the key once the store exists', () => {
+    // Re-declaring the key in force is a no-op, so a module that declares it
+    // defensively at import time is safe to load twice. Moving it to a
+    // DIFFERENT key after the store was created is refused: contexts already
+    // captured against the old instance keep flowing to it while every later
+    // read goes elsewhere — the same silent fork, made intermittent.
+    expect(() => useActorContextKey(DEFAULT_ACTOR_STORE_KEY)).not.toThrow();
+    expect(() => useActorContextKey('__someHostActorStore')).toThrow(AuditConfigError);
+    expect(() => useActorContextKey('')).toThrow(AuditConfigError);
+    // …and the store did not move.
+    expect(actorContextKey()).toBe(DEFAULT_ACTOR_STORE_KEY);
   });
 
   it('reports no actor outside any scope', () => {

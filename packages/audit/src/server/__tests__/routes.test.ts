@@ -5,16 +5,18 @@
    and on locals the heuristic reads as shared. */
 import { describe, expect, it, vi } from 'vitest';
 
-import { FUTURE_PAY_AUDIT_VOCABULARY } from '../../index';
+
 import type { AuditLogPageWire } from '../../core/types';
 import type { AuditActor, AuditRequest, AuditServerConfig } from '../config';
 import { createApiAudit } from '../create-api-audit';
+import { AUDIT_LOG_ORDER_BY } from '../db';
+import { DEFAULT_MESSAGES } from '../config';
 
 import { fakeAuditDb, type FakeAuditDb } from './fake-db';
+import { TEST_VOCABULARY, UNKNOWN_ACTION } from './fixtures';
 
 /**
- * The listing surface (12-14) — the package half of future-pay's
- * `app/api/admin/[tenantSlug]/audit-logs/route.ts` and its route test.
+ * The listing surface.
  *
  * The cases an adversarial reader asks for come first: can a caller read another
  * tenant's trail, can they read it without the permission, and can any request
@@ -44,7 +46,7 @@ function harness(options: {
   const api = createApiAudit({
     db: () => Promise.resolve(fake.db),
     resolveActor: () => actor,
-    vocabulary: FUTURE_PAY_AUDIT_VOCABULARY,
+    vocabulary: TEST_VOCABULARY,
     ...(options.directory ? { directory: options.directory } : {}),
   });
   const request = (query: Record<string, string>): AuditRequest => ({
@@ -136,12 +138,14 @@ describe('tenancy', () => {
 
     const rows = await fake.db.auditLog.findMany({
       where: { clientId: undefined as unknown as string },
-      orderBy: { createdAt: 'desc' },
+      orderBy: AUDIT_LOG_ORDER_BY,
       skip: 0,
       take: 20,
     });
 
-    expect(rows.map((row) => row.resourceId)).toEqual(['mine', 'theirs']);
+    // Sorted, because WHICH TENANTS came back is the point here and the two
+    // rows share an instant: the total order breaks that tie on the random id.
+    expect(rows.map((row) => row.resourceId).sort()).toEqual(['mine', 'theirs']);
   });
 
   it('scopes the actor options to the tenant too', async () => {
@@ -162,7 +166,7 @@ describe('the gate', () => {
     for (const path of ['/audit-logs', '/audit-logs/actors'] as const) {
       const response = await h.get(path);
       expect(response.status).toBe(401);
-      expect(response.body).toEqual({ error: 'Não autenticado.' });
+      expect(response.body).toEqual({ error: DEFAULT_MESSAGES.unauthenticated });
     }
   });
 
@@ -170,7 +174,7 @@ describe('the gate', () => {
     // The actor options are the same security surface as the trail: they name who
     // works at the store.
     const h = harness({
-      actor: { tenantId: TENANT, userId: 'u-waiter', permissions: ['orders:read'] },
+      actor: { tenantId: TENANT, userId: 'u-waiter', permissions: ['charts:read'] },
     });
 
     for (const path of ['/audit-logs', '/audit-logs/actors'] as const) {
@@ -204,7 +208,7 @@ describe('the gate', () => {
     const api = createApiAudit({
       db: () => Promise.resolve(fake.db),
       resolveActor: () => ({ tenantId: TENANT, userId: 'u', permissions: ['trail.view'] }),
-      vocabulary: FUTURE_PAY_AUDIT_VOCABULARY,
+      vocabulary: TEST_VOCABULARY,
       gatePermissions: { read: 'trail.view' },
     });
     const route = api.routes.find((candidate) => candidate.path === '/audit-logs');
@@ -221,23 +225,23 @@ describe('filters', () => {
       {
         clientId: TENANT,
         actorUserId: 'u-ana',
-        action: 'payment.capture',
+        action: 'supply.deliver',
         resourceId: 'o-1',
         createdAt: new Date('2026-07-20T10:00:00Z'),
       },
       {
         clientId: TENANT,
         actorUserId: null,
-        action: 'order.cancel',
+        action: 'lamp.extinguish',
         resourceId: 'o-2',
         createdAt: new Date('2026-07-19T10:00:00Z'),
       },
       {
         clientId: TENANT,
         actorUserId: 'u-ana',
-        action: 'stock.loss',
-        resourceType: 'loss_event',
-        resourceId: 'loss-1',
+        action: 'keeper.assign',
+        resourceType: 'keeper',
+        resourceId: 'keeper-1',
         createdAt: new Date('2026-06-01T09:00:00Z'),
       },
     );
@@ -249,13 +253,13 @@ describe('filters', () => {
     const h = harness();
     seedThree(h);
 
-    expect((await ids(h, { actorUserId: 'u-ana' })).sort()).toEqual(['loss-1', 'o-1']);
-    expect(await ids(h, { action_in: 'order.cancel' })).toEqual(['o-2']);
-    expect(await ids(h, { resourceType_in: 'loss_event' })).toEqual(['loss-1']);
+    expect((await ids(h, { actorUserId: 'u-ana' })).sort()).toEqual(['keeper-1', 'o-1']);
+    expect(await ids(h, { action_in: 'lamp.extinguish' })).toEqual(['o-2']);
+    expect(await ids(h, { resourceType_in: 'keeper' })).toEqual(['keeper-1']);
     expect(await ids(h, { resourceId: 'o-1' })).toEqual(['o-1']);
     // `q` searches the resource id (contains, case-insensitive).
-    expect(await ids(h, { q: 'LOSS' })).toEqual(['loss-1']);
-    expect(await ids(h, { from: '2026-06-01', to: '2026-06-01' })).toEqual(['loss-1']);
+    expect(await ids(h, { q: 'KEEPER' })).toEqual(['keeper-1']);
+    expect(await ids(h, { from: '2026-06-01', to: '2026-06-01' })).toEqual(['keeper-1']);
   });
 
   it('treats `to` as an INCLUSIVE day, whatever time the entry was written', async () => {
@@ -328,22 +332,22 @@ describe('filters', () => {
     const h = harness();
 
     expect((await h.get('/audit-logs', { from: '20-07-2026' })).status).toBe(400);
-    expect((await h.get('/audit-logs', { action_in: 'order.vanish' })).status).toBe(400);
+    expect((await h.get('/audit-logs', { action_in: UNKNOWN_ACTION })).status).toBe(400);
     expect((await h.get('/audit-logs', { resourceType_in: 'invoice' })).status).toBe(400);
     // The message names the offending field so a caller can fix it.
     expect((await h.get('/audit-logs', { from: 'nope' })).body).toEqual({
-      error: 'Filtros inválidos (from).',
+      error: `${DEFAULT_MESSAGES.invalidQuery} (from).`,
     });
   });
 
   it('lets an exact resourceId win over the keyword — both target one column', async () => {
     const h = harness();
     h.fake.seed(
-      { clientId: TENANT, resourceId: 'order-1' },
-      { clientId: TENANT, resourceId: 'order-12' },
+      { clientId: TENANT, resourceId: 'lamp-1' },
+      { clientId: TENANT, resourceId: 'lamp-12' },
     );
 
-    expect(await ids(h, { resourceId: 'order-1', q: 'order' })).toEqual(['order-1']);
+    expect(await ids(h, { resourceId: 'lamp-1', q: 'order' })).toEqual(['lamp-1']);
   });
 });
 

@@ -9,13 +9,14 @@ import { createHarnessBackend, type HarnessBackend } from '../src/app';
 import type { AuditLogPageWire } from '@12-apps/audit';
 
 /**
- * The audit surface as a CONSUMER gets it (12-14): the published Hono router,
- * mounted by the harness host, answering over PGlite with rows the package's own
- * writer produced.
+ * The audit surface as a CONSUMER gets it: the published Hono router, mounted by
+ * the harness host against the HOST'S OWN vocabulary, answering over PGlite with
+ * rows the package's own writer produced.
  *
- * This is the port of future-pay's `tests/integration/audit-log.integration.test.ts`
- * viewer half and its route test — the parts that were about the SURFACE rather
- * than about future-pay's own money paths.
+ * That vocabulary is a lighthouse authority's, in a domain the package was not
+ * extracted from — which is the point of the harness after 2.0. The package
+ * ships no actions, no resources and no labels, so a consumer proof written in
+ * the package's own catalog would be proving nothing at all.
  */
 let backend: HarnessBackend;
 
@@ -50,10 +51,10 @@ describe('the trail, over a real Postgres', () => {
     expect(page.pagination.total).toBe(4);
     // The fixture writes in order, so newest-first is the reverse of the seed.
     expect(page.data.map((entry) => entry.resourceId)).toEqual([
-      'mesa-7',
-      'order-1002',
-      'item-carne',
-      'order-1001',
+      'beacon-7',
+      'lamp-1002',
+      'keeper-north',
+      'lamp-1001',
     ]);
   });
 
@@ -64,30 +65,30 @@ describe('the trail, over a real Postgres', () => {
     const theirs = await backend.app.request('/api/admin/tenant-b/audit-logs');
     const theirPage = (await theirs.json()) as AuditLogPageWire;
 
-    expect(mine.page.data.map((entry) => entry.resourceId)).not.toContain('order-b-1');
-    expect(theirPage.data.map((entry) => entry.resourceId)).toEqual(['order-b-1']);
+    expect(mine.page.data.map((entry) => entry.resourceId)).not.toContain('lamp-b-1');
+    expect(theirPage.data.map((entry) => entry.resourceId)).toEqual(['lamp-b-1']);
   });
 
   it('carries the redacted diff the writer produced, and nothing else', async () => {
-    const { page } = await list('?resourceId=order-1001');
+    const { page } = await list('?resourceId=lamp-1001');
 
     expect(page.data).toHaveLength(1);
     expect(page.data[0]).toMatchObject({
-      action: 'order.cancel',
-      resourceType: 'order',
-      before: { fulfillmentStatus: 'PENDING', totalCents: 4200 },
-      after: { fulfillmentStatus: 'CANCELED' },
+      action: 'lamp.extinguish',
+      resourceType: 'lamp',
+      before: { state: 'LIT', lumens: 4200 },
+      after: { state: 'DARK' },
     });
   });
 
   it('names the actor through the host directory, e-mail as the fallback', async () => {
-    const { page } = await list('?resourceId=item-carne');
+    const { page } = await list('?resourceId=keeper-north');
 
-    expect(page.data[0]).toMatchObject({ actorUserId: 'chef-1', actorName: 'Camila Barbosa' });
+    expect(page.data[0]).toMatchObject({ actorUserId: 'chef-1', actorName: 'Cora Wick' });
   });
 
   it('renders a system write as an entry with no actor at all', async () => {
-    const { page } = await list('?resourceId=order-1002');
+    const { page } = await list('?resourceId=lamp-1002');
 
     expect(page.data[0]).toMatchObject({
       actorUserId: null,
@@ -102,14 +103,14 @@ describe('the trail, over a real Postgres', () => {
     // stamped the pair from the host's session stand-in, the writer resolved the
     // real human, the row kept both, and the listing resolved both names in one
     // directory call.
-    const { page } = await list('?resourceId=mesa-7');
+    const { page } = await list('?resourceId=beacon-7');
 
     expect(page.data[0]).toMatchObject({
       actorUserId: 'support-1',
-      actorName: 'suporte@futurepay.dev',
+      actorName: 'relief@harness.dev',
       actorRole: 'SUPERADMIN',
       onBehalfOfUserId: 'owner-1',
-      onBehalfOfName: 'Ana Proprietária',
+      onBehalfOfName: 'Ada Keeper',
     });
   });
 });
@@ -119,15 +120,15 @@ describe('the filters, over a real Postgres', () => {
     (await list(query)).page.data.map((entry) => entry.resourceId);
 
   it('filters by action, resource type, actor and exact resource id', async () => {
-    expect(await ids('?action_in=order.cancel')).toEqual(['order-1001']);
-    expect(await ids('?resourceType_in=inventory_item')).toEqual(['item-carne']);
-    expect(await ids('?actorUserId=support-1')).toEqual(['mesa-7']);
-    expect(await ids('?resourceId=order-1002')).toEqual(['order-1002']);
+    expect(await ids('?action_in=keeper.assign')).toEqual(['keeper-north']);
+    expect(await ids('?resourceType_in=supply')).toEqual(['lamp-1002']);
+    expect(await ids('?actorUserId=support-1')).toEqual(['beacon-7']);
+    expect(await ids('?resourceId=lamp-1002')).toEqual(['lamp-1002']);
   });
 
   it('searches the resource id case-insensitively', async () => {
     // ILIKE at the database, not a filter in JavaScript over a full page.
-    expect(await ids('?q=ORDER-100')).toEqual(['order-1002', 'order-1001']);
+    expect(await ids('?q=LAMP-100')).toEqual(['lamp-1002', 'lamp-1001']);
   });
 
   it('filters by an inclusive day range', async () => {
@@ -147,15 +148,75 @@ describe('the filters, over a real Postgres', () => {
   });
 
   it('rejects an unknown filter value and a malformed date with 400', async () => {
-    expect((await list('?action_in=order.vanish')).status).toBe(400);
+    // `lamp.vanish` is not in the HOST's vocabulary, and the enum the endpoint
+    // validates against is built from that vocabulary — so the value the writer
+    // would refuse is the value the filter refuses.
+    expect((await list('?action_in=lamp.vanish')).status).toBe(400);
     expect((await list('?from=31-12-2026')).status).toBe(400);
   });
 
   it('ignores a tenant a caller tries to name in the query string', async () => {
     const { page } = await list('?clientId=audit-harness-b&tenantId=audit-harness-b');
 
-    expect(page.data.map((entry) => entry.resourceId)).not.toContain('order-b-1');
+    expect(page.data.map((entry) => entry.resourceId)).not.toContain('lamp-b-1');
     expect(page.pagination.total).toBe(4);
+  });
+});
+
+describe('paging a burst written into ONE millisecond', () => {
+  /**
+   * The defect the total order closes, proven against a REAL Postgres.
+   *
+   * `created_at` is `timestamp(3)` and an audit trail is written in bursts — one
+   * request that relights a lamp, logs its supply run and reassigns its keeper
+   * writes three entries inside one transaction. Postgres guarantees NO order
+   * among rows a sort cannot distinguish, and each page is a separate statement,
+   * so `ORDER BY created_at DESC` alone lets page 1 and page 2 disagree about
+   * the same tied group: the reader sees one entry twice and never sees another.
+   *
+   * The package's listing now asks for `created_at DESC, id DESC`, and the seam
+   * in `src/audit-db.ts` builds its ORDER BY FROM that argument rather than from
+   * its own initiative — which it used to, quietly making this harness stronger
+   * than the Prisma host it stands in for.
+   */
+  const SAME_INSTANT = '2026-05-05 12:00:00.000';
+  const BURST_SIZE = 10;
+
+  async function seedBurst(): Promise<void> {
+    // A straight INSERT through the harness's own PGlite handle: the point is a
+    // GUARANTEED tie, and a writer takes the statement's own clock.
+    for (let index = 0; index < BURST_SIZE; index += 1) {
+      await backend.pg.query(
+        `INSERT INTO audit_logs (id, client_id, action, resource_type, resource_id, created_at)
+         VALUES ($1, 'audit-harness', 'lamp.relight', 'lamp', $2, $3::timestamp)`,
+        [crypto.randomUUID(), `burst-${String(index).padStart(2, '0')}`, SAME_INSTANT],
+      );
+    }
+  }
+
+  it('shows every tied row exactly once across consecutive pages', async () => {
+    await seedBurst();
+
+    const pages = [];
+    for (const page of [1, 2, 3]) {
+      pages.push(await list(`?q=burst-&pageSize=4&page=${page}`));
+    }
+    const seen = pages.flatMap(({ page }) => page.data.map((entry) => entry.resourceId));
+
+    expect(seen).toHaveLength(BURST_SIZE);
+    expect(new Set(seen).size).toBe(BURST_SIZE);
+    expect(pages[0]?.page.pagination.total).toBe(BURST_SIZE);
+  });
+
+  it('answers the same page identically when it is asked twice', async () => {
+    await seedBurst();
+
+    const first = await list('?q=burst-&pageSize=4&page=2');
+    const again = await list('?q=burst-&pageSize=4&page=2');
+
+    expect(again.page.data.map((entry) => entry.id)).toEqual(
+      first.page.data.map((entry) => entry.id),
+    );
   });
 });
 
@@ -166,7 +227,7 @@ describe('the gate, over a real Postgres', () => {
   });
 
   it('answers 403 without the read permission, on both routes', async () => {
-    const denied = { [HEADERS.perms]: 'orders:read' };
+    const denied = { [HEADERS.perms]: 'charts:read' };
     expect((await list('', denied)).status).toBe(403);
     const actors = await backend.app.request('/api/admin/tenant-a/audit-logs/actors', {
       headers: denied,
@@ -187,7 +248,7 @@ describe('the actor options', () => {
     ]);
     // The e-mail stands in for a missing name — a person either way.
     expect(body.data.find((option) => option.id === 'support-1')?.label).toBe(
-      'suporte@futurepay.dev',
+      'relief@harness.dev',
     );
 
     const neighbour = await backend.app.request('/api/admin/tenant-b/audit-logs/actors');

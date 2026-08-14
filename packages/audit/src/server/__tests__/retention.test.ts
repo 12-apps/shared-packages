@@ -5,6 +5,7 @@
    captured timestamp. */
 import { describe, expect, it } from 'vitest';
 
+import { AuditConfigError } from '../../core/errors';
 import { createAuditRetention } from '../retention';
 
 import { fakeAuditDb } from './fake-db';
@@ -53,16 +54,36 @@ describe('the global floor', () => {
     expect(fake.raw[0]?.sql).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 
-  it('REFUSES a negative window instead of deleting everything', async () => {
+  it('REFUSES a window that bounds nothing instead of deleting everything', async () => {
     // A negative window puts the cutoff in the FUTURE, so the predicate matches
-    // every row including the ones written seconds ago. On an append-only table
-    // there is nothing to undo it with.
+    // every row including the ones written seconds ago. `0` is the same deletion
+    // with a friendlier face: it reads as "no retention" and means "keep
+    // nothing". `NaN` is what `Number(process.env.X)` yields for an unset
+    // variable. On an append-only table there is nothing to undo any of it with.
     const fake = fakeAuditDb();
     const retention = createAuditRetention(() => Promise.resolve(fake.db));
+    const refusal = /must be a positive, finite number of days/;
 
-    await expect(retention.purgeExpired(-1)).rejects.toThrow(/Invalid retention window/);
-    await expect(retention.purgeExpired(Number.NaN)).rejects.toThrow(/Invalid retention window/);
+    await expect(retention.purgeExpired(-1)).rejects.toThrow(refusal);
+    await expect(retention.purgeExpired(0)).rejects.toThrow(refusal);
+    await expect(retention.purgeExpired(Number.NaN)).rejects.toThrow(refusal);
+    await expect(retention.purgeExpired(Number.POSITIVE_INFINITY)).rejects.toThrow(refusal);
     expect(fake.raw).toEqual([]);
+  });
+
+  it('REFUSES the same window at CONSTRUCTION, where a host declares it', () => {
+    // The other end of the same funnel, and the one a host actually meets: the
+    // floor is config, so a bad one is found at boot rather than by the first
+    // sweep destroying the trail months later. `AuditConfigError`, because this
+    // is a wiring bug and not a caller's bad request.
+    const db = () => Promise.resolve(fakeAuditDb().db);
+
+    expect(() => createAuditRetention(db, { floorDays: 0 })).toThrow(AuditConfigError);
+    expect(() => createAuditRetention(db, { floorDays: -30 })).toThrow(AuditConfigError);
+    expect(() => createAuditRetention(db, { floorDays: Number.NaN })).toThrow(AuditConfigError);
+    expect(() => createAuditRetention(db, { floorDays: Number.POSITIVE_INFINITY })).toThrow(
+      /retention\.floorDays/,
+    );
   });
 
   it('honours a host floor', async () => {
@@ -129,7 +150,7 @@ describe('the table name', () => {
       createAuditRetention(() => Promise.resolve(fakeAuditDb().db), {
         table: 'audit_logs"; DROP TABLE clients; --',
       }),
-    ).toThrow(/Invalid audit table name/);
+    ).toThrow(/not a bare SQL identifier/);
   });
 
   it('accepts a plain host table name', async () => {

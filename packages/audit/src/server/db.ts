@@ -1,6 +1,6 @@
 /**
- * The database seam (12-14) — the exact, narrow slice of a Prisma-shaped client
- * this surface uses on the ONE model the package owns (`prisma/audit.prisma`).
+ * The database seam — the exact, narrow slice of a Prisma-shaped client this
+ * surface uses on the ONE model the package owns (`prisma/audit.prisma`).
  * Structural on purpose, never generated: a real host passes its Prisma client;
  * the harness passes hand-written SQL over PGlite, and neither the writer nor
  * the routes can tell.
@@ -59,11 +59,44 @@ export interface AuditLogWhere {
   createdAt?: { gte?: Date; lt?: Date };
 }
 
+/**
+ * The listing's TOTAL order: newest first, ties broken by id.
+ *
+ * The tie-break is not a nicety, it is what makes `skip`/`take` pagination
+ * correct at all. `created_at` is `timestamp(3)` and takes the statement's own
+ * clock, so entries written in a burst — which is exactly how an audit trail is
+ * written — routinely share a millisecond. SQL guarantees NO order among rows a
+ * sort cannot distinguish, and the two halves of a page are two separate
+ * statements: with `created_at DESC` alone, page 1 and page 2 can order the
+ * same tied rows differently, so an operator paging through the trail sees one
+ * entry twice and never sees another. On a security log that is a row that
+ * silently does not exist for whoever was reading.
+ *
+ * `id` is the tie-break because it is the primary key: unique, non-null, and
+ * present on every row, so the order is TOTAL. It is a random `uuid()` rather
+ * than a sequence, so it says nothing about arrival order — and it does not
+ * need to. What a tie-break has to be is stable across statements, not
+ * meaningful.
+ *
+ * Frozen, exported, and passed by the store rather than restated: a seam
+ * implementation maps THIS array into its own ORDER BY, so the package and its
+ * host cannot come to disagree about the sort. The shape stays CLOSED — a
+ * two-element tuple with fixed keys — so a hand-written implementation has a
+ * finite thing to translate rather than "all of Prisma's orderBy".
+ */
+export type AuditLogOrderBy = readonly [{ createdAt: 'desc' }, { id: 'desc' }];
+
+/** The one order this package ever asks for. See {@link AuditLogOrderBy}. */
+export const AUDIT_LOG_ORDER_BY: AuditLogOrderBy = Object.freeze([
+  Object.freeze({ createdAt: 'desc' as const }),
+  Object.freeze({ id: 'desc' as const }),
+]) as AuditLogOrderBy;
+
 export interface AuditLogDelegate {
   create(args: { data: AuditLogCreateData }): Promise<unknown>;
   findMany(args: {
     where: AuditLogWhere;
-    orderBy: { createdAt: 'desc' };
+    orderBy: AuditLogOrderBy;
     skip: number;
     take: number;
   }): Promise<AuditLogRecord[]>;

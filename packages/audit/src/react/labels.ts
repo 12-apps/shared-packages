@@ -1,13 +1,21 @@
 /**
- * The viewer's user-facing copy (12-14).
+ * The viewer's user-facing copy.
  *
- * pt-BR by default because that is the product copy this surface came with; a
- * host in another language passes overrides. ACTION and RESOURCE labels are NOT
- * here — they belong to the vocabulary, so the list of actions and the list of
- * their names cannot drift (in future-pay they were separate files and did:
- * nine actions the writer could emit had no label at all and rendered their raw
- * dotted id).
+ * ENGLISH by default, and that default is a FALLBACK rather than a
+ * recommendation. A screen has to render some language, and the only defensible
+ * default for a package is its own documented one — this surface used to
+ * default to the extraction origin's market language, so an adopter that never
+ * passed `labels` shipped somebody else's locale to its users with nothing to
+ * notice it by. Pass your product's copy.
+ *
+ * ACTION and RESOURCE labels are NOT here — they belong to the vocabulary, so
+ * the list of actions and the list of their names cannot drift. They were
+ * separate files in separate apps before this package existed, and did: nine
+ * actions the writer could emit had no label at all and rendered a raw dotted
+ * id to an operator.
  */
+import { AuditConfigError } from '../core/errors';
+
 export interface AuditLabels {
   title: string;
   /** The one-paragraph explanation above the list. */
@@ -37,6 +45,12 @@ export interface AuditLabels {
   loading: string;
   empty: string;
   errorTitle: string;
+  /**
+   * What a failed read reports when the server sent no message of its own — the
+   * default transport's fallback. Distinct from {@link errorTitle}: that heads
+   * the error panel, this is the sentence under it.
+   */
+  requestFailed: string;
   retry: string;
   clearFilters: string;
   previousPage: string;
@@ -47,42 +61,57 @@ export interface AuditLabels {
 }
 
 export const DEFAULT_LABELS: AuditLabels = {
-  title: 'Auditoria',
+  title: 'Audit trail',
   about:
-    'Toda ação registrada aqui é permanente: fica gravado quem fez, o que mudou e quando. ' +
-    'Os registros não podem ser editados nem apagados.',
-  columnDate: 'Data',
-  columnActor: 'Ator',
-  columnAction: 'Ação',
-  columnResource: 'Recurso',
-  columnResourceId: 'Identificador',
-  columnChange: 'Alteração',
-  filterAction: 'Ação',
-  filterResource: 'Recurso',
-  filterActor: 'Ator',
-  filterFrom: 'De',
-  filterTo: 'Até',
-  searchPlaceholder: 'Buscar por identificador',
-  systemActor: 'Sistema',
-  onBehalfOf: '{actor} em nome de {subject}',
-  unknownActor: 'Usuário removido',
-  loading: 'Carregando…',
-  empty: 'Nenhum evento registrado para os filtros escolhidos.',
-  errorTitle: 'Não foi possível carregar a auditoria',
-  retry: 'Tentar novamente',
-  clearFilters: 'Limpar filtros',
-  previousPage: 'Anterior',
-  nextPage: 'Próxima',
-  pageStatus: 'Página {page} de {pageCount} · {total} registros',
-  actorAny: 'Todos',
+    'Everything recorded here is permanent: who did it, what changed and when. ' +
+    'Entries cannot be edited or deleted.',
+  columnDate: 'Date',
+  columnActor: 'Actor',
+  columnAction: 'Action',
+  columnResource: 'Resource',
+  columnResourceId: 'Identifier',
+  columnChange: 'Change',
+  filterAction: 'Action',
+  filterResource: 'Resource',
+  filterActor: 'Actor',
+  filterFrom: 'From',
+  filterTo: 'To',
+  searchPlaceholder: 'Search by identifier',
+  systemActor: 'System',
+  onBehalfOf: '{actor} on behalf of {subject}',
+  unknownActor: 'Deleted user',
+  loading: 'Loading…',
+  empty: 'No entries recorded for the chosen filters.',
+  errorTitle: 'Could not load the audit trail',
+  requestFailed: 'Could not load the audit trail.',
+  retry: 'Try again',
+  clearFilters: 'Clear filters',
+  previousPage: 'Previous',
+  nextPage: 'Next',
+  pageStatus: 'Page {page} of {pageCount} · {total} entries',
+  actorAny: 'All',
 };
 
 export type AuditLabelOverrides = Partial<AuditLabels>;
 
-export const createAuditLabels = (overrides?: AuditLabelOverrides): AuditLabels => ({
-  ...DEFAULT_LABELS,
-  ...overrides,
-});
+/**
+ * The labels in force, refusing a blank override.
+ *
+ * A blank one renders an empty cell, an empty button or an empty heading — a
+ * screen that reads as broken rather than as untranslated, and the likely cause
+ * is a host threading its copy through a lookup that missed a key. Refused at
+ * assembly rather than at render, so it is a failure to build the surface and
+ * not a blank box an operator reports weeks later.
+ */
+export const createAuditLabels = (overrides?: AuditLabelOverrides): AuditLabels => {
+  const merged = { ...DEFAULT_LABELS, ...overrides };
+  for (const [key, value] of Object.entries(merged)) {
+    if (typeof value !== 'string' || value.trim() === '') {
+      throw new AuditConfigError(`labels.${key}`, 'must be a non-blank string.');
+    }
+  }
+  return merged;
+};
 
 /** Fill `{name}` placeholders in a label. */
 export function formatLabel(template: string, values: Record<string, string>): string {

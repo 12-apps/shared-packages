@@ -1,5 +1,5 @@
 /**
- * Prisma client extension that auto-stamps change attribution (12-14).
+ * Prisma client extension that auto-stamps change attribution.
  *
  * For the TRACKED models it fills `createdBy` on create and `updatedBy` on
  * create/update from the current actor context, so repositories and actions never
@@ -7,9 +7,12 @@
  * unauthenticated) is left untouched — the columns stay NULL. Only fields the
  * caller did not already set are filled, so an explicit override always wins.
  *
- * The model set is CONFIG. In future-pay it was a `TRACKED_MODELS` constant
- * inside this file — five restaurant model names hard-coded in otherwise generic
- * machinery, which is exactly the thing that made the file unportable.
+ * The model set is CONFIG. It used to be a `TRACKED_MODELS` constant inside this
+ * file — one application's model names hard-coded in otherwise generic
+ * machinery, which is exactly the thing that made the file unportable. An empty
+ * set is honest here and is NOT refused: naming no model means stamping no
+ * model, nothing else depends on it, and a host that wants only the trail
+ * should not have to invent a model name to get it.
  *
  * ## What this does NOT cover
  *
@@ -36,8 +39,7 @@ import { getActorUserId } from './actor-context';
  * `PrismaClient` would make `@prisma/client` a dependency of a package that
  * never generates one, and Prisma's own `$extends` signature is generic enough
  * that a hand-written constraint rejects the real client. The generic parameter
- * is returned unchanged, so a host's call site keeps its fully-typed client (the
- * same `as unknown as` shape future-pay used).
+ * is returned unchanged, so a host's call site keeps its fully-typed client.
  */
 interface Extendable {
   $extends(extension: unknown): unknown;
@@ -58,10 +60,10 @@ export interface AuditStampConfig {
   /** Column names, when a host spells them differently. */
   columns?: { createdBy?: string; updatedBy?: string };
   /**
-   * Extra per-write derivation on a tracked model's payload — the seam
-   * future-pay needs for the `search_name` column it keeps in sync on the same
-   * writes. Runs for EVERY tracked write, including system/seed writes with no
-   * actor, so a derived column never drifts. Mutate `data` in place.
+   * Extra per-write derivation on a tracked model's payload — the seam for a
+   * column a host must keep in sync on the same writes (a normalized search
+   * key, say). Runs for EVERY tracked write, including system and seed writes
+   * with no actor, so such a column never drifts. Mutate `data` in place.
    */
   deriveFields?: (model: string, data: MutableData) => void;
 }

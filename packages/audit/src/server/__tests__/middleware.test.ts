@@ -5,12 +5,12 @@
    runs the other request in the gap. */
 import { describe, expect, it } from 'vitest';
 
-import { FUTURE_PAY_AUDIT_VOCABULARY } from '../../index';
 import { getActorAttribution, getActorUserId } from '../actor-context';
 import type { AuditActor, AuditRequest } from '../config';
 import { createApiAudit } from '../create-api-audit';
 
 import { fakeAuditDb } from './fake-db';
+import { TEST_VOCABULARY } from './fixtures';
 
 /**
  * The actor-context middleware (12-14) — what a host mounts around every request
@@ -25,7 +25,7 @@ function surface(resolveActor: (request: AuditRequest) => AuditActor | null) {
   return createApiAudit({
     db: () => Promise.resolve(fake.db),
     resolveActor,
-    vocabulary: FUTURE_PAY_AUDIT_VOCABULARY,
+    vocabulary: TEST_VOCABULARY,
   });
 }
 
@@ -150,7 +150,7 @@ describe('extendPrismaClient', () => {
     const api = createApiAudit({
       db: () => Promise.resolve(fake.db),
       resolveActor: () => null,
-      vocabulary: FUTURE_PAY_AUDIT_VOCABULARY,
+      vocabulary: TEST_VOCABULARY,
       trackedModels: ['MenuItem'],
     });
 

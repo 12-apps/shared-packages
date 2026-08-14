@@ -1,5 +1,5 @@
 /**
- * `@12-apps/audit/server` — the backend half (12-14).
+ * `@12-apps/audit/server` — the backend half.
  *
  * One factory: {@link createApiAudit}. Everything else exported here is either a
  * type a host needs to satisfy the config, or a piece a host composes on its own
@@ -12,11 +12,14 @@
 export { createApiAudit, type ApiAudit } from './create-api-audit';
 
 export {
+  actorContextKey,
+  DEFAULT_ACTOR_STORE_KEY,
   getActorAttribution,
   getActorUserId,
   runWithActor,
   runWithActorScope,
   setActor,
+  useActorContextKey,
   type ActorAttribution,
   type ActorAttributionSnapshot,
   type ActorContext,
@@ -25,6 +28,7 @@ export {
 export {
   AppendOnlyViolationError,
   applyAppendOnlyGuard,
+  AUDIT_LOG_MODEL,
   type AppendOnlyConfig,
 } from './append-only-extension';
 export { applyAuditStamps, type AuditStampConfig } from './audit-extension';
@@ -33,13 +37,15 @@ export {
   AuditApiError,
   DEFAULT_GATE_PERMISSIONS,
   DEFAULT_MESSAGES,
-  gatesOf,
-  messagesOf,
+  DEFAULT_PAGINATION,
+  DEFAULT_RETENTION_FLOOR_DAYS,
   requirePermission,
   type AuditActor,
   type AuditDirectory,
   type AuditGatePermissions,
   type AuditMessages,
+  type AuditPagingPolicy,
+  type AuditPaginationConfig,
   type AuditRequest,
   type AuditResponse,
   type AuditRetentionConfig,
@@ -49,11 +55,18 @@ export {
   type ResolveAuditActor,
 } from './config';
 
+/** This package's own permission id, re-exported so `/server` is self-sufficient. */
+export { AUDIT_READ_PERMISSION } from '../core/permissions';
+
+export { gatesOf, messagesOf, modelNamesOf, pagingOf } from './policy';
+
+export { AUDIT_LOG_ORDER_BY } from './db';
 export type {
   AuditDb,
   AuditDbProvider,
   AuditLogCreateData,
   AuditLogDelegate,
+  AuditLogOrderBy,
   AuditLogRecord,
   AuditLogWhere,
   AuditWriteClient,

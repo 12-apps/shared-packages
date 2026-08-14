@@ -1,5 +1,5 @@
 /**
- * `@12-apps/audit/react` — the frontend half (12-14).
+ * `@12-apps/audit/react` — the frontend half.
  *
  * One factory: {@link createWebAudit}. The pieces below are exported for a host
  * that composes its own screen (a trail embedded in an order's detail page, say,
@@ -18,6 +18,7 @@ export {
   AuditRequestError,
   httpAuditTransport,
   type AuditTransport,
+  type AuditTransportOptions,
 } from './transport';
 export { AuditViewer, type AuditViewerProps } from './viewer';
 export { AuditEntriesTable, formatDiff, type AuditEntriesTableProps } from './entries-table';
