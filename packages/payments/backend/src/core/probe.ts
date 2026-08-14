@@ -37,4 +37,40 @@ export interface ProbeOutcome {
   message?: string;
   /** Absent when `ok` — there is nothing to classify about a pass. */
   fault?: ProbeFault;
+  /**
+   * Per-credential findings, when the adapter can produce them (FUT-796).
+   *
+   * One boolean is the wrong shape for a connection built from several
+   * credentials that fail in different ways. Stripe's probe was a bare
+   * `GET /v1/balance`: it authenticated the SECRET KEY and nothing else, so a
+   * green "Testar conexão" said nothing about the publishable key the browser
+   * tokenizes with or the signing secret that authenticates deliveries — both
+   * of which fail later, in front of a buyer, looking like something else.
+   *
+   * Optional, so an adapter that has one thing to check keeps answering with
+   * `ok` alone and every existing screen is unaffected.
+   */
+  checks?: readonly ProbeCheck[];
+}
+
+/**
+ * One credential's own verdict inside a probe.
+ *
+ * `UNCHECKED` is the load-bearing state and the reason this is not a boolean.
+ * Some credentials cannot be verified at all — no Stripe endpoint will tell you
+ * whether a webhook signing secret is the right one; you find out when a
+ * delivery fails to verify. Reporting that as a PASS is a claim nothing
+ * established, and as a FAIL it accuses a value that is probably fine. Saying
+ * "not checked, and here is why" is the only honest answer, and it is also the
+ * useful one: it tells the owner which parts of a green result they may rely on.
+ */
+export interface ProbeCheck {
+  /**
+   * The `credentialSchema` key this is about, so a screen can point at the
+   * field the owner has to fix rather than at the form.
+   */
+  key: string;
+  status: 'PASS' | 'FAIL' | 'UNCHECKED';
+  /** The adapter's words: what was established, or why it could not be. */
+  message: string;
 }
