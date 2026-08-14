@@ -31,18 +31,21 @@ const HOST_BRAND = 'Plataforma Harness';
 const ADOPTER_NAMES = /future[\s_-]?pay|paladira/i;
 
 test.beforeEach(async ({ page }) => {
+  // `guide-brand` seeds Stone CONNECTED. A guide renders the section of the
+  // stage it opens on, and Stone's brand sentence lives in the webhook
+  // section — on a fresh row that text is not in the DOM at all, so a spec
+  // pointed at the default case would fail for a reason that has nothing to
+  // do with what it is asserting.
   await page.goto('#/payments-provider-settings');
   await expect(page.getByTestId('harness-page')).toHaveAttribute(
     'data-page',
     'payments-provider-settings',
   );
+  await page.getByTestId('harness-case-guide-brand').click();
+  await expect(page.getByTestId('harness-case-body')).toHaveAttribute('data-case', 'guide-brand');
   await expect(page.getByTestId('payments-provider-settings')).toBeVisible();
 });
 
-/**
- * Stone is the guide whose brand sentence is unconditional — it sits in the
- * webhook section every render produces, so opening the panel is enough.
- */
 test('a guide that names the platform names THIS host', async ({ page }) => {
   await page.getByTestId('payments-provider-card-stone').click();
 

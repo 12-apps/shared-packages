@@ -51,9 +51,11 @@ const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string 
   'screen-unknown': { slug: 'payments-checkout-provider-screens', caseId: 'screen-unknown' },
   // The setup walkthrough (FUT-760/761) — the PUBLISHED vendor catalog, so the
   // guide under assertion is a real shipped one rather than a harness
-  // invention. `open` walks onto Stone's panel below: its brand sentence is
-  // the unconditional one, in the webhook section every render produces.
-  'setup-guide': { slug: 'payments-provider-settings', caseId: 'guides' },
+  // invention. `open` walks onto Stone's panel below. The case seeds Stone
+  // CONNECTED on purpose: the sentence that addresses the platform by name is
+  // in the webhook section, and a guide renders the section of the stage it
+  // opens on, so a fresh row would leave that text out of the DOM entirely.
+  'setup-guide': { slug: 'payments-provider-settings', caseId: 'guide-brand' },
 };
 
 /**

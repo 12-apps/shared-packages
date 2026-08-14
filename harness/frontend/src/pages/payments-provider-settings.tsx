@@ -83,7 +83,7 @@ function probeWrite(world: AdminWorld): ReactNode {
 }
 
 /**
- * Three cases, one mount shape. They exist so each spec lands on its own
+ * Four cases, one mount shape. They exist so each spec lands on its own
  * world (distinct baseUrl = distinct localStorage ack scope and wire log):
  * `catalog` pins the four cards and read-only-ness, `slug-alias` lands
  * controlled on the raw `infinitepay` name and watches the canonical
@@ -93,6 +93,14 @@ function probeWrite(world: AdminWorld): ReactNode {
  * opens on is computed from the store's progress, and only a non-fresh
  * fixture can prove the stepper moves past step 1 (FUT-691). The row is
  * seeded straight into the store; the mount stays read-only.
+ *
+ * `guide-brand` is the fourth, and it is a separate case rather than a flag on
+ * `guides` because it needs STONE connected: the sentence that addresses the
+ * platform by name lives in Stone's webhook section, and a guide renders the
+ * section of the stage it opens on — a fresh row opens on "gerar chaves" and
+ * the sentence is simply not in the DOM. Seeding it into `guides` instead
+ * would have changed the fixture two other specs assert against, to make a
+ * third one's text appear.
  */
 const CASES: readonly HarnessCase[] = [
   adminCase('catalog', 'Published catalog', catalogSpec('catalog'), {
@@ -107,6 +115,12 @@ const CASES: readonly HarnessCase[] = [
     controlled: true,
     controls: probeWrite,
   }),
+  adminCase(
+    'guide-brand',
+    'Guide names the host',
+    { ...catalogSpec('guide-brand'), stages: { stone: 'connected' } },
+    { controlled: true, controls: probeWrite },
+  ),
 ];
 
 export function PaymentsProviderSettingsPage(): JSX.Element {
