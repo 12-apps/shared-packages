@@ -430,6 +430,31 @@ describe('stripe webhook signature verification', () => {
     ).resolves.toBe(false);
   });
 
+  /**
+   * The same guard, on a store that pasted its own keys (FUT-796).
+   *
+   * One concept, two field names: OAuth stores it as `stripeUserId`, the
+   * credential form as `connectedAccountId`. The guard read only the first, so
+   * a pasted-key store skipped the account check even when its owner had filled
+   * the `acct_` field in — the fact was on record and nothing consulted it.
+   */
+  it("given a pasted-key store's connectedAccountId, when another account's delivery arrives, then it is refused", async () => {
+    const otherAccount = JSON.stringify({ id: 'evt_1', account: 'acct_A', type: 'other' });
+    const pastedKeys = {
+      environment: 'SANDBOX' as const,
+      fields: { webhookSecret: secret, connectedAccountId: 'acct_B' },
+    };
+    await expect(
+      stripeProvider().webhook.verify(stripeSigned(otherAccount, '1700000000', secret), pastedKeys),
+    ).resolves.toBe(false);
+
+    // Its own account still arrives home.
+    const own = JSON.stringify({ id: 'evt_1', account: 'acct_B', type: 'other' });
+    await expect(
+      stripeProvider().webhook.verify(stripeSigned(own, '1700000000', secret), pastedKeys),
+    ).resolves.toBe(true);
+  });
+
   it('given a delivery naming no account, when the credentials carry a stripeUserId, then it still verifies', async () => {
     // Fail open on MISSING metadata (platform-account events carry no
     // `account`), closed only on contradiction.

@@ -89,10 +89,17 @@ interface StripeDeliveryIdentity {
  * signed body itself names the account (`account`, on Connect events) and the
  * environment (`livemode`), so refuse a contradiction with the credentials.
  *
- * Fail OPEN on missing metadata (not every event carries `account`; a
- * pasted-key store has no `stripeUserId`), CLOSED on contradiction. A body
- * that does not parse carries no metadata to contradict — `parse` owns
- * answering the malformed case.
+ * Fail OPEN on missing metadata (not every event carries `account`, and a
+ * store charging on its own key need not name its account at all), CLOSED on
+ * contradiction. A body that does not parse carries no metadata to contradict
+ * — `parse` owns answering the malformed case.
+ *
+ * The account is read under BOTH spellings, because one concept is stored
+ * under two names: the OAuth exchange writes `stripeUserId`
+ * (`tokensToFields`), while the credential form writes `connectedAccountId`,
+ * the schema's own key. Reading only the OAuth one skipped this check on every
+ * pasted-key store — including those that HAD filled the `acct_` field in, so
+ * the owner supplied the fact and the guard ignored it (FUT-796).
  */
 function boundToCredentials(delivery: WebhookDelivery, credentials: ResolvedCredentials): boolean {
   let body: StripeDeliveryIdentity;
@@ -101,7 +108,7 @@ function boundToCredentials(delivery: WebhookDelivery, credentials: ResolvedCred
   } catch {
     return true;
   }
-  const accountId = credentials.fields['stripeUserId'];
+  const accountId = credentials.fields['stripeUserId'] || credentials.fields['connectedAccountId'];
   if (typeof body.account === 'string' && accountId && body.account !== accountId) {
     return false;
   }
