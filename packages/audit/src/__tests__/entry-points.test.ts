@@ -22,7 +22,10 @@ import { describe, expect, it } from 'vitest';
 
 import { AuditConfigError } from '../core/errors';
 import { defineAuditVocabulary, type AuditVocabulary } from '../core/vocabulary';
+import * as rootEntry from '../index';
+import * as honoEntry from '../hono/index';
 import { auditRouter } from '../hono/index';
+import * as serverEntry from '../server/index';
 import { createWebAudit } from '../react/create-web-audit';
 import { applyAppendOnlyGuard } from '../server/append-only-extension';
 import type { AuditDb, AuditServerConfig } from '../server/index';
@@ -86,6 +89,34 @@ const unbuilt = (): AuditVocabulary =>
   }) as unknown as AuditVocabulary;
 
 describe('the published entry points', () => {
+  /**
+   * A `use`-prefixed export on a NON-React entry is a lint bomb in the adopter's
+   * repo, not a naming quibble.
+   *
+   * `react-hooks/rules-of-hooks` decides what a hook is from the identifier
+   * alone. It cannot know that `./server` is `node:async_hooks` code that will
+   * never see a render, and it does not look: a `use…()` call at module scope is
+   * reported as a hook called outside a component. Wiring code runs at module
+   * scope by definition, and this package ships a `./react` entry — so its
+   * adopters lint with that rule on, over the same tree that holds their server
+   * wiring. The first adopter of `declareActorContextKey` paid for this with a
+   * red `--max-warnings 0` lane on a call that was entirely correct, and the
+   * only fixes available to them were suppressing a rule or renaming ours.
+   *
+   * So the constraint belongs here, where a rename is still cheap. `./react`
+   * is deliberately exempt: a hook there SHOULD be `use`-prefixed.
+   */
+  it('never `use`-prefix a name outside `./react`', () => {
+    const hookish = (entry: Record<string, unknown>): string[] =>
+      Object.keys(entry)
+        .filter((name) => /^use[A-Z]/.test(name))
+        .sort();
+
+    expect(hookish(rootEntry)).toEqual([]);
+    expect(hookish(serverEntry)).toEqual([]);
+    expect(hookish(honoEntry)).toEqual([]);
+  });
+
   it('are exactly these four, plus the manifest', () => {
     // Pinned, so adding a subpath is a deliberate act that lands in this diff
     // together with whatever guard the new surface needs.
