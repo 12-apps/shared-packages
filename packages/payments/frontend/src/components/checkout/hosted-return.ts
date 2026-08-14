@@ -18,7 +18,31 @@ import type { CheckoutOrder } from "./types";
  * unrelated session.
  */
 
-const KEY = "futurepay.checkout.hostedOrder";
+/**
+ * Where the parked order lives, namespaced to this PACKAGE.
+ *
+ * It used to carry one adopter's brand as its namespace, written into every
+ * adopter's browser. A storage key is not a private detail: it is observable
+ * surface, asserted on by `@12-apps/payments-e2e` and visible in devtools to
+ * anyone running the host. The sibling handover in this same folder already got
+ * this right with a `payments:` prefix; this one did not.
+ *
+ * Exported so a host or a spec names it rather than retyping it.
+ */
+export const HOSTED_ORDER_STORAGE_KEY = "payments.checkout.hostedOrder";
+
+/**
+ * The key before the rename, READ ONLY.
+ *
+ * A buyer who left for the provider's page on the old bundle comes back to the
+ * new one with their order parked under the old name. Without this they land on
+ * the plain return screen — the order still settles, because the webhook does
+ * that and never depended on any of this, but the confirmation they were
+ * promised is missing for a reason they could not possibly understand.
+ *
+ * Delete once no session can still be mid-redirect across that deploy.
+ */
+const LEGACY_KEY = "futurepay.checkout.hostedOrder";
 
 /**
  * What a hosted provider appends to the return URL. InfinitePay sends the
@@ -46,7 +70,7 @@ function isReturnTrip(): boolean {
 /** Park the raised order before handing the buyer to the provider's page. */
 export function rememberHostedOrder(order: CheckoutOrder): void {
   try {
-    window.sessionStorage?.setItem(KEY, JSON.stringify(order));
+    window.sessionStorage?.setItem(HOSTED_ORDER_STORAGE_KEY, JSON.stringify(order));
   } catch {
     // Storage disabled or full. The redirect must still happen: the webhook
     // settles the order either way, and refusing to send the buyer to pay
@@ -66,8 +90,15 @@ export function takeHostedOrder(): CheckoutOrder | null {
   if (!isReturnTrip()) return null;
   let raw: string | null = null;
   try {
-    raw = window.sessionStorage?.getItem(KEY) ?? null;
-    window.sessionStorage?.removeItem(KEY);
+    // Current key first, then the pre-rename one. Both are cleared either way:
+    // this is read-and-clear, and leaving the legacy entry behind would let a
+    // later return trip resume an order that was already consumed.
+    raw =
+      window.sessionStorage?.getItem(HOSTED_ORDER_STORAGE_KEY) ??
+      window.sessionStorage?.getItem(LEGACY_KEY) ??
+      null;
+    window.sessionStorage?.removeItem(HOSTED_ORDER_STORAGE_KEY);
+    window.sessionStorage?.removeItem(LEGACY_KEY);
   } catch {
     return null;
   }
