@@ -15,17 +15,18 @@ import type { WebEntitlementsConfig } from '../web-config';
 
 function payload(): TenantPlanPayload {
   return {
-    planKey: 'free',
+    planKey: 'hobby',
     name: 'Gratuito',
     priceCents: 0,
-    price: 'Grátis',
+    price: '0.00 cr',
     features: [],
     comparison: [
       {
-        key: 'pro',
-        name: 'Pro',
+        key: 'network',
+        name: 'Network',
         priceCents: 9900,
-        price: 'R$ 99,00',
+        price: '99.00 cr',
+        priceNote: '/ciclo',
         pitch: '',
         headline: '',
         headlineUnit: '',
@@ -63,7 +64,7 @@ function mountHost(over: Partial<WebEntitlementsConfig> = {}, host = fakeHost())
     fetchImpl: host.fetchImpl,
     canRequestPlanChange: true,
     plansPath: '/acme/planos',
-    switchLocation: () => ({ path: '/acme/tables', label: 'Configuração › Mesas' }),
+    switchLocation: () => ({ path: '/acme/alertas', label: 'Ajustes › Alertas' }),
     ...over,
   });
   render(<UpsellHost />);
@@ -79,24 +80,24 @@ describe('the upsell prompt host', () => {
   it('pitches the COMMERCIAL plan name and files the lead on the CTA', async () => {
     const host = mountHost();
     act(() => {
-      raiseUpsell({ feature: 'audit', requiredPlan: 'pro', reason: 'not-entitled' });
+      raiseUpsell({ feature: 'forecast.history', requiredPlan: 'network', reason: 'not-entitled' });
     });
     expect(screen.getByTestId('upsell-modal')).toBeDefined();
     // Resolved from the comparison — never the raw key.
     await waitFor(() =>
-      expect(screen.getByTestId('upsell-plan-name').textContent).toContain('Pro'),
+      expect(screen.getByTestId('upsell-plan-name').textContent).toContain('Network'),
     );
     expect(screen.getByTestId('upsell-planos-link').getAttribute('href')).toBe('/acme/planos');
 
     fireEvent.click(screen.getByTestId('upsell-cta'));
     await waitFor(() => expect(screen.getByTestId('upsell-request-sent')).toBeDefined());
-    expect(host.posts).toEqual([{ requestedPlan: 'pro', feature: 'audit' }]);
+    expect(host.posts).toEqual([{ requestedPlan: 'network', feature: 'forecast.history' }]);
   });
 
-  it('tells a non-admin to ask whoever runs the store — never a 403 button', async () => {
+  it('tells a caller without the permission to ask an admin — never a 403 button', async () => {
     mountHost({ canRequestPlanChange: false });
     act(() => {
-      raiseUpsell({ feature: 'audit', requiredPlan: 'pro', reason: 'not-entitled' });
+      raiseUpsell({ feature: 'forecast.history', requiredPlan: 'network', reason: 'not-entitled' });
     });
     await waitFor(() => expect(screen.getByTestId('upsell-ask-admin')).toBeDefined());
     await waitFor(() => expect(screen.queryByTestId('upsell-cta')).toBeNull());
@@ -106,8 +107,8 @@ describe('the upsell prompt host', () => {
     mountHost();
     act(() => {
       raiseUpsell({
-        feature: 'team.seats',
-        requiredPlan: 'pro',
+        feature: 'crew.seats',
+        requiredPlan: 'network',
         reason: 'quota-exceeded',
         quota: { used: 3, limit: 3 },
       });
@@ -118,10 +119,10 @@ describe('the upsell prompt host', () => {
   it("points the tenant's own switch at its screen and never mentions money", async () => {
     mountHost();
     act(() => {
-      raiseUpsell({ feature: 'storefront.tables', requiredPlan: null, reason: 'disabled-by-tenant' });
+      raiseUpsell({ feature: 'alerts.digest', requiredPlan: null, reason: 'disabled-by-tenant' });
     });
     const link = await screen.findByTestId('upsell-config-link');
-    expect(link.textContent).toContain('Configuração › Mesas');
+    expect(link.textContent).toContain('Ajustes › Alertas');
     await waitFor(() => expect(screen.queryByTestId('upsell-cta')).toBeNull());
     await waitFor(() => expect(screen.queryByTestId('upsell-planos-link')).toBeNull());
   });
@@ -129,7 +130,7 @@ describe('the upsell prompt host', () => {
   it('offers no plan pitch when no tier would fix it', async () => {
     mountHost();
     act(() => {
-      raiseUpsell({ feature: 'audit', requiredPlan: null, reason: 'not-entitled' });
+      raiseUpsell({ feature: 'forecast.history', requiredPlan: null, reason: 'not-entitled' });
     });
     await screen.findByTestId('upsell-modal');
     await waitFor(() => expect(screen.queryByTestId('upsell-plan-name')).toBeNull());

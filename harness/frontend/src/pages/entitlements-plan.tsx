@@ -15,10 +15,9 @@ import type { EntitlementSnapshot } from '@12-apps/entitlements/react';
  * rendered below the heading — the pricing cards, the status rows, the page
  * lock, the upgrade prompt — is the package's.
  *
- * The gated section mirrors future-pay's `withEntitlement` pages: the seeded
- * tenant is on the free tier, so the audit area renders the package's
- * full-page lock, and its "Saiba mais" funnels into the same upsell prompt a
- * 402 would.
+ * The gated section is a `withEntitlement` page: the seeded tenant is on the
+ * cheapest tier, so the jury area renders the package's full-page lock, and
+ * its "Saiba mais" funnels into the same upsell prompt a 402 would.
  */
 const API_BASE = '/api/admin/harness';
 
@@ -27,18 +26,18 @@ const { page: PlanPage, UpsellHost, withEntitlement } = createWebEntitlements({
   canRequestPlanChange: true,
   // The host's own route map: where each tenant switch actually lives.
   switchLocation: (feature) =>
-    feature === 'storefront.tables'
-      ? { path: '#/entitlements-plan', label: 'Configuração › Mesas' }
+    feature === 'submissions.notes'
+      ? { path: '#/entitlements-plan', label: 'Ajustes › Curadoria' }
       : null,
   plansPath: '#/entitlements-plan',
 });
 
 /** A host page that exists only behind the plan gate. */
-function AuditArea(): JSX.Element {
-  return <div data-testid="audit-area">Registro de atividades da loja</div>;
+function JuryArea(): JSX.Element {
+  return <div data-testid="jury-area">Sala de júri da mostra</div>;
 }
 
-const GatedAuditArea = withEntitlement('audit', AuditArea);
+const GatedJuryArea = withEntitlement('jury.deliberation', JuryArea);
 
 export function EntitlementsPlanPage(): JSX.Element {
   const [snapshot, setSnapshot] = useState<EntitlementSnapshot | null>(null);
@@ -73,9 +72,9 @@ export function EntitlementsPlanPage(): JSX.Element {
   return (
     <EntitlementsProvider snapshot={snapshot}>
       <section data-testid="entitlements-plan-page">
-        {/* The gate, on a page the free tier does not include: the package's
-            in-shell lock, whose button raises the upgrade prompt. */}
-        <GatedAuditArea />
+        {/* The gate, on a page the cheapest tier does not include: the
+            package's in-shell lock, whose button raises the upgrade prompt. */}
+        <GatedJuryArea />
 
         {/* The plan screen itself. */}
         <PlanPage />

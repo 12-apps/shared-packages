@@ -16,49 +16,49 @@ interface FakeDb {
 describe('createUsageRegistry', () => {
   it('counts through the caller-supplied db (a transaction client) when given one', async () => {
     const registry = createUsageRegistry<FakeDb>({
-      counters: { 'stock.locations': (db) => Promise.resolve(db.rows) },
+      counters: { 'stations.online': (db) => Promise.resolve(db.rows) },
       getDb: () => ({ rows: 3 }),
     });
-    await expect(registry.count('t1', 'stock.locations')).resolves.toBe(3);
-    await expect(registry.count('t1', 'stock.locations', { rows: 9 })).resolves.toBe(9);
+    await expect(registry.count('t1', 'stations.online')).resolves.toBe(3);
+    await expect(registry.count('t1', 'stations.online', { rows: 9 })).resolves.toBe(9);
   });
 
   it('THROWS for a quota feature with no counter — never a silent zero', async () => {
     const registry = createUsageRegistry<FakeDb>({ counters: {}, getDb: () => ({ rows: 0 }) });
-    await expect(registry.count('t1', 'team.seats')).rejects.toThrow(/no usage counter/);
+    await expect(registry.count('t1', 'crew.seats')).rejects.toThrow(/no usage counter/);
   });
 
   it('answers zero for a retention quota — days, not a count of rows', async () => {
     const counter = vi.fn();
     const registry = createUsageRegistry<FakeDb>({
-      counters: { 'audit.retention_days': counter },
-      retentionFeatures: ['audit.retention_days', 'lifecycle.recycle_bin_days'],
+      counters: { 'readings.retention_days': counter },
+      retentionFeatures: ['readings.retention_days', 'archive.bin_days'],
       getDb: () => ({ rows: 0 }),
     });
-    await expect(registry.count('t1', 'lifecycle.recycle_bin_days')).resolves.toBe(0);
+    await expect(registry.count('t1', 'archive.bin_days')).resolves.toBe(0);
     // Registered AND retention: retention wins, the counter is never asked.
-    await expect(registry.count('t1', 'audit.retention_days')).resolves.toBe(0);
+    await expect(registry.count('t1', 'readings.retention_days')).resolves.toBe(0);
     expect(counter).not.toHaveBeenCalled();
   });
 
   it('refuses to build an engine over a catalog it cannot count', () => {
     const registry = createUsageRegistry<FakeDb>({
-      counters: { 'stock.locations': (db) => Promise.resolve(db.rows) },
-      retentionFeatures: ['audit.retention_days'],
+      counters: { 'stations.online': (db) => Promise.resolve(db.rows) },
+      retentionFeatures: ['readings.retention_days'],
       getDb: () => ({ rows: 0 }),
     });
     expect(() =>
-      registry.assertRegistered(['stock.locations', 'audit.retention_days']),
+      registry.assertRegistered(['stations.online', 'readings.retention_days']),
     ).not.toThrow();
-    expect(() => registry.assertRegistered(['team.seats'])).toThrow(/team\.seats/);
+    expect(() => registry.assertRegistered(['crew.seats'])).toThrow(/crew\.seats/);
   });
 
   it('exposes the engine port over the same counters', async () => {
     const registry = createUsageRegistry<FakeDb>({
-      counters: { 'stock.locations': (db) => Promise.resolve(db.rows) },
+      counters: { 'stations.online': (db) => Promise.resolve(db.rows) },
       getDb: () => ({ rows: 5 }),
     });
-    await expect(registry.port.count('t1', 'stock.locations')).resolves.toBe(5);
+    await expect(registry.port.count('t1', 'stations.online')).resolves.toBe(5);
   });
 });
 

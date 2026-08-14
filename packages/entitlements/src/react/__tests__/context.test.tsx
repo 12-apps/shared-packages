@@ -16,31 +16,31 @@ import {
   useUpsell,
 } from '../context';
 
-type F = 'audit' | 'mcp' | 'seats';
+type F = 'forecast.history' | 'alerts.webhook' | 'crew.seats';
 
 const SNAPSHOT: EntitlementSnapshot<F> = {
   tenantId: 't1',
   status: 'active',
   planKey: 'plus',
   features: {
-    mcp: {
-      feature: 'mcp',
+    'alerts.webhook': {
+      feature: 'alerts.webhook',
       enabled: true,
       reason: 'enabled',
       policy: 'disable',
       limit: null,
       requiredPlan: null,
     },
-    audit: {
-      feature: 'audit',
+    'forecast.history': {
+      feature: 'forecast.history',
       enabled: false,
       reason: 'not-entitled',
       policy: 'hide',
       limit: null,
-      requiredPlan: 'pro',
+      requiredPlan: 'network',
     },
-    seats: {
-      feature: 'seats',
+    'crew.seats': {
+      feature: 'crew.seats',
       enabled: true,
       reason: 'enabled',
       policy: 'readonly',
@@ -63,13 +63,13 @@ function wrap(ui: React.ReactNode, onUpsell?: (r: { feature: F }) => void) {
 
 describe('<Entitled>', () => {
   it('renders children when entitled', () => {
-    wrap(<Entitled feature="mcp">yes</Entitled>);
+    wrap(<Entitled feature="alerts.webhook">yes</Entitled>);
     expect(screen.getByText('yes')).toBeDefined();
   });
 
   it('renders the fallback when not', () => {
     wrap(
-      <Entitled feature="audit" fallback={<span>locked</span>}>
+      <Entitled feature="forecast.history" fallback={<span>locked</span>}>
         yes
       </Entitled>,
     );
@@ -80,16 +80,16 @@ describe('<Entitled>', () => {
 describe('<Locked>', () => {
   it('renders an upsell for a plan denial and reports the target plan', () => {
     wrap(
-      <Locked feature="audit">
+      <Locked feature="forecast.history">
         {({ requiredPlan }) => <span>upgrade to {requiredPlan}</span>}
       </Locked>,
     );
-    expect(screen.getByText(/upgrade to pro/)).toBeDefined();
+    expect(screen.getByText(/upgrade to network/)).toBeDefined();
   });
 
   it('renders nothing when the feature is usable', () => {
     const { container } = wrap(
-      <Locked feature="mcp">{() => <span>upsell</span>}</Locked>,
+      <Locked feature="alerts.webhook">{() => <span>upsell</span>}</Locked>,
     );
     expect(container.textContent).toBe('');
   });
@@ -99,12 +99,12 @@ describe('<Locked>', () => {
       ...SNAPSHOT,
       features: {
         ...SNAPSHOT.features,
-        mcp: { ...SNAPSHOT.features.mcp, enabled: false, reason: 'disabled-by-tenant' },
+        'alerts.webhook': { ...SNAPSHOT.features['alerts.webhook'], enabled: false, reason: 'disabled-by-tenant' },
       },
     };
     const { container } = render(
       <EntitlementsProvider<F> snapshot={snapshot}>
-        <Locked feature="mcp">{() => <span>upsell</span>}</Locked>
+        <Locked feature="alerts.webhook">{() => <span>upsell</span>}</Locked>
       </EntitlementsProvider>,
     );
     expect(container.textContent).toBe('');
@@ -113,7 +113,7 @@ describe('<Locked>', () => {
   it('hands the host an upsell callback rather than owning the modal', () => {
     const onUpsell = vi.fn();
     wrap(
-      <Locked feature="audit">
+      <Locked feature="forecast.history">
         {({ upsell }) => (
           <button type="button" onClick={upsell}>
             unlock
@@ -128,7 +128,7 @@ describe('<Locked>', () => {
     // guaranteed settled on the next line, with no polling window.
     fireEvent.click(screen.getByText('unlock'));
     expect(onUpsell).toHaveBeenCalledWith(
-      expect.objectContaining({ feature: 'audit', requiredPlan: 'pro' }),
+      expect.objectContaining({ feature: 'forecast.history', requiredPlan: 'network' }),
     );
   });
 });
@@ -145,12 +145,12 @@ describe('hooks', () => {
   }
 
   it('computes quota remaining from caller-supplied usage', () => {
-    wrap(<Probe feature="seats" used={3} />);
+    wrap(<Probe feature="crew.seats" used={3} />);
     expect(screen.getByText('true|2|false')).toBeDefined();
   });
 
   it('reports an exceeded quota', () => {
-    wrap(<Probe feature="seats" used={5} />);
+    wrap(<Probe feature="crew.seats" used={5} />);
     expect(screen.getByText('true|0|true')).toBeDefined();
   });
 
@@ -165,7 +165,7 @@ describe('hooks', () => {
 
   it('throws a useful error outside a provider', () => {
     function Bare() {
-      useEntitlement('mcp');
+      useEntitlement('alerts.webhook');
       return null;
     }
     expect(() => render(<Bare />)).toThrow(/within an <EntitlementsProvider>/);
@@ -175,7 +175,7 @@ describe('hooks', () => {
     function Trigger() {
       const upsell = useUpsell<F>();
       return (
-        <button type="button" onClick={() => upsell('audit')}>
+        <button type="button" onClick={() => upsell('forecast.history')}>
           go
         </button>
       );

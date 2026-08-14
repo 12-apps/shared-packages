@@ -28,9 +28,9 @@ import type {
  *
  * @example
  * const PLANS = definePlans(FEATURES, {
- *   basic: { entitlements: { 'stock.locations': 1 } },
- *   plus:  { extends: 'basic', entitlements: { mcp: true } },
- *   pro:   { extends: 'plus',  entitlements: { audit: true, 'stock.locations': 'unlimited' } },
+ *   solo:  { entitlements: { 'seats.included': 1 } },
+ *   team:  { extends: 'solo', entitlements: { 'webhooks.outbound': true } },
+ *   scale: { extends: 'team', entitlements: { 'exports.bulk': true, 'seats.included': 'unlimited' } },
  * } as const);
  */
 /**

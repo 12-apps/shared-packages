@@ -135,13 +135,26 @@ function wrappedKeyOf(moduleSource, exportName) {
   return pattern.exec(moduleSource)?.[1] ?? null;
 }
 
-/** Feature keys declared in the app catalog (the CODE layer). */
+/**
+ * Feature keys declared in the app catalog (the CODE layer).
+ *
+ * Fails rather than returning an empty set. Zero parsed keys is not "this app
+ * gates nothing" — it is a `featuresFile` this parser could not read, and it
+ * turns check 2 from "every wrapped key is declared" into "every wrapped key
+ * is a failure", burying the real findings under one per gated page.
+ */
 function declaredFeatures() {
   const source = read(at(config.featuresFile));
   const body = source.slice(source.indexOf("defineFeatures("));
   const keys = new Set();
   for (const match of body.matchAll(/^ {2}(?:"([\w.]+)"|([A-Za-z_]\w*)):\s*\{/gm)) {
     keys.add(match[1] ?? match[2]);
+  }
+  if (keys.size === 0) {
+    fail(
+      `parsed no feature keys out of ${config.featuresFile} — every wrapped page would ` +
+        `then report an undeclared key. Check the file names a defineFeatures({...}) call.`,
+    );
   }
   return keys;
 }
@@ -171,10 +184,24 @@ function declaredConfigRoutes(prefix) {
   return paths;
 }
 
-/** Every destination the tenant-switch location map can send a store to. */
+/**
+ * Every destination the tenant-switch location map can send a tenant to.
+ *
+ * Anti-vacuity, like `routedExports` and `declaredConfigRoutes`: naming a
+ * `tenantSwitchFile` is a claim that this app HAS tenant switches, so parsing
+ * zero destinations out of it means the parser missed them — and check 5 would
+ * pass over every stale entry in the file.
+ */
 function tenantSwitchPaths() {
   const source = read(at(config.tenantSwitchFile));
-  return [...source.matchAll(/path: "([\w/-]+)"/g)].map((match) => match[1]);
+  const paths = [...source.matchAll(/path: "([\w/-]+)"/g)].map((match) => match[1]);
+  if (paths.length === 0) {
+    fail(
+      `parsed no switch destinations out of ${config.tenantSwitchFile} — the destination ` +
+        `check would be vacuous. Fix the parser, or set "tenantSwitchFile": null to opt out.`,
+    );
+  }
+  return paths;
 }
 
 const failures = [];
@@ -258,11 +285,11 @@ for (const key of navFeatureKeys()) {
   }
 }
 
-// A `disabled-by-tenant` row is the one denial a store can fix themselves, so
+// A `disabled-by-tenant` row is the one denial a tenant can fix themselves, so
 // both the plan page and the upsell prompt end by sending them to the screen
 // holding the switch. That destination has to BE a screen: a config catch-all
 // redirects an unknown path somewhere that "works", so a stale entry here
-// would land the store on a working page with no such switch on it — quietly,
+// would land them on a working page with no such switch on it — quietly,
 // which is the exact failure the location map exists to end.
 if (config.tenantSwitchFile !== null) {
   const prefix = typeof config.configRoutePrefix === "string" ? config.configRoutePrefix : "config";
@@ -280,7 +307,7 @@ if (config.tenantSwitchFile !== null) {
     if (!configRoutes.has(path)) {
       failures.push(
         `${config.tenantSwitchFile} points at "${path}", which ${config.routesFile} does not ` +
-          `declare as a page — a store sent there hits the ${prefix} catch-all instead of the switch.`,
+          `declare as a page — anyone sent there hits the ${prefix} catch-all, not the switch.`,
       );
     }
   }

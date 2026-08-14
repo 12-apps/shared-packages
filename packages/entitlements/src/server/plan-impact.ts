@@ -26,7 +26,7 @@ import type { PlanCatalog } from '../core/types';
 /** One measured surface: the feature key that gates it, and its report label. */
 export interface ImpactSurface<F extends string> {
   feature: F;
-  /** The label the report prints, e.g. "produtos". */
+  /** The label the report prints — the host's own noun for what it counts. */
   label: string;
 }
 
@@ -186,40 +186,79 @@ function formatters<F extends string, K extends string>(
   isPlanKey: (value: string) => value is K,
 ): Pick<PlanImpact<string, K>, 'formatOffLadderNote' | 'formatUnscorableNote' | 'formatTierBreakdown'> {
   return {
+    // Neither note names WHAT a tenant is. It used to carry one host's own
+    // word for its customers, which is simply false for the next one.
     formatOffLadderNote(offLadder, total) {
       if (offLadder <= 0) return null;
       return (
-        `${offLadder}/${total} loja(s) estão em um tier fora da escada (chave aposentada ` +
-        `ou escrita à mão) SEM assinatura ativa. O resolvedor já as trata como ` +
-        `"${defaultPlanKey}", e é contra esse teto que elas foram medidas acima.`
+        `${offLadder}/${total} em um tier fora da escada (chave aposentada ` +
+        `ou escrita à mão) SEM assinatura ativa. O resolvedor já os trata como ` +
+        `"${defaultPlanKey}", e é contra esse teto que foram medidos acima.`
       );
     },
     formatUnscorableNote(unscorable, total) {
       if (unscorable <= 0) return null;
       return (
-        `${unscorable}/${total} loja(s) têm assinatura ativa em um plano fora da escada. ` +
-        `Os limites delas vêm do snapshot congelado da assinatura, que o catálogo não ` +
-        `modela — elas ficaram FORA da conta acima e precisam ser conferidas à mão.`
+        `${unscorable}/${total} têm assinatura ativa em um plano fora da escada. ` +
+        `Os limites deles vêm do snapshot congelado da assinatura, que o catálogo não ` +
+        `modela — ficaram FORA da conta acima e precisam ser conferidos à mão.`
       );
     },
     formatTierBreakdown(counts) {
       const known = plans.list
         .filter((tier) => (counts[tier] ?? 0) > 0)
         .map((tier) => `${tier} ${counts[tier]}`);
+      // "no tier fits" is spelled against the ladder's OWN top tier, read off
+      // `plans.list`. It was hardcoded to one host's tier name, so every other
+      // adopter's report claimed its heaviest tenants were above a tier that
+      // does not exist in their catalog.
+      const richest = plans.list[plans.list.length - 1] ?? '?';
       const unknown = Object.keys(counts)
         .filter((key) => !isPlanKey(key) && (counts[key] ?? 0) > 0)
         .sort()
         .map((key) =>
-          key === 'none' ? `⚠️ acima do Max ${counts[key]}` : `⚠️ ${key} ${counts[key]}`,
+          key === 'none' ? `⚠️ acima do ${richest} ${counts[key]}` : `⚠️ ${key} ${counts[key]}`,
         );
       return [...known, ...unknown].join(', ');
     },
   };
 }
 
+/**
+ * Refuse a report that would be vacuously reassuring.
+ *
+ * With NO surfaces, `impactOf` returns `[]` for every tier, so
+ * `cheapestTierFor` answers the CHEAPEST tier for every tenant and
+ * `losingOnCurrent` is zero across the fleet — the report says "nobody loses
+ * anything, move everyone down" about a fleet it never measured. An empty map
+ * is far more often a config object assembled from the wrong source than a
+ * deliberate "measure nothing", so it is refused rather than believed.
+ */
+function assertPlanImpactConfig<F extends string, S extends string, K extends string>(
+  config: PlanImpactConfig<F, S, K>,
+): void {
+  if (config.plans.list.length === 0) {
+    throw new Error('createPlanImpact: `plans` is an empty ladder — there is no tier to score against.');
+  }
+  if (Object.keys(config.surfaces).length === 0) {
+    throw new Error(
+      'createPlanImpact: `surfaces` is empty. Every tenant would then be reported as ' +
+        'losing nothing on the cheapest tier, which is a verdict about a fleet that was ' +
+        'never measured. Name the surfaces to measure.',
+    );
+  }
+  if (!(config.plans.list as readonly string[]).includes(config.defaultPlanKey)) {
+    throw new Error(
+      `createPlanImpact: \`defaultPlanKey\` is "${config.defaultPlanKey}", which the ladder ` +
+        'does not declare. Off-ladder tenants are scored against it, so it has to be a real tier.',
+    );
+  }
+}
+
 export function createPlanImpact<F extends string, S extends string, K extends string>(
   config: PlanImpactConfig<F, S, K>,
 ): PlanImpact<S, K> {
+  assertPlanImpactConfig(config);
   const { plans, defaultPlanKey, surfaces } = config;
   const surfaceKeys = Object.keys(surfaces) as S[];
   const isPlanKey = planKeyGuard(plans);

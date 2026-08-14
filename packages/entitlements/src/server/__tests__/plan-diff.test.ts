@@ -113,7 +113,7 @@ describe("diffDecisions", () => {
 describe("describeLoss", () => {
   it("says the data survives for a readonly revoke", () => {
     const line = describeLoss({
-      feature: "catalog.products",
+      feature: "stations.online",
       kind: "revoked",
       before: null,
       after: null,
@@ -126,7 +126,7 @@ describe("describeLoss", () => {
 
   it("says the surface disappears for a hide revoke", () => {
     const line = describeLoss({
-      feature: "storefront.tables",
+      feature: "alerts.digest",
       kind: "revoked",
       before: null,
       after: null,
@@ -140,7 +140,7 @@ describe("describeLoss", () => {
 
   it("shows both ends of a narrowed ceiling", () => {
     const line = describeLoss({
-      feature: "catalog.products",
+      feature: "stations.online",
       kind: "narrowed",
       before: "unlimited",
       after: 100,

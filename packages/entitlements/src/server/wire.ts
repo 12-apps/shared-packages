@@ -51,7 +51,7 @@ export function entitlementDenialResponse(
   if (reason === 'disabled-by-tenant') {
     return {
       status: 409,
-      body: { error: 'Este recurso está desativado nas configurações da loja.' },
+      body: { error: 'Este recurso está desativado nas configurações.' },
     };
   }
   if (reason === 'not-supported') {

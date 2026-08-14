@@ -1,12 +1,12 @@
 /**
- * The plan screen — what this store is on, and what every tier gives.
+ * The plan screen — what this tenant is on, and what every tier gives.
  *
- * The page leads with the pricing cards and keeps the store's live status
+ * The page leads with the pricing cards and keeps the tenant's live status
  * BELOW them, because the two answer different questions and only one of them
  * is why somebody opens this screen:
  *
- *   cards   what each tier includes — the catalog, identical for every store
- *   status  what is on for THIS store right now, and why it is off if it is
+ *   cards   what each tier includes — the catalog, identical for everyone
+ *   status  what is on for THIS tenant right now, and why it is off if it is
  *
  * The status half is not decoration and is deliberately not merged into the
  * cards: it is the only place that distinguishes "your plan does not include
@@ -49,12 +49,12 @@ function ceilingLabel(limit: TenantFeatureView['limit']): string | null {
 }
 
 /**
- * "Ativar em Configuração › Mesas" — the way back to the store's own switch.
+ * "Ativar em <the host's screen name>" — the way back to their own switch.
  *
  * Rendered ONLY for `disabled-by-tenant`, and keyed off that code rather than
  * off `enabled === false`: a tenant-switched feature can equally be dark
  * because the plan never granted it, and offering the toggle there would send
- * the store to flip something that cannot help.
+ * them to flip something that cannot help.
  */
 function TenantSwitchLink({
   feature,
@@ -134,7 +134,7 @@ function FeatureRow({
 
 /**
  * The two things that can be true about an ask: one is open, or the last one
- * failed. Both are page-level rather than card-level — a store has ONE
+ * failed. Both are page-level rather than card-level — a tenant has ONE
  * conversation with us, not one per tier.
  */
 function RequestBanners({
@@ -163,7 +163,7 @@ function RequestBanners({
 }
 
 /**
- * What is on for THIS store right now, and why it is off if it is.
+ * What is on for THIS tenant right now, and why it is off if it is.
  *
  * Kept separate from the cards because it is the only place that
  * distinguishes "your plan does not include this" from "you switched this off
@@ -181,7 +181,7 @@ function CurrentStatus({
       <Heading level="h3">Seu plano hoje</Heading>
       <Box sx={{ mb: 1 }}>
         <Text as="div" color="secondary" size="sm">
-          O que está ativo nesta loja agora — e, quando não está, por quê.
+          O que está ativo agora — e, quando não está, por quê.
         </Text>
       </Box>
       {features.length === 0 ? (
@@ -223,12 +223,12 @@ function useAskForPlan(
 
 /**
  * Whether the ask buttons render at all. Shown only to callers the WRITE will
- * accept: the plan READ is staff-wide on purpose — explaining a denial to
- * whoever hit it is the whole point of this screen — but committing the store
- * to a price conversation is an admin decision, and the POST enforces exactly
- * that tier. Offering a button that answers 403 is the same defect as linking
- * a page a role cannot open. Also hidden while the request read is in flight,
- * so it cannot appear and then vanish under someone already mid-click.
+ * accept: the plan READ takes no permission on purpose — explaining a denial to
+ * whoever hit it is the whole point of this screen — but committing the tenant
+ * to a price conversation needs `plan:request`, and the POST enforces exactly
+ * that. Offering a button that answers 403 is the same defect as linking a page
+ * a role cannot open. Also hidden while the request read is in flight, so it
+ * cannot appear and then vanish under someone already mid-click.
  */
 function mayAsk(
   config: ResolvedWebConfig,

@@ -1,7 +1,7 @@
 /**
  * The pricing cards.
  *
- * Four cards, side by side, the store's own marked and every tier's contents
+ * The tiers side by side, the tenant's own marked and every tier's contents
  * spelled out. The columns are the comparison: every card renders the same
  * sections in the same order, so a row means the same thing across all cards
  * and the eye can travel sideways — the host's `comparison` builder
@@ -92,7 +92,7 @@ function LineRow({ line }: { line: ComparisonLine }): JSX.Element {
 
 /** The badge strip: at most one of "seu plano" / "melhor oferta". */
 function TierBadge({ tier }: { tier: ComparisonTier }): JSX.Element | null {
-  // "Seu plano" wins over "melhor oferta" when both apply — telling a store
+  // "Seu plano" wins over "melhor oferta" when both apply — telling a tenant
   // that the tier they already pay for is a great offer is noise, and knowing
   // which card is theirs is the thing they came for.
   if (tier.current) {
@@ -113,18 +113,25 @@ function TierBadge({ tier }: { tier: ComparisonTier }): JSX.Element | null {
   return null;
 }
 
+/**
+ * The price, and whatever the host words beside it.
+ *
+ * `priceNote` arrives from the host's billing rather than being written here.
+ * It used to be a hardcoded "/mês" suppressed on free tiers — which is two
+ * product statements this package is in no position to make: that the host
+ * bills monthly, and that a zero price is not a recurring charge. A host
+ * billing annually rendered its yearly price as a monthly one.
+ */
 function TierPrice({ tier }: { tier: ComparisonTier }): JSX.Element {
   return (
     <Box sx={{ mt: 2 }}>
       <Text size="lg" weight="bold" data-testid={`tier-price-${tier.key}`}>
         {tier.price ?? 'Sob consulta'}
       </Text>
-      {tier.priceCents === null || tier.priceCents === 0 ? null : (
-        // The interval belongs to a charge, and a free tier is not one:
-        // "Grátis/mês" reads like a recurring bill of zero.
-        <Text size="sm" color="secondary">
+      {tier.priceNote === null ? null : (
+        <Text size="sm" color="secondary" data-testid={`tier-price-note-${tier.key}`}>
           {' '}
-          /mês
+          {tier.priceNote}
         </Text>
       )}
     </Box>
@@ -137,8 +144,8 @@ function TierPrice({ tier }: { tier: ComparisonTier }): JSX.Element {
  * Three states, and the two that render NOTHING are the deliberate ones: a
  * cheaper tier gets no button (asking for it through an upgrade flow would
  * file a downgrade as a sale), and neither does any tier when the caller may
- * not ask — the write is admin-only server-side, and a button that answers
- * 403 is the same defect as linking a page a role cannot open.
+ * not ask — the write requires `plan:request` server-side, and a button that
+ * answers 403 is the same defect as linking a page a role cannot open.
  */
 function TierCta({
   tier,
@@ -187,7 +194,7 @@ function TierCard({
         flexDirection: 'column',
         border: 1,
         borderRadius: 2,
-        // The store's own card is outlined, so it is findable without reading.
+        // The tenant's own card is outlined, so it is findable without reading.
         borderColor: tier.current ? 'primary.main' : 'divider',
         borderWidth: tier.current ? 2 : 1,
         p: 2,

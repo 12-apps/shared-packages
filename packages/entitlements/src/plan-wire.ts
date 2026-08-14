@@ -4,22 +4,23 @@
  * renders them). One module, so the two halves of the contract cannot drift.
  *
  * Money appears here only as DISPLAY DATA a host's billing already computed
- * (`priceCents`, a formatted `price` string). The package stores no price,
- * computes no charge and owns no billing model — `Plan`, `Subscription` and
- * the plan-change lead are the HOST's tables, reached through ports.
+ * (`priceCents`, a formatted `price` string, the interval it recurs on). The
+ * package stores no price, computes no charge, words no currency and owns no
+ * billing model — the plan, the subscription and the plan-change lead are the
+ * HOST's tables, reached through ports.
  */
 
 import type { EntitlementReason } from './core/types';
 
 /**
- * The reasons a store can be shown (`not-supported` rows are dropped).
+ * The reasons a tenant can be shown (`not-supported` rows are dropped).
  * DERIVED from the engine's own union — never hand-written — so adding a
  * reason to `EntitlementReason` fails typecheck at the `NOTE` copy table
  * instead of blanking a note at runtime.
  */
 export type TenantFeatureReason = Exclude<EntitlementReason, 'not-supported'>;
 
-/** One capability as the STORE should read it. */
+/** One capability as the TENANT should read it. */
 export interface TenantFeatureView {
   feature: string;
   description: string | null;
@@ -28,7 +29,7 @@ export interface TenantFeatureView {
   note: string;
   /**
    * Branch on this, never on `note`: `disabled-by-tenant` is the only denial
-   * the store fixes themselves, and it is the row that earns a link to the
+   * the tenant fixes themselves, and it is the row that earns a link to the
    * settings screen holding the switch.
    */
   reason: TenantFeatureReason;
@@ -46,7 +47,7 @@ export interface TenantPlanView {
   planKey: string;
   name: string;
   priceCents: number | null;
-  /** Already formatted (`"R$ 59,00"` / `"Grátis"`), or null when unpriced. */
+  /** Already formatted by the host's `formatPrice`, or null when unpriced. */
   price: string | null;
   features: TenantFeatureView[];
 }
@@ -65,29 +66,38 @@ export interface ComparisonSection {
   lines: ComparisonLine[];
 }
 
-/** One pricing card — a tier as a store compares it. */
+/** One pricing card — a tier as a tenant compares it. */
 export interface ComparisonTier {
   key: string;
   name: string;
   priceCents: number | null;
   price: string | null;
+  /**
+   * What rides beside the price — the billing INTERVAL, worded by the host
+   * ("/mês", "per year", "one-off"), or null for a tier where none applies.
+   *
+   * Required, because the card used to print a hardcoded "/mês": an interval
+   * is a property of a charge, and this package neither makes charges nor
+   * knows how often the host's recur.
+   */
+  priceNote: string | null;
   /** What this tier is FOR — the question a feature list cannot answer. */
   pitch: string;
   headline: string;
   headlineUnit: string;
   current: boolean;
-  /** Costs more than the store's tier, so it can be asked for. */
+  /** Costs more than the tenant's tier, so it can be asked for. */
   upgrade: boolean;
   recommended: boolean;
   sections: ComparisonSection[];
 }
 
-/** The plan screen's whole payload: the store's status AND the comparison. */
+/** The plan screen's whole payload: the tenant's status AND the comparison. */
 export interface TenantPlanPayload extends TenantPlanView {
   comparison: ComparisonTier[];
 }
 
-/** The store's open plan-change request, or null when nobody has asked. */
+/** The tenant's open plan-change request, or null when nobody has asked. */
 export interface OpenPlanRequest {
   id: string;
   requestedPlanKey: string;
@@ -96,8 +106,8 @@ export interface OpenPlanRequest {
 
 /**
  * What the POST answers with — deliberately NOT the full open request: the
- * host's lead row exposes `{ id, status }` on the write (the MCP response
- * contract), and the read next door is where the details live.
+ * write's contract is `{ id, status }`, and the read next door is where the
+ * details live.
  */
 export interface FiledPlanRequest {
   id: string;

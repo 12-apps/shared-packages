@@ -20,7 +20,7 @@ import {
   type MemorySource,
 } from '@12-apps/entitlements';
 import {
-  formatPrice,
+  PLAN_REQUEST_PERMISSION,
   type ComparisonTier,
   type FiledPlanRequest,
   type OpenPlanRequest,
@@ -28,47 +28,65 @@ import {
 } from '@12-apps/entitlements/server';
 import { entitlementsRouter } from '@12-apps/entitlements/hono';
 
+/**
+ * A film-festival submissions catalog — a domain this package has no
+ * relationship with, and deliberately not the one it was extracted from. The
+ * harness is the only place the PUBLISHED tarball is exercised, so if a
+ * default in it still answers a commercial question, it shows up here in
+ * somebody else's vocabulary.
+ */
 export const FEATURES = defineFeatures({
-  audit: { onRevoke: 'hide', description: 'Registro de atividades' },
-  'branding.white_label': { onRevoke: 'readonly', description: 'Marca própria' },
-  'storefront.tables': { onRevoke: 'disable', description: 'Mesas e comandas' },
-  'stock.locations': { kind: 'quota', onRevoke: 'readonly', description: 'Locais de estoque' },
+  'jury.deliberation': { onRevoke: 'hide', description: 'Sala de júri' },
+  'catalogue.print': { onRevoke: 'readonly', description: 'Catálogo impresso' },
+  'submissions.notes': { onRevoke: 'disable', description: 'Notas de curadoria' },
+  'screeners.invited': { kind: 'quota', onRevoke: 'readonly', description: 'Curadores' },
 } as const);
 
 export type HarnessFeature = (typeof FEATURES.list)[number];
 
 export const PLANS = definePlans(FEATURES, {
-  free: {
-    description: 'Gratuito',
-    entitlements: { 'storefront.tables': true, 'stock.locations': 3 },
+  shorts: {
+    description: 'Shorts',
+    entitlements: { 'submissions.notes': true, 'screeners.invited': 3 },
   },
-  pro: {
-    extends: 'free',
-    description: 'Pro',
+  feature: {
+    extends: 'shorts',
+    description: 'Feature',
     entitlements: {
-      audit: true,
-      'branding.white_label': true,
-      'stock.locations': 'unlimited',
+      'jury.deliberation': true,
+      'catalogue.print': true,
+      'screeners.invited': 'unlimited',
     },
   },
 } as const);
 
+export type HarnessPlan = (typeof PLANS.list)[number];
+
 /** Pricing DISPLAY rows — the host's billing owns these numbers. */
 const PRICING = [
-  { key: 'free', name: 'Gratuito', priceCents: 0 },
-  { key: 'pro', name: 'Pro', priceCents: 9900 },
+  { key: 'shorts', name: 'Shorts', priceCents: 0 },
+  { key: 'feature', name: 'Feature', priceCents: 9900 },
 ];
 
-/** The tenant every spec drives. On free, with mesas switched off by choice. */
+/**
+ * The host's own money, worded by the host. The package used to ship a
+ * formatter for one country's currency as the default, so a harness that said
+ * nothing rendered that country's prices — which is precisely what the
+ * consumer harness exists to catch.
+ */
+const formatPrice = (cents: number | null): string | null =>
+  cents === null ? null : cents === 0 ? 'Sem custo' : `£${(cents / 100).toFixed(2)}`;
+
+/** The tenant every spec drives. On Shorts, with notes switched off by choice. */
 export const TENANT = 'harness';
 
 function seededState() {
   return {
-    plan: PLANS.get('free').entitlements,
-    planKey: 'free',
-    // The tenant's OWN switch: entitled to mesas, turned them off — the one
-    // denial the plan page must NOT sell an upgrade for.
-    settings: { 'storefront.tables': false },
+    plan: PLANS.get('shorts').entitlements,
+    planKey: 'shorts',
+    // The tenant's OWN switch: entitled to curation notes, turned them off —
+    // the one denial the plan page must NOT sell an upgrade for.
+    settings: { 'submissions.notes': false },
   };
 }
 
@@ -83,25 +101,28 @@ function comparison(currentPlanKey: string): ComparisonTier[] {
     name: row.name,
     priceCents: row.priceCents,
     price: formatPrice(row.priceCents),
-    pitch: row.key === 'free' ? 'Para começar a vender' : 'Para lojas com salão e auditoria',
-    headline: row.key === 'free' ? '3' : 'ilimitado',
-    headlineUnit: 'locais de estoque',
+    // The interval is the HOST's too — the card used to append a hardcoded
+    // monthly suffix of its own.
+    priceNote: row.priceCents === 0 ? null : 'por edição',
+    pitch: row.key === 'shorts' ? 'Para uma mostra pequena' : 'Para um festival com júri',
+    headline: row.key === 'shorts' ? '3' : 'ilimitado',
+    headlineUnit: 'curadores',
     current: row.key === currentPlanKey,
     upgrade: PRICING.findIndex((p) => p.key === row.key) >
       PRICING.findIndex((p) => p.key === currentPlanKey),
-    recommended: row.key === 'pro',
+    recommended: row.key === 'feature',
     sections: [
       {
-        title: 'Loja',
+        title: 'Curadoria',
         lines: [
-          { label: 'Mesas e comandas', included: true, detail: null },
+          { label: 'Notas de curadoria', included: true, detail: null },
           {
-            label: 'Locais de estoque',
+            label: 'Curadores',
             included: true,
-            detail: row.key === 'free' ? 'até 3' : 'ilimitado',
+            detail: row.key === 'shorts' ? 'até 3' : 'ilimitado',
           },
-          { label: 'Registro de atividades', included: row.key === 'pro', detail: null },
-          { label: 'Marca própria', included: row.key === 'pro', detail: null },
+          { label: 'Sala de júri', included: row.key === 'feature', detail: null },
+          { label: 'Catálogo impresso', included: row.key === 'feature', detail: null },
         ],
       },
     ],
@@ -125,7 +146,7 @@ export function createEntitlementsHost(): EntitlementsHost {
   const open = new Map<string, OpenPlanRequest>();
   let sequence = 0;
   // The write answers `{ id, status }` only — the read next door carries the
-  // details, exactly the split future-pay's lead table exposes.
+  // details, exactly the split the port documents.
   const filed = (row: OpenPlanRequest): FiledPlanRequest => ({ id: row.id, status: 'open' });
   const planChangeRequests: PlanChangeRequestPort = {
     async getOpen(tenantId) {
@@ -145,25 +166,28 @@ export function createEntitlementsHost(): EntitlementsHost {
     },
   };
 
-  const { app: router, api } = entitlementsRouter<HarnessFeature>({
+  const { app: router, api } = entitlementsRouter<HarnessFeature, HarnessPlan>({
     features: FEATURES,
     plans: PLANS,
     source,
-    // The seeded store holds four locations against free's ceiling of three —
-    // the over-quota state: everything keeps working, creating more upsells.
-    usage: { count: async (_tenantId, feature) => (feature === 'stock.locations' ? 4 : 0) },
-    defaultPlanKey: 'free',
+    // The seeded tenant holds four curators against Shorts' ceiling of three —
+    // the over-quota state: everything keeps working, inviting more upsells.
+    usage: { count: async (_tenantId, feature) => (feature === 'screeners.invited' ? 4 : 0) },
+    defaultPlanKey: 'shorts',
     pricing: PRICING,
+    formatPrice,
     comparison,
     planChangeRequests,
     resolveActor: (c) => {
       // The host's whole authentication story, reduced to a header the specs
-      // can set: `x-harness-role: staff` is a caller the WRITE refuses.
+      // can set: `x-harness-role: staff` is a caller the WRITE refuses. The
+      // id it grants is the PACKAGE's own contribution, composed into what
+      // this host would otherwise call its catalog.
       const role = c.req.header('x-harness-role') ?? 'admin';
       return {
         tenantId: TENANT,
         userId: 'user-harness',
-        canRequestPlanChange: role === 'admin',
+        permissions: role === 'admin' ? [PLAN_REQUEST_PERMISSION] : [],
       };
     },
   });

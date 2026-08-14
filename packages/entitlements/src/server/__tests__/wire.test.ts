@@ -1,9 +1,12 @@
 // @vitest-environment node
 /**
  * The denial wire, pinned VERBATIM — statuses, machine keys and the pt-BR
- * sentences a customer actually reads. This is line-for-line future-pay's
- * `paymentRequired` mapping, and the whole reason both halves live in one
- * package is that neither the machine half nor the human half may drift.
+ * sentences a customer actually reads. The whole reason both halves live in
+ * one package is that neither the machine half nor the human half may drift.
+ *
+ * The sentences are this SURFACE's own, and they name nothing outside it: not
+ * a tier, not a currency, and not what a tenant is (they used to say "da
+ * loja", one host's word for its customers).
  */
 import { describe, expect, it } from 'vitest';
 
@@ -13,12 +16,12 @@ import { entitlementDenialResponse, PAYMENT_REQUIRED_MESSAGE } from '../wire';
 
 function decision(over: Partial<EntitlementDecision<string>>): EntitlementDecision<string> {
   return {
-    feature: 'audit',
+    feature: 'forecast.history',
     enabled: false,
     reason: 'not-entitled',
     policy: 'hide',
     limit: null,
-    requiredPlan: 'pro',
+    requiredPlan: 'network',
     ...over,
   };
 }
@@ -32,9 +35,9 @@ describe('entitlementDenialResponse', () => {
     expect(denial.body).toEqual({
       error: 'Este recurso não está incluído no seu plano.',
       code: 'entitlement_required',
-      feature: 'audit',
+      feature: 'forecast.history',
       reason: 'not-entitled',
-      requiredPlan: 'pro',
+      requiredPlan: 'network',
     });
     // The exported constant IS the sentence — a host reusing it must get the
     // same words the routes produce.
@@ -50,8 +53,9 @@ describe('entitlementDenialResponse', () => {
     );
     expect(denial.status).toBe(409);
     expect(denial.body).toEqual({
-      error: 'Este recurso está desativado nas configurações da loja.',
+      error: 'Este recurso está desativado nas configurações.',
     });
+    expect(denial.body.error).not.toContain('loja');
   });
 
   it('answers not-supported with 404 — a key this build cannot serve is not for sale', () => {
@@ -67,7 +71,7 @@ describe('entitlementDenialResponse', () => {
 
   it('answers a spent quota with 402, used/limit riding along', () => {
     const quota: QuotaDecision<string> = {
-      ...decision({ feature: 'team.seats', enabled: true, reason: 'enabled', limit: 3 }),
+      ...decision({ feature: 'crew.seats', enabled: true, reason: 'enabled', limit: 3 }),
       used: 3,
       remaining: 0,
       exceeded: true,
@@ -77,10 +81,10 @@ describe('entitlementDenialResponse', () => {
     expect(denial.body).toEqual({
       error: 'Este recurso não está incluído no seu plano.',
       code: 'quota_exceeded',
-      feature: 'team.seats',
+      feature: 'crew.seats',
       used: 3,
       limit: 3,
-      requiredPlan: 'pro',
+      requiredPlan: 'network',
     });
   });
 });

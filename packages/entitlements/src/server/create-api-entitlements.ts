@@ -17,30 +17,37 @@
  * What stays the HOST's, and is passed in rather than guessed at:
  *
  *  - **Authentication and tenant resolution** — who is calling, on which
- *    tenant, and whether they may file a plan-change request. The host hands
- *    over an {@link EntitlementsActor}; the package narrows against it, never
- *    computes it.
+ *    tenant, and which permissions they hold. The host hands over an
+ *    {@link EntitlementsActor}; the package narrows against it, never computes
+ *    it.
  *  - **Where tenant state lives** — the `source` port. The tenant row (its
  *    plan key, overrides, switches, status) is a HOST table this package has
  *    no business knowing the shape of.
- *  - **Money** — entirely. `Plan`, `Subscription` and the plan-change lead
- *    are billing models that STAY in the host: the plan the engine consumes
- *    arrives as config/data (`plans`, `pricing`, `comparison`), and the
- *    plan-change request writes through the {@link PlanChangeRequestPort} —
- *    a lead for a human, never a checkout, and never a package-owned table.
+ *  - **The commercial policy** — the tiers, what they are called, and what
+ *    they cost. `plans`, `pricing`, `comparison` and `formatPrice` are all
+ *    required, because every one of them is a fact about the host's product
+ *    and none of them is a fact about entitlements.
+ *  - **Money** — entirely. The plan and the plan-change lead are billing
+ *    models that STAY in the host: the ladder arrives as config, prices arrive
+ *    as already-formatted display data, and the ask writes through the
+ *    {@link PlanChangeRequestPort} — a lead for a human, never a checkout, and
+ *    never a package-owned table.
+ *
+ * Every one of those is checked at ASSEMBLY (`assertApiEntitlementsConfig`):
+ * a required option nobody validates is still fail-open, and an empty
+ * collection is refused rather than read as a deliberate lockout.
  */
 import { createEntitlements, type EntitlementsEngine } from '../core/engine';
-import type {
-  EntitlementCache,
-  EntitlementSource,
-  FeatureRegistry,
-  PlanCatalog,
-  UsageCounter,
-} from '../core/types';
-import type { ComparisonTier, TenantPlanPayload, TenantPlanView } from '../plan-wire';
+import type { UsageCounter } from '../core/types';
+import type { TenantPlanPayload, TenantPlanView } from '../plan-wire';
+import {
+  assertApiEntitlementsConfig,
+  type ApiEntitlementsConfig,
+  type UsageRegistryLike,
+} from './config';
+import { PLAN_REQUEST_PERMISSION } from './contribution';
 import { createPlanService } from './plan-service';
-import type { PricingRow } from './plan-view';
-import { buildEntitlementsRoutes, type EntitlementsRoute, type PlanChangeRequestPort } from './routes';
+import { buildEntitlementsRoutes, type EntitlementsRoute } from './routes';
 
 export type {
   EntitlementsActor,
@@ -48,46 +55,17 @@ export type {
   EntitlementsRoute,
   PlanChangeRequestPort,
 } from './routes';
-
-/** A usage registry (usage-registry.ts) — the port plus its boot-time audit. */
-export interface UsageRegistryLike<F extends string> {
-  port: UsageCounter<F>;
-  assertRegistered(quotaFeatures: readonly string[]): void;
-}
+export {
+  assertApiEntitlementsConfig,
+  EntitlementsConfigError,
+  type ApiEntitlementsConfig,
+  type UsageRegistryLike,
+} from './config';
 
 function isUsageRegistry<F extends string>(
   usage: UsageCounter<F> | UsageRegistryLike<F>,
 ): usage is UsageRegistryLike<F> {
   return 'port' in usage;
-}
-
-export interface ApiEntitlementsConfig<F extends string> {
-  features: FeatureRegistry<F>;
-  /** The tier ladder — config/data, authored by the host. Null for hand-assigned maps. */
-  plans?: PlanCatalog<F, string> | null;
-  /** Where the tenant's entitlement state lives (a HOST table, behind a port). */
-  source: EntitlementSource<F>;
-  /**
-   * Usage counters for quota features. Pass the registry from
-   * `createUsageRegistry` to also get its boot-time audit: an engine whose
-   * catalog declares a quota this host cannot count refuses to build at all.
-   */
-  usage?: UsageCounter<F> | UsageRegistryLike<F> | null;
-  cache?: EntitlementCache | null;
-  cacheTtlSeconds?: number;
-  /** The tier a tenant with no recognisable plan key resolves to. */
-  defaultPlanKey: string;
-  /** Pricing DISPLAY rows from the host's billing (never computed here). */
-  pricing?: readonly PricingRow[];
-  /** The pricing cards, assembled by the host's billing catalog. */
-  comparison?: (currentPlanKey: string) => ComparisonTier[];
-  /**
-   * How a price in cents reads on the wire (`TenantPlanView.price`).
-   * Defaults to the BRL wording future-pay ships (`"R$ 59,00"` / `"Grátis"`).
-   */
-  formatPrice?: (priceCents: number | null) => string | null;
-  /** The plan-change lead store. Omit it and the request routes do not exist. */
-  planChangeRequests?: PlanChangeRequestPort | null;
 }
 
 export interface ApiEntitlements<F extends string> {
@@ -111,15 +89,15 @@ export interface ApiEntitlements<F extends string> {
     tenantId: string,
     feature: F,
   ): Promise<{ enabled: boolean; reason: string; requiredPlan: string | null }>;
-  /** What the store is on, and what it gets — with live quota usage. */
+  /** What the tenant is on, and what they get — with live quota usage. */
   getPlanView(tenantId: string): Promise<TenantPlanView>;
   /** The plan screen's whole payload: the view plus the pricing cards. */
   getPlanPayload(tenantId: string): Promise<TenantPlanPayload>;
 }
 
 /** Unwrap the usage input, running the registry's boot-time audit if present. */
-function usagePortOf<F extends string>(
-  config: ApiEntitlementsConfig<F>,
+function usagePortOf<F extends string, K extends string>(
+  config: ApiEntitlementsConfig<F, K>,
 ): UsageCounter<F> | null {
   const usage = config.usage ?? null;
   if (usage === null) return null;
@@ -132,11 +110,12 @@ function usagePortOf<F extends string>(
   return usage.port;
 }
 
-export function createApiEntitlements<F extends string>(
-  config: ApiEntitlementsConfig<F>,
+export function createApiEntitlements<F extends string, K extends string>(
+  config: ApiEntitlementsConfig<F, K>,
 ): ApiEntitlements<F> {
-  const plans = config.plans ?? null;
-  const pricing = config.pricing ?? [];
+  assertApiEntitlementsConfig(config);
+
+  const plans = config.plans;
   const usage = usagePortOf(config);
 
   const engine = createEntitlements({
@@ -154,7 +133,7 @@ export function createApiEntitlements<F extends string>(
     plans,
     usage,
     defaultPlanKey: config.defaultPlanKey,
-    pricing,
+    pricing: config.pricing,
     comparison: config.comparison,
     formatPrice: config.formatPrice,
   });
@@ -168,7 +147,8 @@ export function createApiEntitlements<F extends string>(
     isKnownPlan: (key) =>
       plans !== null
         ? (plans.list as readonly string[]).includes(key)
-        : pricing.some((row) => row.key === key),
+        : config.pricing.some((row) => row.key === key),
+    requestPermission: config.planRequestPermission ?? PLAN_REQUEST_PERMISSION,
   });
 
   return {

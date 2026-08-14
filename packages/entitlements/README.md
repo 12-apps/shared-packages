@@ -17,6 +17,14 @@ notification channel policy), a `./hono` adapter that mounts them, and
 for `RetentionWatermark` and the `entitlements-coverage` gate script ship with
 the package. See ADOPTING.md §10.
 
+**The commercial policy is the HOST's, and it is required.** The tiers, what
+they are called, what they cost, the currency they read in, the interval they
+recur on and the permission that may ask for a change all arrive as config,
+checked at ASSEMBLY by `assertApiEntitlementsConfig`. The one thing this
+package contributes back is `ENTITLEMENTS_PERMISSIONS` — the single id
+(`plan:request`) guarding its own write — which the host composes into its RBAC
+catalog. See [`ADOPTING.md`](./ADOPTING.md) §11.
+
 ---
 
 ## The problem it solves
@@ -59,8 +67,8 @@ an internal beta programme, or no billing at all use this unchanged.
 const effective = permissions ∩ entitlements;   // everything is just a 403
 
 // ✓ sequential — keeps it
-await requireEntitlement('audit', { clientId }); // 402 → "Upgrade to Pro"
-await requirePermission('audit:read', { scope }); // 403 → "Ask your admin"
+await requireEntitlement('exports.bulk', { tenantId }); // 402 → upsell
+await requirePermission('exports:read', { scope });     // 403 → "Ask your admin"
 ```
 
 Intersect and you can no longer tell *"your plan doesn't include this"* from
@@ -97,11 +105,11 @@ The typed feature registry. Mirrors `@12-apps/rbac`'s `definePermissions`: pass 
 
 ```ts
 const FEATURES = defineFeatures({
-  audit:             { onRevoke: 'hide' },
-  mcp:               { onRevoke: 'disable' },
-  'stock.locations': { kind: 'quota', onRevoke: 'readonly' },
-  approvals:         { onRevoke: 'disable', defaultWhenEntitled: false },
-  'orders.read':     { retainWhenRestricted: true },
+  'exports.bulk':      { onRevoke: 'hide' },
+  'webhooks.outbound': { onRevoke: 'disable' },
+  'seats.included':    { kind: 'quota', onRevoke: 'readonly' },
+  approvals:           { onRevoke: 'disable', defaultWhenEntitled: false },
+  'records.read':      { retainWhenRestricted: true },
 } as const);
 
 type AppFeature = (typeof FEATURES.list)[number];
@@ -124,9 +132,9 @@ resolution never walks a chain and a bad catalog fails at boot.
 
 ```ts
 const PLANS = definePlans(FEATURES, {
-  basic: { entitlements: { 'orders.read': true, 'stock.locations': 1 } },
-  plus:  { extends: 'basic', entitlements: { mcp: true, 'stock.locations': 5 } },
-  pro:   { extends: 'plus',  entitlements: { audit: true, 'stock.locations': 'unlimited' } },
+  solo:  { entitlements: { 'records.read': true, 'seats.included': 1 } },
+  team:  { extends: 'solo', entitlements: { 'webhooks.outbound': true, 'seats.included': 5 } },
+  scale: { extends: 'team', entitlements: { 'exports.bulk': true, 'seats.included': 'unlimited' } },
 } as const);
 ```
 
@@ -196,8 +204,8 @@ out an inherited quota. `'unlimited'` stays a sentinel rather than `Infinity` so
 a map survives `JSON.stringify`.
 
 ```ts
-await entitlements.requireQuota(clientId, 'stock.locations');    // +1
-await entitlements.requireQuota(clientId, 'stock.locations', 5); // bulk create
+await entitlements.requireQuota(tenantId, 'seats.included');    // +1
+await entitlements.requireQuota(tenantId, 'seats.included', 5); // bulk create
 ```
 
 > ⚠️ **Check-then-act is not atomic.** Two concurrent creates can both read
@@ -238,11 +246,11 @@ is settling up, and that message belongs to the host.
 import { EntitlementsProvider, Entitled, Locked, useQuota } from '@12-apps/entitlements/react';
 
 <EntitlementsProvider snapshot={snapshot} onUpsell={openPricingModal}>
-  <Entitled feature="audit" fallback={<AuditTeaser />}>
-    <AuditPage />
+  <Entitled feature="exports.bulk" fallback={<ExportsTeaser />}>
+    <ExportsPage />
   </Entitled>
 
-  <Locked feature="mcp">
+  <Locked feature="webhooks.outbound">
     {({ requiredPlan, upsell }) => (
       <button onClick={upsell}>🔒 Disponível no plano {requiredPlan}</button>
     )}
@@ -274,11 +282,20 @@ not in the snapshot; the component rendering the list already knows.
 pnpm --filter @12-apps/entitlements test
 ```
 
-89 tests. The load-bearing one is
-[`portability.test.ts`](./src/__tests__/portability.test.ts): a complete toy
-note-taking SaaS wired to the library with only its own catalog, its own plans
-and the two ports — **zero imports from the host app**. If it compiles and
-passes, the core is portable. Mirrors the toy-blog host `@12-apps/rbac` ships.
+Three of the suites are the portability gate, and they answer different
+questions:
+
+| suite | what it proves |
+|---|---|
+| [`portability.test.ts`](./src/__tests__/portability.test.ts) | the ENGINE is portable — a toy note-taking SaaS with its own catalog, its own plans and the two ports |
+| [`portability-surface.test.tsx`](./src/__tests__/portability-surface.test.tsx) | the SURFACES are — it MOUNTS the Hono router and the React factory for a concert hall and refuses a word from any other host's vocabulary |
+| [`packed-artifact.test.ts`](./src/__tests__/packed-artifact.test.ts) | the TARBALL is — it asks `npm pack` what would upload and sweeps every published file |
+
+The middle one exists because the first was not enough: every default that
+actually leaked (a BRL price formatter, a `/mês` interval, a hardcoded top
+tier, copy naming a host's own noun) sat on a surface no engine call reaches.
+The last one exists because `files` publishes `src`, `prisma`, `scripts` and
+every `*.md` — more than any rendered screen can show.
 
 `memory.ts` provides in-memory source/usage/cache adapters for tests and local
 development.

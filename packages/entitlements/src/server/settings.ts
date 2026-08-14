@@ -15,8 +15,22 @@
  * one owner flipping one Switch on one config page. Closing it is a one-line
  * JSONB-merge `UPDATE` in the host's store when a caller appears that needs
  * it.
+ *
+ * ## The write gates on exactly what the read gates on
+ *
+ * `describe` reports `entitled`, and that is what disables the Switch on the
+ * panel. `set` used to check NOTHING, which was inert only because layer 4
+ * runs after layer 2 — a setting for an unentitled feature changes no
+ * decision. But it is STORED, and `defaultWhenEntitled: false` exists exactly
+ * so that some features stay off until the tenant deliberately asks for them
+ * (a preview that borrows a colleague's identity; an approvals gate over
+ * writes). Pre-arming that switch while unentitled meant the deliberate opt-in
+ * happened before the entitlement did: the moment a plan change granted the
+ * feature it was already ON, and nobody ever made that choice knowing what it
+ * would do. So the write applies the read's gate.
  */
 import type { EntitlementsEngine } from '../core/engine';
+import { EntitlementRequiredError } from '../core/errors';
 import type { FeatureRegistry } from '../core/types';
 import { toSettingsMap } from '../coerce';
 
@@ -59,8 +73,26 @@ export interface FeatureSettings<F extends string> {
    * Merge one switch into the tenant layer (the config-panel write path), and
    * invalidate the engine's cached state — the column IS the engine's settings
    * layer, so the cache is stale the moment the write lands.
+   *
+   * Throws {@link EntitlementRequiredError} when the feature is not entitled,
+   * which is the SAME condition `describe` reports as `entitled: false` and
+   * the panel renders as a dead Switch. The host's existing denial mapping
+   * turns it into the right status (402 for a plan gap or a dunning
+   * restriction, 404 for a key this build does not have).
    */
   set(tenantId: string, feature: F, enabled: boolean): Promise<void>;
+}
+
+/**
+ * May the tenant's own switch be touched at all?
+ *
+ * `disabled-by-tenant` counts as entitled — it IS the state this writer exists
+ * to leave and return from. Everything else (a plan gap, `restricted`,
+ * `suspended`, a key this build does not declare) is a denial the tenant
+ * cannot undo with a toggle.
+ */
+function mayToggle(reason: string, enabled: boolean): boolean {
+  return enabled || reason === 'disabled-by-tenant';
 }
 
 export function createFeatureSettings<F extends string>(
@@ -71,11 +103,15 @@ export function createFeatureSettings<F extends string>(
     async describe(tenantId, feature) {
       const decision = await engine.check(tenantId, feature);
       return {
-        entitled: decision.enabled || decision.reason === 'disabled-by-tenant',
+        entitled: mayToggle(decision.reason, decision.enabled),
         enabled: decision.enabled,
       };
     },
     async set(tenantId, feature, enabled) {
+      const decision = await engine.check(tenantId, feature);
+      if (!mayToggle(decision.reason, decision.enabled)) {
+        throw new EntitlementRequiredError(tenantId, decision);
+      }
       const current = toSettingsMap(features, await store.read(tenantId));
       await store.write(tenantId, { ...current, [feature]: enabled });
       // After the commit: silent without a cache configured, which is why a

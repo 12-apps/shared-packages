@@ -12,16 +12,16 @@ import { defineFeatures } from '../../core/registry';
 import { createPlanImpact } from '../plan-impact';
 
 const FEATURES = defineFeatures({
-  'catalog.products': { kind: 'quota', onRevoke: 'readonly' },
-  suppliers: { onRevoke: 'disable' },
-  'team.seats': { kind: 'quota', onRevoke: 'readonly' },
+  'stations.online': { kind: 'quota', onRevoke: 'readonly' },
+  'alerts.digest': { onRevoke: 'disable' },
+  'crew.seats': { kind: 'quota', onRevoke: 'readonly' },
 } as const);
 
 const PLANS = definePlans(FEATURES, {
-  free: { entitlements: { 'catalog.products': 20, suppliers: false, 'team.seats': 1 } },
-  pro: {
-    extends: 'free',
-    entitlements: { 'catalog.products': 'unlimited', suppliers: true, 'team.seats': 10 },
+  hobby: { entitlements: { 'stations.online': 20, 'alerts.digest': false, 'crew.seats': 1 } },
+  network: {
+    extends: 'hobby',
+    entitlements: { 'stations.online': 'unlimited', 'alerts.digest': true, 'crew.seats': 10 },
   },
 } as const);
 
@@ -29,59 +29,60 @@ const PLANS = definePlans(FEATURES, {
 function calc() {
   return createPlanImpact({
     plans: PLANS,
-    defaultPlanKey: 'free',
+    defaultPlanKey: 'hobby',
     surfaces: {
-      products: { feature: 'catalog.products', label: 'produtos' },
-      suppliers: { feature: 'suppliers', label: 'fornecedores' },
-      seats: { feature: 'team.seats', label: 'assentos' },
+      stations: { feature: 'stations.online', label: 'estações' },
+      digests: { feature: 'alerts.digest', label: 'resumos' },
+      seats: { feature: 'crew.seats', label: 'operadores' },
     },
   });
 }
 
 describe('impactOf', () => {
   it('reports a vanished surface before a tightened ceiling, biggest overage first', () => {
-    const violations = calc().impactOf({ products: 25, suppliers: 14, seats: 3 }, 'free');
+    const violations = calc().impactOf({ stations: 25, digests: 14, seats: 3 }, 'hobby');
     expect(violations.map((v) => `${v.surface}:${v.kind}`)).toEqual([
-      'suppliers:lost',
-      'products:capped',
+      'digests:lost',
+      'stations:capped',
       'seats:capped',
     ]);
-    // "loses 14 fornecedores" is actionable in a way "loses suppliers" is not.
-    expect(violations[0]).toMatchObject({ label: 'fornecedores', used: 14, allowed: 0 });
+    // "loses 14 resumos" is actionable in a way "loses digests" is not — and
+    // the noun is the HOST's, which is why `surfaces` carries a label at all.
+    expect(violations[0]).toMatchObject({ label: 'resumos', used: 14, allowed: 0 });
   });
 
   it('violates nothing on a tier whose ceilings clear the usage', () => {
-    expect(calc().impactOf({ products: 25, suppliers: 14, seats: 3 }, 'pro')).toEqual([]);
+    expect(calc().impactOf({ stations: 25, digests: 14, seats: 3 }, 'network')).toEqual([]);
   });
 });
 
 describe('cheapestTierFor', () => {
   it('walks the ladder in declaration order — the same order upsells use', () => {
-    expect(calc().cheapestTierFor({ products: 5, suppliers: 0, seats: 1 })).toBe('free');
-    expect(calc().cheapestTierFor({ products: 25, suppliers: 0, seats: 1 })).toBe('pro');
+    expect(calc().cheapestTierFor({ stations: 5, digests: 0, seats: 1 })).toBe('hobby');
+    expect(calc().cheapestTierFor({ stations: 25, digests: 0, seats: 1 })).toBe('network');
   });
 
   it('answers null when even the top tier would cap them', () => {
-    expect(calc().cheapestTierFor({ products: 25, suppliers: 0, seats: 99 })).toBeNull();
+    expect(calc().cheapestTierFor({ stations: 25, digests: 0, seats: 99 })).toBeNull();
   });
 
   it('starts a brand-new tenant at zero everywhere', () => {
-    expect(calc().emptyUsage()).toEqual({ products: 0, suppliers: 0, seats: 0 });
+    expect(calc().emptyUsage()).toEqual({ stations: 0, digests: 0, seats: 0 });
   });
 });
 
 describe('summarizeImpact — the three meanings of a plan key', () => {
-  const losing = { free: [{}], pro: [] } as Record<'free' | 'pro', readonly unknown[]>;
-  const safe = { free: [], pro: [] } as Record<'free' | 'pro', readonly unknown[]>;
+  const losing = { hobby: [{}], network: [] } as Record<'hobby' | 'network', readonly unknown[]>;
+  const safe = { hobby: [], network: [] } as Record<'hobby' | 'network', readonly unknown[]>;
 
   it('counts a loss against the tenant\'s OWN current tier', () => {
     const summary = calc().summarizeImpact([
-      { currentPlanKey: 'free', planKeyFrom: 'assigned', recommendedTier: 'pro', impactByTier: losing },
-      { currentPlanKey: 'pro', planKeyFrom: 'assigned', recommendedTier: 'pro', impactByTier: losing },
+      { currentPlanKey: 'hobby', planKeyFrom: 'assigned', recommendedTier: 'network', impactByTier: losing },
+      { currentPlanKey: 'network', planKeyFrom: 'assigned', recommendedTier: 'network', impactByTier: losing },
     ]);
-    // The first loses on free; the second's own tier (pro) is clean.
+    // The first loses on hobby; the second's own tier (network) is clean.
     expect(summary.losingOnCurrent).toBe(1);
-    expect(summary.byCurrent).toEqual({ free: 1, pro: 1 });
+    expect(summary.byCurrent).toEqual({ hobby: 1, network: 1 });
   });
 
   it('scores an off-ladder CLIENT key against the default plan, and says so', () => {
@@ -89,12 +90,12 @@ describe('summarizeImpact — the three meanings of a plan key', () => {
       { currentPlanKey: 'legacy', planKeyFrom: 'assigned', recommendedTier: null, impactByTier: losing },
     ]);
     expect(summary).toMatchObject({ offLadder: 1, losingOnCurrent: 1, unscorable: 0 });
-    expect(calc().formatOffLadderNote(summary.offLadder, summary.total)).toContain('"free"');
+    expect(calc().formatOffLadderNote(summary.offLadder, summary.total)).toContain('"hobby"');
   });
 
   it('refuses to score an off-ladder SUBSCRIPTION key in either direction', () => {
     // A live subscription's ceilings are its frozen snapshot, which the
-    // catalog does not model — calling it free would invent losses, calling
+    // catalog does not model — calling it hobby would invent losses, calling
     // it safe would hide them.
     const summary = calc().summarizeImpact([
       {
@@ -109,12 +110,47 @@ describe('summarizeImpact — the three meanings of a plan key', () => {
   });
 
   it('renders unknown keys flagged rather than silently dropped', () => {
-    const line = calc().formatTierBreakdown({ free: 2, legacy: 1, none: 1 });
-    expect(line).toBe('free 2, ⚠️ legacy 1, ⚠️ acima do Max 1');
+    const line = calc().formatTierBreakdown({ hobby: 2, legacy: 1, none: 1 });
+    // "no tier fits" names the ladder's OWN richest tier, read off the
+    // catalog. It used to be hardcoded to one host's tier name, so every other
+    // adopter's report cited a tier its catalog does not contain.
+    expect(line).toBe('hobby 2, ⚠️ legacy 1, ⚠️ acima do network 1');
   });
 
   it('prints no caveat for a fleet with nothing to caveat', () => {
     expect(calc().formatOffLadderNote(0, 5)).toBeNull();
     expect(calc().formatUnscorableNote(0, 5)).toBeNull();
+  });
+
+  it('names no noun for what a tenant IS — one host said "loja", the next does not', () => {
+    const off = calc().formatOffLadderNote(3, 12) ?? '';
+    const unscorable = calc().formatUnscorableNote(2, 12) ?? '';
+    expect(off).toContain('3/12');
+    expect(unscorable).toContain('2/12');
+    for (const note of [off, unscorable]) {
+      expect(note).not.toContain('loja');
+    }
+  });
+});
+
+describe('the assembly check', () => {
+  it('refuses an empty surface map rather than reporting a fleet it never measured', () => {
+    // The empty-collection trap: with no surfaces every tier violates nothing,
+    // so `cheapestTierFor` answers the CHEAPEST tier for everybody and
+    // `losingOnCurrent` is zero — a green light to downgrade the whole fleet,
+    // produced without measuring one of them.
+    expect(() =>
+      createPlanImpact({ plans: PLANS, defaultPlanKey: 'hobby', surfaces: {} }),
+    ).toThrow(/`surfaces` is empty/);
+  });
+
+  it('refuses a default plan key the ladder does not declare', () => {
+    expect(() =>
+      createPlanImpact({
+        plans: PLANS,
+        defaultPlanKey: 'legacy' as 'hobby',
+        surfaces: { stations: { feature: 'stations.online', label: 'estações' } },
+      }),
+    ).toThrow(/does not declare/);
   });
 });
