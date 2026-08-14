@@ -135,7 +135,7 @@ describe('replay safety — a host that already has the table needs no baselinin
       await applyAll(db);
       await db.query(
         `INSERT INTO audit_logs (id, client_id, action, resource_type, resource_id)
-         VALUES ('a1', 't1', 'order.cancel', 'order', 'o1')`,
+         VALUES ('a1', 't1', 'lamp.extinguish', 'lamp', 'o1')`,
       );
 
       await expect(applyAll(db)).resolves.toBeUndefined();
@@ -177,7 +177,7 @@ describe('replay safety — a host that already has the table needs no baselinin
           FOREIGN KEY ("client_id") REFERENCES "clients"("id") ON DELETE CASCADE ON UPDATE CASCADE;
         INSERT INTO "clients" ("id") VALUES ('t1');
         INSERT INTO "audit_logs" (id, client_id, action, resource_type, resource_id)
-          VALUES ('legacy', 't1', 'order.cancel', 'order', 'o1');
+          VALUES ('legacy', 't1', 'lamp.extinguish', 'lamp', 'o1');
       `);
 
       await expect(applyAll(db)).resolves.toBeUndefined();
@@ -233,7 +233,7 @@ describe('replay safety — a host that already has the table needs no baselinin
         db.query(
           `INSERT INTO audit_logs (id, client_id, action, resource_type, resource_id,
              actor_user_id, on_behalf_of_user_id)
-           VALUES ('a1', 't1', 'order.cancel', 'order', 'o1', 'u-real', 'u-subject')`,
+           VALUES ('a1', 't1', 'lamp.extinguish', 'lamp', 'o1', 'u-real', 'u-subject')`,
         ),
       ).resolves.toBeDefined();
     } finally {

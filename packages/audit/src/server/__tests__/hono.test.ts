@@ -5,11 +5,12 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 
-import { FUTURE_PAY_AUDIT_VOCABULARY } from '../../index';
 import { auditRouter } from '../../hono/index';
 import { getActorAttribution, getActorUserId } from '../actor-context';
 
 import { fakeAuditDb } from './fake-db';
+import { TEST_VOCABULARY } from './fixtures';
+import { DEFAULT_MESSAGES } from '../config';
 
 /**
  * The Hono adapter (12-14) — mounted the way a host mounts it, and driven through
@@ -36,7 +37,7 @@ function mounted(options: { permissions?: string[] } = {}) {
       scope: TENANT,
       onBehalfOfUserId: request.header('x-preview-as') ?? null,
     }),
-    vocabulary: FUTURE_PAY_AUDIT_VOCABULARY,
+    vocabulary: TEST_VOCABULARY,
     directory: {
       getUsers: (ids) => Promise.resolve(ids.map((id) => ({ id, name: `Name ${id}` }))),
       listActors: () => Promise.resolve([{ id: 'u-owner', name: 'Ana' }]),
@@ -80,9 +81,7 @@ describe('the mounted router', () => {
     const response = await app.request('/api/admin/my-store/audit-logs');
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({
-      error: 'Você não tem permissão para ver a auditoria.',
-    });
+    expect(await response.json()).toEqual({ error: DEFAULT_MESSAGES.forbidden });
   });
 
   it('answers 400 for a malformed filter', async () => {
@@ -96,12 +95,12 @@ describe('the mounted router', () => {
   it('forwards the query string to the filters', async () => {
     const { app, fake } = mounted();
     fake.seed(
-      { clientId: TENANT, resourceId: 'kept', action: 'order.cancel' },
-      { clientId: TENANT, resourceId: 'dropped', action: 'payment.capture' },
+      { clientId: TENANT, resourceId: 'kept', action: 'lamp.extinguish' },
+      { clientId: TENANT, resourceId: 'dropped', action: 'supply.deliver' },
     );
 
     const response = await app.request(
-      '/api/admin/my-store/audit-logs?action_in=order.cancel',
+      '/api/admin/my-store/audit-logs?action_in=lamp.extinguish',
     );
 
     const body = (await response.json()) as { data: { resourceId: string }[] };

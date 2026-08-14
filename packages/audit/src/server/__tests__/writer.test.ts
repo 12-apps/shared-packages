@@ -1,29 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { AuditVocabularyError, FUTURE_PAY_AUDIT_VOCABULARY, indexVocabulary } from '../../index';
+import { AuditVocabularyError } from '../../index';
 import { getActorAttribution, runWithActorScope, setActor } from '../actor-context';
 import type { AuditWriteClient } from '../db';
 import { AuditActorConflictError, createAuditWriter } from '../writer';
 
+import { TEST_VOCABULARY, UNKNOWN_ACTION, UNKNOWN_RESOURCE } from './fixtures';
+
 /**
- * The audit writer (12-14) — ported from future-pay's
- * `lib/audit/__tests__/audit.test.ts` (actor precedence) and
- * `audit-impersonation.test.ts` (the same invariant through the REAL actor
- * context).
- *
- * Those were two files because the context lived in another package and had to be
- * mocked to test precedence. Here it is the same package, so every case drives the
- * real AsyncLocalStorage context: the join between the two modules — where the bug
- * actually lived — is never stubbed out.
+ * The audit writer — the actor-precedence rules and the impersonation
+ * invariant, both driven through the REAL AsyncLocalStorage context rather than
+ * a mock, so the join between the two modules is never stubbed out.
  */
-const index = indexVocabulary(FUTURE_PAY_AUDIT_VOCABULARY);
-const audit = createAuditWriter(index);
+const audit = createAuditWriter(TEST_VOCABULARY);
 
 const base = {
   clientId: 'tenant-1',
-  action: 'order.cancel',
-  resourceType: 'order',
-  resourceId: 'order-1',
+  action: 'lamp.extinguish',
+  resourceType: 'lamp',
+  resourceId: 'lamp-1',
 };
 
 /** A tx stub exposing just the audit write (pass a custom fn to force failure). */
@@ -51,7 +46,7 @@ describe('actor precedence', () => {
 
     await runWithActorScope(async () => {
       setActor('user-7');
-      await audit(tx, { ...base, after: { fulfillmentStatus: 'CANCELED' } });
+      await audit(tx, { ...base, after: { state: 'DARK' } });
     });
 
     expect(create).toHaveBeenCalledWith({
@@ -61,11 +56,11 @@ describe('actor precedence', () => {
         actorRole: null,
         scope: null,
         onBehalfOfUserId: null,
-        action: 'order.cancel',
-        resourceType: 'order',
-        resourceId: 'order-1',
+        action: 'lamp.extinguish',
+        resourceType: 'lamp',
+        resourceId: 'lamp-1',
         before: {},
-        after: { fulfillmentStatus: 'CANCELED' },
+        after: { state: 'DARK' },
         requestId: null,
       },
     });
@@ -125,9 +120,20 @@ describe('actor precedence', () => {
     // transaction, so nothing commits.
     const { tx, create } = makeTx();
 
-    await expect(audit(tx, { ...base, action: 'order.vanish' })).rejects.toThrow(
+    await expect(audit(tx, { ...base, action: UNKNOWN_ACTION })).rejects.toThrow(
       AuditVocabularyError,
     );
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('refuses an undeclared RESOURCE TYPE for the same reason', async () => {
+    // The other axis, and the one that would otherwise write a structurally
+    // valid row whose diff is empty because no allowlist could be found for it.
+    const { tx, create } = makeTx();
+
+    await expect(
+      audit(tx, { ...base, resourceType: UNKNOWN_RESOURCE, after: { lumens: 1 } }),
+    ).rejects.toThrow(AuditVocabularyError);
     expect(create).not.toHaveBeenCalled();
   });
 });
@@ -179,7 +185,7 @@ describe('impersonation attribution', () => {
     await runWithActorScope(async () => {
       stampImpersonatedSession();
       routeBodyStampsItsOwnGrant();
-      await audit(tx, { ...base, after: { fulfillmentStatus: 'CANCELED' } });
+      await audit(tx, { ...base, after: { state: 'DARK' } });
     });
 
     expect(create).toHaveBeenCalledWith({
@@ -266,7 +272,7 @@ describe('impersonation attribution', () => {
 
     await runWithActorScope(async () => {
       setActor(REAL, { onBehalfOfUserId: TARGET });
-      await audit(tx, { ...base, after: { fulfillmentStatus: 'CANCELED' } });
+      await audit(tx, { ...base, after: { state: 'DARK' } });
     });
 
     // Exact match, not `objectContaining`: the point is that adding the second
@@ -278,11 +284,11 @@ describe('impersonation attribution', () => {
         actorRole: null,
         scope: null,
         onBehalfOfUserId: TARGET,
-        action: 'order.cancel',
-        resourceType: 'order',
-        resourceId: 'order-1',
+        action: 'lamp.extinguish',
+        resourceType: 'lamp',
+        resourceId: 'lamp-1',
         before: {},
-        after: { fulfillmentStatus: 'CANCELED' },
+        after: { state: 'DARK' },
         requestId: null,
       },
     });

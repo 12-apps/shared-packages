@@ -8,12 +8,12 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { AuditActorOptionWire, AuditLogFilters } from '../core/types';
-import type { AuditVocabularyIndex } from '../core/vocabulary';
+import type { AuditVocabulary } from '../core/vocabulary';
 
 import type { AuditLabels } from './labels';
 
 /**
- * The viewer's filter bar (12-14): the resource-id search, the action and
+ * The viewer's filter bar: the resource-id search, the action and
  * resource pills, the actor picker and the inclusive day bounds — the four
  * filters the endpoint accepts, and nothing the endpoint cannot serve.
  *
@@ -72,7 +72,7 @@ function PillGroup({
 export interface AuditFilterBarProps {
   filters: AuditLogFilters;
   labels: AuditLabels;
-  vocabulary: AuditVocabularyIndex;
+  vocabulary: AuditVocabulary;
   actors: readonly AuditActorOptionWire[];
   /** Applies a filter change and resets to page 1 (the screen owns that rule). */
   onChange: (next: AuditLogFilters) => void;
@@ -163,13 +163,16 @@ export function AuditFilterBar({
   actors,
   onChange,
 }: AuditFilterBarProps): JSX.Element {
-  const actionOptions = vocabulary.vocabulary.actions.map((action) => ({
-    id: action.id,
-    label: action.label,
+  // Built from the vocabulary's OWN id order and its own label lookup — the
+  // same two things the server's filter enum is built from, so a pill this
+  // screen offers is a value that endpoint accepts.
+  const actionOptions = vocabulary.actionIds.map((id) => ({
+    id,
+    label: vocabulary.actionLabel(id),
   }));
-  const resourceOptions = vocabulary.vocabulary.resources.map((resource) => ({
-    id: resource.id,
-    label: resource.label,
+  const resourceOptions = vocabulary.resourceIds.map((id) => ({
+    id,
+    label: vocabulary.resourceLabel(id),
   }));
   return (
     <Stack spacing={1.5} data-testid="audit-log-filters">

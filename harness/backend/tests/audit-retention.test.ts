@@ -10,10 +10,9 @@ import { createAuditRetention } from '@12-apps/audit/server';
 import { applyAuditMigrations, auditDb } from '../src/audit-db';
 
 /**
- * The retention sweep (12-14) against a real Postgres — the port of
- * future-pay's `audit-log.integration.test.ts` "removes only expired entries"
- * case, widened to the two questions an adversarial reader asks: does it delete
- * MORE than its window, and does it reach ANOTHER tenant.
+ * The retention sweep against a real Postgres, asking the two questions an
+ * adversarial reader asks first: does it delete MORE than its window, and does
+ * it reach ANOTHER tenant.
  *
  * This is the only delete path that exists for the trail, so a bug here destroys
  * history nothing can restore. The package's unit suite pins the STATEMENT; this
@@ -30,7 +29,7 @@ async function seed(
   for (const row of rows) {
     await pg.query(
       `INSERT INTO audit_logs (id, client_id, action, resource_type, resource_id, created_at)
-       VALUES ($1, $2, 'order.cancel', 'order', $1, $3)`,
+       VALUES ($1, $2, 'lamp.extinguish', 'lamp', $1, $3)`,
       [row.id, row.clientId, new Date(Date.now() - row.daysAgo * DAY_MS)],
     );
   }
@@ -93,12 +92,33 @@ describe('the global floor sweep', () => {
     });
   });
 
-  it('refuses a negative window instead of deleting the whole table', async () => {
+  it('refuses a window that bounds nothing instead of deleting the whole table', async () => {
+    // `0` is the sharp one: it reads as "no retention" and means "keep nothing",
+    // because the cutoff lands at `now`. Against a real table that is every row.
     await withDb(async (pg) => {
       const retention = createAuditRetention(() => Promise.resolve(auditDb(pg)));
       await seed(pg, [{ id: 'today', clientId: A, daysAgo: 0 }]);
+      const refusal = /must be a positive, finite number of days/;
 
-      await expect(retention.purgeExpired(-1)).rejects.toThrow(/Invalid retention window/);
+      await expect(retention.purgeExpired(-1)).rejects.toThrow(refusal);
+      await expect(retention.purgeExpired(0)).rejects.toThrow(refusal);
+      await expect(retention.purgeExpired(Number.NaN)).rejects.toThrow(refusal);
+      expect(await remaining(pg)).toEqual(['today']);
+    });
+  });
+
+  it('refuses the same window at CONSTRUCTION, where a host declares it', async () => {
+    // The floor is host CONFIG now, so a value that bounds nothing is a boot
+    // failure rather than a sweep that finds out later. Nothing is created, so
+    // nothing can run.
+    await withDb(async (pg) => {
+      const db = () => Promise.resolve(auditDb(pg));
+      await seed(pg, [{ id: 'today', clientId: A, daysAgo: 0 }]);
+
+      expect(() => createAuditRetention(db, { floorDays: 0 })).toThrow(/retention\.floorDays/);
+      expect(() => createAuditRetention(db, { floorDays: Number.NaN })).toThrow(
+        /retention\.floorDays/,
+      );
       expect(await remaining(pg)).toEqual(['today']);
     });
   });

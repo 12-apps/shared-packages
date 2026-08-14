@@ -7,9 +7,9 @@ import type {
 import type { AuditTransport } from './transport';
 
 /**
- * The typed wire calls the viewer makes (12-14) — the REST twins of the
- * `/server` descriptors, built from an `apiBase` (the host's admin mount, e.g.
- * `/api/admin/minha-loja`). The paths here and in `routes.ts` are ONE contract;
+ * The typed wire calls the viewer makes — the REST twins of the `/server`
+ * descriptors, built from an `apiBase` (the host's admin mount, e.g.
+ * `/api/admin/acme`). The paths here and in `routes.ts` are ONE contract;
  * changing either alone is a drift bug, which is why both halves ship together.
  */
 

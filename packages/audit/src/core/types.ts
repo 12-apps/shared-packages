@@ -1,9 +1,8 @@
 /**
- * The wire types BOTH halves of this package speak (12-14) — declared once in
- * the framework-free core, so the endpoint that serializes a row and the viewer
- * that renders it cannot disagree about its shape. (The bug class this closes is
- * the one FUT-740 shipped three times over: a payload each half described for
- * itself, agreeing nowhere.)
+ * The wire types BOTH halves of this package speak — declared once in the
+ * framework-free core, so the endpoint that serializes a row and the viewer
+ * that renders it cannot disagree about its shape. The bug class this closes is
+ * a payload each half describes for itself, agreeing nowhere.
  */
 
 /** Pagination meta, the shape the listing endpoint returns. */

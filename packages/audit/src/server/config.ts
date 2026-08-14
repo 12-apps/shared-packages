@@ -1,8 +1,9 @@
 /**
- * What every route in this surface shares (12-14): the actor, the request, the
- * response envelope and the config seam. Mirrors the report-builder / rbac shape
- * — framework-neutral descriptors that a forty-line adapter mounts.
+ * What every route in this surface shares: the actor, the request, the response
+ * envelope and the config seam. Framework-neutral descriptors that a forty-line
+ * adapter mounts.
  */
+import { AUDIT_READ_PERMISSION } from '../core/permissions';
 import type { AuditVocabulary } from '../core/vocabulary';
 
 import type { AuditDbProvider } from './db';
@@ -118,8 +119,17 @@ export interface AuditDirectory {
 export interface AuditRetentionConfig {
   /**
    * The global floor, in days: `purgeExpired()` deletes entries older than this.
-   * Default 365 — twelve months covers a full fiscal year of "who did this?"
-   * disputes for the smallest tenant while bounding table growth.
+   *
+   * Defaults to {@link DEFAULT_RETENTION_FLOOR_DAYS} — twelve months, which
+   * covers a full fiscal year of "who did this?" disputes while bounding table
+   * growth. That number is one deployment's policy, so it is a DEFAULT and not
+   * a rule; a host with a regulator saying otherwise passes its own.
+   *
+   * Validated at ASSEMBLY, and it has to be: this value is the sweep's cutoff,
+   * so `0` puts the cutoff at `now` and the first sweep deletes the entire
+   * trail, while `NaN` — what `Number(process.env.AUDIT_RETENTION_DAYS)` yields
+   * for an unset variable — reaches the same statement. There is nothing to
+   * undo either with.
    */
   floorDays?: number;
   /**
@@ -136,9 +146,26 @@ export interface AuditGatePermissions {
   read: string;
 }
 
-export const DEFAULT_GATE_PERMISSIONS: AuditGatePermissions = { read: 'audit:read' };
+/**
+ * The gate this package's own endpoints use, from this package's own id.
+ *
+ * One definition, in `core/permissions.ts`, so the value a host composes into
+ * its RBAC catalog and the value this surface checks are the same string.
+ */
+export const DEFAULT_GATE_PERMISSIONS: AuditGatePermissions = {
+  read: AUDIT_READ_PERMISSION,
+};
 
-/** The user-facing copy this surface emits (pt-BR product copy by default). */
+/**
+ * The user-facing copy this surface emits.
+ *
+ * ENGLISH by default, and that is a fallback rather than a recommendation: a
+ * message has to be in some language, and the only defensible default for a
+ * package is its own documented one. This package used to default to the
+ * extraction origin's market language, so an adopter that never passed
+ * `messages` shipped somebody else's locale to its users and had no compile
+ * error to notice it by. Pass your product's copy — see ADOPTING.md.
+ */
 export interface AuditMessages {
   unauthenticated: string;
   forbidden: string;
@@ -146,10 +173,50 @@ export interface AuditMessages {
 }
 
 export const DEFAULT_MESSAGES: AuditMessages = {
-  unauthenticated: 'Não autenticado.',
-  forbidden: 'Você não tem permissão para ver a auditoria.',
-  invalidQuery: 'Filtros inválidos',
+  unauthenticated: 'Not authenticated.',
+  forbidden: 'You do not have permission to view the audit trail.',
+  invalidQuery: 'Invalid filters',
 };
+
+/**
+ * The listing's paging policy — one deployment's numbers, as config with those
+ * numbers as the defaults.
+ *
+ * All three bound work a URL can ask for, so all three are validated at
+ * assembly: `pageSize` caps the rows one request returns, and `maxPage` caps
+ * the `OFFSET` behind it, because Postgres COUNTS AND DISCARDS every skipped
+ * row before returning any. `?page=999999999` at the default size is
+ * `OFFSET 19999999980` against a table that only grows.
+ */
+export interface AuditPaginationConfig {
+  /** Rows per page when the request names none. Default 20. */
+  defaultPageSize?: number;
+  /** The ceiling a request's `pageSize` is clamped to. Default 100. */
+  maxPageSize?: number;
+  /**
+   * The ceiling a request's `page` is clamped to. Default 10 000 — past the end
+   * of any trail a human is paging through (200k entries at the default size),
+   * and a caller who genuinely wants the far end of a big tenant's trail should
+   * be narrowing with `from`/`to` instead.
+   */
+  maxPage?: number;
+}
+
+/** The paging policy in force. */
+export interface AuditPagingPolicy {
+  defaultPageSize: number;
+  maxPageSize: number;
+  maxPage: number;
+}
+
+export const DEFAULT_PAGINATION: AuditPagingPolicy = {
+  defaultPageSize: 20,
+  maxPageSize: 100,
+  maxPage: 10_000,
+};
+
+/** The retention floor in force when a host names none. */
+export const DEFAULT_RETENTION_FLOOR_DAYS = 365;
 
 export interface AuditServerConfig {
   /** Prisma-shaped client for the one owned model, through the seam. */
@@ -157,26 +224,36 @@ export interface AuditServerConfig {
   /** Who is calling, per request. See {@link ResolveAuditActor}. */
   resolveActor: ResolveAuditActor;
   /**
-   * What may be audited, and what a row may say. Required: an audit surface with
-   * a vocabulary the package guessed would silently drop diffs.
+   * What may be audited, and what a row may say — the value
+   * `defineAuditVocabulary()` returned, and the SAME value the React half is
+   * given. Required, and checked: there is deliberately no default, because a
+   * package-supplied vocabulary is one host's, and a host that inherited it
+   * would silently drop every diff field its own writers emit.
    */
   vocabulary: AuditVocabulary;
   /**
    * The models whose writes carry `created_by`/`updated_by`, for the stamping
-   * extension. This is the value future-pay hard-coded INSIDE the extension
-   * (`TRACKED_MODELS`); it is config here. Empty/omitted = the extension is a
-   * pass-through.
+   * extension. Omitted or empty = the extension is a pass-through, which is an
+   * honest setting: naming no model means stamping no model, and nothing else
+   * in the package depends on it.
    */
   trackedModels?: readonly string[];
   /**
-   * The models the append-only guard protects. Defaults to `['AuditLog']` — this
-   * package's own. A host with other immutable tables can add them.
+   * ADDITIONAL models the append-only guard protects, for a host with immutable
+   * tables of its own.
+   *
+   * This package's own model is ALWAYS guarded and cannot be removed from the
+   * set. It used to be the default value of this field, which meant declaring
+   * `appendOnlyModels: ['MyLedger']` — the obvious way to add one — silently
+   * turned the audit table's own immutability off, and `[]` turned the guard
+   * off entirely while reading like "the default, spelled out".
    */
   appendOnlyModels?: readonly string[];
   retention?: AuditRetentionConfig;
   directory?: AuditDirectory;
   gatePermissions?: Partial<AuditGatePermissions>;
   messages?: Partial<AuditMessages>;
+  pagination?: AuditPaginationConfig;
 }
 
 /** A user-safe API error carrying the HTTP status the wire promises. */
@@ -211,17 +288,6 @@ export function foldApiError(error: unknown): AuditResponse {
   if (error instanceof AuditApiError) return fail(error.status, error.message);
   throw error;
 }
-
-/** The messages in force, defaulted to the pt-BR product copy. */
-export const messagesOf = (config: Pick<AuditServerConfig, 'messages'>): AuditMessages => ({
-  ...DEFAULT_MESSAGES,
-  ...config.messages,
-});
-
-/** The gate permission ids in force. */
-export const gatesOf = (
-  config: Pick<AuditServerConfig, 'gatePermissions'>,
-): AuditGatePermissions => ({ ...DEFAULT_GATE_PERMISSIONS, ...config.gatePermissions });
 
 /**
  * The permission gate. A platform operator passes; everyone else must carry the

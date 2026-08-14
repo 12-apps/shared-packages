@@ -14,8 +14,7 @@
  *
  * Only the schema partial. MIGRATIONS ARE NOT HANDLED HERE — the host
  * discovers and copies them structurally, by looking for a `prisma/migrations`
- * directory inside every installed `@12-apps/*` package (see future-pay's
- * packages/prisma/scripts/sync-prisma-plugins.mjs). This package's migration is
+ * directory inside every installed `@12-apps/*` package. This package's migration is
  * REPLAY-SAFE (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`,
  * `CREATE INDEX IF NOT EXISTS`), so a host that already has an `audit_logs`
  * table needs no baselining and no `migrate resolve --applied`.
@@ -23,9 +22,9 @@
  * The host package that owns the schema folder MUST also declare this package
  * as a dependency, so the source of the copy is present in every build context.
  *
- * Default host path follows the future-pay layout
- * (`packages/prisma/prisma/schema/`); another repo passes its own schema folder
- * as the positional argument, or sets AUDIT_HOST_SCHEMA_DIR.
+ * The default host path (`packages/prisma/prisma/schema/`) is a convenience for
+ * the layout this repo uses; another repo passes its own schema folder as the
+ * positional argument, or sets AUDIT_HOST_SCHEMA_DIR.
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

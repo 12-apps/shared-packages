@@ -1,6 +1,5 @@
 /**
- * The audit surface's route DESCRIPTORS (12-14) — the package half of
- * future-pay's `app/api/admin/[tenantSlug]/audit-logs/route.ts`.
+ * The audit surface's route DESCRIPTORS.
  *
  * Framework-neutral: a descriptor takes a normalized request and answers a
  * status + body, so `./hono` is an adapter rather than the contract. Both routes
@@ -12,15 +11,18 @@
  * `/audit-logs`, so a framework that matches greedily can never route the literal
  * segment into the listing. Adapters mount the array verbatim.
  */
+import type { AuditVocabulary } from '../core/vocabulary';
+
 import {
   AuditApiError,
   foldApiError,
-  gatesOf,
-  messagesOf,
   ok,
   pageResponse,
   requirePermission,
   type AuditActor,
+  type AuditGatePermissions,
+  type AuditMessages,
+  type AuditPagingPolicy,
   type AuditRequest,
   type AuditResponse,
   type AuditRoute,
@@ -28,12 +30,23 @@ import {
 } from './config';
 import type { AuditStore } from './store';
 import { parseAuditLogQuery } from './wire';
-import type { AuditVocabularyIndex } from '../core/vocabulary';
 
+/**
+ * What the descriptors run on — the RESOLVED policy, not the raw config.
+ *
+ * The messages, the gate ids and the paging numbers are resolved once by
+ * `createApiAudit` (through `policy.ts`, which is where every refusal lives) and
+ * handed over already-checked. Re-resolving them per request would move those
+ * refusals onto the request path, where a host meets them as a 500 on one
+ * endpoint instead of as a failure to boot.
+ */
 interface RouteDeps {
-  config: AuditServerConfig;
-  index: AuditVocabularyIndex;
+  config: Pick<AuditServerConfig, 'resolveActor'>;
+  vocabulary: AuditVocabulary;
   store: AuditStore;
+  messages: AuditMessages;
+  gates: AuditGatePermissions;
+  paging: AuditPagingPolicy;
 }
 
 /**
@@ -46,10 +59,9 @@ interface RouteDeps {
  * identifier that came off the wire.
  */
 async function authorize(deps: RouteDeps, request: AuditRequest): Promise<AuditActor> {
-  const messages = messagesOf(deps.config);
   const actor = await deps.config.resolveActor(request);
-  if (!actor) throw new AuditApiError(401, messages.unauthenticated);
-  requirePermission(actor, gatesOf(deps.config).read, messages);
+  if (!actor) throw new AuditApiError(401, deps.messages.unauthenticated);
+  requirePermission(actor, deps.gates.read, deps.messages);
   return actor;
 }
 
@@ -60,7 +72,12 @@ function listRoute(deps: RouteDeps): AuditRoute {
     async handle(request: AuditRequest): Promise<AuditResponse> {
       try {
         const actor = await authorize(deps, request);
-        const query = parseAuditLogQuery(deps.index, request.query, messagesOf(deps.config));
+        const query = parseAuditLogQuery(
+          deps.vocabulary,
+          request.query,
+          deps.messages,
+          deps.paging,
+        );
         const page = await deps.store.listPage(actor.tenantId, query);
         return pageResponse(page.data, page.pagination);
       } catch (error) {

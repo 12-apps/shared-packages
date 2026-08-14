@@ -8,32 +8,48 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import type { AuditLogPageWire, AuditLogWire } from '../../core/types';
+import { defineAuditVocabulary } from '../../core/vocabulary';
 import { createWebAudit } from '../create-web-audit';
 import type { AuditTransport } from '../transport';
 import { AuditRequestError } from '../transport';
 
 /**
- * The viewer (12-14), driven the way a host mounts it: ONE call to
- * `createWebAudit({ apiBase })`, no screen imported by name.
+ * The viewer, driven the way a host mounts it: ONE call to
+ * `createWebAudit({ apiBase, vocabulary })`, no screen imported by name.
  *
  * The transport is substituted rather than `globalThis.fetch` stubbed, which is
  * the package's own seam — so what these cases assert is the URL the surface
  * actually builds and the row it renders from the body it actually receives.
+ *
+ * The vocabulary is a fixture in a domain this package was not extracted from,
+ * and it is REQUIRED now: there is no default to fall back to, which is the
+ * whole point of this release. A host's actions, its resources and its words
+ * arrive together or the surface refuses to assemble.
  */
+const VOCABULARY = defineAuditVocabulary({
+  actions: {
+    'lamp.extinguish': { label: 'Lamp extinguished' },
+    'supply.deliver': { label: 'Supply run delivered' },
+  },
+  resources: {
+    lamp: { label: 'Lamp', fields: ['state', 'lumens'] },
+    supply: { label: 'Supply run', fields: ['crates'] },
+  },
+});
 const entry = (overrides: Partial<AuditLogWire> = {}): AuditLogWire => ({
   id: 'a1',
   createdAt: '2026-08-01T15:04:00.000Z',
   actorUserId: 'u-real',
-  actorName: 'Ana Proprietária',
+  actorName: 'Ada Keeper',
   actorRole: 'OWNER',
   scope: 'client-1',
   onBehalfOfUserId: null,
   onBehalfOfName: null,
-  action: 'order.cancel',
-  resourceType: 'order',
-  resourceId: 'order-1',
-  before: { fulfillmentStatus: 'PENDING' },
-  after: { fulfillmentStatus: 'CANCELED' },
+  action: 'lamp.extinguish',
+  resourceType: 'lamp',
+  resourceId: 'lamp-1',
+  before: { state: 'LIT' },
+  after: { state: 'DARK' },
   requestId: null,
   ...overrides,
 });
@@ -76,7 +92,8 @@ function harness(options: {
 
 const mount = (h: Harness, config: Record<string, unknown> = {}) => {
   const { page: Page } = createWebAudit({
-    apiBase: '/api/admin/minha-loja',
+    apiBase: '/api/admin/beacon-authority',
+    vocabulary: VOCABULARY,
     transport: h.transport,
     ...config,
   });
@@ -84,8 +101,8 @@ const mount = (h: Harness, config: Record<string, unknown> = {}) => {
 };
 
 /** Mount against a bare transport, for the cases that build their own. */
-function mountWith(transport: AuditTransport, apiBase = '/api/admin/minha-loja') {
-  const { page: Page } = createWebAudit({ apiBase, transport });
+function mountWith(transport: AuditTransport, apiBase = '/api/admin/beacon-authority') {
+  const { page: Page } = createWebAudit({ apiBase, vocabulary: VOCABULARY, transport });
   return render(<Page />);
 }
 
@@ -99,24 +116,24 @@ describe('the trail', () => {
     const row = screen.getByTestId('audit-log-row-a1');
     // The labels come from the VOCABULARY the backend half validates against, so
     // an action that exists is an action this screen can name.
-    expect(row.textContent).toContain('Pedido cancelado');
-    expect(row.textContent).toContain('Pedido');
-    expect(row.textContent).toContain('fulfillmentStatus: PENDING → CANCELED');
+    expect(row.textContent).toContain('Lamp extinguished');
+    expect(row.textContent).toContain('Lamp');
+    expect(row.textContent).toContain('state: LIT → DARK');
     // "Who · under which role".
-    expect(screen.getByTestId('audit-log-actor-a1').textContent).toBe('Ana Proprietária · OWNER');
+    expect(screen.getByTestId('audit-log-actor-a1').textContent).toBe('Ada Keeper · OWNER');
   });
 
   it('renders the impersonation PAIR, naming both people', async () => {
-    // The regression that motivated this port: future-pay's API carried
-    // `onBehalfOfName` and its viewer dropped it, so a support session looked
-    // exactly like the owner working alone.
+    // The regression that motivated the viewer this was ported from: its API
+    // carried `onBehalfOfName` and the screen dropped it, so a support session
+    // looked exactly like the account owner working alone.
     const h = harness({
       entries: [
         entry({
-          actorName: 'Suporte Future',
+          actorName: 'Ivy Relief',
           actorRole: 'SUPERADMIN',
           onBehalfOfUserId: 'u-target',
-          onBehalfOfName: 'Bruno Dono',
+          onBehalfOfName: 'Ada Keeper',
         }),
       ],
     });
@@ -124,9 +141,9 @@ describe('the trail', () => {
     mount(h);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-actor-a1')).toBeDefined());
-    expect(screen.getByTestId('audit-log-actor-a1').textContent).toBe('Suporte Future · SUPERADMIN');
+    expect(screen.getByTestId('audit-log-actor-a1').textContent).toBe('Ivy Relief · SUPERADMIN');
     expect(screen.getByTestId('audit-log-on-behalf-of-a1').textContent).toBe(
-      'Suporte Future em nome de Bruno Dono',
+      'Ivy Relief on behalf of Ada Keeper',
     );
   });
 
@@ -138,7 +155,7 @@ describe('the trail', () => {
     mount(h);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-actor-a1')).toBeDefined());
-    expect(screen.getByTestId('audit-log-actor-a1').textContent).toBe('Sistema');
+    expect(screen.getByTestId('audit-log-actor-a1').textContent).toBe('System');
   });
 
   it('labels an id the directory could not resolve, on both halves of the pair', async () => {
@@ -151,9 +168,9 @@ describe('the trail', () => {
     mount(h);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-actor-a1')).toBeDefined());
-    expect(screen.getByTestId('audit-log-actor-a1').textContent).toBe('Usuário removido');
+    expect(screen.getByTestId('audit-log-actor-a1').textContent).toBe('Deleted user');
     expect(screen.getByTestId('audit-log-on-behalf-of-a1').textContent).toBe(
-      'Usuário removido em nome de Usuário removido',
+      'Deleted user on behalf of Deleted user',
     );
   });
 
@@ -202,13 +219,13 @@ describe('the filters', () => {
     mount(h);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    fireEvent.click(screen.getByTestId('audit-log-action-order.cancel'));
+    fireEvent.click(screen.getByTestId('audit-log-action-lamp.extinguish'));
     await waitFor(() =>
-      expect(h.paths.some((path) => path.includes('action_in=order.cancel'))).toBe(true),
+      expect(h.paths.some((path) => path.includes('action_in=lamp.extinguish'))).toBe(true),
     );
 
     const before = h.paths.length;
-    fireEvent.click(screen.getByTestId('audit-log-action-order.cancel'));
+    fireEvent.click(screen.getByTestId('audit-log-action-lamp.extinguish'));
     await waitFor(() => expect(h.paths.length).toBeGreaterThan(before));
     expect(h.paths[h.paths.length - 1]).not.toContain('action_in');
   });
@@ -219,20 +236,20 @@ describe('the filters', () => {
     mount(h);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    fireEvent.click(screen.getByTestId('audit-log-resource-order'));
+    fireEvent.click(screen.getByTestId('audit-log-resource-lamp'));
     fireEvent.change(screen.getByTestId('audit-log-from'), { target: { value: '2026-07-01' } });
     fireEvent.change(screen.getByTestId('audit-log-to'), { target: { value: '2026-07-31' } });
 
     await waitFor(() => {
       const last = h.paths[h.paths.length - 1] ?? '';
-      expect(last).toContain('resourceType_in=order');
+      expect(last).toContain('resourceType_in=lamp');
       expect(last).toContain('from=2026-07-01');
       expect(last).toContain('to=2026-07-31');
     });
   });
 
   it('offers the roster when the host wired one, and filters by the chosen actor', async () => {
-    const h = harness({ actors: [{ id: 'u-real', label: 'Ana Proprietária' }] });
+    const h = harness({ actors: [{ id: 'u-real', label: 'Ada Keeper' }] });
 
     mount(h);
 
@@ -269,14 +286,14 @@ describe('the filters', () => {
     mount(h);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    fireEvent.click(screen.getByTestId('audit-log-action-order.cancel'));
+    fireEvent.click(screen.getByTestId('audit-log-action-lamp.extinguish'));
     await waitFor(() =>
       expect(h.paths.some((path) => path.includes('action_in'))).toBe(true),
     );
     fireEvent.click(screen.getByTestId('audit-log-clear'));
 
     await waitFor(() =>
-      expect(h.paths[h.paths.length - 1]).toBe('/api/admin/minha-loja/audit-logs'),
+      expect(h.paths[h.paths.length - 1]).toBe('/api/admin/beacon-authority/audit-logs'),
     );
   });
 
@@ -287,12 +304,12 @@ describe('the filters', () => {
     mount(h, { fixedFilters: { resourceId: 'order-1' } });
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    fireEvent.click(screen.getByTestId('audit-log-action-order.cancel'));
+    fireEvent.click(screen.getByTestId('audit-log-action-lamp.extinguish'));
 
     await waitFor(() => {
       const last = h.paths[h.paths.length - 1] ?? '';
       expect(last).toContain('resourceId=order-1');
-      expect(last).toContain('action_in=order.cancel');
+      expect(last).toContain('action_in=lamp.extinguish');
     });
   });
 
@@ -304,7 +321,7 @@ describe('the filters', () => {
     const { paths } = h;
     mount(h);
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    fireEvent.click(screen.getByTestId('audit-log-action-order.cancel'));
+    fireEvent.click(screen.getByTestId('audit-log-action-lamp.extinguish'));
 
     await waitFor(() => expect(paths[paths.length - 1]).toContain('action_in'));
     expect(paths[paths.length - 1]).not.toContain('page=');
@@ -319,8 +336,8 @@ describe('the request the surface builds', () => {
 
     await waitFor(() => expect(h.paths).toHaveLength(2));
     expect(h.paths.sort()).toEqual([
-      '/api/admin/minha-loja/audit-logs',
-      '/api/admin/minha-loja/audit-logs/actors',
+      '/api/admin/beacon-authority/audit-logs',
+      '/api/admin/beacon-authority/audit-logs/actors',
     ]);
   });
 
@@ -341,22 +358,24 @@ describe('the request the surface builds', () => {
     expect(screen.getByTestId('audit-log-actor-id')).toBeDefined();
   });
 
-  it('accepts a host vocabulary and labels rows from it', async () => {
+  it('takes a SECOND host vocabulary and labels rows from that one instead', async () => {
+    // Two vocabularies in one process: the surface renders whichever it was
+    // handed, and knows nothing that is not in it.
     const h = harness({
-      entries: [entry({ action: 'invoice.void', resourceType: 'invoice' })],
+      entries: [entry({ action: 'ticket.refund', resourceType: 'ticket' })],
     });
 
     mount(h, {
-      vocabulary: {
-        actions: [{ id: 'invoice.void', label: 'Invoice voided' }],
-        resources: [{ id: 'invoice', label: 'Invoice', fields: ['total'] }],
-      },
-      labels: { title: 'Audit trail' },
+      vocabulary: defineAuditVocabulary({
+        actions: { 'ticket.refund': { label: 'Ticket refunded' } },
+        resources: { ticket: { label: 'Ticket', fields: ['total'] } },
+      }),
+      labels: { title: 'Ledger history' },
     });
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    expect(screen.getByTestId('audit-log-row-a1').textContent).toContain('Invoice voided');
-    expect(screen.getByText('Audit trail')).toBeDefined();
+    expect(screen.getByTestId('audit-log-row-a1').textContent).toContain('Ticket refunded');
+    expect(screen.getByText('Ledger history')).toBeDefined();
   });
 
   it('formats the stamp with the host formatter', async () => {
@@ -395,7 +414,7 @@ describe('the paginated footer', () => {
 
     await waitFor(() => expect(screen.getByTestId('audit-log-page-status')).toBeDefined());
     expect(screen.getByTestId('audit-log-page-status').textContent).toBe(
-      'Página 1 de 3 · 45 registros',
+      'Page 1 of 3 · 45 entries',
     );
     fireEvent.click(screen.getByTestId('audit-log-next'));
     await waitFor(() => expect(paths.some((path) => path.includes('page=2'))).toBe(true));
@@ -403,7 +422,7 @@ describe('the paginated footer', () => {
     // came from the SERVER's answer rather than from a local counter.
     await waitFor(() =>
       expect(screen.getByTestId('audit-log-page-status').textContent).toBe(
-        'Página 2 de 3 · 45 registros',
+        'Page 2 of 3 · 45 entries',
       ),
     );
   });

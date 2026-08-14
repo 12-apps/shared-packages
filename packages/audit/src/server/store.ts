@@ -1,7 +1,7 @@
 /**
- * Audit-log READS (12-14): the tenant-scoped, server-paginated page behind the
- * viewer and the listing endpoint. Strictly read-only — the write side is
- * `writer.ts`, and the model is append-only.
+ * Audit-log READS: the tenant-scoped, server-paginated page behind the viewer
+ * and the listing endpoint. Strictly read-only — the write side is `writer.ts`,
+ * and the model is append-only.
  *
  * ## Tenancy
  *
@@ -20,6 +20,7 @@
 import type { AuditLogPageWire, AuditLogWire, AuditPagination } from '../core/types';
 
 import type { AuditDirectory, AuditUserIdentity } from './config';
+import { AUDIT_LOG_ORDER_BY } from './db';
 import type { AuditDb, AuditLogRecord, AuditLogWhere } from './db';
 import type { AuditLogQuery } from './wire';
 
@@ -182,7 +183,11 @@ export function createAuditStore(
       const [rows, total] = await Promise.all([
         client.auditLog.findMany({
           where,
-          orderBy: { createdAt: 'desc' },
+          // A TOTAL order, not just "newest first" — see AUDIT_LOG_ORDER_BY.
+          // Entries written in a burst share a millisecond, and without the id
+          // tie-break two pages of the same filtered set can order those ties
+          // differently: the operator sees one row twice and never sees another.
+          orderBy: AUDIT_LOG_ORDER_BY,
           skip: (query.page - 1) * query.pageSize,
           take: query.pageSize,
         }),

@@ -5,6 +5,11 @@ writer, the per-request actor context behind it, the two Prisma extensions that
 enforce it, the retention sweep, the tenant-scoped listing endpoint and the
 viewer that reads it.
 
+**The vocabulary is yours.** This package ships no actions, no resource types,
+no field allowlists and no product language — you declare them and pass them in.
+See [ADOPTING.md](./ADOPTING.md) for the migration table if you are coming from
+1.x.
+
 Two halves, one factory each.
 
 ```ts
@@ -31,15 +36,47 @@ made mechanical:
   who the screen claimed to be. One field cannot answer both questions, and
   collapsing them is not recoverable on an append-only table.
 
+## The vocabulary
+
+One value describes what may be audited, what a row may say, and what a human
+reads. Both halves take the same object.
+
+```ts
+import { defineAuditVocabulary } from '@12-apps/audit';
+
+export const AUDIT = defineAuditVocabulary({
+  actions: {
+    'post.publish': { label: 'Post published' },
+    'comment.hide': { label: 'Comment hidden' },
+  },
+  resources: {
+    post: { label: 'Post', fields: ['title', 'state', 'publishedAt'] },
+    comment: { label: 'Comment', fields: ['state', 'reason'] },
+  },
+});
+```
+
+`fields` is a **deny-by-default allowlist**: a field the diff carries but the
+vocabulary does not name is dropped, so a caller passing a whole database row
+cannot leak PII into an append-only table. The flip side is that an omission is
+invisible at the write site and shows up as a hollow entry — list every field
+each writer of a shared resource type emits.
+
+The factory refuses, at assembly, everything that would make the vocabulary
+unsafe later: an empty axis, an empty `fields`, a blank label, a blank or
+whitespace-padded id or field name, a duplicate field, an integer-like id. Every
+one of those is a fail-open, explained in [ADOPTING.md](./ADOPTING.md) §5.
+
 ## The backend half
 
 ```ts
 const audit = auditRouter({
   db: () => getPrismaClient(),               // the seam: one owned model
-  vocabulary: MY_AUDIT_VOCABULARY,           // what may be audited
-  trackedModels: ['Product', 'Supplier'],    // created_by / updated_by
+  vocabulary: AUDIT,                         // what may be audited
+  trackedModels: ['Post', 'Comment'],        // created_by / updated_by
   retention: { floorDays: 365 },
   directory: { getUsers, listActors },       // who a user id is (optional)
+  messages: { forbidden: 'No access.' },     // your product's copy
   resolveActor: async (request) => {         // WHO is calling
     const session = await auth(request.raw);
     if (!session) return null;
@@ -73,7 +110,7 @@ What you get back:
 | `withActorContext(req, run)` | the actor-context middleware (`actorContext` in `./hono`) |
 | `retention` | `purgeExpired()` and `purgeTenantWindow(tenant, since, cutoff)` |
 | `store` | the tenant-scoped read, for a host surface that lists the same rows |
-| `vocabulary` | the indexed vocabulary: labels, validation |
+| `vocabulary` | the vocabulary in force — labels and validation |
 
 ### Endpoints
 
@@ -84,16 +121,34 @@ What you get back:
 
 Filters: `q` (resource id contains), `action_in`, `resourceType_in`,
 `actorUserId`, `resourceId`, `from`/`to` (inclusive `YYYY-MM-DD`), `page`,
-`pageSize` (default 20, max 100). Unknown filter values and malformed dates are
-`400`; a denial is `{ error }` at the top level with `401` / `403`.
+`pageSize`. The paging numbers are config (`pagination`), defaulting to 20 / 100
+/ 10 000. Unknown filter values and malformed dates are `400`; a denial is
+`{ error }` at the top level with `401` / `403`.
+
+The listing's order is **total**: `created_at DESC, id DESC`. An audit trail is
+written in bursts and `created_at` is `timestamp(3)`, so ties are ordinary — and
+SQL guarantees nothing about the order of rows a sort cannot distinguish, which
+with `skip`/`take` means a reader sees one entry twice and never sees another.
+The tie-break is part of the seam (`AUDIT_LOG_ORDER_BY`), so a non-Prisma
+implementation maps it rather than reinventing it.
 
 There is **no write endpoint**. Entries are written by the mutations themselves,
 so a POST here would only be a way to forge history.
 
+### The permission it gates with
+
+`audit:read` is exported as `AUDIT_READ_PERMISSION`, because this package owns
+the endpoint it guards. Compose it into your catalog, or spell it differently
+with `gatePermissions.read` — the constant is the default, not a requirement.
+
 ## The frontend half
 
 ```ts
-const { page: AuditLog } = createWebAudit({ apiBase: '/api/admin/my-store' });
+const { page: AuditLog } = createWebAudit({
+  apiBase: '/api/admin/my-store',
+  vocabulary: AUDIT,
+  labels: { title: 'History' },   // your product's words
+});
 ```
 
 The whole viewer: the resource-id search, the action and resource pills, the
@@ -102,26 +157,9 @@ and the impersonation pair rendered as one line naming **both** people. The
 vocabulary is shared with the backend half, so an action that exists is an action
 the viewer can label.
 
-## The vocabulary
-
-One value describes what may be audited, what a row may say, and what a human
-reads:
-
-```ts
-const MY_AUDIT_VOCABULARY = {
-  actions: [{ id: 'post.publish', label: 'Post published' }],
-  resources: [{ id: 'post', label: 'Post', fields: ['title', 'state'] }],
-};
-```
-
-`fields` is a **deny-by-default allowlist**: a field the diff carries but the
-vocabulary does not name is dropped, so a caller passing a whole database row
-cannot leak PII into an append-only table. The flip side is that an omission is
-invisible at the write site and shows up as a hollow entry — list every field
-each writer of a shared resource type emits.
-
-`FUTURE_PAY_AUDIT_VOCABULARY` ships the Future Pay catalog for the host this came
-out of.
+Copy defaults to English and dates to the runtime's own locale. Both are
+fallbacks rather than recommendations — a package cannot know your market, and
+1.x defaulted to one application's.
 
 ## The database
 
@@ -155,4 +193,4 @@ them:
   actor that carries none.
 
 See [ADOPTING.md](./ADOPTING.md) for the full contract, the impersonation pair's
-design, and the checklist.
+design, the assembly refusals and the checklist.

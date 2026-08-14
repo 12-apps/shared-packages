@@ -1,5 +1,5 @@
 /**
- * The `AuditDb` seam, backed by a REAL Postgres (12-14).
+ * The `AuditDb` seam, backed by a REAL Postgres.
  *
  * The same arrangement `saved-report-db.ts` and `rbac-db.ts` give their
  * surfaces: PGlite is a real Postgres, the table is created by the PACKAGE'S
@@ -17,7 +17,12 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
 import { PGlite } from '@electric-sql/pglite';
-import type { AuditDb, AuditLogRecord, AuditLogWhere } from '@12-apps/audit/server';
+import type {
+  AuditDb,
+  AuditLogOrderBy,
+  AuditLogRecord,
+  AuditLogWhere,
+} from '@12-apps/audit/server';
 
 /**
  * The package's migrations, located by PATH inside the installed package — the
@@ -88,6 +93,37 @@ const toRecord = (row: Row): AuditLogRecord => ({
   requestId: row.request_id,
 });
 
+/**
+ * Translate the CLOSED `AuditLogOrderBy` into an ORDER BY clause.
+ *
+ * Built FROM the argument rather than hard-coded, which is the whole point of
+ * the order being part of the seam: this file used to write
+ * `ORDER BY created_at DESC, id DESC` on its own initiative while the package
+ * asked only for `createdAt DESC`, so the harness was quietly stronger than the
+ * thing it exists to prove. A tie-break the package does not ask for is a
+ * tie-break a REAL Prisma host does not get.
+ *
+ * The mapping is exhaustive over the two columns the seam can name; anything
+ * else is a widening of the published type that this host must be told about
+ * rather than silently drop.
+ */
+const COLUMN: Record<string, string> = { createdAt: 'created_at', id: 'id' };
+
+function orderClause(orderBy: AuditLogOrderBy): string {
+  return orderBy
+    .map((clause) => {
+      const [field, direction] = Object.entries(clause)[0] ?? [];
+      const column = field === undefined ? undefined : COLUMN[field];
+      if (!column || direction === undefined) {
+        throw new Error(`@12-apps/audit asked for an order this host cannot map: ${
+          JSON.stringify(clause)
+        }`);
+      }
+      return `${column} ${direction === 'desc' ? 'DESC' : 'ASC'}`;
+    })
+    .join(', ');
+}
+
 /** Translate the CLOSED `AuditLogWhere` shapes into SQL + bound parameters. */
 function predicate(where: AuditLogWhere): { sql: string; values: unknown[] } {
   const values: unknown[] = [where.clientId];
@@ -138,11 +174,12 @@ export function auditDb(pg: PGlite): AuditDb {
         );
         return {};
       },
-      async findMany({ where, skip, take }) {
+      async findMany({ where, orderBy, skip, take }) {
         const { sql, values } = predicate(where);
         const { rows } = await pg.query<Row>(
           `SELECT ${SELECT} FROM audit_logs WHERE ${sql}
-           ORDER BY created_at DESC, id DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+           ORDER BY ${orderClause(orderBy)}
+           LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
           [...values, take, skip],
         );
         return rows.map(toRecord);

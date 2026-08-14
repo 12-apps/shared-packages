@@ -1,48 +1,65 @@
 /* eslint-disable test-flakiness/no-test-isolation, test-flakiness/no-unmocked-fs --
-   `api` is a const built by `blogAudit()` inside each case over its own array;
-   the heuristic reads the name as shared state. The filesystem read at the bottom
-   IS the subject: the last case walks this package's own source to prove the
-   optional peers are never imported from the root or the server half. */
+   every `const` the isolation heuristic reads as shared state is built inside
+   the case that uses it, by a factory over its own array. The filesystem read
+   at the bottom IS the subject: the last describe walks this package's own
+   source to prove the optional peers are never imported from the root or the
+   server half. */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { indexVocabulary, redactDiff, type AuditVocabulary } from '../index';
+import { AuditConfigError } from '../core/errors';
+import { defineAuditVocabulary, redactDiff } from '../core/vocabulary';
 import { runWithActorScope, setActor } from '../server/actor-context';
 import { createApiAudit } from '../server/create-api-audit';
 import type { AuditDb, AuditLogCreateData, AuditLogRecord } from '../server/db';
 
-/**
- * The TOY SECOND HOST (12-14 acceptance): a complete "blog" wired to this package
- * with ONLY a vocabulary, an actor resolver and a db seam — zero imports from the
- * Future Pay vocabulary, and zero code the blog had to write to make the surface
- * work. If this suite passes, the machinery presumes no restaurants: no
- * `order.cancel`, no `MenuItem`, no `audit:read`, no pt-BR.
- *
- * The rbac package's `portability.test.ts` is the precedent, and the reason both
- * exist: "generic" is a claim, and a second host is the only thing that checks it.
- */
-const BLOG_VOCABULARY: AuditVocabulary = {
-  actions: [
-    { id: 'post.publish', label: 'Post published' },
-    { id: 'post.retract', label: 'Post retracted' },
-    { id: 'comment.hide', label: 'Comment hidden' },
-  ],
-  resources: [
-    { id: 'post', label: 'Post', fields: ['title', 'state', 'publishedAt'] },
-    { id: 'comment', label: 'Comment', fields: ['state', 'reason'] },
-  ],
-};
+import { foreignPatterns } from './foreign-vocabulary';
 
-const SITE = 'site-cooking';
+/**
+ * A REAL SECOND HOST, in a domain the extraction origin does not touch.
+ *
+ * A portability claim is only worth what it is tested against, and testing it
+ * against the application the package came out of proves nothing: that
+ * application's vocabulary is the one that used to be compiled in. So the host
+ * below is a **seed bank** — accessions, germination trials, a cold vault —
+ * sharing no word with the origin, and the "fixtures themselves" describe
+ * checks that claim against the same ban list the tarball sweep uses rather
+ * than restating it.
+ *
+ * It wires the package the way ADOPTING.md says to: a vocabulary, an actor
+ * resolver, a db seam, its own gate permission, its own copy and its own paging
+ * numbers. If this suite passes, the machinery presumes no product — no
+ * package-supplied actions, no package-supplied resources, no package-supplied
+ * language.
+ */
+const VAULT = defineAuditVocabulary({
+  actions: {
+    'accession.register': { label: 'Accession registered' },
+    'accession.withdraw': { label: 'Accession withdrawn' },
+    'germination.record': { label: 'Germination trial recorded' },
+    'vault.thaw': { label: 'Vault thaw logged' },
+  },
+  resources: {
+    accession: {
+      label: 'Accession',
+      fields: ['taxon', 'gramsRemaining', 'vaultShelf', 'collectedOn'],
+    },
+    trial: { label: 'Germination trial', fields: ['viabilityPercent', 'seedsSown', 'protocol'] },
+    vault: { label: 'Cold vault', fields: ['celsius', 'humidityPercent'] },
+  },
+});
+
+const BANK = 'bank-svalbard';
+const DENIAL = 'You may not read this seed bank trail.';
 
 /** This package's own source root, for the import-hygiene case at the bottom. */
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The blog's "database": an array, and the seam over it. */
-function blogDb(): { db: AuditDb; rows: AuditLogCreateData[] } {
+/** The bank's "database": an array, and the seam over it. */
+function bankDb(): { db: AuditDb; rows: AuditLogCreateData[] } {
   const rows: AuditLogCreateData[] = [];
   const asRecord = (
     data: AuditLogCreateData,
@@ -60,12 +77,13 @@ function blogDb(): { db: AuditDb; rows: AuditLogCreateData[] } {
           rows.push(data);
           return Promise.resolve({});
         },
-        findMany({ where }) {
+        findMany({ where, skip, take }) {
           return Promise.resolve(
             rows
               .map(asRecord)
               .filter((row) => row.clientId === where.clientId)
-              .reverse(),
+              .reverse()
+              .slice(skip, skip + take),
           );
         },
         count({ where }) {
@@ -77,193 +95,290 @@ function blogDb(): { db: AuditDb; rows: AuditLogCreateData[] } {
   };
 }
 
-/** Everything the blog has to write to adopt the package. */
-function blogAudit(store = blogDb()) {
+/** Everything the bank has to write to adopt the package. */
+function bankAudit(store = bankDb()) {
   const api = createApiAudit({
     db: () => Promise.resolve(store.db),
     resolveActor: () => ({
-      tenantId: SITE,
-      userId: 'alice',
-      permissions: ['trail.read'],
-      role: 'EDITOR',
-      scope: SITE,
+      tenantId: BANK,
+      userId: 'curator-1',
+      permissions: ['vault.trail.read'],
+      role: 'CURATOR',
+      scope: BANK,
     }),
-    vocabulary: BLOG_VOCABULARY,
-    trackedModels: ['Post', 'Comment'],
-    gatePermissions: { read: 'trail.read' },
-    messages: { forbidden: 'You cannot read this site trail.' },
-    retention: { floorDays: 90, table: 'blog_audit_logs' },
+    vocabulary: VAULT,
+    trackedModels: ['Accession', 'Trial'],
+    gatePermissions: { read: 'vault.trail.read' },
+    messages: { forbidden: DENIAL },
+    retention: { floorDays: 90, table: 'vault_audit_logs' },
+    pagination: { defaultPageSize: 5, maxPageSize: 25, maxPage: 400 },
   });
   return { api, store };
 }
 
-describe('toy second host — the write path', () => {
-  it('writes an entry with the blog vocabulary and the blog actor', async () => {
-    const { api, store } = blogAudit();
+type BankApi = ReturnType<typeof bankAudit>['api'];
+
+const listRoute = (api: BankApi) => api.routes.find((route) => route.path === '/audit-logs');
+
+const list = (api: BankApi, query: Record<string, string> = {}) =>
+  listRoute(api)?.handle({ params: {}, query, header: () => undefined });
+
+describe('a host that is not the one this package came from — writes', () => {
+  it('writes an entry with the bank vocabulary and the bank actor', async () => {
+    const { api, store } = bankAudit();
 
     await runWithActorScope(async () => {
-      setActor('alice', { role: 'EDITOR', scope: SITE });
+      setActor('curator-1', { role: 'CURATOR', scope: BANK });
       await api.write(store.db, {
-        clientId: SITE,
-        action: 'post.publish',
-        resourceType: 'post',
-        resourceId: 'post-1',
-        before: { state: 'DRAFT' },
-        after: { state: 'LIVE', title: 'Sourdough', secretDraftNotes: 'do not ship' },
+        clientId: BANK,
+        action: 'accession.register',
+        resourceType: 'accession',
+        resourceId: 'ACC-19402',
+        before: { gramsRemaining: 0 },
+        after: { gramsRemaining: 420, taxon: 'Hordeum vulgare', donorPassportId: 'DO-NOT-LOG' },
       });
     });
 
     expect(store.rows[0]).toEqual({
-      clientId: SITE,
-      actorUserId: 'alice',
-      actorRole: 'EDITOR',
-      scope: SITE,
+      clientId: BANK,
+      actorUserId: 'curator-1',
+      actorRole: 'CURATOR',
+      scope: BANK,
       onBehalfOfUserId: null,
-      action: 'post.publish',
-      resourceType: 'post',
-      resourceId: 'post-1',
-      before: { state: 'DRAFT' },
-      // Deny-by-default applies to the blog's allowlist exactly as it did to the
-      // restaurant's: `secretDraftNotes` is not declared, so it never lands.
-      after: { state: 'LIVE', title: 'Sourdough' },
+      action: 'accession.register',
+      resourceType: 'accession',
+      resourceId: 'ACC-19402',
+      before: { gramsRemaining: 0 },
+      // Deny-by-default applies to the bank's allowlist exactly as it would to
+      // anyone's: `donorPassportId` is not declared, so it never lands.
+      after: { gramsRemaining: 420, taxon: 'Hordeum vulgare' },
       requestId: null,
     });
   });
 
-  it('refuses a restaurant action — the vocabulary is the blog', async () => {
-    const { api, store } = blogAudit();
+  it('refuses an action the bank never declared', async () => {
+    const { api, store } = bankAudit();
 
     await expect(
       api.write(store.db, {
-        clientId: SITE,
-        action: 'order.cancel',
-        resourceType: 'post',
-        resourceId: 'post-1',
+        clientId: BANK,
+        action: 'accession.incinerate',
+        resourceType: 'accession',
+        resourceId: 'ACC-19402',
       }),
-    ).rejects.toThrow(/Unknown audit action "order\.cancel"/);
+    ).rejects.toThrow(/Unknown audit action "accession\.incinerate"/);
   });
 
   it('carries the impersonation pair with no host code at all', async () => {
-    // The property ticket 12-24 builds on: the pair is a feature of the package,
-    // not of the host that happens to have impersonation.
-    const { api, store } = blogAudit();
+    // The pair is a feature of the package, not of a host that happens to have
+    // impersonation — so it works here, where nobody wired anything for it.
+    const { api, store } = bankAudit();
 
     await runWithActorScope(async () => {
-      setActor('support', { onBehalfOfUserId: 'alice' });
+      setActor('registrar-9', { onBehalfOfUserId: 'curator-1' });
       await api.write(store.db, {
-        clientId: SITE,
-        action: 'comment.hide',
-        resourceType: 'comment',
-        resourceId: 'c-1',
+        clientId: BANK,
+        action: 'vault.thaw',
+        resourceType: 'vault',
+        resourceId: 'VAULT-B',
       });
     });
 
     expect(store.rows[0]).toMatchObject({
-      actorUserId: 'support',
-      onBehalfOfUserId: 'alice',
+      actorUserId: 'registrar-9',
+      onBehalfOfUserId: 'curator-1',
     });
   });
 });
 
-describe('toy second host — the read surface', () => {
-  it('serves the blog trail under the blog gate permission', async () => {
-    const { api, store } = blogAudit();
+describe('a host that is not the one this package came from — reads', () => {
+  it('serves the bank trail under the bank gate permission', async () => {
+    const { api, store } = bankAudit();
     await api.write(store.db, {
-      clientId: SITE,
-      action: 'post.publish',
-      resourceType: 'post',
-      resourceId: 'post-1',
+      clientId: BANK,
+      action: 'germination.record',
+      resourceType: 'trial',
+      resourceId: 'TRIAL-7',
     });
     await api.write(store.db, {
-      clientId: 'site-other',
-      action: 'post.publish',
-      resourceType: 'post',
+      clientId: 'bank-elsewhere',
+      action: 'germination.record',
+      resourceType: 'trial',
       resourceId: 'not-mine',
     });
 
-    const route = api.routes.find((candidate) => candidate.path === '/audit-logs');
-    const response = await route?.handle({ params: {}, query: {}, header: () => undefined });
+    const response = await list(api);
 
     expect(response?.status).toBe(200);
     expect((response?.body as { data: { resourceId: string }[] }).data).toHaveLength(1);
   });
 
-  it('denies with the blog copy — nothing pt-BR reaches a blog reader', async () => {
-    const store = blogDb();
+  it('denies with the bank copy — no package language reaches a bank reader', async () => {
+    const store = bankDb();
     const api = createApiAudit({
       db: () => Promise.resolve(store.db),
-      resolveActor: () => ({ tenantId: SITE, userId: 'bob', permissions: [] }),
-      vocabulary: BLOG_VOCABULARY,
-      gatePermissions: { read: 'trail.read' },
-      messages: { forbidden: 'You cannot read this site trail.' },
+      resolveActor: () => ({ tenantId: BANK, userId: 'intern', permissions: [] }),
+      vocabulary: VAULT,
+      gatePermissions: { read: 'vault.trail.read' },
+      messages: { forbidden: DENIAL },
     });
 
-    const route = api.routes.find((candidate) => candidate.path === '/audit-logs');
-    const response = await route?.handle({ params: {}, query: {}, header: () => undefined });
+    const response = await list(api);
 
-    expect(response).toEqual({
-      status: 403,
-      body: { error: 'You cannot read this site trail.' },
-    });
+    expect(response).toEqual({ status: 403, body: { error: DENIAL } });
   });
 
-  it('validates the blog filter values, and only those', async () => {
-    const { api } = blogAudit();
-    const route = api.routes.find((candidate) => candidate.path === '/audit-logs');
+  it('validates the bank filter values, and only those', async () => {
+    const { api } = bankAudit();
 
-    const blogAction = await route?.handle({
-      params: {},
-      query: { action_in: 'post.publish' },
-      header: () => undefined,
-    });
-    const foreignAction = await route?.handle({
-      params: {},
-      query: { action_in: 'order.cancel' },
-      header: () => undefined,
-    });
+    expect((await list(api, { action_in: 'vault.thaw' }))?.status).toBe(200);
+    expect((await list(api, { action_in: 'accession.incinerate' }))?.status).toBe(400);
+  });
 
-    expect(blogAction?.status).toBe(200);
-    expect(foreignAction?.status).toBe(400);
+  it('pages on the bank numbers, not on this package defaults', async () => {
+    // The paging policy is config, and the whole of it travels: the default
+    // size, the ceiling a request's size is clamped to, and the page ceiling.
+    const { api, store } = bankAudit();
+    for (const index of [1, 2, 3, 4, 5, 6, 7]) {
+      await api.write(store.db, {
+        clientId: BANK,
+        action: 'germination.record',
+        resourceType: 'trial',
+        resourceId: `TRIAL-${index}`,
+      });
+    }
+
+    const page = (await list(api))?.body as {
+      data: unknown[];
+      pagination: { pageSize: number };
+    };
+    const clamped = (await list(api, { pageSize: '900', page: '99999' }))?.body as {
+      pagination: { pageSize: number; page: number };
+    };
+
+    expect(page.pagination.pageSize).toBe(5);
+    expect(page.data).toHaveLength(5);
+    expect(clamped.pagination).toMatchObject({ pageSize: 25, page: 400 });
   });
 });
 
-describe('toy second host — the rest of the seam', () => {
-  it('sweeps the blog table on the blog window', async () => {
-    const store = blogDb();
+describe('a host that is not the one this package came from — the rest of the seam', () => {
+  it('sweeps the bank table on the bank window', async () => {
+    const store = bankDb();
     const statements: string[] = [];
     store.db.$executeRawUnsafe = (sql: string) => {
       statements.push(sql);
       return Promise.resolve(0);
     };
-    const { api } = blogAudit(store);
+    const { api } = bankAudit(store);
 
     expect(api.retention.floorDays).toBe(90);
     await api.retention.purgeExpired();
-    expect(statements[0]).toContain('"blog_audit_logs"');
+    expect(statements[0]).toContain('"vault_audit_logs"');
   });
 
-  it('stamps the blog models, and leaves the vocabulary out of it', async () => {
-    const { api } = blogAudit();
-    const applied: string[] = [];
+  it('stamps the bank models and guards this package own table, always', () => {
+    const { api } = bankAudit();
+    const applied: { name: string; models?: readonly string[] }[] = [];
     const client = {
       $extends(extension: unknown) {
-        applied.push((extension as { name: string }).name);
+        applied.push(extension as { name: string });
         return this;
       },
     };
 
     api.extendPrismaClient(client);
 
-    expect(applied).toEqual(['auditStamps', 'appendOnlyGuard']);
+    expect(applied.map(({ name }) => name)).toEqual(['auditStamps', 'appendOnlyGuard']);
   });
 
-  it('redacts against the blog allowlist through the exported core helper', () => {
-    // The framework-free entry a blog surface with no database can import.
-    const index = indexVocabulary(BLOG_VOCABULARY);
-    expect(redactDiff(index, 'comment', { state: 'HIDDEN', ip: '1.2.3.4' })).toEqual({
-      state: 'HIDDEN',
+  it('redacts against the bank allowlist through the exported core helper', () => {
+    // The framework-free entry a surface with no database can import.
+    expect(redactDiff(VAULT, 'vault', { celsius: -18, coordinates: '78.2N' })).toEqual({
+      celsius: -18,
     });
-    expect(index.actionLabel('post.retract')).toBe('Post retracted');
+    expect(VAULT.actionLabel('vault.thaw')).toBe('Vault thaw logged');
+  });
+});
+
+describe('two hosts in one process', () => {
+  /** A completely unrelated third vocabulary, mounted alongside the bank's. */
+  const ferry = () =>
+    defineAuditVocabulary({
+      actions: { 'sailing.cancel': { label: 'Sailing cancelled' } },
+      resources: { sailing: { label: 'Sailing', fields: ['berth', 'departsAt'] } },
+    });
+
+  it('do not see each other vocabulary', () => {
+    // A package that quietly kept module-scope state would serve the first host
+    // correctly and the second one somebody else's values.
+    const FERRY = ferry();
+    expect(VAULT.hasAction('sailing.cancel')).toBe(false);
+    expect(FERRY.hasAction('vault.thaw')).toBe(false);
+    expect(VAULT.hasResource('sailing')).toBe(false);
+    expect(FERRY.hasResource('vault')).toBe(false);
+  });
+
+  it('keep their own allowlists, so one host diff cannot leak through another', () => {
+    const FERRY = ferry();
+    expect(() => redactDiff(FERRY, 'vault', { celsius: -18 })).toThrow(
+      /Unknown audit resourceType/,
+    );
+    expect(redactDiff(FERRY, 'sailing', { berth: 'A3', celsius: -18 })).toEqual({ berth: 'A3' });
+  });
+
+  it('refuse the same assembly mistakes, independently', () => {
+    expect(() =>
+      defineAuditVocabulary({
+        actions: { 'sailing.cancel': { label: 'Sailing cancelled' } },
+        resources: { sailing: { label: 'Sailing', fields: [] } },
+      }),
+    ).toThrow(AuditConfigError);
+  });
+});
+
+describe('the fixtures themselves', () => {
+  /**
+   * The anti-vacuity guard for the SUITE above: a portability proof written in
+   * the extraction origin's own words proves nothing, and would look identical
+   * to this file.
+   *
+   * It checks against `foreignPatterns()` — IMPORTED, not restated. A sibling
+   * package's revision wrote its own regex covering eight of the sweep's
+   * entries while claiming in a comment to use "the same one", which is two
+   * statements of a set that can drift: precisely the defect this package now
+   * exists to remove.
+   */
+  it('share no word with the application this package was extracted from', () => {
+    const fixtureWords = [
+      ...VAULT.actionIds,
+      ...VAULT.resourceIds,
+      ...VAULT.actionIds.map((id) => VAULT.actionLabel(id)),
+      ...VAULT.resourceIds.map((id) => VAULT.resourceLabel(id)),
+      BANK,
+      DENIAL,
+      'vault.trail.read',
+      'vault_audit_logs',
+      'Accession',
+      'Trial',
+      'CURATOR',
+    ];
+
+    const bans = foreignPatterns();
+    for (const word of fixtureWords) {
+      expect(bans.filter(({ pattern }) => new RegExp(pattern.source, 'i').test(word))).toEqual([]);
+    }
+
+    // Anti-vacuity for the guard itself: a loop over an empty list passes.
+    expect(fixtureWords.length).toBeGreaterThan(15);
+    // …and the list it checks against is the real one, with entries a
+    // hand-written copy would have dropped.
+    expect(bans.map(({ label }) => label)).toEqual(
+      expect.arrayContaining(['R$', 'future-pay', 'comanda', 'Sistema', 'FUT-<n>']),
+    );
+    expect(bans.some(({ pattern }) => new RegExp(pattern.source, 'i').test('uma comanda'))).toBe(
+      true,
+    );
   });
 });
 
@@ -278,8 +393,7 @@ describe('toy second host — the rest of the seam', () => {
  * TYPE-ONLY imports count too, DELIBERATELY — `import type { Context } from 'hono'`
  * is erased at runtime, but it is still an unavoidable `devDependency`/peer for
  * anyone type-checking against this package's published source, which is what this
- * package ships. (Before, they were caught only by accident: the old regex matched
- * the `from` clause and never looked at what preceded it.)
+ * package ships.
  */
 const FORBIDDEN_PACKAGES = ['hono', 'react', 'react-dom', '@12-apps/ui'];
 
@@ -290,9 +404,7 @@ const FORBIDDEN_PACKAGES = ['hono', 'react', 'react-dom', '@12-apps/ui'];
  * against an exact-string list — so `server/foo.ts → '../react/labels'` passed
  * twice over: the specifier is not a package name, and the file it names is not in
  * the walked set, so nothing ever looked at ITS imports. That chain reaches
- * `@12-apps/ui` and `react` exactly as a direct import would; a transitive
- * resolution would be the thorough fix, and forbidding the one-hop specifier is
- * the cheap one that closes the reachable case.
+ * `@12-apps/ui` and `react` exactly as a direct import would.
  */
 const FORBIDDEN_RELATIVE = /(?:^|\/)\.\.\/(react|hono)(?:\/|$)/;
 

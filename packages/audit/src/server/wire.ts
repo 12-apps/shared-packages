@@ -1,5 +1,5 @@
 /**
- * The listing endpoint's query contract (12-14).
+ * The listing endpoint's query contract.
  *
  * Authored ONCE, as a zod schema built per-vocabulary, because the advertised
  * filter values and the writable values must not be able to drift: the enum a
@@ -14,31 +14,27 @@
  */
 import { z } from 'zod';
 
-import type { AuditVocabularyIndex } from '../core/vocabulary';
+import type { AuditVocabulary } from '../core/vocabulary';
 
-import { AuditApiError, type AuditMessages } from './config';
+import {
+  AuditApiError,
+  DEFAULT_PAGINATION,
+  type AuditMessages,
+  type AuditPagingPolicy,
+} from './config';
 
-const PAGE_SIZE_DEFAULT = 20;
-const PAGE_SIZE_MAX = 100;
 /**
- * A ceiling on `page`, for the same reason `pageSize` has one: the store turns it
- * into `OFFSET (page - 1) * pageSize`, and Postgres COUNTS AND DISCARDS every one
- * of those rows before returning any. `?page=999999999` is `OFFSET 19999999980`
- * against a table that only grows — a scan a caller can ask for in a URL.
+ * A calendar date (`YYYY-MM-DD`), interpreted at UTC midnight by the API.
  *
- * Ten thousand pages is past the end of any trail a human is paging through (at
- * the default size, 200k entries), and a caller who genuinely wants the far end
- * of a big tenant's trail should be narrowing with `from`/`to` instead. Clamped
- * rather than rejected, matching how every other nonsense paging value here is
- * treated — an out-of-range page answers an empty last page, not a 400.
+ * These two strings never reach a user: `parseAuditLogQuery` folds any failure
+ * into the host's own `messages.invalidQuery` plus the field path. They are
+ * developer-facing, and therefore English, like every other identifier and
+ * comment in this package — the host's copy is the thing that gets translated.
  */
-const PAGE_MAX = 10_000;
-
-/** A calendar date (`YYYY-MM-DD`), interpreted at UTC midnight by the API. */
 const isoDate = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use o formato AAAA-MM-DD.')
-  .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)), 'Data inválida.');
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected the format YYYY-MM-DD.')
+  .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)), 'Not a valid date.');
 
 /**
  * Comma-separated pill values, validated against a closed vocabulary.
@@ -62,7 +58,7 @@ const commaList = (allowed: readonly string[]): z.ZodType<string[] | undefined> 
     })
     .refine(
       (values) => values === undefined || values.every((value) => allowed.includes(value)),
-      'Valor de filtro desconhecido.',
+      'Unknown filter value.',
     ) as unknown as z.ZodType<string[] | undefined>;
 
 const positiveInt = (fallback: number, max?: number): z.ZodType<number> =>
@@ -89,18 +85,28 @@ export interface AuditLogQuery {
   pageSize: number;
 }
 
-/** Build the zod schema for one vocabulary. */
-export function auditLogQuerySchema(index: AuditVocabularyIndex) {
+/**
+ * Build the zod schema for one vocabulary and one paging policy.
+ *
+ * The paging numbers are the HOST's (`pagination` on the server config, see
+ * `policy.ts` for the refusals) and default to this package's; they are passed
+ * in rather than read from module constants so the schema a host advertises as
+ * a tool and the clamps the endpoint applies are the same three values.
+ */
+export function auditLogQuerySchema(
+  vocabulary: AuditVocabulary,
+  paging: AuditPagingPolicy = DEFAULT_PAGINATION,
+) {
   return z.object({
     q: z.string().min(1).optional(),
-    action_in: commaList(index.actionIds),
-    resourceType_in: commaList(index.resourceIds),
+    action_in: commaList(vocabulary.actionIds),
+    resourceType_in: commaList(vocabulary.resourceIds),
     actorUserId: z.string().min(1).optional(),
     resourceId: z.string().min(1).optional(),
     from: isoDate.optional(),
     to: isoDate.optional(),
-    page: positiveInt(1, PAGE_MAX),
-    pageSize: positiveInt(PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX),
+    page: positiveInt(1, paging.maxPage),
+    pageSize: positiveInt(paging.defaultPageSize, paging.maxPageSize),
   });
 }
 
@@ -138,11 +144,12 @@ function narrowFilters(value: ParsedQuery): Omit<AuditLogQuery, 'page' | 'pageSi
 
 /** Parse a request query, or throw the 400 the wire promises. */
 export function parseAuditLogQuery(
-  index: AuditVocabularyIndex,
+  vocabulary: AuditVocabulary,
   query: Record<string, string | undefined>,
   messages: Pick<AuditMessages, 'invalidQuery'>,
+  paging: AuditPagingPolicy = DEFAULT_PAGINATION,
 ): AuditLogQuery {
-  const parsed = auditLogQuerySchema(index).safeParse(query);
+  const parsed = auditLogQuerySchema(vocabulary, paging).safeParse(query);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const path = issue?.path.join('.') ?? '';
