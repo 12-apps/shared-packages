@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IMPERSONATION_PERMISSIONS } from '../core/permissions';
 import type { ImpersonationBannerState } from '../core/types';
+// The two published barrels, as namespaces, for the export-surface case at the
+// foot of this file. STATIC on purpose — see the comment there.
+import * as reactEntry from '../react/index';
+import * as serverEntry from '../server/index';
 import { createApiImpersonation } from '../server/create-api-impersonation';
 import type {
   ImpersonationActor,
@@ -362,12 +366,20 @@ describe('the package knows which product it serves: it does not', () => {
     expect([...domains]).toEqual(['user']);
   });
 
-  it('exports no default messages or labels for a host to inherit by accident', async () => {
+  it('exports no default messages or labels for a host to inherit by accident', () => {
     // A default fails OPEN for a second host: it silently adopts another
     // product's vocabulary instead of failing loudly at compile time.
-    const server = (await import('../server/index')) as Record<string, unknown>;
-    const react = (await import('../react/index')) as Record<string, unknown>;
-    const exported = [...Object.keys(server), ...Object.keys(react)];
+    //
+    // The barrels are imported STATICALLY at the top of this file rather than
+    // with `await import(...)` here. `../react/index` pulls the whole component
+    // tree — `@12-apps/ui`, MUI, emotion — and a dynamic import charges Vite's
+    // transform of that graph to the TEST's 5s budget instead of to collection.
+    // Alone that is ~1s and passes; in a full `turbo run test` across thirty
+    // packages it is ~7s and times out, so this suite went red only on main
+    // (where the push lane runs the whole workspace) and stayed green on the PR
+    // that introduced it. Nothing here is testing lazy loading — the subject is
+    // the export surface, and a static import measures it just as well.
+    const exported = [...Object.keys(serverEntry), ...Object.keys(reactEntry)];
     expect(exported.filter((name) => /^DEFAULT_/.test(name))).toEqual([]);
   });
 });
