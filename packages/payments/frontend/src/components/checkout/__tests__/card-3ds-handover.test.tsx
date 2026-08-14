@@ -135,7 +135,7 @@ describe("card charge → 3DS handover (FUT-698)", () => {
       expect(screen.getByTestId("submitted").textContent).toBe("true");
     });
     expect(assign).not.toHaveBeenCalled();
-    expect(window.sessionStorage.getItem("futurepay.checkout.hostedOrder")).toBeNull();
+    expect(window.sessionStorage.getItem(HOSTED_ORDER_STORAGE_KEY)).toBeNull();
   });
 
   it("a decline resolves to the status screen, never a handover", async () => {

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { HOSTED_ORDER_STORAGE_KEY } from '@12-apps/payments-frontend';
 
 import { openPage, reachPayment } from './helpers/checkout';
 
@@ -54,8 +55,14 @@ test('HostedHandoff parks the order, then navigates, and offers a real link', as
   // Parked BEFORE the navigation, which is the whole ordering rule. Reading it
   // out of sessionStorage is the only way to see "first", and this is where the
   // return trip below gets its order from.
-  const parked = await page.evaluate(() =>
-    window.sessionStorage.getItem('futurepay.checkout.hostedOrder'),
+  // The key comes from the PACKAGE, passed into the browser context. The
+  // harness installs the real tarball, so this also proves the constant is
+  // exported from the published entry — and a private copy here would have kept
+  // passing against the old name while the package wrote a new one, which is
+  // exactly how this spec caught the rename in the first place.
+  const parked = await page.evaluate(
+    (key) => window.sessionStorage.getItem(key),
+    HOSTED_ORDER_STORAGE_KEY,
   );
   expect(parked).toContain('inv_harness_0043');
 });
