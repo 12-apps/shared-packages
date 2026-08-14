@@ -4,13 +4,14 @@ import { createInlineJobDriver } from "../drivers/inline";
 import type { JobsDriverChoice, JobsServerConfig, ResolvedConfig } from "./config";
 
 /**
- * Driver resolution — future-pay `runtime.ts`'s `readDriverChoice` +
- * `resolveDriver`. The choice can also arrive through `config.driver` (a name
- * or an instance), which future-pay had no seam for — so the resolution
- * tracks WHERE the choice came from, validates the config path exactly as
- * strictly as the env path, and names the right knob in every error message.
- * The `JOBS_DRIVER=…` messages stay byte-identical to future-pay's, because
- * a host greps for them.
+ * Driver resolution.
+ *
+ * The choice can arrive from the environment (`JOBS_DRIVER`) or through
+ * `config.driver` — a name or a ready-made instance. The resolution tracks
+ * WHERE the choice came from, validates the config path exactly as strictly as
+ * the env path, and names the right knob in every error message: an operator
+ * reading a `JOBS_DRIVER` message for a choice made in code would hunt for an
+ * env var that is not set.
  */
 
 /** A resolved choice, and which knob said so. */
@@ -136,7 +137,14 @@ async function resolveBullMq(
     // once the host bundles this package's published TS source.
     const { createBullMqJobDriver } = await import("../drivers/bullmq");
     return {
-      driver: createBullMqJobDriver({ redisUrl, logger, prefix: resolved.queuePrefix }),
+      driver: createBullMqJobDriver({
+        redisUrl,
+        logger,
+        prefix: resolved.queuePrefix,
+        events: resolved.events,
+        retention: resolved.retention,
+        defaultConcurrency: resolved.defaultConcurrency,
+      }),
       deliberatelyOff: false,
     };
   } catch (error) {
@@ -165,11 +173,8 @@ export async function resolveDriver(
 
   if (choice === "off") {
     if (production) {
-      // Logged in production even for an explicit off — the BEHAVIOUR is
-      // future-pay's runtime.ts, though not the bytes: its message named the
-      // domain sweeps, and the examples were dropped when this moved into
-      // the package. Production with no queue is worth a line in the log
-      // however it came about.
+      // Logged in production even for an explicit off: production with no
+      // queue is worth a line in the log however it came about.
       logger.error(
         "No job driver: scheduled work will NOT run in this deployment. Set REDIS_URL.",
       );
@@ -195,7 +200,10 @@ export async function resolveDriver(
     // Detached on purpose: in a dev server the handler must not run inside
     // the request that enqueued it. A test that wants to await the handler
     // passes its own `createInlineJobDriver({ await: true })` instance.
-    return { driver: createInlineJobDriver({ logger, await: false }), deliberatelyOff: false };
+    return {
+      driver: createInlineJobDriver({ logger, await: false, events: resolved.events }),
+      deliberatelyOff: false,
+    };
   }
 
   return resolveBullMq(named, resolved);

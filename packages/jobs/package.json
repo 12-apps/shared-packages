@@ -59,6 +59,7 @@
     "*.js",
     "*.mjs",
     "*.md",
+    "!docs/**",
     "!eslint.config.js",
     "!**/__tests__/**",
     "!**/tests/**",

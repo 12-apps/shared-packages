@@ -43,7 +43,7 @@ describe("withSweepLease", () => {
     const { withSweepLease } = createSweepLease({ db });
     const work = vi.fn().mockResolvedValue("done");
 
-    const outcome = await withSweepLease("billing.tick", 60_000, work);
+    const outcome = await withSweepLease("ledger.tick", 60_000, work);
 
     expect(outcome).toEqual({ ran: true, result: "done" });
     expect(work).toHaveBeenCalledTimes(1);
@@ -55,10 +55,10 @@ describe("withSweepLease", () => {
     const { store, db } = makeStore();
     const { withSweepLease } = createSweepLease({ db });
 
-    await withSweepLease("billing.tick", 60_000, async () => "x");
+    await withSweepLease("ledger.tick", 60_000, async () => "x");
 
     const claim = store.updateMany.mock.calls[0]?.[0];
-    expect(claim.where.name).toBe("billing.tick");
+    expect(claim.where.name).toBe("ledger.tick");
     // "Free" means nobody holds it, or the holder ran past their TTL.
     expect(claim.where.expiresAt).toHaveProperty("lte");
     expect(claim.data.expiresAt.getTime()).toBeGreaterThan(
@@ -76,7 +76,7 @@ describe("withSweepLease", () => {
     const { withSweepLease } = createSweepLease({ db });
     const work = vi.fn();
 
-    const outcome = await withSweepLease("billing.tick", 60_000, work);
+    const outcome = await withSweepLease("ledger.tick", 60_000, work);
 
     expect(outcome).toEqual({ ran: false, result: null });
     expect(work).not.toHaveBeenCalled();
@@ -92,11 +92,11 @@ describe("withSweepLease", () => {
     const { withSweepLease } = createSweepLease({ db });
     const work = vi.fn().mockResolvedValue("first");
 
-    const outcome = await withSweepLease("stock.low-alert", 60_000, work);
+    const outcome = await withSweepLease("index.rebuild", 60_000, work);
 
     expect(outcome.ran).toBe(true);
     expect(store.create).toHaveBeenCalledTimes(1);
-    expect(store.create.mock.calls[0]?.[0].data.name).toBe("stock.low-alert");
+    expect(store.create.mock.calls[0]?.[0].data.name).toBe("index.rebuild");
   });
 
   it("releases the lease even when the work throws", async () => {
@@ -105,13 +105,13 @@ describe("withSweepLease", () => {
     const { withSweepLease } = createSweepLease({ db });
 
     await expect(
-      withSweepLease("billing.tick", 60_000, async () => {
+      withSweepLease("ledger.tick", 60_000, async () => {
         throw new Error("sweep blew up");
       }),
     ).rejects.toThrow("sweep blew up");
 
     const release = store.updateMany.mock.calls.at(-1)?.[0];
-    expect(release.where.name).toBe("billing.tick");
+    expect(release.where.name).toBe("ledger.tick");
     expect(release.data.expiresAt).toBeInstanceOf(Date);
   });
 
@@ -121,7 +121,7 @@ describe("withSweepLease", () => {
     const { store, db } = makeStore();
     const { withSweepLease } = createSweepLease({ db });
 
-    await withSweepLease("billing.tick", 60_000, async () => "x");
+    await withSweepLease("ledger.tick", 60_000, async () => "x");
 
     const claim = store.updateMany.mock.calls[0]?.[0];
     const release = store.updateMany.mock.calls.at(-1)?.[0];
@@ -135,7 +135,7 @@ describe("withSweepLease", () => {
     const { store, db } = makeStore();
     const { withSweepLease, holder } = createSweepLease({ db, holder: "worker-a" });
 
-    await withSweepLease("billing.tick", 60_000, async () => "x");
+    await withSweepLease("ledger.tick", 60_000, async () => "x");
 
     expect(holder).toBe("worker-a");
     expect(store.updateMany.mock.calls[0]?.[0].data.holder).toBe("worker-a");
@@ -154,7 +154,7 @@ describe("withSweepLease", () => {
     const { withSweepLease } = createSweepLease({ db });
     const work = vi.fn();
 
-    await expect(withSweepLease("billing.tick", 60_000, work)).rejects.toThrow(
+    await expect(withSweepLease("ledger.tick", 60_000, work)).rejects.toThrow(
       "connection refused",
     );
     expect(work).not.toHaveBeenCalled();
@@ -170,7 +170,7 @@ describe("withSweepLease", () => {
     });
     const { withSweepLease } = createSweepLease({ db });
 
-    await expect(withSweepLease("billing.tick", 60_000, vi.fn())).rejects.toThrow(
+    await expect(withSweepLease("ledger.tick", 60_000, vi.fn())).rejects.toThrow(
       "relation does not exist",
     );
   });
@@ -184,6 +184,6 @@ describe("withSweepLease", () => {
     });
     const { withSweepLease } = createSweepLease({ db });
 
-    await expect(withSweepLease("billing.tick", 60_000, vi.fn())).rejects.toThrow("bad column");
+    await expect(withSweepLease("ledger.tick", 60_000, vi.fn())).rejects.toThrow("bad column");
   });
 });

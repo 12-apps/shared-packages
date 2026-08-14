@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 
-import { clearJobs, defineJob } from "../../core/registry";
+import {
+  clearJobs,
+  defineJob,
+  NoJobsRegisteredError,
+  type RegisteredJob,
+} from "../../core/registry";
 import { resetJobRuntime } from "../../core/runtime";
-import type { JobDriver, JobLogger } from "../../core/types";
+import { InvalidJobRetentionError } from "../../core/retention";
+import type { JobDriver, JobEvents, JobLogger } from "../../core/types";
 import { createInlineJobDriver } from "../../drivers/inline";
 import type { SweepLeaseDb } from "../../lease/sweep-lease";
-import type { JobsDriverChoice } from "../config";
+import { JobsConfigError, type JobsDriverChoice, type JobsSource } from "../config";
 import { createApiJobs } from "../create-api-jobs";
 
 /**
@@ -36,6 +42,19 @@ function loggedText(mock: Mock): string {
   return mock.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
 }
 
+/**
+ * One declared job — the minimum a host may mount this package with.
+ *
+ * `jobs: []` was the fixture in most of these cases, and it is exactly what
+ * the empty-`jobs` guard now refuses: a process that declares nothing consumes
+ * no queue, installs no schedule and still answers `/health` with `ok`. Every
+ * case below therefore declares something, which is also what a real host
+ * looks like.
+ */
+function oneJob(name = "test.declared"): RegisteredJob<never>[] {
+  return [defineJob({ name, handle: async () => undefined }) as RegisteredJob<never>];
+}
+
 /** No REDIS_URL, non-production — the zero-config developer environment. */
 function stubBareEnv(): void {
   vi.stubEnv("REDIS_URL", "");
@@ -55,7 +74,7 @@ describe("createApiJobs — driver resolution", () => {
   it("defaults to the inline driver with no Redis and no config (zero-config dev)", async () => {
     stubBareEnv();
     const { logger, info } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger });
+    const api = createApiJobs({ jobs: oneJob(), logger });
 
     await api.start();
 
@@ -93,7 +112,7 @@ describe("createApiJobs — driver resolution", () => {
   it("disables jobs in production when nothing is configured, and says so", async () => {
     stubBareEnv();
     const { logger, error } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger, production: true });
+    const api = createApiJobs({ jobs: oneJob(), logger, production: true });
 
     await api.start();
 
@@ -107,7 +126,7 @@ describe("createApiJobs — driver resolution", () => {
   it("refuses the inline driver in production, naming the config knob", async () => {
     stubBareEnv();
     const { logger, error } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger, production: true, driver: "inline" });
+    const api = createApiJobs({ jobs: oneJob(), logger, production: true, driver: "inline" });
 
     await api.start();
 
@@ -125,7 +144,7 @@ describe("createApiJobs — driver resolution", () => {
     stubBareEnv();
     vi.stubEnv("JOBS_DRIVER", "inline");
     const { logger, error } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger, production: true });
+    const api = createApiJobs({ jobs: oneJob(), logger, production: true });
 
     await api.start();
 
@@ -144,7 +163,7 @@ describe("createApiJobs — driver resolution", () => {
     stubBareEnv();
     const { logger, error } = makeLogger();
     const api = createApiJobs({
-      jobs: [],
+      jobs: oneJob(),
       driver: createInlineJobDriver({ logger }),
       logger,
       production: true,
@@ -162,7 +181,7 @@ describe("createApiJobs — driver resolution", () => {
     stubBareEnv();
     vi.stubEnv("JOBS_DRIVER", "rabbitmq");
     const { logger, error } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger });
+    const api = createApiJobs({ jobs: oneJob(), logger });
 
     await api.start();
 
@@ -177,7 +196,7 @@ describe("createApiJobs — driver resolution", () => {
     stubBareEnv();
     const { logger, error } = makeLogger();
     const api = createApiJobs({
-      jobs: [],
+      jobs: oneJob(),
       logger,
       redisUrl: "redis://localhost:6379", // the silent-bullmq bait
       driver: "rabbitmq" as unknown as JobsDriverChoice,
@@ -196,7 +215,7 @@ describe("createApiJobs — driver resolution", () => {
   it("needs a Redis URL for a bullmq choice, naming the knob that chose it", async () => {
     stubBareEnv();
     const { logger, error } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger, driver: "bullmq" });
+    const api = createApiJobs({ jobs: oneJob(), logger, driver: "bullmq" });
 
     await api.start();
 
@@ -211,7 +230,7 @@ describe("createApiJobs — driver resolution", () => {
     stubBareEnv();
     vi.stubEnv("JOBS_DRIVER", "bullmq");
     const { logger, error } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger });
+    const api = createApiJobs({ jobs: oneJob(), logger });
 
     await api.start();
 
@@ -229,7 +248,7 @@ describe("createApiJobs — driver resolution", () => {
     stubBareEnv();
     const { logger } = makeLogger();
     const api = createApiJobs({
-      jobs: [],
+      jobs: oneJob(),
       logger,
       redisUrl: "redis://localhost:6379",
     });
@@ -251,7 +270,7 @@ describe("createApiJobs — driver resolution", () => {
       start: async () => undefined,
       stop: async () => undefined,
     };
-    const api = createApiJobs({ jobs: [], driver, logger: makeLogger().logger });
+    const api = createApiJobs({ jobs: oneJob(), driver, logger: makeLogger().logger });
 
     await api.start();
 
@@ -267,7 +286,7 @@ describe("createApiJobs — driver resolution", () => {
     // for every variable of the matrix, not just JOBS_DRIVER.
     stubBareEnv();
     const { logger } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger });
+    const api = createApiJobs({ jobs: oneJob(), logger });
 
     vi.stubEnv("REDIS_URL", "redis://localhost:6379"); // arrives late
     await api.start();
@@ -281,7 +300,7 @@ describe("createApiJobs — driver resolution", () => {
     stubBareEnv();
     const { logger } = makeLogger();
     const api = createApiJobs({
-      jobs: [],
+      jobs: oneJob(),
       driver: createInlineJobDriver({ logger }),
       logger,
       installShutdownHooks: false,
@@ -301,7 +320,7 @@ describe("createApiJobs — driver resolution", () => {
     // that had become production by the time start() ran.
     stubBareEnv();
     const { logger, error } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger });
+    const api = createApiJobs({ jobs: oneJob(), logger });
 
     vi.stubEnv("NODE_ENV", "production"); // arrives late
     await api.start();
@@ -326,10 +345,8 @@ describe("createApiJobs — worker mode and lifecycle", () => {
       },
       stop: async () => undefined,
     };
-    defineJob({ name: "test.sweep", handle: async () => undefined });
-
     const api = createApiJobs({
-      jobs: [],
+      jobs: oneJob("test.sweep"),
       driver,
       logger,
       worker: true,
@@ -374,7 +391,7 @@ describe("createApiJobs — worker mode and lifecycle", () => {
     stubBareEnv();
     const { logger } = makeLogger();
     const api = createApiJobs({
-      jobs: [],
+      jobs: oneJob(),
       driver: createInlineJobDriver({ logger }),
       logger,
       worker: true,
@@ -403,7 +420,7 @@ describe("createApiJobs — worker mode and lifecycle", () => {
       stop: async () => undefined,
     };
     const api = createApiJobs({
-      jobs: [],
+      jobs: oneJob(),
       driver,
       logger,
       worker: true,
@@ -421,7 +438,7 @@ describe("createApiJobs — worker mode and lifecycle", () => {
     vi.stubEnv("JOBS_WORKER", "1");
     const { logger } = makeLogger();
     const api = createApiJobs({
-      jobs: [],
+      jobs: oneJob(),
       driver: createInlineJobDriver({ logger }),
       logger,
       installShutdownHooks: false,
@@ -478,7 +495,7 @@ describe("createApiJobs — worker mode and lifecycle", () => {
       stop: async () => undefined,
     };
     const api = createApiJobs({
-      jobs: [],
+      jobs: oneJob(),
       driver,
       logger,
       worker: true,
@@ -512,7 +529,7 @@ describe("createApiJobs — worker mode and lifecycle", () => {
       SIGTERM: new Set(process.listeners("SIGTERM")),
       SIGINT: new Set(process.listeners("SIGINT")),
     };
-    const api = createApiJobs({ jobs: [], driver, logger, worker: true });
+    const api = createApiJobs({ jobs: oneJob(), driver, logger, worker: true });
     try {
       await api.start();
       await api.stop();
@@ -552,7 +569,7 @@ describe("createApiJobs — worker mode and lifecycle", () => {
       SIGTERM: new Set(process.listeners("SIGTERM")),
       SIGINT: new Set(process.listeners("SIGINT")),
     };
-    const api = createApiJobs({ jobs: [], driver, logger, worker: true });
+    const api = createApiJobs({ jobs: oneJob(), driver, logger, worker: true });
     try {
       await api.start();
       const added = process
@@ -580,13 +597,197 @@ describe("createApiJobs — worker mode and lifecycle", () => {
   });
 });
 
+describe("createApiJobs — `jobs` may not name nothing", () => {
+  // A required-but-unchecked option is still fail-open. `jobs: []` resolves a
+  // driver, consumes no queue, installs no schedule and answers /health with
+  // `ok` — every scheduled job in the deployment stops, and the probe stays
+  // green. So "declare nothing" is refused rather than read as a choice.
+
+  it("refuses an empty array at ASSEMBLY, before start() is ever called", () => {
+    stubBareEnv();
+
+    expect(() => createApiJobs({ jobs: [], logger: makeLogger().logger })).toThrow(
+      JobsConfigError,
+    );
+  });
+
+  it("refuses a missing `jobs` — the shape a JS consumer can still pass", () => {
+    stubBareEnv();
+
+    expect(() =>
+      createApiJobs({ logger: makeLogger().logger } as unknown as {
+        jobs: JobsSource;
+      }),
+    ).toThrow(/`jobs` is required/);
+  });
+
+  it("refuses a thunk that registers nothing, at start()", async () => {
+    // The array form is decidable at assembly; the thunk form is only
+    // decidable after it runs. Both end at the same refusal — a dropped import
+    // in the host's jobs barrel is exactly this case, and it is the common one.
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const api = createApiJobs({
+      jobs: () => {
+        /* the host's import got dropped */
+      },
+      logger,
+    });
+
+    await expect(api.start()).rejects.toThrow(NoJobsRegisteredError);
+
+    const { status, body } = await healthOf(api);
+    expect(status).toBe(503);
+    expect(body.checks.configured).toBe(false);
+  });
+
+  it("refuses a producer that registered nothing, not just a worker", async () => {
+    // A producer never calls startJobWorkers, so the runtime's own guard would
+    // never fire for it — and a producer with no registrations enqueues
+    // nothing, which is the same silent stop one step earlier.
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const api = createApiJobs({
+      jobs: () => undefined,
+      driver: createInlineJobDriver({ logger }),
+      logger,
+      worker: false,
+    });
+
+    await expect(api.start()).rejects.toThrow(NoJobsRegisteredError);
+  });
+});
+
+describe("createApiJobs — retention is checked like every other number", () => {
+  // The knob this release adds, and the only configurable number whose bad
+  // value is invisible: a NaN or negative window does not shrink retention, it
+  // stops bounding the backend. Refused where `jobs: []` is refused.
+
+  it("refuses a NaN window at ASSEMBLY", () => {
+    stubBareEnv();
+
+    expect(() =>
+      createApiJobs({
+        jobs: oneJob(),
+        logger: makeLogger().logger,
+        retention: {
+          completed: { ageSeconds: Number.NaN, count: 1_000 },
+          failed: { ageSeconds: 604_800, count: 5_000 },
+        },
+      }),
+    ).toThrow(InvalidJobRetentionError);
+  });
+
+  it("refuses a negative count, and names the field", () => {
+    stubBareEnv();
+
+    expect(() =>
+      createApiJobs({
+        jobs: oneJob(),
+        logger: makeLogger().logger,
+        retention: {
+          completed: { ageSeconds: 86_400, count: -1 },
+          failed: { ageSeconds: 604_800, count: 5_000 },
+        },
+      }),
+    ).toThrow(/retention\.completed\.count/);
+  });
+
+  it("accepts an omitted retention — the package default is the norm", () => {
+    stubBareEnv();
+
+    expect(() =>
+      createApiJobs({ jobs: oneJob(), logger: makeLogger().logger }),
+    ).not.toThrow();
+  });
+});
+
+describe("createApiJobs — the events port", () => {
+  it("reports a dead-letter to the host's observer, marked terminal", async () => {
+    // The package notifies nobody itself. What it owns is the MOMENT, and this
+    // is the moment a host wires to its notifier: no attempt is left.
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const failures: { name: string; terminal: boolean; attempt: number }[] = [];
+    const events: JobEvents = {
+      onJobFailed: ({ name, terminal, attempt }) =>
+        void failures.push({ name, terminal, attempt }),
+    };
+    const job = defineJob({
+      name: "test.explodes",
+      attempts: 2,
+      handle: async () => {
+        throw new Error("boom");
+      },
+    });
+    const api = createApiJobs({
+      jobs: [job] as RegisteredJob<never>[],
+      // An awaiting inline instance: the assertion after enqueue must see the
+      // handler's own outcome rather than race it.
+      driver: createInlineJobDriver({ logger, await: true, events }),
+      logger,
+    });
+    await api.start();
+
+    await job.enqueue();
+
+    expect(failures).toEqual([
+      { name: "test.explodes", terminal: false, attempt: 1 },
+      { name: "test.explodes", terminal: true, attempt: 2 },
+    ]);
+  });
+
+  it("reports a completion, and survives an observer that throws", async () => {
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const completed: string[] = [];
+    const events: JobEvents = {
+      onJobCompleted: ({ name }) => {
+        completed.push(name);
+        // Somebody else's code. It must not be able to fail the job it watches.
+        throw new Error("the observer is broken");
+      },
+    };
+    const job = defineJob({ name: "test.completes", handle: async () => undefined });
+    const api = createApiJobs({
+      jobs: [job] as RegisteredJob<never>[],
+      driver: createInlineJobDriver({ logger, await: true, events }),
+      logger,
+    });
+    await api.start();
+
+    await expect(job.enqueue()).resolves.toEqual({ enqueued: true });
+    expect(completed).toEqual(["test.completes"]);
+  });
+
+  it("passes the events port through env-resolved driver resolution too", async () => {
+    // Not only when the host hands in an instance: the zero-config inline
+    // driver `start()` resolves must carry the observer, or a host's hook is
+    // live in production and dead in development.
+    stubBareEnv();
+    const { logger } = makeLogger();
+    const seen: string[] = [];
+    const job = defineJob({ name: "test.resolved", handle: async () => undefined });
+    const api = createApiJobs({
+      jobs: [job] as RegisteredJob<never>[],
+      logger,
+      events: { onJobCompleted: ({ name }) => void seen.push(name) },
+    });
+    await api.start();
+
+    await job.enqueue();
+
+    await vi.waitFor(() => expect(seen).toEqual(["test.resolved"]));
+  });
+});
+
 describe("createApiJobs — the sweep lease seam", () => {
   it("binds withSweepLease to the configured db", async () => {
     stubBareEnv();
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const db = (): Promise<SweepLeaseDb> =>
       Promise.resolve({ sweepLease: { updateMany, create: vi.fn() } });
-    const api = createApiJobs({ jobs: [], logger: makeLogger().logger, db });
+    const api = createApiJobs({ jobs: oneJob(), logger: makeLogger().logger, db });
 
     const outcome = await api.withSweepLease("test.sweep", 60_000, async () => "ran");
 
@@ -596,7 +797,7 @@ describe("createApiJobs — the sweep lease seam", () => {
 
   it("rejects — never silently skips — when no db was configured", async () => {
     stubBareEnv();
-    const api = createApiJobs({ jobs: [], logger: makeLogger().logger });
+    const api = createApiJobs({ jobs: oneJob(), logger: makeLogger().logger });
 
     // A sweep whose lease quietly no-ops is the unprotected overlap the lease
     // exists to prevent; misconfiguration must surface as a failed job — and
@@ -616,7 +817,7 @@ describe("createApiJobs — health payload", () => {
     // aggregate that folds this endpoint in unable to ever go green.
     stubBareEnv();
     const { logger } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger, driver: "off" });
+    const api = createApiJobs({ jobs: oneJob(), logger, driver: "off" });
 
     await api.start();
 
@@ -630,7 +831,7 @@ describe("createApiJobs — health payload", () => {
     stubBareEnv();
     vi.stubEnv("JOBS_DRIVER", "off");
     const { logger } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger });
+    const api = createApiJobs({ jobs: oneJob(), logger });
 
     await api.start();
 
@@ -646,7 +847,7 @@ describe("createApiJobs — health payload", () => {
     stubBareEnv();
     vi.stubEnv("JOBS_DRIVER", "rabbitmq");
     const { logger } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger });
+    const api = createApiJobs({ jobs: oneJob(), logger });
 
     await api.start();
 
@@ -664,7 +865,7 @@ describe("createApiJobs — health payload", () => {
     stubBareEnv();
     vi.stubEnv("JOBS_DRIVER", "off");
     const { logger, error } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger, production: true });
+    const api = createApiJobs({ jobs: oneJob(), logger, production: true });
 
     await api.start();
 
@@ -682,7 +883,7 @@ describe("createApiJobs — health payload", () => {
     stubBareEnv();
     const { logger, error } = makeLogger();
     const api = createApiJobs({
-      jobs: [],
+      jobs: oneJob(),
       logger,
       driver: 42 as unknown as JobsDriverChoice,
     });
@@ -699,14 +900,17 @@ describe("createApiJobs — health payload", () => {
 
   it("counts registered jobs and schedules", async () => {
     stubBareEnv();
-    defineJob({ name: "test.plain", handle: async () => undefined });
-    defineJob({
+    const plain = defineJob({ name: "test.plain", handle: async () => undefined });
+    const cron = defineJob({
       name: "test.cron",
       schedule: { pattern: "0 * * * *" },
       handle: async () => undefined,
     });
     const { logger } = makeLogger();
-    const api = createApiJobs({ jobs: [], logger });
+    const api = createApiJobs({
+      jobs: [plain, cron] as RegisteredJob<never>[],
+      logger,
+    });
 
     await api.start();
 
