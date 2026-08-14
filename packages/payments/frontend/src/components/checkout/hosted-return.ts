@@ -86,22 +86,37 @@ export function rememberHostedOrder(order: CheckoutOrder): void {
  * of resuming one they never paid. Read-and-clear for the same reason: the
  * resumed view belongs to exactly one return.
  */
-export function takeHostedOrder(): CheckoutOrder | null {
-  if (!isReturnTrip()) return null;
-  let raw: string | null = null;
+/**
+ * The raw parked payload under either key, cleared as it is read.
+ *
+ * Split out from {@link takeHostedOrder} so the storage handling and the
+ * parsing stay separately readable — reading two keys and clearing both put the
+ * combined function over the complexity gate, and the two halves fail for
+ * unrelated reasons anyway (storage disabled vs. a value that is not an order).
+ *
+ * BOTH keys are cleared whichever one answered: this is read-and-clear, and a
+ * legacy entry left behind would let a later return trip resume an order that
+ * was already consumed.
+ */
+function takeParkedPayload(): string | null {
   try {
-    // Current key first, then the pre-rename one. Both are cleared either way:
-    // this is read-and-clear, and leaving the legacy entry behind would let a
-    // later return trip resume an order that was already consumed.
-    raw =
+    const raw =
       window.sessionStorage?.getItem(HOSTED_ORDER_STORAGE_KEY) ??
       window.sessionStorage?.getItem(LEGACY_KEY) ??
       null;
     window.sessionStorage?.removeItem(HOSTED_ORDER_STORAGE_KEY);
     window.sessionStorage?.removeItem(LEGACY_KEY);
+    return raw;
   } catch {
+    // Storage disabled or unavailable — the same "no parked order" as an empty
+    // slot, and the webhook still settles the order regardless.
     return null;
   }
+}
+
+export function takeHostedOrder(): CheckoutOrder | null {
+  if (!isReturnTrip()) return null;
+  const raw = takeParkedPayload();
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
