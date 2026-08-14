@@ -25,6 +25,7 @@ import {
 import {
   FormActions,
   ProbeAlert,
+  ProbeChecklist,
   ReverifyWarning,
   type VerifyProbe,
 } from './CredentialFormAlerts';
@@ -375,6 +376,11 @@ export function ProviderForm(props: ProviderFormProps) {
       {form.probe ? (
         <ProbeAlert probe={form.probe} busy={form.busy !== null} onRetry={form.verify} />
       ) : null}
+      {/* The pasted-key path, and the one FUT-796 is about: this form is where
+          the credentials the probe reports on were typed, so its findings
+          belong beside them — including on a pass, where the unchecked rows are
+          the only place an owner learns what was NOT established. */}
+      {form.probe ? <ProbeChecklist probe={form.probe} /> : null}
 
       <ConfirmCredentialSave
         pending={form.pending}

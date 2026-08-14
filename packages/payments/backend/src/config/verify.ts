@@ -1,6 +1,6 @@
 import type { PaymentProviderAdapter } from '../core/provider';
 import { stubResolvedFor } from '../core/stub-mode';
-import type { PaymentEnvironment, ProbeFault } from '../core/types';
+import type { PaymentEnvironment, ProbeCheck, ProbeFault } from '../core/types';
 import type { MaskedProviderConfig, ProviderConfigStore, StoredProviderConfig } from './types';
 import type { MerchantRef } from '../core/types';
 
@@ -32,7 +32,21 @@ export interface VerifiedProviderConfig extends MaskedProviderConfig {
    * ask again in a moment). One sentence served both, and on the second it
    * accused the owner of a typo the probe had not established.
    */
-  probe: { environment: PaymentEnvironment; ok: boolean; message?: string; fault?: ProbeFault };
+  probe: {
+    environment: PaymentEnvironment;
+    ok: boolean;
+    message?: string;
+    fault?: ProbeFault;
+    /**
+     * The adapter's per-credential findings, when it produces them (FUT-796).
+     *
+     * Carried on a PASS as well as on a failure, which is the opposite of
+     * `message`: a green probe that proved three credentials and could not
+     * check a fourth is exactly the result an owner needs spelled out, because
+     * the unchecked one is what fails later, in front of a buyer.
+     */
+    checks?: readonly ProbeCheck[];
+  };
 }
 
 /**
@@ -101,6 +115,10 @@ export async function runVerify(
       // blank alert — worse than the generic sentence it replaced.
       ...(result.ok || !result.message ? {} : { message: result.message }),
       ...(result.ok || !result.fault ? {} : { fault: result.fault }),
+      // Unlike the two above, carried on a pass too: the findings are the
+      // answer to "what did this actually establish", which is a question a
+      // green result raises rather than settles.
+      ...(result.checks?.length ? { checks: result.checks } : {}),
     },
   };
 }

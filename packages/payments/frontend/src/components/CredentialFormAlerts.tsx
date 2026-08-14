@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, CircularProgress, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
 
 import type { VerifiedProviderConfig } from '@12-apps/payments-backend';
 
@@ -75,6 +75,72 @@ export function ProbeAlert({
     >
       {message}
     </Alert>
+  );
+}
+
+/**
+ * Off-screen but read aloud. Inline rather than `@mui/utils`'s `visuallyHidden`,
+ * which is not a dependency of this package — one style object is not worth a
+ * new one on a package that ships to every host.
+ */
+const SCREEN_READER_ONLY = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+} as const;
+
+/** How each verdict reads at a glance — the mark, and what it is called. */
+const CHECK_MARKS = {
+  PASS: { mark: '✓', color: 'success.main', label: 'Verificado' },
+  FAIL: { mark: '✕', color: 'error.main', label: 'Corrigir' },
+  UNCHECKED: { mark: '–', color: 'text.secondary', label: 'Não verificável' },
+} as const;
+
+/**
+ * What the probe established, credential by credential (FUT-796).
+ *
+ * Rendered on a PASS as well as a failure, which is the point. One boolean over
+ * a four-field form told an owner their connection was fine when only the
+ * secret key had been checked — the publishable key and the signing secret
+ * failed later, at a buyer's card and at a payment that never confirmed, where
+ * neither looks like a credential problem.
+ *
+ * The `UNCHECKED` row is the one that earns this component. It says a
+ * credential could NOT be verified and why, which a green tick would deny and a
+ * red cross would misattribute — and it tells the owner precisely which part of
+ * a passing result not to lean on.
+ */
+export function ProbeChecklist({ probe }: { probe: VerifyProbe }) {
+  if (!probe.checks?.length) return null;
+  return (
+    <Stack spacing={0.5} data-testid="payments-probe-checks">
+      {probe.checks.map((check) => {
+        const { mark, color, label } = CHECK_MARKS[check.status];
+        return (
+          <Stack
+            key={check.key}
+            direction="row"
+            spacing={1}
+            alignItems="flex-start"
+            data-testid={`payments-probe-check-${check.key}`}
+            data-status={check.status}
+          >
+            <Typography component="span" sx={{ color, fontWeight: 700, lineHeight: 1.5 }}>
+              <span aria-hidden>{mark}</span>
+              {/* The mark alone is colour-only information; the state has to be
+                  readable to anyone not seeing the colour. */}
+              <Box component="span" sx={SCREEN_READER_ONLY}>{` ${label}: `}</Box>
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {check.message}
+            </Typography>
+          </Stack>
+        );
+      })}
+    </Stack>
   );
 }
 

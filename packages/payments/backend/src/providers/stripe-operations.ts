@@ -15,6 +15,11 @@ import {
   type StripeErrorBody,
   type StripePaymentIntent,
 } from './stripe-charges';
+import {
+  stripeChecksSummary,
+  stripeCredentialChecks,
+  type StripeAccountFacts,
+} from './stripe-credential-checks';
 import { unreachableOutcome } from './probe-shared';
 import { NAME, stripeRequest } from './stripe-http';
 
@@ -89,14 +94,35 @@ export const createCharge: PaymentProviderAdapter['createCharge'] = async (input
   }
 };
 
+/**
+ * Prove the connection, credential by credential (FUT-796).
+ *
+ * `GET /v1/account` rather than `/v1/balance`: the same authenticated round
+ * trip, but its answer NAMES the account the key resolves to and states
+ * whether Stripe has released charging on it. Both are facts an owner cannot
+ * otherwise get from this screen, and the second is the whole difference
+ * between "your key works" and "your store can take money" — an account still
+ * in document review authenticates perfectly and refuses every charge.
+ *
+ * The rest of the credentials are checked for agreement in
+ * `stripe-credential-checks`, and where Stripe offers no way to check at all,
+ * reported as unchecked rather than passed.
+ */
 export const verifyCredentials: PaymentProviderAdapter['verifyCredentials'] = async (
   credentials,
 ) => {
   if (credentials.stub) return { ok: true, message: 'stub mode' };
   try {
-    // Cheapest authenticated probe there is; a wrong key answers 401.
-    await stripeRequest<unknown>('/v1/balance', credentials, { method: 'GET' });
-    return { ok: true };
+    const account = await stripeRequest<StripeAccountFacts>('/v1/account', credentials, {
+      method: 'GET',
+    });
+    const checks = stripeCredentialChecks(credentials, account);
+    const message = stripeChecksSummary(checks);
+    // A credential that fails its own check fails the PROBE. Whether the key
+    // authenticates is not the question the owner is asking — they are asking
+    // whether this store can take money, and a live secret key beside a test
+    // publishable key cannot.
+    return message ? { ok: false, message, checks } : { ok: true, checks };
   } catch (error) {
     // Transport first: an unanswered probe learned NOTHING about the key, and
     // reporting it without the fault is what let a DNS blip persist FAILED

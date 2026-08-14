@@ -7,7 +7,7 @@ import type { MaskedProviderConfig, ProviderDescriptor } from '@12-apps/payments
 
 import type { PaymentsSettingsClient } from '../client';
 import { isConnected } from './connection-state';
-import { ProbeAlert, type VerifyProbe } from './CredentialFormAlerts';
+import { ProbeAlert, ProbeChecklist, type VerifyProbe } from './CredentialFormAlerts';
 
 /**
  * "Testar conexão" for a store whose connection is a GRANT, not a form.
@@ -73,6 +73,9 @@ export function ConnectionProbe({
       </Button>
       {error ? <Alert severity="error">{error}</Alert> : null}
       {probe ? <ProbeAlert probe={probe} busy={busy} onRetry={() => void verify()} /> : null}
+      {/* Shown on a pass too — see `ProbeChecklist`: what a green probe did
+          NOT check is the half an owner cannot otherwise find out. */}
+      {probe ? <ProbeChecklist probe={probe} /> : null}
     </Stack>
   );
 }
