@@ -60,7 +60,11 @@ function foreignWords(): readonly string[] {
     'salão',
     'garçom',
     'pagbank',
-    'R$ ',
+    // No trailing space. This entry used to read `'R$ '`, which is not how a
+    // price is usually written: `R$59,00` shipped straight past it, and the
+    // surface suite next door (`portability-surface.test.tsx`) had always
+    // banned the bare symbol — so the two gates disagreed about the same word.
+    'R$',
     'stock.locations',
     'catalog.products',
     'storefront.tables',
@@ -135,10 +139,20 @@ describe('the tarball npm would upload', () => {
   it('would catch a plant, so a green run means something', () => {
     // The same check, run over a string that IS a violation — without this the
     // suite above passes just as happily when the word list stops matching.
-    const planted = 'o plano da loja inclui 3 locais de estoque';
+    //
+    // The plant now carries a PRICE, and one written the way a price actually
+    // is: `R$59,00`, no space. The old plant contained no currency at all, so
+    // the currency entry had zero coverage here — which is exactly how it went
+    // unnoticed that the entry itself demanded a trailing space.
+    const planted = 'o plano da loja inclui 3 locais de estoque por R$59,00';
     const caught = foreignWords().filter((word) =>
       planted.toLowerCase().includes(word.toLowerCase()),
     );
-    expect(caught.length).toBeGreaterThan(0);
+    // Named, not counted: a plant that trips three other entries proves
+    // nothing about the one being covered, and `length > 0` is satisfied by
+    // any of them.
+    expect(caught).toContain('R$');
+    expect(caught).toContain('loja');
+    expect(caught).toContain('estoque');
   });
 });

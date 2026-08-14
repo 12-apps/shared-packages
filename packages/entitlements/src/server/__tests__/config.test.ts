@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 import { definePlans } from '../../core/plans';
 import { defineFeatures } from '../../core/registry';
+import type { FeatureRegistry, ResolvedFeatureDef } from '../../core/types';
 import { createMemorySource } from '../../memory';
 import { createApiEntitlements } from '../create-api-entitlements';
 import { EntitlementsConfigError } from '../config';
@@ -39,6 +40,17 @@ const PRICING = [
 
 const priceLabel = (cents: number | null): string | null =>
   cents === null ? null : `${(cents / 100).toFixed(2)} cr`;
+
+/** An empty registry `defineFeatures` did not build — see the case that uses it. */
+function emptyRegistry(): FeatureRegistry<Feature> {
+  return {
+    list: [],
+    has: (feature: string): feature is Feature => feature.length < 0,
+    def: (feature: Feature): ResolvedFeatureDef => {
+      throw new Error(`Unknown feature: "${feature}"`);
+    },
+  };
+}
 
 /** A well-formed config, overridden per test with the thing being refused. */
 function config(
@@ -77,9 +89,22 @@ describe('assertApiEntitlementsConfig', () => {
     // renders a `not-supported` page UNLOCKED (a stale client must not paywall
     // a page the tenant owns). So "declare nothing" is not a lockout — it is
     // an app with every plan-gated page open.
-    const error = buildWith({ features: defineFeatures({}) as never });
+    //
+    // The registry is hand-rolled rather than `defineFeatures({})` because
+    // that now throws in its own right (registry.ts). This assertion used to be
+    // the only one anywhere, sitting a layer ABOVE the hazard and off the path
+    // ADOPTING.md §4 walks adopters down; what is left for it to catch is the
+    // registry this package did not build — `FeatureRegistry` is published, so
+    // a host can implement it itself.
+    const error = buildWith({ features: emptyRegistry() });
     expect(error).toBeInstanceOf(EntitlementsConfigError);
     expect(String(error)).toMatch(/`features` declares no feature keys/);
+  });
+
+  it('refuses an empty catalog at construction too, before any surface exists', () => {
+    // The blocker this pair now closes from both ends: an adopter who never
+    // calls `createApiEntitlements` is refused by `defineFeatures` itself.
+    expect(() => defineFeatures({})).toThrow(/declares no feature keys/);
   });
 
   it('refuses an empty ladder, and asks for `null` when that is what was meant', () => {
@@ -118,6 +143,28 @@ describe('assertApiEntitlementsConfig', () => {
     // enforced — on exactly the tiers being sold.
     const error = buildWith({ usage: null });
     expect(String(error)).toMatch(/`usage` is not configured/);
+  });
+
+  it('refuses a `usage` that is present but cannot count', () => {
+    // `usage == null` used to be the whole test, so an object that merely
+    // EXISTED satisfied it and the failure moved to the first `checkQuota` —
+    // i.e. back to a runtime failure on whichever tier sells that ceiling,
+    // which is the thing the assembly check exists to bring forward.
+    expect(String(buildWith({ usage: {} as never }))).toMatch(/no `count\(/);
+    expect(String(buildWith({ usage: { count: 'soon' } as never }))).toMatch(/no `count\(/);
+    // A registry is checked through its port, not its own shape.
+    expect(String(buildWith({ usage: { port: {}, assertRegistered: () => {} } as never }))).toMatch(
+      /no `count\(/,
+    );
+  });
+
+  it('accepts a bare counter, and says out loud what that costs', () => {
+    // A plain `UsageCounter` is legitimate config and builds. What it does NOT
+    // buy is the per-quota audit: `assertRegistered` only runs when `usage` is
+    // a registry, so `stations.online` having no counter behind this function
+    // is not detectable here. That is a documented limit of the coarse check,
+    // not a bug in it — the PR body used to claim more.
+    expect(buildWith({ usage: { count: async () => 0 } })).toBeNull();
   });
 
   it('refuses a missing price formatter rather than picking a currency', () => {

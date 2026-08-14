@@ -189,3 +189,109 @@ describe('prunableRange', () => {
     });
   });
 });
+
+/**
+ * The window gate — the asymmetry that made `prunableRange` a data-destruction
+ * hazard.
+ *
+ * `retentionWindowDays` answers `null` — KEEP EVERYTHING — for any limit that
+ * is not a positive number. `prunableRange` validated only the feature KEY, so
+ * the same non-positive window it was handed became "delete everything": at
+ * `windowDays: 0` the cutoff IS `now`, every watermark's `since` lies in the
+ * past, `cutoff > since` passes, and the tenant's whole history comes back as
+ * the prunable range.
+ *
+ * Each case asserts BOTH halves: the answer is `null`, AND no watermark row
+ * was created or mutated. The second half is not a nicety — the old code wrote
+ * the watermark before it computed the cutoff, so a bad window recorded itself
+ * as the tenant's current window even on the calls that returned nothing, and
+ * the next sweep at a good window then saw a "changed" window and reset
+ * `since` again.
+ */
+describe('prunableRange refuses a window that is not a positive number of days', () => {
+  const BAD_WINDOWS = [
+    { label: 'zero — a full-history purge, never "prune nothing"', windowDays: 0 },
+    { label: 'a negative window — the cutoff lands in the FUTURE', windowDays: -30 },
+    { label: 'NaN — an Invalid Date compared its way to null by accident', windowDays: Number.NaN },
+    { label: 'Infinity', windowDays: Number.POSITIVE_INFINITY },
+  ];
+
+  // A plain loop rather than `it.each`: the flakiness lint reads a binding
+  // declared inside an `it.each` callback as describe-scoped, and then calls
+  // the next plain test's use of the same name shared state.
+  for (const { label, windowDays } of BAD_WINDOWS) {
+    it(`answers null for ${label}, touching no watermark`, async () => {
+      // A tenant in steady state with 400 days of history behind the
+      // watermark: the case where a bad window destroys the most.
+      const NOW = anchor();
+      const since = new Date(NOW.getTime() - 400 * DAY);
+      const { findUnique, create, update, retention } = harness();
+      findUnique.mockResolvedValue({ windowDays: 30, since });
+
+      await expect(retention.prunableRange(TENANT, FEATURE, windowDays, NOW)).resolves.toBeNull();
+
+      // Refused before the row is even read, so nothing can be written from it.
+      expect(findUnique).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it(`creates no first watermark for ${label} either`, async () => {
+      // The other starting state: a tenant this sweep has never seen. The old
+      // code took the `!existing` branch and CREATED a row recording the bad
+      // window as the tenant's current one.
+      const NOW = anchor();
+      const { findUnique, create, update, retention } = harness();
+      findUnique.mockResolvedValue(null);
+
+      await expect(retention.prunableRange(TENANT, FEATURE, windowDays, NOW)).resolves.toBeNull();
+
+      expect(create).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+    });
+  }
+
+  it('still refuses a non-retention key before it looks at the window', async () => {
+    // Gate order matters: a bad window on a key nothing should prune by is
+    // still the louder mistake, and must keep throwing rather than quietly
+    // answering `null`.
+    const { retention } = harness();
+    await expect(retention.prunableRange(TENANT, 'stations.online', 0, anchor())).rejects.toThrow(
+      /not a retention quota/,
+    );
+  });
+
+  it('hands back no range on the SECOND sweep at a persisted zero', async () => {
+    // The destruction itself, and the reason the "no watermark written" half
+    // of the cases above is load-bearing rather than tidy.
+    //
+    // Sweep one at `windowDays: 0` used to STORE `{ windowDays: 0, since: now }`
+    // and answer null, which reads as harmless. Sweep two then finds a window
+    // that has not "changed", keeps that stored `since`, and computes a cutoff
+    // of `now` — so `cutoff > since` passes and the range handed back is every
+    // row the tenant wrote in between. Nothing here is unreachable: a resolver
+    // hiccup or a plan granting 0 days is all it takes to enter it.
+    const NOW = anchor();
+    const since = new Date(NOW.getTime() - 7 * DAY);
+    const { findUnique, update, retention } = harness();
+    findUnique.mockResolvedValue({ windowDays: 0, since });
+
+    await expect(retention.prunableRange(TENANT, FEATURE, 0, NOW)).resolves.toBeNull();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('is the mirror of what the READ answers for the same window', async () => {
+    // The pair that used to disagree, driven end to end through the engine: a
+    // plan granting `0` days resolves to a limit of 0, which the read reports
+    // as `null` — keep everything. The write half must now say the same thing
+    // about the very window the read just refused to hand out.
+    const NOW = anchor();
+    const since = new Date(NOW.getTime() - 400 * DAY);
+    const { findUnique, source, retention } = harness();
+    source.set(TENANT, { plan: { 'readings.retention_days': 0 } });
+    findUnique.mockResolvedValue({ windowDays: 0, since });
+
+    await expect(retention.retentionWindowDays(TENANT, FEATURE)).resolves.toBeNull();
+    await expect(retention.prunableRange(TENANT, FEATURE, 0, NOW)).resolves.toBeNull();
+  });
+});

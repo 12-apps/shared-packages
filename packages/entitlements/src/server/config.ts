@@ -80,8 +80,9 @@ export interface ApiEntitlementsConfig<F extends string, K extends string> {
    * How a price in cents reads on the wire (`TenantPlanView.price`).
    *
    * REQUIRED. This package words money it is handed and must not dictate whose
-   * money it is: the removed default spelled Brazilian Reais, so every silent
-   * host billed in another currency rendered a number with `R$` in front of it.
+   * money it is: the removed default spelled one particular currency, symbol
+   * and decimal comma included, so every silent host billed in another one
+   * rendered its prices in somebody else's money.
    */
   formatPrice: (priceCents: number | null) => string | null;
   /** The plan-change lead store. Omit it and the request routes do not exist. */
@@ -200,8 +201,16 @@ function assertPricing<F extends string, K extends string>(
  *
  * Without the port the engine throws on the first `checkQuota` — a runtime
  * failure on whichever tier happens to sell that ceiling, rather than at boot.
- * The registry's own `assertRegistered` covers the finer case (a counter
- * missing for ONE quota); this covers the coarse one.
+ *
+ * ⚠️ **This is the COARSE check, and it is the only one a bare `UsageCounter`
+ * gets.** The per-quota audit — "the catalog declares a ceiling this host
+ * cannot count" — lives on `UsageRegistryLike.assertRegistered`, and
+ * `createApiEntitlements` can only run it when `usage` actually IS a registry
+ * (`'port' in usage`). Hand in a plain counter, or a registry's own `.port`,
+ * and nothing checks that every declared quota has a counter behind it: a
+ * counter that answers `0` for a key it does not know leaves `used + 1 > limit`
+ * false for every ceiling ≥ 1, which is the silently-unlimited tier this whole
+ * area exists to prevent. Pass `createUsageRegistry(...)` itself, not its port.
  */
 function assertUsage<F extends string, K extends string>(
   config: ApiEntitlementsConfig<F, K>,
@@ -209,11 +218,26 @@ function assertUsage<F extends string, K extends string>(
   const quotas = config.features.list.filter(
     (feature) => config.features.def(feature).kind === 'quota',
   );
-  if (quotas.length > 0 && (config.usage ?? null) === null) {
+  const usage = config.usage ?? null;
+  if (quotas.length === 0) return;
+  if (usage === null) {
     failConfig(
       `The catalog declares quota feature(s) ${quotas.map((key) => `"${key}"`).join(', ')} ` +
         'but `usage` is not configured. Pass createUsageRegistry(...) so the ceilings ' +
         'can be measured — an unmeasurable ceiling is never enforced.',
+    );
+  }
+  // Shape, not coverage. `usage == null` was the entire test, so an object
+  // that is merely present passed — and a `usage` with no callable `count`
+  // fails on the first `checkQuota` instead of at boot, which is the exact
+  // "runtime failure on whichever tier sells that ceiling" this check exists
+  // to move forward. A registry is checked through its `port`.
+  const port = 'port' in usage ? usage.port : usage;
+  if (typeof port?.count !== 'function') {
+    failConfig(
+      '`usage` has no `count(tenantId, feature)` function. Pass a UsageCounter, or the ' +
+        'registry from createUsageRegistry(...) — a `usage` that cannot count leaves ' +
+        'every declared ceiling unenforced until the first checkQuota throws.',
     );
   }
 }

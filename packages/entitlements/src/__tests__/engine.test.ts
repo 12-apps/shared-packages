@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { createEntitlements } from '../core/engine';
 import { EntitlementRequiredError, QuotaExceededError } from '../core/errors';
+import { defineFeatures } from '../core/registry';
+import type { FeatureRegistry, ResolvedFeatureDef } from '../core/types';
 import {
   createMemoryCache,
   createMemorySource,
@@ -11,6 +13,21 @@ import {
 import { FEATURES, PLANS, type AppFeature } from './fixtures';
 
 const TENANT = 'tenant-1';
+
+/**
+ * An empty registry `defineFeatures` did not build — the shape a host on plain
+ * JS, or one implementing the published `FeatureRegistry` interface itself,
+ * can still hand to the engine. Built per call so nothing is shared.
+ */
+function emptyRegistry(): FeatureRegistry<AppFeature> {
+  return {
+    list: [],
+    has: (feature: string): feature is AppFeature => feature.length < 0,
+    def: (feature: AppFeature): ResolvedFeatureDef => {
+      throw new Error(`Unknown feature: "${feature}"`);
+    },
+  };
+}
 
 /**
  * One engine + one set of ports PER CALL, and every test calls it for itself.
@@ -325,5 +342,45 @@ describe('cache', () => {
     };
     const { engine } = build(unwritable);
     expect((await engine.check(TENANT, 'alerts.webhook')).enabled).toBe(true);
+  });
+});
+
+/**
+ * The empty catalog — the fail-OPEN empty collection, refused on every path in.
+ *
+ * `assertApiEntitlementsConfig` already refused it, but only from the backend
+ * surface's assembly. `createEntitlements` is exported from the package ROOT
+ * and is the path ADOPTING.md §4 walks an adopter through, and it validated
+ * nothing — so the whole chain was reachable without ever touching the
+ * assertion: `defineFeatures({})` → `list: []` → `toSnapshot` → `features: {}`
+ * → `useEntitlement` answers `not-supported` → `withEntitlement`'s
+ * `PASS_THROUGH` renders the page UNLOCKED. A host that declares no features
+ * does not lock everything down; it opens everything.
+ */
+describe('an empty feature catalog is refused, not read as a lockout', () => {
+  it('cannot even be constructed — defineFeatures refuses it', () => {
+    // The construction path, closed at the source. This also covers
+    // `resolveEntitlement` / `resolveAll`, which take a registry directly and
+    // have no assembly step of their own to guard them.
+    expect(() => defineFeatures({})).toThrow(/declares no feature keys/);
+  });
+
+  it('cannot reach a gate through createEntitlements either', () => {
+    // The other way in. `FeatureRegistry` is a published interface, so a host
+    // on plain JS — or one implementing the port itself — can hand in a
+    // registry this package never built. The engine is what every gate reads
+    // through, so the refusal has to live here too.
+    expect(() =>
+      createEntitlements({ features: emptyRegistry(), source: createMemorySource<AppFeature>() }),
+    ).toThrow(/declares no feature keys/);
+  });
+
+  it('a catalog with one key still builds — the guard refuses empty, not small', () => {
+    // Anti-vacuity: a guard that refused everything would pass the two cases
+    // above just as happily.
+    const one = defineFeatures({ 'forecast.history': { onRevoke: 'hide' } } as const);
+    expect(() =>
+      createEntitlements({ features: one, source: createMemorySource<'forecast.history'>() }),
+    ).not.toThrow();
   });
 });

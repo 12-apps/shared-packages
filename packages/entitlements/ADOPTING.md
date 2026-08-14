@@ -41,6 +41,11 @@ Rules of thumb:
   Choose it when you add the feature, not when the first tenant downgrades.
 - `retainWhenRestricted` is how dunning degrades instead of bricking. At minimum
   keep the tenant's read paths and their own billing page open.
+- **The catalog may not be empty**, and `defineFeatures({})` throws. An empty
+  catalog is not a lockout: every key resolves `not-supported`, the browser
+  snapshot is `{}`, and `withEntitlement` renders a `not-supported` page
+  UNLOCKED on purpose — so declaring nothing *opens* every plan-gated page.
+  `createEntitlements` refuses one too, for a registry it did not build.
 
 ## 2. Define your plans
 
@@ -258,6 +263,12 @@ separate.
       not after.
 - [ ] **`0` means "none", not "unset"** — that is what lets a tier zero out an
       inherited quota.
+- [ ] **Never `retentionWindowDays(...) ?? 0`.** `null` means keep everything;
+      `0` is a full-history purge. Branch on `=== null`.
+- [ ] **Declare at least one feature.** An empty catalog resolves every key
+      `not-supported`, which the page gate renders UNLOCKED — it opens the app
+      rather than closing it. `defineFeatures({})` and `createEntitlements`
+      both refuse it.
 - [ ] Keep `UsageCounter` a **port**; the moment the library writes a query it
       stops being portable.
 - [ ] The CI gate must attribute guards **per exported symbol** and strip
@@ -483,6 +494,34 @@ argument: the interface deliberately has **no** `= string` default, because one
 - **`createRetention(...).prunableRange()` now refuses a feature that is not in
   `retentionFeatures`**, matching `retentionWindowDays`. The read half always
   refused; the half that hands back a range to prune BY did not.
+- **`prunableRange()` also answers `null` for a window that is not a positive
+  finite number** (`0`, negative, `NaN`, `Infinity`), and writes no watermark
+  when it does. See the warning below — that gap could destroy data.
+
+### ⚠️ Never write `retentionWindowDays(...) ?? 0`
+
+`retentionWindowDays` returns `null` to mean **keep everything**: the grant is
+`unlimited`, the tenant is not entitled, or the key is not declared in this
+build. Coalescing that to `0` inverts it into a full-history purge —
+`windowDays: 0` puts the cutoff at `now`, so `cutoff > since` passes for every
+watermark and the range handed back is everything the tenant ever wrote.
+
+```ts
+// ✗ NEVER. "Keep everything" becomes "delete everything".
+const windowDays = (await retentionWindowDays(tenantId, feature)) ?? 0;
+const range = await prunableRange(tenantId, feature, windowDays, now);
+
+// ✓ Branch on null and stop. "Nothing to prune" is a normal sweep outcome.
+const windowDays = await retentionWindowDays(tenantId, feature);
+if (windowDays === null) return 0;
+const range = await prunableRange(tenantId, feature, windowDays, now);
+if (!range) return 0;
+```
+
+`prunableRange` now refuses a non-positive window itself, so the `?? 0` form no
+longer deletes anything. Keep the `=== null` branch anyway: the guard is a
+backstop, and the explicit branch is the only form that still reads correctly
+if a window ever reaches a pruning query by some other route.
 
 ### Things to check on your side
 
