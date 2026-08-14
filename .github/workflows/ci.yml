@@ -120,6 +120,13 @@ jobs:
           - '.npmrc'
           - 'pnpm-lock.yaml'
           - 'pnpm-workspace.yaml'
+          # The list of packages this repo releases. It carries no extension the
+          # globs above would catch, so a change to it SKIPPED the whole
+          # pipeline — including the Release Scripts gate that exists to
+          # validate it. Measured on run 31823413396: a PR editing only this
+          # file skipped 14 jobs and still reported CI Success, because a
+          # skipped job counts as a passing one.
+          - 'release-packages.txt'
         # The lanes that exercise the PUBLISHED surface (tarballs, storybook,
         # both harnesses). They cannot be reached by a change to a root quality
         # script, which is the one useful thing this separates from `code`.
@@ -131,6 +138,9 @@ jobs:
           - 'scripts/verify-package-consumers.mjs'
           - 'pnpm-lock.yaml'
           - 'pnpm-workspace.yaml'
+          # Which packages get packed and verified as a consumer sees them is
+          # exactly what this file names.
+          - 'release-packages.txt'
           # Self-verifying: narrowing these filters must re-run the lanes they
           # gate, or a filter could be quietly weakened with nothing to catch it.
           - '.github/workflows/ci.yml'
