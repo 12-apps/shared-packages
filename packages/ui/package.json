@@ -78,6 +78,7 @@
     "./form/Autocomplete": "./src/components/form/Autocomplete/index.ts",
     "./form/Button": "./src/components/form/Button/index.ts",
     "./form/Calendar": "./src/components/form/Calendar/index.ts",
+    "./form/CategorySelect": "./src/components/form/CategorySelect/index.ts",
     "./form/CepField": "./src/components/form/CepField/index.ts",
     "./form/Checkbox": "./src/components/form/Checkbox/index.ts",
     "./form/CodeEditor": "./src/components/form/CodeEditor/index.ts",
