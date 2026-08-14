@@ -22,16 +22,33 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+/* eslint-disable test-flakiness/no-unmocked-fs --
+   the real file system IS the subject, for the whole file. This asserts a
+   property of the source a consumer installs, so reading it through memfs
+   would assert a property of the fixture instead — and would pass forever
+   while the shipped tree said whatever it liked. The reads are of the working
+   tree only: no writes, no temp dirs, nothing another case could observe. */
+
 // `import.meta.url`, not `__dirname`: this package is `"type": "module"`.
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Adopter brands. Word-boundaried so `futurepayments` would not false-fire. */
-const BRANDS = [
-  { label: 'Future Pay', pattern: /\bfuture[\s-]?pay\b/i },
-  { label: 'futurepay.* (namespace)', pattern: /futurepay[.:]/i },
-  { label: 'Paladira', pattern: /\bpaladira\b/i },
-  { label: 'Future Drink', pattern: /\bfuture[\s-]?drink\b/i },
-];
+/**
+ * Adopter brands. Word-boundaried so `futurepayments` would not false-fire.
+ *
+ * A FACTORY rather than a module-level array, and not merely to satisfy
+ * `test-flakiness/no-test-isolation`: these are regexes, and a regex is only
+ * stateless while nobody gives it the `g` flag. Handing every caller its own
+ * copy means adding one later cannot make case order matter through a shared
+ * `lastIndex` — the exact bug the rule is pointed at.
+ */
+function brandMatchers(): { label: string; pattern: RegExp }[] {
+  return [
+    { label: 'Future Pay', pattern: /\bfuture[\s-]?pay\b/i },
+    { label: 'futurepay.* (namespace)', pattern: /futurepay[.:]/i },
+    { label: 'Paladira', pattern: /\bpaladira\b/i },
+    { label: 'Future Drink', pattern: /\bfuture[\s-]?drink\b/i },
+  ];
+}
 
 /**
  * The ONE site allowed to name the old brand, and only because removing it
@@ -68,7 +85,7 @@ function brandHits(): string[] {
         // An allowed FILE excuses only the line that declares the constant it
         // was granted for — not the rest of the file, and not a second use.
         if (allowance && line.includes(allowance.declares)) return [];
-        const hit = BRANDS.find((brand) => brand.pattern.test(line));
+        const hit = brandMatchers().find((brand) => brand.pattern.test(line));
         return hit ? [`${rel}:${index + 1} — ${hit.label}`] : [];
       });
   });
@@ -85,11 +102,11 @@ describe('shipped source names no adopter brand', () => {
   it('detects a brand when one is present, so the sweep is known to fire', () => {
     // Drives the matchers over the shape they exist to catch, rather than
     // trusting that a green sweep means the patterns work.
-    expect(BRANDS.some((b) => b.pattern.test('O Future Pay cria as cobranças'))).toBe(true);
-    expect(BRANDS.some((b) => b.pattern.test('"futurepay.checkout.hostedOrder"'))).toBe(true);
+    expect(brandMatchers().some((b) => b.pattern.test('O Future Pay cria as cobranças'))).toBe(true);
+    expect(brandMatchers().some((b) => b.pattern.test('"futurepay.checkout.hostedOrder"'))).toBe(true);
     // And does not fire on the words this package legitimately needs.
-    expect(BRANDS.some((b) => b.pattern.test('const payments = usePayments();'))).toBe(false);
-    expect(BRANDS.some((b) => b.pattern.test('payments.checkout.hostedOrder'))).toBe(false);
+    expect(brandMatchers().some((b) => b.pattern.test('const payments = usePayments();'))).toBe(false);
+    expect(brandMatchers().some((b) => b.pattern.test('payments.checkout.hostedOrder'))).toBe(false);
   });
 
   it('skips `stories` only while npm genuinely excludes it', () => {
@@ -115,7 +132,7 @@ describe('shipped source names no adopter brand', () => {
       const declaringLine = source
         .split('\n')
         .find((line) => line.includes(entry.declares) && !line.trimStart().startsWith('*'));
-      expect(BRANDS.some((brand) => brand.pattern.test(declaringLine ?? ''))).toBe(true);
+      expect(brandMatchers().some((brand) => brand.pattern.test(declaringLine ?? ''))).toBe(true);
     }
   });
 });
