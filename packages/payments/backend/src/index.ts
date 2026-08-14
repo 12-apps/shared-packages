@@ -146,6 +146,8 @@ export {
   isAccountAccessError,
   isPermanentProviderRefusal,
   providerExchangeReport,
+  providerRejectionReasons,
+  type ProviderRejectionReason,
 } from './core/error-readers';
 // Decline verdicts as taxonomy properties (FUT-761); ladders stay host policy.
 export { declineForbidsRetry, declineMeansInstrumentDead } from './core/decline-verdict';
