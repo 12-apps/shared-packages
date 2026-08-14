@@ -56,9 +56,9 @@ export {
 // hand-composing path is unchanged.
 // ---------------------------------------------------------------------------
 export { createPaymentFlows } from './flows/create-payment-flows';
-export {
-  type CheckoutCopyFE,
-} from './flows/copy';
+// A type and nothing else now: `DEFAULT_CHECKOUT_COPY_FE` used to sit beside it
+// and was the only value this module ever published (FUT-760).
+export type { CheckoutCopyFE } from './flows/copy';
 export {
   type BoundCheckoutClient,
   type BuyerDetailsProps,
