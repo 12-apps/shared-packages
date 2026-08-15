@@ -62,6 +62,20 @@ export interface AuditActorOptionWire {
   label: string;
 }
 
+/**
+ * The orders the listing endpoint serves, as `field:direction`.
+ *
+ * `createdAt` is the only sortable field, and that is a property of the data
+ * rather than an omission: an append-only trail has exactly one meaningful axis,
+ * and every other column is a repeated categorical value that would sort rows
+ * into an order no reader could page through. The DIRECTION is the real request
+ * — "the oldest first" is how a dispute is read forwards.
+ */
+export type AuditSort = 'createdAt:desc' | 'createdAt:asc';
+
+/** The order in force when a request names none. */
+export const DEFAULT_AUDIT_SORT: AuditSort = 'createdAt:desc';
+
 /** The filters the listing endpoint accepts, as the viewer holds them. */
 export interface AuditLogFilters {
   /** Free text over the resource id (paste an order id to see its trail). */
@@ -77,6 +91,8 @@ export interface AuditLogFilters {
   /** Inclusive `YYYY-MM-DD` day bounds. */
   from?: string;
   to?: string;
+  /** Newest or oldest first. Absent = {@link DEFAULT_AUDIT_SORT}. */
+  sort?: AuditSort;
   page?: number;
   pageSize?: number;
 }

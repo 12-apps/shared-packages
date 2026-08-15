@@ -4,10 +4,17 @@ import { Button } from '@12-apps/ui/form/Button';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { AuditActorOptionWire, AuditLogFilters, AuditLogPageWire } from '../core/types';
+import {
+  DEFAULT_AUDIT_SORT,
+  type AuditActorOptionWire,
+  type AuditLogFilters,
+  type AuditLogPageWire,
+  type AuditSort,
+} from '../core/types';
 import type { AuditVocabulary } from '../core/vocabulary';
 
 import type { AuditApiClient } from './api';
+import type { DayFormat } from './day-bound';
 import { AuditEntriesTable } from './entries-table';
 import { AuditFilterBar } from './filter-bar';
 import { formatLabel, type AuditLabels } from './labels';
@@ -27,6 +34,8 @@ export interface AuditViewerProps {
   labels: AuditLabels;
   vocabulary: AuditVocabulary;
   formatDate: (iso: string) => string;
+  /** How the locale writes a numeric date — the day bounds' mask. */
+  dayFormat: DayFormat;
   /** Controlled filter state, for a host that mirrors it into its URL. */
   filters?: AuditLogFilters;
   onFiltersChange?: (filters: AuditLogFilters) => void;
@@ -85,6 +94,8 @@ function ViewerBody({
   labels,
   vocabulary,
   formatDate,
+  sort,
+  onSortChange,
   onRetry,
   onPage,
 }: {
@@ -92,6 +103,8 @@ function ViewerBody({
   labels: AuditLabels;
   vocabulary: AuditVocabulary;
   formatDate: (iso: string) => string;
+  sort: AuditSort;
+  onSortChange: (next: AuditSort) => void;
   onRetry: () => void;
   onPage: (next: number) => void;
 }): JSX.Element {
@@ -131,6 +144,8 @@ function ViewerBody({
         labels={labels}
         vocabulary={vocabulary}
         formatDate={formatDate}
+        sort={sort}
+        onSortChange={onSortChange}
       />
       <PageFooter labels={labels} page={state.page} onPage={onPage} />
     </Stack>
@@ -212,7 +227,7 @@ function useActorOptions(api: AuditApiClient): readonly AuditActorOptionWire[] {
 }
 
 export function AuditViewer(props: AuditViewerProps): JSX.Element {
-  const { api, labels, vocabulary, formatDate, fixedFilters } = props;
+  const { api, labels, vocabulary, formatDate, dayFormat, fixedFilters } = props;
   const [ownFilters, setOwnFilters] = useState<AuditLogFilters>({});
   const filters = props.filters ?? ownFilters;
   const [reloadToken, setReloadToken] = useState(0);
@@ -248,6 +263,7 @@ export function AuditViewer(props: AuditViewerProps): JSX.Element {
         labels={labels}
         vocabulary={vocabulary}
         actors={actors}
+        dayFormat={dayFormat}
         onChange={applyFilters}
       />
       <ViewerBody
@@ -255,6 +271,10 @@ export function AuditViewer(props: AuditViewerProps): JSX.Element {
         labels={labels}
         vocabulary={vocabulary}
         formatDate={formatDate}
+        sort={filters.sort ?? DEFAULT_AUDIT_SORT}
+        // A re-ordering returns to page 1 for the reason a filter change does:
+        // page 5 of "newest first" is not page 5 of "oldest first".
+        onSortChange={(sort) => applyFilters({ ...filters, sort })}
         onRetry={() => setReloadToken((token) => token + 1)}
         onPage={(page) => {
           const next = { ...filters, page };

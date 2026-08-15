@@ -349,6 +349,44 @@ describe('filters', () => {
 
     expect(await ids(h, { resourceId: 'lamp-1', q: 'order' })).toEqual(['lamp-1']);
   });
+
+  it('serves the trail oldest-first when asked, tie-break and all', async () => {
+    // `sort` is HONOURED rather than accepted-and-dropped. An operator
+    // reconstructing what happened reads forwards, and a saved link carrying
+    // `?sort=createdAt:asc` that silently answers newest-first is a page of the
+    // right rows in the wrong order, with nothing to say so.
+    const h = harness();
+    seedThree(h);
+
+    expect(await ids(h, { sort: 'createdAt:asc' })).toEqual(['keeper-1', 'o-2', 'o-1']);
+    expect(await ids(h, { sort: 'createdAt:desc' })).toEqual(['o-1', 'o-2', 'keeper-1']);
+    // The default is unchanged: newest first.
+    expect(await ids(h, {})).toEqual(['o-1', 'o-2', 'keeper-1']);
+    // The tie-break follows the direction, or the two views are not reverses of
+    // each other and paging the ascending one skips and repeats the ties.
+    expect(h.fake.orderBys).toContainEqual([{ createdAt: 'asc' }, { id: 'asc' }]);
+  });
+
+  it('answers 400 for an order it cannot serve', async () => {
+    // The third option — accept it and ignore it — is the one no client can tell
+    // apart from a working sort.
+    const h = harness();
+
+    expect((await h.get('/audit-logs', { sort: 'action:asc' })).status).toBe(400);
+    expect((await h.get('/audit-logs', { sort: 'createdAt' })).body).toEqual({
+      error: `${DEFAULT_MESSAGES.invalidQuery} (sort).`,
+    });
+  });
+
+  it('bounds the keyword rather than scanning on whatever arrives', async () => {
+    // `q` is an unindexed `contains`, so the length of the needle is the cost of
+    // the scan and the caller picks it.
+    const h = harness();
+    seedThree(h);
+
+    expect((await h.get('/audit-logs', { q: 'o'.repeat(200) })).status).toBe(200);
+    expect((await h.get('/audit-logs', { q: 'o'.repeat(201) })).status).toBe(400);
+  });
 });
 
 describe('identity resolution', () => {

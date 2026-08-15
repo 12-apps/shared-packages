@@ -21,5 +21,12 @@ export {
   type AuditTransportOptions,
 } from './transport';
 export { AuditViewer, type AuditViewerProps } from './viewer';
+export {
+  DayBound,
+  resolveDayFormat,
+  type DayBoundProps,
+  type DayFormat,
+  type DaySegment,
+} from './day-bound';
 export { AuditEntriesTable, formatDiff, type AuditEntriesTableProps } from './entries-table';
 export { AuditFilterBar, type AuditFilterBarProps } from './filter-bar';

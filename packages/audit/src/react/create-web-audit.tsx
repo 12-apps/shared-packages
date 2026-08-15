@@ -4,6 +4,7 @@ import type { AuditLogFilters } from '../core/types';
 import { assertAuditVocabulary, type AuditVocabulary } from '../core/vocabulary';
 
 import { createAuditApiClient, type AuditApiClient } from './api';
+import { resolveDayFormat, type DayFormat } from './day-bound';
 import { createAuditLabels, type AuditLabelOverrides, type AuditLabels } from './labels';
 import { httpAuditTransport, type AuditTransport } from './transport';
 import { AuditViewer } from './viewer';
@@ -52,7 +53,16 @@ export interface AuditWebConfig {
    * full control passes `formatDate`.
    */
   formatDate?: (iso: string) => string;
-  /** BCP-47 tag for the default stamp formatter. Default: the runtime's. */
+  /**
+   * BCP-47 tag for the default stamp formatter AND for the day bounds' segment
+   * order — `01/07/2026` for `pt-BR`, `07/01/2026` for `en-US`. Default: the
+   * runtime's.
+   *
+   * The order is not cosmetic. The bounds are masked fields precisely so this
+   * surface CHOOSES it (a native date input renders in the browser's own locale,
+   * which the page cannot see or set), and a merchant who types the day first
+   * into a month-first field silently filters the wrong window.
+   */
   locale?: string;
   /**
    * Filters pinned IN THE UI — merged over the operator's own on every request, so
@@ -87,6 +97,7 @@ interface SurfaceParts {
   labels: AuditLabels;
   vocabulary: AuditVocabulary;
   formatDate: (iso: string) => string;
+  dayFormat: DayFormat;
   fixedFilters?: AuditLogFilters;
 }
 
@@ -110,6 +121,10 @@ function surfaceParts(config: AuditWebConfig): SurfaceParts {
     labels,
     vocabulary,
     formatDate: config.formatDate ?? ((iso) => formatter.format(new Date(iso))),
+    // Resolved ONCE, with the rest of the config: it is a stable value the day
+    // bounds re-sync on, and rebuilding it per render would re-run their guard
+    // on every keystroke.
+    dayFormat: resolveDayFormat(config.locale),
     ...(config.fixedFilters ? { fixedFilters: config.fixedFilters } : {}),
   };
 }
@@ -123,6 +138,7 @@ export function createWebAudit(config: AuditWebConfig): WebAudit {
         labels={parts.labels}
         vocabulary={parts.vocabulary}
         formatDate={parts.formatDate}
+        dayFormat={parts.dayFormat}
         {...(parts.fixedFilters ? { fixedFilters: parts.fixedFilters } : {})}
       />
     ),
@@ -132,6 +148,7 @@ export function createWebAudit(config: AuditWebConfig): WebAudit {
         labels={parts.labels}
         vocabulary={parts.vocabulary}
         formatDate={parts.formatDate}
+        dayFormat={parts.dayFormat}
         filters={filters}
         onFiltersChange={onFiltersChange}
         {...(parts.fixedFilters ? { fixedFilters: parts.fixedFilters } : {})}

@@ -99,15 +99,21 @@ function orderRows(
   call: number,
 ): StoredRow[] {
   const byId = orderBy?.some((clause) => 'id' in clause) ?? false;
+  // The DIRECTION is read off the clause rather than assumed: the listing serves
+  // both, and a fake that always answered newest-first would let an ascending
+  // sort pass while sorting nothing.
+  const ascending =
+    orderBy?.some((clause) => 'createdAt' in clause && clause.createdAt === 'asc') ?? false;
+  const rank = (order: number): number => (ascending ? -order : order);
   const groups = new Map<number, StoredRow[]>();
   for (const stored of matched) {
     const key = stored.createdAt.getTime();
     groups.set(key, [...(groups.get(key) ?? []), stored]);
   }
-  const instants = [...groups.keys()].sort((a, b) => b - a);
+  const instants = [...groups.keys()].sort((a, b) => rank(b - a));
   return instants.flatMap((instant) => {
     const tied = groups.get(instant) ?? [];
-    if (byId) return [...tied].sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+    if (byId) return [...tied].sort((a, b) => rank(a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
     // No tie-break asked for: any permutation is a legal answer, so give a
     // different legal one per statement.
     const offset = tied.length === 0 ? 0 : call % tied.length;
