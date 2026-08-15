@@ -46,6 +46,10 @@ const { appendFileSync, readFileSync } = require("node:fs");
 const plan = JSON.parse(readFileSync(process.env.FAKE_PLAN, "utf8"));
 const args = process.argv.slice(2);
 appendFileSync(process.env.FAKE_GIT_CALLS, args.join(" ") + "\\n");
+if (args[0] === "rev-parse" && args[1] === "HEAD") {
+  process.stdout.write("0123456789abcdef0123456789abcdef01234567\\n");
+  process.exit(0);
+}
 if (args[0] === "tag" && args[1] === "--list") {
   const pkg = args[2].replace(/-v\\*$/, "");
   const entry = plan[pkg];
@@ -55,6 +59,12 @@ if (args[0] === "tag" && args[1] === "--list") {
 if (args[0] === "push" && args.includes("--delete")) {
   if (process.env.FAKE_PUSH_FAILS === "1") {
     process.stderr.write("remote: error: refusing to delete a protected tag\\n");
+    process.exit(1);
+  }
+}
+if (args[0] === "push" && String(args[2] || "").startsWith("refs/tags/")) {
+  if (process.env.FAKE_TAG_PUSH_FAILS === "1") {
+    process.stderr.write("remote: error: refusing to create a protected tag\\n");
     process.exit(1);
   }
 }
@@ -117,7 +127,7 @@ function workspace(packages) {
 }
 
 /** Runs the real scripts/recover-orphans.mjs over a scripted git, npm and API. */
-async function recover({ plan, hasRelease = true, pushFails = false, env = {} }) {
+async function recover({ plan, hasRelease = true, pushFails = false, tagPushFails = false, env = {} }) {
   const { root, bin, dirs } = workspace(Object.keys(plan));
   const planFile = join(root, "plan.json");
   const gitCalls = join(root, "git.log");
@@ -138,6 +148,7 @@ async function recover({ plan, hasRelease = true, pushFails = false, env = {} })
         FAKE_PLAN: planFile,
         FAKE_GIT_CALLS: gitCalls,
         FAKE_PUSH_FAILS: pushFails ? "1" : "0",
+        FAKE_TAG_PUSH_FAILS: tagPushFails ? "1" : "0",
         GITHUB_API_URL: `http://127.0.0.1:${port}`,
         GITHUB_REPOSITORY: "12-apps/shared-packages",
         GITHUB_TOKEN: "selftest-token",
@@ -268,9 +279,68 @@ check(
   `the tag and the Release are created separately, so either can exist without\n    the other; a missing Release must not block the deletion that matters.\n    git saw:\n    ${noRelease.git.join("\n    ")}`,
 );
 
+// ── The MIRROR of an orphan: published, with no tag ──────────────────────────
+//
+// Deleting is not the remedy here — nothing is there to delete. The version is
+// on the registry and no tag records it, so semantic-release has no floor, will
+// re-cut that version, and publish.mjs will report "skipped" while the run goes
+// green and the release is swallowed. The repair is to WRITE the tag.
+const UNTAGGED = { scope: { versions: ["1.0.0"] } };
+const untagged = await recover({ plan: UNTAGGED });
+
+check(
+  "a published package with no tag gets the missing tag created",
+  untagged.git.some((call) => /^tag scope-v1\.0\.0 /.test(call)),
+  `nothing else in the release job writes this tag, so if this does not, the\n    next release re-cuts 1.0.0 and ships nothing. git saw:\n    ${untagged.git.join("\n    ")}`,
+);
+
+check(
+  "the tag is PUSHED, not just made locally",
+  untagged.git.some((call) => call.includes("push origin refs/tags/scope-v1.0.0")),
+  `semantic-release reads tags from the checkout, but the NEXT run reads them\n    from the remote — a local-only tag fixes this run and nothing after it.\n    git saw:\n    ${untagged.git.join("\n    ")}`,
+);
+
+check(
+  "nothing is deleted while repairing it",
+  !untagged.git.some((call) => call.includes("--delete")) && untagged.deletedReleases.length === 0,
+  `this is the opposite repair to an orphan's. Deleting anything here would be\n    destroying a record rather than restoring one. git saw:\n    ${untagged.git.join("\n    ")}`,
+);
+
+check(
+  "the run stays green so the release it unblocks can proceed",
+  untagged.status === 0,
+  `expected exit 0 after a successful repair, got ${untagged.status}. Output:\n    ${untagged.output}`,
+);
+
+// ── A refused tag push must not leave the tag behind locally ─────────────────
+const tagRefused = await recover({ plan: UNTAGGED, tagPushFails: true });
+
+check(
+  "a refused tag push fails the step instead of reporting a repair",
+  tagRefused.status !== 0,
+  `a green run here would claim the package is fixed when the remote never got\n    the tag. Output:\n    ${tagRefused.output}`,
+);
+
+check(
+  "and the local tag is removed again, or this run cuts nothing at all",
+  tagRefused.git.some((call) => call === "tag -d scope-v1.0.0"),
+  `semantic-release runs later in THIS checkout: a tag left locally but absent\n    from the remote makes it see a released version and cut nothing, which is\n    worse than the state being repaired and just as silent. git saw:\n    ${tagRefused.git.join("\n    ")}`,
+);
+
+// ── The opt-out covers the new direction too ─────────────────────────────────
+const untaggedOff = await recover({ plan: UNTAGGED, env: { RELEASE_AUTO_RECOVER: "false" } });
+
+check(
+  "RELEASE_AUTO_RECOVER=false reports the untagged package and writes nothing",
+  untaggedOff.status === 0 &&
+    !untaggedOff.git.some((call) => /^tag scope-v/.test(call)) &&
+    /no scope-v\* tag/.test(untaggedOff.output),
+  `the escape hatch must cover both repairs, or turning it off still mutates\n    the repository. Output:\n    ${untaggedOff.output}\n    git saw:\n    ${untaggedOff.git.join("\n    ")}`,
+);
+
 if (failures.length > 0) {
   console.log(`\n${failures.length} failure(s):\n`);
   for (const failure of failures) console.log(`  FAIL  ${failure}\n`);
   process.exit(1);
 }
-console.log("\nrecover-orphans.mjs deletes only what is safe to delete");
+console.log("\nrecover-orphans.mjs repairs both directions and touches nothing else");

@@ -36,7 +36,7 @@
 import { spawnSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 
-import { publishDirs, releaseState } from "./lib/release-state.mjs";
+import { newestPublished, publishDirs, releaseState } from "./lib/release-state.mjs";
 
 const DIRS = publishDirs();
 const ENABLED = process.env.RELEASE_AUTO_RECOVER !== "false";
@@ -96,6 +96,37 @@ function deleteTag(tag) {
   return { ok: true, note: "deleted the tag locally and on the remote" };
 }
 
+/**
+ * Write the tag a published version never got, at HEAD.
+ *
+ * WHY HEAD, and not the commit that actually released it. That commit is not
+ * knowable from here: the run that published the version is precisely the run
+ * that failed to record it, so nothing in the repository points at it. HEAD is
+ * the conservative choice rather than the accurate one — the tag's whole job is
+ * to give semantic-release a FLOOR, and a floor set late can only narrow the
+ * next release's notes. Set it early, at a guess, and it would re-cut versions
+ * that are already published, which is the failure this exists to end.
+ *
+ * The cost is real and the log says so: commits between the unrecorded release
+ * and HEAD appear in no release's notes. Someone who knows the true commit can
+ * tag it by hand instead — this is here so that nobody has to.
+ *
+ * The local delete on a failed push is `deleteTag`'s reasoning inverted, and
+ * matters just as much. semantic-release reads tags from THIS checkout minutes
+ * later, so a tag that exists locally but never reached the remote would make it
+ * cut nothing at all — a worse state than the one being repaired, and silent.
+ */
+function createTag(tag, sha) {
+  const local = git(["tag", tag, sha]);
+  if (!local.ok) return { ok: false, note: `could not create the tag locally: ${local.err}` };
+  const remote = git(["push", "origin", `refs/tags/${tag}`]);
+  if (!remote.ok) {
+    git(["tag", "-d", tag]);
+    return { ok: false, note: `could not push the tag: ${remote.err}` };
+  }
+  return { ok: true, note: `created ${tag} at ${sha.slice(0, 7)} locally and on the remote` };
+}
+
 function summarize(lines) {
   console.log(lines.join("\n"));
   if (!process.env.GITHUB_STEP_SUMMARY) return;
@@ -110,17 +141,52 @@ if (DIRS.length === 0) throw new Error("PUBLISH_DIRS is empty — nothing to rec
 // `releaseState` keeps a name the registry has never seen OUT of `orphans` — it
 // is a first publish, which scripts/first-publish.mjs owns, and deleting the tag
 // of a package that is merely new would be a fine way to invent this bug.
-const { orphans } = releaseState(DIRS);
+const { orphans, untagged } = releaseState(DIRS);
 
-if (orphans.length === 0) {
+// The MIRROR of an orphan, healed here for the same reason and by the opposite
+// act. A package on the registry with no tag leaves semantic-release no floor:
+// it re-cuts the published version, npm refuses it, publish.mjs says "skipped",
+// and the run is GREEN while the release is swallowed. Deleting nothing helps —
+// the tag is what is missing, so this writes it.
+//
+// It belongs in this script rather than beside the check that detects it,
+// because the two have to happen in this order and in this job: the tag must
+// exist BEFORE semantic-release runs, or it cuts the wrong version one more
+// time. scripts/verify-released.mjs reports the state; this ends it.
+const HEAD = git(["rev-parse", "HEAD"]).out;
+
+if (orphans.length === 0 && untagged.length === 0) {
   summarize(["no orphaned release tags — every package's newest tag is on the registry"]);
 } else if (!ENABLED) {
   summarize([
     "RELEASE_AUTO_RECOVER=false, so these were reported and left alone:",
     ...orphans.map((o) => `${o.name} is tagged ${o.tag}, which the registry does not have`),
+    ...untagged.map(
+      (u) => `${u.name} is on the registry at ${newestPublished(u.versions)} with no ${u.prefix}-v* tag`,
+    ),
   ]);
 } else {
   const lines = [];
+  for (const { name, prefix, versions } of untagged) {
+    const version = newestPublished(versions);
+    const tag = `${prefix}-v${version}`;
+    const { ok, note } = createTag(tag, HEAD);
+    if (ok) {
+      console.log(
+        `::warning::${name} is on the registry at ${version} with no tag recording it, so ` +
+          `semantic-release would have re-cut ${version} and shipped nothing. Recovered: ` +
+          `${note}. Commits before HEAD will not appear in the next release's notes.`,
+      );
+      lines.push(`**recovered**: ${name} — wrote the missing ${tag}, releases resume from ${version}`);
+    } else {
+      console.log(
+        `::error::${name} is on the registry at ${version} with no ${prefix}-v* tag, and ${note}. ` +
+          `Until that tag exists every release of this package silently ships nothing.`,
+      );
+      lines.push(`**stuck**: ${name} published ${version}, untagged — ${note}`);
+      process.exitCode = 1;
+    }
+  }
   for (const { name, tag, version } of orphans) {
     // Nothing has been tagged yet in this run, so every orphan found here was
     // left by an EARLIER one — which is exactly the case whose remedy is to
