@@ -185,7 +185,7 @@ because your host computed `canAuthor` from a role tier now needs the id in
 
 ## The endpoints
 
-Mounted under whatever prefix the host chooses (future-pay uses
+Mounted under whatever prefix the host chooses (the origin host uses
 `/api/admin/:tenantSlug`):
 
 | Method | Path | Notes |

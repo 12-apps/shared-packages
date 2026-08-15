@@ -10,7 +10,7 @@ import type { OnboardingStateSnapshot } from "../types";
 import { fakeOnboardingDb, type FakeOnboardingDb } from "./fake-db";
 
 /**
- * The progress surface (12-23) — the port of future-pay's
+ * The progress surface (12-23) — the port of the origin host's
  * `app/api/admin/[tenantSlug]/onboarding/[featureKey]/__tests__/route.test.ts`,
  * now against the package's own descriptors instead of a Next route.
  *
@@ -154,7 +154,7 @@ describe("PATCH — the three operations", () => {
     await patch(FEATURE, { op: "save", status: "completed" });
     const response = await patch(FEATURE, { op: "reset" });
     expect(response.status).toBe(403);
-    // pt-BR product copy, verbatim from future-pay's route.
+    // pt-BR product copy, verbatim from the origin host's route.
     expect(response.body).toEqual({ error: "Reset de onboarding indisponível em produção." });
     // And the row is still there — a refused reset must not half-delete.
     expect(db.rows()).toHaveLength(1);

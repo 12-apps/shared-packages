@@ -101,7 +101,7 @@ export function CanvasLiveRegion({ text }: { text: string }): JSX.Element {
  * The removal confirmation — ONE dialog for the block's 🗑 and the
  * configuration panel's *Remover* (GAP 6).
  *
- * Its test id stays keyed by the block, which is what future-pay's e2e drives;
+ * Its test id stays keyed by the block, which is what the origin host's e2e drives;
  * with no target it still has to render something addressable, so it falls
  * back to a name no block can have.
  */

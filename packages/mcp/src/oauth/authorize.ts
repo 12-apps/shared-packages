@@ -6,7 +6,7 @@ import type { StoredOAuthClient } from "./stores";
 
 /**
  * The OAuth 2.1 Authorization Code + PKCE authorization endpoint (12-23, ported
- * from future-pay's `app/api/oauth/authorize/route.ts`).
+ * from the origin host's `app/api/oauth/authorize/route.ts`).
  *
  * It renders no UI: it authenticates the caller against the host's cookie session
  * (through `resolveSession`), validates the request, and either 302-redirects an

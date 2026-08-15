@@ -24,7 +24,7 @@
 --
 -- ============================ REPLAY SAFETY ================================
 -- Every statement is guarded, because the first adopters ALREADY HAVE these
--- tables: future-pay created them by hand before the package existed, so this
+-- tables: the origin host created them by hand before the package existed, so this
 -- migration must be a no-op there and correct on an empty database.
 --
 -- The guards are per COLUMN, not per table. `CREATE TABLE IF NOT EXISTS` alone

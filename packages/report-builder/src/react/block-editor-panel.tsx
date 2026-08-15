@@ -53,7 +53,7 @@
  * describe one block two ways.
  *
  * The test ids are unchanged from the popover on purpose: `report-block-<id>-editor`
- * and `-editor-entity` are driven by future-pay's reports e2e, so swapping the
+ * and `-editor-entity` are driven by the origin host's reports e2e, so swapping the
  * container must not break a consumer's suite.
  */
 import { useMemo, useState, type JSX } from "react";

@@ -1,14 +1,14 @@
 /**
  * The per-entity endpoints, GENERATED from one registration (12-17) — the
- * six route files future-pay hand-wrote per collection, emitted here for
+ * six route files the origin host hand-wrote per collection, emitted here for
  * every entry of `config.entities`. Paths, statuses, envelopes and error
- * copy match the future-pay originals, so the admin screens (and their
+ * copy match the origin host originals, so the admin screens (and their
  * specs) port without edits.
  *
  * Every route awaits the registration's gates before its handler runs:
- * `routePermission` (future-pay's `roles:manage` over the whole roles
+ * `routePermission` (the origin host's `roles:manage` over the whole roles
  * surface) and then `authorize` (the host's per-collection plan gate) — the
- * same order future-pay evaluates them (route gate, then entitled context).
+ * same order the origin host evaluates them (route gate, then entitled context).
  *
  * Emission keeps the literal `/drafts` routes before the `/:id` ones. That is
  * a stability guarantee of the array, not a collision guard — no emitted pair
@@ -104,7 +104,7 @@ function versionsRoute(deps: EntityRouteDeps): LifecycleRoute {
     const history = await foldLifecycle(messages, () => lifecycle.history(ctx, id));
     const names = await resolveActorNames(directory, history.map((row) => row.actorId));
     // A host that mirrors a published-version column is the authority on it —
-    // including `null` (the entity is archived/gone), which future-pay's
+    // including `null` (the entity is archived/gone), which the origin host's
     // soft-delete-filtered read answers as 0 so the dialog offers Restaurar
     // on every row. Only a host that mirrors NOTHING falls back to the
     // highest recorded version (version rows exist only for applied writes).
@@ -141,7 +141,7 @@ function restoreRoute(deps: EntityRouteDeps): LifecycleRoute {
     async ({ actor, params }) => {
       const id = requireParam(params, 'id', messages);
       // Strict digits only — `parseInt` would accept "1.5"/"1abc" and
-      // silently restore v1; future-pay's zod coercion answers 400.
+      // silently restore v1; the origin host's zod coercion answers 400.
       const raw = requireParam(params, 'version', messages);
       if (!/^[0-9]+$/.test(raw)) throw new LifecycleApiError(400, messages.invalidBody);
       const version = Number.parseInt(raw, 10);

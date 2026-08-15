@@ -5,7 +5,7 @@ import { roleDiff, toRoleRecord, type RoleRecord, type RolesStoreCtx } from './r
 
 /**
  * Per-tenant TEMPLATE overrides (12-13) — the copy-on-write edit of a seeded
- * SYSTEM role and its reset to the catalog default, ported from future-pay's
+ * SYSTEM role and its reset to the catalog default, ported from the origin host's
  * `lib/repositories/role.ts` (FUT-217/FUT-231 half). Split from
  * `roles-store.ts` so both stay within the size gate.
  */

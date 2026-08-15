@@ -14,14 +14,14 @@
  *
  * Only the schema partial. MIGRATIONS ARE NOT HANDLED HERE — the host
  * discovers and copies them structurally, by looking for a `prisma/migrations`
- * directory inside every installed `@12-apps/*` package (see future-pay's
+ * directory inside every installed `@12-apps/*` package (see the origin host's
  * packages/prisma/scripts/sync-prisma-plugins.mjs).
  *
  * The host package that owns the schema folder MUST also declare this package
  * as a dependency, so the source of the copy is present in every build
  * context.
  *
- * Default host path follows the future-pay layout
+ * Default host path follows the origin host layout
  * (`packages/prisma/prisma/schema/`); another repo passes its own schema
  * folder as the positional argument, or sets RBAC_HOST_SCHEMA_DIR.
  */

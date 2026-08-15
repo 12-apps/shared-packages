@@ -9,7 +9,7 @@ import {
 
 /**
  * `?topics=` parsing for a subscribe surface — the deny-by-default half the
- * package owns, ported from future-pay's `apps/web/lib/realtime/topics.ts`.
+ * package owns, ported from the origin host's `apps/web/lib/realtime/topics.ts`.
  *
  * The surface declares which DOMAINS are subscribable, and which of those may
  * carry qualifiers; anything else in the query is a 400 before authorization ever
@@ -59,7 +59,7 @@ export function toTopicSpec(
  * Parse and validate a comma-separated topic list. Throws {@link EventsDenial}
  * (400) on an empty list, a list over `max`, or any refused entry.
  *
- * The default messages are the pt-BR wire contract future-pay's SPAs already read;
+ * The default messages are the pt-BR wire contract the origin host's SPAs already read;
  * `messages` is the seam a differently-localised host overrides them through (see
  * {@link EventsMessages}).
  */

@@ -72,7 +72,7 @@ export interface HarnessPage {
 
 /**
  * The nav SECTIONS, borrowed wholesale from the admin sidebar's structure
- * (future-pay `apps/admin/src/shell/nav-config.ts`, FUT-428): labelled groups
+ * (the origin host `apps/admin/src/shell/nav-config.ts`, FUT-428): labelled groups
  * in a deliberate order, a collapsible disclosure per group, a caret on the
  * group header and nowhere else, and parent rows whose children appear when
  * you are inside them.
@@ -82,7 +82,7 @@ export interface HarnessPage {
  * restaurant, and that doc's first rule is that a group IS a mental model
  * rather than a department. The thing being navigated here is a set of
  * PUBLISHED SURFACES, so the model that fits is *whose screen is this*: the
- * same split future-pay itself makes between `apps/client` and `apps/admin`.
+ * same split the origin host itself makes between `apps/client` and `apps/admin`.
  *
  * Ordered the same way the admin orders its groups — by how often you open
  * them. Thirteen of the seventeen pages are buyer flows.

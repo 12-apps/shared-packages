@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { postToServiceWorker, registerServiceWorker } from "../register";
 
 /**
- * Boot registration and the worker handoff (12-23), ported from future-pay's
+ * Boot registration and the worker handoff (12-23), ported from the origin host's
  * `@repo/spa-shared/service-worker` suite.
  *
  * Both behaviours are "must not break anything" rather than "must succeed": a

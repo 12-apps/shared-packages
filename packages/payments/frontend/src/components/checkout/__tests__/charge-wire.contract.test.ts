@@ -134,7 +134,7 @@ function mountBehindFetch() {
   });
   credentials.set(MERCHANT, "alpha", { environment: "SANDBOX", fields: {}, stub: true });
 
-  // An INVOICE whose buyer identity has no CPF in it — future-pay's own order
+  // An INVOICE whose buyer identity has no CPF in it — the origin host's own order
   // row has no column for one, so this is the shape a real payable comes back
   // in and the CPF can only arrive with the charge.
   const world = {

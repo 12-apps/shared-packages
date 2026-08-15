@@ -6,8 +6,8 @@ import type { RbacDbProvider } from './db';
 import { parseRolePermissions, tenantRoleKey } from './permissions-format';
 
 /**
- * The DB-backed engine wiring (12-13) — ported from future-pay's
- * `lib/rbac/rbac.ts`, with every Future-Pay domain name turned into config.
+ * The DB-backed engine wiring (12-13) — ported from the origin host's
+ * `lib/rbac/rbac.ts`, with every origin-host domain name turned into config.
  * The resolver reads ONLY the tables this package owns, which is what lets it
  * live here rather than in every host.
  */

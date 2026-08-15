@@ -43,7 +43,7 @@ The invite above only *asks*. Two things have to exist first, and both ship here
    looking at. `resolveApp` returning `null` is a 404, and that 404 is the whole
    installability gate.
 2. **A REGISTERED service worker, on every visit.** `registerServiceWorker()`
-   belongs at app boot, not behind a settings screen: future-pay registered its
+   belongs at app boot, not behind a settings screen: the origin host registered its
    worker only from `enableWebPush()`, so a visitor who never opened notification
    preferences had no worker — and the browser never offered to install the store.
 

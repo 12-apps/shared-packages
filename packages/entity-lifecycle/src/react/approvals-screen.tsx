@@ -18,7 +18,7 @@ import { LifecycleHttpError, type LifecycleResult } from './transport';
 
 /**
  * Aprovações (12-17) — the parked-change-request inbox of the
- * entity-lifecycle machinery, ported from future-pay's `pages/approvals`
+ * entity-lifecycle machinery, ported from the origin host's `pages/approvals`
  * with its test ids and pt-BR copy intact: filter chips (Pendentes /
  * Aprovadas / Rejeitadas); a PENDING row offers "Aprovar" and "Rejeitar"
  * (the reject dialog takes an optional note). A 403 (feature off for the

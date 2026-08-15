@@ -104,7 +104,7 @@ describe('top-N with an "Outros" bucket', () => {
     // "Outros" bucket nobody asked for. A caller asking for 10,000 rows on a
     // 5-row cap wants 10,000; what it gets is 5 truncated.
     //
-    // Found by a CONSUMER (future-pay's run-route test), not here: no test in
+    // Found by a CONSUMER (the origin host's run-route test), not here: no test in
     // this package had ever set `maxRows` below a spec's own limit.
     const result = await runReport(
       {

@@ -79,7 +79,7 @@ which no sweep selects again.
 
 ## The endpoints
 
-Mounted under whatever prefix the host chooses (future-pay: `/api/account`):
+Mounted under whatever prefix the host chooses (the origin host: `/api/account`):
 
 | | |
 |---|---|

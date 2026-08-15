@@ -15,7 +15,7 @@ import type { DraftRecord, FeatureFlagMap, LifecycleContext, Snapshot, WriteResu
  * itself, from the tables it owns.
  *
  * The feature layers ride the actor because they are tenant state the host
- * owns (future-pay keeps them as two JSON columns on its tenant row): the
+ * owns (the origin host keeps them as two JSON columns on its tenant row): the
  * package never reads a tenant table it cannot know the shape of.
  */
 export interface LifecycleActor {
@@ -73,7 +73,7 @@ export interface LifecycleUserDirectory {
 /**
  * The answer of a collection's `authorize` gate (see
  * `LifecycleEntityRegistration.authorize`). A denial crosses the wire
- * unmodified — the host's `status` and `error` pass through (future-pay's
+ * unmodified — the host's `status` and `error` pass through (the origin host's
  * entitlement denial is a 402 with its own copy); omitted, the denial is the
  * 403 feature-off message.
  */
@@ -103,7 +103,7 @@ export interface LifecycleMessages {
   unauthenticated: string;
 }
 
-/** future-pay's exact copy (lib/lifecycle/api.ts + auth/tenant.ts) — the product default. */
+/** The origin host's exact copy (lib/lifecycle/api.ts + auth/tenant.ts) — the product default. */
 export const DEFAULT_MESSAGES: LifecycleMessages = {
   entityNotFound: 'Este item não existe mais — ele pode ter sido excluído.',
   versionNotFound: 'Esta versão não existe mais.',
@@ -170,7 +170,7 @@ function toApiError(error: unknown, messages: LifecycleMessages): LifecycleApiEr
 
 /**
  * Run a lifecycle call, translating library failures to the HTTP surface —
- * the descriptor-side twin of future-pay's `runLifecycle`.
+ * the descriptor-side twin of the origin host's `runLifecycle`.
  */
 export async function foldLifecycle<T>(
   messages: LifecycleMessages,
@@ -200,7 +200,7 @@ export function writeOutcome(result: WriteResult): {
     : { applied: false, entityId: null, requestId: result.requestId };
 }
 
-/** A parked write answers 202; an applied one 200 (the future-pay contract). */
+/** A parked write answers 202; an applied one 200 (the origin host contract). */
 export function writeResponse(result: WriteResult): LifecycleResponse {
   return ok(writeOutcome(result), result.status === 'applied' ? 200 : 202);
 }
@@ -251,7 +251,7 @@ function permissionSetOf(actor: LifecycleActor): ReadonlySet<string> {
 
 /**
  * Gate a collection-scoped route on the registration's `routePermission`
- * (future-pay's `roles:manage`). `isSuper` bypasses, mirroring `contextOf`.
+ * (the origin host's `roles:manage`). `isSuper` bypasses, mirroring `contextOf`.
  */
 export function requireRoutePermission(
   actor: LifecycleActor,

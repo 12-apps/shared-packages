@@ -9,7 +9,7 @@ import { createTheme } from '@12-apps/ui/mui/styles';
  * sees MUI-blue chrome that exists nowhere a real host would see it, and every
  * screenshot taken from this harness is of a product that does not ship.
  *
- * A host's own theme is its own business: future-pay layers tenant brand
+ * A host's own theme is its own business: the origin host layers tenant brand
  * overrides on top of these very tokens. The harness takes them unmodified
  * because it is the neutral case — what a package looks like before anyone
  * brands it.

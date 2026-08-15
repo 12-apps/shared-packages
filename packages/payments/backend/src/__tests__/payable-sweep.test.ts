@@ -6,7 +6,7 @@ import { createMemoryChargeStore } from '../memory';
 
 /**
  * The pending-charge reconciliation sweep (FUT-761, ported from the
- * future-pay host). A paid charge whose webhook went missing was rescued
+ * origin host). A paid charge whose webhook went missing was rescued
  * only while the buyer's own tab kept polling; this is the machine that asks
  * the provider after they leave. Pinned: the age window, the stub skip, the
  * PAID-only settle through the HOST's port, and that one unreachable

@@ -12,7 +12,7 @@ import { providerRejectionReasons } from '../core/error-readers';
  * cap, and the failure is silent: reasons parse to `[]`, and every specific
  * message collapses into the generic refusal.
  *
- * The last case is the one that matters. It is the exact shape future-pay's
+ * The last case is the one that matters. It is the exact shape the origin host's
  * `lib/payments/pagbank-reasons.ts` cannot read, and its own docstring admits
  * it ("a body truncated past the 300-char cap in the message").
  */

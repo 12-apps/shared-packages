@@ -2,7 +2,7 @@ import type { RealtimeLogger } from "../core/types";
 
 /**
  * Per-subject connection accounting for the subscribe surfaces (ported from
- * future-pay FUT-438) — the ops guardrail that keeps one tenant's tablets (or
+ * the origin host FUT-438) — the ops guardrail that keeps one tenant's tablets (or
  * one person's tabs, or one seat's devices) from exhausting the process's
  * open-stream budget.
  *

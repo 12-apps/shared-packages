@@ -22,14 +22,14 @@ the library updates, every host updates with **no app changes**. Same contract
    `{ userId, clientId }`, and that pair IS the isolation: the row's identity is
    `(userId, clientId, featureKey)`, so there is no tenant parameter on the wire
    for a caller to tamper with. `userId` must be the host's **DB user id** —
-   future-pay resolves it by email, because `session.user.id` is the OAuth `sub`
+   the origin host resolves it by email, because `session.user.id` is the OAuth `sub`
    and not a users row.
-2. **Authorization stays outside.** future-pay gates these routes with
+2. **Authorization stays outside.** The origin host gates these routes with
    `requireTenantAdminBySlug` before delegating; the package never learns what a
    tenant admin is. A `resolveActor` that throws is the host's refusal (403/402)
    and the adapter lets it through untouched — only `null` is the packaged 401.
 3. **Declare your feature keys.** `featureKeys: ['ai_integration', 'payments']`
-   makes an undeclared key a 404. Omit it and any key is accepted (future-pay's
+   makes an undeclared key a 404. Omit it and any key is accepted (the origin host's
    original behaviour), which means a typo mints its own row and reads back as
    "no progress" forever.
 4. **`reset` is DEV-only, and the host decides what dev means.**
@@ -60,7 +60,7 @@ the library updates, every host updates with **no app changes**. Same contract
 
 ## The endpoints
 
-Mounted under whatever prefix the host chooses (future-pay uses
+Mounted under whatever prefix the host chooses (the origin host uses
 `/api/admin/:tenantSlug`). Bodies are the house `{ data }` envelope.
 
 | Method | Path | Answers |
@@ -105,7 +105,7 @@ const initialState = await fetchOnboardingState({ apiBase, featureKey: 'ai_integ
 </OnboardingProvider>
 ```
 
-## Phase B — adopting into a host that ALREADY has the table (future-pay)
+## Phase B — adopting into a host that ALREADY has the table (the origin host)
 
 **Nothing to baseline.** Every statement in the package migration is guarded
 (`CREATE TABLE IF NOT EXISTS`, `CREATE [UNIQUE] INDEX IF NOT EXISTS`, and a
@@ -113,16 +113,16 @@ conrelid-scoped `DO` block for the status CHECK, which has no `IF NOT EXISTS`
 form), so applying it to a host that already has `onboarding_states` changes
 nothing and exits 0 — no `prisma migrate resolve --applied` step, and no risk of
 a green deploy that skipped a schema change. The columns, defaults, indexes and
-the CHECK are future-pay's `20260715180000_add_onboarding_state_mcp_connection`
+the CHECK are the origin host's `20260715180000_add_onboarding_state_mcp_connection`
 verbatim.
 
 Two deliberate deltas to reconcile:
 
 - **The FKs to `users` / `clients` are not in the package migration.** They are
   host vocabulary — this package cannot know the name of a host's user or tenant
-  table. future-pay keeps its own `ON DELETE CASCADE` constraints; they are
+  table. The origin host keeps its own `ON DELETE CASCADE` constraints; they are
   compatible with everything the package writes.
-- **`mcp_connections` is not here.** future-pay's migration created both tables;
+- **`mcp_connections` is not here.** The origin host's migration created both tables;
   the MCP half belongs to `@12-apps/mcp` and ships in its folder (12-23).
 
 Then delete the host's own copies: the two route files, the onboarding schema
@@ -136,6 +136,6 @@ module, the repository binding, and `apps/admin/src/shared/onboarding-store.ts`
   `repository.listOnboardingByStatus` is the per-tenant half it is built on.
 - **Which features are guided, and their steps** — `GuidedStep[]` is content the
   host composes; the package renders it.
-- **Server actions.** future-pay had both an action pair and these routes; only
+- **Server actions.** The origin host had both an action pair and these routes; only
   the REST surface moved, because an action is a framework's calling convention
   rather than part of this contract.

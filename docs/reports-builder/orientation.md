@@ -128,7 +128,7 @@ mitigated, and Phase 3's urgency was lowered accordingly.
 
 `porting.md` §2 prescribes `@dnd-kit/sortable`. It is **not** a dependency today — the package ships
 with `@12-apps/stock-domain`, `@12-apps/ui` and `zod` only. Adding it puts a new runtime dependency
-into a published npm package that future-pay consumes. That's a decision to take explicitly, not a
+into a published npm package that the origin host consumes. That's a decision to take explicitly, not a
 detail to absorb inside a feature commit.
 
 ### 2.7 The flagship example commit is largely already done

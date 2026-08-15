@@ -2,7 +2,7 @@
  * Service-worker registration at app boot (12-23).
  *
  * A registered worker is a PRECONDITION for installability, so this has to run
- * on every visit — not from a settings screen somebody has to find. future-pay
+ * on every visit — not from a settings screen somebody has to find. The origin host
  * learned that the hard way: its worker was registered only by
  * `enableWebPush()`, so a visitor who never opened notification preferences had
  * no worker at all and the browser never offered to install the store. The whole
@@ -54,7 +54,7 @@ export function registerServiceWorker(options: RegisterServiceWorkerOptions = {}
 /**
  * Post a message to the ACTIVE worker, if there is one.
  *
- * The generic half of future-pay's push-icon handoff: a worker is terminated
+ * The generic half of the origin host's push-icon handoff: a worker is terminated
  * between events and a push arrives with no page open, so anything the worker
  * needs to know at delivery time has to have been told while someone was
  * looking. Silently does nothing when no worker is active yet — the common case

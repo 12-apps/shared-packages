@@ -4,7 +4,7 @@ import { Input } from '@12-apps/ui/form/Input';
 
 /**
  * The commit-on-Enter keyword box both admin grids share (12-13) — the same
- * affordance the future-pay DataViews search carried: typing is local, Enter
+ * affordance the origin host DataViews search carried: typing is local, Enter
  * commits the term and the grid re-fetches from the backend.
  */
 export function SearchField(props: {

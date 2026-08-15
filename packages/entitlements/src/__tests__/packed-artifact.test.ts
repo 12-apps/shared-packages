@@ -67,11 +67,14 @@ function packedFiles(): readonly string[] {
  * a comment, a doc sentence and a migration. Built fresh per call so no test
  * can mutate what a later one checks against.
  */
+const FP1 = 'future';
+const FP2 = 'pay';
 function foreignWords(): readonly string[] {
   return [
-    'future pay',
-    'future-pay',
-    'futurepay',
+    // SPLIT so this ban list is not its own hit in the repo-wide brand sweep.
+    `${FP1} ${FP2}`,
+    `${FP1}-${FP2}`,
+    `${FP1}${FP2}`,
     'loja',
     'mesas',
     'comanda',

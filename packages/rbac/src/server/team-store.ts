@@ -20,7 +20,7 @@ import {
 } from './team-roster-read';
 
 /**
- * The team roster store (12-13) — ported from future-pay's
+ * The team roster store (12-13) — ported from the origin host's
  * `lib/repositories/membership.ts` + `membership-roles.ts` + the status flip
  * of `tenant-invites.ts`, over the {@link RbacDbClient} seam; the read half
  * lives in `team-roster-read.ts`. What did NOT come along: the seat/quota
@@ -323,7 +323,7 @@ export function createTeamStore<P extends string>(config: TeamStoreConfig<P>): T
       const row = await membershipOf(await ctx.db(), tenantId, userId);
       // The TIER reader: a soft-disabled membership grants NOTHING —
       // "Desativar" is the reversible revocation, and the roster tier is
-      // exactly the kind of access it must revoke (future-pay's
+      // exactly the kind of access it must revoke (the origin host's
       // `membershipTier` refuses a disabled row the same way). The WRITE
       // paths deliberately keep seeing the disabled row: `setMembershipActive`
       // re-enables it and `removeTenantMemberGuarded` deletes it.

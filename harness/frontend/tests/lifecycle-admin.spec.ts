@@ -8,7 +8,7 @@ import { expect, test, type Page } from '@playwright/test';
  * GENERATED endpoints over a real Postgres through the Vite proxy, as the
  * seeded OWNER.
  *
- * The cases are the port of future-pay's `recycle-bin.e2e.ts` (the delete →
+ * The cases are the port of the origin host's `recycle-bin.e2e.ts` (the delete →
  * Lixeira → restore round trip, the FUT-546 type-to-confirm purge) and
  * `approvals.e2e.ts` (the status chips, the decision flows), plus the
  * history-dialog and draft-banner flows their admin suites covered — with
@@ -30,10 +30,10 @@ async function openPage(page: Page): Promise<void> {
 }
 
 /**
- * The packaged screens fetch on MOUNT (exactly like the future-pay pages,
+ * The packaged screens fetch on MOUNT (exactly like the origin host pages,
  * which an operator reaches by navigating). This page mounts them beside the
  * host's list, so a spec that mutates on one side re-loads the document where
- * the future-pay spec navigated between pages.
+ * the origin host spec navigated between pages.
  */
 async function reloadPage(page: Page): Promise<void> {
   await page.reload();

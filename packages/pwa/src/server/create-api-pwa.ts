@@ -15,7 +15,7 @@ import {
  * descriptors (the report-builder doctrine). `@12-apps/pwa/hono` mounts them.
  *
  * What stays the HOST's is the only genuinely host-shaped question — **is this
- * origin an app, and which one?** future-pay answers it by resolving the request
+ * origin an app, and which one?** The origin host answers it by resolving the request
  * hostname to a verified custom domain and checking the tenant's plan; another
  * host might answer from a config map. `resolveApp` returning `null` is a 404,
  * and that 404 IS the gate.

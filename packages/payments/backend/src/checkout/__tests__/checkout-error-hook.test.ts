@@ -14,7 +14,7 @@ interface SeenError {
 
 /**
  * The `onChargeError` seam (FUT-490) — the host's chance to bookkeep a THROWN
- * charge failure before it is worded. future-pay flips the merchant's
+ * charge failure before it is worded. The origin host flips the merchant's
  * connection to FAILED on an account-level rejection (401/403) so its settings
  * screen surfaces the outage instead of a stale VERIFIED; without this seam a
  * host adopting the mount silently loses that, because both money paths catch

@@ -22,7 +22,7 @@
 // and for a stronger reason: the category set is HOST vocabulary (`categories`
 // on the server config), so a closed set in the schema would be wrong for every
 // adopter but the first. A host that wants its own taxonomy enforced adds the
-// CHECK in a migration of its own — future-pay does. Only `channel` and `status`
+// CHECK in a migration of its own — the origin host does. Only `channel` and `status`
 // on the delivery row are closed here, because those two are the LIBRARY's.
 model Notification {
   id        String    @id @default(uuid())

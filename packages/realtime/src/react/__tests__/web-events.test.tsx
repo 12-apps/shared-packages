@@ -81,7 +81,7 @@ afterEach(() => {
 });
 
 describe("createWebEvents — endpoints", () => {
-  it("derives both surfaces from the api base, future-pay's spellings by default", () => {
+  it("derives both surfaces from the api base, the origin host's spellings by default", () => {
     const events = createWebEvents();
     expect(events.tenantEndpoint("loja-a")).toBe("/api/admin/loja-a/realtime");
     expect(events.userEndpoint()).toBe("/api/account/realtime");

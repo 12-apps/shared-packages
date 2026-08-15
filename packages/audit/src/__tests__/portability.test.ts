@@ -16,7 +16,7 @@ import { runWithActorScope, setActor } from '../server/actor-context';
 import { createApiAudit } from '../server/create-api-audit';
 import type { AuditDb, AuditLogCreateData, AuditLogRecord } from '../server/db';
 
-import { foreignPatterns } from './foreign-vocabulary';
+import { foreignPatterns, HOST1, HOST2 } from './foreign-vocabulary';
 
 /**
  * A REAL SECOND HOST, in a domain the extraction origin does not touch.
@@ -374,7 +374,7 @@ describe('the fixtures themselves', () => {
     // …and the list it checks against is the real one, with entries a
     // hand-written copy would have dropped.
     expect(bans.map(({ label }) => label)).toEqual(
-      expect.arrayContaining(['R$', 'future-pay', 'comanda', 'Sistema', 'FUT-<n>']),
+      expect.arrayContaining(['R$', `${HOST1}-${HOST2}`, 'comanda', 'Sistema', 'FUT-<n>']),
     );
     expect(bans.some(({ pattern }) => new RegExp(pattern.source, 'i').test('uma comanda'))).toBe(
       true,

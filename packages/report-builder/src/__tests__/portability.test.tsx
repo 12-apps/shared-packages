@@ -21,7 +21,7 @@ import type {
  * no word with the application it was extracted from.
  *
  * This suite exists because of how the same defect was missed twice. The
- * consumer harness and every fixture in this package spoke future-pay's
+ * consumer harness and every fixture in this package spoke the origin host's
  * vocabulary — `orders`, `Pedidos`, `reports:sales:read`, `America/Sao_Paulo` —
  * so a value the package DEFAULTED and a value the host STATED produced
  * identical output, and the axis with surviving defaults was the axis nothing

@@ -183,6 +183,8 @@ function mountHall(options: { permissions?: readonly string[]; used?: number } =
  * or a wire body containing any of them means a default in this package
  * answered a question only a host can.
  */
+const FP1 = 'future';
+const FP2 = 'pay';
 const FOREIGN = [
   'loja',
   'mesa',
@@ -193,9 +195,10 @@ const FOREIGN = [
   'produto',
   'fornecedor',
   'salão',
-  'future pay',
-  'future-pay',
-  'futurepay',
+  // SPLIT so this ban list is not its own hit in the repo-wide brand sweep.
+  `${FP1} ${FP2}`,
+  `${FP1}-${FP2}`,
+  `${FP1}${FP2}`,
   'R$',
   'Grátis',
   '/mês',

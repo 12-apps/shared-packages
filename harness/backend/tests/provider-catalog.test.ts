@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * The server half of the assertion the frontend harness makes in a browser.
  *
- * future-pay's settings page renders an EMPTY provider list, and the two ends of
+ * the origin host's settings page renders an EMPTY provider list, and the two ends of
  * that page are checked in different places: the frontend harness proves the
  * published UI renders whatever descriptors it is handed, and this proves the
  * published backend produces four of them through its own HTTP handler. A
@@ -60,7 +60,7 @@ describe('@12-apps/payments-backend — the settings endpoint offers every regis
     expect(response.status).toBe(200);
 
     const view = (await response.json()) as { providers: { name: string }[] };
-    // The exact failure in future-pay is an EMPTY array here, which is why this
+    // The exact failure in the origin host is an EMPTY array here, which is why this
     // asserts the names rather than a count: a catalog that silently loses one
     // adapter and a catalog that loses all four are the same bug caught early.
     expect(view.providers.map((provider) => provider.name).sort()).toEqual([...EXPECTED].sort());

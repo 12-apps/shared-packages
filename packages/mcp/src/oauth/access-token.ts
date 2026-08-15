@@ -4,7 +4,7 @@ import { issuer, resourceAudience, DEFAULT_MCP_RESOURCE_PATH, type McpScope } fr
 import { SIGNING_ALG, type McpSigningKeyProvider } from "./keys";
 
 /**
- * JWT access-token issuer + verifier (12-23, ported from future-pay's
+ * JWT access-token issuer + verifier (12-23, ported from the origin host's
  * `lib/mcp/oauth/jwt.ts` — behaviour unchanged; the signing key arrives through a
  * provider and the resource path is config).
  *

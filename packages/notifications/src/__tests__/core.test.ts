@@ -40,7 +40,7 @@ describe('the generator registry', () => {
   });
 
   it('is per-instance, so two mounts do not share a set', () => {
-    // The whole reason this is not a module-level Map: future-pay's was, which
+    // The whole reason this is not a module-level Map: the origin host's was, which
     // made "which types exist" a property of the module graph.
     const a = createGeneratorRegistry([generator as never]);
     const b = createGeneratorRegistry();

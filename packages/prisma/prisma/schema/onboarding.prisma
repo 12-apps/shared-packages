@@ -12,7 +12,7 @@
 // Host-agnostic by design (the entity-lifecycle / report-builder doctrine):
 //   - `user_id` and `client_id` are by-value scalars, NOT relations — this
 //     package cannot know the name of the host's user or tenant model. The
-//     host's own migration may add the FK constraints (future-pay has both,
+//     host's own migration may add the FK constraints (the origin host has both,
 //     ON DELETE CASCADE).
 //   - `status` is a String with a DB CHECK rather than a Prisma enum (the
 //     house String+CHECK pattern); the four values are the package's own

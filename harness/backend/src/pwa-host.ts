@@ -3,7 +3,7 @@
  *
  * The manifest is a per-host ENDPOINT rather than a static file, and the reason is
  * the only thing left for a host to answer: **is this origin an app, and which
- * one?** future-pay resolves the request hostname against verified custom-domain
+ * one?** The origin host resolves the request hostname against verified custom-domain
  * rows and the tenant's plan; this harness resolves it against a map. Everything
  * after that answer — the W3C document, the short-name elision, the 404 that IS
  * the gate, the worker's caching rules — is the package's.

@@ -67,7 +67,7 @@ const ACTOR_HEADER = 'x-notifications-user';
 
 /**
  * The host's domain events. These are the part that deliberately does NOT port:
- * `order.paid` is Future Pay's vocabulary, and a host declares its own.
+ * `order.paid` is the origin host's vocabulary, and a host declares its own.
  */
 const GENERATORS: readonly NotificationGenerator<never>[] = [
   {

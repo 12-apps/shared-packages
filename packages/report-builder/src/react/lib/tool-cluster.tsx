@@ -252,7 +252,7 @@ export function OverflowToolCluster({
    *
    * Opt-in, and only the VIEWER takes it. The editor's chrome is the primary
    * way to operate a block rather than a secondary affordance on top of a
-   * reading surface — and it is what future-pay's reports e2e drives, where a
+   * reading surface — and it is what the origin host's reports e2e drives, where a
    * `pointer-events: none` resting state would fail Playwright's actionability
    * check before any hover could rescue it.
    */
