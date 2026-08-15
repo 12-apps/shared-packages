@@ -4,8 +4,8 @@
  * The shell is mostly a browser thing, and this half is deliberately small: the
  * consent status/accept pair, which is the only part of the shell that needs a
  * server at all. It is HERE rather than in the host because the two halves must
- * agree on the paths and on the response body, and future-pay proved what happens
- * when the gate and the endpoint are owned by different repos — the endpoint could
+ * agree on the paths and on the response body, and the extraction proved what
+ * happens when the gate and the endpoint are owned by different repos — the endpoint could
  * fix a stale caller for months while nothing on screen ever called it.
  *
  * What stays the HOST's, and is passed in rather than guessed at:

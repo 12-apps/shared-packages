@@ -55,7 +55,6 @@ export {
 } from './theme';
 
 export {
-  DEFAULT_MESSAGES,
   messagesOf,
   type AppShellMessages,
 } from './messages';

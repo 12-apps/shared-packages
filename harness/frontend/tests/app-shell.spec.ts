@@ -65,7 +65,7 @@ test('the provider tower mounts: session, brand and the host query client', asyn
   // auth surface, so a signed-out app is the honest state — and it is still the claim
   // that `useSession` resolved at all, which it cannot do outside its provider.
   await expect(page.getByTestId('session-status')).toHaveText('unauthenticated');
-  await expect(page.getByTestId('brand-name')).toHaveText('Paladira');
+  await expect(page.getByTestId('brand-name')).toHaveText('Ferragens Norte');
 });
 
 test('a tenant colour nobody can read comes back legible, hue intact', async ({ page }) => {
@@ -127,7 +127,15 @@ test('a caller who never accepted anything is asked, and accepting clears it', a
   await expect(dialog).toBeVisible();
   // Says WHY. The failure this replaces stopped the user without telling them anything
   // they could act on.
-  await expect(dialog).toContainText('Sua conta segue ativa');
+  //
+  // THIS HOST'S sentence, from `src/app-shell/shell-copy.ts`. It used to be the
+  // package's pt-BR default, which is precisely what made that default invisible:
+  // the one consumer standing in for an independent adopter was asserting the
+  // origin's copy back at it. Written as a literal rather than imported from the
+  // module because Playwright loads this spec through Node, which refuses to
+  // strip types outside its own transpiled graph — so the module is the source of
+  // truth and this line is the assertion that it reached the screen.
+  await expect(dialog).toContainText('Sua conta continua ativa');
 
   await page.getByTestId('terms-consent-accept').click();
   await expect(dialog).toBeHidden();

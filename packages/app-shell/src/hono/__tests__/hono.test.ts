@@ -12,6 +12,8 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 
+import { CLUB_SERVER_MESSAGES } from '../../__tests__/host-copy';
+
 import { CONSENT_ACCEPT_PATH, CONSENT_STATUS_PATH } from '../../core/consent-wire';
 import { appShellRouter } from '../index';
 import type { AppShellServerConfig, ConsentActor } from '../../server/config';
@@ -26,6 +28,7 @@ function app(options: { accepted?: string; cookie?: boolean; recordThrows?: bool
   const state = { accepted: options.accepted ?? null };
   const config: AppShellServerConfig = {
     termsVersion: VERSION,
+    messages: CLUB_SERVER_MESSAGES,
     consent: {
       resolveActor: (request) => {
         const raw = request.header('cookie') ?? '';

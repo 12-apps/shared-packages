@@ -122,6 +122,13 @@ export function appShellHost() {
         secure: false,
       },
     },
+    // Required now, and this host's own sentence. The pt-BR default the package
+    // used to ship was the extraction origin's wording, reached by omission —
+    // and this harness omitted it, so it rendered that copy while standing in
+    // for an independent consumer.
+    messages: {
+      recordFailed: 'Não foi possível registrar seu aceite. Tente de novo em instantes.',
+    },
   };
 
   const shell = appShellRouter(config);
