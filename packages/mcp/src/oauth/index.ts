@@ -115,3 +115,10 @@ export type {
   StoredRefreshToken,
   TokenEndpointAuthMethod,
 } from "./stores";
+export {
+  disconnectAiHost,
+  listAiConnections,
+  type AiConnectionCaller,
+  type AiConnectionSnapshot,
+  type AiDisconnectResult,
+} from "./connections";

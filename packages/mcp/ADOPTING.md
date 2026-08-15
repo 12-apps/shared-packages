@@ -109,11 +109,14 @@ library updates, every host updates with **no app changes**. Same contract
     FENCED: a failing directory can never turn a valid grant into a 500, and nothing
     about the attempt is logged, because the only values in hand are an email and a
     client id.
-11. **Disconnecting means BOTH halves.** `connections.revokeByHost(...)` returns the
-    OAuth client ids it revoked, and the caller must then
-    `refreshTokens.revokeLiveForClient(email, clientId)` for each — a host holding a
-    live refresh token simply rotates its way back in and the card lights green on
-    the next grant. Neither half invalidates an outstanding ACCESS token: those are
+11. **Disconnecting means BOTH halves — call `disconnectAiHost`, not the stores.**
+    `connections.revokeByHost(...)` ends the rows and returns the OAuth client ids
+    behind them, and every live refresh token of those clients must be ended in the
+    same act — a host holding a live refresh token simply rotates its way back in
+    and the card lights green on the next grant. Since 12-48 the rule IS a
+    function: `disconnectAiHost(stores, { userId, email }, host)` does both and
+    reports what it ended, so a host cannot import one half without the other.
+    Neither half invalidates an outstanding ACCESS token: those are
     self-contained JWTs, so a disconnected host keeps working for at most their
     15-minute TTL and can then obtain nothing further.
 12. **These bodies are NOT the `{ data }` envelope.** A 302 with a `Location`, RFC
@@ -234,10 +237,18 @@ Deliberate deltas to reconcile:
 
 ## What deliberately did NOT move into the package
 
-- **The account/connection SCREENS' endpoints** (`GET/DELETE
-  /api/account/mcp-connections`) — they mix session resolution, published plugin
-  URLs and a logger. The stores they need (`listActive`, `revokeByHost`,
-  `revokeLiveForClient`) are all here; the route is a follow-up.
+- **The account/connection SCREENS' route files** (`GET/DELETE
+  /api/account/mcp-connections`) — they answer in the HOST's app-wide response
+  envelope and mix its session resolution, published plugin URLs and logger, so
+  the handler stays host code (unlike the OAuth endpoints, whose shapes are
+  fixed by RFC — rule 12 — these are ordinary host API routes). What DID move
+  (12-48) is the operations under them: `listAiConnections` (the stored open
+  `host` string narrowed to the package's own `AiProvider` union) and
+  `disconnectAiHost`, which owns the disconnect's both-halves rule — revoke the
+  connection rows AND end every live refresh token of each returned client id in
+  one call. A host that imports the disconnect cannot get only half of it; half
+  is the failure mode where the assistant rotates its live token and the card
+  the user just disconnected lights green again on the next grant (rule 11).
 - **The MCP registry itself** — which endpoints become tools, their annotations
   and redactions, is the host's catalogue. The package generates, dispatches and
   gates it.
