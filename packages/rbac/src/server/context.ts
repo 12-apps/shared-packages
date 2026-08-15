@@ -271,7 +271,7 @@ export interface RbacServerConfig<P extends string = string> {
    * to assemble its catalog, so the two cannot silently disagree.
    *
    * Set it only to NARROW the protected set below the grant-protected one
-   * (future-pay protects grants for `OWNER` + `SUPERADMIN` but runs the roster
+   * (the origin host protects grants for `OWNER` + `SUPERADMIN` but runs the roster
    * invariants on `OWNER` alone). It used to default to `['OWNER']`, so a host
    * spelling its owner tier any other way lost both invariants outright.
    */
@@ -345,7 +345,7 @@ export function foldApiError(error: unknown): RbacResponse {
   throw error;
 }
 
-/** Pagination meta, the same wire shape the future-pay search engine emits. */
+/** Pagination meta, the same wire shape the origin host search engine emits. */
 export interface PaginationMeta {
   total: number;
   page: number;

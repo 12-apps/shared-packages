@@ -25,7 +25,7 @@ import type { McpOauthStores, StoredOAuthClient } from "./stores";
 /** The identity an authorize request binds a code to. From the SESSION only. */
 export interface McpOauthSession {
   /**
-   * The OAuth subject (future-pay passes the Google `sub`, falling back to the
+   * The OAuth subject (the origin host passes the Google `sub`, falling back to the
    * email). Carried through every rotation so a refreshed token keeps the same
    * stable `sub`.
    */
@@ -45,7 +45,7 @@ export interface McpOauthPaths {
 }
 
 export const DEFAULT_OAUTH_PATHS: McpOauthPaths = {
-  // future-pay's paths, and the ones the RFC 8414 document has always advertised.
+  // the origin host's paths, and the ones the RFC 8414 document has always advertised.
   authorize: "/api/oauth/authorize",
   token: "/api/oauth/token",
   register: "/api/oauth/register",
@@ -78,12 +78,12 @@ export interface McpOauthConfig {
   resolveSession: (request: Request) => Promise<McpOauthSession | null> | McpOauthSession | null;
   /**
    * The operator gate. `false` makes the whole surface inert — authorize/token/jwks
-   * answer 404 and registration answers 403 — which is how future-pay ships it OFF
+   * answer 404 and registration answers 403 — which is how the origin host ships it OFF
    * by default (`MCP_BEARER_ENABLED`). Default: enabled (mounting is the opt-in).
    */
   enabled?: boolean | (() => boolean);
   /**
-   * Signing material. Default: the env-backed provider with future-pay's variable
+   * Signing material. Default: the env-backed provider with the origin host's variable
    * names. `null` from the provider means "not provisioned": nothing is minted and
    * the JWKS answers 503 rather than falling back to a weaker mode.
    */
@@ -216,7 +216,7 @@ export function resolveMcpOauthConfig(config: McpOauthConfig): McpOauthContext {
     stores: config.stores,
     resolveSession: config.resolveSession,
     // Mounting is the opt-in, so the gate defaults to ON; a host that ships the
-    // surface dark passes its own flag (future-pay: `MCP_BEARER_ENABLED`).
+    // surface dark passes its own flag (the origin host: `MCP_BEARER_ENABLED`).
     enabled: typeof enabled === "function" ? enabled : () => enabled,
     // `null` from the provider means "not provisioned": nothing is minted and the
     // JWKS answers 503 rather than falling back to a weaker mode.

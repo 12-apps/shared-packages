@@ -14,7 +14,7 @@ import {
 
 /**
  * One authorized socket: subscribe its topics, relay events, accept the client's
- * own frames, and clean up exactly once however it ends. Ported from future-pay's
+ * own frames, and clean up exactly once however it ends. Ported from the origin host's
  * `apps/realtime-gateway/src/connection.ts` (FUT-641/644/657).
  *
  * ## The wire frame is byte-identical to the SSE one

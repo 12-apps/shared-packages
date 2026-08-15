@@ -34,7 +34,7 @@ export interface EntityLifecycleWebConfig {
   apiBase: string;
   /** How the surface reaches its data. Default: same-origin fetch. */
   transport?: LifecycleTransport;
-  /** pt-BR entity-type labels, merged over the future-pay defaults. */
+  /** The host's own pt-BR entity-type labels; an unlisted type renders as its raw key. */
   entityTypeLabels?: EntityTypeLabels;
 }
 

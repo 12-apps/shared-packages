@@ -22,7 +22,7 @@ import { useConfirmable } from './use-confirmable';
 /**
  * Papéis — the tenant role catalog (12-13): the seeded template roles plus
  * the tenant's custom roles, with compose/edit/override/reset/delete. Ported
- * from future-pay's `apps/admin/src/pages/roles/*`; the grid keeps the same
+ * from the origin host's `apps/admin/src/pages/roles/*`; the grid keeps the same
  * test ids (`roles-grid`, `roles-search-all`, `add-role-button`,
  * `role-dialog`) so the e2e specs moved with the screen.
  */

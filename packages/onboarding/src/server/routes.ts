@@ -12,13 +12,13 @@ import {
 } from "./context";
 
 /**
- * The two progress endpoints (12-23) — the package half of future-pay's
+ * The two progress endpoints (12-23) — the package half of the origin host's
  * `app/api/admin/[tenantSlug]/onboarding/[featureKey]/route.ts`:
  *
  *   GET   /onboarding/:featureKey   → the caller's snapshot, or `null`
  *   PATCH /onboarding/:featureKey   → one operation (save / dismiss / reset)
  *
- * Paths are relative to the host's mount (future-pay mounts them under
+ * Paths are relative to the host's mount (the origin host mounts them under
  * `/api/admin/:tenantSlug`). Parsing, statuses, the `{ data }` envelope and the
  * three operations' semantics are the package's; who is asking, on which
  * tenant, is the host's.
@@ -72,7 +72,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-/** One onboarding operation, mirroring future-pay's discriminated-union body. */
+/** One onboarding operation, mirroring the origin host's discriminated-union body. */
 type Operation =
   | { op: "save"; patch: OnboardingStatePatch }
   | { op: "dismiss" }
@@ -151,9 +151,9 @@ async function applyOperation(
     });
   }
   // `reset` — DEV-only: refuse in production even if a caller reaches the route
-  // (future-pay also compiles the UI affordance out of prod builds).
+  // (the origin host also compiles the UI affordance out of prod builds).
   //
-  // DIVERGENCE from future-pay, deliberate: this answers 403 where the host's
+  // DIVERGENCE from the origin host, deliberate: this answers 403 where the host's
   // `ActionError` mapping made it 400. 403 is the accurate code for "you may not do
   // this here", and no caller branches on it (the affordance is compiled out), but
   // it IS a changed status rather than a pure move.

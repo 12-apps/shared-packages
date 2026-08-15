@@ -14,7 +14,7 @@ import { createMemoryDb, memoryContacts, type MemoryDb } from './memory-db';
 
 /**
  * The route descriptors: the request contract, the `{ data }` envelope, the
- * status codes and the pt-BR denial copy — this is future-pay's six colocated
+ * status codes and the pt-BR denial copy — this is the origin host's six colocated
  * route suites, in the package that now owns them.
  */
 

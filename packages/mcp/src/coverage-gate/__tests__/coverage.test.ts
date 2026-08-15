@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { exportedMethodsOf, runMcpCoverage } from "../index";
 
 /**
- * The `mcp:coverage` gate (12-23) — the port of future-pay's
+ * The `mcp:coverage` gate (12-23) — the port of the origin host's
  * `apps/web/scripts/mcp/coverage.ts`, whose contract is a COMPLETENESS property:
  * every served endpoint is registered on the agent surface or explicitly excepted,
  * and every advertised tool maps back to a route that serves it.

@@ -24,7 +24,7 @@ import { MAX_INBOUND_BYTES } from "./inbound";
  *
  * ## Why a separate process at all
  *
- * It is a CHOICE now, not a constraint. future-pay's gateway docstring said "Next
+ * It is a CHOICE now, not a constraint. The origin host's gateway docstring said "Next
  * cannot serve a WebSocket", which was true of route handlers and stopped being the
  * reason when that app moved to Hono — `serve()` returns a Node `http.Server` a
  * host could attach `ws` to directly. What survives is the actual benefit:

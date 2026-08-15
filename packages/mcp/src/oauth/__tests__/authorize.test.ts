@@ -6,7 +6,7 @@ import { verifyAccessToken } from "../access-token";
 import { testSigningKey } from "./fixtures";
 
 /**
- * The authorization endpoint (12-23) — ported from future-pay's own suite, because
+ * The authorization endpoint (12-23) — ported from the origin host's own suite, because
  * every case here is a security property rather than a behaviour preference:
  *
  *  - an error is NEVER redirected to an unvalidated `redirect_uri`;
@@ -267,7 +267,7 @@ describe("consent: the approval gate on an OPEN registration endpoint", () => {
 
   it("lets an OPERATOR-registered client through with no seam at all", async () => {
     // The escape hatch for a host that registers its own first-party clients and has
-    // no screen to show — future-pay's shape. Approval is implied by the operator
+    // no screen to show — the origin host's shape. Approval is implied by the operator
     // having named the id in config, which an attacker cannot do.
     const { api, stores } = await asHarness({ resolveApproval: undefined });
     const { clientId } = await registerTestClient(api);

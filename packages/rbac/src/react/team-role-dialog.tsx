@@ -11,7 +11,7 @@ import type { RbacApiClient, TeamMemberWire } from './api';
 import type { RbacLabels } from './labels';
 
 /**
- * The unified role-edit popup (12-13) — ported from future-pay's
+ * The unified role-edit popup (12-13) — ported from the origin host's
  * `role-edit-dialog.tsx` + `use-role-editor.ts`. One checklist over ALL
  * roles: exactly one SYSTEM role is the member's base, any custom picks are
  * additive; the save maps the diff onto the existing set-role +

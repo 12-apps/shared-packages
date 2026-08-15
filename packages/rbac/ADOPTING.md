@@ -70,7 +70,7 @@ reusable across repositories, exposing standardized surfaces. A host repo only
    harness satisfies it with hand-written SQL. The argument shapes are CLOSED
    (documented in `src/server/db.ts`), so a non-Prisma host has a finite
    surface to fill.
-4. **Billing stays outside.** The future-pay `POST /roles` entitlement gate
+4. **Billing stays outside.** The origin host's `POST /roles` entitlement gate
    (`team.custom_roles`) and the seat quota on member activation are answered
    in the host BEFORE the request reaches a descriptor. `resolveActor`
    receives no route identity, so a host gates by wrapping the mount per
@@ -100,7 +100,7 @@ reusable across repositories, exposing standardized surfaces. A host repo only
    `skipDuplicates`), derived from `config.tenantRoleSeeds`.
 9. **Scope chains are config.** Flat tenants need nothing. An `org:` hierarchy
    passes `scopeParent` (synchronous) and `warmScope` (the async pre-load the
-   sync walk reads from) — future-pay's client→org cache is the reference.
+   sync walk reads from) — the origin host's client→org cache is the reference.
 
 ## The config, field by field
 
@@ -119,7 +119,7 @@ reusable across repositories, exposing standardized surfaces. A host repo only
 | `invites` | no | — | the optional port (see rule 5) |
 | `scopeParent` / `warmScope` | no | flat scopes | `org:` chains (see rule 9) |
 | `ownership` | no | none | entity-gate owner map for INSTANCE permissions |
-| `expandAssignments` | no | identity | e.g. future-pay's sector → mesas expansion |
+| `expandAssignments` | no | identity | e.g. the origin host's sector → mesas expansion |
 | `permissionsExtras` | no | `{}` | merged into `GET /permissions` (e.g. an entitlement snapshot) |
 | `messages` | no | pt-BR product copy | every user-facing string, overridable per host |
 
@@ -138,12 +138,12 @@ one failed OPEN when it was wrong for a host, and silently:
 The first two are now REQUIRED. The third derives from the catalog the host
 already composed (`catalog.governance.ownerRoles`), so the roster invariants
 and the grant protection cannot name different sets by accident; pass
-`ownerRoles` only to deliberately narrow it (future-pay protects grants for
+`ownerRoles` only to deliberately narrow it (the origin host protects grants for
 `OWNER` + `SUPERADMIN` and runs the roster invariants on `OWNER` alone).
 
 The remaining defaults (`gatePermissions`, `messages`) are ids and pt-BR copy,
 not role names, and each is a field a second host overrides in one line. What
-is NOT a default any more is the catalog: it used to be future-pay's, so a host
+is NOT a default any more is the catalog: it used to be the origin host's, so a host
 that passed its own registry to the server and said nothing to the browser got
 a screen governed by a different application's policy. There is nothing to fall
 back to now, and `catalog` is required on both halves.
@@ -153,7 +153,7 @@ recognised by that flag alone; the package never compares a membership role
 against a magic string, so a host may have a role literally called
 `SUPERADMIN` meaning whatever it likes.
 
-## Phase B — adopting into a host that ALREADY has these tables (future-pay)
+## Phase B — adopting into a host that ALREADY has these tables (the origin host)
 
 The package migration unconditionally `CREATE TABLE`s the five tables, so a
 host whose schema already carries them must **baseline** it rather than run
@@ -162,15 +162,15 @@ it: after the plugin-migration sync copies
 applied (`prisma migrate resolve --applied 20260812120000_add_rbac_tables`)
 before the next `migrate deploy`. Then reconcile the deliberate deltas:
 
-- **CHECK constraints are dropped.** future-pay's `memberships_role_check`
+- **CHECK constraints are dropped.** The origin host's `memberships_role_check`
   and `roles_kind_check` are host vocabulary; the package enforces the base
   role in code (`assignableBaseRoles`) instead. Keep the host CHECKs — they
   are compatible with everything the package writes.
 - **Two partial indexes are required.** `resource_assignments_active_unique_idx`
   and the `WHERE valid_to IS NULL` form of the `(user_id, resource_type)` read
-  index ship in the package migration; future-pay already has both, so the
+  index ship in the package migration; the origin host already has both, so the
   baseline covers them.
-- **`DELETE /roles/:id` archives** — the same behaviour future-pay's route has
+- **`DELETE /roles/:id` archives** — the same behaviour the origin host's route has
   through entity-lifecycle, but WITHOUT drafts/versions/approvals (12-17). The
   host keeps its lifecycle routes mounted for those until 12-17 lands.
 - **The permissions endpoint**: pass `permissionsExtras` to keep serving the
@@ -179,7 +179,7 @@ before the next `migrate deploy`. Then reconcile the deliberate deltas:
 
 ## The endpoints
 
-Mounted under whatever prefix the host chooses (future-pay uses
+Mounted under whatever prefix the host chooses (the origin host uses
 `/api/admin/:tenantSlug`). Every "admin tier" and "staff tier" gate requires
 an **ACTIVE** membership: a soft-disabled member ("Desativar") holds no tier,
 exactly as their permissions already resolve to nothing.
@@ -283,24 +283,23 @@ enforce, and one assembly is the only arrangement in which they cannot drift.
   an actor carrying one is never `isSuper`, even if the host forgot to force
   the flag off.
 - **The member PROFILE page** (`member-details-tab`, `member-role`,
-  `member-since`, `member-last-login`, `member-custom-roles` in the future-pay
+  `member-since`, `member-last-login`, `member-custom-roles` in the origin host
   admin). `GET /team/:userId` returns all of its data; the screen itself did
   not move. Same for the loading/error/status test ids of the DataViews grids
   — the packaged screens render plain tables.
 
 ## Migrating from 2.x to 3.0.0 — the catalog left the package
 
-`@12-apps/rbac` **2.0.0 is on npm and still contains all of it**: an
-application's permission catalog and role matrix, exported as
-`FUTURE_PAY_PERMISSIONS` (62 ids), `DEFAULT_ROLE_TEMPLATES` (eight roles),
-`FUTURE_PAY_GOVERNANCE`, `FUTURE_PAY_SOD_PAIRS`, `FUTURE_PAY_LEAF_ONLY_ROLES`,
-`FUTURE_PAY_PLATFORM_ONLY_ROLES`, `CLIENT_CAPABILITIES`,
-`futurePayTenantRoleSeeds()` and the `FuturePayPermission` union. **3.0.0** is
-the release that removes them — along with `createWebRbac`'s habit of falling
-back to them — so a consumer pinned to `2.0.0` bumps to `3.0.0` and rewrites
-the call sites below in the same change. (The `1.x` this section used to name
-was wrong on both ends: the catalog survived 2.0.0, and the removal ships as
-the NEXT major.)
+`@12-apps/rbac` **2.0.0 is on npm and still contains all of it**: one
+application's permission catalog and role matrix (62 permission ids, eight role
+templates, its governance, SoD pairs, leaf-only and platform-only role lists,
+its tenant role seeds and its permission union), every one exported under the
+origin host's own name — the 2.x tags' copy of this file spells the exact
+export names out. **3.0.0** is the release that removes them — along with
+`createWebRbac`'s habit of falling back to them — so a consumer pinned to
+`2.0.0` bumps to `3.0.0` and rewrites the call sites below in the same change.
+(The `1.x` this section used to name was wrong on both ends: the catalog
+survived 2.0.0, and the removal ships as the NEXT major.)
 
 **A deprecation shipment was the alternative and it was rejected**: keeping
 those exports for one more minor would have kept the thing this release exists
@@ -310,19 +309,19 @@ insulation; a `@deprecated` tag is not.
 
 | 2.x | 3.0.0 |
 | --- | --- |
-| `FUTURE_PAY_PERMISSIONS` | your own `definePermissionContribution(...)`, composed with `RBAC_PERMISSIONS` |
+| the host-branded permission catalog constant | your own `definePermissionContribution(...)`, composed with `RBAC_PERMISSIONS` |
 | `DEFAULT_ROLE_TEMPLATES` | your own `RoleDef<P>[]`, passed to `.withRoles({ roles })` |
-| `FUTURE_PAY_GOVERNANCE` | `CATALOG.governance` |
-| `FUTURE_PAY_SOD_PAIRS` | `separateFrom` on the declaring permission |
-| `FUTURE_PAY_LEAF_ONLY_ROLES` | `.withRoles({ leafOnlyRoles })` — now REQUIRED, `[]` included |
-| `FUTURE_PAY_PLATFORM_ONLY_ROLES` | `.withRoles({ platformOnlyRoles })` — now REQUIRED, `[]` included |
-| `futurePayTenantRoleSeeds()` | `CATALOG.tenantRoleSeeds` |
-| `FuturePayPermission` | `PermissionOf<typeof CATALOG>` (the type argument is not optional) |
+| the host-branded governance constant | `CATALOG.governance` |
+| the host-branded SoD-pairs constant | `separateFrom` on the declaring permission |
+| the host-branded leaf-only-roles list | `.withRoles({ leafOnlyRoles })` — now REQUIRED, `[]` included |
+| the host-branded platform-only-roles list | `.withRoles({ platformOnlyRoles })` — now REQUIRED, `[]` included |
+| the host-branded tenant-role-seeds factory | `CATALOG.tenantRoleSeeds` |
+| the host-branded permission union type | `PermissionOf<typeof CATALOG>` (the type argument is not optional) |
 | `CLIENT_CAPABILITIES` | a host constant — it was never a role assignment |
 | `config.permissions` / `roleTemplates` / `governance` / `tenantRoleSeeds` | `config.catalog` |
 | `createWebRbac({ apiBase })` | `createWebRbac({ apiBase, catalog })` |
 | `RbacLabelOverrides` (from `@12-apps/rbac/react`) | `RbacLabelVocabulary`, from the ROOT barrel `@12-apps/rbac` — see below |
-| `FUTURE_PAY_RBAC_GUARDS` / `FUTURE_PAY_ENTITLEMENT_GUARDS` | required `rbacGuards` / `entitlementGuards` options |
+| the host-branded guard-name lists | required `rbacGuards` / `entitlementGuards` options |
 | `adminRoles` / `customerRole` defaults | REQUIRED config fields (`customerRole: null` for a host with no customer tier) |
 | `ownerRoles` default `['OWNER']` | derived from `catalog.governance.ownerRoles`; pass it only to NARROW that set |
 | `PermissionContribution` (bare) | `PermissionContribution<P>` — the `= string` default is gone; prefer no annotation at all |

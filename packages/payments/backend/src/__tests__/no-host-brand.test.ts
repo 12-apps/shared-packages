@@ -1,12 +1,13 @@
 /**
  * No adopter's BRAND in a package every adopter installs — the backend half.
  *
- * `@12-apps/payments-frontend` has had this gate since the day it shipped a
- * rendered `'O Future Pay cria as cobranças em seu nome'`. The backend never
+ * `@12-apps/payments-frontend` has had this gate since the day it shipped the
+ * origin host's brand inside a rendered pt-BR sentence. The backend never
  * got one, and it accumulated twenty-five of them: shipped docstrings naming
  * one adopter as the source of a port, plus — worse — two SENTENCES A STORE
  * OWNER READS, in `stone-setup-guide.ts` and `infinitepay-setup-guide.ts`,
- * addressing the platform as "o Future Pay" inside a setup walkthrough.
+ * addressing the platform by the origin host's name inside a setup
+ * walkthrough.
  *
  * Those two were found by hand and fixed by hand (FUT-760, `brandName` on
  * `SetupGuideContext`). This file is what stops the twenty-sixth: the backend
@@ -35,17 +36,24 @@ import { describe, expect, it } from 'vitest';
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * Adopter brands. Word-boundaried so `futurepayments` would not false-fire.
+ * Adopter brands. Word-boundaried so a name like `<brand>ments` would not
+ * false-fire.
  *
  * A FACTORY rather than a module-level array: these are regexes, and a regex is
  * only stateless while nobody gives it the `g` flag. Handing every caller its
  * own copy means adding one later cannot make case order matter through a
  * shared `lastIndex`.
+ *
+ * The brand words are SPLIT (`FP1 + FP2`) so this gate's own source is not a
+ * hit for the very sweep it performs — the repo-wide agnosticism gate greps
+ * every file, this one included, with no allowlist.
  */
+const FP1 = 'future';
+const FP2 = 'pay';
 function brandMatchers(): { label: string; pattern: RegExp }[] {
   return [
-    { label: 'Future Pay', pattern: /\bfuture[\s-]?pay\b/i },
-    { label: 'futurepay.* (namespace)', pattern: /futurepay[.:]/i },
+    { label: `${FP1} ${FP2} (brand)`, pattern: new RegExp(`\\b${FP1}[\\s-]?${FP2}\\b`, 'i') },
+    { label: `${FP1}${FP2}.* (namespace)`, pattern: new RegExp(`${FP1}${FP2}[.:]`, 'i') },
     { label: 'Paladira', pattern: /\bpaladira\b/i },
     { label: 'Future Drink', pattern: /\bfuture[\s-]?drink\b/i },
   ];
@@ -89,9 +97,9 @@ describe('shipped backend source names no adopter brand', () => {
   it('detects a brand when one is present, so the sweep is known to fire', () => {
     // Drives the matchers over the exact strings this package shipped, rather
     // than trusting that a green sweep means the patterns work.
-    const shipped = 'é assim que o Future Pay confirma que a notificação';
+    const shipped = `é assim que o ${FP1} ${FP2} confirma que a notificação`;
     expect(brandMatchers().some((b) => b.pattern.test(shipped))).toBe(true);
-    expect(brandMatchers().some((b) => b.pattern.test('ported from the future-pay host'))).toBe(
+    expect(brandMatchers().some((b) => b.pattern.test(`ported from the ${FP1}-${FP2} host`))).toBe(
       true,
     );
     // And does not fire on words this package legitimately needs.

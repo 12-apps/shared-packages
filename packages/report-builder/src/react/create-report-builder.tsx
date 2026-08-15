@@ -35,7 +35,7 @@ export interface ReportBuilderConfig {
    * picker offers, and the clock its tenants keep.
    *
    * REQUIRED, every field of it, including the empty cases. Each one used to be
-   * a module-scope import of future-pay's answer, which meant a host mounting
+   * a module-scope import of the origin host's answer, which meant a host mounting
    * this surface published that store's built-ins under its own menu — and had
    * no field to decline them with. `{ systemReports: [], systemDashboards: [],
    * sections: [], blockTemplates: [], timeZone: 'Europe/Lisbon' }` is a

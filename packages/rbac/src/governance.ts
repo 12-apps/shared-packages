@@ -20,7 +20,7 @@ export type SodPair = readonly [string, string];
 
 /**
  * Governance catalog: the policy knobs the validator enforces. Framework-free
- * data — a host assembles it once (see the Future Pay template config).
+ * data — a host assembles it once (see the origin host template config).
  */
 export interface GovernanceCatalog {
   /** Permission registry (used for scope-kind of a permission). */

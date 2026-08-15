@@ -2,7 +2,7 @@
  * `@12-apps/entity-lifecycle/react` — the frontend half (12-17):
  * `createWebEntityLifecycle({ apiBase })` returns the Lixeira + Aprovações
  * page, plus the version-history dialog and draft banner a host mounts
- * inside its own editors. pt-BR product copy and the future-pay test ids are
+ * inside its own editors. pt-BR product copy and the origin host's test ids are
  * preserved so the admin specs port verbatim.
  */
 

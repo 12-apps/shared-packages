@@ -6,9 +6,9 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * driving the published package's own Hono router over a real Postgres
  * through the Vite proxy, as the seeded DIRECTOR.
  *
- * The cases are the port of future-pay's `roles.e2e.ts`, `team.e2e.ts` and
+ * The cases are the port of the origin host's `roles.e2e.ts`, `team.e2e.ts` and
  * `team-roles.e2e.ts` (FUT-146): the same test ids, the same affordances, the
- * same restore discipline — plus the write path the future-pay specs left
+ * same restore discipline — plus the write path the origin host specs left
  * read-only, which THIS harness may exercise because the reset below owns the
  * database.
  */
@@ -47,7 +47,7 @@ test.describe('Roles admin (port of roles.e2e.ts)', () => {
     await openRoles(page);
 
     // The inline keyword box commits on Enter; the grid re-fetches from the
-    // backend with `q=` (the future-pay spec proved the same via the URL — the
+    // backend with `q=` (the origin host spec proved the same via the URL — the
     // packaged screen owns its state, so the proof here is the narrowed grid).
     const searchBox = page.getByTestId('roles-search-all');
     await searchBox.fill('Voluntário');
@@ -125,7 +125,7 @@ test.describe('Team admin (port of team.e2e.ts)', () => {
 
 // System roles by their pt-BR checkbox labels — targeted by ACCESSIBLE NAME,
 // not testid: a tenant custom role may share a system role's raw NAME, never
-// its translated label (the future-pay spec's own rationale).
+// its translated label (the origin host spec's own rationale).
 const SYSTEM_ROLE_LABELS: Record<string, string> = {
   HEAD_LIBRARIAN: 'Bibliotecário-chefe',
   BRANCH_LEAD: 'Coordenação de unidade',

@@ -2,7 +2,7 @@ import { exportJWK, importPKCS8, type CryptoKey, type JWK } from "jose";
 
 /**
  * Signing-key / JWK loading for the OAuth authorization server (12-23, ported
- * from future-pay's `lib/mcp/oauth/keys.ts`).
+ * from the origin host's `lib/mcp/oauth/keys.ts`).
  *
  * ES256 (P-256) from PEM material, the published public JWK (with `kid` for
  * rotation), and a safe-by-default absence signal (`null`) when no key is
@@ -10,7 +10,7 @@ import { exportJWK, importPKCS8, type CryptoKey, type JWK } from "jose";
  * rather than falling back to a weaker mode while the surface is mounted.
  *
  * WHERE the PEM comes from is the host's business: `loadSigningKeyFromEnv` keeps
- * future-pay's env-var wiring, and any other provider (a secrets manager, a KMS
+ * the origin host's env-var wiring, and any other provider (a secrets manager, a KMS
  * export) satisfies the same `McpSigningKeyProvider` shape.
  */
 
@@ -87,13 +87,13 @@ export function signingKeyProvider(
   };
 }
 
-/** Env var carrying the ES256 private key as a PKCS#8 PEM (future-pay's name). */
+/** Env var carrying the ES256 private key as a PKCS#8 PEM (the origin host's name). */
 export const DEFAULT_SIGNING_KEY_ENV = "MCP_OAUTH_SIGNING_KEY";
 /** Env var carrying the key id (`kid`) used to select the key during rotation. */
 export const DEFAULT_SIGNING_KEY_ID_ENV = "MCP_OAUTH_SIGNING_KEY_ID";
 
 /**
- * The env-backed provider — future-pay's wiring, kept identical, with the
+ * The env-backed provider — the origin host's wiring, kept identical, with the
  * variable names as arguments so the package states no host's vocabulary.
  */
 export function loadSigningKeyFromEnv(

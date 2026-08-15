@@ -12,10 +12,10 @@ import {
 import type { TeamStoreCtx } from './team-store';
 
 /**
- * The roster's READ half (12-13) — ported from future-pay's
+ * The roster's READ half (12-13) — ported from the origin host's
  * `team-roster.ts` + `membership-detail.ts` + `membership-roles.ts`, over the
  * seam. Kept apart from the write half (`team-store.ts`) so both files stay
- * within the size gate, exactly as the future-pay originals were split.
+ * within the size gate, exactly as the origin host originals were split.
  */
 
 export interface TeamMemberRecord {

@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
  * name — driving the published package's own Hono router, its own local-disk
  * driver and real files through the Vite proxy.
  *
- * The cases are the port of future-pay's admin upload specs: what the store owner
+ * The cases are the port of the origin host's admin upload specs: what the store owner
  * sees when a pick succeeds, and each of the four refusals they can act on. What
  * only THIS level can prove is the seam BETWEEN the two published halves — the
  * `{ data }` envelope the browser parses, the key shape it saves, and the object

@@ -154,7 +154,7 @@ describe('destructive writes sit behind a confirm step', () => {
     });
   });
 
-  it('removing a member asks first with the future-pay consequence copy', async () => {
+  it('removing a member asks first with the origin host consequence copy', async () => {
     const api = apiStub();
     mountTeam(api, ['team:manage']);
     await waitFor(() => {

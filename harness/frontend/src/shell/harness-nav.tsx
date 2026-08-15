@@ -18,7 +18,7 @@ import { Text } from '@12-apps/ui/typography/Text';
 import { buildHarnessNav, rowHoldsSlug, type NavRow, type NavSection } from './nav-tree';
 
 /**
- * The harness sidebar — the same sidebar future-pay's admin has
+ * The harness sidebar — the same sidebar the origin host's admin has
  * (`apps/admin/src/shell/admin-sidebar-nav.tsx`), rendered from the same
  * components against the same theme.
  *

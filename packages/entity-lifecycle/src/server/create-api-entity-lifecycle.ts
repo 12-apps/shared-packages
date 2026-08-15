@@ -19,7 +19,7 @@
  *    {@link LifecycleActor} (tenant id, user id, permission ids, the tenant's
  *    two feature layers).
  *  - **Entitlements/billing** — the plan gate on a collection's whole surface
- *    (future-pay's `requireEntitlement(tenant, 'suppliers')`) is the host's
+ *    (the origin host's `requireEntitlement(tenant, 'suppliers')`) is the host's
  *    answer, supplied per collection as `registration.authorize` and awaited
  *    here. It cannot be a wrapper around the mount: the recycle-bin and
  *    approvals item routes carry no collection prefix, so which collection is

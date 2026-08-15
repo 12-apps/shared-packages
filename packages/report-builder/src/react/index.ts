@@ -29,7 +29,7 @@ export { httpTransport, type ReportBuilderTransport } from './transport';
  * The vocabulary a host declares, and the types it declares it in.
  *
  * This export used to be `SYSTEM_DASHBOARDS`, `SYSTEM_REPORT_KEYS` and
- * `SYSTEM_REPORT_NAV` — future-pay's seven built-ins and two dashboards, as
+ * `SYSTEM_REPORT_NAV` — the origin host's seven built-ins and two dashboards, as
  * VALUES, out of a package every other host installs. A host's menu built rows
  * from them and got another product's reports. What crosses this boundary now
  * is the shape they are declared in; the entries themselves are the host's, and

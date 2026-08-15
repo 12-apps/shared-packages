@@ -105,24 +105,15 @@ describe("hosted-return", () => {
     expect(takeHostedOrder()).toBeNull();
   });
 
-  it("still reads an order parked under the pre-rename key, once", () => {
-    // The compatibility path for a buyer who left on the old bundle. Written by
-    // hand because nothing produces this key any more — and asserted because
-    // otherwise the fallback is dead code that only LOOKS like a migration.
-    window.sessionStorage.setItem("futurepay.checkout.hostedOrder", JSON.stringify(ORDER));
+  it("reads only its own key — a value under any other name is ignored", () => {
+    // The pre-rename legacy fallback is gone: its window was one hosted round
+    // trip across one deploy. A foreign key must neither resume an order nor be
+    // touched by the read-and-clear.
+    window.sessionStorage.setItem("some-other.checkout.key", JSON.stringify(ORDER));
     land("?transaction_nsu=123");
 
-    expect(takeHostedOrder()?.orderId).toBe(ORDER.orderId);
-    // Cleared like any other read, so a later return trip cannot resume it.
-    expect(window.sessionStorage.getItem("futurepay.checkout.hostedOrder")).toBeNull();
-  });
-
-  it("prefers the current key when both are somehow present", () => {
-    window.sessionStorage.setItem("futurepay.checkout.hostedOrder", JSON.stringify({ ...ORDER, orderId: "stale" }));
-    window.sessionStorage.setItem(HOSTED_ORDER_STORAGE_KEY, JSON.stringify(ORDER));
-    land("?transaction_nsu=123");
-
-    expect(takeHostedOrder()?.orderId).toBe(ORDER.orderId);
+    expect(takeHostedOrder()).toBeNull();
+    expect(window.sessionStorage.getItem("some-other.checkout.key")).not.toBeNull();
   });
 
   it("answers null when nothing was parked", () => {

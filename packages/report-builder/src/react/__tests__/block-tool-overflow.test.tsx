@@ -243,7 +243,7 @@ describe('edit mode — ✎ and 🗑 shed into ⋮, the trash first', () => {
     await screen.findByTestId('report-block-bloco-1-edit');
     await openMenu('report-block-bloco-1-menu');
 
-    // future-pay's reports e2e drives `${testId}-remove`. An id that exists on
+    // the origin host's reports e2e drives `${testId}-remove`. An id that exists on
     // a desktop and not on a laptop is a suite that fails for the width.
     const remove = screen.getByTestId('report-block-bloco-1-remove');
     fireEvent.click(remove);

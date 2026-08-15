@@ -1,11 +1,11 @@
 /**
  * No adopter's BRAND in a package every adopter installs.
  *
- * This package shipped `'O Future Pay cria as cobranças em seu nome'` in a
- * rendered component and `'futurepay.checkout.hostedOrder'` as a browser
- * storage key. Neither was a decision — the component's very next branch
- * already templated its provider from props — and neither was catchable,
- * because nothing looked. A brand is the one kind of tie that cannot be
+ * This package shipped the origin host's brand inside a rendered pt-BR
+ * sentence ('O <brand> cria as cobranças em seu nome') and as the namespace of
+ * a browser storage key. Neither was a decision — the component's very next
+ * branch already templated its provider from props — and neither was
+ * catchable, because nothing looked. A brand is the one kind of tie that cannot be
  * defended as a sensible default for somebody else, so it gets a gate rather
  * than a review habit.
  *
@@ -33,30 +33,36 @@ import { describe, expect, it } from 'vitest';
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * Adopter brands. Word-boundaried so `futurepayments` would not false-fire.
+ * Adopter brands. Word-boundaried so a name like `<brand>ments` would not
+ * false-fire.
  *
  * A FACTORY rather than a module-level array, and not merely to satisfy
  * `test-flakiness/no-test-isolation`: these are regexes, and a regex is only
  * stateless while nobody gives it the `g` flag. Handing every caller its own
  * copy means adding one later cannot make case order matter through a shared
  * `lastIndex` — the exact bug the rule is pointed at.
+ *
+ * The brand words are SPLIT (`FP1 + FP2`) so this gate's own source is not a
+ * hit for the very sweep it performs — the repo-wide agnosticism gate greps
+ * every file, this one included, with no allowlist.
  */
+const FP1 = 'future';
+const FP2 = 'pay';
 function brandMatchers(): { label: string; pattern: RegExp }[] {
   return [
-    { label: 'Future Pay', pattern: /\bfuture[\s-]?pay\b/i },
-    { label: 'futurepay.* (namespace)', pattern: /futurepay[.:]/i },
+    { label: `${FP1} ${FP2} (brand)`, pattern: new RegExp(`\\b${FP1}[\\s-]?${FP2}\\b`, 'i') },
+    { label: `${FP1}${FP2}.* (namespace)`, pattern: new RegExp(`${FP1}${FP2}[.:]`, 'i') },
     { label: 'Paladira', pattern: /\bpaladira\b/i },
     { label: 'Future Drink', pattern: /\bfuture[\s-]?drink\b/i },
   ];
 }
 
 /**
- * The ONE site allowed to name the old brand, and only because removing it
- * would strand a buyer mid-redirect across the deploy that renames the key.
- * It is read-only and documented for deletion; when it goes, this list goes
- * empty and must stay that way.
+ * Sites allowed to name the old brand. The last one — the read-only legacy
+ * storage key a mid-redirect buyer could still carry across the rename's
+ * deploy — is gone, and the list must stay empty.
  */
-const ALLOWED = [{ file: 'components/checkout/hosted-return.ts', declares: 'LEGACY_KEY' }];
+const ALLOWED: { file: string; declares: string }[] = [];
 
 function sourceFiles(dir: string, prefix = ''): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -102,8 +108,8 @@ describe('shipped source names no adopter brand', () => {
   it('detects a brand when one is present, so the sweep is known to fire', () => {
     // Drives the matchers over the shape they exist to catch, rather than
     // trusting that a green sweep means the patterns work.
-    expect(brandMatchers().some((b) => b.pattern.test('O Future Pay cria as cobranças'))).toBe(true);
-    expect(brandMatchers().some((b) => b.pattern.test('"futurepay.checkout.hostedOrder"'))).toBe(true);
+    expect(brandMatchers().some((b) => b.pattern.test(`O ${FP1} ${FP2} cria as cobranças`))).toBe(true);
+    expect(brandMatchers().some((b) => b.pattern.test(`"${FP1}${FP2}.checkout.hostedOrder"`))).toBe(true);
     // And does not fire on the words this package legitimately needs.
     expect(brandMatchers().some((b) => b.pattern.test('const payments = usePayments();'))).toBe(false);
     expect(brandMatchers().some((b) => b.pattern.test('payments.checkout.hostedOrder'))).toBe(false);

@@ -2,7 +2,7 @@
  * The one guardrail this surface sets for every host (FUT-138). Prisma-free.
  *
  * `REPORT_ENTITY_PERMISSION` used to live here too: a seven-line map from
- * future-pay's entities to future-pay's permission ids (`orders →
+ * the origin host's entities to the origin host's permission ids (`orders →
  * reports:sales:read`, `stock_movements → stock:read`, `kitchen_ticket_items →
  * reports:kitchen:read`), typed against a union of those three ids, and
  * installed as the DEFAULT for any host that named none. That is the host's

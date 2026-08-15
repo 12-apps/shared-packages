@@ -5,7 +5,7 @@
  * such factory is that the FLAT exports it was built on quietly stop working —
  * nobody drives them any more, so nothing notices. They are not a legacy
  * surface: a host that wants its own pixels, its own steps or its own order of
- * questions composes them by hand, and future-pay's storefront did exactly that
+ * questions composes them by hand, and the origin host's storefront did exactly that
  * until FUT-741.
  *
  * So this page uses NO factory. It reaches only for what `.` exports and writes

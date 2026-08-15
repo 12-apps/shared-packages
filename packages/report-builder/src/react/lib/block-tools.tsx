@@ -114,7 +114,7 @@ export function BlockToolCluster({
   /**
    * The test id of the RENDERING these tools drive — the toggle is
    * `${renderTestId}-as-table`, which is the id it has always had and which
-   * future-pay's reports e2e drives.
+   * the origin host's reports e2e drives.
    */
   renderTestId: string;
   menuTestId: string;

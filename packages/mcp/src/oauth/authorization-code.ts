@@ -4,7 +4,7 @@ import { issuer } from "./config";
 import { SIGNING_ALG, type McpSigningKeyProvider } from "./keys";
 
 /**
- * Stateless authorization-code mint/verify (12-23, ported from future-pay's
+ * Stateless authorization-code mint/verify (12-23, ported from the origin host's
  * `lib/mcp/oauth/authorization-code.ts` — behaviour unchanged; the signing key
  * arrives through a provider instead of an env read).
  *

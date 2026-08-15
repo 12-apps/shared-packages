@@ -3,12 +3,12 @@ import { expect, test } from '@playwright/test';
 /**
  * THE WALKTHROUGH MUST SAY THE ADOPTER'S NAME, AND NOBODY ELSE'S (FUT-760/761).
  *
- * Two shipped setup guides addressed the platform by name in the middle of a
- * pt-BR instruction — "é assim que o Future Pay confirma que a notificação veio
- * mesmo da Stone" (Stone), "não há como reverter pelo Future Pay"
- * (InfinitePay). Those sentences render to a STORE OWNER, out of a package
- * four products install, so every adopter but one shipped a stranger's brand on
- * its own settings screen.
+ * Two shipped setup guides addressed the platform by the origin host's brand
+ * name in the middle of a pt-BR instruction — "é assim que o <brand> confirma
+ * que a notificação veio mesmo da Stone" (Stone), "não há como reverter pelo
+ * <brand>" (InfinitePay). Those sentences render to a STORE OWNER, out of a
+ * package four products install, so every adopter but one shipped a stranger's
+ * brand on its own settings screen.
  *
  * No test caught it because the package's own suites fed those guides the very
  * host vocabulary the guides had baked in, and agreement proves nothing when

@@ -7,7 +7,7 @@ import type { MerchantRef, ResolvedCredentials } from '../core/types';
 import type { WebhookPipelineObserver } from '../core/webhook-pipeline';
 
 /**
- * The pre-inbox refusal trace (FUT-761, ported from the future-pay host).
+ * The pre-inbox refusal trace (FUT-761, ported from the origin host).
  * Verification runs BEFORE the durable inbox, so a refused delivery is
  * recorded nowhere — a silence indistinguishable from "the provider never
  * called us", which hid FUT-463 through three rounds of fixes. The observer

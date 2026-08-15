@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
  * @12-apps/onboarding ships its model AND its migration (12-23), and a host
  * applies them — the same contract `rbac-migrations.test.ts` pins for RBAC.
  *
- * The property with teeth is REPLAYABILITY: future-pay already has this table, so
+ * The property with teeth is REPLAYABILITY: the origin host already has this table, so
  * adoption must be a no-op rather than a failed deploy. Every statement in the
  * migration is guarded, and the second-apply case below is what keeps it that way.
  */
@@ -132,7 +132,7 @@ describe('@12-apps/onboarding — the prisma assets survive publication', () => 
   });
 
   it('replays into a schema that already has the table', async () => {
-    // future-pay's case exactly: adoption must change nothing rather than fail.
+    // the origin host's case exactly: adoption must change nothing rather than fail.
     await withMigrated(async (db) => {
       for (const name of migrations()) {
         await expect(db.exec(sqlOf(name)), `replay ${name}`).resolves.toBeDefined();

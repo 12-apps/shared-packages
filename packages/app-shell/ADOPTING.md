@@ -6,7 +6,7 @@ only *points* at these surfaces — when the library updates, every host updates
 **no app changes**. The contract is the one `@12-apps/report-builder`,
 `@12-apps/rbac`, `@12-apps/audit` and `@12-apps/realtime` established.
 
-It replaces `future-pay/packages/spa-shared`, a **private** workspace package that
+It replaces the origin host's private `packages/spa-shared` workspace package, one that
 was the browser half of nearly every subsystem in this series and that no other app
 could install.
 
@@ -222,7 +222,7 @@ The other plugins in this series own tables. This one owns none, and that is a
 decision rather than an omission.
 
 The only state the shell persists is "has this user accepted version X", and that
-is a fact about the **host's own identity row** — future-pay stamps
+is a fact about the **host's own identity row** — the origin host stamps
 `users.terms_accepted_at` / `users.terms_version`, and its sign-up gate, its cart,
 its checkout and its whole MCP surface read the same predicate off it. A model here
 would be a second, competing answer to a question the host's user table already

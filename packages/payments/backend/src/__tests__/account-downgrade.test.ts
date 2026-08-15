@@ -6,7 +6,7 @@ import { ProviderRequestError } from '../core/errors';
 import type { MerchantRef } from '../core/types';
 
 /**
- * The account-level downgrade rule, ported from the future-pay host
+ * The account-level downgrade rule, ported from the origin host
  * (FUT-761): a 401/403 on a charge is the provider rejecting the MERCHANT'S
  * account, and without writing that to the connection row the settings screen
  * keeps showing a stale VERIFIED while every real charge fails — which is

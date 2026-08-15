@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
  * name — driving the published package's own Hono router over a real Postgres
  * through the Vite proxy, as the seeded owner.
  *
- * The cases are the port of future-pay's notification-centre coverage (its
+ * The cases are the port of the origin host's notification-centre coverage (its
  * `badge-realtime` component suite and the account preferences screen), moved to
  * the level they belong at: a real browser, a real socket, real rows. What only
  * exists here is the seam BETWEEN the two published halves — the URLs the client

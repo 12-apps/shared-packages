@@ -43,9 +43,14 @@ const PACKAGE_ROOT = join(SRC, '..');
  * copy means adding one later cannot make case order matter through a shared
  * `lastIndex`.
  */
+const FP1 = 'future';
+const FP2 = 'pay';
 function brandMatchers(): { label: string; pattern: RegExp }[] {
+  // The brand words are SPLIT (`FP1 + FP2`) so this gate's own source is not a
+  // hit for the repo-wide agnosticism sweep, which greps every file with no
+  // allowlist.
   return [
-    { label: 'Future Pay', pattern: /\bfuture[\s_-]?pay\b/i },
+    { label: `${FP1} ${FP2} (brand)`, pattern: new RegExp(`\\b${FP1}[\\s_-]?${FP2}\\b`, 'i') },
     { label: 'Paladira', pattern: /\bpaladira\b/i },
     { label: 'Future Drink', pattern: /\bfuture[\s_-]?drink\b/i },
   ];
@@ -85,7 +90,7 @@ describe('the shipped source names no adopter', () => {
   it('detects a brand when one is present, so the sweep is known to fire', () => {
     // Driven over the exact strings this package shipped, rather than trusting
     // that a green sweep means the patterns work.
-    const shipped = "What used to be `future-pay/packages/spa-shared`";
+    const shipped = `What used to be \`${FP1}-${FP2}/packages/spa-shared\``;
     expect(brandMatchers().some((b) => b.pattern.test(shipped))).toBe(true);
     expect(brandMatchers().some((b) => b.pattern.test("brand: { name: 'Paladira' }"))).toBe(true);
     // …and does not fire on words this package legitimately needs.
