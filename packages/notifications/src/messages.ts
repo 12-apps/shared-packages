@@ -1,21 +1,47 @@
 /**
- * Every sentence this package can say to a USER, in one table.
+ * Every sentence this package can say to a USER, stated by the HOST.
  *
- * pt-BR by default because that is the product copy the surface shipped with
- * (future-pay's storefront and backoffice are Brazilian); a host in another
- * market passes `messages` and overrides the subset it cares about. The copy
- * lives HERE rather than in each screen so the api half and the react half can
- * never disagree about a sentence — the 401 body the wire returns and the
- * error the panel renders come from the same key.
+ * The copy lives in ONE table rather than in each screen so the api half and
+ * the react half can never disagree about a sentence — the 401 body the wire
+ * returns and the error the panel renders come from the same key.
+ *
+ * THE pt-BR TABLE THAT USED TO BE THE DEFAULT IS GONE. Its own docstring said
+ * what it was: "the product copy the surface shipped with", labelled in the
+ * source as one named application's "exact copy". A description of one adopter,
+ * shipped inside the package every other adopter installs, and reached by
+ * saying nothing.
+ *
+ * `categoryLabels` is the sharpest of the forty. The categories themselves
+ * became required config in the release before this one, precisely because
+ * WHICH categories exist is product vocabulary — and their LABELS kept
+ * defaulting, so a host that declared `['loans', 'fines']` got a labels map
+ * describing somebody else's four. Required categories with defaulted labels
+ * for a different host's categories is not a smaller version of the bug; it is
+ * the same bug with a compile-time gesture in front of it.
+ *
+ * So `messages` is REQUIRED and whole. The interface is the checklist, and the
+ * compiler names the sentences a host has not written yet.
  */
-export interface NotificationMessages {
-  // --- the wire ------------------------------------------------------------
+/**
+ * The sentences the SERVER half renders — and the whole of what a backend mount
+ * has to state.
+ *
+ * Split out when `messages` became required. Requiring the full forty on a
+ * server config would have made a backend-only adopter write three dozen
+ * sentences for screens it does not serve, which is the kind of tax that gets a
+ * required-config migration reverted rather than adopted. These four are the
+ * ones the router and the route descriptors actually put on a wire.
+ */
+export interface NotificationWireMessages {
   unauthenticated: string;
   invalidBody: string;
   operationFailed: string;
   /** `POST /notifications/mark-read` with neither `ids` nor `all`. */
   markReadTargetRequired: string;
+}
 
+/** Every sentence, wire and screen — what the REACT half needs. */
+export interface NotificationMessages extends NotificationWireMessages {
   // --- the inbox panel -----------------------------------------------------
   panelTitle: string;
   markAllRead: string;
@@ -58,99 +84,20 @@ export interface NotificationMessages {
   devicePushEnabling: string;
 }
 
-/** future-pay's exact copy — the product default. */
-export const DEFAULT_NOTIFICATION_MESSAGES: NotificationMessages = {
-  unauthenticated: 'Não autenticado.',
-  invalidBody: 'Dados inválidos.',
-  operationFailed: 'Não foi possível concluir a operação.',
-  markReadTargetRequired: 'Informe `ids` ou `all: true` (exatamente um).',
-
-  panelTitle: 'Notificações',
-  markAllRead: 'Marcar todas como lidas',
-  loading: 'Carregando notificações...',
-  loadMore: 'Carregar mais',
-  loadingMore: 'Carregando...',
-  loadFailedTitle: 'Não foi possível carregar',
-  loadFailedBody: 'Tente novamente em instantes.',
-  retry: 'Tentar novamente',
-  emptyTitle: 'Nenhuma notificação',
-  emptyBody: 'Você está em dia — novidades aparecem aqui.',
-  openBell: 'Abrir notificações',
-  openBellWithUnread: (count) => `Abrir notificações (${count} não lidas)`,
-  unreadSuffix: 'não lida',
-  deleteOne: (title) => `Excluir notificação: ${title}`,
-
-  justNow: 'agora',
-  minutesAgo: (minutes) => `há ${minutes} min`,
-  hoursAgo: (hours) => `há ${hours} h`,
-  daysAgo: (days) => (days === 1 ? 'há 1 dia' : `há ${days} dias`),
-  dateLocale: 'pt-BR',
-
-  preferencesTitle: 'Notificações',
-  preferencesLead:
-    'Escolha como quer ser avisado, por tipo de assunto. O sino do app sempre recebe tudo.',
-  channelLabels: {
-    EMAIL: 'E-mail',
-    SMS: 'SMS',
-    WHATSAPP: 'WhatsApp',
-    WEB_PUSH: 'Navegador',
-  },
-  channelUnavailableHints: {
-    EMAIL: 'Envio de e-mail não está configurado neste ambiente.',
-    SMS: 'Cadastre um telefone no seu perfil para receber SMS.',
-    WHATSAPP: 'Cadastre um telefone no seu perfil para receber WhatsApp.',
-    WEB_PUSH: 'Alertas do navegador não estão configurados neste ambiente.',
-  },
-  categoryLabels: {
-    orders: {
-      title: 'Pedidos',
-      description: 'Confirmações e andamento dos seus pedidos.',
-    },
-    payments: {
-      title: 'Pagamentos',
-      description: 'Cobranças, comprovantes e falhas de pagamento.',
-    },
-    stock: {
-      title: 'Estoque',
-      description: 'Alertas de estoque das lojas que você administra.',
-    },
-    system: {
-      title: 'Sistema',
-      description: 'Avisos da sua conta e da plataforma.',
-    },
-  },
-  categoryFallbackTitle: (category) => category,
-  devicePushTitle: 'Alertas neste navegador',
-  devicePushIdle: 'Permita notificações para receber alertas mesmo com o site fechado.',
-  devicePushOn: 'Este navegador está recebendo alertas.',
-  devicePushDenied:
-    'Permissão negada — habilite notificações nas configurações do navegador.',
-  devicePushFailed: 'Não foi possível ativar. Tente novamente.',
-  devicePushEnable: 'Ativar',
-  devicePushEnabling: 'Ativando...',
-};
-
-/** The messages in force, defaulted to the pt-BR product copy. */
-export function messagesOf(config: {
-  messages?: Partial<NotificationMessages>;
-}): NotificationMessages {
-  const overrides = config.messages ?? {};
-  return {
-    ...DEFAULT_NOTIFICATION_MESSAGES,
-    ...overrides,
-    // Nested records merge per KEY. A host relabelling one channel must not
-    // erase the labels for the other three, which a shallow spread would do.
-    channelLabels: {
-      ...DEFAULT_NOTIFICATION_MESSAGES.channelLabels,
-      ...overrides.channelLabels,
-    },
-    channelUnavailableHints: {
-      ...DEFAULT_NOTIFICATION_MESSAGES.channelUnavailableHints,
-      ...overrides.channelUnavailableHints,
-    },
-    categoryLabels: {
-      ...DEFAULT_NOTIFICATION_MESSAGES.categoryLabels,
-      ...overrides.categoryLabels,
-    },
-  };
+/**
+ * The messages in force.
+ *
+ * A pass-through rather than a merge: there is nothing left to merge WITH, and
+ * that is the point of the change. The old version spread the host's table over
+ * the origin's, including PER KEY inside `channelLabels`,
+ * `channelUnavailableHints` and `categoryLabels` — so a host that relabelled one
+ * channel kept the origin's wording for the other three, and a host that
+ * labelled its own two categories kept the origin's four sitting beside them in
+ * the same screen.
+ *
+ * Kept as a function because all three mounts read it off a config object, and
+ * because a later rule (a blank-string refusal, say) belongs in one place.
+ */
+export function messagesOf<T extends NotificationWireMessages>(config: { messages: T }): T {
+  return config.messages;
 }

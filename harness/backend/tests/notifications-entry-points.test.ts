@@ -58,7 +58,12 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
     // beside the sets it DOES own — `NOTIFICATION_CHANNELS` is the library's
     // own closed set and stays.
     expect(core).not.toHaveProperty('NOTIFICATION_CATEGORIES');
-    expect(core.DEFAULT_NOTIFICATION_MESSAGES.panelTitle).toBe('Notificações');
+    // Nor `DEFAULT_NOTIFICATION_MESSAGES`, for the same reason and one release
+    // later: it was ~40 sentences of the extraction origin's copy, labelled in
+    // its own source as that product's "exact copy", spread UNDER whatever a
+    // host passed. Asserted from a REPACKED TARBALL, so this says what npm
+    // actually uploads rather than what the working tree happens to contain.
+    expect(core).not.toHaveProperty('DEFAULT_NOTIFICATION_MESSAGES');
     // The country is the CALLER's, always: this package assumes none, so a US
     // adopter that forgets it cannot text a Brazilian stranger their customer's
     // order. That makes the second argument required, which is the shape below.

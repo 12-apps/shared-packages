@@ -1,4 +1,4 @@
-import type { NotificationMessages } from '../messages';
+import type { NotificationWireMessages } from '../messages';
 import { NOTIFICATION_CHANNELS, type NotificationChannel } from '../types';
 
 import {
@@ -25,7 +25,7 @@ import type { TransportRegistry } from './transports/registry';
  * Nine routes, and the paths are the PACKAGE's: the shipped react client
  * builds these URLs, so a host that renamed one would be a host whose own bell
  * stopped working. The host names only where the whole block is mounted
- * (future-pay: `/api/account`).
+ * (the origin mounts it at `/api/account`).
  *
  * Route ORDER is preserved by every adapter. Nothing here is shaped `/:id`, so
  * no sibling can capture a literal — but the order is still the contract,
@@ -40,7 +40,7 @@ interface NotificationRoutesDeps {
   transports: TransportRegistry;
   contacts: NotificationContactDirectory;
   categories: readonly string[];
-  messages: NotificationMessages;
+  messages: NotificationWireMessages;
   /** Told when a write actually changed something (for a realtime hint). */
   onInboxChanged?: (userId: string) => void;
 }

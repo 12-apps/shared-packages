@@ -33,7 +33,7 @@ export interface WebPushSetupConfig {
    * asks no permission, creates no subscription, and fails with nothing a user
    * could act on. The check is a config seam rather than a dependency because
    * "is this an installable iOS browser" is a question a host's PWA layer
-   * already answers (future-pay passes
+   * already answers (the origin passes
    * `() => isIosInstallable() && !isStandalone()` from `@12-apps/pwa`).
    */
   needsInstallFirst?: () => boolean;

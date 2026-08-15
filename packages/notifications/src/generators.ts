@@ -4,7 +4,7 @@ import type { NotificationGenerator } from './types';
 /**
  * Generator registry: one {@link NotificationGenerator} per event `type`.
  *
- * INSTANCE state, not a module-level Map. future-pay's original was
+ * INSTANCE state, not a module-level Map. the origin's own was
  * process-wide, which is what a package of loose functions forces; a factory
  * config does not need it, and one registry per mount is what makes a test (or
  * a second mount) able to hold its own set without clearing anyone else's.
