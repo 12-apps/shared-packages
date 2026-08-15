@@ -1,8 +1,10 @@
 'use client';
 
-import { Alert, Tab, Tabs } from '@mui/material';
+import { Alert, Box, Tab, Tabs, Typography } from '@mui/material';
 
 import type { PaymentEnvironment } from '@12-apps/payments-backend';
+
+import { T } from './panel-tokens';
 
 /** One environment's human name — the tabs and the probe result share it. */
 export const ENVIRONMENT_LABELS: Record<PaymentEnvironment, string> = {
@@ -14,7 +16,22 @@ export const ENVIRONMENT_LABELS: Record<PaymentEnvironment, string> = {
  * Sentence case, because these are place names rather than shouted commands —
  * MUI upper-cases tab labels by default, which turns "Produção" into signage.
  */
-const TAB_SX = { textTransform: 'none' } as const;
+const TAB_SX = {
+  textTransform: 'none',
+  minHeight: 0,
+  minWidth: 0,
+  borderRadius: '6px',
+  px: '14px',
+  py: '6px',
+  fontSize: '12.5px',
+  fontWeight: 600,
+  color: T.ink3,
+  '&.Mui-selected': {
+    background: T.bg,
+    color: T.ink,
+    boxShadow: '0 1px 3px rgba(0,0,0,.09)',
+  },
+} as const;
 
 /**
  * The two environments as tabs, not a select: there are exactly two, and which
@@ -30,26 +47,45 @@ export function EnvironmentSelector({
   environment: PaymentEnvironment;
   onChange: (next: PaymentEnvironment) => void;
 }) {
+  // A segmented control, not underlined tabs. Two options that CHANGE WHAT
+  // EVERY FIELD BELOW MEANS should look like a switch being thrown, and the
+  // label above says which switch — "Ambiente" alone reads as a page section.
   return (
-    <Tabs
-      value={environment}
-      onChange={(_, next: PaymentEnvironment) => onChange(next)}
-      aria-label="Ambiente"
-      data-testid="payments-environment-tabs"
-    >
-      <Tab
-        label="Sandbox"
-        value="SANDBOX"
-        data-testid="payments-environment-SANDBOX"
-        sx={TAB_SX}
-      />
-      <Tab
-        label="Produção"
-        value="PRODUCTION"
-        data-testid="payments-environment-PRODUCTION"
-        sx={TAB_SX}
-      />
-    </Tabs>
+    <Box>
+      <Typography
+        sx={{ display: 'block', fontSize: '12px', fontWeight: 650, color: T.ink2, mb: '5px' }}
+      >
+        Ambiente desta conexão
+      </Typography>
+      <Tabs
+        value={environment}
+        onChange={(_, next: PaymentEnvironment) => onChange(next)}
+        aria-label="Ambiente desta conexão"
+        data-testid="payments-environment-tabs"
+        slotProps={{ indicator: { sx: { display: 'none' } } }}
+        sx={{
+          minHeight: 0,
+          width: 'fit-content',
+          background: T.bg2,
+          border: `1px solid ${T.line}`,
+          borderRadius: '9px',
+          p: '4px',
+        }}
+      >
+        <Tab
+          label="Sandbox"
+          value="SANDBOX"
+          data-testid="payments-environment-SANDBOX"
+          sx={TAB_SX}
+        />
+        <Tab
+          label="Produção"
+          value="PRODUCTION"
+          data-testid="payments-environment-PRODUCTION"
+          sx={TAB_SX}
+        />
+      </Tabs>
+    </Box>
   );
 }
 
@@ -72,10 +108,23 @@ export function EnvironmentSelector({
 export function EnvironmentNotice({
   environment,
   active,
+  band = true,
 }: {
   environment: PaymentEnvironment;
   /** The environment this store's real checkout uses, when it has one. */
   active: PaymentEnvironment | null;
+  /**
+   * Rendered as the card's full-bleed strip (the default), or as an ordinary
+   * inset alert.
+   *
+   * The band geometry — square corners, and `px: 3` matching the card's own
+   * padding so the text lines up with the content above and below — only reads
+   * correctly when the strip actually spans the card. Stacked INSIDE the manual
+   * disclosure, where it is already inset by the accordion, the same values
+   * indent the text a second time and square off a box that is visibly not
+   * touching either edge.
+   */
+  band?: boolean;
 }) {
   const elsewhere = active !== null && active !== environment ? ENVIRONMENT_LABELS[active] : null;
   const production = environment === 'PRODUCTION';
@@ -83,9 +132,9 @@ export function EnvironmentNotice({
     <Alert
       severity={production ? 'warning' : 'info'}
       variant="standard"
-      square
+      square={band}
       data-testid={`payments-environment-notice-${environment}`}
-      sx={{ borderRadius: 0, py: 0.5, px: 3 }}
+      sx={band ? { borderRadius: 0, py: 0.5, px: 3 } : { py: 0.5 }}
     >
       <strong>
         {production ? 'Produção — dinheiro real.' : 'Sandbox — ambiente de teste.'}

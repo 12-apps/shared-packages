@@ -18,21 +18,36 @@ import type { PendingSave } from './ConfirmCredentialSave';
  */
 
 /**
- * Is there actually something stored to probe?
+ * Is there enough on record to make the probe WORTH RUNNING?
  *
- * Read from the SERVER's answer to the save rather than from the form: blank
- * fields are preserved rather than cleared, so what the browser just typed does
- * not describe what is now on record.
+ * A required-field test cannot answer this, and Stripe is why: every field in its
+ * schema is `required: false`, because under authorization the access token
+ * fulfils the secret key and nothing needs typing at all. On the credentials
+ * path that makes the required-field test vacuously true, so a save with one
+ * key pasted and three boxes empty went straight to the probe and came back
+ * "Credenciais recusadas pela Stripe." — a rejection reported for a request
+ * that was never worth making, blaming the owner mid-way through typing.
+ *
+ * So completeness is measured over the schema MINUS its `advanced` fields.
+ * Not the whole schema: that asked for Stripe's `connectedAccountId`, which
+ * ordinary stores must leave empty, and owners filled it with their own account
+ * id to satisfy the button — producing exactly the refusal this was meant to
+ * prevent. A partial save is still a perfectly good save (blank fields preserve
+ * what is stored); it simply is not yet a connection worth testing.
  */
-export function allRequiredStored(
+export function credentialsComplete(
   descriptor: ProviderDescriptor,
-  config: MaskedProviderConfig,
+  config: MaskedProviderConfig | null,
   environment: PaymentEnvironment,
+  values: Record<string, string>,
 ): boolean {
-  const stored = config.environments[environment] ?? {};
-  return descriptor.credentialSchema
-    .filter((spec) => spec.required)
-    .every((spec) => stored[spec.key]?.configured === true);
+  const stored = config?.environments[environment] ?? {};
+  return descriptor.credentialSchema.every((spec) => {
+    if (spec.advanced) return true;
+    const typed = values[spec.key];
+    if (typed !== undefined && typed.trim() !== '') return true;
+    return stored[spec.key]?.configured === true;
+  });
 }
 
 /**
@@ -55,10 +70,31 @@ export function fieldsWellFormed(
   });
 }
 
-export function saveLabel(descriptor: ProviderDescriptor): string {
+/**
+ * What the one button says it will do — and it does BOTH halves.
+ *
+ * Saving IS testing (see `FormActions`): the write is followed straight away by
+ * the probe, which is what reaches the provider with the pasted keys and, on a
+ * pass, is the only thing that makes the activation charge appear. A button
+ * reading "Salvar" claims half of that. On the credentials path the owner has
+ * no other control, so they were left looking for the one that sends the keys
+ * to the provider — there isn't one, because this is it.
+ *
+ * …but only once there is a connection to test. Half a credential set cannot
+ * be, so a partly-filled form says plain "Salvar" and the save skips the probe:
+ * promising a test that is then reported as "Credenciais recusadas" is worse
+ * than promising nothing, because it reads as a verdict on what was typed.
+ *
+ * A provider whose whole connection is ONE field keeps naming that field
+ * instead. The label then says what is about to be committed rather than merely
+ * that something is, and on a step whose entire content is that single box that
+ * is the more useful of the two truths. Naming one of Stripe's four would be a
+ * lie about what the button writes, which is why only the fallback changes.
+ */
+export function saveLabel(descriptor: ProviderDescriptor, complete: boolean): string {
   const required = descriptor.credentialSchema.filter((field) => field.required);
   const only = required.length === 1 ? required[0] : undefined;
-  if (!only) return 'Salvar';
+  if (!only) return complete ? 'Salvar e testar conexão' : 'Salvar';
   return `Salvar ${only.label.replace(/\s*\([^)]*\)\s*$/, '')}`;
 }
 

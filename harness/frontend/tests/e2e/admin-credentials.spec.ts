@@ -153,9 +153,14 @@ test('masked secrets: write-only fields, preserve-on-blank, clear-on-empty', asy
   await expect(page.getByText('deixe em branco')).toHaveCount(2);
 
   // Three required fields: nothing collapses to a summary row, and the button
-  // keeps the plain verb — naming one of three would lie about the commit.
+  // does not name one of them — that would lie about what the save commits.
+  //
+  // It DOES name the second half of what it does. Saving is testing: the write
+  // is followed straight away by the probe that reaches the provider. All three
+  // fields are on record here, so there is a connection to test and the button
+  // says so. Half-filled, it reads plain "Salvar" and runs no probe.
   await expect(page.getByTestId('payments-credential-summary')).toBeHidden();
-  await expect(page.getByTestId('payments-save')).toHaveText('Salvar');
+  await expect(page.getByTestId('payments-save')).toHaveText('Salvar e testar conexão');
 
   // Connected but unproven, no guide: the context says exactly that.
   await expect(page.getByTestId('admin-verification-context')).toHaveText(

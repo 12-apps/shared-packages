@@ -2,14 +2,10 @@
 
 import {
   Alert,
+  Box,
   Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Stack,
   Typography,
 } from '@mui/material';
@@ -23,7 +19,9 @@ import type {
 } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
+import { ConnectionFacts, ConnectSteps, DisconnectDialog } from './ConnectionCard';
 import { expiryProximity, isConnected } from './connection-state';
+import { BAR_MSG_SX, BAR_SX, BTN_PRIMARY_SX, BTN_QUIET_DANGER_SX, T } from './panel-tokens';
 
 /**
  * The `authMode: 'oauth'` half of the settings page: a provider whose
@@ -81,6 +79,47 @@ function ExpiryNote(props: { expiresAt: string }) {
   );
 }
 
+/**
+ * A failed connect, in the owner's terms.
+ *
+ * The one case worth naming is the deployment that has registered no OAuth
+ * application for this provider. It surfaced as
+ * `{"error":"CredentialsError","message":"No platform OAuth application
+ * credentials configured for stripe/SANDBOX"}` in a red box under the connect
+ * button — an error class, a slash-joined pair of internal identifiers, and not
+ * one word about what to do. It is not a failure the owner caused or can fix,
+ * and it is not a dead end either: the credentials path works, and it is right
+ * there on the same screen. So it reads as a warning that names the way round.
+ *
+ * Anything else is passed through. The adapter's own sentence beats a generic
+ * one, and inventing copy for a failure we have not seen is how a screen ends
+ * up confidently misdescribing an outage.
+ */
+function connectFailure(
+  message: string,
+  displayName: string,
+): { severity: 'error' | 'warning'; text: string } {
+  if (/no platform oauth application credentials/i.test(message)) {
+    return {
+      severity: 'warning',
+      text:
+        `A conexão automática com ${displayName} não está disponível nesta instalação — ` +
+        'o aplicativo de autorização não foi cadastrado. Para conectar agora, abra ' +
+        '“Prefiro informar as credenciais manualmente” abaixo e cole as suas próprias chaves.',
+    };
+  }
+  return { severity: 'error', text: message };
+}
+
+function ConnectError({ message, displayName }: { message: string; displayName: string }) {
+  const { severity, text } = connectFailure(message, displayName);
+  return (
+    <Alert severity={severity} data-testid="payments-connect-failure">
+      {text}
+    </Alert>
+  );
+}
+
 function connectLabel(displayName: string, connected: boolean, busy: string | null) {
   if (busy === 'connect') return <CircularProgress size={18} />;
   return connected ? 'Reconectar' : `Conectar com ${displayName}`;
@@ -134,6 +173,8 @@ function ConnectedAccountDetails(props: { account: ConnectedOAuthAccount }) {
   );
 }
 
+
+
 /** Header + explanatory copy + any warning banner for the connection. */
 function ConnectionSummary(props: {
   displayName: string;
@@ -153,15 +194,11 @@ function ConnectionSummary(props: {
         once connected, since the provider sealed it into the grant.
       */}
       {props.connected ? (
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Chip
-            size="small"
-            variant="outlined"
-            data-testid="payments-connected-environment"
-            label={props.environment === 'PRODUCTION' ? 'Produção' : 'Sandbox (testes)'}
-            color={props.environment === 'PRODUCTION' ? 'default' : 'warning'}
-          />
-        </Stack>
+        <ConnectionFacts
+          environment={props.environment}
+          account={props.connectedAccount}
+          displayName={props.displayName}
+        />
       ) : null}
       {/*
         The connected sentence names NO platform. It used to open with one
@@ -176,11 +213,12 @@ function ConnectionSummary(props: {
         grant, not whose logo is on the page. The subject is the connection
         itself, which is true for every host and needs no new configuration.
       */}
-      <Typography variant="body2" color="text.secondary">
+      <Typography sx={{ fontSize: '13px', color: T.ink2, lineHeight: 1.6 }}>
         {props.connected
           ? 'Sua conta está conectada. As cobranças são criadas em seu nome — nenhuma chave precisa ser copiada.'
           : `Conecte sua conta ${props.displayName} autorizando o acesso no site do provedor. Nenhuma chave precisa ser copiada.`}
       </Typography>
+      {props.connected ? null : <ConnectSteps displayName={props.displayName} />}
       {props.connected && props.connectedAccount ? (
         <ConnectedAccountDetails account={props.connectedAccount} />
       ) : null}
@@ -194,47 +232,16 @@ function ConnectionSummary(props: {
   );
 }
 
-/**
- * Confirmation for Desconectar, which is destructive and irreversible from
- * here: it revokes the grant at the provider, so the store stops being able to
- * charge immediately and getting back requires the owner to authorize again on
- * the provider's site. It also sat one careless click from "Reconectar".
- */
-function DisconnectDialog(props: {
-  open: boolean;
-  displayName: string;
-  busy: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <Dialog open={props.open} onClose={props.onCancel} data-testid="payments-disconnect-confirm">
-      <DialogTitle>Desconectar {props.displayName}?</DialogTitle>
-      <DialogContent>
-        <DialogContentText>
-          A autorização será revogada no {props.displayName} e sua loja deixa de conseguir cobrar
-          imediatamente. Para voltar a receber, será necessário conectar a conta novamente
-          autorizando o acesso no site do provedor.
-        </DialogContentText>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={props.onCancel} disabled={props.busy}>
-          Cancelar
-        </Button>
-        <Button
-          color="error"
-          variant="contained"
-          onClick={props.onConfirm}
-          disabled={props.busy}
-          data-testid="payments-disconnect-confirm-action"
-        >
-          {props.busy ? <CircularProgress size={18} /> : 'Desconectar'}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
 
+
+/**
+ * The connect card's action bar.
+ *
+ * Removing the connection is stated QUIETLY beside the step's own button rather
+ * than as a second filled control: an owner reaches it deliberately or not at
+ * all, and a red button of equal weight on every visit is an invitation to
+ * misclick the one action here that cannot be undone from this screen.
+ */
 function ConnectionActions(props: {
   displayName: string;
   connected: boolean;
@@ -244,16 +251,32 @@ function ConnectionActions(props: {
 }) {
   const { displayName, connected, busy, onConnect, onDisconnect } = props;
   return (
-    <Stack direction="row" spacing={1}>
-      <Button variant="contained" disabled={busy !== null} onClick={onConnect}>
-        {connectLabel(displayName, connected, busy)}
-      </Button>
+    <Box sx={BAR_SX} data-testid="payments-connection-bar">
+      <Typography sx={BAR_MSG_SX}>
+        {connected
+          ? `Conta ${displayName} conectada. Revogue quando quiser, aqui ou no painel do provedor.`
+          : 'Você sai para o provedor e volta para cá — leva menos de um minuto.'}
+      </Typography>
       {connected ? (
-        <Button variant="outlined" color="error" disabled={busy !== null} onClick={onDisconnect}>
-          {busy === 'disconnect' ? <CircularProgress size={18} /> : 'Desconectar'}
+        <Button
+          disabled={busy !== null}
+          onClick={onDisconnect}
+          sx={BTN_QUIET_DANGER_SX}
+          data-testid="payments-disconnect"
+        >
+          {busy === 'disconnect' ? <CircularProgress size={18} /> : 'Remover conexão'}
         </Button>
       ) : null}
-    </Stack>
+      <Button
+        variant="contained"
+        disableElevation
+        disabled={busy !== null}
+        onClick={onConnect}
+        sx={BTN_PRIMARY_SX}
+      >
+        {connectLabel(displayName, connected, busy)}
+      </Button>
+    </Box>
   );
 }
 
@@ -278,17 +301,37 @@ function useConnectionAction(onChanged: () => void) {
   return { busy, error, run };
 }
 
+/**
+ * The connection as this card reads it, with every default applied once.
+ *
+ * `environment` follows whatever the provider is already configured for and
+ * falls back to SANDBOX, so a live grant is never the accident — changing it is
+ * an ADVANCED action that lives with the manual credentials, not on the
+ * one-button connect card.
+ */
+function readConnection(config: MaskedProviderConfig | null) {
+  return {
+    environment: (config?.environment ?? 'SANDBOX') as PaymentEnvironment,
+    status: config?.status ?? 'UNVERIFIED',
+    connected: isConnected(config),
+    expiresAt: config?.expiresAt ?? null,
+    account: config?.connectedAccount ?? null,
+    receiving: config?.enabled === true,
+  };
+}
+
 export function ProviderConnection(props: ProviderConnectionProps) {
   const { descriptor, config, client, prepareConnect, onChanged } = props;
   const { busy, error, run } = useConnectionAction(onChanged);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
-  // Which account the owner is connecting. Follows whatever this provider is
-  // already configured for, defaulting to SANDBOX so a live grant is never the
-  // accident. Changing it is an ADVANCED action and lives with the manual
-  // credentials, not on the one-button connect card.
-  const environment: PaymentEnvironment = config?.environment ?? 'SANDBOX';
-  const status = config?.status ?? 'UNVERIFIED';
-  const connected = isConnected(config);
+  const { environment, status, connected, expiresAt, account, receiving } = readConnection(config);
+
+  /** Run a dialog action and shut the dialog once it has actually landed. */
+  const close = (kind: string, action: () => Promise<unknown>) =>
+    void run(kind, async () => {
+      await action();
+      setConfirmingDisconnect(false);
+    });
 
   const connect = () =>
     void run('connect', async () => {
@@ -307,12 +350,12 @@ export function ProviderConnection(props: ProviderConnectionProps) {
         displayName={descriptor.displayName}
         status={status}
         connected={connected}
-        expiresAt={config?.expiresAt ?? null}
+        expiresAt={expiresAt}
         environment={environment}
-        connectedAccount={config?.connectedAccount ?? null}
+        connectedAccount={account}
       />
 
-      {error ? <Alert severity="error">{error}</Alert> : null}
+      {error ? <ConnectError message={error} displayName={descriptor.displayName} /> : null}
 
       <ConnectionActions
         displayName={descriptor.displayName}
@@ -326,13 +369,12 @@ export function ProviderConnection(props: ProviderConnectionProps) {
         open={confirmingDisconnect}
         displayName={descriptor.displayName}
         busy={busy === 'disconnect'}
+        // Live on this provider: removing it stops checkout, and pausing is a
+        // real alternative rather than a lesser version of the same thing.
+        receiving={receiving}
+        onPauseInstead={() => close('pause', () => client.setEnabled(descriptor.name, false))}
         onCancel={() => setConfirmingDisconnect(false)}
-        onConfirm={() =>
-          void run('disconnect', async () => {
-            await client.disconnectOAuth(descriptor.name);
-            setConfirmingDisconnect(false);
-          })
-        }
+        onConfirm={() => close('disconnect', () => client.disconnectOAuth(descriptor.name))}
       />
     </Stack>
   );

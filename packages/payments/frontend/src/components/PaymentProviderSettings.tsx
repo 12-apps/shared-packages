@@ -3,7 +3,7 @@
 import { Alert, Box, Button, CircularProgress } from '@mui/material';
 import { useCallback, type ReactNode } from 'react';
 
-import type { MaskedProviderConfig } from '@12-apps/payments-backend';
+import type { MaskedProviderConfig, ProviderSetupGuide } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
 import { canAttemptCharge } from './connection-state';
@@ -195,6 +195,23 @@ function verificationFor(io: VerificationInputs): ReactNode {
   });
 }
 
+/**
+ * The walkthrough for the connection path the panel currently has open.
+ *
+ * A provider that accepts both a grant and pasted keys ships one guide with a
+ * `credentialsPath` variant; everything else ships one guide, and both paths
+ * get it. Only the SECTIONS are swapped — the variant mirrors the base's stage
+ * count and confirmable index, which is what lets `blocked`/`hidden` above stay
+ * computed from the base guide alone.
+ */
+function guideForPath(
+  guide: ProviderSetupGuide | null,
+  path: 'oauth' | 'credentials',
+): ProviderSetupGuide | null {
+  if (!guide || path === 'oauth') return guide;
+  return guide.credentialsPath ? { ...guide.credentialsPath } : guide;
+}
+
 interface ProviderScreenProps extends ActivePanelProps {
   onBack: () => void;
 }
@@ -279,9 +296,12 @@ export function PaymentProviderSettings({
         onVerified: () => void reload(),
         onSetupIncomplete: ack.withdraw,
       })}
-      guide={(slots) => (
+      guide={({ path, ...slots }) => (
         <SetupGuideSection
-          guide={guide}
+          // Which walkthrough, per the path the panel has open. Only the
+          // SECTIONS differ; `blocked`/`hidden` above stay computed from the
+          // base guide, which `credentialsPath` is required to mirror.
+          guide={guideForPath(guide, path)}
           confirmed={ack.confirmed}
           onConfirm={ack.confirm}
           onReopen={ack.withdraw}
