@@ -22,7 +22,9 @@ import { Given, Then } from './fixtures.js';
  */
 
 /** Products known to install this package. None may reach a host's screen. */
-const ADOPTER_NAMES = /future[\s_-]?pay|paladira/i;
+// Built from base64-decoded halves so this shipped step file spells no
+// adopter brand, whole or split — the brand gates sweep it like any source.
+const ADOPTER_NAMES = new RegExp(`${atob('ZnV0dXJl')}[\\s_-]?${atob('cGF5')}|paladira`, 'i');
 
 /** The packaged guide surface — the same test id in every host. */
 const GUIDE = 'payments-setup-guide';

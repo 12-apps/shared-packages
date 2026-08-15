@@ -11,6 +11,7 @@ import {
 } from '@12-apps/audit/server';
 
 import {
+  DEFAULT_ACTOR_STORE_KEY,
   getActorAttribution,
   getActorUserId,
   runWithActor,
@@ -53,9 +54,11 @@ import {
 // The declaration a host makes, at module scope so it runs before any case
 // stamps an actor — moving the key after the store exists is refused, which is
 // the guard that keeps this from being a way to fork the store rather than share
-// it. `'__12appsPrismaActorStore'` is THIS package's key; the audit package no
-// longer knows it.
-declareActorContextKey('__12appsPrismaActorStore');
+// it. The key is THIS package's, imported as the constant it now exports so the
+// contract cannot drift into a retyped literal; the audit package does not know
+// it. (`tests/actor-store-key.test.ts` proves what happens when a host SKIPS
+// this line — that is the failure this declaration exists to prevent.)
+declareActorContextKey(DEFAULT_ACTOR_STORE_KEY);
 const REAL = 'support-agent';
 const TARGET = 'shop-owner';
 

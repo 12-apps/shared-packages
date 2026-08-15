@@ -147,7 +147,7 @@ describe('provider skeletons (stub mode)', () => {
     for (const adapter of branded) {
       const text = JSON.stringify(adapter.setupGuide?.(ctx));
       expect(text).toContain(HOST_BRAND);
-      expect(text).not.toMatch(/future[\s_-]?pay|paladira/i);
+      expect(text).not.toMatch(new RegExp(`${atob('ZnV0dXJl')}[\\s_-]?${atob('cGF5')}|paladira`, 'i'));
     }
   });
 

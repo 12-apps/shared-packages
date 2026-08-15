@@ -11,10 +11,12 @@
 // no allowlist, exit 1 on the first mention.
 //
 // NO ALLOWLIST is the load-bearing property. The per-package ban lists need
-// the brand words to hunt them, so they build their patterns from SPLIT parts
-// (`'future' + 'pay'` — see e.g. `packages/audit/src/__tests__/
-// foreign-vocabulary.ts`), and this file does the same. An allowlist would
-// have to be burned down forever; split literals need nothing.
+// the brand words to hunt them, so they DECODE their patterns from base64 at
+// runtime (see e.g. `packages/audit/src/__tests__/foreign-vocabulary.ts`),
+// and this file does the same. A split spelling — the halves as adjacent
+// quoted literals, or a regex source — is still a discoverable mention, so
+// this gate bans those idioms too; an allowlist would have to be burned down
+// forever, while an opaque encoding needs nothing.
 //
 // Scope is the BRAND only, shaped so ordinary English survives: the plural
 // phrase "<A> <B>ments" and "in the future, pay attention" are not offences.
@@ -23,9 +25,13 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-// The name, split so this gate is not its own first hit.
-const A = "future";
-const B = "pay";
+import { Buffer } from "node:buffer";
+
+// The name, base64-decoded at runtime so this gate is not its own first hit —
+// under its own split-spelling ban, not just the plain ones.
+const decode = (encoded) => Buffer.from(encoded, "base64").toString();
+const A = decode("ZnV0dXJl");
+const B = decode("cGF5");
 
 /** Every spelling the repo has actually shipped, each with its own reason. */
 const BANS = [
@@ -42,6 +48,20 @@ const BANS = [
     label: `${A} ${B} (spaced)`,
     pattern: new RegExp(`\\b${A} ${B}\\b`, "i"),
   },
+  {
+    // A SPLIT spelling: the halves as adjacent quoted literals — an array pair
+    // or a concatenation — which is the idiom this repo once used to keep gate
+    // files grep-clean, and which is itself a discoverable mention. The only
+    // acceptable representation is an opaque one (base64, decoded at runtime).
+    label: `${A}','${B} (split literals)`,
+    pattern: new RegExp(`${A}['"\`]\\s*[,+]\\s*['"\`]${B}(?=['"\`.])`, "i"),
+  },
+  {
+    // A regex-source spelling: the halves separated by a character class, as
+    // in a hand-written ban pattern. Build such patterns from decoded parts.
+    label: `${A}[…]${B} (regex source)`,
+    pattern: new RegExp(`${A}\\[[^\\]]{0,12}\\]\\??${B}`, "i"),
+  },
 ];
 
 /**
@@ -55,6 +75,9 @@ function selftest() {
     `__${A}${B[0].toUpperCase()}${B.slice(1)}Store`,
     `${A}${B}.checkout.hostedOrder`,
     `o ${A[0].toUpperCase()}${A.slice(1)} ${B[0].toUpperCase()}${B.slice(1)} confirma`,
+    `['${A}', '${B}'].join('')`,
+    `"${A}" + "${B}"`,
+    `${A}[\\s_-]?${B}|paladira`,
   ];
   const mustPass = [
     `${A} ${B}ments are retried nightly`,
