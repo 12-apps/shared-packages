@@ -122,7 +122,7 @@ test.describe('the inbox panel', () => {
   test('deleting a row removes it for good', async ({ page }) => {
     await openPanel(page);
     await rowFor(page, 'Pedido A-1026 pago.')
-      .getByRole('button', { name: 'Excluir notificação: Pagamento confirmado' })
+      .getByRole('button', { name: 'Excluir aviso: Pagamento confirmado' })
       .click();
 
     await expect(page.getByText('Pedido A-1026 pago.')).toBeHidden();
