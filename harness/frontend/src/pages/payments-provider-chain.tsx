@@ -11,7 +11,7 @@
  * disabled provider nor omit an enabled one — the two refusals
  * `assertReorderOnly` exists for are unreachable from the UI. `refusal-ui`
  * therefore proves the component's rollback via a host `requireAuth` refusal
- * (the realistic cause: future-pay's quota gate is exactly this shape), and
+ * (the realistic cause: the origin host's quota gate is exactly this shape), and
  * `refusal-wire` issues the two 409s raw at the mount. Trying to make the UI
  * produce them burns the day; the split is not an oversight.
  */

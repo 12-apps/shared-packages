@@ -13,7 +13,7 @@ import { impersonation } from '../impersonation/surface';
 import { HarnessNav } from './harness-nav';
 
 /**
- * The harness chrome — the shape future-pay's admin shell has
+ * The harness chrome — the shape the origin host's admin shell has
  * (`apps/admin/src/shell/admin-shell.tsx`): a fixed-viewport flex row where a
  * `Sidebar` and the content each own an independent scroll region, the sidebar
  * panel tinted a few percent of primary so it reads as chrome rather than as

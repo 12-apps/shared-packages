@@ -21,7 +21,7 @@
  * The host package that owns the schema folder MUST also declare this package as a
  * dependency, so the source of the copy is present in every build context.
  *
- * Default host path follows the future-pay layout
+ * Default host path follows the origin host layout
  * (`packages/prisma/prisma/schema/`); another repo passes its own schema folder as
  * the positional argument, or sets REALTIME_HOST_SCHEMA_DIR.
  */

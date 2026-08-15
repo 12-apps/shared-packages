@@ -96,7 +96,7 @@ describe('validateGrant — owner-protection', () => {
 
   it('rejects an INLINE custom role carrying an owner-marker permission', () => {
     // The owner-marker guard vets custom/inline roles (a named catalog template
-    // that legitimately holds a marker is exempt — see the Future Pay catalog block).
+    // that legitimately holds a marker is exempt — see the origin host catalog block).
     const r = validateGrant({
       granterPermissions: ['danger'],
       roleBeingGranted: { name: 'DANGER', permissions: ['danger'] },

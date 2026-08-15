@@ -4,7 +4,7 @@ import { hasUsableCredentials } from '../config/usable-credentials';
 import type { PaymentProviderAdapter } from '../core/provider';
 
 /**
- * "Stored" is not "usable" (FUT-761, ported from the future-pay host). Two
+ * "Stored" is not "usable" (FUT-761, ported from the origin host). Two
  * real ways non-empty lies: a host-stamped extra field survives a CLEARED
  * token, and a set holding the token but missing a required sibling raises
  * charges nothing can confirm. The answer must come from the adapter's own

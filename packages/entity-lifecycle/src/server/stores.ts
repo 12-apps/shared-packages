@@ -1,6 +1,6 @@
 /**
  * The {@link LifecycleStores} bundle over the four tables this package owns
- * (12-17) — the port of future-pay's `lib/lifecycle/stores.ts` +
+ * (12-17) — the port of the origin host's `lib/lifecycle/stores.ts` +
  * `store-versions.ts`, generalized onto the structural {@link LifecycleDb}
  * seam so a host passes its Prisma client and a harness passes SQL.
  *

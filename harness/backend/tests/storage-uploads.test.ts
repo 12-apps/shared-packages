@@ -1,5 +1,5 @@
 /* eslint-disable test-flakiness/no-database-operations, test-flakiness/no-unmocked-fs, test-flakiness/no-test-isolation --
-   the database and the FILESYSTEM are the subject: these are future-pay's storage
+   the database and the FILESYSTEM are the subject: these are the origin host's storage
    integration suites, ported to run against the PUBLISHED tarball, with the
    reclaim's reference probes reading a real Postgres (PGlite) and the local-disk
    driver writing real files. A mocked fs would test a driver nobody ships, and the
@@ -15,7 +15,7 @@ import { createHarnessBackend, type HarnessBackend } from '../src/app';
 import { STORAGE_TENANT, STORAGE_TENANT_B } from '../src/storage-host';
 
 /**
- * `@12-apps/storage` end to end (12-20): the port of future-pay's
+ * `@12-apps/storage` end to end (12-20): the port of the origin host's
  * `app/api/uploads/image/__tests__/route.integration.test.ts`,
  * `app/api/uploads/local/__tests__/route.integration.test.ts` and
  * `lib/storage/__tests__/store-image-set.integration.test.ts` — now driven through

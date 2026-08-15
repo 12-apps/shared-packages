@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 /**
  * `@12-apps/realtime/parity` — the publisher-parity gate (12-16), moved out of
- * future-pay's `apps/web/scripts/realtime/publisher-gate.ts` so a host's own script is a
+ * the origin host's `apps/web/scripts/realtime/publisher-gate.ts` so a host's own script is a
  * one-line re-export and the CI job that shells out to a package script keeps working
  * unchanged. Packaged the same way `@12-apps/rbac/coverage` is: a library plus a CLI
  * wrapper — except that the host's lists are INPUTS here rather than defaults, for the
@@ -37,7 +37,7 @@ import { resolve } from "node:path";
  *
  * A completeness gate whose own completeness is assumed is not one, which is what this
  * module got wrong on its first pass: it took an ARRAY of declarations, defaulted it to a
- * copy of future-pay's, and rested on "a host declares its publishers as
+ * copy of the origin host's, and rested on "a host declares its publishers as
  * `Record<Domain, PublisherDeclaration>`, so the COMPILER already forces every domain to
  * appear". That property does not survive the array boundary and it did not survive the
  * package boundary either — add a domain to the host's registry and the gate stayed green
@@ -99,67 +99,6 @@ function stripComments(source: string): string {
 /** Where the ratchet lives, relative to the repo root. */
 export const DEFAULT_SILENT_BASELINE = ".realtime-silent-domains.json";
 
-/**
- * future-pay's own declarations — an EXAMPLE, and deliberately not a default.
- *
- * It was a fallback for `declarations` in this gate's first version, for the same reason
- * `@12-apps/rbac/coverage` used to default its accepted guard names to future-pay's:
- * zero-configuration adoption for a host with that layout. That is exactly what made the
- * gate fail OPEN — a host that adds a domain to its registry and forgets the map got a
- * green run out of a seven-entry copy of somebody else's domains. A completeness gate
- * cannot supply its own subject, and rbac's gate has since reached the same conclusion:
- * `rbacGuards` / `entitlementGuards` are required options there now.
- *
- * So it is exported to be READ (a shape to copy, and the harness's fixture material) and
- * nothing consumes it implicitly. The module paths are repo-relative and resolved against
- * the caller's `root`.
- */
-export const FUTURE_PAY_PUBLISHER_DECLARATIONS: readonly PublisherEntry[] = [
-  {
-    scheme: "tenant",
-    domain: "kitchen",
-    // Work moves here; the shift lifecycle half lives in shift-hints.ts, which reuses
-    // this module's fan-out rather than addressing topics itself.
-    declaration: { kind: "publishes", module: "apps/web/lib/realtime/kitchen-hints.ts" },
-  },
-  {
-    scheme: "tenant",
-    domain: "tables",
-    // The floor's lifecycle: comanda close/reopen, and the waiter-call moves the tables
-    // screen renders beside them.
-    declaration: { kind: "publishes", module: "apps/web/lib/realtime/tables-hints.ts" },
-  },
-  {
-    scheme: "tenant",
-    domain: "orders",
-    // Everything the orders list draws: an order appearing, its payment settling or
-    // parking, its fulfillment moving, a cancel, an expiry.
-    declaration: { kind: "publishes", module: "apps/web/lib/realtime/order-hints.ts" },
-  },
-  {
-    scheme: "tenant",
-    domain: "comanda",
-    // The buyer's own channel: the order, the kitchen ticket's progress, the bill's
-    // lifecycle.
-    declaration: { kind: "publishes", module: "apps/web/lib/realtime/comanda-hints.ts" },
-  },
-  {
-    scheme: "tenant",
-    domain: "research-run",
-    declaration: { kind: "publishes", module: "apps/web/lib/research/realtime.ts" },
-  },
-  {
-    scheme: "user",
-    domain: "consent",
-    declaration: { kind: "publishes", module: "apps/web/lib/realtime/user-hints.ts" },
-  },
-  {
-    scheme: "user",
-    domain: "notifications",
-    declaration: { kind: "publishes", module: "apps/web/lib/realtime/user-hints.ts" },
-  },
-];
-
 /** Every domain a host's subscribe surfaces will authorize, per topic scheme. */
 export interface PublisherParityDomains {
   readonly tenant: readonly string[];
@@ -172,9 +111,9 @@ export interface PublisherParityOptions {
   /**
    * The host's declarations, one per subscribable domain.
    *
-   * REQUIRED, with no shipped fallback: a default meant this gate could run against
-   * somebody else's domain list and report green — see
-   * {@link FUTURE_PAY_PUBLISHER_DECLARATIONS}. Build it from the host's own
+   * REQUIRED, with no shipped fallback: the first version shipped one adopter's
+   * declarations as the default, which meant this gate could run against somebody else's
+   * domain list and report green. Build it from the host's own
    * `Record<Domain, PublisherDeclaration>` so the compiler keeps forcing every domain to
    * appear THERE too; `domains` below is what makes the gate assert it rather than assume
    * it.
@@ -303,7 +242,7 @@ export function runPublisherParity(options: PublisherParityOptions): PublisherPa
   // Both are REQUIRED in the type. Coalesced anyway, and coalesced to EMPTY, for a host
   // whose gate script is plain JavaScript: nothing to check then trips the vacuous-pass
   // guard below, which is a red run with an actionable message. The default this replaced
-  // was a seven-entry copy of future-pay's domains, and that failed OPEN — which is the
+  // was a seven-entry copy of one adopter's domains, and that failed OPEN — which is the
   // difference that matters, not whether there is a default at all.
   const declarations = options.declarations ?? [];
   const domains = options.domains ?? { tenant: [], user: [] };

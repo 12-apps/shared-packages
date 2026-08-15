@@ -13,7 +13,7 @@ import type { ToolManifest } from "../types";
 
 /**
  * `@12-apps/mcp/generate` — the `mcp:generate` / `mcp:check` gate (12-23), moved
- * out of future-pay's `apps/web/scripts/mcp/generate.ts` so a host's own script is
+ * out of the origin host's `apps/web/scripts/mcp/generate.ts` so a host's own script is
  * a one-line call and `12-apps/ci`'s `mcp-contract.yml`, which shells out to the
  * consumer's `mcp:check` package script, keeps working unchanged.
  *

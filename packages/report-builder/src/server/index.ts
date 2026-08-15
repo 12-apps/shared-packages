@@ -39,7 +39,7 @@ export { toSummary, type SavedReportSummary } from './summary';
  * What it does NOT ship, and used to: a field catalog, a set of built-in
  * reports, a starter per entity, a picker of block templates, an
  * entity→permission map and a tenant-scoped Prisma DataSource — all of them
- * future-pay's, in pt-BR, over `orders` / `stock_movements` /
+ * the origin host's, in pt-BR, over `orders` / `stock_movements` /
  * `kitchen_ticket_items`, and half of them wired in as DEFAULTS so a host that
  * declared none inherited all of them. Those are the host's, and arrive as
  * config. See ADOPTING.md for the migration.

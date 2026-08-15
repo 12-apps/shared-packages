@@ -14,7 +14,7 @@ import type { OnboardingPrisma } from "../repository";
  * key is `(userId, clientId, featureKey)`, so the actor IS the isolation.
  */
 export interface OnboardingActor {
-  /** The host's DB user id (future-pay resolves it by email — the OAuth `sub` is not it). */
+  /** The host's DB user id (the origin host resolves it by email — the OAuth `sub` is not it). */
   userId: string;
   /** The tenant row id this progress is scoped to. */
   clientId: string;
@@ -64,7 +64,7 @@ export interface OnboardingMessages {
 }
 
 const DEFAULT_MESSAGES: OnboardingMessages = {
-  // pt-BR, verbatim from future-pay's route (product copy never gets
+  // pt-BR, verbatim from the origin host's route (product copy never gets
   // "translated" while tidying code).
   resetUnavailable: "Reset de onboarding indisponível em produção.",
   invalidOperation: "Operação de onboarding inválida.",
@@ -86,12 +86,12 @@ export interface OnboardingServerConfig {
    * The guided features this host serves, e.g. `['ai_integration',
    * 'payments']`. Any other `featureKey` is a 404 — a typo'd key would
    * otherwise mint its own row and look like progress nobody can see. Omit to
-   * accept ANY key (future-pay's original behaviour).
+   * accept ANY key (the origin host's original behaviour).
    */
   featureKeys?: readonly string[];
   /**
    * Whether the DEV-only `reset` operation is allowed. Default:
-   * `process.env.NODE_ENV !== 'production'` — the same refusal future-pay's
+   * `process.env.NODE_ENV !== 'production'` — the same refusal the origin host's
    * route makes, kept as config so a host decides what "development" means.
    */
   resetEnabled?: () => boolean;

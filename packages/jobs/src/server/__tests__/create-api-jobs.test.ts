@@ -140,7 +140,7 @@ describe("createApiJobs — driver resolution", () => {
     );
   });
 
-  it("refuses JOBS_DRIVER=inline in production with future-pay's exact words", async () => {
+  it("refuses JOBS_DRIVER=inline in production with the origin host's exact words", async () => {
     stubBareEnv();
     vi.stubEnv("JOBS_DRIVER", "inline");
     const { logger, error } = makeLogger();
@@ -150,7 +150,7 @@ describe("createApiJobs — driver resolution", () => {
 
     const { status } = await healthOf(api);
     expect(status).toBe(503);
-    // Byte-identical to future-pay's runtime.ts — a host greps for this line.
+    // Byte-identical to the origin host's runtime.ts — a host greps for this line.
     expect(loggedText(error)).toContain(
       "JOBS_DRIVER=inline is refused in production; jobs are disabled.",
     );
@@ -226,7 +226,7 @@ describe("createApiJobs — driver resolution", () => {
     );
   });
 
-  it("needs a Redis URL for JOBS_DRIVER=bullmq, with future-pay's exact words", async () => {
+  it("needs a Redis URL for JOBS_DRIVER=bullmq, with the origin host's exact words", async () => {
     stubBareEnv();
     vi.stubEnv("JOBS_DRIVER", "bullmq");
     const { logger, error } = makeLogger();
@@ -236,7 +236,7 @@ describe("createApiJobs — driver resolution", () => {
 
     const { status } = await healthOf(api);
     expect(status).toBe(503);
-    // Byte-identical to future-pay's runtime.ts — a host greps for this line.
+    // Byte-identical to the origin host's runtime.ts — a host greps for this line.
     expect(loggedText(error)).toContain(
       "JOBS_DRIVER=bullmq needs REDIS_URL; jobs are disabled.",
     );
@@ -279,7 +279,7 @@ describe("createApiJobs — driver resolution", () => {
   });
 
   it("reads REDIS_URL at start(), not at factory time", async () => {
-    // Reviewer probe E: future-pay's bootstrapJobs read the WHOLE matrix at
+    // Reviewer probe E: the origin host's bootstrapJobs read the WHOLE matrix at
     // the moment it ran. The recommended host shape is factory-at-module-scope
     // + start() at process start, so an env var set between the two (a config
     // module loading after the module that built the api) must be honoured —
@@ -471,7 +471,7 @@ describe("createApiJobs — worker mode and lifecycle", () => {
     expect(status).toBe(503);
     expect(body.status).toBe("degraded");
     expect(body.checks.configured).toBe(false);
-    // And the latch holds: a retry is a no-op, exactly like future-pay's
+    // And the latch holds: a retry is a no-op, exactly like the origin host's
     // `bootstrapped` flag — never a silent second bootstrap.
     await expect(api.start()).resolves.toBeUndefined();
   });
@@ -843,7 +843,7 @@ describe("createApiJobs — health payload", () => {
   it("keeps off-by-misconfiguration degraded — only a CHOICE reads as disabled", async () => {
     // Production with nothing configured RESOLVES to off, but nobody chose
     // it; that is the broken state the 503 exists for. (The explicit-off
-    // production case still logs future-pay's error line either way.)
+    // production case still logs the origin host's error line either way.)
     stubBareEnv();
     vi.stubEnv("JOBS_DRIVER", "rabbitmq");
     const { logger } = makeLogger();

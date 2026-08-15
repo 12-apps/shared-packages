@@ -95,7 +95,7 @@ export function mcpOauthHost(pg: PGlite) {
     resolveSession: (request) => {
       const email = request.headers.get(SESSION_HEADER);
       if (!email || email === 'anonymous') return null;
-      // A real host passes the OAuth `sub` it verified (future-pay: the Google
+      // A real host passes the OAuth `sub` it verified (the origin host: the Google
       // one), which is deliberately NOT the DB id — the AS binds to email.
       return { subject: `google-sub-${email}`, email };
     },

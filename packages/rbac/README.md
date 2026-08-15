@@ -2,7 +2,7 @@
 
 Generic, portable, **engine-agnostic** authorization. A framework-free core plus
 optional React and framework-neutral server adapters. **Zero app coupling**: the
-core knows nothing about Future Pay — permissions, roles, scopes and actors are
+core knows nothing about the origin host — permissions, roles, scopes and actors are
 all host-supplied data.
 
 > **Adopting this in another project?** This README is the API reference. See

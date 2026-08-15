@@ -63,8 +63,8 @@ export { normalizeSearchText } from './search-normalize';
 // a second PGlite instance against the same dataDir — PGlite holds a single
 // exclusive connection, and a duplicate would deadlock or corrupt the store.
 const globalStore = globalThis as unknown as {
-  __futurePayPrisma?: PrismaClient;
-  __futurePayPrismaInit?: Promise<PrismaClient>;
+  __12appsPrisma?: PrismaClient;
+  __12appsPrismaInit?: Promise<PrismaClient>;
 };
 
 /**
@@ -196,20 +196,20 @@ const createPostgresClient = async (): Promise<PrismaClient> => {
  * module-load failure.
  */
 export const getPrismaClient = async (): Promise<PrismaClient> => {
-  if (globalStore.__futurePayPrisma) return globalStore.__futurePayPrisma;
-  if (globalStore.__futurePayPrismaInit) return globalStore.__futurePayPrismaInit;
+  if (globalStore.__12appsPrisma) return globalStore.__12appsPrisma;
+  if (globalStore.__12appsPrismaInit) return globalStore.__12appsPrismaInit;
 
   const pglite = resolvePglite();
   const init = (
     pglite ? createPgliteClient(pglite.dataDir) : createPostgresClient()
   )
     .then((client) => {
-      globalStore.__futurePayPrisma = client;
-      globalStore.__futurePayPrismaInit = undefined;
+      globalStore.__12appsPrisma = client;
+      globalStore.__12appsPrismaInit = undefined;
       return client;
     })
     .catch((error: unknown) => {
-      globalStore.__futurePayPrismaInit = undefined;
+      globalStore.__12appsPrismaInit = undefined;
       throw new Error(
         `Prisma client not available (${pglite ? 'PGlite' : 'PostgreSQL'} mode). ` +
           'Run "pnpm --filter @12-apps/prisma prisma generate" from the ' +
@@ -219,7 +219,7 @@ export const getPrismaClient = async (): Promise<PrismaClient> => {
       );
     });
 
-  globalStore.__futurePayPrismaInit = init;
+  globalStore.__12appsPrismaInit = init;
   return init;
 };
 
@@ -227,14 +227,14 @@ export const getPrismaClient = async (): Promise<PrismaClient> => {
  * Set a custom Prisma client instance (for testing).
  */
 export const setPrismaClient = (client: PrismaClient): void => {
-  globalStore.__futurePayPrisma = client;
-  globalStore.__futurePayPrismaInit = undefined;
+  globalStore.__12appsPrisma = client;
+  globalStore.__12appsPrismaInit = undefined;
 };
 
 /**
  * Reset the Prisma client instance (for testing).
  */
 export const resetPrismaClient = (): void => {
-  globalStore.__futurePayPrisma = undefined;
-  globalStore.__futurePayPrismaInit = undefined;
+  globalStore.__12appsPrisma = undefined;
+  globalStore.__12appsPrismaInit = undefined;
 };

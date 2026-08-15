@@ -1,7 +1,7 @@
 /**
  * The OAuth 2.1 authorization-server foundation: the shared scope source, the
  * issuer/audience derivation, and the trusted-origin resolver every URL in the
- * surface is built from (12-23, ported from future-pay's
+ * surface is built from (12-23, ported from the origin host's
  * `lib/mcp/oauth/config.ts`).
  *
  * Keeping the scopes and the origin resolution in ONE place is what stops the
@@ -11,7 +11,7 @@
  *
  * What was env-reading in the host is CONFIG here (the package must not learn a
  * host's variable names); `trustedOriginsFromEnv` is the one-line helper that
- * keeps future-pay's wiring identical.
+ * keeps the origin host's wiring identical.
  */
 
 /** Scopes advertised by both discovery documents. `mcp:write` gates mutating tools. */
@@ -66,7 +66,7 @@ function normalizeOrigins(origins: readonly string[]): string[] {
 }
 
 /**
- * Read a comma-separated allowlist out of an environment variable — future-pay
+ * Read a comma-separated allowlist out of an environment variable — the origin host
  * passes `trustedOriginsFromEnv('MCP_OAUTH_TRUSTED_ORIGINS')`, so the behaviour
  * is identical while the variable's NAME stays the host's.
  */

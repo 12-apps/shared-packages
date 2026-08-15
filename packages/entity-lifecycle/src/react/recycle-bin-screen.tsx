@@ -17,7 +17,7 @@ import type { LifecycleResult } from './transport';
 
 /**
  * Lixeira (12-17) — the soft-delete recycle bin of the entity-lifecycle
- * machinery, ported from future-pay's `pages/recycle-bin` with its test ids
+ * machinery, ported from the origin host's `pages/recycle-bin` with its test ids
  * and pt-BR copy intact: every binned entry (all registered collections) as
  * simple cards, each restorable ("Restaurar") or permanently purgeable
  * ("Excluir definitivamente", behind the FUT-546 type-to-confirm popup — the

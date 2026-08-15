@@ -18,7 +18,7 @@ import {
 
 /**
  * `@12-apps/rbac/coverage` — the RBAC coverage gate (12-13), moved from
- * future-pay's `apps/web/scripts/rbac/coverage.ts` so a host's own script is
+ * the origin host's `apps/web/scripts/rbac/coverage.ts` so a host's own script is
  * a one-line re-export and the CI workflow that shells out to the consumer's
  * `rbac:coverage` package script keeps working unchanged.
  *
@@ -68,7 +68,7 @@ export interface RbacCoverageOptions {
   /**
    * The identifiers this HOST accepts as an RBAC gate — its own guard helpers,
    * by name. Required, and it used to default to a hard-coded list of
-   * future-pay's seventeen: a second host adopting the gate inherited another
+   * the origin host's seventeen: a second host adopting the gate inherited another
    * application's vocabulary, so every one of its own guards read as "not a
    * guard" and every route it protects read as unprotected. There is no
    * generic answer here — the gate greps the host's source for the host's

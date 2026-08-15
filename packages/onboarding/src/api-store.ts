@@ -4,7 +4,7 @@ import type { OnboardingStateSnapshot, OnboardingStore } from "./types";
  * The `OnboardingStore` bound to the package's OWN endpoints (12-23).
  *
  * `OnboardingProvider` takes a store, and until now every host wrote that store
- * itself — future-pay's `apps/admin/src/shared/onboarding-store.ts` is a
+ * itself — the origin host's `apps/admin/src/shared/onboarding-store.ts` is a
  * ~70-line file whose entire content is "which URL, which body, revive the
  * dates". Those are facts about the endpoints in `./server`, which is to say
  * facts about this package: shipping the two halves separately is how a
@@ -90,7 +90,7 @@ export async function fetchOnboardingState(
   config: OnboardingApiStoreConfig,
 ): Promise<OnboardingStateSnapshot | null> {
   const doFetch = config.fetchImpl ?? fetch;
-  // DIVERGENCE from future-pay, deliberate: a failed READ resolves to `null` — "no
+  // DIVERGENCE from the origin host, deliberate: a failed READ resolves to `null` — "no
   // progress recorded yet" — where the host's action returned the error to its
   // caller. A checklist that cannot be loaded should not block the screen it
   // decorates, and `null` is already the pre-progress state every consumer renders.

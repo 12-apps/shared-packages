@@ -10,7 +10,7 @@
  * It is not a stub that says yes. The one property the whole design turns on is that a
  * client cannot be served a topic the host did not resolve, and a permissive seam would
  * make every spec in `tests/realtime-endpoints.test.ts` vacuous. So this host implements
- * the shape future-pay has: a tenant resolved from the PATH, a caller resolved from the
+ * the shape the origin host has: a tenant resolved from the PATH, a caller resolved from the
  * request, per-domain read tiers, and a kitchen qualifier the caller must have reach for.
  */
 import type { PGlite } from '@electric-sql/pglite';

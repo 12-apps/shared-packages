@@ -15,7 +15,7 @@ import { createMemoryLifecycleDb } from './memory-db';
  * The generated surface, end to end over the in-memory db seam (12-17): the
  * per-entity endpoints exist because a REGISTRATION exists — none of them is
  * hand-written — and their wire (paths, envelopes, statuses, pt-BR copy) is
- * byte-compatible with the future-pay routes they replace.
+ * byte-compatible with the origin host routes they replace.
  */
 
 const TENANT = 't1';
@@ -216,7 +216,7 @@ describe('versions + restore', () => {
   });
 
   it('honours a mirrored publishedVersion of null as 0 (an archived entity)', async () => {
-    // future-pay reads `published_version` through a soft-delete-filtered
+    // the origin host reads `published_version` through a soft-delete-filtered
     // query, so an ARCHIVED entity answers 0 and the dialog offers Restaurar
     // on every row — including the newest. A host that mirrors the column is
     // the authority on it, `null` included; only a host that mirrors NOTHING
@@ -241,7 +241,7 @@ describe('versions + restore', () => {
     expect(data.publishedVersion).toBe(0);
   });
 
-  it('rejects a non-integer version id with the 400 future-pay answers', async () => {
+  it('rejects a non-integer version id with the 400 the origin host answers', async () => {
     const { api, rows } = buildApi();
     const handle = api.entity('product');
     const created = await handle.lifecycle.create(handle.context(approver), { name: 'v1' });
@@ -309,7 +309,7 @@ describe('drafts', () => {
     expect(rows.get(id)?.name).toBe('Rascunho');
 
     // A published draft is no longer OPEN, so discarding it is an invalid
-    // state transition: 422 + `operationFailed`, exactly as future-pay answers.
+    // state transition: 422 + `operationFailed`, exactly as the origin host answers.
     const discard = await call(
       routeOf(api.routes, 'DELETE', '/products/drafts/:draftId'),
       noApprovals,
@@ -402,7 +402,7 @@ describe('recycle bin', () => {
       undefined,
       { entityType: '' },
     );
-    // future-pay's `z.string().min(1).optional()` answers 400 rather than
+    // the origin host's `z.string().min(1).optional()` answers 400 rather than
     // listing every collection as if the filter were absent.
     expect(response.status).toBe(400);
     expect((response.body as { error: string }).error).toBe('Dados inválidos.');
@@ -561,7 +561,7 @@ describe('approvals', () => {
 });
 
 /**
- * The per-collection PLAN gate (M1 of the 12-17 review). future-pay answers
+ * The per-collection PLAN gate (M1 of the 12-17 review). The origin host answers
  * `requireEntitlement(tenant, '<collection>')` on every lifecycle call for
  * that collection — including the recycle-bin and approvals ITEM routes, which
  * carry no collection prefix and learn their collection only from the row.
@@ -621,7 +621,7 @@ describe('the registration authorize gate', () => {
     await products.lifecycle.softDelete(products.context(bothApprovals), product.entityId);
 
     // The bin LIST spans every collection and is not per-collection gated —
-    // parity with future-pay, whose list route gates only the admin tier.
+    // parity with the origin host, whose list route gates only the admin tier.
     const listed = await call(routeOf(api.routes, 'GET', '/recycle-bin'), bothApprovals);
     const entries = (
       listed.body as { data: { entries: { id: string; entityType: string }[] } }
@@ -693,7 +693,7 @@ describe('the registration authorize gate', () => {
   });
 
   it("passes the host's own status and copy through the wire unchanged", async () => {
-    // future-pay's entitlement denial is a 402 carrying its upsell copy; the
+    // the origin host's entitlement denial is a 402 carrying its upsell copy; the
     // package never rewrites it (and defaults to 403 + featureDisabled only
     // when the host says nothing).
     const { api } = buildGated({ status: 402, error: 'Seu plano não inclui fornecedores.' });
@@ -737,7 +737,7 @@ describe('the registration authorize gate', () => {
 });
 
 /**
- * The per-collection ROUTE permission (M2 of the 12-17 review): future-pay's
+ * The per-collection ROUTE permission (M2 of the 12-17 review): the origin host's
  * `roles` collection gates its whole lifecycle surface on `roles:manage`,
  * where the other nine need only the mount's admin tier. Without this the
  * generated endpoints would be strictly more permissive than their twins — a
@@ -780,8 +780,8 @@ describe('the registration routePermission', () => {
     expect((await call(routeOf(api.routes, 'GET', '/roles/drafts'), platform)).status).toBe(200);
   });
 
-  it('does NOT gate the shared bin (parity with future-pay)', async () => {
-    // future-pay's bin and approvals pages require the admin tier, never the
+  it('does NOT gate the shared bin (parity with the origin host)', async () => {
+    // the origin host's bin and approvals pages require the admin tier, never the
     // collection's route permission — the row's collection is unknown until
     // the row is read, and both twins gate only the plan there. So the actor
     // below restores a ROLE without holding `roles:manage`.

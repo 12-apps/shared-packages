@@ -11,7 +11,7 @@
  *
  * Json columns cross the seam as `unknown` on the way OUT (rows) and as the
  * library's own JSON types on the way IN (create/update data); the stores cast
- * at the boundary exactly as the future-pay originals did.
+ * at the boundary exactly as the origin host originals did.
  */
 
 import type { Snapshot } from '../types';

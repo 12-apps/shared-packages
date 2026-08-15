@@ -85,7 +85,7 @@ describe('@12-apps/realtime — every published subpath resolves', () => {
     const parity = await import('@12-apps/realtime/parity');
     expect(typeof parity.runPublisherParity).toBe('function');
     expect(typeof parity.publisherParityCli).toBe('function');
-    expect(parity.FUTURE_PAY_PUBLISHER_DECLARATIONS.length).toBeGreaterThan(0);
+    expect(typeof parity.DEFAULT_SILENT_BASELINE).toBe('string');
   });
 
   it('./package.json — the manifest, and it declares every subpath above', async () => {

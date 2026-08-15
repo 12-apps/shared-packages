@@ -21,7 +21,7 @@ import {
 import { TeamTable } from './team-table';
 
 /**
- * Equipe — the staff roster (12-13), ported from future-pay's
+ * Equipe — the staff roster (12-13), ported from the origin host's
  * `apps/admin/src/pages/team/*`: the members grid, the unified role-edit
  * dialog (in `team-role-dialog.tsx`), enable/disable and remove. Same test
  * ids (`team-grid`, `team-search-all`, `team-actions-<userId>`,
@@ -96,7 +96,7 @@ function useTeamPage(api: RbacApiClient, query: string): {
 }
 
 /**
- * The role-edit popup's state + save orchestration — future-pay's
+ * The role-edit popup's state + save orchestration — the origin host's
  * `use-role-editor.ts`, hookified against the packaged api client: the base
  * change and the custom-role diff map onto the EXISTING endpoints, so no new
  * server surface exists for the dialog.

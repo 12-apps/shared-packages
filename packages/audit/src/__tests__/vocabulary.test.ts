@@ -34,7 +34,7 @@ import {
  * | falls back to the raw id for something unlabelled | **ported** — still the read-side behaviour, and now beside its opposite: a BLANK label is refused at assembly |
  * | "labels EVERY action and resource it declares" | **promoted** to a runtime refusal (`requireLabel`), so no host can get it wrong rather than one host being asserted right |
  * | "declares an allowlist for every resource, and a non-empty one" | **promoted** to a runtime refusal (`freezeFields`), same reason |
- * | "carries every action future-pay could write" | **dropped** — host data. Those literals are the host's, asserted where the host declares them |
+ * | "carries every action the origin host could write" | **dropped** — host data. Those literals are the host's, asserted where the host declares them |
  * | "never lets a diff carry buyer contact data for any resource" | **dropped** — host data. It scanned one application's field names for `email\|cpf\|…`; the generic property it stood for (a field not declared is never written) is what every `redactDiff` case here asserts |
  *
  * No coverage of generic logic was dropped because its fixture was host-shaped;

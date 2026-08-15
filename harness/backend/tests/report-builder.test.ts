@@ -108,7 +108,7 @@ describe('the block templates the picker offers', () => {
    * The templates are the HOST's now, so what is under test is the composition
    * rather than a shipped list. This used to call `blockTemplateGroups()` with
    * no arguments and assert "more than four runnable templates" — the four
-   * being future-pay's, compiled against future-pay's catalog, both of which
+   * being the origin host's, compiled against the origin host's catalog, both of which
    * the package shipped. A consumer with its own catalog inherited a picker of
    * blocks it could not run.
    */

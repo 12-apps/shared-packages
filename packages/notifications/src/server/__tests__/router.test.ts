@@ -12,7 +12,7 @@ import { createMemoryDb, memoryContacts, type MemoryDb } from './memory-db';
  * The channel router: routing and fan-out, preference gating, the delivery
  * lifecycle, failure isolation and the retry sweep.
  *
- * This is future-pay's `tests/integration/notifications.test.ts` as a unit
+ * This is the origin host's `tests/integration/notifications.test.ts` as a unit
  * suite — the same claims, against the in-memory seam. The database half of
  * those claims is re-run over a real Postgres in
  * `harness/backend/tests/notifications-pipeline.test.ts`.

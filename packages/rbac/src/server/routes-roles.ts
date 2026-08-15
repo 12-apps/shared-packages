@@ -20,7 +20,7 @@ import {
 
 /**
  * The role CRUD + template-override + permissions routes (12-13) — the
- * package half of future-pay's `app/api/admin/[tenantSlug]/{roles,permissions}`
+ * package half of the origin host's `app/api/admin/[tenantSlug]/{roles,permissions}`
  * files. Route paths are relative to the host's admin mount (the segment that
  * used to be `/api/admin/:tenantSlug`).
  *

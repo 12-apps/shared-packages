@@ -72,7 +72,7 @@ actually asking, and they are the rules the ADR in `decisions/` relies on:
 - UI: `packages/report-builder/src/react/`
 - Design system: `packages/ui/src/components/`
 
-`future-pay`'s `apps/admin/src/pages/reports/index.tsx` is a thin wrapper — it resolves
+The origin host's `apps/admin/src/pages/reports/index.tsx` is a thin wrapper — it resolves
 the tenant and mounts `@12-apps/report-builder/react`. The reports surface is built here,
 not there.
 

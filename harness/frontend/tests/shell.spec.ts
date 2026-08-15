@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test';
  * shell has to survive one. It did not: a 280px rail out of a 390px viewport
  * left the page 110px, and out of a 660px one left it 380px — narrower than a
  * single chart. The rail is an overlay drawer below 900px now, the way
- * future-pay's admin shell has always done it.
+ * the origin host's admin shell has always done it.
  *
  * These are geometry and media-query claims, which is why they live here
  * rather than in a unit test: jsdom matches no media query it is not told to,

@@ -1,6 +1,6 @@
 /**
  * THE HOST'S OWN ROUTES on the admin mount — the two OAuth legs a real host
- * writes beside the library table (future-pay ships both shapes: an
+ * writes beside the library table (the origin host ships both shapes: an
  * `oauth/prepare` extension and a callback route), served through
  * `MountPaymentsOptions.extensions` so the same parse → auth → dispatch path
  * runs for them.
@@ -117,7 +117,7 @@ export function connectPrepareFor(
  * `POST {base}/activation/verify/:provider` — the host route behind the
  * activation step (FUT-463/FUT-689): run the package's card-phase verification
  * over this store's OWN ports, then settle enablement BOTH ways, exactly as
- * future-pay's route does. A refused verification answers 200 — it is the
+ * the origin host's route does. A refused verification answers 200 — it is the
  * ANSWER the screen exists to show, not a transport error.
  */
 export function activationVerifyFor(

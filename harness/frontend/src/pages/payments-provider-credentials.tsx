@@ -92,7 +92,7 @@ const CASES: readonly HarnessCase[] = [
     releaseVerify,
   ),
   credentialsCase('guided-setup', 'Guided walkthrough', { providers: [aurora()] }),
-  // The quota shape future-pay bills on `setEnabled`: the host refuses the
+  // The quota shape the origin host bills on `setEnabled`: the host refuses the
   // ENABLE (body `enabled: true`) and only that, so switching off still works.
   credentialsCase('quota', 'Enable refused (quota)', {
     providers: [boreal()],

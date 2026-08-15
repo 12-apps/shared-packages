@@ -17,7 +17,7 @@ import { LifecycleHttpError } from './transport';
 
 /**
  * Reusable, entity-agnostic version-history dialog (12-17), ported from
- * future-pay's `shared/lifecycle/VersionHistoryDialog` with its test ids and
+ * the origin host's `shared/lifecycle/VersionHistoryDialog` with its test ids and
  * pt-BR copy intact: lists `GET <apiBase>/{resourcePath}/versions` newest
  * first and lets the admin restore any non-current version (behind an
  * AlertDialog confirm). A 403 (feature off for the tenant) renders a friendly

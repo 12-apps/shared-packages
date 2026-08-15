@@ -30,7 +30,7 @@ import { messagesOf, type LifecycleActor } from '../server/context';
 
 /**
  * Resolve the caller. Returning `null` means unauthenticated, which answers
- * 401 before any handler runs. A PER-COLLECTION billing gate (future-pay's
+ * 401 before any handler runs. A PER-COLLECTION billing gate (the origin host's
  * plan entitlement) does NOT belong here — it belongs on the registration
  * (`authorize`), because the shared recycle-bin/approvals routes only learn
  * their collection from the row they read.

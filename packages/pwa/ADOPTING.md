@@ -27,13 +27,13 @@ updates with **no app changes**. Same contract `@12-apps/report-builder` and
 2. **Mount at the origin root.** A worker's directory bounds its scope, and the
    manifest is linked from a static `index.html` that cannot know a prefix. The
    descriptors therefore carry absolute paths (`/manifest.webmanifest`, `/sw.js`);
-   `manifestPath` / `serviceWorker.path` move them (future-pay serves the manifest
+   `manifestPath` / `serviceWorker.path` move them (the origin host serves the manifest
    at `/api/storefront-manifest`, because its edge only forwards `/api/*` on
    tenant domains).
 3. **`resolveApp` returning `null` is the whole gate.** Installability then exists
    exactly where the host's own rules say it does, with no extra feature flag to
    keep in sync with the ones that already decide whether a domain serves.
-   future-pay resolves the request host to a verified custom domain and checks the
+   the origin host resolves the request host to a verified custom domain and checks the
    tenant's plan; anything else 404s with an empty body.
    > **iOS 26 weakened this and it is worth knowing how much:** Safari dropped
    > every installability requirement, so on iOS a visitor can add ANY origin to
@@ -42,7 +42,7 @@ updates with **no app changes**. Same contract `@12-apps/report-builder` and
    > 404s, therefore it cannot be installed" as false.
 4. **The forwarded host is a CLAIM.** The adapter reads `X-Forwarded-Host`'s first
    hop (lowercased) because a reverse proxy is the normal topology for per-tenant
-   domains, but whether to honour it is `resolveApp`'s decision — future-pay
+   domains, but whether to honour it is `resolveApp`'s decision — the origin host
    resolves it against verified-domain rows, so a spoofed header resolves to
    nothing.
 5. **CACHING: network-first for documents. This is not a preference.** Every
@@ -106,7 +106,7 @@ updates with **no app changes**. Same contract `@12-apps/report-builder` and
 |---|---|---|---|
 | `resolveApp` | yes | — | `{ request, host }` → `PwaApp \| null`; `null` is the 404 gate, on the WORKER route as well as the manifest |
 | `defaults` | no | theme `#6366F1`, background `#FFFFFF`, scope `/`, display `standalone`, short name ≤12 | per-host, set once |
-| `manifestPath` | no | `/manifest.webmanifest` | future-pay uses `/api/storefront-manifest` |
+| `manifestPath` | no | `/manifest.webmanifest` | the origin host uses `/api/storefront-manifest` |
 | `manifestCacheControl` | no | `public, max-age=300, must-revalidate` | version the ICONS, don't shorten this |
 | `serviceWorker` | no | `false` | `{ cachePrefix, cacheVersion, shellUrl, assetPrefixes, neverCachePrefixes, importScripts, path }` |
 
@@ -152,7 +152,7 @@ import { registerServiceWorker } from '@12-apps/pwa';
 registerServiceWorker();            // '/sw.js' at scope '/', after `load`
 ```
 
-## Phase B — adopting into future-pay
+## Phase B — adopting into the origin host
 
 - `apps/web/app/api/storefront-manifest/route.ts` keeps only `resolveApp`: the
   `findServableDomain` lookup, the entitlement check and the branding read. The
@@ -171,7 +171,7 @@ registerServiceWorker();            // '/sw.js' at scope '/', after `load`
 - **Push notification rendering** (`push` / `notificationclick`, the per-tenant
   icon cache) — the payload contract belongs to the notifications transport, and
   the `importScripts` seam is where a host adds it.
-- **The install invite's placement** — future-pay's storefront has a second
+- **The install invite's placement** — the origin host's storefront has a second
   claimant on the bottom of the viewport (the "Ver carrinho" bar), and that
   collision is a fact about that app's layout, not about installability.
 - **`theme-color` / `apple-touch-icon`** — static head tags in the host's

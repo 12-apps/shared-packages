@@ -3,7 +3,7 @@ import { verifyRealtimeTicket, type RealtimeTicket } from "../core/ticket";
 /**
  * The client→server half of the socket channel — parsing and admission, with no
  * socket and no bus in sight so the rules are testable on their own. Ported from
- * future-pay's `apps/realtime-gateway/src/inbound.ts` (FUT-644).
+ * the origin host's `apps/realtime-gateway/src/inbound.ts` (FUT-644).
  *
  * ## Why a closed verb set and not a general RPC
  *

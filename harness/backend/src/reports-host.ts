@@ -93,7 +93,7 @@ const SYSTEM_REPORTS: SystemReportDef[] = [
 /**
  * The known-good spec each entity opens with, served on `/reports/fields`.
  *
- * The package used to ship one per future-pay entity (`REPORT_ENTITY_STARTERS`)
+ * The package used to ship one per origin-host entity (`REPORT_ENTITY_STARTERS`)
  * and serve them to any catalog whose entity names happened to match. A host
  * declares its own; the mount compile-checks them against this catalog, so a
  * starter naming a field this fixture does not have fails at boot.

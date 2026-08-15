@@ -3,7 +3,7 @@
  * mint and the provider selection a real admin app supplies — written once so
  * each story is only its own store.
  *
- * Deliberately the same amount of glue future-pay's admin page writes
+ * Deliberately the same amount of glue the origin host's admin page writes
  * (`apps/admin/src/pages/config/payments`): a `createPaymentsSettingsClient`
  * bound to the merchant's prefix, a `prepareConnect` that mints the CSRF
  * state, and a selection the HOST owns — there a URL segment, here story
@@ -28,7 +28,7 @@ import {
 /**
  * The host's OAuth state mint. The REAL one is a server endpoint that pins
  * the state to the admin's session and compares it on the callback
- * (future-pay: `POST …/oauth/prepare`); the COMPONENT sees only this shape,
+ * (the origin host: `POST …/oauth/prepare`); the COMPONENT sees only this shape,
  * so a story — being its own host — mints locally. The fictional consent URL
  * the mount then answers with carries the state back visibly: that echo is
  * the CSRF round trip the connect button exists to start.
@@ -105,7 +105,7 @@ interface SettingsSceneProps {
    */
   withPrepareConnect?: boolean;
   /**
-   * The host's activation step (`renderVerification`) — future-pay's
+   * The host's activation step (`renderVerification`) — the origin host's
    * pay-R$1,01-and-activate card. The PACKAGE decides only where the slot
    * appears and which facts it is handed; what a story passes here is a stand-in
    * card that makes those facts visible.

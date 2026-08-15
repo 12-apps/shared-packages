@@ -7,7 +7,7 @@ import { createTestHost, memberActor, superActor, type TestHost } from './server
 
 /**
  * The route descriptors end-to-end over the in-memory seam (12-13) — the
- * package port of future-pay's roles/team route tests plus the
+ * package port of the origin host's roles/team route tests plus the
  * `rbac-roles-per-tenant` / `team-role-assignment` integration behaviors:
  * governance rejections, owner invariants, tenant scoping, idempotent grants.
  */
@@ -463,7 +463,7 @@ describe('team routes', () => {
   });
 
   it('granting an unknown role is a 400 governance rejection (UNKNOWN_ROLE)', async () => {
-    // Governance runs BEFORE the store, exactly as the future-pay route did —
+    // Governance runs BEFORE the store, exactly as the origin host route did —
     // an unknown name never reaches the write path.
     const h = await teamHost();
     const response = await call(h, 'POST', '/team/:userId/roles', {
@@ -577,7 +577,7 @@ describe('team routes', () => {
 
   it('a base role outside assignableBaseRoles is the wire 400, custom roles included', async () => {
     // MAJOR-7: the base role is a CLOSED set. A tenant custom role is
-    // additive by design — on future-pay's DB this write would hit the
+    // additive by design — on the origin host's DB this write would hit the
     // memberships_role_check CHECK and 500; the package answers the wire's
     // 400 before governance ever runs.
     const h = await teamHost();

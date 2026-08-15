@@ -18,7 +18,7 @@ import type { TeamStore } from './team-store';
 import { parseBody, parseTeamListQuery, requireParam, type RoleWireSchemas } from './wire';
 
 /**
- * The team roster routes (12-13) — the package half of future-pay's
+ * The team roster routes (12-13) — the package half of the origin host's
  * `app/api/admin/[tenantSlug]/team/**` files.
  *
  * ROUTE ORDER IS PART OF THE SURFACE: `/team/context` and `/team/invites/…`
@@ -40,7 +40,7 @@ interface TeamRouteDeps<P extends string> {
 
 /**
  * The coarse admin tier — the outer boundary the whole roster sits behind
- * (future-pay's `requireTenantAdminBySlug`). Answers the caller's tier for the
+ * (the origin host's `requireTenantAdminBySlug`). Answers the caller's tier for the
  * ownership rules: their REAL membership role, or the platform discriminator
  * for a caller the host resolved as `isSuper`.
  *
@@ -238,7 +238,7 @@ function setMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute
         // The BASE role is a closed set — the non-owner template names, or
         // whatever `assignableBaseRoles` narrows it to. Enforced BEFORE
         // governance so a custom role (additive by design, and refused by the
-        // host schema's CHECK constraint on future-pay) is the wire's 400
+        // host schema's CHECK constraint on the origin host) is the wire's 400
         // here rather than a 500 there. Custom roles ride
         // POST /team/:userId/roles instead.
         //

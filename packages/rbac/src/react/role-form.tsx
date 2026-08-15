@@ -14,7 +14,7 @@ import type { PermissionRegistry } from '../core/types';
 import { groupPermissions, sodCounterpart, type RbacLabels } from './labels';
 
 /**
- * The role compose/edit form (12-13) — ported from future-pay's
+ * The role compose/edit form (12-13) — ported from the origin host's
  * `apps/admin/src/pages/roles/role-form.tsx`. Owner-marker permissions are
  * never composable; a separation-of-duties pair disables its counterpart —
  * except for a curated TEMPLATE override, whose duty pairs are intrinsic to

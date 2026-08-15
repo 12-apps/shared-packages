@@ -11,7 +11,7 @@ import type { GeneratedTool, ToolManifest } from "../types";
 export interface BuildManifestOptions {
   /** Bumped intentionally on any tool-shape change (mirrors the golden catalog). */
   version: number;
-  /** Human label for the spec, e.g. "future-pay web @ openapi.json". */
+  /** Human label for the spec, e.g. "acme web @ openapi.json". */
   source: string;
 }
 

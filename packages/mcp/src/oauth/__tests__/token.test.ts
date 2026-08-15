@@ -4,7 +4,7 @@ import { asHarness, authorize, codeFrom, pkcePair, registerTestClient, token } f
 import { verifyAccessToken } from "../access-token";
 
 /**
- * The token endpoint (12-23) — the port of future-pay's grant suites.
+ * The token endpoint (12-23) — the port of the origin host's grant suites.
  *
  * Every case is an invariant a reviewer of an AS should insist on: single-use
  * codes, PKCE actually verified, the bound `redirect_uri` re-checked, client

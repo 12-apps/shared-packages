@@ -7,7 +7,7 @@ import type { TeamMemberWire } from './api';
 
 /**
  * The roster row's ⋮ menu (12-13) — plain ARIA roles so the surface needs no
- * menu library; a spec addresses it exactly as it addressed the future-pay
+ * menu library; a spec addresses it exactly as it addressed the origin host
  * kebab (`team-actions-<userId>`, `menuitem` by name).
  */
 

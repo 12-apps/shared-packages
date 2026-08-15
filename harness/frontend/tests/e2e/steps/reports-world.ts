@@ -10,7 +10,7 @@ import { defineReportsWorld } from '@12-apps/report-builder/e2e';
  * lives at, how to get the saved documents back to a known state, what a fresh
  * session is, and which of this app's own seeded rows a scenario may name.
  *
- * That is the integration a real consumer performs too — future-pay's admin
+ * That is the integration a real consumer performs too — the origin host's admin
  * routes to `/{slug}/reports` where this routes to `#/report-builder`, and
  * resets through its own State API where this posts to `/__harness/reset`. The
  * features do not change.

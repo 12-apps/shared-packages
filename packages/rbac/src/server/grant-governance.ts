@@ -17,7 +17,7 @@ import type { RbacDbProvider } from './db';
 import { tenantRoleKey } from './permissions-format';
 
 /**
- * Shared role-grant governance (12-13) — ported from future-pay's
+ * Shared role-grant governance (12-13) — ported from the origin host's
  * `lib/rbac/grant-governance.ts`: the single source of truth for "may THIS
  * actor grant THIS role at THIS tenant?", reused by the member-role route and
  * the role CRUD routes so the surfaces can never diverge.

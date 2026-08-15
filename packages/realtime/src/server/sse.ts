@@ -5,7 +5,7 @@ import type { ConnectionLedger } from "./connections";
 
 /**
  * The SSE wire for the realtime subscribe surfaces — ported verbatim from
- * future-pay's `apps/web/lib/realtime/sse.ts` (FUT-438/FUT-657). This module
+ * the origin host's `apps/web/lib/realtime/sse.ts` (FUT-438/FUT-657). This module
  * is the ONLY place the transport is spelled out: publishers talk to topics
  * and the browser talks to the react half's `RealtimeChannel`, so swapping
  * SSE for something else touches this file and the client's connection

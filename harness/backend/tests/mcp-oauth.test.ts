@@ -1,5 +1,5 @@
 /* eslint-disable test-flakiness/no-database-operations -- the database is the
-   subject: this is future-pay's OAuth round-trip, refresh, client and metadata
+   subject: this is the origin host's OAuth round-trip, refresh, client and metadata
    integration suites, ported to run against the PUBLISHED @12-apps/mcp tarball
    over a real Postgres, driving the same app a connector would. */
 /* eslint-disable test-flakiness/no-test-isolation -- every `response` here is a
@@ -21,7 +21,7 @@ import {
 
 /**
  * The @12-apps/mcp OAuth 2.1 authorization server end-to-end (12-23): the port of
- * future-pay's `oauth-roundtrip`, `oauth-refresh`, `oauth-clients`,
+ * the origin host's `oauth-roundtrip`, `oauth-refresh`, `oauth-clients`,
  * `oauth-metadata` and `oauth-schema` integration suites.
  *
  * What moves the proof past the package's own unit suite is what is REAL here:

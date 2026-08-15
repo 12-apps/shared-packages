@@ -1,5 +1,5 @@
 /* eslint-disable test-flakiness/no-database-operations -- the database is the
-   subject: this is future-pay's `tests/integration/notifications.test.ts`, ported
+   subject: this is the origin host's `tests/integration/notifications.test.ts`, ported
    to run against the PUBLISHED tarball over a real Postgres (PGlite), driving the
    same mount the browser drives. */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -11,7 +11,7 @@ import {
 } from '../src/notifications-host';
 
 /**
- * The notification PIPELINE end-to-end (12-15): the port of future-pay's
+ * The notification PIPELINE end-to-end (12-15): the port of the origin host's
  * integration suite — `notify()` routing (the inbox record always, plus
  * per-channel fan-out), preference gating, the delivery lifecycle, failure
  * isolation and the retry sweep — now exercised through the published package's

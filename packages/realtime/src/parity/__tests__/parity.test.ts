@@ -4,11 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  FUTURE_PAY_PUBLISHER_DECLARATIONS,
-  runPublisherParity,
-  type PublisherEntry,
-} from "../index";
+import { runPublisherParity, type PublisherEntry } from "../index";
 
 /**
  * The publisher-parity gate.
@@ -270,24 +266,12 @@ describe("runPublisherParity — a DOCSTRING is not a publisher", () => {
   });
 });
 
-describe("the shipped future-pay declarations are an EXAMPLE, not a default", () => {
-  it("is an all-publishing set with a repo-relative module each", () => {
-    // It used to be the fallback for `declarations`, which is precisely how the gate came
-    // to run against somebody else's domain list and report green. Now it is material to
-    // READ — a shape to copy — so what is worth pinning is that it stays copyable.
-    expect(FUTURE_PAY_PUBLISHER_DECLARATIONS.length).toBeGreaterThan(0);
-    for (const entry of FUTURE_PAY_PUBLISHER_DECLARATIONS) {
-      expect(entry.declaration.kind).toBe("publishes");
-      const { module } = entry.declaration as { module: string };
-      expect(module).toMatch(/^[^/].*\.ts$/);
-    }
-  });
-
-  it("is not consulted when a host omits its own — the gate has no subject to invent", () => {
+describe("the gate ships no example declarations to fall back on", () => {
+  it("has no subject to invent when a host omits its own lists", () => {
     const root = fakeRepo({ ".realtime-silent-domains.json": EMPTY_BASELINE });
     // @ts-expect-error — `declarations` and `domains` are REQUIRED. This is the whole M3
     // fix at the type level: the old signature made both optional and silently substituted
-    // future-pay's seven domains, so a host with a different registry got a green run.
+    // one adopter's seven domains, so a host with a different registry got a green run.
     const result = runPublisherParity({ root });
     // And it does not fall back at runtime either: nothing to check is a violation.
     expect(result.ok).toBe(false);

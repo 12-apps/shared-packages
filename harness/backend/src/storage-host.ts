@@ -15,7 +15,7 @@
  * "Is this object still needed?" is the one storage question a package cannot
  * answer, because the answer lives in the host's catalog. So the harness gives it
  * a catalog: two tables on the same PGlite the rest of the harness uses, one of
- * live rows and one of pending edits held as JSON — the shape future-pay's own
+ * live rows and one of pending edits held as JSON — the shape the origin host's own
  * reclaim probes, including the `entity_versions` table that must NOT pin an
  * object. Those are the claims worth running against a real database.
  *

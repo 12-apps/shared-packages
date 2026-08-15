@@ -13,7 +13,7 @@
  * watches the hash itself (`useHashQuery`); `?oauth=consent` swaps in the
  * consent panel, `?code=` drives the host callback route, and
  * `?connected=` / `?connectError=` land on the banner logic, which erases the
- * query — the same choreography future-pay's admin performs.
+ * query — the same choreography the origin host's admin performs.
  */
 import { useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react';
 

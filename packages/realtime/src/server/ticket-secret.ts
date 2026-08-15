@@ -3,7 +3,7 @@ import type { RealtimeLogger } from "../core/types";
 /**
  * The secret both halves of the WebSocket handshake share: the API surface
  * signs a connection ticket with it, the gateway verifies with it. Ported
- * from future-pay's `apps/web/lib/realtime/ticket-secret.ts`.
+ * from the origin host's `apps/web/lib/realtime/ticket-secret.ts`.
  *
  * ## Why it falls back to AUTH_SECRET
  *

@@ -4,7 +4,7 @@
  * or change request knows its own `entityType`, and the action is decided
  * against THAT collection's lifecycle and approve permission (a category
  * request is decided against `categories:approve`, not the product one).
- * Ported from future-pay's `recycle-bin/**` and `approvals/**` routes.
+ * Ported from the origin host's `recycle-bin/**` and `approvals/**` routes.
  */
 
 import type { EntityLifecycle } from '../service';
@@ -75,7 +75,7 @@ function entityOf(deps: SharedRouteDeps, entityType: string): RegisteredEntity {
  * only place its plan gate can run: without it, a tenant whose `suppliers`
  * plan is off could still purge a binned supplier or decide its requests.
  * `routePermission` deliberately does NOT apply here — parity with
- * future-pay, where the bin and the inbox require the admin tier, never the
+ * the origin host, where the bin and the inbox require the admin tier, never the
  * collection's route permission.
  */
 const dispatchContext = async (
@@ -96,7 +96,7 @@ const dispatchContext = async (
  * the table as an audit trail but leave the bin.
  *
  * The list is deliberately NOT run through a collection's `authorize` gate: it
- * spans every registered collection at once, and future-pay's twin gates it
+ * spans every registered collection at once, and the origin host's twin gates it
  * the same way (the admin tier for the page, nothing per collection). The
  * per-collection gate lands on the item routes below, where the row names the
  * collection.
@@ -104,7 +104,7 @@ const dispatchContext = async (
 function binListRoute(deps: SharedRouteDeps): LifecycleRoute {
   return route('GET', '/recycle-bin', async ({ actor, query }) => {
     // An EMPTY `?entityType=` is a malformed filter, not an absent one —
-    // future-pay's `z.string().min(1).optional()` answers 400 rather than
+    // the origin host's `z.string().min(1).optional()` answers 400 rather than
     // silently listing every collection.
     if (query.entityType === '') throw new LifecycleApiError(400, deps.messages.invalidBody);
     const roots = await deps.recycleBin.list(actor.tenantId, {

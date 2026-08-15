@@ -100,7 +100,7 @@ describe('createWebAppShell', () => {
 
   /**
    * The shell must never invent a cache. A host's query client is where a 402→upsell
-   * interceptor lives (future-pay's admin puts it in the query and mutation caches),
+   * interceptor lives (the origin host's admin puts it in the query and mutation caches),
    * so a shell-created one would silently drop that interception.
    */
   it('installs the host query client, and mounts no provider without one', async () => {

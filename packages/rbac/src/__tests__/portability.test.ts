@@ -6,7 +6,7 @@
  * tenants named `Client`, Prisma, or Next.js.
  *
  * IT USED TO PROVE LESS THAN IT LOOKED LIKE IT DID. "Zero imports from the
- * Future Pay templates" was the whole claim, and it held — because a suite
+ * origin host's templates" was the whole claim, and it held — because a suite
  * chooses its own imports. What it could not see is that the package it
  * vouched for SHIPPED those templates: a second host installing
  * `@12-apps/rbac` received 61 ids and eight roles of somebody else's

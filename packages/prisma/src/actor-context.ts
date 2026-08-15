@@ -93,11 +93,11 @@ export interface ActorContext extends ActorAttributionSnapshot {
 // module) can't create a second store whose context is invisible to closures
 // captured against the first.
 const globalStore = globalThis as unknown as {
-  __futurePayActorStore?: AsyncLocalStorage<ActorContext>;
+  __12appsPrismaActorStore?: AsyncLocalStorage<ActorContext>;
 };
 
 const store = (): AsyncLocalStorage<ActorContext> =>
-  (globalStore.__futurePayActorStore ??= new AsyncLocalStorage<ActorContext>());
+  (globalStore.__12appsPrismaActorStore ??= new AsyncLocalStorage<ActorContext>());
 
 /**
  * The REAL human behind `onBehalfOfUserId`, derived (never accepted) from the

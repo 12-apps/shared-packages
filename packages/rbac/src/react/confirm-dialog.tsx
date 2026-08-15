@@ -7,7 +7,7 @@ import { Text } from '@12-apps/ui/typography/Text';
 
 /**
  * The confirm step every destructive write sits behind (12-13) — the packaged
- * counterpart of future-pay's shared row-confirm primitive (FUT-546): one
+ * counterpart of the origin host's shared row-confirm primitive (FUT-546): one
  * question, the consequence in plain words, and the destructive verb as the
  * primary action. Self-contained because the package cannot import the
  * host's dialog machinery.

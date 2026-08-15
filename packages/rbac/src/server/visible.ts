@@ -1,7 +1,7 @@
 import type { VisibleResult } from '../core/types';
 
 /**
- * The LIST-seam verdict plumbing (12-13) — ported verbatim from future-pay's
+ * The LIST-seam verdict plumbing (12-13) — ported verbatim from the origin host's
  * `lib/rbac/visible.ts` + `visible-query.ts`. Pure functions: how a set of
  * per-tier {@link VisibleResult}s merges into one query fragment.
  */

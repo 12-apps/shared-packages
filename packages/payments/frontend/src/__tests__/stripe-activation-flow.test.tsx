@@ -60,7 +60,7 @@ function fakeClient(): PaymentsSettingsClient {
 }
 
 /**
- * The canonical host branch, verbatim (future-pay's `VerificationCharge`):
+ * The canonical host branch, verbatim (the origin host's `VerificationCharge`):
  * no tokenizer ⇒ the hosted-redirect verification, tokenizer ⇒ the card form.
  */
 const hostActivationStep: NonNullable<PaymentProviderSettingsProps['renderVerification']> = (ctx) =>

@@ -4,7 +4,7 @@ import { isAccountAccessError, isPermanentProviderRefusal, providerExchangeRepor
 import { CredentialsError, PaymentsError, ProviderRequestError } from '../core/errors';
 
 /**
- * The error-taxonomy readers ported from the future-pay host (FUT-761):
+ * The error-taxonomy readers ported from the origin host (FUT-761):
  * the printable request/response pair (FUT-489), the account-level-rejection
  * test, and "can waiting improve this refusal". Pinned here so hosts can
  * delete their copies and the answers cannot drift per adopter.

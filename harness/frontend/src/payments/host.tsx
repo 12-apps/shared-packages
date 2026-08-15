@@ -5,7 +5,7 @@
  *
  * Nothing here is part of the package. It is deliberately the same amount of
  * glue an adopter writes — `apps/client/src/pages/checkout/index.tsx` in
- * future-pay is the reference — which is also what makes these pages a check on
+ * the origin host is the reference — which is also what makes these pages a check on
  * whether that amount is reasonable.
  */
 import {

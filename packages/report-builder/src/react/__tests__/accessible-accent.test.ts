@@ -11,7 +11,7 @@ import { accessibleAccent, contrastRatio } from '../lib/report-surface';
  * the landing screen.
  *
  * The fix derives the text shade from the live theme rather than hardcoding
- * one, because the accent is not fixed: future-pay layers a tenant's brand onto
+ * one, because the accent is not fixed: the origin host layers a tenant's brand onto
  * this same token. These cases are what says that generalisation is real — a
  * literal hex would pass the first case here and fail the branded ones.
  */

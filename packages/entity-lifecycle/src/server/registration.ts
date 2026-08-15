@@ -1,6 +1,6 @@
 /**
  * The DECLARATION a host writes to plug one collection into the surface
- * (12-17). future-pay's per-entity files each repeated the same mechanical
+ * (12-17). The origin host's per-entity files each repeated the same mechanical
  * steps — build the service, build the context, join the dispatch registry,
  * hand-write six route files (ten collections in the registry, eight with
  * per-entity routes, ~1.8k LOC of registrations beside them). All of that is
@@ -33,7 +33,7 @@ export interface LifecycleEntityRegistration {
   /** Version-history auto-clean policy. */
   retention?: RetentionPolicy;
   /**
-   * The collection's own authorization gate — future-pay's per-collection
+   * The collection's own authorization gate — the origin host's per-collection
    * PLAN entitlement lives here (the host wraps `requireEntitlement`, keeping
    * this package money-free). Awaited before every collection-scoped route
    * AND, on the shared recycle-bin/approvals item routes, after the row has
@@ -45,12 +45,12 @@ export interface LifecycleEntityRegistration {
   authorize?: LifecycleAuthorizeGate;
   /**
    * A permission id required for EVERY collection-scoped route (drafts,
-   * versions, restore) — future-pay's `roles` collection gates its whole
+   * versions, restore) — the origin host's `roles` collection gates its whole
    * lifecycle surface on `roles:manage` where the other collections need
    * only the mount's own admin gate. Checked against the actor's resolved
    * permission set; `isSuper` bypasses; denial is the 403
    * `routeNotAllowed` message. The shared recycle-bin/approvals surfaces are
-   * NOT gated by it (parity with future-pay, where the bin and the inbox
+   * NOT gated by it (parity with the origin host, where the bin and the inbox
    * require the admin tier plus the collection's `authorize` gate).
    */
   routePermission?: string;

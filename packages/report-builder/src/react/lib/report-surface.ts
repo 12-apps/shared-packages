@@ -138,7 +138,7 @@ export function contrastRatio(foreground: string, background: string): number {
  * area failed the rule by a hair, including the report-list card title, which
  * is the primary click target on the landing screen.
  *
- * Derived rather than hardcoded, because the accent is NOT fixed: future-pay
+ * Derived rather than hardcoded, because the accent is NOT fixed: the origin host
  * layers a tenant's brand colour onto this same token, so a literal hex would
  * fix the default palette and leave every branded store failing. Darkening in
  * small steps keeps the hue and stops at the first shade that clears the bar,

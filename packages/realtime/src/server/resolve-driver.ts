@@ -2,7 +2,7 @@ import { createInlineRealtimeDriver } from "../drivers/inline";
 import type { RealtimeDriver, RealtimeLogger } from "../core/types";
 
 /**
- * Which driver this process runs — ported from future-pay's
+ * Which driver this process runs — ported from the origin host's
  * `apps/web/lib/realtime/runtime.ts` (FUT-438), the only place that decision
  * was ever made. Mirrors `@12-apps/jobs`' `resolve-driver` because the seam is
  * the same:

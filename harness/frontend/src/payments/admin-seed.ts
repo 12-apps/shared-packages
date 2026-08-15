@@ -2,7 +2,7 @@
  * SEEDING the merchant admin store: `AdminStage` → stored row.
  *
  * Written through `store.save`, never through `settings.saveCredentials` — the
- * same reason future-pay's state route gives: the service's invalidation
+ * same reason the origin host's state route gives: the service's invalidation
  * cascade (clear status, drop the proof, `enabled: false`) would destroy the
  * exact state a case is trying to establish.
  *

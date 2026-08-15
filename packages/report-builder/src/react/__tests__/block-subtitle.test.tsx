@@ -132,7 +132,7 @@ describe('an authored description — a disclosure, whole', () => {
     expect(renderFrame({ description: PROSE }).textContent).toBe(PROSE);
   });
 
-  it('keeps the test id future-pay drives for a built-in\'s caveats', () => {
+  it('keeps the test id the origin host drives for a built-in\'s caveats', () => {
     // `apps/admin`'s reports-cozinha-disclosures test reads exactly this id on
     // `system-dashboard-block-<key>`; the split must not move it.
     render(

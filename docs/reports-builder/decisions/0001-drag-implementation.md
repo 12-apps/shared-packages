@@ -46,7 +46,7 @@ Three findings, in order of weight.
 
 **Avoided:**
 
-- A runtime dependency in a published package, resolved by every consumer including future-pay.
+- A runtime dependency in a published package, resolved by every consumer including the origin host.
 - A second drag idiom in a package that already has one, and the migration of the existing FUT-311 behaviour onto it.
 
 **Revisit when:** a second surface in this repo needs drag-and-drop, or the keyboard/announcement work turns out to exceed roughly the effort of the migration it avoids. Either is a reason to reopen this; neither is true today.

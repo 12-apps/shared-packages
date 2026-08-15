@@ -34,7 +34,7 @@ import type {
  *
  * This is the whole admin table in one component: the Select All / Sort By /
  * counter / saved-views toolbar, the filter row, column visibility, row kebabs
- * and bulk actions. In future-pay the same screen is
+ * and bulk actions. In the origin host the same screen is
  * `apps/admin/src/pages/orders`, which wires `persistence`, `router` and the
  * fetch to its backend and react-router; here they are inert so the story stays
  * hermetic.
@@ -346,7 +346,7 @@ const router: DataViewRouter = { syncViewParam: () => {}, refresh: () => {} };
  *
  * Not `DataViewsTableBase`'s `title` / `headerActions` props: `DataViewsGrid`
  * declares both and renders neither, so passing them draws nothing. The real
- * screen composes this row itself (future-pay uses `Dashboard.Header` +
+ * screen composes this row itself (the origin host uses `Dashboard.Header` +
  * `Dashboard.Action`), and so does this story.
  */
 function PedidosHeader(): React.JSX.Element {

@@ -20,7 +20,7 @@ sweep — endpoints and screens included.
 | **Core** | `@12-apps/notifications` | Nothing to wire — the framework-free, storage-free vocabulary both halves share: types, the generator registry, the preference policy, the phone rules, the copy table, the inbox wire shape. Safe in a browser. |
 | **Server** | `@12-apps/notifications/server` | Call `createApiNotifications({ db, contacts, transports })` and mount the `routes` it returns — the nine inbox / preferences / push-subscription endpoints, with parsing, statuses and the `{ data }` envelope inside. It also returns `notify` (the emit front door), `notifyByPermission`, `dispatchDeliveries`, `drainPending` and the three stores. |
 | **Hono** | `@12-apps/notifications/hono` | `const notifications = notificationsRouter({ ...serverConfig, resolveActor }); app.route('/api/account', notifications.router)`. A one-call mount; `hono` is an OPTIONAL peer, so importing the root, `/server` or `/react` never resolves it. |
-| **React** | `@12-apps/notifications/react` | Call `createWebNotifications({ apiBase })`. `BellWithPanel` is the whole feature as one element; `BellButton` + `Panel` are the pair for a host with its own chrome; `page` is the preferences screen you route to. pt-BR product copy and the future-pay test ids ship inside. |
+| **React** | `@12-apps/notifications/react` | Call `createWebNotifications({ apiBase })`. `BellWithPanel` is the whole feature as one element; `BellButton` + `Panel` are the pair for a host with its own chrome; `page` is the preferences screen you route to. pt-BR product copy and the origin host's test ids ship inside. |
 | **Web Push** | `@12-apps/notifications/web-push` | `sender: vapidPushSender({ subject, publicKey, privateKey })` on the `WEB_PUSH` declaration. Its own subpath because it is the only piece that needs `web-push` — an OPTIONAL peer a host that never enables the channel never installs. |
 | **Prisma** | `prisma/notifications.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/notifications prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma; a symlinked partial dangles under `turbo prune`). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 
@@ -35,7 +35,7 @@ sweep — endpoints and screens included.
    someone else's inbox would be a different surface with a different actor.
 
 2. **`contacts` is not optional, and it is not the `users` table.** A transport
-   needs an address: `getContact(userId) → { email, phone } | null`. future-pay's
+   needs an address: `getContact(userId) → { email, phone } | null`. The origin host's
    router read `users.email` / `users.phone` directly, which is the one thing in
    the pipeline that was always the host's — a package cannot know the shape of
    an identity table, and a host with phone VERIFICATION wants to answer the
@@ -105,8 +105,8 @@ sweep — endpoints and screens included.
    it with hand-written SQL. The argument shapes are CLOSED (documented in
    `src/server/db.ts`), so a non-Prisma host has a finite surface to fill.
 
-5. **`categories` is product vocabulary.** The default is future-pay's four
-   (`orders` / `payments` / `stock` / `system`) and the preferences screen
+5. **`categories` is product vocabulary, and REQUIRED.** There is no default:
+   the host declares its own taxonomy, and the preferences screen
    renders whatever the api half was given — the taxonomy travels on the
    `GET /notification-preferences` payload, so the two halves cannot disagree
    about it. The packaged migration deliberately puts **no CHECK** on
@@ -115,7 +115,7 @@ sweep — endpoints and screens included.
 6. **`generators` are registered from the OUTSIDE, and stay the host's.** A
    generator maps a domain event to `{ title, body, link, data }`, and the
    events are exactly what does not port: `order.paid`, `stock.low` and
-   `short-payment` are Future Pay's, not any host's. Pass them in `generators`,
+   `short-payment` are the origin host's, not any host's. Pass them in `generators`,
    or call `registerGenerator` for a module imported later. The generator's
    `category` is what the router gates fan-out on.
 
@@ -184,7 +184,7 @@ sweep — endpoints and screens included.
     notified — and the log line that tells "nobody holds it" apart from "every
     dispatch failed". Two rules for your implementation:
 
-    - `listCandidates` must be **bounded to people who hold a role**. future-pay's
+    - `listCandidates` must be **bounded to people who hold a role**. The origin host's
       requires a role grant, which keeps a store's storefront BUYERS out of a loop
       that resolves permissions one user at a time.
     - `getPermissions` must be **scoped to the tenant**. Unioning a user's grants
@@ -222,7 +222,7 @@ sweep — endpoints and screens included.
 
 13. **These endpoints are cookie-authenticated WRITES. CSRF is yours.** Eight of
     the nine change state, and `resolveActor` typically reads a session cookie —
-    so the host, not this package, owns the cross-site question. In future-pay it
+    so the host, not this package, owns the cross-site question. In the origin host it
     is fully mitigated by the Auth.js cookie's `SameSite=Lax`; a host
     authenticating with `SameSite=None`, or one whose `resolveActor` trusts a
     header a proxy sets, inherits an unguarded write surface. The one that matters

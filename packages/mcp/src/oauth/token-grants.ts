@@ -19,7 +19,7 @@ import {
 } from "./token-response";
 
 /**
- * The two grant handlers of the token endpoint (12-23, ported from future-pay's
+ * The two grant handlers of the token endpoint (12-23, ported from the origin host's
  * `lib/mcp/oauth/token-grants.ts`).
  *
  * Security invariants enforced here, unchanged:
@@ -123,7 +123,7 @@ function readAuthorizationCodeParams(form: URLSearchParams): AuthorizationCodePa
 /**
  * Redeem a presented code, or refuse.
  *
- * The ORDER is the security contract, and it is the order future-pay established:
+ * The ORDER is the security contract, and it is the order the origin host established:
  * verify the code's signature, authenticate the presenting client against the
  * client the code was bound to, check the bound `redirect_uri`, check PKCE — and
  * only THEN consume the single-use `jti`. Consuming earlier would let a failed

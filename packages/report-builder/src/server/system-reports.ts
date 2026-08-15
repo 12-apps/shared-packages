@@ -11,7 +11,7 @@ import type { ReportSpecInput, TimeGrain } from '../index';
  * because only the host has entities to query.
  *
  * This module used to ship seven of them (`presets.ts`, `presets-kitchen.ts`):
- * future-pay's revenue, product ranking, payment-method donut, peak hours,
+ * the origin host's revenue, product ranking, payment-method donut, peak hours,
  * stock ledger, losses and its kitchen dashboard, in pt-BR, over entities named
  * `orders` and `kitchen_ticket_items`, gated by ids from that application's
  * catalog. They were the DEFAULT, so a host that named none served all seven —

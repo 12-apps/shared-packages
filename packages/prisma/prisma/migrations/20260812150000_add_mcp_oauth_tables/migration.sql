@@ -18,13 +18,13 @@
 -- Authorization codes are deliberately absent: they are STATELESS signed blobs,
 -- so there is no table to create and nothing to sweep.
 --
--- The columns, defaults, indexes and CHECK are future-pay's
+-- The columns, defaults, indexes and CHECK are the origin host's
 -- `20260713120000_add_oauth_client_refresh`,
 -- `20260715180000_add_onboarding_state_mcp_connection` (the mcp_connections half
 -- — the onboarding half belongs to @12-apps/onboarding) and
 -- `20260720120000_add_mcp_connection_host` verbatim, minus the FK to `users`:
 -- this package cannot know the name of a host's user table, and a host that has
--- one keeps its own constraint (future-pay's is ON DELETE CASCADE).
+-- one keeps its own constraint (the origin host's is ON DELETE CASCADE).
 --
 -- EVERY statement is guarded (`IF NOT EXISTS`, and a conrelid-scoped DO block for
 -- the CHECK, which has no IF NOT EXISTS form). That is what makes adoption by a
@@ -35,7 +35,7 @@
 -- the difference bites exactly the host this file is written for: `CREATE TABLE IF
 -- NOT EXISTS` skips the whole table, columns included, so a host holding an OLDER
 -- shape of one of these tables silently keeps it. Each table below is therefore
--- followed by a guarded `ADD COLUMN` for every column that reached future-pay in a
+-- followed by a guarded `ADD COLUMN` for every column that reached the origin host in a
 -- LATER migration than its own CREATE. The full audit: `oauth_refresh_tokens
 -- .user_sub` (`20260713150000_add_oauth_refresh_user_sub`) and `mcp_connections
 -- .host` (`20260720120000_add_mcp_connection_host`). `oauth_clients` needs none —
@@ -112,10 +112,10 @@ CREATE INDEX IF NOT EXISTS "oauth_refresh_tokens_user_email_client_id_idx"
 -- `CREATE TABLE IF NOT EXISTS` skips the WHOLE table, so a host that already holds
 -- `oauth_refresh_tokens` in an OLDER SHAPE gets none of the columns declared above
 -- — statement-level guarding is not the same as column-level guarding. That is
--- precisely how future-pay's own history ran: `user_sub` arrived in a SECOND
+-- precisely how the origin host's own history ran: `user_sub` arrived in a SECOND
 -- migration (FUT-105, `20260713150000_add_oauth_refresh_user_sub`), so a host
 -- frozen before it would adopt this file, skip the CREATE, never get the column,
--- and then fail on every refresh the package serves. Mirror future-pay's pair
+-- and then fail on every refresh the package serves. Mirror the origin host's pair
 -- verbatim — guarded add with a backfill default to satisfy NOT NULL, then drop
 -- the default so the column matches the Prisma schema (`String`, no default).
 -- Both statements are no-ops on a fresh host and on a replay.
@@ -147,6 +147,6 @@ CREATE INDEX IF NOT EXISTS "mcp_connections_last_active_at_idx"
   ON "mcp_connections"("last_active_at");
 
 -- A host adopting this migration where `mcp_connections` predates the `host`
--- column (future-pay added it in a later migration) gets it here; a fresh host
+-- column (the origin host added it in a later migration) gets it here; a fresh host
 -- already has it from the CREATE above, so the guard makes both cases a no-op.
 ALTER TABLE "mcp_connections" ADD COLUMN IF NOT EXISTS "host" TEXT;

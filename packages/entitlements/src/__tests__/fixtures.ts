@@ -4,7 +4,7 @@ import { definePlans } from '../core/plans';
 /**
  * The catalog the unit suites resolve against.
  *
- * It used to be a Future-Pay-shaped one — its feature keys, its tier names,
+ * It used to be an origin-host-shaped one — its feature keys, its tier names,
  * its descriptions — which made every assertion in this package read as a
  * statement about one application's product. The SHAPE is what these suites
  * are actually about, so it is kept exactly (a `hide` boolean, a `disable`

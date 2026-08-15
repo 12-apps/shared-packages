@@ -175,7 +175,7 @@ Almost all of this shipped, and the hard part is the part that shipped. The dirt
 **Status:** ALREADY DONE — `src/react/block-editor-panel.tsx`
 **Depends on:** Phase 0
 
-Shipped with FUT-391, and the file's header gives the plan's two reasons back verbatim: the popover covered the block it configured, and it truncated its own labels to `St…` / `igu…`. It is a 344px right-hand panel on desktop and a bottom sheet below 760px (`SHEET_BELOW_PX`, `SHEET_HEIGHT = "78vh"`), full height, with the preview re-running live on every keystroke beside it. Focus returns to the opening control on close (`restoreFocusTo`, `:62,78`). The popover's test ids were kept deliberately, because future-pay's reports e2e drives them.
+Shipped with FUT-391, and the file's header gives the plan's two reasons back verbatim: the popover covered the block it configured, and it truncated its own labels to `St…` / `igu…`. It is a 344px right-hand panel on desktop and a bottom sheet below 760px (`SHEET_BELOW_PX`, `SHEET_HEIGHT = "78vh"`), full height, with the preview re-running live on every keystroke beside it. Focus returns to the opening control on close (`restoreFocusTo`, `:62,78`). The popover's test ids were kept deliberately, because the origin host's reports e2e drives them.
 
 **Residual, from `inventory.md` §1:** the mobile branch is `Drawer anchor="bottom"` rather than `data-display/Sheet`. It behaves as a sheet; adopting the component would bring the grip for free (entry 25). Cosmetic, not a defect.
 
@@ -466,7 +466,7 @@ The period is component state — `useState<ReportRange>("30d")` in both `report
 Two constraints to design around:
 
 - **`compare` does not exist yet** (entry 4). Either land that first or ship `period` alone.
-- **Standalone mounting uses a `MemoryRouter`** (`create-report-builder.tsx:115`), which has no address bar. Hosts that mount the surface under their own router — future-pay does — get real URLs; the standalone path will not. Make the period read/write go through the router so both paths stay correct, and accept that standalone loses the sharing half.
+- **Standalone mounting uses a `MemoryRouter`** (`create-report-builder.tsx:115`), which has no address bar. Hosts that mount the surface under their own router — the origin host does — get real URLs; the standalone path will not. Make the period read/write go through the router so both paths stay correct, and accept that standalone loses the sharing half.
 
 ### 28. `feat(reports): scheduled email delivery`
 **Status:** BUILD NEW

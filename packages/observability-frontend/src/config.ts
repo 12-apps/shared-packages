@@ -16,7 +16,7 @@
  * Which app is reporting, as the backend's `?app=` parameter spells it.
  *
  * A plain `string` rather than a union: the set of apps belongs to the HOST,
- * not to this package. Future Pay narrows it to its own three in the adapter
+ * not to this package. The origin host narrows it to its own three in the adapter
  * that wires this up; another product would name its own.
  */
 export type ObservabilityApp = string;

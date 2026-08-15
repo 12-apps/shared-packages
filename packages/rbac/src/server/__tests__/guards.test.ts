@@ -7,7 +7,7 @@ import { assignRole, enrolMember, seedRole } from './fake-db';
 import { createTestHost, memberActor, superActor } from './server-fixtures';
 
 /**
- * The guard helpers over the seam (12-13) — the package port of future-pay's
+ * The guard helpers over the seam (12-13) — the package port of the origin host's
  * `tests/integration/rbac.integration.test.ts` (the FUT-146 foundation) and
  * `custom-role.integration.test.ts` (custom roles grant at runtime). The
  * same assertions run in `harness/backend` against the PUBLISHED tarball over

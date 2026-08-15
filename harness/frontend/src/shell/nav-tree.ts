@@ -3,7 +3,7 @@ import { NAV_GROUPS, PAGES, type HarnessNavGroup, type HarnessPage } from '../pa
 /**
  * The nav TREE, derived from the registry.
  *
- * future-pay's admin hand-writes its equivalent (`shell/nav-groups.ts`) because
+ * the origin host's admin hand-writes its equivalent (`shell/nav-groups.ts`) because
  * every one of its rows carries gates the sidebar has to resolve. Nothing here
  * is gated, so deriving keeps the promise `registry.ts` makes: registering a
  * page is one edit, in one file.

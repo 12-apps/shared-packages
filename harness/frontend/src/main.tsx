@@ -17,7 +17,7 @@ import { harnessTheme } from './shell/theme';
  * to be about OUR packages. `location.hash` needs nothing.
  *
  * `ThemeProvider` + `CssBaseline` are the exception, and they are not chrome:
- * they are the mounting a host performs, in the same order future-pay's
+ * they are the mounting a host performs, in the same order the origin host's
  * `apps/admin/src/App.tsx` performs it. Without them, every package under test
  * renders against MUI's stock palette instead of the design system's, so a
  * page that looks right here would look wrong in the only place it ships.
@@ -28,7 +28,7 @@ import { harnessTheme } from './shell/theme';
 function useHashSlug(fallback: string) {
   // The slug is the FIRST segment of the hash's path; anything after `?` is the
   // page's own query. The OAuth callback comes back to a page carrying
-  // `?connected=`/`?code=`, exactly as future-pay's admin does — and a
+  // `?connected=`/`?code=`, exactly as the origin host's admin does — and a
   // fragment-only navigation is what keeps the in-page mount alive across the
   // provider hop.
   //

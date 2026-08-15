@@ -22,8 +22,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   foreignPatterns,
+  HOST1,
+  HOST2,
   removedVocabularyPatterns,
-  REMOVED_EXPORTS_ALLOWED_IN,
   type ForeignPattern,
 } from './foreign-vocabulary';
 
@@ -82,26 +83,19 @@ function isTextual(entry: string): boolean {
 
 /** What one ban actually found in a file, as concrete text. */
 function hitsFor(text: string, ban: ForeignPattern): string[] {
-  // The MATCHED TEXT, never the pattern source, so an exemption stays as narrow
-  // as it claims to be: exempting `FUTURE_PAY_AUDIT_VOCABULARY` on one path
-  // leaves `FUTURE_PAY_TRACKED_MODELS` on that same path failing. Deduplicated,
+  // The MATCHED TEXT, never the pattern source. Deduplicated,
   // so one banned name repeated in a file is one offence and not a wall.
   const global = new RegExp(ban.pattern.source, `${ban.pattern.flags.replace('g', '')}g`);
   return [...new Set(text.match(global) ?? [])];
 }
 
 /**
- * Every ban a file's text trips.
- *
- * `removedVocabularyPatterns` is exempt on exactly ONE path — the migration
- * table in ADOPTING.md, whose left column has to name what was removed. The
- * prose bans are exempt nowhere at all.
+ * Every ban a file's text trips. No exemptions: the migration table that once
+ * needed to name the removed exports moved to the 2.x tags' git history, so
+ * every packed entry — ADOPTING.md included — is swept with the full list.
  */
 export function offencesIn(entry: string, text: string): string[] {
-  const removedAllowed = entry === REMOVED_EXPORTS_ALLOWED_IN;
-  const bans = removedAllowed
-    ? foreignPatterns()
-    : [...foreignPatterns(), ...removedVocabularyPatterns()];
+  const bans = [...foreignPatterns(), ...removedVocabularyPatterns()];
   return bans.flatMap((ban) => hitsFor(text, ban).map((hit) => `${entry}: "${hit}"`));
 }
 
@@ -133,7 +127,7 @@ describe('the tarball npm would upload', () => {
     // The module that used to ship one application's vocabulary. Named here
     // rather than left to the word sweep: the sweep would also pass if the file
     // came back holding a DIFFERENT product's values.
-    expect(files).not.toContain('src/core/future-pay-vocabulary.ts');
+    expect(files).not.toContain(`src/core/${HOST1}-${HOST2}-vocabulary.ts`);
 
     // `files` excludes these, and it has to keep doing so: the portability
     // hosts name a vocabulary on purpose, and the ban list itself is a file
@@ -199,37 +193,19 @@ describe('the tarball npm would upload', () => {
     expect(offencesIn('src/innocent.ts', innocent)).toEqual([]);
   });
 
-  it('keeps the ADOPTING.md exemption narrow, and load-bearing', () => {
-    // An exemption that swallowed the whole file would hide the next leak in
-    // it, and one keyed on the pattern rather than the path would hide every
-    // removed name everywhere. Both directions are asserted with the REAL list.
-    const migrationRow = '| `FUTURE_PAY_AUDIT_VOCABULARY` | the origin catalog | gone |';
-    expect(offencesIn(REMOVED_EXPORTS_ALLOWED_IN, migrationRow)).toEqual([]);
-    // Same text, any other packed file: still a failure. Reported as the text
-    // the ban MATCHED, which is what keeps an exemption as narrow as it claims.
-    expect(offencesIn('src/index.ts', migrationRow)).toEqual([
-      'src/index.ts: "FUTURE_PAY_AUDIT"',
-    ]);
-    // Same file, a PROSE ban rather than a removed export: still a failure, so
-    // the exemption is scoped to the migration table's job and not to the file.
-    expect(offencesIn(REMOVED_EXPORTS_ALLOWED_IN, 'one trail per loja')).toEqual([
-      'ADOPTING.md: "loja"',
+  it('sweeps ADOPTING.md with the FULL list — the old exemption stayed dead', () => {
+    // ADOPTING.md once held the one documented exemption: the 2.x → 3.0.0
+    // migration table had to name the removed host-branded exports. That table
+    // is gone (git history keeps it), so a removed name reappearing there is a
+    // failure like anywhere else — asserted here so the exemption cannot creep
+    // back in silently.
+    const HOST_PREFIX = `${HOST1.toUpperCase()}_${HOST2.toUpperCase()}`;
+    const migrationRow = `| \`${HOST_PREFIX}_AUDIT_VOCABULARY\` | the origin catalog | gone |`;
+    // Two bans fire on one row — the brand itself and the removed export — and
+    // both are reported: the exemption that would have swallowed either is gone.
+    expect(offencesIn('ADOPTING.md', migrationRow)).toEqual([
+      `ADOPTING.md: "${HOST_PREFIX}"`,
+      `ADOPTING.md: "${HOST_PREFIX}_AUDIT"`,
     ]);
   });
-
-  /* eslint-disable test-flakiness/no-unmocked-fs --
-     see above: the published bytes are the subject. */
-  it('proves the exemption is not quietly dead', () => {
-    // If ADOPTING.md ever stops naming the removed exports, the exemption
-    // becomes decorative and its scoping cases prove the scoping of a rule
-    // nothing exercises. So the file must still contain them.
-    const adopting = readFileSync(join(PACKAGE_ROOT, REMOVED_EXPORTS_ALLOWED_IN), 'utf8');
-    const named = removedVocabularyPatterns().filter(({ pattern }) =>
-      new RegExp(pattern.source, pattern.flags.replace('g', '')).test(adopting),
-    );
-    expect(named.map(({ label }) => label)).toEqual(
-      expect.arrayContaining(['FUTURE_PAY_AUDIT_*', 'FUTURE_PAY_TRACKED_MODELS']),
-    );
-  });
-  /* eslint-enable test-flakiness/no-unmocked-fs */
 });

@@ -17,7 +17,7 @@ import {
 } from '../index';
 
 /**
- * The rbac:coverage gate (12-13) — ported behaviors from future-pay's
+ * The rbac:coverage gate (12-13) — ported behaviors from the origin host's
  * `scripts/rbac/coverage.ts` + `detect.ts`: guard detection over stripped
  * source, per-symbol attribution (the piggyback defense), exclusion matching
  * on segment boundaries, stale-exclusion pruning and the entitlement

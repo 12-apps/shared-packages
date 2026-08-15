@@ -16,7 +16,7 @@ import type { GeneratedTool } from "../types";
  * ask again: a tool that shipped stays invisible to every ALREADY CONNECTED
  * client for as long as that connection lives.
  *
- * That is not a hypothetical. In `future-pay` a new tool reached production,
+ * That is not a hypothetical. In the origin host a new tool reached production,
  * answered on its route, and did not appear in a live connector — behind a
  * `serverInfo.version` frozen at its initial value while ~280 tools were added
  * underneath it. Nothing was broken; the only thing asking anyone to bump it was

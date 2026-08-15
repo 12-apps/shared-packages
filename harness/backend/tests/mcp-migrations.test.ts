@@ -16,10 +16,10 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * @12-apps/mcp ships the three tables behind its authorization server (12-23) —
- * the port of future-pay's `oauth-schema.integration.test.ts`, asserted against
+ * the port of the origin host's `oauth-schema.integration.test.ts`, asserted against
  * the tarball.
  *
- * Two properties matter more than the rest: the migration REPLAYS (future-pay
+ * Two properties matter more than the rest: the migration REPLAYS (the origin host
  * already has these tables, so adoption is a no-op or it is a failed deploy), and
  * there is deliberately NO code table — authorization codes are stateless signed
  * blobs, so a host inheriting an `oauth_codes` table would be inheriting a

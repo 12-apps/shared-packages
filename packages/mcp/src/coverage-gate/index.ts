@@ -6,7 +6,7 @@ import { collectRouteMethods } from "./route-methods";
 
 /**
  * `@12-apps/mcp/coverage` — the MCP route/action coverage gate (12-23), moved out
- * of future-pay's `apps/web/scripts/mcp/coverage.ts` so a host's own script is a
+ * of the origin host's `apps/web/scripts/mcp/coverage.ts` so a host's own script is a
  * one-line re-export and the CI workflow that shells out to the consumer's
  * `mcp:coverage` package script (`12-apps/ci`'s `mcp-contract.yml`) keeps working
  * unchanged.

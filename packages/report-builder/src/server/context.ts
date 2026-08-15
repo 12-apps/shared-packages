@@ -123,7 +123,7 @@ export interface ReportBuilderServerConfig {
    * host's data.
    *
    * REQUIRED, and every catalog entity must appear (checked at assembly). It
-   * used to default to future-pay's map, which meant a silent host's `orders`
+   * used to default to the origin host's map, which meant a silent host's `orders`
    * entity was gated by `reports:sales:read` — an id belonging to another
    * application's catalog — while an entity that map did not name was
    * queryable by nobody at all. Both halves were policy nobody had stated.
@@ -132,7 +132,7 @@ export interface ReportBuilderServerConfig {
   /**
    * The built-in reports offered at `/reports/system`. Pass `[]` to serve none.
    *
-   * REQUIRED, including the empty case: it used to default to future-pay's
+   * REQUIRED, including the empty case: it used to default to the origin host's
    * seven presets, so a host that named none advertised `vendas-resumo` and
    * `cozinha-por-cozinheiro` over its own catalog. Each is compile-validated
    * against `catalog` at assembly.
@@ -200,7 +200,7 @@ export function isDuplicateName(error: unknown): boolean {
  *
  * A permission check, not the `canAuthor` boolean it replaces. That boolean
  * made each host derive an answer this package's own surface decides, and the
- * derivation was invisible from here: future-pay computed it from a hardcoded
+ * derivation was invisible from here: the origin host computed it from a hardcoded
  * set of role names, so "who may build a report" was not expressible as a grant
  * in the very role editor that grants everything else.
  */

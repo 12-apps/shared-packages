@@ -20,7 +20,7 @@ import { onboardingRoutes } from "./routes";
  *
  *  - **Authentication and tenant resolution** — the host hands over an
  *    `OnboardingActor` (`{ userId, clientId }`), which IS the row's isolation.
- *  - **Authorization** — the tenant-admin gate future-pay applies before
+ *  - **Authorization** — the tenant-admin gate the origin host applies before
  *    delegating (`requireTenantAdminBySlug`).
  *  - **Where the data lives** — the owned model through the `db` seam.
  */

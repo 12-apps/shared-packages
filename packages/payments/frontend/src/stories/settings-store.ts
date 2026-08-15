@@ -80,7 +80,7 @@ interface SettingsStoryWorld {
 /**
  * The merchant-scoped prefix the shipped admin mounts one client per store on
  * (`/api/admin/<slug>/payments`). Kept in that shape so the wire the stories
- * drive is the wire future-pay drives — and because `baseUrl` is the key the
+ * drive is the wire the origin host drives — and because `baseUrl` is the key the
  * components scope their per-store browser state on (the setup confirmation).
  */
 export const SETTINGS_BASE_URL = "/api/admin/loja-1/payments";
@@ -162,7 +162,7 @@ async function seedSettings(
 
 /**
  * What this store has already done, read from the SAME rows the page renders
- * — future-pay's `setupProgressFor`, story-sized. It is what makes a guide
+ * — the origin host's `setupProgressFor`, story-sized. It is what makes a guide
  * open on a later step when a story seeds a further stage.
  */
 async function progressFor(
@@ -183,7 +183,7 @@ async function progressFor(
 
 /**
  * The HTTP surface over the real domain services — the same
- * `createPaymentsHttp` composition future-pay's `gateway.ts` builds, with the
+ * `createPaymentsHttp` composition the origin host's `gateway.ts` builds, with the
  * memory stores standing in for Prisma.
  */
 function settingsHttp(
@@ -247,7 +247,7 @@ export function createSettingsStoryStore(spec: SettingsStorySpec = {}): Settings
   const connections = createMemoryProviderConfigStore();
   const seeded = seedSettings(spec, catalog, connections);
 
-  // The same mount future-pay's admin catch-all builds: host auth first, then
+  // The same mount the origin host's admin catch-all builds: host auth first, then
   // merchant attribution, then the one handler the intent names.
   // `completeOAuth` is excluded exactly as it is there — only a
   // state-validating callback may spend an authorization code, and a story

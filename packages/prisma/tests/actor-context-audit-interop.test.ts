@@ -53,9 +53,9 @@ import {
 // The declaration a host makes, at module scope so it runs before any case
 // stamps an actor — moving the key after the store exists is refused, which is
 // the guard that keeps this from being a way to fork the store rather than share
-// it. `'__futurePayActorStore'` is THIS package's key; the audit package no
+// it. `'__12appsPrismaActorStore'` is THIS package's key; the audit package no
 // longer knows it.
-declareActorContextKey('__futurePayActorStore');
+declareActorContextKey('__12appsPrismaActorStore');
 const REAL = 'support-agent';
 const TARGET = 'shop-owner';
 

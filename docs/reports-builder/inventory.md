@@ -5,7 +5,7 @@ invents components that duplicate yours, and the result looks foreign no matter 
 behaviour is."
 
 **Scope of "this codebase":** `12-apps/shared-packages`. The design system is `packages/ui`
-(`@12-apps/ui`), and the screens being ported are `packages/report-builder/src/react`. future-pay has
+(`@12-apps/ui`), and the screens being ported are `packages/report-builder/src/react`. The origin host has
 no `packages/ui` — it consumes the published `@12-apps/ui`, so a component invented here would be
 invented for every consumer, not just one app.
 

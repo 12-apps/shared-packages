@@ -47,7 +47,7 @@ function panelTarget(draft: ReportDraft, selectedId: string | null): PanelTarget
       id: null,
     };
   }
-  // The test id is the one future-pay's reports e2e drives, so it stays keyed
+  // The test id is the one the origin host's reports e2e drives, so it stays keyed
   // by the BLOCK even though the panel no longer belongs to one.
   return {
     key: block.id,

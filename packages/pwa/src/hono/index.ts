@@ -29,7 +29,7 @@ export interface PwaHono extends ApiPwa {
  * The host this request claims. The forwarded header is read FIRST because a
  * reverse proxy is the normal topology for per-tenant domains — but it is a
  * CLAIM: whether to honour it is `resolveApp`'s decision, and the whole point of
- * the seam is that the host owns that call (future-pay resolves it against
+ * the seam is that the host owns that call (the origin host resolves it against
  * verified-domain rows, so a spoofed header resolves to nothing).
  */
 function hostOf(c: Context): string {

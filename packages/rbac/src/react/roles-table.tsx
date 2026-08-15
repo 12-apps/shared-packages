@@ -10,7 +10,7 @@ import type { RoleListRowWire } from './api';
 /**
  * The Papéis grid rows (12-13) — split from `roles-screen.tsx` so the screen
  * stays within the size gate. A plain table with the same test ids the
- * future-pay grid carried (`roles-grid`, per-row action test ids).
+ * origin host's grid carried (`roles-grid`, per-row action test ids).
  */
 
 interface RolesTableProps {

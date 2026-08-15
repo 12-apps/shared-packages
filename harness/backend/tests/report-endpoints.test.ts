@@ -117,7 +117,7 @@ function memoryDb(seed: Row[]) {
  * handed to the mount below, because there is nowhere else it could come from
  * any more.
  *
- * It used to be justified the other way round: "the Future Pay tier the default
+ * It used to be justified the other way round: "the tier the origin host's default
  * `entityPermission` map already assigns to `orders`", narrowing "by the
  * SHIPPED policy rather than by one this test invented". That default is gone.
  * A package cannot ship the policy over a host's data, and a harness that took
@@ -152,7 +152,7 @@ const OUTSIDER: ReportActor = { ...STAFF, userId: 'u3', permissions: [] };
 
 /**
  * A built-in defined over THIS harness's catalog. The shipped presets are
- * written against Future Pay's real field catalog, so running one here would
+ * written against the origin host's real field catalog, so running one here would
  * be testing the wrong thing; what matters is that a host can name its own and
  * that the routes narrow, run and echo them.
  */
@@ -530,7 +530,7 @@ describe('the host’s row cap is the host’s', () => {
     // `maxRows` is a HOST setting, so nothing inside the library had ever run
     // a spec whose limit exceeded it. When one did, the safety cap was read as
     // an author's top-N and the answer came back with cap + 1 rows, carrying an
-    // "Outros" bucket nobody asked for. future-pay's route test found it.
+    // "Outros" bucket nobody asked for. The origin host's route test found it.
     const { route } = setup({ maxRows: 1 });
 
     const response = await route('POST', '/reports/run').handle({

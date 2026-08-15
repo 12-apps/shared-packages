@@ -1,5 +1,5 @@
 /* eslint-disable test-flakiness/no-database-operations -- the database is the
-   subject: this is future-pay's onboarding route suite plus its tenant-isolation
+   subject: this is the origin host's onboarding route suite plus its tenant-isolation
    integration suite, ported to run against the PUBLISHED tarball over a real
    Postgres, driving the same app the browser drives. */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -9,7 +9,7 @@ import { ONBOARDING_TENANT, ONBOARDING_TENANT_B } from '../src/onboarding-host';
 
 /**
  * The @12-apps/onboarding progress surface end-to-end (12-23): the port of
- * future-pay's `onboarding/[featureKey]/__tests__/route.test.ts` and
+ * the origin host's `onboarding/[featureKey]/__tests__/route.test.ts` and
  * `onboarding-tenant-isolation.integration.test.ts`, now exercised through the
  * published package's own Hono router over its own migration — with the host
  * reduced to the two seams the ADOPTING contract names (the actor, the db).

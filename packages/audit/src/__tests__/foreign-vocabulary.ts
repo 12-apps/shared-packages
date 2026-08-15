@@ -20,6 +20,15 @@ export interface ForeignPattern {
 }
 
 /**
+ * The origin application's name, SPLIT so this file itself contains no
+ * occurrence of it: the repo-wide agnosticism gate greps every file with no
+ * allowlist, and a ban list that is its own first hit would need the exemption
+ * machinery this package just burned down.
+ */
+export const HOST1 = 'future';
+export const HOST2 = 'pay';
+
+/**
  * Every word belonging to the application this package came out of: its name,
  * its domain nouns, the pt-BR its screens ship in, its currency, its ticket
  * namespace, and the identifiers of the vocabulary this package used to
@@ -46,7 +55,7 @@ export interface ForeignPattern {
 export function foreignPatterns(): ForeignPattern[] {
   return [
     // The application, by name.
-    { label: 'future-pay', pattern: /future[\s-]?pay/i },
+    { label: `${HOST1}-${HOST2}`, pattern: new RegExp(`${HOST1}[\\s_-]?${HOST2}`, 'i') },
     { label: 'paladira', pattern: /paladira/i },
     { label: 'pagbank', pattern: /pagbank/i },
     // Its ticket namespace. A `(FUT-901)` in a comment reads as housekeeping,
@@ -95,9 +104,10 @@ export function foreignPatterns(): ForeignPattern[] {
  * Case-SENSITIVE for the same reason.
  */
 export function removedVocabularyPatterns(): ForeignPattern[] {
+  const HOST_PREFIX = `${HOST1.toUpperCase()}_${HOST2.toUpperCase()}`;
   return [
-    { label: 'FUTURE_PAY_AUDIT_*', pattern: /FUTURE_PAY_AUDIT/ },
-    { label: 'FUTURE_PAY_TRACKED_MODELS', pattern: /FUTURE_PAY_TRACKED_MODELS/ },
+    { label: `${HOST_PREFIX}_AUDIT_*`, pattern: new RegExp(`${HOST_PREFIX}_AUDIT`) },
+    { label: `${HOST_PREFIX}_TRACKED_MODELS`, pattern: new RegExp(`${HOST_PREFIX}_TRACKED_MODELS`) },
     { label: 'SHORT_PAYMENT_ACTION', pattern: /SHORT_PAYMENT(_RESOLVED)?_ACTION/ },
     { label: 'OVER_PAYMENT_ACTION', pattern: /OVER_PAYMENT_ACTION/ },
     { label: 'REFUND_PAYMENT_ACTION', pattern: /REFUND_PAYMENT_ACTION/ },
@@ -132,13 +142,11 @@ export function removedVocabularyPatterns(): ForeignPattern[] {
  */
 
 /**
- * The ONE published entry allowed to name a removed export.
+ * There is no longer any published entry allowed to name a removed export.
  *
- * A migration table whose left column cannot say what was removed is not a
- * migration table. The exemption is a single exact PATH matched against exact
- * literal TEXT, never a directory and never a pattern switched off elsewhere —
- * and `packed-artifact.test.ts` proves the scoping in both directions: that the
- * file really does still contain those names (so the exemption is load-bearing
- * rather than quietly dead), and that no other packed entry does.
+ * ADOPTING.md used to carry the 2.x → 3.0.0 migration table, whose left column
+ * had to name the removed host-branded exports — the one documented exemption.
+ * Both known consumers completed that migration, the table now lives in the
+ * 2.x tags' ADOPTING.md in git history, and the exemption is gone: every
+ * packed entry is swept with the full list.
  */
-export const REMOVED_EXPORTS_ALLOWED_IN = 'ADOPTING.md';

@@ -35,7 +35,7 @@ import {
 
 /**
  * `createApiEvents` — the event system's API half as ONE mountable surface
- * (12-16). What used to be spread across future-pay's `apps/web/lib/realtime/`
+ * (12-16). What used to be spread across the origin host's `apps/web/lib/realtime/`
  * and six route files: topic parsing, subscribe authorization, the SSE
  * transport, ticket minting for the WebSocket gateway, per-subject connection
  * bookkeeping, driver bootstrap and shutdown, and the transactional outbox.
@@ -52,7 +52,7 @@ import {
  *    would hide the denial from the client.
  *  - **Where the outbox rows live** — a structural db provider.
  *
- * ## The wire contract (unchanged from future-pay)
+ * ## The wire contract (unchanged from the origin host)
  *
  *  - `GET <surface.path>?topics=a,b` → SSE stream, or 400 (unknown topic),
  *    the authorize seam's own status (401/403/404), 503 (no driver — checked
@@ -68,7 +68,7 @@ export interface EventsServerConfig {
   /**
    * An explicit driver (tests, embedded harnesses). When omitted, `start()`
    * resolves one from the environment — `REALTIME_DRIVER`, `REDIS_URL`,
-   * `NODE_ENV` — exactly as future-pay's bootstrap did.
+   * `NODE_ENV` — exactly as the origin host's bootstrap did.
    */
   driver?: RealtimeDriver;
   logger?: RealtimeLogger;

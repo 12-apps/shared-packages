@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * `lifecycle-migrations` pin for their tarballs, plus the one property those two
  * do not need: **replay safety per column**.
  *
- * The first adopters already HAVE these tables (future-pay created them by hand
+ * The first adopters already HAVE these tables (the origin host created them by hand
  * before the package existed), so the migration has to be a no-op there and
  * correct on an empty database. `CREATE TABLE IF NOT EXISTS` alone is the trap
  * it must avoid — it skips the whole table, so a host whose table predates a

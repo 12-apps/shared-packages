@@ -5,7 +5,7 @@ import { stripCommentsAndStrings } from './detect';
 
 /**
  * Static-scan helpers for the RBAC coverage gate (12-13) — the discovery half
- * of future-pay's `scripts/lib/surface-scan.ts`, shipped with the package so
+ * of the origin host's `scripts/lib/surface-scan.ts`, shipped with the package so
  * the gate and the guards it looks for version together.
  *
  * THE SCAN ROOT IS THE WHOLE `app` FOLDER, never `app/api`, and that is

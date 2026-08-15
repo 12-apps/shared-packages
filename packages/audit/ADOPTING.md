@@ -15,11 +15,7 @@ config.
 
 | Removed in 2.0 | Was | Now |
 | --- | --- | --- |
-| `FUTURE_PAY_AUDIT_VOCABULARY` | one application's actions + resources | `defineAuditVocabulary({ actions, resources })` — yours |
-| `FUTURE_PAY_AUDIT_ACTIONS` | that application's action array | the `actions` map of your own spec |
-| `FUTURE_PAY_AUDIT_RESOURCES` | that application's resource array | the `resources` map of your own spec |
-| `FUTURE_PAY_TRACKED_MODELS` | that application's five Prisma model names | `trackedModels` on the server config — yours |
-| `SHORT_PAYMENT_ACTION`, `OVER_PAYMENT_ACTION`, `REFUND_PAYMENT_ACTION`, `DISPUTE_PAYMENT_ACTION`, `SHORT_PAYMENT_RESOLVED_ACTION` | that application's action literals, exported so its own reconciliation lists could select on them | declare them in your own module beside the vocabulary; a package cannot own a host's selectors |
+| the host-branded vocabulary constants (the origin application's actions, resources, tracked-model names and payment-action literals — the exact export names are in the 1.x/2.x tags' copy of this file) | one application's catalog, published as everybody's default | `defineAuditVocabulary({ actions, resources })`, `trackedModels` on the server config, and your own module for any selector literals — all yours |
 | `indexVocabulary(vocabulary)` | built an index from a loose literal | `defineAuditVocabulary(spec)` — the index IS the vocabulary now, and it is guarded |
 | `AuditVocabularyIndex` (type) | the built index | `AuditVocabulary` |
 | `AuditVocabulary` (type) | a loose `{ actions: [], resources: [] }` literal | `AuditVocabularySpec` is the input; `AuditVocabulary` is what the factory returns |

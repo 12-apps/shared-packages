@@ -3,7 +3,7 @@
  *
  * A complete, runnable note-taking SaaS wired to the library with ONLY its own
  * feature catalog, its own plans and the two ports. It deliberately imports
- * NOTHING from `./fixtures` and nothing from Future Pay. If this suite compiles
+ * NOTHING from `./fixtures` and nothing from the origin host. If this suite compiles
  * and passes, the core is portable: nothing in it presumes restaurants,
  * tenants named `Client`, Prisma, Next.js — or billing.
  *
@@ -17,7 +17,7 @@ import { definePlans } from '../core/plans';
 import { defineFeatures } from '../core/registry';
 import type { EntitlementSource, UsageCounter } from '../core/types';
 
-// ── The note app's own catalog (nothing shared with Future Pay) ─────────────
+// ── The note app's own catalog (nothing shared with the origin host) ─────────────
 const NOTE_FEATURES = defineFeatures({
   'notes.read': { retainWhenRestricted: true },
   'notes.export': { onRevoke: 'hide' },

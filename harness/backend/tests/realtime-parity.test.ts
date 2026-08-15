@@ -10,7 +10,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_SILENT_BASELINE,
-  FUTURE_PAY_PUBLISHER_DECLARATIONS,
   runPublisherParity,
   type PublisherEntry,
   type PublisherParityDomains,
@@ -21,8 +20,8 @@ import {
  * against a real repo layout on disk.
  *
  * The package's own suite covers the rules. This one covers the ADOPTION: that `./parity`
- * resolves for a consumer, that its shipped future-pay declarations are usable as example
- * material, and that a host's `.realtime-silent-domains.json` sitting at the repo root is
+ * resolves for a consumer, that a host-authored declaration list drives it end to end, and
+ * that a host's `.realtime-silent-domains.json` sitting at the repo root is
  * found with no configuration. #150 shipped a `./coverage` export that resolved for nobody,
  * and the review of #156 found two subpaths no test imported — a gate a host cannot actually
  * run is the same failure wearing a different name.
@@ -58,14 +57,26 @@ const EMPTY_RATCHET = JSON.stringify({
   silent: [],
 });
 
-/** Every future-pay publisher module, as a file that really emits. */
-function futurePayModules(): Record<string, string> {
+/**
+ * A host's declarations, authored HERE the way an adopter authors its own: one entry per
+ * subscribable domain, each naming the repo-relative module that emits for it. The package
+ * deliberately ships no example to fall back on — a completeness gate cannot supply its
+ * own subject — so the harness plays the adopter and declares a small registry of its own.
+ */
+const EXAMPLE_DECLARATIONS: readonly PublisherEntry[] = [
+  { scheme: 'tenant', domain: 'orders', declaration: { kind: 'publishes', module: 'src/realtime/order-hints.ts' } },
+  { scheme: 'tenant', domain: 'billing', declaration: { kind: 'publishes', module: 'src/realtime/billing-hints.ts' } },
+  { scheme: 'tenant', domain: 'inventory', declaration: { kind: 'publishes', module: 'src/realtime/inventory-hints.ts' } },
+  { scheme: 'user', domain: 'alerts', declaration: { kind: 'publishes', module: 'src/realtime/user-hints.ts' } },
+  { scheme: 'user', domain: 'consent', declaration: { kind: 'publishes', module: 'src/realtime/user-hints.ts' } },
+];
+
+/** Every declared publisher module, as a file that really emits. */
+function exampleModules(): Record<string, string> {
   return {
     [DEFAULT_SILENT_BASELINE]: EMPTY_RATCHET,
     ...Object.fromEntries(
-      FUTURE_PAY_PUBLISHER_DECLARATIONS.filter(
-        (entry) => entry.declaration.kind === 'publishes',
-      ).map((entry) => [
+      EXAMPLE_DECLARATIONS.filter((entry) => entry.declaration.kind === 'publishes').map((entry) => [
         (entry.declaration as { module: string }).module,
         'await publishRealtimeEvent(topic, { type: "x", data: {} });\n',
       ]),
@@ -74,11 +85,9 @@ function futurePayModules(): Record<string, string> {
 }
 
 /** The registry the example declarations are complete against, derived from them. */
-function futurePayDomains(): PublisherParityDomains {
+function exampleDomains(): PublisherParityDomains {
   const of = (scheme: 'tenant' | 'user'): string[] =>
-    FUTURE_PAY_PUBLISHER_DECLARATIONS.filter((entry) => entry.scheme === scheme).map(
-      (entry) => entry.domain,
-    );
+    EXAMPLE_DECLARATIONS.filter((entry) => entry.scheme === scheme).map((entry) => entry.domain);
   return { tenant: of('tenant'), user: of('user') };
 }
 
@@ -86,27 +95,27 @@ function futurePayDomains(): PublisherParityDomains {
 function parityOf(root: string, overrides: Partial<Parameters<typeof runPublisherParity>[0]> = {}) {
   return runPublisherParity({
     root,
-    declarations: FUTURE_PAY_PUBLISHER_DECLARATIONS,
-    domains: futurePayDomains(),
+    declarations: EXAMPLE_DECLARATIONS,
+    domains: exampleDomains(),
     ...overrides,
   });
 }
 
 /** The first declared publisher, and the module path it claims. */
 function firstPublisherModule(): string {
-  const [first] = FUTURE_PAY_PUBLISHER_DECLARATIONS;
+  const [first] = EXAMPLE_DECLARATIONS;
   if (!first || first.declaration.kind !== 'publishes') throw new Error('no publisher declared');
   return first.declaration.module;
 }
 
-/** `futurePayModules()` with one entry replaced — a named helper, not a test-body mutation. */
+/** `exampleModules()` with one entry replaced — a named helper, not a test-body mutation. */
 function modulesWith(path: string, contents: string): Record<string, string> {
-  return { ...futurePayModules(), [path]: contents };
+  return { ...exampleModules(), [path]: contents };
 }
 
-/** `futurePayModules()` with one entry removed. */
+/** `exampleModules()` with one entry removed. */
 function modulesWithout(path: string): Record<string, string> {
-  const { [path]: _removed, ...rest } = futurePayModules();
+  const { [path]: _removed, ...rest } = exampleModules();
   return rest;
 }
 
@@ -114,12 +123,12 @@ describe('@12-apps/realtime/parity — a host can run this gate', () => {
   it('passes on a repo whose registry, declarations and publisher modules all agree', () => {
     // The example declarations paired with the registry they cover, plus a root ratchet
     // file: no `baselineFile`, so the default `.realtime-silent-domains.json` is found.
-    const root = fakeHost(futurePayModules());
+    const root = fakeHost(exampleModules());
     expect(parityOf(root)).toMatchObject({
       ok: true,
       problems: [],
       silent: [],
-      publishing: FUTURE_PAY_PUBLISHER_DECLARATIONS.length,
+      publishing: EXAMPLE_DECLARATIONS.length,
     });
   });
 
@@ -127,8 +136,8 @@ describe('@12-apps/realtime/parity — a host can run this gate', () => {
     // The regression the gate exists for, and the one it could not see while the host's
     // lists were optional: `tenant:stock` is subscribable, so a screen connects, is told it
     // is live and relaxes its poll to 30 s — and no publisher was ever written.
-    const domains = futurePayDomains();
-    const result = parityOf(fakeHost(futurePayModules()), {
+    const domains = exampleDomains();
+    const result = parityOf(fakeHost(exampleModules()), {
       domains: { ...domains, tenant: [...domains.tenant, 'stock'] },
     });
     expect(result.ok).toBe(false);
@@ -157,9 +166,9 @@ describe('@12-apps/realtime/parity — a host can run this gate', () => {
       domain: 'novo',
       declaration: { kind: 'silent', ticket: '12-99', why: 'no emitter yet' },
     };
-    const domains = futurePayDomains();
+    const domains = exampleDomains();
     const result = parityOf(fakeHost({ [DEFAULT_SILENT_BASELINE]: EMPTY_RATCHET }), {
-      declarations: [...FUTURE_PAY_PUBLISHER_DECLARATIONS, silent],
+      declarations: [...EXAMPLE_DECLARATIONS, silent],
       domains: { ...domains, tenant: [...domains.tenant, 'novo'] },
     });
     expect(result.ok).toBe(false);

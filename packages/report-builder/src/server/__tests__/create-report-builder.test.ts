@@ -312,7 +312,7 @@ describe('the built-in reports', () => {
   });
 
   it('serves no built-ins at all when the host declares none', async () => {
-    // The case that used to serve future-pay's seven presets to a silent host.
+    // The case that used to serve the origin host's seven presets to a silent host.
     // An empty list is now the only thing "I have no built-ins" can mean, and
     // it is an empty LIST rather than a 403: refusing here would say "you may
     // not", when what is true is "there are none".

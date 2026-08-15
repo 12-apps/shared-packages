@@ -136,7 +136,7 @@ export interface FieldDef {
    *
    * A STRING dimension that declares this is asserting that its values sort
    * into their real order LEXICOGRAPHICALLY, because a string column is all
-   * the sort has to work with. Future Pay's six — `orders.hourOfDay` /
+   * the sort has to work with. The origin host's six — `orders.hourOfDay` /
    * `dayOfWeek` and the kitchen's four — are encoded precisely so they do:
    * the hour is zero-padded ("09", never "9") and the weekday numeric-prefixed
    * ("1-seg", never "seg"). Shortening either would sort 10:00 before 09:00

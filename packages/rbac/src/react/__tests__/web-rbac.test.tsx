@@ -10,7 +10,7 @@ import { splitRoleSelection } from '../team-screen';
 
 /**
  * The web half's pure logic + the role form's affordances (12-13) — the
- * package port of what future-pay's admin asserted about the roles dialog:
+ * package port of what the origin host's admin asserted about the roles dialog:
  * submit unlocks only with a name AND a permission, the counter reflects the
  * composed set, and SoD/owner-marker checkboxes protect the composition.
  */

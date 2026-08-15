@@ -3,7 +3,7 @@ import type { McpOauthContext } from "./context";
 import type { TokenEndpointAuthMethod } from "./stores";
 
 /**
- * RFC 7591 Dynamic Client Registration (12-23, ported from future-pay's
+ * RFC 7591 Dynamic Client Registration (12-23, ported from the origin host's
  * `app/api/oauth/register/route.ts`).
  *
  * An external host (a Claude.ai / ChatGPT connector) self-registers by POSTing RFC

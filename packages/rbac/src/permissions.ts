@@ -9,7 +9,7 @@
  * this surface gates, it gates with one of these.
  *
  * WHAT USED TO BE HERE, and why it left (12-13 follow-up): a 61-id catalog of
- * Future Pay's products, orders, mesas, kitchen, stock and payments, plus that
+ * the origin host's products, orders, mesas, kitchen, stock and payments, plus that
  * host's eight role templates and its governance policy — under a header that
  * called itself "application DATA, not generic core" while sitting inside the
  * package every other host installs. A permission belongs to whoever owns the

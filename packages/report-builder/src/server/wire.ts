@@ -41,7 +41,7 @@ export const reportsParams = z.object({
  * A built-in's path params.
  *
  * `key` is a plain string here, and used to be `z.enum(SYSTEM_REPORT_KEYS)` —
- * an enum of future-pay's seven preset keys, baked into the schema every host's
+ * an enum of the origin host's seven preset keys, baked into the schema every host's
  * MCP registry advertises and every handler validates with. For any other host
  * that is a contract that rejects its OWN reports and offers an agent a menu of
  * seven it does not have. An unknown key is answered by the route with 404,

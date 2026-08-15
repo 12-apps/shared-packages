@@ -129,10 +129,10 @@ describe('provider skeletons (stub mode)', () => {
   /**
    * NO GUIDE MAY NAME AN ADOPTER (FUT-760/761).
    *
-   * Two of these guides used to address the platform as "o Future Pay" in the
-   * middle of a pt-BR instruction, so every host installing this package
-   * shipped one particular storefront's brand to its own store owners — in
-   * copy, not in a comment. `brandName` is the seam that fixed it, and this is
+   * Two of these guides used to address the platform by the origin host's own
+   * brand name ("o <brand>…") in the middle of a pt-BR instruction, so every
+   * host installing this package shipped one particular storefront's brand to
+   * its own store owners — in copy, not in a comment. `brandName` is the seam that fixed it, and this is
    * the assertion that keeps it fixed: render every guide under a brand no
    * adopter uses, then require that the rendered text says THAT and contains
    * no known adopter's name.

@@ -13,7 +13,7 @@ import type { ReportSpec } from '../spec';
  * Which is exactly why they cannot live here. This module used to hold seven of
  * them — receita por dia, produtos mais vendidos, tempo de preparo por estação,
  * horas por estação, formas de pagamento, perdas por motivo, movimentações de
- * estoque — built from future-pay's starter specs, imported at module scope by
+ * estoque — built from the origin host's starter specs, imported at module scope by
  * the editor canvas, and rendered to every host that mounted the surface. A
  * picker offering "Horas trabalhadas por estação" to a store with no kitchen is
  * not a default; it is another product's menu.

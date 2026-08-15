@@ -43,7 +43,7 @@ lint, type-check, build, and test. So:
   and is tested once.
 
 That third point is the compounding one, and it grows with the org. Today
-`future-pay` is the only serious consumer. With `future-drink` arriving as a
+the origin host is the only serious consumer. With `future-drink` arriving as a
 second, and `base-app` as a third, the ratio of "shared code that could be
 public" to "app-specific code that must stay private" moves further in favour of
 publishing.
@@ -136,7 +136,7 @@ here the moment it does, and starts mattering more in the private consumers.
 
 ### Blocker — RESOLVED
 
-> **Status:** resolved when the packages were re-imported from `future-pay`.
+> **Status:** resolved when the packages were re-imported from the origin host.
 > `packages/shared-helpers/prisma/schema/schema.prisma` is now datasource +
 > generator only; the app's domain models never came across. What the host
 > schema holds is 17 models, every one of them owned by a plugin package in
@@ -152,7 +152,7 @@ seed data — the full commerce domain: `Order`, `OrderCharge`, `Payment`,
 `SavedCard`, `CustomerProfile`, `StockLot`, `StockMovement`, `Recipe`,
 `RecipeComponent`, `Supplier`, `LossEvent`, `OAuthClient`, `OAuthRefreshToken`,
 `McpConnection`, `Membership`, `PaymentIntegration`. Publishing it publishes
-`future-pay`'s design — every entity, every relationship, every payment state
+the origin host's design — every entity, every relationship, every payment state
 transition. It also carries 41 `FUT-*` internal tracker references.
 
 Two independent reasons this has to be resolved first, and the second is the
@@ -160,7 +160,7 @@ important one:
 
 1. **Disclosure.** A public repo would expose the product's complete data model.
 2. **It blocks the multi-project plan outright.** The entire point of pushing
-   code into `shared-packages` is that `future-drink` and `future-pay` can share
+   code into `shared-packages` is that `future-drink` and the origin host can share
    it. A schema hardcoded to one app's domain cannot be shared by two apps — so
    this split has to happen for the refactor to work *even if the repo stays
    private forever*. Open-sourcing just makes the deadline visible.
@@ -172,7 +172,7 @@ across, because they carry no models and are reusable by both apps.
 
 ### Excluded — host-coupled, not shareable
 
-Three things were deliberately left in `future-pay`, each for the same reason:
+Three things were deliberately left in the origin host, each for the same reason:
 they cannot function without the app's schema or its screens.
 
 - **`shared-helpers/src/notifications/`** — the only module in the package that
@@ -207,7 +207,7 @@ they cannot function without the app's schema or its screens.
 
 ### Leaks that are real but low-harm
 
-- `12-apps/ci`'s `README.md` and `CONSUMING.md` name `future-pay`, `apps/web`,
+- `12-apps/ci`'s `README.md` and `CONSUMING.md` name the origin host, `apps/web`,
   and `apps/admin`, and document the deployment topology (DigitalOcean droplet
   running docker-compose, GHCR images, Cloudflare Pages/Workers) plus the exact
   secret *names* consumers must set. This is architecture disclosure, not
@@ -261,7 +261,7 @@ proxies each tool call to the real endpoint carrying the caller's bearer token �
 holding *zero* authorization logic, so the agent can do exactly what the user
 can — is a pattern people are actively looking for. It is already written
 app-agnostic, already declares MIT, and after the `futuredrink` fix has no
-internal references left beyond two doc mentions of `future-pay`.
+internal references left beyond two doc mentions of the origin host.
 
 **`@12-apps/ui`** is ~90 MUI-based components across ~155k LOC (mostly stories
 and test-stories). Real value, but public means issues, accessibility reports,
@@ -297,7 +297,7 @@ once and get both payoffs.
 6. **Independently, fix the job topology** — consolidate the four install-heavy
    jobs, route through `monorepo-static.yml` for `turbo --affected` and the
    `.turbo` cache. It stops mattering here once the repo is public, but the same
-   fix applies in `future-pay` and `future-drink`, where it will keep mattering.
+   fix applies in the origin host and `future-drink`, where it will keep mattering.
 
 ## Sources
 

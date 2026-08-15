@@ -34,7 +34,7 @@ library updates, every host updates with **no app changes**. Same contract
    `enabled: false` authorize/token/jwks/discovery answer **404** — a probe cannot
    tell a disabled AS from an app that has none — while registration answers
    **403 `access_denied`**, because RFC 7591 has a code for "the endpoint is here,
-   registration is closed". future-pay passes
+   registration is closed". The origin host passes
    `enabled: () => process.env.MCP_BEARER_ENABLED === 'true'`, so the surface stays
    OFF until an operator opts in.
 4. **No signing key, no tokens.** `signingKey` defaults to the env-backed provider
@@ -51,7 +51,7 @@ library updates, every host updates with **no app changes**. Same contract
    the internal origin rather than to an attacker's. Issuance and verification read
    the same resolver from the same request, which is what stops "minted for A,
    verified against B" from rejecting valid tokens.
-   `trustedOriginsFromEnv('MCP_OAUTH_TRUSTED_ORIGINS')` keeps future-pay's wiring.
+   `trustedOriginsFromEnv('MCP_OAUTH_TRUSTED_ORIGINS')` keeps the origin host's wiring.
 6. **The stores are narrow ports; Prisma fills them in one line.**
    `createPrismaMcpStores(async () => prisma as unknown as McpOauthPrisma)`. A
    non-Prisma host implements `OAuthClientStore` / `RefreshTokenStore` /
@@ -104,7 +104,7 @@ library updates, every host updates with **no app changes**. Same contract
      default, and it is deliberately the inconvenient one.
 10. **Connections are per USER, not per tenant** — an MCP bearer is
     auth-passthrough. `connections.resolveUserId(email)` maps the token's email to
-    the host's user id (future-pay resolves it by email because `session.user.id` is
+    the host's user id (the origin host resolves it by email because `session.user.id` is
     the OAuth `sub`); returning `null` records nothing. Recording is best-effort and
     FENCED: a failing directory can never turn a valid grant into a 500, and nothing
     about the attempt is logged, because the only values in hand are an email and a
@@ -211,7 +211,7 @@ Two things about the gates worth knowing before you adopt them:
   committed exclusions file the moment it adopted the package, so it needs its own
   burn-down).
 
-## Phase B — adopting into a host that ALREADY has these tables (future-pay)
+## Phase B — adopting into a host that ALREADY has these tables (the origin host)
 
 **Nothing to baseline.** Every statement in the package migration is guarded
 (`CREATE TABLE IF NOT EXISTS`, `CREATE [UNIQUE] INDEX IF NOT EXISTS`, `ADD COLUMN
@@ -223,8 +223,8 @@ a host that already has `oauth_clients` / `oauth_refresh_tokens` /
 Deliberate deltas to reconcile:
 
 - **The FK from `mcp_connections.user_id` to `users` is not in the package
-  migration** — host vocabulary. future-pay keeps its `ON DELETE CASCADE`.
-- **`onboarding_states` is not here.** future-pay's migration created it beside
+  migration** — host vocabulary. The origin host keeps its `ON DELETE CASCADE`.
+- **`onboarding_states` is not here.** The origin host's migration created it beside
   `mcp_connections`; it belongs to `@12-apps/onboarding` (12-23).
 - The host's `lib/mcp/oauth/**` (~1.5k LOC) and its four route files are replaced
   by the mount plus, where a coverage gate forces the file to exist, a one-line
@@ -242,7 +242,7 @@ Deliberate deltas to reconcile:
   and redactions, is the host's catalogue. The package generates, dispatches and
   gates it.
 - **`mcp:lint`, `mcp:parity`, `mcp:smoke`, `mcp:test-coverage`** — the remaining
-  future-pay MCP scripts. Only the two the reusable CI workflows shell out to moved
+  the origin host MCP scripts. Only the two the reusable CI workflows shell out to moved
   (12-23's scope).
 - **Authorization codes as rows.** They are stateless signed blobs, so there is no
   table and nothing to sweep — only the replay store (rule 8).

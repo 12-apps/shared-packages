@@ -19,7 +19,7 @@ declaration per collection rather than hand-written per entity.
 | **Core engine** | `@12-apps/entity-lifecycle` | Nothing to wire — the framework-free kernel: `createEntityLifecycle`, `resolveFeature`, diff/versioning, the store contracts and the in-memory adapters. |
 | **Server** | `@12-apps/entity-lifecycle/server` | Call `createApiEntityLifecycle({ db, entities, directory })` and mount the `routes` it returns — the versions / restore / drafts / recycle-bin / approvals endpoints for EVERY registered collection, with parsing, statuses, feature gates, approvals interception and the `{ data }` envelope inside. Also returns `entity(type)` — the handle the host's OWN entity routes use to funnel create/update/delete through the same machinery — and the `stores` bundle. |
 | **Hono** | `@12-apps/entity-lifecycle/hono` | `const lifecycle = entityLifecycleRouter({ ...serverConfig, resolveActor }); app.route('/api/admin/:tenantSlug', lifecycle.router)`. A one-call mount; `hono` is an OPTIONAL peer, so importing the root, `/server` or `/react` never resolves it. |
-| **React** | `@12-apps/entity-lifecycle/react` | Call `createWebEntityLifecycle({ apiBase })` and mount the `page` it returns (Lixeira + Aprovações behind the package's own tabs), or route `RecycleBinScreen` / `ApprovalsScreen` yourself. `VersionHistoryDialog` and `DraftBanner` are per-entity pieces you drop INTO your own editors, already bound to the same wire client. pt-BR product copy and the future-pay test ids ship inside. |
+| **React** | `@12-apps/entity-lifecycle/react` | Call `createWebEntityLifecycle({ apiBase })` and mount the `page` it returns (Lixeira + Aprovações behind the package's own tabs), or route `RecycleBinScreen` / `ApprovalsScreen` yourself. `VersionHistoryDialog` and `DraftBanner` are per-entity pieces you drop INTO your own editors, already bound to the same wire client. pt-BR product copy and the origin host's test ids ship inside. |
 | **Prisma** | `prisma/entity-lifecycle.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/entity-lifecycle prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma; a symlinked partial dangles under `turbo prune`). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 
 ## Host wiring rules (the ones that bite)
@@ -29,10 +29,10 @@ declaration per collection rather than hand-written per entity.
    caller's resolved `permissions`, optional `isSuper` — and the tenant's two
    **feature layers** (`entitlements` = the plan layer, `settings` = the
    config-panel toggles). The layers ride the actor because they are tenant
-   state the host owns (future-pay keeps them as two JSON columns on its
+   state the host owns (the origin host keeps them as two JSON columns on its
    tenant row); the package never reads a tenant table it cannot know the
    shape of. `null` → 401 before any handler runs.
-2. **A registration is a DECLARATION.** future-pay wrote six route files and a
+2. **A registration is a DECLARATION.** The origin host wrote six route files and a
    registration module per collection (ten collections in its dispatch
    registry, eight of them with per-entity routes: 54 route files including the
    six shared, ~1.8k LOC of registrations beside them); here a collection is one
@@ -61,7 +61,7 @@ declaration per collection rather than hand-written per entity.
    money logic is the host's — this package never learns what a plan is. What
    it does own is *where the answer is asked for*: `registration.authorize`,
    an async `(actor) => { ok: true } | { ok: false; status?, error? }` that
-   future-pay fills with `requireEntitlement(tenant, 'suppliers')`. It is
+   the origin host fills with `requireEntitlement(tenant, 'suppliers')`. It is
    awaited before every collection-scoped route AND inside the shared
    recycle-bin / approvals dispatch, after the row has named its collection. A
    denial crosses the wire unmodified (the host's `status` and `error`; default
@@ -76,7 +76,7 @@ declaration per collection rather than hand-written per entity.
    `request.entityType`), so no prefix-based wrapper can gate them. Skip
    `authorize` and a tenant whose `suppliers` feature is off can still purge a
    binned supplier for good and decide its parked writes — which is exactly the
-   hole future-pay closes by putting the gate in its context builder rather
+   hole the origin host closes by putting the gate in its context builder rather
    than in its routes.
 
    Distinct from it: the feature layers on the actor are the
@@ -88,12 +88,12 @@ declaration per collection rather than hand-written per entity.
    it and only `isSuper` can decide. The package never computes permissions —
    that is `@12-apps/rbac`'s job (or the host's).
 
-   A collection whose whole surface needs a permission — future-pay's `roles`,
+   A collection whose whole surface needs a permission — the origin host's `roles`,
    gated on `roles:manage` where its nine siblings need only the mount's admin
    tier — declares `routePermission`, checked on every collection-scoped route
    (`isSuper` bypasses). It deliberately does NOT gate the shared bin and
    inbox: those require the mount's own tier plus the collection's `authorize`,
-   which is the split future-pay ships.
+   which is the split the origin host ships.
 7. **Mount the packaged router BEFORE any host route shaped `/:slug/:id`.**
    Hono resolves by REGISTRATION order, mounted sub-routers included, so this
    is the host's call and nothing in the package can make it for you:
@@ -152,7 +152,7 @@ declaration per collection rather than hand-written per entity.
 | `retention` | no | version auto-clean (`{ maxVersions, maxAgeDays }`) with safe compaction |
 | `approvePermission` | no | the permission id that may DECIDE this collection's approvals; omitted = only `isSuper` |
 | `authorize` | no | the collection's own gate — `(actor) => { ok }`, async, the host's plan/billing answer (rule 5). Awaited before every collection-scoped route AND inside the shared bin/approvals dispatch; a denial's `status`/`error` pass through unmodified (default 403 + `featureDisabled`). Omitted = always authorized |
-| `routePermission` | no | a permission id required for every collection-scoped route (future-pay's `roles:manage`); `isSuper` bypasses; denial is 403 `routeNotAllowed`. Does not gate the shared bin/inbox (rule 6) |
+| `routePermission` | no | a permission id required for every collection-scoped route (the origin host's `roles:manage`); `isSuper` bypasses; denial is 403 `routeNotAllowed`. Does not gate the shared bin/inbox (rule 6) |
 | `ops` | yes | the host's `EntityOps` (rule 3) |
 | `publishedVersion` | no | read back a mirrored version column for the history dialog's "Versão atual". The host is then the authority on it, `null` included → **0** (an archived entity, whose read filters `archived_at IS NULL`, so every row keeps its Restaurar button). Omit the callback entirely and the highest recorded version is used |
 
@@ -162,15 +162,14 @@ declaration per collection rather than hand-written per entity.
 |---|---|---|---|
 | `apiBase` | yes | — | the admin mount the routes live under (`/api/admin/minha-loja`) |
 | `transport` | no | same-origin `fetch` | the ONLY way the screens perform I/O — substitute it and you have substituted the backend |
-| `entityTypeLabels` | no | future-pay's pt-BR catalog | merged over the defaults; unknown types render as their raw key |
+| `entityTypeLabels` | no | — | the host's own pt-BR catalog; the package ships none, and an unlisted type renders as its raw key |
 
-The defaults are future-pay's vocabulary on purpose (the same posture as
-rbac's): future-pay adopts with near-zero config, and any other host reviews
-these tables once and names its own.
+The package ships no label catalog: every host — the origin host included —
+names its own, which is the same conclusion rbac's catalog reached.
 
 ## The endpoints
 
-Mounted under whatever prefix the host chooses (future-pay uses
+Mounted under whatever prefix the host chooses (the origin host uses
 `/api/admin/:tenantSlug`). Per registration (`:slug` below is the
 registration's own slug), in mount order:
 
@@ -276,10 +275,10 @@ const lifecycle = createWebEntityLifecycle({ apiBase: `/api/admin/${tenantSlug}`
 //   <lifecycle.VersionHistoryDialog resourcePath={`products/${id}`} … />
 ```
 
-## Phase B — adopting into a host that ALREADY has these tables (future-pay)
+## Phase B — adopting into a host that ALREADY has these tables (the origin host)
 
 The package migration unconditionally `CREATE TABLE`s the four tables, so a
-host whose schema already carries them (future-pay's
+host whose schema already carries them (the origin host's
 `20260722120000_add_entity_lifecycle`) must **baseline** it rather than run
 it: after the plugin-migration sync copies
 `20260813120000_add_entity_lifecycle_tables` into the host's migrations
@@ -289,12 +288,12 @@ before the next `migrate deploy`. Then reconcile the deliberate deltas:
 
 - **The `clients` FKs are dropped in the package migration** — `client_id` is
   a by-value scalar here because the package cannot know a host's tenant
-  table. future-pay's existing FKs (`ON DELETE CASCADE`) are compatible with
+  table. The origin host's existing FKs (`ON DELETE CASCADE`) are compatible with
   everything the package writes; keep them.
 - **The tenant feature layers stay host columns.** `lifecycle_entitlements` /
   `lifecycle_settings` on `clients` are host state; the actor carries them by
   value (rule 1). The RBAC `products:approve` backfill and the
-  `products.published_version` mirror column in future-pay's original
+  `products.published_version` mirror column in the origin host's original
   migration are host vocabulary too — the mirror is fed through
   `ops.onVersionRecorded` and read back through `publishedVersion`.
 - **The registration modules collapse into declarations.** Each
@@ -308,7 +307,7 @@ before the next `migrate deploy`. Then reconcile the deliberate deltas:
   `loss-reasons`, `roles`, `sectors`, `suppliers`, `tables`) each declare
   `authorize: (actor) => requireEntitlement(actor.tenantId, '<feature>')`
   folded into a verdict. Keeping it in a mount wrapper instead would drop the
-  gate on the recycle-bin and approvals item routes, which future-pay gates
+  gate on the recycle-bin and approvals item routes, which the origin host gates
   today *because* its context builder is where the gate lives (rule 5).
 - **`roles` keeps its route permission** — `requireTenantPermissionBySlug(slug,
   'roles:manage')`, which its four route files carry and its nine siblings do
@@ -317,7 +316,7 @@ before the next `migrate deploy`. Then reconcile the deliberate deltas:
   permissive than the files they replace: a tenant admin lacking it could read
   every role's permission history and publish a staged privilege change.
 - **Snapshot shape is unchanged** — the version/draft/request payloads the
-  package reads and writes are the same loose JSON future-pay recorded, so
+  package reads and writes are the same loose JSON the origin host recorded, so
   existing history replays without conversion.
 - **The admin pages** (`pages/recycle-bin`, `pages/approvals`, the shared
   `VersionHistoryDialog`, the product draft banner) become mounts of the
@@ -335,7 +334,7 @@ before the next `migrate deploy`. Then reconcile the deliberate deltas:
   stays money-free: it knows nothing of plans, features or upsells. What did
   move is the *seam* where the verdict is asked for (`authorize`, rule 5),
   because the shared bin/approvals routes have no other place to ask.
-- **Snapshotting host entities** (future-pay's `product-snapshot.ts` etc.) —
+- **Snapshotting host entities** (the origin host's `product-snapshot.ts` etc.) —
   that is `EntityOps.readSnapshot` / `applySnapshot`: the host's schema, the
   host's write model, including reference re-validation on restore (the
   current schema always wins; an old snapshot can never write a column that

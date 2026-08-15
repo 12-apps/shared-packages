@@ -11,7 +11,7 @@ import type { MemberWithRoles } from './team-role-dialog';
 /**
  * The Equipe roster rows (12-13) — split from `team-screen.tsx` so the
  * screen stays within the size gate. A plain table with the same test id the
- * future-pay grid carried (`team-grid`; rows are `tr` elements the specs
+ * origin host's grid carried (`team-grid`; rows are `tr` elements the specs
  * locate by text).
  */
 

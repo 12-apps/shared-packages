@@ -12,7 +12,7 @@ import { delegate, fakePrismaClient, type FakePrisma } from './fake-prisma';
 
 /**
  * The two Prisma extensions (12-14) — the `created_by`/`updated_by` stamp and the
- * append-only guard, ported from future-pay's `packages/prisma/src/*-extension.ts`
+ * append-only guard, ported from the origin host's `packages/prisma/src/*-extension.ts`
  * with the tracked-model set turned into config.
  *
  * These cases pin the SEMANTICS against a Prisma-shaped fake; the harness runs the
@@ -122,7 +122,7 @@ describe('created_by / updated_by stamping', () => {
   });
 
   it('runs the derive hook on EVERY tracked write, actor or not', async () => {
-    // The seam future-pay needs for its normalized `search_name` column: it has to
+    // The seam the origin host needs for its normalized `search_name` column: it has to
     // stay in sync on system and seed writes too, or the column drifts.
     const client = applyAuditStamps(fakePrismaClient(MODELS), {
       trackedModels: ['MenuItem'],

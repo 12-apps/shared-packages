@@ -7,7 +7,7 @@ import type { RoleListQuery } from './roles-store';
 import type { TeamListQuery } from './team-store';
 
 /**
- * The wire schemas (12-13) — ported from future-pay's
+ * The wire schemas (12-13) — ported from the origin host's
  * `lib/mcp/registry/roles.ts` + `team.ts`, built per-config because the
  * permission enum is the HOST's catalog, not a constant. Authored once, so an
  * advertised tool surface built on these can never drift from the runtime

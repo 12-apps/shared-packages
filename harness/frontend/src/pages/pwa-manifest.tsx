@@ -13,7 +13,7 @@ import { registerServiceWorker } from '@12-apps/pwa';
  *     different tenant domains and as one nobody registered — and prints what came
  *     back, so "one installable app per tenant" is a comparison rather than a
  *     claim. (`x-forwarded-host` is how a reverse proxy states the public host;
- *     whether to honour it is the HOST's call, and future-pay answers it against
+ *     whether to honour it is the HOST's call, and the origin host answers it against
  *     verified-domain rows.)
  *
  *  2. **The worker actually registers, at the root.** A worker's default scope is
