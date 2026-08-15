@@ -60,7 +60,7 @@ export { AUDIT_READ_PERMISSION } from '../core/permissions';
 
 export { gatesOf, messagesOf, modelNamesOf, pagingOf } from './policy';
 
-export { AUDIT_LOG_ORDER_BY } from './db';
+export { auditLogOrderBy, AUDIT_LOG_ORDER_BY, AUDIT_LOG_ORDER_BY_ASC } from './db';
 export type {
   AuditDb,
   AuditDbProvider,
@@ -69,6 +69,7 @@ export type {
   AuditLogOrderBy,
   AuditLogRecord,
   AuditLogWhere,
+  AuditSortDirection,
   AuditWriteClient,
 } from './db';
 

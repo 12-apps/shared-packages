@@ -84,13 +84,35 @@ export interface AuditLogWhere {
  * two-element tuple with fixed keys — so a hand-written implementation has a
  * finite thing to translate rather than "all of Prisma's orderBy".
  */
-export type AuditLogOrderBy = readonly [{ createdAt: 'desc' }, { id: 'desc' }];
+export type AuditSortDirection = 'asc' | 'desc';
+export type AuditLogOrderBy = readonly [
+  { createdAt: AuditSortDirection },
+  { id: AuditSortDirection },
+];
 
-/** The one order this package ever asks for. See {@link AuditLogOrderBy}. */
+/** The default order: newest first. See {@link AuditLogOrderBy}. */
 export const AUDIT_LOG_ORDER_BY: AuditLogOrderBy = Object.freeze([
   Object.freeze({ createdAt: 'desc' as const }),
   Object.freeze({ id: 'desc' as const }),
 ]) as AuditLogOrderBy;
+
+/** Oldest first — the same total order, read forwards. */
+export const AUDIT_LOG_ORDER_BY_ASC: AuditLogOrderBy = Object.freeze([
+  Object.freeze({ createdAt: 'asc' as const }),
+  Object.freeze({ id: 'asc' as const }),
+]) as AuditLogOrderBy;
+
+/**
+ * The order for one direction.
+ *
+ * The TIE-BREAK follows the direction rather than staying fixed: reversing only
+ * the timestamp would leave rows that share a millisecond in their old relative
+ * order, so page 1 ascending and page 1 descending would not be reverses of each
+ * other — and paging through the ascending view would skip and repeat exactly
+ * the ties the tie-break exists to pin down.
+ */
+export const auditLogOrderBy = (direction: AuditSortDirection): AuditLogOrderBy =>
+  direction === 'asc' ? AUDIT_LOG_ORDER_BY_ASC : AUDIT_LOG_ORDER_BY;
 
 export interface AuditLogDelegate {
   create(args: { data: AuditLogCreateData }): Promise<unknown>;

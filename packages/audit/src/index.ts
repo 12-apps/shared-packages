@@ -45,10 +45,12 @@ export {
 
 export { AUDIT_READ_PERMISSION } from './core/permissions';
 
+export { DEFAULT_AUDIT_SORT } from './core/types';
 export type {
   AuditActorOptionWire,
   AuditLogFilters,
   AuditLogPageWire,
   AuditLogWire,
   AuditPagination,
+  AuditSort,
 } from './core/types';

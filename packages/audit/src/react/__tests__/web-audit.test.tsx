@@ -233,12 +233,16 @@ describe('the filters', () => {
   it('sends the resource pill and the day bounds', async () => {
     const h = harness();
 
-    mount(h);
+    // The bounds are masked fields in the surface's declared locale, so what is
+    // TYPED is `dd/mm/aaaa` and what is SENT is the ISO day. The digit-by-digit
+    // properties of that field are `day-bound.test.tsx`'s; this case is about
+    // the query the surface builds from a whole one.
+    mount(h, { locale: 'pt-BR' });
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
     fireEvent.click(screen.getByTestId('audit-log-resource-lamp'));
-    fireEvent.change(screen.getByTestId('audit-log-from'), { target: { value: '2026-07-01' } });
-    fireEvent.change(screen.getByTestId('audit-log-to'), { target: { value: '2026-07-31' } });
+    fireEvent.change(screen.getByTestId('audit-log-from'), { target: { value: '01/07/2026' } });
+    fireEvent.change(screen.getByTestId('audit-log-to'), { target: { value: '31/07/2026' } });
 
     await waitFor(() => {
       const last = h.paths[h.paths.length - 1] ?? '';

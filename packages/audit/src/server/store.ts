@@ -20,7 +20,7 @@
 import type { AuditLogPageWire, AuditLogWire, AuditPagination } from '../core/types';
 
 import type { AuditDirectory, AuditUserIdentity } from './config';
-import { AUDIT_LOG_ORDER_BY } from './db';
+import { auditLogOrderBy } from './db';
 import type { AuditDb, AuditLogRecord, AuditLogWhere } from './db';
 import type { AuditLogQuery } from './wire';
 
@@ -183,11 +183,12 @@ export function createAuditStore(
       const [rows, total] = await Promise.all([
         client.auditLog.findMany({
           where,
-          // A TOTAL order, not just "newest first" — see AUDIT_LOG_ORDER_BY.
-          // Entries written in a burst share a millisecond, and without the id
-          // tie-break two pages of the same filtered set can order those ties
-          // differently: the operator sees one row twice and never sees another.
-          orderBy: AUDIT_LOG_ORDER_BY,
+          // A TOTAL order in whichever direction was asked for — see
+          // `auditLogOrderBy`. Entries written in a burst share a millisecond,
+          // and without the id tie-break two pages of the same filtered set can
+          // order those ties differently: the operator sees one row twice and
+          // never sees another.
+          orderBy: auditLogOrderBy(query.sort === 'createdAt:asc' ? 'asc' : 'desc'),
           skip: (query.page - 1) * query.pageSize,
           take: query.pageSize,
         }),

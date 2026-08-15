@@ -14,6 +14,7 @@
  */
 import { z } from 'zod';
 
+import { DEFAULT_AUDIT_SORT, type AuditSort } from '../core/types';
 import type { AuditVocabulary } from '../core/vocabulary';
 
 import {
@@ -61,15 +62,42 @@ const commaList = (allowed: readonly string[]): z.ZodType<string[] | undefined> 
       'Unknown filter value.',
     ) as unknown as z.ZodType<string[] | undefined>;
 
-const positiveInt = (fallback: number, max?: number): z.ZodType<number> =>
-  z
-    .string()
-    .optional()
-    .transform((raw) => {
-      const value = raw === undefined ? Number.NaN : Number.parseInt(raw, 10);
-      if (!Number.isFinite(value) || value < 1) return fallback;
-      return max !== undefined && value > max ? max : value;
-    }) as unknown as z.ZodType<number>;
+/**
+ * A clamped positive integer that ADVERTISES itself as one.
+ *
+ * The tolerant runtime behaviour is deliberate and unchanged — junk falls back
+ * to the default, an over-large value is clamped to the ceiling rather than
+ * refused, because a paging parameter is not what a caller came for and a 400
+ * there loses a page of a security log over a typo.
+ *
+ * What is NOT optional is saying so on the wire. Parsing this as
+ * `z.string().transform(...)` published `{"type":"string"}` to every generated
+ * OpenAPI doc and MCP tool, so a client had no way to learn the ceiling it was
+ * being clamped to, the default it would get, or that the field is an integer at
+ * all — the schema described the transport rather than the contract. `z.coerce`
+ * keeps the numeric constraints in the INPUT schema, and the clamp rides after
+ * them with `maximum` restated as metadata so the published bound is the bound
+ * the endpoint applies.
+ */
+const clampedInt = (fallback: number, max: number): z.ZodType<number> =>
+  z.coerce
+    .number()
+    .int()
+    .min(1)
+    .catch(fallback)
+    .transform((value) => Math.min(value, max))
+    .meta({ maximum: max }) as unknown as z.ZodType<number>;
+
+/**
+ * The free-text bound. Long enough for any resource id this searches (a uuid is
+ * 36), short enough that `LIKE '%…%'` cannot be handed a megabyte — the column
+ * is unindexed for `contains`, so the length of the needle is the cost of the
+ * scan, and it is chosen entirely by the caller.
+ */
+const MAX_SEARCH_LENGTH = 200;
+
+/** The orders this endpoint serves. See {@link AuditSort}. */
+const SORT_VALUES = ['createdAt:desc', 'createdAt:asc'] as const;
 
 /** The parsed query — what the store consumes. */
 export interface AuditLogQuery {
@@ -81,6 +109,8 @@ export interface AuditLogQuery {
   /** Inclusive day bounds, already resolved to UTC instants. */
   from?: Date;
   toExclusive?: Date;
+  /** Absent = the default order; see {@link DEFAULT_AUDIT_SORT}. */
+  sort?: AuditSort;
   page: number;
   pageSize: number;
 }
@@ -98,15 +128,20 @@ export function auditLogQuerySchema(
   paging: AuditPagingPolicy = DEFAULT_PAGINATION,
 ) {
   return z.object({
-    q: z.string().min(1).optional(),
+    q: z.string().min(1).max(MAX_SEARCH_LENGTH).optional(),
     action_in: commaList(vocabulary.actionIds),
     resourceType_in: commaList(vocabulary.resourceIds),
     actorUserId: z.string().min(1).optional(),
     resourceId: z.string().min(1).optional(),
     from: isoDate.optional(),
     to: isoDate.optional(),
-    page: positiveInt(1, paging.maxPage),
-    pageSize: positiveInt(paging.defaultPageSize, paging.maxPageSize),
+    // REFUSED rather than ignored when it is not one of the two orders. An
+    // accepted-and-dropped parameter is the worst of the three options: the
+    // caller gets a 200 carrying the OPPOSITE order to the one it asked for,
+    // and nothing anywhere says so.
+    sort: z.enum(SORT_VALUES).default(DEFAULT_AUDIT_SORT),
+    page: clampedInt(1, paging.maxPage),
+    pageSize: clampedInt(paging.defaultPageSize, paging.maxPageSize),
   });
 }
 
@@ -139,6 +174,7 @@ function narrowFilters(value: ParsedQuery): Omit<AuditLogQuery, 'page' | 'pageSi
     ...(value.resourceId ? { resourceId: value.resourceId } : {}),
     ...(value.from ? { from: atUtcMidnight(value.from) } : {}),
     ...(value.to ? { toExclusive: nextUtcMidnight(value.to) } : {}),
+    sort: value.sort,
   };
 }
 

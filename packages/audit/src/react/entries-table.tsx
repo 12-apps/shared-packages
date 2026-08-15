@@ -1,10 +1,11 @@
 import type { JSX } from 'react';
 
+import { Button } from '@12-apps/ui/form/Button';
 import { Box } from '@12-apps/ui/mui/Box';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { AuditLogWire } from '../core/types';
+import type { AuditLogWire, AuditSort } from '../core/types';
 import type { AuditVocabulary } from '../core/vocabulary';
 
 import { formatLabel, type AuditLabels } from './labels';
@@ -81,12 +82,46 @@ function ActorCell({
   );
 }
 
+/**
+ * The date column's header: the ONE sortable axis, as a toggle.
+ *
+ * `createdAt` is the only field a trail can be ordered by (see {@link AuditSort}),
+ * and "oldest first" is a real reading of it — a dispute is reconstructed
+ * forwards. The arrow states which way it is pointing now, so the control says
+ * what it will do rather than what it just did.
+ */
+function DateHeader({
+  labels,
+  sort,
+  onSortChange,
+}: {
+  labels: AuditLabels;
+  sort: AuditSort;
+  onSortChange: (next: AuditSort) => void;
+}): JSX.Element {
+  const ascending = sort === 'createdAt:asc';
+  return (
+    <Button
+      variant="text"
+      size="sm"
+      aria-label={labels.sortByDate}
+      dataTestId="audit-log-sort-date"
+      onClick={() => onSortChange(ascending ? 'createdAt:desc' : 'createdAt:asc')}
+    >
+      {`${labels.columnDate} ${ascending ? '↑' : '↓'}`}
+    </Button>
+  );
+}
+
 export interface AuditEntriesTableProps {
   entries: readonly AuditLogWire[];
   labels: AuditLabels;
   vocabulary: AuditVocabulary;
-  /** Stamp formatter — the host's locale, defaulting to pt-BR date + time. */
+  /** Stamp formatter — the host's locale, defaulting to the runtime's. */
   formatDate: (iso: string) => string;
+  /** The order in force, and the way to change it. */
+  sort: AuditSort;
+  onSortChange: (next: AuditSort) => void;
 }
 
 export function AuditEntriesTable({
@@ -94,6 +129,8 @@ export function AuditEntriesTable({
   labels,
   vocabulary,
   formatDate,
+  sort,
+  onSortChange,
 }: AuditEntriesTableProps): JSX.Element {
   return (
     <Box
@@ -103,8 +140,10 @@ export function AuditEntriesTable({
     >
       <Box component="thead">
         <Box component="tr">
+          <Box component="th" sx={{ ...CELL, textAlign: 'left' }}>
+            <DateHeader labels={labels} sort={sort} onSortChange={onSortChange} />
+          </Box>
           {[
-            labels.columnDate,
             labels.columnActor,
             labels.columnAction,
             labels.columnResource,

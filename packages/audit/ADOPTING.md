@@ -150,6 +150,23 @@ labels:   { title: '…', systemActor: '…', onBehalfOf: '{actor} … {subject}
 locale:   'pt-BR'   // the stamp formatter, or pass formatDate for full control
 ```
 
+`locale` also decides the DAY BOUNDS' segment order — `01/07/2026` under `pt-BR`,
+`07/01/2026` under `en-US` — and `labels.dayPlaceholder{Day,Month,Year}` supply
+its letters (`aaaa` rather than `yyyy` for a Portuguese screen). The order comes
+from `Intl`, the words come from you.
+
+The bounds are masked text fields rather than `<input type="date">`, for two
+reasons worth knowing before you restyle them:
+
+- **A controlled native date input cannot survive commit latency.** It reports a
+  WHOLE date from the year's first digit (`0002-…`), and a host mirroring filters
+  into a URL hands that back one commit later — mid-edit, over the browser's own
+  segment buffer. Typing `2026` at a 150 ms commit lag measured as the year
+  `0006`: a valid date, applied as a filter, with nothing on screen to say so.
+  A masked field commits only a WHOLE day, and never overwrites a half-typed one.
+- **A native date input renders in the BROWSER's locale**, which the page cannot
+  read or set, so the same field asks two merchants for two different orders.
+
 A blank override is refused at assembly: a blank message renders a denial as an
 empty box, and a blank label renders an empty cell — both read as a broken
 screen rather than as an untranslated one.
@@ -394,6 +411,14 @@ Deliberately asymmetric, in two places, and both drops are the point:
 | `pagination.defaultPageSize` | no | `20` | rows per page when the request names none |
 | `pagination.maxPageSize` | no | `100` | the ceiling a request's `pageSize` is clamped to |
 | `pagination.maxPage` | no | `10000` | the ceiling a request's `page` is clamped to |
+
+The listing's query parameters, as published: `q` (≤200 chars), `action_in`,
+`resourceType_in`, `actorUserId`, `resourceId`, `from`/`to` (inclusive
+`YYYY-MM-DD`), `sort` (`createdAt:desc` — the default — or `createdAt:asc`) and
+`page`/`pageSize` (integers, clamped to the numbers above). `sort` is the one
+axis a trail HAS; an unknown value is refused with a 400 rather than accepted
+and dropped, because an accepted-and-dropped sort answers a caller's request
+with the opposite order and no way to notice.
 
 Viewer config: `apiBase` and `vocabulary` are required; `transport`, `labels`,
 `locale`, `formatDate` and `fixedFilters` are optional.

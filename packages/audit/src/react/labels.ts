@@ -31,6 +31,26 @@ export interface AuditLabels {
   filterActor: string;
   filterFrom: string;
   filterTo: string;
+  /**
+   * The day bounds' placeholder segments, in the host's words.
+   *
+   * The ORDER they appear in is the locale's (see `resolveDayFormat`); these are
+   * only the letters, which are a translation like any other — a Brazilian
+   * merchant reads `aaaa` where an English one reads `yyyy`, and a field that
+   * spells its own format is the difference between typing it right the first
+   * time and discovering the order by getting it wrong.
+   */
+  dayPlaceholderDay: string;
+  dayPlaceholderMonth: string;
+  dayPlaceholderYear: string;
+  /**
+   * Accessible name for ONE bound's clear button — "{field}" is the bound's own
+   * label. Each bound carries its own, because clearing just "From" otherwise
+   * means pressing "Clear filters" and losing every other filter on the screen.
+   */
+  clearBound: string;
+  /** Accessible name for the date column's sort toggle. */
+  sortByDate: string;
   /** Placeholder for the free-text resource-id search. */
   searchPlaceholder: string;
   /** The actor cell for an entry with no actor (a webhook, a job). */
@@ -76,6 +96,11 @@ export const DEFAULT_LABELS: AuditLabels = {
   filterActor: 'Actor',
   filterFrom: 'From',
   filterTo: 'To',
+  dayPlaceholderDay: 'dd',
+  dayPlaceholderMonth: 'mm',
+  dayPlaceholderYear: 'yyyy',
+  clearBound: 'Clear {field}',
+  sortByDate: 'Sort by date',
   searchPlaceholder: 'Search by identifier',
   systemActor: 'System',
   onBehalfOf: '{actor} on behalf of {subject}',
