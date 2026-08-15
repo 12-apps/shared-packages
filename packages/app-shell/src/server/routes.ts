@@ -1,6 +1,6 @@
 /**
- * The consent surface's route DESCRIPTORS (12-18) — the package half of
- * future-pay's `app/api/consent/{status,terms}/route.ts`.
+ * The consent surface's route DESCRIPTORS (12-18) — the package half of a
+ * host's `consent/{status,terms}` endpoints.
  *
  * Framework-neutral: a descriptor takes a normalized request and answers a status
  * + body, so `./hono` is an adapter rather than the contract.

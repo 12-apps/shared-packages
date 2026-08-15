@@ -8,6 +8,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { CLUB_SERVER_MESSAGES } from '../../__tests__/host-copy';
+
 import { CONSENT_ACCEPT_PATH, CONSENT_STATUS_PATH } from '../../core/consent-wire';
 import { createApiAppShell } from '../create-api-app-shell';
 import type { AppShellRequest, AppShellServerConfig, ConsentActor } from '../config';
@@ -42,6 +44,7 @@ function host(
   const recorded: Recorded = { accepted: [], published: [] };
   const config: AppShellServerConfig = {
     termsVersion: VERSION,
+    messages: CLUB_SERVER_MESSAGES,
     consent: {
       resolveActor: () => actor,
       isCurrent: (_actor, version) => state.accepted === version,
