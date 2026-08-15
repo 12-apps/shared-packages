@@ -56,9 +56,9 @@ async function typeDayBound(page: Page, testId: string, iso: string): Promise<st
   const [year, month, day] = iso.split('-') as [string, string, string];
   const tokens = placeholder.split(/[^A-Za-z]+/).filter(Boolean);
   // A bound that announces no order is a bound whose order nobody can know —
-  // including this helper, which would then type nothing and let every
-  // assertion below pass vacuously.
-  expect(tokens, `${testId} must announce its segment order in its placeholder`).toHaveLength(3);
+  // including this helper, which would then type nothing into `testId` and let
+  // every assertion below pass vacuously.
+  expect(tokens).toHaveLength(3);
   const segments = tokens.map((token) => {
     const head = token.slice(0, 1).toLowerCase();
     if (head === 'y' || head === 'a') return year;
