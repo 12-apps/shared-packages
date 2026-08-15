@@ -105,8 +105,9 @@ that owns an approval gate ships its own duty pair rather than asking every host
 to remember it.
 
 Composition throws `RbacCatalogError` on a duplicated id (naming both sources),
-an SoD counterpart nothing contributes, a role granting an unknown id, or a
-policy naming an unknown role.
+a spec that does not declare a valid `kind` / `ownerMarker` / `separateFrom`, an
+SoD counterpart nothing contributes, a role granting an unknown id, or a policy
+naming an unknown role.
 
 ## 3. Build the engine (the DB seam)
 

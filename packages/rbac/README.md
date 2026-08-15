@@ -258,7 +258,12 @@ and the governance from another and have them disagree.
 (`class` / `instance`), its owner-marker flag, its separation-of-duties
 counterparts and its label. An id registered without its scope-kind resolves to
 `class` and skips the entity gate — the half-wiring that fails open — so there
-is no shape of the declaration that omits it.
+is no shape of the declaration that omits it. The TYPE says that where a catalog
+is written; composition says it again at assembly, because a catalog that is
+generated, read from config or parsed from JSON crosses that boundary exactly
+once. A spec whose `kind` is not `class`/`instance`, whose `ownerMarker` is not
+a boolean, or whose `separateFrom` is not a list of ids throws an
+`RbacCatalogError` (`INVALID_PERMISSION_SPEC`) naming the id and its source.
 
 **Collisions are loud.** Two sources contributing the same id throw an
 `RbacCatalogError` (`PERMISSION_COLLISION`) naming both, in either order. There
