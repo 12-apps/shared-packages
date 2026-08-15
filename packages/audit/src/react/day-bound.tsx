@@ -131,7 +131,7 @@ const display = (iso: string, format: DayFormat): string =>
  * round trip through UTC is the check — if the month or the day comes back
  * changed, the input was not a day.
  */
-export function isoOf(text: string, format: DayFormat): string {
+function isoOf(text: string, format: DayFormat): string {
   const digits = digitsIn(text);
   if (digits.length !== 8) return '';
   const cut = segmentsOf(digits, format);
