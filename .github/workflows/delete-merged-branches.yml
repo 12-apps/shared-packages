@@ -1,0 +1,136 @@
+name: Delete merged branches
+
+# Sweep away branches whose pull request has already landed.
+#
+# WHY this exists as a workflow rather than as a habit. This repository has
+# "Automatically delete head branches" switched OFF, so every merged PR leaves
+# its branch behind for ever. The list had grown to eighteen, nearly all of them
+# merged months apart, and a branch list that is mostly dead is not merely untidy
+# — it is the thing people read to answer "what is in flight?", so noise there
+# costs a real answer.
+#
+# WHY it is `workflow_dispatch` and nothing else. The permanent fix is the repo
+# SETTING (Settings → General → "Automatically delete head branches"), which
+# handles every future merge with no code at all. Duplicating that as an
+# on-merge job would race it the day someone flips the switch, and leave a
+# workflow nobody remembers is redundant. So this deliberately does only the
+# half the setting cannot: the ONE-OFF sweep of what has already accumulated.
+# Flip the setting as well, and this becomes a tool you reach for rarely.
+#
+# WHY a branch delete from CI is safe here, when it is the kind of sentence that
+# should make a reader suspicious. The criterion is not "looks stale" or "old" —
+# it is that GitHub reports a MERGED pull request for that exact head ref, which
+# means the commits are in the base branch's history and nothing is lost by
+# dropping the pointer. A branch with an open PR, or with no PR at all (somebody
+# working locally), is never touched. `dry_run` is the default answer to the
+# remaining doubt: run it once to read the list, then run it again to act.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'List what would be deleted without deleting it'
+        type: boolean
+        default: true
+      include_closed:
+        description: >-
+          Also delete branches whose PR was CLOSED without merging. Off by
+          default: an unmerged PR can still hold work that exists nowhere else.
+        type: boolean
+        default: false
+      extra:
+        description: >-
+          Space-separated branch names to delete regardless of PR state. For
+          refs that never had a PR at all.
+        type: string
+        default: ''
+
+# The only write this needs, and it is the reason the job cannot simply read.
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      # No checkout: every question here is answered by the API, and cloning a
+      # repository to delete a remote ref would be pure ceremony.
+      - name: Work out which branches have landed, and drop them
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          INCLUDE_CLOSED: ${{ inputs.include_closed }}
+          EXTRA: ${{ inputs.extra }}
+        run: |
+          set -euo pipefail
+
+          # Names that are never candidates whatever their PR history says.
+          # `release/*` is matched as a prefix below rather than listed.
+          PROTECTED='main master develop'
+
+          gh api "repos/$REPO/branches" --paginate --jq '.[].name' | sort -u > existing.txt
+          echo "branches on the remote: $(wc -l < existing.txt)"
+
+          # `--state merged` is the whole safety argument: GitHub is asserting
+          # these commits reached the base branch. Anything else is a guess.
+          gh pr list --repo "$REPO" --state merged --limit 500 \
+            --json headRefName --jq '.[].headRefName' | sort -u > landed.txt
+
+          if [ "$INCLUDE_CLOSED" = "true" ]; then
+            gh pr list --repo "$REPO" --state closed --limit 500 \
+              --json headRefName,mergedAt \
+              --jq '.[] | select(.mergedAt == null) | .headRefName' | sort -u >> landed.txt
+            sort -u -o landed.txt landed.txt
+          fi
+
+          for name in $EXTRA; do echo "$name" >> landed.txt; done
+          sort -u -o landed.txt landed.txt
+
+          # A branch with an OPEN pull request is in flight by definition, and
+          # outranks every other signal — including an explicit `extra`, because
+          # deleting the head of an open PR closes it.
+          gh pr list --repo "$REPO" --state open --limit 500 \
+            --json headRefName --jq '.[].headRefName' | sort -u > open.txt
+
+          comm -12 existing.txt landed.txt | comm -23 - open.txt > candidates.txt
+
+          deleted=0
+          skipped=0
+          while read -r branch; do
+            [ -n "$branch" ] || continue
+            case " $PROTECTED " in *" $branch "*) echo "skip (protected): $branch"; skipped=$((skipped+1)); continue;; esac
+            case "$branch" in release/*) echo "skip (release line): $branch"; skipped=$((skipped+1)); continue;; esac
+
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "would delete: $branch"
+              continue
+            fi
+
+            if gh api -X DELETE "repos/$REPO/git/refs/heads/$branch" --silent 2>/dev/null; then
+              echo "deleted: $branch"
+              deleted=$((deleted+1))
+            else
+              # A protected branch, or one deleted by someone else between the
+              # listing and now. Neither is worth failing the run over.
+              echo "::warning::could not delete $branch — protected, or already gone"
+              skipped=$((skipped+1))
+            fi
+          done < candidates.txt
+
+          {
+            echo "### Merged-branch sweep"
+            echo
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "Dry run — nothing was deleted. $(wc -l < candidates.txt) branch(es) would go:"
+              echo
+              sed 's/^/- `/; s/$/`/' candidates.txt
+              echo
+              echo "Re-run with \`dry_run\` unchecked to apply."
+            else
+              echo "Deleted **$deleted** branch(es), skipped **$skipped**."
+              echo
+              echo "$(wc -l < existing.txt) branch(es) were on the remote before this run."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
