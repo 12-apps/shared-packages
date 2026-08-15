@@ -40,6 +40,7 @@ export {
   useInboxList,
   useInboxState,
   useUnreadCount,
+  type NotificationsSignalHook,
   type NotificationsSubscribe,
 } from './hooks';
 

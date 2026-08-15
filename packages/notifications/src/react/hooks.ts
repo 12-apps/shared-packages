@@ -24,6 +24,26 @@ import {
  */
 export type NotificationsSubscribe = (onHint: () => void) => () => void;
 
+/**
+ * The same wiring, as a HOOK — for a host whose realtime connection lives in
+ * React context rather than in a module.
+ *
+ * `subscribe` above is supplied at FACTORY time, which is module scope, and a
+ * context-bound connection cannot be reached from there: the provider holding
+ * it is inside the tree. A host in that shape (a `<UserRealtimeProvider>` and a
+ * `useUserTopics` hook, which is the common one) had no way to pass anything at
+ * all, and the badge simply never heard an event.
+ *
+ * So this is the second door, and it is the one `@12-apps/app-shell` already
+ * uses for the same problem — its consent dialog takes a `useSignal` hook for
+ * exactly this reason. Two packages solving one problem two ways is how an
+ * adopter ends up believing the feature is unavailable to it.
+ *
+ * Called during render, so it may use context and hooks freely. Pass one or
+ * the other; passing both runs both, which is a host's business.
+ */
+export type NotificationsSignalHook = (onHint: () => void) => void;
+
 export function useInboxState(store: InboxStore): InboxState {
   return useSyncExternalStore(store.subscribe, store.getState, store.getState);
 }
@@ -36,11 +56,21 @@ export function useInboxState(store: InboxStore): InboxState {
  */
 export function useUnreadCount(
   store: InboxStore,
-  options: { enabled?: boolean; subscribe?: NotificationsSubscribe } = {},
+  options: {
+    enabled?: boolean;
+    subscribe?: NotificationsSubscribe;
+    useSignal?: NotificationsSignalHook;
+  } = {},
 ): number {
   const enabled = options.enabled ?? true;
   const subscribe = options.subscribe;
   const { unread } = useInboxState(store);
+
+  // Called unconditionally — it is a hook, so it cannot sit behind `enabled`.
+  // The host's own hook decides what to do when there is nothing to hear.
+  options.useSignal?.(() => {
+    if (enabled) store.invalidate();
+  });
 
   useEffect(() => {
     if (!enabled) return;
