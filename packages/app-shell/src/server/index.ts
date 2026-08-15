@@ -26,7 +26,9 @@ export {
   type ConsentActor,
   type ConsentCookieConfig,
   type ConsentSeam,
+  type ReportUnexpectedError,
   type ResolveConsentActor,
+  type UnexpectedErrorContext,
 } from './config';
 
 export { appShellRoutes } from './routes';
