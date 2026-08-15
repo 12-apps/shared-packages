@@ -2,12 +2,24 @@
   "name": "@12-apps/app-shell",
   "version": "1.0.0",
   "type": "module",
-  "description": "The shell three SPAs of one product share (12-18). Framework-free core (.): the typed JSON API client and its ApiError, the WCAG brand-palette correction, pt-BR formatting, the stale-chunk recovery and the consent wire. Browser half (./react: createWebAppShell — MUI theme from a tenant brand seed, session through @12-apps/auth, the route error boundary, lazyRoute, the terms/privacy consent gate and Apple-device detection). Backend half (./server: createApiAppShell — the consent status/accept endpoints behind host seams) with a Hono adapter (./hono), plus the Vite dependency pre-bundling preset the SPAs share (./vite). Standardized adoption contract in ADOPTING.md.",
+  "description": "The shell three SPAs of one product share (12-18). Framework-free core (.): the typed JSON API client and its ApiError, the WCAG brand-palette correction, pt-BR formatting, the stale-chunk recovery and the consent wire. Browser half (./react: createWebAppShell \u2014 MUI theme from a tenant brand seed, session through @12-apps/auth, the route error boundary, lazyRoute, the terms/privacy consent gate and Apple-device detection). Backend half (./server: createApiAppShell \u2014 the consent status/accept endpoints behind host seams) with a Hono adapter (./hono), plus the Vite dependency pre-bundling preset the SPAs share (./vite). Standardized adoption contract in ADOPTING.md.",
   "exports": {
-    ".": "./src/index.ts",
-    "./server": "./src/server/index.ts",
-    "./hono": "./src/hono/index.ts",
-    "./react": "./src/react/index.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
+    "./hono": {
+      "types": "./dist/hono/index.d.ts",
+      "default": "./dist/hono/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
     "./vite": {
       "types": "./dist/vite/index.d.ts",
       "default": "./dist/vite/index.js"

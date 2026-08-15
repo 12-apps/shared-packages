@@ -119,21 +119,76 @@ function checksNodeResolves({ manifest, entries, requireFrom }) {
  * the fixture installs with --omit=dev: eslint-config's three configs import
  * nine plugins between them, and every one of those imports threw
  * ERR_MODULE_NOT_FOUND for consumers while this repo stayed green.
+ *
+ * ## An absent OPTIONAL peer is the design, not a break
+ *
+ * The fixture is a bare consumer: npm installs a package's dependencies and its
+ * REQUIRED peers, and nothing at all for a peer marked optional. So an entry
+ * that exists to adapt an optional peer — `@12-apps/app-shell/hono` is a Hono
+ * adapter, `./react` is a React tower — cannot be imported there, and no
+ * packaging change could make it so. Failing on that would be asking a package
+ * to promise, in a consumer that opted OUT, that the thing it opted out of
+ * works.
+ *
+ * `checksImportsAreDeclared` already says this in as many words — *"the manifest
+ * is the subject, NOT the installed tree … absent-but-declared is the design;
+ * absent-and-undeclared is the bug"*. This check simply never had to apply the
+ * rule: until `@12-apps/app-shell` compiled its entries, no shipped `.js` in
+ * this repo had a RUNTIME import of an optional peer. The others' optional-peer
+ * imports are all type-only and erase (`impersonation` and `report-builder`'s
+ * `./e2e`, `app-shell`'s own `./vite`), and `observability-frontend/vite`
+ * imports `@sentry/vite-plugin`, which is a real dependency.
+ *
+ * So the excuse is narrow and it is the manifest that grants it: the ONE
+ * package Node names as missing has to be declared, by this manifest, as an
+ * optional peer. Anything else still fails — an undeclared import (the
+ * eslint-config case: those were devDependencies, which `declaredNames` does not
+ * include), a REQUIRED peer that is absent (npm installs those, so absence means
+ * something is genuinely wrong), a syntax error, a throwing top level, a bad
+ * export. Skips are PRINTED rather than swallowed, because a check nobody can
+ * see the extent of is the thing this file exists to replace.
  */
-async function checksEntriesImport({ pkgDir, entries }) {
+async function checksEntriesImport({ name, manifest, pkgDir, entries }) {
   const targets = [...new Set(entries.flatMap(({ targets: paths }) => paths))];
   const executable = targets.filter((target) => /\.[cm]?js$/.test(target));
   const results = await Promise.all(
-    executable.map((target) => importOrExplain(join(pkgDir, target), target)),
+    executable.map((target) => importOrExplain(join(pkgDir, target), target, manifest, name)),
   );
   return results.flat();
 }
 
-async function importOrExplain(path, target) {
+/** Optional peers, the only absences an entry is allowed to fail on. */
+function optionalPeers(manifest) {
+  return new Set(
+    Object.entries(manifest.peerDependenciesMeta ?? {})
+      .filter(([, meta]) => meta?.optional === true)
+      .map(([peer]) => peer),
+  );
+}
+
+/**
+ * The package Node could not find, read from its own message.
+ *
+ * `ERR_MODULE_NOT_FOUND` carries no structured field for it, and the quoted name
+ * is the PACKAGE — `hono/cookie` is reported as `hono` — which is exactly the
+ * granularity `peerDependenciesMeta` is keyed at. An unparseable message returns
+ * null and the entry fails, because an excuse nobody can name is not one.
+ */
+function missingPackageOf(error) {
+  if (error?.code !== "ERR_MODULE_NOT_FOUND") return null;
+  return /Cannot find package '([^']+)'/.exec(error.message ?? "")?.[1] ?? null;
+}
+
+async function importOrExplain(path, target, manifest, name) {
   try {
     await import(pathToFileURL(path).href);
     return [];
   } catch (error) {
+    const missing = missingPackageOf(error);
+    if (missing !== null && optionalPeers(manifest).has(missing)) {
+      console.log(`    · ${name} ${target}: not imported — optional peer "${missing}" is absent`);
+      return [];
+    }
     return [`importing ${target} failed: ${error.code ?? ""} ${error.message}`.trim()];
   }
 }
