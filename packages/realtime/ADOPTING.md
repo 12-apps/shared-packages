@@ -44,7 +44,7 @@ const web    = createWebEvents({ apiBase: "/api" });    // frontend
 
 3. **A qualifier is the only client-controlled part of a topic name.** Domains are
    deny-by-default and so are qualifiers: list a domain in `qualifiedDomains` only when
-   its `authorize` really checks the qualifier (future-pay's kitchen station reach is that
+   its `authorize` really checks the qualifier (the origin host's kitchen station reach is that
    check). A domain absent from that list cannot receive one — it is a 400 before
    `authorize` runs.
 
@@ -100,7 +100,7 @@ opaque subject hash in the ticket plus a per-subject ledger in the gateway (acco
 authorization); that is a deliberate non-goal today, not an oversight.
 
 **The wire's pt-BR strings are overridable.** They are defaults rather than constants
-because they ARE the wire contract — future-pay's SPAs read those exact bodies, so changing
+because they ARE the wire contract — the origin host's SPAs read those exact bodies, so changing
 one breaks every open tab — and because a generic package must not force Portuguese on an
 adopter. Pass `messages: { unavailable, invalidTopics, unknownTopic, tooMany }` (partial is
 fine). If you override `unknownTopic`, keep ONE message for "unknown domain" and for "that
@@ -426,9 +426,9 @@ publisherParityCli({
 });
 ```
 
-Both are inputs with no fallback. `FUTURE_PAY_PUBLISHER_DECLARATIONS` is still exported, as
-an EXAMPLE to copy — it was a default once, and that is precisely what let the gate run
-against somebody else's seven domains and report green.
+Both are inputs with no fallback, and the package ships no example list to fall back on —
+its first version defaulted `declarations` to one adopter's seven domains, and that is
+precisely what let the gate run against somebody else's registry and report green.
 
 with the ratchet beside it:
 
@@ -441,7 +441,7 @@ refused, and an entry that now publishes must be deleted in the same PR, so addi
 publisher is never enough on its own. Declaring a domain `silent` and ratcheting it is a
 legitimate answer to "this has no emitter yet"; declaring NOTHING is the hole.
 
-## Phase B — adopting into a host that ALREADY has these tables (future-pay)
+## Phase B — adopting into a host that ALREADY has these tables (the origin host)
 
 1. **Bump the exact pin** in every consuming `package.json` and refresh the lockfile.
    Nothing raises these pins by itself.

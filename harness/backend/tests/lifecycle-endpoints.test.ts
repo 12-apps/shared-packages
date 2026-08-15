@@ -1,5 +1,5 @@
 /* eslint-disable test-flakiness/no-database-operations -- the database is the
-   subject: these are future-pay's lifecycle route suites (versions / drafts /
+   subject: these are the origin host's lifecycle route suites (versions / drafts /
    recycle-bin / change-requests), ported to run against the PUBLISHED tarball
    over a real Postgres (PGlite), driving the same app the browser drives. */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -9,7 +9,7 @@ import { LIFECYCLE_TENANT_ID, LIFECYCLE_TENANT_OFF_ID } from '../src/lifecycle-h
 
 /**
  * The @12-apps/entity-lifecycle surface end-to-end (12-17): the port of
- * future-pay's colocated route tests for `[id]/versions`,
+ * the origin host's colocated route tests for `[id]/versions`,
  * `[id]/versions/[version]/restore`, `[id]/draft`, `drafts/**`,
  * `recycle-bin/**` and `approvals/**` — now exercised through the published
  * package's own Hono router, generated from two registrations, over its own

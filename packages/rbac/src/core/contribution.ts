@@ -107,7 +107,7 @@ export interface RbacLabelVocabulary extends PermissionLabelVocabulary {
 export interface PermissionContribution<P extends string> {
   /**
    * The owner, named in every composition error — a package name
-   * (`@12-apps/rbac`) or a host domain (`future-pay`). It is diagnostics, not
+   * (`@12-apps/rbac`) or a host domain (the host's own name). It is diagnostics, not
    * a namespace: ids are not prefixed with it.
    */
   readonly source: string;

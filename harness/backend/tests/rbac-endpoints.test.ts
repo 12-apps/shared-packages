@@ -1,5 +1,5 @@
 /* eslint-disable test-flakiness/no-database-operations -- the database is the
-   subject: these are future-pay's RBAC integration suites, ported to run
+   subject: these are the origin host's RBAC integration suites, ported to run
    against the PUBLISHED tarball over a real Postgres (PGlite), driving the
    same app the browser drives. */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -8,7 +8,7 @@ import { createHarnessBackend, type HarnessBackend } from '../src/app';
 import { RBAC_TENANT_B_ID, RBAC_TENANT_ID } from '../src/rbac-host';
 
 /**
- * The @12-apps/rbac surface end-to-end (12-13): the port of future-pay's
+ * The @12-apps/rbac surface end-to-end (12-13): the port of the origin host's
  * `rbac.integration.test.ts`, `custom-role.integration.test.ts`,
  * `rbac-roles-per-tenant` and the roles/team route tests — now exercised
  * through the published package's own Hono router over its own migrations,
@@ -308,7 +308,7 @@ describe('team — the roster over the directory seam', () => {
     );
     expect(permissions.data.permissions).toContain('titles:write');
 
-    // Restore, as the future-pay spec did, so ordering never matters.
+    // Restore, as the origin host spec did, so ordering never matters.
     await owner.send('PATCH', '/team/role-target', { role: 'CONSERVATOR' });
   });
 

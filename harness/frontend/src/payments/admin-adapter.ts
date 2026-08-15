@@ -226,7 +226,15 @@ function handleGuide(ctx: SetupGuideContext): ProviderSetupGuide {
         id: 'chave',
         title: 'Informe o arroba da loja',
         intro: 'O arroba identifica quem recebe as vendas.',
-        steps: [{ text: 'Copie o arroba no aplicativo Aurora e informe no campo abaixo.' }],
+        steps: [
+          { text: 'Copie o arroba no aplicativo Aurora e informe no campo abaixo.' },
+          // Addresses the platform BY NAME, out of `ctx.brandName` — the one
+          // shape of sentence that used to carry a hardcoded adopter brand
+          // out of the published package. Rendered here so the spec can
+          // assert against the real DOM that the host's word arrives, and
+          // that no other adopter's does.
+          { text: `É assim que ${ctx.brandName} confirma que a cobrança saiu desta conta.` },
+        ],
       },
       {
         id: 'ativar-cobrancas',

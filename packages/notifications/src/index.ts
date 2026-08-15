@@ -21,7 +21,6 @@
  */
 
 export {
-  NOTIFICATION_CATEGORIES,
   NOTIFICATION_CHANNELS,
   taxonomyOf,
   type DeliveryStatus,
@@ -60,8 +59,8 @@ export {
 export { normalizePhoneE164, type PhoneNormalizeOptions } from './phone';
 
 export {
-  DEFAULT_NOTIFICATION_MESSAGES,
   messagesOf,
+  type NotificationWireMessages,
   type NotificationMessages,
 } from './messages';
 

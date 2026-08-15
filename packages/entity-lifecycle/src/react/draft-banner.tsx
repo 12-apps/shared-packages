@@ -9,14 +9,14 @@ import type { DraftWire, LifecycleApiClient } from './api';
 import { DATE_TIME } from './labels';
 
 /**
- * The unpublished-draft banner (12-17), ported from future-pay's
+ * The unpublished-draft banner (12-17), ported from the origin host's
  * `product-draft-banner` and generalized to any registered collection: when
  * the tenant has drafts on and the item carries an open draft, offers
  * "Carregar rascunho" (the host prefills its form), "Publicar" and
  * "Descartar". The draft `data` payload is the same body the host's save
  * endpoints accept, so the prefill is a straight remap.
  *
- * `testIdPrefix` keeps the future-pay ids portable: the product editor passes
+ * `testIdPrefix` keeps the origin host ids portable: the product editor passes
  * `product-draft` and its specs keep matching `product-draft-banner`,
  * `product-draft-publish`, … verbatim.
  */
@@ -30,10 +30,10 @@ export interface DraftBannerProps {
   /** The draft was published; `applied: false` means parked for approval. */
   onPublished: (applied: boolean) => void;
   onDiscarded: () => void;
-  /** Test-id namespace; future-pay's product editor passes `product-draft`. */
+  /** Test-id namespace; the origin host's product editor passes `product-draft`. */
   testIdPrefix?: string;
   /** The notice, when the generic copy is wrong for the collection
-   * (future-pay's product editor says "Este produto tem…"). */
+   * (the origin host's product editor says "Este produto tem…"). */
   title?: string;
 }
 

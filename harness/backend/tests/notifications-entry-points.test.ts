@@ -53,8 +53,17 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
 
   it('the ROOT entry carries the framework-free core', () => {
     expect(core.NOTIFICATION_CHANNELS).toEqual(['EMAIL', 'SMS', 'WHATSAPP', 'WEB_PUSH']);
-    expect(core.NOTIFICATION_CATEGORIES).toContain('orders');
-    expect(core.DEFAULT_NOTIFICATION_MESSAGES.panelTitle).toBe('Notificações');
+    // No `NOTIFICATION_CATEGORIES`: the preference categories are the HOST's
+    // product vocabulary and this package ships none. Asserted as an absence,
+    // beside the sets it DOES own — `NOTIFICATION_CHANNELS` is the library's
+    // own closed set and stays.
+    expect(core).not.toHaveProperty('NOTIFICATION_CATEGORIES');
+    // Nor `DEFAULT_NOTIFICATION_MESSAGES`, for the same reason and one release
+    // later: it was ~40 sentences of the extraction origin's copy, labelled in
+    // its own source as that product's "exact copy", spread UNDER whatever a
+    // host passed. Asserted from a REPACKED TARBALL, so this says what npm
+    // actually uploads rather than what the working tree happens to contain.
+    expect(core).not.toHaveProperty('DEFAULT_NOTIFICATION_MESSAGES');
     // The country is the CALLER's, always: this package assumes none, so a US
     // adopter that forgets it cannot text a Brazilian stranger their customer's
     // order. That makes the second argument required, which is the shape below.

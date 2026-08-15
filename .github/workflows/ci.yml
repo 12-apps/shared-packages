@@ -31,6 +31,7 @@ env:
   PUBLISH_DIRS: >-
     packages/eslint-config
     packages/typescript-config
+    packages/request-scope
     packages/observability-backend
     packages/auth
     packages/entity-lifecycle
@@ -44,6 +45,7 @@ env:
     packages/payments/frontend
     packages/payments/e2e
     packages/ui
+    packages/impersonation
     packages/audit
     packages/storage
     packages/entitlements
@@ -647,9 +649,9 @@ jobs:
   # Layer 2 of the same idea: Consumer Verification proves the packages RESOLVE
   # from a tarball; this proves they still WORK once a browser runs them. It
   # renders the published payments adapters through the published settings page
-  # — the pairing future-pay is currently failing on, which neither repo's CI
+  # — the pairing the origin host is currently failing on, which neither repo's CI
   # covers: this one tests each package against its workspace siblings, and
-  # future-pay finds out at e2e time, a release too late.
+  # the origin host finds out at e2e time, a release too late.
   frontend-harness:
     name: Frontend Harness
     needs: changes

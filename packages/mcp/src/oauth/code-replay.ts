@@ -1,6 +1,6 @@
 /**
  * Single-use guard for the stateless authorization codes (12-23, ported from
- * future-pay's `lib/mcp/oauth/token-replay.ts`).
+ * the origin host's `lib/mcp/oauth/token-replay.ts`).
  *
  * A code is a signed blob with a `jti`, so "already redeemed" has to be remembered
  * somewhere. The in-process option remembers it IN THIS PROCESS: a small map of

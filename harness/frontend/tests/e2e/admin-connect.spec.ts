@@ -180,7 +180,7 @@ test('disconnect asks first, then clears tokens, status, proof and enablement', 
   await openProvider(page, 'cerrado');
 
   // Cancelling the confirmation writes nothing.
-  await page.getByRole('button', { name: 'Desconectar' }).click();
+  await page.getByTestId('payments-disconnect').click();
   await expect(page.getByTestId('payments-disconnect-confirm')).toBeVisible();
   await page.getByRole('button', { name: 'Cancelar' }).click();
   await expect(page.getByTestId('payments-disconnect-confirm')).toBeHidden();
@@ -189,7 +189,7 @@ test('disconnect asks first, then clears tokens, status, proof and enablement', 
   // Confirming disconnects: every environment's blob emptied, status back to
   // UNVERIFIED, the charge proof dropped, the chain rank gone — and the
   // button offers to connect again.
-  await page.getByRole('button', { name: 'Desconectar' }).click();
+  await page.getByTestId('payments-disconnect').click();
   await page.getByTestId('payments-disconnect-confirm-action').click();
   await expectWireOrder(page, ['POST /settings/providers/cerrado/oauth/disconnect 200']);
   await expect(page.getByTestId('admin-stored-cerrado-SANDBOX')).toHaveText('(none)');
@@ -204,7 +204,7 @@ test('a failing revoke is reported, and the disconnect still lands locally', asy
   await openAdminCase(page, 'revoke-fails');
   await openProvider(page, 'dunas');
 
-  await page.getByRole('button', { name: 'Desconectar' }).click();
+  await page.getByTestId('payments-disconnect').click();
   await page.getByTestId('payments-disconnect-confirm-action').click();
 
   // The provider never answered the revocation — the failure lands in the
@@ -235,9 +235,19 @@ test('no platform app registered: begin refuses with the package 409', async ({ 
 
   await page.getByRole('button', { name: 'Conectar com Cerrado Pagamentos' }).click();
 
-  // The prepare succeeded — the refusal is the PACKAGE's, on `beginOAuth`,
-  // and the component surfaces the raw refusal body in its own alert.
-  await expect(page.getByRole('alert').filter({ hasText: 'CredentialsError' })).toBeVisible();
+  // The prepare succeeded — the refusal is the PACKAGE's, on `beginOAuth`.
+  //
+  // What the owner reads is no longer the wire envelope. It used to be:
+  // `{"error":"CredentialsError","message":"No platform OAuth application
+  // credentials configured for cerrado/SANDBOX"}`, in a red box under the
+  // connect button, as the entire explanation of why nothing happened. An error
+  // class name is not the store owner's problem, and this particular refusal is
+  // not a fault they caused OR a dead end — the credentials path works and is
+  // on the same screen, so it says that instead.
+  const failure = page.getByTestId('payments-connect-failure');
+  await expect(failure).toBeVisible();
+  await expect(failure).toContainText('credenciais manualmente');
+  await expect(failure).not.toContainText('CredentialsError');
   await expectWireOrder(page, [
     'POST /oauth/prepare/cerrado 200',
     'POST /settings/providers/cerrado/oauth/begin 409',

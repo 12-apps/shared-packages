@@ -2,7 +2,7 @@ import type { RealtimeLogger } from "../core/types";
 
 /**
  * Everything the gateway process reads from the environment, resolved once and
- * validated loudly. Ported from future-pay's `apps/realtime-gateway/src/config.ts`.
+ * validated loudly. Ported from the origin host's `apps/realtime-gateway/src/config.ts`.
  *
  * The gateway is deliberately tiny in what it needs: a port, the shared ticket
  * secret, and the bus. It has NO database URL, NO session secret and NO RBAC

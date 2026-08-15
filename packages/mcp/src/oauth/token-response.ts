@@ -5,7 +5,7 @@ import type { OAuthClientStore } from "./stores";
 /**
  * The token endpoint's wire helpers: the RFC 6749 §5.1/§5.2 bodies and client
  * authentication (12-23, split out of the grant handlers so each file stays under
- * the size gate — the same split future-pay made).
+ * the size gate — the same split the origin host made).
  *
  * These bodies are NOT the house `{ data }` envelope, deliberately: they are read
  * by OAuth clients that expect the RFC shapes at the top level, and `Cache-Control:

@@ -7,7 +7,7 @@ import type { NotificationsApiClient } from './api';
  *
  * They have to share it: marking a row read in the panel must move the badge in
  * the same tick, and an arrival must add a row to the list AND to the count.
- * future-pay got that for free from a react-query cache the host had already
+ * the origin got that for free from a react-query cache the host had already
  * mounted; a published package cannot assume one — a query client is a host
  * decision, and requiring a particular one (or a particular version of one) is
  * the kind of dependency that keeps a package out of a host that made the other

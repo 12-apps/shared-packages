@@ -42,7 +42,7 @@ export function isEventsDenial(error: unknown): error is EventsDenial {
  *
  * ## Why the defaults are pt-BR, and why they are not "fixed" here
  *
- * They ARE the wire contract: future-pay's SPAs read these exact bodies today, so changing
+ * They ARE the wire contract: the origin host's SPAs read these exact bodies today, so changing
  * one is a breaking change to every open tab. That justifies the strings; it does not
  * justify a generic package having no way to override them, which is what a
  * non-Brazilian adopter met — Portuguese error bodies out of `@12-apps/realtime` with no
@@ -138,7 +138,7 @@ export interface EventsSurfaceConfig {
    * ids it resolved itself — the tenant from the path, the user from the session
    * — which is what makes the subscribe surface tenant-safe. A qualifier is
    * different: it is attacker-controlled text that the host is then expected to
-   * authorize, and future-pay's kitchen station reach is exactly that check.
+   * authorize, and the origin host's kitchen station reach is exactly that check.
    *
    * A domain that has no qualified form must therefore never receive one, and
    * "must never" is worth more as a structural refusal than as a rule in a

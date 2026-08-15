@@ -67,7 +67,7 @@ const ACTOR_HEADER = 'x-notifications-user';
 
 /**
  * The host's domain events. These are the part that deliberately does NOT port:
- * `order.paid` is Future Pay's vocabulary, and a host declares its own.
+ * `order.paid` is the origin host's vocabulary, and a host declares its own.
  */
 const GENERATORS: readonly NotificationGenerator<never>[] = [
   {
@@ -321,6 +321,26 @@ export function notificationsHost(pg: PGlite) {
   const latch = createOutboxLatch();
 
   const surface = notificationsRouter({
+    // The harness declares its own categories and its own copy, because the
+    // package ships neither — this is the wiring every adopter now performs.
+    //
+    // These four names are generic enough that a hardware shop uses the same
+    // words the extraction origin did; the LABELS beside them, which are the
+    // part that is actually somebody's language, are this host's. That pairing
+    // is the point: `categories` became required one release ago while
+    // `categoryLabels` kept defaulting, so a host could declare its own
+    // taxonomy and still be handed another product's descriptions for it.
+    categories: ['orders', 'payments', 'stock', 'system'],
+    // Required now, and only the FOUR the server half puts on a wire — the
+    // panel's own forty belong to the react mount, which states them in
+    // `frontend/src/notifications/notification-copy.ts`. Stated here in this
+    // host's words, because the package ships none.
+    messages: {
+      unauthenticated: 'Entre na sua conta para ver os avisos.',
+      invalidBody: 'Não foi possível ler o pedido.',
+      operationFailed: 'Não deu certo. Tente de novo.',
+      markReadTargetRequired: 'Informe `ids` ou `all: true` (exatamente um).',
+    },
     db: () => Promise.resolve(notificationsDb(pg)),
     generators: GENERATORS,
     contacts: {
@@ -345,6 +365,10 @@ export function notificationsHost(pg: PGlite) {
         driver: 'harness',
         appUrl: 'https://harness.test',
         templateName: 'harness_alert',
+        // Stated even though this harness driver never sends to Meta: a
+        // template is registered under exactly one language, so the channel
+        // declaration is where that belongs regardless of who delivers it.
+        templateLanguage: 'pt_BR',
         defaultCountryCode: '55',
       },
       { channel: 'WEB_PUSH', driver: 'harness', publicKey: 'BHarnessVapidPublicKey' },

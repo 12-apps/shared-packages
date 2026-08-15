@@ -1,12 +1,14 @@
 /**
  * The consent surface, descriptor by descriptor (12-18).
  *
- * Ported from future-pay's `app/api/consent/{status,terms}` route tests. What changed
+ * Ported from the origin host's `app/api/consent/{status,terms}` route tests. What changed
  * in the move is that the host's user store became two named seams, so these cases
  * assert the CONTRACT of those seams rather than a Prisma double — including the two
  * places a defaulted seam would fail OPEN, which is why neither has a default.
  */
 import { describe, expect, it } from 'vitest';
+
+import { CLUB_SERVER_MESSAGES } from '../../__tests__/host-copy';
 
 import { CONSENT_ACCEPT_PATH, CONSENT_STATUS_PATH } from '../../core/consent-wire';
 import { createApiAppShell } from '../create-api-app-shell';
@@ -42,6 +44,7 @@ function host(
   const recorded: Recorded = { accepted: [], published: [] };
   const config: AppShellServerConfig = {
     termsVersion: VERSION,
+    messages: CLUB_SERVER_MESSAGES,
     consent: {
       resolveActor: () => actor,
       isCurrent: (_actor, version) => state.accepted === version,

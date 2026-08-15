@@ -2,6 +2,18 @@ import { createTheme, type Theme } from '@12-apps/ui/mui/styles';
 
 import { brandHex, DEFAULT_SURFACE, readableInk, separateFromBrand } from '../core/brand-palette';
 
+/**
+ * What `createTheme` accepts under `components`, derived from the function
+ * rather than imported.
+ *
+ * `@12-apps/ui/mui/styles` does not re-export `ThemeOptions`, and reaching past it
+ * to `@mui/material/styles` would give this module a second route to MUI that
+ * the rest of the package deliberately does not have. Deriving it is also the
+ * tighter statement: the type is defined as "whatever the factory below takes",
+ * so it cannot drift from it.
+ */
+type ThemeComponents = NonNullable<Parameters<typeof createTheme>[0]>['components'];
+
 /** Supported color-scheme modes for the app theme. */
 export type ThemeMode = 'light' | 'dark';
 
@@ -134,6 +146,59 @@ export interface AppThemeOptions {
    * lands the tenant's text under the 4.5:1 floor on the surface you really paint.
    */
   surface?: Partial<Record<ThemeMode, string>>;
+  /**
+   * The host's own MUI component overrides, merged into the theme this builds.
+   *
+   * REQUIRED to exist, even though it is optional to pass, and the reason is
+   * that a theme is not only a palette. A host arrives here with `styleOverrides`
+   * and `defaultProps` of its own — a glass treatment on `MuiAlert`, a radius on
+   * `MuiButton` — and before this key the only way to keep them was to not use
+   * this factory at all. Which is to say: the factory silently encoded "no host
+   * needs component overrides", and that was true of exactly the one host it was
+   * extracted from.
+   *
+   * The failure it produced was the quiet kind. Adopting the shell dropped the
+   * overrides with no type error and no test failure — the theme is still a valid
+   * theme, the app still renders, and the only symptom is that a component stops
+   * looking the way the product designed it, everywhere at once.
+   *
+   * Merged UNDER nothing: these win. The factory owns the palette (that is what
+   * the legibility correction is for), and the host owns how its components are
+   * drawn.
+   */
+  components?: ThemeComponents;
+}
+
+/**
+ * The palette half, resolved: host tokens or the platform's, host surface or the
+ * default, and the tenant seed corrected against whichever surface applies.
+ *
+ * Its own function because the theme now has two halves and only one of them is
+ * this. Keeping them together also put `createAppTheme` over the complexity
+ * ceiling — every `?.` and `??` here counts, and there are six.
+ */
+function themePalette(
+  mode: ThemeMode,
+  options: AppThemeOptions,
+): {
+  mode: ThemeMode;
+  primary: { main: string; light?: string };
+  secondary: { main: string; light?: string };
+  success: { main: string };
+  warning: { main: string };
+  error: { main: string };
+  info: { main: string };
+} {
+  const tokens = options.tokens?.[mode] ?? DEFAULT_THEME_TOKENS[mode];
+  const surface = options.surface?.[mode] ?? DEFAULT_SURFACES[mode];
+  const { override } = options;
+
+  return {
+    mode,
+    primary: brandRole(override?.primary, tokens.primary, surface),
+    secondary: brandRole(override?.secondary, tokens.secondary, surface),
+    ...semantics(override?.primary),
+  };
 }
 
 /**
@@ -143,18 +208,16 @@ export interface AppThemeOptions {
  * token identical — MUI's `augmentColor` derives the remaining shades and
  * `contrastText` from `main`, so a tenant hex needs no extra plumbing beyond the
  * legibility correction in {@link brandRole}.
+ *
+ * `components` is the host's, passed through untouched — see
+ * {@link AppThemeOptions.components}.
  */
 export function createAppTheme(mode: ThemeMode = 'light', options: AppThemeOptions = {}): Theme {
-  const tokens = options.tokens?.[mode] ?? DEFAULT_THEME_TOKENS[mode];
-  const surface = options.surface?.[mode] ?? DEFAULT_SURFACES[mode];
-  const { override } = options;
-
   return createTheme({
-    palette: {
-      mode,
-      primary: brandRole(override?.primary, tokens.primary, surface),
-      secondary: brandRole(override?.secondary, tokens.secondary, surface),
-      ...semantics(override?.primary),
-    },
+    palette: themePalette(mode, options),
+    // Omitted entirely rather than passed as `undefined`: MUI treats an explicit
+    // `components: undefined` the same as absent today, but the spread keeps the
+    // built options identical to what a host that passed nothing used to get.
+    ...(options.components ? { components: options.components } : {}),
   });
 }

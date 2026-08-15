@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 
 import { describe, expect, it, vi } from 'vitest';
 
+
 import { WebhookVerificationError } from '../core/errors';
 import { createPaymentsGateway } from '../core/gateway';
 import type { PaymentProviderAdapter } from '../core/provider';
@@ -20,6 +21,18 @@ import { sha256Hex } from '../providers/shared';
 import { stoneProvider } from '../providers/stone';
 import { stripeProvider } from '../providers/stripe';
 import { STUB_CREDS, TENANT, cardInput, pixInput } from './fixtures';
+/**
+ * The platform name every guide in this suite renders under.
+ *
+ * Deliberately NOT the name of any real adopter. `SetupGuideContext.brandName`
+ * exists because two guides addressed the platform by one adopter's product
+ * name in shipped pt-BR copy; a suite feeding those guides that same name back
+ * would assert the seam exists while proving nothing about whether it is used.
+ * A stranger's brand here makes the assertion below fail the moment a guide
+ * hardcodes anybody's.
+ */
+const HOST_BRAND = 'Quitanda Digital';
+
 
 /** Stripe's HMAC over `<t>.<body>`, keyed by an endpoint secret. */
 function stripeMac(body: string, timestamp: string, key: string): string {
@@ -100,7 +113,7 @@ describe('provider skeletons (stub mode)', () => {
    * never confirmed to apply to Connect.
    */
   it('every provider with a setup guide names the merchant webhook URL', () => {
-    const ctx = { webhookUrl: 'https://host.example/api/webhooks/x', publicKeyUrl: 'https://host.example/pk' };
+    const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x', publicKeyUrl: 'https://host.example/pk' };
     expect(pagbankProvider().setupGuide).toBeUndefined();
     for (const adapter of [stoneProvider(), infinitePayProvider(), stripeProvider()]) {
       const guide = adapter.setupGuide?.(ctx);
@@ -110,6 +123,31 @@ describe('provider skeletons (stub mode)', () => {
       expect(guide?.stages.length).toBeGreaterThanOrEqual(2);
       expect(guide?.sections.length).toBeGreaterThanOrEqual(1);
       expect(JSON.stringify(guide)).toContain(ctx.webhookUrl);
+    }
+  });
+
+  /**
+   * NO GUIDE MAY NAME AN ADOPTER (FUT-760/761).
+   *
+   * Two of these guides used to address the platform by the origin host's own
+   * brand name ("o <brand>…") in the middle of a pt-BR instruction, so every
+   * host installing this package shipped one particular storefront's brand to
+   * its own store owners — in copy, not in a comment. `brandName` is the seam that fixed it, and this is
+   * the assertion that keeps it fixed: render every guide under a brand no
+   * adopter uses, then require that the rendered text says THAT and contains
+   * no known adopter's name.
+   *
+   * Checking `toContain(HOST_BRAND)` alone would not hold the line — a guide
+   * could interpolate the brand once and still hardcode another somewhere
+   * else, which is exactly the state this replaces.
+   */
+  it('renders the HOST platform brand, and no adopter of this package', () => {
+    const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/w' };
+    const branded = [stoneProvider(), infinitePayProvider()];
+    for (const adapter of branded) {
+      const text = JSON.stringify(adapter.setupGuide?.(ctx));
+      expect(text).toContain(HOST_BRAND);
+      expect(text).not.toMatch(new RegExp(`${atob('ZnV0dXJl')}[\\s_-]?${atob('cGF5')}|paladira`, 'i'));
     }
   });
 
@@ -127,7 +165,7 @@ describe('provider skeletons (stub mode)', () => {
    * created however valid the InfiniteTag is.
    */
   it('infinitepay tells the owner to enable Checkout, not to register a webhook', () => {
-    const ctx = { webhookUrl: 'https://host.example/api/webhooks/x' };
+    const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x' };
     const guide = infinitePayProvider().setupGuide?.(ctx);
     const text = JSON.stringify(guide);
 
@@ -153,7 +191,7 @@ describe('provider skeletons (stub mode)', () => {
       configured: Record<string, boolean>;
       connected: boolean;
       proven: boolean;
-    }) => infinitePayProvider().setupGuide?.({ webhookUrl: 'https://host.example/w', progress });
+    }) => infinitePayProvider().setupGuide?.({ brandName: HOST_BRAND, webhookUrl: 'https://host.example/w', progress });
 
     const nothing = guide({ configured: {}, connected: false, proven: false });
     expect(nothing?.sections.map((s) => s.id)).toEqual(['handle', 'enable']);
@@ -203,12 +241,61 @@ describe('provider skeletons (stub mode)', () => {
    * test pinning one direction and not the other defends the bug.
    */
   it('no guide ships an unpaired section, nor a section on its last stage', () => {
-    const ctx = { webhookUrl: 'https://host.example/api/webhooks/x' };
+    const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x' };
     for (const adapter of [stoneProvider(), infinitePayProvider(), stripeProvider()]) {
       const guide = adapter.setupGuide?.(ctx);
       const stageIds = guide?.stages.map((s) => s.id) ?? [];
       const sectionIds = guide?.sections.map((s) => s.id) ?? [];
 
+      expect(sectionIds.filter((id) => !stageIds.includes(id))).toEqual([]);
+      expect(sectionIds).not.toContain(stageIds.at(-1));
+    }
+  });
+
+  /**
+   * A `credentialsPath` variant must MIRROR the guide it varies.
+   *
+   * The host resolves the activation card's `blocked` and `hidden` from the
+   * base guide alone — that happens in `PaymentProviderSettings`, before the
+   * panel knows which disclosure is open, and it is what keeps one screen's
+   * step 3 in agreement with the walkthrough above it. A variant with a
+   * different stage count, or with the owner-confirmable section at a different
+   * index, silently desyncs the two: the walkthrough would show one step while
+   * the card computed its state from another.
+   *
+   * The variant is free to differ in every way that does not move those — the
+   * whole point is that step 1 and the webhook wording DO differ. This pins
+   * only the shape, and it runs over every shipped adapter so the next provider
+   * to add a variant is held to it without anyone remembering to.
+   */
+  it('every credentialsPath variant mirrors its base guide shape', () => {
+    const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x' };
+    const confirmableIndex = (guide: {
+      stages: readonly { id: string }[];
+      sections: readonly { id: string; steps: readonly { action?: string }[] }[];
+    }) =>
+      guide.stages.findIndex((stage) => {
+        const section = guide.sections.find((candidate) => candidate.id === stage.id);
+        return section?.steps.some((step) => step.action === 'checkout-integrado-confirmado');
+      });
+
+    // Derived, not counted: a mutable tally inside the loop is shared state the
+    // flakiness gate refuses, and the pair is what each assertion needs anyway.
+    const pairs = [stoneProvider(), infinitePayProvider(), stripeProvider()]
+      .map((adapter) => adapter.setupGuide?.(ctx))
+      .filter((guide) => guide?.credentialsPath !== undefined)
+      .map((guide) => ({ guide: guide!, variant: guide!.credentialsPath! }));
+
+    // A silent zero-iteration loop proves nothing — stripe ships one today.
+    expect(pairs.length).toBeGreaterThan(0);
+
+    for (const { guide, variant } of pairs) {
+      expect(variant.stages).toHaveLength(guide.stages.length);
+      expect(confirmableIndex(variant)).toBe(confirmableIndex(guide));
+      // And the variant is a guide in its own right: the two rules above hold
+      // for it too, or its activation card has nowhere to render either.
+      const stageIds = variant.stages.map((s) => s.id);
+      const sectionIds = variant.sections.map((s) => s.id);
       expect(sectionIds.filter((id) => !stageIds.includes(id))).toEqual([]);
       expect(sectionIds).not.toContain(stageIds.at(-1));
     }
@@ -231,7 +318,7 @@ describe('provider skeletons (stub mode)', () => {
    */
   it('every provable guide reaches its empty last stage once connected', () => {
     const at = (adapter: PaymentProviderAdapter, progress: SetupProgress) =>
-      adapter.setupGuide?.({ webhookUrl: 'https://host.example/w', progress });
+      adapter.setupGuide?.({ brandName: HOST_BRAND, webhookUrl: 'https://host.example/w', progress });
 
     for (const adapter of [stoneProvider(), infinitePayProvider(), stripeProvider()]) {
       // Only a provider that CAN prove itself by charging is held to this: the
@@ -257,7 +344,7 @@ describe('provider skeletons (stub mode)', () => {
    * vendor's product on Stripe's and Stone's screens (FUT-799).
    */
   it('a confirmable section authors its own confirm label, per vendor', () => {
-    const ctx = { webhookUrl: 'https://host.example/w' };
+    const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/w' };
     const asking = (adapter: PaymentProviderAdapter) =>
       adapter.setupGuide?.(ctx)?.sections.find((section) =>
         section.steps.some((step) => step.action === 'checkout-integrado-confirmado'),
@@ -281,7 +368,7 @@ describe('provider skeletons (stub mode)', () => {
    * (FUT-799).
    */
   it('stripe asks for one visit to the dashboard, carrying the notification URL', () => {
-    const ctx = { webhookUrl: 'https://host.example/api/webhooks/x' };
+    const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x' };
     const guide = stripeProvider().setupGuide?.(ctx);
 
     expect(guide?.stages.map((s) => s.id)).toEqual(['connect', 'dashboard', 'activate']);
@@ -303,7 +390,7 @@ describe('provider skeletons (stub mode)', () => {
    * so either mode satisfies the schema.
    */
   it('stripe points a store at the manual-credentials path too', () => {
-    const guide = stripeProvider().setupGuide?.({ webhookUrl: 'https://host.example/w' });
+    const guide = stripeProvider().setupGuide?.({ brandName: HOST_BRAND, webhookUrl: 'https://host.example/w' });
 
     expect(guide?.sections.find((s) => s.id === 'connect')?.intro).toContain(
       'credenciais manualmente',

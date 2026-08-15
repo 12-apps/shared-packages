@@ -251,7 +251,7 @@ describe('what the picker offers', () => {
    * The groups are the HOST's, and these two cases are what that means.
    *
    * They used to assert `vendas` / `movimento` / `pagamentos-e-perdas` — the
-   * three groups future-pay's `block-templates.ts` shipped from inside this
+   * three groups the origin host's `block-templates.ts` shipped from inside this
    * package, rendered to every consumer that mounted the editor. The picker's
    * contract is not those words; it is "your groups, in your order, then the
    * blank one". So the fixture declares two groups of its own and the cases

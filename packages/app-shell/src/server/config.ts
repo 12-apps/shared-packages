@@ -114,7 +114,7 @@ export interface ConsentCookieConfig {
  * Where consent state lives.
  *
  * Deliberately NOT a Prisma model of ours. "Has this user accepted version X" is a
- * fact about the host's own identity row (future-pay stamps
+ * fact about the host's own identity row (a typical host stamps something like
  * `User.termsAcceptedAt` / `User.termsVersion`, and its guards read the same
  * predicate) — so a model here would be a second, competing answer to a question
  * the host's user table already answers. See ADOPTING.md.
@@ -149,15 +149,15 @@ export interface ConsentSeam {
   cookie?: ConsentCookieConfig;
 }
 
-/** Server-side copy for the two failure bodies. Overridable; pt-BR by default. */
+/**
+ * Server-side copy for the failure body — the HOST's, like every other sentence
+ * this package renders. The pt-BR default that used to sit here was one
+ * adopter's wording reached by omission; see `react/messages.ts`.
+ */
 export interface AppShellServerMessages {
   /** Body of the 500 when the host's `record` threw. */
   recordFailed: string;
 }
-
-export const DEFAULT_SERVER_MESSAGES: AppShellServerMessages = {
-  recordFailed: 'Não foi possível registrar seu aceite. Tente novamente.',
-};
 
 export interface AppShellServerConfig {
   /**
@@ -166,11 +166,11 @@ export interface AppShellServerConfig {
    */
   termsVersion: string;
   consent: ConsentSeam;
-  messages?: Partial<AppShellServerMessages>;
+  messages: AppShellServerMessages;
 }
 
 export function messagesOf(config: AppShellServerConfig): AppShellServerMessages {
-  return { ...DEFAULT_SERVER_MESSAGES, ...config.messages };
+  return config.messages;
 }
 
 /** An error a descriptor answers with directly, status and all. */

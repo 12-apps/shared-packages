@@ -3,7 +3,7 @@
  *
  * The mechanism suites need SOME application to exercise: an engine with no
  * catalog decides nothing, and a roles screen with no permissions renders an
- * empty picker. Until 12-13's follow-up that application was Future Pay's real
+ * empty picker. Until 12-13's follow-up that application was the origin host's real
  * catalog, imported from `../templates` — which is exactly what made the
  * package look like it owned it.
  *
@@ -18,7 +18,7 @@
  *   3. `DEMO_DOMAIN`       — the host's own domain, with its own pt-BR words.
  *
  * IT IS A LIBRARY, and deliberately not a restaurant. The first version of
- * this file kept future-pay's own role names and ids — OWNER/ADMIN/MANAGER/
+ * this file kept the origin host's own role names and ids — OWNER/ADMIN/MANAGER/
  * WAITER/CHEF over Produtos/Estoque/Cozinha — on the reasoning that reusing
  * them let the ported suites keep their assertions. What that actually did was
  * hide a class of bug: every package-side default left in the server config

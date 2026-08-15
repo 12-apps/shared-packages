@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { NewRefreshToken, RefreshTokenStore, StoredRefreshToken } from "./stores";
 
 /**
- * Refresh-token issue + rotation (12-23, ported from future-pay's
+ * Refresh-token issue + rotation (12-23, ported from the origin host's
  * `lib/mcp/oauth/refresh.ts` — behaviour unchanged; Prisma calls became the
  * `RefreshTokenStore` port).
  *

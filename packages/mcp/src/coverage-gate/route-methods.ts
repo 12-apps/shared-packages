@@ -11,7 +11,7 @@ import { exportedNamesOf, urlPathOf, walkRouteFiles } from "@12-apps/rbac/covera
  * walk (`walkRouteFiles`), the URL mapping (`urlPathOf`) AND the export-head
  * parser (`exportedNamesOf`) — and that is deliberate: both gates assert a
  * COMPLETENESS property over the same two surfaces (`app/**` route files and
- * `*actions.ts` modules), and future-pay's own comment on the shared scanner says
+ * `*actions.ts` modules), and the origin host's own comment on the shared scanner says
  * why they must share it — "so the two gates can never disagree about what the
  * surface is". Two copies would agree on the day they were written and drift
  * silently after, in the direction of not looking. What is left here is the one

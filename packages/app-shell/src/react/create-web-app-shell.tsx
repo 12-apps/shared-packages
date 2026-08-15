@@ -1,7 +1,7 @@
 /**
  * The one thing this package exposes to a FRONTEND host (12-18).
  *
- * What used to be `future-pay/packages/spa-shared` — a PRIVATE workspace package no
+ * What used to be a PRIVATE workspace package inside one application — one no
  * other app could install — assembled into one factory. Three SPAs each repeated the
  * same provider tower by hand: a query client, a theme, `CssBaseline`, a session
  * provider, the consent gate, then a router. The tower is not interesting and it is
@@ -9,7 +9,7 @@
  *
  * ```tsx
  * const shell = createWebAppShell({
- *   brand: { name: 'Paladira' },
+ *   brand: { name: 'Acme Storefront' },
  *   onCrash: reportRouteCrash,
  *   queryClient,
  *   consent: {},        // or `false` — the app has no terms flow
@@ -61,7 +61,7 @@
  *  - `onCrash` — see `route-error-boundary.ts`: the boundary's own default reports
  *    past the host's noise rules, so a crashed page can file an issue for a 404.
  *  - `consent` — `false` is the DECLARATION that a host has no terms flow. Omitting it
- *    silently meant the same thing, and that is the FUT-462 dead end back again for a
+ *    silently meant the same thing, and that is the original dead end back again for a
  *    host that has a terms flow and forgot the key: the surface answers, nobody asks it,
  *    and a version bump strands every consented user. The server half's `isCurrent` is
  *    required for this exact reason; silence must not be one of the two answers.
@@ -132,7 +132,7 @@ export interface WebAppShellConfig {
    * find it. `false` is one word and it is a statement; silence was a guess.
    */
   consent: ShellConsentConfig | false;
-  messages?: Partial<AppShellMessages>;
+  messages: AppShellMessages;
 }
 
 /** Props for the shell's provider tower. */
@@ -157,7 +157,28 @@ export interface WebAppShell {
   Provider: (props: ShellProviderProps) => JSX.Element;
   /** The MUI theme the Provider installs, for a host that needs it directly. */
   theme: Theme;
-  /** Read the session; throws outside `Provider`. */
+  /**
+   * The session ALONE, for a tree that needs one without the rest of the tower.
+   *
+   * `Provider` is the whole thing — boundary, theme, session, consent gate,
+   * router — which is right for an application entry point and wrong for
+   * everything else. A unit test rendering one signed-in component, a Storybook
+   * story, a fixture: each needs the session, and none of them wants a consent
+   * gate reaching for the terms endpoint or a `BrowserRouter` fighting the one
+   * the harness already mounted.
+   *
+   * Without this a host cannot get there, and cannot work around it either:
+   * `useSession` reads the context THIS mount created, so a host that calls
+   * `createWebAuth()` itself has a second context, and a component renders under
+   * one provider while reading from the other. What that looks like is
+   * `useSession must be used within a SessionProvider`, thrown from a tree that
+   * visibly has one — which is a bad hour for whoever is holding it.
+   *
+   * Same instance `Provider` mounts, so a component behaves identically under
+   * either.
+   */
+  SessionProvider: (props: { children: ReactNode }) => JSX.Element;
+  /** Read the session; throws outside `Provider` or {@link WebAppShell.SessionProvider}. */
   useSession: () => SessionContextValue;
   /** `React.lazy` with the stale-chunk recovery. Use it for every routed page. */
   lazyRoute: typeof lazyRoute;
@@ -275,7 +296,9 @@ export function createWebAppShell(config: WebAppShellConfig): WebAppShell {
   // render.
   const RouteErrorBoundary = createShellRouteErrorBoundary({
     onCrash: config.onCrash,
-    ...(config.messages ? { messages: config.messages } : {}),
+    // Passed straight through: `messages` is required on both configs now, so
+    // there is no "absent" case left to spread around.
+    messages: config.messages,
   });
 
   const consent = config.consent;
@@ -302,6 +325,7 @@ export function createWebAppShell(config: WebAppShellConfig): WebAppShell {
       RouteErrorBoundary,
     }),
     theme,
+    SessionProvider: auth.SessionProvider,
     useSession: auth.useSession,
     lazyRoute,
     RouteErrorBoundary,

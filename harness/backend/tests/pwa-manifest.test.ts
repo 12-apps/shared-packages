@@ -6,7 +6,7 @@ import { PWA_HOST_A, PWA_HOST_B, PWA_HOST_UNKNOWN } from '../src/pwa-host';
 /**
  * The @12-apps/pwa request-time half against the PUBLISHED tarball (12-23).
  *
- * The claim under test is the one future-pay's `docs/PWA.md` makes and a static
+ * The claim under test is the one the origin host's `docs/PWA.md` makes and a static
  * file cannot keep: **a PWA's identity is its origin**, so one installable app per
  * tenant means one manifest per host, which only a request-time answer produces. A
  * bundle has exactly one `index.html` for every tenant it serves.

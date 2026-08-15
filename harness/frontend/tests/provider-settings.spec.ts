@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * The assertion future-pay is currently failing on, made where it can be seen.
+ * The assertion the origin host is currently failing on, made where it can be seen.
  *
  * Its admin settings page renders an EMPTY provider list against these same two
  * published packages, and nothing in either repo's CI covers the pairing: this
- * repo tests each package against its workspace siblings, and future-pay finds
+ * repo tests each package against its workspace siblings, and the origin host finds
  * out at e2e time. A card missing here means the published adapters and the
  * published settings page no longer compose — the exact defect, one repo earlier.
  */

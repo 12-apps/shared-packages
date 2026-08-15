@@ -1,15 +1,6 @@
 'use client';
 
-import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
-  Alert,
-  Box,
-  Paper,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Box, Paper, Stack } from '@mui/material';
 import { useCallback, useState, type ReactNode } from 'react';
 
 import type {
@@ -19,9 +10,9 @@ import type {
 } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
-import { ConnectionProbe } from './ConnectionProbe';
+import { CARD_SX } from './panel-tokens';
+import { OAuthPanel } from './OAuthPanel';
 import { EnvironmentNotice, EnvironmentSelector } from './EnvironmentTabs';
-import { ProviderConnection } from './ProviderConnection';
 import { ProviderForm } from './ProviderCredentialForm';
 import { ProviderStatusBar } from './ProviderStatusBar';
 
@@ -72,6 +63,15 @@ export interface ActivePanelProps {
     editing: boolean;
     /** The environment on screen holds its credentials — see `renderGuide`. */
     stored: boolean;
+    /**
+     * Which connection path the walkthrough is describing.
+     *
+     * The steps are not the same for both: step 1 under authorization says to
+     * press a button that is not rendered while the credential form is open,
+     * and it opens by saying no key needs copying — to an owner looking at the
+     * boxes for those keys. The panel owns the disclosure, so it owns this.
+     */
+    path: 'oauth' | 'credentials';
   }) => ReactNode;
   /** The host's activation step (see `renderVerification`), already resolved. */
   verification?: ReactNode;
@@ -138,7 +138,7 @@ function EnableBar({ descriptor, config, client, onChanged, reload }: ActivePane
  * container, so the header and the body carry the padding and the band between
  * them carries none.
  */
-function ProviderCard({
+export function ProviderCard({
   header,
   band,
   children,
@@ -147,13 +147,16 @@ function ProviderCard({
   band?: ReactNode;
   children: ReactNode;
 }) {
+  // The body carries NO padding of its own: each block inside it (a step panel,
+  // a done row, the disclosure) sets its own 20px inset, because the
+  // environment band between them has to reach both edges and a padded parent
+  // makes that impossible. `CARD_SX` is the prototype's hairline verbatim —
+  // `Paper variant="outlined"` would paint the theme's divider instead.
   return (
-    <Paper variant="outlined">
-      <Box sx={{ px: 3, pt: 3 }}>{header}</Box>
+    <Paper elevation={0} sx={CARD_SX}>
+      <Box sx={{ px: '20px', pt: '18px', pb: '6px' }}>{header}</Box>
       {band}
-      <Box sx={{ p: 3 }}>
-        <Stack spacing={2}>{children}</Stack>
-      </Box>
+      <Box>{children}</Box>
     </Paper>
   );
 }
@@ -188,7 +191,7 @@ function oauthWithConnect(props: ActivePanelProps): boolean {
  * which is the one the connect card and the server-computed stage describe
  * (the tabs inside the disclosure govern the form, not this).
  */
-function oauthWalkthrough(props: ActivePanelProps): ReactNode {
+function oauthWalkthrough(props: ActivePanelProps, path: 'oauth' | 'credentials'): ReactNode {
   const { descriptor, config, guide } = props;
   if (!guide || !oauthWithConnect(props)) return null;
   return guide({
@@ -196,25 +199,41 @@ function oauthWalkthrough(props: ActivePanelProps): ReactNode {
     sectionFooter: null,
     editing: false,
     stored: requiredStored(descriptor, config, config?.environment ?? 'SANDBOX'),
+    path,
   });
 }
 
+/**
+ * One provider's screen, assembled.
+ *
+ * Three pieces of state live HERE rather than in the form, and each for a
+ * reason the form cannot see:
+ *
+ *  - `environment` frames everything below it, so the panel puts the switch at
+ *    the top instead of halfway down the form's own column.
+ *  - `editing` decides more than the form: reopening step 1 must also take step
+ *    3 off the screen. A card offering to charge under a heading about typing a
+ *    credential is two steps at once, and the one that costs money is the one
+ *    nobody asked for.
+ *  - `storedHere` answers for the environment ON SCREEN. The activation step
+ *    charges through those credentials, and shown on a tab holding none it
+ *    offers to charge an account that is not there — on the screen whose whole
+ *    subject is which account receives the money. `config.environment` is the
+ *    ACTIVE one and cannot answer it; the fields can.
+ *
+ * On the connect branch the walkthrough leaves the form (see `guide`) and the
+ * form stands alone inside the manual disclosure, so `walkthrough` is passed as
+ * a FUNCTION: which steps to show depends on the disclosure, whose state lives
+ * in `OAuthPanel`.
+ */
 export function ActivePanel(props: ActivePanelProps) {
   const { descriptor, config, client, onChanged, reload, guide, verification } = props;
   const statusBar = <EnableBar {...props} />;
-  // The environment frames everything below it, so the PANEL owns the choice
-  // and puts the tabs at the top — not the form, halfway down its own column.
   const [environment, setEnvironment] = useState<PaymentEnvironment>(
     config?.environment ?? 'SANDBOX',
   );
-  // Lifted out of the form because it decides more than the form: reopening
-  // step 1 must also take step 3 off the screen. A card offering to charge
-  // R$ 1,01 under a heading about typing your InfiniteTag is two steps at once,
-  // and the one that costs money is the one you did not ask for.
   const [editing, setEditing] = useState(false);
 
-  // On the connect branch the walkthrough leaves the form (see the `guide`
-  // prop): the form then stands alone inside the manual disclosure.
   const oauthConnect = oauthWithConnect(props);
 
   const credentials = (
@@ -233,13 +252,12 @@ export function ActivePanel(props: ActivePanelProps) {
   );
 
   const selector = <EnvironmentSelector environment={environment} onChange={setEnvironment} />;
-  const band = <EnvironmentNotice environment={environment} active={config?.environment ?? null} />;
+  // Full-bleed across the card, and the same notice inset for the manual
+  // disclosure, where it no longer spans anything. See `EnvironmentNotice`.
+  const active = config?.environment ?? null;
+  const band = <EnvironmentNotice environment={environment} active={active} />;
+  const notice = <EnvironmentNotice environment={environment} active={active} band={false} />;
 
-  // The activation step charges through the credentials of the environment it
-  // is under. Shown on a tab that stores none, it offers to charge an account
-  // that is not there — on the screen whose entire subject is which account
-  // receives the store's money. `config.environment` is the ACTIVE one, so it
-  // cannot answer this; the fields on screen can.
   const storedHere = requiredStored(descriptor, config, environment);
 
   if (descriptor.authMode !== 'oauth') {
@@ -263,11 +281,12 @@ export function ActivePanel(props: ActivePanelProps) {
     <OAuthPanel
       {...props}
       statusBar={statusBar}
-      walkthrough={oauthWalkthrough(props)}
+      walkthrough={(path: 'oauth' | 'credentials') => oauthWalkthrough(props, path)}
       form={
         <Stack spacing={2}>
           {selector}
-          {band}
+          {notice}
+          {oauthWalkthrough(props, 'credentials')}
           {credentials}
         </Stack>
       }
@@ -275,80 +294,4 @@ export function ActivePanel(props: ActivePanelProps) {
   );
 }
 
-/**
- * The OAuth path: a connect button as the happy path, with the credential form
- * kept behind a disclosure.
- *
- * That fallback is not decoration — stores connected before Connect existed
- * still hold a pasted token, and a deployment with no registered provider
- * application has no working connect button at all. Hiding the form outright
- * would strand both.
- */
-function OAuthPanel({
-  descriptor,
-  config,
-  client,
-  reload,
-  prepareConnect,
-  verification,
-  statusBar,
-  walkthrough,
-  form,
-}: ActivePanelProps & { statusBar: ReactNode; walkthrough: ReactNode; form: ReactNode }) {
-  // The connection probe, for a store whose connection is a grant: the form's
-  // own probe runs off Salvar, which an OAuth store never presses (FUT-691).
-  const probe = (
-    <ConnectionProbe descriptor={descriptor} config={config} client={client} reload={reload} />
-  );
-  if (!prepareConnect) {
-    return (
-      <ProviderCard header={statusBar}>
-        <Alert severity="info">
-          Este provedor conecta por autorização, mas o botão de conexão não está disponível nesta
-          instalação. Você ainda pode conectar informando as credenciais manualmente.
-        </Alert>
-        {form}
-        {probe}
-        {verification}
-      </ProviderCard>
-    );
-  }
 
-  return (
-    <ProviderCard header={statusBar}>
-      <ProviderConnection
-        descriptor={descriptor}
-        config={config}
-        client={client}
-        prepareConnect={prepareConnect}
-        onChanged={reload}
-      />
-      {/*
-        Directly under the connect card, ABOVE the manual disclosure: this is
-        the step that actually turns the store on, and an owner who just
-        authorized has no reason to open "prefiro informar as credenciais
-        manualmente" to find it.
-      */}
-      {verification}
-      {/*
-        The provider's walkthrough, OUTSIDE the disclosure for the same reason
-        as the activation step above it: it used to live inside the credential
-        form, which on this branch is folded into the manual fallback — so the
-        guide (and the stepper answering "where am I") was buried behind a
-        label the connect card says there is no reason to open (FUT-691).
-      */}
-      {walkthrough}
-      {probe}
-      {descriptor.credentialSchema.length > 0 ? (
-        <Accordion disableGutters data-testid="payments-manual-fallback">
-          <AccordionSummary expandIcon={<span aria-hidden>▾</span>}>
-            <Typography variant="body2" color="text.secondary">
-              Prefiro informar as credenciais manualmente
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails>{form}</AccordionDetails>
-        </Accordion>
-      ) : null}
-    </ProviderCard>
-  );
-}

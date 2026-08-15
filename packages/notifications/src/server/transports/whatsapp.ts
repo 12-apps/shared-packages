@@ -54,8 +54,16 @@ export interface WhatsAppDriverDeclaration extends DriverDeclarationBase {
   accessToken?: string;
   phoneNumberId?: string;
   templateName?: string;
-  /** Default `pt_BR`. */
-  templateLanguage?: string;
+  /**
+   * The WhatsApp template's language code, e.g. `pt_BR`, `en_US`.
+   *
+   * REQUIRED: a template is registered with Meta under one language, and
+   * sending it with the wrong code is rejected by the Graph API. This defaulted
+   * to `pt_BR` — one market's answer — so a host that forgot it did not get a
+   * sensible fallback, it got somebody else's template language and a delivery
+   * failure it had no reason to expect.
+   */
+  templateLanguage: string;
   /** Graph API base, so a host can pin a version. */
   graphApiBase?: string;
   appUrl?: string;
@@ -80,7 +88,7 @@ function templatePayload(
     type: 'template',
     template: {
       name: declaration.templateName,
-      language: { code: declaration.templateLanguage ?? 'pt_BR' },
+      language: { code: declaration.templateLanguage },
       components: [
         {
           type: 'body',

@@ -16,6 +16,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { JSX } from "react";
 
+import { HOSTED_ORDER_STORAGE_KEY } from "../hosted-return";
+
 const client = vi.hoisted(() => ({
   chargeCard: vi.fn(),
   listSavedCards: vi.fn(),
@@ -112,7 +114,10 @@ describe("card charge → 3DS handover (FUT-698)", () => {
     });
     // Parked exactly as the redirect-provider handoff parks (FUT-556), so the
     // return trip resumes THIS order's confirmation screen.
-    const parked = window.sessionStorage.getItem("futurepay.checkout.hostedOrder");
+    // The exported constant, not a literal: a private copy of the key here
+    // would keep passing against the old name while the module wrote the new
+    // one, which is exactly the drift this assertion exists to catch.
+    const parked = window.sessionStorage.getItem(HOSTED_ORDER_STORAGE_KEY);
     expect(parked).not.toBeNull();
     expect((JSON.parse(parked as string) as { orderId: string }).orderId).toBe("o1");
     // The tab is navigating away: nothing resolved, no poll started here.
@@ -130,7 +135,7 @@ describe("card charge → 3DS handover (FUT-698)", () => {
       expect(screen.getByTestId("submitted").textContent).toBe("true");
     });
     expect(assign).not.toHaveBeenCalled();
-    expect(window.sessionStorage.getItem("futurepay.checkout.hostedOrder")).toBeNull();
+    expect(window.sessionStorage.getItem(HOSTED_ORDER_STORAGE_KEY)).toBeNull();
   });
 
   it("a decline resolves to the status screen, never a handover", async () => {

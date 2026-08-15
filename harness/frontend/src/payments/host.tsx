@@ -5,7 +5,7 @@
  *
  * Nothing here is part of the package. It is deliberately the same amount of
  * glue an adopter writes — `apps/client/src/pages/checkout/index.tsx` in
- * future-pay is the reference — which is also what makes these pages a check on
+ * the origin host is the reference — which is also what makes these pages a check on
  * whether that amount is reasonable.
  */
 import {
@@ -23,6 +23,7 @@ import {
 import { useMemo, type JSX, type ReactNode } from 'react';
 
 import { brlLabel } from './adapter';
+import { HARNESS_CHECKOUT_COPY } from './checkout-copy';
 import { createHarnessStore, type HarnessStoreSpec, type HarnessWorld } from './store';
 
 /** The envelope every checkout route answers with. */
@@ -154,6 +155,11 @@ export function harnessFlows(
     useBuyerDefaults: () => ({ buyer: host.buyer, taxIdOnFile: host.taxIdOnFile ?? false }),
     useComanda: () => host.comanda ?? null,
     components: host.components,
+    // Required now, and stated by THIS host in its own words. It used to be
+    // omitted, which meant rendering the package's pt-BR default — another
+    // product's restaurant vocabulary — while claiming to be an independent
+    // consumer. See `./checkout-copy`.
+    copy: HARNESS_CHECKOUT_COPY,
     confirmation: host.confirmationExtra ? { extra: host.confirmationExtra } : undefined,
     ports: {
       createPayable: (input) => raisePayable(world, input),

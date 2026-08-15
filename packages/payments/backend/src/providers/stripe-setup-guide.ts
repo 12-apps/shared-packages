@@ -48,12 +48,24 @@ export function stripeSetupGuide(ctx: SetupGuideContext): ProviderSetupGuide {
     { id: 'dashboard', label: 'Configurar na Stripe' },
     { id: 'activate', label: 'Ativar vendas' },
   ];
-  const sections = [connectSection(), dashboardSection(ctx)];
+  const sections = [connectSection(), dashboardSection(ctx, 'oauth')];
+  // Same three stages, same confirmable section at index 1 — the mirror
+  // `credentialsPath` requires. Only step 1 and the webhook wording change,
+  // because only those depend on how the store connected.
+  const credentialsPath = {
+    stages: [
+      { id: 'connect', label: 'Informar as chaves' },
+      { id: 'dashboard', label: 'Configurar na Stripe' },
+      { id: 'activate', label: 'Ativar vendas' },
+    ],
+    sections: [credentialsSection(ctx), dashboardSection(ctx, 'credentials')],
+  };
   // With no `progress` from the host the whole guide is returned, unchanged: a
   // caller that cannot say what is done must not be shown a guide that has
   // decided for them (same contract as InfinitePay's).
-  if (!ctx.progress) return { stages, sections };
-  return { stages, sections, activeStage: activeStageOf(ctx.progress, stages.length) };
+  if (!ctx.progress) return { stages, sections, credentialsPath };
+  const activeStage = activeStageOf(ctx.progress, stages.length);
+  return { stages, sections, activeStage, credentialsPath: { ...credentialsPath, activeStage } };
 }
 
 /**
@@ -78,7 +90,7 @@ function connectSection(): ProviderSetupGuide['sections'][number] {
     id: 'connect',
     title: 'Passo 1 · Conectar sua conta Stripe',
     intro:
-      'A conexão é feita por autorização no site da Stripe — você não precisa copiar nenhuma chave, e pode revogar o acesso quando quiser, pelo painel da Stripe ou pelo botão “Desconectar” aqui. Prefere usar as suas próprias chaves? Abra “Prefiro informar as credenciais manualmente” abaixo e cole-as: os passos seguintes são os mesmos.',
+      'A conexão é feita por autorização no site da Stripe — você não precisa copiar nenhuma chave, e pode revogar o acesso quando quiser, pelo painel da Stripe ou pelo botão “Desconectar” aqui. Prefere usar as suas próprias chaves? Abra “Prefiro informar as credenciais manualmente” abaixo: o passo a passo muda para esse caminho.',
     steps: [
       {
         text: 'Clique em “Conectar com Stripe” acima. Você será levado ao site da Stripe para entrar na sua conta e autorizar o acesso. Se ainda não tiver conta, dá para criar uma durante o processo.',
@@ -95,14 +107,59 @@ function connectSection(): ProviderSetupGuide['sections'][number] {
 }
 
 /**
+ * Step 1 for a store using its OWN Stripe keys.
+ *
+ * The OAuth section cannot stand in for this one: it points at "Conectar com
+ * Stripe", a button that is not rendered while the credential form is open,
+ * and it opens by saying no key needs copying — to an owner looking at four
+ * boxes for keys.
+ *
+ * Where each value comes from is the whole content, because that is the part
+ * Stripe's own dashboard makes hard: the signing secret does not exist until
+ * an endpoint is created, and it is shown once.
+ */
+function credentialsSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'][number] {
+  return {
+    id: 'connect',
+    title: 'Passo 1 · Informar as suas chaves da Stripe',
+    intro:
+      'Você está conectando com as **suas próprias chaves**. Elas ficam guardadas nesta loja, e o ambiente escolhido acima (Sandbox ou Produção) decide de qual conta da Stripe elas têm de vir — as chaves de teste não funcionam em produção.',
+    steps: [
+      {
+        text: 'No painel da Stripe, abra “Desenvolvedores › Chaves de API” e copie a **Secret key** (`sk_...`) e a **Publishable key** (`pk_...`).',
+        button: {
+          label: 'Abrir chaves de API',
+          url: 'https://dashboard.stripe.com/apikeys',
+        },
+      },
+      {
+        text: 'Em “Desenvolvedores › Webhooks”, crie um endpoint apontando para a URL de notificação desta loja e copie o **Signing secret** (`whsec_...`) que a Stripe mostra ao criá-lo. Sem ele, um pagamento aprovado não é confirmado aqui.',
+        copy: { label: 'URL de notificação', text: ctx.webhookUrl, collapsible: true },
+      },
+      {
+        text: 'Cole as chaves no formulário abaixo e clique em “Salvar e testar conexão”. Elas são enviadas à Stripe na hora, e o resultado de cada uma aparece logo em seguida.',
+      },
+    ],
+  };
+}
+
+/**
  * The one visit to Stripe's dashboard, and the step the owner closes by hand.
  *
  * The notification URL is named in the step's own TEXT, not only in the copy
  * button's label: `CopyRow` renders `copy.label` as that button's aria-label
  * and nowhere else, so a step whose sentence never mentions the URL captions it
  * to screen readers alone.
+ *
+ * The webhook step is the one sentence that cannot serve both paths. Under
+ * authorization the endpoint is registered for the store and the URL is there
+ * to be checked; with its own keys the store must create it, and saying "ela já
+ * vem configurada" to that owner describes work nobody has done.
  */
-function dashboardSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'][number] {
+function dashboardSection(
+  ctx: SetupGuideContext,
+  path: 'oauth' | 'credentials',
+): ProviderSetupGuide['sections'][number] {
   return {
     id: 'dashboard',
     title: 'Passo 2 · Configurar sua conta na Stripe',
@@ -118,6 +175,20 @@ function dashboardSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'
         },
       },
       {
+        // The step 3 charge dies without this, and Stripe's refusal names a
+        // dashboard toggle rather than anything the owner did here: "This
+        // integration surface is unsupported for publishable key tokenization."
+        // Newer accounts ship it OFF, so a store can pass every credential
+        // check, reach the activation charge, and be stopped by a setting no
+        // step ever mentioned — on the one screen whose job is to list the
+        // settings only the owner can change.
+        text: 'Abra “Configurações › Integração” e ative a tokenização de cartão com chave publicável. Contas novas vêm com isso desligado, e sem ele a Stripe recusa a cobrança de teste do Passo 3 com “integration surface is unsupported”.',
+        button: {
+          label: 'Abrir configurações de integração',
+          url: 'https://dashboard.stripe.com/settings/integration',
+        },
+      },
+      {
         text: 'Confirme que sua conta está habilitada para receber pagamentos — a Stripe pede documentos da empresa antes de liberar repasses.',
         button: {
           label: 'Abrir o painel da Stripe',
@@ -125,7 +196,10 @@ function dashboardSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'
         },
       },
       {
-        text: 'A URL de notificação desta loja é a de baixo. Conectando por autorização ela já vem configurada; copie-a se você usa as suas próprias chaves, ou se prefere cadastrar um endpoint próprio em “Desenvolvedores › Webhooks”.',
+        text:
+          path === 'oauth'
+            ? 'A URL de notificação desta loja é a de baixo. Conectando por autorização ela já vem configurada — copie-a apenas se preferir cadastrar um endpoint próprio em “Desenvolvedores › Webhooks”.'
+            : 'Confira que o endpoint criado em “Desenvolvedores › Webhooks” aponta para a URL de notificação desta loja, abaixo. Com as suas próprias chaves, este cadastro é seu — sem ele a Stripe não avisa esta loja quando um pagamento é aprovado.',
         copy: { label: 'URL de notificação', text: ctx.webhookUrl, collapsible: true },
       },
       { action: 'checkout-integrado-confirmado' },

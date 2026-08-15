@@ -1,4 +1,4 @@
-import type { NotificationMessages } from '../messages';
+import type { NotificationWireMessages } from '../messages';
 import { NOTIFICATION_CHANNELS, type NotificationChannel } from '../types';
 
 /**
@@ -96,7 +96,7 @@ export function guarded(
 // Body / query parsing — the request contract, in the package
 // ---------------------------------------------------------------------------
 
-function asRecord(body: unknown, messages: NotificationMessages): Record<string, unknown> {
+function asRecord(body: unknown, messages: NotificationWireMessages): Record<string, unknown> {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     throw new NotificationsApiError(400, messages.invalidBody);
   }
@@ -104,7 +104,7 @@ function asRecord(body: unknown, messages: NotificationMessages): Record<string,
 }
 
 /** 1..100 non-empty string ids. */
-function parseIds(value: unknown, messages: NotificationMessages): string[] {
+function parseIds(value: unknown, messages: NotificationWireMessages): string[] {
   if (!Array.isArray(value) || value.length === 0 || value.length > 100) {
     throw new NotificationsApiError(400, messages.invalidBody);
   }
@@ -120,7 +120,7 @@ function parseIds(value: unknown, messages: NotificationMessages): string[] {
  * Query strings arrive as strings; the store clamps, but a non-number is a
  * client bug and must not silently read as "the default page".
  */
-function parseLimit(raw: string | undefined, messages: NotificationMessages): number | undefined {
+function parseLimit(raw: string | undefined, messages: NotificationWireMessages): number | undefined {
   if (raw === undefined || raw === '') return undefined;
   const limit = Number(raw);
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
@@ -131,7 +131,7 @@ function parseLimit(raw: string | undefined, messages: NotificationMessages): nu
 
 function parseFilter(
   raw: string | undefined,
-  messages: NotificationMessages,
+  messages: NotificationWireMessages,
 ): 'all' | 'unread' | undefined {
   if (raw === undefined) return undefined;
   if (raw !== 'all' && raw !== 'unread') {
@@ -143,7 +143,7 @@ function parseFilter(
 /** `GET <mount>/notifications` — `filter`, `cursor`, `limit`. */
 export function parseListQuery(
   query: Record<string, string | undefined>,
-  messages: NotificationMessages,
+  messages: NotificationWireMessages,
 ): { filter?: 'all' | 'unread'; cursor?: string; limit?: number } {
   const filter = parseFilter(query.filter, messages);
   const limit = parseLimit(query.limit, messages);
@@ -157,7 +157,7 @@ export function parseListQuery(
 /** `POST <mount>/notifications/mark-read` — explicit ids, or `all: true`. */
 export function parseMarkReadBody(
   body: unknown,
-  messages: NotificationMessages,
+  messages: NotificationWireMessages,
 ): { all: true } | { ids: string[] } {
   const record = asRecord(body, messages);
   const wantsAll = record.all === true;
@@ -171,7 +171,7 @@ export function parseMarkReadBody(
 }
 
 /** `POST <mount>/notifications/delete` — 1..100 ids. */
-export function parseDeleteBody(body: unknown, messages: NotificationMessages): string[] {
+export function parseDeleteBody(body: unknown, messages: NotificationWireMessages): string[] {
   return parseIds(asRecord(body, messages).ids, messages);
 }
 
@@ -181,7 +181,7 @@ export function parseDeleteBody(body: unknown, messages: NotificationMessages): 
  */
 export function parsePreferencesBody(
   body: unknown,
-  messages: NotificationMessages,
+  messages: NotificationWireMessages,
 ): Record<string, Partial<Record<NotificationChannel, boolean>>> {
   const record = asRecord(body, messages);
   const parsed: Record<string, Partial<Record<NotificationChannel, boolean>>> = {};
@@ -194,7 +194,7 @@ export function parsePreferencesBody(
 /** One category's toggles, narrowed onto the closed channel set. */
 function parseToggles(
   value: unknown,
-  messages: NotificationMessages,
+  messages: NotificationWireMessages,
 ): Partial<Record<NotificationChannel, boolean>> {
   const toggles = asRecord(value, messages);
   const row: Partial<Record<NotificationChannel, boolean>> = {};
@@ -210,7 +210,7 @@ function parseToggles(
 const MAX_ENDPOINT_CHARS = 2000;
 const MAX_KEY_CHARS = 500;
 
-function parseEndpoint(value: unknown, messages: NotificationMessages): string {
+function parseEndpoint(value: unknown, messages: NotificationWireMessages): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > MAX_ENDPOINT_CHARS) {
     throw new NotificationsApiError(400, messages.invalidBody);
   }
@@ -231,7 +231,7 @@ function parseEndpoint(value: unknown, messages: NotificationMessages): string {
 /** `POST <mount>/push-subscriptions` — `PushSubscription.toJSON()`. */
 export function parsePushSubscriptionBody(
   body: unknown,
-  messages: NotificationMessages,
+  messages: NotificationWireMessages,
 ): { endpoint: string; keys: { p256dh: string; auth: string } } {
   const record = asRecord(body, messages);
   const keys = asRecord(record.keys, messages);
@@ -248,7 +248,7 @@ export function parsePushSubscriptionBody(
 }
 
 /** `DELETE <mount>/push-subscriptions` — by endpoint. */
-export function parsePushEndpointBody(body: unknown, messages: NotificationMessages): string {
+export function parsePushEndpointBody(body: unknown, messages: NotificationWireMessages): string {
   return parseEndpoint(asRecord(body, messages).endpoint, messages);
 }
 
@@ -262,7 +262,7 @@ export function parsePushEndpointBody(body: unknown, messages: NotificationMessa
  */
 export function parsePushEndpointQuery(
   query: Record<string, string | undefined>,
-  messages: NotificationMessages,
+  messages: NotificationWireMessages,
 ): string | undefined {
   if (query.endpoint === undefined || query.endpoint === '') return undefined;
   return parseEndpoint(query.endpoint, messages);

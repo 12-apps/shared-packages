@@ -8,7 +8,7 @@ import type { ProviderConfigStore } from './types';
  * Best-effort: mark the merchant's connection FAILED after an account-level
  * rejection on a charge (see `isAccountAccessError`), so the settings screen
  * surfaces the outage instead of a stale VERIFIED — which is exactly how the
- * first production outage stayed invisible (ported from the future-pay host,
+ * first production outage stayed invisible (ported from the first adopting host,
  * FUT-761).
  *
  * The FAILED row must belong to the provider that REFUSED — the error names

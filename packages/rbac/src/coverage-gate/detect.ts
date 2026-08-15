@@ -1,6 +1,6 @@
 /**
  * Guard detection for the RBAC coverage gate (12-13) — ported from
- * future-pay's `scripts/rbac/detect.ts`, with the guard identifier lists
+ * the origin host's `scripts/rbac/detect.ts`, with the guard identifier lists
  * turned into REQUIRED arguments. The host's guards are host vocabulary, so
  * there is no generic list to default to — a completeness gate cannot supply
  * its own subject. Defaulting them was the bug: a second host inherited

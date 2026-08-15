@@ -11,6 +11,7 @@
 # Paths rather than names because payments ships as a nested workspace.
 packages/eslint-config
 packages/typescript-config
+packages/request-scope
 packages/observability-backend
 packages/auth
 packages/entity-lifecycle
@@ -24,6 +25,7 @@ packages/shift
 packages/payments/frontend
 packages/payments/e2e
 packages/ui
+packages/impersonation
 packages/audit
 packages/storage
 packages/entitlements

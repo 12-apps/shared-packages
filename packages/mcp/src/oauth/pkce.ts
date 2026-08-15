@@ -1,6 +1,6 @@
 /**
  * PKCE (RFC 7636) S256 challenge helpers for the OAuth authorization server
- * (12-23, ported verbatim from future-pay's `lib/mcp/oauth/pkce.ts`).
+ * (12-23, ported verbatim from the origin host's `lib/mcp/oauth/pkce.ts`).
  *
  * OAuth 2.1 mandates the `S256` code-challenge method and forbids `plain`, so
  * this module computes `BASE64URL(SHA-256(code_verifier))` and compares it to

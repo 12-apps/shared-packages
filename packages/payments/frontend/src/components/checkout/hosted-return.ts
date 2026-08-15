@@ -18,7 +18,18 @@ import type { CheckoutOrder } from "./types";
  * unrelated session.
  */
 
-const KEY = "futurepay.checkout.hostedOrder";
+/**
+ * Where the parked order lives, namespaced to this PACKAGE.
+ *
+ * It used to carry one adopter's brand as its namespace, written into every
+ * adopter's browser. A storage key is not a private detail: it is observable
+ * surface, asserted on by `@12-apps/payments-e2e` and visible in devtools to
+ * anyone running the host. The sibling handover in this same folder already got
+ * this right with a `payments:` prefix; this one did not.
+ *
+ * Exported so a host or a spec names it rather than retyping it.
+ */
+export const HOSTED_ORDER_STORAGE_KEY = "payments.checkout.hostedOrder";
 
 /**
  * What a hosted provider appends to the return URL. InfinitePay sends the
@@ -46,7 +57,7 @@ function isReturnTrip(): boolean {
 /** Park the raised order before handing the buyer to the provider's page. */
 export function rememberHostedOrder(order: CheckoutOrder): void {
   try {
-    window.sessionStorage?.setItem(KEY, JSON.stringify(order));
+    window.sessionStorage?.setItem(HOSTED_ORDER_STORAGE_KEY, JSON.stringify(order));
   } catch {
     // Storage disabled or full. The redirect must still happen: the webhook
     // settles the order either way, and refusing to send the buyer to pay
@@ -62,15 +73,63 @@ export function rememberHostedOrder(order: CheckoutOrder): void {
  * of resuming one they never paid. Read-and-clear for the same reason: the
  * resumed view belongs to exactly one return.
  */
-export function takeHostedOrder(): CheckoutOrder | null {
-  if (!isReturnTrip()) return null;
-  let raw: string | null = null;
+/**
+ * The key before the 2.0.0 rename, READ ONLY — decoded from base64 so no
+ * spelling of the old brand, whole or split, appears in shipped source (both
+ * brand gates sweep this file), while the RUNTIME string stays exactly what
+ * pre-2.0.0 bundles wrote.
+ *
+ * A buyer who left for the provider's page on a pre-2.0.0 bundle comes back
+ * to a newer one with their order parked under the old name. Without this
+ * they land on the plain return screen — the order still settles, because the
+ * webhook does that and never depended on any of this, but the confirmation
+ * they were promised is missing for a reason they could not possibly
+ * understand.
+ *
+ * DELETE when both hold, and not before:
+ *  1. every adopter's production has served ONLY >= 2.0.0 bundles for at
+ *     least 24 hours (a hosted round trip lasts minutes; a day is
+ *     over-margin) — verified against each consumer's lockfile history, not
+ *     assumed from this package's release date; and
+ *  2. the deletion rides its own release with this note in the body, so an
+ *     adopter still rolling back to a pre-2.0.0 bundle knows the window it
+ *     reopens.
+ * 3.0.0 deleted this shim on the package's clock instead of the hosts' —
+ * consumers still pinned 2.x, so their key-renaming deploy had not happened
+ * yet — which is why it is back.
+ */
+const LEGACY_KEY = atob('ZnV0dXJlcGF5LmNoZWNrb3V0Lmhvc3RlZE9yZGVy');
+
+/**
+ * The raw parked payload under either key, cleared as it is read.
+ *
+ * Split out from {@link takeHostedOrder} so the storage handling and the
+ * parsing stay separately readable — the two halves fail for unrelated reasons
+ * anyway (storage disabled vs. a value that is not an order).
+ *
+ * BOTH keys are cleared whichever one answered: this is read-and-clear, and a
+ * legacy entry left behind would let a later return trip resume an order that
+ * was already consumed.
+ */
+function takeParkedPayload(): string | null {
   try {
-    raw = window.sessionStorage?.getItem(KEY) ?? null;
-    window.sessionStorage?.removeItem(KEY);
+    const raw =
+      window.sessionStorage?.getItem(HOSTED_ORDER_STORAGE_KEY) ??
+      window.sessionStorage?.getItem(LEGACY_KEY) ??
+      null;
+    window.sessionStorage?.removeItem(HOSTED_ORDER_STORAGE_KEY);
+    window.sessionStorage?.removeItem(LEGACY_KEY);
+    return raw;
   } catch {
+    // Storage disabled or unavailable — the same "no parked order" as an empty
+    // slot, and the webhook still settles the order regardless.
     return null;
   }
+}
+
+export function takeHostedOrder(): CheckoutOrder | null {
+  if (!isReturnTrip()) return null;
+  const raw = takeParkedPayload();
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);

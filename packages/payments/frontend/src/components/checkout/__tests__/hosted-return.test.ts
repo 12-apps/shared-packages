@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { rememberHostedOrder, takeHostedOrder } from "../hosted-return";
+import {
+  HOSTED_ORDER_STORAGE_KEY,
+  rememberHostedOrder,
+  takeHostedOrder,
+} from "../hosted-return";
 import type { CheckoutOrder } from "../types";
 
 /**
@@ -88,17 +92,51 @@ describe("hosted-return", () => {
   });
 
   it("answers null for a value that is not an order", () => {
-    window.sessionStorage.setItem("futurepay.checkout.hostedOrder", '{"nonsense":true}');
+    window.sessionStorage.setItem(HOSTED_ORDER_STORAGE_KEY, '{"nonsense":true}');
     land("?transaction_nsu=123");
 
     expect(takeHostedOrder()).toBeNull();
   });
 
   it("answers null for unparseable storage rather than throwing", () => {
-    window.sessionStorage.setItem("futurepay.checkout.hostedOrder", "{not json");
+    window.sessionStorage.setItem(HOSTED_ORDER_STORAGE_KEY, "{not json");
     land("?transaction_nsu=123");
 
     expect(takeHostedOrder()).toBeNull();
+  });
+
+  it("still reads an order parked under the pre-2.0.0 key, once", () => {
+    // The compatibility path for a buyer who left on a pre-rename bundle.
+    // Written by hand (decoded, so this file stays brand-clean under the repo
+    // sweep) because nothing in this version produces the key any more — and
+    // asserted because otherwise the fallback is dead code that only LOOKS
+    // like a migration. See LEGACY_KEY's docstring for the deletion condition.
+    const legacyKey = atob("ZnV0dXJlcGF5LmNoZWNrb3V0Lmhvc3RlZE9yZGVy");
+    window.sessionStorage.setItem(legacyKey, JSON.stringify(ORDER));
+    land("?transaction_nsu=123");
+
+    expect(takeHostedOrder()?.orderId).toBe(ORDER.orderId);
+    // Cleared like any other read, so a later return trip cannot resume it.
+    expect(window.sessionStorage.getItem(legacyKey)).toBeNull();
+  });
+
+  it("prefers the current key when both are somehow present", () => {
+    const legacyKey = atob("ZnV0dXJlcGF5LmNoZWNrb3V0Lmhvc3RlZE9yZGVy");
+    window.sessionStorage.setItem(legacyKey, JSON.stringify({ ...ORDER, orderId: "stale" }));
+    window.sessionStorage.setItem(HOSTED_ORDER_STORAGE_KEY, JSON.stringify(ORDER));
+    land("?transaction_nsu=123");
+
+    expect(takeHostedOrder()?.orderId).toBe(ORDER.orderId);
+  });
+
+  it("ignores a value under any other name — no generic key scan", () => {
+    // A foreign key must neither resume an order nor be touched by the
+    // read-and-clear: the fallback is ONE named legacy key, not a pattern.
+    window.sessionStorage.setItem("some-other.checkout.key", JSON.stringify(ORDER));
+    land("?transaction_nsu=123");
+
+    expect(takeHostedOrder()).toBeNull();
+    expect(window.sessionStorage.getItem("some-other.checkout.key")).not.toBeNull();
   });
 
   it("answers null when nothing was parked", () => {

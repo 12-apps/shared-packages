@@ -2,7 +2,7 @@ import type { ChargeSnapshot, DeclineReason } from './types';
 
 /**
  * What a decline MEANS, as properties of this package's taxonomy — ported
- * from the future-pay host's collection policy (FUT-761).
+ * from the first adopting host's collection policy (FUT-761).
  *
  * The split matters: which reasons kill the INSTRUMENT (rather than the
  * moment) and which snapshots forbid another presentation are statements

@@ -12,7 +12,7 @@ import {
 import { mergeVisibleResults, type ListVisibility } from './visible';
 
 /**
- * The guard helpers (12-13) — ported from future-pay's `lib/rbac/guards.ts`,
+ * The guard helpers (12-13) — ported from the origin host's `lib/rbac/guards.ts`,
  * with one deliberate signature change: WHO is asking arrives as an argument
  * instead of being read from an ambient session. Resolving the session is the
  * host's half of the port ("who is calling"); everything after that — the
@@ -104,7 +104,7 @@ function outsideCeiling(actor: RbacGuardActor, action: string): boolean {
  * The structural belt for "impersonating means NOT super". Every guard
  * short-circuits on `isSuper` before any other check runs, so a host that
  * forgot to force it false while carrying a ceiling would get the UNION —
- * silently, on every route at once (future-pay calls its equivalent line
+ * silently, on every route at once (the origin host calls its equivalent line
  * "the single most important line in this feature"). A ceiling and platform
  * authority are never both meaningful: the ceiling wins.
  */

@@ -46,7 +46,7 @@ function harness(resolvers?: VaultRequestResolvers) {
 const RESOLVERS: VaultRequestResolvers = {
   begin: async () => ({
     reference: 'sub-42',
-    customer: { name: 'Loja Acme', email: 'acme@futurepay.test', taxId: '12345678000199' },
+    customer: { name: 'Loja Acme', email: 'acme@example.test', taxId: '12345678000199' },
     customerRef: 'cus_9',
   }),
   complete: async (_merchant, browser) => ({

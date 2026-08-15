@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
  * name — driving the published package's own Hono router over a real Postgres
  * through the Vite proxy, as the seeded owner.
  *
- * The cases are the port of future-pay's notification-centre coverage (its
+ * The cases are the port of the origin host's notification-centre coverage (its
  * `badge-realtime` component suite and the account preferences screen), moved to
  * the level they belong at: a real browser, a real socket, real rows. What only
  * exists here is the seam BETWEEN the two published halves — the URLs the client
@@ -42,6 +42,15 @@ function rowFor(page: Page, body: string) {
   return page.locator('[data-testid^="notification-"]').filter({ hasText: body });
 }
 
+/**
+ * THE COPY THESE SPECS READ IS THIS HARNESS'S OWN, and that is load-bearing.
+ *
+ * They used to read the package's pt-BR default, which made the one consumer
+ * standing in for an independent adopter assert the extraction origin's
+ * sentences back at it — exactly how that default stayed invisible. `messages`
+ * is required config now, and this app states a hardware shop's words in
+ * `src/notifications/notification-copy.ts`; the assertions follow it.
+ */
 test.describe('the bell and its badge', () => {
   test('shows the seeded unread count, in pt-BR', async ({ page }) => {
     await openPage(page);
@@ -49,7 +58,7 @@ test.describe('the bell and its badge', () => {
     // `/notifications/unread-count` over a real COUNT.
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações (3 não lidas)',
+      'Abrir avisos (3 não lidos)',
     );
   });
 
@@ -61,7 +70,7 @@ test.describe('the bell and its badge', () => {
     // rather than incremented locally, so this number is one the database gave.
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações (4 não lidas)',
+      'Abrir avisos (4 não lidos)',
     );
   });
 });
@@ -82,12 +91,12 @@ test.describe('the inbox panel', () => {
   test('marking one read moves the badge and survives a reload', async ({ page }) => {
     await openPanel(page);
     await rowFor(page, 'Pedido A-1026 pago.')
-      .getByRole('button', { name: 'Pagamento confirmado (não lida)' })
+      .getByRole('button', { name: 'Pagamento confirmado (não lido)' })
       .click();
 
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações (2 não lidas)',
+      'Abrir avisos (2 não lidos)',
     );
 
     // The optimistic update is not the claim — the row on disk is. Reload and the
@@ -95,7 +104,7 @@ test.describe('the inbox panel', () => {
     await page.reload();
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações (2 não lidas)',
+      'Abrir avisos (2 não lidos)',
     );
   });
 
@@ -105,7 +114,7 @@ test.describe('the inbox panel', () => {
 
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações',
+      'Abrir avisos',
     );
     await expect(page.getByTestId('notifications-mark-all-read')).toBeHidden();
   });
@@ -113,13 +122,13 @@ test.describe('the inbox panel', () => {
   test('deleting a row removes it for good', async ({ page }) => {
     await openPanel(page);
     await rowFor(page, 'Pedido A-1026 pago.')
-      .getByRole('button', { name: 'Excluir notificação: Pagamento confirmado' })
+      .getByRole('button', { name: 'Excluir aviso: Pagamento confirmado' })
       .click();
 
     await expect(page.getByText('Pedido A-1026 pago.')).toBeHidden();
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações (2 não lidas)',
+      'Abrir avisos (2 não lidos)',
     );
 
     await page.reload();
@@ -131,7 +140,7 @@ test.describe('the inbox panel', () => {
   test('opening a row deep-links through the host router', async ({ page }) => {
     await openPanel(page);
     await rowFor(page, 'Pedido A-1026 pago.')
-      .getByRole('button', { name: 'Pagamento confirmado (não lida)' })
+      .getByRole('button', { name: 'Pagamento confirmado (não lido)' })
       .click();
 
     // The link the host's own generator put on the notification, handed to the
@@ -222,7 +231,7 @@ test.describe('the preferences screen', () => {
     // every transport is silent.
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações (4 não lidas)',
+      'Abrir avisos (4 não lidos)',
     );
     await page.getByTestId('notifications-bell').click();
     await expect(page.getByText('Pedido A-2048 pago.')).toBeVisible();

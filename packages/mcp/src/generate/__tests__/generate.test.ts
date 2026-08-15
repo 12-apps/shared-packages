@@ -19,7 +19,7 @@ import {
 /**
  * The `mcp:generate` / `mcp:check` gate as a LIBRARY (12-23).
  *
- * It was a script in future-pay, which is why a second app could not have it: a
+ * It was a script in the origin host, which is why a second app could not have it: a
  * script gets copied, and a copy drifts. What matters about the move is that the
  * two properties the gate exists for survive it —
  *

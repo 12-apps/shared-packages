@@ -20,7 +20,7 @@ import { httpTransport, type ReportBuilderTransport } from "./transport";
  *
  * The vocabulary half is new, and it is what stopped this package shipping
  * another application's product inside it. `system-report`, `system-dashboard`
- * and `reports-page` used to import future-pay's `SYSTEM_REPORT_NAV`,
+ * and `reports-page` used to import the origin host's `SYSTEM_REPORT_NAV`,
  * `SYSTEM_DASHBOARDS` and `SYSTEM_REPORT_KEYS` at module scope, and the editor
  * canvas imported that host's block templates the same way — so a host that
  * mounted this surface got that store's built-ins, its dashboards, its pt-BR

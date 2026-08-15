@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchPagbankCardPublicKey } from '../providers/pagbank-public-key';
 
 /**
- * PagBank's on-demand card key (FUT-761, ported from the future-pay host —
+ * PagBank's on-demand card key (FUT-761, ported from the origin host —
  * the FUT-174 per-store rule). Best-effort by contract: a checkout that
  * falls back to the mock/pasted key must never be blocked by this read, so
  * every failure answers null and only a pre-send network error is retried.

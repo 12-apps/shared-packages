@@ -2,7 +2,7 @@ import type { PaymentProviderAdapter } from '../core/provider';
 
 /**
  * Whether a stored credential set is actually USABLE for its adapter — not
- * merely non-empty (ported from the future-pay host, FUT-761).
+ * merely non-empty (ported from the first adopting host, FUT-761).
  *
  * Two ways "non-empty" lies: a host-stamped extra field (a `notificationUrl`
  * that belongs to no schema) survives a CLEARED token, and a set holding a

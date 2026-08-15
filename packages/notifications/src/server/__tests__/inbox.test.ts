@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { CLINIC_MESSAGES } from '../../__tests__/host-copy';
+
 import { createApiNotifications, type ApiNotifications } from '../create-api-notifications';
 
 import { createMemoryDb, memoryContacts, type MemoryDb } from './memory-db';
@@ -24,6 +26,8 @@ let api: ApiNotifications;
 beforeEach(() => {
   db = createMemoryDb();
   api = createApiNotifications({
+    categories: ['orders', 'payments', 'stock', 'system'],
+    messages: CLINIC_MESSAGES,
     db: () => Promise.resolve(db),
     contacts: memoryContacts({
       u1: { email: 'buyer@example.com', phone: null },

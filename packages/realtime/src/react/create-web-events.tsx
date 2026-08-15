@@ -62,7 +62,7 @@ const DEFAULT_API_BASE = "/api";
 /**
  * Default paths of the two subscribe surfaces, relative to `apiBase`.
  *
- * These are future-pay's own spellings, so a host that mounts `createApiEvents` with the
+ * These are the origin host's own spellings, so a host that mounts `createApiEvents` with the
  * matching surface paths configures nothing at all.
  */
 const DEFAULT_TENANT_PATH = (tenantSlug: string): string =>

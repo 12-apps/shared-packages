@@ -192,7 +192,7 @@ describe('shift PostgreSQL schema', () => {
     // `client_id` carries no FK (that is what makes the package host-agnostic),
     // so a host purging a tenant deletes the tenant row and then sweeps the
     // by-value tables. A trigger that raised on DELETE aborted that sweep —
-    // and Future Pay runs it on every deploy for the demo stores.
+    // and the origin host runs it on every deploy for the demo stores.
     await db.exec(`
       INSERT INTO "shifts"
         ("id", "client_id", "user_id", "kind", "started_at",

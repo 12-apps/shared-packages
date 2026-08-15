@@ -68,6 +68,24 @@ export interface CredentialFieldSpec {
    * bridge; no consumer has to know a provider's token vocabulary.
    */
   fulfilledBy?: string;
+  /**
+   * An EXTRA most stores must leave empty — not merely "not required".
+   *
+   * `required: false` is a claim about enablement, and it is true of every
+   * Stripe field (under OAuth the access token fulfils the secret key, so
+   * nothing has to be typed at all). That makes a required-field test vacuous
+   * on the credentials path, and a completeness rule built on it asked for
+   * every box in the schema — which turned Stripe's `connectedAccountId` into
+   * a field owners dutifully filled with their OWN account id. That value sends
+   * `Stripe-Account: acct_...`, which is for a PLATFORM charging on behalf of a
+   * separately-onboarded account; sent with that same account's own key, Stripe
+   * refuses the call. The screen then reported "Credenciais recusadas" over
+   * four correctly-filled boxes.
+   *
+   * So a field the ordinary store does not use says so, and completeness skips
+   * it. The form still renders it — the platforms that need it are real.
+   */
+  advanced?: boolean;
 }
 
 /** A labelled external link rendered inline within a setup step. */
@@ -191,7 +209,32 @@ export interface ProviderSetupGuide {
    * renders as the first step, exactly as before this field existed.
    */
   activeStage?: number;
+  /**
+   * The same walkthrough for a store connecting with its OWN keys.
+   *
+   * A provider that accepts both a grant and pasted credentials has ONE screen
+   * and two genuinely different first steps. Written as a single guide, step 1
+   * said "clique em 'Conectar com Stripe' acima" to an owner who had opened the
+   * credential form — where that button is not rendered, because it acts on a
+   * grant they are not using. The rest of the walkthrough (configure the
+   * account, then charge to activate) really is shared, which is why this is a
+   * variant of one guide rather than two unrelated ones.
+   *
+   * Omitted when a provider's steps do not depend on how it was connected —
+   * both paths then render the base guide, unchanged.
+   *
+   * **It must MIRROR the base guide's shape**: the same number of stages, with
+   * the owner-confirmable section at the same index. The host resolves the
+   * activation card's `blocked`/`hidden` from the base guide alone — that
+   * happens before the panel knows which path is open — so a variant that moved
+   * either would desync the step that switches the store on from the
+   * walkthrough above it. Pinned by the guide invariant tests.
+   */
+  credentialsPath?: SetupPathVariant;
 }
+
+/** A walkthrough variant: every part of a guide except its alternatives. */
+export type SetupPathVariant = Omit<ProviderSetupGuide, 'credentialsPath'>;
 
 /**
  * Host-computed, merchant-specific values interpolated into setup guides.
@@ -203,6 +246,21 @@ export interface ProviderSetupGuide {
  * provider's onboarding to render it.
  */
 export interface SetupGuideContext {
+  /**
+   * What the HOST PLATFORM is called, in the owner's own words — the name a
+   * store owner would recognise on the screen they are reading.
+   *
+   * REQUIRED, and deliberately not defaulted. Two guides address the platform
+   * by name in the middle of an instruction ("é assim que o {brandName}
+   * confirma que a notificação veio mesmo da Stone"), and until this existed
+   * those sentences carried ONE adopter's product name, shipped inside a
+   * package every other adopter installs. A default would preserve that
+   * failure rather than fix it: a host that says nothing would silently ship
+   * a stranger's brand to its own store owners, and nothing would fail. A
+   * required field makes a new host answer the question once, loudly, at the
+   * single call site that knows the answer.
+   */
+  brandName: string;
   /** This merchant's webhook/notification URL for the provider. */
   webhookUrl: string;
   /** Optional extra URL some providers require (e.g. public-key service). */

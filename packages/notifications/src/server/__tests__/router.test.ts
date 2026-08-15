@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CLINIC_MESSAGES } from '../../__tests__/host-copy';
+
 import { UnknownNotificationRecipientError, UnknownNotificationTypeError } from '../../errors';
 import type { NotificationChannel, NotificationTransport } from '../../types';
 import { createApiNotifications, type ApiNotifications } from '../create-api-notifications';
@@ -10,7 +12,7 @@ import { createMemoryDb, memoryContacts, type MemoryDb } from './memory-db';
  * The channel router: routing and fan-out, preference gating, the delivery
  * lifecycle, failure isolation and the retry sweep.
  *
- * This is future-pay's `tests/integration/notifications.test.ts` as a unit
+ * This is the origin host's `tests/integration/notifications.test.ts` as a unit
  * suite — the same claims, against the in-memory seam. The database half of
  * those claims is re-run over a real Postgres in
  * `harness/backend/tests/notifications-pipeline.test.ts`.
@@ -94,6 +96,8 @@ function mount(
   overrides: Partial<Parameters<typeof createApiNotifications>[0]> = {},
 ): ApiNotifications {
   return createApiNotifications({
+    categories: ['orders', 'payments', 'stock', 'system'],
+    messages: CLINIC_MESSAGES,
     db: () => Promise.resolve(db),
     contacts: memoryContacts({
       u1: { email: 'buyer@example.com', phone: '+5531999998888' },

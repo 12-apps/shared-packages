@@ -14,7 +14,7 @@ import { HARNESS_BACKEND_ORIGIN, HARNESS_GATEWAY_ORIGIN } from '../backend/src/p
  * The proxy is not one of those. It is the ordinary arrangement of a SPA in
  * front of an API on another port — the reason the reports surface can reach
  * `/api/admin/...` with a plain same-origin `fetch` and no `transport` seam at
- * all, exactly as future-pay's admin does against `apps/web`. `/__harness` is
+ * all, exactly as the origin host's admin does against `apps/web`. `/__harness` is
  * the suite's reset control on the same server; it is deliberately NOT under
  * `/api`, so nothing can mistake it for part of the package's surface.
  *
@@ -34,7 +34,7 @@ const proxy = {
   // @12-apps/pwa's two assets (12-23), and they belong HERE rather than under
   // `/api`: a worker's directory bounds its scope and the manifest is linked from
   // `index.html`, so both are served from the ORIGIN ROOT in every real
-  // deployment. Proxying them one level up is the same arrangement future-pay
+  // deployment. Proxying them one level up is the same arrangement the origin host
   // has, where the SPA's origin answers them and `apps/web` produces them.
   '/manifest.webmanifest': { target: HARNESS_BACKEND_ORIGIN, changeOrigin: true },
   '/sw.js': { target: HARNESS_BACKEND_ORIGIN, changeOrigin: true },

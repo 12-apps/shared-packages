@@ -3,6 +3,8 @@
    asks for; it flags the module-scoped binding they are assigned to, which is
    how a Hono app has to be shared between a builder and the cases. */
 import { beforeEach, describe, expect, it } from 'vitest';
+
+import { CLINIC_MESSAGES } from '../../__tests__/host-copy';
 import { Hono } from 'hono';
 
 import { notificationsRouter } from '../../hono';
@@ -26,6 +28,8 @@ let app: Hono;
 beforeEach(() => {
   db = createMemoryDb();
   const notifications = notificationsRouter({
+    categories: ['orders', 'payments', 'stock', 'system'],
+    messages: CLINIC_MESSAGES,
     db: () => Promise.resolve(db),
     contacts: memoryContacts({ u1: { email: 'buyer@example.com', phone: null } }),
     generators: [ORDER_PAID as never],
@@ -51,7 +55,7 @@ describe('authentication', () => {
   it('401s an unauthenticated caller before any handler runs', async () => {
     const response = await app.request('/api/account/notifications');
     expect(response.status).toBe(401);
-    expect((await json<{ error: string }>(response)).error).toBe('Não autenticado.');
+    expect((await json<{ error: string }>(response)).error).toBe(CLINIC_MESSAGES.unauthenticated);
   });
 
   it('scopes every read to the signed-in user', async () => {
@@ -94,7 +98,7 @@ describe('the wire', () => {
     });
     expect(response.status).toBe(400);
     const body = await json<{ error?: string; data?: unknown }>(response);
-    expect(body.error).toBe('Dados inválidos.');
+    expect(body.error).toBe(CLINIC_MESSAGES.invalidBody);
     // A denial is NOT wrapped — the `{ data }` envelope is success only.
     expect(body.data).toBeUndefined();
   });

@@ -12,7 +12,7 @@ import { pwaServiceWorkerSource } from "../service-worker-source";
 
 /**
  * The manifest ENDPOINT and the packaged worker (12-23) — the port of
- * future-pay's `storefront-manifest` route behaviour into the package.
+ * the origin host's `storefront-manifest` route behaviour into the package.
  *
  * The cases here are the ones that were only ever true by accident in a host:
  * that "not an app" is an empty 404 rather than a partial manifest, that the

@@ -4,6 +4,8 @@ import { Box, Button, Stack, TextField, Typography } from '@mui/material';
 
 import type { CredentialFieldSpec, MaskedFieldState } from '@12-apps/payments-backend';
 
+import { LINKISH_SX, T } from './panel-tokens';
+
 /**
  * The schema-driven credential inputs, and the one-line summary a finished
  * step collapses into.
@@ -67,19 +69,122 @@ interface CredentialFieldProps {
   state: MaskedFieldState | undefined;
   value: string | undefined;
   onChange: (value: string) => void;
+  /**
+   * What the last probe found about THIS credential, when it found anything.
+   *
+   * The adapter has always returned per-credential verdicts; the screen showed
+   * them as a list under the form, which leaves the owner matching four
+   * sentences to four boxes by eye. A verdict about a field belongs at the
+   * field: "chave publicável de produção em conexão de teste" is unactionable
+   * three boxes away from the box it is about.
+   */
+  check?: { status: 'PASS' | 'FAIL' | 'UNCHECKED'; message: string };
 }
 
 /** One schema-driven form field. Secrets are write-only: hint, never value. */
-export function CredentialField({ spec, state, value, onChange }: CredentialFieldProps) {
+export function CredentialField({ spec, state, value, onChange, check }: CredentialFieldProps) {
   const presentation = fieldPresentation(spec, state, value);
+  // Label ABOVE the box, not floating in it. Four credentials whose names are
+  // the only thing distinguishing them (`sk_`, `pk_`, `whsec_`, `acct_`) are
+  // read as a column, and a floating label disappears the moment a value is
+  // pasted — exactly when the owner is checking they pasted into the right one.
+  // `htmlFor`/`id` rather than a bare <label>: lifting the text out of
+  // TextField also lifts it out of MUI's own labelling, and an input whose
+  // label is merely ABOVE it is unlabelled to a screen reader and unfindable by
+  // `getByLabelText`. The association has to be restated by hand.
+  const inputId = `payments-credential-${spec.key}`;
   return (
-    <TextField
-      size="small"
-      label={spec.label}
-      {...presentation}
-      slotProps={spec.mono ? { htmlInput: { sx: MONO_INPUT, spellCheck: false } } : undefined}
-      onChange={(e) => onChange(e.target.value)}
-    />
+    <Box>
+      <Typography
+        component="label"
+        htmlFor={inputId}
+        sx={{ display: 'block', fontSize: '12px', fontWeight: 650, color: T.ink2, mb: '5px' }}
+      >
+        {spec.label}
+        {spec.advanced ? (
+          <Box component="span" sx={{ fontWeight: 500, color: T.ink4 }}>
+            {' · só para plataformas Connect'}
+          </Box>
+        ) : null}
+      </Typography>
+      <TextField
+        size="small"
+        fullWidth
+        id={inputId}
+        {...presentation}
+        helperText={undefined}
+        slotProps={
+          spec.mono ? { htmlInput: { sx: MONO_INPUT, spellCheck: false } } : { htmlInput: {} }
+        }
+        sx={fieldSx(check?.status)}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <FieldNote
+        check={check}
+        fallback={presentation.helperText ?? spec.helperText}
+        testId={`payments-field-note-${spec.key}`}
+      />
+    </Box>
+  );
+}
+
+/**
+ * The box itself: 8px, hairline, brand focus ring — and the probe's verdict in
+ * its border, so a wrong credential is visible before any sentence is read.
+ */
+function fieldSx(status?: 'PASS' | 'FAIL' | 'UNCHECKED') {
+  const failed = status === 'FAIL';
+  return {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '8px',
+      fontSize: '13px',
+      background: failed ? '#fffbfb' : undefined,
+      '& fieldset': {
+        borderColor: failed ? T.bad : status === 'PASS' ? T.okLine : T.line,
+      },
+      '&:hover fieldset': { borderColor: failed ? T.bad : T.ink4 },
+      '&.Mui-focused fieldset': { borderColor: T.brand, borderWidth: '2px' },
+    },
+    '& .MuiOutlinedInput-input': { padding: '10px 12px' },
+  } as const;
+}
+
+/**
+ * How each verdict reads under its box. `UNCHECKED` deliberately carries no
+ * mark: a tick would claim it passed and a cross would blame the owner, when
+ * the truth is that nothing could be established either way.
+ */
+const VERDICT = {
+  PASS: { mark: '✓', color: T.ok },
+  FAIL: { mark: '✕', color: T.bad },
+  UNCHECKED: { mark: '', color: T.ink3 },
+  NONE: { mark: '', color: T.ink3 },
+} as const;
+
+/** The line under a box: the probe's verdict when there is one, else the hint. */
+function FieldNote({
+  check,
+  fallback,
+  testId,
+}: {
+  check?: { status: 'PASS' | 'FAIL' | 'UNCHECKED'; message: string };
+  fallback?: string;
+  testId: string;
+}) {
+  const text = check?.message ?? fallback;
+  if (!text) return null;
+  const { mark, color } = VERDICT[check?.status ?? 'NONE'];
+  return (
+    <Stack direction="row" gap="6px" alignItems="flex-start" sx={{ mt: '5px' }} data-testid={testId}>
+      {mark ? (
+        <Box component="span" aria-hidden sx={{ fontWeight: 800, color }}>
+          {mark}
+        </Box>
+      ) : null}
+      <Typography sx={{ fontSize: '11.5px', lineHeight: 1.45, color, fontWeight: mark ? 500 : 400 }}>
+        {text}
+      </Typography>
+    </Stack>
   );
 }
 
@@ -128,29 +233,36 @@ export function DoneRow({
   testId: string;
 }) {
   return (
+    // Green, not grey: a finished step reads as an achievement at a glance, and
+    // the whole point of collapsing it is that the eye can skip it on the way to
+    // the step still owed.
     <Stack
       direction="row"
-      spacing={1.5}
+      spacing={1.25}
       alignItems="center"
       data-testid={testId}
-      sx={{ border: 1, borderColor: 'divider', borderRadius: 1, px: 2, py: 1.25 }}
+      sx={{
+        border: `1px solid ${T.okLine}`,
+        background: T.okSoft,
+        borderRadius: '9px',
+        px: '16px',
+        py: '11px',
+        mx: '20px',
+        mb: '10px',
+        fontSize: '13px',
+      }}
     >
-      <Box aria-hidden sx={{ color: 'success.main', fontWeight: 700 }}>
+      <Box aria-hidden sx={{ color: T.ok, fontWeight: 800 }}>
         ✓
       </Box>
-      <Typography variant="body2" color="text.secondary">
+      <Typography sx={{ fontSize: '13px', fontWeight: 600, color: T.ink }}>
         {stripTrailingParenthetical(label)}
       </Typography>
-      <Typography variant="body2" sx={mono ? MONO_INPUT : undefined}>
+      <Typography sx={{ fontSize: '13px', color: T.ink3, ...(mono ? MONO_INPUT : {}) }}>
         {value}
       </Typography>
       <Box sx={{ flexGrow: 1 }} />
-      <Button
-        size="small"
-        onClick={onEdit}
-        data-testid={`${testId}-edit`}
-        sx={{ textTransform: 'none' }}
-      >
+      <Button size="small" onClick={onEdit} data-testid={`${testId}-edit`} sx={LINKISH_SX}>
         {editLabel}
       </Button>
     </Stack>

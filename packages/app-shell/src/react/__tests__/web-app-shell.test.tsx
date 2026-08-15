@@ -14,6 +14,7 @@ import { createContext, useContext, type JSX } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { CLUB_MESSAGES } from '../../__tests__/host-copy';
 import { createWebAppShell } from '../create-web-app-shell';
 
 /** The crashes a host's reporter saw, in a container the test owns. */
@@ -61,6 +62,9 @@ const REQUIRED = {
   brand: { name: 'Harness' },
   onCrash: (): void => {},
   consent: false,
+  // Required config now — this suite states its own copy rather than
+  // inheriting one, because there is nothing left to inherit.
+  messages: CLUB_MESSAGES,
 } as const;
 
 afterEach(() => {
@@ -96,7 +100,7 @@ describe('createWebAppShell', () => {
 
   /**
    * The shell must never invent a cache. A host's query client is where a 402→upsell
-   * interceptor lives (future-pay's admin puts it in the query and mutation caches),
+   * interceptor lives (the origin host's admin puts it in the query and mutation caches),
    * so a shell-created one would silently drop that interception.
    */
   it('installs the host query client, and mounts no provider without one', async () => {
@@ -244,7 +248,7 @@ describe('createWebAppShell', () => {
     expect(shell.brand.name).toBe('Harness');
     expect(typeof shell.lazyRoute).toBe('function');
     expect(typeof shell.RouteErrorBoundary).toBe('function');
-    expect(shell.messages.consentAccept).toBe('Li e aceito');
+    expect(shell.messages.consentAccept).toBe(CLUB_MESSAGES.consentAccept);
     // One theme object, built once: a theme rebuilt per render is a new object
     // identity and re-runs every `styled` cache below it.
     expect(shell.theme).toBe(shell.theme);
@@ -272,6 +276,7 @@ describe('createWebAppShell', () => {
     const shell = createWebAppShell({
       brand: { name: 'Harness' },
       onCrash: host.onCrash,
+      messages: CLUB_MESSAGES,
       queryClient: new QueryClient(),
       consent: {},
     });
@@ -308,6 +313,7 @@ describe('createWebAppShell', () => {
     const shell = createWebAppShell({
       brand: { name: 'Harness' },
       onCrash: host.onCrash,
+      messages: CLUB_MESSAGES,
       consent: false,
     });
 
@@ -345,5 +351,70 @@ describe('createWebAppShell', () => {
     // brand-palette contract, reached through the factory rather than directly.
     expect(shell.theme.palette.primary.main).not.toBe('#7ED957');
     expect(shell.theme.palette.primary.light).toBe('#7ED957');
+  });
+});
+
+/**
+ * THE SESSION, WITHOUT THE TOWER.
+ *
+ * `Provider` mounts theme + session + consent gate + router, which is what an
+ * application entry point wants and what nothing else does. A unit test
+ * rendering one signed-in component does not want a consent gate calling the
+ * terms endpoint, and cannot mount a second `BrowserRouter` inside the harness's
+ * own.
+ *
+ * The reason this needs a test rather than a docstring is the failure it
+ * prevents: a host that works around the gap by calling `createWebAuth()` itself
+ * gets a SECOND context, so a component renders under one provider and reads
+ * from the other. `useSession must be used within a SessionProvider`, thrown
+ * from a tree that visibly has one. So the assertion is not "a provider exists"
+ * — it is that the value read under `SessionProvider` is the value `Provider`
+ * would have given.
+ */
+describe('SessionProvider, on its own', () => {
+  it('serves the session with no theme, no gate and no router mounted', async () => {
+    const calls = server();
+    const shell = createWebAppShell({ ...REQUIRED, queryClient: new QueryClient() });
+
+    function Page(): JSX.Element {
+      return <p data-testid="status">{shell.useSession().status}</p>;
+    }
+
+    render(
+      <shell.SessionProvider>
+        <Page />
+      </shell.SessionProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('unauthenticated'));
+    // The gate is what would have reached the network for something this test
+    // never asked about. Asserted with the same literal the other cases in this
+    // file use rather than a predicate — a closure over the recorded calls is
+    // what the flakiness gate reads as shared mutable state.
+    expect(calls).not.toContain('GET /backend/consent/status');
+  });
+
+  it('is the SAME context `Provider` mounts, not a second one', async () => {
+    server();
+    const shell = createWebAppShell({ ...REQUIRED, queryClient: new QueryClient() });
+
+    // Reads through `useSession` while mounted under `Provider`, which installs
+    // its own session. If `SessionProvider` were a different instance this still
+    // renders — it is the nesting that proves they are one, because the inner
+    // provider would otherwise shadow the outer with an unrelated context and
+    // the hook would read whichever it found.
+    function Page(): JSX.Element {
+      return <p data-testid="nested">{shell.useSession().status}</p>;
+    }
+
+    render(
+      <shell.Provider router={{}}>
+        <shell.SessionProvider>
+          <Page />
+        </shell.SessionProvider>
+      </shell.Provider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('nested').textContent).toBe('unauthenticated'));
   });
 });

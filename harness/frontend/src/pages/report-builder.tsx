@@ -50,7 +50,7 @@ const spec = (input: unknown): ReportSpec => reportSpecSchema.parse(input);
  * The block templates this host offers — its product, in its words.
  *
  * They used to come from inside the package: `blockTemplateGroups()` returned
- * three groups of future-pay's own reports, built from future-pay's starters,
+ * three groups of the origin host's own reports, built from the origin host's starters,
  * and every consumer that mounted the editor got them. The picker's contract is
  * "your groups, then the blank one", so the groups are declared here, over the
  * catalog `harness/backend` actually serves.
@@ -217,7 +217,7 @@ const { page: ReportSurface } = createWebReportBuilder({
  * The cache the surface shares with its host.
  *
  * `standalone` used to stand one up. A host that owns the router owns this too
- * — the arrangement future-pay's admin has, where an invalidation anywhere in
+ * — the arrangement the origin host's admin has, where an invalidation anywhere in
  * the app reaches the reports screens.
  */
 const queryClient = new QueryClient();

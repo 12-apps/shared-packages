@@ -35,7 +35,7 @@ export interface ShellRouteErrorBoundaryConfig {
    * default here silently reports through a path with no noise rules on it.
    */
   onCrash: RouteCrashReporter;
-  messages?: Partial<AppShellMessages>;
+  messages: AppShellMessages;
 }
 
 /**

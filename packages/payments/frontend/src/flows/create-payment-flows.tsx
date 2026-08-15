@@ -7,7 +7,7 @@
  *
  * ## Why the scope arrives as HOOKS
  *
- * `useScope`, `useCart`, `useBuyerDefaults`, `useComanda` and
+ * `useScope`, `useCart`, `useBuyerDefaults`, `useSettlement` and
  * `ports.useAvailability` are hooks, not values, and they are invoked in a
  * component BODY — never read at factory time. The factory runs once, at module
  * evaluation, so a value-shaped config would freeze the first store's slug and
@@ -19,10 +19,9 @@ import { useCallback, type JSX, type ReactNode } from "react";
 import { buyerFieldsFor } from "../components/checkout/buyer-fields";
 import { CheckoutFlow } from "../components/checkout/checkout-flow";
 import { createCheckoutClient } from "../components/checkout/transport";
-import type { CheckoutProviderConfig, ComandaCheckout } from "../components/checkout/types";
+import type { CheckoutProviderConfig, SettlementCheckout } from "../components/checkout/types";
 import { useCheckoutController } from "../components/checkout/use-checkout-controller";
 
-import { DEFAULT_CHECKOUT_COPY_FE } from "./copy";
 import { FlowsProvider, useResolvedConfig, type FlowsRuntime } from "./runtime";
 import { buyerScreens } from "./screens-buyer";
 import { hostedScreens } from "./screens-hosted";
@@ -50,7 +49,7 @@ function buildRuntime(config: PaymentFlowsConfig): FlowsRuntime {
   return {
     config,
     client,
-    copy: { ...DEFAULT_CHECKOUT_COPY_FE, ...config.copy },
+    copy: config.copy,
     navigate,
     // Both of these are HOOKS. They are called from a component body on every
     // render, so the slug follows the host's router and the availability vote
@@ -68,10 +67,10 @@ function buildCheckout(
   const { ports } = runtime.config;
   const Unavailable = screens.PaymentsUnavailable;
 
-  function CheckoutBody({ comanda }: { comanda?: ComandaCheckout | null }): JSX.Element {
+  function CheckoutBody({ settlement }: { settlement?: SettlementCheckout | null }): JSX.Element {
     const cart = runtime.config.useCart();
     const defaults = runtime.config.useBuyerDefaults?.() ?? {};
-    const hostComanda = runtime.config.useComanda?.() ?? null;
+    const hostSettlement = runtime.config.useSettlement?.() ?? null;
     const { config, pending } = useResolvedConfig(runtime);
     const availability = runtime.useAvailability();
     const tenantSlug = runtime.useTenantSlug();
@@ -93,7 +92,7 @@ function buildCheckout(
         onPaid={ports.onPaid}
         defaultBuyer={defaults.buyer}
         taxIdOnFile={defaults.taxIdOnFile ?? false}
-        comanda={comanda ?? hostComanda}
+        settlement={settlement ?? hostSettlement}
         providerConfig={config}
         tenantSlug={tenantSlug}
         confirmationExtra={runtime.config.confirmation?.extra}

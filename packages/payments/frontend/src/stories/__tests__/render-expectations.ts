@@ -435,7 +435,7 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // Name+chip adjacency: "Produção" alone would match inside other copy.
   "Connection/ConnectedProduction": {
     testIds: ["payments-connected-environment", "payments-connected-account"],
-    text: ["ProduçãoSua conta está conectada."],
+    text: ["Produção", "Sua conta está conectada."],
     absentText: ["Sandbox (testes)"],
   },
   "Connection/ExpiryNear": {
@@ -453,7 +453,7 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   },
   "Connection/DisconnectFlow": {
     testIds: ["payments-connected-account"],
-    text: ["Desconectar"],
+    text: ["Remover conexão"],
   },
   // The chips are COMPUTED by the driven service — asserting the printed
   // `statusBadge → …` lines pins label AND color per row.
@@ -614,7 +614,11 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     text: [
       "Pagamentos em pausa na cantina",
       "Ir para o pagamento",
-      "padrão: “Pagamento online indisponível”",
+      // "sem o override", not "padrão": there is no package default any more
+      // (FUT-760), so the caption contrasts this demo host's own baseline copy
+      // with its per-store override. Pinned here precisely so the wording
+      // cannot drift back to implying a default the package no longer ships.
+      "sem o override: “Pagamento online indisponível”",
     ],
   },
 

@@ -5,7 +5,7 @@ import type { MerchantRef } from '../core/types';
 import { createMemoryProviderConfigStore } from '../memory';
 
 /**
- * The platform credential bootstrap (FUT-761, ported from the future-pay
+ * The platform credential bootstrap (FUT-761, ported from the origin
  * host). The load-bearing rules, each of which has already bitten once:
  * seeding NEVER overwrites a stored set (FUT-409 — the panel owns, the env
  * bootstraps), the chain order is written only when no chain existed yet,

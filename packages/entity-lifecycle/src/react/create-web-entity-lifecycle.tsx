@@ -7,7 +7,7 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { createLifecycleApiClient, type LifecycleApiClient } from './api';
 import { ApprovalsScreen } from './approvals-screen';
 import { DraftBanner, type DraftBannerProps } from './draft-banner';
-import { DEFAULT_ENTITY_TYPE_LABELS, type EntityTypeLabels } from './labels';
+import { type EntityTypeLabels } from './labels';
 import { RecycleBinScreen } from './recycle-bin-screen';
 import {
   VersionHistoryDialog,
@@ -34,7 +34,7 @@ export interface EntityLifecycleWebConfig {
   apiBase: string;
   /** How the surface reaches its data. Default: same-origin fetch. */
   transport?: LifecycleTransport;
-  /** pt-BR entity-type labels, merged over the future-pay defaults. */
+  /** The host's own pt-BR entity-type labels; an unlisted type renders as its raw key. */
   entityTypeLabels?: EntityTypeLabels;
 }
 
@@ -98,7 +98,10 @@ export function createWebEntityLifecycle(config: EntityLifecycleWebConfig): WebE
     config.apiBase,
     config.transport ?? httpLifecycleTransport(),
   );
-  const labels = { ...DEFAULT_ENTITY_TYPE_LABELS, ...config.entityTypeLabels };
+  // The host's map, WHOLE — not merged over a shipped one. A base layer here
+  // meant every key the host did not restate silently kept another host's
+  // word, while the presence of `entityTypeLabels` made it look configured.
+  const labels = config.entityTypeLabels ?? {};
   return {
     page: () => <LifecycleTabs api={api} labels={labels} />,
     RecycleBinScreen: () => <RecycleBinScreen api={api} labels={labels} />,

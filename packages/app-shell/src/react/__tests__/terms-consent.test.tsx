@@ -17,6 +17,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { CLUB_MESSAGES } from '../../__tests__/host-copy';
 import { CONSENT_ACCEPT_PATH, CONSENT_STATUS_PATH } from '../../core/consent-wire';
 import { TermsConsentDialog, type ConsentSignalHook } from '../consent/terms-consent-dialog';
 
@@ -84,23 +85,23 @@ afterEach(() => {
 describe('TermsConsentDialog', () => {
   it('stays out of the way when the acceptance is current', async () => {
     server({ stale: false });
-    render(<TermsConsentDialog />);
+    render(<TermsConsentDialog messages={CLUB_MESSAGES} />);
     await waitFor(() => expect(screen.queryByTestId('terms-consent-dialog')).toBeNull());
   });
 
   it('asks a stale user to accept, instead of letting a guard dead-end them', async () => {
     server({ stale: true });
-    render(<TermsConsentDialog />);
+    render(<TermsConsentDialog messages={CLUB_MESSAGES} />);
 
     const dialog = await screen.findByTestId('terms-consent-dialog');
     // Says WHY. The failure it replaces stopped the user without telling them
     // anything they could act on.
-    expect(dialog.textContent).toContain('Sua conta segue ativa');
+    expect(dialog.textContent).toContain('Sua associação continua em dia');
   });
 
   it('records the acceptance and gets out of the way', async () => {
     const calls = server({ stale: true });
-    render(<TermsConsentDialog />);
+    render(<TermsConsentDialog messages={CLUB_MESSAGES} />);
 
     fireEvent.click(await screen.findByTestId('terms-consent-accept'));
 
@@ -115,7 +116,7 @@ describe('TermsConsentDialog', () => {
    */
   it('keeps asking when the server could not record the acceptance', async () => {
     server({ stale: true, acceptOk: false });
-    render(<TermsConsentDialog />);
+    render(<TermsConsentDialog messages={CLUB_MESSAGES} />);
 
     fireEvent.click(await screen.findByTestId('terms-consent-accept'));
 
@@ -125,13 +126,15 @@ describe('TermsConsentDialog', () => {
   /** A host that mounted the surface elsewhere moves both calls with one prop. */
   it('asks wherever the host mounted the surface', async () => {
     const calls = server({ stale: false });
-    render(<TermsConsentDialog apiBase="/backend/v1" />);
+    render(<TermsConsentDialog apiBase="/backend/v1" messages={CLUB_MESSAGES} />);
     await waitFor(() => expect(calls).toContain(`GET /backend/v1${CONSENT_STATUS_PATH}`));
   });
 
-  it('renders the host copy when a message override is given', async () => {
+  it('renders the copy of a host in another language', async () => {
+    // The seam is not a translation feature — it is where the sentences come
+    // from at all. Nothing in the package has an opinion about the language.
     server({ stale: true });
-    render(<TermsConsentDialog messages={{ consentAccept: 'I accept' }} />);
+    render(<TermsConsentDialog messages={{ ...CLUB_MESSAGES, consentAccept: 'I accept' }} />);
     expect(await screen.findByText('I accept')).toBeDefined();
   });
 });
@@ -150,7 +153,7 @@ describe('TermsConsentDialog · the realtime accelerator', () => {
     const options = { stale: false };
     server(options);
     const stream = signal();
-    const view = render(<TermsConsentDialog useSignal={stream.hook} />);
+    const view = render(<TermsConsentDialog messages={CLUB_MESSAGES} useSignal={stream.hook} />);
 
     await waitFor(() => expect(screen.queryByTestId('terms-consent-dialog')).toBeNull());
 
@@ -159,7 +162,7 @@ describe('TermsConsentDialog · the realtime accelerator', () => {
     options.stale = true;
     stream.connect();
     await act(async () => {
-      view.rerender(<TermsConsentDialog useSignal={stream.hook} />);
+      view.rerender(<TermsConsentDialog messages={CLUB_MESSAGES} useSignal={stream.hook} />);
     });
 
     expect(await screen.findByTestId('terms-consent-dialog')).toBeDefined();
@@ -169,7 +172,7 @@ describe('TermsConsentDialog · the realtime accelerator', () => {
     const options = { stale: false };
     server(options);
     const stream = signal();
-    render(<TermsConsentDialog useSignal={stream.hook} />);
+    render(<TermsConsentDialog messages={CLUB_MESSAGES} useSignal={stream.hook} />);
 
     await waitFor(() => expect(screen.queryByTestId('terms-consent-dialog')).toBeNull());
     options.stale = true;
@@ -189,7 +192,7 @@ describe('TermsConsentDialog · the realtime accelerator', () => {
    */
   it('works with no signal wired at all', async () => {
     server({ stale: true });
-    render(<TermsConsentDialog />);
+    render(<TermsConsentDialog messages={CLUB_MESSAGES} />);
     expect(await screen.findByTestId('terms-consent-dialog')).toBeDefined();
   });
 });
@@ -209,19 +212,19 @@ describe('TermsConsentDialog · reading the documents', () => {
   it('gets out of the way on the terms and privacy pages', async () => {
     server({ stale: true });
     at('/terms');
-    render(<TermsConsentDialog />);
+    render(<TermsConsentDialog messages={CLUB_MESSAGES} />);
     await waitFor(() => expect(screen.queryByTestId('terms-consent-dialog')).toBeNull());
 
     cleanup();
     at('/privacidade/');
-    render(<TermsConsentDialog />);
+    render(<TermsConsentDialog messages={CLUB_MESSAGES} />);
     await waitFor(() => expect(screen.queryByTestId('terms-consent-dialog')).toBeNull());
   });
 
   it('still asks everywhere else, including on a page whose path merely starts alike', async () => {
     server({ stale: true });
     at('/terms-de-parceria');
-    render(<TermsConsentDialog />);
+    render(<TermsConsentDialog messages={CLUB_MESSAGES} />);
     expect(await screen.findByTestId('terms-consent-dialog')).toBeDefined();
   });
 });

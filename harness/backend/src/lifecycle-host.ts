@@ -46,7 +46,7 @@ export const LIFECYCLE_TENANT_OFF_ID = 'harness-off';
 const TENANT_FLAGS: Record<string, { entitlements: FeatureFlagMap; settings: FeatureFlagMap }> = {
   [LIFECYCLE_TENANT_ID]: {
     entitlements: { versioning: true, drafts: true, approvals: true },
-    // Approvals ON for the harness tenant (future-pay's default is off): the
+    // Approvals ON for the harness tenant (the origin host's default is off): the
     // parked-write flows are the surface's hardest part, so the fixture keeps
     // them reachable.
     settings: { versioning: true, drafts: true, approvals: true },
@@ -271,7 +271,7 @@ export function lifecycleHost(pg: PGlite) {
         approvePermission: 'products:approve',
         ops: productOps(pg),
         // Soft-delete visibility is the HOST's job on every read it owns
-        // (ADOPTING rule 3), this one included: future-pay's twin reads the
+        // (ADOPTING rule 3), this one included: the origin host's twin reads the
         // mirror column through its soft-delete-filtered client, so an
         // ARCHIVED entity answers nothing and the dialog offers Restaurar on
         // every row. `null` is that answer, and the package renders it as 0.

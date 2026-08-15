@@ -11,7 +11,7 @@ import { Box } from '@12-apps/ui/mui/Box';
 import type { NotificationMessages } from '../messages';
 
 import { BellIcon } from './bell-icon';
-import { useUnreadCount, type NotificationsSubscribe } from './hooks';
+import { useUnreadCount, type NotificationsSignalHook, type NotificationsSubscribe } from './hooks';
 import type { InboxStore } from './inbox-state';
 
 const triggerSx = {
@@ -46,14 +46,17 @@ export function BellButton({
   store,
   messages,
   subscribe,
+  useSignal,
 }: BellButtonProps & {
   store: InboxStore;
   messages: NotificationMessages;
   subscribe?: NotificationsSubscribe;
+  useSignal?: NotificationsSignalHook;
 }): JSX.Element {
   const count = useUnreadCount(store, {
     enabled,
     ...(subscribe ? { subscribe } : {}),
+    ...(useSignal ? { useSignal } : {}),
   });
   return (
     <Box

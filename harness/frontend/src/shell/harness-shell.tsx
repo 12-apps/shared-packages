@@ -9,10 +9,11 @@ import { alpha, type Theme } from '@12-apps/ui/mui/styles';
 import useMediaQuery from '@12-apps/ui/mui/useMediaQuery';
 import { Text } from '@12-apps/ui/typography/Text';
 
+import { impersonation } from '../impersonation/surface';
 import { HarnessNav } from './harness-nav';
 
 /**
- * The harness chrome — the shape future-pay's admin shell has
+ * The harness chrome — the shape the origin host's admin shell has
  * (`apps/admin/src/shell/admin-shell.tsx`): a fixed-viewport flex row where a
  * `Sidebar` and the content each own an independent scroll region, the sidebar
  * panel tinted a few percent of primary so it reads as chrome rather than as
@@ -240,6 +241,7 @@ export function HarnessShell({
 }): JSX.Element {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const nav = useMobileNav(isMobile, activeSlug);
+  const ImpersonationBanner = impersonation.banner;
 
   return (
     // `100dvh`, not `100vh`: on a phone the browser's own chrome retracts as
@@ -256,6 +258,15 @@ export function HarnessShell({
       {/* A column on both paths, so the page below scrolls under a top bar that
           stays put rather than scrolling away with it. */}
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
+        {/* ONCE per app, in the chrome, ABOVE the scroll region — never per
+            page. `flow` because this shell already owns a non-scrolling top
+            region, so the bar drops in as a `flex: 0 0 auto` row and the content
+            simply gets shorter. A storefront whose own header is fixed passes
+            `placement="fixed"` instead and the package offsets the chrome by
+            the bar's measured height. It renders nothing when there is no
+            session but STAYS MOUNTED: the package refuses to start a session in
+            a document with no banner host. */}
+        <ImpersonationBanner />
         {isMobile ? <MobileTopBar onOpenNav={nav.toggle} /> : null}
         <Box
           sx={{

@@ -118,3 +118,50 @@ describe('createAppTheme palette', () => {
     expect(light.palette.primary.main).toBe(bare.palette.primary.main);
   });
 });
+
+/**
+ * A theme is not only a palette.
+ *
+ * A host arrives with `styleOverrides` and `defaultProps` of its own — the
+ * extraction origin carries ~240 lines of them for a glass treatment on
+ * `MuiAlert` alone. Before `components` existed here, adopting this factory
+ * dropped every one of them: no type error, no failing test, a still-valid
+ * theme, and the only symptom a component that stops looking the way the
+ * product designed it, in every app at once.
+ *
+ * That is why these assert the OVERRIDE SURVIVES rather than that the key is
+ * accepted — accepting it and discarding it would pass the weaker test.
+ */
+describe('createAppTheme components', () => {
+  const overrides = {
+    MuiAlert: { styleOverrides: { root: { backdropFilter: 'blur(8px)' } } },
+  } as const;
+
+  it("keeps the host's component overrides", () => {
+    const theme = createAppTheme('light', { components: overrides });
+
+    expect(theme.components?.MuiAlert?.styleOverrides?.root).toEqual({
+      backdropFilter: 'blur(8px)',
+    });
+  });
+
+  it('leaves the palette to the factory, overrides or not', () => {
+    const seed = '#7ED957';
+    const bare = createAppTheme('light', { override: { primary: seed } });
+    const styled = createAppTheme('light', { override: { primary: seed }, components: overrides });
+
+    // The two halves are independent: a host restyling its alerts must not move
+    // the legibility-corrected brand colour underneath them.
+    expect(styled.palette.primary.main).toBe(bare.palette.primary.main);
+  });
+
+  it('builds the same theme as before when a host passes none', () => {
+    // The key is additive. A host that never heard of it gets byte-identical
+    // options, which is what makes this a minor rather than a break.
+    const withKey = createAppTheme('dark', { components: undefined });
+    const without = createAppTheme('dark');
+
+    expect(withKey.palette.primary.main).toBe(without.palette.primary.main);
+    expect(withKey.components).toEqual(without.components);
+  });
+});

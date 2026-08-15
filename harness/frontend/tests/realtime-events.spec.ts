@@ -19,7 +19,7 @@ import { expect, test, type Page } from '@playwright/test';
  * live in a SharedWorker, so the ticket request is issued by the worker and neither
  * `page.on("request")` nor `context.on("request")` sees it — a SharedWorker is attached to no
  * page. A probe that passed would only be observing the in-page fallback, i.e. asserting the
- * optimisation is OFF. A Gherkin step doing exactly that went red on future-pay's main and was
+ * optimisation is OFF. A Gherkin step doing exactly that went red on the origin host's main and was
  * removed. The claim is covered where it can be: at the route (the backend suites), over the
  * bus (the outbox suite), and here as an end-to-end ROUND TRIP.
  */

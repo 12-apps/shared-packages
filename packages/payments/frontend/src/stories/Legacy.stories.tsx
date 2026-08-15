@@ -8,7 +8,6 @@ import {
   CheckoutFlow,
   CheckoutPayment,
   createPaymentsClient,
-  DEFAULT_CHECKOUT_COPY_FE,
   NEW_CARD,
   PaymentsProvider,
   SavedCardsPicker,
@@ -23,6 +22,7 @@ import {
 } from "../index";
 
 import { CLIENT_BASE_URL, createClientStoryStore, type ClientStorySpec } from "./client-store";
+import { STORY_CHECKOUT_COPY } from "./demo-copy";
 import { raisePayable, StoryFlow, withConfigRead, type StoryHost } from "./host";
 import type { StoryWorld } from "./store";
 
@@ -45,9 +45,10 @@ const meta: Meta = {
     docs: {
       description: {
         component:
-          "The pre-factory exports — `CheckoutFlow`, `CheckoutPayment`, `SavedCardsPicker`, " +
-          "`DEFAULT_CHECKOUT_COPY_FE` — mounted directly, the way a hand-composing host does, " +
-          "against live in-page mounts.",
+          "The pre-factory exports — `CheckoutFlow`, `CheckoutPayment`, `SavedCardsPicker` " +
+          "— mounted directly, the way a hand-composing host does, against live in-page " +
+          "mounts. The copy table is no longer among them: `copy` is required config now, " +
+          "so the sentences come from the host, and here from `./demo-copy`.",
       },
     },
   },
@@ -305,7 +306,7 @@ export const SavedCardsPickerDirect: StoryObj = {
 };
 
 // ---------------------------------------------------------------------------
-// `DEFAULT_CHECKOUT_COPY_FE`, overridden
+// The host's copy, overridden per store
 // ---------------------------------------------------------------------------
 
 /**
@@ -332,9 +333,15 @@ function ContinueActionDemo({
 /**
  * The same override, visible on the two factory surfaces that own the
  * sentences: the mounted flow's unavailable screen (title and body, left) and
- * the standalone `screens.BuyerDetails`' continue action (right). The caption
- * under each quotes what `DEFAULT_CHECKOUT_COPY_FE` would have said — the
- * export a host reads to know which sentences are the factory's to replace.
+ * the standalone `screens.BuyerDetails`' continue action (right).
+ *
+ * The caption under each quotes THIS STORYBOOK'S baseline, not a package
+ * default — there is no longer any such thing (FUT-760). `copy` is required on
+ * `createPaymentFlows`, so `STORY_CHECKOUT_COPY` is simply the copy this demo
+ * host wrote for itself, and the contrast on screen is host-copy vs host-copy.
+ * It is worth being exact about: a caption reading "padrão" here would teach
+ * the opposite of what the release does, and Storybook is where an adopter
+ * looks to learn the seam.
  *
  * `copy.ts` scopes the table on purpose: screens that carried their own
  * product copy before the factory (the flow's Dados step, PIX, card, status)
@@ -352,7 +359,7 @@ export const CopyOverridden: StoryObj = {
           {(flows) => <flows.Checkout />}
         </StoryFlow>
         <p style={{ fontSize: 11, opacity: 0.6 }}>
-          padrão: “{DEFAULT_CHECKOUT_COPY_FE.unavailableTitle}”
+          sem o override: “{STORY_CHECKOUT_COPY.unavailableTitle}”
         </p>
       </section>
       <section>
@@ -363,7 +370,7 @@ export const CopyOverridden: StoryObj = {
           {(flows) => <ContinueActionDemo Screen={flows.screens.BuyerDetails} />}
         </StoryFlow>
         <p style={{ fontSize: 11, opacity: 0.6 }}>
-          padrão: “{DEFAULT_CHECKOUT_COPY_FE.continueAction}”
+          sem o override: “{STORY_CHECKOUT_COPY.continueAction}”
         </p>
       </section>
     </div>

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { CLINIC_MESSAGES } from '../../__tests__/host-copy';
+
 import type { NotificationLogger } from '../../types';
 import { createApiNotifications, type ApiNotifications } from '../create-api-notifications';
 import type { NotificationAudienceDirectory } from '../by-permission';
@@ -47,6 +49,8 @@ function mount(
   logger: NotificationLogger = { info: () => undefined, error: () => undefined },
 ): ApiNotifications {
   return createApiNotifications({
+    categories: ['orders', 'payments', 'stock', 'system'],
+    messages: CLINIC_MESSAGES,
     db: () => Promise.resolve(db),
     contacts,
     generators: [ALERT as never],
@@ -168,6 +172,8 @@ describe('notifyByPermission', () => {
     const errors: string[] = [];
     const infos: string[] = [];
     const api = createApiNotifications({
+    categories: ['orders', 'payments', 'stock', 'system'],
+    messages: CLINIC_MESSAGES,
       db: () => Promise.resolve(db),
       contacts: memoryContacts({}),
       generators: [ALERT as never],
@@ -224,6 +230,8 @@ describe('notifyByPermission', () => {
 
   it('rejects loudly when the host configured no audience directory', async () => {
     const api = createApiNotifications({
+    categories: ['orders', 'payments', 'stock', 'system'],
+    messages: CLINIC_MESSAGES,
       db: () => Promise.resolve(db),
       contacts: memoryContacts({}),
       logger: { info: () => undefined, error: () => undefined },

@@ -23,7 +23,7 @@ import { parseRolePermissions, serializeRolePermissions } from './permissions-fo
 import { resetTemplateRole, templateSeedFor, upsertTemplateOverride } from './template-store';
 
 /**
- * The tenant role store (12-13) — ported from future-pay's
+ * The tenant role store (12-13) — ported from the origin host's
  * `lib/repositories/role.ts` + `role-list.ts`, over the {@link RbacDbClient}
  * seam. All writes are scoped by `clientId`, so one tenant can never read or
  * mutate another's roles — and `clientId` is non-null on every filter, so the
@@ -242,7 +242,7 @@ async function deleteTenantRole(
   tenantId: string,
 ): Promise<boolean> {
   const db = await ctx.db();
-  // The delete is an ARCHIVE, exactly like the future-pay route it ports
+  // The delete is an ARCHIVE, exactly like the origin host route it ports
   // ("a DELETE soft-archives the role"): the row keeps its id and its
   // membership links, stops granting at runtime (every resolver read filters
   // `archived_at IS NULL`) and disappears from the grid — while a hard

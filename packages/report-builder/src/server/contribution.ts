@@ -10,12 +10,12 @@
  *
  * WHAT USED TO BE HERE INSTEAD, and why it left: nothing, and that was the
  * defect. Authoring was a boolean on the actor (`canAuthor`), which every host
- * had to derive from something of its own — future-pay derived it from a
+ * had to derive from something of its own — the origin host derived it from a
  * hardcoded `new Set(["OWNER", "ADMIN", "SUPERADMIN"])` sitting in its wiring
  * file. A permission this package's surface decides was therefore spelled in
  * the host, in role names, with no id to grant, revoke, audit or show in a role
  * editor. Meanwhile the ids that ARE the host's — `reports:sales:read`,
- * `stock:read`, `reports:kitchen:read`, which gate future-pay's orders, stock
+ * `stock:read`, `reports:kitchen:read`, which gate the origin host's orders, stock
  * ledger and kitchen lines — were hardcoded in here. Both halves were on the
  * wrong side of the boundary.
  *

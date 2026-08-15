@@ -72,6 +72,7 @@ const AURORA: SettingsStoryProvider = {
  */
 function auroraGuide(progress?: SetupProgress): Guide {
   const context: SetupGuideContext = {
+    brandName: "Plataforma Exemplo",
     webhookUrl: "https://loja.exemplo/api/payments/webhooks/aurora",
     merchantName: "Loja Exemplo",
     storefrontUrl: "https://loja.exemplo/cardapio",

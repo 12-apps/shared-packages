@@ -2,7 +2,7 @@
 # ===========================================================================
 # tunnel.sh — put the local Storybook on a public HTTPS URL
 #
-# A slim sibling of future-pay's scripts/ephemeral/tunnel.sh, carrying over
+# A slim sibling of the origin host's scripts/ephemeral/tunnel.sh, carrying over
 # only the part that applies here: this repo has no app and no database, just a
 # dev server someone needs to LOOK at from outside the container.
 #

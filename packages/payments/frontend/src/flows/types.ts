@@ -31,7 +31,7 @@ import type {
   ChargeOutcome,
   CheckoutOrder,
   CheckoutProviderConfig,
-  ComandaCheckout,
+  SettlementCheckout,
   CreateOrderRequest,
   CreateOrderResult,
   OrderStatus,
@@ -100,8 +100,8 @@ export interface PaymentFlowsConfig {
   useCart(): CheckoutCartView;
   /** The buyer's saved details, and whether a CPF is already on file. */
   useBuyerDefaults?(): { buyer?: BuyerInfo; taxIdOnFile?: boolean; pending?: boolean };
-  /** Present ⇒ this checkout settles a comanda rather than the cart. */
-  useComanda?(): ComandaCheckout | null;
+  /** Present ⇒ this checkout settles a settlement rather than the cart. */
+  useSettlement?(): SettlementCheckout | null;
 
   /** Design-system slots, filled ONCE instead of per screen. */
   components?: Partial<CheckoutComponents>;
@@ -117,7 +117,20 @@ export interface PaymentFlowsConfig {
   // "what happens WHEN it fires": a timed-out mint must decide whether the walk
   // advances to the next entry or the whole charge refuses, and that is a money
   // rule (FUT-563), not a wire-up.
-  copy?: Partial<CheckoutCopyFE>;
+  /**
+   * Every buyer-facing sentence the factory's own screens render.
+   *
+   * REQUIRED, and not partial. It used to be `Partial<…>` over a pt-BR default
+   * spread in at `create-payment-flows.tsx`, and that default was one product's
+   * RESTAURANT vocabulary — "Pagamento com o garçom", "Chame o garçom para
+   * fechar a conta na mesa", "Ver cardápio" — reaching every adopter that said
+   * nothing. A host selling insurance got a waiter.
+   *
+   * That is the failure a default cannot warn about: saying nothing is exactly
+   * how a host adopts another product's voice, and nothing fails. Required
+   * makes a new host answer once, at the one call site that knows the answer.
+   */
+  copy: CheckoutCopyFE;
   /** Host content under the paid receipt (the storefront's PWA install invite). */
   confirmation?: { extra?: ReactNode };
   /**
@@ -187,7 +200,7 @@ export interface CheckoutConfigState {
 /** What `createPaymentFlows` returns. */
 export interface PaymentFlows {
   /** THE mount: a complete buyer checkout in one line. */
-  Checkout: ComponentType<{ comanda?: ComandaCheckout | null }>;
+  Checkout: ComponentType<{ settlement?: SettlementCheckout | null }>;
   /** Slots + transport + scope + the fetched config, for a nesting host. */
   Provider: ComponentType<{ children: ReactNode; config?: CheckoutProviderConfig | null }>;
   screens: CheckoutScreens;

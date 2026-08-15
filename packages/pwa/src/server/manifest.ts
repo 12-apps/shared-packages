@@ -10,7 +10,7 @@
  * The whole gate is structural for the same reason: whoever the host says is not
  * an app gets a **404**, so "installable" exists exactly where the host's own
  * domain rules say it does — no extra feature flag to keep in sync with the ones
- * that already decide whether a domain serves at all. (future-pay's
+ * that already decide whether a domain serves at all. (the origin host's
  * `docs/PWA.md` has the long version, including the iOS 26 caveat: Safari
  * dropped every installability requirement, so on iOS the 404 no longer *stops*
  * anyone adding an origin to their Home Screen — it decides whether they get the

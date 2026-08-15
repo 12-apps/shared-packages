@@ -58,6 +58,38 @@ export interface WebStorageMessages {
   session_expired: string;
   /** `fetch` rejected outright; no response ever arrived. */
   transport: string;
+
+  /**
+   * THE FIVE BELOW ARE THE REFUSALS THAT USED TO HAVE NO KNOB AT ALL.
+   *
+   * They are decided in the browser before a request leaves it (see
+   * {@link rejectFileUpfront}) or after a response nothing could parse, and they
+   * were written as literals inside those functions — not defaults a host could
+   * override, but sentences a host could not reach. The docstring at the top of
+   * this file already argued they should be here ("every sentence here reaches a
+   * store owner, so it is product copy"); these four simply never arrived.
+   *
+   * A host overriding `file_too_large` and finding its own words replaced two
+   * lines later by ours is the specific failure this closes.
+   *
+   * Three take the fact they are about, because the sentence is worthless
+   * without it: the size that was refused, the type that was refused. Functions
+   * rather than tokens in a string, so a host writing "8,4 MB é grande demais"
+   * can put the number where its own grammar wants it.
+   */
+
+  /** A 0-byte file — an interrupted copy or an unreadable share. */
+  empty_file: string;
+  /** Over the ceiling, before any request. Both sizes already formatted. */
+  file_too_large_upfront: (context: { size: string; limit: string }) => string;
+  /** The OS identified no type at all — an extensionless drop, most often. */
+  unknown_content_type: string;
+  /** A type we do not accept. Carries it, because the owner will dispute it. */
+  unsupported_content_type_upfront: (context: { contentType: string }) => string;
+  /** 2xx with no key in the body — accepted, and unusable. */
+  missing_key: string;
+  /** Anything thrown on the way. The last resort, and it says so. */
+  upload_failed: string;
 }
 
 /** Copy that only makes sense with the configured ceiling in it. */
@@ -82,15 +114,33 @@ export function defaultWebStorageMessages(
     not_found: 'Essa imagem não está mais disponível.',
     session_expired: 'Sua sessão expirou. Entre novamente e repita o envio.',
     transport: 'Não foi possível falar com o servidor. Verifique sua conexão e tente de novo.',
+    empty_file: 'Arquivo vazio (0 bytes). Escolha a imagem novamente.',
+    file_too_large_upfront: ({ size, limit }) =>
+      `Imagem muito grande: ${size}. O limite é ${limit} — reduza a imagem e tente de novo.`,
+    unknown_content_type:
+      'Não foi possível identificar o tipo do arquivo. Envie um PNG, JPG ou WebP.',
+    unsupported_content_type_upfront: ({ contentType }) =>
+      `Formato não suportado (${contentType}). Envie PNG, JPG, WebP ou GIF.`,
+    missing_key: 'O servidor aceitou a imagem mas não devolveu a chave. Tente de novo.',
+    upload_failed: 'Falha ao enviar a imagem. Tente de novo em instantes.',
   };
 }
 
-function resolve(
+/**
+ * The messages in force for a mount's ceiling.
+ *
+ * Exported because `use-upload` needs the same table for the two refusals it
+ * phrases itself, and a second `{ ...defaults, ...overrides }` there would be
+ * the exact drift this file exists to prevent.
+ */
+export function messagesOf(
   maxBytes: number,
-  overrides: Partial<WebStorageMessages> | undefined,
+  overrides?: Partial<WebStorageMessages>,
 ): WebStorageMessages {
   return { ...defaultWebStorageMessages({ limit: megabytes(maxBytes) }), ...overrides };
 }
+
+const resolve = messagesOf;
 
 /**
  * The sentence for a refusal CODE, or `undefined` for a code with no entry.
@@ -101,7 +151,11 @@ function resolve(
  */
 function sentenceFor(messages: WebStorageMessages, code: string): string | undefined {
   if (!Object.prototype.hasOwnProperty.call(messages, code)) return undefined;
-  return messages[code as keyof WebStorageMessages];
+  const entry = messages[code as keyof WebStorageMessages];
+  // Only the plain-string entries are reachable by a server CODE. The three
+  // that take a fact are browser-side refusals with no server equivalent, and
+  // a response naming one would otherwise render a function at a store owner.
+  return typeof entry === 'string' ? entry : undefined;
 }
 
 /**
@@ -116,20 +170,26 @@ function sentenceFor(messages: WebStorageMessages, code: string): string | undef
  * extensionless drop, most often) — worth its own sentence, because "formato não
  * suportado" reads as an accusation about a file the owner knows is a PNG.
  */
-export function rejectFileUpfront(file: File, maxBytes: number): string | null {
+export function rejectFileUpfront(
+  file: File,
+  maxBytes: number,
+  overrides?: Partial<WebStorageMessages>,
+): string | null {
+  const messages = resolve(maxBytes, overrides);
   if (file.size === 0) {
-    return 'Arquivo vazio (0 bytes). Escolha a imagem novamente.';
+    return messages.empty_file;
   }
   if (file.size > maxBytes) {
-    return `Imagem muito grande: ${megabytes(file.size)}. O limite é ${megabytes(
-      maxBytes,
-    )} — reduza a imagem e tente de novo.`;
+    return messages.file_too_large_upfront({
+      size: megabytes(file.size),
+      limit: megabytes(maxBytes),
+    });
   }
   if (file.type === '') {
-    return 'Não foi possível identificar o tipo do arquivo. Envie um PNG, JPG ou WebP.';
+    return messages.unknown_content_type;
   }
   if (!ACCEPTED_CONTENT_TYPES.includes(file.type)) {
-    return `Formato não suportado (${file.type}). Envie PNG, JPG, WebP ou GIF.`;
+    return messages.unsupported_content_type_upfront({ contentType: file.type });
   }
   return null;
 }

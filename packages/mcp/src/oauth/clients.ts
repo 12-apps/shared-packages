@@ -8,7 +8,7 @@ import type {
 
 /**
  * Client registration and the open-redirect guard (12-23, ported from
- * future-pay's `lib/mcp/oauth/clients.ts`).
+ * the origin host's `lib/mcp/oauth/clients.ts`).
  *
  * A registered client is an external host (a Claude.ai / ChatGPT connector) from
  * RFC 7591 dynamic client registration, or a static registration an operator
@@ -122,7 +122,7 @@ export interface ProviderAttributionRule {
   provider: string;
 }
 
-/** future-pay's rules, and a sane default for any host talking to the same two. */
+/** The origin host's rules, and a sane default for any host talking to the same two. */
 export const DEFAULT_PROVIDER_ROOTS: readonly ProviderAttributionRule[] = [
   { roots: ["claude.ai", "anthropic.com"], provider: "claude" },
   { roots: ["chatgpt.com", "openai.com"], provider: "chatgpt" },

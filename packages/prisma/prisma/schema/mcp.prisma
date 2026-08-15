@@ -11,7 +11,7 @@
 //
 // Host-agnostic by design (the entity-lifecycle / rbac doctrine): `user_id` is a
 // by-value scalar with NO relation, because this package cannot know the name of
-// the host's user model. The host's own migration may add the FK (future-pay's
+// the host's user model. The host's own migration may add the FK (the origin host's
 // is ON DELETE CASCADE). Note there is deliberately no `oauth_codes` table:
 // authorization codes are STATELESS signed blobs, so there is nothing to store
 // and nothing to sweep.

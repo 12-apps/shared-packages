@@ -13,7 +13,7 @@ import { formatWhatsApp, whatsAppTransport } from '../transports/whatsapp';
 
 /**
  * The transports and their vendor DRIVERS — the seam that replaced
- * future-pay's `process.env` reads, and the reason a second provider is a
+ * the origin host's `process.env` reads, and the reason a second provider is a
  * config entry rather than a package change.
  */
 
@@ -197,6 +197,7 @@ describe('the whatsapp transport', () => {
   const base = {
     channel: 'WHATSAPP',
     driver: 'meta',
+    templateLanguage: 'pt_BR',
     accessToken: 'tok',
     phoneNumberId: '1234',
     appUrl: 'https://loja.example.com',

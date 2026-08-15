@@ -80,7 +80,7 @@ function settingsClient(spec: SettingsStorySpec): PaymentsSettingsClient {
 
 /**
  * The host's OAuth state mint, story-sized — same shape as `settings-host.tsx`
- * and future-pay's `POST …/oauth/prepare`: the CSRF state the component only
+ * and the origin host's `POST …/oauth/prepare`: the CSRF state the component only
  * RELAYS, echoed back visibly in the consent URL the mount answers with.
  */
 async function prepareConnect(

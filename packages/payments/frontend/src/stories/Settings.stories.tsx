@@ -485,7 +485,7 @@ type ActivationContext = Parameters<
 >[0];
 
 /**
- * A stand-in for future-pay's pay-R$1,01-and-activate card: the PACKAGE owns
+ * A stand-in for the origin host's pay-R$1,01-and-activate card: the PACKAGE owns
  * only WHERE this appears and WHICH facts it is handed, so the story's card
  * prints those facts verbatim — it is the slot's contract made visible, not a
  * copy of any host's UI. A real host renders nothing visible when `hidden`
