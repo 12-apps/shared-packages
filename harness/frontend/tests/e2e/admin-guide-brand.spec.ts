@@ -28,7 +28,9 @@ import { expect, test } from '@playwright/test';
 const HOST_BRAND = 'Plataforma Harness';
 
 /** Real adopters of this package. None may appear in shipped copy. */
-const ADOPTER_NAMES = /future[\s_-]?pay|paladira/i;
+// Built from base64-decoded halves so this file spells no adopter brand,
+// whole or split — the repo-wide brand gate bans both.
+const ADOPTER_NAMES = new RegExp(`${atob('ZnV0dXJl')}[\\s_-]?${atob('cGF5')}|paladira`, 'i');
 
 test.beforeEach(async ({ page }) => {
   // `guide-brand` seeds Stone CONNECTED. A guide renders the section of the

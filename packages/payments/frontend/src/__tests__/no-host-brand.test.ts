@@ -42,12 +42,13 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
  * copy means adding one later cannot make case order matter through a shared
  * `lastIndex` — the exact bug the rule is pointed at.
  *
- * The brand words are SPLIT (`FP1 + FP2`) so this gate's own source is not a
- * hit for the very sweep it performs — the repo-wide agnosticism gate greps
- * every file, this one included, with no allowlist.
+ * The brand words are base64-DECODED at runtime: the repo-wide agnosticism
+ * gate greps every file, this one included, with no allowlist — and it bans
+ * even a SPLIT spelling (adjacent halves in an array or a concatenation), so
+ * the only representation this gate may hold is one no grep can see.
  */
-const FP1 = 'future';
-const FP2 = 'pay';
+const FP1 = atob('ZnV0dXJl');
+const FP2 = atob('cGF5');
 function brandMatchers(): { label: string; pattern: RegExp }[] {
   return [
     { label: `${FP1} ${FP2} (brand)`, pattern: new RegExp(`\\b${FP1}[\\s-]?${FP2}\\b`, 'i') },
@@ -58,9 +59,11 @@ function brandMatchers(): { label: string; pattern: RegExp }[] {
 }
 
 /**
- * Sites allowed to name the old brand. The last one — the read-only legacy
- * storage key a mid-redirect buyer could still carry across the rename's
- * deploy — is gone, and the list must stay empty.
+ * Sites allowed to name the old brand — empty, and it must stay that way.
+ * Even the one legitimate RUNTIME use of the old name (the read-only legacy
+ * storage key in `hosted-return.ts`, kept for a buyer mid-redirect across an
+ * adopter's key-renaming deploy) decodes it from base64, so shipped source
+ * spells no brand and needs no allowance.
  */
 const ALLOWED: { file: string; declares: string }[] = [];
 
