@@ -42,18 +42,17 @@ function rowFor(page: Page, body: string) {
   return page.locator('[data-testid^="notification-"]').filter({ hasText: body });
 }
 
-test.describe('the bell and its badge', () => {
-  test('/**
- * THE COPY BELOW IS THIS HARNESS'S OWN, and that is load-bearing.
+/**
+ * THE COPY THESE SPECS READ IS THIS HARNESS'S OWN, and that is load-bearing.
  *
- * These specs used to read `'Abrir notificações (3 não lidas)'` — the package's
- * pt-BR default. That made the one consumer standing in for an independent
- * adopter assert the extraction origin's sentences back at it, which is exactly
- * how the default stayed invisible. `messages` is required config now and this
- * app states a hardware shop's words in
- * `src/notifications/notification-copy.ts`; these assertions follow it.
+ * They used to read the package's pt-BR default, which made the one consumer
+ * standing in for an independent adopter assert the extraction origin's
+ * sentences back at it — exactly how that default stayed invisible. `messages`
+ * is required config now, and this app states a hardware shop's words in
+ * `src/notifications/notification-copy.ts`; the assertions follow it.
  */
-shows the seeded unread count, in pt-BR', async ({ page }) => {
+test.describe('the bell and its badge', () => {
+  test('shows the seeded unread count, in pt-BR', async ({ page }) => {
     await openPage(page);
     // Three seeded rows, all unread — and the count came from the packaged
     // `/notifications/unread-count` over a real COUNT.
