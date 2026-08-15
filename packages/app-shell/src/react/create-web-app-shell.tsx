@@ -157,7 +157,28 @@ export interface WebAppShell {
   Provider: (props: ShellProviderProps) => JSX.Element;
   /** The MUI theme the Provider installs, for a host that needs it directly. */
   theme: Theme;
-  /** Read the session; throws outside `Provider`. */
+  /**
+   * The session ALONE, for a tree that needs one without the rest of the tower.
+   *
+   * `Provider` is the whole thing — boundary, theme, session, consent gate,
+   * router — which is right for an application entry point and wrong for
+   * everything else. A unit test rendering one signed-in component, a Storybook
+   * story, a fixture: each needs the session, and none of them wants a consent
+   * gate reaching for the terms endpoint or a `BrowserRouter` fighting the one
+   * the harness already mounted.
+   *
+   * Without this a host cannot get there, and cannot work around it either:
+   * `useSession` reads the context THIS mount created, so a host that calls
+   * `createWebAuth()` itself has a second context, and a component renders under
+   * one provider while reading from the other. What that looks like is
+   * `useSession must be used within a SessionProvider`, thrown from a tree that
+   * visibly has one — which is a bad hour for whoever is holding it.
+   *
+   * Same instance `Provider` mounts, so a component behaves identically under
+   * either.
+   */
+  SessionProvider: (props: { children: ReactNode }) => JSX.Element;
+  /** Read the session; throws outside `Provider` or {@link WebAppShell.SessionProvider}. */
   useSession: () => SessionContextValue;
   /** `React.lazy` with the stale-chunk recovery. Use it for every routed page. */
   lazyRoute: typeof lazyRoute;
@@ -304,6 +325,7 @@ export function createWebAppShell(config: WebAppShellConfig): WebAppShell {
       RouteErrorBoundary,
     }),
     theme,
+    SessionProvider: auth.SessionProvider,
     useSession: auth.useSession,
     lazyRoute,
     RouteErrorBoundary,
