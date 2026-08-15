@@ -5,6 +5,8 @@
    realtime-hint recorder, and appending to it is what the assertions read. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CLINIC_MESSAGES } from '../../__tests__/host-copy';
+
 import { createApiNotifications, type ApiNotifications } from '../create-api-notifications';
 import type { NotificationsResponse, NotificationsRoute } from '../context';
 
@@ -33,6 +35,7 @@ function mount(overrides: Partial<Parameters<typeof createApiNotifications>[0]> 
   changed = [];
   api = createApiNotifications({
     categories: ['orders', 'payments', 'stock', 'system'],
+    messages: CLINIC_MESSAGES,
     db: () => Promise.resolve(db),
     contacts: memoryContacts({
       u1: { email: 'buyer@example.com', phone: '+5531999998888' },
@@ -109,7 +112,7 @@ describe('GET /notifications', () => {
     for (const limit of ['0', '101', 'abc', '2.5']) {
       const response = await call('GET', '/notifications', { query: { limit } });
       expect(response.status).toBe(400);
-      expect(error(response)).toBe('Dados inválidos.');
+      expect(error(response)).toBe(CLINIC_MESSAGES.invalidBody);
     }
   });
 
@@ -401,14 +404,24 @@ describe('the push-subscription endpoints', () => {
 });
 
 describe('the copy table reaches the wire', () => {
-  it('says a host override instead of the pt-BR default', async () => {
-    mount({ messages: { invalidBody: 'Bad request.' } });
+  it("says the host's sentence, because there is no other one to say", async () => {
+    // The package ships no table, so this is not "an override beat a default" —
+    // it is the only copy that exists. `messages` is whole, so a host restating
+    // one sentence restates them all, which is what removes the class of bug
+    // where a partial table left the origin's wording in the gaps.
+    mount({ messages: { ...CLINIC_MESSAGES, invalidBody: 'Bad request.' } });
     const response = await call('POST', '/notifications/delete', { body: { ids: [] } });
     expect(error(response)).toBe('Bad request.');
   });
 
-  it('exposes the copy in force so a host screen can reuse a sentence', () => {
-    expect(api.messages.panelTitle).toBe('Notificações');
+  it('exposes the WIRE copy in force, which is all a server mount states', () => {
+    // Narrowed to `NotificationWireMessages` when `messages` became required:
+    // making a backend-only adopter write three dozen sentences for screens it
+    // does not serve is the kind of tax that gets a migration reverted rather
+    // than adopted. The four here are the ones this half actually puts on a
+    // wire; the panel's own copy belongs to the react mount.
+    expect(api.messages.unauthenticated).toBe(CLINIC_MESSAGES.unauthenticated);
+    expect(api.messages.invalidBody).toBe(CLINIC_MESSAGES.invalidBody);
   });
 });
 

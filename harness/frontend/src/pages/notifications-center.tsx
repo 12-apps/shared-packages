@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type JSX } from 'react';
 
 import { createWebNotifications } from '@12-apps/notifications/react';
 
+import { HARNESS_NOTIFICATION_MESSAGES } from '../notifications/notification-copy';
+
 /**
  * The whole wiring a frontend host performs for @12-apps/notifications (12-15).
  *
@@ -28,7 +30,14 @@ import { createWebNotifications } from '@12-apps/notifications/react';
  *    wire probe, applied to notifications: an assertion becomes a string
  *    comparison against what crossed, instead of a screenshot of a screen.
  */
-const notifications = createWebNotifications({ apiBase: '/api/account' });
+const notifications = createWebNotifications({
+  apiBase: '/api/account',
+  // Required now, and stated by THIS host in its own words. It used to be
+  // omitted, which meant rendering the package's ~40-sentence pt-BR default —
+  // the extraction origin's copy — while claiming to be an independent
+  // consumer. See `../notifications/notification-copy`.
+  messages: HARNESS_NOTIFICATION_MESSAGES,
+});
 const { BellButton, Panel, page: PreferencesSurface, store } = notifications;
 
 interface OutboxEntry {

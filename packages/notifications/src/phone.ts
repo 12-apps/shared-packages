@@ -13,7 +13,7 @@
  * `4155552671` into `+554155552671` — a plausible Brazilian mobile — and sent a
  * stranger the customer's order details. There is no country this package could
  * assume that is not wrong for every other adopter, so it assumes none and the
- * omission is a compile error rather than a wrong number. future-pay passes
+ * omission is a compile error rather than a wrong number. the origin passes
  * `'55'` explicitly.
  *
  * NOTE: "verified phone" is approximated by "has a normalizable phone on

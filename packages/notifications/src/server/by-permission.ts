@@ -24,7 +24,7 @@ import type { NotificationRouter } from './router';
  * wrong.
  *
  * The two QUERIES are the host's, through {@link NotificationAudienceDirectory}
- * — because an authorization engine is host machinery. In future-pay this
+ * — because an authorization engine is host machinery. In the extraction origin this
  * module could not live in a package at all: it needed `notify()` AND the RBAC
  * engine, and neither package could see the other. Inverting the dependency
  * (the host answers, the package asks) is what makes it portable.
@@ -34,7 +34,7 @@ import type { NotificationRouter } from './router';
  * The host's authorization engine, as this fan-out needs it.
  *
  * `listCandidates` must be BOUNDED to people who actually hold a role at the
- * tenant. future-pay's implementation requires a role grant, which is what
+ * tenant. that host's implementation requires a role grant, which is what
  * keeps a store's storefront BUYERS — who all carry a default membership — out
  * of a loop that resolves permissions one user at a time.
  *

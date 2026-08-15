@@ -19,7 +19,7 @@ import { whatsAppTransport } from './whatsapp';
  * transports are untouched (open/closed).
  *
  * A mount declares its channels and gets a registry; nothing is process-wide.
- * future-pay registered its four transports as an IMPORT SIDE EFFECT of the
+ * The origin registered its four transports as an IMPORT SIDE EFFECT of the
  * package's root entry, which made "which channels are on" a property of the
  * module graph rather than of any configuration — importing the inbox helpers
  * in a unit test silently armed four transports.

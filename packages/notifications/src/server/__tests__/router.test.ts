@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CLINIC_MESSAGES } from '../../__tests__/host-copy';
+
 import { UnknownNotificationRecipientError, UnknownNotificationTypeError } from '../../errors';
 import type { NotificationChannel, NotificationTransport } from '../../types';
 import { createApiNotifications, type ApiNotifications } from '../create-api-notifications';
@@ -95,6 +97,7 @@ function mount(
 ): ApiNotifications {
   return createApiNotifications({
     categories: ['orders', 'payments', 'stock', 'system'],
+    messages: CLINIC_MESSAGES,
     db: () => Promise.resolve(db),
     contacts: memoryContacts({
       u1: { email: 'buyer@example.com', phone: '+5531999998888' },

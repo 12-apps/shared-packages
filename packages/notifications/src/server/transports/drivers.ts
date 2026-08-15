@@ -2,7 +2,7 @@
  * The DRIVER port — the reason a host adds a vendor with a config entry and no
  * code (12-15).
  *
- * future-pay's transports each read `process.env` directly:
+ * the origin's transports each read `process.env` directly:
  * `NOTIFICATIONS_EMAIL_PROVIDER=resend` plus `RESEND_API_KEY`, and a second
  * vendor meant editing the package. That is exactly backwards for a published
  * package — it cannot know a host's variable names, and it must not be the
@@ -101,7 +101,7 @@ export function resolveDriver<TDeclaration extends DriverDeclarationBase, TDrive
  *
  * A relative path is useless in an inbox and a fabricated localhost link is
  * worse than none, so with no `appUrl` configured the link is simply dropped —
- * future-pay's rule, kept.
+ * The origin's rule, kept.
  */
 export function absoluteLink(link: string | undefined, appUrl: string | undefined): string | null {
   if (!link || !appUrl) return null;

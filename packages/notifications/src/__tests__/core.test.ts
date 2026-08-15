@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { UnknownNotificationTypeError } from '../errors';
 import { createGeneratorRegistry } from '../generators';
-import { DEFAULT_NOTIFICATION_MESSAGES, messagesOf } from '../messages';
+import { messagesOf } from '../messages';
+import { CLINIC_MESSAGES } from './host-copy';
 import { normalizePhoneE164 } from '../phone';
 import { taxonomyOf } from '../types';
 import { inboxWire, type NotificationRow } from '../wire';
@@ -67,28 +68,31 @@ describe('the taxonomy', () => {
 });
 
 describe('the copy table', () => {
-  it('is pt-BR product copy by default', () => {
-    expect(DEFAULT_NOTIFICATION_MESSAGES.panelTitle).toBe('Notificações');
-    expect(DEFAULT_NOTIFICATION_MESSAGES.emptyBody).toBe(
-      'Você está em dia — novidades aparecem aqui.',
-    );
-    expect(DEFAULT_NOTIFICATION_MESSAGES.openBellWithUnread(3)).toBe(
-      'Abrir notificações (3 não lidas)',
-    );
-    expect(DEFAULT_NOTIFICATION_MESSAGES.daysAgo(1)).toBe('há 1 dia');
-    expect(DEFAULT_NOTIFICATION_MESSAGES.daysAgo(3)).toBe('há 3 dias');
+  it('is whatever the host said, and nothing else', () => {
+    // The package ships NO table. `messagesOf` used to spread a host's
+    // overrides over one product's pt-BR — including per KEY inside the three
+    // nested records, so a host relabelling one channel kept the origin's
+    // wording for the other three, and a host labelling its own categories
+    // kept the origin's four sitting beside them on the same screen.
+    //
+    // There is nothing left to merge with, so this is a pass-through, and the
+    // case that used to assert the merge is gone with the merge.
+    const messages = messagesOf({ messages: CLINIC_MESSAGES });
+    expect(messages).toBe(CLINIC_MESSAGES);
+    expect(messages.panelTitle).toBe('Avisos da clínica');
+    expect(messages.openBellWithUnread(3)).toBe('Abrir avisos (3 não lidos)');
+    expect(messages.daysAgo(1)).toBe('há 1 dia');
+    expect(messages.daysAgo(3)).toBe('há 3 dias');
   });
 
-  it('merges the nested records per KEY, not per record', () => {
-    // A host relabelling one channel must not erase the other three.
-    const messages = messagesOf({ messages: { channelLabels: { SMS: 'Texto' } } });
-    expect(messages.channelLabels.SMS).toBe('Texto');
-    expect(messages.channelLabels.EMAIL).toBe('E-mail');
-    expect(messages.categoryLabels.orders?.title).toBe('Pedidos');
-  });
-
-  it('lets a host replace a top-level sentence', () => {
-    expect(messagesOf({ messages: { panelTitle: 'Alerts' } }).panelTitle).toBe('Alerts');
+  it('carries the host\'s OWN categories, labels included', () => {
+    // The pairing that was missing. `categories` became required config one
+    // release earlier because WHICH categories exist is product vocabulary —
+    // while their LABELS kept defaulting, so a host declaring two got a labels
+    // map describing somebody else's four.
+    const messages = messagesOf({ messages: CLINIC_MESSAGES });
+    expect(Object.keys(messages.categoryLabels).sort()).toEqual(['consultas', 'vacinas']);
+    expect(messages.categoryLabels['consultas']?.title).toBe('Consultas');
   });
 });
 

@@ -9,7 +9,7 @@
  * own stores actually pass — so a non-Prisma implementation has a finite,
  * documented surface to satisfy instead of "all of Prisma".
  *
- * What is NOT here: the `users` table. future-pay's router read
+ * What is NOT here: the `users` table. the origin's router read
  * `users.email/phone` directly to answer "can this channel reach them", which
  * is the one thing in the pipeline that belonged to the host all along — a
  * package cannot know the shape of a host's identity table, and a host with
