@@ -11,8 +11,15 @@ import { describe, expect, it } from 'vitest';
 import { CLUB_SERVER_MESSAGES } from '../../__tests__/host-copy';
 
 import { CONSENT_ACCEPT_PATH, CONSENT_STATUS_PATH } from '../../core/consent-wire';
+import { AppShellApiError } from '../config';
 import { createApiAppShell } from '../create-api-app-shell';
-import type { AppShellRequest, AppShellServerConfig, ConsentActor } from '../config';
+import type {
+  AppShellRequest,
+  AppShellServerConfig,
+  ConsentActor,
+  ReportUnexpectedError,
+  UnexpectedErrorContext,
+} from '../config';
 
 const VERSION = '2026-07-27';
 
@@ -238,5 +245,114 @@ describe(`POST ${CONSENT_ACCEPT_PATH}`, () => {
     const { config } = host();
     const response = await routeFor(config, CONSENT_ACCEPT_PATH).handle(request());
     expect(response.cookies).toBeUndefined();
+  });
+});
+
+/**
+ * THE 500 HAS TO REACH SOMEBODY (12-18).
+ *
+ * The surface answers 500 over a failed write on purpose — a 204 there tells a user
+ * they accepted while every guard keeps refusing them. But a deliberate 500 nobody
+ * can see is only half of that decision: the caller is locked out and the operator
+ * has nothing to look up. `onUnexpectedError` is the seam that carries it out, and
+ * these cases pin the three properties a host depends on — that it fires at all,
+ * that it is handed the ERROR rather than a message, and that it cannot change the
+ * answer.
+ *
+ * It exists because of how the first adopter reached this: the host's routes went
+ * from a wrapper that logged every unexpected throw through its error reporter to a
+ * one-line delegation to this package, and the reporting went with the wrapper
+ * silently. Nothing in either half failed.
+ */
+describe('reporting the unexpected', () => {
+  /**
+   * A host with a reporter, and the record of what it was told. The wiring lives
+   * here rather than in each case so nothing mutates a binding a `it` body owns.
+   */
+  function reporting(
+    options: Parameters<typeof host>[0] = {},
+    report?: ReportUnexpectedError,
+  ): {
+    config: AppShellServerConfig;
+    seen: Array<{ error: unknown; context: UnexpectedErrorContext }>;
+  } {
+    const { config } = host(options);
+    const seen: Array<{ error: unknown; context: UnexpectedErrorContext }> = [];
+    config.onUnexpectedError =
+      report ?? ((error, context) => void seen.push({ error, context }));
+    return { config, seen };
+  }
+
+  it('hands the host the error itself, and the descriptor that threw', async () => {
+    const { config, seen } = reporting({ recordThrows: true });
+    const response = await routeFor(config, CONSENT_ACCEPT_PATH).handle(request());
+
+    expect(response.status).toBe(500);
+    expect(seen).toHaveLength(1);
+    // The ERROR, not a string: a reporter needs a stack to group on, and
+    // `String(error)` gives it neither that nor a cause.
+    expect(seen[0]?.error).toBeInstanceOf(Error);
+    expect((seen[0]?.error as Error).message).toBe('the write failed');
+    expect(seen[0]?.context).toEqual({ method: 'POST', path: CONSENT_ACCEPT_PATH });
+  });
+
+  /**
+   * The READ, too. A caller who cannot find out they are stale is in the same dead
+   * end as one who cannot clear it, so the status route is not the quiet one.
+   */
+  it('reports a failed status read as well as a failed write', async () => {
+    const { config, seen } = reporting();
+    config.consent.isCurrent = () => {
+      throw new Error('the user store is down');
+    };
+    const response = await routeFor(config, CONSENT_STATUS_PATH).handle(request());
+
+    expect(response.status).toBe(500);
+    expect(seen[0]?.context).toEqual({ method: 'GET', path: CONSENT_STATUS_PATH });
+  });
+
+  /** Nothing went wrong, so nothing is an incident. */
+  it('stays silent when the surface answered normally', async () => {
+    const { config, seen } = reporting({ acceptedVersion: '2026-01-01' });
+    await routeFor(config, CONSENT_STATUS_PATH).handle(request());
+    await routeFor(config, CONSENT_ACCEPT_PATH).handle(request());
+    expect(seen).toEqual([]);
+  });
+
+  /**
+   * Diagnostics may not decide what the caller receives. A reporter that throws —
+   * a misconfigured DSN, a logger initialised too late — must not turn a 500 the
+   * browser gate knows how to read into an unhandled rejection.
+   */
+  it('still answers 500 when the reporter itself throws', async () => {
+    const { config } = reporting({ recordThrows: true }, () => {
+      throw new Error('the reporter is broken too');
+    });
+    const response = await routeFor(config, CONSENT_ACCEPT_PATH).handle(request());
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: CLUB_SERVER_MESSAGES.recordFailed });
+  });
+
+  /**
+   * A status this surface CHOSE is not an incident. Reporting one would file an
+   * issue every time a host's own refusal travelled through the fold, which is the
+   * noise that makes a reporter stop being read.
+   */
+  it('does not report a status the surface chose for itself', async () => {
+    const { config, seen } = reporting();
+    config.consent.resolveActor = () => {
+      throw new AppShellApiError(403, 'nope');
+    };
+    const response = await routeFor(config, CONSENT_STATUS_PATH).handle(request());
+
+    expect(response).toEqual({ status: 403, body: { error: 'nope' } });
+    expect(seen).toEqual([]);
+  });
+
+  /** A host that wired nothing is unchanged — the seam is optional by design. */
+  it('answers exactly the same 500 for a host that wired no reporter', async () => {
+    const { config } = host({ recordThrows: true });
+    const response = await routeFor(config, CONSENT_ACCEPT_PATH).handle(request());
+    expect(response).toEqual({ status: 500, body: { error: CLUB_SERVER_MESSAGES.recordFailed } });
   });
 });

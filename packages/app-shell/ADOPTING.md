@@ -215,6 +215,22 @@ app.route('/api', shell.router);
     `node_modules` (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`). It does not
     refuse while the package is a workspace sibling, so this failure appears only
     after publishing.
+11. **Wire `onUnexpectedError`, or the 500 rule 4 asks for reaches nobody.** The
+    two are one decision: rule 4 makes a failed write a 500 so the USER gets a
+    signal to retry, and this is what gives the OPERATOR one. It is optional
+    because a package cannot require a host to own an error reporter, and
+    `console` is not one — in every adopter so far a `console.error` reaches
+    stdout and nothing else. Pass the same channel your other routes report
+    through; it is handed the thrown value itself, so the reporter keeps a stack
+    and something to group on. This is a regression that actually shipped: a host
+    replaced its own route wrapper — which logged every unexpected throw through
+    its reporter — with a one-line delegation to this surface, and the reporting
+    went with the wrapper. Nothing failed, in either half.
+
+    ```ts
+    onUnexpectedError: (error, { method, path }) =>
+      log.error(`[consent] ${method} ${path} threw:`, error),
+    ```
 
 ## Why there is no Prisma partial
 

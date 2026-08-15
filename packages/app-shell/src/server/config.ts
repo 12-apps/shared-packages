@@ -16,6 +16,12 @@
  * There is no default `termsVersion` either. A version string is a fact about a
  * host's own legal documents; inventing one would silently stamp acceptances of a
  * document nobody wrote.
+ *
+ * And a third, which is about the 500 the second one deliberately produces:
+ * {@link AppShellServerConfig.onUnexpectedError} is where it gets REPORTED. The
+ * package has no logger and must not acquire one, so silence is what a host gets
+ * until it wires that key — see its own docstring for why that is the one default
+ * worth being loud about in a review.
  */
 
 /**
@@ -159,6 +165,31 @@ export interface AppShellServerMessages {
   recordFailed: string;
 }
 
+/** Which descriptor was handling the request when it threw. */
+export interface UnexpectedErrorContext {
+  method: AppShellRoute['method'];
+  /** Path relative to the host's mount, in `:param` form — as declared. */
+  path: string;
+}
+
+/**
+ * Report a failure this surface did not expect, on its way to becoming a 500.
+ *
+ * Called with the thrown value EXACTLY as caught — a real `Error` where the host's
+ * seam threw one — because an error reporter needs a stack and something to group
+ * on, and a stringified message gives it neither.
+ *
+ * Only for the unexpected branch. An {@link AppShellApiError} is a status this
+ * surface CHOSE, so folding one is not an incident and nothing is reported.
+ *
+ * Fire-and-forget, and its own throw is swallowed: a reporter that fails must not
+ * replace the status the caller is waiting for.
+ */
+export type ReportUnexpectedError = (
+  error: unknown,
+  context: UnexpectedErrorContext,
+) => void;
+
 export interface AppShellServerConfig {
   /**
    * The terms version this deployment is on. REQUIRED — see the module docstring.
@@ -167,6 +198,29 @@ export interface AppShellServerConfig {
   termsVersion: string;
   consent: ConsentSeam;
   messages: AppShellServerMessages;
+  /**
+   * Where an unexpected throw is reported before it is folded into a 500.
+   *
+   * OPTIONAL only because a package cannot require a host to own an error reporter,
+   * and `console` is not one: in every adopter this surface has, a `console.error`
+   * reaches stdout and nothing else, so a 500 logged that way is a 500 nobody is
+   * told about. Wire your own — the same channel your other routes report through.
+   *
+   * This matters most on exactly the path {@link ConsentSeam.record} is documented
+   * to fail on. That 500 is deliberate: the alternative is a 204 over a failed
+   * write, which tells a user they accepted while every guard keeps refusing them.
+   * But a deliberate 500 that nobody can see is only half of that decision — the
+   * user is stuck and the operator has nothing to look up. The host that first
+   * mounted this surface reached it by dropping its own route wrapper, and the
+   * catch-all reporter went with it silently, which is why the seam exists here
+   * rather than being left to whatever each adopter wraps around the mount.
+   *
+   * ```ts
+   * onUnexpectedError: (error, { method, path }) =>
+   *   log.error(`[consent] ${method} ${path} threw:`, error),
+   * ```
+   */
+  onUnexpectedError?: ReportUnexpectedError;
 }
 
 export function messagesOf(config: AppShellServerConfig): AppShellServerMessages {
@@ -202,13 +256,26 @@ export function noContent(cookies?: readonly AppShellCookie[]): AppShellResponse
  * An {@link AppShellApiError} carries its own status. Anything else is a 500 with
  * the host's message and the error RE-THROWN nowhere — it is reported as a status,
  * never swallowed into a success.
+ *
+ * `report` is the unexpected branch's only trace. It is called BEFORE the fold and
+ * only on that branch, so a chosen status stays a status and an incident stays an
+ * incident. Its own failure is swallowed on purpose: a reporter is diagnostics, and
+ * diagnostics may not decide what the caller receives — the 500 goes out either way.
  */
 export function foldApiError(
   error: unknown,
   messages: AppShellServerMessages,
+  report?: (error: unknown) => void,
 ): AppShellResponse {
   if (error instanceof AppShellApiError) {
     return { status: error.status, body: { error: error.message } };
+  }
+  if (report) {
+    try {
+      report(error);
+    } catch {
+      // See above: the response is not the reporter's to break.
+    }
   }
   return { status: 500, body: { error: messages.recordFailed } };
 }
