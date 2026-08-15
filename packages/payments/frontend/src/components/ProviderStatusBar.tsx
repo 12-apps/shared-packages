@@ -173,6 +173,52 @@ function headline(io: { enabled: boolean; paused: boolean; lockedOff: boolean; h
  * you hover it. The reason is printed underneath instead of hidden in a
  * tooltip, since the owner who most needs it is the one who cannot click.
  */
+/**
+ * The provider's name and its status chip, side by side.
+ *
+ * The name is a REAL heading, not a div sized to look like one: it is what this
+ * screen is about, and it is how a screen reader — and the harness — identifies
+ * the page it landed on. The restyle set the size by hand and took the element
+ * with it, which no unit test could see and the harness caught at once.
+ */
+function ProviderName({
+  displayName,
+  label,
+  proven,
+}: {
+  displayName: string;
+  label: string;
+  proven: boolean;
+}) {
+  return (
+    <Stack direction="row" alignItems="center" gap="9px">
+      <Typography
+        component="h2"
+        sx={{ m: 0, fontSize: '19px', fontWeight: 700, letterSpacing: '-.01em', color: T.ink }}
+      >
+        {displayName}
+      </Typography>
+      <Box
+        component="span"
+        data-testid="payments-status"
+        sx={{
+          fontSize: '10px',
+          fontWeight: 800,
+          letterSpacing: '.06em',
+          textTransform: 'uppercase',
+          borderRadius: '5px',
+          px: '7px',
+          py: '3px',
+          background: proven ? T.okSoft : '#f0f1f4',
+          color: proven ? T.ok : T.ink3,
+        }}
+      >
+        {label}
+      </Box>
+    </Stack>
+  );
+}
+
 export function ProviderStatusBar({
   descriptor,
   config,
@@ -195,31 +241,7 @@ export function ProviderStatusBar({
   return (
     <Stack direction="row" alignItems="flex-start" gap="14px" flexWrap="wrap">
       <Box>
-        <Stack direction="row" alignItems="center" gap="9px">
-          <Typography
-            component="div"
-            sx={{ fontSize: '19px', fontWeight: 700, letterSpacing: '-.01em', color: T.ink }}
-          >
-            {descriptor.displayName}
-          </Typography>
-          <Box
-            component="span"
-            data-testid="payments-status"
-            sx={{
-              fontSize: '10px',
-              fontWeight: 800,
-              letterSpacing: '.06em',
-              textTransform: 'uppercase',
-              borderRadius: '5px',
-              px: '7px',
-              py: '3px',
-              background: proven ? T.okSoft : '#f0f1f4',
-              color: proven ? T.ok : T.ink3,
-            }}
-          >
-            {badge.label}
-          </Box>
-        </Stack>
+        <ProviderName displayName={descriptor.displayName} label={badge.label} proven={proven} />
         <Typography
           sx={{ fontSize: '12.5px', color: T.ink3, mt: '5px', maxWidth: '52ch', lineHeight: 1.5 }}
           data-testid="payments-enable-hint"

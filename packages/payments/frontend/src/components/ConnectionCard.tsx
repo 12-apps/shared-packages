@@ -46,24 +46,34 @@ export function ConnectionFacts({
   account: ConnectedOAuthAccount | null;
   displayName: string;
 }) {
-  const facts: [string, string][] = [
-    ['Conta', account?.accountLabel ?? account?.accountId ?? `Conta ${displayName}`],
-    ['Conexão', `Autorizada no ${displayName}`],
-    ['Ambiente', environment === 'PRODUCTION' ? 'Produção' : 'Sandbox (testes)'],
+  // A fact's testid names its VALUE, not its row: the environment is asserted
+  // with an exact `toHaveText`, so hanging the id on the grid — or even on the
+  // row, which also carries the "AMBIENTE" label — makes that assertion read
+  // the whole card. Every consumer of this id wants the one string.
+  const facts: { key: string; value: string; testId?: string }[] = [
+    { key: 'Conta', value: account?.accountLabel ?? account?.accountId ?? `Conta ${displayName}` },
+    { key: 'Conexão', value: `Autorizada no ${displayName}` },
+    {
+      key: 'Ambiente',
+      value: environment === 'PRODUCTION' ? 'Produção' : 'Sandbox (testes)',
+      testId: 'payments-connected-environment',
+    },
   ];
   if (account?.connectedAt) {
-    facts.push(['Conectada em', new Date(account.connectedAt).toLocaleString('pt-BR')]);
+    facts.push({
+      key: 'Conectada em',
+      value: new Date(account.connectedAt).toLocaleString('pt-BR'),
+    });
   }
   return (
     <Box
-      data-testid="payments-connected-environment"
       sx={{
         display: 'grid',
         gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
         gap: '12px 22px',
       }}
     >
-      {facts.map(([key, value]) => (
+      {facts.map(({ key, value, testId }) => (
         <Stack key={key} spacing={0.4} sx={{ borderLeft: `2px solid ${T.line2}`, pl: '11px' }}>
           <Typography
             sx={{
@@ -76,7 +86,10 @@ export function ConnectionFacts({
           >
             {key}
           </Typography>
-          <Typography sx={{ fontSize: '13px', color: T.ink2, fontFamily: T.mono }}>
+          <Typography
+            data-testid={testId}
+            sx={{ fontSize: '13px', color: T.ink2, fontFamily: T.mono }}
+          >
             {value}
           </Typography>
         </Stack>
