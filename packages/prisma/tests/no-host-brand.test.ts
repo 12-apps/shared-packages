@@ -47,6 +47,8 @@ const SRC = join(PACKAGE_ROOT, 'src');
  */
 const FP1 = atob('ZnV0dXJl');
 const FP2 = atob('cGF5');
+/** TitleCase second half — the camelCase key shapes the self-test drives. */
+const FP2_TITLE = FP2.charAt(0).toUpperCase() + FP2.slice(1);
 function brandMatchers(): { label: string; pattern: RegExp }[] {
   return [
     { label: `${FP1} ${FP2} (brand)`, pattern: new RegExp(`\\b${FP1}[\\s_-]?${FP2}\\b`, 'i') },
@@ -89,9 +91,8 @@ describe('shipped prisma source names no adopter brand', () => {
     // Driven over the exact shapes this package shipped — the camelCase
     // globalThis keys — rather than trusting that a green sweep means the
     // patterns work.
-    const upper = FP2[0].toUpperCase() + FP2.slice(1);
-    expect(brandMatchers().some((b) => b.pattern.test(`__${FP1}${upper}ActorStore`))).toBe(true);
-    expect(brandMatchers().some((b) => b.pattern.test(`__${FP1}${upper}Prisma`))).toBe(true);
+    expect(brandMatchers().some((b) => b.pattern.test(`__${FP1}${FP2_TITLE}ActorStore`))).toBe(true);
+    expect(brandMatchers().some((b) => b.pattern.test(`__${FP1}${FP2_TITLE}Prisma`))).toBe(true);
     expect(brandMatchers().some((b) => b.pattern.test(`${FP1}-${FP2}'s layout`))).toBe(true);
     // And does not fire on words this package legitimately needs.
     expect(brandMatchers().some((b) => b.pattern.test('a future payment sweep'))).toBe(false);
