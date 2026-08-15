@@ -238,6 +238,30 @@ check(
   `the reader identifies the package by its npm name. Output:\n    ${nested.output}`,
 );
 
+// ── A name on the registry with NO versions left ─────────────────────────────
+//
+// Reserved `null` means "npm has never heard of this name", so a name whose
+// versions were all unpublished arrives as `[]` instead — published-looking,
+// with nothing published. Treating that as untagged makes the remedy
+// interpolate `newestPublished`'s null into a tag NAME and print "create
+// scope-vnull" at a human, which is the churn loop recover-orphans.mjs guards
+// against, reached through the reader rather than the automation.
+const noVersions = verify({ scope: { versions: [] } });
+
+check(
+  "a name with no versions left is not reported as untagged",
+  noVersions.status === 0,
+  `there is no published version to record, so nothing is stuck. Output:\n    ${noVersions.output}`,
+);
+
+check(
+  "and it never advises creating a -vnull tag",
+  !/vnull|at null|published null/.test(noVersions.output),
+  `interpolating a null version into a tag name is defect #3 aimed at a human:\n    ` +
+    `the tag names a version that does not exist, so the next run reads it back as\n    ` +
+    `an orphan and deletes it. Output:\n    ${noVersions.output}`,
+);
+
 // ── The orphan handoff branches ─────────────────────────────────────────────
 const wedged = verify(
   { scope: { tag: "scope-v2.0.0", versions: ["1.0.0"] } },

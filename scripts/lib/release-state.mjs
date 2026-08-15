@@ -130,7 +130,17 @@ export function releaseState(dirs = publishDirs()) {
       // every package looks like this before its first release, and flagging
       // those would fail the job on every genuinely new package. It is only a
       // fault once a version exists to be recorded.
-      if (versions !== null) untagged.push({ name, prefix, versions });
+      //
+      // `length > 0` is not belt-and-braces: a name CAN sit on the registry
+      // with no versions left (they were unpublished), and `null` is reserved
+      // for "npm has never heard of it", so that case arrives here as `[]`.
+      // Admitting it makes every consumer interpolate `newestPublished`'s null
+      // into a tag NAME — `verify-released` prints "create <prefix>-vnull" at a
+      // human and `release-alert` files it in an issue, which is defect #3's
+      // churn loop reached through the reader instead of the automation.
+      // Excluding it here fixes all three consumers at once and leaves
+      // `recover-orphans`' own null guard as defence in depth.
+      if (versions !== null && versions.length > 0) untagged.push({ name, prefix, versions });
       continue;
     }
 
