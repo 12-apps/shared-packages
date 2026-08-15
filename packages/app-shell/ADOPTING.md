@@ -206,15 +206,30 @@ app.route('/api', shell.router);
    have not written yet. Both halves work this way — `AppShellMessages` on
    `createWebAppShell`, `AppShellServerMessages` on the server mount. Do not
    fork a component to retype a string.
-9. **Static imports only.** This package publishes TypeScript source, except
-   `./vite`. A dynamic non-literal `import()` of a subpath crashes a bundled
-   server.
-10. **`./vite` is the one COMPILED entry, and it has to be.** Vite bundles a
-    `vite.config.ts` with esbuild while leaving bare specifiers external, so that
-    import is resolved and executed by **Node** — which refuses to strip types below
-    `node_modules` (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`). It does not
-    refuse while the package is a workspace sibling, so this failure appears only
-    after publishing.
+9. **Static imports only.** A dynamic non-literal `import()` of a subpath
+   crashes a bundled server.
+10. **Every entry ships COMPILED, and `./vite` is why the rest do too.** Vite
+    bundles a `vite.config.ts` with esbuild while leaving bare specifiers
+    external, so that import is resolved and executed by **Node** — which
+    refuses to strip types below `node_modules`
+    (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`). `./vite` shipped compiled
+    for that reason and the others shipped as source, on the reasoning that
+    application code is compiled by the consumer's bundler.
+
+    That reasoning was wrong about who the consumers are. `./server` and
+    `./hono` exist to be mounted in a Node process, and `.` is imported by
+    backends too — so all three hit the same wall, and the first adopter's Node
+    API server died on boot naming `src/index.ts`. Nothing caught it earlier
+    because the failure is invisible twice over: pnpm LINKS a workspace sibling,
+    so the realpath falls outside `node_modules` and stripping is allowed until
+    the package is actually published; and every bundler-shaped check (Vite
+    builds, Vitest, `tsc --noEmit`) compiles the source itself.
+
+    If you fork this build, keep `splitting: true`. `ApiError` is compared with
+    `instanceof` across `.` and `./react`, which is sound only while both resolve
+    to ONE `core/api` module — compiling some entries and not others, or
+    compiling all of them into self-contained bundles, gives you two classes with
+    one name and every cross-boundary `instanceof` answers false.
 11. **Wire `onUnexpectedError`, or the 500 rule 4 asks for reaches nobody.** The
     two are one decision: rule 4 makes a failed write a 500 so the USER gets a
     signal to retry, and this is what gives the OPERATOR one. It is optional
