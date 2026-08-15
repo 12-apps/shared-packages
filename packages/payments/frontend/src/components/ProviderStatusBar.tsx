@@ -1,10 +1,11 @@
 'use client';
 
-import { Box, Chip, FormControlLabel, Stack, Switch, Tooltip, Typography } from '@mui/material';
+import { Box, Stack, Switch, Tooltip, Typography } from '@mui/material';
 
 import type { MaskedProviderConfig, ProviderDescriptor } from '@12-apps/payments-backend';
 
 import { isConnected } from './connection-state';
+import { T } from './panel-tokens';
 
 /**
  * The provider's headline: what state it is in, and the switch that decides
@@ -125,6 +126,36 @@ function toggleGate(
 }
 
 /**
+ * The three sentences the header can be saying, chosen once.
+ *
+ * Proven-but-off is its OWN state. "Não está recebendo" is true of a store that
+ * never finished setup AND of one that finished and paused, and those are
+ * opposite situations: the first is a step outstanding, the second a decision
+ * the owner made and can undo in one click.
+ */
+function headline(io: { enabled: boolean; paused: boolean; lockedOff: boolean; hint: string }) {
+  if (io.enabled) {
+    return {
+      state: 'Recebendo vendas',
+      sub: 'Sua loja está recebendo por este provedor.',
+      tone: T.ok,
+    };
+  }
+  if (io.paused) {
+    return {
+      state: 'Pausado',
+      sub: 'Conexão pronta e pausada por você — nenhum pedido novo é cobrado aqui.',
+      tone: T.warn,
+    };
+  }
+  return {
+    state: 'Ainda não está recebendo',
+    sub: io.lockedOff ? io.hint : 'Tudo pronto — ligue a chave para começar a receber.',
+    tone: T.ink3,
+  };
+}
+
+/**
  * Status chip + the "recebendo vendas" switch, hoisted OUT of the credential
  * form.
  *
@@ -142,6 +173,52 @@ function toggleGate(
  * you hover it. The reason is printed underneath instead of hidden in a
  * tooltip, since the owner who most needs it is the one who cannot click.
  */
+/**
+ * The provider's name and its status chip, side by side.
+ *
+ * The name is a REAL heading, not a div sized to look like one: it is what this
+ * screen is about, and it is how a screen reader — and the harness — identifies
+ * the page it landed on. The restyle set the size by hand and took the element
+ * with it, which no unit test could see and the harness caught at once.
+ */
+function ProviderName({
+  displayName,
+  label,
+  proven,
+}: {
+  displayName: string;
+  label: string;
+  proven: boolean;
+}) {
+  return (
+    <Stack direction="row" alignItems="center" gap="9px">
+      <Typography
+        component="h2"
+        sx={{ m: 0, fontSize: '19px', fontWeight: 700, letterSpacing: '-.01em', color: T.ink }}
+      >
+        {displayName}
+      </Typography>
+      <Box
+        component="span"
+        data-testid="payments-status"
+        sx={{
+          fontSize: '10px',
+          fontWeight: 800,
+          letterSpacing: '.06em',
+          textTransform: 'uppercase',
+          borderRadius: '5px',
+          px: '7px',
+          py: '3px',
+          background: proven ? T.okSoft : '#f0f1f4',
+          color: proven ? T.ok : T.ink3,
+        }}
+      >
+        {label}
+      </Box>
+    </Stack>
+  );
+}
+
 export function ProviderStatusBar({
   descriptor,
   config,
@@ -157,37 +234,40 @@ export function ProviderStatusBar({
   const { lockedOff, hint } = toggleGate(descriptor, config, enabled);
   const badge = statusBadge(config, descriptor);
 
+  const proven = Boolean(config?.chargeVerifiedAt);
+  const paused = proven && !enabled;
+  const { state, sub, tone } = headline({ enabled, paused, lockedOff, hint });
+
   return (
-    <Stack spacing={0.5}>
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Typography variant="h6">{descriptor.displayName}</Typography>
-        <Chip size="small" data-testid="payments-status" label={badge.label} color={badge.color} />
-        {/* The switch belongs at the far edge: it is the one control here that
-            changes what buyers experience, and crowding it against the status
-            chip made the two read as one compound widget. */}
-        <Box sx={{ flexGrow: 1 }} />
+    <Stack direction="row" alignItems="flex-start" gap="14px" flexWrap="wrap">
+      <Box>
+        <ProviderName displayName={descriptor.displayName} label={badge.label} proven={proven} />
+        <Typography
+          sx={{ fontSize: '12.5px', color: T.ink3, mt: '5px', maxWidth: '52ch', lineHeight: 1.5 }}
+          data-testid="payments-enable-hint"
+        >
+          {sub}
+        </Typography>
+      </Box>
+      {/* The switch belongs at the far edge: it is the one control here that
+          changes what buyers experience, and crowding it against the status
+          chip made the two read as one compound widget. */}
+      <Stack direction="row" alignItems="center" gap="10px" sx={{ ml: 'auto' }}>
         <Tooltip title={hint}>
           {/* A disabled control fires no events, so the tooltip needs a live wrapper. */}
           <span>
-            <FormControlLabel
-              control={
-                <Switch
-                  data-testid="payments-enabled-toggle"
-                  checked={enabled}
-                  disabled={busy || lockedOff}
-                  onChange={(_, next) => onToggle(next)}
-                />
-              }
-              label={enabled ? 'Recebendo vendas' : 'Não está recebendo'}
+            <Switch
+              data-testid="payments-enabled-toggle"
+              checked={enabled}
+              disabled={busy || lockedOff}
+              onChange={(_, next) => onToggle(next)}
             />
           </span>
         </Tooltip>
-      </Stack>
-      {lockedOff ? (
-        <Typography variant="caption" color="text.secondary" data-testid="payments-enable-hint">
-          {hint}
+        <Typography sx={{ fontSize: '12.5px', fontWeight: tone === T.ink3 ? 400 : 600, color: tone }}>
+          {state}
         </Typography>
-      ) : null}
+      </Stack>
     </Stack>
   );
 }

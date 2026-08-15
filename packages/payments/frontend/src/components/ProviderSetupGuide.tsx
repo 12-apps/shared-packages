@@ -6,17 +6,29 @@ import {
   Button,
   IconButton,
   Link,
-  Paper,
   Stack,
   Step,
+  StepConnector,
+  stepConnectorClasses,
   StepLabel,
   Stepper,
+  styled,
+  type StepIconProps,
   TextField,
   Typography,
 } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 
 import type { ProviderSetupGuide as Guide, SetupSection, SetupStep } from '@12-apps/payments-backend';
+
+import {
+  BAR_MSG_SX,
+  BAR_SX,
+  BTN_PRIMARY_SX,
+  BTN_SECONDARY_SX,
+  PANEL_SX,
+  T,
+} from './panel-tokens';
 
 import { richText } from './rich-text';
 
@@ -122,6 +134,39 @@ const BUTTON_SX = { textTransform: 'none' } as const;
 
 type StepActions = ProviderSetupGuideProps['actions'];
 
+/** A step's sentence, with the provider's own reference inline after it. */
+function StepText({ text, link }: { text?: string; link?: SetupStep['link'] }) {
+  if (!text) return null;
+  return (
+    <Typography sx={{ fontSize: '13px', color: T.ink2, lineHeight: 1.5 }}>
+      {richText(text)}{' '}
+      {link ? (
+        <Link href={link.url} target="_blank" rel="noreferrer">
+          {link.label}
+        </Link>
+      ) : null}
+    </Typography>
+  );
+}
+
+/**
+ * The panel's action bar: what this step is asking, and the button that answers.
+ *
+ * The sentence is not decoration. This is the one step no API can report, so
+ * the owner is being asked to vouch for work done somewhere else — and a bare
+ * button gives them nothing to weigh that against.
+ */
+function ConfirmBar({ action }: { action: { label: string; run: () => void } }) {
+  return (
+    <Box sx={BAR_SX} data-testid="payments-setup-confirm-bar">
+      <Typography sx={BAR_MSG_SX}>Confirme quando terminar do lado do provedor.</Typography>
+      <Button variant="contained" disableElevation sx={BTN_PRIMARY_SX} onClick={() => action.run()}>
+        {action.label}
+      </Button>
+    </Box>
+  );
+}
+
 interface StepRowProps {
   step: SetupStep;
   actions: StepActions;
@@ -153,37 +198,21 @@ function WarningRow({ text }: { text: string }) {
 function StepRow({ step, actions }: StepRowProps) {
   const action = step.action ? actions?.[step.action] : undefined;
   if (step.tone === 'warning') return <WarningRow text={step.text ?? ''} />;
+  // An action-only step IS the panel's action bar — see `SectionCard`.
+  if (action && !step.text) return <ConfirmBar action={action} />;
+  // A bordered row with the work on the left and the way to do it on the
+  // right, so a step reads as a thing to tick off rather than as a paragraph.
+  // The instructions on this screen are a CHECKLIST — each one is a piece of
+  // work the owner does somewhere else and comes back from.
   return (
-    <Stack spacing={1}>
-      {step.text ? (
-        <Typography variant="body2">
-          {richText(step.text)}{' '}
-          {step.link ? (
-            <Link href={step.link.url} target="_blank" rel="noreferrer">
-              {step.link.label}
-            </Link>
-          ) : null}
-        </Typography>
-      ) : null}
-      {step.button ? (
-        <Box>
-          <Button
-            variant="outlined"
-            size="small"
-            href={step.button.url}
-            target="_blank"
-            rel="noreferrer"
-            sx={BUTTON_SX}
-            // The mark is the promise: this leaves the store and opens the
-            // provider's site. A button that reads the same as the in-page ones
-            // and then navigates away is a small betrayal, and here it lands on
-            // a screen that can CHANGE the tag.
-            endIcon={<Box component="span" aria-hidden sx={{ fontSize: '0.9em' }}>↗</Box>}
-          >
-            {step.button.label}
-          </Button>
-        </Box>
-      ) : null}
+    <Stack
+      direction="row"
+      gap="12px"
+      alignItems="flex-start"
+      sx={{ border: `1px solid ${T.line}`, borderRadius: '9px', px: '14px', py: '12px' }}
+    >
+      <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
+        <StepText text={step.text} link={step.link} />
       {action ? (
         <Box>
           <Button variant="contained" size="small" sx={BUTTON_SX} onClick={() => void action.run()}>
@@ -191,16 +220,87 @@ function StepRow({ step, actions }: StepRowProps) {
           </Button>
         </Box>
       ) : null}
-      {step.copy ? (
-        <CopyField
-          label={step.copy.label}
-          text={step.copy.text}
-          collapsible={step.copy.collapsible}
-        />
+        {step.copy ? (
+          <CopyField
+            label={step.copy.label}
+            text={step.copy.text}
+            collapsible={step.copy.collapsible}
+          />
+        ) : null}
+      </Stack>
+      {step.button ? (
+        <Button
+          size="small"
+          href={step.button.url}
+          target="_blank"
+          rel="noreferrer"
+          sx={{ ...BTN_SECONDARY_SX, px: '12px', py: '7px', fontSize: '12px', flexShrink: 0 }}
+          // The mark is the promise: this leaves the store and opens the
+          // provider's site. A button that reads the same as the in-page ones
+          // and then navigates away is a small betrayal, and here it lands on
+          // a screen that can CHANGE where the money goes.
+          endIcon={
+            <Box component="span" aria-hidden sx={{ fontSize: '0.9em' }}>
+              ↗
+            </Box>
+          }
+        >
+          {step.button.label}
+        </Button>
       ) : null}
     </Stack>
   );
 }
+
+/**
+ * The numbered dot: 24px, filled once the store is ON or PAST the step.
+ *
+ * MUI's own icon is a 24px circle with the number inside and the same fill for
+ * active and completed, which is nearly the prototype — the differences are the
+ * exact greys and the ✓ on a finished step, and on a screen whose whole job is
+ * "where am I" those are the two things that carry the answer.
+ */
+function StageIcon({ active, completed, icon }: StepIconProps) {
+  const filled = active || completed;
+  return (
+    <Box
+      sx={{
+        width: 24,
+        height: 24,
+        borderRadius: '50%',
+        background: filled ? T.brand : '#d9dbe1',
+        color: '#fff',
+        fontSize: '12px',
+        fontWeight: 700,
+        display: 'grid',
+        placeItems: 'center',
+      }}
+    >
+      {completed ? '✓' : icon}
+    </Box>
+  );
+}
+
+/** A 2px rule that turns brand-coloured behind the steps already passed. */
+const StageConnector = styled(StepConnector)({
+  top: 11,
+  [`& .${stepConnectorClasses.line}`]: { borderTopWidth: 2, borderColor: T.line },
+  [`&.${stepConnectorClasses.active} .${stepConnectorClasses.line}`]: { borderColor: T.brandLine },
+  [`&.${stepConnectorClasses.completed} .${stepConnectorClasses.line}`]: {
+    borderColor: T.brandLine,
+  },
+});
+
+const STAGE_LABEL_SX = {
+  '& .MuiStepLabel-label': {
+    fontSize: '12px',
+    color: T.ink3,
+    lineHeight: 1.25,
+    mt: '7px !important',
+    '&.Mui-active': { color: T.ink, fontWeight: 650 },
+    '&.Mui-completed': { color: T.ink3, fontWeight: 400 },
+  },
+} as const;
 
 export function ProviderSetupGuide({
   guide,
@@ -210,11 +310,18 @@ export function ProviderSetupGuide({
   sectionFooter,
 }: ProviderSetupGuideProps) {
   return (
-    <Stack spacing={3} data-testid="payments-setup-guide">
-      <Stepper activeStep={activeStage} alternativeLabel>
-        {guide.stages.map((stage) => (
-          <Step key={stage.id}>
-            <StepLabel>{stage.label}</StepLabel>
+    <Stack spacing={0} data-testid="payments-setup-guide">
+      <Stepper
+        activeStep={activeStage}
+        alternativeLabel
+        connector={<StageConnector />}
+        sx={{ px: '20px', pt: '6px', pb: '18px' }}
+      >
+        {guide.stages.map((stage, index) => (
+          <Step key={stage.id} completed={index < activeStage}>
+            <StepLabel slots={{ stepIcon: StageIcon }} sx={STAGE_LABEL_SX}>
+              {stage.label}
+            </StepLabel>
           </Step>
         ))}
       </Stepper>
@@ -235,29 +342,42 @@ function SectionCard({
   actions: StepActions;
   footer?: ReactNode;
 }) {
+  // The step whose completion only the OWNER can report is not a row among the
+  // instructions — it is what this panel is FOR. It moves to the action bar, so
+  // the control the owner is working toward is the last thing in the block and
+  // stays on screen while they read the steps above it.
+  const asks = section.steps.filter((step) => step.action !== undefined);
+  const reads = section.steps.filter((step) => step.action === undefined);
+
   return (
-    <Paper
-      variant="outlined"
-      sx={{ p: 2 }}
+    <Box
+      sx={PANEL_SX}
       // Which section is showing is now a FACT about the store's progress, not
       // a constant, so it needs to be assertable by id rather than by matching
       // the prose inside it.
       data-testid={`payments-setup-section-${section.id}`}
     >
-      <Stack spacing={2}>
-        <Typography variant="subtitle1" fontWeight="bold">
+      <Box sx={{ px: '18px', pt: '15px' }}>
+        <Typography sx={{ fontSize: '14.5px', fontWeight: 700, color: T.ink }}>
           {section.title}
         </Typography>
         {section.intro ? (
-          <Typography variant="body2" color="text.secondary">
+          <Typography sx={{ fontSize: '12.5px', color: T.ink3, mt: '5px', lineHeight: 1.5 }}>
             {richText(section.intro)}
           </Typography>
         ) : null}
-        {section.steps.map((step, index) => (
-          <StepRow key={index} step={step} actions={actions} />
-        ))}
-        {footer}
-      </Stack>
-    </Paper>
+      </Box>
+      <Box sx={{ px: '18px', pt: '14px', pb: '18px' }}>
+        <Stack spacing={1.5}>
+          {reads.map((step, index) => (
+            <StepRow key={index} step={step} actions={actions} />
+          ))}
+          {footer}
+        </Stack>
+      </Box>
+      {asks.map((step, index) => (
+        <StepRow key={`ask-${index}`} step={step} actions={actions} />
+      ))}
+    </Box>
   );
 }

@@ -253,6 +253,55 @@ describe('provider skeletons (stub mode)', () => {
   });
 
   /**
+   * A `credentialsPath` variant must MIRROR the guide it varies.
+   *
+   * The host resolves the activation card's `blocked` and `hidden` from the
+   * base guide alone — that happens in `PaymentProviderSettings`, before the
+   * panel knows which disclosure is open, and it is what keeps one screen's
+   * step 3 in agreement with the walkthrough above it. A variant with a
+   * different stage count, or with the owner-confirmable section at a different
+   * index, silently desyncs the two: the walkthrough would show one step while
+   * the card computed its state from another.
+   *
+   * The variant is free to differ in every way that does not move those — the
+   * whole point is that step 1 and the webhook wording DO differ. This pins
+   * only the shape, and it runs over every shipped adapter so the next provider
+   * to add a variant is held to it without anyone remembering to.
+   */
+  it('every credentialsPath variant mirrors its base guide shape', () => {
+    const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x' };
+    const confirmableIndex = (guide: {
+      stages: readonly { id: string }[];
+      sections: readonly { id: string; steps: readonly { action?: string }[] }[];
+    }) =>
+      guide.stages.findIndex((stage) => {
+        const section = guide.sections.find((candidate) => candidate.id === stage.id);
+        return section?.steps.some((step) => step.action === 'checkout-integrado-confirmado');
+      });
+
+    // Derived, not counted: a mutable tally inside the loop is shared state the
+    // flakiness gate refuses, and the pair is what each assertion needs anyway.
+    const pairs = [stoneProvider(), infinitePayProvider(), stripeProvider()]
+      .map((adapter) => adapter.setupGuide?.(ctx))
+      .filter((guide) => guide?.credentialsPath !== undefined)
+      .map((guide) => ({ guide: guide!, variant: guide!.credentialsPath! }));
+
+    // A silent zero-iteration loop proves nothing — stripe ships one today.
+    expect(pairs.length).toBeGreaterThan(0);
+
+    for (const { guide, variant } of pairs) {
+      expect(variant.stages).toHaveLength(guide.stages.length);
+      expect(confirmableIndex(variant)).toBe(confirmableIndex(guide));
+      // And the variant is a guide in its own right: the two rules above hold
+      // for it too, or its activation card has nowhere to render either.
+      const stageIds = variant.stages.map((s) => s.id);
+      const sectionIds = variant.sections.map((s) => s.id);
+      expect(sectionIds.filter((id) => !stageIds.includes(id))).toEqual([]);
+      expect(sectionIds).not.toContain(stageIds.at(-1));
+    }
+  });
+
+  /**
    * The other half of the deadlock, and the half a shape check cannot see: a
    * guide has to REACH its empty stage under its own steam.
    *
