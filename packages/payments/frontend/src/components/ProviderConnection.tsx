@@ -185,6 +185,63 @@ function ConnectedAccountDetails(props: { account: ConnectedOAuthAccount }) {
   );
 }
 
+/**
+ * What this connection IS, as four labelled facts.
+ *
+ * A connected store's screen used to answer "connected?" and stop. The
+ * questions an owner actually returns with are which account, how it was
+ * connected, which environment, and what it can take — and every one of them
+ * was either absent or buried in a sentence. Read as a grid they are checkable
+ * at a glance, which is the whole reason to come back to this screen at all.
+ */
+function ConnectionFacts({
+  environment,
+  account,
+  displayName,
+}: {
+  environment: PaymentEnvironment;
+  account: ConnectedOAuthAccount | null;
+  displayName: string;
+}) {
+  const facts: [string, string][] = [
+    ['Conta', account?.accountLabel ?? account?.accountId ?? `Conta ${displayName}`],
+    ['Conexão', `Autorizada no ${displayName}`],
+    ['Ambiente', environment === 'PRODUCTION' ? 'Produção' : 'Sandbox (testes)'],
+  ];
+  if (account?.connectedAt) {
+    facts.push(['Conectada em', new Date(account.connectedAt).toLocaleString('pt-BR')]);
+  }
+  return (
+    <Box
+      data-testid="payments-connected-environment"
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+        gap: '12px 22px',
+      }}
+    >
+      {facts.map(([key, value]) => (
+        <Stack key={key} spacing={0.4} sx={{ borderLeft: `2px solid ${T.line2}`, pl: '11px' }}>
+          <Typography
+            sx={{
+              fontSize: '11px',
+              letterSpacing: '.05em',
+              textTransform: 'uppercase',
+              color: T.ink4,
+              fontWeight: 700,
+            }}
+          >
+            {key}
+          </Typography>
+          <Typography sx={{ fontSize: '13px', color: T.ink2, fontFamily: T.mono }}>
+            {value}
+          </Typography>
+        </Stack>
+      ))}
+    </Box>
+  );
+}
+
 /** Header + explanatory copy + any warning banner for the connection. */
 function ConnectionSummary(props: {
   displayName: string;
@@ -204,15 +261,11 @@ function ConnectionSummary(props: {
         once connected, since the provider sealed it into the grant.
       */}
       {props.connected ? (
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Chip
-            size="small"
-            variant="outlined"
-            data-testid="payments-connected-environment"
-            label={props.environment === 'PRODUCTION' ? 'Produção' : 'Sandbox (testes)'}
-            color={props.environment === 'PRODUCTION' ? 'default' : 'warning'}
-          />
-        </Stack>
+        <ConnectionFacts
+          environment={props.environment}
+          account={props.connectedAccount}
+          displayName={props.displayName}
+        />
       ) : null}
       {/*
         The connected sentence names NO platform. It used to open with one
