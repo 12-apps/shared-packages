@@ -110,7 +110,7 @@ describe('the two connection paths are mutually exclusive', () => {
 
     await screen.findByTestId('payments-setup-guide');
     expect(screen.getByRole('button', { name: /Reconectar/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Desconectar/i })).toBeTruthy();
+    expect(screen.getByTestId('payments-disconnect')).toBeTruthy();
     // No return leg to offer: the owner is already on the path it returns to.
     expect(screen.queryByTestId('payments-oauth-fallback')).toBeNull();
   });
@@ -122,7 +122,7 @@ describe('the two connection paths are mutually exclusive', () => {
 
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /Reconectar/i })).toBeNull();
-      expect(screen.queryByRole('button', { name: /Desconectar/i })).toBeNull();
+      expect(screen.queryByTestId('payments-disconnect')).toBeNull();
     });
     // Each path is one block — a way in, its steps, its inputs — so the
     // credentials walkthrough lives INSIDE the disclosure with the fields it

@@ -180,7 +180,7 @@ test('disconnect asks first, then clears tokens, status, proof and enablement', 
   await openProvider(page, 'cerrado');
 
   // Cancelling the confirmation writes nothing.
-  await page.getByRole('button', { name: 'Desconectar' }).click();
+  await page.getByTestId('payments-disconnect').click();
   await expect(page.getByTestId('payments-disconnect-confirm')).toBeVisible();
   await page.getByRole('button', { name: 'Cancelar' }).click();
   await expect(page.getByTestId('payments-disconnect-confirm')).toBeHidden();
@@ -189,7 +189,7 @@ test('disconnect asks first, then clears tokens, status, proof and enablement', 
   // Confirming disconnects: every environment's blob emptied, status back to
   // UNVERIFIED, the charge proof dropped, the chain rank gone — and the
   // button offers to connect again.
-  await page.getByRole('button', { name: 'Desconectar' }).click();
+  await page.getByTestId('payments-disconnect').click();
   await page.getByTestId('payments-disconnect-confirm-action').click();
   await expectWireOrder(page, ['POST /settings/providers/cerrado/oauth/disconnect 200']);
   await expect(page.getByTestId('admin-stored-cerrado-SANDBOX')).toHaveText('(none)');
@@ -204,7 +204,7 @@ test('a failing revoke is reported, and the disconnect still lands locally', asy
   await openAdminCase(page, 'revoke-fails');
   await openProvider(page, 'dunas');
 
-  await page.getByRole('button', { name: 'Desconectar' }).click();
+  await page.getByTestId('payments-disconnect').click();
   await page.getByTestId('payments-disconnect-confirm-action').click();
 
   // The provider never answered the revocation — the failure lands in the

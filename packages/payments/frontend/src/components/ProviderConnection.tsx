@@ -2,6 +2,7 @@
 
 import {
   Alert,
+  Box,
   Button,
   Chip,
   CircularProgress,
@@ -24,6 +25,7 @@ import type {
 
 import type { PaymentsSettingsClient } from '../client';
 import { expiryProximity, isConnected } from './connection-state';
+import { BAR_MSG_SX, BAR_SX, BTN_PRIMARY_SX, BTN_QUIET_DANGER_SX } from './panel-tokens';
 
 /**
  * The `authMode: 'oauth'` half of the settings page: a provider whose
@@ -276,6 +278,14 @@ function DisconnectDialog(props: {
   );
 }
 
+/**
+ * The connect card's action bar.
+ *
+ * Removing the connection is stated QUIETLY beside the step's own button rather
+ * than as a second filled control: an owner reaches it deliberately or not at
+ * all, and a red button of equal weight on every visit is an invitation to
+ * misclick the one action here that cannot be undone from this screen.
+ */
 function ConnectionActions(props: {
   displayName: string;
   connected: boolean;
@@ -285,16 +295,32 @@ function ConnectionActions(props: {
 }) {
   const { displayName, connected, busy, onConnect, onDisconnect } = props;
   return (
-    <Stack direction="row" spacing={1}>
-      <Button variant="contained" disabled={busy !== null} onClick={onConnect}>
-        {connectLabel(displayName, connected, busy)}
-      </Button>
+    <Box sx={BAR_SX} data-testid="payments-connection-bar">
+      <Typography sx={BAR_MSG_SX}>
+        {connected
+          ? `Conta ${displayName} conectada. Revogue quando quiser, aqui ou no painel do provedor.`
+          : 'Você sai para o provedor e volta para cá — leva menos de um minuto.'}
+      </Typography>
       {connected ? (
-        <Button variant="outlined" color="error" disabled={busy !== null} onClick={onDisconnect}>
-          {busy === 'disconnect' ? <CircularProgress size={18} /> : 'Desconectar'}
+        <Button
+          disabled={busy !== null}
+          onClick={onDisconnect}
+          sx={BTN_QUIET_DANGER_SX}
+          data-testid="payments-disconnect"
+        >
+          {busy === 'disconnect' ? <CircularProgress size={18} /> : 'Remover conexão'}
         </Button>
       ) : null}
-    </Stack>
+      <Button
+        variant="contained"
+        disableElevation
+        disabled={busy !== null}
+        onClick={onConnect}
+        sx={BTN_PRIMARY_SX}
+      >
+        {connectLabel(displayName, connected, busy)}
+      </Button>
+    </Box>
   );
 }
 

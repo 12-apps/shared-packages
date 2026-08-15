@@ -74,16 +74,61 @@ interface CredentialFieldProps {
 /** One schema-driven form field. Secrets are write-only: hint, never value. */
 export function CredentialField({ spec, state, value, onChange }: CredentialFieldProps) {
   const presentation = fieldPresentation(spec, state, value);
+  // Label ABOVE the box, not floating in it. Four credentials whose names are
+  // the only thing distinguishing them (`sk_`, `pk_`, `whsec_`, `acct_`) are
+  // read as a column, and a floating label disappears the moment a value is
+  // pasted — exactly when the owner is checking they pasted into the right one.
+  // `htmlFor`/`id` rather than a bare <label>: lifting the text out of
+  // TextField also lifts it out of MUI's own labelling, and an input whose
+  // label is merely ABOVE it is unlabelled to a screen reader and unfindable by
+  // `getByLabelText`. The association has to be restated by hand.
+  const inputId = `payments-credential-${spec.key}`;
   return (
-    <TextField
-      size="small"
-      label={spec.label}
-      {...presentation}
-      slotProps={spec.mono ? { htmlInput: { sx: MONO_INPUT, spellCheck: false } } : undefined}
-      onChange={(e) => onChange(e.target.value)}
-    />
+    <Box>
+      <Typography
+        component="label"
+        htmlFor={inputId}
+        sx={{ display: 'block', fontSize: '12px', fontWeight: 650, color: T.ink2, mb: '5px' }}
+      >
+        {spec.label}
+        {spec.advanced ? (
+          <Box component="span" sx={{ fontWeight: 500, color: T.ink4 }}>
+            {' · só para plataformas Connect'}
+          </Box>
+        ) : null}
+      </Typography>
+      <TextField
+        size="small"
+        fullWidth
+        id={inputId}
+        {...presentation}
+        helperText={undefined}
+        slotProps={
+          spec.mono ? { htmlInput: { sx: MONO_INPUT, spellCheck: false } } : { htmlInput: {} }
+        }
+        sx={FIELD_SX}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {presentation.helperText ?? spec.helperText ? (
+        <Typography sx={{ fontSize: '11.5px', color: T.ink3, mt: '5px', lineHeight: 1.45 }}>
+          {presentation.helperText ?? spec.helperText}
+        </Typography>
+      ) : null}
+    </Box>
   );
 }
+
+/** The box itself: 8px, hairline, monospace-friendly, brand focus ring. */
+const FIELD_SX = {
+  '& .MuiOutlinedInput-root': {
+    borderRadius: '8px',
+    fontSize: '13px',
+    '& fieldset': { borderColor: T.line },
+    '&:hover fieldset': { borderColor: T.ink4 },
+    '&.Mui-focused fieldset': { borderColor: T.brand, borderWidth: '2px' },
+  },
+  '& .MuiOutlinedInput-input': { padding: '10px 12px' },
+} as const;
 
 /**
  * What a completed step collapses to.

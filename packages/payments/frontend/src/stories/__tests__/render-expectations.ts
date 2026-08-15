@@ -453,7 +453,7 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   },
   "Connection/DisconnectFlow": {
     testIds: ["payments-connected-account"],
-    text: ["Desconectar"],
+    text: ["Remover conexão"],
   },
   // The chips are COMPUTED by the driven service — asserting the printed
   // `statusBadge → …` lines pins label AND color per row.

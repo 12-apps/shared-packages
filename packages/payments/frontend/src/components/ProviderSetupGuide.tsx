@@ -21,7 +21,14 @@ import { useState, type ReactNode } from 'react';
 
 import type { ProviderSetupGuide as Guide, SetupSection, SetupStep } from '@12-apps/payments-backend';
 
-import { BAR_MSG_SX, BAR_SX, BTN_PRIMARY_SX, PANEL_SX, T } from './panel-tokens';
+import {
+  BAR_MSG_SX,
+  BAR_SX,
+  BTN_PRIMARY_SX,
+  BTN_SECONDARY_SX,
+  PANEL_SX,
+  T,
+} from './panel-tokens';
 
 import { richText } from './rich-text';
 
@@ -178,37 +185,28 @@ function StepRow({ step, actions }: StepRowProps) {
   if (step.tone === 'warning') return <WarningRow text={step.text ?? ''} />;
   // An action-only step IS the panel's action bar — see `SectionCard`.
   if (action && !step.text) return <ConfirmBar action={action} />;
+  // A bordered row with the work on the left and the way to do it on the
+  // right, so a step reads as a thing to tick off rather than as a paragraph.
+  // The instructions on this screen are a CHECKLIST — each one is a piece of
+  // work the owner does somewhere else and comes back from.
   return (
-    <Stack spacing={1}>
-      {step.text ? (
-        <Typography variant="body2">
-          {richText(step.text)}{' '}
-          {step.link ? (
-            <Link href={step.link.url} target="_blank" rel="noreferrer">
-              {step.link.label}
-            </Link>
-          ) : null}
-        </Typography>
-      ) : null}
-      {step.button ? (
-        <Box>
-          <Button
-            variant="outlined"
-            size="small"
-            href={step.button.url}
-            target="_blank"
-            rel="noreferrer"
-            sx={BUTTON_SX}
-            // The mark is the promise: this leaves the store and opens the
-            // provider's site. A button that reads the same as the in-page ones
-            // and then navigates away is a small betrayal, and here it lands on
-            // a screen that can CHANGE the tag.
-            endIcon={<Box component="span" aria-hidden sx={{ fontSize: '0.9em' }}>↗</Box>}
-          >
-            {step.button.label}
-          </Button>
-        </Box>
-      ) : null}
+    <Stack
+      direction="row"
+      gap="12px"
+      alignItems="flex-start"
+      sx={{ border: `1px solid ${T.line}`, borderRadius: '9px', px: '14px', py: '12px' }}
+    >
+      <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
+        {step.text ? (
+          <Typography sx={{ fontSize: '13px', color: T.ink2, lineHeight: 1.5 }}>
+            {richText(step.text)}{' '}
+            {step.link ? (
+              <Link href={step.link.url} target="_blank" rel="noreferrer">
+                {step.link.label}
+              </Link>
+            ) : null}
+          </Typography>
+        ) : null}
       {action ? (
         <Box>
           <Button variant="contained" size="small" sx={BUTTON_SX} onClick={() => void action.run()}>
@@ -216,12 +214,33 @@ function StepRow({ step, actions }: StepRowProps) {
           </Button>
         </Box>
       ) : null}
-      {step.copy ? (
-        <CopyField
-          label={step.copy.label}
-          text={step.copy.text}
-          collapsible={step.copy.collapsible}
-        />
+        {step.copy ? (
+          <CopyField
+            label={step.copy.label}
+            text={step.copy.text}
+            collapsible={step.copy.collapsible}
+          />
+        ) : null}
+      </Stack>
+      {step.button ? (
+        <Button
+          size="small"
+          href={step.button.url}
+          target="_blank"
+          rel="noreferrer"
+          sx={{ ...BTN_SECONDARY_SX, px: '12px', py: '7px', fontSize: '12px', flexShrink: 0 }}
+          // The mark is the promise: this leaves the store and opens the
+          // provider's site. A button that reads the same as the in-page ones
+          // and then navigates away is a small betrayal, and here it lands on
+          // a screen that can CHANGE where the money goes.
+          endIcon={
+            <Box component="span" aria-hidden sx={{ fontSize: '0.9em' }}>
+              ↗
+            </Box>
+          }
+        >
+          {step.button.label}
+        </Button>
       ) : null}
     </Stack>
   );
