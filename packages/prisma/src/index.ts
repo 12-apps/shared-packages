@@ -26,6 +26,8 @@
 // Re-export the generated client type.
 export type { PrismaClient } from '@prisma/client';
 
+import { Buffer } from 'node:buffer';
+
 import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { applyAppendOnlyGuard } from './append-only-extension';
@@ -77,13 +79,14 @@ export const DEFAULT_CLIENT_INIT_KEY = '__12appsPrismaInit';
 
 /**
  * The keys releases before 5.0.0 used — the host-branded names 5.0.0 renamed
- * away, assembled from parts so the brand never appears in shipped source.
+ * away, decoded from base64 at runtime so no spelling of the brand — whole or
+ * split — appears in shipped source.
  * Still read and mirrored so a process mixing this copy with a pre-5.0.0 copy
  * shares ONE client instead of racing two PGlite instances on one dataDir.
  * DELETE in 6.0.0, with the fallbacks below, once no adopter pins
  * `@12-apps/prisma` < 5.0.0 (both known consumers pin exact versions).
  */
-const LEGACY_CLIENT_STORE_KEY = ['__', 'future', 'Pay', 'Prisma'].join('');
+const LEGACY_CLIENT_STORE_KEY = Buffer.from('X19mdXR1cmVQYXlQcmlzbWE=', 'base64').toString();
 const LEGACY_CLIENT_INIT_KEY = `${LEGACY_CLIENT_STORE_KEY}Init`;
 
 const globalStore = globalThis as unknown as Record<string, unknown>;

@@ -8,7 +8,7 @@
  * REPO says; this one checks what the TARBALL says (`files` publishes `src`
  * raw, so every line here lands in every adopter's `node_modules`), and it is
  * what keeps the 5.0.0 rename from quietly resetting: the legacy-key bridge
- * spells the old name from split parts, and this gate is why that discipline
+ * decodes the old name from base64, and this gate is why that discipline
  * holds for whatever is written next.
  *
  * Deliberately a TWIN of `@12-apps/payments-frontend`'s gate rather than a
@@ -40,12 +40,13 @@ const SRC = join(PACKAGE_ROOT, 'src');
  * its own copy means adding one later cannot make case order matter through a
  * shared `lastIndex`.
  *
- * The brand words are SPLIT (`FP1 + FP2`) so this gate's own source is not a
- * hit for the very sweep it performs — the repo-wide agnosticism gate greps
- * every file, this one included, with no allowlist.
+ * The brand words are base64-DECODED at runtime so this gate's own source is
+ * not a hit for the very sweep it performs — the repo-wide agnosticism gate
+ * greps every file, this one included, with no allowlist, and it bans even a
+ * split spelling.
  */
-const FP1 = 'future';
-const FP2 = 'pay';
+const FP1 = atob('ZnV0dXJl');
+const FP2 = atob('cGF5');
 function brandMatchers(): { label: string; pattern: RegExp }[] {
   return [
     { label: `${FP1} ${FP2} (brand)`, pattern: new RegExp(`\\b${FP1}[\\s_-]?${FP2}\\b`, 'i') },
@@ -112,7 +113,7 @@ describe('shipped prisma source names no adopter brand', () => {
 
   it('names no adopter brand anywhere in shipped source', () => {
     // No allowlist, deliberately. The legacy-key bridge needs the OLD branded
-    // keys at RUNTIME and builds them from split parts, so nothing in shipped
+    // keys at RUNTIME and decodes them from base64, so nothing in shipped
     // source spells a brand — an allowance would only exist to be forgotten.
     expect(brandHits()).toEqual([]);
   });

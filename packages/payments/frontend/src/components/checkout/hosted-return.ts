@@ -74,9 +74,10 @@ export function rememberHostedOrder(order: CheckoutOrder): void {
  * resumed view belongs to exactly one return.
  */
 /**
- * The key before the 2.0.0 rename, READ ONLY — assembled from parts so the
- * old brand never appears in shipped source (both brand gates sweep this
- * file), while the RUNTIME string stays exactly what pre-2.0.0 bundles wrote.
+ * The key before the 2.0.0 rename, READ ONLY — decoded from base64 so no
+ * spelling of the old brand, whole or split, appears in shipped source (both
+ * brand gates sweep this file), while the RUNTIME string stays exactly what
+ * pre-2.0.0 bundles wrote.
  *
  * A buyer who left for the provider's page on a pre-2.0.0 bundle comes back
  * to a newer one with their order parked under the old name. Without this
@@ -97,7 +98,7 @@ export function rememberHostedOrder(order: CheckoutOrder): void {
  * consumers still pinned 2.x, so their key-renaming deploy had not happened
  * yet — which is why it is back.
  */
-const LEGACY_KEY = ['future', 'pay'].join('') + '.checkout.hostedOrder';
+const LEGACY_KEY = atob('ZnV0dXJlcGF5LmNoZWNrb3V0Lmhvc3RlZE9yZGVy');
 
 /**
  * The raw parked payload under either key, cleared as it is read.

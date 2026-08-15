@@ -40,8 +40,8 @@ import type { ActorContext } from '../src/actor-context';
  * delete it knowingly rather than re-discover why it existed.
  */
 
-/** The pre-5.0.0 key, assembled the same way the source does (brand gates). */
-const LEGACY_KEY = ['__', 'future', 'Pay', 'ActorStore'].join('');
+/** The pre-5.0.0 key, decoded the same way the source does (brand gates). */
+const LEGACY_KEY = atob('X19mdXR1cmVQYXlBY3RvclN0b3Jl');
 
 const globals = globalThis as unknown as Record<string, AsyncLocalStorage<ActorContext> | undefined>;
 

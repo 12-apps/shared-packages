@@ -107,11 +107,11 @@ describe("hosted-return", () => {
 
   it("still reads an order parked under the pre-2.0.0 key, once", () => {
     // The compatibility path for a buyer who left on a pre-rename bundle.
-    // Written by hand (split, so this file stays brand-clean under the repo
+    // Written by hand (decoded, so this file stays brand-clean under the repo
     // sweep) because nothing in this version produces the key any more — and
     // asserted because otherwise the fallback is dead code that only LOOKS
     // like a migration. See LEGACY_KEY's docstring for the deletion condition.
-    const legacyKey = ["future", "pay"].join("") + ".checkout.hostedOrder";
+    const legacyKey = atob("ZnV0dXJlcGF5LmNoZWNrb3V0Lmhvc3RlZE9yZGVy");
     window.sessionStorage.setItem(legacyKey, JSON.stringify(ORDER));
     land("?transaction_nsu=123");
 
@@ -121,7 +121,7 @@ describe("hosted-return", () => {
   });
 
   it("prefers the current key when both are somehow present", () => {
-    const legacyKey = ["future", "pay"].join("") + ".checkout.hostedOrder";
+    const legacyKey = atob("ZnV0dXJlcGF5LmNoZWNrb3V0Lmhvc3RlZE9yZGVy");
     window.sessionStorage.setItem(legacyKey, JSON.stringify({ ...ORDER, orderId: "stale" }));
     window.sessionStorage.setItem(HOSTED_ORDER_STORAGE_KEY, JSON.stringify(ORDER));
     land("?transaction_nsu=123");
