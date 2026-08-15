@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -124,5 +124,88 @@ describe('the redesigned provider panel', () => {
     fireEvent.click(await screen.findByTestId('payments-disconnect'));
     await screen.findByTestId('payments-disconnect-confirm');
     expect(screen.queryByTestId('payments-pause-instead')).toBeNull();
+  });
+
+  /**
+   * A verdict about a credential belongs AT that credential.
+   *
+   * The adapter has always returned per-field checks; the screen listed them
+   * under the form, so "chave publicável de produção em conexão de teste" sat
+   * three boxes away from the box it was about, and the owner matched four
+   * sentences to four inputs by eye. Reading it at the field is the difference
+   * between a diagnosis and a puzzle.
+   */
+  it('shows each credential verdict at its own field', async () => {
+    const config = {
+      provider: 'stripe',
+      status: 'FAILED',
+      enabled: false,
+      chargeVerifiedAt: null,
+      environment: 'SANDBOX',
+      environments: { SANDBOX: {}, PRODUCTION: {} },
+    } as unknown as MaskedProviderConfig;
+
+    const client = {
+      baseUrl: '/api/admin/acme/payments',
+      getSettings: vi.fn().mockResolvedValue({
+        providers: [descriptorOf()],
+        configs: [config],
+        activeProvider: null,
+      } as unknown as MerchantSettingsView),
+      getSetupGuide: vi.fn().mockResolvedValue(null),
+      // What the SERVER answers after the write: the three non-advanced fields
+      // now on record. The probe runs off this, not off what was typed.
+      saveCredentials: vi.fn().mockResolvedValue({
+        ...config,
+        environments: {
+          SANDBOX: {
+            secretKey: { configured: true, hint: '••••x' },
+            publishableKey: { configured: true, hint: 'pk_live_x' },
+            webhookSecret: { configured: true, hint: '••••x' },
+          },
+          PRODUCTION: {},
+        },
+      } as unknown as MaskedProviderConfig),
+      setEnabled: vi.fn(),
+      verify: vi.fn().mockResolvedValue({
+        probe: {
+          ok: false,
+          environment: 'SANDBOX',
+          checks: [
+            {
+              key: 'publishableKey',
+              status: 'FAIL',
+              message: 'Chave publicável de produção em conexão de teste.',
+            },
+          ],
+        },
+      }),
+    } as unknown as PaymentsSettingsClient;
+
+    render(
+      <PaymentProviderSettings
+        client={client}
+        initialProvider="stripe"
+        prepareConnect={async () => ({ state: 's', redirectUri: 'https://h.test/cb' })}
+      />,
+    );
+
+    const disclosure = await screen.findByTestId('payments-manual-fallback');
+    fireEvent.click(within(disclosure).getByText(/Prefiro informar as credenciais manualmente/i));
+
+    const secret = await screen.findByLabelText(/Secret key/i);
+    fireEvent.change(secret, { target: { value: 'sk_test_x' } });
+    fireEvent.change(await screen.findByLabelText(/Publishable key/i), {
+      target: { value: 'pk_live_x' },
+    });
+    // Every non-advanced field: the save only probes once the set is complete,
+    // and `Connected account` is the one that must stay empty.
+    fireEvent.change(await screen.findByLabelText(/Webhook signing secret/i), {
+      target: { value: 'whsec_x' },
+    });
+    fireEvent.click(await screen.findByTestId('payments-save'));
+
+    const note = await screen.findByTestId('payments-field-note-publishableKey');
+    expect(note.textContent).toContain('produção em conexão de teste');
   });
 });

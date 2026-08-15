@@ -335,6 +335,11 @@ function CredentialFields({
           spec={spec}
           state={form.masked[spec.key]}
           value={form.values[spec.key]}
+          // The probe's own verdict for THIS credential, keyed by the same
+          // field id the adapter checked. Shown at the box rather than in a
+          // list below the form, where the owner had to match four sentences
+          // to four boxes by eye.
+          check={form.probe?.checks?.find((entry) => entry.key === spec.key)}
           onChange={(value) => form.edit(spec.key, value)}
         />
       ))}
@@ -346,6 +351,12 @@ function CredentialFields({
       />
     </Stack>
   );
+}
+
+/** Verdict keys that name no field, so they have no box to be shown at. */
+function unkeyed(descriptor: ProviderDescriptor): (key: string) => boolean {
+  const fields = new Set(descriptor.credentialSchema.map((spec) => spec.key));
+  return (key: string) => !fields.has(key);
 }
 
 export function ProviderForm(props: ProviderFormProps) {
@@ -390,11 +401,10 @@ export function ProviderForm(props: ProviderFormProps) {
       {form.probe ? (
         <ProbeAlert probe={form.probe} busy={form.busy !== null} onRetry={form.verify} />
       ) : null}
-      {/* The pasted-key path, and the one FUT-796 is about: this form is where
-          the credentials the probe reports on were typed, so its findings
-          belong beside them — including on a pass, where the unchecked rows are
-          the only place an owner learns what was NOT established. */}
-      {form.probe ? <ProbeChecklist probe={form.probe} /> : null}
+      {/* Only what could NOT be tied to a box. Every verdict carrying a field
+          key is rendered at that field now; this keeps the leftovers, which is
+          where the UNCHECKED rows live — the half a green result would deny. */}
+      {form.probe ? <ProbeChecklist probe={form.probe} only={unkeyed(descriptor)} /> : null}
 
       <ConfirmCredentialSave
         pending={form.pending}

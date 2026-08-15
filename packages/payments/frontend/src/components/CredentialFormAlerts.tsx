@@ -114,11 +114,19 @@ const CHECK_MARKS = {
  * red cross would misattribute — and it tells the owner precisely which part of
  * a passing result not to lean on.
  */
-export function ProbeChecklist({ probe }: { probe: VerifyProbe }) {
-  if (!probe.checks?.length) return null;
+export function ProbeChecklist({
+  probe,
+  only,
+}: {
+  probe: VerifyProbe;
+  /** Keep only the verdicts this predicate accepts — see `ProviderForm`. */
+  only?: (key: string) => boolean;
+}) {
+  const shown = (probe.checks ?? []).filter((check) => only?.(check.key) ?? true);
+  if (shown.length === 0) return null;
   return (
     <Stack spacing={0.5} data-testid="payments-probe-checks">
-      {probe.checks.map((check) => {
+      {shown.map((check) => {
         const { mark, color, label } = CHECK_MARKS[check.status];
         return (
           <Stack
