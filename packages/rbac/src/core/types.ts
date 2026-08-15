@@ -87,7 +87,12 @@ export interface RoleDef<P extends string = string> {
 export interface PermissionRegistry<P extends string> {
   list: readonly P[];
   has(p: string): p is P;
-  /** Scope-kind of a permission; unknown permissions default to `'class'`. */
+  /**
+   * Scope-kind of a permission; a permission the registry does not KNOW
+   * defaults to `'class'`. In a composed catalog that default reaches only ids
+   * no source contributes — composition refuses a spec that does not declare a
+   * valid `kind`, so a registered id always answers with its own.
+   */
   kind(p: string): PermissionKind;
 }
 

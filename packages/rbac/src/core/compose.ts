@@ -24,30 +24,27 @@ import type { GovernanceCatalog, SodPair } from '../governance';
 import { tenantRoleSeeds, type TenantRoleSeed } from '../tenant-role-seeds';
 
 import {
+  assertIdsCoverSpecs,
+  assertSpecDeclaresItself,
+  RbacCatalogError,
+} from './catalog-integrity';
+import {
   mergeLabelVocabulary,
   type PermissionContribution,
   type PermissionOf,
   type PermissionSpec,
   type RbacLabelVocabulary,
 } from './contribution';
-import type { PermissionRegistry, RoleDef } from './types';
+import type { PermissionKind, PermissionRegistry, RoleDef } from './types';
 
-/** Why a catalog refused to assemble. Stable codes, for tests and hosts. */
-export type RbacCatalogErrorCode =
-  | 'PERMISSION_COLLISION'
-  | 'UNKNOWN_PERMISSION'
-  | 'UNKNOWN_ROLE';
-
-/** A composition failure. Thrown at assembly, never during a decision. */
-export class RbacCatalogError extends Error {
-  readonly code: RbacCatalogErrorCode;
-  constructor(code: RbacCatalogErrorCode, message: string) {
-    super(message);
-    this.name = 'RbacCatalogError';
-    this.code = code;
-    Object.setPrototypeOf(this, RbacCatalogError.prototype);
-  }
-}
+/**
+ * The failure every check throws, re-exported from the module that owns those
+ * checks so `RbacCatalogError` keeps the import path hosts already use.
+ */
+export {
+  RbacCatalogError,
+  type RbacCatalogErrorCode,
+} from './catalog-integrity';
 
 /**
  * The host's ROLE policy — the half of governance no package can own.
@@ -125,31 +122,6 @@ interface CatalogEntry {
   source: string;
 }
 
-/**
- * The OTHER direction of the id/spec agreement: a spec present in
- * `permissions` but absent from `ids`.
- *
- * `definePermissionContribution` derives `ids` from the map's keys, so this is
- * unreachable through it — but {@link PermissionContribution} is a PUBLIC
- * interface, and a factory that builds its own `ids` (an approval-permission
- * helper generating them per entity) can drift. Dropping such a spec is silent
- * and fails OPEN twice over: its `ownerMarker` never reaches
- * `ownerPermissions` (so `checkOwnerProtected` stops refusing it inside an
- * inline custom role) and its `separateFrom` never becomes a pair (so
- * `checkSoD` never fires). Both guards only ever REMOVE power, so losing one
- * shows up as nothing at all.
- */
-function assertIdsCoverSpecs(contribution: PermissionContribution<string>): void {
-  const listed = new Set<string>(contribution.ids);
-  const orphan = Object.keys(contribution.permissions).find((id) => !listed.has(id));
-  if (orphan !== undefined) {
-    throw new RbacCatalogError(
-      'UNKNOWN_PERMISSION',
-      `"${contribution.source}" declares a spec for "${orphan}" but leaves it out of its ids — the two must name the same set, or that spec's ownerMarker and separateFrom are dropped silently`,
-    );
-  }
-}
-
 /** Flatten the contributions, refusing a second claim on any id. */
 function collectEntries(
   contributions: readonly PermissionContribution<string>[],
@@ -173,6 +145,7 @@ function collectEntries(
           `"${contribution.source}" lists "${id}" among its ids but declares no spec for it`,
         );
       }
+      assertSpecDeclaresItself(id, spec, contribution.source);
       owner.set(id, contribution.source);
       entries.push({ id, spec, source: contribution.source });
     });
@@ -274,11 +247,30 @@ function composeUntyped(
   const entries = collectEntries(contributions);
   const ids = entries.map((entry) => entry.id);
   const known = new Set(ids);
-  const kinds = new Map(entries.map((entry) => [entry.id, entry.spec.kind]));
+  const kinds = new Map<string, PermissionKind>(
+    entries.map((entry) => [entry.id, entry.spec.kind]),
+  );
   const sources = new Map(entries.map((entry) => [entry.id, entry.source]));
   const permissions: PermissionRegistry<string> = {
     list: ids,
     has: (permission): permission is string => known.has(permission),
+    /**
+     * The fallback stays, and it now means something different from what it
+     * used to. `collectEntries` refuses a spec whose `kind` is not exactly
+     * `'class'` or `'instance'`, so every CONTRIBUTED id is in this map: the
+     * `??` can no longer convert an undeclared kind into `class`, which was
+     * the whole of the fail-open. What is left is a permission NO source
+     * contributes, where the {@link PermissionRegistry} contract answers
+     * `'class'` (`definePermissions` does the same) and `has` is the question
+     * to ask instead.
+     *
+     * Answering `'instance'` there was the alternative and is rejected on
+     * purpose: an unknown id only ever reaches a decision through a WILDCARD
+     * role, so the change would narrow an owner's `visible` to owned/assigned
+     * rows and make `validateGrant` refuse a DB custom role carrying a stale
+     * id at an org scope — a live behaviour change for ids that are already a
+     * bug, in exchange for a gate that has nothing to gate.
+     */
     kind: (permission) => kinds.get(permission) ?? 'class',
   };
   const ownerPermissions = entries

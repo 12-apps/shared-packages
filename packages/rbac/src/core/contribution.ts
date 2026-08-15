@@ -25,7 +25,11 @@ import type { PermissionKind } from './types';
  * Everything true about ONE permission, in one place.
  *
  * `kind` is required on purpose: it is the field whose absence fails open, so
- * there is no shape of this object that registers an id without it.
+ * there is no shape of this object that registers an id without it. The type
+ * says so where a catalog is WRITTEN; `composePermissions` says so again at
+ * assembly (`./catalog-integrity`), because a catalog that is generated, read
+ * from config or parsed from JSON passes the compiler exactly once — at the
+ * `as` on its boundary — and this is the field that must not slip through it.
  */
 export interface PermissionSpec {
   /**
