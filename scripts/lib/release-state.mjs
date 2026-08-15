@@ -85,55 +85,23 @@ function registryVersions(name) {
 }
 
 /**
- * Split every package into the four states that matter to a release.
+ * Split every package into the three states that matter to a release.
  *
  * `orphans` are tagged for a version npm does not have — the stuck ones.
- * `untagged` are the MIRROR of an orphan: on the registry, with no tag at all.
  * `unpublished` are not on the registry at all — a first publish, not a fault.
  * `healthy` is everything whose newest tag is on the registry.
- *
- * ## Why `untagged` is a state and not just "no tag yet"
- *
- * This function used to `continue` past any package without a tag, which reads
- * as obviously safe — a package nobody has tagged cannot have a stale tag. It
- * is safe only while the registry has never seen the name. Once a version IS
- * published and no tag records it, semantic-release has no floor to count from:
- * it treats the next release as the package's FIRST, re-cuts the version that
- * is already on the registry, and `scripts/publish.mjs` reports the upload as
- * "skipped" because that version exists. Every step succeeds and the release is
- * silently swallowed.
- *
- * That is the same ending as an orphaned tag, reached from the opposite side,
- * with one difference that matters: an orphan turns the run RED, and this did
- * not turn up anywhere at all — the `continue` above meant no caller could see
- * it. `@12-apps/request-scope` sat in exactly this state after its bootstrap
- * run published 1.0.0 with a token and then failed to tag it.
- *
- * The two states need OPPOSITE remedies, which is why they are separate keys
- * rather than one "stuck" list: an orphan is fixed by DELETING its tag so the
- * version re-cuts, and this is fixed by CREATING the missing one.
  */
 export function releaseState(dirs = publishDirs()) {
   const orphans = [];
-  const untagged = [];
   const unpublished = [];
   const healthy = [];
 
   for (const dir of dirs) {
     const { name } = manifest(dir);
-    const prefix = basename(dir);
-    const tag = newestTag(prefix);
+    const tag = newestTag(basename(dir));
+    if (!tag) continue;
+
     const versions = registryVersions(name);
-
-    if (!tag) {
-      // No tag is the NORMAL state for a name the registry has never seen —
-      // every package looks like this before its first release, and flagging
-      // those would fail the job on every genuinely new package. It is only a
-      // fault once a version exists to be recorded.
-      if (versions !== null) untagged.push({ name, prefix, versions });
-      continue;
-    }
-
     if (versions === null) {
       unpublished.push({ name, ...tag });
     } else if (versions.includes(tag.version)) {
@@ -143,18 +111,7 @@ export function releaseState(dirs = publishDirs()) {
     }
   }
 
-  return { orphans, untagged, unpublished, healthy };
-}
-
-/**
- * The newest version of an `untagged` entry, by the same version-aware ordering
- * the tag sort uses. `npm view … versions` returns publication order, which is
- * NOT version order once a patch lands on an older line after a newer minor.
- */
-export function newestPublished(versions) {
-  return [...versions].sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
-  ).at(-1);
+  return { orphans, unpublished, healthy };
 }
 
 /** The names a workflow step handed over through GITHUB_ENV, as a Set. */
