@@ -353,3 +353,66 @@ describe('createWebAppShell', () => {
     expect(shell.theme.palette.primary.light).toBe('#7ED957');
   });
 });
+
+/**
+ * THE SESSION, WITHOUT THE TOWER.
+ *
+ * `Provider` mounts theme + session + consent gate + router, which is what an
+ * application entry point wants and what nothing else does. A unit test
+ * rendering one signed-in component does not want a consent gate calling the
+ * terms endpoint, and cannot mount a second `BrowserRouter` inside the harness's
+ * own.
+ *
+ * The reason this needs a test rather than a docstring is the failure it
+ * prevents: a host that works around the gap by calling `createWebAuth()` itself
+ * gets a SECOND context, so a component renders under one provider and reads
+ * from the other. `useSession must be used within a SessionProvider`, thrown
+ * from a tree that visibly has one. So the assertion is not "a provider exists"
+ * — it is that the value read under `SessionProvider` is the value `Provider`
+ * would have given.
+ */
+describe('SessionProvider, on its own', () => {
+  it('serves the session with no theme, no gate and no router mounted', async () => {
+    const calls = server();
+    const shell = createWebAppShell({ ...REQUIRED, queryClient: new QueryClient() });
+
+    function Page(): JSX.Element {
+      return <p data-testid="status">{shell.useSession().status}</p>;
+    }
+
+    render(
+      <shell.SessionProvider>
+        <Page />
+      </shell.SessionProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('unauthenticated'));
+    // The gate is the one that would have made this harness reach the network
+    // for something the test never asked about.
+    expect(calls.some((url) => url.includes('terms-consent'))).toBe(false);
+  });
+
+  it('is the SAME context `Provider` mounts, not a second one', async () => {
+    server();
+    const shell = createWebAppShell({ ...REQUIRED, queryClient: new QueryClient() });
+
+    // Reads through `useSession` while mounted under `Provider`, which installs
+    // its own session. If `SessionProvider` were a different instance this still
+    // renders — it is the nesting that proves they are one, because the inner
+    // provider would otherwise shadow the outer with an unrelated context and
+    // the hook would read whichever it found.
+    function Page(): JSX.Element {
+      return <p data-testid="nested">{shell.useSession().status}</p>;
+    }
+
+    render(
+      <shell.Provider router={{}}>
+        <shell.SessionProvider>
+          <Page />
+        </shell.SessionProvider>
+      </shell.Provider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('nested').textContent).toBe('unauthenticated'));
+  });
+});
