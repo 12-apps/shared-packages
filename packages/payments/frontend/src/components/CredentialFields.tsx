@@ -4,6 +4,8 @@ import { Box, Button, Stack, TextField, Typography } from '@mui/material';
 
 import type { CredentialFieldSpec, MaskedFieldState } from '@12-apps/payments-backend';
 
+import { LINKISH_SX, T } from './panel-tokens';
+
 /**
  * The schema-driven credential inputs, and the one-line summary a finished
  * step collapses into.
@@ -128,29 +130,36 @@ export function DoneRow({
   testId: string;
 }) {
   return (
+    // Green, not grey: a finished step reads as an achievement at a glance, and
+    // the whole point of collapsing it is that the eye can skip it on the way to
+    // the step still owed.
     <Stack
       direction="row"
-      spacing={1.5}
+      spacing={1.25}
       alignItems="center"
       data-testid={testId}
-      sx={{ border: 1, borderColor: 'divider', borderRadius: 1, px: 2, py: 1.25 }}
+      sx={{
+        border: `1px solid ${T.okLine}`,
+        background: T.okSoft,
+        borderRadius: '9px',
+        px: '16px',
+        py: '11px',
+        mx: '20px',
+        mb: '10px',
+        fontSize: '13px',
+      }}
     >
-      <Box aria-hidden sx={{ color: 'success.main', fontWeight: 700 }}>
+      <Box aria-hidden sx={{ color: T.ok, fontWeight: 800 }}>
         ✓
       </Box>
-      <Typography variant="body2" color="text.secondary">
+      <Typography sx={{ fontSize: '13px', fontWeight: 600, color: T.ink }}>
         {stripTrailingParenthetical(label)}
       </Typography>
-      <Typography variant="body2" sx={mono ? MONO_INPUT : undefined}>
+      <Typography sx={{ fontSize: '13px', color: T.ink3, ...(mono ? MONO_INPUT : {}) }}>
         {value}
       </Typography>
       <Box sx={{ flexGrow: 1 }} />
-      <Button
-        size="small"
-        onClick={onEdit}
-        data-testid={`${testId}-edit`}
-        sx={{ textTransform: 'none' }}
-      >
+      <Button size="small" onClick={onEdit} data-testid={`${testId}-edit`} sx={LINKISH_SX}>
         {editLabel}
       </Button>
     </Stack>

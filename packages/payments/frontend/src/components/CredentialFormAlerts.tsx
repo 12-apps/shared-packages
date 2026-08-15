@@ -5,6 +5,7 @@ import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/ma
 import type { VerifiedProviderConfig } from '@12-apps/payments-backend';
 
 import { ENVIRONMENT_LABELS } from './EnvironmentTabs';
+import { BAR_MSG_SX, BAR_SX, BTN_PRIMARY_SX } from './panel-tokens';
 
 /**
  * The credential step's alerts and its one button.
@@ -186,25 +187,38 @@ export function FormActions({
   disabled: boolean;
   onSave: () => void;
 }) {
+  // The bar states what pressing it costs, which is the half a verb cannot
+  // carry: a complete set is sent to the provider on save, and a partial one is
+  // only written down. The owner reads the promise and the button in one line.
+  const message =
+    busy === 'verify'
+      ? 'Testando a conexão…'
+      : label.includes('testar')
+        ? 'Salvamos e testamos as chaves no provedor antes de seguir.'
+        : 'Guardamos o que você já preencheu. Complete os campos para testar.';
+
   return (
-    <Stack spacing={1} alignItems="flex-start">
+    <Box sx={BAR_SX} data-testid="payments-form-bar">
+      <Typography sx={BAR_MSG_SX} data-testid={busy === 'verify' ? 'payments-verifying' : undefined}>
+        {busy === 'verify' ? (
+          <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            <CircularProgress size={14} />
+            {message}
+          </Box>
+        ) : (
+          message
+        )}
+      </Typography>
       <Button
         variant="contained"
+        disableElevation
         data-testid="payments-save"
         disabled={busy !== null || disabled}
-        sx={{ textTransform: 'none' }}
+        sx={BTN_PRIMARY_SX}
         onClick={onSave}
       >
-        {busy === 'save' ? <CircularProgress size={18} /> : label}
+        {busy === 'save' ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : label}
       </Button>
-      {busy === 'verify' ? (
-        <Stack direction="row" spacing={1} alignItems="center" data-testid="payments-verifying">
-          <CircularProgress size={14} />
-          <Typography variant="body2" color="text.secondary">
-            Testando a conexão…
-          </Typography>
-        </Stack>
-      ) : null}
-    </Stack>
+    </Box>
   );
 }

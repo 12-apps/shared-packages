@@ -20,6 +20,7 @@ import type {
 
 import type { PaymentsSettingsClient } from '../client';
 import { ConnectionProbe } from './ConnectionProbe';
+import { CARD_SX } from './panel-tokens';
 import { EnvironmentNotice, EnvironmentSelector } from './EnvironmentTabs';
 import { ProviderConnection } from './ProviderConnection';
 import { ProviderForm } from './ProviderCredentialForm';
@@ -156,13 +157,16 @@ function ProviderCard({
   band?: ReactNode;
   children: ReactNode;
 }) {
+  // The body carries NO padding of its own: each block inside it (a step panel,
+  // a done row, the disclosure) sets its own 20px inset, because the
+  // environment band between them has to reach both edges and a padded parent
+  // makes that impossible. `CARD_SX` is the prototype's hairline verbatim —
+  // `Paper variant="outlined"` would paint the theme's divider instead.
   return (
-    <Paper variant="outlined">
-      <Box sx={{ px: 3, pt: 3 }}>{header}</Box>
+    <Paper elevation={0} sx={CARD_SX}>
+      <Box sx={{ px: '20px', pt: '18px', pb: '6px' }}>{header}</Box>
       {band}
-      <Box sx={{ p: 3 }}>
-        <Stack spacing={2}>{children}</Stack>
-      </Box>
+      <Box>{children}</Box>
     </Paper>
   );
 }

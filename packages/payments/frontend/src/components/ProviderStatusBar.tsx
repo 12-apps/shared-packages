@@ -1,10 +1,11 @@
 'use client';
 
-import { Box, Chip, FormControlLabel, Stack, Switch, Tooltip, Typography } from '@mui/material';
+import { Box, Stack, Switch, Tooltip, Typography } from '@mui/material';
 
 import type { MaskedProviderConfig, ProviderDescriptor } from '@12-apps/payments-backend';
 
 import { isConnected } from './connection-state';
+import { T } from './panel-tokens';
 
 /**
  * The provider's headline: what state it is in, and the switch that decides
@@ -157,37 +158,80 @@ export function ProviderStatusBar({
   const { lockedOff, hint } = toggleGate(descriptor, config, enabled);
   const badge = statusBadge(config, descriptor);
 
+  // Proven-but-off is its OWN word. "Não está recebendo" is true of a store
+  // that has not finished setup and of one that finished and paused, and those
+  // are opposite situations: the first is a step outstanding, the second is a
+  // decision the owner made and can undo in one click.
+  const proven = Boolean(config?.chargeVerifiedAt);
+  const paused = proven && !enabled;
+  const state = enabled ? 'Recebendo vendas' : paused ? 'Pausado' : 'Ainda não está recebendo';
+
   return (
-    <Stack spacing={0.5}>
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Typography variant="h6">{descriptor.displayName}</Typography>
-        <Chip size="small" data-testid="payments-status" label={badge.label} color={badge.color} />
-        {/* The switch belongs at the far edge: it is the one control here that
-            changes what buyers experience, and crowding it against the status
-            chip made the two read as one compound widget. */}
-        <Box sx={{ flexGrow: 1 }} />
+    <Stack direction="row" alignItems="flex-start" gap="14px" flexWrap="wrap">
+      <Box>
+        <Stack direction="row" alignItems="center" gap="9px">
+          <Typography
+            component="div"
+            sx={{ fontSize: '19px', fontWeight: 700, letterSpacing: '-.01em', color: T.ink }}
+          >
+            {descriptor.displayName}
+          </Typography>
+          <Box
+            component="span"
+            data-testid="payments-status"
+            sx={{
+              fontSize: '10px',
+              fontWeight: 800,
+              letterSpacing: '.06em',
+              textTransform: 'uppercase',
+              borderRadius: '5px',
+              px: '7px',
+              py: '3px',
+              background: proven ? T.okSoft : '#f0f1f4',
+              color: proven ? T.ok : T.ink3,
+            }}
+          >
+            {badge.label}
+          </Box>
+        </Stack>
+        <Typography
+          sx={{ fontSize: '12.5px', color: T.ink3, mt: '5px', maxWidth: '52ch', lineHeight: 1.5 }}
+          data-testid="payments-enable-hint"
+        >
+          {paused
+            ? 'Conexão pronta e pausada por você — nenhum pedido novo é cobrado aqui.'
+            : enabled
+              ? 'Sua loja está recebendo por este provedor.'
+              : lockedOff
+                ? hint
+                : 'Tudo pronto — ligue a chave para começar a receber.'}
+        </Typography>
+      </Box>
+      {/* The switch belongs at the far edge: it is the one control here that
+          changes what buyers experience, and crowding it against the status
+          chip made the two read as one compound widget. */}
+      <Stack direction="row" alignItems="center" gap="10px" sx={{ ml: 'auto' }}>
         <Tooltip title={hint}>
           {/* A disabled control fires no events, so the tooltip needs a live wrapper. */}
           <span>
-            <FormControlLabel
-              control={
-                <Switch
-                  data-testid="payments-enabled-toggle"
-                  checked={enabled}
-                  disabled={busy || lockedOff}
-                  onChange={(_, next) => onToggle(next)}
-                />
-              }
-              label={enabled ? 'Recebendo vendas' : 'Não está recebendo'}
+            <Switch
+              data-testid="payments-enabled-toggle"
+              checked={enabled}
+              disabled={busy || lockedOff}
+              onChange={(_, next) => onToggle(next)}
             />
           </span>
         </Tooltip>
-      </Stack>
-      {lockedOff ? (
-        <Typography variant="caption" color="text.secondary" data-testid="payments-enable-hint">
-          {hint}
+        <Typography
+          sx={{
+            fontSize: '12.5px',
+            fontWeight: enabled || paused ? 600 : 400,
+            color: enabled ? T.ok : paused ? T.warn : T.ink3,
+          }}
+        >
+          {state}
         </Typography>
-      ) : null}
+      </Stack>
     </Stack>
   );
 }
