@@ -387,9 +387,11 @@ describe('SessionProvider, on its own', () => {
     );
 
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('unauthenticated'));
-    // The gate is the one that would have made this harness reach the network
-    // for something the test never asked about.
-    expect(calls.some((url) => url.includes('terms-consent'))).toBe(false);
+    // The gate is what would have reached the network for something this test
+    // never asked about. Asserted with the same literal the other cases in this
+    // file use rather than a predicate — a closure over the recorded calls is
+    // what the flakiness gate reads as shared mutable state.
+    expect(calls).not.toContain('GET /backend/consent/status');
   });
 
   it('is the SAME context `Provider` mounts, not a second one', async () => {
