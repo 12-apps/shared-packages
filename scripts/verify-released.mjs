@@ -1,4 +1,7 @@
-// Fail when a package has a release TAG the registry never received.
+// Fail when a package's tags and the registry disagree, in EITHER direction:
+// a release TAG the registry never received, or a published VERSION no tag
+// records. Both end with the package silently never releasing again; they need
+// opposite remedies, so they are reported separately at the bottom of this file.
 //
 // WHY this exists. `semantic-release` decides what to release by looking at the
 // tags: the commit range for a package is "everything since its newest
@@ -32,12 +35,14 @@
 // right ORDER: fix the publish first, delete the tag second.
 import { appendFileSync } from "node:fs";
 
-import { handedOver, publishDirs, releaseState } from "./lib/release-state.mjs";
+import { handedOver, newestPublished, publishDirs, releaseState } from "./lib/release-state.mjs";
 
 const DIRS = publishDirs();
 
 const INCOMPLETE = handedOver("PUBLISH_INCOMPLETE");
 const WEDGED = handedOver("PUBLISH_WEDGED");
+// Names scripts/first-publish.mjs put on the registry EARLIER IN THIS JOB.
+const BOOTSTRAPPED = handedOver("FIRST_PUBLISHED");
 
 function report(lines) {
   console.log(lines.join("\n"));
@@ -50,7 +55,7 @@ function report(lines) {
 
 if (DIRS.length === 0) throw new Error("PUBLISH_DIRS is empty — nothing to verify");
 
-const { orphans, unpublished, healthy } = releaseState(DIRS);
+const { orphans, untagged, unpublished, healthy } = releaseState(DIRS);
 
 const lines = [`${healthy.length + orphans.length} package(s) verified against the registry`];
 if (unpublished.length > 0) {
@@ -99,6 +104,57 @@ for (const { name, tag, version } of orphans) {
   lines.push(`**stuck**: ${name} tagged ${tag}, ${version} absent from the registry${caveat}`);
 }
 
+/**
+ * The mirror of an orphan: a version on the registry that no tag records.
+ *
+ * Same ending as an orphan — the package stops releasing — but reached from the
+ * other side and, until this check existed, reached SILENTLY. semantic-release
+ * counts from the newest `<pkg>-v*` tag; with none it treats the next release as
+ * the package's first, re-cuts the version already on npm, and publish.mjs
+ * reports "skipped" because that version exists. Green run, nothing shipped.
+ *
+ * The remedy is the opposite of an orphan's. Do NOT delete anything: the tag is
+ * what is missing. Point it at the commit whose release produced that version,
+ * which is the merge the package's release notes were generated from. Tagging a
+ * later commit is not wrong so much as lossy — the tag's only job is to give
+ * semantic-release a floor, and a floor set too late just narrows the NEXT
+ * release's commit range.
+ */
+function untaggedRemedy(prefix, version) {
+  return (
+    `Create the missing tag at the commit whose release published ${version}, ` +
+    `then push it: git tag ${prefix}-v${version} <commit> && ` +
+    `git push origin ${prefix}-v${version}`
+  );
+}
+
+// A package THIS job just bootstrapped is untagged for the rest of the job by
+// construction, so failing on it would make adding a package a red run the
+// author cannot clear — the tag only exists once a release cuts one, and the
+// recovery on the next push is what supplies it. Reported, never fatal.
+const bootstrapped = untagged.filter(({ name }) => BOOTSTRAPPED.has(name));
+const stuck = untagged.filter(({ name }) => !BOOTSTRAPPED.has(name));
+
+for (const { name, prefix, versions } of bootstrapped) {
+  const version = newestPublished(versions);
+  lines.push(
+    `first published this run: ${name}@${version} — no ${prefix}-v* tag yet, ` +
+      `which the next push recovers`,
+  );
+}
+
+for (const { name, prefix, versions } of stuck) {
+  const version = newestPublished(versions);
+  console.log(
+    `::error::${name} is on the registry at ${version} but has no ${prefix}-v* tag. ` +
+      `Releases for this package are STUCK, and silently: semantic-release has no ` +
+      `floor to count from, so it re-cuts ${version}, npm refuses a version it ` +
+      `already has, and the run stays green while nothing ships. ` +
+      `${untaggedRemedy(prefix, version)}`,
+  );
+  lines.push(`**stuck**: ${name} published ${version} with no ${prefix}-v* tag recording it`);
+}
+
 report(lines);
 
-if (orphans.length > 0) process.exitCode = 1;
+if (orphans.length > 0 || stuck.length > 0) process.exitCode = 1;
