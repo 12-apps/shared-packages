@@ -1,0 +1,62 @@
+{
+  "name": "@12-apps/request-scope",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Generic, portable AMBIENT REQUEST SCOPE for hosts serving web-standard Request/Response. Framework-free core (an AsyncLocalStorage-backed per-request store, a paired cookie read/write codec, queued cookie writes drained onto the outgoing response, and the immutable-redirect rebuild that Response.redirect() otherwise makes a 500), a Hono middleware (./hono) and a next/headers-compatible accessor pair for migrating hosts (./next-compat). Zero runtime dependencies. Standardized adoption contract in ADOPTING.md.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./hono": "./src/hono/index.ts",
+    "./next-compat": "./src/next-compat/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "hono": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "hono": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "hono": "^4.6.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/request-scope"
+  },
+  "files": [
+    "src",
+    "dist",
+    "*.js",
+    "*.mjs",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*"
+  ]
+}
