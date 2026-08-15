@@ -477,6 +477,7 @@ describe('the realtime hint, wired as a hook', () => {
     const hints: (() => void)[] = [];
     const { BellButton } = createWebNotifications({
       apiBase: '/api/account',
+      messages: CLINIC_MESSAGES,
       // Called during render, so a real host may read context here — which is
       // the entire point of this door existing beside `subscribe`.
       useSignal: (onHint) => {
