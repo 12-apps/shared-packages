@@ -31,6 +31,7 @@ env:
   PUBLISH_DIRS: >-
     packages/eslint-config
     packages/typescript-config
+    packages/request-scope
     packages/observability-backend
     packages/auth
     packages/entity-lifecycle
