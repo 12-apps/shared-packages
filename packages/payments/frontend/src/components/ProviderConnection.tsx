@@ -242,6 +242,50 @@ function ConnectionFacts({
   );
 }
 
+/**
+ * What authorizing actually involves, in three numbered steps.
+ *
+ * The card used to be one sentence and a button, which asks the owner to click
+ * something that navigates away from their store to a site they will be asked
+ * to log into. Numbering the three moments — sign in, authorize, come back —
+ * makes the trip finite and says the one thing that most reduces hesitation:
+ * you end up back here.
+ */
+function ConnectSteps({ displayName }: { displayName: string }) {
+  const steps = [
+    `Entre na sua conta ${displayName} — dá para criar uma na hora, se ainda não tiver.`,
+    'Autorize o acesso na tela do provedor.',
+    'Você volta para cá com a conta conectada.',
+  ];
+  return (
+    <Stack component="ol" spacing={1.1} sx={{ listStyle: 'none', m: 0, p: 0 }}>
+      {steps.map((text, index) => (
+        <Stack component="li" key={text} direction="row" gap="9px">
+          <Box
+            aria-hidden
+            sx={{
+              width: 19,
+              height: 19,
+              borderRadius: '50%',
+              background: T.brandSoft,
+              color: T.brandInk,
+              fontSize: '11px',
+              fontWeight: 700,
+              display: 'grid',
+              placeItems: 'center',
+              flex: '0 0 auto',
+              mt: '1px',
+            }}
+          >
+            {index + 1}
+          </Box>
+          <Typography sx={{ fontSize: '13px', color: T.ink2, lineHeight: 1.5 }}>{text}</Typography>
+        </Stack>
+      ))}
+    </Stack>
+  );
+}
+
 /** Header + explanatory copy + any warning banner for the connection. */
 function ConnectionSummary(props: {
   displayName: string;
@@ -280,11 +324,12 @@ function ConnectionSummary(props: {
         grant, not whose logo is on the page. The subject is the connection
         itself, which is true for every host and needs no new configuration.
       */}
-      <Typography variant="body2" color="text.secondary">
+      <Typography sx={{ fontSize: '13px', color: T.ink2, lineHeight: 1.6 }}>
         {props.connected
           ? 'Sua conta está conectada. As cobranças são criadas em seu nome — nenhuma chave precisa ser copiada.'
           : `Conecte sua conta ${props.displayName} autorizando o acesso no site do provedor. Nenhuma chave precisa ser copiada.`}
       </Typography>
+      {props.connected ? null : <ConnectSteps displayName={props.displayName} />}
       {props.connected && props.connectedAccount ? (
         <ConnectedAccountDetails account={props.connectedAccount} />
       ) : null}

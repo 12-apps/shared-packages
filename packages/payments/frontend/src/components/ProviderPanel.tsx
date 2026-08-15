@@ -1,15 +1,6 @@
 'use client';
 
-import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
-  Alert,
-  Box,
-  Paper,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Alert, Box, Button, Paper, Stack } from '@mui/material';
 import { useCallback, useState, type ReactNode } from 'react';
 
 import type {
@@ -20,7 +11,7 @@ import type {
 
 import type { PaymentsSettingsClient } from '../client';
 import { ConnectionProbe } from './ConnectionProbe';
-import { CARD_SX } from './panel-tokens';
+import { CARD_SX, LINKISH_SX } from './panel-tokens';
 import { EnvironmentNotice, EnvironmentSelector } from './EnvironmentTabs';
 import { ProviderConnection } from './ProviderConnection';
 import { ProviderForm } from './ProviderCredentialForm';
@@ -329,26 +320,24 @@ function PathSwitch({
   testId: string;
   children?: ReactNode;
 }) {
+  // Open, this is not a disclosure any more — it IS the path, and dressing a
+  // whole block (its own stepper, environment switch, fields and action bar) in
+  // a collapsible chrome adds a frame around a frame. So the content renders
+  // bare and only the CLOSED state is a control: one quiet line offering the
+  // other way in, which is all a path the owner is not on needs to be.
+  if (expanded) {
+    return (
+      <Box data-testid={testId} data-open="true">
+        {children}
+      </Box>
+    );
+  }
   return (
-    <Accordion
-      disableGutters
-      expanded={expanded}
-      onChange={(_, open) => onChange(open)}
-      // A collapsed Accordion still MOUNTS its children, and this one now
-      // contains a whole path block — its own stepper included. Left mounted,
-      // both paths' steppers are in the DOM at once: two "Passo 1"s, two step
-      // cards, and any query for the walkthrough matching whichever came first.
-      // Closed means this path is not on screen, so it should not exist.
-      TransitionProps={{ unmountOnExit: true }}
-      data-testid={testId}
-    >
-      <AccordionSummary expandIcon={<span aria-hidden>▾</span>}>
-        <Typography variant="body2" color="text.secondary">
-          {label}
-        </Typography>
-      </AccordionSummary>
-      {children ? <AccordionDetails>{children}</AccordionDetails> : null}
-    </Accordion>
+    <Box data-testid={testId} sx={{ px: '20px', pb: '20px' }}>
+      <Button onClick={() => onChange(true)} sx={{ ...LINKISH_SX, fontSize: '12.5px' }}>
+        {label}
+      </Button>
+    </Box>
   );
 }
 
