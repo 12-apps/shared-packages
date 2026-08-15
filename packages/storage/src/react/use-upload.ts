@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { STORAGE_PATHS } from '../paths';
 import {
+  messagesOf,
   rejectFileUpfront,
   transportFailure,
   uploadFailure,
@@ -87,7 +88,7 @@ export function useUpload(config: UseUploadConfig): UploadState {
     const payload = (await response.json()) as { data?: { imageKey?: string } };
     const key = payload.data?.imageKey;
     if (!key) {
-      setError('O servidor aceitou a imagem mas não devolveu a chave. Tente de novo.');
+      setError(messagesOf(config.maxBytes, config.messages).missing_key);
       return null;
     }
     return key;
@@ -103,14 +104,14 @@ export function useUpload(config: UseUploadConfig): UploadState {
       const upright =
         options.optimize === false ? file : await optimizeImage(file, config.profile);
 
-      const upfront = rejectFileUpfront(upright, config.maxBytes);
+      const upfront = rejectFileUpfront(upright, config.maxBytes, config.messages);
       if (upfront) {
         setError(upfront);
         return null;
       }
       return await send(upright);
     } catch {
-      setError('Falha ao enviar a imagem. Tente de novo em instantes.');
+      setError(messagesOf(config.maxBytes, config.messages).upload_failed);
       return null;
     } finally {
       setUploading(false);

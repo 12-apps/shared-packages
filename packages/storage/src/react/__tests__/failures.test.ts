@@ -53,6 +53,50 @@ describe('rejectFileUpfront', () => {
   it('catches a zero-byte pick before it is uploaded and 413ed', () => {
     expect(rejectFileUpfront(file('image/png', 0), MAX)).toContain('vazio');
   });
+
+  /**
+   * Every sentence above used to be a LITERAL inside this function — not a
+   * default a host could override, but copy a host could not reach at all,
+   * inside a package that documents (see `failures.ts`) that "every sentence
+   * here reaches a store owner, so it is product copy". A host that overrode
+   * `file_too_large` for the server's 413 found its own words replaced two
+   * lines later by ours, for the same refusal caught in the browser.
+   *
+   * These cases pin the seam rather than the wording: an adopter's sentence
+   * has to come out, in each of the four upfront refusals, including the two
+   * that carry a fact.
+   */
+  it('lets a host state every upfront refusal in its own words', () => {
+    const own = {
+      empty_file: 'Esse arquivo está vazio.',
+      file_too_large_upfront: ({ size, limit }: { size: string; limit: string }) =>
+        `${size} passa do teto de ${limit}.`,
+      unknown_content_type: 'Não deu para saber o tipo desse arquivo.',
+      unsupported_content_type_upfront: ({ contentType }: { contentType: string }) =>
+        `Não aceitamos ${contentType} por aqui.`,
+    };
+
+    expect(rejectFileUpfront(file('image/png', 0), MAX, own)).toBe('Esse arquivo está vazio.');
+    expect(rejectFileUpfront(file('image/png', 12 * 1024 * 1024), MAX, own)).toBe(
+      '12 MB passa do teto de 8 MB.',
+    );
+    expect(rejectFileUpfront(file('', 1024), MAX, own)).toBe(
+      'Não deu para saber o tipo desse arquivo.',
+    );
+    expect(rejectFileUpfront(file('application/pdf', 1024), MAX, own)).toBe(
+      'Não aceitamos application/pdf por aqui.',
+    );
+  });
+
+  it('still answers with its own copy for the refusals a host did not restate', () => {
+    // A partial override is the ordinary case, and the seam must not require
+    // an adopter to restate sentences it is happy with.
+    const partial = { empty_file: 'Vazio.' };
+    expect(rejectFileUpfront(file('image/png', 0), MAX, partial)).toBe('Vazio.');
+    expect(rejectFileUpfront(file('application/pdf', 1024), MAX, partial)).toContain(
+      'application/pdf',
+    );
+  });
 });
 
 describe('uploadFailure', () => {
