@@ -126,6 +126,36 @@ function toggleGate(
 }
 
 /**
+ * The three sentences the header can be saying, chosen once.
+ *
+ * Proven-but-off is its OWN state. "Não está recebendo" is true of a store that
+ * never finished setup AND of one that finished and paused, and those are
+ * opposite situations: the first is a step outstanding, the second a decision
+ * the owner made and can undo in one click.
+ */
+function headline(io: { enabled: boolean; paused: boolean; lockedOff: boolean; hint: string }) {
+  if (io.enabled) {
+    return {
+      state: 'Recebendo vendas',
+      sub: 'Sua loja está recebendo por este provedor.',
+      tone: T.ok,
+    };
+  }
+  if (io.paused) {
+    return {
+      state: 'Pausado',
+      sub: 'Conexão pronta e pausada por você — nenhum pedido novo é cobrado aqui.',
+      tone: T.warn,
+    };
+  }
+  return {
+    state: 'Ainda não está recebendo',
+    sub: io.lockedOff ? io.hint : 'Tudo pronto — ligue a chave para começar a receber.',
+    tone: T.ink3,
+  };
+}
+
+/**
  * Status chip + the "recebendo vendas" switch, hoisted OUT of the credential
  * form.
  *
@@ -158,13 +188,9 @@ export function ProviderStatusBar({
   const { lockedOff, hint } = toggleGate(descriptor, config, enabled);
   const badge = statusBadge(config, descriptor);
 
-  // Proven-but-off is its OWN word. "Não está recebendo" is true of a store
-  // that has not finished setup and of one that finished and paused, and those
-  // are opposite situations: the first is a step outstanding, the second is a
-  // decision the owner made and can undo in one click.
   const proven = Boolean(config?.chargeVerifiedAt);
   const paused = proven && !enabled;
-  const state = enabled ? 'Recebendo vendas' : paused ? 'Pausado' : 'Ainda não está recebendo';
+  const { state, sub, tone } = headline({ enabled, paused, lockedOff, hint });
 
   return (
     <Stack direction="row" alignItems="flex-start" gap="14px" flexWrap="wrap">
@@ -198,13 +224,7 @@ export function ProviderStatusBar({
           sx={{ fontSize: '12.5px', color: T.ink3, mt: '5px', maxWidth: '52ch', lineHeight: 1.5 }}
           data-testid="payments-enable-hint"
         >
-          {paused
-            ? 'Conexão pronta e pausada por você — nenhum pedido novo é cobrado aqui.'
-            : enabled
-              ? 'Sua loja está recebendo por este provedor.'
-              : lockedOff
-                ? hint
-                : 'Tudo pronto — ligue a chave para começar a receber.'}
+          {sub}
         </Typography>
       </Box>
       {/* The switch belongs at the far edge: it is the one control here that
@@ -222,13 +242,7 @@ export function ProviderStatusBar({
             />
           </span>
         </Tooltip>
-        <Typography
-          sx={{
-            fontSize: '12.5px',
-            fontWeight: enabled || paused ? 600 : 400,
-            color: enabled ? T.ok : paused ? T.warn : T.ink3,
-          }}
-        >
+        <Typography sx={{ fontSize: '12.5px', fontWeight: tone === T.ink3 ? 400 : 600, color: tone }}>
           {state}
         </Typography>
       </Stack>

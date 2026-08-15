@@ -13,22 +13,16 @@ import type {
 import type { PaymentsSettingsClient } from '../client';
 
 import { ConfirmCredentialSave, type PendingSave } from './ConfirmCredentialSave';
+import { CredentialFields } from './CredentialFieldStack';
 import { isConnected } from './connection-state';
-import { CredentialField, DoneRow } from './CredentialFields';
+import { DoneRow } from './CredentialFields';
 import {
   credentialsComplete,
   fieldsWellFormed,
   needsConfirmation,
-  saveLabel,
   summaryOf,
 } from './credential-rules';
-import {
-  FormActions,
-  ProbeAlert,
-  ProbeChecklist,
-  ReverifyWarning,
-  type VerifyProbe,
-} from './CredentialFormAlerts';
+import { ProbeAlert, ProbeChecklist, type VerifyProbe } from './CredentialFormAlerts';
 
 /**
  * The `authMode: 'credentials'` half of the settings page — a provider whose
@@ -189,6 +183,19 @@ function useRetireOnEnvironmentChange(
   }, [environment, onEditingChange, setProbe, setValues]);
 }
 
+/**
+ * The form's memory and its two writes.
+ *
+ * `nothingEdited` guards the save because saving an untouched form is not a
+ * free no-op: `saveCredentials` resets the connection to UNVERIFIED, drops the
+ * proof and switches the provider OFF. `complete` answers whether there is
+ * enough on record for the probe to be worth running — see
+ * `credentialsComplete`, which skips the advanced fields an ordinary store must
+ * leave empty.
+ */
+/** Everything `CredentialFields` needs, without importing the hook itself. */
+export type CredentialFormState = ReturnType<typeof useCredentialForm>;
+
 function useCredentialForm(props: ProviderFormProps) {
   const {
     descriptor,
@@ -248,11 +255,8 @@ function useCredentialForm(props: ProviderFormProps) {
     busy,
     error,
     masked: config?.environments[environment] ?? {},
-    // Saving an untouched form is not a free no-op: `saveCredentials` resets
-    // the connection to UNVERIFIED, drops the proof and switches it OFF.
     nothingEdited: Object.keys(values).length === 0,
     valid: fieldsWellFormed(descriptor, values),
-    // Every field either on record or in the box — see `credentialsComplete`.
     complete: credentialsComplete(descriptor, config, environment, values),
     summary: summaryOf(descriptor, config, environment),
     edit: (spec: string, value: string) => {
@@ -308,50 +312,6 @@ function collapsedSummary(
 }
 
 
-/**
- * The live inputs for the step still owed, plus the one button that commits
- * them — and, on a store that has already proved it can receive, the warning
- * that saving will undo that.
- *
- * Its own component so `ProviderForm` stays about WHICH of the two shapes is on
- * screen (the collapsed row, or this) rather than about what each contains.
- */
-function CredentialFields({
-  descriptor,
-  form,
-  proven,
-}: {
-  descriptor: ProviderDescriptor;
-  form: ReturnType<typeof useCredentialForm>;
-  /** A real charge has landed through this connection — see `ReverifyWarning`. */
-  proven: boolean;
-}) {
-  return (
-    <Stack spacing={2}>
-      {proven ? <ReverifyWarning /> : null}
-      {descriptor.credentialSchema.map((spec) => (
-        <CredentialField
-          key={spec.key}
-          spec={spec}
-          state={form.masked[spec.key]}
-          value={form.values[spec.key]}
-          // The probe's own verdict for THIS credential, keyed by the same
-          // field id the adapter checked. Shown at the box rather than in a
-          // list below the form, where the owner had to match four sentences
-          // to four boxes by eye.
-          check={form.probe?.checks?.find((entry) => entry.key === spec.key)}
-          onChange={(value) => form.edit(spec.key, value)}
-        />
-      ))}
-      <FormActions
-        busy={form.busy}
-        label={saveLabel(descriptor, form.complete)}
-        disabled={form.nothingEdited || !form.valid}
-        onSave={form.requestSave}
-      />
-    </Stack>
-  );
-}
 
 /** Verdict keys that name no field, so they have no box to be shown at. */
 function unkeyed(descriptor: ProviderDescriptor): (key: string) => boolean {

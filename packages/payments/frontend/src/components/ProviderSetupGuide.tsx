@@ -134,6 +134,21 @@ const BUTTON_SX = { textTransform: 'none' } as const;
 
 type StepActions = ProviderSetupGuideProps['actions'];
 
+/** A step's sentence, with the provider's own reference inline after it. */
+function StepText({ text, link }: { text?: string; link?: SetupStep['link'] }) {
+  if (!text) return null;
+  return (
+    <Typography sx={{ fontSize: '13px', color: T.ink2, lineHeight: 1.5 }}>
+      {richText(text)}{' '}
+      {link ? (
+        <Link href={link.url} target="_blank" rel="noreferrer">
+          {link.label}
+        </Link>
+      ) : null}
+    </Typography>
+  );
+}
+
 /**
  * The panel's action bar: what this step is asking, and the button that answers.
  *
@@ -197,16 +212,7 @@ function StepRow({ step, actions }: StepRowProps) {
       sx={{ border: `1px solid ${T.line}`, borderRadius: '9px', px: '14px', py: '12px' }}
     >
       <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
-        {step.text ? (
-          <Typography sx={{ fontSize: '13px', color: T.ink2, lineHeight: 1.5 }}>
-            {richText(step.text)}{' '}
-            {step.link ? (
-              <Link href={step.link.url} target="_blank" rel="noreferrer">
-                {step.link.label}
-              </Link>
-            ) : null}
-          </Typography>
-        ) : null}
+        <StepText text={step.text} link={step.link} />
       {action ? (
         <Box>
           <Button variant="contained" size="small" sx={BUTTON_SX} onClick={() => void action.run()}>

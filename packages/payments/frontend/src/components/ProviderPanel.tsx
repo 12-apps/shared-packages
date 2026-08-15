@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Box, Button, Paper, Stack } from '@mui/material';
+import { Box, Paper, Stack } from '@mui/material';
 import { useCallback, useState, type ReactNode } from 'react';
 
 import type {
@@ -10,10 +10,9 @@ import type {
 } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
-import { ConnectionProbe } from './ConnectionProbe';
-import { CARD_SX, LINKISH_SX } from './panel-tokens';
+import { CARD_SX } from './panel-tokens';
+import { OAuthPanel } from './OAuthPanel';
 import { EnvironmentNotice, EnvironmentSelector } from './EnvironmentTabs';
-import { ProviderConnection } from './ProviderConnection';
 import { ProviderForm } from './ProviderCredentialForm';
 import { ProviderStatusBar } from './ProviderStatusBar';
 
@@ -139,7 +138,7 @@ function EnableBar({ descriptor, config, client, onChanged, reload }: ActivePane
  * container, so the header and the body carry the padding and the band between
  * them carries none.
  */
-function ProviderCard({
+export function ProviderCard({
   header,
   band,
   children,
@@ -204,22 +203,37 @@ function oauthWalkthrough(props: ActivePanelProps, path: 'oauth' | 'credentials'
   });
 }
 
+/**
+ * One provider's screen, assembled.
+ *
+ * Three pieces of state live HERE rather than in the form, and each for a
+ * reason the form cannot see:
+ *
+ *  - `environment` frames everything below it, so the panel puts the switch at
+ *    the top instead of halfway down the form's own column.
+ *  - `editing` decides more than the form: reopening step 1 must also take step
+ *    3 off the screen. A card offering to charge under a heading about typing a
+ *    credential is two steps at once, and the one that costs money is the one
+ *    nobody asked for.
+ *  - `storedHere` answers for the environment ON SCREEN. The activation step
+ *    charges through those credentials, and shown on a tab holding none it
+ *    offers to charge an account that is not there — on the screen whose whole
+ *    subject is which account receives the money. `config.environment` is the
+ *    ACTIVE one and cannot answer it; the fields can.
+ *
+ * On the connect branch the walkthrough leaves the form (see `guide`) and the
+ * form stands alone inside the manual disclosure, so `walkthrough` is passed as
+ * a FUNCTION: which steps to show depends on the disclosure, whose state lives
+ * in `OAuthPanel`.
+ */
 export function ActivePanel(props: ActivePanelProps) {
   const { descriptor, config, client, onChanged, reload, guide, verification } = props;
   const statusBar = <EnableBar {...props} />;
-  // The environment frames everything below it, so the PANEL owns the choice
-  // and puts the tabs at the top — not the form, halfway down its own column.
   const [environment, setEnvironment] = useState<PaymentEnvironment>(
     config?.environment ?? 'SANDBOX',
   );
-  // Lifted out of the form because it decides more than the form: reopening
-  // step 1 must also take step 3 off the screen. A card offering to charge
-  // R$ 1,01 under a heading about typing your InfiniteTag is two steps at once,
-  // and the one that costs money is the one you did not ask for.
   const [editing, setEditing] = useState(false);
 
-  // On the connect branch the walkthrough leaves the form (see the `guide`
-  // prop): the form then stands alone inside the manual disclosure.
   const oauthConnect = oauthWithConnect(props);
 
   const credentials = (
@@ -238,18 +252,12 @@ export function ActivePanel(props: ActivePanelProps) {
   );
 
   const selector = <EnvironmentSelector environment={environment} onChange={setEnvironment} />;
-  const band = <EnvironmentNotice environment={environment} active={config?.environment ?? null} />;
-  // The same notice, inset: on the OAuth path it is stacked inside the manual
-  // disclosure rather than spanning the card. See `EnvironmentNotice`'s `band`.
-  const notice = (
-    <EnvironmentNotice environment={environment} active={config?.environment ?? null} band={false} />
-  );
+  // Full-bleed across the card, and the same notice inset for the manual
+  // disclosure, where it no longer spans anything. See `EnvironmentNotice`.
+  const active = config?.environment ?? null;
+  const band = <EnvironmentNotice environment={environment} active={active} />;
+  const notice = <EnvironmentNotice environment={environment} active={active} band={false} />;
 
-  // The activation step charges through the credentials of the environment it
-  // is under. Shown on a tab that stores none, it offers to charge an account
-  // that is not there — on the screen whose entire subject is which account
-  // receives the store's money. `config.environment` is the ACTIVE one, so it
-  // cannot answer this; the fields on screen can.
   const storedHere = requiredStored(descriptor, config, environment);
 
   if (descriptor.authMode !== 'oauth') {
@@ -273,23 +281,11 @@ export function ActivePanel(props: ActivePanelProps) {
     <OAuthPanel
       {...props}
       statusBar={statusBar}
-      // A function, not a node: which steps to show depends on the disclosure,
-      // and that state lives in `OAuthPanel`.
-      walkthrough={(path) => oauthWalkthrough(props, path)}
+      walkthrough={(path: 'oauth' | 'credentials') => oauthWalkthrough(props, path)}
       form={
         <Stack spacing={2}>
           {selector}
           {notice}
-          {/*
-            The credentials path's OWN stepper and step card, inside the
-            disclosure with the fields they describe.
-
-            Each path is one block: a way in, the steps for it, and the boxes or
-            button it needs. One stepper shared between them could only ever
-            describe one of the two, and it described the wrong one the moment
-            the owner opened this form — "Conectar conta" over four key fields,
-            with a step 1 pointing at a button the panel had just removed.
-          */}
           {oauthWalkthrough(props, 'credentials')}
           {credentials}
         </Stack>
@@ -298,156 +294,4 @@ export function ActivePanel(props: ActivePanelProps) {
   );
 }
 
-/**
- * The collapsed row that moves the owner between the two connection paths.
- *
- * Both directions get one, and they are the same control: the row on screen
- * always names the path you are NOT on. Only the manual leg carries content —
- * the OAuth leg's "content" is the connect card, which belongs above the
- * walkthrough rather than nested inside a disclosure — so `children` is
- * optional and an empty one renders as a bare, clickable row.
- */
-function PathSwitch({
-  label,
-  expanded,
-  onChange,
-  testId,
-  children,
-}: {
-  label: string;
-  expanded: boolean;
-  onChange: (expanded: boolean) => void;
-  testId: string;
-  children?: ReactNode;
-}) {
-  // Open, this is not a disclosure any more — it IS the path, and dressing a
-  // whole block (its own stepper, environment switch, fields and action bar) in
-  // a collapsible chrome adds a frame around a frame. So the content renders
-  // bare and only the CLOSED state is a control: one quiet line offering the
-  // other way in, which is all a path the owner is not on needs to be.
-  if (expanded) {
-    return (
-      <Box data-testid={testId} data-open="true">
-        {children}
-      </Box>
-    );
-  }
-  return (
-    <Box data-testid={testId} sx={{ px: '20px', pb: '20px' }}>
-      <Button onClick={() => onChange(true)} sx={{ ...LINKISH_SX, fontSize: '12.5px' }}>
-        {label}
-      </Button>
-    </Box>
-  );
-}
 
-/**
- * The OAuth path: a connect button as the happy path, with the credential form
- * kept behind a disclosure.
- *
- * That fallback is not decoration — stores connected before Connect existed
- * still hold a pasted token, and a deployment with no registered provider
- * application has no working connect button at all. Hiding the form outright
- * would strand both.
- */
-function OAuthPanel({
-  descriptor,
-  config,
-  client,
-  reload,
-  prepareConnect,
-  verification,
-  statusBar,
-  walkthrough,
-  form,
-}: ActivePanelProps & {
-  statusBar: ReactNode;
-  walkthrough: (path: 'oauth' | 'credentials') => ReactNode;
-  form: ReactNode;
-}) {
-  // Which path the owner is on. The disclosure is no longer just a container —
-  // opening it CHOOSES the credentials path, so the panel has to know.
-  const [manual, setManual] = useState(false);
-  // The connection probe, for a store whose connection is a grant: the form's
-  // own probe runs off Salvar, which an OAuth store never presses (FUT-691).
-  const probe = (
-    <ConnectionProbe descriptor={descriptor} config={config} client={client} reload={reload} />
-  );
-  if (!prepareConnect) {
-    return (
-      <ProviderCard header={statusBar}>
-        <Alert severity="info">
-          Este provedor conecta por autorização, mas o botão de conexão não está disponível nesta
-          instalação. Você ainda pode conectar informando as credenciais manualmente.
-        </Alert>
-        {form}
-        {probe}
-        {verification}
-      </ProviderCard>
-    );
-  }
-
-  return (
-    <ProviderCard header={statusBar}>
-      {/*
-        The two connection paths are alternatives, so only one is on screen.
-
-        Opening "prefiro informar as credenciais manualmente" is the owner
-        SAYING which one they are on, and while the connect card stayed above
-        the open form the screen showed both at once — a card explaining that
-        no key needs copying, directly over four boxes asking for keys, with
-        "Reconectar" and "Desconectar" in between belonging to neither. Every
-        control on that card acts on the OAuth grant; on a store connecting by
-        hand there is no grant for them to act on.
-      */}
-      {manual ? (
-        <PathSwitch
-          label="Prefiro conectar por autorização"
-          expanded={false}
-          onChange={() => setManual(false)}
-          testId="payments-oauth-fallback"
-        />
-      ) : (
-        <ProviderConnection
-          descriptor={descriptor}
-          config={config}
-          client={client}
-          prepareConnect={prepareConnect}
-          onChanged={reload}
-        />
-      )}
-      {/*
-        Directly under the connect card, ABOVE the manual disclosure: this is
-        the step that actually turns the store on, and an owner who just
-        authorized has no reason to open "prefiro informar as credenciais
-        manualmente" to find it.
-      */}
-      {verification}
-      {/*
-        The provider's walkthrough, OUTSIDE the disclosure: it used to live
-        inside the credential form, which on this branch is folded into the
-        manual fallback — so the guide (and the stepper answering "where am I")
-        was buried behind a label the connect card says there is no reason to
-        open (FUT-691).
-
-        The step LIST depends on the path. Under authorization step 1 says to
-        press "Conectar com Stripe" above; with pasted keys that button is not
-        rendered, so the same sentence points at nothing. An adapter that ships
-        a `credentialsPath` variant gets its own steps here — one that does not
-        keeps the single guide on both paths, unchanged.
-      */}
-      {manual ? null : walkthrough('oauth')}
-      {probe}
-      {descriptor.credentialSchema.length > 0 ? (
-        <PathSwitch
-          label="Prefiro informar as credenciais manualmente"
-          expanded={manual}
-          onChange={setManual}
-          testId="payments-manual-fallback"
-        >
-          {form}
-        </PathSwitch>
-      ) : null}
-    </ProviderCard>
-  );
-}

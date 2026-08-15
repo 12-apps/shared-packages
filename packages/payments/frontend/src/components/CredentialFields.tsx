@@ -149,6 +149,18 @@ function fieldSx(status?: 'PASS' | 'FAIL' | 'UNCHECKED') {
   } as const;
 }
 
+/**
+ * How each verdict reads under its box. `UNCHECKED` deliberately carries no
+ * mark: a tick would claim it passed and a cross would blame the owner, when
+ * the truth is that nothing could be established either way.
+ */
+const VERDICT = {
+  PASS: { mark: '✓', color: T.ok },
+  FAIL: { mark: '✕', color: T.bad },
+  UNCHECKED: { mark: '', color: T.ink3 },
+  NONE: { mark: '', color: T.ink3 },
+} as const;
+
 /** The line under a box: the probe's verdict when there is one, else the hint. */
 function FieldNote({
   check,
@@ -161,23 +173,15 @@ function FieldNote({
 }) {
   const text = check?.message ?? fallback;
   if (!text) return null;
-  const failed = check?.status === 'FAIL';
-  const passed = check?.status === 'PASS';
+  const { mark, color } = VERDICT[check?.status ?? 'NONE'];
   return (
     <Stack direction="row" gap="6px" alignItems="flex-start" sx={{ mt: '5px' }} data-testid={testId}>
-      {check && check.status !== 'UNCHECKED' ? (
-        <Box component="span" aria-hidden sx={{ fontWeight: 800, color: failed ? T.bad : T.ok }}>
-          {failed ? '✕' : '✓'}
+      {mark ? (
+        <Box component="span" aria-hidden sx={{ fontWeight: 800, color }}>
+          {mark}
         </Box>
       ) : null}
-      <Typography
-        sx={{
-          fontSize: '11.5px',
-          lineHeight: 1.45,
-          color: failed ? T.bad : passed ? T.ok : T.ink3,
-          fontWeight: failed ? 500 : 400,
-        }}
-      >
+      <Typography sx={{ fontSize: '11.5px', lineHeight: 1.45, color, fontWeight: mark ? 500 : 400 }}>
         {text}
       </Typography>
     </Stack>
