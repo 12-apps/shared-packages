@@ -43,6 +43,26 @@ import {
 /** Default lifetime of the signed handoff cookie: one OAuth round trip. */
 const DEFAULT_COOKIE_TTL_MS = 10 * 60 * 1000;
 
+/**
+ * The host's error reporter, bound to THIS descriptor — or nothing, when it wired
+ * none.
+ *
+ * Bound here rather than read inside `foldApiError` so a report can name the
+ * endpoint that failed without the fold having to know anything about routes.
+ * Both descriptors take one: `resolveActor` and `isCurrent` can fail as
+ * completely as `record` can, and a 500 on the READ is what leaves a caller
+ * unable to find out they are stale.
+ */
+function reporterFor(
+  config: AppShellServerConfig,
+  method: AppShellRoute['method'],
+  path: string,
+): ((error: unknown) => void) | undefined {
+  const report = config.onUnexpectedError;
+  if (!report) return undefined;
+  return (error: unknown) => report(error, { method, path });
+}
+
 function statusRoute(config: AppShellServerConfig): AppShellRoute {
   return {
     method: 'GET',
@@ -56,7 +76,11 @@ function statusRoute(config: AppShellServerConfig): AppShellRoute {
         const current = await config.consent.isCurrent(actor, version);
         return ok({ stale: !current, version } satisfies ConsentStatus);
       } catch (error) {
-        return foldApiError(error, messagesOf(config));
+        return foldApiError(
+          error,
+          messagesOf(config),
+          reporterFor(config, 'GET', CONSENT_STATUS_PATH),
+        );
       }
     },
   };
@@ -113,7 +137,11 @@ function acceptRoute(config: AppShellServerConfig): AppShellRoute {
         }
         return noContent(handoffCookie(config));
       } catch (error) {
-        return foldApiError(error, messagesOf(config));
+        return foldApiError(
+          error,
+          messagesOf(config),
+          reporterFor(config, 'POST', CONSENT_ACCEPT_PATH),
+        );
       }
     },
   };
