@@ -14,7 +14,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import type {
   ConnectedOAuthAccount,
@@ -25,7 +25,15 @@ import type {
 
 import type { PaymentsSettingsClient } from '../client';
 import { expiryProximity, isConnected } from './connection-state';
-import { BAR_MSG_SX, BAR_SX, BTN_PRIMARY_SX, BTN_QUIET_DANGER_SX } from './panel-tokens';
+import {
+  BAR_MSG_SX,
+  BAR_SX,
+  BTN_PRIMARY_SX,
+  BTN_QUIET_DANGER_SX,
+  BTN_SECONDARY_SX,
+  LINKISH_SX,
+  T,
+} from './panel-tokens';
 
 /**
  * The `authMode: 'oauth'` half of the settings page: a provider whose
@@ -247,34 +255,84 @@ function DisconnectDialog(props: {
   open: boolean;
   displayName: string;
   busy: boolean;
+  /** The store is live on this provider — removing it stops checkout NOW. */
+  receiving: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  /** The softer path: keep the connection, stop taking orders through it. */
+  onPauseInstead?: () => void;
 }) {
+  const { displayName, receiving } = props;
   return (
     <Dialog open={props.open} onClose={props.onCancel} data-testid="payments-disconnect-confirm">
-      <DialogTitle>Desconectar {props.displayName}?</DialogTitle>
-      <DialogContent>
-        <DialogContentText>
-          A autorização será revogada no {props.displayName} e sua loja deixa de conseguir cobrar
-          imediatamente. Para voltar a receber, será necessário conectar a conta novamente
-          autorizando o acesso no site do provedor.
+      <DialogTitle sx={{ fontSize: '16.5px', fontWeight: 700, letterSpacing: '-.01em', pb: '8px' }}>
+        Remover a conexão com {displayName}?
+      </DialogTitle>
+      <DialogContent sx={{ pb: '4px' }}>
+        <DialogContentText sx={{ fontSize: '13px', color: T.ink2, lineHeight: 1.55 }}>
+          {receiving
+            ? 'A loja para de receber na hora e fica sem provedor ativo — pedidos novos não conseguem ser pagos até você conectar outro.'
+            : 'Esta conexão sai da loja. Você pode conectar de novo depois.'}
         </DialogContentText>
+        {/* The consequences, itemised. A single paragraph makes the reversible
+            facts and the irreversible one weigh the same, and the one that
+            costs money is the one an owner skims past. */}
+        <Stack component="ul" spacing={1} sx={{ listStyle: 'none', m: 0, mt: '14px', p: 0 }}>
+          {receiving ? (
+            <Consequence tone="bad">Pedidos novos deixam de ser cobrados imediatamente.</Consequence>
+          ) : null}
+          <Consequence>
+            {`A autorização é revogada no ${displayName}. Sua conta e seu histórico continuam lá, intactos.`}
+          </Consequence>
+          <Consequence>
+            {`Pagamentos já aprovados e estornos em andamento seguem normalmente pelo ${displayName}.`}
+          </Consequence>
+          <Consequence>Para reconectar, os passos recomeçam do zero.</Consequence>
+        </Stack>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={props.onCancel} disabled={props.busy}>
-          Cancelar
-        </Button>
+      <DialogActions sx={{ display: 'flex', flexDirection: 'column', gap: '8px', p: '18px 22px 20px' }}>
+        {/* Offered FIRST, and only when it is a real alternative. An owner who
+            came here to stop taking orders wants the switch, not the removal —
+            and reaching for the destructive control is how they got here. */}
+        {receiving && props.onPauseInstead ? (
+          <Button
+            fullWidth
+            onClick={props.onPauseInstead}
+            disabled={props.busy}
+            sx={BTN_SECONDARY_SX}
+            data-testid="payments-pause-instead"
+          >
+            Só pausar o recebimento
+          </Button>
+        ) : null}
         <Button
-          color="error"
+          fullWidth
           variant="contained"
+          disableElevation
           onClick={props.onConfirm}
           disabled={props.busy}
           data-testid="payments-disconnect-confirm-action"
+          sx={{ ...BTN_PRIMARY_SX, background: T.bad, '&:hover': { background: '#a51f1f' } }}
         >
-          {props.busy ? <CircularProgress size={18} /> : 'Desconectar'}
+          {props.busy ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Remover conexão'}
+        </Button>
+        <Button fullWidth onClick={props.onCancel} disabled={props.busy} sx={LINKISH_SX}>
+          Cancelar
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+/** One consequence of removing the connection, marked by how much it costs. */
+function Consequence({ children, tone }: { children: ReactNode; tone?: 'bad' }) {
+  return (
+    <Stack component="li" direction="row" gap="9px">
+      <Box component="span" aria-hidden sx={{ fontWeight: 800, color: tone ? T.bad : T.ink4 }}>
+        {tone ? '✕' : '·'}
+      </Box>
+      <Typography sx={{ fontSize: '12.5px', color: T.ink2, lineHeight: 1.5 }}>{children}</Typography>
+    </Stack>
   );
 }
 
@@ -393,6 +451,15 @@ export function ProviderConnection(props: ProviderConnectionProps) {
         open={confirmingDisconnect}
         displayName={descriptor.displayName}
         busy={busy === 'disconnect'}
+        // Live on this provider: removing it stops checkout, and pausing is a
+        // real alternative rather than a lesser version of the same thing.
+        receiving={config?.enabled === true}
+        onPauseInstead={() =>
+          void run('pause', async () => {
+            await client.setEnabled(descriptor.name, false);
+            setConfirmingDisconnect(false);
+          })
+        }
         onCancel={() => setConfirmingDisconnect(false)}
         onConfirm={() =>
           void run('disconnect', async () => {

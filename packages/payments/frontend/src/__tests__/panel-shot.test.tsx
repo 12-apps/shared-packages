@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -32,11 +32,11 @@ function descriptorOf(): ProviderDescriptor {
   } as unknown as ProviderDescriptor;
 }
 
-function renderPanel() {
+function renderPanel(enabled = false) {
   const config = {
     provider: 'stripe',
     status: 'VERIFIED',
-    enabled: false,
+    enabled,
     chargeVerifiedAt: null,
     environment: 'SANDBOX',
     environments: { SANDBOX: { secretKey: { configured: true, hint: '••••42' } }, PRODUCTION: {} },
@@ -57,8 +57,9 @@ function renderPanel() {
     } as unknown as MerchantSettingsView),
     getSetupGuide: vi.fn().mockResolvedValue(guide),
     verify: vi.fn(),
-    setEnabled: vi.fn(),
+    setEnabled: vi.fn().mockResolvedValue(config),
     saveCredentials: vi.fn(),
+    disconnectOAuth: vi.fn(),
   } as unknown as PaymentsSettingsClient;
 
   render(
@@ -68,6 +69,7 @@ function renderPanel() {
       prepareConnect={async () => ({ state: 's', redirectUri: 'https://h.test/cb' })}
     />,
   );
+  return client;
 }
 
 describe('the redesigned provider panel', () => {
@@ -94,5 +96,33 @@ describe('the redesigned provider panel', () => {
     await screen.findByTestId('payments-status');
     expect(screen.getByTestId('payments-status').textContent).toBe('CONEXÃO OK');
     expect(screen.getByText('Ainda não está recebendo')).toBeTruthy();
+  });
+
+  /**
+   * The owner who reaches for "remover" while live usually wants to STOP
+   * TAKING ORDERS, which is a switch — not a revocation that also costs them
+   * the reconnection. Offering it inside the dialog is the only place the two
+   * are ever weighed against each other.
+   */
+  it('offers pausing instead of removing, but only while the store is live', async () => {
+    const client = renderPanel(true);
+
+    fireEvent.click(await screen.findByTestId('payments-disconnect'));
+    const pause = await screen.findByTestId('payments-pause-instead');
+    fireEvent.click(pause);
+
+    await waitFor(() => {
+      expect(client.setEnabled).toHaveBeenCalledWith('stripe', false);
+    });
+    // …and the grant is untouched: pausing is not a quieter disconnect.
+    expect(client.disconnectOAuth).not.toHaveBeenCalled();
+  });
+
+  it('does not offer pausing when the store is not receiving anyway', async () => {
+    renderPanel(false);
+
+    fireEvent.click(await screen.findByTestId('payments-disconnect'));
+    await screen.findByTestId('payments-disconnect-confirm');
+    expect(screen.queryByTestId('payments-pause-instead')).toBeNull();
   });
 });
