@@ -170,6 +170,38 @@ export interface AppThemeOptions {
 }
 
 /**
+ * The palette half, resolved: host tokens or the platform's, host surface or the
+ * default, and the tenant seed corrected against whichever surface applies.
+ *
+ * Its own function because the theme now has two halves and only one of them is
+ * this. Keeping them together also put `createAppTheme` over the complexity
+ * ceiling — every `?.` and `??` here counts, and there are six.
+ */
+function themePalette(
+  mode: ThemeMode,
+  options: AppThemeOptions,
+): {
+  mode: ThemeMode;
+  primary: { main: string; light?: string };
+  secondary: { main: string; light?: string };
+  success: { main: string };
+  warning: { main: string };
+  error: { main: string };
+  info: { main: string };
+} {
+  const tokens = options.tokens?.[mode] ?? DEFAULT_THEME_TOKENS[mode];
+  const surface = options.surface?.[mode] ?? DEFAULT_SURFACES[mode];
+  const { override } = options;
+
+  return {
+    mode,
+    primary: brandRole(override?.primary, tokens.primary, surface),
+    secondary: brandRole(override?.secondary, tokens.secondary, surface),
+    ...semantics(override?.primary),
+  };
+}
+
+/**
  * Build an MUI theme for the given mode using the shared design tokens.
  *
  * `override` lets a white-labelled host swap the palette while keeping every other
@@ -181,17 +213,8 @@ export interface AppThemeOptions {
  * {@link AppThemeOptions.components}.
  */
 export function createAppTheme(mode: ThemeMode = 'light', options: AppThemeOptions = {}): Theme {
-  const tokens = options.tokens?.[mode] ?? DEFAULT_THEME_TOKENS[mode];
-  const surface = options.surface?.[mode] ?? DEFAULT_SURFACES[mode];
-  const { override } = options;
-
   return createTheme({
-    palette: {
-      mode,
-      primary: brandRole(override?.primary, tokens.primary, surface),
-      secondary: brandRole(override?.secondary, tokens.secondary, surface),
-      ...semantics(override?.primary),
-    },
+    palette: themePalette(mode, options),
     // Omitted entirely rather than passed as `undefined`: MUI treats an explicit
     // `components: undefined` the same as absent today, but the spread keeps the
     // built options identical to what a host that passed nothing used to get.
