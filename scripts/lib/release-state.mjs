@@ -85,23 +85,65 @@ function registryVersions(name) {
 }
 
 /**
- * Split every package into the three states that matter to a release.
+ * Split every package into the four states that matter to a release.
  *
  * `orphans` are tagged for a version npm does not have — the stuck ones.
+ * `untagged` are the MIRROR of an orphan: on the registry, with no tag at all.
  * `unpublished` are not on the registry at all — a first publish, not a fault.
  * `healthy` is everything whose newest tag is on the registry.
+ *
+ * ## Why `untagged` is a state and not just "no tag yet"
+ *
+ * This function used to `continue` past any package without a tag, which reads
+ * as obviously safe — a package nobody has tagged cannot have a stale tag. It
+ * is safe only while the registry has never seen the name. Once a version IS
+ * published and no tag records it, semantic-release has no floor to count from:
+ * it treats the next release as the package's FIRST, re-cuts the version that
+ * is already on the registry, and `scripts/publish.mjs` reports the upload as
+ * "skipped" because that version exists. Every step succeeds and the release is
+ * silently swallowed.
+ *
+ * That is the same ending as an orphaned tag, reached from the opposite side,
+ * with one difference that matters: an orphan turns the run RED, and this did
+ * not turn up anywhere at all — the `continue` above meant no caller could see
+ * it. `@12-apps/request-scope` sat in exactly this state after its bootstrap
+ * run published 1.0.0 with a token and then failed to tag it.
+ *
+ * The two states need OPPOSITE remedies, which is why they are separate keys
+ * rather than one "stuck" list: an orphan is fixed by DELETING its tag so the
+ * version re-cuts, and this is fixed by CREATING the missing one.
  */
 export function releaseState(dirs = publishDirs()) {
   const orphans = [];
+  const untagged = [];
   const unpublished = [];
   const healthy = [];
 
   for (const dir of dirs) {
     const { name } = manifest(dir);
-    const tag = newestTag(basename(dir));
-    if (!tag) continue;
-
+    const prefix = basename(dir);
+    const tag = newestTag(prefix);
     const versions = registryVersions(name);
+
+    if (!tag) {
+      // No tag is the NORMAL state for a name the registry has never seen —
+      // every package looks like this before its first release, and flagging
+      // those would fail the job on every genuinely new package. It is only a
+      // fault once a version exists to be recorded.
+      //
+      // `length > 0` is not belt-and-braces: a name CAN sit on the registry
+      // with no versions left (they were unpublished), and `null` is reserved
+      // for "npm has never heard of it", so that case arrives here as `[]`.
+      // Admitting it makes every consumer interpolate `newestPublished`'s null
+      // into a tag NAME — `verify-released` prints "create <prefix>-vnull" at a
+      // human and `release-alert` files it in an issue, which is defect #3's
+      // churn loop reached through the reader instead of the automation.
+      // Excluding it here fixes all three consumers at once and leaves
+      // `recover-orphans`' own null guard as defence in depth.
+      if (versions !== null && versions.length > 0) untagged.push({ name, prefix, versions });
+      continue;
+    }
+
     if (versions === null) {
       unpublished.push({ name, ...tag });
     } else if (versions.includes(tag.version)) {
@@ -111,7 +153,86 @@ export function releaseState(dirs = publishDirs()) {
     }
   }
 
-  return { orphans, unpublished, healthy };
+  return { orphans, untagged, unpublished, healthy };
+}
+
+/** `1.2.3-beta.4+build` → `{ nums: [1,2,3], pre: "beta.4" }`. Build metadata is ignored, as semver says. */
+function parseVersion(version) {
+  const withoutBuild = String(version).split("+")[0];
+  const dash = withoutBuild.indexOf("-");
+  const core = dash === -1 ? withoutBuild : withoutBuild.slice(0, dash);
+  const [major, minor, patch] = core.split(".");
+  return {
+    nums: [major, minor, patch].map((part) => Number.parseInt(part, 10) || 0),
+    pre: dash === -1 ? null : withoutBuild.slice(dash + 1),
+  };
+}
+
+/**
+ * Compare two dot-separated prerelease strings by semver's rules: numeric
+ * identifiers compare numerically, a numeric identifier is LOWER than an
+ * alphanumeric one, and when everything before matches, fewer fields is lower
+ * (`1.0.0-rc` < `1.0.0-rc.1`).
+ */
+function compareIdentifier(x, y) {
+  const xIsNum = /^\d+$/.test(x);
+  const yIsNum = /^\d+$/.test(y);
+  if (xIsNum && yIsNum) return Number(x) - Number(y);
+  // A numeric identifier always sorts below an alphanumeric one.
+  if (xIsNum !== yIsNum) return xIsNum ? -1 : 1;
+  if (x === y) return 0;
+  return x < y ? -1 : 1;
+}
+
+function comparePrerelease(a, b) {
+  const left = a.split(".");
+  const right = b.split(".");
+  for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
+    // Whichever ran out of fields first is the lower one.
+    if (left[i] === undefined) return -1;
+    if (right[i] === undefined) return 1;
+    const order = compareIdentifier(left[i], right[i]);
+    if (order !== 0) return order;
+  }
+  return 0;
+}
+
+/** Semver ordering. Negative when `a` precedes `b`. */
+function compareVersions(a, b) {
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+  for (let i = 0; i < 3; i += 1) {
+    if (left.nums[i] !== right.nums[i]) return left.nums[i] - right.nums[i];
+  }
+  // A version WITH a prerelease precedes the same version without one. This is
+  // the clause a lexical or numeric-collation sort gets backwards, and getting
+  // it backwards here is not cosmetic: the caller tags whatever this returns,
+  // so picking `1.0.0-beta.1` over `1.0.0` writes a floor BELOW a release
+  // already out — and the package then reads as healthy for ever while
+  // semantic-release re-cuts a published version. That is precisely the silent
+  // failure this whole module exists to detect.
+  if (left.pre === null && right.pre === null) return 0;
+  if (left.pre === null) return 1;
+  if (right.pre === null) return -1;
+  return comparePrerelease(left.pre, right.pre);
+}
+
+/**
+ * The newest version in a list, or `null` for an empty one.
+ *
+ * `npm view … versions` returns PUBLICATION order, which stops being version
+ * order the moment a patch lands on an older line after a newer minor — and it
+ * is not semver order at all where prereleases are involved.
+ *
+ * The `null` matters as much as the sort. A caller that tags this value builds
+ * a tag name by interpolation, so `undefined` from an empty list becomes a
+ * literal `<pkg>-vundefined` pushed to the remote — which the next run reads
+ * back as an orphan, deletes, and recreates, for ever. Returning `null` makes
+ * the empty case a decision the caller has to make rather than a string.
+ */
+export function newestPublished(versions) {
+  if (!Array.isArray(versions) || versions.length === 0) return null;
+  return [...versions].sort(compareVersions).at(-1);
 }
 
 /** The names a workflow step handed over through GITHUB_ENV, as a Set. */

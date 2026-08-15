@@ -105,6 +105,23 @@ if (DIRS.length === 0) throw new Error("PUBLISH_DIRS is empty — nothing to che
 const failures = [];
 const published = DIRS.map((dir) => attempt(dir, failures)).filter(Boolean);
 
+/**
+ * Tell the later steps which names THIS run put on the registry.
+ *
+ * A package bootstrapped here sits on the registry with no tag for as long as
+ * the rest of this job takes, which is the exact shape `verify-released.mjs`
+ * fails on. Left unsaid, adding a package turns the run that adds it red — and
+ * red for a state nobody can clear from that PR, because a tag only appears
+ * once a release cuts one. The recovery on the next push is what fixes it.
+ *
+ * GITHUB_ENV for the same reason `publish.mjs` uses it: the runner exports it to
+ * every later step whether this one passed or failed, which is exactly the
+ * lifetime wanted. Outside Actions it is unset and nothing changes.
+ */
+if (process.env.GITHUB_ENV && published.length > 0) {
+  appendFileSync(process.env.GITHUB_ENV, `FIRST_PUBLISHED=${published.join(" ")}\n`);
+}
+
 if (published.length > 0) reportPublished(published);
 else if (failures.length === 0) {
   console.log("every package is already on the registry — nothing to bootstrap");
