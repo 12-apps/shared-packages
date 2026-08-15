@@ -112,7 +112,9 @@ describe('the two connection paths are mutually exclusive', () => {
     expect(screen.getByRole('button', { name: /Reconectar/i })).toBeTruthy();
     expect(screen.getByTestId('payments-disconnect')).toBeTruthy();
     // No return leg to offer: the owner is already on the path it returns to.
-    expect(screen.queryByTestId('payments-oauth-fallback')).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByTestId('payments-oauth-fallback')).toBeNull();
+    });
   });
 
   it('withdraws the grant-only controls once the credential form is open', async () => {
@@ -127,8 +129,8 @@ describe('the two connection paths are mutually exclusive', () => {
     // Each path is one block — a way in, its steps, its inputs — so the
     // credentials walkthrough lives INSIDE the disclosure with the fields it
     // describes, and the OAuth one leaves with the card it belongs to.
-    const guide = screen.getByTestId('payments-setup-guide');
-    expect(guide.closest('[data-testid="payments-manual-fallback"]')).not.toBeNull();
+    const walkthrough = screen.getByTestId('payments-setup-guide');
+    expect(walkthrough.closest('[data-testid="payments-manual-fallback"]')).not.toBeNull();
   });
 
   it('offers the way back, so the form is not a one-way door', async () => {

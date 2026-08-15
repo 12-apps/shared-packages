@@ -279,13 +279,17 @@ describe('provider skeletons (stub mode)', () => {
         return section?.steps.some((step) => step.action === 'checkout-integrado-confirmado');
       });
 
-    let variants = 0;
-    for (const adapter of [stoneProvider(), infinitePayProvider(), stripeProvider()]) {
-      const guide = adapter.setupGuide?.(ctx);
-      const variant = guide?.credentialsPath;
-      if (!guide || !variant) continue;
-      variants += 1;
+    // Derived, not counted: a mutable tally inside the loop is shared state the
+    // flakiness gate refuses, and the pair is what each assertion needs anyway.
+    const pairs = [stoneProvider(), infinitePayProvider(), stripeProvider()]
+      .map((adapter) => adapter.setupGuide?.(ctx))
+      .filter((guide) => guide?.credentialsPath !== undefined)
+      .map((guide) => ({ guide: guide!, variant: guide!.credentialsPath! }));
 
+    // A silent zero-iteration loop proves nothing — stripe ships one today.
+    expect(pairs.length).toBeGreaterThan(0);
+
+    for (const { guide, variant } of pairs) {
       expect(variant.stages).toHaveLength(guide.stages.length);
       expect(confirmableIndex(variant)).toBe(confirmableIndex(guide));
       // And the variant is a guide in its own right: the two rules above hold
@@ -295,8 +299,6 @@ describe('provider skeletons (stub mode)', () => {
       expect(sectionIds.filter((id) => !stageIds.includes(id))).toEqual([]);
       expect(sectionIds).not.toContain(stageIds.at(-1));
     }
-    // A silent zero-iteration loop proves nothing — stripe ships one today.
-    expect(variants).toBeGreaterThan(0);
   });
 
   /**

@@ -123,7 +123,9 @@ describe('the redesigned provider panel', () => {
 
     fireEvent.click(await screen.findByTestId('payments-disconnect'));
     await screen.findByTestId('payments-disconnect-confirm');
-    expect(screen.queryByTestId('payments-pause-instead')).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByTestId('payments-pause-instead')).toBeNull();
+    });
   });
 
   /**

@@ -178,6 +178,37 @@ const oauth: NonNullable<PaymentProviderAdapter['oauth']> = {
   },
 };
 
+/**
+ * What a store types when it connects with its OWN keys.
+ *
+ * A module constant rather than an inline literal: it is data, it never varies
+ * per call, and inlining it pushed `stripeProvider` past the size gate — the
+ * adapter's shape is what that function is for, not four field descriptions.
+ */
+const CREDENTIAL_SCHEMA: PaymentProviderAdapter['credentialSchema'] = [
+      { key: 'secretKey', label: 'Secret key (sk_...)', secret: true, required: false, fulfilledBy: 'accessToken' },
+      { key: 'publishableKey', label: 'Publishable key (pk_...)', secret: false, required: false },
+      {
+        key: 'webhookSecret',
+        label: 'Webhook signing secret (whsec_...)',
+        secret: true,
+        required: false,
+        role: 'webhookSecret',
+      },
+      {
+        key: 'connectedAccountId',
+        label: 'Connected account (acct_...)',
+        secret: false,
+        required: false,
+        // Sends `Stripe-Account:` — only meaningful for a platform charging on
+        // behalf of an account it onboarded. A store using its own key must
+        // leave this empty; its own id here makes Stripe refuse every call.
+        advanced: true,
+        helperText:
+          'Deixe em branco. Só preencha se você é uma plataforma Connect cobrando em nome de outra conta — com as suas próprias chaves, este campo faz a Stripe recusar a conexão.',
+      },
+    ];
+
 export function stripeProvider(): PaymentProviderAdapter {
   return {
     name: NAME,
@@ -207,29 +238,7 @@ export function stripeProvider(): PaymentProviderAdapter {
     // key under `accessToken`, never `secretKey` (`apiKeyOf` says why the two
     // must not share a slot) — `fulfilledBy` is what keeps the masked view
     // reading that store as configured, not as empty fields (FUT-691).
-    credentialSchema: [
-      { key: 'secretKey', label: 'Secret key (sk_...)', secret: true, required: false, fulfilledBy: 'accessToken' },
-      { key: 'publishableKey', label: 'Publishable key (pk_...)', secret: false, required: false },
-      {
-        key: 'webhookSecret',
-        label: 'Webhook signing secret (whsec_...)',
-        secret: true,
-        required: false,
-        role: 'webhookSecret',
-      },
-      {
-        key: 'connectedAccountId',
-        label: 'Connected account (acct_...)',
-        secret: false,
-        required: false,
-        // Sends `Stripe-Account:` — only meaningful for a platform charging on
-        // behalf of an account it onboarded. A store using its own key must
-        // leave this empty; its own id here makes Stripe refuse every call.
-        advanced: true,
-        helperText:
-          'Deixe em branco. Só preencha se você é uma plataforma Connect cobrando em nome de outra conta — com as suas próprias chaves, este campo faz a Stripe recusar a conexão.',
-      },
-    ],
+    credentialSchema: CREDENTIAL_SCHEMA,
     customerSchema,
 
     verifyCredentials,
