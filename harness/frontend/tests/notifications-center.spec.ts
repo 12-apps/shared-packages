@@ -43,13 +43,23 @@ function rowFor(page: Page, body: string) {
 }
 
 test.describe('the bell and its badge', () => {
-  test('shows the seeded unread count, in pt-BR', async ({ page }) => {
+  test('/**
+ * THE COPY BELOW IS THIS HARNESS'S OWN, and that is load-bearing.
+ *
+ * These specs used to read `'Abrir notificações (3 não lidas)'` — the package's
+ * pt-BR default. That made the one consumer standing in for an independent
+ * adopter assert the extraction origin's sentences back at it, which is exactly
+ * how the default stayed invisible. `messages` is required config now and this
+ * app states a hardware shop's words in
+ * `src/notifications/notification-copy.ts`; these assertions follow it.
+ */
+shows the seeded unread count, in pt-BR', async ({ page }) => {
     await openPage(page);
     // Three seeded rows, all unread — and the count came from the packaged
     // `/notifications/unread-count` over a real COUNT.
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações (3 não lidas)',
+      'Abrir avisos (3 não lidos)',
     );
   });
 
@@ -61,7 +71,7 @@ test.describe('the bell and its badge', () => {
     // rather than incremented locally, so this number is one the database gave.
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações (4 não lidas)',
+      'Abrir avisos (4 não lidos)',
     );
   });
 });
@@ -82,12 +92,12 @@ test.describe('the inbox panel', () => {
   test('marking one read moves the badge and survives a reload', async ({ page }) => {
     await openPanel(page);
     await rowFor(page, 'Pedido A-1026 pago.')
-      .getByRole('button', { name: 'Pagamento confirmado (não lida)' })
+      .getByRole('button', { name: 'Pagamento confirmado (não lido)' })
       .click();
 
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações (2 não lidas)',
+      'Abrir avisos (2 não lidos)',
     );
 
     // The optimistic update is not the claim — the row on disk is. Reload and the
@@ -95,7 +105,7 @@ test.describe('the inbox panel', () => {
     await page.reload();
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações (2 não lidas)',
+      'Abrir avisos (2 não lidos)',
     );
   });
 
@@ -105,7 +115,7 @@ test.describe('the inbox panel', () => {
 
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações',
+      'Abrir avisos',
     );
     await expect(page.getByTestId('notifications-mark-all-read')).toBeHidden();
   });
@@ -119,7 +129,7 @@ test.describe('the inbox panel', () => {
     await expect(page.getByText('Pedido A-1026 pago.')).toBeHidden();
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações (2 não lidas)',
+      'Abrir avisos (2 não lidos)',
     );
 
     await page.reload();
@@ -131,7 +141,7 @@ test.describe('the inbox panel', () => {
   test('opening a row deep-links through the host router', async ({ page }) => {
     await openPanel(page);
     await rowFor(page, 'Pedido A-1026 pago.')
-      .getByRole('button', { name: 'Pagamento confirmado (não lida)' })
+      .getByRole('button', { name: 'Pagamento confirmado (não lido)' })
       .click();
 
     // The link the host's own generator put on the notification, handed to the
@@ -222,7 +232,7 @@ test.describe('the preferences screen', () => {
     // every transport is silent.
     await expect(page.getByTestId('notifications-bell')).toHaveAttribute(
       'aria-label',
-      'Abrir notificações (4 não lidas)',
+      'Abrir avisos (4 não lidos)',
     );
     await page.getByTestId('notifications-bell').click();
     await expect(page.getByText('Pedido A-2048 pago.')).toBeVisible();
