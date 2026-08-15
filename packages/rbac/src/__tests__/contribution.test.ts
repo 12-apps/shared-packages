@@ -5,7 +5,10 @@ import {
   RbacCatalogError,
   type ComposedPermissions,
 } from '../core/compose';
-import { definePermissionContribution } from '../core/contribution';
+import {
+  definePermissionContribution,
+  type PermissionSpec,
+} from '../core/contribution';
 import { DEFAULT_GATE_PERMISSIONS } from '../server/context';
 import { RBAC_PERMISSIONS } from '../permissions';
 
@@ -152,6 +155,138 @@ describe('composePermissions — ids and specs must name the same set', () => {
       expect(failure.message).toContain('a:pay');
       expect(failure.message).toContain('drifted');
     }
+  });
+});
+
+describe('composePermissions — a spec must actually declare what it claims', () => {
+  /**
+   * `PermissionSpec` makes `kind` required, but a catalog only ever passes
+   * through the compiler ONCE — at the boundary where it is read. Assembly now
+   * lives in the HOST, where a catalog is far likelier to be generated or
+   * loaded than written as a literal, so the two shapes below both type-check
+   * and both used to compose: an unset `kind` resolved to `'class'`, which
+   * means RBAC alone decides and the entity gate never runs. An
+   * instance-scoped id declared without its kind (`orders:read:own`,
+   * `tables:read:assigned`) therefore granted class-wide access.
+   */
+  it('refuses a spec whose kind is missing — the config/JSON path', () => {
+    const fromConfig = JSON.parse(
+      '{"posts:read:own":{"ownerMarker":false}}',
+    ) as Record<string, PermissionSpec>;
+    const catalog = definePermissionContribution({
+      source: 'config',
+      permissions: fromConfig,
+    });
+    expect(() => composePermissions(catalog)).toThrow(RbacCatalogError);
+    try {
+      composePermissions(catalog);
+      expect.unreachable('a spec with no kind must not compose');
+    } catch (error) {
+      const failure = error as RbacCatalogError;
+      expect(failure.code).toBe('INVALID_PERMISSION_SPEC');
+      expect(failure.message).toContain('posts:read:own');
+      expect(failure.message).toContain('config');
+      expect(failure.message).toContain('instance');
+    }
+  });
+
+  it('refuses a spec whose kind is missing — the hand-built contribution', () => {
+    const hand = {
+      source: 'hand',
+      ids: ['a:b'],
+      permissions: { 'a:b': {} as PermissionSpec },
+      labels: {},
+    };
+    expect(() => composePermissions(hand)).toThrow(RbacCatalogError);
+    try {
+      composePermissions(hand);
+      expect.unreachable('a hand-built spec with no kind must not compose');
+    } catch (error) {
+      const failure = error as RbacCatalogError;
+      expect(failure.code).toBe('INVALID_PERMISSION_SPEC');
+      expect(failure.message).toContain('a:b');
+      expect(failure.message).toContain('hand');
+    }
+  });
+
+  it('refuses a kind that is neither class nor instance', () => {
+    const typo = {
+      source: 'typo',
+      ids: ['a:b'],
+      permissions: { 'a:b': { kind: 'Instance' } as unknown as PermissionSpec },
+      labels: {},
+    };
+    expect(() => composePermissions(typo)).toThrow(RbacCatalogError);
+    try {
+      composePermissions(typo);
+      expect.unreachable('a misspelt kind must not compose');
+    } catch (error) {
+      const failure = error as RbacCatalogError;
+      expect(failure.code).toBe('INVALID_PERMISSION_SPEC');
+      expect(failure.message).toContain('Instance');
+    }
+  });
+
+  it('refuses an ownerMarker that is not a boolean', () => {
+    // Owner markers are collected with `=== true`, so `"true"` — what a JSON
+    // or env-shaped catalog writes — is NOT one: the id stays composable into
+    // an inline custom role, which is the guard silently going away.
+    const fromConfig = JSON.parse(
+      '{"money:move":{"kind":"class","ownerMarker":"true"}}',
+    ) as Record<string, PermissionSpec>;
+    const compose = (): unknown =>
+      composePermissions(
+        definePermissionContribution({ source: 'config', permissions: fromConfig }),
+      );
+    expect(compose).toThrow(RbacCatalogError);
+    try {
+      compose();
+      expect.unreachable('a non-boolean ownerMarker must not compose');
+    } catch (error) {
+      const failure = error as RbacCatalogError;
+      expect(failure.code).toBe('INVALID_PERMISSION_SPEC');
+      expect(failure.message).toContain('money:move');
+      expect(failure.message).toContain('ownerMarker');
+    }
+  });
+
+  it('refuses a separateFrom that is not a list of ids', () => {
+    // `null` is what JSON writes for an absent list, and `?? []` reads it as
+    // "declares no pair" — so the duty pair is never derived and `checkSoD`
+    // never fires, for a spec that says on its face that it must.
+    const fromConfig = JSON.parse(
+      '{"posts:approve":{"kind":"class","separateFrom":null}}',
+    ) as Record<string, PermissionSpec>;
+    const compose = (): unknown =>
+      composePermissions(
+        definePermissionContribution({ source: 'config', permissions: fromConfig }),
+      );
+    expect(compose).toThrow(RbacCatalogError);
+    try {
+      compose();
+      expect.unreachable('a malformed separateFrom must not compose');
+    } catch (error) {
+      const failure = error as RbacCatalogError;
+      expect(failure.code).toBe('INVALID_PERMISSION_SPEC');
+      expect(failure.message).toContain('posts:approve');
+      expect(failure.message).toContain('separateFrom');
+    }
+  });
+
+  it('still accepts the stated-and-empty forms of both optional fields', () => {
+    // The rule is about a field that is present and MALFORMED, not about one a
+    // source deliberately leaves off or states as empty.
+    const stated = definePermissionContribution({
+      source: 'stated',
+      permissions: {
+        'a:read': { kind: 'instance', ownerMarker: false, separateFrom: [] },
+        'a:write': { kind: 'class' },
+      },
+    });
+    const composed = composePermissions(stated);
+    expect(composed.permissions.kind('a:read')).toBe('instance');
+    expect(composed.ownerPermissions).toEqual([]);
+    expect(composed.sodPairs).toEqual([]);
   });
 });
 

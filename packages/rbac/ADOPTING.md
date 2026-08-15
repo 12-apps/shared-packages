@@ -51,7 +51,11 @@ reusable across repositories, exposing standardized surfaces. A host repo only
    Two ids from two sources is an `RbacCatalogError`, in either order. So is an
    SoD counterpart nothing contributes, a spec and an `ids` list that name
    different sets (in EITHER direction), a role granting an unknown id, and a
-   policy naming an unknown role. All at assembly, never during a decision.
+   policy naming an unknown role. So is a spec that does not actually declare
+   what its type says — no `kind`, or an `ownerMarker`/`separateFrom` that is
+   not a boolean/list — which is what a catalog read from config or JSON can
+   carry past the one place the compiler checked it. All at assembly, never
+   during a decision.
 
 1. **The host resolves WHO and WHERE; the package resolves WHAT THEY MAY DO.**
    `resolveActor` answers `{ tenantId, userId, isSuper }` — auth, tenant
