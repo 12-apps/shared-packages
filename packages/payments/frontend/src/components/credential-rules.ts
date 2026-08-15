@@ -18,7 +18,7 @@ import type { PendingSave } from './ConfirmCredentialSave';
  */
 
 /**
- * Is the credential set COMPLETE — every field on record or in the box?
+ * Is there enough on record to make the probe WORTH RUNNING?
  *
  * A required-field test cannot answer this, and Stripe is why: every field in its
  * schema is `required: false`, because under authorization the access token
