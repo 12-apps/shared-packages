@@ -146,15 +146,83 @@ export function releaseState(dirs = publishDirs()) {
   return { orphans, untagged, unpublished, healthy };
 }
 
+/** `1.2.3-beta.4+build` → `{ nums: [1,2,3], pre: "beta.4" }`. Build metadata is ignored, as semver says. */
+function parseVersion(version) {
+  const withoutBuild = String(version).split("+")[0];
+  const dash = withoutBuild.indexOf("-");
+  const core = dash === -1 ? withoutBuild : withoutBuild.slice(0, dash);
+  const [major, minor, patch] = core.split(".");
+  return {
+    nums: [major, minor, patch].map((part) => Number.parseInt(part, 10) || 0),
+    pre: dash === -1 ? null : withoutBuild.slice(dash + 1),
+  };
+}
+
 /**
- * The newest version of an `untagged` entry, by the same version-aware ordering
- * the tag sort uses. `npm view … versions` returns publication order, which is
- * NOT version order once a patch lands on an older line after a newer minor.
+ * Compare two dot-separated prerelease strings by semver's rules: numeric
+ * identifiers compare numerically, a numeric identifier is LOWER than an
+ * alphanumeric one, and when everything before matches, fewer fields is lower
+ * (`1.0.0-rc` < `1.0.0-rc.1`).
+ */
+function compareIdentifier(x, y) {
+  const xIsNum = /^\d+$/.test(x);
+  const yIsNum = /^\d+$/.test(y);
+  if (xIsNum && yIsNum) return Number(x) - Number(y);
+  // A numeric identifier always sorts below an alphanumeric one.
+  if (xIsNum !== yIsNum) return xIsNum ? -1 : 1;
+  if (x === y) return 0;
+  return x < y ? -1 : 1;
+}
+
+function comparePrerelease(a, b) {
+  const left = a.split(".");
+  const right = b.split(".");
+  for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
+    // Whichever ran out of fields first is the lower one.
+    if (left[i] === undefined) return -1;
+    if (right[i] === undefined) return 1;
+    const order = compareIdentifier(left[i], right[i]);
+    if (order !== 0) return order;
+  }
+  return 0;
+}
+
+/** Semver ordering. Negative when `a` precedes `b`. */
+function compareVersions(a, b) {
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+  for (let i = 0; i < 3; i += 1) {
+    if (left.nums[i] !== right.nums[i]) return left.nums[i] - right.nums[i];
+  }
+  // A version WITH a prerelease precedes the same version without one. This is
+  // the clause a lexical or numeric-collation sort gets backwards, and getting
+  // it backwards here is not cosmetic: the caller tags whatever this returns,
+  // so picking `1.0.0-beta.1` over `1.0.0` writes a floor BELOW a release
+  // already out — and the package then reads as healthy for ever while
+  // semantic-release re-cuts a published version. That is precisely the silent
+  // failure this whole module exists to detect.
+  if (left.pre === null && right.pre === null) return 0;
+  if (left.pre === null) return 1;
+  if (right.pre === null) return -1;
+  return comparePrerelease(left.pre, right.pre);
+}
+
+/**
+ * The newest version in a list, or `null` for an empty one.
+ *
+ * `npm view … versions` returns PUBLICATION order, which stops being version
+ * order the moment a patch lands on an older line after a newer minor — and it
+ * is not semver order at all where prereleases are involved.
+ *
+ * The `null` matters as much as the sort. A caller that tags this value builds
+ * a tag name by interpolation, so `undefined` from an empty list becomes a
+ * literal `<pkg>-vundefined` pushed to the remote — which the next run reads
+ * back as an orphan, deletes, and recreates, for ever. Returning `null` makes
+ * the empty case a decision the caller has to make rather than a string.
  */
 export function newestPublished(versions) {
-  return [...versions].sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
-  ).at(-1);
+  if (!Array.isArray(versions) || versions.length === 0) return null;
+  return [...versions].sort(compareVersions).at(-1);
 }
 
 /** The names a workflow step handed over through GITHUB_ENV, as a Set. */

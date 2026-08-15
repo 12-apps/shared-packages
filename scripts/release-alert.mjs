@@ -19,7 +19,7 @@
 // RELEASE_ALERT_WEBHOOK is optional and additive: set it to a Slack (or any
 // JSON) webhook URL to get the same headline pushed somewhere people read
 // during the day. Unset, this is a no-op and the issue is the whole alert.
-import { releaseState, handedOver, publishDirs } from "./lib/release-state.mjs";
+import { releaseState, handedOver, newestPublished, publishDirs } from "./lib/release-state.mjs";
 
 const REPO = process.env.GITHUB_REPOSITORY ?? "";
 const TOKEN = process.env.GITHUB_TOKEN ?? "";
@@ -72,7 +72,7 @@ function bullet(items, describe) {
  * first, because a stuck package is the only failure here that outlives the run.
  */
 function buildBody(problems) {
-  const { orphans, tagFailed, wedged, incomplete } = problems;
+  const { orphans, untagged, tagFailed, wedged, incomplete } = problems;
   return [
     MARKER,
     "",
@@ -93,6 +93,27 @@ function buildBody(problems) {
           "`scripts/recover-orphans.mjs` deletes an orphaned tag at the start of the",
           "next release so the version re-cuts. If one is still listed here, that",
           "recovery could not run or could not finish — see the run above.",
+        ].join("\n")
+      : "",
+    untagged.length > 0
+      ? [
+          "",
+          "### Stuck packages (published, never tagged)",
+          "",
+          "The MIRROR of the list above, and worse to spot: the registry has the",
+          "version, nothing records it, so `semantic-release` has no floor to count",
+          "from. It re-cuts the published version, npm refuses it, and the run stays",
+          "GREEN while nothing ships.",
+          "",
+          bullet(
+            untagged,
+            (u) =>
+              `\`${u.name}\` is on the registry at ${newestPublished(u.versions)} with no \`${u.prefix}-v*\` tag`,
+          ),
+          "",
+          "The remedy is the OPPOSITE of an orphan's — create the tag, never delete",
+          "one. `scripts/recover-orphans.mjs` writes it at HEAD on the next release;",
+          "if one is still listed here, that recovery could not run or could not push.",
         ].join("\n")
       : "",
     wedged.size > 0
@@ -172,9 +193,14 @@ if (!TOKEN || !REPO) {
   process.exit(0);
 }
 
-const { orphans } = releaseState(publishDirs());
+const { orphans, untagged } = releaseState(publishDirs());
+// A package first-published earlier in THIS job is untagged by construction and
+// recovers on the next push — the same exemption verify-released.mjs applies, so
+// the alert cannot file an issue for a state that is about to fix itself.
+const bootstrapped = handedOver("FIRST_PUBLISHED");
 const problems = {
   orphans,
+  untagged: untagged.filter(({ name }) => !bootstrapped.has(name)),
   tagFailed: handedOver("TAG_FAILED"),
   wedged: handedOver("PUBLISH_WEDGED"),
   incomplete: handedOver("PUBLISH_INCOMPLETE"),
@@ -183,8 +209,13 @@ const problems = {
 // A job that FAILED with nothing stuck is still worth an alert — it means this
 // run shipped nothing — but it is not the self-perpetuating kind, so the issue
 // closes as soon as a later run goes green.
+// `untagged` counts in its own right, not merely via JOB_STATUS. Relying on the
+// job having failed would make the alert's correctness depend on another step's
+// exit code — and the whole point of this state is that it is the one that
+// keeps everything reporting success.
 const anyProblem =
   orphans.length > 0 ||
+  problems.untagged.length > 0 ||
   problems.tagFailed.size > 0 ||
   problems.wedged.size > 0 ||
   problems.incomplete.size > 0 ||
@@ -194,10 +225,19 @@ if (!anyProblem) {
   const closed = await resolveIssue();
   console.log(closed ? `release healthy — closed alert issue #${closed}` : "release healthy — no alert open");
 } else {
-  const stuck = orphans.map((o) => o.name);
+  const stuck = [...orphans.map((o) => o.name), ...problems.untagged.map((u) => u.name)];
+  // The two kinds are stuck for MIRRORED reasons, so a headline naming only one
+  // of them sends half the readers looking for the wrong thing. Say which shape
+  // this alert is, or that it is both.
+  const shape =
+    orphans.length > 0 && problems.untagged.length > 0
+      ? "tags and the registry disagree, in both directions"
+      : orphans.length > 0
+        ? "tagged, but never published to npm"
+        : "published to npm, but never tagged";
   const headline =
     stuck.length > 0
-      ? `Release is STUCK for ${stuck.join(", ")} — tagged, but never published to npm.`
+      ? `Release is STUCK for ${stuck.join(", ")} — ${shape}.`
       : "The Release job on main did not get every package to the registry.";
   const number = await upsertIssue(buildBody(problems), headline);
   console.log(number ? `::warning::release alert raised on issue #${number}: ${headline}` : `::warning::${headline}`);

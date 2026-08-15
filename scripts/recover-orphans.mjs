@@ -169,6 +169,14 @@ if (orphans.length === 0 && untagged.length === 0) {
   const lines = [];
   for (const { name, prefix, versions } of untagged) {
     const version = newestPublished(versions);
+    // No version means there is nothing to record, and the tag name would
+    // interpolate to a literal `<prefix>-vnull` — which the NEXT run reads back
+    // as an orphan (that version does not exist), deletes, and recreates. A
+    // permanent churn loop written by the recovery itself. Skip instead.
+    if (version === null) {
+      console.log(`::warning::${name} reported no versions on the registry — nothing to tag`);
+      continue;
+    }
     const tag = `${prefix}-v${version}`;
     const { ok, note } = createTag(tag, HEAD);
     if (ok) {

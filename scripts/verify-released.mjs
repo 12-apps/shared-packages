@@ -41,6 +41,8 @@ const DIRS = publishDirs();
 
 const INCOMPLETE = handedOver("PUBLISH_INCOMPLETE");
 const WEDGED = handedOver("PUBLISH_WEDGED");
+// Names scripts/first-publish.mjs put on the registry EARLIER IN THIS JOB.
+const BOOTSTRAPPED = handedOver("FIRST_PUBLISHED");
 
 function report(lines) {
   console.log(lines.join("\n"));
@@ -126,7 +128,22 @@ function untaggedRemedy(prefix, version) {
   );
 }
 
-for (const { name, prefix, versions } of untagged) {
+// A package THIS job just bootstrapped is untagged for the rest of the job by
+// construction, so failing on it would make adding a package a red run the
+// author cannot clear — the tag only exists once a release cuts one, and the
+// recovery on the next push is what supplies it. Reported, never fatal.
+const bootstrapped = untagged.filter(({ name }) => BOOTSTRAPPED.has(name));
+const stuck = untagged.filter(({ name }) => !BOOTSTRAPPED.has(name));
+
+for (const { name, prefix, versions } of bootstrapped) {
+  const version = newestPublished(versions);
+  lines.push(
+    `first published this run: ${name}@${version} — no ${prefix}-v* tag yet, ` +
+      `which the next push recovers`,
+  );
+}
+
+for (const { name, prefix, versions } of stuck) {
   const version = newestPublished(versions);
   console.log(
     `::error::${name} is on the registry at ${version} but has no ${prefix}-v* tag. ` +
@@ -140,4 +157,4 @@ for (const { name, prefix, versions } of untagged) {
 
 report(lines);
 
-if (orphans.length > 0 || untagged.length > 0) process.exitCode = 1;
+if (orphans.length > 0 || stuck.length > 0) process.exitCode = 1;

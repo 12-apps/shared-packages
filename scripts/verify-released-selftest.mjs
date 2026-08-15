@@ -46,8 +46,12 @@ const { readFileSync } = require("node:fs");
 const plan = JSON.parse(readFileSync(process.env.FAKE_PLAN, "utf8"));
 const args = process.argv.slice(2);
 if (args[0] === "view") {
-  const pkg = args[1].replace(/^@selftest\\//, "");
-  const entry = plan[pkg];
+  // Look the entry up by its npm NAME, which a fixture may set independently of
+  // its directory key — the two differ for real packages.
+  const key = Object.keys(plan).find(
+    (k) => (plan[k].npmName || "@selftest/" + k) === args[1],
+  );
+  const entry = key ? plan[key] : null;
   if (!entry || !entry.versions) process.exit(1);
   process.stdout.write(JSON.stringify(entry.versions));
 }
@@ -68,10 +72,17 @@ function verify(plan, env = {}) {
     chmodSync(join(bin, name), 0o755);
   }
 
+  // `npmName` lets a fixture make the DIRECTORY basename differ from the npm
+  // name, which is the only shape that can catch `prefix` and `name` being
+  // swapped. It is not hypothetical: `packages/payments/backend` publishes as
+  // `@12-apps/payments-backend`, so its tags are `backend-v*`. With every
+  // fixture named after its own directory the two are interchangeable and the
+  // suite passes either way.
   const dirs = Object.keys(plan).map((pkg) => {
     const dir = join(root, pkg);
     mkdirSync(dir);
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: `@selftest/${pkg}` }));
+    const npmName = plan[pkg].npmName ?? `@selftest/${pkg}`;
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: npmName }));
     return dir;
   });
 
@@ -171,6 +182,74 @@ check(
   "a package whose newest tag is on the registry does not fail",
   healthy.status === 0,
   `Output:\n    ${healthy.output}`,
+);
+
+const bootstrapped = verify(
+  { scope: { versions: ["1.0.0"] } },
+  { FIRST_PUBLISHED: "@selftest/scope" },
+);
+
+check(
+  "a package THIS run first-published is reported but does not fail",
+  bootstrapped.status === 0 && /first published this run/.test(bootstrapped.output),
+  `first-publish.mjs puts a new name on the registry earlier in the same job, so it\n    ` +
+    `is untagged by construction until a release cuts one. Failing here makes ADDING\n    ` +
+    `a package a red run its author cannot clear. Output:\n    ${bootstrapped.output}`,
+);
+
+// ── A prerelease must never be chosen as the newest ──────────────────────────
+const prerelease = verify({ scope: { versions: ["1.0.0-beta.1", "1.0.0"] } });
+
+check(
+  "the remedy prefers a release over its own prerelease",
+  /git tag scope-v1\.0\.0 /.test(prerelease.output),
+  `semver puts 1.0.0-beta.1 BELOW 1.0.0; a numeric-collation sort puts it above.\n    ` +
+    `Tagging the prerelease sets the floor below a release already out, and the\n    ` +
+    `package then reads healthy for ever while nothing ships — the exact silent\n    ` +
+    `failure this check exists to catch. Output:\n    ${prerelease.output}`,
+);
+
+const acrossMajors = verify({ scope: { versions: ["2.0.0-alpha.1", "1.5.0"] } });
+
+check(
+  "a prerelease of a FUTURE major does not outrank the current release",
+  /git tag scope-v2\.0\.0-alpha\.1 /.test(acrossMajors.output),
+  `2.0.0-alpha.1 really is newer than 1.5.0 — the prerelease rule only demotes it\n    ` +
+    `below its OWN release, 2.0.0. Output:\n    ${acrossMajors.output}`,
+);
+
+// ── prefix (directory) vs name (npm) must not be interchangeable ─────────────
+const nested = verify({
+  backend: { npmName: "@selftest/payments-backend", versions: ["1.0.0"] },
+});
+
+check(
+  "the tag uses the DIRECTORY basename, not the npm name",
+  /git tag backend-v1\.0\.0 /.test(nested.output) &&
+    !/payments-backend-v/.test(nested.output),
+  `packages/payments/backend publishes as @12-apps/payments-backend and is tagged\n    ` +
+    `backend-v*. Every other fixture has basename === name suffix, so without this\n    ` +
+    `case swapping prefix for name passes the whole suite. Output:\n    ${nested.output}`,
+);
+
+check(
+  "and it still names the npm package in the error",
+  /@selftest\/payments-backend/.test(nested.output),
+  `the reader identifies the package by its npm name. Output:\n    ${nested.output}`,
+);
+
+// ── The orphan handoff branches ─────────────────────────────────────────────
+const wedged = verify(
+  { scope: { tag: "scope-v2.0.0", versions: ["1.0.0"] } },
+  { PUBLISH_WEDGED: "@selftest/scope" },
+);
+
+check(
+  "an orphan THIS run failed to publish says so instead of advising a re-cut",
+  /this run's publish failed for it/.test(wedged.output),
+  `"delete the tag and re-run" is right for an orphan left by an EARLIER run and\n    ` +
+    `wrong for one this run just made — re-cutting walks back into the same\n    ` +
+    `failure. Output:\n    ${wedged.output}`,
 );
 
 console.log(
