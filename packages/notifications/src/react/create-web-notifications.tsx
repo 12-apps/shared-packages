@@ -33,7 +33,7 @@ export interface NotificationsWebConfig {
   /** How the surface reaches its data. Default: same-origin fetch. */
   transport?: NotificationsTransport;
   /** User-facing copy overrides (pt-BR product copy by default). */
-  messages?: Partial<NotificationMessages>;
+  messages: NotificationMessages;
   /**
    * How the surface learns an inbox changed without asking — the host's message
    * bus. Without it the badge keeps its 60 s poll, which is the standing

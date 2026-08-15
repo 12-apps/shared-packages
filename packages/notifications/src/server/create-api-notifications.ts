@@ -1,5 +1,5 @@
 import { createGeneratorRegistry, type NotificationGeneratorRegistry } from '../generators';
-import { messagesOf, type NotificationMessages } from '../messages';
+import { messagesOf, type NotificationWireMessages } from '../messages';
 import type { ChannelRow } from '../preferences-core';
 import {
   taxonomyOf,
@@ -105,7 +105,7 @@ export interface NotificationsServerConfig {
   /** The host's authorization engine, for `notifyByPermission`. */
   audience?: NotificationAudienceDirectory;
   /** User-facing copy overrides (pt-BR product copy by default). */
-  messages?: Partial<NotificationMessages>;
+  messages: NotificationWireMessages;
   /** The host's logger. Defaults to the console. */
   logger?: NotificationLogger;
 }
@@ -133,7 +133,7 @@ export interface ApiNotifications {
   /** The declared transports, for diagnostics and availability probes. */
   transports: TransportRegistry;
   /** The copy in force, so a host's own screens can reuse a sentence. */
-  messages: NotificationMessages;
+  messages: NotificationWireMessages;
 }
 
 /** Drop the keys the host left unset, so an absent seam stays absent. */

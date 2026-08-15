@@ -2,6 +2,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { CLINIC_MESSAGES } from '../../__tests__/host-copy';
+
 import { createWebNotifications } from '../create-web-notifications';
 import type { NotificationsResult, NotificationsTransport } from '../transport';
 
@@ -43,13 +45,22 @@ function inboxPage(
   };
 }
 
+/**
+ * THE HOST'S OWN taxonomy, not the extraction origin's four.
+ *
+ * `categories` became required config one release ago and their LABELS became
+ * required in this one — which is the pairing that was missing, because a host
+ * could declare its own two and still be handed a labels map describing
+ * somebody else's four. These are `CLINIC_MESSAGES.categoryLabels`' keys, so
+ * the screen below proves both halves come from the same host.
+ */
 const PREFERENCES = {
   preferences: {
-    orders: { EMAIL: true, SMS: false, WHATSAPP: false, WEB_PUSH: true },
-    system: { EMAIL: true, SMS: false, WHATSAPP: false, WEB_PUSH: true },
+    consultas: { EMAIL: true, SMS: false, WHATSAPP: false, WEB_PUSH: true },
+    vacinas: { EMAIL: true, SMS: false, WHATSAPP: false, WEB_PUSH: true },
   },
   availability: { EMAIL: true, SMS: false, WHATSAPP: false, WEB_PUSH: false },
-  categories: ['orders', 'system'],
+  categories: ['consultas', 'vacinas'],
 };
 
 function fakeTransport(
@@ -94,6 +105,7 @@ describe('the bell and the badge', () => {
   it('renders the unread count in the pt-BR accessible name', async () => {
     const { BellButton } = createWebNotifications({
       apiBase: '/api/account',
+      messages: CLINIC_MESSAGES,
       transport: fakeTransport(
         { '/api/account/notifications/unread-count': { count: 3 } },
         recorded,
@@ -101,7 +113,7 @@ describe('the bell and the badge', () => {
     });
     render(<BellButton onClick={() => undefined} />);
 
-    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (3 não lidas)'));
+    await waitFor(() => expect(bellLabel()).toBe(CLINIC_MESSAGES.openBellWithUnread(3)));
   });
 
   it('refetches on a hint from the host bus, and unsubscribes on unmount', async () => {
@@ -111,6 +123,7 @@ describe('the bell and the badge', () => {
     const bus = { counts: 1, hint: (): void => undefined, unsubscribed: 0 };
     const { BellButton } = createWebNotifications({
       apiBase: '/api/account',
+      messages: CLINIC_MESSAGES,
       transport: {
         get: <T,>(path: string): Promise<T> => {
           recorded.reads.push(path);
@@ -128,10 +141,10 @@ describe('the bell and the badge', () => {
     });
     const view = render(<BellButton onClick={() => undefined} />);
 
-    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (1 não lidas)'));
+    await waitFor(() => expect(bellLabel()).toBe(CLINIC_MESSAGES.openBellWithUnread(1)));
     bus.counts = 7;
     bus.hint();
-    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (7 não lidas)'));
+    await waitFor(() => expect(bellLabel()).toBe(CLINIC_MESSAGES.openBellWithUnread(7)));
 
     view.unmount();
     expect(bus.unsubscribed).toBe(1);
@@ -140,6 +153,7 @@ describe('the bell and the badge', () => {
   it('asks for nothing at all while disabled (a signed-out header)', async () => {
     const { BellButton } = createWebNotifications({
       apiBase: '/api/account',
+      messages: CLINIC_MESSAGES,
       transport: fakeTransport(
         { '/api/account/notifications/unread-count': { count: 3 } },
         recorded,
@@ -147,7 +161,7 @@ describe('the bell and the badge', () => {
     });
     render(<BellButton enabled={false} onClick={() => undefined} />);
 
-    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações'));
+    await waitFor(() => expect(bellLabel()).toBe(CLINIC_MESSAGES.openBell));
     expect(recorded.reads).toEqual([]);
   });
 });
@@ -156,6 +170,7 @@ describe('the inbox panel', () => {
   function mount(pages: Record<string, unknown>): ReturnType<typeof createWebNotifications> {
     return createWebNotifications({
       apiBase: '/api/account',
+      messages: CLINIC_MESSAGES,
       transport: fakeTransport(
         { '/api/account/notifications/unread-count': { count: 2 }, ...pages },
         recorded,
@@ -177,7 +192,7 @@ describe('the inbox panel', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('notifications-empty').textContent).toContain(
-        'Nenhuma notificação',
+        CLINIC_MESSAGES.emptyTitle,
       ),
     );
   });
@@ -188,7 +203,7 @@ describe('the inbox panel', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('notifications-error').textContent).toContain(
-        'Não foi possível carregar',
+        CLINIC_MESSAGES.loadFailedTitle,
       ),
     );
   });
@@ -205,12 +220,12 @@ describe('the inbox panel', () => {
     );
 
     await waitFor(() => expect(screen.getByTestId('notification-n0')).toBeTruthy());
-    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (2 não lidas)'));
+    await waitFor(() => expect(bellLabel()).toBe(CLINIC_MESSAGES.openBellWithUnread(2)));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pagamento 0 (não lida)' }));
+    fireEvent.click(screen.getByRole('button', { name: `Pagamento 0 (${CLINIC_MESSAGES.unreadSuffix})` }));
 
     // The bell and the panel share ONE store, which is what makes this true.
-    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (1 não lidas)'));
+    await waitFor(() => expect(bellLabel()).toBe(CLINIC_MESSAGES.openBellWithUnread(1)));
     expect(recorded.writes).toContainEqual({
       path: '/api/account/notifications/mark-read',
       method: 'POST',
@@ -232,7 +247,7 @@ describe('the inbox panel', () => {
     await waitFor(() => expect(screen.getByTestId('notifications-mark-all-read')).toBeTruthy());
     fireEvent.click(screen.getByTestId('notifications-mark-all-read'));
 
-    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações'));
+    await waitFor(() => expect(bellLabel()).toBe(CLINIC_MESSAGES.openBell));
     expect(recorded.writes).toContainEqual({
       path: '/api/account/notifications/mark-read',
       method: 'POST',
@@ -255,7 +270,7 @@ describe('the inbox panel', () => {
     fireEvent.click(screen.getByTestId('notification-delete-n0'));
 
     await waitFor(() => expect(screen.queryByTestId('notification-n0')).toBeNull());
-    await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (1 não lidas)'));
+    await waitFor(() => expect(bellLabel()).toBe(CLINIC_MESSAGES.openBellWithUnread(1)));
     expect(recorded.writes).toContainEqual({
       path: '/api/account/notifications/delete',
       method: 'POST',
@@ -292,7 +307,7 @@ describe('the inbox panel', () => {
     );
 
     await waitFor(() => expect(screen.getByTestId('notification-n0')).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: 'Pagamento 0 (não lida)' }));
+    fireEvent.click(screen.getByRole('button', { name: `Pagamento 0 (${CLINIC_MESSAGES.unreadSuffix})` }));
 
     await waitFor(() => expect(navigated).toEqual(['/orders/0']));
     expect(closed.count).toBe(1);
@@ -305,6 +320,7 @@ describe('the inbox panel', () => {
     ): ReturnType<typeof createWebNotifications> {
       return createWebNotifications({
         apiBase: '/api/account',
+        messages: CLINIC_MESSAGES,
         transport: fakeTransport(
           {
             '/api/account/notifications/unread-count': { count: 2 },
@@ -332,17 +348,17 @@ describe('the inbox panel', () => {
           </>,
         );
         await waitFor(() => expect(screen.getByTestId('notification-n0')).toBeTruthy());
-        await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (2 não lidas)'));
+        await waitFor(() => expect(bellLabel()).toBe(CLINIC_MESSAGES.openBellWithUnread(2)));
         const readsBefore = recorded.reads.length;
 
-        fireEvent.click(screen.getByRole('button', { name: 'Pagamento 0 (não lida)' }));
+        fireEvent.click(screen.getByRole('button', { name: `Pagamento 0 (${CLINIC_MESSAGES.unreadSuffix})` }));
 
         // The badge went back to the server's 2, and the row is unread again —
         // both because page one was reloaded, not because a local undo guessed.
         await waitFor(() => expect(recorded.reads.length).toBeGreaterThan(readsBefore));
-        await waitFor(() => expect(bellLabel()).toBe('Abrir notificações (2 não lidas)'));
+        await waitFor(() => expect(bellLabel()).toBe(CLINIC_MESSAGES.openBellWithUnread(2)));
         await waitFor(() =>
-          expect(screen.getByRole('button', { name: 'Pagamento 0 (não lida)' })).toBeTruthy(),
+          expect(screen.getByRole('button', { name: `Pagamento 0 (${CLINIC_MESSAGES.unreadSuffix})` })).toBeTruthy(),
         );
       },
     );
@@ -377,6 +393,7 @@ describe('the preferences screen', () => {
   function mount(): ReturnType<typeof createWebNotifications> {
     return createWebNotifications({
       apiBase: '/api/account',
+      messages: CLINIC_MESSAGES,
       transport: fakeTransport(
         {
           '/api/account/notification-preferences': PREFERENCES,
@@ -387,25 +404,31 @@ describe('the preferences screen', () => {
     });
   }
 
-  it('renders the HOST taxonomy, not a hardcoded four', async () => {
+  it('renders the HOST taxonomy AND the host labels, not a hardcoded four', async () => {
     const { page: PreferencesPage } = mount();
     render(<PreferencesPage />);
 
-    await waitFor(() => expect(screen.getByTestId('prefs-orders')).toBeTruthy());
-    expect(screen.getByTestId('prefs-system')).toBeTruthy();
-    await waitFor(() => expect(screen.queryByTestId('prefs-stock')).toBeNull());
-    expect(screen.getByTestId('prefs-orders').textContent).toContain('Pedidos');
+    await waitFor(() => expect(screen.getByTestId('prefs-consultas')).toBeTruthy());
+    expect(screen.getByTestId('prefs-vacinas')).toBeTruthy();
+    // The origin's categories are absent, which is the property under test: a
+    // package that still knew them would render them here.
+    await waitFor(() => expect(screen.queryByTestId('prefs-orders')).toBeNull());
+    expect(screen.getByTestId('prefs-consultas').textContent).toContain(
+      CLINIC_MESSAGES.categoryLabels['consultas']?.title,
+    );
   });
 
   it('disables an unreachable channel and says why, in pt-BR', async () => {
     const { page: PreferencesPage } = mount();
     render(<PreferencesPage />);
 
-    await waitFor(() => expect(screen.getByTestId('prefs-orders-SMS')).toBeTruthy());
-    expect((screen.getByTestId('prefs-orders-SMS') as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByTestId('prefs-orders-EMAIL') as HTMLInputElement).disabled).toBe(false);
+    await waitFor(() => expect(screen.getByTestId('prefs-consultas-SMS')).toBeTruthy());
+    expect((screen.getByTestId('prefs-consultas-SMS') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByTestId('prefs-consultas-EMAIL') as HTMLInputElement).disabled).toBe(
+      false,
+    );
     expect(screen.getByTestId('prefs-hint-SMS').textContent).toContain(
-      'Cadastre um telefone no seu perfil para receber SMS',
+      CLINIC_MESSAGES.channelUnavailableHints['SMS'],
     );
   });
 
@@ -413,8 +436,8 @@ describe('the preferences screen', () => {
     const { page: PreferencesPage } = mount();
     render(<PreferencesPage />);
 
-    await waitFor(() => expect(screen.getByTestId('prefs-orders-EMAIL')).toBeTruthy());
-    fireEvent.click(screen.getByTestId('prefs-orders-EMAIL'));
+    await waitFor(() => expect(screen.getByTestId('prefs-consultas-EMAIL')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('prefs-consultas-EMAIL'));
 
     await waitFor(() =>
       expect(recorded.writes).toContainEqual({
@@ -422,7 +445,7 @@ describe('the preferences screen', () => {
         method: 'PUT',
         // One category, one channel: the whole reason the server MERGES a save
         // rather than replacing the row.
-        body: { orders: { EMAIL: false } },
+        body: { consultas: { EMAIL: false } },
       }),
     );
   });
@@ -430,7 +453,7 @@ describe('the preferences screen', () => {
   it('hides the browser push step when the platform cannot send at all', async () => {
     const { page: PreferencesPage } = mount();
     render(<PreferencesPage />);
-    await waitFor(() => expect(screen.getByTestId('prefs-orders')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('prefs-consultas')).toBeTruthy());
     await waitFor(() => expect(screen.queryByTestId('web-push-device-setup')).toBeNull());
   });
 });
