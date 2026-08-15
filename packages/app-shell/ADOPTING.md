@@ -43,10 +43,11 @@ import { reportRouteCrash } from './observability';   // YOUR adapter — see be
 import { createWebAppShell } from '@12-apps/app-shell/react';
 
 export const shell = createWebAppShell({
-  brand: { name: 'Paladira' },
+  brand: { name: 'Acme Storefront' },
   onCrash: reportRouteCrash,
   queryClient,
   consent: {},          // or `false` if your app has no terms flow — see rule 3
+  messages: SHELL_COPY,  // REQUIRED — every sentence, in YOUR words. See rule 8
 });
 ```
 
@@ -197,7 +198,13 @@ app.route('/api', shell.router);
    current build; a second failure inside 15s is rethrown for the boundary.
    Keep your static server's history fallback **off** asset paths, or a stale
    chunk 404s as `200 text/html` and `import()` fails in a way nothing can read.
-8. **`messages` is the only place to change copy.** Defaults are pt-BR. Do not
+8. **`messages` is REQUIRED, and it is the only place copy comes from.** There
+   is deliberately no default any more: a shipped one was the extraction
+   origin's pt-BR, spread UNDER whatever a host passed, so a host that stated
+   some of the table silently inherited another product's wording for the rest.
+   The interface enumerates every sentence, so your compiler names the ones you
+   have not written yet. Both halves work this way — `AppShellMessages` on
+   `createWebAppShell`, `AppShellServerMessages` on the server mount. Do not
    fork a component to retype a string.
 9. **Static imports only.** This package publishes TypeScript source, except
    `./vite`. A dynamic non-literal `import()` of a subpath crashes a bundled

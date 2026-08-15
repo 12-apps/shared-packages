@@ -15,6 +15,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import type { JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { AppShellMessages } from '../messages';
+import { CLUB_MESSAGES } from '../../__tests__/host-copy';
 import { createShellRouteErrorBoundary } from '../route-error-boundary';
 
 /** A page that renders — the healthy case. */
@@ -28,9 +30,15 @@ function BadPage(): JSX.Element {
 }
 
 /** The crashes a host's reporter saw, in a container the test owns. */
-function reporter(): { seen: unknown[]; onCrash: (error: unknown) => void } {
+function reporter(): {
+  seen: unknown[];
+  onCrash: (error: unknown) => void;
+  messages: AppShellMessages;
+} {
   const seen: unknown[] = [];
-  return { seen, onCrash: (error: unknown) => seen.push(error) };
+  // `messages` is required config now, so the helper that builds every config
+  // in this file states it once — in this suite's own voice, never a default.
+  return { seen, onCrash: (error: unknown) => seen.push(error), messages: CLUB_MESSAGES };
 }
 
 beforeEach(() => {
@@ -63,7 +71,7 @@ describe('createShellRouteErrorBoundary', () => {
     );
     expect(screen.getByTestId('route-error')).toBeDefined();
     expect(screen.getByText('chunk exploded')).toBeDefined();
-    expect(screen.getByText('Não foi possível abrir esta página')).toBeDefined();
+    expect(screen.getByText(CLUB_MESSAGES.routeErrorTitle)).toBeDefined();
   });
 
   it('clears the error when the location changes', async () => {
@@ -106,10 +114,17 @@ describe('createShellRouteErrorBoundary', () => {
     expect((host.seen[0] as Error).message).toBe('chunk exploded');
   });
 
-  it('renders the host copy when a message override is given', () => {
+  it('renders the copy of a host in another language', () => {
+    // The seam is not a translation feature — it is where the sentences come
+    // from at all. A host in English states English; nothing in the package
+    // has an opinion about which language that is.
     const RouteErrorBoundary = createShellRouteErrorBoundary({
       ...reporter(),
-      messages: { routeErrorTitle: 'This page could not open', routeErrorRetry: 'Reload' },
+      messages: {
+        ...CLUB_MESSAGES,
+        routeErrorTitle: 'This page could not open',
+        routeErrorRetry: 'Reload',
+      },
     });
     render(
       <RouteErrorBoundary resetKey="a">

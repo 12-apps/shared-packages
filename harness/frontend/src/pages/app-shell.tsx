@@ -4,6 +4,8 @@ import { useCallback, useState, type JSX } from 'react';
 import { formatBRL, formatMinutesLabel } from '@12-apps/app-shell';
 import { createWebAppShell } from '@12-apps/app-shell/react';
 
+import { HARNESS_SHELL_MESSAGES } from '../app-shell/shell-copy';
+
 import { CONSENT_SIGNAL, useConsentSignal } from '../app-shell/consent-signal';
 import { CrashCount, CrashingPanel, crashReports } from '../app-shell/crash-on-demand';
 import { LazyPanel } from '../app-shell/lazy-panel';
@@ -49,7 +51,9 @@ if (!document.cookie.includes('harness-consent=')) {
 const queryClient = new QueryClient();
 
 const shell = createWebAppShell({
-  brand: { name: 'Paladira' },
+  // The harness's OWN name. It used to borrow a real tenant of the extraction
+  // origin, which is precisely the thing a consumer harness exists to disprove.
+  brand: { name: 'Ferragens Norte' },
   // A tenant's white-label seed, chosen because it is UNREADABLE as text on white
   // (1.76:1 against a 4.5:1 floor). The probe below renders what the theme did with it,
   // so the correction is observable in a real browser rather than asserted against a
@@ -61,6 +65,11 @@ const shell = createWebAppShell({
   onCrash: (error) => crashReports.push(error instanceof Error ? error.message : String(error)),
   queryClient,
   consent: { useSignal: useConsentSignal },
+  // Required now, and stated by THIS host in its own words. It used to be
+  // omitted, which meant rendering the package's pt-BR default — the extraction
+  // origin's copy — while claiming to be an independent consumer. See
+  // `../app-shell/shell-copy`.
+  messages: HARNESS_SHELL_MESSAGES,
 });
 
 /**

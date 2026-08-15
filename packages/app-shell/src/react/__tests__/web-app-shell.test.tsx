@@ -14,6 +14,7 @@ import { createContext, useContext, type JSX } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { CLUB_MESSAGES } from '../../__tests__/host-copy';
 import { createWebAppShell } from '../create-web-app-shell';
 
 /** The crashes a host's reporter saw, in a container the test owns. */
@@ -61,6 +62,9 @@ const REQUIRED = {
   brand: { name: 'Harness' },
   onCrash: (): void => {},
   consent: false,
+  // Required config now — this suite states its own copy rather than
+  // inheriting one, because there is nothing left to inherit.
+  messages: CLUB_MESSAGES,
 } as const;
 
 afterEach(() => {
@@ -244,7 +248,7 @@ describe('createWebAppShell', () => {
     expect(shell.brand.name).toBe('Harness');
     expect(typeof shell.lazyRoute).toBe('function');
     expect(typeof shell.RouteErrorBoundary).toBe('function');
-    expect(shell.messages.consentAccept).toBe('Li e aceito');
+    expect(shell.messages.consentAccept).toBe(CLUB_MESSAGES.consentAccept);
     // One theme object, built once: a theme rebuilt per render is a new object
     // identity and re-runs every `styled` cache below it.
     expect(shell.theme).toBe(shell.theme);
@@ -272,6 +276,7 @@ describe('createWebAppShell', () => {
     const shell = createWebAppShell({
       brand: { name: 'Harness' },
       onCrash: host.onCrash,
+      messages: CLUB_MESSAGES,
       queryClient: new QueryClient(),
       consent: {},
     });
@@ -308,6 +313,7 @@ describe('createWebAppShell', () => {
     const shell = createWebAppShell({
       brand: { name: 'Harness' },
       onCrash: host.onCrash,
+      messages: CLUB_MESSAGES,
       consent: false,
     });
 

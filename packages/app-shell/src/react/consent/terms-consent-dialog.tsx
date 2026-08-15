@@ -87,7 +87,7 @@ export interface TermsConsentDialogProps {
   apiBase?: string;
   termsHref?: string;
   privacyHref?: string;
-  messages?: Partial<AppShellMessages>;
+  messages: AppShellMessages;
   useSignal?: ConsentSignalHook;
 }
 

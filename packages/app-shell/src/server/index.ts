@@ -13,7 +13,6 @@ export { createApiAppShell, type ApiAppShell } from './create-api-app-shell';
 
 export {
   AppShellApiError,
-  DEFAULT_SERVER_MESSAGES,
   foldApiError,
   messagesOf,
   noContent,

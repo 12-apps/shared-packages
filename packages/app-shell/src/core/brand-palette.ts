@@ -212,8 +212,8 @@ export function hueOfHex(value: string): number | null {
 }
 
 /**
- * Keep a SEMANTIC colour distinguishable from the tenant's brand (FUT-810
- * rule 10).
+ * Keep a SEMANTIC colour distinguishable from the tenant's brand (rule 10 of
+ * the palette rules stated at the top of this file).
  *
  * The four semantics — success, warning, danger, info — are anchored to meaning,
  * not to the tenant. Green is good and red is stop in every tenant, so nothing
