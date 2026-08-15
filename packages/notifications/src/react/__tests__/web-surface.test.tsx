@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createWebNotifications } from '../create-web-notifications';
@@ -432,5 +432,48 @@ describe('the preferences screen', () => {
     render(<PreferencesPage />);
     await waitFor(() => expect(screen.getByTestId('prefs-orders')).toBeTruthy());
     await waitFor(() => expect(screen.queryByTestId('web-push-device-setup')).toBeNull());
+  });
+});
+
+/**
+ * THE SECOND DOOR onto the same wiring (FUT-859).
+ *
+ * `subscribe` is read at FACTORY time, which is module scope. A host whose
+ * realtime connection lives in React context — a provider in the tree plus a
+ * `useTopics` hook, which is the common shape — cannot reach it from there, so
+ * it had no way to wire the badge at all and the bell simply never heard an
+ * event.
+ *
+ * `useSignal` is that host's door, and it is the shape `@12-apps/app-shell`
+ * already uses for the identical problem in its consent dialog. Two packages
+ * solving one problem two ways is how an adopter concludes the feature is not
+ * available to it.
+ */
+describe('the realtime hint, wired as a hook', () => {
+  it('refetches the badge when a host HOOK signals, not just a factory callback', async () => {
+    const hints: (() => void)[] = [];
+    const { BellButton } = createWebNotifications({
+      apiBase: '/api/account',
+      // Called during render, so a real host may read context here — which is
+      // the entire point of this door existing beside `subscribe`.
+      useSignal: (onHint) => {
+        hints.push(onHint);
+      },
+      transport: fakeTransport(
+        { '/api/account/notifications/unread-count': { count: 1 } },
+        recorded,
+      ),
+    });
+
+    render(<BellButton onClick={() => undefined} />);
+    // Waits for the first badge read to land, so the count below is a REFETCH
+    // rather than the mount's own fetch arriving late.
+    await waitFor(() => expect(recorded.reads.length).toBeGreaterThan(0));
+
+    const readsBefore = recorded.reads.length;
+    act(() => {
+      hints.at(-1)?.();
+    });
+    await waitFor(() => expect(recorded.reads.length).toBeGreaterThan(readsBefore));
   });
 });

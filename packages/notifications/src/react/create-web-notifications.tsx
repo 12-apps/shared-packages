@@ -4,7 +4,11 @@ import { messagesOf, type NotificationMessages } from '../messages';
 
 import { createNotificationsApiClient, type NotificationsApiClient } from './api';
 import { BellButton, type BellButtonProps } from './bell-button';
-import { useUnreadCount, type NotificationsSubscribe } from './hooks';
+import {
+  useUnreadCount,
+  type NotificationsSignalHook,
+  type NotificationsSubscribe,
+} from './hooks';
 import { createInboxStore, type InboxStore } from './inbox-state';
 import { NotificationsPanel, type NotificationsPanelProps } from './panel';
 import { PreferencesScreen, type PreferencesScreenProps } from './preferences-screen';
@@ -41,6 +45,12 @@ export interface NotificationsWebConfig {
    * correctness.
    */
   subscribe?: NotificationsSubscribe;
+  /**
+   * The same wiring as a HOOK, for a host whose realtime connection lives in
+   * React context — see `NotificationsSignalHook`. `subscribe` is read at
+   * factory time, which such a host cannot reach.
+   */
+  useSignal?: NotificationsSignalHook;
   /** The browser push enable step's host seams (SW path, platform hint). */
   webPush?: WebPushSetupConfig;
 }
@@ -79,7 +89,10 @@ export function createWebNotifications(config: NotificationsWebConfig): WebNotif
   const store = createInboxStore(api);
   const webPush = config.webPush ?? {};
   const subscribe = config.subscribe;
-  const subscribeOption = subscribe ? { subscribe } : {};
+  const subscribeOption = {
+    ...(subscribe ? { subscribe } : {}),
+    ...(config.useSignal ? { useSignal: config.useSignal } : {}),
+  };
 
   const Bell: ComponentType<BellButtonProps> = (props) => (
     <BellButton {...props} store={store} messages={messages} {...subscribeOption} />
