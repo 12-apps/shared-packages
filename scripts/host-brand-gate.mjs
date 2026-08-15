@@ -85,6 +85,14 @@ function trackedFiles() {
     .filter(Boolean);
 }
 
+/** Every offence in one file's text, as `path:line — label`. */
+function offencesIn(file, text) {
+  return text.split("\n").flatMap((line, index) => {
+    const hit = BANS.find(({ pattern }) => pattern.test(line));
+    return hit ? [`${file}:${index + 1} — ${hit.label}`] : [];
+  });
+}
+
 function sweep() {
   const offences = [];
   for (const file of trackedFiles()) {
@@ -95,11 +103,7 @@ function sweep() {
       continue; // deleted in the working tree, or unreadable — nothing to say
     }
     if (text.includes("\0")) continue; // binary
-    const lines = text.split("\n");
-    for (let i = 0; i < lines.length; i += 1) {
-      const hit = BANS.find(({ pattern }) => pattern.test(lines[i]));
-      if (hit) offences.push(`${file}:${i + 1} — ${hit.label}`);
-    }
+    offences.push(...offencesIn(file, text));
   }
   return offences;
 }
