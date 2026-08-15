@@ -119,13 +119,18 @@ What you get back:
 | `GET` | `/audit-logs` | the tenant's trail, newest first — `{ data, pagination }` |
 | `GET` | `/audit-logs/actors` | the viewer's actor-filter options — `{ data }` |
 
-Filters: `q` (resource id contains), `action_in`, `resourceType_in`,
-`actorUserId`, `resourceId`, `from`/`to` (inclusive `YYYY-MM-DD`), `page`,
-`pageSize`. The paging numbers are config (`pagination`), defaulting to 20 / 100
-/ 10 000. Unknown filter values and malformed dates are `400`; a denial is
-`{ error }` at the top level with `401` / `403`.
+Filters: `q` (resource id contains, ≤200 chars), `action_in`, `resourceType_in`,
+`actorUserId`, `resourceId`, `from`/`to` (inclusive `YYYY-MM-DD`), `sort`,
+`page`, `pageSize`. The paging numbers are config (`pagination`), defaulting to
+20 / 100 / 10 000, and they are published as bounded integers rather than as
+bare strings. Unknown filter values, an unservable `sort` and malformed dates are
+`400` — never accepted and ignored; a denial is `{ error }` at the top level with
+`401` / `403`.
 
-The listing's order is **total**: `created_at DESC, id DESC`. An audit trail is
+The listing's order is **total**: `created_at DESC, id DESC` by default, or
+`ASC, ASC` for `?sort=createdAt:asc` — `created_at` is the one axis a trail has,
+and reading it forwards is how an incident is reconstructed. The tie-break
+follows the direction, or the two views would not be reverses of each other. An audit trail is
 written in bursts and `created_at` is `timestamp(3)`, so ties are ordinary — and
 SQL guarantees nothing about the order of rows a sort cannot distinguish, which
 with `skip`/`take` means a reader sees one entry twice and never sees another.
@@ -152,7 +157,9 @@ const { page: AuditLog } = createWebAudit({
 ```
 
 The whole viewer: the resource-id search, the action and resource pills, the
-actor picker, the day bounds, the trail with its diff summary and pagination —
+actor picker, the day bounds (masked, in the declared locale's order, each with
+its own clear), the sortable date column, the trail with its diff summary and
+pagination —
 and the impersonation pair rendered as one line naming **both** people. The
 vocabulary is shared with the backend half, so an action that exists is an action
 the viewer can label.

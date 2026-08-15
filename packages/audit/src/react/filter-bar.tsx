@@ -10,7 +10,8 @@ import { Text } from '@12-apps/ui/typography/Text';
 import type { AuditActorOptionWire, AuditLogFilters } from '../core/types';
 import type { AuditVocabulary } from '../core/vocabulary';
 
-import type { AuditLabels } from './labels';
+import { DayBound, type DayFormat, type DaySegment } from './day-bound';
+import { formatLabel, type AuditLabels } from './labels';
 
 /**
  * The viewer's filter bar: the resource-id search, the action and
@@ -21,6 +22,12 @@ import type { AuditLabels } from './labels';
  * native `<select>`: this bar is the one part of the surface a host with a
  * non-MUI design system still has to render, so the controls stay as plain as the
  * behaviour allows (the payments "two design systems" proof is the precedent).
+ *
+ * The day bounds are the ONE control here that is not the plainest thing that
+ * could work: they are masked text fields rather than `<input type="date">`,
+ * because a controlled native date input cannot survive the commit latency a
+ * URL-mirroring host introduces, and renders in a locale the surface does not
+ * choose. Both reasons, with the measurement, are in `day-bound.tsx`.
  */
 
 /** Add or remove one value from a pill filter, preserving declaration order. */
@@ -74,9 +81,18 @@ export interface AuditFilterBarProps {
   labels: AuditLabels;
   vocabulary: AuditVocabulary;
   actors: readonly AuditActorOptionWire[];
+  /** The locale's date order — see `day-bound.tsx`. */
+  dayFormat: DayFormat;
   /** Applies a filter change and resets to page 1 (the screen owns that rule). */
   onChange: (next: AuditLogFilters) => void;
 }
+
+/** The placeholder's letters, in the host's words. */
+const segmentNames = (labels: AuditLabels): Readonly<Record<DaySegment, string>> => ({
+  day: labels.dayPlaceholderDay,
+  month: labels.dayPlaceholderMonth,
+  year: labels.dayPlaceholderYear,
+});
 
 /** The free-text box: typing is local, Enter commits (the house affordance). */
 function SearchBox({
@@ -161,8 +177,10 @@ export function AuditFilterBar({
   labels,
   vocabulary,
   actors,
+  dayFormat,
   onChange,
 }: AuditFilterBarProps): JSX.Element {
+  const names = segmentNames(labels);
   // Built from the vocabulary's OWN id order and its own label lookup — the
   // same two things the server's filter enum is built from, so a pill this
   // screen offers is a value that endpoint accepts.
@@ -188,23 +206,23 @@ export function AuditFilterBar({
           value={filters.actorUserId}
           onChange={(actorUserId) => onChange({ ...filters, actorUserId })}
         />
-        <Input
-          type="date"
+        <DayBound
           label={labels.filterFrom}
-          aria-label={labels.filterFrom}
-          InputLabelProps={{ shrink: true }}
           value={filters.from ?? ''}
-          data-testid="audit-log-from"
-          onChange={(event) => onChange({ ...filters, from: event.target.value || undefined })}
+          segmentNames={names}
+          clearLabel={formatLabel(labels.clearBound, { field: labels.filterFrom })}
+          format={dayFormat}
+          testId="audit-log-from"
+          onCommit={(from) => onChange({ ...filters, from })}
         />
-        <Input
-          type="date"
+        <DayBound
           label={labels.filterTo}
-          aria-label={labels.filterTo}
-          InputLabelProps={{ shrink: true }}
           value={filters.to ?? ''}
-          data-testid="audit-log-to"
-          onChange={(event) => onChange({ ...filters, to: event.target.value || undefined })}
+          segmentNames={names}
+          clearLabel={formatLabel(labels.clearBound, { field: labels.filterTo })}
+          format={dayFormat}
+          testId="audit-log-to"
+          onCommit={(to) => onChange({ ...filters, to })}
         />
         <Button variant="text" dataTestId="audit-log-clear" onClick={() => onChange({})}>
           {labels.clearFilters}

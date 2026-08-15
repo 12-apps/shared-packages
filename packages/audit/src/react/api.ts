@@ -38,6 +38,7 @@ export function auditQueryString(filters: AuditLogFilters): string {
     ['resourceId', filters.resourceId],
     ['from', filters.from],
     ['to', filters.to],
+    ['sort', filters.sort],
     ['page', filters.page && filters.page > 1 ? String(filters.page) : undefined],
     ['pageSize', filters.pageSize ? String(filters.pageSize) : undefined],
   ];
