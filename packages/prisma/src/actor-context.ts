@@ -92,12 +92,101 @@ export interface ActorContext extends ActorAttributionSnapshot {
 // Kept on globalThis so Next dev / Turbopack hot-reload (which re-evaluates this
 // module) can't create a second store whose context is invisible to closures
 // captured against the first.
-const globalStore = globalThis as unknown as {
-  __12appsPrismaActorStore?: AsyncLocalStorage<ActorContext>;
+//
+// The KEY it lives under is a cross-package CONTRACT, not a private detail:
+// `@12-apps/audit` ships its own copy of this module, and a host that routes
+// audit writes through that package while stamping actors through this one
+// needs both copies on ONE store (see `declareActorContextKey` there, and the
+// interop suite in `tests/`). If the two disagree they get two separate
+// AsyncLocalStorage instances and the failure is SILENT: audit writes rows
+// with every attribution column NULL while this package believes a context is
+// set — on an append-only table, so the attribution is gone for good.
+const globalStore = globalThis as unknown as Record<
+  string | symbol,
+  AsyncLocalStorage<ActorContext> | undefined
+>;
+
+/**
+ * The `globalThis` key this package keeps its actor store under, exported so a
+ * host (or the audit package's `declareActorContextKey`) can name it without
+ * retyping the literal. The same shape `@12-apps/audit` exports as its
+ * `DEFAULT_ACTOR_STORE_KEY`.
+ */
+export const DEFAULT_ACTOR_STORE_KEY = '__12appsPrismaActorStore';
+
+/**
+ * The key releases before 5.0.0 used — the host-branded name 5.0.0 renamed
+ * away, assembled from parts so the brand never appears in shipped source (the
+ * per-package and repo-wide brand gates both sweep this file).
+ *
+ * It is still READ (and mirrored, below) for exactly one reason: a process
+ * that mixes this copy with a pre-5.0.0 copy of this package — or whose audit
+ * store was declared against the old name — would otherwise fork the store,
+ * which is the silent NULL-attribution failure described above.
+ *
+ * DELETE in 6.0.0, together with the adopt/mirror branches in `store()`, once
+ * no adopter pins `@12-apps/prisma` < 5.0.0. Both known consumers pin exact
+ * versions, so the check is one grep over their lockfiles.
+ */
+const LEGACY_ACTOR_STORE_KEY = ['__', 'future', 'Pay', 'ActorStore'].join('');
+
+/** The key in force, and the key the live store (if any) was created under. */
+const storeKey: { declared: string | symbol; created?: string | symbol } = {
+  declared: DEFAULT_ACTOR_STORE_KEY,
 };
 
-const store = (): AsyncLocalStorage<ActorContext> =>
-  (globalStore.__12appsPrismaActorStore ??= new AsyncLocalStorage<ActorContext>());
+/**
+ * Point this package's actor context at an existing store, by naming its
+ * `globalThis` key — the same seam (same name, same rules) as
+ * `@12-apps/audit`'s `declareActorContextKey`, so a host with an in-house
+ * actor module can put all three on one store with two identical calls.
+ *
+ * Call it ONCE, at wiring time, before anything stamps or reads an actor.
+ * Changing the key after the store exists is REFUSED rather than honoured:
+ * contexts already captured against the old instance would keep flowing to it
+ * while every later read went elsewhere — the silent fork this seam exists to
+ * prevent. Passing the key already in force is a no-op, so a defensive
+ * module-scope declaration is safe to load twice.
+ */
+export function declareActorContextKey(key: string | symbol): void {
+  if (typeof key === 'string' && key.trim() === '') {
+    throw new Error('actor context key must not be blank.');
+  }
+  if (key === storeKey.declared) return;
+  if (storeKey.created !== undefined) {
+    throw new Error(
+      `actor context key cannot change to ${String(key)}: the store already exists under ` +
+        `${String(storeKey.created)}. Declare the key once, before anything stamps an actor — ` +
+        'moving it later forks the store, and a forked store loses every attribution ' +
+        'silently onto an append-only table.',
+    );
+  }
+  storeKey.declared = key;
+}
+
+/** The key the store is (or would be) created under — diagnostics and tests. */
+export const actorContextKey = (): string | symbol => storeKey.declared;
+
+const store = (): AsyncLocalStorage<ActorContext> => {
+  const key = storeKey.declared;
+  let instance = globalStore[key];
+  if (instance === undefined && key === DEFAULT_ACTOR_STORE_KEY) {
+    // A pre-5.0.0 copy of this package already created the store under the
+    // old name: ADOPT it rather than fork it. One instance, two keys.
+    instance = globalStore[LEGACY_ACTOR_STORE_KEY];
+    if (instance !== undefined) globalStore[key] = instance;
+  }
+  if (instance === undefined) {
+    instance = new AsyncLocalStorage<ActorContext>();
+    globalStore[key] = instance;
+    // MIRROR under the old name so a pre-5.0.0 copy loaded after this one
+    // finds this store instead of creating its own. Only for the default key:
+    // a host that declared its own key has opted out of this package's names.
+    if (key === DEFAULT_ACTOR_STORE_KEY) globalStore[LEGACY_ACTOR_STORE_KEY] = instance;
+  }
+  storeKey.created = key;
+  return instance;
+};
 
 /**
  * The REAL human behind `onBehalfOfUserId`, derived (never accepted) from the

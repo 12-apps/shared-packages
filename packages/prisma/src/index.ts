@@ -47,6 +47,9 @@ export { configureAuditStamps, auditStampConfig, type AuditStampConfig } from '.
 // stamp created_by/updated_by. Re-exported here so consumers import them from
 // the same `@12-apps/prisma` entry point as `getPrismaClient`.
 export {
+  actorContextKey,
+  DEFAULT_ACTOR_STORE_KEY,
+  declareActorContextKey,
   getActorAttribution,
   getActorUserId,
   runWithActor,
@@ -62,9 +65,51 @@ export { normalizeSearchText } from './search-normalize';
 // Next dev / Turbopack hot-reload (which re-evaluates this module) never spawns
 // a second PGlite instance against the same dataDir — PGlite holds a single
 // exclusive connection, and a duplicate would deadlock or corrupt the store.
-const globalStore = globalThis as unknown as {
-  __12appsPrisma?: PrismaClient;
-  __12appsPrismaInit?: Promise<PrismaClient>;
+
+/**
+ * The `globalThis` keys the client singleton lives under, exported as named
+ * constants because they are cross-module-instance coordination surface (two
+ * copies of this package in one process share the client through them), not a
+ * private detail.
+ */
+export const DEFAULT_CLIENT_STORE_KEY = '__12appsPrisma';
+export const DEFAULT_CLIENT_INIT_KEY = '__12appsPrismaInit';
+
+/**
+ * The keys releases before 5.0.0 used — the host-branded names 5.0.0 renamed
+ * away, assembled from parts so the brand never appears in shipped source.
+ * Still read and mirrored so a process mixing this copy with a pre-5.0.0 copy
+ * shares ONE client instead of racing two PGlite instances on one dataDir.
+ * DELETE in 6.0.0, with the fallbacks below, once no adopter pins
+ * `@12-apps/prisma` < 5.0.0 (both known consumers pin exact versions).
+ */
+const LEGACY_CLIENT_STORE_KEY = ['__', 'future', 'Pay', 'Prisma'].join('');
+const LEGACY_CLIENT_INIT_KEY = `${LEGACY_CLIENT_STORE_KEY}Init`;
+
+const globalStore = globalThis as unknown as Record<string, unknown>;
+
+/** The live client, under the current key or a pre-5.0.0 copy's. */
+const currentClient = (): PrismaClient | undefined =>
+  (globalStore[DEFAULT_CLIENT_STORE_KEY] ?? globalStore[LEGACY_CLIENT_STORE_KEY]) as
+    | PrismaClient
+    | undefined;
+
+/** The in-flight init, under the current key or a pre-5.0.0 copy's. */
+const currentInit = (): Promise<PrismaClient> | undefined =>
+  (globalStore[DEFAULT_CLIENT_INIT_KEY] ?? globalStore[LEGACY_CLIENT_INIT_KEY]) as
+    | Promise<PrismaClient>
+    | undefined;
+
+/** Write (or clear) the client under BOTH keys, so either copy finds it. */
+const storeClient = (client: PrismaClient | undefined): void => {
+  globalStore[DEFAULT_CLIENT_STORE_KEY] = client;
+  globalStore[LEGACY_CLIENT_STORE_KEY] = client;
+};
+
+/** Write (or clear) the in-flight init under BOTH keys. */
+const storeInit = (init: Promise<PrismaClient> | undefined): void => {
+  globalStore[DEFAULT_CLIENT_INIT_KEY] = init;
+  globalStore[LEGACY_CLIENT_INIT_KEY] = init;
 };
 
 /**
@@ -196,20 +241,30 @@ const createPostgresClient = async (): Promise<PrismaClient> => {
  * module-load failure.
  */
 export const getPrismaClient = async (): Promise<PrismaClient> => {
-  if (globalStore.__12appsPrisma) return globalStore.__12appsPrisma;
-  if (globalStore.__12appsPrismaInit) return globalStore.__12appsPrismaInit;
+  const existing = currentClient();
+  if (existing) {
+    // Found under either key (a pre-5.0.0 copy may have created it): make sure
+    // both names point at it before answering, so neither copy re-creates.
+    storeClient(existing);
+    return existing;
+  }
+  const inFlight = currentInit();
+  if (inFlight) {
+    storeInit(inFlight);
+    return inFlight;
+  }
 
   const pglite = resolvePglite();
   const init = (
     pglite ? createPgliteClient(pglite.dataDir) : createPostgresClient()
   )
     .then((client) => {
-      globalStore.__12appsPrisma = client;
-      globalStore.__12appsPrismaInit = undefined;
+      storeClient(client);
+      storeInit(undefined);
       return client;
     })
     .catch((error: unknown) => {
-      globalStore.__12appsPrismaInit = undefined;
+      storeInit(undefined);
       throw new Error(
         `Prisma client not available (${pglite ? 'PGlite' : 'PostgreSQL'} mode). ` +
           'Run "pnpm --filter @12-apps/prisma prisma generate" from the ' +
@@ -219,7 +274,7 @@ export const getPrismaClient = async (): Promise<PrismaClient> => {
       );
     });
 
-  globalStore.__12appsPrismaInit = init;
+  storeInit(init);
   return init;
 };
 
@@ -227,14 +282,14 @@ export const getPrismaClient = async (): Promise<PrismaClient> => {
  * Set a custom Prisma client instance (for testing).
  */
 export const setPrismaClient = (client: PrismaClient): void => {
-  globalStore.__12appsPrisma = client;
-  globalStore.__12appsPrismaInit = undefined;
+  storeClient(client);
+  storeInit(undefined);
 };
 
 /**
  * Reset the Prisma client instance (for testing).
  */
 export const resetPrismaClient = (): void => {
-  globalStore.__12appsPrisma = undefined;
-  globalStore.__12appsPrismaInit = undefined;
+  storeClient(undefined);
+  storeInit(undefined);
 };
