@@ -156,6 +156,38 @@ library updates, every host updates with **no app changes**. Same contract
 | POST | `/api/oauth/token` | `authorization_code` (single-use, PKCE-verified, bound `redirect_uri`) and `refresh_token` (rotated, client-bound, narrow-only scope) |
 | POST | `/api/oauth/register` | 201 RFC 7591 client information; the secret exactly once, hashed at rest |
 
+## The MCP transport (`/api/mcp`)
+
+`handleMcpJsonRpc` is the JSON-RPC 2.0 request half of the Streamable HTTP
+transport: the envelope, the method table (`initialize`, `ping`, `tools/list`,
+`tools/call`), the error codes and the notification convention. The host keeps
+what is its own — the server's name, its advertised surface version, and the
+`instructions` an agent reads on connect:
+
+```ts
+import { handleMcpJsonRpc, UNAUTHORIZED_CODE } from '@12-apps/mcp';
+
+const response = await handleMcpJsonRpc(body, registry, auth, {
+  serverInfo: { name: 'example-host', version: `${MCP_SURFACE_VERSION}.0.0` },
+  instructions: 'Resolve the tenant with `listUserTenants` before acting.',
+});
+```
+
+Three rules the signature enforces rather than documents:
+
+- **Discovery stays open.** `auth` is `null` when the request carried no valid
+  bearer; only `tools/call` refuses, with `UNAUTHORIZED_CODE` (-32001), which the
+  host maps to HTTP 401. A client can read the surface before it has a token.
+- **`null` means "no reply".** Notifications (`notifications/*`) return `null`,
+  and the host must send no body for them.
+- **A malformed payload is answered, not thrown.** A `null` batch element or an
+  object with no `method` returns -32600, so one bad element cannot 500 the route.
+
+`serverInfo.version` is the ONLY signal a connected client gets that the tool
+surface moved — this transport has no server→client stream, so
+`capabilities.tools` deliberately does not claim `listChanged`. Pair it with the
+surface lock (`mcp:generate`) so forgetting the bump is a build error.
+
 ## Minimal host (Hono)
 
 ```ts
