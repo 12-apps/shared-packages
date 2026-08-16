@@ -5,7 +5,7 @@
 -- with no foreign key (that is what keeps the package host-agnostic), so a host
 -- that deletes its tenant row and then sweeps the remaining by-value tables by
 -- `client_id` could never remove a shift: the RAISE aborted the whole
--- transaction. The origin host's demo-store reset does exactly that on EVERY deploy,
+-- transaction. Future Pay's demo-store reset does exactly that on EVERY deploy,
 -- so a single shift row would have wedged the deploy step.
 --
 -- Deletability is host policy, not a package invariant. What the guard actually

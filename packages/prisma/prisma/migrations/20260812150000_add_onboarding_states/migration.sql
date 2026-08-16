@@ -2,13 +2,13 @@
 -- the package and copied into a host's migrations folder by its
 -- plugin-migration sync.
 --
--- The columns, defaults, indexes and the status CHECK are the origin host's
+-- The columns, defaults, indexes and the status CHECK are future-pay's
 -- `20260715180000_add_onboarding_state_mcp_connection` verbatim, minus two
 -- things that are the HOST's vocabulary rather than the package's:
 --
 --   * the FKs to `users` / `clients` — this package cannot know the name of a
 --     host's user or tenant table. A host that has them keeps its own
---     constraints (the origin host's are ON DELETE CASCADE) and they stay
+--     constraints (future-pay's are ON DELETE CASCADE) and they stay
 --     compatible with everything the package writes;
 --   * the `mcp_connections` half of that migration, which belongs to
 --     @12-apps/mcp and ships in ITS folder.
@@ -16,7 +16,7 @@
 -- EVERY statement is guarded (`IF NOT EXISTS`, and a conrelid-scoped DO block
 -- for the CHECK, which has no IF NOT EXISTS form). That is what makes adoption
 -- by a host that ALREADY has the table a no-op instead of a failed deploy —
--- the origin host applies this and nothing changes, no `prisma migrate resolve`
+-- future-pay applies this and nothing changes, no `prisma migrate resolve`
 -- dance required. It is also what lets the PGlite provisioner replay it into an
 -- existing schema, which is how the harness and the integration suites run.
 
