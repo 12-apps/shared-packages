@@ -153,14 +153,18 @@ function tail(output, lines = 25) {
 /**
  * Release ONE package, retrying while the failure looks transient.
  *
- * Returns null when the package released (or had nothing to release, which
- * semantic-release also reports as success); returns the diagnosis otherwise.
+ * Returns `{ failure, output }`. `failure` is null when the package released
+ * (or had nothing to release, which semantic-release also reports as success)
+ * and the diagnosis otherwise; `output` is the last attempt's log, which
+ * silentNoRelease() reads to tell those two successes apart.
  */
 function releasePackage(dir, pkg) {
+  let output = "";
   for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
-    const { ok, output } = semanticRelease(dir, pkg);
+    const run = semanticRelease(dir, pkg);
+    output = run.output;
     console.log(tail(output, 60));
-    if (ok) return null;
+    if (run.ok) return { failure: null, output };
 
     const { retry, why } = classify(output);
     if (retry && attempt < ATTEMPTS) {
@@ -172,9 +176,45 @@ function releasePackage(dir, pkg) {
       sleep(wait * 1000);
       continue;
     }
-    return `${pkg}: semantic-release failed${retry ? ` after ${ATTEMPTS} attempts` : ""}\n${tail(output)}`;
+    return {
+      failure: `${pkg}: semantic-release failed${retry ? ` after ${ATTEMPTS} attempts` : ""}\n${tail(output)}`,
+      output,
+    };
   }
-  return null;
+  return { failure: null, output };
+}
+
+// semantic-release's own accounting of the range it analysed. Both lines come
+// from the CORE rather than a plugin, so they do not move with plugin config.
+const COMMITS_IN_RANGE = /Found (\d+) commits? since last release/;
+const NOTHING_RELEASED = /There are no relevant changes, so no new version is released/;
+
+/**
+ * The success that ships nothing: commits landed in this package's range and
+ * NOT ONE of them produced a version.
+ *
+ * semantic-release exits 0 for both "nothing changed here" and "things changed
+ * and none of them counted", and this step prints the same green line for each.
+ * The second is almost always a mistake, and it is silent in the one direction
+ * that matters — the fix is on main, the registry never gets it, and every later
+ * run agrees there is nothing to do.
+ *
+ * How this repo met it: `fix(prisma)!: …` on main. The `!` shorthand is
+ * conventionalcommits, and semantic-release runs the ANGULAR preset, whose
+ * headerPattern does not allow it — so the header did not parse at all and the
+ * commit was worth NO release rather than the major its author intended. It was
+ * the only commit in range for prisma, mcp, notifications, onboarding and shift,
+ * all five of which carried a production migration fix. `0 published, 30 already
+ * on the registry`, exit 0, nothing said.
+ *
+ * A WARNING and not a failure, because the state is legitimate too: a
+ * `docs(pkg)` or `test(pkg)` commit is a real change that correctly releases
+ * nothing. Distinguishing intent from a commit message is not something this
+ * script can do — naming the packages, so a human can, is.
+ */
+function silentNoRelease(output) {
+  if (!NOTHING_RELEASED.test(output)) return 0;
+  return Number((output.match(COMMITS_IN_RANGE) ?? [, "0"])[1]);
 }
 
 function summarize(lines) {
@@ -202,6 +242,7 @@ if (DIRS.length === 0) throw new Error("PUBLISH_DIRS is empty — nothing to rel
 
 const failures = [];
 const failed = [];
+const silent = [];
 
 // Every package is attempted, even after one fails. The loop is in topological
 // order and a failure here means "this package did not get a NEW version" — it
@@ -210,15 +251,29 @@ const failed = [];
 for (const dir of DIRS) {
   const pkg = basename(dir);
   console.log(`::group::semantic-release ${pkg}`);
-  const failure = releasePackage(dir, pkg);
+  const { failure, output } = releasePackage(dir, pkg);
   if (failure) {
     failed.push(pkg);
     failures.push(failure);
+  } else {
+    // `pkg:count`, with no space in it, because handOff() joins on spaces.
+    const count = silentNoRelease(output);
+    if (count > 0) silent.push(`${pkg}:${count}`);
   }
   console.log("::endgroup::");
 }
 
 for (const failure of failures) console.log(`::error::${failure}`);
+
+for (const entry of silent) {
+  const [pkg, count] = entry.split(":");
+  console.log(
+    `::warning::${pkg}: ${count} commit(s) in range and NO release. If any of them was ` +
+      `meant to ship, its subject did not say so in a form the commit-analyzer reads — ` +
+      `note the \`!\` breaking shorthand is NOT parsed by the angular preset, so use a ` +
+      `BREAKING CHANGE footer`,
+  );
+}
 
 summarize([
   `${DIRS.length - failed.length} of ${DIRS.length} package(s) versioned and tagged`,
@@ -228,8 +283,21 @@ summarize([
           `package tagged before these still reaches the registry`,
       ]
     : []),
+  ...(silent.length > 0
+    ? [
+        `**changed but released nothing**: ${silent
+          .map((entry) => entry.replace(":", " ("))
+          .map((entry) => `${entry} commits)`)
+          .join(", ")} — commits landed in these packages and none produced a version. ` +
+          `Legitimate for docs/test/chore; a mistake for anything meant to ship`,
+      ]
+    : []),
 ]);
 
 handOff(failed, "TAG_FAILED");
+// Named for what a reader must check, not for a verdict this script cannot
+// reach: the packages ARE changed, and whether that should have released is a
+// judgement about intent that only the commit's author has.
+handOff(silent, "CHANGED_NO_RELEASE");
 
 if (failed.length > 0) process.exitCode = 1;

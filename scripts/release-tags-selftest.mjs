@@ -82,6 +82,20 @@ const BROKEN_CONFIG = [
 const RELEASED = "[semantic-release] › ℹ  Published release 1.22.0 on default channel";
 const NOTHING = "[semantic-release] › ℹ  There are no relevant changes, so no new version is released.";
 
+/**
+ * The OTHER exit-0-and-shipped-nothing, in run 31971842924's shape: commits
+ * landed in range and not one produced a version. semantic-release prints the
+ * same closing line as NOTHING and exits 0 either way, which is how
+ * `fix(prisma)!: …` released nothing for five packages while the job stayed
+ * green. `Found N commits` is the only line that tells the two apart.
+ */
+const CHANGED_BUT_SILENT = [
+  "[semantic-release] › ℹ  Found git tag prisma-v5.1.0 associated with version 5.1.0 on branch main",
+  "[semantic-release] › ℹ  Found 1 commits since last release",
+  "[semantic-release] › ℹ  Analysis of 1 commits complete: no release",
+  NOTHING,
+].join("\n");
+
 // ── The scripted pnpm ───────────────────────────────────────────────────────
 
 /**
@@ -286,6 +300,43 @@ check(
   clean.argv.some((call) => call.startsWith("auth :: ") && call.includes("--tag-format auth-v${version}")) &&
     clean.argv.some((call) => call.startsWith("ui :: ") && call.includes("--tag-format ui-v${version}")),
   `--tag-format keeps the scheme 700+ existing tags use. Without it\n    semantic-release-monorepo imposes @12-apps/ui-v1.2.3, under which no package\n    finds its own last tag and every one resets to 1.0.0. Calls:\n    ${clean.argv.join("\n    ")}`,
+);
+
+// ── exit 0 and nothing shipped: the success that has to be told apart ──────
+//
+// Both packages "succeed" and neither is tagged. `ui` is correct — nothing in
+// its range. `prisma` is the bug. Told apart in BOTH directions: a warning that
+// fires for `ui` too is noise on every release, one that fires for neither is
+// today's silence.
+const quiet = releaseTags(["prisma", "ui"], {
+  prisma: [{ status: 0, out: CHANGED_BUT_SILENT }],
+  ui: [{ status: 0, out: NOTHING }],
+});
+
+check(
+  "a package with commits in range and no release is named",
+  /::warning::prisma: 1 commit\(s\) in range and NO release/.test(quiet.output),
+  `semantic-release exits 0 for this, so nothing else in the job can see it.\n    Output was:\n    ${quiet.output}`,
+);
+check(
+  "the warning says what to check, including the ! shorthand the preset ignores",
+  /BREAKING CHANGE footer/.test(quiet.output) && /angular preset/.test(quiet.output),
+  "the reader has to know WHY a commit that looked like a release was not one",
+);
+check(
+  "it is handed to the rest of the job with its commit count",
+  /^CHANGED_NO_RELEASE=prisma:1$/m.test(quiet.handoff),
+  `later steps read GITHUB_ENV, and the count is what makes the entry actionable.\n    Handoff was: ${JSON.stringify(quiet.handoff)}`,
+);
+check(
+  "a package with NO commits in range is not reported",
+  !/ui: \d+ commit/.test(quiet.output) && !/CHANGED_NO_RELEASE=.*\bui\b/.test(quiet.handoff),
+  `this is the normal state for 29 of 30 packages on every release — warning about\n    it would bury the one that matters. Output was:\n    ${quiet.output}`,
+);
+check(
+  "and none of it fails the run",
+  quiet.status === 0,
+  `expected exit 0: a docs or test commit legitimately releases nothing, so this is\n    a warning. Got ${quiet.status}`,
 );
 
 // ── The two copies of the package list must be the same list ───────────────
