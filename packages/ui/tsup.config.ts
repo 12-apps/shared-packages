@@ -87,6 +87,7 @@
  * publishing uses.
  */
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { glob } from 'glob';
 import { defineConfig, type Options } from 'tsup';
@@ -124,7 +125,15 @@ export default defineConfig(() => {
 
   return {
     ...shared,
-    entry: JSON.parse(readFileSync('entries.json', 'utf8')) as Record<string, string>,
+    // Resolved against THIS FILE, never the cwd. knip loads this config to
+    // discover entry points and runs it from the repo root, where a relative
+    // 'entries.json' is ENOENT — which fails the whole static-gates job, not
+    // just knip. `__dirname` because tsup transpiles this config to CJS, so
+    // `import.meta` is not available here (see the plugin note below).
+    entry: JSON.parse(readFileSync(join(__dirname, 'entries.json'), 'utf8')) as Record<
+      string,
+      string
+    >,
     // See the docstring: this is what keeps the theme, the emotion cache and
     // every React context a single module across 129 entries.
     splitting: true,
