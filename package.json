@@ -11,7 +11,7 @@
     "quality": "pnpm quality:complexity && pnpm quality:flakiness && pnpm quality:portability && pnpm quality:release",
     "quality:complexity": "eslint --config eslint.complexity.config.mjs .",
     "quality:flakiness": "eslint --config eslint.flakiness.config.mjs .",
-    "quality:portability": "pnpm quality:portability:selftest && node scripts/host-brand-gate.mjs && eslint --config eslint.payments-portability.config.mjs .",
+    "quality:portability": "pnpm quality:portability:selftest && node scripts/host-brand-gate.mjs && node scripts/migration-freeze-gate.mjs && eslint --config eslint.payments-portability.config.mjs .",
     "quality:portability:selftest": "node scripts/payments-portability-selftest.mjs",
     "quality:release": "node scripts/publish-selftest.mjs && node scripts/release-tags-selftest.mjs && node scripts/release-alert-selftest.mjs && node scripts/recover-orphans-selftest.mjs && node scripts/verify-released-selftest.mjs",
     "quality:dup": "jscpd --min-tokens 50 --threshold 3 --gitignore --reporters consoleFull --format \"typescript,tsx,javascript,jsx\" --ignore \"**/*.test.*,**/*.spec.*,**/tests/**,**/__tests__/**,**/*.stories.*,**/generated/**,**/*.d.ts,**/dist/**,**/build/**,**/.turbo/**,**/coverage/**,**/storybook-static/**\" .",
@@ -22,7 +22,9 @@
     "test:bdd": "cd harness/frontend && npx bddgen test && npx playwright test --project=journeys",
     "quality:bdd": "node scripts/bdd-gate.mjs",
     "quality:all": "pnpm quality && pnpm quality:dup && pnpm quality:quarantine && pnpm quality:knip && pnpm quality:bdd",
-    "quality:agnostic": "node scripts/host-brand-gate.mjs"
+    "quality:agnostic": "node scripts/host-brand-gate.mjs",
+    "quality:migrations": "node scripts/migration-freeze-gate.mjs",
+    "quality:migrations:update": "node scripts/migration-freeze-gate.mjs --update"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",

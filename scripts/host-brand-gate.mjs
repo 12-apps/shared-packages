@@ -22,8 +22,28 @@
 // phrase "<A> <B>ments" and "in the future, pay attention" are not offences.
 // The domain-noun sweeps (mesa, comanda, R$ …) stay per-package, where the
 // package's own vocabulary decides what is foreign.
+//
+// ## The one category this gate does NOT sweep, and why it is not an allowlist
+//
+// A published `migration.sql` is excluded — see `isFrozenMigration`. Prisma
+// checksums the whole file, so an applied migration is not prose this repo can
+// revise: editing one breaks `prisma migrate deploy` against every database
+// that already ran it. This gate learned that the expensive way. Its first
+// sweep rewrote comments inside EIGHT already-published migrations (12-50),
+// which no lane could catch, because a suite that applies migration SQL to a
+// fresh database never consults a checksum.
+//
+// That is a category, not a judgement call, which is what keeps NO ALLOWLIST
+// intact: nobody decides whether a given migration deserves a pass, and no
+// entry has to be burned down. The rule still binds — it simply binds when the
+// migration is WRITTEN rather than for ever afterwards, and
+// `migration-freeze-gate.mjs` is where that happens. A new migration is not yet
+// frozen, so the freeze gate runs these very patterns over it before admitting
+// it to the lock, and refuses one that names the host. After that the bytes are
+// immutable and there is nothing left to enforce.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 import { Buffer } from "node:buffer";
 
@@ -34,7 +54,7 @@ const A = decode("ZnV0dXJl");
 const B = decode("cGF5");
 
 /** Every spelling the repo has actually shipped, each with its own reason. */
-const BANS = [
+export const BANS = [
   {
     // The joined spellings: hyphenated, dotted, snake_case, SCREAMING_SNAKE,
     // camelCase and fully fused. No space alternative here, so the ordinary
@@ -68,7 +88,7 @@ const BANS = [
  * The gate proves it can fire before claiming the tree is clean — a sweep
  * whose patterns rotted matches nothing and reads exactly like success.
  */
-function selftest() {
+export function selftest() {
   const mustCatch = [
     `${A}-${B}`,
     `${A}_${B}_AUDIT_VOCABULARY`.toUpperCase(),
@@ -108,8 +128,15 @@ function trackedFiles() {
     .filter(Boolean);
 }
 
+/**
+ * A published migration's bytes are frozen by `migration-freeze-gate.mjs`, so
+ * this sweep must not ask for an edit it cannot have. See the header.
+ */
+export const isFrozenMigration = (file) =>
+  /(^|\/)prisma\/migrations\/[^/]+\/migration\.sql$/.test(file);
+
 /** Every offence in one file's text, as `path:line — label`. */
-function offencesIn(file, text) {
+export function offencesIn(file, text) {
   return text.split("\n").flatMap((line, index) => {
     const hit = BANS.find(({ pattern }) => pattern.test(line));
     return hit ? [`${file}:${index + 1} — ${hit.label}`] : [];
@@ -119,6 +146,7 @@ function offencesIn(file, text) {
 function sweep() {
   const offences = [];
   for (const file of trackedFiles()) {
+    if (isFrozenMigration(file)) continue; // immutable — enforced at authoring, see the header
     let text;
     try {
       text = readFileSync(file, "utf8");
@@ -131,17 +159,20 @@ function sweep() {
   return offences;
 }
 
-selftest();
-const offences = sweep();
-if (offences.length > 0) {
-  console.error(`host-brand-gate: ${offences.length} mention(s) of the origin host's name:\n`);
-  for (const offence of offences) console.error(`  ${offence}`);
-  console.error(
-    "\nA shared package (or this repo's harness, docs and CI) must not name the " +
-      "application it was extracted from — not in exports, not in defaults, not in " +
-      "docstrings. Describe the host generically ('the origin host', 'one adopter') " +
-      "or move the host-specific artifact into the host's own repository.",
-  );
-  process.exit(1);
+/** Run only as a script: `migration-freeze-gate.mjs` imports the patterns. */
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  selftest();
+  const offences = sweep();
+  if (offences.length > 0) {
+    console.error(`host-brand-gate: ${offences.length} mention(s) of the origin host's name:\n`);
+    for (const offence of offences) console.error(`  ${offence}`);
+    console.error(
+      "\nA shared package (or this repo's harness, docs and CI) must not name the " +
+        "application it was extracted from — not in exports, not in defaults, not in " +
+        "docstrings. Describe the host generically ('the origin host', 'one adopter') " +
+        "or move the host-specific artifact into the host's own repository.",
+    );
+    process.exit(1);
+  }
+  console.log("host-brand-gate: clean — no tracked file names the origin host.");
 }
-console.log("host-brand-gate: clean — no tracked file names the origin host.");
