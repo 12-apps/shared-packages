@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -306,6 +306,38 @@ check(
   "ci.yml's PUBLISH_DIRS and release-packages.txt are the same list, in the same order",
   inWorkflow.length > 0 && inWorkflow.join(",") === inFile.join(","),
   `the two must not drift.\n    ci.yml (${inWorkflow.length}): ${inWorkflow.join(" ")}\n    release-packages.txt (${inFile.length}): ${inFile.join(" ")}`,
+);
+
+// ── Every released package must carry its own release config ───────────────
+//
+// semantic-release resolves its config with cosmiconfig, which searches UPWARD
+// from the cwd. So a package directory with no `.releaserc.json` does not fail
+// — it silently inherits the ROOT one, which does not `extends
+// semantic-release-monorepo`. Without that extension nothing narrows the commit
+// range to the package's own directory, and the package is versioned from the
+// WHOLE repository's history.
+//
+// `packages/request-scope` shipped that way. Measured on this tree: run bare, it
+// analysed 11 commits belonging to other packages, found the `BREAKING CHANGE`
+// footer on a `fix(app-shell)` commit, and computed `request-scope-v2.0.0` — a
+// major for a package with zero commits since its last tag. The release job then
+// failed on it (`TAG_FAILED: request-scope`) on every push to main for days.
+//
+// The inherited config is a VALID one, which is what makes this invisible: there
+// is no missing-file error to read, and the version it invents is plausible.
+// Only the range it was computed from is wrong. Hence a check on the file's
+// existence AND on the one key that does the narrowing — a `.releaserc.json`
+// that forgot `extends` fails exactly the same way as no file at all.
+const misconfigured = inFile.filter((dir) => {
+  const config = join(HERE, "..", dir, ".releaserc.json");
+  if (!existsSync(config)) return true;
+  return JSON.parse(readFileSync(config, "utf8")).extends !== "semantic-release-monorepo";
+});
+
+check(
+  "every released package has a .releaserc.json extending semantic-release-monorepo",
+  inFile.length > 0 && misconfigured.length === 0,
+  `without it semantic-release inherits the root config, whose commit range is the\n    WHOLE repository — the package is versioned off other packages' commits.\n    Missing or not extending semantic-release-monorepo: ${misconfigured.join(", ")}`,
 );
 
 if (failures.length > 0) {
