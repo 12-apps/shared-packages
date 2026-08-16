@@ -44,6 +44,19 @@ export {
   type McpToolDescriptor,
   type McpToolResult,
 } from "./server/registry";
+// The JSON-RPC 2.0 request half of the Streamable HTTP transport. The envelope,
+// the method table and the error codes are the specification's and live here; the
+// server NAME, its version and the `instructions` an agent reads on connect are
+// one product's vocabulary and arrive as options.
+export {
+  handleMcpJsonRpc,
+  MCP_PROTOCOL_VERSION,
+  UNAUTHORIZED_CODE,
+  type JsonRpcRequest,
+  type JsonRpcResponse,
+  type McpJsonRpcOptions,
+  type McpServerInfo,
+} from "./server/jsonrpc";
 export {
   buildManifest,
   serializeManifest,
