@@ -57,13 +57,11 @@ if (check) {
 
   // A matching map still proves nothing if the build never emitted the files:
   // that is precisely how 128 exports pointed at source for as long as they did.
-  const missing = [];
-  for (const [subpath, target] of Object.entries(expected)) {
-    if (typeof target === 'string') continue;
-    for (const file of [target.types, target.default]) {
-      if (!existsSync(file)) missing.push(`${subpath} -> ${file}`);
-    }
-  }
+  const missing = Object.entries(expected)
+    .flatMap(([subpath, target]) =>
+      [target.types, target.default].map((file) => `${subpath} -> ${file}`),
+    )
+    .filter((entry) => !existsSync(entry.split(' -> ')[1]));
   if (missing.length > 0) {
     console.error(`ui exports: ${missing.length} target(s) missing from dist. Run "pnpm build".\n`);
     for (const line of missing.slice(0, 20)) console.error(`  ${line}`);
