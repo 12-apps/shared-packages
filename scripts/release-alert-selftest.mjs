@@ -65,17 +65,27 @@ process.exit(0);
  * `issues` is the state the run starts from, so a case can say "an alert is
  * already open" without having to make one first.
  */
-function githubStub(issues) {
+function githubStub(issues, createStatus = 201) {
   const calls = [];
   const server = createServer((req, res) => {
     let body = "";
     req.on("data", (chunk) => (body += chunk));
     req.on("end", () => {
-      calls.push({ method: req.method, path: req.url.split("?")[0], body });
+      const path = req.url.split("?")[0];
+      calls.push({ method: req.method, path, body });
       const created = { number: 42, body: `${JSON.parse(body || "{}").body ?? ""}` };
       if (req.method === "GET") {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify(issues));
+        return;
+      }
+      // A repository that REFUSES issue creation. 410 is not hypothetical: it is
+      // what `12-apps/shared-packages` answers today, because Issues are
+      // disabled on it — so the alert channel this script is built around does
+      // not exist, and every alert it has raised has been a log line.
+      if (req.method === "POST" && path.endsWith("/issues") && createStatus >= 400) {
+        res.writeHead(createStatus, { "content-type": "application/json" });
+        res.end(JSON.stringify({ message: "Issues has been disabled in this repository." }));
         return;
       }
       res.writeHead(req.method === "POST" ? 201 : 200, { "content-type": "application/json" });
@@ -111,12 +121,12 @@ function workspace(packages) {
 }
 
 /** Runs the real scripts/release-alert.mjs against the stub API. */
-async function alert({ plan, issues = [], env = {} }) {
+async function alert({ plan, issues = [], env = {}, createStatus = 201 }) {
   const { root, bin, dirs } = workspace(Object.keys(plan));
   const planFile = join(root, "plan.json");
   writeFileSync(planFile, JSON.stringify(plan));
 
-  const { server, calls } = githubStub(issues);
+  const { server, calls } = githubStub(issues, createStatus);
   const port = await listen(server);
 
   // `spawn`, NOT `spawnSync`. The stub API is served by this very process, so a
@@ -276,6 +286,46 @@ check(
   "a package npm could not authenticate for gets the Trusted Publisher remedy",
   /Trusted Publisher/i.test(wedged.creations[0]?.body ?? ""),
   `"a plain re-run will not fix this" is the whole point of distinguishing it.\n    Body was:\n    ${wedged.creations[0]?.body}`,
+);
+
+// ── The alert channel itself is missing ─────────────────────────────────────
+//
+// The one case where this script's own premise fails. Its header says a GitHub
+// issue is "the alert channel this repo already has" — on `12-apps/shared-packages`
+// that is false, because Issues are disabled, so `POST /issues` answers 410 and
+// the alert degrades to a line in the run's log: the exact place the header says
+// nobody looks. It has to say so, and say it differently depending on whether a
+// webhook carried the alert anyway, or the dead channel is itself invisible.
+const noChannel = await alert({ plan: STUCK, createStatus: 410 });
+
+check(
+  "an alert that could not be filed says so, loudly",
+  /::error::THIS ALERT REACHED NOBODY/.test(noChannel.output),
+  `a failed POST used to degrade to the same ::warning:: a successful one prints.\n    Output was:\n    ${noChannel.output}`,
+);
+check(
+  "it names the cause and what to do about it",
+  /Issues are disabled/.test(noChannel.output) && /RELEASE_ALERT_WEBHOOK/.test(noChannel.output),
+  `"could not file" is not actionable; "Issues are disabled, set the webhook" is.\n    Output was:\n    ${noChannel.output}`,
+);
+check(
+  "the headline is still emitted, so the reason is not all a reader gets",
+  /::error::Release is STUCK for \S*auth — tagged, but never published/.test(noChannel.output),
+  `the alert's CONTENT must survive its channel failing.\n    Output was:\n    ${noChannel.output}`,
+);
+
+// The same refusal with a webhook configured: the alert did reach someone, so
+// this is a warning about durability, not a blackout.
+const webhookOnly = await alert({
+  plan: STUCK,
+  createStatus: 410,
+  env: { RELEASE_ALERT_WEBHOOK: "http://127.0.0.1:1/hook" },
+});
+
+check(
+  "with a webhook configured it is a warning about durability, not a blackout",
+  !/REACHED NOBODY/.test(webhookOnly.output) && /nothing here outlives the run/.test(webhookOnly.output),
+  `crying blackout when the webhook fired is the kind of false alarm that gets a\n    gate ignored. Output was:\n    ${webhookOnly.output}`,
 );
 
 if (failures.length > 0) {
