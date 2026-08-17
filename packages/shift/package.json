@@ -4,10 +4,17 @@
   "type": "module",
   "description": "Headless tenant-scoped work shifts with resource bindings and audit ports.",
   "exports": {
-    ".": "./src/index.ts",
-    "./types": "./src/types.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    }
   },
   "scripts": {
+    "build": "rm -rf dist && tsup",
     "clean": "rm -rf node_modules coverage",
     "test": "node ../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest watch",
@@ -16,12 +23,13 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.2.17",
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@electric-sql/pglite": "0.2.17",
     "@types/pg": "^8.16.0",
     "eslint": "^9.39.1",
     "pg": "^8.16.3",
+    "tsup": "^8.0.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   },
@@ -46,6 +54,7 @@
     "*.mjs",
     "*.md",
     "!eslint.config.js",
+    "!tsup.config.ts",
     "!**/__tests__/**",
     "!**/tests/**",
     "!**/*.test.*",
