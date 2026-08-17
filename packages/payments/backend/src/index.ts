@@ -308,6 +308,7 @@ export {
   hostedSnapshotMismatch,
 } from './core/charge-identity';
 export {
+  attemptIdempotencyKey,
   attemptReference,
   baseReference,
   attemptReferencePrefix,
