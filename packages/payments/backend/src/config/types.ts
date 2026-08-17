@@ -235,6 +235,13 @@ export type MaskedFields = Record<string, MaskedFieldState>;
 export interface MaskedProviderConfig {
   provider: ProviderName;
   enabled: boolean;
+  /**
+   * Whether the row's ACTIVE environment carries credentials its adapter can
+   * use (`hasUsableCredentials`). Projected so screens and platform tooling
+   * never have to read raw `StoredProviderConfig` rows just to learn this —
+   * the masked view is meant to be the only one a caller needs.
+   */
+  credentialed: boolean;
   /** Rank in the failover chain (ascending); meaningful only when enabled. */
   priority: number;
   environment: PaymentEnvironment;

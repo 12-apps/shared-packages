@@ -307,6 +307,16 @@ export {
   chargeSnapshotMismatch,
   hostedSnapshotMismatch,
 } from './core/charge-identity';
+export { isValidCpf } from './core/cpf';
+export { forgetVaultPointers, type VaultPointerRef } from './core/gateway-vault';
+export {
+  createConnectState,
+  parseEnvironment,
+  type ConnectAttribution,
+  type ConnectState,
+  type ConnectStateConfig,
+  type MintedConnectState,
+} from './config/connect-state';
 export {
   attemptIdempotencyKey,
   attemptReference,

@@ -1,4 +1,5 @@
 import { CredentialsError, UnknownProviderError } from '../core/errors';
+import { hasUsableCredentials } from './usable-credentials';
 import type { CredentialStore } from '../core/ports';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { ProviderRegistry } from '../core/registry';
@@ -110,6 +111,13 @@ export interface SettingsService {
    */
   setPriorities(merchant: MerchantRef, ordered: readonly ProviderName[]): Promise<MerchantSettingsView>;
   /**
+   * Move ONE enabled provider to the head of the merchant's failover chain,
+   * keeping the rest in their current relative order — the "make this the
+   * active one" verb every settings screen wants, expressed through the same
+   * reorder-only validation `setPriorities` runs.
+   */
+  promoteProvider(merchant: MerchantRef, provider: ProviderName): Promise<MerchantSettingsView>;
+  /**
    * Choose whether a declined card may be retried on the next acquirer.
    * Defaults to TECHNICAL; cascading is a deliberate, per-merchant opt-in
    * because it carries fraud and interchange-fee consequences.
@@ -158,6 +166,7 @@ function toMasked(adapter: PaymentProviderAdapter, config: StoredProviderConfig)
   return {
     provider: config.provider,
     enabled: config.enabled,
+    credentialed: hasUsableCredentials(adapter, config.environments[config.environment]),
     priority: config.priority,
     environment: config.environment,
     status: config.status,
@@ -306,6 +315,16 @@ export function createSettingsService(
       await assertReorderOnly(providers, store, merchant, ordered);
       await store.setProviderPriorities(merchant, ordered);
       return this.getSettings(merchant);
+    },
+
+    async promoteProvider(merchant, provider) {
+      const rows = await store.list(merchant);
+      const chain = rows
+        .filter((row) => row.enabled)
+        .sort((a, b) => a.priority - b.priority)
+        .map((row) => row.provider);
+      const ordered = [provider, ...chain.filter((name) => name !== provider)];
+      return this.setPriorities(merchant, ordered);
     },
 
     setupGuide(provider, ctx) {
