@@ -42,6 +42,12 @@ export {
   type OutstandingActivation,
 } from './reconcile';
 export { settleActivationCharge } from './webhook';
+export {
+  createActivationRouteExtensions,
+  type ActivationPayer,
+  type ActivationRoutesConfig,
+  type ActivationRoutesContext,
+} from './routes';
 // Public-API seam for the FRONTEND half of FUT-558: `<ProviderActivation>`
 // will pick the CARD-vs-REDIRECT branch from capabilities through this,
 // retiring the admin's provider-name table (`tokenizerFor`). No host consumer

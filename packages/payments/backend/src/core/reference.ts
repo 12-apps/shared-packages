@@ -79,3 +79,15 @@ export function baseReference(reference: string): string {
 export function attemptReferencePrefix(base: string): string {
   return `${base}${ATTEMPT_SEPARATOR}`;
 }
+
+/**
+ * The idempotency key ONE attempt on `base` is deduplicated under at the
+ * provider. Minted here so the formula has exactly one definition:
+ * `attemptReference` moved package-side and the key that must move in
+ * lockstep with it was left for hosts to spell by hand — and a host whose
+ * spelling drifts breaks provider dedup silently (a retried attempt
+ * re-charges instead of answering the charge already stored under the key).
+ */
+export function attemptIdempotencyKey(base: string, attempt: number): string {
+  return `${base}:${attempt}`;
+}
