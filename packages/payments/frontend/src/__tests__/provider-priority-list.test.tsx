@@ -19,6 +19,9 @@ function config(provider: string, enabled: boolean, priority: number): MaskedPro
   return {
     provider,
     enabled,
+    // Proven rows carry usable keys by definition — same reasoning as
+    // chargeVerifiedAt below.
+    credentialed: true,
     priority,
     environment: 'SANDBOX',
     status: 'VERIFIED',
