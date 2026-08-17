@@ -28,6 +28,11 @@ export {
 } from "./guide";
 export { generateTools } from "./openapi/generate";
 export { inlineSchemaRefs, UnsupportedSchemaError } from "./openapi/refs";
+// The shape a route is DECLARED in, upstream of the OpenAPI document. It lives
+// here so that packages which own a domain can ship that domain's endpoints and
+// a host can concatenate them — which requires all of them to mean the same
+// thing by "an endpoint". See `openapi/endpoint.ts`.
+export type { McpEndpoint, HttpMethod } from "./openapi/endpoint";
 export type {
   OpenApiDocument,
   OpenApiOperation,
