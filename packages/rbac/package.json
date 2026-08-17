@@ -4,15 +4,34 @@
   "type": "module",
   "description": "Generic, portable Role-Based Access Control. Framework-free core (engine, registry, caveats, templates, governance), host-mounted backend surface (./server: role CRUD, permissions, team roster, guard helpers, duck-typed Prisma seam), Hono adapter (./hono), React screens + <Can> (./react), the rbac:coverage gate (./coverage) and the package-owned Prisma partial + migrations. Standardized adoption contract in ADOPTING.md.",
   "exports": {
-    ".": "./src/index.ts",
-    "./react": "./src/react/index.ts",
-    "./next": "./src/next/index.ts",
-    "./server": "./src/server/index.ts",
-    "./hono": "./src/hono/index.ts",
-    "./coverage": "./src/coverage-gate/index.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
+    "./next": {
+      "types": "./dist/next/index.d.ts",
+      "default": "./dist/next/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
+    "./hono": {
+      "types": "./dist/hono/index.d.ts",
+      "default": "./dist/hono/index.js"
+    },
+    "./coverage": {
+      "types": "./dist/coverage-gate/index.d.ts",
+      "default": "./dist/coverage-gate/index.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
+    "build": "rm -rf dist && tsup",
     "clean": "rm -rf node_modules coverage",
     "test": "node ../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest watch",
@@ -50,6 +69,7 @@
     "jsdom": "^25.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "tsup": "^8.0.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   },
@@ -75,6 +95,7 @@
     "*.mjs",
     "*.md",
     "!eslint.config.js",
+    "!tsup.config.ts",
     "!**/__tests__/**",
     "!**/tests/**",
     "!**/*.test.*",
