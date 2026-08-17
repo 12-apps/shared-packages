@@ -169,3 +169,80 @@ function noInstrument(provider: ProviderName, owner: ProviderName | undefined): 
 export function hasInstrument(result: ChargeInput | NoInstrument): result is ChargeInput {
   return !('reason' in result);
 }
+
+/**
+ * Does this chain offer ANY in-browser card path? (ported from the first
+ * adopting host, FUT-760.)
+ *
+ * A checkout has to know BEFORE it raises a charge whether to show a card form
+ * or hand the buyer to a provider's own page — and the answer is read off the
+ * adapters' declared `tokenization`, never off their names, so a fifth
+ * provider needs no edit anywhere.
+ *
+ * Asked of the WHOLE CHAIN, not the head. With failover the head is not
+ * entitled to answer alone: a store whose head is a hosted page but whose next
+ * provider tokenizes in the browser must still show the form, or the buyer is
+ * handed over before the chain has been walked and the failover the merchant
+ * configured can never happen.
+ *
+ * An EMPTY chain answers false — a store with nothing connected has no charge
+ * path to choose between, and its caller has already failed closed.
+ *
+ * Hosts were spelling the `PUBLIC_KEY`/`SDK` set out for themselves to ask
+ * this; it is {@link NEEDS_INSTRUMENT}, the same set the walk routes on, and a
+ * second copy in a host is a copy that drifts.
+ */
+export function chainTokenizesInBrowser(
+  chain: readonly { tokenization: ClientTokenization }[],
+): boolean {
+  return chain.some((entry) => NEEDS_INSTRUMENT.has(entry.tokenization));
+}
+
+/**
+ * Do we hold a card instrument THAT PROVIDER could charge? (ported from the
+ * first adopting host, FUT-760.)
+ *
+ * Distinct from {@link chargeInputFor}, which decides what to SEND during a
+ * walk. This answers a question asked before any walk begins: whether a live
+ * charge already raised at `provider` is still the honest answer to a re-tap.
+ *
+ * "Is there a card in the request" is the wrong test and was a real defect —
+ * the card route always sends one, so once a chain could land on a REDIRECT
+ * provider from the card form, a second submit walked the chain again while
+ * the first hosted link was still payable: two payable charges for one order.
+ * The right question is whether the card we hold could have produced a
+ * DIFFERENT charge at that provider. For a provider we minted no instrument
+ * for — a hosted page, which takes the card on its own site — the answer is
+ * no, and the buyer gets back the link they already have.
+ */
+export function holdsInstrumentFor(
+  card: ChargeInput['card'] | undefined,
+  provider: ProviderName,
+): boolean {
+  if (!card) return false;
+  // A minted MAP is a complete statement: a provider missing from it has no
+  // instrument here, whatever else the block carries.
+  const minted = card.tokensByProvider;
+  if (minted && Object.keys(minted).length > 0) return Boolean(minted[provider]);
+  return Boolean(card.token ?? card.savedCardToken);
+}
+
+/**
+ * The card block to hand the gateway when the browser minted one instrument
+ * PER provider (ported from the first adopting host, FUT-760).
+ *
+ * The bare `token` is dropped on purpose. An unattributed token defaults to
+ * the chain head (see {@link ownerOf}), and every provider WITHOUT an entry in
+ * the map would then look like it was handed a foreign instrument and be
+ * skipped — including a REDIRECT provider, which needs no instrument at all
+ * and is otherwise the one entry a card charge can always fall through to.
+ *
+ * A saved card is left untouched: its owner is whichever provider's vault
+ * holds it, which the gateway resolves for itself.
+ */
+export function attributedCard(card: ChargeInput['card'] | undefined): ChargeInput['card'] {
+  const minted = card?.tokensByProvider;
+  if (!card || !minted || Object.keys(minted).length === 0) return card;
+  if (card.savedCardToken) return card;
+  return { tokensByProvider: minted };
+}
