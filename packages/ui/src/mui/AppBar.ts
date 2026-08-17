@@ -1,2 +1,2 @@
-export type { AppBarProps } from '@mui/material/AppBar';
-export { default as AppBar, default } from '@mui/material/AppBar';
+export type { AppBarProps } from '@mui/material';
+export { AppBar, AppBar as default } from '@mui/material';

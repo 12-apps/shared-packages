@@ -1,2 +1,2 @@
-export type { ListItemProps } from '@mui/material/ListItem';
-export { default as ListItem, default } from '@mui/material/ListItem';
+export type { ListItemProps } from '@mui/material';
+export { ListItem, ListItem as default } from '@mui/material';

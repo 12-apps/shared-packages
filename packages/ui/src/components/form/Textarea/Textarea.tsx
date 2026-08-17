@@ -4,8 +4,8 @@ import {
   FormHelperText,
   InputLabel,
   TextareaAutosize } from '@mui/material';
-import type { Theme } from '@mui/material/styles';
-import { styled } from '@mui/material/styles';
+import type { Theme } from '@mui/material';
+import { styled } from '@mui/material';
 import React, { useState } from 'react';
 
 import {

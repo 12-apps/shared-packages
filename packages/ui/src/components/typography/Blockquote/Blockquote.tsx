@@ -1,7 +1,7 @@
 import FormatQuote from '@mui/icons-material/FormatQuote';
 import type { Theme} from '@mui/material';
 import { alpha, Box,Typography } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import React from 'react';
 
 import type { BlockquoteProps } from './Blockquote.types';
