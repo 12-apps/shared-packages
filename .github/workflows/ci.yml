@@ -872,6 +872,7 @@ jobs:
     permissions:
       contents: write # tags + GitHub releases
       issues: write # semantic-release's "release is failing" issue
+      statuses: write # release-alert's fallback when Issues are disabled
       pull-requests: write # the `released` label semantic-release puts on a PR
       id-token: write # OIDC trusted publishing — no token
     steps:
