@@ -181,6 +181,40 @@ function channelRemedy(status) {
   return `the issues API answered ${status}`;
 }
 
+/**
+ * The fallback channel, for a repository that cannot be issued against.
+ *
+ * A commit status is the only durable signal left to a job that has no Issues
+ * and no webhook: it is attached to the released commit, so a stuck release
+ * shows as a red mark beside that commit on `main` and in the branch view,
+ * rather than as a line in a run log. That is weaker than an issue — it does
+ * not FOLLOW the problem onto later commits, so each release re-states it — but
+ * it is the difference between a signal and none, and it needs no repository
+ * setting a script cannot change.
+ *
+ * `statuses: write` is what the release job grants for it, under a distinct
+ * `context` so it sits beside the CI checks rather than pretending to be one.
+ * Only the FAILING half is ever posted: a status belongs to one commit, so
+ * "this commit's release did not deliver" stays true however long it sits
+ * there, and there is no green to write later.
+ */
+async function commitStatus(state, description) {
+  const sha = process.env.GITHUB_SHA;
+  if (!sha) return false;
+  const response = await api(`/statuses/${sha}`, {
+    method: "POST",
+    body: JSON.stringify({
+      state,
+      context: "release/delivery",
+      // The API caps this at 140 characters and REJECTS a longer one, which
+      // would lose the fallback exactly when the headline is most detailed.
+      description: description.slice(0, 140),
+      ...(RUN_URL ? { target_url: RUN_URL } : {}),
+    }),
+  });
+  return response.ok;
+}
+
 async function resolveIssue() {
   const existing = await findAlertIssue();
   if (!existing) return null;
@@ -246,6 +280,12 @@ const anyProblem =
 
 if (!anyProblem) {
   const closed = await resolveIssue();
+  // No status is posted here, and it is not an omission. A commit status is a
+  // statement about ONE commit's release, not a flag about the repository, so a
+  // red mark on a commit whose release really did fail stays true for ever and
+  // there is nothing to clear. Writing a green one would also break this
+  // script's older contract that a healthy release with no alert open writes
+  // nothing at all — the selftest asserts it, and it caught this.
   console.log(closed ? `release healthy — closed alert issue #${closed}` : "release healthy — no alert open");
 } else {
   const stuck = [...orphans.map((o) => o.name), ...problems.untagged.map((u) => u.name)];
@@ -267,17 +307,21 @@ if (!anyProblem) {
     console.log(`::warning::release alert raised on issue #${number}: ${headline}`);
   } else {
     console.log(`::error::${headline}`);
-    // The webhook is the other half of the channel, so it decides how bad this
-    // is: with one configured the alert still reached someone and the issue was
-    // only the durable copy; without one, nothing left this run.
+    // Two other channels can still carry it, so what to say depends on whether
+    // EITHER did. Ranked by how long the signal survives: the commit status
+    // outlives the run, the webhook only reaches whoever was watching.
+    const marked = await commitStatus("failure", headline);
     console.log(
-      WEBHOOK
-        ? `::warning::no alert issue — ${channelRemedy(status)}. The webhook still fired, ` +
-            `but nothing here outlives the run, so a package that stays stuck stops being visible.`
-        : `::error::THIS ALERT REACHED NOBODY — ${channelRemedy(status)}, and no ` +
-            `RELEASE_ALERT_WEBHOOK is set. Enable Issues or set that secret; otherwise this ` +
-            `failure is one line in a run nobody opens, which is the exact state this script ` +
-            `exists to end.`,
+      marked
+        ? `::warning::no alert issue — ${channelRemedy(status)}. Marked the released commit ` +
+            `\`release/delivery\` failing instead, so it is visible on main; that status does ` +
+            `not follow the problem onto later commits, so fix the channel.`
+        : WEBHOOK
+          ? `::warning::no alert issue and no commit status — ${channelRemedy(status)}. The ` +
+              `webhook fired, but nothing here outlives the run.`
+          : `::error::THIS ALERT REACHED NOBODY — ${channelRemedy(status)}, the commit status ` +
+              `failed too, and no RELEASE_ALERT_WEBHOOK is set. This failure is one line in a ` +
+              `run nobody opens, which is the exact state this script exists to end.`,
     );
   }
   await notifyWebhook(`${headline}\n${RUN_URL}`);
