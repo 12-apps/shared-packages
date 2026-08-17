@@ -1,5 +1,5 @@
 import { Box, List, ListItemButton } from '@mui/material';
-import { alpha, keyframes, styled } from '@mui/material/styles';
+import { alpha, keyframes, styled } from '@mui/material';
 import type { CSSProperties, PropsWithChildren, ReactNode } from 'react';
 import React from 'react';
 

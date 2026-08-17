@@ -8,7 +8,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { CSSObject, Theme } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import React, { cloneElement, isValidElement,useState } from 'react';
 
 import type { ContextMenuItem,ContextMenuProps } from './ContextMenu.types';

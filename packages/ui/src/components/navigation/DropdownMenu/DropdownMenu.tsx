@@ -10,8 +10,8 @@ import {
   MenuItem,
   Typography,
 } from '@mui/material';
-import { styled } from '@mui/material/styles';
-import type { CSSObject, Theme } from '@mui/material/styles';
+import { styled } from '@mui/material';
+import type { CSSObject, Theme } from '@mui/material';
 import React, { cloneElement, isValidElement,useRef, useState } from 'react';
 
 import type { DropdownMenuItem,DropdownMenuProps } from './DropdownMenu.types';

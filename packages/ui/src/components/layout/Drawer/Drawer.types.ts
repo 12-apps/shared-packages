@@ -1,4 +1,4 @@
-import type { CSSObject } from '@mui/material/styles';
+import type { CSSObject } from '@mui/material';
 import type { HTMLAttributes,ReactNode } from 'react';
 
 export type DrawerVariant = 'left' | 'right' | 'top' | 'bottom' | 'glass';

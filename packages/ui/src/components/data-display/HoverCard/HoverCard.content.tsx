@@ -1,5 +1,5 @@
 import { Avatar, Box, CircularProgress, Typography } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import React from 'react';
 
 import type { HoverCardProps } from './HoverCard.types';

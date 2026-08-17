@@ -3,11 +3,15 @@
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
-  "description": "Pure, framework-agnostic form primitives — field validators, the Result type, and createServerAction. Zero dependencies, consumed from source by @12-apps/ui and apps.",
+  "description": "Pure, framework-agnostic form primitives — field validators, the Result type, and createServerAction. Zero dependencies, shipped compiled so a Node consumer can import it (Node cannot strip types under node_modules).",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
+    "build": "rm -rf dist && tsup",
     "clean": "rm -rf node_modules coverage",
     "test": "node ../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest watch",
@@ -16,6 +20,7 @@
   },
   "devDependencies": {
     "@12-apps/typescript-config": "workspace:*",
+    "tsup": "^8.0.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   },
@@ -36,6 +41,7 @@
     "*.mjs",
     "*.md",
     "!eslint.config.js",
+    "!tsup.config.ts",
     "!**/__tests__/**",
     "!**/tests/**",
     "!**/*.test.*",

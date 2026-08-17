@@ -7,7 +7,7 @@ import {
   Box,
   Pagination as MuiPagination,
   PaginationItem } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import React from 'react';
 
 import type { ResolvedPaginationProps } from './Pagination.helpers';

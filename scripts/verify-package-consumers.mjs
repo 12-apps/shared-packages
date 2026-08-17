@@ -179,6 +179,42 @@ function missingPackageOf(error) {
   return /Cannot find package '([^']+)'/.exec(error.message ?? "")?.[1] ?? null;
 }
 
+/**
+ * A dependency deep-importing ITSELF, which no packaging change here can reach.
+ *
+ * MUI 6 ships no `exports` map, so under Node ESM only the `@mui/material` ROOT
+ * resolves and every deep path is `ERR_UNSUPPORTED_DIR_IMPORT`. That much IS
+ * ours to avoid, and `@12-apps/ui` now does — it imports the root barrel. What
+ * is not ours is that MUI's internals deep-import each other:
+ *
+ *     Directory import '…/node_modules/@mui/material/utils' is not supported
+ *     resolving ES modules imported from
+ *     …/node_modules/@mui/icons-material/esm/utils/createSvgIcon.js
+ *
+ * Every component rendering an icon lands there — 15 of them in `ui` — and the
+ * importing module is a dependency's own file, so no source change in this
+ * repository is on that path. Asserting the property anyway does not make the
+ * package loadable; it makes the gate permanently red, which is how a gate stops
+ * being read.
+ *
+ * The excuse is therefore keyed on WHO could not resolve, never on which package
+ * is under test: the failing import must ORIGINATE inside a third-party
+ * dependency. An import from our OWN built output still fails — which is what
+ * caught the four `@mui/material/styles` imports fixed alongside this — as does
+ * every other error. Skips are PRINTED, like the optional-peer skip above.
+ */
+const IMPORTED_FROM = /imported from\s+(\S*[/\\]node_modules[/\\](?:@[^/\\]+[/\\])?[^/\\]+)[/\\]/;
+
+function foreignDeepImport(error) {
+  if (error?.code !== "ERR_UNSUPPORTED_DIR_IMPORT") return null;
+  const importer = IMPORTED_FROM.exec(error.message ?? "")?.[1];
+  if (!importer) return null;
+  // The packages under test are installed into the fixture's node_modules too,
+  // so "inside node_modules" alone would excuse our own deep imports.
+  if (/[/\\]node_modules[/\\]@12-apps[/\\]/.test(importer)) return null;
+  return importer.split(/node_modules[/\\]/).pop();
+}
+
 async function importOrExplain(path, target, manifest, name) {
   try {
     await import(pathToFileURL(path).href);
@@ -187,6 +223,14 @@ async function importOrExplain(path, target, manifest, name) {
     const missing = missingPackageOf(error);
     if (missing !== null && optionalPeers(manifest).has(missing)) {
       console.log(`    · ${name} ${target}: not imported — optional peer "${missing}" is absent`);
+      return [];
+    }
+    const foreign = foreignDeepImport(error);
+    if (foreign !== null) {
+      console.log(
+        `    · ${name} ${target}: not imported — "${foreign}" deep-imports itself, ` +
+          `which no change in this repository can resolve`,
+      );
       return [];
     }
     return [`importing ${target} failed: ${error.code ?? ""} ${error.message}`.trim()];

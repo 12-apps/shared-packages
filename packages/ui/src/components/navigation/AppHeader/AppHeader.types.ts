@@ -1,4 +1,4 @@
-import type { Breakpoint } from '@mui/material/styles';
+import type { Breakpoint } from '@mui/material';
 import type { ReactNode } from 'react';
 
 import type { ColorValue, SizeValue } from '../../../tokens/scales';

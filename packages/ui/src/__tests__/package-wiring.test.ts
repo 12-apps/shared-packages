@@ -26,24 +26,48 @@ describe("@12-apps/ui package wiring (Task 5)", () => {
     expect(pkg.dependencies?.["@12-apps/shared-helpers"]).toBeUndefined();
   });
 
-  it("exposes the ./form/total-form package export", () => {
+  /**
+   * The shape changed in 12-51 and the assertion changed with it, deliberately.
+   *
+   * It used to pin the raw source path, `./src/components/form/total-form/
+   * index.ts`. That is exactly what made this package unloadable by Node, which
+   * refuses to strip types below `node_modules` — so the old expectation was
+   * pinning the bug. Every subpath now names a compiled target and its emitted
+   * declarations, generated from `entries.json` by `scripts/sync-exports.mjs`.
+   *
+   * Kept as a spot-check on one entry rather than deleted: `total-form` is the
+   * export this test was written for, and a generated 129-entry map still
+   * deserves one hand-written example that says what a correct entry looks like.
+   */
+  it("exposes the ./form/total-form package export, compiled", () => {
     const pkg = readPkg();
-    expect(pkg.exports?.["./form/total-form"]).toBe(
-      "./src/components/form/total-form/index.ts",
-    );
+    expect(pkg.exports?.["./form/total-form"]).toEqual({
+      types: "./dist/types/components/form/total-form/index.d.ts",
+      default: "./dist/form/total-form.js",
+    });
   });
 
+  /**
+   * `typesVersions` is the fallback for a consumer on `moduleResolution: node`,
+   * which ignores `exports`. It pointed under `./src/components/` at
+   * `index.d.ts` files that have never existed, because the source is `.ts` and
+   * nothing emitted declarations beside it. So the fallback silently resolved
+   * to nothing for every such consumer.
+   *
+   * 12-51 repoints it at the declarations `tsc --emitDeclarationOnly` now
+   * writes. Kept rather than deleted: removing it would change what an older
+   * consumer resolves, and a real fallback is strictly better than a dead one.
+   */
   it("registers a form/* typesVersions entry covering total-form", () => {
     const pkg = readPkg();
     const formTypes = pkg.typesVersions?.["*"]?.["form/*"];
-    expect(formTypes).toContain("./src/components/form/*/index.d.ts");
+    expect(formTypes).toContain("./dist/types/components/form/*/index.d.ts");
   });
 
   /**
    * Every subpath must be an entry point Vite is willing to PRE-BUNDLE.
    *
-   * `exports` points at this package's own source, so a consumer's bundler
-   * follows it directly. Vite decides what it may pre-bundle with
+   * Vite decides what it may pre-bundle with
    *
    *     OPTIMIZABLE_ENTRY_RE = /\.[cm]?[jt]s$/
    *
@@ -58,9 +82,11 @@ describe("@12-apps/ui package wiring (Task 5)", () => {
    * `./social-login-button` and `./user-avatar` shipped that way and took out
    * 41 storefront e2e specs downstream, none of which import them.
    *
-   * So a component's entry point is its `index.ts` barrel — which is what
-   * every component under `src/components/**` already does. These three were
-   * the stragglers.
+   * Since 12-51 every subpath resolves to compiled `./dist/**.js`, so the
+   * hazard is structurally gone rather than merely avoided — a `.tsx` can no
+   * longer BE an entry target. The assertion stays anyway: it costs nothing,
+   * and it is the thing that would notice if the exports map were ever
+   * hand-edited back towards source.
    */
   it("exposes every subpath through a bundler-optimizable entry point", () => {
     const OPTIMIZABLE_ENTRY_RE = /\.[cm]?[jt]s$/;

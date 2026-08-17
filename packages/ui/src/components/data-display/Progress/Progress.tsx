@@ -5,7 +5,7 @@ import {
   LinearProgress,
   Typography,
 } from '@mui/material';
-import { styled, useTheme } from '@mui/material/styles';
+import { styled, useTheme } from '@mui/material';
 import React from 'react';
 
 import { resolveProgressProps } from './Progress.helpers';

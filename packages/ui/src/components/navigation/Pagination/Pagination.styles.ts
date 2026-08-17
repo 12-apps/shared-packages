@@ -1,5 +1,5 @@
 import { alpha } from '@mui/material';
-import type { CSSObject, Theme } from '@mui/material/styles';
+import type { CSSObject, Theme } from '@mui/material';
 
 const ITEM_SIZE_STYLES: Record<string, (theme: Theme) => CSSObject> = {
   sm: (theme) => ({

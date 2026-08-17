@@ -1,10 +1,10 @@
 'use client';
 
 import { alpha } from '@mui/material';
-import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
-import type { AutocompleteRenderInputParams } from '@mui/material/Autocomplete';
-import CircularProgress from '@mui/material/CircularProgress';
-import TextField from '@mui/material/TextField';
+import { Autocomplete, createFilterOptions } from '@mui/material';
+import type { AutocompleteRenderInputParams } from '@mui/material';
+import { CircularProgress } from '@mui/material';
+import { TextField } from '@mui/material';
 import { useId, useMemo } from 'react';
 
 import { FormControl, FormLabel, FormMessage } from '../Form';

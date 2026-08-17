@@ -12,7 +12,7 @@ import {
   Link as MuiLink,
   Typography,
 } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import React, { useMemo, useState } from 'react';
 
 import { DashboardContext, useDashboardContext } from './DashboardContext';

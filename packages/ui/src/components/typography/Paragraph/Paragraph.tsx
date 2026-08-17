@@ -1,6 +1,6 @@
 import type { Theme} from '@mui/material';
 import {Typography } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import React from 'react';
 
 import type { ParagraphProps } from './Paragraph.types';

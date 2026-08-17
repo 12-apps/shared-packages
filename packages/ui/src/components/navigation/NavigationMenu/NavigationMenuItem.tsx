@@ -11,7 +11,7 @@ import {
   Grow,
   ListItemText,
   Popover } from '@mui/material';
-import { alpha, styled } from '@mui/material/styles';
+import { alpha, styled } from '@mui/material';
 import React, {  } from 'react';
 
 import { useMenuItemState } from './NavigationMenuItem.hooks';

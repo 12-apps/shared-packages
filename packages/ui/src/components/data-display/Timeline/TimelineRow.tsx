@@ -12,7 +12,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { alpha, keyframes,styled } from '@mui/material/styles';
+import { alpha, keyframes, styled } from '@mui/material';
 import React from 'react';
 
 import type { TimelineItem, TimelineProps } from './Timeline.types';

@@ -1,5 +1,5 @@
 import { Box } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import React, { forwardRef, useCallback, useMemo } from 'react';
 
 import { resolveWorkflowStepProps, withDerivedStatus } from './WorkflowStep.helpers';
