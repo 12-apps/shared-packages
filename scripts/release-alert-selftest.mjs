@@ -143,6 +143,7 @@ async function alert({ plan, issues = [], env = {}, createStatus = 201 }) {
         GITHUB_REPOSITORY: "12-apps/shared-packages",
         GITHUB_TOKEN: "selftest-token",
         GITHUB_RUN_ID: "31427350698",
+        GITHUB_SHA: "c4471bb6c67270667a102b775beca48539906168",
         RELEASE_ALERT_WEBHOOK: "",
         TAG_FAILED: "",
         PUBLISH_WEDGED: "",
@@ -298,15 +299,26 @@ check(
 // webhook carried the alert anyway, or the dead channel is itself invisible.
 const noChannel = await alert({ plan: STUCK, createStatus: 410 });
 
+const SHA = "c4471bb6c67270667a102b775beca48539906168";
+const statusOf = (run) => JSON.parse(run.of("POST", `/statuses/${SHA}`)[0]?.body ?? "{}");
+
 check(
-  "an alert that could not be filed says so, loudly",
-  /::error::THIS ALERT REACHED NOBODY/.test(noChannel.output),
-  `a failed POST used to degrade to the same ::warning:: a successful one prints.\n    Output was:\n    ${noChannel.output}`,
+  "it falls back to a commit status on the released commit",
+  statusOf(noChannel).state === "failure" && statusOf(noChannel).context === "release/delivery",
+  `a repository with Issues disabled still has ONE durable channel, and using it is\n    the difference between a red mark on main and a line in a log. Calls:\n    ${JSON.stringify(noChannel.calls.map((c) => `${c.method} ${c.path}`))}`,
 );
 check(
-  "it names the cause and what to do about it",
-  /Issues are disabled/.test(noChannel.output) && /RELEASE_ALERT_WEBHOOK/.test(noChannel.output),
-  `"could not file" is not actionable; "Issues are disabled, set the webhook" is.\n    Output was:\n    ${noChannel.output}`,
+  "the status carries the headline and a link to the run",
+  /Release is STUCK/.test(statusOf(noChannel).description ?? "") &&
+    (statusOf(noChannel).description ?? "").length <= 140 &&
+    /actions\/runs/.test(statusOf(noChannel).target_url ?? ""),
+  `the API REJECTS a description over 140 characters, which would lose the fallback\n    exactly when the headline is longest. Status was: ${JSON.stringify(statusOf(noChannel))}`,
+);
+check(
+  "and it says the fallback does not follow the problem forward",
+  /does not follow the problem onto later commits/.test(noChannel.output) &&
+    /Issues are disabled/.test(noChannel.output),
+  `a weaker channel presented as an equal one stops anyone fixing the real one.\n    Output was:\n    ${noChannel.output}`,
 );
 check(
   "the headline is still emitted, so the reason is not all a reader gets",
@@ -314,18 +326,19 @@ check(
   `the alert's CONTENT must survive its channel failing.\n    Output was:\n    ${noChannel.output}`,
 );
 
-// The same refusal with a webhook configured: the alert did reach someone, so
-// this is a warning about durability, not a blackout.
-const webhookOnly = await alert({
-  plan: STUCK,
-  createStatus: 410,
-  env: { RELEASE_ALERT_WEBHOOK: "http://127.0.0.1:1/hook" },
-});
+// Only the failing half is ever posted, which the "healthy release with no
+// alert open writes nothing" case above already asserts — it caught a first
+// attempt at this that wrote a green status on every release. A status belongs
+// to ONE commit, so a red mark on a commit whose release really did fail stays
+// true, and there is no repository-wide flag needing a clear.
+
+// With no SHA there is no commit to mark — the blackout message is the honest one.
+const blackout = await alert({ plan: STUCK, createStatus: 410, env: { GITHUB_SHA: "" } });
 
 check(
-  "with a webhook configured it is a warning about durability, not a blackout",
-  !/REACHED NOBODY/.test(webhookOnly.output) && /nothing here outlives the run/.test(webhookOnly.output),
-  `crying blackout when the webhook fired is the kind of false alarm that gets a\n    gate ignored. Output was:\n    ${webhookOnly.output}`,
+  "with no issue, no status and no webhook it says the alert reached nobody",
+  /::error::THIS ALERT REACHED NOBODY/.test(blackout.output),
+  `this is the state the script exists to end, and it has to be able to say so.\n    Output was:\n    ${blackout.output}`,
 );
 
 if (failures.length > 0) {
