@@ -55,6 +55,21 @@ export {
 } from "./core/registry";
 export type { RegisteredJob } from "./core/registry";
 
+/**
+ * The PACKAGE-side seam — the worker counterpart of an endpoint mount. A
+ * package declares blueprints whose handlers take host deps; the host binds
+ * them in one line and spreads the result into `createApiJobs({ jobs })`. See
+ * `core/module.ts` for why a package cannot reach for `defineJob` directly.
+ */
+export { defineJobModule } from "./core/module";
+export type {
+  JobBlueprint,
+  JobBlueprints,
+  JobModule,
+  JobModuleEnqueue,
+  MountedJobs,
+} from "./core/module";
+
 export {
   configureJobs,
   enqueueJob,
