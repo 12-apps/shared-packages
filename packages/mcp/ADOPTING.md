@@ -188,6 +188,37 @@ surface moved — this transport has no server→client stream, so
 `capabilities.tools` deliberately does not claim `listChanged`. Pair it with the
 surface lock (`mcp:generate`) so forgetting the bump is a build error.
 
+## Redaction: take both halves
+
+A redacted field has to disappear from two places, and they are reached at
+different times:
+
+```ts
+import { redactResponseSchema, redactResponseBody } from '@12-apps/mcp';
+
+// generate time — what the tool ADVERTISES
+schema = redactResponseSchema(responseSchema, paths, operationId);
+// dispatch time — what it RETURNS (the registry already does this for you
+// from `x-mcp-redact-response`)
+body = redactResponseBody(body, paths);
+```
+
+Drive both from ONE list — in an OpenAPI-generated surface that list is the
+operation's `x-mcp-redact-response`, which `generateTools` carries onto the tool
+and the registry applies at dispatch. Take one half only and you get the failure
+the pair exists to prevent:
+
+- **body stripped, schema not narrowed** → every successful call returns
+  `structuredContent` that fails validation against the schema the manifest
+  itself published; worst when the field was `required`.
+- **schema narrowed, body not stripped** → the manifest claims the field is gone
+  while the value still reaches the agent. The redaction protected nothing.
+
+`redactResponseSchema` **throws** when a path names no field, rather than
+returning quietly — a typo'd or stale redaction otherwise protects nothing,
+invisibly, which is the one outcome a redaction list must never have. Let it fail
+the generator.
+
 ## Minimal host (Hono)
 
 ```ts
