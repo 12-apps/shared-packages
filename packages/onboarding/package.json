@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
-  "description": "Reusable guided onboarding: React provider + GuidedSection and the API-bound OnboardingStore (.), the host-mounted progress surface (./server: createApiOnboarding — GET/PATCH progress with save/dismiss/reset), a Hono adapter (./hono), and the package-owned Prisma partial + migration for OnboardingState. Standardized adoption contract in ADOPTING.md.",
+  "description": "Reusable guided onboarding: React provider + GuidedSection and the API-bound OnboardingStore (.), the host-mounted progress surface (./server: createApiOnboarding \u2014 GET/PATCH progress with save/dismiss/reset), a Hono adapter (./hono), and the package-owned Prisma partial + migration for OnboardingState. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server/index.ts",
@@ -21,7 +21,7 @@
     "prisma:sync:check": "node scripts/sync-onboarding-schema.mjs --check"
   },
   "dependencies": {
-    "@12-apps/ui": "^5.0.0",
+    "@12-apps/ui": "workspace:*",
     "react": "^19.2.0"
   },
   "peerDependencies": {
@@ -37,8 +37,8 @@
     }
   },
   "devDependencies": {
-    "@12-apps/eslint-config": "^1.20.0",
-    "@12-apps/typescript-config": "^1.20.0",
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
     "@types/react": "19.2.2",
     "eslint": "^9.39.1",
     "eslint-plugin-test-flakiness": "^1.4.0",

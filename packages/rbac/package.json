@@ -39,8 +39,8 @@
     }
   },
   "devDependencies": {
-    "@12-apps/eslint-config": "^1.20.0",
-    "@12-apps/typescript-config": "^1.20.0",
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
     "@testing-library/react": "^16.1.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
@@ -84,7 +84,7 @@
     "!**/test-helpers.*"
   ],
   "dependencies": {
-    "@12-apps/ui": "^5.0.0",
+    "@12-apps/ui": "workspace:*",
     "zod": "^4.3.5"
   }
 }

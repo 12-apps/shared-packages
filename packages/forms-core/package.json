@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@12-apps/typescript-config": "^1.20.0",
+    "@12-apps/typescript-config": "workspace:*",
     "tsup": "^8.0.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
@@ -36,6 +36,7 @@
   "files": [
     "src",
     "dist",
+    "prisma",
     "*.js",
     "*.mjs",
     "*.md",
@@ -44,6 +45,9 @@
     "!**/__tests__/**",
     "!**/tests/**",
     "!**/*.test.*",
-    "!**/*.spec.*"
+    "!**/*.spec.*",
+    "!**/*.stories.*",
+    "!**/*.test-story.*",
+    "!**/test-helpers.*"
   ]
 }
