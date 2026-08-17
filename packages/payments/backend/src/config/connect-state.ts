@@ -1,5 +1,3 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
-
 import type { PaymentEnvironment } from '../core/types';
 
 /**
@@ -104,13 +102,31 @@ function decodeCookie(value: string | undefined): {
   };
 }
 
-/** Constant-time comparison — a state check is an authentication check. */
+/**
+ * Web Crypto rather than `node:crypto`, deliberately: this module sits on the
+ * package's root index, and the frontend's Storybook pulls that index into a
+ * browser bundle for its fixtures — a node builtin at module top level breaks
+ * that bundle. `globalThis.crypto` is standard in every browser and in every
+ * Node this package supports.
+ */
+function randomStateHex(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Constant-time comparison — a state check is an authentication check. The
+ * XOR accumulator visits every character regardless of where the first
+ * difference sits, so timing reveals only the (public) length.
+ */
 function stateMatches(expected: string | undefined, presented: string | null): boolean {
   if (!expected || !presented) return false;
-  const a = Buffer.from(expected);
-  const b = Buffer.from(presented);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  if (expected.length !== presented.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i += 1) {
+    diff |= expected.charCodeAt(i) ^ presented.charCodeAt(i);
+  }
+  return diff === 0;
 }
 
 export interface ConnectState {
@@ -153,7 +169,7 @@ export function createConnectState(config: ConnectStateConfig): ConnectState {
     redirectUri: (provider) =>
       `${config.baseUrl()}${config.callbackPath}/${encodeURIComponent(provider)}`,
     mint(tenantSlug, provider, environment) {
-      const state = randomBytes(32).toString('hex');
+      const state = randomStateHex();
       return {
         state,
         redirectUri: this.redirectUri(provider),
