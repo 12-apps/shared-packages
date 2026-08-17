@@ -28,7 +28,7 @@
     "hono": ">=4.0.0",
     "react": ">=19.0.0",
     "react-dom": ">=19.0.0",
-    "@12-apps/mcp": ">=3.0.0",
+    "@12-apps/mcp": ">=3.4.0",
     "zod": ">=4.0.0"
   },
   "peerDependenciesMeta": {
