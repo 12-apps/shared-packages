@@ -308,6 +308,13 @@ export {
   hostedSnapshotMismatch,
 } from './core/charge-identity';
 export { isValidCpf } from './core/cpf';
+// Caller-side charge questions (FUT-760): what a reversal event reversed,
+// whether a charge already raised is still payable, and the two instrument
+// questions a checkout asks BEFORE any failover walk begins.
+export { classifyReversalEvent } from './core/reversal';
+export type { DisputeFacts, RefundFacts, ReversalFacts } from './core/reversal';
+export { chargeDeadlinePassed, hostedChargePayable, pixChargePayable } from './core/charge-reuse';
+export { attributedCard, chainTokenizesInBrowser, holdsInstrumentFor } from './core/card-instrument';
 export { promoteProvider } from './config/promote';
 export { forgetVaultPointers, type VaultPointerRef } from './core/gateway-vault';
 export {
