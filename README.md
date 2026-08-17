@@ -74,12 +74,18 @@ Three rules that came from production incidents, all gated by
 
 ```bash
 pnpm install
-pnpm build          # turbo
+pnpm build          # turbo — NOT optional before the four below
 pnpm check-types
 pnpm lint
 pnpm test
 pnpm quality:all    # complexity, flakiness, duplication, quarantine, knip
 ```
+
+Packages resolve each other through `dist`, so the checks need their workspace
+dependencies built rather than merely installed — skipping `pnpm build` fails as
+a missing module rather than as a missing build. See
+[CONTRIBUTING.md](CONTRIBUTING.md#build-before-you-check) for the way out, and
+for building one package's dependencies instead of the whole graph.
 
 ## Publishing
 
