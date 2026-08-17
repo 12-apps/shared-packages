@@ -36,6 +36,11 @@ export type {
   OpenApiResponse,
 } from "./openapi/generate";
 export { dispatchTool, DispatchInputError } from "./dispatch/proxy";
+// Both halves of the redaction contract. `redactResponseSchema` narrows what a
+// tool ADVERTISES at generate time; `redactResponseBody` removes the same paths
+// from what it RETURNS at dispatch. Taking one without the other reintroduces the
+// schema/payload disagreement they exist to prevent — see `server/redact.ts`.
+export { redactResponseSchema, redactResponseBody } from "./server/redact";
 export {
   createToolRegistry,
   HTTP_STATUS_META_KEY,
