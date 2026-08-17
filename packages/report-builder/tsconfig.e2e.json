@@ -13,5 +13,8 @@
     "types": ["node"]
   },
   "include": ["src/e2e/**/*"],
-  "exclude": ["node_modules", "dist"]
+  // The suites beside these helpers are vitest's, and this config compiles what
+  // ships: leaving them in would emit them into `dist/e2e` and make the
+  // published journeys' BUILD depend on a test runner no consumer installs.
+  "exclude": ["node_modules", "dist", "src/e2e/**/__tests__/**", "src/e2e/**/*.test.ts"]
 }

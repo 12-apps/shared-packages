@@ -116,6 +116,64 @@ export function blockRows(page: Page, id: string): Locator {
   return block(page, id).locator('tbody tr');
 }
 
+/**
+ * The count a block has SETTLED on, and the number a caller may bank.
+ *
+ * An EMPTY table is not an answer, and that is the harder half of every wait in
+ * these journeys. A block re-rendering its new window momentarily shows ZERO
+ * rows — the period is part of the query's key, so the moment one is pressed the
+ * new key holds no data — and zero satisfies "fewer than before" against any
+ * count at all. A poll that accepts it succeeds on the loading state and records
+ * 0 as that period's size. Nothing is fewer than none, so the NEXT narrowing in
+ * the scenario can then never pass: it burns its timeout and reports the count
+ * that did eventually render, against an expectation of "< 0".
+ *
+ * So the answer has to be a count that is both real and what was asked for, and
+ * the value RETURNED is the one that actually satisfied it — re-reading after
+ * the wait is a second read that another render can land in between.
+ *
+ * Stated once, here, because three steps bank a count and each of them is one
+ * plausible-looking `await rows.count()` away from the same bug.
+ */
+async function countWhenSettled(
+  rows: Locator,
+  expectation: string,
+  holds: (count: number) => boolean,
+): Promise<number> {
+  let settled = 0;
+  await expect
+    .poll(
+      async () => {
+        const count = await rows.count();
+        // Said out loud rather than swallowed, so a block that never refills
+        // fails reading "no rows at all" instead of timing out on a bare number.
+        if (count === 0) return 'no rows at all';
+        settled = count;
+        return holds(count) ? expectation : `${count} rows`;
+      },
+      { timeout: BLOCK_RENDER_TIMEOUT_MS },
+    )
+    .toBe(expectation);
+  return settled;
+}
+
+/** How many rows the block holds, once it holds any. */
+export function settledRowCount(rows: Locator): Promise<number> {
+  return countWhenSettled(rows, 'some rows', () => true);
+}
+
+/**
+ * The same, once the block has settled on FEWER rows than `before` — the shape
+ * every "a narrower period answers with less" assertion needs.
+ *
+ * Both halves matter. Without the ceiling the step proves nothing about the
+ * period that was pressed; without the floor an empty frame proves it, which is
+ * worse than nothing because the scenario goes green.
+ */
+export function narrowedRowCount(rows: Locator, before: number): Promise<number> {
+  return countWhenSettled(rows, `fewer than ${before} rows`, (count) => count < before);
+}
+
 /** Open the report the host published to the team, from the list. */
 export async function openPublishedReport(page: Page): Promise<void> {
   const { id } = reportsWorld().fixtures.publishedReport;
