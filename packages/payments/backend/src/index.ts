@@ -308,6 +308,7 @@ export {
   hostedSnapshotMismatch,
 } from './core/charge-identity';
 export { isValidCpf } from './core/cpf';
+export { promoteProvider } from './config/promote';
 export { forgetVaultPointers, type VaultPointerRef } from './core/gateway-vault';
 export {
   createConnectState,

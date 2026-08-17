@@ -4,6 +4,7 @@ import { isValidCpf } from '../core/cpf';
 import { forgetVaultPointers, type VaultPointerRef } from '../core/gateway-vault';
 import { ProviderRequestError, UnsupportedOperationError } from '../core/errors';
 import { createConnectState, parseEnvironment } from '../config/connect-state';
+import { promoteProvider } from '../config/promote';
 import type { MerchantRef } from '../core/types';
 
 const ACME: MerchantRef = { kind: 'PLATFORM', id: 'platform' };
@@ -23,13 +24,15 @@ describe('isValidCpf', () => {
 });
 
 describe('createConnectState', () => {
-  const connect = createConnectState({
-    cookiePrefix: 'host_pay_oauth',
-    callbackPath: '/api/payments/oauth/callback',
-    baseUrl: () => 'https://store.example',
-  });
+  const connectState = () =>
+    createConnectState({
+      cookiePrefix: 'host_pay_oauth',
+      callbackPath: '/api/payments/oauth/callback',
+      baseUrl: () => 'https://store.example',
+    });
 
   it('mints a state the consume check accepts, with merchant and environment recovered', () => {
+    const connect = connectState();
     const minted = connect.mint('acme', 'pagbank', 'PRODUCTION');
     expect(minted.redirectUri).toBe('https://store.example/api/payments/oauth/callback/pagbank');
     expect(minted.cookie.name).toBe('host_pay_oauth_pagbank');
@@ -47,6 +50,7 @@ describe('createConnectState', () => {
   });
 
   it('refuses a mismatched or absent state, and a cookie naming no merchant', () => {
+    const connect = connectState();
     const minted = connect.mint('acme', 'pagbank', 'SANDBOX');
     expect(connect.consume(minted.cookie.value, 'not-the-state')).toBeNull();
     expect(connect.consume(minted.cookie.value, null)).toBeNull();
@@ -54,6 +58,7 @@ describe('createConnectState', () => {
   });
 
   it('parses the cookie from the ends so a dotted slug cannot shift the fields', () => {
+    const connect = connectState();
     const minted = connect.mint('acme.v2', 'stripe', 'SANDBOX');
     expect(connect.consume(minted.cookie.value, minted.state)).toEqual({
       environment: 'SANDBOX',
@@ -133,5 +138,23 @@ describe('forgetVaultPointers', () => {
     });
     expect(result).toEqual({ ok: false });
     expect(dropped).toEqual([]);
+  });
+});
+
+describe('promoteProvider', () => {
+  it('moves the named provider to the chain head keeping relative order, via setPriorities', async () => {
+    const setPriorities = vi.fn().mockResolvedValue({ providers: [] });
+    const store = {
+      list: vi.fn().mockResolvedValue([
+        { provider: 'stripe', enabled: true, priority: 0 },
+        { provider: 'pagbank', enabled: true, priority: 1 },
+        { provider: 'infinitepay', enabled: true, priority: 2 },
+        { provider: 'stone', enabled: false, priority: 0 },
+      ]),
+    };
+    await promoteProvider({ setPriorities }, store as never, ACME, 'infinitepay');
+    // Disabled rows never enter the chain; the validated write receives the
+    // promoted order and is what refuses a name outside the enabled set.
+    expect(setPriorities).toHaveBeenCalledWith(ACME, ['infinitepay', 'stripe', 'pagbank']);
   });
 });
