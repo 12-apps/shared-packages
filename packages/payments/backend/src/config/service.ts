@@ -1,4 +1,5 @@
 import { CredentialsError, UnknownProviderError } from '../core/errors';
+import { hasUsableCredentials } from './usable-credentials';
 import type { CredentialStore } from '../core/ports';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { ProviderRegistry } from '../core/registry';
@@ -158,6 +159,7 @@ function toMasked(adapter: PaymentProviderAdapter, config: StoredProviderConfig)
   return {
     provider: config.provider,
     enabled: config.enabled,
+    credentialed: hasUsableCredentials(adapter, config.environments[config.environment]),
     priority: config.priority,
     environment: config.environment,
     status: config.status,
