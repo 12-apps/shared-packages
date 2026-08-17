@@ -143,6 +143,18 @@ function buildBody(problems) {
     .join("\n");
 }
 
+/**
+ * Returns `{ number }` when the alert reached the issue, `{ status }` when it
+ * did not — never a bare null.
+ *
+ * The distinction is load-bearing. This whole script exists because "the run's
+ * own log is where nobody looks", so an alert that quietly fails to file is
+ * back to exactly the state it was written to fix, while reporting success. The
+ * one refusal this repo actually hits is `410 Gone`: Issues are DISABLED on
+ * `12-apps/shared-packages`, so every alert this script has ever raised has
+ * degraded to a log line. `403`/`404` mean the token cannot write issues, which
+ * reaches nobody in the same way.
+ */
 async function upsertIssue(body, headline) {
   const existing = await findAlertIssue();
   if (existing) {
@@ -151,11 +163,22 @@ async function upsertIssue(body, headline) {
       method: "POST",
       body: JSON.stringify({ body: `${headline}\n\n${RUN_URL}` }),
     });
-    return existing.number;
+    return { number: existing.number };
   }
   const created = await api("/issues", { method: "POST", body: JSON.stringify({ title: TITLE, body }) });
-  if (!created.ok) return null;
-  return (await created.json()).number;
+  if (!created.ok) return { status: created.status };
+  return { number: (await created.json()).number };
+}
+
+/** Why the issue could not be filed, in terms of what to do about it. */
+function channelRemedy(status) {
+  if (status === 410) {
+    return "Issues are disabled on this repository, so the alert channel does not exist";
+  }
+  if (status === 403 || status === 404) {
+    return "the token cannot write issues (needs `issues: write`)";
+  }
+  return `the issues API answered ${status}`;
 }
 
 async function resolveIssue() {
@@ -239,7 +262,23 @@ if (!anyProblem) {
     stuck.length > 0
       ? `Release is STUCK for ${stuck.join(", ")} — ${shape}.`
       : "The Release job on main did not get every package to the registry.";
-  const number = await upsertIssue(buildBody(problems), headline);
-  console.log(number ? `::warning::release alert raised on issue #${number}: ${headline}` : `::warning::${headline}`);
+  const { number, status } = await upsertIssue(buildBody(problems), headline);
+  if (number) {
+    console.log(`::warning::release alert raised on issue #${number}: ${headline}`);
+  } else {
+    console.log(`::error::${headline}`);
+    // The webhook is the other half of the channel, so it decides how bad this
+    // is: with one configured the alert still reached someone and the issue was
+    // only the durable copy; without one, nothing left this run.
+    console.log(
+      WEBHOOK
+        ? `::warning::no alert issue — ${channelRemedy(status)}. The webhook still fired, ` +
+            `but nothing here outlives the run, so a package that stays stuck stops being visible.`
+        : `::error::THIS ALERT REACHED NOBODY — ${channelRemedy(status)}, and no ` +
+            `RELEASE_ALERT_WEBHOOK is set. Enable Issues or set that secret; otherwise this ` +
+            `failure is one line in a run nobody opens, which is the exact state this script ` +
+            `exists to end.`,
+    );
+  }
   await notifyWebhook(`${headline}\n${RUN_URL}`);
 }
