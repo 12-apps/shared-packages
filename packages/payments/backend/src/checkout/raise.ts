@@ -1,7 +1,7 @@
 import { ChargeIdentityError, chargeIdentityMismatch } from '../core/charge-identity';
 import type { PaymentsGateway } from '../core/gateway';
 import type { ChargeQueryStore } from '../core/ports';
-import { attemptReference } from '../core/reference';
+import { attemptIdempotencyKey, attemptReference } from '../core/reference';
 import type { ChargeSnapshot, CustomerInfo, PaymentMethodKind } from '../core/types';
 
 import {
@@ -132,7 +132,7 @@ export async function raiseCharge(
   if (live) return live;
 
   const attempt = await deps.charges.countByReference(payable.merchant, payable.ref);
-  const idempotencyKey = `${payable.ref}:${attempt}`;
+  const idempotencyKey = attemptIdempotencyKey(payable.ref, attempt);
   const reference = attemptReference(payable.ref, attempt);
   const stored = await deps.gateway.charge(payable.merchant, {
     // PER ATTEMPT, not per payable: a provider that dedupes on the reference
