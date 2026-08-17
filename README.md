@@ -81,9 +81,10 @@ pnpm test
 pnpm quality:all    # complexity, flakiness, duplication, quarantine, knip
 ```
 
-Packages resolve each other through `dist`, so the checks need their workspace
-dependencies built rather than merely installed — skipping `pnpm build` fails as
-a missing module rather than as a missing build. See
+Half the packages — `@12-apps/ui` among them, so in practice most of the graph —
+are consumed through `dist`, so the checks need those dependencies built rather
+than merely installed. Skipping `pnpm build` fails as a missing module rather
+than as a missing build. See
 [CONTRIBUTING.md](CONTRIBUTING.md#build-before-you-check) for the way out, and
 for building one package's dependencies instead of the whole graph.
 

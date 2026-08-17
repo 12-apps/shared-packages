@@ -79,11 +79,16 @@ touches several packages either takes the most affected one or drops the scope.
 
 ## Build before you check
 
-Every `@12-apps/*` package resolves its siblings through `dist`: the manifests
-point `exports` at compiled entries rather than at `src`, which is what makes a
-published tarball work for the apps that install it. The cost is paid locally —
-a package's `check-types`, `lint` and `test` need its workspace dependencies
-**built**, not merely installed, and `pnpm install` alone leaves them unbuilt.
+Fifteen of the `@12-apps/*` packages ship **compiled** entries — their `exports`
+point at `dist` rather than at `src` — which is what makes a published tarball
+work for the apps that install it. The other thirteen still export `src`, so
+whether this bites you depends on what you depend on. In practice it usually
+does: `@12-apps/ui` is one of the fifteen and sits under almost everything else,
+and `forms-core`, `mcp`, `rbac`, `onboarding` and `report-builder` are too.
+
+The cost is paid locally. A package's `check-types`, `lint` and `test` need
+those dependencies **built**, not merely installed, and `pnpm install` alone
+leaves them unbuilt.
 
 What makes this worth a section is that the failure names the wrong thing. It
 reads as a missing module, in a package that plainly declares it:
