@@ -5,6 +5,16 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  ACCIDENTAL_MAJOR,
+  BROKEN_CONFIG,
+  CHANGED_BUT_SILENT,
+  DELIBERATE_MINOR,
+  NOTHING,
+  RELEASED,
+  STALE_REF,
+  TLS_BLIP,
+} from "./release-tags-selftest-fixtures.mjs";
 import { declaredDirs } from "./lib/release-state.mjs";
 
 /**
@@ -42,45 +52,6 @@ import { declaredDirs } from "./lib/release-state.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RELEASE_TAGS = join(HERE, "release-tags.mjs");
-
-// ── npm/semantic-release outputs ────────────────────────────────────────────
-
-/**
- * Run 31427350698, copied from the job log.
- *
- * Both lines matter and they disagree: the CODE says permissions, the line above
- * it says TLS. A reader — or a classifier — that stops at the code gets the
- * wrong answer, which is the entire point of the first case below.
- */
-const TLS_BLIP = [
-  '[semantic-release] › ✘  The command "git push --dry-run --no-verify -- ' +
-    'https://github.com/12-apps/shared-packages.git HEAD:main" failed with the error ' +
-    "message fatal: unable to access 'https://github.com/12-apps/shared-packages.git/': " +
-    "server certificate verification failed. CAfile: none CRLfile: none.",
-  "[semantic-release] › ✘  EGITNOPERMISSION Cannot push to the Git repository.",
-].join("\n");
-
-/**
- * Constructed, not copied: the stale-ref race this repo's concurrency block
- * describes. Push runs are keyed by SHA so two merges release CONCURRENTLY, and
- * the older run's HEAD:main is then behind the ref it pushes to.
- */
-const STALE_REF = [
-  " ! [rejected]        HEAD -> main (non-fast-forward)",
-  "error: failed to push some refs to 'https://github.com/12-apps/shared-packages.git'",
-  "hint: Updates were rejected because a pushed branch tip is behind its remote counterpart.",
-  "[semantic-release] › ✘  EGITNOPERMISSION Cannot push to the Git repository.",
-].join("\n");
-
-/** Constructed: a genuine, non-retryable fault in the package's own config. */
-const BROKEN_CONFIG = [
-  "[semantic-release] › ✘  An error occurred while running semantic-release: Error: " +
-    "Cannot find module 'semantic-release-monorepo'",
-  "[semantic-release] › ✘  EINVALIDCONFIG",
-].join("\n");
-
-const RELEASED = "[semantic-release] › ℹ  Published release 1.22.0 on default channel";
-const NOTHING = "[semantic-release] › ℹ  There are no relevant changes, so no new version is released.";
 
 // ── The scripted pnpm ───────────────────────────────────────────────────────
 
@@ -286,6 +257,60 @@ check(
   clean.argv.some((call) => call.startsWith("auth :: ") && call.includes("--tag-format auth-v${version}")) &&
     clean.argv.some((call) => call.startsWith("ui :: ") && call.includes("--tag-format ui-v${version}")),
   `--tag-format keeps the scheme 700+ existing tags use. Without it\n    semantic-release-monorepo imposes @12-apps/ui-v1.2.3, under which no package\n    finds its own last tag and every one resets to 1.0.0. Calls:\n    ${clean.argv.join("\n    ")}`,
+);
+
+// ── exit 0 and nothing shipped: the success that has to be told apart ──────
+//
+// Both packages "succeed" and neither is tagged. `ui` is correct — nothing in
+// its range. `prisma` is the bug. Told apart in BOTH directions: a warning that
+// fires for `ui` too is noise on every release, one that fires for neither is
+// today's silence.
+// `request-scope` and the second `ui` line carry the mirror case: the version a
+// consumer cannot take without reading is the one the job currently says least
+// about, and it is decided by whether a wrap put `BREAKING CHANGE` at column 0.
+const quiet = releaseTags(["prisma", "ui", "request-scope", "auth"], {
+  prisma: [{ status: 0, out: CHANGED_BUT_SILENT }],
+  ui: [{ status: 0, out: NOTHING }],
+  "request-scope": [{ status: 0, out: ACCIDENTAL_MAJOR }],
+  auth: [{ status: 0, out: DELIBERATE_MINOR }],
+});
+
+check(
+  "a major is named while the run is still on screen, with what caused it",
+  /::warning::request-scope: cut a MAJOR, from a BREAKING CHANGE footer/.test(quiet.output) &&
+    /RELEASED_MAJOR=request-scope/.test(quiet.handoff),
+  `@12-apps/request-scope went out as 2.0.0 because a 100-char wrap put the phrase at\n    the start of a body line, and nothing in the job said so. Output was:\n    ${quiet.output}`,
+);
+check(
+  "a minor bump is not reported as one",
+  !/auth: cut a MAJOR/.test(quiet.output) && !/RELEASED_MAJOR=.*auth/.test(quiet.handoff),
+  `most releases are minor or patch; warning on those makes the warning worthless`,
+);
+
+check(
+  "a package with commits in range and no release is named",
+  /::warning::prisma: 1 commit\(s\) in range and NO release/.test(quiet.output),
+  `semantic-release exits 0 for this, so nothing else in the job can see it.\n    Output was:\n    ${quiet.output}`,
+);
+check(
+  "the warning says what to check, including the ! shorthand the preset ignores",
+  /BREAKING CHANGE footer/.test(quiet.output) && /angular preset/.test(quiet.output),
+  "the reader has to know WHY a commit that looked like a release was not one",
+);
+check(
+  "it is handed to the rest of the job with its commit count",
+  /^CHANGED_NO_RELEASE=prisma:1$/m.test(quiet.handoff),
+  `later steps read GITHUB_ENV, and the count is what makes the entry actionable.\n    Handoff was: ${JSON.stringify(quiet.handoff)}`,
+);
+check(
+  "a package with NO commits in range is not reported",
+  !/ui: \d+ commit/.test(quiet.output) && !/CHANGED_NO_RELEASE=.*\bui\b/.test(quiet.handoff),
+  `this is the normal state for 29 of 30 packages on every release — warning about\n    it would bury the one that matters. Output was:\n    ${quiet.output}`,
+);
+check(
+  "and none of it fails the run",
+  quiet.status === 0,
+  `expected exit 0: a docs or test commit legitimately releases nothing, so this is\n    a warning. Got ${quiet.status}`,
 );
 
 // ── The two copies of the package list must be the same list ───────────────
