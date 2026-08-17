@@ -15,15 +15,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@12-apps/product-research": "workspace:*",
-    "@12-apps/ui": "workspace:*"
+    "@12-apps/product-research": "^2.0.0",
+    "@12-apps/ui": "^5.0.0"
   },
   "peerDependencies": {
     "react": ">=19.0.0"
   },
   "devDependencies": {
-    "@12-apps/eslint-config": "workspace:*",
-    "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/eslint-config": "^1.20.0",
+    "@12-apps/typescript-config": "^1.20.0",
     "@storybook/react-vite": "^9.1.10",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.2.0",

@@ -2,7 +2,7 @@
   "name": "@12-apps/observability-frontend",
   "version": "1.0.0",
   "type": "module",
-  "description": "Browser error reporting for a React SPA, on Sentry: deferred init behind a served DSN, the noise rules that keep a deploy from filing one issue per open tab, a PII scrub, a route error boundary and a self-check page that proves the chain is live in the deployed bundle. Host-agnostic \u2014 what an app-specific error looks like, what a crashed page renders and where the config lives all arrive through named seams.",
+  "description": "Browser error reporting for a React SPA, on Sentry: deferred init behind a served DSN, the noise rules that keep a deploy from filing one issue per open tab, a PII scrub, a route error boundary and a self-check page that proves the chain is live in the deployed bundle. Host-agnostic — what an app-specific error looks like, what a crashed page renders and where the config lives all arrive through named seams.",
   "exports": {
     ".": "./src/index.ts",
     "./react": "./src/react/index.ts",
@@ -26,7 +26,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@12-apps/ui": "workspace:*",
+    "@12-apps/ui": "^5.0.0",
     "@sentry/react": "^10.69.0",
     "@sentry/vite-plugin": "^5.4.0"
   },
@@ -45,8 +45,8 @@
     }
   },
   "devDependencies": {
-    "@12-apps/eslint-config": "workspace:*",
-    "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/eslint-config": "^1.20.0",
+    "@12-apps/typescript-config": "^1.20.0",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.2.0",
     "eslint": "^9.39.1",

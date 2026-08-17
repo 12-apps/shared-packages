@@ -2,7 +2,7 @@
   "name": "@12-apps/payments-frontend",
   "version": "1.0.0",
   "type": "module",
-  "description": "Browser half of the vendor-agnostic payments platform: plug-and-play MUI components for the per-provider settings page (credential form from each provider's schema, masked hints, verify/enable) and the checkout page (PIX QR + polling, card tokenization, hosted-checkout redirect), plus the headless hooks and fetch clients they build on. Talks only to the host's payments HTTP surface \u2014 never to a provider directly. Microfrontend-ready: no app coupling, host injects theme and auth.",
+  "description": "Browser half of the vendor-agnostic payments platform: plug-and-play MUI components for the per-provider settings page (credential form from each provider's schema, masked hints, verify/enable) and the checkout page (PIX QR + polling, card tokenization, hosted-checkout redirect), plus the headless hooks and fetch clients they build on. Talks only to the host's payments HTTP surface — never to a provider directly. Microfrontend-ready: no app coupling, host injects theme and auth.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -17,7 +17,7 @@
     "storybook:build": "storybook build"
   },
   "dependencies": {
-    "@12-apps/payments-backend": "workspace:*",
+    "@12-apps/payments-backend": "^4.2.0",
     "react-qr-code": "^2.2.0"
   },
   "peerDependencies": {
@@ -28,8 +28,8 @@
     "react-dom": ">=19.0.0"
   },
   "devDependencies": {
-    "@12-apps/eslint-config": "workspace:*",
-    "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/eslint-config": "^1.20.0",
+    "@12-apps/typescript-config": "^1.20.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/material": "^6.5.0",
