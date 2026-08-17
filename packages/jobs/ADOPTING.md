@@ -19,6 +19,59 @@ arrive as config. What the package owns is the RUNNING of them.
 | **Drivers** | `@12-apps/jobs/bullmq`, `@12-apps/jobs/inline` | Nothing, usually — `createApiJobs` resolves them. Import directly only to hand a pre-built instance in (`driver: createInlineJobDriver({ await: true })` in a test). |
 | **Prisma** | `prisma/jobs.prisma` + `prisma/migrations/*` | Sync BOTH into the host's schema/migrations folders as **copies** (see below). One table: `sweep_leases`. |
 
+## `defineJobModule` — how another PACKAGE ships background work
+
+A package that owns a domain owns the deferred half of it too: the sweep that
+finishes what a request could not, the watcher that waits for a callback, the
+expiry that stops waiting. `defineJob` cannot express that — it registers at
+module scope, so the handler would have to close over a database client, a
+gateway and a logger the package cannot know at import time.
+
+So a package declares **blueprints** (everything about a job except the deps)
+and the host supplies the deps in one line — the worker counterpart of
+`mountPayments(config) → { routes }`:
+
+```ts
+// in the package, beside the domain it belongs to
+export const paymentsJobs = defineJobModule<PaymentsJobDeps>()({
+  namespace: 'payments',
+  jobs: {
+    watchSettlement: {
+      name: 'watch-settlement',            // → `payments.watch-settlement`
+      attempts: 3,
+      backoff: { type: 'exponential', delayMs: 5_000 },
+      handle: async ({ chargeId }, deps) => deps.gateway.refreshCharge(chargeId),
+    },
+  },
+});
+
+// in the host, beside the endpoint mount it already writes
+const { jobs } = paymentsJobs.mount({ gateway, store, logger });
+createApiJobs({ jobs: [...jobs, ...ownJobs] });
+```
+
+Three properties this buys, each of which a host could otherwise satisfy by
+accident and lose silently:
+
+- **Importing the package registers nothing.** Work reaches a registry only
+  when a host mounts it.
+- **The host is never asked for the policy.** Retries, backoff, queue,
+  schedule and concurrency are the package's decisions, exactly as the HTTP
+  methods of a settings route are. A host that had to restate them is a host
+  that can get them wrong.
+- **The package can enqueue its own work.**
+  `paymentsJobs.enqueue.watchSettlement(…)` resolves through the registry by
+  NAME at call time, so it works from a module that holds no deps and was
+  imported long before the mount. Enqueueing before a mount reports
+  `unregistered` and logs — it never throws, because the emit site is usually a
+  request path (a charge being raised) and a wiring mistake in the deferred
+  half must not fail the money path in front of it.
+
+Names are namespaced here, once: a blueprint states `watch-settlement` and the
+module prepends `payments.`. Two packages therefore cannot collide by both
+calling something `drain`, and a queue dashboard says whose work it is. A blank
+or dotted namespace is refused at declaration.
+
 ## Why there is no `createWebJobs`
 
 The porting contract asks for both halves — `createApiFoo` and `createWebFoo`
