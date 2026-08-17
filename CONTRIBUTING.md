@@ -77,6 +77,42 @@ BREAKING CHANGE: `<Button kind="…">` is replaced by `variant`. Callers passing
 Use the package name — `feat(ui):`, `fix(payments-frontend):`. A change that
 touches several packages either takes the most affected one or drops the scope.
 
+## Build before you check
+
+Fifteen of the `@12-apps/*` packages ship **compiled** entries — their `exports`
+point at `dist` rather than at `src` — which is what makes a published tarball
+work for the apps that install it. The other thirteen still export `src`, so
+whether this bites you depends on what you depend on. In practice it usually
+does: `@12-apps/ui` is one of the fifteen and sits under almost everything else,
+and `forms-core`, `mcp`, `rbac`, `onboarding` and `report-builder` are too.
+
+The cost is paid locally. A package's `check-types`, `lint` and `test` need
+those dependencies **built**, not merely installed, and `pnpm install` alone
+leaves them unbuilt.
+
+What makes this worth a section is that the failure names the wrong thing. It
+reads as a missing module, in a package that plainly declares it:
+
+```
+src/react/ai-capabilities.tsx(1,21): error TS2307: Cannot find module
+'@12-apps/ui/mui/Box' or its corresponding type declarations.
+```
+
+Nothing is wrong with the import. `@12-apps/ui` simply has no `dist` yet.
+
+So build first. `pnpm build` does the whole graph and is the safe default — it
+is what CI runs before any per-package job. Turbo's `...` suffix builds one
+package's dependencies instead, which is much faster when that is all you need:
+
+```bash
+pnpm turbo run build --filter=@12-apps/mcp...   # mcp AND everything it needs
+pnpm --filter @12-apps/mcp check-types
+```
+
+If a build itself fails with `tsup: not found`, or a `dist` never appears for a
+package that clearly builds one, the install did not finish — re-run
+`pnpm install` before looking for the cause anywhere else.
+
 ## Pull requests
 
 Target `main`. Open the PR, get it green, then mark it ready for review.
