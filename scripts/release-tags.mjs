@@ -186,7 +186,19 @@ function releasePackage(dir, pkg) {
 
 // semantic-release's own accounting of the range it analysed. Both lines come
 // from the CORE rather than a plugin, so they do not move with plugin config.
-const COMMITS_IN_RANGE = /Found (\d+) commits? since last release/;
+// The FILTERED count — semantic-release-monorepo's, after it has narrowed the
+// range to commits touching this package's directory.
+//
+// NOT the core's `Found N commits since last release`, which is what this first
+// shipped as and which is wrong in the way that matters. That line is printed
+// before the filter, so it is the whole repository's range: measured on `main`,
+// prisma reports 15, eslint-config 133 and auth 43 — all non-zero, on every
+// package, on every release. Reading it made the warning fire for all thirty
+// and quote a count belonging to none of them, which is precisely the noise the
+// "a package with NO commits in range is not reported" case exists to forbid.
+// It passed only because the fixture it was written against was inferred rather
+// than captured, and omitted a line real output always prints.
+const COMMITS_IN_RANGE = /Analysis of (\d+) commits? complete/;
 const NOTHING_RELEASED = /There are no relevant changes, so no new version is released/;
 
 /**

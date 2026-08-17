@@ -41,21 +41,45 @@ export const BROKEN_CONFIG = [
 ].join("\n");
 
 export const RELEASED = "[semantic-release] › ℹ  Published release 1.22.0 on default channel";
-export const NOTHING =
-  "[semantic-release] › ℹ  There are no relevant changes, so no new version is released.";
 
 /**
- * The OTHER exit-0-and-shipped-nothing, in run 31971842924's shape: commits
- * landed in range and not one produced a version. semantic-release prints the
- * same closing line as NOTHING and exits 0 either way, which is how
- * `fix(prisma)!: …` released nothing for five packages while the job stayed
- * green. `Found N commits` is the only line that tells the two apart.
+ * A package with NOTHING in its own range — captured from a real dry run of
+ * `@12-apps/auth` on `main`, and captured rather than written for a reason.
+ *
+ * The `Found 43 commits` line is the CORE's, printed before
+ * semantic-release-monorepo narrows the range to this package's directory, so
+ * it counts the whole repository and is large and non-zero here even though
+ * nothing touched `packages/auth`. The plugin's `Analysis of 0 commits` is the
+ * count that means anything.
+ *
+ * An earlier version of this fixture was inferred and left the core's line out.
+ * That made "no commits in range" look distinguishable by a line's absence when
+ * it is not, and the detector written against it fired on every package of
+ * every release. Both lines belong here so that can never read as clean again.
+ */
+export const NOTHING = [
+  "[semantic-release] › ℹ  Found git tag auth-v1.22.0 associated with version 1.22.0 on branch main",
+  "[semantic-release] › ℹ  Found 43 commits since last release",
+  "[semantic-release] [[Function: semantic-release-monorepo]] › ℹ  Analysis of 0 commits complete: no release",
+  "[semantic-release] › ℹ  There are no relevant changes, so no new version is released.",
+].join("\n");
+
+/**
+ * The OTHER exit-0-and-shipped-nothing, captured from a real dry run of
+ * `@12-apps/prisma` on `main`: one commit DID touch the package and produced no
+ * version. semantic-release prints the same closing line as NOTHING and exits 0
+ * either way, which is how `fix(prisma)!: …` released nothing for five packages
+ * while the job stayed green.
+ *
+ * Only `Analysis of N commits` separates this from NOTHING above — 1 against 0.
+ * The core's `Found N` line is 15 here and 43 there, and says nothing about
+ * either package.
  */
 export const CHANGED_BUT_SILENT = [
   "[semantic-release] › ℹ  Found git tag prisma-v5.1.0 associated with version 5.1.0 on branch main",
-  "[semantic-release] › ℹ  Found 1 commits since last release",
-  "[semantic-release] › ℹ  Analysis of 1 commits complete: no release",
-  NOTHING,
+  "[semantic-release] › ℹ  Found 15 commits since last release",
+  "[semantic-release] [[Function: semantic-release-monorepo]] › ℹ  Analysis of 1 commits complete: no release",
+  "[semantic-release] › ℹ  There are no relevant changes, so no new version is released.",
 ].join("\n");
 
 /**
