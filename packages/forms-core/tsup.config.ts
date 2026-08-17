@@ -26,6 +26,9 @@ export default defineConfig({
   entry: { index: 'src/index.ts' },
   format: ['esm'],
   dts: true,
+  // Preserve class and function `.name` through minification/renaming — a
+  // consumer matching on `err.name` must not see esbuild's internal alias.
+  keepNames: true,
   sourcemap: true,
   // The build script removes `dist` before tsup starts, matching the other
   // packages here — an entry owning `clean` races its siblings.

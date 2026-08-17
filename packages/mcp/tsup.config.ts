@@ -31,6 +31,12 @@ export default defineConfig({
   format: ['esm'],
   dts: true,
   splitting: true,
+  // esbuild renames a class re-exported across chunks (`class _Foo` plus
+  // `export { _Foo as Foo }`), and the rename lands on the class's intrinsic
+  // `.name`. Any consumer matching on `err.name` — or serialising it into a
+  // response — then sees `_Foo`. The backend harness caught exactly that:
+  // `expected '_UnknownNotificationTypeError' to be 'UnknownNotificationTypeError'`.
+  keepNames: true,
   sourcemap: true,
   // `dist` is removed by the build script before tsup starts.
   clean: false,
