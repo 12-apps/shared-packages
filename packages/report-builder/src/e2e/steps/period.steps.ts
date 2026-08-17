@@ -89,8 +89,30 @@ Then('the report covers fewer days than before', async ({ page, journey }) => {
   const rows = periodRows(page);
   // Polled rather than read once: the period is a round trip, and the count
   // between the click and the answer is legitimately the OLD one.
-  await expect.poll(() => rows.count()).toBeLessThan(journey.rows);
-  journey.countedRows(await rows.count());
+  //
+  // An EMPTY table is not an answer either, and that is the harder half. A
+  // block re-rendering its new window momentarily shows ZERO rows — and zero
+  // satisfies "fewer than before" against any count at all, so a poll that
+  // accepts it succeeds on the loading state and records 0 as this period's
+  // size. Nothing is fewer than none, so the NEXT narrowing in the scenario
+  // can then never pass: it burns its timeout and reports the count that did
+  // eventually render, against an expectation of "< 0".
+  //
+  // So the answer has to be a count that is BOTH narrower AND real, and the
+  // value recorded is the one that actually satisfied it — re-reading after
+  // the poll is a second read that another render can land in between.
+  let settled = 0;
+  await expect
+    .poll(
+      async () => {
+        const count = await rows.count();
+        if (count > 0 && count < journey.rows) settled = count;
+        return settled;
+      },
+      { timeout: BLOCK_RENDER_TIMEOUT_MS },
+    )
+    .toBeGreaterThan(0);
+  journey.countedRows(settled);
 });
 
 Then('the report covers a single day', async ({ page, journey }) => {
