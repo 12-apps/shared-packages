@@ -1,6 +1,6 @@
 import BrokenImage from '@mui/icons-material/BrokenImage';
 import Person from '@mui/icons-material/Person';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import React, { useCallback, useEffect, useState } from 'react';
 
 import type { AvatarProps } from './Avatar.types';

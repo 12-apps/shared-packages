@@ -1,6 +1,6 @@
 import { alpha, keyframes,Tooltip as MuiTooltip } from '@mui/material';
 import type { CSSObject, Theme } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import React from 'react';
 
 import type { TooltipProps } from './Tooltip.types';

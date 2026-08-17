@@ -13,7 +13,7 @@ import {
   TableContainer,
   TableRow
   } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import React from 'react';
 
 import type {

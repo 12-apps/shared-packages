@@ -3,7 +3,7 @@ import Info from '@mui/icons-material/Info';
 import CheckCircle from '@mui/icons-material/CheckCircle';
 import Warning from '@mui/icons-material/Warning';
 import { alpha, darken, keyframes, lighten } from '@mui/material';
-import type { CSSObject, Theme } from '@mui/material/styles';
+import type { CSSObject, Theme } from '@mui/material';
 import React from 'react';
 
 export const pulseAnimation = keyframes`

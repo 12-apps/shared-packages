@@ -1,4 +1,4 @@
-import type { CSSObject, Theme } from '@mui/material/styles';
+import type { CSSObject, Theme } from '@mui/material';
 import { alpha } from '@mui/material';
 
 import type { ScrollAreaProps } from './ScrollArea.types';

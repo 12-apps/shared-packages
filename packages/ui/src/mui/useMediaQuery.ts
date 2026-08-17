@@ -1,1 +1,1 @@
-export { default as useMediaQuery, default } from '@mui/material/useMediaQuery';
+export { useMediaQuery, useMediaQuery as default } from '@mui/material';

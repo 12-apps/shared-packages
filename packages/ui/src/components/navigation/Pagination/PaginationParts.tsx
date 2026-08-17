@@ -1,5 +1,5 @@
 import { Box, FormControl, MenuItem, Select, Typography } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import type { FC } from 'react';
 import React from 'react';
 

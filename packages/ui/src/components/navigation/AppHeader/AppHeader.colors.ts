@@ -1,4 +1,4 @@
-import { decomposeColor } from '@mui/material/styles';
+import { decomposeColor } from '@mui/material';
 
 /**
  * Turning ONE brand colour into the mark's fill.

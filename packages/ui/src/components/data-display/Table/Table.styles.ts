@@ -1,5 +1,5 @@
 import { alpha, keyframes } from '@mui/material';
-import type { CSSObject, Theme } from '@mui/material/styles';
+import type { CSSObject, Theme } from '@mui/material';
 
 import type { TableDensity, TableStripeColor } from './Table.types';
 

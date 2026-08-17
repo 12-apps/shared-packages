@@ -11,173 +11,563 @@
     "yarn": "please-use-pnpm"
   },
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/types/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./button": "./src/button/index.ts",
-    "./charts": "./src/charts/index.ts",
-    "./social-login-button": "./src/social-login-button/index.ts",
-    "./user-avatar": "./src/user-avatar/index.ts",
-    "./utils": "./src/utils/index.ts",
-    "./tokens": "./src/tokens/scales.ts",
-    "./mui/Box": "./src/mui/Box.ts",
-    "./mui/Link": "./src/mui/Link.ts",
-    "./mui/Stack": "./src/mui/Stack.ts",
-    "./mui/AppBar": "./src/mui/AppBar.ts",
-    "./mui/Toolbar": "./src/mui/Toolbar.ts",
-    "./mui/styles": "./src/mui/styles.ts",
-    "./mui/FormControl": "./src/mui/FormControl.ts",
-    "./mui/FormControlLabel": "./src/mui/FormControlLabel.ts",
-    "./mui/InputLabel": "./src/mui/InputLabel.ts",
-    "./mui/SvgIcon": "./src/mui/SvgIcon.ts",
-    "./mui/CssBaseline": "./src/mui/CssBaseline.ts",
-    "./mui/Grid2": "./src/mui/Grid2.ts",
-    "./mui/useMediaQuery": "./src/mui/useMediaQuery.ts",
-    "./mui/List": "./src/mui/List.ts",
-    "./mui/ListItem": "./src/mui/ListItem.ts",
-    "./mui/ListItemButton": "./src/mui/ListItemButton.ts",
-    "./mui/ListItemText": "./src/mui/ListItemText.ts",
-    "./data-display/Alert": "./src/components/data-display/Alert/index.ts",
-    "./data-display/AlertDialog": "./src/components/data-display/AlertDialog/index.ts",
-    "./data-display/Avatar": "./src/components/data-display/Avatar/index.ts",
-    "./data-display/Badge": "./src/components/data-display/Badge/index.ts",
-    "./data-display/Banner": "./src/components/data-display/Banner/index.ts",
-    "./data-display/Carousel": "./src/components/data-display/Carousel/index.ts",
-    "./data-display/Chart": "./src/components/data-display/Chart/index.ts",
-    "./data-display/Chip": "./src/components/data-display/Chip/index.ts",
-    "./data-display/DataGrid": "./src/components/data-display/DataGrid/index.ts",
-    "./data-display/DataViews": "./src/components/data-display/DataViews/index.ts",
-    "./data-display/DescriptionItem": "./src/components/data-display/DescriptionItem/index.ts",
-    "./data-display/EmptyState": "./src/components/data-display/EmptyState/index.ts",
-    "./data-display/SectionOnboarding": "./src/components/data-display/SectionOnboarding/index.ts",
-    "./data-display/StatCard": "./src/components/data-display/StatCard/index.ts",
-    "./data-display/HoverCard": "./src/components/data-display/HoverCard/index.ts",
-    "./data-display/InteractiveTooltip": "./src/components/data-display/InteractiveTooltip/index.ts",
-    "./data-display/LazyImage": "./src/components/data-display/LazyImage/index.ts",
-    "./data-display/Lightbox": "./src/components/data-display/Lightbox/index.ts",
-    "./data-display/MapPreview": "./src/components/data-display/MapPreview/index.ts",
-    "./data-display/Popover": "./src/components/data-display/Popover/index.ts",
-    "./data-display/Progress": "./src/components/data-display/Progress/index.ts",
-    "./data-display/Sheet": "./src/components/data-display/Sheet/index.ts",
-    "./data-display/Stepper": "./src/components/data-display/Stepper/index.ts",
-    "./data-display/Table": "./src/components/data-display/Table/index.ts",
-    "./data-display/Timeline": "./src/components/data-display/Timeline/index.ts",
-    "./data-display/TimingDiagram": "./src/components/data-display/TimingDiagram/index.ts",
-    "./data-display/Tooltip": "./src/components/data-display/Tooltip/index.ts",
-    "./data-display/AsyncStateContainer": "./src/components/data-display/AsyncStateContainer/index.ts",
-    "./data-display/ErrorState": "./src/components/data-display/ErrorState/index.ts",
-    "./data-display/LoadingState": "./src/components/data-display/LoadingState/index.ts",
-    "./feedback/ConfirmAction": "./src/components/feedback/ConfirmAction/index.ts",
-    "./feedback/Dialog": "./src/components/feedback/Dialog/index.ts",
-    "./feedback/Modal": "./src/components/feedback/Modal/index.ts",
-    "./feedback/Sonner": "./src/components/feedback/Sonner/index.ts",
-    "./feedback/StackedModal": "./src/components/feedback/StackedModal/index.ts",
-    "./feedback/Toast": "./src/components/feedback/Toast/index.ts",
-    "./feedback/TutorialOverlay": "./src/components/feedback/TutorialOverlay/index.ts",
-    "./form/AddressAutocomplete": "./src/components/form/AddressAutocomplete/index.ts",
-    "./form/Autocomplete": "./src/components/form/Autocomplete/index.ts",
-    "./form/Button": "./src/components/form/Button/index.ts",
-    "./form/Calendar": "./src/components/form/Calendar/index.ts",
-    "./form/CategorySelect": "./src/components/form/CategorySelect/index.ts",
-    "./form/CepField": "./src/components/form/CepField/index.ts",
-    "./form/Checkbox": "./src/components/form/Checkbox/index.ts",
-    "./form/CodeEditor": "./src/components/form/CodeEditor/index.ts",
-    "./form/Command": "./src/components/form/Command/index.ts",
-    "./form/CreatableSelect": "./src/components/form/CreatableSelect/index.ts",
-    "./form/DateRangePicker": "./src/components/form/DateRangePicker/index.ts",
-    "./form/Form": "./src/components/form/Form/index.ts",
-    "./form/HeaderButton": "./src/components/form/HeaderButton/index.ts",
-    "./form/total-form": "./src/components/form/total-form/index.ts",
-    "./form/Input": "./src/components/form/Input/index.ts",
-    "./form/InputOTP": "./src/components/form/InputOTP/index.ts",
-    "./form/Label": "./src/components/form/Label/index.ts",
-    "./form/Menubar": "./src/components/form/Menubar/index.ts",
-    "./form/PasswordStrength": "./src/components/form/PasswordStrength/index.ts",
-    "./form/PhoneInput": "./src/components/form/PhoneInput/index.ts",
-    "./form/RadioGroup": "./src/components/form/RadioGroup/index.ts",
-    "./form/RichTextEditor": "./src/components/form/RichTextEditor/index.ts",
-    "./form/SearchPalette": "./src/components/form/SearchPalette/index.ts",
-    "./form/Select": "./src/components/form/Select/index.ts",
-    "./form/Slider": "./src/components/form/Slider/index.ts",
-    "./form/Switch": "./src/components/form/Switch/index.ts",
-    "./form/Textarea": "./src/components/form/Textarea/index.ts",
-    "./form/Toggle": "./src/components/form/Toggle/index.ts",
-    "./form/ToggleGroup": "./src/components/form/ToggleGroup/index.ts",
-    "./form/UploadButton": "./src/components/form/UploadButton/index.ts",
-    "./layout/Accordion": "./src/components/layout/Accordion/index.ts",
-    "./layout/Card": "./src/components/layout/Card/index.ts",
-    "./layout/CardGrid": "./src/components/layout/CardGrid/index.ts",
-    "./layout/Collapsible": "./src/components/layout/Collapsible/index.ts",
-    "./layout/Container": "./src/components/layout/Container/index.ts",
-    "./layout/ContentToolbar": "./src/components/layout/ContentToolbar/index.ts",
-    "./layout/Dashboard": "./src/components/layout/Dashboard/index.ts",
-    "./layout/Drawer": "./src/components/layout/Drawer/index.ts",
-    "./layout/Resizable": "./src/components/layout/Resizable/index.ts",
-    "./layout/ScrollArea": "./src/components/layout/ScrollArea/index.ts",
-    "./layout/Separator": "./src/components/layout/Separator/index.ts",
-    "./layout/SettingsLayout": "./src/components/layout/SettingsLayout/index.ts",
-    "./layout/Sidebar": "./src/components/layout/Sidebar/index.ts",
-    "./layout/Skeleton": "./src/components/layout/Skeleton/index.ts",
-    "./layout/Spacer": "./src/components/layout/Spacer/index.ts",
-    "./layout/TableFilter": "./src/components/layout/TableFilter/index.ts",
-    "./navigation/AppHeader": "./src/components/navigation/AppHeader/index.ts",
-    "./navigation/Breadcrumbs": "./src/components/navigation/Breadcrumbs/index.ts",
-    "./navigation/CommandPalette": "./src/components/navigation/CommandPalette/index.ts",
-    "./navigation/ContextMenu": "./src/components/navigation/ContextMenu/index.ts",
-    "./navigation/DropdownMenu": "./src/components/navigation/DropdownMenu/index.ts",
-    "./navigation/NavigationMenu": "./src/components/navigation/NavigationMenu/index.ts",
-    "./navigation/Pagination": "./src/components/navigation/Pagination/index.ts",
-    "./navigation/Tabs": "./src/components/navigation/Tabs/index.ts",
-    "./typography/Blockquote": "./src/components/typography/Blockquote/index.ts",
-    "./typography/Code": "./src/components/typography/Code/index.ts",
-    "./typography/Heading": "./src/components/typography/Heading/index.ts",
-    "./typography/Paragraph": "./src/components/typography/Paragraph/index.ts",
-    "./typography/Text": "./src/components/typography/Text/index.ts",
-    "./utility/AnimatedIcon": "./src/components/utility/AnimatedIcon/index.ts",
-    "./utility/AspectRatio": "./src/components/utility/AspectRatio/index.ts",
-    "./utility/InfiniteScroll": "./src/components/utility/InfiniteScroll/index.ts",
-    "./utility/InstallPrompt": "./src/components/utility/InstallPrompt/index.ts",
-    "./utility/Overflow": "./src/components/utility/Overflow/index.ts",
-    "./utility/Portal": "./src/components/utility/Portal/index.ts",
-    "./utility/Transition": "./src/components/utility/Transition/index.ts",
-    "./utility/VirtualList": "./src/components/utility/VirtualList/index.ts",
-    "./utility/WorkflowStep": "./src/components/utility/WorkflowStep/index.ts"
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./button": {
+      "types": "./dist/types/button/index.d.ts",
+      "default": "./dist/button.js"
+    },
+    "./charts": {
+      "types": "./dist/types/charts/index.d.ts",
+      "default": "./dist/charts.js"
+    },
+    "./social-login-button": {
+      "types": "./dist/types/social-login-button/index.d.ts",
+      "default": "./dist/social-login-button.js"
+    },
+    "./user-avatar": {
+      "types": "./dist/types/user-avatar/index.d.ts",
+      "default": "./dist/user-avatar.js"
+    },
+    "./utils": {
+      "types": "./dist/types/utils/index.d.ts",
+      "default": "./dist/utils.js"
+    },
+    "./tokens": {
+      "types": "./dist/types/tokens/scales.d.ts",
+      "default": "./dist/tokens.js"
+    },
+    "./mui/Box": {
+      "types": "./dist/types/mui/Box.d.ts",
+      "default": "./dist/mui/Box.js"
+    },
+    "./mui/Link": {
+      "types": "./dist/types/mui/Link.d.ts",
+      "default": "./dist/mui/Link.js"
+    },
+    "./mui/Stack": {
+      "types": "./dist/types/mui/Stack.d.ts",
+      "default": "./dist/mui/Stack.js"
+    },
+    "./mui/AppBar": {
+      "types": "./dist/types/mui/AppBar.d.ts",
+      "default": "./dist/mui/AppBar.js"
+    },
+    "./mui/Toolbar": {
+      "types": "./dist/types/mui/Toolbar.d.ts",
+      "default": "./dist/mui/Toolbar.js"
+    },
+    "./mui/styles": {
+      "types": "./dist/types/mui/styles.d.ts",
+      "default": "./dist/mui/styles.js"
+    },
+    "./mui/FormControl": {
+      "types": "./dist/types/mui/FormControl.d.ts",
+      "default": "./dist/mui/FormControl.js"
+    },
+    "./mui/FormControlLabel": {
+      "types": "./dist/types/mui/FormControlLabel.d.ts",
+      "default": "./dist/mui/FormControlLabel.js"
+    },
+    "./mui/InputLabel": {
+      "types": "./dist/types/mui/InputLabel.d.ts",
+      "default": "./dist/mui/InputLabel.js"
+    },
+    "./mui/SvgIcon": {
+      "types": "./dist/types/mui/SvgIcon.d.ts",
+      "default": "./dist/mui/SvgIcon.js"
+    },
+    "./mui/CssBaseline": {
+      "types": "./dist/types/mui/CssBaseline.d.ts",
+      "default": "./dist/mui/CssBaseline.js"
+    },
+    "./mui/Grid2": {
+      "types": "./dist/types/mui/Grid2.d.ts",
+      "default": "./dist/mui/Grid2.js"
+    },
+    "./mui/useMediaQuery": {
+      "types": "./dist/types/mui/useMediaQuery.d.ts",
+      "default": "./dist/mui/useMediaQuery.js"
+    },
+    "./mui/List": {
+      "types": "./dist/types/mui/List.d.ts",
+      "default": "./dist/mui/List.js"
+    },
+    "./mui/ListItem": {
+      "types": "./dist/types/mui/ListItem.d.ts",
+      "default": "./dist/mui/ListItem.js"
+    },
+    "./mui/ListItemButton": {
+      "types": "./dist/types/mui/ListItemButton.d.ts",
+      "default": "./dist/mui/ListItemButton.js"
+    },
+    "./mui/ListItemText": {
+      "types": "./dist/types/mui/ListItemText.d.ts",
+      "default": "./dist/mui/ListItemText.js"
+    },
+    "./data-display/Alert": {
+      "types": "./dist/types/components/data-display/Alert/index.d.ts",
+      "default": "./dist/data-display/Alert.js"
+    },
+    "./data-display/AlertDialog": {
+      "types": "./dist/types/components/data-display/AlertDialog/index.d.ts",
+      "default": "./dist/data-display/AlertDialog.js"
+    },
+    "./data-display/Avatar": {
+      "types": "./dist/types/components/data-display/Avatar/index.d.ts",
+      "default": "./dist/data-display/Avatar.js"
+    },
+    "./data-display/Badge": {
+      "types": "./dist/types/components/data-display/Badge/index.d.ts",
+      "default": "./dist/data-display/Badge.js"
+    },
+    "./data-display/Banner": {
+      "types": "./dist/types/components/data-display/Banner/index.d.ts",
+      "default": "./dist/data-display/Banner.js"
+    },
+    "./data-display/Carousel": {
+      "types": "./dist/types/components/data-display/Carousel/index.d.ts",
+      "default": "./dist/data-display/Carousel.js"
+    },
+    "./data-display/Chart": {
+      "types": "./dist/types/components/data-display/Chart/index.d.ts",
+      "default": "./dist/data-display/Chart.js"
+    },
+    "./data-display/Chip": {
+      "types": "./dist/types/components/data-display/Chip/index.d.ts",
+      "default": "./dist/data-display/Chip.js"
+    },
+    "./data-display/DataGrid": {
+      "types": "./dist/types/components/data-display/DataGrid/index.d.ts",
+      "default": "./dist/data-display/DataGrid.js"
+    },
+    "./data-display/DataViews": {
+      "types": "./dist/types/components/data-display/DataViews/index.d.ts",
+      "default": "./dist/data-display/DataViews.js"
+    },
+    "./data-display/DescriptionItem": {
+      "types": "./dist/types/components/data-display/DescriptionItem/index.d.ts",
+      "default": "./dist/data-display/DescriptionItem.js"
+    },
+    "./data-display/EmptyState": {
+      "types": "./dist/types/components/data-display/EmptyState/index.d.ts",
+      "default": "./dist/data-display/EmptyState.js"
+    },
+    "./data-display/SectionOnboarding": {
+      "types": "./dist/types/components/data-display/SectionOnboarding/index.d.ts",
+      "default": "./dist/data-display/SectionOnboarding.js"
+    },
+    "./data-display/StatCard": {
+      "types": "./dist/types/components/data-display/StatCard/index.d.ts",
+      "default": "./dist/data-display/StatCard.js"
+    },
+    "./data-display/HoverCard": {
+      "types": "./dist/types/components/data-display/HoverCard/index.d.ts",
+      "default": "./dist/data-display/HoverCard.js"
+    },
+    "./data-display/InteractiveTooltip": {
+      "types": "./dist/types/components/data-display/InteractiveTooltip/index.d.ts",
+      "default": "./dist/data-display/InteractiveTooltip.js"
+    },
+    "./data-display/LazyImage": {
+      "types": "./dist/types/components/data-display/LazyImage/index.d.ts",
+      "default": "./dist/data-display/LazyImage.js"
+    },
+    "./data-display/Lightbox": {
+      "types": "./dist/types/components/data-display/Lightbox/index.d.ts",
+      "default": "./dist/data-display/Lightbox.js"
+    },
+    "./data-display/MapPreview": {
+      "types": "./dist/types/components/data-display/MapPreview/index.d.ts",
+      "default": "./dist/data-display/MapPreview.js"
+    },
+    "./data-display/Popover": {
+      "types": "./dist/types/components/data-display/Popover/index.d.ts",
+      "default": "./dist/data-display/Popover.js"
+    },
+    "./data-display/Progress": {
+      "types": "./dist/types/components/data-display/Progress/index.d.ts",
+      "default": "./dist/data-display/Progress.js"
+    },
+    "./data-display/Sheet": {
+      "types": "./dist/types/components/data-display/Sheet/index.d.ts",
+      "default": "./dist/data-display/Sheet.js"
+    },
+    "./data-display/Stepper": {
+      "types": "./dist/types/components/data-display/Stepper/index.d.ts",
+      "default": "./dist/data-display/Stepper.js"
+    },
+    "./data-display/Table": {
+      "types": "./dist/types/components/data-display/Table/index.d.ts",
+      "default": "./dist/data-display/Table.js"
+    },
+    "./data-display/Timeline": {
+      "types": "./dist/types/components/data-display/Timeline/index.d.ts",
+      "default": "./dist/data-display/Timeline.js"
+    },
+    "./data-display/TimingDiagram": {
+      "types": "./dist/types/components/data-display/TimingDiagram/index.d.ts",
+      "default": "./dist/data-display/TimingDiagram.js"
+    },
+    "./data-display/Tooltip": {
+      "types": "./dist/types/components/data-display/Tooltip/index.d.ts",
+      "default": "./dist/data-display/Tooltip.js"
+    },
+    "./data-display/AsyncStateContainer": {
+      "types": "./dist/types/components/data-display/AsyncStateContainer/index.d.ts",
+      "default": "./dist/data-display/AsyncStateContainer.js"
+    },
+    "./data-display/ErrorState": {
+      "types": "./dist/types/components/data-display/ErrorState/index.d.ts",
+      "default": "./dist/data-display/ErrorState.js"
+    },
+    "./data-display/LoadingState": {
+      "types": "./dist/types/components/data-display/LoadingState/index.d.ts",
+      "default": "./dist/data-display/LoadingState.js"
+    },
+    "./feedback/ConfirmAction": {
+      "types": "./dist/types/components/feedback/ConfirmAction/index.d.ts",
+      "default": "./dist/feedback/ConfirmAction.js"
+    },
+    "./feedback/Dialog": {
+      "types": "./dist/types/components/feedback/Dialog/index.d.ts",
+      "default": "./dist/feedback/Dialog.js"
+    },
+    "./feedback/Modal": {
+      "types": "./dist/types/components/feedback/Modal/index.d.ts",
+      "default": "./dist/feedback/Modal.js"
+    },
+    "./feedback/Sonner": {
+      "types": "./dist/types/components/feedback/Sonner/index.d.ts",
+      "default": "./dist/feedback/Sonner.js"
+    },
+    "./feedback/StackedModal": {
+      "types": "./dist/types/components/feedback/StackedModal/index.d.ts",
+      "default": "./dist/feedback/StackedModal.js"
+    },
+    "./feedback/Toast": {
+      "types": "./dist/types/components/feedback/Toast/index.d.ts",
+      "default": "./dist/feedback/Toast.js"
+    },
+    "./feedback/TutorialOverlay": {
+      "types": "./dist/types/components/feedback/TutorialOverlay/index.d.ts",
+      "default": "./dist/feedback/TutorialOverlay.js"
+    },
+    "./form/AddressAutocomplete": {
+      "types": "./dist/types/components/form/AddressAutocomplete/index.d.ts",
+      "default": "./dist/form/AddressAutocomplete.js"
+    },
+    "./form/Autocomplete": {
+      "types": "./dist/types/components/form/Autocomplete/index.d.ts",
+      "default": "./dist/form/Autocomplete.js"
+    },
+    "./form/Button": {
+      "types": "./dist/types/components/form/Button/index.d.ts",
+      "default": "./dist/form/Button.js"
+    },
+    "./form/Calendar": {
+      "types": "./dist/types/components/form/Calendar/index.d.ts",
+      "default": "./dist/form/Calendar.js"
+    },
+    "./form/CategorySelect": {
+      "types": "./dist/types/components/form/CategorySelect/index.d.ts",
+      "default": "./dist/form/CategorySelect.js"
+    },
+    "./form/CepField": {
+      "types": "./dist/types/components/form/CepField/index.d.ts",
+      "default": "./dist/form/CepField.js"
+    },
+    "./form/Checkbox": {
+      "types": "./dist/types/components/form/Checkbox/index.d.ts",
+      "default": "./dist/form/Checkbox.js"
+    },
+    "./form/CodeEditor": {
+      "types": "./dist/types/components/form/CodeEditor/index.d.ts",
+      "default": "./dist/form/CodeEditor.js"
+    },
+    "./form/Command": {
+      "types": "./dist/types/components/form/Command/index.d.ts",
+      "default": "./dist/form/Command.js"
+    },
+    "./form/CreatableSelect": {
+      "types": "./dist/types/components/form/CreatableSelect/index.d.ts",
+      "default": "./dist/form/CreatableSelect.js"
+    },
+    "./form/DateRangePicker": {
+      "types": "./dist/types/components/form/DateRangePicker/index.d.ts",
+      "default": "./dist/form/DateRangePicker.js"
+    },
+    "./form/Form": {
+      "types": "./dist/types/components/form/Form/index.d.ts",
+      "default": "./dist/form/Form.js"
+    },
+    "./form/HeaderButton": {
+      "types": "./dist/types/components/form/HeaderButton/index.d.ts",
+      "default": "./dist/form/HeaderButton.js"
+    },
+    "./form/total-form": {
+      "types": "./dist/types/components/form/total-form/index.d.ts",
+      "default": "./dist/form/total-form.js"
+    },
+    "./form/Input": {
+      "types": "./dist/types/components/form/Input/index.d.ts",
+      "default": "./dist/form/Input.js"
+    },
+    "./form/InputOTP": {
+      "types": "./dist/types/components/form/InputOTP/index.d.ts",
+      "default": "./dist/form/InputOTP.js"
+    },
+    "./form/Label": {
+      "types": "./dist/types/components/form/Label/index.d.ts",
+      "default": "./dist/form/Label.js"
+    },
+    "./form/Menubar": {
+      "types": "./dist/types/components/form/Menubar/index.d.ts",
+      "default": "./dist/form/Menubar.js"
+    },
+    "./form/PasswordStrength": {
+      "types": "./dist/types/components/form/PasswordStrength/index.d.ts",
+      "default": "./dist/form/PasswordStrength.js"
+    },
+    "./form/PhoneInput": {
+      "types": "./dist/types/components/form/PhoneInput/index.d.ts",
+      "default": "./dist/form/PhoneInput.js"
+    },
+    "./form/RadioGroup": {
+      "types": "./dist/types/components/form/RadioGroup/index.d.ts",
+      "default": "./dist/form/RadioGroup.js"
+    },
+    "./form/RichTextEditor": {
+      "types": "./dist/types/components/form/RichTextEditor/index.d.ts",
+      "default": "./dist/form/RichTextEditor.js"
+    },
+    "./form/SearchPalette": {
+      "types": "./dist/types/components/form/SearchPalette/index.d.ts",
+      "default": "./dist/form/SearchPalette.js"
+    },
+    "./form/Select": {
+      "types": "./dist/types/components/form/Select/index.d.ts",
+      "default": "./dist/form/Select.js"
+    },
+    "./form/Slider": {
+      "types": "./dist/types/components/form/Slider/index.d.ts",
+      "default": "./dist/form/Slider.js"
+    },
+    "./form/Switch": {
+      "types": "./dist/types/components/form/Switch/index.d.ts",
+      "default": "./dist/form/Switch.js"
+    },
+    "./form/Textarea": {
+      "types": "./dist/types/components/form/Textarea/index.d.ts",
+      "default": "./dist/form/Textarea.js"
+    },
+    "./form/Toggle": {
+      "types": "./dist/types/components/form/Toggle/index.d.ts",
+      "default": "./dist/form/Toggle.js"
+    },
+    "./form/ToggleGroup": {
+      "types": "./dist/types/components/form/ToggleGroup/index.d.ts",
+      "default": "./dist/form/ToggleGroup.js"
+    },
+    "./form/UploadButton": {
+      "types": "./dist/types/components/form/UploadButton/index.d.ts",
+      "default": "./dist/form/UploadButton.js"
+    },
+    "./layout/Accordion": {
+      "types": "./dist/types/components/layout/Accordion/index.d.ts",
+      "default": "./dist/layout/Accordion.js"
+    },
+    "./layout/Card": {
+      "types": "./dist/types/components/layout/Card/index.d.ts",
+      "default": "./dist/layout/Card.js"
+    },
+    "./layout/CardGrid": {
+      "types": "./dist/types/components/layout/CardGrid/index.d.ts",
+      "default": "./dist/layout/CardGrid.js"
+    },
+    "./layout/Collapsible": {
+      "types": "./dist/types/components/layout/Collapsible/index.d.ts",
+      "default": "./dist/layout/Collapsible.js"
+    },
+    "./layout/Container": {
+      "types": "./dist/types/components/layout/Container/index.d.ts",
+      "default": "./dist/layout/Container.js"
+    },
+    "./layout/ContentToolbar": {
+      "types": "./dist/types/components/layout/ContentToolbar/index.d.ts",
+      "default": "./dist/layout/ContentToolbar.js"
+    },
+    "./layout/Dashboard": {
+      "types": "./dist/types/components/layout/Dashboard/index.d.ts",
+      "default": "./dist/layout/Dashboard.js"
+    },
+    "./layout/Drawer": {
+      "types": "./dist/types/components/layout/Drawer/index.d.ts",
+      "default": "./dist/layout/Drawer.js"
+    },
+    "./layout/Resizable": {
+      "types": "./dist/types/components/layout/Resizable/index.d.ts",
+      "default": "./dist/layout/Resizable.js"
+    },
+    "./layout/ScrollArea": {
+      "types": "./dist/types/components/layout/ScrollArea/index.d.ts",
+      "default": "./dist/layout/ScrollArea.js"
+    },
+    "./layout/Separator": {
+      "types": "./dist/types/components/layout/Separator/index.d.ts",
+      "default": "./dist/layout/Separator.js"
+    },
+    "./layout/SettingsLayout": {
+      "types": "./dist/types/components/layout/SettingsLayout/index.d.ts",
+      "default": "./dist/layout/SettingsLayout.js"
+    },
+    "./layout/Sidebar": {
+      "types": "./dist/types/components/layout/Sidebar/index.d.ts",
+      "default": "./dist/layout/Sidebar.js"
+    },
+    "./layout/Skeleton": {
+      "types": "./dist/types/components/layout/Skeleton/index.d.ts",
+      "default": "./dist/layout/Skeleton.js"
+    },
+    "./layout/Spacer": {
+      "types": "./dist/types/components/layout/Spacer/index.d.ts",
+      "default": "./dist/layout/Spacer.js"
+    },
+    "./layout/TableFilter": {
+      "types": "./dist/types/components/layout/TableFilter/index.d.ts",
+      "default": "./dist/layout/TableFilter.js"
+    },
+    "./navigation/AppHeader": {
+      "types": "./dist/types/components/navigation/AppHeader/index.d.ts",
+      "default": "./dist/navigation/AppHeader.js"
+    },
+    "./navigation/Breadcrumbs": {
+      "types": "./dist/types/components/navigation/Breadcrumbs/index.d.ts",
+      "default": "./dist/navigation/Breadcrumbs.js"
+    },
+    "./navigation/CommandPalette": {
+      "types": "./dist/types/components/navigation/CommandPalette/index.d.ts",
+      "default": "./dist/navigation/CommandPalette.js"
+    },
+    "./navigation/ContextMenu": {
+      "types": "./dist/types/components/navigation/ContextMenu/index.d.ts",
+      "default": "./dist/navigation/ContextMenu.js"
+    },
+    "./navigation/DropdownMenu": {
+      "types": "./dist/types/components/navigation/DropdownMenu/index.d.ts",
+      "default": "./dist/navigation/DropdownMenu.js"
+    },
+    "./navigation/NavigationMenu": {
+      "types": "./dist/types/components/navigation/NavigationMenu/index.d.ts",
+      "default": "./dist/navigation/NavigationMenu.js"
+    },
+    "./navigation/Pagination": {
+      "types": "./dist/types/components/navigation/Pagination/index.d.ts",
+      "default": "./dist/navigation/Pagination.js"
+    },
+    "./navigation/Tabs": {
+      "types": "./dist/types/components/navigation/Tabs/index.d.ts",
+      "default": "./dist/navigation/Tabs.js"
+    },
+    "./typography/Blockquote": {
+      "types": "./dist/types/components/typography/Blockquote/index.d.ts",
+      "default": "./dist/typography/Blockquote.js"
+    },
+    "./typography/Code": {
+      "types": "./dist/types/components/typography/Code/index.d.ts",
+      "default": "./dist/typography/Code.js"
+    },
+    "./typography/Heading": {
+      "types": "./dist/types/components/typography/Heading/index.d.ts",
+      "default": "./dist/typography/Heading.js"
+    },
+    "./typography/Paragraph": {
+      "types": "./dist/types/components/typography/Paragraph/index.d.ts",
+      "default": "./dist/typography/Paragraph.js"
+    },
+    "./typography/Text": {
+      "types": "./dist/types/components/typography/Text/index.d.ts",
+      "default": "./dist/typography/Text.js"
+    },
+    "./utility/AnimatedIcon": {
+      "types": "./dist/types/components/utility/AnimatedIcon/index.d.ts",
+      "default": "./dist/utility/AnimatedIcon.js"
+    },
+    "./utility/AspectRatio": {
+      "types": "./dist/types/components/utility/AspectRatio/index.d.ts",
+      "default": "./dist/utility/AspectRatio.js"
+    },
+    "./utility/InfiniteScroll": {
+      "types": "./dist/types/components/utility/InfiniteScroll/index.d.ts",
+      "default": "./dist/utility/InfiniteScroll.js"
+    },
+    "./utility/InstallPrompt": {
+      "types": "./dist/types/components/utility/InstallPrompt/index.d.ts",
+      "default": "./dist/utility/InstallPrompt.js"
+    },
+    "./utility/Overflow": {
+      "types": "./dist/types/components/utility/Overflow/index.d.ts",
+      "default": "./dist/utility/Overflow.js"
+    },
+    "./utility/Portal": {
+      "types": "./dist/types/components/utility/Portal/index.d.ts",
+      "default": "./dist/utility/Portal.js"
+    },
+    "./utility/Transition": {
+      "types": "./dist/types/components/utility/Transition/index.d.ts",
+      "default": "./dist/utility/Transition.js"
+    },
+    "./utility/VirtualList": {
+      "types": "./dist/types/components/utility/VirtualList/index.d.ts",
+      "default": "./dist/utility/VirtualList.js"
+    },
+    "./utility/WorkflowStep": {
+      "types": "./dist/types/components/utility/WorkflowStep/index.d.ts",
+      "default": "./dist/utility/WorkflowStep.js"
+    }
   },
   "typesVersions": {
     "*": {
       "charts": [
-        "./src/charts/index.d.ts"
+        "./dist/types/charts/index.d.ts"
       ],
       "mui/*": [
-        "./src/mui/*.ts"
+        "./dist/types/mui/*.d.ts"
       ],
       "data-display/*": [
-        "./src/components/data-display/*/index.d.ts"
+        "./dist/types/components/data-display/*/index.d.ts"
       ],
       "feedback/*": [
-        "./src/components/feedback/*/index.d.ts"
+        "./dist/types/components/feedback/*/index.d.ts"
       ],
       "form/*": [
-        "./src/components/form/*/index.d.ts"
+        "./dist/types/components/form/*/index.d.ts"
       ],
       "layout/*": [
-        "./src/components/layout/*/index.d.ts"
+        "./dist/types/components/layout/*/index.d.ts"
       ],
       "navigation/*": [
-        "./src/components/navigation/*/index.d.ts"
+        "./dist/types/components/navigation/*/index.d.ts"
       ],
       "typography/*": [
-        "./src/components/typography/*/index.d.ts"
+        "./dist/types/components/typography/*/index.d.ts"
       ],
       "utility/*": [
-        "./src/components/utility/*/index.d.ts"
+        "./dist/types/components/utility/*/index.d.ts"
       ]
     }
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "dev": "storybook dev -p 6006",
-    "build": "tsup",
+    "build": "tsup && pnpm build:types && pnpm exports:check",
+    "build:types": "tsc --emitDeclarationOnly --outDir dist/types",
+    "exports:sync": "node scripts/sync-exports.mjs",
+    "exports:check": "node scripts/sync-exports.mjs --check",
     "clean": "rm -rf dist storybook-static",
     "storybook:build": "storybook build",
     "storybook:serve": "http-server storybook-static -p 6008 --silent",

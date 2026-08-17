@@ -2,8 +2,8 @@
 
 import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
 import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
-import useMediaQuery from "@mui/material/useMediaQuery";
-import type { Theme } from "@mui/material/styles";
+import { useMediaQuery } from "@mui/material";
+import type { Theme } from "@mui/material";
 
 import type { SortFieldDefinition } from "../../layout/ContentToolbar";
 import { Box } from "../../../mui/Box";

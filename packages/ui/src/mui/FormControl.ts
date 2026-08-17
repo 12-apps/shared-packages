@@ -1,2 +1,2 @@
-export type { FormControlProps } from '@mui/material/FormControl';
-export { default as FormControl, default } from '@mui/material/FormControl';
+export type { FormControlProps } from '@mui/material';
+export { FormControl, FormControl as default } from '@mui/material';

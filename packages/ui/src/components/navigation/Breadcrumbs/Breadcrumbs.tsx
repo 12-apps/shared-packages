@@ -6,7 +6,7 @@ import {
   Breadcrumbs as MuiBreadcrumbs,
   useMediaQuery,
   useTheme } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import React from 'react';
 
 import {

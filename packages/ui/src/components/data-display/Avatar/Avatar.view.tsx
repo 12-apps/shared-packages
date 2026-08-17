@@ -1,6 +1,6 @@
 import { alpha, Avatar as MuiAvatar, Badge, Fade, keyframes, useTheme } from '@mui/material';
-import type { CSSObject, Theme } from '@mui/material/styles';
-import { styled } from '@mui/material/styles';
+import type { CSSObject, Theme } from '@mui/material';
+import { styled } from '@mui/material';
 import React from 'react';
 
 import type { AvatarSize, AvatarStatus } from './Avatar.types';

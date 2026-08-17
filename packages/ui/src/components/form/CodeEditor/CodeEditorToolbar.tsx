@@ -4,7 +4,7 @@ import ExitFullscreenIcon from '@mui/icons-material/FullscreenExit';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import WrapIcon from '@mui/icons-material/WrapText';
 import { Box, IconButton, Stack, Tooltip, Typography } from '@mui/material';
-import { alpha, styled } from '@mui/material/styles';
+import { alpha, styled } from '@mui/material';
 import React from 'react';
 
 // Each button repeated the same conditional test id; this is that ternary once.

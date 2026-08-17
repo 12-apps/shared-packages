@@ -1,2 +1,2 @@
-export type { ToolbarProps } from '@mui/material/Toolbar';
-export { default as Toolbar, default } from '@mui/material/Toolbar';
+export type { ToolbarProps } from '@mui/material';
+export { Toolbar, Toolbar as default } from '@mui/material';
