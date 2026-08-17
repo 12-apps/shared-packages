@@ -3,8 +3,10 @@ import { expect, type Page } from '@playwright/test';
 import {
   BLOCK_RENDER_TIMEOUT_MS,
   blockRows,
+  narrowedRowCount,
   quickRangeId,
   rangeId,
+  settledRowCount,
 } from '../helpers/surface.js';
 import { reportsWorld } from '../world.js';
 
@@ -80,39 +82,19 @@ When(
 
 Then('the report opens on {string}', async ({ page, journey }, label: string) => {
   await expect(periodPill(page, label)).toHaveAttribute('aria-pressed', 'true');
-  const rows = periodRows(page);
-  await expect(rows).not.toHaveCount(0, { timeout: BLOCK_RENDER_TIMEOUT_MS });
-  journey.countedRows(await rows.count());
+  // The BASELINE every later narrowing is measured against, so it is banked the
+  // same way they are: from the count that satisfied the wait, not from a read
+  // taken after it. An empty frame caught here is the same bug one step earlier.
+  journey.countedRows(await settledRowCount(periodRows(page)));
 });
 
 Then('the report covers fewer days than before', async ({ page, journey }) => {
-  const rows = periodRows(page);
-  // Polled rather than read once: the period is a round trip, and the count
-  // between the click and the answer is legitimately the OLD one.
-  //
-  // An EMPTY table is not an answer either, and that is the harder half. A
-  // block re-rendering its new window momentarily shows ZERO rows — and zero
-  // satisfies "fewer than before" against any count at all, so a poll that
-  // accepts it succeeds on the loading state and records 0 as this period's
-  // size. Nothing is fewer than none, so the NEXT narrowing in the scenario
-  // can then never pass: it burns its timeout and reports the count that did
-  // eventually render, against an expectation of "< 0".
-  //
-  // So the answer has to be a count that is BOTH narrower AND real, and the
-  // value recorded is the one that actually satisfied it — re-reading after
-  // the poll is a second read that another render can land in between.
-  let settled = 0;
-  await expect
-    .poll(
-      async () => {
-        const count = await rows.count();
-        if (count > 0 && count < journey.rows) settled = count;
-        return settled;
-      },
-      { timeout: BLOCK_RENDER_TIMEOUT_MS },
-    )
-    .toBeGreaterThan(0);
-  journey.countedRows(settled);
+  // Waited for rather than read once: the period is a round trip, and the count
+  // between the click and the answer is legitimately the OLD one — or, while
+  // the new answer is in flight, no count at all. Why an empty table cannot be
+  // taken for an answer, and why the matched count is the one banked, is in
+  // `narrowedRowCount`.
+  journey.countedRows(await narrowedRowCount(periodRows(page), journey.rows));
 });
 
 Then('the report covers a single day', async ({ page, journey }) => {

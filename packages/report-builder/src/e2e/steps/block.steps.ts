@@ -8,6 +8,7 @@ import {
   blockRows,
   NEW_BLOCK,
   pickBlockTemplate,
+  settledRowCount,
 } from '../helpers/surface.js';
 import { reportsWorld } from '../world.js';
 
@@ -128,9 +129,10 @@ function chartBlock(page: Page): Locator {
 When(new RegExp(`^${THEY} asks to see the chart as a table$`), async ({ page, journey }) => {
   const id = reportsWorld().fixtures.publishedReport.chartBlockId;
   await chartBlock(page).getByTestId(`report-block-${id}-render-as-table`).click();
-  const rows = blockRows(page, id);
-  await expect(rows).not.toHaveCount(0, { timeout: BLOCK_RENDER_TIMEOUT_MS });
-  journey.countedRows(await rows.count());
+  // The matched count, not a read taken after the wait — the two Thens that
+  // follow measure the table and the CSV against this number, so a frame caught
+  // mid-render here would fail one of them for the toggle's sake.
+  journey.countedRows(await settledRowCount(blockRows(page, id)));
 });
 
 When(new RegExp(`^${THEY} downloads the chart's rows$`), async ({ page, journey }) => {

@@ -79,7 +79,16 @@ export interface ReportsFixtures {
     name: string;
     /** A block of it drawn as a chart: what the table toggle and the CSV act on. */
     chartBlockId: string;
-    /** A block of it drawn as a table: what a period narrows, row by row. */
+    /**
+     * A block of it drawn as a table: what a period narrows, row by row.
+     *
+     * Its data has to run THIN, not out: each rolling preset must leave this
+     * block holding fewer rows than the one before it and still holding some,
+     * down to exactly one for "today". A host whose seed empties it partway
+     * through fails the period journey rather than skipping it — an empty block
+     * is indistinguishable from a period control that returns nothing at all,
+     * which is the bug those scenarios exist to catch.
+     */
     tableBlockId: string;
   };
   /**
