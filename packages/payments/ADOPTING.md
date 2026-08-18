@@ -456,6 +456,18 @@ slots.
 3. Point order charge/webhook paths at the gateway; delete the app-local
    plumbing the gateway now owns.
 
+**Do not keep PagBank's hostnames.** `pagbankApiBase(environment)` is exported
+from the package root and answers the Orders API host for `'SANDBOX'` or
+`'PRODUCTION'`. A host that writes those two URLs itself has forked a vendor
+fact that is identical for every deployment — and since both copies agree on
+the day they are written, the fork is invisible until one of them changes,
+which on this surface means a live charge sent at the sandbox host or the
+reverse. The first adopting host had exactly that copy (FUT-760).
+
+The environment is a REQUIRED argument, deliberately: a helper that guesses
+when asked about "no environment" is one that can route money at the wrong
+host silently. Resolve the environment at your own seam and pass it.
+
 ## 5. Completing a live adapter
 
 Each skeleton runs fully in stub mode and throws `liveNotImplemented` on
