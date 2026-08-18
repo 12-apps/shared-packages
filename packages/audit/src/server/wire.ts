@@ -86,7 +86,28 @@ const clampedInt = (fallback: number, max: number): z.ZodType<number> =>
     .min(1)
     .catch(fallback)
     .transform((value) => Math.min(value, max))
-    .meta({ maximum: max }) as unknown as z.ZodType<number>;
+    .meta({ maximum: max })
+    // `.catch` already accepts an ABSENT value and answers with the fallback, so
+    // the field has always been optional at runtime. It was not optional in the
+    // JSON Schema: on zod 4.3.5 — inside this package's own `^4.3.5` range —
+    // `.catch()` alone leaves the key in `required`, so a consumer generating a
+    // tool schema advertised `page`/`pageSize` as mandatory while the endpoint
+    // happily served requests without them. `.default` states the optionality
+    // the runtime already had, the way `sort` below already states its own.
+    //
+    // It survived because this package develops against a newer zod, where
+    // `.catch()` projects as optional on its own and a test here cannot fail.
+    //
+    // CLAMPED, because zod 4's `.default` answers with the default INSTEAD of
+    // running the chain — it does not re-parse it. `.catch(fallback)` followed
+    // by the transform answered `min(fallback, max)`, and a bare
+    // `.default(fallback)` would answer `fallback`. The two agree for every
+    // policy `pagingOf` accepts, since it refuses `defaultPageSize` above
+    // `maxPageSize` — but a host may hand this factory a paging object that
+    // never passed through it, and there the difference is a page-less request
+    // served MORE rows than the declared ceiling, which is the exact failure
+    // that refusal exists to prevent.
+    .default(Math.min(fallback, max)) as unknown as z.ZodType<number>;
 
 /**
  * The free-text bound. Long enough for any resource id this searches (a uuid is
