@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   HOSTED_ORDER_STORAGE_KEY,
@@ -199,5 +199,85 @@ describe("hostedCheckoutReturnPending — the host gate's question", () => {
     land("");
 
     expect(hostedCheckoutReturnPending()).toBe(false);
+  });
+});
+
+describe("another store's hand-off", () => {
+  it("is NOT resumed on a different store's checkout", () => {
+    // The case that made the marker gate load-bearing by accident: one tab
+    // holds one slot, and on a multi-tenant storefront every store shares an
+    // origin. Store B's buyer must not meet store A's order.
+    rememberHostedOrder(ORDER, "loja-a");
+    land("");
+
+    expect(takeHostedOrder("loja-b")).toBeNull();
+  });
+
+  it("is left where it is, so going back to that store still resumes it", () => {
+    // Not consumed on a mismatch: the hand-off is store A's to finish, and the
+    // buyer may well return to it.
+    rememberHostedOrder(ORDER, "loja-a");
+    land("");
+
+    expect(takeHostedOrder("loja-b")).toBeNull();
+    expect(takeHostedOrder("loja-a")?.orderId).toBe("o1");
+  });
+
+  it("resumes on its own store", () => {
+    rememberHostedOrder(ORDER, "loja-a");
+    land("");
+
+    expect(takeHostedOrder("loja-a")?.orderId).toBe("o1");
+  });
+
+  it("keeps an unscoped entry readable — the single-tenant host", () => {
+    // A host that passes no slug has no other store to confuse it with, and an
+    // entry parked by a pre-scope bundle must still come back.
+    rememberHostedOrder(ORDER);
+    land("");
+
+    expect(takeHostedOrder("loja-a")?.orderId).toBe("o1");
+  });
+});
+
+describe("a hand-off that has been sitting too long", () => {
+  it("is dropped rather than resumed", () => {
+    // A hosted round trip is minutes. Beyond the window the buyer is no longer
+    // trying to place this order, and telling them about it is noise.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-08-18T10:00:00Z"));
+      rememberHostedOrder(ORDER, "loja-a");
+      land("");
+
+      vi.setSystemTime(new Date("2026-08-18T10:31:00Z"));
+      expect(takeHostedOrder("loja-a")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still resumes inside the window", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-08-18T10:00:00Z"));
+      rememberHostedOrder(ORDER, "loja-a");
+      land("");
+
+      vi.setSystemTime(new Date("2026-08-18T10:20:00Z"));
+      expect(takeHostedOrder("loja-a")?.orderId).toBe("o1");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("hostedCheckoutReturnPending — scoped like the resume", () => {
+  it("is false for another store, so its gate still gates", () => {
+    rememberHostedOrder(ORDER, "loja-a");
+    land("");
+
+    expect(hostedCheckoutReturnPending("loja-b")).toBe(false);
+    expect(hostedCheckoutReturnPending("loja-a")).toBe(true);
   });
 });
