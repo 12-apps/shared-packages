@@ -130,6 +130,7 @@ await products.create(ctx, snapshot);        // → { status: 'applied' | 'pendi
 await products.update(ctx, id, snapshot);    // records a diff version
 await products.softDelete(ctx, id);          // archive + recycle-bin tree
 await products.history(ctx, id);             // newest-first summaries
+await products.compareVersion(ctx, id, 3);   // v3 beside previous / next / current
 await products.restoreVersion(ctx, id, 3);   // replay 1..3, apply, record RESTORE
 await products.restoreDeleted(ctx, entryId); // un-archive from the bin
 await products.purgeDeleted(ctx, entryId);   // permanent delete
