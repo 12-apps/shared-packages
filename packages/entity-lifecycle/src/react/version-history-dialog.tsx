@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type JSX } from 'react';
+import { Fragment, useCallback, useEffect, useState, type JSX } from 'react';
 
 import { Alert } from '@12-apps/ui/data-display/Alert';
 import { AlertDialog } from '@12-apps/ui/data-display/AlertDialog';
@@ -14,6 +14,7 @@ import { Text } from '@12-apps/ui/typography/Text';
 import type { LifecycleApiClient, VersionsWire, VersionWire } from './api';
 import { DATE_TIME } from './labels';
 import { LifecycleHttpError } from './transport';
+import { VersionComparisonSection } from './version-comparison-panel';
 
 /**
  * Reusable, entity-agnostic version-history dialog (12-17), ported from
@@ -23,6 +24,11 @@ import { LifecycleHttpError } from './transport';
  * AlertDialog confirm). A 403 (feature off for the tenant) renders a friendly
  * notice; a parked restore (202 → `applied: false`) surfaces the
  * pending-approval notice.
+ *
+ * CLICKING a row opens the comparison panel under it (FUT-247): that version
+ * beside its previous, its next and the current one, field by field. The list
+ * alone can only name the fields a version touched — the row stores nothing
+ * else — so "what did it actually say" is a second, deliberate read.
  */
 
 /** pt-BR labels for the version kinds. */
@@ -43,20 +49,47 @@ export interface VersionHistoryDialogProps {
   onRestored?: () => void;
 }
 
-/** One version row: number, kind chip, date, author, field chips + restore. */
+/**
+ * One version row: number, kind chip, date, author, field chips + restore.
+ *
+ * The whole row is the affordance that opens the comparison — the ticket's
+ * "click an item" — so it carries the button role and the keyboard handling
+ * itself rather than growing a second control the mouse would race with. The
+ * restore button inside it stops propagation: restoring is not selecting.
+ */
 function VersionRow({
   entry,
   isCurrent,
+  isSelected,
+  onSelect,
   onRestore,
 }: {
   entry: VersionWire;
   isCurrent: boolean;
+  isSelected: boolean;
+  onSelect: (version: number) => void;
   onRestore: (version: number) => void;
 }): JSX.Element {
   return (
     <Box
       data-testid={`version-row-${entry.version}`}
-      sx={{ p: 1.5, borderRadius: 1, border: (theme) => `1px solid ${theme.palette.divider}` }}
+      role="button"
+      tabIndex={0}
+      aria-expanded={isSelected}
+      aria-label={`Comparar a versão v${entry.version}`}
+      onClick={() => onSelect(entry.version)}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        onSelect(entry.version);
+      }}
+      sx={{
+        p: 1.5,
+        borderRadius: 1,
+        cursor: 'pointer',
+        border: (theme) =>
+          `1px solid ${isSelected ? theme.palette.primary.main : theme.palette.divider}`,
+      }}
     >
       <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
         <Text variant="heading" size="sm" as="span">
@@ -76,7 +109,10 @@ function VersionRow({
           <Button
             variant="outline"
             size="xs"
-            onClick={() => onRestore(entry.version)}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRestore(entry.version);
+            }}
             dataTestId={`version-restore-${entry.version}`}
           >
             Restaurar
@@ -189,14 +225,42 @@ function useRestoreFlow(
   };
 }
 
+/** Which version the admin is comparing, cleared whenever the list reloads. */
+function useSelectedVersion(data: VersionsWire | null): {
+  selected: number | null;
+  toggle: (version: number) => void;
+} {
+  const [selected, setSelected] = useState<number | null>(null);
+  // A restore rewrites the history under the panel, so the selection cannot
+  // survive a reload — it would leave a comparison of a list that has moved.
+  useEffect(() => setSelected(null), [data]);
+  return {
+    selected,
+    toggle: useCallback(
+      (version: number) => setSelected((current) => (current === version ? null : version)),
+      [],
+    ),
+  };
+}
+
+interface VersionsBodyProps {
+  api: LifecycleApiClient;
+  resourcePath: string;
+  load: HistoryLoad;
+  selected: number | null;
+  onSelect: (version: number) => void;
+  onRestore: (version: number) => void;
+}
+
 /** The list body: loading / feature-off / error / version rows. */
 function VersionsBody({
+  api,
+  resourcePath,
   load,
+  selected,
+  onSelect,
   onRestore,
-}: {
-  load: HistoryLoad;
-  onRestore: (version: number) => void;
-}): JSX.Element {
+}: VersionsBodyProps): JSX.Element {
   if (load.error) {
     // Feature off for the tenant — a friendly notice instead of an error state.
     if (load.error.status === 403) {
@@ -231,12 +295,24 @@ function VersionsBody({
   return (
     <Stack spacing={1}>
       {versions.map((entry) => (
-        <VersionRow
-          key={entry.version}
-          entry={entry}
-          isCurrent={entry.version === publishedVersion}
-          onRestore={onRestore}
-        />
+        <Fragment key={entry.version}>
+          <VersionRow
+            entry={entry}
+            isCurrent={entry.version === publishedVersion}
+            isSelected={selected === entry.version}
+            onSelect={onSelect}
+            onRestore={onRestore}
+          />
+          {/* Below the row rather than inside it: the row IS a button, and a
+              table of interactive-width content does not belong in one. */}
+          {selected === entry.version && (
+            <VersionComparisonSection
+              api={api}
+              resourcePath={resourcePath}
+              version={entry.version}
+            />
+          )}
+        </Fragment>
       ))}
     </Stack>
   );
@@ -252,13 +328,15 @@ export function VersionHistoryDialog({
 }: VersionHistoryDialogProps & { api: LifecycleApiClient }): JSX.Element {
   const load = useHistory(api, props.resourcePath, props.open);
   const restore = useRestoreFlow(api, props, load.refetch);
+  const comparison = useSelectedVersion(load.data);
 
   return (
     <Dialog
       open={props.open}
       onClose={props.onClose}
       title={`Histórico de versões — ${props.itemLabel}`}
-      size="sm"
+      // The list alone is a narrow dialog; a four-column comparison is not.
+      size={comparison.selected === null ? 'sm' : 'lg'}
       showCloseButton
       dataTestId="version-history-dialog"
     >
@@ -273,7 +351,14 @@ export function VersionHistoryDialog({
               data-testid="version-history-notice"
             />
           )}
-          <VersionsBody load={load} onRestore={restore.setConfirming} />
+          <VersionsBody
+            api={api}
+            resourcePath={props.resourcePath}
+            load={load}
+            selected={comparison.selected}
+            onSelect={comparison.toggle}
+            onRestore={restore.setConfirming}
+          />
         </Stack>
       </DialogContent>
       <AlertDialog

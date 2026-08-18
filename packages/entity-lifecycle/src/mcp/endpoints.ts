@@ -8,6 +8,7 @@ import {
   saveDraftBody,
   versionItemParams,
   versionsParams,
+  versionsQuery,
   versionsResponse,
   writeOutcomeResponse,
 } from './schemas';
@@ -109,6 +110,7 @@ function versioningEndpoints(
       summary: summaries.getVersions,
       tags,
       params: versionsParams,
+      query: versionsQuery,
       response: versionsResponse,
     },
     {

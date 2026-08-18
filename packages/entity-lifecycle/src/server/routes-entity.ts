@@ -19,6 +19,7 @@
  * harness.
  */
 
+import type { VersionComparison } from '../comparison';
 import type { EntityLifecycle } from '../service';
 import type { LifecycleContext } from '../types';
 
@@ -92,14 +93,67 @@ async function ctxOf(deps: EntityRouteDeps, actor: LifecycleActor): Promise<Life
 }
 
 /**
+ * `?compare=N` — the version the caller wants read beside its neighbours.
+ * Absent (the default) means the plain history list, which is the cheap read
+ * every caller makes; a comparison materializes up to four versions.
+ *
+ * Strict digits, like the restore route: `parseInt` would accept "1.5" and
+ * "1abc" and quietly compare v1 instead of answering 400.
+ */
+function requestedComparison(
+  query: Record<string, string | undefined>,
+  messages: LifecycleMessages,
+): number | null {
+  const raw = query.compare;
+  if (raw === undefined || raw === '') return null;
+  if (!/^[0-9]+$/.test(raw)) throw new LifecycleApiError(400, messages.invalidBody);
+  const version = Number.parseInt(raw, 10);
+  if (version < 1) throw new LifecycleApiError(400, messages.invalidBody);
+  return version;
+}
+
+/** The comparison table for the wire: dates as ISO, actors resolved to names. */
+function comparisonJson(
+  comparison: VersionComparison,
+  names: ReadonlyMap<string, string | null>,
+) {
+  return {
+    selectedVersion: comparison.selectedVersion,
+    columns: comparison.columns.map((column) => ({
+      version: column.version,
+      roles: column.roles,
+      kind: column.kind,
+      actorId: column.actorId,
+      actorName: column.actorId ? (names.get(column.actorId) ?? null) : null,
+      createdAt: column.createdAt.toISOString(),
+    })),
+    rows: comparison.rows.map((row) => ({
+      field: row.field,
+      changed: row.changed,
+      cells: row.cells.map((cell) => ({
+        version: cell.version,
+        present: cell.present,
+        value: cell.value,
+      })),
+    })),
+  };
+}
+
+/**
  * `GET /:slug/:id/versions` — the entity's version history (newest first):
  * who changed what, when, and which fields each version touched. Backs the
  * reusable version-history dialog. 403 when versioning is off for the tenant.
+ *
+ * With `?compare=N` it ALSO answers what N actually says, beside its previous
+ * version, its next one and the current one (FUT-247) — the history list names
+ * the fields a version touched, but a version row stores only the new values,
+ * so "what did it say before" needs the chain replayed.
  */
 function versionsRoute(deps: EntityRouteDeps): LifecycleRoute {
   const { registration, lifecycle, directory, messages } = deps;
-  return route('GET', `/${registration.slug}/:id/versions`, async ({ actor, params }) => {
+  return route('GET', `/${registration.slug}/:id/versions`, async ({ actor, params, query }) => {
     const id = requireParam(params, 'id', messages);
+    const compare = requestedComparison(query, messages);
     const ctx = await ctxOf(deps, actor);
     const history = await foldLifecycle(messages, () => lifecycle.history(ctx, id));
     const names = await resolveActorNames(directory, history.map((row) => row.actorId));
@@ -111,6 +165,14 @@ function versionsRoute(deps: EntityRouteDeps): LifecycleRoute {
     const publishedVersion = registration.publishedVersion
       ? ((await registration.publishedVersion(actor.tenantId, id)) ?? 0)
       : (history[0]?.version ?? 0);
+    // The host's published version is what "current" MEANS to this tenant, so
+    // it is the comparison's current column rather than a second guess at it.
+    const comparison =
+      compare === null
+        ? null
+        : await foldLifecycle(messages, () =>
+            lifecycle.compareVersion(ctx, id, compare, { currentVersion: publishedVersion }),
+          );
     return ok({
       versions: history.map((row) => ({
         version: row.version,
@@ -123,6 +185,9 @@ function versionsRoute(deps: EntityRouteDeps): LifecycleRoute {
         restoredFromVersion: row.restoredFromVersion,
       })),
       publishedVersion,
+      // Absent, not null, when nothing was asked for: the plain list stays the
+      // byte-for-byte answer it was before this endpoint learned to compare.
+      ...(comparison ? { comparison: comparisonJson(comparison, names) } : {}),
     });
   });
 }

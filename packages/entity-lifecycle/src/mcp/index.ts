@@ -36,6 +36,7 @@ export {
   saveDraftBody,
   versionItemParams,
   versionsParams,
+  versionsQuery,
   versionsResponse,
   writeOutcomeResponse,
 } from './schemas';

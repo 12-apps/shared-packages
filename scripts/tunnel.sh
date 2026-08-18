@@ -6,7 +6,8 @@
 # only the part that applies here: this repo has no app and no database, just a
 # dev server someone needs to LOOK at from outside the container.
 #
-#   ./scripts/tunnel.sh up                  # start Storybook, publish it
+#   ./scripts/tunnel.sh up                  # start the UI Storybook, publish it
+#   ./scripts/tunnel.sh up --package entity-lifecycle   # another package's book
 #   ./scripts/tunnel.sh up --port 6008      # publish something else instead
 #   ./scripts/tunnel.sh up --id review-42   # pick the subdomain
 #   ./scripts/tunnel.sh up --no-start       # publish a server already running
@@ -27,11 +28,15 @@
 # for a name. A name the relay says is taken is retried with a -2, -3 suffix,
 # and the host actually taken is printed.
 #
+# WHICH BOOK. More than one package ships a Storybook now — packages/ui is the
+# component library's, and a package that ships React screens shows them itself
+# (packages/entity-lifecycle). --package names the directory under packages/;
+# it defaults to `ui`, which is what every existing invocation meant.
+#
 # ALLOWED HOSTS. Vite answers 403 to a Host it was not told about, so `up`
-# exports STORYBOOK_ALLOWED_HOSTS before starting Storybook (see
-# packages/ui/.storybook/main.ts). --no-start cannot do that for a server that
-# is already up: start that one with the variable set, or let this script
-# start it.
+# exports STORYBOOK_ALLOWED_HOSTS before starting Storybook (see each package's
+# .storybook/main.ts). --no-start cannot do that for a server that is already
+# up: start that one with the variable set, or let this script start it.
 #
 # ANYTHING PUBLISHED HERE IS WORLD-READABLE. The URL is unguessable, not
 # private, and there is no auth in front of it.
@@ -48,6 +53,9 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 PORT="${TUNNEL_PORT:-6006}"
 TUNNEL_ID="${TUNNEL_ID:-}"
+# Which package's Storybook to start. Defaults to the component library, which
+# is what this script published when it was the only book in the repo.
+SB_PACKAGE="${TUNNEL_PACKAGE:-ui}"
 START=1
 
 WORK_DIR="$REPO_ROOT/.tunnel"
@@ -221,7 +229,11 @@ start_storybook() {
        will answer 403; stop it and re-run without --no-start."
     return 0
   fi
-  info "starting Storybook on :$port ..."
+  local sb_dir="$REPO_ROOT/packages/$SB_PACKAGE"
+  [ -f "$sb_dir/.storybook/main.ts" ] ||
+    die "packages/$SB_PACKAGE has no .storybook/main.ts — nothing to publish there."
+  SB_DIR="$sb_dir"
+  info "starting Storybook for $SB_PACKAGE on :$port ..."
   mkdir -p "$WORK_DIR"
   # The dev server has to accept the tunnel's Host header, and it can only be
   # told at startup — which is why publishing a server we did not start is the
@@ -237,7 +249,7 @@ start_storybook() {
   # setsid: same reason as frpc, and more so — `storybook dev` is a node parent
   # with vite children, and killing only the parent leaves :$port held.
   STORYBOOK_ALLOWED_HOSTS="$hosts" \
-    setsid pnpm --dir "$REPO_ROOT/packages/ui" exec storybook dev -p "$port" --no-open --ci \
+    setsid pnpm --dir "$SB_DIR" exec storybook dev -p "$port" --no-open --ci \
     > "$WORK_DIR/storybook.log" 2>&1 &
   echo $! > "$WORK_DIR/storybook.pid"
   wait_http "http://127.0.0.1:$port/" "Storybook" 90
@@ -315,6 +327,7 @@ while [[ $# -gt 0 ]]; do
     # Assignment form on purpose: it propagates the exit status of a rejected
     # name, so `set -e` stops here instead of carrying an empty id forward.
     -i|--id) TUNNEL_ID="$(normalize_id "$2")"; shift 2 ;;
+    --package) SB_PACKAGE="$2"; shift 2 ;;
     --no-start) START=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown option: $1" ;;

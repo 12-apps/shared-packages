@@ -10,6 +10,7 @@
  * tree, retention is applied opportunistically after each write.
  */
 
+import { compareVersions, type CompareOptions, type VersionComparison } from './comparison';
 import { LifecycleError } from './errors';
 import { createKernel, type LifecycleKernel } from './kernel';
 import {
@@ -45,6 +46,12 @@ export interface EntityLifecycle extends DraftMethods, ApprovalMethods {
   // Version history
   history(ctx: LifecycleContext, entityId: string): Promise<VersionSummary[]>;
   versionState(ctx: LifecycleContext, entityId: string, version: number): Promise<Snapshot>;
+  compareVersion(
+    ctx: LifecycleContext,
+    entityId: string,
+    version: number,
+    options?: CompareOptions,
+  ): Promise<VersionComparison>;
   restoreVersion(ctx: LifecycleContext, entityId: string, version: number): Promise<WriteResult>;
 
   // Recycle bin
@@ -101,6 +108,21 @@ function createVersionMethods(kernel: LifecycleKernel) {
     ): Promise<Snapshot> {
       kernel.requireFeature(ctx, 'versioning');
       return materializeVersion(kernel.stores.versions, kernel.refOf(ctx, entityId), version);
+    },
+
+    async compareVersion(
+      ctx: LifecycleContext,
+      entityId: string,
+      version: number,
+      options?: CompareOptions,
+    ): Promise<VersionComparison> {
+      kernel.requireFeature(ctx, 'versioning');
+      return compareVersions(
+        kernel.stores.versions,
+        kernel.refOf(ctx, entityId),
+        version,
+        options,
+      );
     },
 
     async restoreVersion(

@@ -99,6 +99,13 @@ function routeOf(routes: LifecycleRoute[], method: string, path: string): Lifecy
   return found;
 }
 
+/** The `?compare=` half of the versions payload, as the wire returns it. */
+interface ComparisonPayload {
+  selectedVersion: number;
+  columns: { version: number; roles: string[]; actorName: string | null }[];
+  rows: { field: string; changed: boolean; cells: { version: number; value: unknown }[] }[];
+}
+
 const call = (
   route: LifecycleRoute,
   actor: LifecycleActor,
@@ -190,6 +197,90 @@ describe('versions + restore', () => {
     expect(data.versions.map((v) => v.version)).toEqual([2, 1]);
     expect(data.versions[0]?.actorName).toBe('User u-approver');
     expect(data.publishedVersion).toBe(2);
+  });
+
+  it('compares a version with its previous, next and current on ?compare=', async () => {
+    const { api } = buildApi();
+    const handle = api.entity('product');
+    const ctx = handle.context(approver);
+    const created = await handle.lifecycle.create(ctx, { name: 'Coca', priceCents: 500 });
+    if (created.status !== 'applied') throw new Error('expected applied');
+    await handle.lifecycle.update(ctx, created.entityId, { name: 'Coca', priceCents: 700 });
+    await handle.lifecycle.update(ctx, created.entityId, { name: 'Coca Zero', priceCents: 700 });
+    await handle.lifecycle.update(ctx, created.entityId, { name: 'Coca Zero', priceCents: 900 });
+
+    const response = await call(
+      routeOf(api.routes, 'GET', '/products/:id/versions'),
+      approver,
+      { id: created.entityId },
+      undefined,
+      { compare: '2' },
+    );
+
+    expect(response.status).toBe(200);
+    const { data } = response.body as { data: { comparison: ComparisonPayload } };
+    expect(data.comparison.selectedVersion).toBe(2);
+    expect(data.comparison.columns.map((column) => [column.version, column.roles])).toEqual([
+      [1, ['previous']],
+      [2, ['selected']],
+      [3, ['next']],
+      [4, ['current']],
+    ]);
+    // Actor names are resolved on the columns too, from the same directory
+    // lookup the history rows use.
+    expect(data.comparison.columns[0]?.actorName).toBe('User u-approver');
+    const price = data.comparison.rows.find((row) => row.field === 'priceCents');
+    expect(price?.changed).toBe(true);
+    expect(price?.cells.map((cell) => cell.value)).toEqual([500, 700, 700, 900]);
+  });
+
+  it('omits the comparison entirely when nothing was asked for', async () => {
+    const { api } = buildApi();
+    const handle = api.entity('product');
+    const created = await handle.lifecycle.create(handle.context(approver), { name: 'Coca' });
+    if (created.status !== 'applied') throw new Error('expected applied');
+
+    const response = await call(
+      routeOf(api.routes, 'GET', '/products/:id/versions'),
+      approver,
+      { id: created.entityId },
+    );
+
+    expect(Object.keys(response.body as object)).toEqual(['data']);
+    expect((response.body as { data: object }).data).not.toHaveProperty('comparison');
+  });
+
+  it('answers 400 for a compare that is not a version number', async () => {
+    const { api } = buildApi();
+    const handle = api.entity('product');
+    const created = await handle.lifecycle.create(handle.context(approver), { name: 'Coca' });
+    if (created.status !== 'applied') throw new Error('expected applied');
+    const route = routeOf(api.routes, 'GET', '/products/:id/versions');
+
+    for (const compare of ['1.5', '1abc', '0', '-1', 'abc']) {
+      const response = await call(route, approver, { id: created.entityId }, undefined, {
+        compare,
+      });
+      expect(`${compare} -> ${response.status}`).toBe(`${compare} -> 400`);
+    }
+  });
+
+  it('answers 404 for a comparison of a version the entity never had', async () => {
+    const { api } = buildApi();
+    const handle = api.entity('product');
+    const created = await handle.lifecycle.create(handle.context(approver), { name: 'Coca' });
+    if (created.status !== 'applied') throw new Error('expected applied');
+
+    const response = await call(
+      routeOf(api.routes, 'GET', '/products/:id/versions'),
+      approver,
+      { id: created.entityId },
+      undefined,
+      { compare: '9' },
+    );
+
+    expect(response.status).toBe(404);
+    expect((response.body as { error: string }).error).toBe('Esta versão não existe mais.');
   });
 
   it('restores a version (200 applied) and parks it for a non-approver (202)', async () => {

@@ -15,16 +15,27 @@ export {
   createLifecycleApiClient,
   type ApprovalRequestWire,
   type ApprovalStatusWire,
+  type ComparisonCellWire,
+  type ComparisonColumnWire,
+  type ComparisonRoleWire,
+  type ComparisonRowWire,
   type DraftWire,
   type LifecycleApiClient,
   type RecycleBinChildWire,
   type RecycleBinEntryWire,
+  type VersionComparisonWire,
   type VersionWire,
   type VersionsWire,
   type WriteOutcomeWire,
 } from './api';
 export type { DraftBannerProps } from './draft-banner';
 export type { VersionHistoryDialogProps } from './version-history-dialog';
+export {
+  VersionComparisonPanel,
+  VersionComparisonSection,
+  type VersionComparisonPanelProps,
+  type VersionComparisonSectionProps,
+} from './version-comparison-panel';
 export { type EntityTypeLabels } from './labels';
 export {
   httpLifecycleTransport,

@@ -45,10 +45,61 @@ const versionSummarySchema = z.object({
   restoredFromVersion: z.number().nullable(),
 });
 
+/**
+ * Ask the history endpoint to ALSO compare one version with its neighbours
+ * (FUT-247). Optional, and absent by default: the list is the cheap read every
+ * caller makes, and materializing four versions is not.
+ */
+export const versionsQuery = z.object({
+  compare: z.coerce.number().int().min(1).optional(),
+});
+
+/** What a compared version is to the selection (a version can play two). */
+const comparisonRoleSchema = z.enum(['previous', 'selected', 'next', 'current']);
+
+/**
+ * One column of the comparison table. `roles` is a LIST because the newest
+ * version is both `next` and `current`, and a record with a single version is
+ * both `selected` and `current`.
+ */
+const comparisonColumnSchema = z.object({
+  version: z.number(),
+  roles: z.array(comparisonRoleSchema),
+  kind: z.enum(['CREATE', 'UPDATE', 'RESTORE']),
+  actorId: z.string().nullable(),
+  actorName: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+/**
+ * One field across every column. `present: false` means the version did not
+ * carry the field AT ALL — distinct from a field whose value is null, which is
+ * a value the admin chose.
+ */
+const comparisonRowSchema = z.object({
+  field: z.string(),
+  changed: z.boolean(),
+  cells: z.array(
+    z.object({
+      version: z.number(),
+      present: z.boolean(),
+      value: z.unknown(),
+    }),
+  ),
+});
+
+const comparisonSchema = z.object({
+  selectedVersion: z.number(),
+  columns: z.array(comparisonColumnSchema),
+  rows: z.array(comparisonRowSchema),
+});
+
 export const versionsResponse = z.object({
   data: z.object({
     versions: z.array(versionSummarySchema),
     publishedVersion: z.number(),
+    /** Present only when the request asked for a comparison. */
+    comparison: comparisonSchema.nullish(),
   }),
 });
 

@@ -118,6 +118,18 @@
         "index.{ts,tsx}"
       ]
     },
+    "packages/entity-lifecycle": {
+      "entry": [
+        "src/index.ts",
+        "// Stories and the Storybook config are reached by .storybook/main.ts's",
+        "// glob, not by any import \u2014 same shape as payments/frontend below.",
+        "src/**/*.stories.{ts,tsx}",
+        ".storybook/*.{ts,tsx}"
+      ],
+      "ignoreDependencies": [
+        "@storybook/builder-vite"
+      ]
+    },
     "packages/payments/frontend": {
       "entry": [
         "src/index.ts",
