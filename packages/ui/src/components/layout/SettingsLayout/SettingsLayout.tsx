@@ -24,6 +24,7 @@ type ResolvedProps = SettingsLayoutProps &
     Pick<
       SettingsLayoutProps,
       | 'searchPlaceholder'
+      | 'defaultQuery'
       | 'emptySearchLabel'
       | 'testIdPrefix'
       | 'railBreakpoint'
@@ -35,6 +36,7 @@ type ResolvedProps = SettingsLayoutProps &
 
 const DEFAULTS = {
   searchPlaceholder: 'Search settings',
+  defaultQuery: '',
   emptySearchLabel: 'No settings match your search.',
   testIdPrefix: 'settings',
   railBreakpoint: 'md',
@@ -89,6 +91,7 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
     activeItemId,
     onSelectItem,
     searchPlaceholder,
+    defaultQuery,
     emptySearchLabel,
     emptySearchAction,
     linkComponent,
@@ -101,7 +104,7 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
     backLabel,
     sectionChips,
   } = withDefaults(props, DEFAULTS) as ResolvedProps;
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(defaultQuery);
   const [navOpen, setNavOpen] = useState(false);
   const filteredGroups = useMemo(() => filterGroups(groups, query), [groups, query]);
   const activeLabel = useMemo(() => activeItemLabel(groups, activeItemId), [groups, activeItemId]);

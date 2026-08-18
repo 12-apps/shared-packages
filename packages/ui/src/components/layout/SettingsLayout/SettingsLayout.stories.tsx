@@ -291,10 +291,31 @@ export const EmptySearchWithExit: Story = {
         title="Configuração"
         groups={GROUPS}
         activeItemId="profile"
+        // Opens ALREADY in the state it is named for. Without `defaultQuery` the
+        // story renders the ordinary rail and the reader has to guess which term
+        // matches nothing — a story named for a state nobody sees.
+        defaultQuery="zzzz"
         emptySearchLabel="Nenhuma configuração encontrada."
         emptySearchAction={{ label: 'Limpar a busca' }}
       >
         <ExamplePanel itemId="profile" />
+      </SettingsLayout>
+    </Box>
+  ),
+};
+
+/** The same rail, opened on a term that DOES match — the filtered middle state. */
+export const SeededSearch: Story = {
+  render: () => (
+    <Box sx={{ p: 3, minHeight: 420 }}>
+      <SettingsLayout
+        title="Configuração"
+        groups={GROUPS}
+        activeItemId="billing"
+        defaultQuery="bill"
+        searchPlaceholder="Pesquisar configurações"
+      >
+        <ExamplePanel itemId="billing" />
       </SettingsLayout>
     </Box>
   ),

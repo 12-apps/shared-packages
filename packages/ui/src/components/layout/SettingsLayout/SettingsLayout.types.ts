@@ -116,6 +116,16 @@ export interface SettingsLayoutProps {
   onSelectItem?: (id: string) => void;
   /** Placeholder for the search field. Defaults to `"Search settings"`. */
   searchPlaceholder?: string;
+  /**
+   * The term the search field opens with. Uncontrolled — the layout owns the
+   * field from there, and typing (or the empty state's exit) changes it.
+   *
+   * For a host that deep-links into its own settings search (`?q=…`), and for a
+   * story or a test that needs to OPEN in a filtered — or empty — state rather
+   * than type its way there. A screen named for a state it cannot be opened in
+   * is a screen nobody looks at in that state.
+   */
+  defaultQuery?: string;
   /** Shown when the search matches no items. Defaults to a generic string. */
   emptySearchLabel?: ReactNode;
   /**
