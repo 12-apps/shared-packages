@@ -30,9 +30,13 @@ const ORDER: CheckoutOrder = {
   totalLabel: "R$ 42,00",
 };
 
-/** The screen's own cap and interval — see `screens-hosted.tsx`. */
-const POLL_MS = 5_000;
-const POLL_CAP = 180;
+/** The screen's own two rates and cap — see `screens-hosted.tsx`. */
+const FAST_MS = 2_500;
+const SLOW_MS = 10_000;
+const FAST_POLLS = 48;
+const POLL_CAP = 126;
+/** The whole window the pair adds up to. */
+const WINDOW_MS = FAST_POLLS * FAST_MS + (POLL_CAP - FAST_POLLS) * SLOW_MS;
 
 /** A store that never confirms: every status read answers AWAITING_PAYMENT. */
 function pendingForever(): typeof fetch {
@@ -88,7 +92,7 @@ describe("the flows return screen", () => {
 
     render(<flows.screens.HostedReturn onResolved={() => undefined} />);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(POLL_MS * (POLL_CAP + 10));
+      await vi.advanceTimersByTimeAsync(WINDOW_MS + SLOW_MS * 10);
     });
 
     expect(screen.getByTestId("checkout-hosted-return-timeout")).toBeTruthy();
@@ -101,7 +105,7 @@ describe("the flows return screen", () => {
 
     render(<flows.screens.HostedReturn onResolved={() => undefined} />);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(POLL_MS * (POLL_CAP + 10));
+      await vi.advanceTimersByTimeAsync(WINDOW_MS + SLOW_MS * 10);
     });
 
     expect(screen.getByText("Não pague de novo.")).toBeTruthy();
@@ -115,7 +119,7 @@ describe("the flows return screen", () => {
 
     render(<flows.screens.HostedReturn onResolved={() => undefined} />);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(POLL_MS * (POLL_CAP + 10));
+      await vi.advanceTimersByTimeAsync(WINDOW_MS + SLOW_MS * 10);
     });
 
     expect(screen.getByTestId("checkout-hosted-return-timeout")).toBeTruthy();
@@ -127,7 +131,7 @@ describe("the flows return screen", () => {
 
     render(<flows.screens.HostedReturn onResolved={() => undefined} />);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(POLL_MS * 10);
+      await vi.advanceTimersByTimeAsync(FAST_MS * 10);
     });
 
     expect(screen.getByTestId("checkout-hosted-return-waiting")).toBeTruthy();
