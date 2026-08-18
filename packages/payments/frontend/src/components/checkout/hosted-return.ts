@@ -107,7 +107,7 @@ interface ParkedHostedOrder {
  * buyer who fetches their card, not one who comes back tomorrow. Beyond it the
  * entry is dropped on read rather than resumed.
  */
-export const MAX_PARKED_AGE_MS = 30 * 60_000;
+const MAX_PARKED_AGE_MS = 30 * 60_000;
 
 /** Park the raised order before handing the buyer to the provider's page. */
 export function rememberHostedOrder(order: CheckoutOrder, tenantSlug?: string): void {
