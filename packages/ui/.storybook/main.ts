@@ -46,7 +46,6 @@ const config: StorybookConfig = {
     // Sibling packages whose components must be explorable without a host
     // (FUT-420) — same single Storybook, their stories grouped by title.
     '../../product-research-ui/src/**/*.stories.@(ts|tsx)',
-    '../../entity-lifecycle/src/**/*.stories.@(ts|tsx)',
   ],
   addons: ['@storybook/addon-links', '@storybook/addon-docs'],
 

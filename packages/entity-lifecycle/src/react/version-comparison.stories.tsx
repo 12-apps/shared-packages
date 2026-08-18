@@ -23,7 +23,7 @@ import { createWebEntityLifecycle } from './create-web-entity-lifecycle';
 import type { LifecycleResult, LifecycleTransport } from './transport';
 import { VersionComparisonPanel } from './version-comparison-panel';
 
-const meta: Meta = { title: 'Entity Lifecycle/Version comparison' };
+const meta: Meta = { title: 'Version comparison' };
 export default meta;
 
 const WHO = ['Ana Souza', 'Bruno Lima', 'Ana Souza', 'Carla Dias'];
