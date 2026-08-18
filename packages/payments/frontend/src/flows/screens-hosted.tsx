@@ -99,16 +99,22 @@ function buildHostedHandoff(runtime: FlowsRuntime): CheckoutScreens["HostedHando
 /**
  * How long this screen keeps asking, and how often — see the twin constants in
  * `use-checkout-controller.ts`, which bounds the same wait for the components
- * layer. 180 polls at 5 s ≈ 15 minutes.
+ * layer. 2.5 s for two minutes, then 10 s for thirteen: 126 polls, 15 minutes.
+ *
+ * Two rates because one cannot serve both ends of this wait — a paying buyer
+ * learns within 2.5 s, an abandoned checkout costs a third of what a flat fast
+ * rate would. The reasoning is on the twin constants.
  *
  * Stated here rather than imported because the two waits are the same DECISION
- * arrived at twice, not one shared implementation: this screen takes its
+ * arrived at twice, not one shared implementation: this screen takes its FAST
  * interval from the host's `polling` config when there is one, and a host that
  * tunes that must not have this package's cap silently mean a different
  * wall-clock window than the constant's comment claims.
  */
-const RETURN_POLL_MS = 5_000;
-const RETURN_POLL_CAP = 180;
+const RETURN_FAST_MS = 2_500;
+const RETURN_SLOW_MS = 10_000;
+const RETURN_FAST_POLLS = (2 * 60_000) / RETURN_FAST_MS;
+const RETURN_POLL_CAP = RETURN_FAST_POLLS + (13 * 60_000) / RETURN_SLOW_MS;
 
 function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn"] {
   function HostedReturnBody({
@@ -125,7 +131,9 @@ function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn
     // watches until they close the tab.
     const { status, timedOut } = usePaymentPolling(parked?.orderId ?? null, {
       enabled: Boolean(parked),
-      intervalMs: runtime.config.polling?.intervalMs ?? RETURN_POLL_MS,
+      intervalMs: runtime.config.polling?.intervalMs ?? RETURN_FAST_MS,
+      slowAfterPolls: RETURN_FAST_POLLS,
+      slowIntervalMs: RETURN_SLOW_MS,
       maxHealthyPolls: RETURN_POLL_CAP,
     });
 
