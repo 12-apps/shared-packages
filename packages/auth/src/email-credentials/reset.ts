@@ -58,22 +58,16 @@ export async function requestPasswordReset(
 /**
  * Spend a reset token and set the new password.
  *
- * ## Why two parameters instead of one `{ token, password }` object
+ * Two parameters rather than one `{ token, password }` object: they are two
+ * different credentials that merely arrive in the same request, and the token
+ * is spent while the password is stored. Bagging them together suggests a
+ * cohesion they do not have.
  *
- * The two arguments are separate credentials that happen to arrive together,
- * and keeping them in separate parameters keeps them separable to a reader AND
- * to static analysis. Bundled into one object, CodeQL's
- * `js/insufficient-password-hash` reports {@link hashToken} as hashing a
- * password with SHA-256: taint flows from the `password` property into the
- * object, and reading `.token` back out of that same object inherits it. The
- * finding is a false positive — {@link hashToken} only ever sees the 32-byte
- * CSPRNG token, and the password goes to scrypt in `hashPassword` — but the
- * coupling it objects to is real enough to be worth not writing. `verifyEmail`
- * hashes its token exactly the same way and draws no such finding, because its
- * token never shares a bag with a secret.
- *
- * GitHub code scanning honours no inline suppression comment, so the shape of
- * the call is the only place this can be answered.
+ * (The split was first made while chasing a CodeQL
+ * `js/insufficient-password-hash` alert on {@link hashToken}, on the theory
+ * that taint reached `.token` through a `password` sibling property. That
+ * theory was wrong — the source was the string `"password-reset"` used as a
+ * label in the tests — and the shape is kept only because it reads better.)
  */
 export async function resetPassword(
   ctx: EmailCredentialsContext,

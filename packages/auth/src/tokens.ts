@@ -77,13 +77,18 @@ export interface IssueTokenOptions {
  * ## Keeping it clear of `js/insufficient-password-hash`
  *
  * That CodeQL query treats every input to a non-password-hashing algorithm as a
- * sink, so this call qualifies; whether it ALERTS depends on whether anything
- * named like a password reaches it. Callers must therefore keep a reset token
- * out of any object that also carries a password — taint flows into the object
- * and back out of a sibling property — which is why `resetPassword` takes its
- * token and its new password as two parameters. Inline suppression comments do
- * nothing here: GitHub code scanning does not honour `// codeql[...]`, so the
- * call shape is the only place to answer this.
+ * sink, so this call always qualifies; whether it ALERTS depends on whether
+ * anything the query classifies as a password reaches it. Classification is by
+ * NAME, and a call counts as a password source when one of its string arguments
+ * looks like one — so a helper invoked as `tokenFromLink(host, "password-reset")`
+ * hands this function a "password" that is really a mail-template label. That is
+ * exactly what happened here, and it cost two wrong fixes before the alert was
+ * read: the word never appeared on any value, only on a test's kind string.
+ *
+ * So the rule for callers is about NAMING, not shape: do not put the word
+ * "password" on anything whose value reaches this function. Inline suppression
+ * is not an escape — GitHub code scanning does not honour `// codeql[...]`, and
+ * default setup accepts no config file to filter a query in either.
  */
 export function hashToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");

@@ -86,7 +86,7 @@ describe("requestPasswordReset", () => {
     host.withUser({ email: "ana@example.com", passwordHash: await hashPassword(GOOD_PASSWORD) });
 
     await expect(flow.requestPasswordReset("Ana@Example.com")).resolves.toEqual({ ok: true });
-    expect(host.lastEmail("password-reset")?.link).toContain(`${APP_URL}/reset-password?token=`);
+    expect(host.lastEmail("reset-link")?.link).toContain(`${APP_URL}/reset-password?token=`);
   });
 
   it("answers an UNKNOWN address exactly as a known one, and mails nothing", async () => {
@@ -96,14 +96,14 @@ describe("requestPasswordReset", () => {
     const unknown = await flow.requestPasswordReset("nobody@example.com");
 
     expect(known).toEqual(unknown);
-    expect(host.sent.filter((message) => message.kind === "password-reset")).toHaveLength(1);
+    expect(host.sent.filter((message) => message.kind === "reset-link")).toHaveLength(1);
   });
 
   it("mails a Google-only account too — the link is how it gets its first password", async () => {
     await seedGoogleUser(host);
 
     await expect(flow.requestPasswordReset("ana@example.com")).resolves.toEqual({ ok: true });
-    expect(host.lastEmail("password-reset")).toBeTruthy();
+    expect(host.lastEmail("reset-link")).toBeTruthy();
   });
 });
 
@@ -117,7 +117,7 @@ describe("resetPassword", () => {
     await flow.requestPasswordReset("ana@example.com");
 
     await expect(
-      flow.resetPassword(tokenFromLink(host, "password-reset"), NEW_PASSWORD),
+      flow.resetPassword(tokenFromLink(host, "reset-link"), NEW_PASSWORD),
     ).resolves.toEqual({ ok: true });
 
     const user = await host.findByEmail("ana@example.com");
@@ -130,7 +130,7 @@ describe("resetPassword", () => {
     await flow.requestPasswordReset("ana@example.com");
     expect((await host.findByEmail("ana@example.com"))?.emailVerifiedAt).toBeNull();
 
-    await flow.resetPassword(tokenFromLink(host, "password-reset"), NEW_PASSWORD);
+    await flow.resetPassword(tokenFromLink(host, "reset-link"), NEW_PASSWORD);
 
     // Without this the account is in a dead end: right password, still refused.
     expect((await host.findByEmail("ana@example.com"))?.emailVerifiedAt).toBeInstanceOf(Date);
@@ -142,9 +142,9 @@ describe("resetPassword", () => {
   it("works exactly once, and kills every other outstanding link", async () => {
     host.withUser({ email: "ana@example.com", passwordHash: await hashPassword(GOOD_PASSWORD) });
     await flow.requestPasswordReset("ana@example.com");
-    const first = tokenFromLink(host, "password-reset");
+    const first = tokenFromLink(host, "reset-link");
     await flow.requestPasswordReset("ana@example.com");
-    const second = tokenFromLink(host, "password-reset");
+    const second = tokenFromLink(host, "reset-link");
 
     await expect(flow.resetPassword(second, NEW_PASSWORD)).resolves.toEqual({ ok: true });
     await expect(flow.resetPassword(second, NEW_PASSWORD)).resolves.toEqual({
@@ -161,7 +161,7 @@ describe("resetPassword", () => {
   it("checks the policy before spending the token, so a weak try is retryable", async () => {
     host.withUser({ email: "ana@example.com", passwordHash: await hashPassword(GOOD_PASSWORD) });
     await flow.requestPasswordReset("ana@example.com");
-    const token = tokenFromLink(host, "password-reset");
+    const token = tokenFromLink(host, "reset-link");
 
     await expect(flow.resetPassword(token, "abc")).resolves.toMatchObject({
       ok: false,
@@ -234,7 +234,7 @@ describe("setPassword — the Google account that wants a password", () => {
       passwordHash: await hashPassword(GOOD_PASSWORD),
     });
     await flow.requestPasswordReset("ana@example.com");
-    const stolen = tokenFromLink(host, "password-reset");
+    const stolen = tokenFromLink(host, "reset-link");
 
     await flow.setPassword({
       userId: user.id,

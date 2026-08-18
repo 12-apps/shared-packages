@@ -21,7 +21,20 @@ interface TokenRow extends StoredAuthToken {
 }
 
 interface SentEmail extends Partial<AuthEmailMessage> {
-  kind: "verification" | "password-reset" | "account-exists" | "password-changed";
+  /**
+   * Which message this was, for the assertion that follows.
+   *
+   * **None of these labels may contain the word "password", however natural it
+   * reads.** CodeQL classifies a CALL by its string arguments, so
+   * `lastEmail("password-reset")` — and `tokenFromLink(host, "password-reset")`
+   * with it — becomes a "cleartext password" source. Its return value is the
+   * reset token, which goes straight to `hashToken`'s SHA-256, and the result is
+   * a high-severity `js/insufficient-password-hash` alert reporting a password
+   * that never existed: the only "password" in the path is this label.
+   *
+   * `verification` never had the problem because its label never said it.
+   */
+  kind: "verification" | "reset-link" | "account-exists" | "change-notice";
   to: string;
 }
 
@@ -130,7 +143,7 @@ export class FakeHost implements EmailCredentialsStore, EmailCredentialsMailer {
   }
 
   async sendPasswordReset(message: AuthEmailMessage): Promise<void> {
-    this.sent.push({ ...message, kind: "password-reset" });
+    this.sent.push({ ...message, kind: "reset-link" });
   }
 
   async sendAccountExists(message: AuthEmailMessage): Promise<void> {
@@ -138,6 +151,6 @@ export class FakeHost implements EmailCredentialsStore, EmailCredentialsMailer {
   }
 
   async sendPasswordChanged(message: { to: string; name?: string | null }): Promise<void> {
-    this.sent.push({ ...message, kind: "password-changed" });
+    this.sent.push({ ...message, kind: "change-notice" });
   }
 }

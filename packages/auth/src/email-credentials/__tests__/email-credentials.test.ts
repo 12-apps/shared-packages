@@ -216,7 +216,7 @@ describe("verifyEmail", () => {
     host.withUser({ email: "ana@example.com", passwordHash: await hashPassword(GOOD_PASSWORD) });
     await flow.requestPasswordReset("ana@example.com");
 
-    await expect(flow.verifyEmail(tokenFromLink(host, "password-reset"))).resolves.toEqual({
+    await expect(flow.verifyEmail(tokenFromLink(host, "reset-link"))).resolves.toEqual({
       ok: false,
       reason: "token-invalid",
     });
