@@ -17,7 +17,10 @@
  * environment or a database. Server-only.
  */
 
-const DEFAULT_SANDBOX_API_BASE = 'https://sandbox.api.pagseguro.com';
+import { pagbankApiBase } from '../providers/pagbank-api-base';
+
+/** Sandbox-only by construction — see the header. */
+const DEFAULT_SANDBOX_API_BASE = pagbankApiBase('SANDBOX');
 
 /** The generated attachment, ready for a browser download / form upload. */
 export interface HomologacaoAnexo {
