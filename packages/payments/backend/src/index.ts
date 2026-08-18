@@ -307,6 +307,14 @@ export {
   chargeSnapshotMismatch,
   hostedSnapshotMismatch,
 } from './core/charge-identity';
+
+export { createChargeRaiser } from './core/charge-raise';
+export type {
+  ChargeRaiseDeps,
+  ChargeRaiseGateway,
+  ChargeRaiseLog,
+  RaiseChargeRequest,
+} from './core/charge-raise';
 export { isValidCpf } from './core/cpf';
 // Caller-side charge questions (FUT-760): what a reversal event reversed,
 // whether a charge already raised is still payable, and the two instrument
