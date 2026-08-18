@@ -2,7 +2,7 @@
   "name": "@12-apps/entity-lifecycle",
   "version": "1.0.0",
   "type": "module",
-  "description": "Generic, portable entity-lifecycle plugin: diff-based version history with restore + retention, recycle-bin soft delete, per-item drafts and change approvals. Framework-free core, host-mounted backend surface (./server: versions/restore/drafts/recycle-bin/approvals endpoints GENERATED per registered collection, duck-typed Prisma seam), Hono adapter (./hono), React screens (./react: Lixeira, Aprovações, version-history dialog, draft banner) and the package-owned Prisma partial + migrations. Standardized adoption contract in ADOPTING.md.",
+  "description": "Generic, portable entity-lifecycle plugin: diff-based version history with restore + retention, recycle-bin soft delete, per-item drafts and change approvals. Framework-free core, host-mounted backend surface (./server: versions/restore/drafts/recycle-bin/approvals endpoints GENERATED per registered collection, duck-typed Prisma seam), Hono adapter (./hono), React screens (./react: Lixeira, Aprova\u00e7\u00f5es, version-history dialog, draft banner) and the package-owned Prisma partial + migrations. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server/index.ts",
@@ -52,6 +52,7 @@
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/mcp": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@storybook/react-vite": "^9.1.10",
     "@testing-library/react": "^16.1.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
