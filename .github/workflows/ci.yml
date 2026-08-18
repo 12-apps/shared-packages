@@ -558,6 +558,21 @@ jobs:
       # reset and confirmation screen without a backend, a database or an
       # inbox — so a story that no longer compiles has to be a red check rather
       # than something a reviewer meets by clicking.
+      # These stories render through `@12-apps/ui`, whose exports point at `dist/`,
+      # and `storybook build` is run directly rather than through turbo — so
+      # nothing builds that dependency first. Locally the failure hides behind a
+      # `dist/` left over from earlier work; on a fresh checkout Rollup simply
+      # cannot resolve the design system. The payments Storybook above needs no
+      # such step because it renders raw MUI.
+      #
+      # Through turbo, not `pnpm --filter`: the design system's own type build
+      # needs its workspace dependencies built first, which is precisely what
+      # `dependsOn: ["^build"]` expresses and a raw filter skips.
+      - name: Build the design system the auth stories render through
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm exec turbo run build --filter=@12-apps/ui 2>&1 | tee ui-build.log
       - name: Build the e-mail auth Storybook
         shell: bash
         run: |
