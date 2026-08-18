@@ -43,6 +43,16 @@ export interface SignUpClientData {
 export interface AccountSecurityData {
   hasPassword: boolean;
   emailVerified: boolean;
+  /**
+   * Is the e-mail method switched on for this deployment at all?
+   *
+   * The security card renders nothing when it is off, rather than offering to
+   * set a password nobody could then sign in with. Declared here because the
+   * endpoint has always sent it — the screen used to reach it through an
+   * `as unknown as` cast, which is the same thing with the type checking
+   * removed.
+   */
+  enabled: boolean;
 }
 
 export interface EmailAuthConfig {

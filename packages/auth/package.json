@@ -11,14 +11,17 @@
     "./react": "./src/react/index.ts",
     "./email-credentials": "./src/email-credentials/index.ts",
     "./password": "./src/password.ts",
-    "./tokens": "./src/tokens.ts"
+    "./tokens": "./src/tokens.ts",
+    "./react/screens": "./src/react/screens/index.tsx"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit",
     "test": "node ../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest",
-    "test:coverage": "node ../../scripts/vitest-with-teardown.mjs run --coverage"
+    "test:coverage": "node ../../scripts/vitest-with-teardown.mjs run --coverage",
+    "dev": "storybook dev -p 6008",
+    "storybook:build": "storybook build"
   },
   "dependencies": {
     "@auth/core": "0.41.0",
@@ -27,16 +30,23 @@
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/ui": "workspace:*",
+    "@storybook/addon-docs": "^9.1.10",
+    "@storybook/addon-links": "^9.1.10",
+    "@storybook/react-vite": "^9.1.10",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "eslint": "^9.39.1",
+    "eslint-plugin-storybook": "9.1.10",
     "eslint-plugin-test-flakiness": "^1.8.0",
     "jsdom": "^25.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "storybook": "^9.1.10",
     "typescript": "5.9.2",
+    "vite": "^6.4.1",
     "vitest": "^3.2.4"
   },
   "publishConfig": {
@@ -65,6 +75,7 @@
     "!**/test-helpers.*"
   ],
   "peerDependencies": {
+    "@12-apps/ui": ">=5.0.0",
     "react": ">=19.0.0",
     "react-dom": ">=19.0.0"
   },
@@ -73,6 +84,9 @@
       "optional": true
     },
     "react-dom": {
+      "optional": true
+    },
+    "@12-apps/ui": {
       "optional": true
     }
   }

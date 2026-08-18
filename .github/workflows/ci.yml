@@ -553,6 +553,21 @@ jobs:
           name: payments-storybook
           path: packages/payments/frontend/storybook-static
           retention-days: 7
+      # The e-mail auth screens (12-55). Same argument as the checkout above:
+      # the stories are how a reviewer sees every state of a login, sign-up,
+      # reset and confirmation screen without a backend, a database or an
+      # inbox — so a story that no longer compiles has to be a red check rather
+      # than something a reviewer meets by clicking.
+      - name: Build the e-mail auth Storybook
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @12-apps/auth storybook:build 2>&1 | tee auth-storybook.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: auth-storybook
+          path: packages/auth/storybook-static
+          retention-days: 7
 
   # The payments PORTABILITY gate (FUT-562). Separate from `quality` above
   # because that job is the org's reusable workflow (12-apps/ci) and knows

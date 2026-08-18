@@ -1,9 +1,16 @@
 import { config as baseConfig } from "@12-apps/eslint-config/react-internal";
+import storybook from "eslint-plugin-storybook";
 import testFlakiness from "eslint-plugin-test-flakiness";
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
   ...baseConfig,
+  // The story files are linted as stories — `eslint-plugin-storybook` catches
+  // the mistakes that only show up as a broken sidebar (a story with no meta, a
+  // default export that is not one, an autodocs tag on a module that cannot
+  // produce them).
+  ...storybook.configs["flat/recommended"],
+  { ignores: ["storybook-static/**"] },
   {
     // Registers `eslint-plugin-test-flakiness` with every rule left OFF — the
     // same trick, for the same reason, as packages/prisma and
