@@ -109,15 +109,19 @@ export async function recordChange(
 }
 
 /**
- * Rebuild the entity state as of `version` by replaying the chain from the
- * nearest full snapshot at-or-before it.
+ * Rebuild the entity state as of `version` from an ALREADY-LOADED row list
+ * (ascending, as {@link VersionStore.list} returns it).
+ *
+ * Split out of {@link materializeVersion} because a caller that needs several
+ * versions of the same entity — the comparison panel wants up to four — would
+ * otherwise re-read the whole chain once per version. The replay is pure, so
+ * one read serves them all.
  */
-export async function materializeVersion(
-  store: VersionStore,
-  ref: EntityRef,
+export function materializeFromRows(
+  rows: readonly VersionRecord[],
   version: number,
-): Promise<Snapshot> {
-  const rows = await store.list(ref);
+  ref: Pick<EntityRef, 'entityType' | 'entityId'>,
+): Snapshot {
   const target = rows.filter((row) => row.version <= version);
   const last = target[target.length - 1];
   if (!last || last.version !== version) {
@@ -151,6 +155,18 @@ export async function materializeVersion(
     if (row) state = applyDelta(state, row.data, row.removedFields);
   }
   return state;
+}
+
+/**
+ * Rebuild the entity state as of `version` by replaying the chain from the
+ * nearest full snapshot at-or-before it.
+ */
+export async function materializeVersion(
+  store: VersionStore,
+  ref: EntityRef,
+  version: number,
+): Promise<Snapshot> {
+  return materializeFromRows(await store.list(ref), version, ref);
 }
 
 /** Decorate history rows for a UI list (newest first). */

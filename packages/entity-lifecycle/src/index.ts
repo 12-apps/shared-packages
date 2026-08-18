@@ -33,10 +33,20 @@ export {
   recordCreate,
   recordChange,
   materializeVersion,
+  materializeFromRows,
   listHistory,
   applyRetention,
   type VersionSummary,
 } from './versioning';
+export {
+  compareVersions,
+  type CompareOptions,
+  type ComparisonCell,
+  type ComparisonColumn,
+  type ComparisonRole,
+  type ComparisonRow,
+  type VersionComparison,
+} from './comparison';
 export { resolveFeature } from './features';
 export { createEntityLifecycle, type EntityLifecycle } from './service';
 export {
