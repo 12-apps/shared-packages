@@ -138,6 +138,24 @@ describe('rule 3 — the returned row is not taken on trust', () => {
     await expect(createChargeRaiser(d)(REQUEST)).rejects.toBeInstanceOf(ChargeIdentityError);
   });
 
+  /**
+   * A row stored under NO key cannot be proved to be this attempt's. It is the
+   * shape a pre-idempotency charge has, and the one a store returns when the
+   * key never reached it — neither is evidence, so it is refused like any other
+   * mismatch.
+   */
+  it('refuses a charge stored under no key at all', async () => {
+    const { d } = deps({
+      charge: vi.fn(async () => ({
+        reference: 'ord_1',
+        idempotencyKey: null,
+        snapshot: snapshot(),
+      })) as unknown as ChargeRaiseDeps['gateway']['charge'],
+    });
+
+    await expect(createChargeRaiser(d)(REQUEST)).rejects.toBeInstanceOf(ChargeIdentityError);
+  });
+
   it('does not void anything when identity failed', async () => {
     const stale = snapshot({ providerChargeId: 'OLD', amount: BRL(800) });
     const { d } = deps({
