@@ -93,6 +93,17 @@ export { fetchCheckoutConfig } from './components/checkout/client';
  * literal and silently drifts when it changes.
  */
 export { HOSTED_ORDER_STORAGE_KEY } from './components/checkout/hosted-return';
+/**
+ * Whether a hand-off from this tab is still waiting to be resolved.
+ *
+ * For a HOST GATE in front of the checkout route — a closed-shop curtain, a
+ * plan check. Every such gate has to stand aside for a buyer coming back from
+ * a payment, because that route is where the money gets confirmed, and a host
+ * deciding it alone had to copy this package's marker list and storage key.
+ * That copy goes stale: it did, the moment Stripe's 3-D Secure markers were
+ * added here. Reads without consuming.
+ */
+export { hostedCheckoutReturnPending } from './components/checkout/hosted-return';
 // ---------------------------------------------------------------------------
 // Digital wallets (FUT-471/472) — the Google-branded button and the capability
 // read it is gated on. `CheckoutFlow` wires these automatically; they are

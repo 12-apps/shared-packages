@@ -5,6 +5,7 @@ import {
   HOSTED_ORDER_STORAGE_KEY,
   rememberHostedOrder,
   takeHostedOrder,
+  hostedCheckoutReturnPending,
 } from "../hosted-return";
 import type { CheckoutOrder } from "../types";
 
@@ -74,12 +75,32 @@ describe("hosted-return", () => {
     expect(takeHostedOrder()?.orderId).toBe("o1");
   });
 
-  it("ignores a parked order when this is not a return trip", () => {
+  it("resumes a parked order even when the provider marked nothing", () => {
     rememberHostedOrder(ORDER);
     land("");
 
-    // A buyer who abandoned the provider's page and came back to checkout later
-    // must start a fresh order, not resume one they never paid.
+    // THE INVERSION, and it is a money rule rather than a UX preference.
+    //
+    // Pressing the provider's "Continuar" is the only thing that marks the
+    // URL. Closing the tab, hitting back and retyping the store's address are
+    // all commoner, and all of them used to land the buyer on a live payment
+    // step for an order that may already be paid — an invitation to pay twice.
+    //
+    // Polling before deciding does not rescue it either: InfinitePay's
+    // `payment_check` will not answer without a `transaction_nsu` that only
+    // that same redirect carries, so "ask first" reads PAID as PENDING and
+    // drops them on the pay button anyway.
+    expect(takeHostedOrder()?.orderId).toBe("o1");
+  });
+
+  it("still hands a bare resume back exactly once", () => {
+    // What bounds the cost for a buyer who genuinely abandoned: they see one
+    // confirmation screen reporting what the store actually knows, and leaving
+    // and reopening checkout gives them a fresh order.
+    rememberHostedOrder(ORDER);
+    land("");
+
+    expect(takeHostedOrder()).not.toBeNull();
     expect(takeHostedOrder()).toBeNull();
   });
 
@@ -143,5 +164,40 @@ describe("hosted-return", () => {
     land("?transaction_nsu=123");
 
     expect(takeHostedOrder()).toBeNull();
+  });
+});
+
+describe("hostedCheckoutReturnPending — the host gate's question", () => {
+  it("is true on a marked return, before the flow has read anything", () => {
+    rememberHostedOrder(ORDER);
+    land("?transaction_nsu=123&slug=abc");
+
+    expect(hostedCheckoutReturnPending()).toBe(true);
+  });
+
+  it("is true on a BARE return, which is the case a host cannot detect itself", () => {
+    // The buyer who closed the provider's page. A host gate reading only the
+    // URL sees nothing here and curtains a payment that already happened.
+    rememberHostedOrder(ORDER);
+    land("");
+
+    expect(hostedCheckoutReturnPending()).toBe(true);
+  });
+
+  it("does not consume the order — the gate asks on every render", () => {
+    rememberHostedOrder(ORDER);
+    land("");
+
+    expect(hostedCheckoutReturnPending()).toBe(true);
+    expect(hostedCheckoutReturnPending()).toBe(true);
+    // And the flow still gets it.
+    expect(takeHostedOrder()?.orderId).toBe("o1");
+  });
+
+  it("is false for a plain visit, so a host gate still gates", () => {
+    // The exemption is for a buyer coming BACK from a payment and nothing else.
+    land("");
+
+    expect(hostedCheckoutReturnPending()).toBe(false);
   });
 });
