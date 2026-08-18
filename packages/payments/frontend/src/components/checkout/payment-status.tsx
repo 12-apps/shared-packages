@@ -66,6 +66,28 @@ const OUTCOME: Record<OrderStatus, Outcome> = {
   },
 };
 
+/**
+ * What the screen says once it has stopped asking (FUT-556).
+ *
+ * NOT an `OrderStatus`: the order really is still AWAITING_PAYMENT and may yet
+ * settle — the scheduled reconciliation keeps asking the provider long after
+ * this tab is gone. What ran out is the WAIT, not the order, and saying
+ * otherwise would be the more expensive lie: a buyer told "não concluído" who
+ * has in fact paid will either pay twice or call the store.
+ *
+ * So it leads with what is true and unglamorous — we have not heard yet — and
+ * spends its remaining words on the one instruction that matters, which is not
+ * to pay again.
+ */
+const AWAITING_TIMED_OUT: Outcome = {
+  heading: "Ainda não recebemos a confirmação",
+  support:
+    "Se você já pagou, o pedido é confirmado assim que a operadora avisar — " +
+    "não pague de novo. Você pode fechar esta tela.",
+  icon: <ScheduleIcon fontSize="large" />,
+  tone: "warning",
+};
+
 const TONE_COLOR: Record<Outcome["tone"], string> = {
   success: "success.main",
   danger: "error.main",
@@ -86,14 +108,29 @@ function orderReference(orderId: string): string {
 }
 
 /** The headline block: icon, outcome, and one supporting line. */
-function OutcomeHero({ status }: { status: OrderStatus }): JSX.Element {
+function OutcomeHero({
+  status,
+  timedOut = false,
+}: {
+  status: OrderStatus;
+  timedOut?: boolean;
+}): JSX.Element {
   const { Text } = useCheckoutComponents();
-  const outcome = OUTCOME[status];
+  const outcome = timedOut && status === "AWAITING_PAYMENT" ? AWAITING_TIMED_OUT : OUTCOME[status];
   return (
     <Box
       // `payment-paid` is load-bearing for the storefront journeys — it is how
-      // they assert the buyer actually got there.
-      data-testid={status === "PAID" ? "payment-paid" : `payment-${status.toLowerCase()}`}
+      // they assert the buyer actually got there. The timed-out wait gets its
+      // OWN id rather than reusing `payment-awaiting_payment`: a test that
+      // cannot tell "still asking" from "stopped asking" is a test that would
+      // pass against the unbounded spinner this replaced.
+      data-testid={
+        timedOut && status === "AWAITING_PAYMENT"
+          ? "payment-awaiting-timeout"
+          : status === "PAID"
+            ? "payment-paid"
+            : `payment-${status.toLowerCase()}`
+      }
       sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, textAlign: "center" }}
     >
       <Box sx={{ color: TONE_COLOR[outcome.tone], display: "flex" }}>{outcome.icon}</Box>
@@ -206,6 +243,7 @@ export function PaymentStatus({
   onRegenerate,
   onBackToMenu,
   paidExtra,
+  awaitingTimedOut = false,
 }: {
   status: OrderStatus | null;
   totalLabel: string;
@@ -223,6 +261,12 @@ export function PaymentStatus({
    * is the difference between an offer and an interruption.
    */
   paidExtra?: ReactNode;
+  /**
+   * The wait has been given up on — see {@link AWAITING_TIMED_OUT}. Only
+   * meaningful while AWAITING_PAYMENT; every other status has already resolved,
+   * so a stale flag cannot change what a settled screen says.
+   */
+  awaitingTimedOut?: boolean;
 }): JSX.Element {
   const { LoadingState } = useCheckoutComponents();
   const effective: OrderStatus = status ?? "AWAITING_PAYMENT";
@@ -231,9 +275,10 @@ export function PaymentStatus({
     <Box
       data-testid="payment-status"
       data-status={effective}
+      data-timed-out={awaitingTimedOut ? "true" : undefined}
       sx={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "stretch", py: 2 }}
     >
-      <OutcomeHero status={effective} />
+      <OutcomeHero status={effective} timedOut={awaitingTimedOut} />
 
       {effective === "PAID" ? (
         <PaidFacts totalLabel={totalLabel} orderId={orderId} buyerEmail={buyerEmail} />
@@ -241,7 +286,7 @@ export function PaymentStatus({
 
       {effective === "PAID" ? paidExtra : null}
 
-      {effective === "AWAITING_PAYMENT" ? (
+      {effective === "AWAITING_PAYMENT" && !awaitingTimedOut ? (
         <LoadingState variant="spinner" size="md" message="" dataTestId="payment-pending" />
       ) : null}
 

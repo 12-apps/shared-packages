@@ -35,6 +35,18 @@ export interface CheckoutCopyFE {
   returnPending: string;
   /** The return leg when nothing was parked — the buyer came back to nothing. */
   returnUnknown: string;
+  /**
+   * The return leg once the bounded wait elapsed and the screen stopped asking
+   * (FUT-556) — say that nothing has arrived yet and, above all, not to pay
+   * again.
+   *
+   * OPTIONAL, so adopting a version with the bound is not a breaking change for
+   * a host that has not written the sentence yet. The BOUND itself applies
+   * either way: with no copy the screen still stops spinning and falls back to
+   * `returnPending` as a warning, which is the honest half. The words are the
+   * part only a host can own.
+   */
+  returnTimedOut?: string;
   /** Nothing to check out (cart mode only). */
   emptyCartTitle: string;
   emptyCartAction: string;

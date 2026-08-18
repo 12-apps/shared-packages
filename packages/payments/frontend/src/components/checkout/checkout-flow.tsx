@@ -197,6 +197,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
           onRegenerate={() => { c.setStep("payment"); void c.startPayment("PIX"); }}
           onBackToMenu={c.goToMenu}
           paidExtra={confirmationExtra}
+          awaitingTimedOut={c.resumeTimedOut}
         />
       ) : null}
     </Box>
