@@ -3,6 +3,7 @@ import { pagbankConnectError } from './pagbank-connect-errors';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { OAuthTokens, ResolvedCredentials } from '../core/types';
 import { providerFetch } from './http';
+import { pagbankApiBase } from './pagbank-api-base';
 import { NAME } from './pagbank-http';
 
 /**
@@ -35,11 +36,6 @@ const AUTHORIZE_BASE = {
   SANDBOX: 'https://connect.sandbox.pagbank.com.br',
 } as const;
 
-const TOKEN_BASE = {
-  PRODUCTION: 'https://api.pagseguro.com',
-  SANDBOX: 'https://sandbox.api.pagseguro.com',
-} as const;
-
 /**
  * Least privilege that still runs a store: read and create payments, plus
  * refunds. Overridable per deployment because PagBank grants scopes per
@@ -47,11 +43,15 @@ const TOKEN_BASE = {
  */
 const DEFAULT_SCOPES = 'payments.read payments.create payments.refund';
 
-function baseFor(
-  table: typeof AUTHORIZE_BASE | typeof TOKEN_BASE,
-  credentials: ResolvedCredentials,
-): string {
-  return credentials.environment === 'PRODUCTION' ? table.PRODUCTION : table.SANDBOX;
+/**
+ * The CONSENT host only. The token and revoke calls go to the Orders API,
+ * which is {@link pagbankApiBase} — a different hostname entirely, and the
+ * reason this pair was never one table.
+ */
+function authorizeBaseFor(credentials: ResolvedCredentials): string {
+  return credentials.environment === 'PRODUCTION'
+    ? AUTHORIZE_BASE.PRODUCTION
+    : AUTHORIZE_BASE.SANDBOX;
 }
 
 interface PagBankTokenResponse {
@@ -137,7 +137,7 @@ async function tokenRequest(
   path: '/oauth2/token' | '/oauth2/refresh' = '/oauth2/token',
 ): Promise<PagBankTokenResponse> {
   return connectRequest<PagBankTokenResponse>(
-    `${baseFor(TOKEN_BASE, appCredentials)}${path}`,
+    `${pagbankApiBase(appCredentials.environment)}${path}`,
     appCredentials,
     body,
   );
@@ -205,7 +205,7 @@ export const pagbankOAuth: NonNullable<PaymentProviderAdapter['oauth']> = {
       state: ctx.state,
     });
     return {
-      url: `${baseFor(AUTHORIZE_BASE, appCredentials)}/oauth2/authorize?${params.toString()}`,
+      url: `${authorizeBaseFor(appCredentials)}/oauth2/authorize?${params.toString()}`,
       state: ctx.state,
     };
   },
@@ -277,7 +277,7 @@ export const pagbankOAuth: NonNullable<PaymentProviderAdapter['oauth']> = {
     // Resolved once up front so a missing account token fails before any
     // token is sent, rather than partway through the loop.
     connectHeaders(appCredentials);
-    const url = `${baseFor(TOKEN_BASE, appCredentials)}/oauth2/revoke`;
+    const url = `${pagbankApiBase(appCredentials.environment)}/oauth2/revoke`;
     const failures: string[] = [];
 
     for (const [hint, field] of REVOCABLE) {

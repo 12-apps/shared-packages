@@ -2,6 +2,8 @@ import { ProviderRequestError, type ProviderRequestSnapshot } from '../core/erro
 import { isPreSendNetworkError } from '../core/failover';
 import type { CustomerInfo, CustomerSchema, ResolvedCredentials } from '../core/types';
 
+import { pagbankApiBase } from './pagbank-api-base';
+
 /**
  * PagBank Orders API transport — the bits every call shares, kept apart from
  * the adapter so the adapter reads as pure request/response MAPPING.
@@ -14,18 +16,17 @@ import type { CustomerInfo, CustomerSchema, ResolvedCredentials } from '../core/
 
 export const NAME = 'pagbank';
 
-/** Sandbox is the safe default: a misconfigured deploy must never hit live. */
-const SANDBOX_API_BASE = 'https://sandbox.api.pagseguro.com';
-const PRODUCTION_API_BASE = 'https://api.pagseguro.com';
-
 /**
  * Chosen by the RESOLVED ENVIRONMENT only. There is deliberately no
  * credential-field override: that field is tenant-supplied data, and
  * honouring it would let a store admin point an authenticated, token-bearing
  * request at any origin they like.
+ *
+ * The hosts themselves are {@link pagbankApiBase}'s; what stays here is the
+ * rule about which input is allowed to pick between them.
  */
 function apiBaseFor(credentials: ResolvedCredentials): string {
-  return credentials.environment === 'PRODUCTION' ? PRODUCTION_API_BASE : SANDBOX_API_BASE;
+  return pagbankApiBase(credentials.environment);
 }
 
 /** PagBank wants the CPF/CNPJ as bare digits. */

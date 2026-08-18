@@ -26,7 +26,7 @@ interface PagBankPublicKeyResponse {
 }
 
 export interface PagbankPublicKeyConfig {
-  /** e.g. https://api.pagseguro.com or the sandbox base. */
+  /** The Orders API origin for this merchant's environment — `pagbankApiBase`. */
   apiBase: string;
   /** The MERCHANT's own token — never the platform's (see module doc). */
   token: string | null | undefined;

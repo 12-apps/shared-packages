@@ -315,6 +315,10 @@ export { classifyReversalEvent } from './core/reversal';
 export type { DisputeFacts, RefundFacts, ReversalFacts } from './core/reversal';
 export { chargeDeadlinePassed, hostedChargePayable, pixChargePayable } from './core/charge-reuse';
 export { attributedCard, chainTokenizesInBrowser, holdsInstrumentFor } from './core/card-instrument';
+// PagBank's published Orders API hosts (FUT-760). Exported because a host that
+// resolves its own PagBank config had to write them out a sixth time to do it —
+// a vendor hostname is the adapter's fact, not the deployment's.
+export { pagbankApiBase } from './providers/pagbank-api-base';
 export { promoteProvider } from './config/promote';
 export { forgetVaultPointers, type VaultPointerRef } from './core/gateway-vault';
 export {
