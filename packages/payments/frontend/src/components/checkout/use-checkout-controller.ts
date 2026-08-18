@@ -156,12 +156,20 @@ function initialStep(resuming: boolean, taxIdOnFile: boolean): Step {
  *
  * @returns true when the buyer is on their way and the caller must stop.
  */
-function handOverToProvider(order: CheckoutOrder, navigate: CheckoutNavigate): boolean {
+function handOverToProvider(
+  order: CheckoutOrder,
+  navigate: CheckoutNavigate,
+  tenantSlug?: string,
+): boolean {
   if (!order.hostedCheckoutUrl) return false;
   // PARK FIRST, navigate second. The order is the only thing the return trip
   // has to rehydrate from, and the navigation may tear this SPA down before
   // any later write lands.
-  rememberHostedOrder(order);
+  //
+  // The STORE goes with it: one tab holds one slot, and on a multi-tenant
+  // storefront every store shares an origin. Without the slug, abandoning this
+  // hand-off and opening another store's checkout resumed THIS order there.
+  rememberHostedOrder(order, tenantSlug);
   navigate(order.hostedCheckoutUrl);
   return true;
 }
@@ -175,8 +183,11 @@ function handOverToProvider(order: CheckoutOrder, navigate: CheckoutNavigate): b
  * card view, because a redirect provider produced neither. The webhook is still
  * what settles the order; this only tells the buyer that it did.
  */
-function useHostedResume(): { order: CheckoutOrder | null; status: OrderStatus | null } {
-  const [order] = useState(takeHostedOrder);
+function useHostedResume(tenantSlug?: string): {
+  order: CheckoutOrder | null;
+  status: OrderStatus | null;
+} {
+  const [order] = useState(() => takeHostedOrder(tenantSlug));
   const { status } = usePaymentPolling(order?.orderId ?? null, { enabled: Boolean(order) });
   return { order, status };
 }
@@ -252,10 +263,11 @@ export function useCheckoutController(
   defaultBuyer?: BuyerInfo,
   taxIdOnFile = false,
   buyerFields: readonly CheckoutCustomerField[] = CPF_ONLY,
+  tenantSlug?: string,
 ) {
   const { createOrder, saveBuyerContact, onExitToMenu, onPaid } = ports;
   const navigate = useCheckoutNavigate();
-  const resume = useHostedResume();
+  const resume = useHostedResume(tenantSlug);
   const [step, setStep] = useState<Step>(initialStep(Boolean(resume.order), taxIdOnFile));
   // No method pre-selected: the Pagamento step shows just the picker until the
   // buyer chooses PIX or card, then that method's order is raised and its UI
@@ -296,10 +308,10 @@ export function useCheckoutController(
     const result = await createOrder({ method: chosen, buyer: override ?? buyer, saveProfile });
     setCreating(false);
     if (!result.ok) { failure.fail(result.error); return; }
-    if (handOverToProvider(result.data, navigate)) return;
+    if (handOverToProvider(result.data, navigate, tenantSlug)) return;
     setOrder(result.data);
     setFinalStatus(null);
-  }, [buyer, saveProfile, createOrder, clearError, navigate]);
+  }, [buyer, saveProfile, createOrder, clearError, navigate, tenantSlug]);
   const payWithEmail = useCallback((email: string) => {
     if (!method) return;
     const next = { ...buyer, email };

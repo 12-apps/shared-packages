@@ -119,7 +119,15 @@ describe("card charge → 3DS handover (FUT-698)", () => {
     // one, which is exactly the drift this assertion exists to catch.
     const parked = window.sessionStorage.getItem(HOSTED_ORDER_STORAGE_KEY);
     expect(parked).not.toBeNull();
-    expect((JSON.parse(parked as string) as { orderId: string }).orderId).toBe("o1");
+    // The parked payload is an ENVELOPE since the cross-store fix: the order,
+    // the store it belongs to, and when it was parked. A bare order in the slot
+    // is what let one store's hand-off resume on another store's checkout.
+    const envelope = JSON.parse(parked as string) as {
+      order: { orderId: string };
+      parkedAt: number;
+    };
+    expect(envelope.order.orderId).toBe("o1");
+    expect(typeof envelope.parkedAt).toBe("number");
     // The tab is navigating away: nothing resolved, no poll started here.
     expect(onResolved).not.toHaveBeenCalled();
     expect(client.pollOrderStatus).not.toHaveBeenCalled();
