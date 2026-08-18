@@ -265,6 +265,27 @@ export const InertItem: Story = {
   },
 };
 
+export const SeededQuery: Story = {
+  name: '🌱 Seeded Query Test',
+  render: () => (
+    <SettingsLayout title="Configuração" groups={GROUPS} defaultQuery="zzzz">
+      {panel}
+    </SettingsLayout>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('The rail opens already filtered by the seeded term', async () => {
+      // The point of the prop: a screen named for a state has to be openable IN
+      // that state, for a story, for a test, and for a host deep-linking `?q=`.
+      await expect(canvas.getByTestId('settings-search').querySelector('input')).toHaveValue(
+        'zzzz',
+      );
+      await expect(canvas.getByTestId('settings-empty')).toBeInTheDocument();
+    });
+  },
+};
+
 export const EmptySearchExit: Story = {
   name: '🚪 Empty Search Exit Test',
   args: { emptySearchAction: { label: 'Limpar a busca', onClear: fn() } },
