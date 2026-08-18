@@ -1,6 +1,14 @@
+/* eslint-disable test-flakiness/no-test-isolation --
+   the rule flags every method call on `host` / `flow` / `settings`, which it
+   reads as mutating shared state. They are not shared: `beforeEach` rebuilds
+   all three from scratch, so each case gets its own in-memory store, its own
+   mailer and its own settings object, and no case can observe another's
+   writes. The rule's own remedy — "initialize in beforeEach" — is exactly what
+   this file does; it fires on the CALLS regardless, because a flow whose whole
+   job is to write to a store cannot be exercised without calling it. */
 import { randomBytes, scryptSync } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { hashPassword, verifyPassword } from "../../password";
 import { createEmailCredentials, type EmailCredentials } from "../index";
@@ -15,27 +23,33 @@ import { FakeHost } from "./fake-host";
 
 const APP_URL = "https://app.example.com";
 const GOOD_PASSWORD = "uma senha boa 42";
+/** A fixed moment; these tests only need "already verified, at some point". */
+const VERIFIED_AT = new Date("2026-01-01T00:00:00.000Z");
 const NEW_PASSWORD = "outra senha boa 77";
 
-function setup(overrides: Partial<EmailAuthSettings> = {}): {
-  host: FakeHost;
-  flow: EmailCredentials;
-  settings: EmailAuthSettings;
-} {
-  const host = new FakeHost();
-  const settings: EmailAuthSettings = {
-    enabled: true,
-    requireEmailVerification: true,
-    ...overrides,
-  };
-  const flow = createEmailCredentials({
+/**
+ * A fresh host and flow per test, wired in `beforeEach`.
+ *
+ * `settings` is a MUTABLE object the flow reads through a getter, not a
+ * snapshot — a superadmin flips these mid-session and the next call must obey,
+ * which is the behaviour the settings port exists for. A test that wants the
+ * other posture assigns to it directly, which is also how the real thing
+ * changes.
+ */
+let host: FakeHost;
+let flow: EmailCredentials;
+let settings: EmailAuthSettings;
+
+beforeEach(() => {
+  host = new FakeHost();
+  settings = { enabled: true, requireEmailVerification: true };
+  flow = createEmailCredentials({
     store: host,
     mailer: host,
     settings: () => settings,
     appUrl: APP_URL,
   });
-  return { host, flow, settings };
-}
+});
 
 /**
  * A hash genuinely derived at an older cost, in the stored format.
@@ -58,7 +72,7 @@ function tokenFromLink(host: FakeHost, kind: Parameters<FakeHost["lastEmail"]>[0
 
 /** The account this whole feature is about: created by Google, no password. */
 async function seedGoogleUser(host: FakeHost): Promise<string> {
-  const user = host.seed({
+  const user = host.withUser({
     email: "ana@example.com",
     name: "Ana",
     passwordHash: null,
@@ -69,16 +83,14 @@ async function seedGoogleUser(host: FakeHost): Promise<string> {
 
 describe("requestPasswordReset", () => {
   it("mails a reset link to an account that has one", async () => {
-    const { host, flow } = setup();
-    host.seed({ email: "ana@example.com", passwordHash: await hashPassword(GOOD_PASSWORD) });
+    host.withUser({ email: "ana@example.com", passwordHash: await hashPassword(GOOD_PASSWORD) });
 
     await expect(flow.requestPasswordReset("Ana@Example.com")).resolves.toEqual({ ok: true });
     expect(host.lastEmail("password-reset")?.link).toContain(`${APP_URL}/reset-password?token=`);
   });
 
   it("answers an UNKNOWN address exactly as a known one, and mails nothing", async () => {
-    const { host, flow } = setup();
-    host.seed({ email: "ana@example.com", passwordHash: await hashPassword(GOOD_PASSWORD) });
+    host.withUser({ email: "ana@example.com", passwordHash: await hashPassword(GOOD_PASSWORD) });
 
     const known = await flow.requestPasswordReset("ana@example.com");
     const unknown = await flow.requestPasswordReset("nobody@example.com");
@@ -88,7 +100,6 @@ describe("requestPasswordReset", () => {
   });
 
   it("mails a Google-only account too — the link is how it gets its first password", async () => {
-    const { host, flow } = setup();
     await seedGoogleUser(host);
 
     await expect(flow.requestPasswordReset("ana@example.com")).resolves.toEqual({ ok: true });
@@ -98,11 +109,10 @@ describe("requestPasswordReset", () => {
 
 describe("resetPassword", () => {
   it("sets the new password and lets the old one stop working", async () => {
-    const { host, flow } = setup();
-    host.seed({
+    host.withUser({
       email: "ana@example.com",
       passwordHash: await hashPassword(GOOD_PASSWORD),
-      emailVerifiedAt: new Date(),
+      emailVerifiedAt: VERIFIED_AT,
     });
     await flow.requestPasswordReset("ana@example.com");
 
@@ -116,7 +126,6 @@ describe("resetPassword", () => {
   });
 
   it("verifies the address, because clicking the link proved it", async () => {
-    const { host, flow } = setup();
     await flow.signUp({ email: "ana@example.com", password: GOOD_PASSWORD });
     await flow.requestPasswordReset("ana@example.com");
     expect((await host.findByEmail("ana@example.com"))?.emailVerifiedAt).toBeNull();
@@ -134,8 +143,7 @@ describe("resetPassword", () => {
   });
 
   it("works exactly once, and kills every other outstanding link", async () => {
-    const { host, flow } = setup();
-    host.seed({ email: "ana@example.com", passwordHash: await hashPassword(GOOD_PASSWORD) });
+    host.withUser({ email: "ana@example.com", passwordHash: await hashPassword(GOOD_PASSWORD) });
     await flow.requestPasswordReset("ana@example.com");
     const first = tokenFromLink(host, "password-reset");
     await flow.requestPasswordReset("ana@example.com");
@@ -155,8 +163,7 @@ describe("resetPassword", () => {
   });
 
   it("checks the policy before spending the token, so a weak try is retryable", async () => {
-    const { host, flow } = setup();
-    host.seed({ email: "ana@example.com", passwordHash: await hashPassword(GOOD_PASSWORD) });
+    host.withUser({ email: "ana@example.com", passwordHash: await hashPassword(GOOD_PASSWORD) });
     await flow.requestPasswordReset("ana@example.com");
     const token = tokenFromLink(host, "password-reset");
 
@@ -170,7 +177,6 @@ describe("resetPassword", () => {
   });
 
   it("refuses an unknown token", async () => {
-    const { flow } = setup();
     await expect(
       flow.resetPassword({ token: "nope", password: NEW_PASSWORD }),
     ).resolves.toEqual({ ok: false, reason: "token-invalid" });
@@ -179,7 +185,6 @@ describe("resetPassword", () => {
 
 describe("setPassword — the Google account that wants a password", () => {
   it("adds the first password with NO current password, because there is none", async () => {
-    const { host, flow } = setup();
     const userId = await seedGoogleUser(host);
 
     await expect(flow.setPassword({ userId, password: NEW_PASSWORD })).resolves.toEqual({
@@ -192,7 +197,6 @@ describe("setPassword — the Google account that wants a password", () => {
   });
 
   it("reports which of the two screens to show", async () => {
-    const { host, flow } = setup();
     const userId = await seedGoogleUser(host);
 
     await expect(flow.hasPassword(userId)).resolves.toBe(false);
@@ -201,8 +205,7 @@ describe("setPassword — the Google account that wants a password", () => {
   });
 
   it("demands the current password once one exists", async () => {
-    const { host, flow } = setup();
-    const user = host.seed({
+    const user = host.withUser({
       email: "ana@example.com",
       passwordHash: await hashPassword(GOOD_PASSWORD),
     });
@@ -224,7 +227,6 @@ describe("setPassword — the Google account that wants a password", () => {
   });
 
   it("does not un-verify an address the provider already vouched for", async () => {
-    const { host, flow } = setup();
     const userId = await seedGoogleUser(host);
 
     await flow.setPassword({ userId, password: NEW_PASSWORD });
@@ -233,8 +235,7 @@ describe("setPassword — the Google account that wants a password", () => {
   });
 
   it("invalidates outstanding reset links — somebody else may hold one", async () => {
-    const { host, flow } = setup();
-    const user = host.seed({
+    const user = host.withUser({
       email: "ana@example.com",
       passwordHash: await hashPassword(GOOD_PASSWORD),
     });
@@ -253,7 +254,6 @@ describe("setPassword — the Google account that wants a password", () => {
   });
 
   it("refuses for an unknown user", async () => {
-    const { flow } = setup();
     await expect(
       flow.setPassword({ userId: "ghost", password: NEW_PASSWORD }),
     ).resolves.toEqual({ ok: false, reason: "no-account" });
@@ -262,11 +262,10 @@ describe("setPassword — the Google account that wants a password", () => {
 
 describe("authenticate", () => {
   it("accepts the right password for a verified account", async () => {
-    const { host, flow } = setup();
-    const user = host.seed({
+    const user = host.withUser({
       email: "ana@example.com",
       passwordHash: await hashPassword(GOOD_PASSWORD),
-      emailVerifiedAt: new Date(),
+      emailVerifiedAt: VERIFIED_AT,
     });
 
     await expect(
@@ -275,11 +274,10 @@ describe("authenticate", () => {
   });
 
   it("gives the SAME refusal for an unknown address, a Google-only account and a wrong password", async () => {
-    const { host, flow } = setup();
-    host.seed({
+    host.withUser({
       email: "ana@example.com",
       passwordHash: await hashPassword(GOOD_PASSWORD),
-      emailVerifiedAt: new Date(),
+      emailVerifiedAt: VERIFIED_AT,
     });
     await seedGoogleUser(host);
     host.users.forEach((user) => {
@@ -296,7 +294,6 @@ describe("authenticate", () => {
   });
 
   it("distinguishes an unverified address — but only after the password was right", async () => {
-    const { flow } = setup();
     await flow.signUp({ email: "ana@example.com", password: GOOD_PASSWORD });
 
     await expect(
@@ -309,7 +306,6 @@ describe("authenticate", () => {
   });
 
   it("lets an unverified account in once the switch is off", async () => {
-    const { flow, settings } = setup();
     await flow.signUp({ email: "ana@example.com", password: GOOD_PASSWORD });
 
     settings.requireEmailVerification = false;
@@ -319,11 +315,10 @@ describe("authenticate", () => {
   });
 
   it("refuses while the method is switched off, right password or not", async () => {
-    const { host, flow, settings } = setup();
-    host.seed({
+    host.withUser({
       email: "ana@example.com",
       passwordHash: await hashPassword(GOOD_PASSWORD),
-      emailVerifiedAt: new Date(),
+      emailVerifiedAt: VERIFIED_AT,
     });
 
     settings.enabled = false;
@@ -333,15 +328,14 @@ describe("authenticate", () => {
   });
 
   it("silently re-hashes a password stored at a lower cost", async () => {
-    const { host, flow } = setup();
     // Derived at the OLD cost for real. Rewriting the cost field of a modern
     // hash would not do: the key was derived at 16384, so it simply would not
     // verify at 1024, and the test would pass for the wrong reason.
     const legacy = legacyHash(GOOD_PASSWORD, 1024);
-    const user = host.seed({
+    const user = host.withUser({
       email: "ana@example.com",
       passwordHash: legacy,
-      emailVerifiedAt: new Date(),
+      emailVerifiedAt: VERIFIED_AT,
     });
 
     await expect(

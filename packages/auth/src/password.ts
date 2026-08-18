@@ -26,8 +26,8 @@ import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
  * notices the difference at the one moment it holds the plaintext (a successful
  * sign-in) and can upgrade the row silently.
  *
- * Nothing here is Future Pay's, or any host's: no copy, no domain vocabulary,
- * no database. It is the primitive the email-credentials factory is built on.
+ * Nothing here belongs to any one host: no copy, no domain vocabulary, no
+ * database. It is the primitive the email-credentials factory is built on.
  */
 
 /**
@@ -123,31 +123,54 @@ const COMMON_PASSWORDS: readonly string[] = [
   "trustno1",
 ];
 
-/** Every way a candidate password fails the policy, in reading order. */
+/** The two length bounds. */
+function lengthViolations(
+  password: string,
+  policy: PasswordPolicy,
+): PasswordPolicyViolation[] {
+  const { minLength = MIN_PASSWORD_LENGTH, maxLength = MAX_PASSWORD_LENGTH } = policy;
+  const violations: PasswordPolicyViolation[] = [];
+  if (password.length < minLength) violations.push("too-short");
+  if (password.length > maxLength) violations.push("too-long");
+  return violations;
+}
+
+/** The character-class rules, each independently switchable off. */
+function characterViolations(
+  password: string,
+  policy: PasswordPolicy,
+): PasswordPolicyViolation[] {
+  const { requireLetter = true, requireNumber = true } = policy;
+  const violations: PasswordPolicyViolation[] = [];
+  // `\p{L}`, not `[a-z]`: a Cyrillic or Greek passphrase has letters.
+  if (requireLetter && !/\p{L}/u.test(password)) violations.push("needs-letter");
+  if (requireNumber && !/\d/u.test(password)) violations.push("needs-number");
+  return violations;
+}
+
+/** Is this one of the guesses we refuse outright? Case- and padding-insensitive. */
+function isDenied(password: string, policy: PasswordPolicy): boolean {
+  const normalized = password.trim().toLowerCase();
+  return [...COMMON_PASSWORDS, ...(policy.denyList ?? [])].some(
+    (entry) => entry.trim().toLowerCase() === normalized,
+  );
+}
+
+/**
+ * Every way a candidate password fails the policy, in reading order.
+ *
+ * All of them, not the first: a form that reveals one requirement per attempt
+ * is a guessing game, and the person has to satisfy every rule anyway.
+ */
 export function checkPasswordPolicy(
   password: string,
   policy: PasswordPolicy = {},
 ): PasswordPolicyViolation[] {
-  const {
-    minLength = MIN_PASSWORD_LENGTH,
-    maxLength = MAX_PASSWORD_LENGTH,
-    requireLetter = true,
-    requireNumber = true,
-    denyList = [],
-  } = policy;
-
-  const violations: PasswordPolicyViolation[] = [];
-  if (password.length < minLength) violations.push("too-short");
-  if (password.length > maxLength) violations.push("too-long");
-  if (requireLetter && !/\p{L}/u.test(password)) violations.push("needs-letter");
-  if (requireNumber && !/\d/u.test(password)) violations.push("needs-number");
-
-  const normalized = password.trim().toLowerCase();
-  const denied = [...COMMON_PASSWORDS, ...denyList].some(
-    (entry) => entry.trim().toLowerCase() === normalized,
-  );
-  if (denied) violations.push("too-common");
-
+  const violations = [
+    ...lengthViolations(password, policy),
+    ...characterViolations(password, policy),
+  ];
+  if (isDenied(password, policy)) violations.push("too-common");
   return violations;
 }
 

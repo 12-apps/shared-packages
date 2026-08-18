@@ -170,6 +170,68 @@ function submitSignInForm(action: string, fields: Record<string, string>): void 
   form.submit();
 }
 
+/**
+ * Start a social sign-in: fetch the token, then submit the hidden form.
+ *
+ * Module scope rather than inside the provider — it closes over nothing from
+ * React, and lifting it is what keeps the provider readable as "state, effect,
+ * value" instead of three request bodies.
+ */
+async function startSocialSignIn(
+  basePath: string,
+  provider?: string,
+  callbackUrl?: string,
+): Promise<void> {
+  const target = sameOriginCallbackUrl(callbackUrl, window.location);
+  const action = provider
+    ? `${basePath}/signin/${encodeURIComponent(provider)}`
+    : `${basePath}/signin`;
+  // Fetch first: if this rejects, the caller still owns its loading state and
+  // can surface the failure. Building the form first would leave a stray node
+  // in the document on the error path.
+  const csrfToken = await fetchCsrfToken(basePath);
+  submitSignInForm(action, { csrfToken, callbackUrl: target });
+}
+
+/** Post credentials and report the outcome. Never throws for a refusal. */
+async function startPasswordSignIn(
+  basePath: string,
+  providerId: string,
+  input: { email: string; password: string; callbackUrl?: string },
+): Promise<PasswordSignInResult> {
+  const target = sameOriginCallbackUrl(input.callbackUrl, window.location);
+  let csrfToken: string;
+  try {
+    csrfToken = await fetchCsrfToken(basePath);
+  } catch {
+    // Same failure the social flow surfaces by rejecting; here it becomes a
+    // result, because the form is still on screen to show it.
+    return { ok: false, reason: "unknown" };
+  }
+  return postPasswordSignIn({
+    basePath,
+    providerId,
+    csrfToken,
+    email: input.email,
+    password: input.password,
+    callbackUrl: target,
+  });
+}
+
+/** End the session at the backend. The caller refreshes local state after. */
+async function postSignOut(basePath: string): Promise<void> {
+  const csrfToken = await fetchCsrfToken(basePath);
+  const response = await fetch(`${basePath}/signout`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ csrfToken, json: "true" }).toString(),
+  });
+  if (!response.ok) {
+    throw new Error(`Sign-out request failed: ${response.status}`);
+  }
+}
+
 /** Build the browser auth surface. One call, one config object. */
 export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
   const basePath = config.basePath ?? "/api/auth";
@@ -197,17 +259,8 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
     }, [refresh]);
 
     const signIn = useCallback(
-      async (provider?: string, callbackUrl?: string): Promise<void> => {
-        const target = sameOriginCallbackUrl(callbackUrl, window.location);
-        const action = provider
-          ? `${basePath}/signin/${encodeURIComponent(provider)}`
-          : `${basePath}/signin`;
-        // Fetch first: if this rejects, the caller still owns its loading state
-        // and can surface the failure. Building the form first would leave a
-        // stray node in the document on the error path.
-        const csrfToken = await fetchCsrfToken(basePath);
-        submitSignInForm(action, { csrfToken, callbackUrl: target });
-      },
+      (provider?: string, callbackUrl?: string) =>
+        startSocialSignIn(basePath, provider, callbackUrl),
       [],
     );
 
@@ -217,25 +270,9 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
         password: string;
         callbackUrl?: string;
       }): Promise<PasswordSignInResult> => {
-        const target = sameOriginCallbackUrl(input.callbackUrl, window.location);
-        let csrfToken: string;
-        try {
-          csrfToken = await fetchCsrfToken(basePath);
-        } catch {
-          // Same failure the social flow surfaces by rejecting; here it becomes
-          // a result, because the form is still on screen to show it.
-          return { ok: false, reason: "unknown" };
-        }
-        const result = await postPasswordSignIn({
-          basePath,
-          providerId: credentialsProviderId,
-          csrfToken,
-          email: input.email,
-          password: input.password,
-          callbackUrl: target,
-        });
-        // The cookie is already set by the response above; this is what makes
-        // the tree re-render as authenticated without a reload.
+        const result = await startPasswordSignIn(basePath, credentialsProviderId, input);
+        // The cookie is already set by that response; this is what makes the
+        // tree re-render as authenticated without a reload.
         if (result.ok) await refresh();
         return result;
       },
@@ -243,16 +280,7 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
     );
 
     const signOut = useCallback(async () => {
-      const csrfToken = await fetchCsrfToken(basePath);
-      const response = await fetch(`${basePath}/signout`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ csrfToken, json: "true" }).toString(),
-      });
-      if (!response.ok) {
-        throw new Error(`Sign-out request failed: ${response.status}`);
-      }
+      await postSignOut(basePath);
       await refresh();
     }, [refresh]);
 

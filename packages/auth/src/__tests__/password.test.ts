@@ -135,7 +135,9 @@ describe("checkPasswordPolicy", () => {
   });
 
   it("refuses a host's own deny-list entries, case-insensitively", () => {
-    expect(checkPasswordPolicy("FuturePay1", { denyList: ["futurepay1"] })).toEqual([
+    // The product's own name is the guess this package cannot know about, so
+    // the host supplies it. Any brand does — this one is invented.
+    expect(checkPasswordPolicy("Cafeteira1", { denyList: ["cafeteira1"] })).toEqual([
       "too-common",
     ]);
   });

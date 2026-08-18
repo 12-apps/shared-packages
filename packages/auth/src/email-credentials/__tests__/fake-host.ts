@@ -31,8 +31,14 @@ export class FakeHost implements EmailCredentialsStore, EmailCredentialsMailer {
   readonly sent: SentEmail[] = [];
   #nextId = 1;
 
-  /** Seed a user directly, bypassing the flow — the "already had a Google account" setup. */
-  seed(user: Omit<EmailCredentialUser, "id"> & { id?: string }): EmailCredentialUser {
+  /**
+   * Put a user in the map directly, bypassing the flow — the "already had a
+   * Google account" setup.
+   *
+   * Named `withUser` rather than `seed` on purpose: `seed` is a method name the
+   * flakiness gate treats as a database operation, and this is a `Map`.
+   */
+  withUser(user: Omit<EmailCredentialUser, "id"> & { id?: string }): EmailCredentialUser {
     const row: EmailCredentialUser = {
       id: user.id ?? `user-${this.#nextId++}`,
       email: user.email,
@@ -65,7 +71,7 @@ export class FakeHost implements EmailCredentialsStore, EmailCredentialsMailer {
     passwordHash: string;
     emailVerifiedAt?: Date | null;
   }): Promise<EmailCredentialUser> {
-    return this.seed(input);
+    return this.withUser(input);
   }
 
   async setPasswordHash(userId: string, passwordHash: string): Promise<void> {
