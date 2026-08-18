@@ -8,7 +8,10 @@
     "./config": "./src/config.ts",
     "./admin": "./src/admin.ts",
     "./device-detection": "./src/device-detection.ts",
-    "./react": "./src/react/index.ts"
+    "./react": "./src/react/index.ts",
+    "./email-credentials": "./src/email-credentials/index.ts",
+    "./password": "./src/password.ts",
+    "./tokens": "./src/tokens.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",

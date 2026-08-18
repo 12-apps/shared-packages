@@ -9,6 +9,9 @@ import {
   type ReactNode,
 } from "react";
 
+import { CREDENTIALS_PROVIDER_ID } from "../credentials-provider-id";
+import { postPasswordSignIn, type PasswordSignInResult } from "./password-signin";
+
 /**
  * The browser half of `@12-apps/auth`, as one factory taking one config object.
  *
@@ -60,6 +63,23 @@ export interface SessionContextValue {
    * surface an error rather than leaving the button stuck.
    */
   signIn: (provider?: string, callbackUrl?: string) => Promise<void>;
+  /**
+   * Sign in with an e-mail and a password, WITHOUT leaving the page.
+   *
+   * Resolves with the outcome rather than throwing on a refusal: a wrong
+   * password is an ordinary answer the form has to render beside the fields,
+   * not an exception. On success the session has already been refreshed, so a
+   * caller only has to navigate.
+   *
+   * Available only when the backend was built with
+   * `createApiAuth({ emailPassword })`; without it the endpoint does not exist
+   * and every attempt resolves `{ ok: false, reason: "unknown" }`.
+   */
+  signInWithPassword: (input: {
+    email: string;
+    password: string;
+    callbackUrl?: string;
+  }) => Promise<PasswordSignInResult>;
   /** End the session, then refresh local state. */
   signOut: () => Promise<void>;
 }
@@ -70,6 +90,11 @@ export interface WebAuthConfig {
    * `createApiAuth`. Defaults to `/api/auth`.
    */
   basePath?: string;
+  /**
+   * The credentials provider's id. Must match the one given to
+   * `createApiAuth({ emailPassword: { id } })`, since it IS the callback URL.
+   */
+  credentialsProviderId?: string;
 }
 
 export interface WebAuth {
@@ -148,6 +173,7 @@ function submitSignInForm(action: string, fields: Record<string, string>): void 
 /** Build the browser auth surface. One call, one config object. */
 export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
   const basePath = config.basePath ?? "/api/auth";
+  const credentialsProviderId = config.credentialsProviderId ?? CREDENTIALS_PROVIDER_ID;
 
   const SessionContext = createContext<SessionContextValue | null>(null);
 
@@ -185,6 +211,37 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
       [],
     );
 
+    const signInWithPassword = useCallback(
+      async (input: {
+        email: string;
+        password: string;
+        callbackUrl?: string;
+      }): Promise<PasswordSignInResult> => {
+        const target = sameOriginCallbackUrl(input.callbackUrl, window.location);
+        let csrfToken: string;
+        try {
+          csrfToken = await fetchCsrfToken(basePath);
+        } catch {
+          // Same failure the social flow surfaces by rejecting; here it becomes
+          // a result, because the form is still on screen to show it.
+          return { ok: false, reason: "unknown" };
+        }
+        const result = await postPasswordSignIn({
+          basePath,
+          providerId: credentialsProviderId,
+          csrfToken,
+          email: input.email,
+          password: input.password,
+          callbackUrl: target,
+        });
+        // The cookie is already set by the response above; this is what makes
+        // the tree re-render as authenticated without a reload.
+        if (result.ok) await refresh();
+        return result;
+      },
+      [refresh],
+    );
+
     const signOut = useCallback(async () => {
       const csrfToken = await fetchCsrfToken(basePath);
       const response = await fetch(`${basePath}/signout`, {
@@ -200,8 +257,8 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
     }, [refresh]);
 
     const value = useMemo(
-      () => ({ session, status, refresh, signIn, signOut }),
-      [session, status, refresh, signIn, signOut],
+      () => ({ session, status, refresh, signIn, signInWithPassword, signOut }),
+      [session, status, refresh, signIn, signInWithPassword, signOut],
     );
 
     return (
