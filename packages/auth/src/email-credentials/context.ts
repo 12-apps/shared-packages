@@ -86,7 +86,7 @@ export function normalizeEmail(email: string): string {
  * flow does — so a stricter regex here buys nothing and rejects valid,
  * unusual-looking addresses.
  */
-export function isPlausibleEmail(email: string): boolean {
+function isPlausibleEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email) && email.length <= 320;
 }
 

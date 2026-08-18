@@ -20,7 +20,7 @@ interface TokenRow extends StoredAuthToken {
   consumedAt: Date | null;
 }
 
-export interface SentEmail extends Partial<AuthEmailMessage> {
+interface SentEmail extends Partial<AuthEmailMessage> {
   kind: "verification" | "password-reset" | "account-exists" | "password-changed";
   to: string;
 }

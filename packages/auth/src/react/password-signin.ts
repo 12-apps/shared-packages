@@ -67,7 +67,7 @@ export function parseSignInUrl(rawUrl: string): PasswordSignInResult {
   };
 }
 
-export interface PasswordSignInInput {
+interface PasswordSignInInput {
   basePath: string;
   providerId: string;
   csrfToken: string;

@@ -1,4 +1,4 @@
-import { dummyVerify, hashPassword, verifyPassword } from "../password";
+import { hashPassword, verifyPassword } from "../password";
 import { hashToken, isTokenExpired } from "../tokens";
 import {
   checkPassword,
@@ -165,11 +165,3 @@ export async function hasPassword(
   const user = await ctx.store.findById(userId);
   return Boolean(user?.passwordHash);
 }
-
-/**
- * Equalise the timing of a failed lookup with a successful one.
- *
- * Re-exported through the flow so `authenticate` reads as one sequence; see
- * `dummyVerify` for why skipping it turns sign-in into an enumeration oracle.
- */
-export { dummyVerify };
