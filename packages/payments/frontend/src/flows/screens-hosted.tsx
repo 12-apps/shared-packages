@@ -96,6 +96,20 @@ function buildHostedHandoff(runtime: FlowsRuntime): CheckoutScreens["HostedHando
   };
 }
 
+/**
+ * How long this screen keeps asking, and how often — see the twin constants in
+ * `use-checkout-controller.ts`, which bounds the same wait for the components
+ * layer. 180 polls at 5 s ≈ 15 minutes.
+ *
+ * Stated here rather than imported because the two waits are the same DECISION
+ * arrived at twice, not one shared implementation: this screen takes its
+ * interval from the host's `polling` config when there is one, and a host that
+ * tunes that must not have this package's cap silently mean a different
+ * wall-clock window than the constant's comment claims.
+ */
+const RETURN_POLL_MS = 5_000;
+const RETURN_POLL_CAP = 180;
+
 function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn"] {
   function HostedReturnBody({
     onResolved,
@@ -106,9 +120,13 @@ function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn
     // Read-and-clear, once, on first render: the resumed view belongs to
     // exactly one return trip.
     const [parked] = useState(takeHostedOrder);
-    const { status } = usePaymentPolling(parked?.orderId ?? null, {
+    // Bounded, for the reason on RETURN_POLL_CAP: nothing here can ever reach a
+    // terminal state on its own, so an unbounded poll is a spinner the buyer
+    // watches until they close the tab.
+    const { status, timedOut } = usePaymentPolling(parked?.orderId ?? null, {
       enabled: Boolean(parked),
-      intervalMs: runtime.config.polling?.intervalMs,
+      intervalMs: runtime.config.polling?.intervalMs ?? RETURN_POLL_MS,
+      maxHealthyPolls: RETURN_POLL_CAP,
     });
 
     useEffect(() => {
@@ -124,6 +142,21 @@ function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn
           showIcon
           data-testid="checkout-hosted-return-unknown"
         />
+      );
+    }
+    if (timedOut) {
+      return (
+        <Box data-testid="checkout-hosted-return" sx={{ py: 4 }}>
+          <Alert
+            variant="warning"
+            title={runtime.copy.returnPending}
+            {...(runtime.copy.returnTimedOut === undefined
+              ? {}
+              : { description: runtime.copy.returnTimedOut })}
+            showIcon
+            data-testid="checkout-hosted-return-timeout"
+          />
+        </Box>
       );
     }
     return (
