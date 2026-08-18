@@ -58,7 +58,28 @@ export interface IssueTokenOptions {
  *
  * Also the ONLY way a host should search for a token row — never by the raw
  * value, which is not there.
+ *
+ * ## Why SHA-256 and not a slow KDF, in full
+ *
+ * CodeQL flags this as `js/insufficient-password-hash`, reaching it through
+ * `resetPassword({ token, password })` — one object carrying both, which makes
+ * the token look like a password to the analysis. It is not one, and the
+ * distinction is the whole reason this function exists:
+ *
+ * - **What is hashed here is never chosen by a person.** {@link issueToken}
+ *   mints 32 bytes of CSPRNG output. There is no guessable input for a slow KDF
+ *   to defend against — the search space is 2^256 whatever the cost factor.
+ * - **The stored hashes are only ever of OUR tokens.** A caller can POST any
+ *   string to the verify or reset endpoint, but a guess simply misses the
+ *   lookup; nothing about the response narrows the space, so there is no
+ *   offline-guessing surface for a work factor to slow down.
+ * - **It runs on every click of every link.** Making it memory-hard would put
+ *   ~100ms and ~16MB on a path whose security does not improve by a bit.
+ *
+ * Passwords in this package are hashed by `password.ts`, with scrypt, and that
+ * is where the work factor belongs.
  */
+// codeql[js/insufficient-password-hash]
 export function hashToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
