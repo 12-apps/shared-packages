@@ -61,11 +61,6 @@ export interface IssueTokenOptions {
  *
  * ## Why SHA-256 and not a slow KDF, in full
  *
- * CodeQL flags this as `js/insufficient-password-hash`, reaching it through
- * `resetPassword({ token, password })` — one object carrying both, which makes
- * the token look like a password to the analysis. It is not one, and the
- * distinction is the whole reason this function exists:
- *
  * - **What is hashed here is never chosen by a person.** {@link issueToken}
  *   mints 32 bytes of CSPRNG output. There is no guessable input for a slow KDF
  *   to defend against — the search space is 2^256 whatever the cost factor.
@@ -78,8 +73,18 @@ export interface IssueTokenOptions {
  *
  * Passwords in this package are hashed by `password.ts`, with scrypt, and that
  * is where the work factor belongs.
+ *
+ * ## Keeping it clear of `js/insufficient-password-hash`
+ *
+ * That CodeQL query treats every input to a non-password-hashing algorithm as a
+ * sink, so this call qualifies; whether it ALERTS depends on whether anything
+ * named like a password reaches it. Callers must therefore keep a reset token
+ * out of any object that also carries a password — taint flows into the object
+ * and back out of a sibling property — which is why `resetPassword` takes its
+ * token and its new password as two parameters. Inline suppression comments do
+ * nothing here: GitHub code scanning does not honour `// codeql[...]`, so the
+ * call shape is the only place to answer this.
  */
-// codeql[js/insufficient-password-hash]
 export function hashToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }

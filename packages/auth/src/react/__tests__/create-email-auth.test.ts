@@ -35,7 +35,7 @@ describe("createEmailAuth routing", () => {
       ["/api/auth/email/verify", (c) => c.verifyEmail("t")],
       ["/api/auth/email/resend-verification", (c) => c.resendVerification("a@b.co")],
       ["/api/auth/email/forgot-password", (c) => c.requestPasswordReset("a@b.co")],
-      ["/api/auth/email/reset-password", (c) => c.resetPassword({ token: "t", password: "x" })],
+      ["/api/auth/email/reset-password", (c) => c.resetPassword("t", "x")],
       ["/api/auth/email/password", (c) => c.setPassword({ password: "x" })],
       ["/api/auth/email/settings", (c) => c.getSettings()],
     ];
@@ -97,7 +97,7 @@ describe("createEmailAuth results", () => {
       body: { error: "…", reason: "weak-password", violations: ["too-short", "needs-number"] },
     });
     await expect(
-      createEmailAuth({ fetchImpl: impl }).resetPassword({ token: "t", password: "a" }),
+      createEmailAuth({ fetchImpl: impl }).resetPassword("t", "a"),
     ).resolves.toEqual({
       ok: false,
       reason: "weak-password",

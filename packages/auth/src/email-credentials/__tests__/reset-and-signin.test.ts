@@ -117,7 +117,7 @@ describe("resetPassword", () => {
     await flow.requestPasswordReset("ana@example.com");
 
     await expect(
-      flow.resetPassword({ token: tokenFromLink(host, "password-reset"), password: NEW_PASSWORD }),
+      flow.resetPassword(tokenFromLink(host, "password-reset"), NEW_PASSWORD),
     ).resolves.toEqual({ ok: true });
 
     const user = await host.findByEmail("ana@example.com");
@@ -130,10 +130,7 @@ describe("resetPassword", () => {
     await flow.requestPasswordReset("ana@example.com");
     expect((await host.findByEmail("ana@example.com"))?.emailVerifiedAt).toBeNull();
 
-    await flow.resetPassword({
-      token: tokenFromLink(host, "password-reset"),
-      password: NEW_PASSWORD,
-    });
+    await flow.resetPassword(tokenFromLink(host, "password-reset"), NEW_PASSWORD);
 
     // Without this the account is in a dead end: right password, still refused.
     expect((await host.findByEmail("ana@example.com"))?.emailVerifiedAt).toBeInstanceOf(Date);
@@ -149,17 +146,16 @@ describe("resetPassword", () => {
     await flow.requestPasswordReset("ana@example.com");
     const second = tokenFromLink(host, "password-reset");
 
-    await expect(flow.resetPassword({ token: second, password: NEW_PASSWORD })).resolves.toEqual({
-      ok: true,
-    });
-    await expect(flow.resetPassword({ token: second, password: NEW_PASSWORD })).resolves.toEqual({
+    await expect(flow.resetPassword(second, NEW_PASSWORD)).resolves.toEqual({ ok: true });
+    await expect(flow.resetPassword(second, NEW_PASSWORD)).resolves.toEqual({
       ok: false,
       reason: "token-invalid",
     });
     // Whoever asked for the first link is not necessarily whoever used the second.
-    await expect(flow.resetPassword({ token: first, password: "mais uma senha 3" })).resolves.toEqual(
-      { ok: false, reason: "token-invalid" },
-    );
+    await expect(flow.resetPassword(first, "mais uma senha 3")).resolves.toEqual({
+      ok: false,
+      reason: "token-invalid",
+    });
   });
 
   it("checks the policy before spending the token, so a weak try is retryable", async () => {
@@ -167,18 +163,16 @@ describe("resetPassword", () => {
     await flow.requestPasswordReset("ana@example.com");
     const token = tokenFromLink(host, "password-reset");
 
-    await expect(flow.resetPassword({ token, password: "abc" })).resolves.toMatchObject({
+    await expect(flow.resetPassword(token, "abc")).resolves.toMatchObject({
       ok: false,
       reason: "weak-password",
     });
-    await expect(flow.resetPassword({ token, password: NEW_PASSWORD })).resolves.toEqual({
-      ok: true,
-    });
+    await expect(flow.resetPassword(token, NEW_PASSWORD)).resolves.toEqual({ ok: true });
   });
 
   it("refuses an unknown token", async () => {
     await expect(
-      flow.resetPassword({ token: "nope", password: NEW_PASSWORD }),
+      flow.resetPassword("nope", NEW_PASSWORD),
     ).resolves.toEqual({ ok: false, reason: "token-invalid" });
   });
 });
@@ -249,7 +243,7 @@ describe("setPassword — the Google account that wants a password", () => {
     });
 
     await expect(
-      flow.resetPassword({ token: stolen, password: "atacante 99" }),
+      flow.resetPassword(stolen, "atacante 99"),
     ).resolves.toEqual({ ok: false, reason: "token-invalid" });
   });
 

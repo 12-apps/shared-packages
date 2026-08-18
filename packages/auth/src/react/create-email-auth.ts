@@ -69,10 +69,7 @@ export interface EmailAuth {
   verifyEmail(token: string): Promise<EmailAuthClientResult<null>>;
   resendVerification(email: string): Promise<EmailAuthClientResult<null>>;
   requestPasswordReset(email: string): Promise<EmailAuthClientResult<null>>;
-  resetPassword(input: {
-    token: string;
-    password: string;
-  }): Promise<EmailAuthClientResult<null>>;
+  resetPassword(token: string, newPassword: string): Promise<EmailAuthClientResult<null>>;
   /** Signed-in: change the password, or set the first one on a social account. */
   setPassword(input: {
     password: string;
@@ -158,7 +155,8 @@ export function createEmailAuth(config: EmailAuthConfig = {}): EmailAuth {
       call<null>("/resend-verification", { method: "POST", body: { email } }),
     requestPasswordReset: (email) =>
       call<null>("/forgot-password", { method: "POST", body: { email } }),
-    resetPassword: (input) => call<null>("/reset-password", { method: "POST", body: input }),
+    resetPassword: (token, newPassword) =>
+      call<null>("/reset-password", { method: "POST", body: { token, password: newPassword } }),
     setPassword: (input) => call<null>("/password", { method: "PUT", body: input }),
     getSecurity: () => call<AccountSecurityData>("/password", { method: "GET" }),
   };

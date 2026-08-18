@@ -52,7 +52,7 @@ export interface EmailCredentials {
   verifyEmail(token: string): Promise<AcknowledgeResult>;
   resendVerification(email: string): Promise<AcknowledgeResult>;
   requestPasswordReset(email: string): Promise<AcknowledgeResult>;
-  resetPassword(input: { token: string; password: string }): Promise<AcknowledgeResult>;
+  resetPassword(token: string, newPassword: string): Promise<AcknowledgeResult>;
   setPassword(input: {
     userId: string;
     password: string;
@@ -74,7 +74,7 @@ export function createEmailCredentials(
     verifyEmail: (token) => verifyEmail(ctx, token),
     resendVerification: (email) => resendVerification(ctx, email),
     requestPasswordReset: (email) => requestPasswordReset(ctx, email),
-    resetPassword: (input) => resetPassword(ctx, input),
+    resetPassword: (token, newPassword) => resetPassword(ctx, token, newPassword),
     setPassword: (input) => setPassword(ctx, input),
     hasPassword: (userId) => hasPassword(ctx, userId),
     authenticate: (input) => authenticate(ctx, input),

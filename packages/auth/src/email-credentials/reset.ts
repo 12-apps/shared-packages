@@ -55,18 +55,38 @@ export async function requestPasswordReset(
   return { ok: true };
 }
 
-/** Spend a reset token and set the new password. */
+/**
+ * Spend a reset token and set the new password.
+ *
+ * ## Why two parameters instead of one `{ token, password }` object
+ *
+ * The two arguments are separate credentials that happen to arrive together,
+ * and keeping them in separate parameters keeps them separable to a reader AND
+ * to static analysis. Bundled into one object, CodeQL's
+ * `js/insufficient-password-hash` reports {@link hashToken} as hashing a
+ * password with SHA-256: taint flows from the `password` property into the
+ * object, and reading `.token` back out of that same object inherits it. The
+ * finding is a false positive — {@link hashToken} only ever sees the 32-byte
+ * CSPRNG token, and the password goes to scrypt in `hashPassword` — but the
+ * coupling it objects to is real enough to be worth not writing. `verifyEmail`
+ * hashes its token exactly the same way and draws no such finding, because its
+ * token never shares a bag with a secret.
+ *
+ * GitHub code scanning honours no inline suppression comment, so the shape of
+ * the call is the only place this can be answered.
+ */
 export async function resetPassword(
   ctx: EmailCredentialsContext,
-  input: { token: string; password: string },
+  token: string,
+  newPassword: string,
 ): Promise<AcknowledgeResult> {
   const { enabled } = await ctx.readSettings();
   if (!enabled) return refuse("method-disabled");
 
-  const weak = checkPassword(ctx, input.password);
+  const weak = checkPassword(ctx, newPassword);
   if (weak) return weak;
 
-  const tokenHash = hashToken(input.token);
+  const tokenHash = hashToken(token);
   const row = await ctx.store.findToken("PASSWORD_RESET", tokenHash);
   if (!row || row.consumedAt || isTokenExpired(row.expiresAt, ctx.now())) {
     return refuse("token-invalid");
@@ -77,7 +97,7 @@ export async function resetPassword(
   const user = await ctx.store.findById(row.userId);
   if (!user) return refuse("token-invalid");
 
-  await ctx.store.setPasswordHash(user.id, await hashPassword(input.password));
+  await ctx.store.setPasswordHash(user.id, await hashPassword(newPassword));
   // Every other outstanding reset link dies with this one: whoever asked for
   // them is not necessarily whoever just used one.
   await ctx.store.deleteTokens(user.id, "PASSWORD_RESET");
