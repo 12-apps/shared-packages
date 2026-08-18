@@ -40,9 +40,13 @@ const ORDER: CheckoutOrder = {
   totalLabel: "R$ 24,00",
 };
 
-/** The cap and interval the controller polls a resumed return on. */
-const POLL_MS = 5_000;
-const POLL_CAP = 180;
+/** The two rates the controller polls a resumed return on, and its cap. */
+const FAST_MS = 2_500;
+const SLOW_MS = 10_000;
+const FAST_POLLS = 48;
+const POLL_CAP = 126;
+/** The whole window either rate combination has to add up to. */
+const WINDOW_MS = FAST_POLLS * FAST_MS + (POLL_CAP - FAST_POLLS) * SLOW_MS;
 
 /**
  * A client that answers a scripted sequence of statuses and counts the asking.
@@ -97,7 +101,7 @@ describe("the resumed hosted return stops asking", () => {
     );
 
     const { result } = renderHook(() => useCheckoutController(makePorts()), { wrapper });
-    await elapse(POLL_MS * (POLL_CAP + 10));
+    await elapse(WINDOW_MS + SLOW_MS * 10);
 
     expect(result.current.resumeTimedOut).toBe(true);
     expect(calls()).toBe(POLL_CAP);
@@ -115,7 +119,7 @@ describe("the resumed hosted return stops asking", () => {
     );
 
     const { result } = renderHook(() => useCheckoutController(makePorts()), { wrapper });
-    await elapse(POLL_MS * (POLL_CAP + 10));
+    await elapse(WINDOW_MS + SLOW_MS * 10);
 
     expect(result.current.finalStatus).toBe("AWAITING_PAYMENT");
   });
@@ -130,7 +134,7 @@ describe("the resumed hosted return stops asking", () => {
     );
 
     const { result } = renderHook(() => useCheckoutController(makePorts()), { wrapper });
-    await elapse(POLL_MS * (POLL_CAP - 2));
+    await elapse(WINDOW_MS - SLOW_MS * 2);
 
     expect(result.current.resumeTimedOut).toBe(false);
     expect(calls()).toBeGreaterThan(POLL_CAP - 5);
@@ -148,7 +152,7 @@ describe("the resumed hosted return stops asking", () => {
     );
 
     const { result } = renderHook(() => useCheckoutController(makePorts()), { wrapper });
-    await elapse(POLL_MS * 5);
+    await elapse(FAST_MS * 5);
 
     expect(result.current.finalStatus).toBe("PAID");
     expect(result.current.resumeTimedOut).toBe(false);
@@ -163,10 +167,74 @@ describe("the resumed hosted return stops asking", () => {
     );
 
     const { result } = renderHook(() => useCheckoutController(makePorts()), { wrapper });
-    await elapse(POLL_MS * (POLL_CAP + 10));
+    await elapse(WINDOW_MS + SLOW_MS * 10);
 
     expect(result.current.resumeTimedOut).toBe(false);
     expect(calls()).toBe(0);
+  });
+});
+
+describe("how fast the resumed return asks", () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    window.sessionStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("asks at the fast rate while a webhook is plausibly in flight", async () => {
+    // The case that matters most and is easiest to lose: the person on this
+    // screen has almost always PAID, and this rate is how long they watch a
+    // spinner after their money moved. It shipped once at a flat 5 s, which
+    // doubled that wait to economise on the buyer who never paid.
+    rememberHostedOrder(ORDER);
+    const { client, calls } = scriptedClient(() => "AWAITING_PAYMENT");
+    const wrapper = ({ children }: { children: ReactNode }): JSX.Element => (
+      <CheckoutClientProvider client={client}>{children}</CheckoutClientProvider>
+    );
+
+    renderHook(() => useCheckoutController(makePorts()), { wrapper });
+    await elapse(FAST_MS * 10);
+
+    // 10 intervals ⇒ the mount poll plus ten more. A slower rate would have
+    // made about half of them.
+    expect(calls()).toBeGreaterThanOrEqual(10);
+  });
+
+  it("backs off once the webhook is not coming", async () => {
+    // The other end of the same wait. Every poll is a provider round trip, so
+    // holding the fast rate for the full window would spend 360 of them on a
+    // checkout nobody is going to pay.
+    rememberHostedOrder(ORDER);
+    const { client, calls } = scriptedClient(() => "AWAITING_PAYMENT");
+    const wrapper = ({ children }: { children: ReactNode }): JSX.Element => (
+      <CheckoutClientProvider client={client}>{children}</CheckoutClientProvider>
+    );
+
+    renderHook(() => useCheckoutController(makePorts()), { wrapper });
+    await elapse(FAST_MS * FAST_POLLS);
+    const atSwitch = calls();
+    await elapse(FAST_MS * 20);
+
+    // 50 s more at the SLOW rate is ~5 polls, not the ~20 the fast rate makes.
+    expect(calls() - atSwitch).toBeLessThan(10);
+  });
+
+  it("still reaches its bound in one window, not a longer one", async () => {
+    rememberHostedOrder(ORDER);
+    const { client, calls } = scriptedClient(() => "AWAITING_PAYMENT");
+    const wrapper = ({ children }: { children: ReactNode }): JSX.Element => (
+      <CheckoutClientProvider client={client}>{children}</CheckoutClientProvider>
+    );
+
+    const { result } = renderHook(() => useCheckoutController(makePorts()), { wrapper });
+    await elapse(WINDOW_MS + SLOW_MS);
+
+    expect(result.current.resumeTimedOut).toBe(true);
+    expect(calls()).toBe(POLL_CAP);
   });
 });
 

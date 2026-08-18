@@ -177,21 +177,40 @@ function handOverToProvider(
 /**
  * How long the resumed screen keeps asking, and how often.
  *
- * 180 polls at 5 s ≈ 15 minutes. Both halves are chosen against what actually
- * settles a hosted charge, which is the WEBHOOK: it lands seconds after the
- * payment, so a faster interval buys nothing, and by a quarter of an hour a
- * delivery that was ever coming has come. Past that the answer is not going to
- * change while the buyer watches — the scheduled reconciliation is what
- * rescues a genuinely late one, and it does that whether the tab is open or
- * not.
+ * TWO RATES, because one rate cannot serve this wait. The interval decides two
+ * things that pull opposite ways: how fast a buyer WHO PAID is told so, and
+ * what an abandoned checkout costs for the rest of the window. Every poll is a
+ * provider round trip, so a slow rate is cheap and leaves a paying buyer
+ * watching a spinner seconds longer than they need to — and the person on this
+ * screen has almost always paid. A single number picks one of them to lose;
+ * this shipped at a flat 5 s and picked the wrong one.
+ *
+ * So: 2.5 s for the first two minutes, which is where essentially every real
+ * webhook lands (it fires within seconds of the payment, and this rate matches
+ * what card and PIX already use), then 10 s for the remaining thirteen. A
+ * confirmation is at most 2.5 s late, and an abandoned checkout costs ~126
+ * polls instead of the 360 a flat 2.5 s would have.
+ *
+ * The three constants are ONE decision — 48 × 2.5 s + 78 × 10 s ≈ 15 min — so
+ * the cap is derived rather than typed, and cannot drift from the comment.
+ *
+ * Fifteen minutes because by then a webhook that was ever coming has come. Past
+ * that the answer will not change while the buyer watches: the scheduled
+ * reconciliation is what rescues a genuinely late one, and it does that whether
+ * the tab is open or not.
  *
  * The card wait is bounded at 90 s (`CARD_AWAITING_POLL_CAP`) because a card
  * authorises inline and a buyer is holding their phone. This leg is the other
  * shape: the buyer has already been off to another site and back, and may
  * legitimately still be finishing there.
  */
-const HOSTED_RESUME_POLL_MS = 5_000;
-const HOSTED_RESUME_POLL_CAP = 180;
+const HOSTED_RESUME_FAST_MS = 2_500;
+const HOSTED_RESUME_SLOW_MS = 10_000;
+/** Two minutes at the fast rate, before the wait is worth economising on. */
+const HOSTED_RESUME_FAST_POLLS = (2 * 60_000) / HOSTED_RESUME_FAST_MS;
+/** Thirteen more at the slow one — 15 minutes all told. */
+const HOSTED_RESUME_POLL_CAP =
+  HOSTED_RESUME_FAST_POLLS + (13 * 60_000) / HOSTED_RESUME_SLOW_MS;
 
 /**
  * The leg of checkout that resumes after a hosted provider sent the buyer back
@@ -218,7 +237,9 @@ function useHostedResume(tenantSlug?: string): {
   const [order] = useState(() => takeHostedOrder(tenantSlug));
   const { status, timedOut } = usePaymentPolling(order?.orderId ?? null, {
     enabled: Boolean(order),
-    intervalMs: HOSTED_RESUME_POLL_MS,
+    intervalMs: HOSTED_RESUME_FAST_MS,
+    slowAfterPolls: HOSTED_RESUME_FAST_POLLS,
+    slowIntervalMs: HOSTED_RESUME_SLOW_MS,
     maxHealthyPolls: HOSTED_RESUME_POLL_CAP,
   });
   return { order, status, timedOut };
