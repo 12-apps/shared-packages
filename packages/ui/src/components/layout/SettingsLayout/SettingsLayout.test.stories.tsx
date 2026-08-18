@@ -258,6 +258,7 @@ export const InertItem: Story = {
     await step('An inert row is listed, with its marker, but is not a control', async () => {
       const inert = canvas.getByTestId('settings-item-orders');
       await expect(inert).toHaveAttribute('data-inert', 'true');
+      // eslint-disable-next-line test-flakiness/no-element-removal-check -- never rendered as a control, not removed by an action; the row itself is asserted present above
       await expect(within(inert).queryByRole('button')).toBeNull();
       await expect(canvas.getByTestId('settings-status-orders')).toBeInTheDocument();
     });
@@ -373,8 +374,10 @@ export const DrilldownIndexKeepsPanelMounted: Story = {
     const canvas = within(canvasElement);
 
     await step('At the index there is no strip and no back link', async () => {
+      /* eslint-disable test-flakiness/no-element-removal-check -- never rendered at the index, not removed by an action; the rail and panel are asserted present below */
       await expect(canvas.queryByTestId('settings-chips')).toBeNull();
       await expect(canvas.queryByTestId('settings-back')).toBeNull();
+      /* eslint-enable test-flakiness/no-element-removal-check */
     });
 
     await step('The list and the panel are both mounted; only display separates them', async () => {
@@ -417,12 +420,14 @@ export const ChipStripCentresActive: Story = {
     const strip = canvas.getByTestId('settings-chips');
 
     await step('The strip clips its own overflow rather than widening the page', async () => {
+      // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject under test is scrolling itself; the strip's width is pinned by the story's 320px wrapper and its shape by a numeric breakpoint past any viewport
       await waitFor(() => expect(strip.scrollWidth).toBeGreaterThan(strip.clientWidth));
     });
 
     await step('It scrolls itself to the open section without anyone clicking', async () => {
       // Smooth scrolling is animated, so this is waited on rather than read
       // once — a fixed sleep here is exactly the intermittency the gate refuses.
+      // eslint-disable-next-line test-flakiness/no-viewport-dependent -- as above: pinned width, pinned shape, and the scroll is the behaviour being proved
       await waitFor(() => expect(strip.scrollLeft).toBeGreaterThan(0));
     });
   },
