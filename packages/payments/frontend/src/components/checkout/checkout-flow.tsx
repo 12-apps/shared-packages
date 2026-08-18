@@ -131,7 +131,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
   // any chain member may need rather than re-opening after the choice. A chain
   // that declares nothing degrades to CPF-required, never to "ask nothing".
   const buyerFields = useMemo(() => buyerFieldsFor(providerConfig?.chain, null), [providerConfig]);
-  const c = useCheckoutController(ports, defaultBuyer, taxIdOnFile, buyerFields);
+  const c = useCheckoutController(ports, defaultBuyer, taxIdOnFile, buyerFields, tenantSlug);
 
   // A settlement settlement pays already-sent kitchen items — the cart is
   // legitimately empty here, so the empty-cart guard only applies to cart mode.

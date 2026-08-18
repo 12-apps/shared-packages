@@ -69,22 +69,55 @@ function isReturnTrip(): boolean {
  * Read WITHOUT consuming. The gate asks on every render; only the flow may
  * take the order.
  */
-export function hostedCheckoutReturnPending(): boolean {
+export function hostedCheckoutReturnPending(tenantSlug?: string): boolean {
   if (isReturnTrip()) return true;
-  try {
-    return Boolean(
-      window.sessionStorage?.getItem(HOSTED_ORDER_STORAGE_KEY) ??
-        window.sessionStorage?.getItem(LEGACY_KEY),
-    );
-  } catch {
-    return false;
-  }
+  const parked = readParked();
+  if (!parked) return false;
+  // Same two questions the resume asks, so a gate and the flow behind it can
+  // never disagree: another store's hand-off is not this route's business, and
+  // a stale one is nobody's.
+  return belongsHere(parked, tenantSlug) && !isStale(parked);
 }
 
+/**
+ * What is actually parked: the order, WHOSE STORE it belongs to, and when.
+ *
+ * `CheckoutOrder` carries no tenant, and on a multi-tenant storefront every
+ * store shares one origin — so one tab holds one slot for all of them. Without
+ * the slug, a buyer who abandoned store A's hand-off and opened store B's
+ * checkout resumed A's order on B's screen: a confirmation for an unrelated
+ * order, and B's own checkout skipped.
+ *
+ * `parkedAt` bounds the other axis. A hand-off is a round trip of minutes; an
+ * entry older than {@link MAX_PARKED_AGE_MS} belongs to a session the buyer has
+ * long since abandoned, and resuming it tells them about an order they are no
+ * longer trying to place.
+ */
+interface ParkedHostedOrder {
+  order: CheckoutOrder;
+  /** The store this hand-off belongs to; absent for an unscoped host. */
+  tenantSlug?: string;
+  parkedAt: number;
+}
+
+/**
+ * How long a parked hand-off stays resumable.
+ *
+ * Thirty minutes: a hosted payment takes minutes, and the window has to cover a
+ * buyer who fetches their card, not one who comes back tomorrow. Beyond it the
+ * entry is dropped on read rather than resumed.
+ */
+export const MAX_PARKED_AGE_MS = 30 * 60_000;
+
 /** Park the raised order before handing the buyer to the provider's page. */
-export function rememberHostedOrder(order: CheckoutOrder): void {
+export function rememberHostedOrder(order: CheckoutOrder, tenantSlug?: string): void {
   try {
-    window.sessionStorage?.setItem(HOSTED_ORDER_STORAGE_KEY, JSON.stringify(order));
+    const parked: ParkedHostedOrder = {
+      order,
+      ...(tenantSlug ? { tenantSlug } : {}),
+      parkedAt: Date.now(),
+    };
+    window.sessionStorage?.setItem(HOSTED_ORDER_STORAGE_KEY, JSON.stringify(parked));
   } catch {
     // Storage disabled or full. The redirect must still happen: the webhook
     // settles the order either way, and refusing to send the buyer to pay
@@ -156,15 +189,13 @@ const LEGACY_KEY = atob('ZnV0dXJlcGF5LmNoZWNrb3V0Lmhvc3RlZE9yZGVy');
  * legacy entry left behind would let a later return trip resume an order that
  * was already consumed.
  */
-function takeParkedPayload(): string | null {
+function peekParkedPayload(): string | null {
   try {
-    const raw =
+    return (
       window.sessionStorage?.getItem(HOSTED_ORDER_STORAGE_KEY) ??
       window.sessionStorage?.getItem(LEGACY_KEY) ??
-      null;
-    window.sessionStorage?.removeItem(HOSTED_ORDER_STORAGE_KEY);
-    window.sessionStorage?.removeItem(LEGACY_KEY);
-    return raw;
+      null
+    );
   } catch {
     // Storage disabled or unavailable — the same "no parked order" as an empty
     // slot, and the webhook still settles the order regardless.
@@ -172,12 +203,51 @@ function takeParkedPayload(): string | null {
   }
 }
 
-export function takeHostedOrder(): CheckoutOrder | null {
-  const raw = takeParkedPayload();
+export function takeHostedOrder(tenantSlug?: string): CheckoutOrder | null {
+  const parked = readParked();
+  if (!parked) return null;
+  // A hand-off from ANOTHER store is left where it is rather than consumed: it
+  // is that store's to resume, and this buyer may well go back to it.
+  if (!belongsHere(parked, tenantSlug)) return null;
+  clearParked();
+  if (isStale(parked)) return null;
+  return parked.order;
+}
+
+/** Whether a parked hand-off is this store's. */
+function belongsHere(parked: ParkedHostedOrder, tenantSlug?: string): boolean {
+  // An unscoped entry (a host that passes no slug, or one parked by an older
+  // bundle) stays readable by anyone — the single-tenant case, where there is
+  // no other store to confuse it with.
+  if (!parked.tenantSlug || !tenantSlug) return true;
+  return parked.tenantSlug === tenantSlug;
+}
+
+/** Whether it has been sitting long enough to no longer be this trip's. */
+function isStale(parked: ParkedHostedOrder): boolean {
+  if (typeof parked.parkedAt !== "number") return false;
+  return Date.now() - parked.parkedAt > MAX_PARKED_AGE_MS;
+}
+
+/**
+ * The parked entry, parsed, or null. Tolerates the PRE-SCOPE shape — a bare
+ * `CheckoutOrder` — so a buyer mid-hand-off across the deploy still comes back
+ * to their confirmation.
+ */
+function readParked(): ParkedHostedOrder | null {
+  const raw = peekParkedPayload();
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
-    return isCheckoutOrder(parsed) ? parsed : null;
+    if (isCheckoutOrder(parsed)) return { order: parsed, parkedAt: Date.now() };
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const candidate = parsed as Partial<ParkedHostedOrder>;
+    if (!isCheckoutOrder(candidate.order)) return null;
+    return {
+      order: candidate.order,
+      ...(candidate.tenantSlug ? { tenantSlug: candidate.tenantSlug } : {}),
+      parkedAt: typeof candidate.parkedAt === "number" ? candidate.parkedAt : Date.now(),
+    };
   } catch {
     return null;
   }
@@ -192,4 +262,21 @@ function isCheckoutOrder(value: unknown): value is CheckoutOrder {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Partial<CheckoutOrder>;
   return typeof candidate.orderId === "string" && typeof candidate.totalLabel === "string";
+}
+
+/**
+ * Drop the parked entry. Split from the read because the READ now has to
+ * decide whose it is first — consuming another store's hand-off was the bug
+ * this scoping exists to stop.
+ *
+ * BOTH keys, whichever answered: a legacy entry left behind would let a later
+ * return trip resume an order that was already consumed.
+ */
+function clearParked(): void {
+  try {
+    window.sessionStorage?.removeItem(HOSTED_ORDER_STORAGE_KEY);
+    window.sessionStorage?.removeItem(LEGACY_KEY);
+  } catch {
+    // Storage disabled — there was nothing to clear.
+  }
 }
