@@ -54,6 +54,33 @@ function isReturnTrip(): boolean {
   return RETURN_MARKERS.some((marker) => params.has(marker));
 }
 
+/**
+ * Whether a hand-off from THIS tab is still waiting to be resolved.
+ *
+ * Exported because a host needs it and was otherwise forced to reimplement it.
+ * `/menu/checkout` is a URL like any other, so a host may put a gate in front
+ * of it — a closed-shop curtain, a plan check — and every such gate has to
+ * stand aside for a buyer coming back from a payment, because that route is
+ * where the money is confirmed. Deciding that from the outside meant copying
+ * this module's marker list and its storage key into the host, which is
+ * precisely the drift this package exists to stop: the copy went stale the
+ * moment Stripe's 3-D Secure markers were added here.
+ *
+ * Read WITHOUT consuming. The gate asks on every render; only the flow may
+ * take the order.
+ */
+export function hostedCheckoutReturnPending(): boolean {
+  if (isReturnTrip()) return true;
+  try {
+    return Boolean(
+      window.sessionStorage?.getItem(HOSTED_ORDER_STORAGE_KEY) ??
+        window.sessionStorage?.getItem(LEGACY_KEY),
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Park the raised order before handing the buyer to the provider's page. */
 export function rememberHostedOrder(order: CheckoutOrder): void {
   try {
@@ -66,12 +93,30 @@ export function rememberHostedOrder(order: CheckoutOrder): void {
 }
 
 /**
- * The parked order, but ONLY on a return trip — and cleared as it is read.
+ * The parked order, cleared as it is read.
  *
- * Gated on the URL rather than on mere presence so a buyer who abandons the
- * provider's page and later opens checkout again starts a fresh order instead
- * of resuming one they never paid. Read-and-clear for the same reason: the
- * resumed view belongs to exactly one return.
+ * This USED to require a marker on the URL, so that a buyer who abandoned the
+ * provider's page and reopened checkout got a fresh order rather than resuming
+ * one they never paid. That reasoning is inverted for the provider it matters
+ * most for, and the inversion is a money bug rather than a UX preference.
+ *
+ * Pressing the provider's "Continuar" is the ONLY thing that marks the URL.
+ * Closing the tab, hitting back, or retyping the store's address are all
+ * commoner, and all of them landed the buyer on a live payment step for an
+ * order that may already be paid — an invitation to pay twice. It cannot be
+ * decided by asking first, either: InfinitePay's `payment_check` refuses to
+ * answer without a `transaction_nsu` that only that same redirect carries, so
+ * "poll before resuming" reads PAID as PENDING and drops them on the pay
+ * button anyway.
+ *
+ * So a parked order is itself the signal. The cost is that a buyer who truly
+ * abandoned sees one confirmation screen reporting what the store actually
+ * knows — which is the truth — with the way back on it. The read-and-clear
+ * bounds it: the resume happens once per hand-off, and leaving and reopening
+ * checkout gives a fresh one.
+ *
+ * `sessionStorage` already scopes this to one tab's round trip, so nothing
+ * here can resurface in a later, unrelated session.
  */
 /**
  * The key before the 2.0.0 rename, READ ONLY — decoded from base64 so no
@@ -128,7 +173,6 @@ function takeParkedPayload(): string | null {
 }
 
 export function takeHostedOrder(): CheckoutOrder | null {
-  if (!isReturnTrip()) return null;
   const raw = takeParkedPayload();
   if (!raw) return null;
   try {
