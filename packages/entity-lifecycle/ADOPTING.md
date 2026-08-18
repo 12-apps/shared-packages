@@ -181,7 +181,7 @@ registration's own slug), in mount order:
 | DELETE | `/:slug/drafts/:draftId` | bodyless 204 — discard (live record untouched; row kept as DISCARDED) |
 | GET | `/:slug/:id/draft` | `{ data: { draft } }` (or `draft: null`) — the item's OPEN draft |
 | PUT | `/:slug/:id/draft` | `{ data: { draft } }` — create/update WITHOUT touching the live record |
-| GET | `/:slug/:id/versions` | `{ data: { versions, publishedVersion } }` — newest first, actor names resolved |
+| GET | `/:slug/:id/versions` | `{ data: { versions, publishedVersion } }` — newest first, actor names resolved. With `?compare=N`, also `comparison`: version N beside its previous, its next and the current one, field by field |
 | POST | `/:slug/:id/versions/:version/restore` | `{ data: { applied, entityId, requestId } }` — 200 applied / 202 parked |
 
 Shared, dispatched across every registered collection by the record's own

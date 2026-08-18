@@ -1,4 +1,5 @@
 import { config as baseConfig } from '@12-apps/eslint-config/base';
+import storybook from 'eslint-plugin-storybook';
 import testFlakiness from 'eslint-plugin-test-flakiness';
 
 /**
@@ -10,12 +11,17 @@ import testFlakiness from 'eslint-plugin-test-flakiness';
  */
 export default [
   ...baseConfig,
+  // Storybook's own rules (FUT-247), same as packages/ui and payments/frontend:
+  // they catch the story mistakes a type-check cannot — a default export that
+  // is not a `Meta`, a story exported without a name, a `render` that is not a
+  // component.
+  ...storybook.configs['flat/recommended'],
   {
     files: ['**/__tests__/**', '**/*.test.{ts,tsx}'],
     plugins: { 'test-flakiness': testFlakiness },
     linterOptions: { reportUnusedDisableDirectives: 'off' },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'storybook-static/**'],
   },
 ];

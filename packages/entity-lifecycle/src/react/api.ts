@@ -1,4 +1,4 @@
-import type { Snapshot } from '../types';
+import type { JsonValue, Snapshot } from '../types';
 
 import type { LifecycleResult, LifecycleTransport } from './transport';
 
@@ -20,9 +20,47 @@ export interface VersionWire {
   restoredFromVersion: number | null;
 }
 
+/** What a compared version is to the selection (a version can play two). */
+export type ComparisonRoleWire = 'previous' | 'selected' | 'next' | 'current';
+
+/** One column of the comparison table: a version, and what it is to the selection. */
+export interface ComparisonColumnWire {
+  version: number;
+  roles: ComparisonRoleWire[];
+  kind: VersionWire['kind'];
+  actorId: string | null;
+  actorName: string | null;
+  createdAt: string;
+}
+
+/**
+ * One field's value in one column. `present: false` means the version did not
+ * carry the field at all — which the panel renders differently from a field
+ * whose value IS null, because they are different answers.
+ */
+export interface ComparisonCellWire {
+  version: number;
+  present: boolean;
+  value: JsonValue | null;
+}
+
+export interface ComparisonRowWire {
+  field: string;
+  changed: boolean;
+  cells: ComparisonCellWire[];
+}
+
+export interface VersionComparisonWire {
+  selectedVersion: number;
+  columns: ComparisonColumnWire[];
+  rows: ComparisonRowWire[];
+}
+
 export interface VersionsWire {
   versions: VersionWire[];
   publishedVersion: number;
+  /** Present only when the request asked to compare a version (FUT-247). */
+  comparison?: VersionComparisonWire | null;
 }
 
 /** The write outcome — `applied: false` means parked for approval (202). */
@@ -78,6 +116,12 @@ export interface ApprovalRequestWire {
 export interface LifecycleApiClient {
   /** `resourcePath` is `<slug>/<entityId>`, e.g. `products/p1`. */
   listVersions(resourcePath: string): Promise<VersionsWire>;
+  /**
+   * The comparison table for one version — it, its neighbours and the current
+   * one. Same endpoint as {@link listVersions}, asked a bigger question, so a
+   * host that mounts the history route has this for free.
+   */
+  compareVersion(resourcePath: string, version: number): Promise<VersionComparisonWire | null>;
   restoreVersion(resourcePath: string, version: number): Promise<LifecycleResult<WriteOutcomeWire>>;
   getDraft(resourcePath: string): Promise<{ draft: DraftWire | null }>;
   saveDraft(resourcePath: string, data: Snapshot): Promise<LifecycleResult<{ draft: DraftWire }>>;
@@ -107,6 +151,13 @@ export function createLifecycleApiClient(
   return {
     listVersions: (resourcePath) =>
       readData(transport, `${base}/${resourcePath}/versions`),
+    compareVersion: async (resourcePath, version) => {
+      const payload = await readData<VersionsWire>(
+        transport,
+        `${base}/${resourcePath}/versions?compare=${version}`,
+      );
+      return payload.comparison ?? null;
+    },
     restoreVersion: (resourcePath, version) =>
       transport.send(`${base}/${resourcePath}/versions/${version}/restore`, 'POST'),
     getDraft: (resourcePath) => readData(transport, `${base}/${resourcePath}/draft`),
