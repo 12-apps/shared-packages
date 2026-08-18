@@ -165,7 +165,7 @@ describe('clicking a version row', () => {
     expect(screen.getByTestId('comparison-cell-priceCents-4').textContent).toBe('900');
     // An unchanged field is not a difference — the panel is opened to see what
     // moved, and a product carries far more fields than it changes.
-    expect(screen.queryByTestId('comparison-row-sku')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('comparison-row-sku')).toBeNull());
   });
 
   it('closes the panel when the same row is clicked again', async () => {
@@ -186,7 +186,7 @@ describe('clicking a version row', () => {
     fireEvent.click(screen.getByTestId('version-restore-2'));
 
     await waitFor(() => expect(screen.getByTestId('version-restore-confirm')).toBeTruthy());
-    expect(screen.queryByTestId('version-comparison')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('version-comparison')).toBeNull());
   });
 });
 
