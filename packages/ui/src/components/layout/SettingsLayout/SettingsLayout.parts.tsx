@@ -5,8 +5,10 @@ import SearchIcon from '@mui/icons-material/Search';
 import {
   alpha,
   Box,
+  Button,
   InputAdornment,
   List,
+  ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
@@ -16,10 +18,16 @@ import {
 } from '@mui/material';
 import React from 'react';
 
-import type { SettingsLayoutProps, SettingsNavGroup, SettingsNavItem } from './SettingsLayout.types';
-
-/** Fixed width of the left navigation rail on `md`+ screens. */
-const RAIL_WIDTH = 300;
+import { atLeastRail, displayAcrossRail, RAIL_WIDTH, TOUCH_TARGET } from './SettingsLayout.styles';
+import { SettingsStatusMarker } from './SettingsStatusMarker';
+import type {
+  SettingsEmptySearchAction,
+  SettingsLayoutProps,
+  SettingsNavGroup,
+  SettingsNavItem,
+  SettingsNavVariant,
+  SettingsRailBreakpoint,
+} from './SettingsLayout.types';
 
 /** Case-insensitive filter over item label + keywords; drops emptied groups. */
 export function filterGroups(groups: SettingsNavGroup[], query: string): SettingsNavGroup[] {
@@ -41,7 +49,14 @@ export function activeItemLabel(
   return groups.flatMap((group) => group.items).find((item) => item.id === activeItemId)?.label;
 }
 
-interface RailItemProps {
+/** The shape-deciding inputs every rail part needs to know about. */
+interface RailShape {
+  variant: SettingsNavVariant;
+  breakpoint: SettingsRailBreakpoint;
+  atIndex: boolean;
+}
+
+interface RailItemProps extends RailShape {
   item: SettingsNavItem;
   active: boolean;
   linkComponent?: SettingsLayoutProps['linkComponent'];
@@ -51,32 +66,17 @@ interface RailItemProps {
   testIdPrefix: string;
 }
 
-/** One rail entry — rendered as a link when it has `href`, else a button. */
-function SettingsRailItem({
+/** Label, plus the situation marker when the host resolved one. */
+function RailItemContent({
   item,
   active,
-  linkComponent,
-  onSelectItem,
-  onNavigate,
   testIdPrefix,
-}: RailItemProps): React.JSX.Element {
-  const theme = useTheme();
-  const shared = {
-    selected: active,
-    'aria-current': active ? ('page' as const) : undefined,
-    'data-testid': `${testIdPrefix}-item-${item.id}`,
-    sx: {
-      borderRadius: 1.5,
-      mb: 0.25,
-      gap: 1.5,
-      color: active ? 'primary.main' : 'text.secondary',
-      '&.Mui-selected': {
-        bgcolor: alpha(theme.palette.primary.main, 0.12),
-        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.18) },
-      },
-    },
-  };
-  const content = (
+}: {
+  item: SettingsNavItem;
+  active: boolean;
+  testIdPrefix: string;
+}): React.JSX.Element {
+  return (
     <>
       {item.icon ? (
         <ListItemIcon sx={{ minWidth: 0, color: 'inherit' }}>{item.icon}</ListItemIcon>
@@ -85,13 +85,76 @@ function SettingsRailItem({
         primary={item.label}
         primaryTypographyProps={{ variant: 'body2', noWrap: true, fontWeight: active ? 600 : 500 }}
       />
+      {item.status ? (
+        <SettingsStatusMarker
+          status={item.status}
+          label={item.statusLabel}
+          testId={`${testIdPrefix}-status-${item.id}`}
+        />
+      ) : null}
     </>
   );
+}
+
+/** One rail entry — a link when it has `href`, inert text when it says so, else a button. */
+function SettingsRailItem({
+  item,
+  active,
+  linkComponent,
+  onSelectItem,
+  onNavigate,
+  testIdPrefix,
+  variant,
+  breakpoint,
+}: RailItemProps): React.JSX.Element {
+  const theme = useTheme();
+  // In `drilldown` the narrow rail IS the page's list, so its rows are the
+  // primary touch targets rather than a secondary column — hence the 44px floor
+  // below the breakpoint. Above it, the row goes back to rail density.
+  const touchFloor =
+    variant === 'drilldown'
+      ? {
+          minHeight: TOUCH_TARGET,
+          [atLeastRail(theme, breakpoint)]: { minHeight: 'auto' },
+        }
+      : null;
+  const shared = {
+    'data-testid': `${testIdPrefix}-item-${item.id}`,
+    sx: {
+      borderRadius: 1.5,
+      mb: 0.25,
+      gap: 1.5,
+      ...touchFloor,
+      color: active ? 'primary.main' : 'text.secondary',
+      '&.Mui-selected': {
+        bgcolor: alpha(theme.palette.primary.main, 0.12),
+        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.18) },
+      },
+    },
+  };
+  const content = <RailItemContent item={item} active={active} testIdPrefix={testIdPrefix} />;
+
+  // Listed but not reachable from here. Deliberately not a disabled button: a
+  // disabled control says "you may not", and the true statement is "not from
+  // this screen" — the section exists and someone else's screen owns it.
+  if (item.inert) {
+    return (
+      <ListItem {...shared} data-inert="true">
+        {content}
+      </ListItem>
+    );
+  }
+
+  const interactive = {
+    ...shared,
+    selected: active,
+    'aria-current': active ? ('page' as const) : undefined,
+  };
 
   if (item.href && linkComponent) {
     const LinkComponent = linkComponent;
     return (
-      <ListItemButton component={LinkComponent} href={item.href} onClick={onNavigate} {...shared}>
+      <ListItemButton component={LinkComponent} href={item.href} onClick={onNavigate} {...interactive}>
         {content}
       </ListItemButton>
     );
@@ -102,14 +165,14 @@ function SettingsRailItem({
         onSelectItem?.(item.id);
         onNavigate?.();
       }}
-      {...shared}
+      {...interactive}
     >
       {content}
     </ListItemButton>
   );
 }
 
-interface RailGroupProps {
+interface RailGroupProps extends RailShape {
   group: SettingsNavGroup;
   activeItemId?: string;
   linkComponent?: SettingsLayoutProps['linkComponent'];
@@ -126,6 +189,7 @@ function SettingsRailGroup({
   onSelectItem,
   onNavigate,
   testIdPrefix,
+  ...shape
 }: RailGroupProps): React.JSX.Element {
   return (
     <Box data-testid={`${testIdPrefix}-group-${group.id}`} sx={{ mb: 2 }}>
@@ -147,7 +211,24 @@ function SettingsRailGroup({
           {group.description}
         </Typography>
       ) : null}
-      <List disablePadding sx={{ mt: 0.5 }}>
+      <List
+        disablePadding
+        sx={(theme) => ({
+          mt: 0.5,
+          // At the index on a wide phone/tablet the list has room for two
+          // columns; the rail column never does, so the second column is undone
+          // at exactly the width where this stops being the page.
+          ...(shape.variant === 'drilldown' && shape.atIndex
+            ? {
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                columnGap: 8,
+                [theme.breakpoints.up('sm')]: { gridTemplateColumns: '1fr 1fr' },
+                [atLeastRail(theme, shape.breakpoint)]: { gridTemplateColumns: '1fr' },
+              }
+            : null),
+        })}
+      >
         {group.items.map((item) => (
           <SettingsRailItem
             key={item.id}
@@ -157,6 +238,7 @@ function SettingsRailGroup({
             onSelectItem={onSelectItem}
             onNavigate={onNavigate}
             testIdPrefix={testIdPrefix}
+            {...shape}
           />
         ))}
       </List>
@@ -169,18 +251,21 @@ interface RailToggleProps {
   activeLabel?: string;
   open: boolean;
   onToggle: () => void;
+  breakpoint: SettingsRailBreakpoint;
   testIdPrefix: string;
 }
 
 /**
- * Mobile-only collapse control: shows the current section (a compact switcher)
- * so the panel content stays at the top of the screen. Hidden on `md`+.
+ * `switcher`-only collapse control: shows the current section (a compact
+ * switcher) so the panel content stays at the top of the screen. Hidden once the
+ * rail has its own column.
  */
 function SettingsRailToggle({
   title,
   activeLabel,
   open,
   onToggle,
+  breakpoint,
   testIdPrefix,
 }: RailToggleProps): React.JSX.Element {
   return (
@@ -191,12 +276,13 @@ function SettingsRailToggle({
       aria-expanded={open}
       aria-label={typeof title === 'string' ? title : 'Settings'}
       data-testid={`${testIdPrefix}-toggle`}
-      sx={{
-        display: { xs: 'flex', md: 'none' },
+      sx={(theme) => ({
+        ...displayAcrossRail(theme, breakpoint, 'flex', 'none'),
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 1,
         width: '100%',
+        minHeight: TOUCH_TARGET,
         px: 1.5,
         py: 1,
         mb: 1,
@@ -204,9 +290,9 @@ function SettingsRailToggle({
         cursor: 'pointer',
         color: 'text.primary',
         background: 'transparent',
-        border: (theme) => `1px solid ${theme.palette.divider}`,
+        border: `1px solid ${theme.palette.divider}`,
         borderRadius: 1.5,
-      }}
+      })}
     >
       <Box sx={{ minWidth: 0 }}>
         {title ? (
@@ -225,18 +311,55 @@ function SettingsRailToggle({
           color: 'text.secondary',
           transition: 'transform 150ms ease',
           transform: open ? 'rotate(180deg)' : 'none',
+          '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
         }}
       />
     </Box>
   );
 }
 
-interface RailBodyProps {
+/** The empty-search state, with the way out of it rendered inside. */
+function SettingsSearchEmpty({
+  label,
+  action,
+  onClear,
+  testIdPrefix,
+}: {
+  label: React.ReactNode;
+  action?: SettingsEmptySearchAction;
+  onClear: () => void;
+  testIdPrefix: string;
+}): React.JSX.Element {
+  return (
+    <Box data-testid={`${testIdPrefix}-empty`} sx={{ px: 1, py: 2 }}>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      {action ? (
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={() => {
+            onClear();
+            action.onClear?.();
+          }}
+          data-testid={`${testIdPrefix}-empty-action`}
+          sx={{ mt: 1.5, minHeight: TOUCH_TARGET }}
+        >
+          {action.label}
+        </Button>
+      ) : null}
+    </Box>
+  );
+}
+
+interface RailBodyProps extends RailShape {
   navOpen: boolean;
   query: string;
   onQueryChange: (value: string) => void;
   searchPlaceholder: string;
   emptySearchLabel: React.ReactNode;
+  emptySearchAction?: SettingsEmptySearchAction;
   filteredGroups: SettingsNavGroup[];
   activeItemId?: string;
   linkComponent?: SettingsLayoutProps['linkComponent'];
@@ -245,24 +368,32 @@ interface RailBodyProps {
   testIdPrefix: string;
 }
 
-/** The searchable rail body (search + groups); hidden on mobile until expanded. */
+/** The searchable rail body (search + groups). */
 function SettingsRailBody({
   navOpen,
   query,
   onQueryChange,
   searchPlaceholder,
   emptySearchLabel,
+  emptySearchAction,
   filteredGroups,
   activeItemId,
   linkComponent,
   onSelectItem,
   onNavigate,
   testIdPrefix,
+  ...shape
 }: RailBodyProps): React.JSX.Element {
+  // `drilldown` has no disclosure to be closed behind: below the breakpoint the
+  // body is the page, above it the rail. Only `switcher` hides it.
   return (
     <Box
       data-testid={`${testIdPrefix}-rail-body`}
-      sx={{ display: { xs: navOpen ? 'block' : 'none', md: 'block' } }}
+      sx={(theme) =>
+        shape.variant === 'drilldown'
+          ? { display: 'block' }
+          : displayAcrossRail(theme, shape.breakpoint, navOpen ? 'block' : 'none', 'block')
+      }
     >
       <TextField
         value={query}
@@ -282,14 +413,12 @@ function SettingsRailBody({
         sx={{ mb: 2 }}
       />
       {filteredGroups.length === 0 ? (
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          data-testid={`${testIdPrefix}-empty`}
-          sx={{ px: 1, py: 2 }}
-        >
-          {emptySearchLabel}
-        </Typography>
+        <SettingsSearchEmpty
+          label={emptySearchLabel}
+          action={emptySearchAction}
+          onClear={() => onQueryChange('')}
+          testIdPrefix={testIdPrefix}
+        />
       ) : (
         filteredGroups.map((group) => (
           <SettingsRailGroup
@@ -300,6 +429,7 @@ function SettingsRailBody({
             onSelectItem={onSelectItem}
             onNavigate={onNavigate}
             testIdPrefix={testIdPrefix}
+            {...shape}
           />
         ))
       )}
@@ -314,7 +444,7 @@ export type SettingsRailProps = RailBodyProps & {
   onToggleNav: () => void;
 };
 
-/** The left navigation column: desktop title, mobile switcher, and the body. */
+/** The navigation column: title, the `switcher`'s disclosure, and the body. */
 export function SettingsRail({
   title,
   activeLabel,
@@ -323,35 +453,57 @@ export function SettingsRail({
   testIdPrefix,
   ...bodyProps
 }: SettingsRailProps): React.JSX.Element {
-  const theme = useTheme();
+  const { variant, breakpoint, atIndex } = bodyProps;
+  // In `drilldown` the rail is the index's list below the breakpoint and the
+  // left column above it — so inside a section it steps aside for the chip
+  // strip. It is `display: none`, never unmounted: the two navigation forms
+  // both stay in the DOM at every width, which is what makes "the phone offers
+  // what the desktop offers" true by construction instead of by review.
+  const hiddenWhileInSection = variant === 'drilldown' && !atIndex;
+
   return (
     <Box
       component="nav"
       aria-label={typeof title === 'string' ? title : 'Settings'}
       data-testid={`${testIdPrefix}-rail`}
-      sx={{
-        flex: { xs: '0 0 auto', md: `0 0 ${RAIL_WIDTH}px` },
-        width: { xs: '100%', md: RAIL_WIDTH },
-        borderRight: { md: `1px solid ${theme.palette.divider}` },
-        pr: { md: 2 },
-      }}
+      sx={(theme) => ({
+        display: hiddenWhileInSection ? 'none' : 'block',
+        flex: '0 0 auto',
+        width: '100%',
+        [atLeastRail(theme, breakpoint)]: {
+          display: 'block',
+          flex: `0 0 ${RAIL_WIDTH}px`,
+          width: RAIL_WIDTH,
+          borderRight: `1px solid ${theme.palette.divider}`,
+          pr: 2,
+        },
+      })}
     >
       {title ? (
         <Typography
           variant="h6"
           data-testid={`${testIdPrefix}-title`}
-          sx={{ display: { xs: 'none', md: 'block' }, fontWeight: 700, mb: 1.5 }}
+          sx={(theme) => ({
+            ...(variant === 'drilldown'
+              ? { display: 'block' }
+              : displayAcrossRail(theme, breakpoint, 'none', 'block')),
+            fontWeight: 700,
+            mb: 1.5,
+          })}
         >
           {title}
         </Typography>
       ) : null}
-      <SettingsRailToggle
-        title={title}
-        activeLabel={activeLabel}
-        open={navOpen}
-        onToggle={onToggleNav}
-        testIdPrefix={testIdPrefix}
-      />
+      {variant === 'switcher' ? (
+        <SettingsRailToggle
+          title={title}
+          activeLabel={activeLabel}
+          open={navOpen}
+          onToggle={onToggleNav}
+          breakpoint={breakpoint}
+          testIdPrefix={testIdPrefix}
+        />
+      ) : null}
       <SettingsRailBody navOpen={navOpen} testIdPrefix={testIdPrefix} {...bodyProps} />
     </Box>
   );

@@ -542,6 +542,13 @@ Components for structuring and organizing page layouts.
 **Location**: `src/components/layout/Separator`
 **Docs**: `src/components/layout/Separator/Separator.md`
 
+### SettingsLayout
+**Purpose**: Two-pane settings shell — searchable grouped rail + central panel
+**Use Cases**: Any "Configuração"/Settings area with many sections and its own routes
+**Features**: Grouped searchable rail, host-resolved situation markers (ok/off/new/locked), `switcher` or list→detail `drilldown` on narrow widths, always-mounted section chip strip that scrolls itself to the open section, configurable rail breakpoint, empty-search state carrying its own exit
+**Location**: `src/components/layout/SettingsLayout`
+**Docs**: `src/components/layout/SettingsLayout/SettingsLayout.md`
+
 ### Sidebar
 **Purpose**: Application sidebar navigation
 **Use Cases**: App navigation, menu structure, collapsible navigation
