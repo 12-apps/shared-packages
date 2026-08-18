@@ -50,6 +50,13 @@ const escaped: { calls: string[] } = { calls: [] };
 
 beforeEach(() => {
   escaped.calls = [];
+  // Every story starts with an EMPTY tab. `sessionStorage` is per-tab state and
+  // these stories share one jsdom, so a hand-off story parks an order that the
+  // return stories would otherwise inherit — and the pinned state they assert
+  // is exactly "what does the return screen show when nothing was parked".
+  // The URL-marker gate used to hide that leak by accident; it is not the
+  // gate's job, and it no longer exists.
+  window.sessionStorage.clear();
   vi.stubGlobal("fetch", (input: RequestInfo | URL) => {
     escaped.calls.push(String(input));
     return Promise.reject(new Error("a story reached the network"));
