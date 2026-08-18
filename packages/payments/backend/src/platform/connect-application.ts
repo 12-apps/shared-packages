@@ -1,5 +1,6 @@
 import type { OAuthAppCredentialsResolver } from '../config/oauth';
 import type { PaymentEnvironment } from '../core/types';
+import { pagbankApiBase } from '../providers/pagbank-api-base';
 
 /**
  * The platform's PagBank Connect APPLICATION, consulted per environment
@@ -37,12 +38,6 @@ const SECRET_KEY_RE = /secret|token|password|credential/i;
 
 /** The one provider with this consult surface today. */
 const PROVIDER = 'pagbank';
-
-/** PagBank's own hosts, overridable per call for tests and proxies. */
-const DEFAULT_API_BASE: Record<PaymentEnvironment, string> = {
-  SANDBOX: 'https://sandbox.api.pagseguro.com',
-  PRODUCTION: 'https://api.pagseguro.com',
-};
 
 /** What PagBank reports about a registered application — parsed defensively. */
 export interface RegisteredConnectApplication {
@@ -226,7 +221,9 @@ async function consultEnvironment(
     );
   }
 
-  const apiBase = deps.apiBaseFor?.(environment) ?? DEFAULT_API_BASE[environment];
+  // Still overridable per call for tests and proxies; the default is now the
+  // package's single spelling of PagBank's hosts rather than a fourth copy.
+  const apiBase = deps.apiBaseFor?.(environment) ?? pagbankApiBase(environment);
   try {
     const result = await fetchApplication(apiBase, clientId, accountToken);
     if ('error' in result) return unanswered(environment, true, clientId, result.error);
