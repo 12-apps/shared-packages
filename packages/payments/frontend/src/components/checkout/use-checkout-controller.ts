@@ -175,6 +175,25 @@ function handOverToProvider(
 }
 
 /**
+ * How long the resumed screen keeps asking, and how often.
+ *
+ * 180 polls at 5 s ≈ 15 minutes. Both halves are chosen against what actually
+ * settles a hosted charge, which is the WEBHOOK: it lands seconds after the
+ * payment, so a faster interval buys nothing, and by a quarter of an hour a
+ * delivery that was ever coming has come. Past that the answer is not going to
+ * change while the buyer watches — the scheduled reconciliation is what
+ * rescues a genuinely late one, and it does that whether the tab is open or
+ * not.
+ *
+ * The card wait is bounded at 90 s (`CARD_AWAITING_POLL_CAP`) because a card
+ * authorises inline and a buyer is holding their phone. This leg is the other
+ * shape: the buyer has already been off to another site and back, and may
+ * legitimately still be finishing there.
+ */
+const HOSTED_RESUME_POLL_MS = 5_000;
+const HOSTED_RESUME_POLL_CAP = 180;
+
+/**
  * The leg of checkout that resumes after a hosted provider sent the buyer back
  * (FUT-556).
  *
@@ -182,14 +201,27 @@ function handOverToProvider(
  * parked copy — once, on first render — and polled here rather than in a PIX or
  * card view, because a redirect provider produced neither. The webhook is still
  * what settles the order; this only tells the buyer that it did.
+ *
+ * And it stops telling them eventually. This poll was the one unbounded wait
+ * left in checkout — card and wallet both cap theirs — so a buyer who came back
+ * from a payment they never completed got "Confirmando seu pagamento… isso
+ * costuma levar alguns segundos" and a spinner, truthfully forever. The screen
+ * had no way to reach a terminal state, because the ORDER has none: expiry is
+ * PIX-only, and a redirect charge carries no QR window to lapse. `timedOut` is
+ * what the screen says instead of spinning.
  */
 function useHostedResume(tenantSlug?: string): {
   order: CheckoutOrder | null;
   status: OrderStatus | null;
+  timedOut: boolean;
 } {
   const [order] = useState(() => takeHostedOrder(tenantSlug));
-  const { status } = usePaymentPolling(order?.orderId ?? null, { enabled: Boolean(order) });
-  return { order, status };
+  const { status, timedOut } = usePaymentPolling(order?.orderId ?? null, {
+    enabled: Boolean(order),
+    intervalMs: HOSTED_RESUME_POLL_MS,
+    maxHealthyPolls: HOSTED_RESUME_POLL_CAP,
+  });
+  return { order, status, timedOut };
 }
 
 /**
@@ -328,6 +360,10 @@ export function useCheckoutController(
   return {
     step, setStep, method, setMethod, buyer, setBuyer, saveProfile, setSaveProfile,
     order, finalStatus: finalStatus ?? resume.status, creating,
+    // Only ever true on the resumed leg: `useHostedResume` is the sole caller
+    // that caps its polls, and a buyer who never left has a card or PIX view
+    // reporting its own wait.
+    resumeTimedOut: resume.timedOut,
     createError: failure.message, errorField: failure.field, errorCode: failure.code,
     goToMenu: onExitToMenu, back, editBuyer,
     goToPayment, startPayment, payWithEmail, handleResolved, retry, completed,

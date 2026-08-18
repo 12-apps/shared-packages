@@ -26,6 +26,8 @@ export const STORY_CHECKOUT_COPY: CheckoutCopyFE = {
   handoffLink: "Abrir a página de pagamento",
   handoffCancel: "Voltar",
   returnPending: "Confirmando seu pagamento…",
+  returnTimedOut:
+    "Se você já pagou, o pedido é confirmado assim que a operadora avisar — não pague de novo.",
   returnUnknown:
     "Não encontramos um pagamento em andamento nesta sessão. Verifique seus pedidos em instantes.",
   emptyCartTitle: "Seu carrinho está vazio.",

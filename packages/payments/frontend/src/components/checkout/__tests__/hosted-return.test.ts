@@ -272,6 +272,45 @@ describe("a hand-off that has been sitting too long", () => {
   });
 });
 
+describe("hostedCheckoutReturnPending — the parked entry outranks the URL", () => {
+  it("is false at another store even when the URL carries a marker", () => {
+    // The regression this pair exists to stop, at the GATE this time. A
+    // provider marker is per-TAB: store A's abandoned hand-off plus any marked
+    // URL had the gate answer "a return is pending here" on store B, while
+    // `takeHostedOrder` refused to resume it — so the gate stood aside for a
+    // return that was never going to happen.
+    rememberHostedOrder(ORDER, "loja-a");
+    land("?transaction_nsu=123&slug=abc");
+
+    expect(hostedCheckoutReturnPending("loja-b")).toBe(false);
+    expect(hostedCheckoutReturnPending("loja-a")).toBe(true);
+  });
+
+  it("is false for a hand-off that has gone stale, marker or no marker", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-01-01T10:00:00Z"));
+      rememberHostedOrder(ORDER, "loja-a");
+      vi.setSystemTime(new Date("2026-01-01T11:00:00Z"));
+      land("?transaction_nsu=123&slug=abc");
+
+      expect(hostedCheckoutReturnPending("loja-a")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still trusts the marker once the flow has CONSUMED the entry", () => {
+    // The one case with no other signal. A host gate that re-asks mid-visit
+    // must not curtain the confirmation it just let through.
+    rememberHostedOrder(ORDER, "loja-a");
+    land("?transaction_nsu=123&slug=abc");
+    takeHostedOrder("loja-a");
+
+    expect(hostedCheckoutReturnPending("loja-a")).toBe(true);
+  });
+});
+
 describe("hostedCheckoutReturnPending — scoped like the resume", () => {
   it("is false for another store, so its gate still gates", () => {
     rememberHostedOrder(ORDER, "loja-a");

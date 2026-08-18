@@ -70,13 +70,24 @@ function isReturnTrip(): boolean {
  * take the order.
  */
 export function hostedCheckoutReturnPending(tenantSlug?: string): boolean {
-  if (isReturnTrip()) return true;
   const parked = readParked();
-  if (!parked) return false;
-  // Same two questions the resume asks, so a gate and the flow behind it can
-  // never disagree: another store's hand-off is not this route's business, and
+  // THE PARKED ENTRY DECIDES whenever there is one — the same two questions the
+  // resume asks, so a gate and the flow behind it cannot disagree about whose
+  // return this is. Another store's hand-off is not this route's business, and
   // a stale one is nobody's.
-  return belongsHere(parked, tenantSlug) && !isStale(parked);
+  //
+  // Asking the URL FIRST is what this used to do, and it made the two disagree
+  // exactly where it costs something: a provider marker is per-TAB, so store
+  // A's abandoned hand-off plus any marked URL had the gate answer "a return is
+  // pending here" on store B while `takeHostedOrder` correctly refused to
+  // resume it. A gate that stands aside for a return that is not going to
+  // happen is a gate that has been talked out of its job.
+  if (parked) return belongsHere(parked, tenantSlug) && !isStale(parked);
+  // Nothing parked, so the provider's own marker is the only evidence left that
+  // a return is in progress. It is kept, and only here, for the case that has
+  // no other signal: the flow has already CONSUMED the entry, and a gate
+  // re-asking mid-visit must not curtain the confirmation it just let through.
+  return isReturnTrip();
 }
 
 /**
