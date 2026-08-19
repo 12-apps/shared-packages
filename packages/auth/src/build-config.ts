@@ -145,8 +145,15 @@ export function getEnv(): EnvConfig {
 /**
  * The OAuth providers each credential pair in the environment configures.
  * A provider missing either half is simply not offered.
+ *
+ * Exported so `createApiAuth` can take this list and APPEND the e-mail +
+ * password provider to it. It has to be able to reach the environment default
+ * rather than only an explicit `providers` array: a host that adds a password
+ * provider has not thereby said anything about which OAuth buttons it wants,
+ * and making it restate them would be the shape of config change that silently
+ * drops Facebook from a deployment.
  */
-function buildProviders(): Provider[] {
+export function buildProviders(): Provider[] {
   const env = getEnv();
   const providers: Provider[] = [];
 

@@ -76,7 +76,12 @@ import { BrowserRouter } from 'react-router-dom';
 import { CssBaseline } from '@12-apps/ui/mui/CssBaseline';
 import { ThemeProvider } from '@12-apps/ui/mui/styles';
 import type { Theme } from '@12-apps/ui/mui/styles';
-import { createWebAuth, type SessionContextValue } from '@12-apps/auth/react';
+import {
+  createEmailAuth,
+  createWebAuth,
+  type EmailAuth,
+  type SessionContextValue,
+} from '@12-apps/auth/react';
 
 import { apiFetch, type ApiFetchOptions } from '../core/api';
 import { joinApiPath } from '../core/paths';
@@ -121,6 +126,17 @@ export interface WebAppShellConfig {
   queryClient?: QueryClient;
   /** Where the auth endpoints live. Passed straight to `createWebAuth`. */
   authBasePath?: string;
+  /**
+   * Where the host mounted the e-mail + password endpoints. Defaults to
+   * `{authBasePath}/email`, which is where `createEmailAuth` looks.
+   *
+   * Only the PATH is configurable, never whether the surface exists: the shell
+   * always exposes {@link WebAppShell.emailAuth}, and a deployment that has the
+   * method switched off says so through `emailAuth.getSettings()` rather than
+   * by the client not being there. A screen that had to branch on the client's
+   * existence could not render "e-mail sign-in is unavailable" at all.
+   */
+  emailAuthBasePath?: string;
   /**
    * The consent gate's wiring, or `false` to declare that this app has no terms flow.
    *
@@ -180,6 +196,17 @@ export interface WebAppShell {
   SessionProvider: (props: { children: ReactNode }) => JSX.Element;
   /** Read the session; throws outside `Provider` or {@link WebAppShell.SessionProvider}. */
   useSession: () => SessionContextValue;
+  /**
+   * The e-mail + password flow: sign up, verify, forget, reset, and add a
+   * password to an account that only had a social provider.
+   *
+   * Here rather than left to each host for the same reason `useSession` is. It
+   * is the same base path, the same cookies and the same session that
+   * `signInWithPassword` refreshes — a host building its own `createEmailAuth`
+   * would be free to point it somewhere else, and the failure would show up as
+   * a 404 on a screen nobody tests until someone forgets their password.
+   */
+  emailAuth: EmailAuth;
   /** `React.lazy` with the stale-chunk recovery. Use it for every routed page. */
   lazyRoute: typeof lazyRoute;
   /**
@@ -288,9 +315,11 @@ export function createWebAppShell(config: WebAppShellConfig): WebAppShell {
   const apiBase = config.apiBase ?? '/api';
   const messages = messagesOf(config.messages);
   const theme = createAppTheme(config.theme?.mode ?? 'light', config.theme ?? {});
-  const auth = createWebAuth(
-    config.authBasePath === undefined ? {} : { basePath: config.authBasePath },
-  );
+  const authBasePath = config.authBasePath ?? '/api/auth';
+  const auth = createWebAuth({ basePath: authBasePath });
+  const emailAuth = createEmailAuth({
+    basePath: config.emailAuthBasePath ?? `${authBasePath}/email`,
+  });
   // Built ONCE, at factory time: a boundary rebuilt per render is a new component
   // type each time, so React would remount everything below it on every parent
   // render.
@@ -327,6 +356,7 @@ export function createWebAppShell(config: WebAppShellConfig): WebAppShell {
     theme,
     SessionProvider: auth.SessionProvider,
     useSession: auth.useSession,
+    emailAuth,
     lazyRoute,
     RouteErrorBoundary,
     TermsConsentGate: ConsentGate,

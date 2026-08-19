@@ -126,6 +126,55 @@ export { createApiAuth } from "./create-api-auth";
 export type { ApiAuth, ApiAuthConfig } from "./create-api-auth";
 
 /**
+ * The e-mail + password half — the second factory, same shape as the first.
+ *
+ * `createEmailCredentials` is the flow (sign up, verify, forget, reset, set a
+ * password on an account that only had Google); `credentialsProvider` is the
+ * Auth.js bridge that `createApiAuth({ emailPassword })` builds for you, and is
+ * exported for a host assembling its own provider list.
+ *
+ * Also available as `@12-apps/auth/email-credentials`, `/password` and
+ * `/tokens` for callers that want the primitives without pulling in
+ * `@auth/core` — a background job that expires stale tokens, for instance,
+ * needs `hashToken` and nothing else.
+ */
+export { createEmailCredentials } from "./email-credentials";
+export type { EmailCredentials } from "./email-credentials";
+export type {
+  AcknowledgeResult,
+  AuthEmailMessage,
+  AuthRateLimiter,
+  AuthTokenPurpose,
+  AuthenticateInput,
+  AuthenticateResult,
+  EmailAuthFailure,
+  EmailAuthRefusal,
+  EmailAuthSettings,
+  EmailAuthSettingsResolver,
+  EmailCredentialUser,
+  EmailCredentialsConfig,
+  EmailCredentialsMailer,
+  EmailCredentialsStore,
+  SignUpInput,
+  SignUpResult,
+  StoredAuthToken,
+} from "./email-credentials";
+export { credentialsProvider, CREDENTIALS_PROVIDER_ID } from "./credentials-provider";
+export type { CredentialsProviderConfig } from "./credentials-provider";
+export {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  checkPasswordPolicy,
+  hashPassword,
+  isPasswordAcceptable,
+  needsRehash,
+  verifyPassword,
+} from "./password";
+export type { PasswordPolicy, PasswordPolicyViolation } from "./password";
+export { DEFAULT_TOKEN_TTL_MS, buildTokenLink, hashToken, isTokenExpired, issueToken } from "./tokens";
+export type { IssuedToken } from "./tokens";
+
+/**
  * Re-export the config (and its `ExtendedSession` type) so consumers can reach
  * it from the package root, while `@12-apps/auth/config` stays importable without
  * applying the env defaults (tests).
