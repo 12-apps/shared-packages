@@ -6,6 +6,7 @@
 
 import { LifecycleError } from '../errors';
 import type { DraftRecord, FeatureFlagMap, LifecycleContext, Snapshot, WriteResult } from '../types';
+import type { DraftWire, WriteOutcomeWire } from '../wire';
 
 /**
  * What a host must resolve before a request reaches these handlers: WHO is
@@ -190,11 +191,7 @@ export function foldApiError(error: unknown): LifecycleResponse {
 }
 
 /** The `{ applied, entityId, requestId }` wire shape for approvals-aware writes. */
-export function writeOutcome(result: WriteResult): {
-  applied: boolean;
-  entityId: string | null;
-  requestId: string | null;
-} {
+export function writeOutcome(result: WriteResult): WriteOutcomeWire {
   return result.status === 'applied'
     ? { applied: true, entityId: result.entityId, requestId: null }
     : { applied: false, entityId: null, requestId: result.requestId };
@@ -206,15 +203,7 @@ export function writeResponse(result: WriteResult): LifecycleResponse {
 }
 
 /** Serialize a draft for the wire (shared by the draft routes). */
-export function draftJson(draft: DraftRecord | null): {
-  draft: {
-    id: string;
-    entityId: string | null;
-    data: Snapshot;
-    status: DraftRecord['status'];
-    updatedAt: string;
-  } | null;
-} {
+export function draftJson(draft: DraftRecord | null): { draft: DraftWire | null } {
   return {
     draft: draft
       ? {
