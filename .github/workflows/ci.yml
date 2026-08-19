@@ -737,17 +737,27 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      # Split from the browsers on purpose. This half is apt, it is a few
-      # seconds, and it must run on a cache HIT too — the runner image is fresh
-      # each time, so the fonts a cached browser needs are not there yet.
-      - name: Install Chromium system dependencies
-        working-directory: harness/frontend
-        timeout-minutes: 5
-        run: npx playwright install-deps chromium
-      # Downloads only on a miss; a hit finds the binaries already in the cache
-      # directory and returns immediately. The timeout is the backstop the
-      # incident above wanted: a stalled download now fails this job in minutes
-      # instead of holding the release pipeline until GitHub's 6-hour kill.
+      # NO `install-deps`, and that is the fix rather than an omission.
+      #
+      # It is the half that hangs. Splitting it out (#272) is what proved it:
+      # the next run failed on the 5-minute bound with
+      # `Terminate orphan process: npm exec playwright install-deps chromium`,
+      # which is apt wedged — a lock, a mirror, `needrestart`, take your pick.
+      # Before the split the two halves were one command and the stall could
+      # not be attributed.
+      #
+      # Dropping it is safe HERE, on evidence from the run that worked: apt
+      # reported "0 upgraded, 9 newly installed", and all nine were fonts —
+      # fonts-freefont-ttf, fonts-ipafont-gothic, fonts-tlwg-loma-otf,
+      # fonts-unifont, fonts-wqy-zenhei and four xfonts-*. Chromium's actual
+      # shared libraries are already on `ubuntu-24.04`; `install-deps`
+      # contributed CJK and legacy X fonts and nothing else.
+      #
+      # This suite needs none of them. It drives a pt-BR interface — Latin
+      # glyphs the base image has — and every assertion in it reads a test id
+      # rather than a pixel, so there is no screenshot whose rendering could
+      # shift. A suite that DID compare pixels, or one rendering CJK, would
+      # have to put this back and bound it.
       - name: Install Chromium
         working-directory: harness/frontend
         timeout-minutes: 10
@@ -836,17 +846,27 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      # Split from the browsers on purpose. This half is apt, it is a few
-      # seconds, and it must run on a cache HIT too — the runner image is fresh
-      # each time, so the fonts a cached browser needs are not there yet.
-      - name: Install Chromium system dependencies
-        working-directory: harness/frontend
-        timeout-minutes: 5
-        run: npx playwright install-deps chromium
-      # Downloads only on a miss; a hit finds the binaries already in the cache
-      # directory and returns immediately. The timeout is the backstop the
-      # incident above wanted: a stalled download now fails this job in minutes
-      # instead of holding the release pipeline until GitHub's 6-hour kill.
+      # NO `install-deps`, and that is the fix rather than an omission.
+      #
+      # It is the half that hangs. Splitting it out (#272) is what proved it:
+      # the next run failed on the 5-minute bound with
+      # `Terminate orphan process: npm exec playwright install-deps chromium`,
+      # which is apt wedged — a lock, a mirror, `needrestart`, take your pick.
+      # Before the split the two halves were one command and the stall could
+      # not be attributed.
+      #
+      # Dropping it is safe HERE, on evidence from the run that worked: apt
+      # reported "0 upgraded, 9 newly installed", and all nine were fonts —
+      # fonts-freefont-ttf, fonts-ipafont-gothic, fonts-tlwg-loma-otf,
+      # fonts-unifont, fonts-wqy-zenhei and four xfonts-*. Chromium's actual
+      # shared libraries are already on `ubuntu-24.04`; `install-deps`
+      # contributed CJK and legacy X fonts and nothing else.
+      #
+      # This suite needs none of them. It drives a pt-BR interface — Latin
+      # glyphs the base image has — and every assertion in it reads a test id
+      # rather than a pixel, so there is no screenshot whose rendering could
+      # shift. A suite that DID compare pixels, or one rendering CJK, would
+      # have to put this back and bound it.
       - name: Install Chromium
         working-directory: harness/frontend
         timeout-minutes: 10
