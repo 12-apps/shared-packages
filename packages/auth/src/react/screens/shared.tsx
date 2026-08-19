@@ -37,12 +37,21 @@ export function FailureBanner({
   if (!reason) return null;
   return (
     <>
+      {/*
+        `data-testid` + `data-reason` so a test can assert WHICH refusal came
+        back without matching the host's own words. The copy is the host's — a
+        journey that asserted "E-mail ou senha incorretos." would only ever run
+        in a pt-BR app, which is exactly what stops these scenarios shipping
+        with the library. The reason code is the same in every consumer.
+      */}
       <Alert
         variant="danger"
         title={title}
         description={failureMessage(copy, reason, violations)}
         closable
         onClose={onDismiss}
+        data-testid="auth-failure"
+        data-reason={reason}
       />
       <Spacer size="sm" />
     </>

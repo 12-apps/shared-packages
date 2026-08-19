@@ -48,6 +48,26 @@ describe("createApiAuth", () => {
     expect(createApiAuth({ basePath: "/explicit" }).config.basePath).toBe("/explicit");
   });
 
+  it("takes an explicit trustHost, including a false that overrides the environment", () => {
+    // The flag any host behind a proxy needs. Its absence fails as "the session
+    // endpoint 500s while every other route works", which reads as a broken
+    // session rather than a missing option — the harness lost an afternoon to
+    // exactly that.
+    vi.stubEnv("AUTH_TRUST_HOST", "true");
+
+    expect(createApiAuth({ trustHost: true }).config.trustHost).toBe(true);
+    // `false` has to survive an environment that says otherwise, which a
+    // nullish-assign would not have given: a deployment configuring this in code
+    // is the authority over one that configured it in a shell.
+    expect(createApiAuth({ trustHost: false }).config.trustHost).toBe(false);
+  });
+
+  it("trusts the host from AUTH_TRUST_HOST when no option is given", () => {
+    vi.stubEnv("AUTH_TRUST_HOST", "true");
+
+    expect(createApiAuth().config.trustHost).toBe(true);
+  });
+
   it("keeps the JWT strategy and owns no database adapter", () => {
     const { config } = createApiAuth();
 

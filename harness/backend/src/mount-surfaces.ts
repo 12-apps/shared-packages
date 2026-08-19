@@ -47,6 +47,27 @@ export function mountSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
   // 12-18, also at the API root and for the same reason: consent is a fact about the
   // CALLER, so neither of its two paths carries a tenant slug.
   app.route('/api', hosts.appShell.router);
+  /**
+   * @12-apps/auth (12-25). Three mounts, and the split between them is the
+   * point:
+   *
+   *  - `/api/auth/**` is REAL Auth.js, served by `createApiAuth`'s handler —
+   *    the session endpoint, the CSRF token and the credentials callback the
+   *    packaged sign-in form posts to. Mounted with `app.all` over a `*` because
+   *    it is one handler for a whole URL space rather than a router;
+   *  - `/api/auth/email/**` is `emailAuthRouter`, mounted BEFORE it for this
+   *    file's more-specific-first rule — Hono resolves by registration order,
+   *    and the Auth.js catch-all would otherwise swallow every one of them and
+   *    answer its own 404;
+   *  - `/api/platform/auth-settings` is `emailAuthSettingsRouter`, and it is
+   *    somewhere else entirely on purpose. Those two switches turn a sign-in
+   *    method off for EVERYBODY, so they do not belong behind the same gate as
+   *    "reset my password".
+   */
+  app.route('/api/auth/email', hosts.auth.emailRouter);
+  app.all('/api/auth/*', (c) => hosts.auth.apiAuth.handler(c.req.raw));
+  app.route('/api/platform/auth-settings', hosts.auth.settingsRouter);
+  app.route('/__harness', hosts.auth.harnessRoutes);
   // The last three mount at the ROOT and have to — the header says why for each.
   // `/` is the broadest prefix here, so they go on LAST by the same
   // more-specific-first rule the `/api` mounts above follow.
