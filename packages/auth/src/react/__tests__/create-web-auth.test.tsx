@@ -129,6 +129,53 @@ describe("createWebAuth", () => {
     });
   });
 
+  it("picks up a global fetch installed AFTER the surface was built", async () => {
+    // The order every other test in this file happens to use — stub, then build
+    // — is the one order a host never uses. An app calls `createWebAuth()` at
+    // module scope, so the factory runs at IMPORT time and any stub a suite
+    // installs in `beforeEach` lands afterwards. Reading the global once inside
+    // the factory therefore froze the real `fetch` in, and every SPA suite that
+    // stubs it hung on a session request nothing was left to answer.
+    const { SessionProvider, useSession } = createWebAuth();
+    const fetchMock = stubFetch(
+      () => new Response(JSON.stringify({ user: { id: "u1" } }), { status: 200 }),
+    );
+
+    render(
+      <SessionProvider>
+        <Probe useSession={useSession} />
+      </SessionProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status").textContent).toBe("authenticated");
+    });
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("still lets an explicit fetchImpl override the global", async () => {
+    // The late binding is only the DEFAULT. A story or a design review that
+    // hands in its own transport must keep it even where a global exists.
+    stubFetch(() => {
+      throw new Error("the global fetch must not be reached");
+    });
+    const injected = vi.fn(
+      async () => new Response(JSON.stringify({ user: { id: "u1" } }), { status: 200 }),
+    );
+    const { SessionProvider, useSession } = createWebAuth({ fetchImpl: injected });
+
+    render(
+      <SessionProvider>
+        <Probe useSession={useSession} />
+      </SessionProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status").textContent).toBe("authenticated");
+    });
+    expect(injected).toHaveBeenCalled();
+  });
+
   it("throws a named error when useSession is used outside the provider", () => {
     const { useSession } = createWebAuth();
 
