@@ -1,5 +1,6 @@
 import type { EmailCredentials } from "../email-credentials";
 import type { EmailAuthRefusal } from "../email-credentials/types";
+import type { PasswordPolicyViolation } from "../password";
 
 import { EMAIL_AUTH_STATUS, type EmailAuthMessages } from "./messages";
 
@@ -71,16 +72,27 @@ export interface EmailAuthRoutesConfig {
   onSignedUp?: (input: { email: string; name?: string }) => Promise<void> | void;
 }
 
-/** A refusal, as the wire sees it. */
+/**
+ * A refusal, as the wire sees it.
+ *
+ * The broken password rules are TRANSLATED here, not passed through.
+ * `checkPassword` answers in codes — `too-short`, `needs-number` — which is
+ * what keeps the policy free of any language; sending them raw put
+ * `too-short` in front of a shopper. The `reason` stays a code, deliberately:
+ * the screen branches on it, and a sentence cannot be branched on.
+ */
 function refusal(refusalResult: EmailAuthRefusal, messages: EmailAuthMessages): EmailAuthResponse {
-  const { reason, violations } = refusalResult;
-  const detail = violations && violations.length > 0 ? ` ${violations.join(" ")}` : "";
+  const { reason } = refusalResult;
+  const violations = (refusalResult.violations ?? []).map(
+    (code) => messages.violations[code as PasswordPolicyViolation] ?? code,
+  );
+  const detail = violations.length > 0 ? ` ${violations.join(" ")}` : "";
   return {
     status: EMAIL_AUTH_STATUS[reason],
     body: {
       error: `${messages[reason]}${detail}`,
       reason,
-      ...(violations && violations.length > 0 ? { violations } : {}),
+      ...(violations.length > 0 ? { violations } : {}),
     },
   };
 }
@@ -100,9 +112,22 @@ function str(body: unknown, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+/**
+ * An optional string field, TRIMMED.
+ *
+ * The trim is not tidiness: `name` reaches a display name, and " Ana " renders
+ * with the padding wherever it is shown. Every host that wrote these handlers
+ * by hand trimmed it in its own schema, so leaving it here would have made the
+ * mount a quiet regression rather than a like-for-like replacement.
+ *
+ * Whitespace-only therefore collapses to `undefined`, which is the right
+ * answer: it is a name nobody typed.
+ */
 function optionalStr(body: unknown, key: string): string | undefined {
   const value = fields(body)[key];
-  return typeof value === "string" && value.length > 0 ? value : undefined;
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 /**
