@@ -13,8 +13,7 @@ Feature: Getting back in after forgetting a password
     * the link dies on use, so a forwarded mail is not a second chance.
 
   Background:
-    Given the storefront journey fixture is seeded
-    And the platform offers e-mail and password sign-in
+    Given the platform offers e-mail and password sign-in
 
   Scenario: A shopper resets her password and the old one stops working
     Given "dora.reset@example.test" has an account with the password "senha antiga 11"

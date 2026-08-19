@@ -61,7 +61,7 @@ async function givePassword(
   const world = authWorld();
   const asked = await page.request.post('/api/auth/email/forgot-password', { data: { email } });
   expect(asked.ok(), `asking for a reset link failed: ${await asked.text()}`).toBe(true);
-  const message = world.lastMail(email, world.subjects.reset);
+  const message = await world.lastMail(email, world.subjects.reset);
   expect(message, `no reset mail reached ${email}`).toBeDefined();
   const token = new URL(linkFrom(message!.text)).searchParams.get('token');
   const reset = await page.request.post('/api/auth/email/reset-password', {
@@ -178,7 +178,7 @@ When(
 
 When(new RegExp(`^${THEY} opens the confirmation link we sent ${THEIR}$`), async ({ page, account }) => {
   const world = authWorld();
-  const message = world.lastMail(account.email, world.subjects.verify);
+  const message = await world.lastMail(account.email, world.subjects.verify);
   expect(message, `no confirmation mail reached ${account.email}`).toBeDefined();
   account.rememberLink(linkFrom(message!.text));
   await page.goto(account.lastLink);
@@ -186,13 +186,20 @@ When(new RegExp(`^${THEY} opens the confirmation link we sent ${THEIR}$`), async
 
 When(new RegExp(`^${THEY} opens the reset link we sent ${THEIR}$`), async ({ page, account }) => {
   const world = authWorld();
-  const message = world.lastMail(account.email, world.subjects.reset);
+  const message = await world.lastMail(account.email, world.subjects.reset);
   expect(message, `no reset mail reached ${account.email}`).toBeDefined();
   account.rememberLink(linkFrom(message!.text));
   await page.goto(account.lastLink);
 });
 
 When(new RegExp(`^${THEY} opens that same link again$`), async ({ page, account }) => {
+  // Away FIRST, and it is not ceremony. `page.goto` to a URL identical to the
+  // current one is a same-document navigation — nothing reloads, no effect
+  // re-runs, and the screen keeps showing the previous visit's outcome. The
+  // scenario then reads "the spent link still worked", which is the exact
+  // opposite of what it is checking, and it passes or fails on whether the
+  // host's router happens to remount rather than on the token being spent.
+  await page.goto('about:blank');
   await page.goto(account.lastLink);
 });
 
@@ -267,7 +274,12 @@ When(new RegExp(`^${THEY} signs out$`), async ({ context }) => {
 // ---------------------------------------------------------------------------
 
 Then(new RegExp(`^${THEY} is told to check ${THEIR} inbox$`), async ({ page }) => {
-  await expect(page.getByTestId('signup-verification-sent')).toBeVisible();
+  // Either screen may answer, and from the person's side it IS one outcome:
+  // sign-up says it after creating an account, forgot-password after asking for
+  // a link. The scenarios say the same sentence for that reason.
+  await expect(
+    page.getByTestId('signup-verification-sent').or(page.getByTestId('forgot-link-sent')).first(),
+  ).toBeVisible();
 });
 
 Then(new RegExp(`^${THEY} is told to confirm ${THEIR} e-mail first$`), async ({ page }) => {
@@ -301,7 +313,12 @@ Then(new RegExp(`^${THEY} is told ${THEIR} e-mail or password is wrong$`), async
 });
 
 Then(new RegExp(`^${THEY} is told ${THEIR} password was changed$`), async ({ page }) => {
-  await expect(page.getByTestId('password-saved')).toBeVisible();
+  // Two screens change a password and both report it: the reset page after a
+  // mailed link, the security card while signed in. Same outcome, so the same
+  // sentence — and the step accepts whichever screen the scenario is on.
+  await expect(
+    page.getByTestId('password-saved').or(page.getByTestId('reset-done')).first(),
+  ).toBeVisible();
 });
 
 Then(new RegExp(`^${THEY} is told ${THEIR} password was created$`), async ({ page }) => {
@@ -346,13 +363,13 @@ Then('signing in with Google is still offered', async ({ page }) => {
 
 Then(new RegExp(`^the message we sent says ${THEY} already has an account$`), async ({ account }) => {
   const world = authWorld();
-  const message = world.lastMail(account.email);
+  const message = await world.lastMail(account.email);
   expect(message, `no mail reached ${account.email}`).toBeDefined();
   expect(message!.subject).toContain(world.subjects.alreadyRegistered);
 });
 
 Then(/^no message was sent to "(.+)"$/, async ({ account }, email: string) => {
   void account;
-  const message = authWorld().lastMail(email);
+  const message = await authWorld().lastMail(email);
   expect(message, `${email} should have received nothing`).toBeUndefined();
 });

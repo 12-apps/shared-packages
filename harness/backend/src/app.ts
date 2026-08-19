@@ -80,6 +80,8 @@ import { enqueueRealtimeEvent } from '@12-apps/realtime/server';
 import { appShellHost, mountAppShellControls } from './app-shell-host';
 import { applyAuditMigrations } from './audit-db';
 import { auditHost, reseedAudit } from './audit-host';
+import { applyAuthMigrations, reseedAuth } from './auth-db';
+import { authHost } from './auth-host';
 import { createEntitlementsHost, TENANT } from './entitlements-host';
 import { impersonationHost, mountImpersonationDemo } from './impersonation-host';
 import { mcpProbeRouter } from './harness-mcp-probe';
@@ -168,11 +170,17 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
   // created HERE and shared, for the reason on `HarnessBackend.realtimeDriver`.
   await applyRealtimeMigrations(pg);
   const realtimeDriver = createInlineRealtimeDriver({ logger: console });
+  // 12-25: the e-mail + password tables. HAND-WRITTEN, unlike every other
+  // surface here, because @12-apps/auth ships no migration and owns no model —
+  // an account is the host's row. See auth-db.ts for why that is the design.
+  await applyAuthMigrations(pg);
+  await reseedAuth(pg);
   // 12-20: no migrations — @12-apps/storage owns no models. What it needs from a
   // host is the two tables its reference probes read (storage-host.ts) and a
   // directory to keep objects in.
   const storage = await createStorageHost(pg);
   return {
+    auth: authHost(pg),
     rbac,
     audit,
     lifecycle,
@@ -196,6 +204,7 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
 
 /** The mounted hosts one harness server is assembled from. */
 export interface Hosts {
+  auth: ReturnType<typeof authHost>;
   rbac: ReturnType<typeof rbacHost>;
   audit: ReturnType<typeof auditHost>;
   lifecycle: ReturnType<typeof lifecycleHost>;
@@ -226,6 +235,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await reseed(pg);
     await reseedRbac(pg, hosts.rbac);
     await reseedAudit(pg, hosts.audit);
+    await reseedAuth(pg);
     await reseedOnboarding(pg);
     await reseedMcpOauth(pg);
     await reseedLifecycle(pg);

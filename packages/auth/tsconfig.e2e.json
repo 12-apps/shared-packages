@@ -1,23 +1,17 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "@12-apps/typescript-config/base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src",
+    "outDir": "dist/e2e",
+    "rootDir": "src/e2e",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "skipLibCheck": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["src/e2e/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

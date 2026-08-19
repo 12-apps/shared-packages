@@ -59,8 +59,13 @@ export interface AuthWorld {
    * seeded — is the whole point. A seeded token exercises the consumption while
    * proving nothing about the link a real person receives, and a wrong app URL
    * or a moved path fails only there.
+   *
+   * ASYNC, and it has to be. An outbox is a file for one host, a table for the
+   * next and a vendor's sandbox API for a third; only the first of those can be
+   * read synchronously, so a synchronous signature here would silently exclude
+   * the other two — the harness's own mailer writes to Postgres.
    */
-  lastMail: (email: string, subjectContains?: string) => SentAuthEmail | undefined;
+  lastMail: (email: string, subjectContains?: string) => Promise<SentAuthEmail | undefined>;
 
   /** Put the browser in a signed-in session for `email`, however you do that. */
   signInAs: (context: BrowserContext, email: string) => Promise<void>;
@@ -118,7 +123,7 @@ export function authWorld(): AuthWorld {
   if (!installed) {
     throw new Error(
       'No AuthWorld installed. Call defineAuthWorld(...) from a module inside ' +
-        "this app's bdd `steps` glob — see @12-apps/auth-e2e's README.",
+        "this app's bdd `steps` glob — see @12-apps/auth/e2e's README.",
     );
   }
   return installed;

@@ -1,4 +1,4 @@
-# `@12-apps/auth-e2e`
+# `@12-apps/auth/e2e`
 
 The e-mail + password journeys, as Gherkin you run **against your own app**.
 
@@ -37,13 +37,13 @@ where your app puts its login and account pages. That, and only that, is
 
 ```ts
 // tests/e2e/steps/auth-world.ts
-import { defineAuthWorld } from '@12-apps/auth-e2e';
+import { defineAuthWorld } from '@12-apps/auth/e2e';
 
 defineAuthWorld({
   seedUser: async (page, user) => { /* however you seed */ },
   setEmailAuthEnabled: async (page, on) => { /* your platform switch */ },
   setRequireVerification: async (page, on) => { /* the other one */ },
-  lastMail: (email, subject) => { /* what your mailer actually sent */ },
+  lastMail: async (email, subject) => { /* what your mailer actually sent */ },
   signInAs: async (context, email) => { /* mint your session */ },
   signOut: async (context) => { await context.clearCookies(); },
   paths: { login: '/login', signup: '/signup', forgotPassword: '/forgot-password', account: '/account' },
@@ -58,7 +58,7 @@ worker.
 **2. Point your bdd config at the package:**
 
 ```ts
-import { authFeatures, authFeaturesRoot, authSteps } from '@12-apps/auth-e2e';
+import { authFeatures, authFeaturesRoot, authSteps } from '@12-apps/auth/e2e';
 
 const journeys = defineBddConfig({
   features: [authFeatures, 'tests/e2e/features/**/*.feature'],

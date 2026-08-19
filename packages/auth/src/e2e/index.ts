@@ -1,5 +1,5 @@
 /**
- * `@12-apps/auth-e2e` — the e-mail + password journeys, as Gherkin a host runs
+ * `@12-apps/auth/e2e` — the e-mail + password journeys, as Gherkin a host runs
  * against its own app.
  *
  * Mounting `createEmailCredentials` and `createEmailAuthScreens` gives you

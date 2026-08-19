@@ -16,8 +16,7 @@ Feature: A Google account that also wants a password
   who can no longer get in at all.
 
   Background:
-    Given the storefront journey fixture is seeded
-    And the platform offers e-mail and password sign-in
+    Given the platform offers e-mail and password sign-in
 
   Scenario: She adds a password to an account that only had Google, and keeps both
     Given "fabi.google@example.test" signed up with Google and has no password

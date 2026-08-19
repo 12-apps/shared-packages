@@ -12,13 +12,13 @@ Feature: Signing up with an e-mail and a password
   support ticket. So each scenario reads the message the mailer actually
   produced and clicks what is inside it.
 
-  It happens at "jornada-balcao-pago", which needs nothing of the store beyond
-  existing: sign-in is not a store's affair, and the storefront is simply where
-  the screens live.
+  Nothing here names a product, a cart or a tenant, and that is deliberate:
+  signing in is not a store's affair. The app under test is simply wherever
+  these screens live, which is what lets the same scenarios run against any
+  host that mounts them.
 
   Background:
-    Given the storefront journey fixture is seeded
-    And the platform offers e-mail and password sign-in
+    Given the platform offers e-mail and password sign-in
     And the platform requires e-mail confirmation
 
   Scenario: A new shopper confirms her address and then signs in with her password

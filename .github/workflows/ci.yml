@@ -34,7 +34,6 @@ env:
     packages/request-scope
     packages/observability-backend
     packages/auth
-    packages/auth-e2e
     packages/entity-lifecycle
     packages/forms-core
     packages/jobs
