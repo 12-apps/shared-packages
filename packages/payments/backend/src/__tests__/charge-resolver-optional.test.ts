@@ -24,16 +24,26 @@ import { createPaymentsHttp, type PaymentsHttpDeps } from '../http/handlers';
  * than charging through a half-built input.
  */
 
-function harness(resolveChargeRequest?: PaymentsHttpDeps['resolveChargeRequest']) {
-  const charge = vi.fn();
+/**
+ * One container per case, never destructured: `charge` is configured after
+ * construction, and a loose binding to it is shared mutable state as far as
+ * the flakiness gate is concerned.
+ */
+function harness(
+  resolveChargeRequest?: PaymentsHttpDeps['resolveChargeRequest'],
+  raised?: unknown,
+) {
+  const charge = vi.fn(async () => raised);
   const gateway = { charge } as unknown as PaymentsGateway;
-  const http = createPaymentsHttp({
-    gateway,
-    settings: {} as never,
-    charges: {} as never,
-    resolveChargeRequest,
-  } as PaymentsHttpDeps);
-  return { http, charge };
+  return {
+    charge,
+    http: createPaymentsHttp({
+      gateway,
+      settings: {} as never,
+      charges: {} as never,
+      resolveChargeRequest,
+    } as PaymentsHttpDeps),
+  };
 }
 
 const MERCHANT: MerchantRef = { kind: 'TENANT', id: 'acme' };
@@ -43,13 +53,13 @@ const request = () =>
 
 describe('createCharge without a host resolver', () => {
   it('answers 404 and never reaches the gateway', async () => {
-    const { http, charge } = harness();
+    const unwired = harness();
 
-    const response = await http.createCharge(request(), CTX);
+    const response = await unwired.http.createCharge(request(), CTX);
 
     expect(response.status).toBe(404);
     // The point of the 404: no charge is raised from an input nobody built.
-    expect(charge).not.toHaveBeenCalled();
+    expect(unwired.charge).not.toHaveBeenCalled();
   });
 
   it('still charges through the resolver when a host wires one', async () => {
@@ -60,8 +70,7 @@ describe('createCharge without a host resolver', () => {
       customer: { name: 'Ana' },
       idempotencyKey: 'ord_1:0',
     };
-    const { http, charge } = harness(async () => resolved as never);
-    charge.mockResolvedValue({
+    const wired = harness(async () => resolved as never, {
       snapshot: {
         provider: 'pagbank',
         providerChargeId: 'CHAR_1',
@@ -71,11 +80,11 @@ describe('createCharge without a host resolver', () => {
       },
     });
 
-    const response = await http.createCharge(request(), CTX);
+    const response = await wired.http.createCharge(request(), CTX);
 
     expect(response.status).toBe(201);
     // The HOST's input reaches the gateway verbatim — the browser's draft
     // contributes no amount and no reference.
-    expect(charge).toHaveBeenCalledWith(MERCHANT, resolved);
+    expect(wired.charge).toHaveBeenCalledWith(MERCHANT, resolved);
   });
 });
