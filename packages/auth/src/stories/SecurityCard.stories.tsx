@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { userEvent, within } from "storybook/test";
 
 import { storyScreens } from "./fixtures";
 
@@ -76,5 +77,37 @@ export const MethodSwitchedOff: StoryObj = {
         }),
     });
     return <screens.PasswordSecurityCard />;
+  },
+};
+
+/**
+ * Straight after creating the first one.
+ *
+ * The confirmation has to describe what just HAPPENED, not the state the card
+ * is now in — the reload flips `hasPassword` to true, and a message derived
+ * from that told somebody who had just created their first password that it was
+ * "changed".
+ */
+export const JustCreatedTheFirstPassword: StoryObj = {
+  render: () => {
+    let hasPassword = false;
+    const screens = storyScreens({
+      getSecurity: () =>
+        Promise.resolve({
+          ok: true,
+          data: { hasPassword, emailVerified: true, enabled: true },
+        }),
+      setPassword: () => {
+        hasPassword = true;
+        return Promise.resolve({ ok: true, data: null });
+      },
+    });
+    return <screens.PasswordSecurityCard />;
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByTestId("new-password"), "minha senha 7");
+    await userEvent.type(canvas.getByTestId("new-password-confirm"), "minha senha 7");
+    await userEvent.click(canvas.getByTestId("save-password"));
   },
 };

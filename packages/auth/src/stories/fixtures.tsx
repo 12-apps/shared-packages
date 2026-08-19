@@ -26,7 +26,7 @@ import type { ScreensSession } from "../react/screens/context";
  */
 
 /** A complete copy table. Every field, so a missing one is a compile error here. */
-const STORY_COPY: EmailAuthCopy = {
+export const STORY_COPY: EmailAuthCopy = {
   failures: {
     "method-disabled": "Signing in with a password is switched off right now.",
     "invalid-email": "Enter a valid e-mail address.",

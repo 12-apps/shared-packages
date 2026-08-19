@@ -29,6 +29,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StoryObj } from "@storybook/react-vite";
 
+import * as demoLoginPageStories from "../DemoLoginPage.stories";
 import * as forgotPasswordStories from "../ForgotPassword.stories";
 import * as passwordFieldStories from "../PasswordField.stories";
 import * as resetPasswordStories from "../ResetPassword.stories";
@@ -77,6 +78,7 @@ function moduleEntries(): [string, Record<string, unknown>][] {
     ["ResetPassword", resetPasswordStories],
     ["VerifyEmail", verifyEmailStories],
     ["SecurityCard", securityCardStories],
+    ["DemoLoginPage", demoLoginPageStories],
   ];
 }
 

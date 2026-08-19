@@ -44,6 +44,14 @@ interface CardState {
   reason: EmailAuthScreenReason | null;
   violations: readonly string[] | null;
   saved: boolean;
+  /**
+   * Was the save an ADD rather than a change?
+   *
+   * Captured when the save succeeds, not read back off `account`: the reload
+   * right after flips `hasPassword` to true, so deriving it from state would
+   * tell somebody who just created their first password that it was "changed".
+   */
+  savedAdding: boolean;
   mismatch: boolean;
   setPassword: (value: string) => void;
   setConfirmation: (value: string) => void;
@@ -63,6 +71,7 @@ function useSecurityCard(): CardState {
   const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
   const [violations, setViolations] = useState<readonly string[] | null>(null);
   const [saved, setSaved] = useState(false);
+  const [savedAdding, setSavedAdding] = useState(false);
   const mismatch = confirmation.length > 0 && password !== confirmation;
 
   const load = useCallback(async () => {
@@ -91,6 +100,7 @@ function useSecurityCard(): CardState {
       });
       if (result.ok) {
         setSaved(true);
+        setSavedAdding(!account?.hasPassword);
         setPassword("");
         setConfirmation("");
         setCurrentPassword("");
@@ -114,6 +124,7 @@ function useSecurityCard(): CardState {
     reason,
     violations,
     saved,
+    savedAdding,
     mismatch,
     setPassword,
     setConfirmation,
@@ -212,7 +223,11 @@ export function PasswordSecurityCard(): JSX.Element | null {
         <>
           <Alert
             variant="success"
-            title={adding ? copy.securityCard.savedTitleAdd : copy.securityCard.savedTitleChange}
+            title={
+              card.savedAdding
+                ? copy.securityCard.savedTitleAdd
+                : copy.securityCard.savedTitleChange
+            }
             description={copy.securityCard.savedDescription}
             data-testid="password-saved"
           />

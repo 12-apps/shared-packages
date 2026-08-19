@@ -95,6 +95,15 @@ export interface WebAuthConfig {
    * `createApiAuth({ emailPassword: { id } })`, since it IS the callback URL.
    */
   credentialsProviderId?: string;
+  /**
+   * The `fetch` these calls go through. Defaults to the global one.
+   *
+   * The same escape hatch `createEmailAuth` has, and for the same reason: the
+   * session is read on mount, so anything rendering this provider outside a
+   * browser with a live backend — a test, a story, a design review — otherwise
+   * has no way to answer it but to reach for the global.
+   */
+  fetchImpl?: typeof fetch;
 }
 
 export interface WebAuth {
@@ -126,8 +135,8 @@ export function sameOriginCallbackUrl(
     : fallback;
 }
 
-async function fetchSession(basePath: string): Promise<Session | null> {
-  const response = await fetch(`${basePath}/session`, {
+async function fetchSession(basePath: string, fetchImpl: typeof fetch): Promise<Session | null> {
+  const response = await fetchImpl(`${basePath}/session`, {
     credentials: "same-origin",
     headers: { Accept: "application/json" },
   });
@@ -138,8 +147,8 @@ async function fetchSession(basePath: string): Promise<Session | null> {
   return payload && payload.user ? payload : null;
 }
 
-async function fetchCsrfToken(basePath: string): Promise<string> {
-  const response = await fetch(`${basePath}/csrf`, {
+async function fetchCsrfToken(basePath: string, fetchImpl: typeof fetch): Promise<string> {
+  const response = await fetchImpl(`${basePath}/csrf`, {
     credentials: "same-origin",
     headers: { Accept: "application/json" },
   });
@@ -179,6 +188,7 @@ function submitSignInForm(action: string, fields: Record<string, string>): void 
  */
 async function startSocialSignIn(
   basePath: string,
+  fetchImpl: typeof fetch,
   provider?: string,
   callbackUrl?: string,
 ): Promise<void> {
@@ -189,20 +199,21 @@ async function startSocialSignIn(
   // Fetch first: if this rejects, the caller still owns its loading state and
   // can surface the failure. Building the form first would leave a stray node
   // in the document on the error path.
-  const csrfToken = await fetchCsrfToken(basePath);
+  const csrfToken = await fetchCsrfToken(basePath, fetchImpl);
   submitSignInForm(action, { csrfToken, callbackUrl: target });
 }
 
 /** Post credentials and report the outcome. Never throws for a refusal. */
 async function startPasswordSignIn(
   basePath: string,
+  fetchImpl: typeof fetch,
   providerId: string,
   input: { email: string; password: string; callbackUrl?: string },
 ): Promise<PasswordSignInResult> {
   const target = sameOriginCallbackUrl(input.callbackUrl, window.location);
   let csrfToken: string;
   try {
-    csrfToken = await fetchCsrfToken(basePath);
+    csrfToken = await fetchCsrfToken(basePath, fetchImpl);
   } catch {
     // Same failure the social flow surfaces by rejecting; here it becomes a
     // result, because the form is still on screen to show it.
@@ -210,6 +221,7 @@ async function startPasswordSignIn(
   }
   return postPasswordSignIn({
     basePath,
+    fetchImpl,
     providerId,
     csrfToken,
     email: input.email,
@@ -219,9 +231,9 @@ async function startPasswordSignIn(
 }
 
 /** End the session at the backend. The caller refreshes local state after. */
-async function postSignOut(basePath: string): Promise<void> {
-  const csrfToken = await fetchCsrfToken(basePath);
-  const response = await fetch(`${basePath}/signout`, {
+async function postSignOut(basePath: string, fetchImpl: typeof fetch): Promise<void> {
+  const csrfToken = await fetchCsrfToken(basePath, fetchImpl);
+  const response = await fetchImpl(`${basePath}/signout`, {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -236,6 +248,9 @@ async function postSignOut(basePath: string): Promise<void> {
 export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
   const basePath = config.basePath ?? "/api/auth";
   const credentialsProviderId = config.credentialsProviderId ?? CREDENTIALS_PROVIDER_ID;
+  // Read once, so a host swapping the global later cannot change what an
+  // already-mounted provider talks to.
+  const fetchImpl = config.fetchImpl ?? globalThis.fetch.bind(globalThis);
 
   const SessionContext = createContext<SessionContextValue | null>(null);
 
@@ -245,7 +260,7 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
 
     const refresh = useCallback(async () => {
       try {
-        const next = await fetchSession(basePath);
+        const next = await fetchSession(basePath, fetchImpl);
         setSession(next);
         setStatus(next ? "authenticated" : "unauthenticated");
       } catch {
@@ -260,7 +275,7 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
 
     const signIn = useCallback(
       (provider?: string, callbackUrl?: string) =>
-        startSocialSignIn(basePath, provider, callbackUrl),
+        startSocialSignIn(basePath, fetchImpl, provider, callbackUrl),
       [],
     );
 
@@ -270,7 +285,12 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
         password: string;
         callbackUrl?: string;
       }): Promise<PasswordSignInResult> => {
-        const result = await startPasswordSignIn(basePath, credentialsProviderId, input);
+        const result = await startPasswordSignIn(
+          basePath,
+          fetchImpl,
+          credentialsProviderId,
+          input,
+        );
         // The cookie is already set by that response; this is what makes the
         // tree re-render as authenticated without a reload.
         if (result.ok) await refresh();
@@ -280,7 +300,7 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
     );
 
     const signOut = useCallback(async () => {
-      await postSignOut(basePath);
+      await postSignOut(basePath, fetchImpl);
       await refresh();
     }, [refresh]);
 

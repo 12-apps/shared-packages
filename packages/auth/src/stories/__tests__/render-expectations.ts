@@ -75,6 +75,14 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // password nobody could sign in with.
   "SecurityCard/MethodSwitchedOff": { empty: true },
 
+  "SecurityCard/JustCreatedTheFirstPassword": {
+    testIds: ["password-saved"],
+    text: ["Password created"],
+    // The regression: after the reload the card is in the "change" state, and a
+    // title derived from that state would say this instead.
+    absentText: ["Password changed"],
+  },
+
   "SignIn/Empty": {
     testIds: ["email-password-form", "login-email", "login-password", "login-submit"],
   },
@@ -145,6 +153,13 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     testIds: ["email-signup-form"],
     text: ["There is already an account with this e-mail."],
   },
+  // The assembly, not a single screen: the social buttons and the e-mail form
+  // on one card, plus the mailbox that makes the link flows clickable.
+  "DemoLoginPage/LoginPage": {
+    testIds: ["email-password-form", "login-submit", "demo-mailbox", "go-account"],
+    text: ["Demo store", "Nothing sent yet"],
+  },
+
   "SignUp/WeakPassword": {
     testIds: ["email-signup-form"],
     text: ["Choose a stronger password.", "At least 8 characters."],

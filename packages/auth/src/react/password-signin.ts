@@ -74,6 +74,15 @@ interface PasswordSignInInput {
   email: string;
   password: string;
   callbackUrl: string;
+  /**
+   * The `fetch` to post through. Defaults to the global one.
+   *
+   * Threaded from `createWebAuth`'s config: without it, a host that injected a
+   * fetch would find every call honouring it EXCEPT this one, which is the
+   * single call that signs somebody in — the least acceptable place for the
+   * escape hatch to leak.
+   */
+  fetchImpl?: typeof fetch;
 }
 
 /**
@@ -85,7 +94,8 @@ interface PasswordSignInInput {
 export async function postPasswordSignIn(
   input: PasswordSignInInput,
 ): Promise<PasswordSignInResult> {
-  const response = await fetch(
+  const doFetch = input.fetchImpl ?? fetch;
+  const response = await doFetch(
     `${input.basePath}/callback/${encodeURIComponent(input.providerId)}`,
     {
       method: "POST",
