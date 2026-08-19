@@ -211,6 +211,8 @@ export type SettingsRailProps = RailBodyProps & {
   title?: React.ReactNode;
   activeLabel?: string;
   onToggleNav: () => void;
+  /** Scroll inside the rail rather than with the page. See `fillHeight`. */
+  fillHeight?: boolean;
 };
 
 /** The navigation column: title, the `switcher`'s disclosure, and the body. */
@@ -220,6 +222,7 @@ export function SettingsRail({
   navOpen,
   onToggleNav,
   testIdPrefix,
+  fillHeight = false,
   ...bodyProps
 }: SettingsRailProps): React.JSX.Element {
   const { variant, breakpoint, atIndex } = bodyProps;
@@ -245,6 +248,14 @@ export function SettingsRail({
           width: RAIL_WIDTH,
           borderRight: `1px solid ${theme.palette.divider}`,
           pr: 2,
+          // Its own scrollbar, so a settings area with twenty categories does
+          // not make the thing you NAVIGATE with scroll away while you read the
+          // panel. `minHeight: 0` is the load-bearing half: without it a flex
+          // child refuses to shrink below its content and `overflow` never
+          // engages.
+          ...(fillHeight
+            ? { height: '100%', minHeight: 0, overflowY: 'auto' as const, overscrollBehavior: 'contain' as const }
+            : {}),
         },
       })}
     >

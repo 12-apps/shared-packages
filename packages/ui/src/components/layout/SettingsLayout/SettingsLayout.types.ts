@@ -146,6 +146,25 @@ export interface SettingsLayoutProps {
   /** Prefix for `data-testid` attributes. Defaults to `"settings"`. */
   testIdPrefix?: string;
   /** Width at which the rail takes its own column. Defaults to `"md"`. */
+  /**
+   * Give the rail and the panel a scrollbar EACH, instead of scrolling the
+   * page (default `false`).
+   *
+   * Off by default because it only works where the host has already given this
+   * component a definite height — a `100dvh` flex column with the settings area
+   * as a `flex: 1; min-height: 0` child is the usual shape. Turned on without
+   * that, the percentage heights below resolve against `auto` and the layout
+   * collapses, which is why an opt-in beats a clever guess.
+   *
+   * What it buys, in a settings area with twenty-odd categories: the rail stops
+   * scrolling away when you read down a long panel, so the thing you navigate
+   * with is still there when you want it. It also makes the PANEL the scroll
+   * container, which is what a `position: sticky` toolbar inside `children`
+   * needs in order to pin below the host's header rather than at the top of the
+   * document.
+   */
+  fillHeight?: boolean;
+
   railBreakpoint?: SettingsRailBreakpoint;
   /** Narrow-width navigation shape. Defaults to `"switcher"`. */
   navVariant?: SettingsNavVariant;

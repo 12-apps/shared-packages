@@ -4,7 +4,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import { Box } from '@mui/material';
 import React from 'react';
 
-import { displayAcrossRail, TOUCH_TARGET } from './SettingsLayout.styles';
+import { atLeastRail, displayAcrossRail, TOUCH_TARGET } from './SettingsLayout.styles';
 import { SettingsSectionChips } from './SettingsSectionChips';
 import type {
   SettingsLayoutProps,
@@ -27,6 +27,8 @@ export interface SettingsPanelProps {
   onSelectItem?: (id: string) => void;
   testIdPrefix: string;
   children: React.ReactNode;
+  /** Scroll inside the panel rather than with the page. See `fillHeight`. */
+  fillHeight?: boolean;
 }
 
 /** The way back to the area's index — narrow widths only. */
@@ -88,6 +90,7 @@ export function SettingsPanel({
   linkComponent,
   onSelectItem,
   testIdPrefix,
+  fillHeight = false,
   children,
 }: SettingsPanelProps): React.JSX.Element {
   const showBack = inSection && indexHref !== undefined && linkComponent !== undefined;
@@ -103,6 +106,19 @@ export function SettingsPanel({
         flex: '1 1 auto',
         minWidth: 0,
         width: '100%',
+        // The panel scrolls itself, which is what lets a `position: sticky`
+        // toolbar inside `children` pin to the TOP OF THE PANEL — under the
+        // host's header — rather than to a document that is not the scroller.
+        ...(fillHeight
+          ? {
+              [atLeastRail(theme, breakpoint)]: {
+                height: '100%',
+                minHeight: 0,
+                overflowY: 'auto' as const,
+                overscrollBehavior: 'contain' as const,
+              },
+            }
+          : {}),
       })}
     >
       {showBack ? (

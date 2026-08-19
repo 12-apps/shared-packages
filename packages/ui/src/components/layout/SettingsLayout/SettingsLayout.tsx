@@ -46,7 +46,7 @@ const DEFAULTS = {
 } satisfies Partial<SettingsLayoutProps>;
 
 /** Stacked below the rail's breakpoint, two columns at and above it. */
-function shellSx(breakpoint: SettingsLayoutProps['railBreakpoint']) {
+function shellSx(breakpoint: SettingsLayoutProps['railBreakpoint'], fillHeight: boolean) {
   return (theme: Theme) => ({
     display: 'flex',
     flexDirection: 'column' as const,
@@ -54,7 +54,14 @@ function shellSx(breakpoint: SettingsLayoutProps['railBreakpoint']) {
     gap: 1.5,
     width: '100%',
     minWidth: 0,
-    [atLeastRail(theme, breakpoint ?? 'md')]: { flexDirection: 'row', gap: 3 },
+    // Only ever at the wide shape. Narrow, the rail is a disclosure or the page
+    // itself, and two independent scrollbars on a phone is a trap rather than a
+    // convenience.
+    [atLeastRail(theme, breakpoint ?? 'md')]: {
+      flexDirection: 'row',
+      gap: 3,
+      ...(fillHeight ? { height: '100%', minHeight: 0 } : {}),
+    },
   });
 }
 
@@ -98,6 +105,7 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
     children,
     testIdPrefix,
     railBreakpoint,
+    fillHeight = false,
     navVariant,
     atIndex,
     indexHref,
@@ -117,7 +125,7 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
       data-testid={testIdPrefix}
       data-nav-variant={navVariant}
       data-at-index={atIndex ? 'true' : 'false'}
-      sx={shellSx(railBreakpoint)}
+      sx={shellSx(railBreakpoint, fillHeight)}
     >
       <SettingsRail
         title={title}
@@ -138,6 +146,7 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
         variant={navVariant}
         breakpoint={railBreakpoint}
         atIndex={atIndex}
+        fillHeight={fillHeight}
       />
 
       <SettingsPanel
@@ -152,6 +161,7 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
         linkComponent={linkComponent}
         onSelectItem={onSelectItem}
         testIdPrefix={testIdPrefix}
+        fillHeight={fillHeight}
       >
         {children}
       </SettingsPanel>
