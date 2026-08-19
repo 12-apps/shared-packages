@@ -30,13 +30,16 @@ const GROUPS: SettingsNavGroup[] = [
   },
 ];
 
-function renderLayout(fillHeight?: boolean): void {
+function renderLayout(fillHeight?: boolean, atIndex = false): void {
   render(
     <SettingsLayout
       title="Configuração"
       groups={GROUPS}
       activeItemId="location"
       railBreakpoint={1024}
+      navVariant="drilldown"
+      atIndex={atIndex}
+      indexHref="#/config"
       {...(fillHeight === undefined ? {} : { fillHeight })}
     >
       <div data-testid="panel-child">Endereço</div>
@@ -96,5 +99,20 @@ describe('fillHeight', () => {
     expect(styleTextOf(screen.getByTestId('settings-panel'))).not.toContain('overflow-y:auto');
     // The area still renders — this is the shape every current consumer gets.
     expect(screen.getByTestId('panel-child')).toBeInTheDocument();
+  });
+
+  it('does not cost the panel its wide-width display at a drilldown index', () => {
+    // THE REGRESSION. At a `drilldown` index the panel is `display: none`
+    // narrow and `block` wide — and both that rule and `fillHeight`'s live at
+    // the SAME media query. Spread as two separate `{ [query]: … }` objects the
+    // second replaces the first, so switching `fillHeight` on dropped the
+    // `display: block` and hid the panel at every width. A section route looked
+    // fine, because `hideOnNarrow` is false there.
+    renderLayout(true, true);
+
+    const panel = styleTextOf(screen.getByTestId('settings-panel'));
+    // Both rules, from one media-query block.
+    expect(panel).toContain('display:block');
+    expect(panel).toContain('overflow-y:auto');
   });
 });
