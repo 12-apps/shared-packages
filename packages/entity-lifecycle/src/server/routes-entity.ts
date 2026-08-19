@@ -44,6 +44,7 @@ import {
   parseSnapshotBody,
 } from './context';
 import type { LifecycleEntityRegistration } from './registration';
+import type { VersionComparisonWire, VersionsWire } from '../wire';
 
 interface EntityRouteDeps {
   registration: LifecycleEntityRegistration;
@@ -116,7 +117,7 @@ function requestedComparison(
 function comparisonJson(
   comparison: VersionComparison,
   names: ReadonlyMap<string, string | null>,
-) {
+): VersionComparisonWire {
   return {
     selectedVersion: comparison.selectedVersion,
     columns: comparison.columns.map((column) => ({
@@ -173,7 +174,7 @@ function versionsRoute(deps: EntityRouteDeps): LifecycleRoute {
         : await foldLifecycle(messages, () =>
             lifecycle.compareVersion(ctx, id, compare, { currentVersion: publishedVersion }),
           );
-    return ok({
+    const payload: VersionsWire = {
       versions: history.map((row) => ({
         version: row.version,
         kind: row.kind,
@@ -188,7 +189,8 @@ function versionsRoute(deps: EntityRouteDeps): LifecycleRoute {
       // Absent, not null, when nothing was asked for: the plain list stays the
       // byte-for-byte answer it was before this endpoint learned to compare.
       ...(comparison ? { comparison: comparisonJson(comparison, names) } : {}),
-    });
+    };
+    return ok(payload);
   });
 }
 
