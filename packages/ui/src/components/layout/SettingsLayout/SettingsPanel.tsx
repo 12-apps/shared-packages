@@ -100,25 +100,33 @@ export function SettingsPanel({
     <Box
       data-testid={`${testIdPrefix}-panel`}
       sx={(theme) => ({
-        ...(hideOnNarrow
-          ? displayAcrossRail(theme, breakpoint, 'none', 'block')
-          : { display: 'block' }),
+        display: hideOnNarrow ? 'none' : 'block',
         flex: '1 1 auto',
         minWidth: 0,
         width: '100%',
-        // The panel scrolls itself, which is what lets a `position: sticky`
-        // toolbar inside `children` pin to the TOP OF THE PANEL — under the
-        // host's header — rather than to a document that is not the scroller.
-        ...(fillHeight
-          ? {
-              [atLeastRail(theme, breakpoint)]: {
+        // ONE object for the wide shape, not two.
+        //
+        // Both of these rules live at the same media query, and spreading them
+        // as separate `{ [query]: … }` objects makes the second REPLACE the
+        // first — so turning `fillHeight` on silently dropped the `display:
+        // block` that `hideOnNarrow` puts there, leaving the panel `display:
+        // none` at every width. That only shows at a drilldown INDEX, where
+        // `hideOnNarrow` is true, which is why a section route looked fine.
+        [atLeastRail(theme, breakpoint)]: {
+          ...(hideOnNarrow ? { display: 'block' } : {}),
+          ...(fillHeight
+            ? {
+                // The panel scrolls itself, which is what lets a `position:
+                // sticky` toolbar inside `children` pin to the TOP OF THE PANEL
+                // — under the host's header — rather than to a document that is
+                // not the scroller.
                 height: '100%',
                 minHeight: 0,
                 overflowY: 'auto' as const,
                 overscrollBehavior: 'contain' as const,
-              },
-            }
-          : {}),
+              }
+            : {}),
+        },
       })}
     >
       {showBack ? (
