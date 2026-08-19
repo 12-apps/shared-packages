@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { draftJson, writeOutcome } from '../../server/context';
-import { draftResponse, writeOutcomeResponse } from '../schemas';
+import {
+  draftResponse,
+  type LifecycleSchemasMatchTheWire,
+  writeOutcomeResponse,
+} from '../schemas';
 
 /**
  * The runtime twin of the type-level guards in `schemas.ts`.
@@ -22,6 +26,16 @@ import { draftResponse, writeOutcomeResponse } from '../schemas';
  * problem these guards exist to end.
  */
 describe('the advertised schemas accept what the routes produce', () => {
+  it('holds every schema to the wire vocabulary at compile time', () => {
+    // The assertion IS the type: `LifecycleSchemasMatchTheWire` is a tuple of
+    // `Assert<Exact<schema, wire>>`, so this line stops compiling the moment a
+    // schema and its producer disagree in either direction. Naming it here
+    // gives the guard a consumer as well — an export nothing references is
+    // dead code to `knip`, and a guard deleted as dead code guards nothing.
+    const proof: LifecycleSchemasMatchTheWire = [true, true, true, true, true];
+    expect(proof).toHaveLength(5);
+  });
+
   it('keeps every field of a write outcome — applied and parked alike', () => {
     for (const result of [
       { status: 'applied', entityId: 'ent_1' },
