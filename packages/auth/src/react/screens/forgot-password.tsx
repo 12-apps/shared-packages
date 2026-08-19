@@ -41,10 +41,18 @@ function LinkSent({
   return (
     <Container variant="centered" padding="lg">
       <SocialLoginContainer title={copy.forgotPassword.sentTitle} showDivider={false}>
+        {/*
+          Its own id rather than the sign-up form's: the two screens reach the
+          same OUTCOME — go and read your mail — but a test that could not tell
+          them apart could not tell "the reset mail went out" from "the sign-up
+          mail went out", and this screen's whole point is that it answers
+          identically for an address with an account and one without.
+        */}
         <Alert
           variant="success"
           title={copy.forgotPassword.sentAlertTitle}
           description={copy.forgotPassword.sentDescription(email)}
+          data-testid="forgot-link-sent"
         />
         <Spacer size="md" />
         <Button

@@ -59,6 +59,20 @@ export interface EmailCredentials {
     currentPassword?: string;
   }): Promise<AcknowledgeResult>;
   hasPassword(userId: string): Promise<boolean>;
+  /**
+   * Everything the security screen needs, in one read.
+   *
+   * `hasPassword` alone is not enough and every host discovered that the same
+   * way: the card also has to know whether the address is confirmed and whether
+   * the method is switched on at all. Answering it here rather than leaving the
+   * host to join `hasPassword`, its own user table and `readSettings` is what
+   * turns that screen's endpoint into a mount rather than a hand-written join.
+   */
+  accountSecurity(userId: string): Promise<{
+    hasPassword: boolean;
+    emailVerified: boolean;
+    enabled: boolean;
+  }>;
   authenticate(input: AuthenticateInput): Promise<AuthenticateResult>;
   /** The live operator switches — what a login screen renders itself from. */
   readSettings(): Promise<EmailAuthSettings>;
@@ -77,6 +91,18 @@ export function createEmailCredentials(
     resetPassword: (token, newPassword) => resetPassword(ctx, token, newPassword),
     setPassword: (input) => setPassword(ctx, input),
     hasPassword: (userId) => hasPassword(ctx, userId),
+    accountSecurity: async (userId) => {
+      const [has, user, settings] = await Promise.all([
+        hasPassword(ctx, userId),
+        ctx.store.findById(userId),
+        ctx.readSettings(),
+      ]);
+      return {
+        hasPassword: has,
+        emailVerified: Boolean(user?.emailVerifiedAt),
+        enabled: settings.enabled,
+      };
+    },
     authenticate: (input) => authenticate(ctx, input),
     readSettings: () => ctx.readSettings(),
   };

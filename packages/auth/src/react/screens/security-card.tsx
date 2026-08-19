@@ -209,7 +209,11 @@ export function PasswordSecurityCard(): JSX.Element | null {
   const adding = !card.account.hasPassword;
 
   return (
-    <section data-testid="password-security-card">
+    // `data-mode` states which of the two situations the SERVER put this card
+    // in, so a test reads it without matching the host's title copy. It is the
+    // one thing about this card worth asserting portably: "add" and "change"
+    // are different flows, and only the server knows which applies.
+    <section data-testid="password-security-card" data-mode={adding ? "add" : "change"}>
       <Text size="lg" style={{ fontWeight: 600 }}>
         {adding ? copy.securityCard.addTitle : copy.securityCard.changeTitle}
       </Text>

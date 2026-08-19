@@ -12,7 +12,28 @@
     "./email-credentials": "./src/email-credentials/index.ts",
     "./password": "./src/password.ts",
     "./tokens": "./src/tokens.ts",
-    "./react/screens": "./src/react/screens/index.tsx"
+    "./react/screens": "./src/react/screens/index.tsx",
+    "./server": {
+      "types": "./src/server/index.ts",
+      "default": "./src/server/index.ts"
+    },
+    "./hono": {
+      "types": "./src/hono/index.ts",
+      "default": "./src/hono/index.ts"
+    },
+    "./react/settings": {
+      "types": "./src/react/settings/index.tsx",
+      "default": "./src/react/settings/index.tsx"
+    },
+    "./e2e": {
+      "types": "./dist/e2e/index.d.ts",
+      "default": "./dist/e2e/index.js"
+    },
+    "./package.json": "./package.json",
+    "./notifications": {
+      "types": "./src/notifications/index.ts",
+      "default": "./src/notifications/index.ts"
+    }
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
@@ -21,7 +42,8 @@
     "test:watch": "vitest",
     "test:coverage": "node ../../scripts/vitest-with-teardown.mjs run --coverage",
     "dev": "storybook dev -p 6008",
-    "storybook:build": "storybook build"
+    "storybook:build": "storybook build",
+    "build": "tsc -p tsconfig.e2e.json"
   },
   "dependencies": {
     "@auth/core": "0.41.0",
@@ -29,8 +51,10 @@
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/notifications": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@12-apps/ui": "workspace:*",
+    "@playwright/test": "^1.56.1",
     "@storybook/addon-docs": "^9.1.10",
     "@storybook/addon-links": "^9.1.10",
     "@storybook/react-vite": "^9.1.10",
@@ -41,7 +65,9 @@
     "eslint": "^9.39.1",
     "eslint-plugin-storybook": "9.1.10",
     "eslint-plugin-test-flakiness": "^1.8.0",
+    "hono": "^4.6.0",
     "jsdom": "^25.0.1",
+    "playwright-bdd": "^8.4.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "storybook": "^9.1.10",
@@ -60,6 +86,7 @@
   },
   "files": [
     "src",
+    "features",
     "dist",
     "prisma",
     "*.js",
@@ -77,7 +104,11 @@
   "peerDependencies": {
     "@12-apps/ui": ">=5.0.0",
     "react": ">=19.0.0",
-    "react-dom": ">=19.0.0"
+    "react-dom": ">=19.0.0",
+    "hono": ">=4.0.0",
+    "@playwright/test": ">=1.40.0",
+    "playwright-bdd": ">=8.0.0",
+    "@12-apps/notifications": ">=4.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -87,6 +118,18 @@
       "optional": true
     },
     "@12-apps/ui": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    },
+    "@playwright/test": {
+      "optional": true
+    },
+    "playwright-bdd": {
+      "optional": true
+    },
+    "@12-apps/notifications": {
       "optional": true
     }
   }

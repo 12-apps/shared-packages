@@ -112,6 +112,22 @@ export interface ApiAuthConfig {
   signInPage?: string;
   /** Session lifetime in seconds. Defaults to 30 days. */
   maxAge?: number;
+  /**
+   * Accept the incoming `Host` header. Defaults to `AUTH_TRUST_HOST=true`, or
+   * to `NODE_ENV=development`.
+   *
+   * Needed by any host whose app is reached through something else — a reverse
+   * proxy, a SPA dev server proxying `/api`, a tunnel. Without it Auth.js
+   * refuses every request with `UntrustedHost`, and the symptom is that the
+   * session endpoint 500s while every other route works, which reads as a
+   * broken session rather than a missing flag.
+   *
+   * An explicit option because every other environment-driven setting here has
+   * one (`secret`, `authUrl`, `basePath`, `adminEmails`), and a deployment that
+   * configures this package in code should not have to reach for `process.env`
+   * for exactly one field.
+   */
+  trustHost?: boolean;
 }
 
 export interface ApiAuth {
@@ -139,6 +155,28 @@ function toAllowlist(
 }
 
 /**
+ * Where the auth endpoints are mounted: the option, then `AUTH_URL`'s pathname,
+ * then `/api/auth`.
+ *
+ * Core defaults to `/auth` while the old `next-auth` wrapper defaulted to
+ * `/api/auth`, which is what every already-registered OAuth redirect URI points
+ * at — so taking core's default would invalidate all of them.
+ */
+function resolveBasePath(options: ApiAuthConfig): string {
+  if (options.basePath) return options.basePath;
+  try {
+    const url = options.authUrl ?? process.env.AUTH_URL;
+    if (url) {
+      const { pathname } = new URL(url);
+      if (pathname !== "/") return pathname;
+    }
+  } catch {
+    // A malformed AUTH_URL falls through to the default below.
+  }
+  return "/api/auth";
+}
+
+/**
  * Apply the `AUTH_*` environment defaults, matching `next-auth`'s behaviour.
  *
  * Its `NEXTAUTH_SECRET` / `NEXTAUTH_URL` fallbacks are dropped: they were v4
@@ -146,21 +184,14 @@ function toAllowlist(
  */
 function applyEnvDefaults(config: AuthConfig, options: ApiAuthConfig): void {
   config.secret ??= options.secret ?? process.env.AUTH_SECRET;
+  config.basePath = resolveBasePath(options);
 
-  if (options.basePath) {
-    config.basePath = options.basePath;
-  } else {
-    try {
-      const url = options.authUrl ?? process.env.AUTH_URL;
-      if (url) {
-        const { pathname } = new URL(url);
-        if (pathname !== "/") config.basePath ||= pathname;
-      }
-    } catch {
-      // A malformed AUTH_URL falls through to the /api/auth default below.
-    }
-    config.basePath ||= "/api/auth";
-  }
+  // A plain assignment, not `??=`: `buildAuthConfig` has already resolved this
+  // to a boolean from the environment, so a nullish-assign could never fire.
+  // Placed before the core defaults, which use `??=` and therefore leave it —
+  // that is what lets a host pass `false` and refuse the header even where the
+  // environment would have trusted it.
+  if (options.trustHost !== undefined) config.trustHost = options.trustHost;
 
   coreSetEnvDefaults(process.env, config, true);
 }

@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 
 import { AppShellPage } from './app-shell';
 import { AuditLogPage } from './audit-log';
+import { AUTH_PAGES, AUTH_SETTINGS_PAGE } from './auth-pages';
 import { EntitlementsPlanPage } from './entitlements-plan';
 import { ImpersonationPage } from './impersonation';
 import { LifecycleAdminPage } from './lifecycle-admin';
@@ -118,7 +119,15 @@ export const NAV_GROUPS: readonly HarnessNavGroup[] = [
     // destinations — the same claim the admin makes by nesting an area's
     // reports under it. Flat, they were the whole sidebar and the two pages
     // that are not payments sank below them.
-    parents: [{ key: 'checkout', label: 'Checkout', slug: 'payments-checkout-pix' }],
+    parents: [
+      { key: 'checkout', label: 'Checkout', slug: 'payments-checkout-pix' },
+      // The same exception `checkout` is, for the same reason. @12-apps/auth's six
+      // buyer-facing screens are ASPECTS of signing in, not six destinations —
+      // and unlike every other package here it genuinely needs six URLs, because
+      // a confirmation mail has to land on one specific page and a reset mail on
+      // another. Flat, they would be a quarter of the sidebar.
+      { key: 'auth', label: 'Sign-in', slug: 'auth-login' },
+    ],
   },
   {
     key: 'backoffice',
@@ -245,6 +254,7 @@ export const PAGES: readonly HarnessPage[] = [
     group: 'storefront',
     Component: PaymentsWalletPage,
   },
+  ...AUTH_PAGES,
   {
     slug: 'pwa-install-prompt',
     title: 'Install prompt',
@@ -308,6 +318,7 @@ export const PAGES: readonly HarnessPage[] = [
     title: 'Chain & policy',
     Component: PaymentsProviderChainPage,
   },
+  AUTH_SETTINGS_PAGE,
   {
     slug: 'report-builder',
     title: 'Report builder',

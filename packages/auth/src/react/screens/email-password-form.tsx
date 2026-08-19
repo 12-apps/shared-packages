@@ -6,9 +6,9 @@ import { Input } from "@12-apps/ui/form/Input";
 import { Spacer } from "@12-apps/ui/layout/Spacer";
 
 import { useScreens } from "./context";
-import { failureMessage, type EmailAuthScreenReason } from "./copy";
+import type { EmailAuthScreenReason } from "./copy";
 import { PasswordField } from "./password-field";
-import { LinkButton } from "./shared";
+import { FailureBanner, LinkButton } from "./shared";
 
 /**
  * Sign in with an e-mail and a password.
@@ -126,12 +126,22 @@ function UnverifiedNotice({
   const { copy } = useScreens();
   return (
     <>
+      {/*
+        The same `auth-failure` + `data-reason` pair `FailureBanner` emits, and
+        it has to be: this IS the refusal display for `email-not-verified`, it
+        merely looks different because it carries an action. Without the pair
+        the one refusal a caller most needs to distinguish — right password,
+        unconfirmed address — was the only one no test could read, and it went
+        unnoticed until a second host ran the packaged journeys.
+      */}
       <Alert
         variant="warning"
         title={copy.signIn.unverifiedTitle}
         description={
           resent ? copy.signIn.resentDescription : copy.signIn.unverifiedDescription
         }
+        data-testid="auth-failure"
+        data-reason="email-not-verified"
       />
       <Spacer size="sm" />
       {!resent && (
@@ -160,17 +170,20 @@ export function EmailPasswordForm({
 
   return (
     <form onSubmit={(event) => void form.submit(event)} data-testid="email-password-form">
-      {form.reason && !unverified && (
-        <>
-          <Alert
-            variant="danger"
-            title={copy.signIn.failureTitle}
-            description={failureMessage(copy, form.reason)}
-            closable
-            onClose={form.dismiss}
-          />
-          <Spacer size="sm" />
-        </>
+      {/*
+        The SHARED banner, not a hand-rolled Alert. This screen carried its own
+        for no reason anybody could name, and the cost was that `auth-failure`
+        and `data-reason` were missing from the single most important refusal in
+        the package — a wrong password on the sign-in form. Every other screen
+        used the shared one, so the gap was invisible until a second host ran
+        the packaged journeys against this one.
+      */}
+      {!unverified && (
+        <FailureBanner
+          title={copy.signIn.failureTitle}
+          reason={form.reason}
+          onDismiss={form.dismiss}
+        />
       )}
 
       {unverified && (
