@@ -79,11 +79,19 @@ export const PT_BR_MAIL: MailPack = {
   alreadyRegistered: {
     subject: "Você já tem uma conta",
     greeting: (name) => (name?.trim() ? `Olá, ${name.trim()}` : "Olá"),
-    // No lifetime in this one: it carries a sign-in link, not a token.
-    lead: () =>
-      "Alguém tentou criar uma conta com este e-mail, e você já tem uma. Entre normalmente — ou peça uma nova senha se não lembrar dela.",
-    cta: "Entrar",
-    footer: "Se não foi você, pode ignorar esta mensagem com segurança.",
+    /**
+     * The link in THIS message is a RESET link, not a sign-in one — see
+     * `signup.ts`: the overwhelmingly common cause is a returning user who
+     * forgot they had an account, and the second most common is one who forgot
+     * the password. So it words a lifetime like the other token mails, and its
+     * button says what the button actually does. Calling it "Entrar" would send
+     * somebody to a choose-a-new-password form expecting a sign-in.
+     */
+    lead: ({ validFor }) =>
+      `Alguém tentou criar uma conta com este e-mail, e você já tem uma. Se foi você, entre normalmente — ou use o link abaixo para definir uma nova senha. Ele vale por ${validFor}.`,
+    cta: "Definir uma nova senha",
+    footer:
+      "Se não foi você, pode ignorar esta mensagem com segurança. Nenhuma conta nova foi criada.",
   },
   passwordChanged: {
     subject: "Sua senha foi alterada",
