@@ -6,10 +6,15 @@ import type { Session } from "@auth/core/types";
 import { isAdminEmail } from "./admin";
 import {
   buildAuthConfig,
+  buildProviders,
   getEnv,
   type SessionAdminResolver,
   type SignInGate,
 } from "./build-config";
+import {
+  credentialsProvider,
+  type CredentialsProviderConfig,
+} from "./credentials-provider";
 
 /**
  * The backend half of `@12-apps/auth`, as one factory taking one config object.
@@ -73,6 +78,18 @@ export interface ApiAuthConfig {
   basePath?: string;
   /** OAuth providers. Defaults to whatever the environment configures. */
   providers?: Provider[];
+  /**
+   * Turn on e-mail + password sign-in by handing over the flow's
+   * `authenticate` (see `createEmailCredentials`).
+   *
+   * The credentials provider is APPENDED to the OAuth ones rather than
+   * replacing them, which is what lets one account carry both: a person who
+   * signed up with Google can add a password later and afterwards use either.
+   * Omit this and nothing changes — no provider is registered and
+   * `{basePath}/callback/credentials` 404s, so the surface cannot be reached by
+   * a host that has not opted in.
+   */
+  emailPassword?: CredentialsProviderConfig;
   /**
    * Comma-separated allowlist (or an array) used to answer
    * {@link ApiAuth.isAdmin} and to stamp `isSuperadmin` when no
@@ -169,6 +186,20 @@ function reqWithEnvUrl(request: Request, authUrl: string | undefined): Request {
 }
 
 /**
+ * The provider list: whatever OAuth is configured, plus the credentials
+ * provider when the host opted into e-mail + password.
+ *
+ * `undefined` when there is nothing to add, so `buildAuthConfig` keeps its own
+ * environment default and this function stays invisible to hosts that do not
+ * use passwords.
+ */
+function resolveProviders(options: ApiAuthConfig): Provider[] | undefined {
+  if (!options.emailPassword) return options.providers;
+  const oauth = options.providers ?? buildProviders();
+  return [...oauth, credentialsProvider(options.emailPassword)];
+}
+
+/**
  * Build the backend auth surface. One call, one config object, nothing global.
  */
 export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
@@ -178,7 +209,7 @@ export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
   const config = buildAuthConfig({
     getSignInGate: () => options.signInGate ?? null,
     getSessionAdmin: () => options.sessionAdmin ?? null,
-    providers: options.providers,
+    providers: resolveProviders(options),
     getAdminEmails,
     signInPage: options.signInPage,
     maxAge: options.maxAge,

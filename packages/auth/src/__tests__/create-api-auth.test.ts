@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApiAuth } from "../create-api-auth";
+import { CREDENTIALS_PROVIDER_ID } from "../credentials-provider-id";
 
 beforeEach(() => {
   // `vi.stubEnv` rather than assigning `process.env` directly: the flakiness
@@ -55,6 +56,81 @@ describe("createApiAuth", () => {
     // migrate. A host's user record is the host's.
     expect(config.session?.strategy).toBe("jwt");
     expect(config.adapter).toBeUndefined();
+  });
+
+  describe("adding a password provider leaves OAuth alone", () => {
+    /**
+     * The regression this guards is silent and expensive: a host opts into
+     * e-mail + password and "Continue with Google" quietly stops existing,
+     * which nothing else here would notice — the gate tests pass an identity in
+     * directly and never go near the provider list.
+     *
+     * Every test re-imports the module. `getEnv()` MEMOISES the validated
+     * environment in a module-level cache, and the tests above have already
+     * warmed it, so stubbing the Google variables would otherwise change
+     * nothing. Resetting the module registry is what makes the fixture below
+     * the thing `buildProviders()` actually reads — and the first version of
+     * this suite, which did not, passed on a machine with real Google
+     * credentials exported and failed in CI, which had none.
+     */
+    beforeEach(() => {
+      vi.resetModules();
+      vi.stubEnv("GOOGLE_CLIENT_ID", "google-client-id");
+      vi.stubEnv("GOOGLE_CLIENT_SECRET", "google-client-secret");
+    });
+
+    function providerIds(config: { providers: unknown[] }): string[] {
+      return config.providers.map((provider) =>
+        typeof provider === "function"
+          ? String((provider as () => { id?: string })().id)
+          : String((provider as { id?: string }).id),
+      );
+    }
+
+    /** The factory, freshly imported so it sees the stubbed environment. */
+    async function freshFactory(): Promise<typeof createApiAuth> {
+      const module = (await import("../create-api-auth")) as {
+        createApiAuth: typeof createApiAuth;
+      };
+      return module.createApiAuth;
+    }
+
+    const emailPassword = {
+      authenticate: () => Promise.resolve({ ok: false as const, reason: "invalid-credentials" as const }),
+    };
+
+    it("keeps Google and appends the credentials provider after it", async () => {
+      const factory = await freshFactory();
+
+      const ids = providerIds(factory({ emailPassword }).config);
+
+      expect(ids).toContain("google");
+      expect(ids).toContain(CREDENTIALS_PROVIDER_ID);
+      // LAST, not first. Order decides which provider a bare sign-in falls
+      // through to, so appending is the part that must not drift.
+      expect(ids[ids.length - 1]).toBe(CREDENTIALS_PROVIDER_ID);
+    });
+
+    it("adds nothing at all when the host did not opt in", async () => {
+      const factory = await freshFactory();
+
+      const ids = providerIds(factory().config);
+
+      expect(ids).toContain("google");
+      expect(ids).not.toContain(CREDENTIALS_PROVIDER_ID);
+    });
+
+    it("keeps a host's explicit provider list and appends to that", async () => {
+      // A host that names its providers has not thereby said anything about
+      // passwords, and vice versa — restating one to get the other is the shape
+      // of config change that drops a provider from a deployment.
+      const factory = await freshFactory();
+      const custom = { id: "custom-oauth", name: "Custom", type: "oidc" } as never;
+
+      const ids = providerIds(factory({ providers: [custom], emailPassword }).config);
+
+      expect(ids).toEqual(["custom-oauth", CREDENTIALS_PROVIDER_ID]);
+    });
   });
 
   describe("the sign-in gate", () => {
