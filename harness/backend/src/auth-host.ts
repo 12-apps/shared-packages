@@ -6,14 +6,11 @@ import { getCookie, setCookie } from 'hono/cookie';
 import type { PGlite } from '@electric-sql/pglite';
 
 import { createApiAuth } from '@12-apps/auth';
-import {
-  createEmailCredentials,
-  type AuthEmailMessage,
-  type EmailCredentials,
-  type EmailCredentialsMailer,
-} from '@12-apps/auth/email-credentials';
+import { createEmailCredentials, type EmailCredentials } from '@12-apps/auth/email-credentials';
 import { emailAuthRouter, emailAuthSettingsRouter } from '@12-apps/auth/hono';
-import { PT_BR_MAIL, PT_BR_MESSAGES, renderAuthMail } from '@12-apps/auth/server';
+import { createAuthMailer } from '@12-apps/auth/notifications';
+import { PT_BR_MESSAGES } from '@12-apps/auth/server';
+import type { EmailDriver } from '@12-apps/notifications/server';
 
 import { authSettingsStore, authStore } from './auth-store';
 import { HARNESS_SPA_ORIGIN } from './port';
@@ -81,45 +78,28 @@ const LOGIN_PATH = '/#/auth-login';
 const HOST_SESSION_COOKIE = 'harness-auth-actor';
 
 /**
- * The mailer, rendering through the package's own layout (12-25).
+ * WHERE a message goes — the vendor seam, and the only half of the mailer this
+ * host owns (12-25).
  *
- * `renderAuthMail(PT_BR_MAIL, …)` is the pack-plus-layout seam: the skeleton,
- * the escaping and the plain-text twin are `@12-apps/auth`'s, the words are the
- * pack's. A host that wanted English would pass a different pack and change
- * nothing else — which is what makes it a seam rather than a hardcoded
- * language.
+ * `EmailDriver` is `@12-apps/notifications`' own port, so this is a fourth
+ * driver beside its `resend` and `log` ones. A real adopter passes
+ * `EMAIL_DRIVERS.resend({...})` and writes none of this; the harness keeps the
+ * message instead, because the journeys READ what was sent and click the link
+ * inside it.
  *
- * Delivery is the host's, and here it is an INSERT. A real adopter hands the
- * same rendered object to a vendor.
+ * The PLAIN-TEXT half is stored. The HTML carries the same URL twice — once on
+ * the button, once in the paste-this fallback — so "the first http… in the
+ * document" is ambiguous there in a way it never is here.
  */
-function recordingMailer(pg: PGlite): EmailCredentialsMailer {
-  const send = async (
-    kind: 'verification' | 'passwordReset' | 'alreadyRegistered' | 'passwordChanged',
-    message: AuthEmailMessage,
-  ): Promise<void> => {
-    const mail = renderAuthMail(PT_BR_MAIL, kind, message);
-    // The PLAIN-TEXT half is stored, and the journeys read the link out of it.
-    // The HTML carries the same URL twice — once on the button, once in the
-    // paste-this fallback — so "the first http… in the document" is ambiguous
-    // there in a way it never is here.
-    await pg.query('INSERT INTO auth_sent_mail (to_email, subject, body) VALUES ($1, $2, $3)', [
-      mail.to,
-      mail.subject,
-      mail.text,
-    ]);
-  };
-
+function recordingDriver(pg: PGlite): EmailDriver {
   return {
-    sendVerification: (message) => send('verification', message),
-    sendPasswordReset: (message) => send('passwordReset', message),
-    sendAccountExists: (message) => send('alreadyRegistered', message),
-    sendPasswordChanged: (message) =>
-      send('passwordChanged', {
-        ...message,
-        link: `${APP_URL}${LOGIN_PATH}`,
-        token: '',
-        expiresAt: new Date(),
-      }),
+    send: async (to, message) => {
+      await pg.query('INSERT INTO auth_sent_mail (to_email, subject, body) VALUES ($1, $2, $3)', [
+        to,
+        message.subject,
+        message.text,
+      ]);
+    },
   };
 }
 
@@ -220,7 +200,20 @@ export function authHost(pg: PGlite): AuthHost {
 
   const credentials = createEmailCredentials({
     store: authStore(pg),
-    mailer: recordingMailer(pg),
+    /**
+     * The mailer comes from the PACKAGE, not from this host (12-25).
+     *
+     * `@12-apps/auth/notifications` renders the four messages through
+     * `renderAuthMail` and hands each to an `@12-apps/notifications` driver, so
+     * the host supplies only the vendor. That is the whole integration: no
+     * `sendVerification`, no `sendPasswordReset`, no layout and no escaping
+     * written here — the two packages already own a half each, and a host
+     * writing them again is copying.
+     */
+    mailer: createAuthMailer({
+      driver: recordingDriver(pg),
+      loginUrl: `${APP_URL}${LOGIN_PATH}`,
+    }),
     // A RESOLVER, not a fixed object: both switches are flipped mid-scenario by
     // the operator console, and a value captured at construction would take
     // effect on the next restart instead of the next request.

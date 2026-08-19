@@ -284,6 +284,7 @@
         "// from the root entry.",
         "src/server/index.ts",
         "src/hono/index.ts",
+        "src/notifications/index.ts",
         "src/react/index.ts",
         "src/react/screens/index.tsx",
         "src/react/settings/index.tsx",

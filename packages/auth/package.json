@@ -29,7 +29,11 @@
       "types": "./dist/e2e/index.d.ts",
       "default": "./dist/e2e/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./notifications": {
+      "types": "./src/notifications/index.ts",
+      "default": "./src/notifications/index.ts"
+    }
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
@@ -47,6 +51,7 @@
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/notifications": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@12-apps/ui": "workspace:*",
     "@playwright/test": "^1.56.1",
@@ -102,7 +107,8 @@
     "react-dom": ">=19.0.0",
     "hono": ">=4.0.0",
     "@playwright/test": ">=1.40.0",
-    "playwright-bdd": ">=8.0.0"
+    "playwright-bdd": ">=8.0.0",
+    "@12-apps/notifications": ">=4.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -121,6 +127,9 @@
       "optional": true
     },
     "playwright-bdd": {
+      "optional": true
+    },
+    "@12-apps/notifications": {
       "optional": true
     }
   }
