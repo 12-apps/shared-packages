@@ -248,9 +248,13 @@ async function postSignOut(basePath: string, fetchImpl: typeof fetch): Promise<v
 export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
   const basePath = config.basePath ?? "/api/auth";
   const credentialsProviderId = config.credentialsProviderId ?? CREDENTIALS_PROVIDER_ID;
-  // Read once, so a host swapping the global later cannot change what an
-  // already-mounted provider talks to.
-  const fetchImpl = config.fetchImpl ?? globalThis.fetch.bind(globalThis);
+  // Resolved per CALL, not once here. A host builds its auth surface at module
+  // scope, so "once here" happens at IMPORT time — before a test's `beforeEach`
+  // installs its stub, before a polyfill loads, before anything else that
+  // replaces `globalThis.fetch` has run. Capturing it froze every SPA's auth
+  // client onto the real `fetch`, and a suite that stubs the global then hung
+  // on a session request that nothing was left to answer.
+  const fetchImpl: typeof fetch = config.fetchImpl ?? ((...args) => globalThis.fetch(...args));
 
   const SessionContext = createContext<SessionContextValue | null>(null);
 
