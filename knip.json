@@ -188,11 +188,15 @@
         "// `./e2e` has to be named as SOURCE: its `exports` target is built output,",
         "// which does not exist in a checkout, so knip would read the whole journey",
         "// subtree as unused. The step definitions are reached by playwright-bdd's",
-        "// `steps` GLOB and never by an import.",
+        "// `steps` GLOB and never by an import \u2014 a host points at",
+        "// dist/e2e/steps/**/*.js and bddgen loads each file for its registration",
+        "// side effect.",
         "src/e2e/index.ts",
         "src/e2e/steps/**/*.ts"
       ],
-      "ignoreDependencies": ["playwright-bdd"]
+      "ignoreDependencies": [
+        "playwright-bdd"
+      ]
     },
     "packages/report-builder": {
       "entry": [
@@ -273,22 +277,14 @@
         "src/drivers/inline.ts"
       ]
     },
-    "packages/impersonation": {
+    "packages/auth-e2e": {
       "entry": [
         "src/index.ts",
-        "// The published subpaths. Each is reached by a CONSUMER import and never",
-        "// from the root entry, which is framework-free on purpose.",
-        "src/server/index.ts",
-        "src/hono/index.ts",
-        "src/react/index.ts",
-        "// `./e2e` has to be named as SOURCE: its `exports` target is built output,",
-        "// which does not exist in a checkout, so knip would read the whole journey",
-        "// subtree as unused. The step definitions are reached by playwright-bdd's",
-        "// `steps` GLOB and never by an import \u2014 a host points at",
-        "// dist/e2e/steps/**/*.js and bddgen loads each file for its registration",
-        "// side effect.",
-        "src/e2e/index.ts",
-        "src/e2e/steps/**/*.ts"
+        "// Step definitions are reached by playwright-bdd's `steps` GLOB, never by",
+        "// an import \u2014 the same shape as packages/payments/e2e. A host points at",
+        "// dist/steps/**/*.js and bddgen loads each file for its registration side",
+        "// effect, so nothing in this repo ever imports them.",
+        "src/steps/**/*.ts"
       ],
       "ignoreDependencies": [
         "playwright-bdd"

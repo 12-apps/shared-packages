@@ -22,7 +22,7 @@ Feature: Signing up with an e-mail and a password
     And the platform requires e-mail confirmation
 
   Scenario: A new shopper confirms her address and then signs in with her password
-    Given "ana.cadastro@futurepay.test" has no account yet
+    Given "ana.cadastro@example.test" has no account yet
 
     When she creates an account with the password "uma senha boa 42"
     Then she is told to check her inbox
@@ -40,7 +40,7 @@ Feature: Signing up with an e-mail and a password
     Then she is signed in
 
   Scenario: The confirmation link works exactly once
-    Given "bia.cadastro@futurepay.test" has no account yet
+    Given "bia.cadastro@example.test" has no account yet
     And she created an account with the password "outra senha boa 77"
 
     When she opens the confirmation link we sent her
@@ -53,19 +53,19 @@ Feature: Signing up with an e-mail and a password
 
   Scenario: With confirmation switched off, the account works straight away
     Given the platform does not require e-mail confirmation
-    And "duda.cadastro@futurepay.test" has no account yet
+    And "duda.cadastro@example.test" has no account yet
 
     # The other half of the superadmin switch, and it is not merely "one step
     # fewer": the sign-up CONTRACT changes with it. The funnel gets shorter and
     # the platform gives up the property the scenario below depends on.
     When she creates an account with the password "senha direta 33"
     Then she is signed in
-    And no message was sent to "duda.cadastro@futurepay.test"
+    And no message was sent to "duda.cadastro@example.test"
 
   Scenario: Signing up with an address that already has an account tells only the inbox
-    Given "carla.cadastro@futurepay.test" already has an account
+    Given "carla.cadastro@example.test" already has an account
 
-    When someone tries to create an account with "carla.cadastro@futurepay.test"
+    When someone tries to create an account with "carla.cadastro@example.test"
     # The SAME answer a free address gives. Anything else here — a "já existe",
     # a different status, a faster reply — turns this form into a way to ask
     # who banks with us, one address at a time, with no credentials at all.

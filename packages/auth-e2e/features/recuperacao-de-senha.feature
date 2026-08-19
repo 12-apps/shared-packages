@@ -17,7 +17,7 @@ Feature: Getting back in after forgetting a password
     And the platform offers e-mail and password sign-in
 
   Scenario: A shopper resets her password and the old one stops working
-    Given "dora.reset@futurepay.test" has an account with the password "senha antiga 11"
+    Given "dora.reset@example.test" has an account with the password "senha antiga 11"
 
     When she asks for a link to reset her password
     Then she is told to check her inbox
@@ -33,7 +33,7 @@ Feature: Getting back in after forgetting a password
     Then she is signed in
 
   Scenario: The reset link works exactly once
-    Given "elza.reset@futurepay.test" has an account with the password "senha antiga 11"
+    Given "elza.reset@example.test" has an account with the password "senha antiga 11"
     And she asked for a link to reset her password
 
     When she opens the reset link we sent her
@@ -50,9 +50,9 @@ Feature: Getting back in after forgetting a password
     Then she is told the link is no longer valid
 
   Scenario: Asking about an address with no account gives nothing away
-    When someone asks for a reset link for "ninguem@futurepay.test"
+    When someone asks for a reset link for "ninguem@example.test"
     # Identical to the answer a real account gets. The screen cannot tell them
     # apart because the server does not, which is the point: otherwise this
     # form answers "does this person have an account here" for anyone who asks.
     Then she is told to check her inbox
-    And no message was sent to "ninguem@futurepay.test"
+    And no message was sent to "ninguem@example.test"

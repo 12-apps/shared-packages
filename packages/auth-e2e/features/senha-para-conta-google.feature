@@ -20,7 +20,7 @@ Feature: A Google account that also wants a password
     And the platform offers e-mail and password sign-in
 
   Scenario: She adds a password to an account that only had Google, and keeps both
-    Given "fabi.google@futurepay.test" signed up with Google and has no password
+    Given "fabi.google@example.test" signed up with Google and has no password
     And she is already signed in
 
     When she opens her account
@@ -48,7 +48,7 @@ Feature: A Google account that also wants a password
     Then signing in with Google is still offered
 
   Scenario: Changing a password she already has needs the current one
-    Given "gina.google@futurepay.test" has an account with the password "senha atual 33"
+    Given "gina.google@example.test" has an account with the password "senha atual 33"
     And she is already signed in
 
     When she opens her account
