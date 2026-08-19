@@ -64,7 +64,21 @@ describe("createApiAuth", () => {
      * e-mail + password and "Continue with Google" quietly stops existing,
      * which nothing else here would notice — the gate tests pass an identity in
      * directly and never go near the provider list.
+     *
+     * Every test re-imports the module. `getEnv()` MEMOISES the validated
+     * environment in a module-level cache, and the tests above have already
+     * warmed it, so stubbing the Google variables would otherwise change
+     * nothing. Resetting the module registry is what makes the fixture below
+     * the thing `buildProviders()` actually reads — and the first version of
+     * this suite, which did not, passed on a machine with real Google
+     * credentials exported and failed in CI, which had none.
      */
+    beforeEach(() => {
+      vi.resetModules();
+      vi.stubEnv("GOOGLE_CLIENT_ID", "google-client-id");
+      vi.stubEnv("GOOGLE_CLIENT_SECRET", "google-client-secret");
+    });
+
     function providerIds(config: { providers: unknown[] }): string[] {
       return config.providers.map((provider) =>
         typeof provider === "function"
@@ -73,42 +87,49 @@ describe("createApiAuth", () => {
       );
     }
 
-    beforeEach(() => {
-      vi.stubEnv("GOOGLE_CLIENT_ID", "google-client-id");
-      vi.stubEnv("GOOGLE_CLIENT_SECRET", "google-client-secret");
-    });
+    /** The factory, freshly imported so it sees the stubbed environment. */
+    async function freshFactory(): Promise<typeof createApiAuth> {
+      const module = (await import("../create-api-auth")) as {
+        createApiAuth: typeof createApiAuth;
+      };
+      return module.createApiAuth;
+    }
 
-    it("keeps Google and appends the credentials provider after it", () => {
-      const { config } = createApiAuth({
-        emailPassword: { authenticate: () => Promise.resolve({ ok: false, reason: "invalid-credentials" }) },
-      });
+    const emailPassword = {
+      authenticate: () => Promise.resolve({ ok: false as const, reason: "invalid-credentials" as const }),
+    };
 
-      const ids = providerIds(config);
+    it("keeps Google and appends the credentials provider after it", async () => {
+      const factory = await freshFactory();
+
+      const ids = providerIds(factory({ emailPassword }).config);
+
       expect(ids).toContain("google");
       expect(ids).toContain(CREDENTIALS_PROVIDER_ID);
-      // LAST, not first. Order is what decides which provider a bare sign-in
-      // falls through to, so appending is the part that must not drift.
+      // LAST, not first. Order decides which provider a bare sign-in falls
+      // through to, so appending is the part that must not drift.
       expect(ids[ids.length - 1]).toBe(CREDENTIALS_PROVIDER_ID);
     });
 
-    it("adds nothing at all when the host did not opt in", () => {
-      const ids = providerIds(createApiAuth().config);
+    it("adds nothing at all when the host did not opt in", async () => {
+      const factory = await freshFactory();
+
+      const ids = providerIds(factory().config);
 
       expect(ids).toContain("google");
       expect(ids).not.toContain(CREDENTIALS_PROVIDER_ID);
     });
 
-    it("keeps a host's explicit provider list and appends to that", () => {
+    it("keeps a host's explicit provider list and appends to that", async () => {
       // A host that names its providers has not thereby said anything about
       // passwords, and vice versa — restating one to get the other is the shape
       // of config change that drops a provider from a deployment.
+      const factory = await freshFactory();
       const custom = { id: "custom-oauth", name: "Custom", type: "oidc" } as never;
-      const { config } = createApiAuth({
-        providers: [custom],
-        emailPassword: { authenticate: () => Promise.resolve({ ok: false, reason: "invalid-credentials" }) },
-      });
 
-      expect(providerIds(config)).toEqual(["custom-oauth", CREDENTIALS_PROVIDER_ID]);
+      const ids = providerIds(factory({ providers: [custom], emailPassword }).config);
+
+      expect(ids).toEqual(["custom-oauth", CREDENTIALS_PROVIDER_ID]);
     });
   });
 
