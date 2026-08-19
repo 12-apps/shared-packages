@@ -151,6 +151,15 @@ export interface SocialLoginContainerProps {
   subtitle?: string;
   showDivider?: boolean;
   dividerText?: string;
+  /**
+   * How wide the card is allowed to get. Defaults to the 400 it has always
+   * intended, so nothing that does not ask for a width moves.
+   *
+   * Worth passing for a card holding a FORM rather than a row of provider
+   * buttons: 400 was chosen for the latter, and an e-mail + password pair reads
+   * cramped in it.
+   */
+  maxWidth?: number | string;
 }
 
 export function SocialLoginContainer({
@@ -159,11 +168,18 @@ export function SocialLoginContainer({
   subtitle,
   showDivider = false,
   dividerText = "or",
+  maxWidth = 400,
 }: SocialLoginContainerProps): React.ReactElement {
   return (
-    <Card variant="elevated" borderRadius="lg">
+    // `width: 100%` is what makes the cap below mean anything. Every caller
+    // centres this card in a flex column (`Container variant="centered"` does),
+    // and a flex item under `align-items: center` sizes to its CONTENT — so the
+    // card sat at whatever the longest label happened to need, ~267px, at every
+    // viewport from 390 to 1280. The 400 was never reached, which is why raising
+    // it would have changed nothing; the card had no width to cap.
+    <Card variant="elevated" borderRadius="lg" sx={{ width: '100%', maxWidth }}>
       <CardContent>
-        <Stack spacing={3} sx={{ width: '100%', maxWidth: 400 }}>
+        <Stack spacing={3} sx={{ width: '100%' }}>
           {title && (
             <Box sx={{ textAlign: 'center' }}>
               <Heading level="h2">

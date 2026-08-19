@@ -33,6 +33,10 @@
     "./notifications": {
       "types": "./src/notifications/index.ts",
       "default": "./src/notifications/index.ts"
+    },
+    "./prisma": {
+      "types": "./src/prisma/index.ts",
+      "default": "./src/prisma/index.ts"
     }
   },
   "scripts": {
@@ -43,7 +47,9 @@
     "test:coverage": "node ../../scripts/vitest-with-teardown.mjs run --coverage",
     "dev": "storybook dev -p 6008",
     "storybook:build": "storybook build",
-    "build": "tsc -p tsconfig.e2e.json"
+    "build": "tsc -p tsconfig.e2e.json",
+    "prisma:sync": "node scripts/sync-auth-schema.mjs",
+    "prisma:sync:check": "node scripts/sync-auth-schema.mjs --check"
   },
   "dependencies": {
     "@auth/core": "0.41.0",
@@ -99,7 +105,8 @@
     "!**/*.spec.*",
     "!**/*.stories.*",
     "!**/*.test-story.*",
-    "!**/test-helpers.*"
+    "!**/test-helpers.*",
+    "scripts"
   ],
   "peerDependencies": {
     "@12-apps/ui": ">=5.0.0",
