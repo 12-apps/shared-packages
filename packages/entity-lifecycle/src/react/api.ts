@@ -1,4 +1,10 @@
-import type { JsonValue, Snapshot } from '../types';
+import type { Snapshot } from '../types';
+import type {
+  DraftWire,
+  VersionComparisonWire,
+  VersionsWire,
+  WriteOutcomeWire,
+} from '../wire';
 
 import type { LifecycleResult, LifecycleTransport } from './transport';
 
@@ -9,74 +15,17 @@ import type { LifecycleResult, LifecycleTransport } from './transport';
  * contract; changing either alone is a drift bug.
  */
 
-export interface VersionWire {
-  version: number;
-  kind: 'CREATE' | 'UPDATE' | 'RESTORE';
-  actorId: string | null;
-  actorName: string | null;
-  createdAt: string;
-  changedFields: string[];
-  removedFields: string[];
-  restoredFromVersion: number | null;
-}
-
-/** What a compared version is to the selection (a version can play two). */
-export type ComparisonRoleWire = 'previous' | 'selected' | 'next' | 'current';
-
-/** One column of the comparison table: a version, and what it is to the selection. */
-export interface ComparisonColumnWire {
-  version: number;
-  roles: ComparisonRoleWire[];
-  kind: VersionWire['kind'];
-  actorId: string | null;
-  actorName: string | null;
-  createdAt: string;
-}
-
-/**
- * One field's value in one column. `present: false` means the version did not
- * carry the field at all — which the panel renders differently from a field
- * whose value IS null, because they are different answers.
- */
-export interface ComparisonCellWire {
-  version: number;
-  present: boolean;
-  value: JsonValue | null;
-}
-
-export interface ComparisonRowWire {
-  field: string;
-  changed: boolean;
-  cells: ComparisonCellWire[];
-}
-
-export interface VersionComparisonWire {
-  selectedVersion: number;
-  columns: ComparisonColumnWire[];
-  rows: ComparisonRowWire[];
-}
-
-export interface VersionsWire {
-  versions: VersionWire[];
-  publishedVersion: number;
-  /** Present only when the request asked to compare a version (FUT-247). */
-  comparison?: VersionComparisonWire | null;
-}
-
-/** The write outcome — `applied: false` means parked for approval (202). */
-export interface WriteOutcomeWire {
-  applied: boolean;
-  entityId: string | null;
-  requestId: string | null;
-}
-
-export interface DraftWire {
-  id: string;
-  entityId: string | null;
-  data: Snapshot;
-  status: 'OPEN' | 'PUBLISHED' | 'DISCARDED';
-  updatedAt: string;
-}
+export type {
+  ComparisonCellWire,
+  ComparisonColumnWire,
+  ComparisonRoleWire,
+  ComparisonRowWire,
+  DraftWire,
+  VersionComparisonWire,
+  VersionsWire,
+  VersionWire,
+  WriteOutcomeWire,
+} from '../wire';
 
 export interface RecycleBinChildWire {
   id: string;
