@@ -714,9 +714,44 @@ jobs:
         run: |
           set -o pipefail
           node scripts/harness-install.mjs 2>&1 | tee harness-install.log
+      # The browser binaries, cached across runs.
+      #
+      # `playwright install` pulls ~300 MB from the CDN every time — Chrome for
+      # Testing, the headless shell and ffmpeg — and that download is the whole
+      # cost of this step and its whole risk. It is what left a `Frontend
+      # Harness` job wedged for over an hour on an otherwise green run to main,
+      # which blocked `release` (it `needs` this job) and so blocked a publish,
+      # silently, with nothing red to look at.
+      #
+      # Keyed on the RESOLVED Playwright version rather than a lockfile: the
+      # harness deliberately has no lockfile (it must resolve like a fresh
+      # consumer), so the browser build it wants can change with no file in this
+      # repo changing. Reading the version back off the install is the only
+      # honest key. A miss simply downloads, which is what happens today.
+      - name: Resolve the Playwright version
+        id: playwright
+        working-directory: harness/frontend
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      # Split from the browsers on purpose. This half is apt, it is a few
+      # seconds, and it must run on a cache HIT too — the runner image is fresh
+      # each time, so the fonts a cached browser needs are not there yet.
+      - name: Install Chromium system dependencies
+        working-directory: harness/frontend
+        timeout-minutes: 5
+        run: npx playwright install-deps chromium
+      # Downloads only on a miss; a hit finds the binaries already in the cache
+      # directory and returns immediately. The timeout is the backstop the
+      # incident above wanted: a stalled download now fails this job in minutes
+      # instead of holding the release pipeline until GitHub's 6-hour kill.
       - name: Install Chromium
         working-directory: harness/frontend
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 10
+        run: npx playwright install chromium
       # No `npm run build` step: playwright.config.ts's webServer command builds
       # the SPA before `vite preview` serves it, so the build is owned by the one
       # thing every invocation has to go through. A step here would build it a
@@ -778,9 +813,44 @@ jobs:
         run: |
           set -o pipefail
           node scripts/harness-install.mjs 2>&1 | tee harness-install.log
+      # The browser binaries, cached across runs.
+      #
+      # `playwright install` pulls ~300 MB from the CDN every time — Chrome for
+      # Testing, the headless shell and ffmpeg — and that download is the whole
+      # cost of this step and its whole risk. It is what left a `Frontend
+      # Harness` job wedged for over an hour on an otherwise green run to main,
+      # which blocked `release` (it `needs` this job) and so blocked a publish,
+      # silently, with nothing red to look at.
+      #
+      # Keyed on the RESOLVED Playwright version rather than a lockfile: the
+      # harness deliberately has no lockfile (it must resolve like a fresh
+      # consumer), so the browser build it wants can change with no file in this
+      # repo changing. Reading the version back off the install is the only
+      # honest key. A miss simply downloads, which is what happens today.
+      - name: Resolve the Playwright version
+        id: playwright
+        working-directory: harness/frontend
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      # Split from the browsers on purpose. This half is apt, it is a few
+      # seconds, and it must run on a cache HIT too — the runner image is fresh
+      # each time, so the fonts a cached browser needs are not there yet.
+      - name: Install Chromium system dependencies
+        working-directory: harness/frontend
+        timeout-minutes: 5
+        run: npx playwright install-deps chromium
+      # Downloads only on a miss; a hit finds the binaries already in the cache
+      # directory and returns immediately. The timeout is the backstop the
+      # incident above wanted: a stalled download now fails this job in minutes
+      # instead of holding the release pipeline until GitHub's 6-hour kill.
       - name: Install Chromium
         working-directory: harness/frontend
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 10
+        run: npx playwright install chromium
       # No `npm run build` step here either — see `Frontend Harness` above.
       # FIRST, and it starts no browser — it compiles and inspects. It fails on
       # exactly the states a green suite would hide: a feature that produced no
