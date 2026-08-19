@@ -13,11 +13,11 @@ import { cardInput, pixInput } from './fixtures';
  * amounts, declines, QR and webhook signing, but never asserts any of the
  * three, so a mapping that swapped two of them stayed green.
  *
- * That gap had a consumer: `future-pay` re-derived both from `snapshot.raw`
- * in its own host code (`providerOrderIdOf`, `vaultTokenOf`), which meant the
- * HOST's tests were the only thing exercising the rule — for one host, in one
- * repo, against fixtures it wrote itself. Deleting that host code in favour of
- * the normalized fields (FUT-760) is what makes these assertions the only
+ * That gap had a consumer: an adopter re-derived two of them from
+ * `snapshot.raw` in its own code, which meant a HOST's tests were the only
+ * thing exercising the rule — for one adopter, in another repo, against
+ * fixtures it wrote itself. Dropping that host code in favour of the
+ * normalized fields (FUT-760) is what makes these assertions the only
  * remaining guard, so they belong here now.
  *
  * Each id is wrong in a distinct, expensive way: the order id is what
