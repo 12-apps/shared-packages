@@ -77,8 +77,18 @@ export interface PaymentsHttpDeps {
    * and returns the amount IT computed; anything the client sent for those
    * fields is discarded here (the draft type does not even carry them).
    * Throw from this resolver to reject the charge.
+   *
+   * OPTIONAL, like `setupContextFor` below and for the same reason: a host
+   * that does not mount the buyer checkout has no order table to resolve
+   * against, and `createCharge` is unreachable for it anyway. A mount with a
+   * `prefix` prepends those segments to every incoming path, so a mount
+   * scoped to the admin credential lifecycle can never match the `charges`
+   * row — requiring the resolver there only forces a host to hand-write a
+   * per-attempt reference and idempotency key for a handler it never serves,
+   * and those are exactly the rules `createChargeRaiser` exists to keep in
+   * one place. Omit it to disable the endpoint (404).
    */
-  resolveChargeRequest: (
+  resolveChargeRequest?: (
     merchant: MerchantRef,
     draft: ChargeRequestDraft,
   ) => Promise<ChargeInput>;
@@ -309,6 +319,9 @@ export function createPaymentsHttp(deps: PaymentsHttpDeps): PaymentsHttpHandlers
 
     createCharge: (request, ctx) =>
       guarded(async () => {
+        if (!resolveChargeRequest) {
+          return json({ error: 'NotFound', message: 'No checkout resolver' }, 404);
+        }
         const draft = (await request.json()) as ChargeRequestDraft;
         // The ONLY charge input that reaches the gateway is the one the
         // host derived server-side; amount and reference never come from
