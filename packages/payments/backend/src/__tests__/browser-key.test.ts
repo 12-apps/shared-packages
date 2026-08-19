@@ -34,19 +34,22 @@ function world(options: { mint?: () => Promise<string | null>; config?: StoredPr
     browserKey: { field: 'publicKey', mint },
   } as Partial<PaymentProviderAdapter>);
 
-  let stored: StoredProviderConfig | null = options.config ?? connectedConfig();
+  // A container, not a closed-over binding — see `activation-fixtures.ts`.
+  const row: { current: StoredProviderConfig | null } = {
+    current: options.config ?? connectedConfig(),
+  };
   const saves: StoredProviderConfig[] = [];
   const deps = {
     providers: activationRegistry({ pagbank: adapter }),
     connections: {
-      get: async () => stored,
+      get: async () => row.current,
       save: async (_merchant: MerchantRef, config: StoredProviderConfig) => {
-        stored = config;
+        row.current = config;
         saves.push(config);
       },
     },
   };
-  return { adapter, deps, mint, saves, current: () => stored };
+  return { adapter, deps, mint, saves, current: () => row.current };
 }
 
 const CREDS = { environment: 'PRODUCTION' as const, fields: { token: 'live-token' } };

@@ -246,6 +246,22 @@ const credentialSchema = [
   },
 ] as const;
 
+/**
+ * The card-encryption public key, minted with the store's OWN token when none
+ * is stored (FUT-174) — an OAuth-connected store never pastes one, and copying
+ * the platform's own key in would name a different account. Declaring it here
+ * is what lets a host stop asking `provider === 'pagbank'` on its checkout
+ * path. Hoisted for the size gate, like `credentialSchema` above.
+ */
+const browserKey = {
+  field: 'publicKey',
+  mint: (credentials: ResolvedCredentials) =>
+    fetchPagbankCardPublicKey({
+      apiBase: pagbankApiBase(credentials.environment),
+      token: credentials.fields['token'],
+    }),
+};
+
 export function pagbankProvider(): PaymentProviderAdapter {
   return {
     name: NAME,
@@ -289,19 +305,7 @@ export function pagbankProvider(): PaymentProviderAdapter {
     // contract's honest way to say so.
     vault: pagbankVault,
 
-    // The card-encryption public key, minted with the store's OWN token when
-    // none is stored (FUT-174) — an OAuth-connected store never pastes one,
-    // and copying the platform's own key in would name a different account.
-    // The vendor call is `pagbank-public-key.ts`; declaring it here is what
-    // lets a host stop asking `provider === 'pagbank'` on its checkout path.
-    browserKey: {
-      field: 'publicKey',
-      mint: (credentials) =>
-        fetchPagbankCardPublicKey({
-          apiBase: pagbankApiBase(credentials.environment),
-          token: credentials.fields['token'],
-        }),
-    },
+    browserKey,
 
     // Apple Pay's certificate round-trip (FUT-472) — see `pagbank-wallets.ts`.
     applePay: {

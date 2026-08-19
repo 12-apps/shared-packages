@@ -131,15 +131,17 @@ export function activationContextFor(options: {
   returnUrl?: ActivationContext['returnUrl'];
   mintCardPublicKey?: ActivationContext['mintCardPublicKey'];
 }): ActivationContext {
-  // Mutable, so a test can assert what a mint CACHED — the row is written back
-  // through the same `save` a host's store would receive.
-  let stored = options.config ?? null;
+  // A one-field CONTAINER, not a closed-over binding: a test can assert what a
+  // mint CACHED — the row is written back through the same `save` a host's
+  // store would receive — and the flakiness gate refuses a stub that reassigns
+  // a binding from the outer scope.
+  const row: { current: StoredProviderConfig | null } = { current: options.config ?? null };
   return {
     providers: options.providers,
     config: {
-      get: async () => stored,
+      get: async () => row.current,
       save: async (_merchant, config) => {
-        stored = config;
+        row.current = config;
       },
     },
     settings: options.settings ?? fakeSettings(),
