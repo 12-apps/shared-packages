@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PaymentsGateway } from '../core/gateway';
+import type { MerchantRef } from '../core/types';
+import type { PaymentsRequestContext } from '../http/handlers';
 import { createPaymentsHttp, type PaymentsHttpDeps } from '../http/handlers';
 
 /**
@@ -34,7 +36,8 @@ function harness(resolveChargeRequest?: PaymentsHttpDeps['resolveChargeRequest']
   return { http, charge };
 }
 
-const CTX = { merchant: { kind: 'TENANT', id: 'acme' } } as never;
+const MERCHANT: MerchantRef = { kind: 'TENANT', id: 'acme' };
+const CTX = { merchant: MERCHANT } as PaymentsRequestContext;
 const request = () =>
   new Request('https://host/charges', { method: 'POST', body: JSON.stringify({ method: 'PIX' }) });
 
@@ -73,6 +76,6 @@ describe('createCharge without a host resolver', () => {
     expect(response.status).toBe(201);
     // The HOST's input reaches the gateway verbatim — the browser's draft
     // contributes no amount and no reference.
-    expect(charge).toHaveBeenCalledWith(CTX.merchant, resolved);
+    expect(charge).toHaveBeenCalledWith(MERCHANT, resolved);
   });
 });
