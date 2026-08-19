@@ -905,6 +905,9 @@ importers:
       '@12-apps/audit':
         specifier: workspace:*
         version: link:../audit
+      '@12-apps/auth':
+        specifier: workspace:*
+        version: link:../auth
       '@12-apps/entitlements':
         specifier: workspace:*
         version: link:../entitlements
