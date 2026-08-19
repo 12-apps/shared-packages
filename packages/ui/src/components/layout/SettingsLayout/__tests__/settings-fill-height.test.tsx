@@ -44,24 +44,34 @@ function renderLayout(fillHeight?: boolean): void {
   );
 }
 
-/** The emotion-generated rule text for an element, across its class chain. */
+/** A stylesheet's rules, or none when the browser refuses to expose them. */
+function rulesOf(sheet: CSSStyleSheet): CSSRule[] {
+  try {
+    return Array.from(sheet.cssRules);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The emotion-generated rule text for an element, across its class chain.
+ *
+ * Built by mapping rather than by accumulating into an outer binding: the
+ * flakiness ruleset rejects the latter, and it is right to — a reassigned
+ * closure variable is how a helper starts leaking state between cases.
+ *
+ * `cssText` normalises to `prop: value`, so the result is compared with the
+ * spaces stripped rather than guessing which side of the colon a serialiser
+ * puts them on.
+ */
 function styleTextOf(el: HTMLElement): string {
   const classes = Array.from(el.classList);
-  let text = '';
-  for (const sheet of Array.from(document.styleSheets)) {
-    let rules: CSSRuleList;
-    try {
-      rules = sheet.cssRules;
-    } catch {
-      continue;
-    }
-    for (const rule of Array.from(rules)) {
-      if (classes.some((cls) => rule.cssText.includes(`.${cls}`))) text += rule.cssText;
-    }
-  }
-  // `cssText` normalises to `prop: value`, so compare without the spaces
-  // rather than guessing which side of the colon a serialiser puts them.
-  return text.replace(/\s+/gu, '');
+  return Array.from(document.styleSheets)
+    .flatMap((sheet) => rulesOf(sheet))
+    .filter((rule) => classes.some((cls) => rule.cssText.includes(`.${cls}`)))
+    .map((rule) => rule.cssText)
+    .join('')
+    .replace(/\s+/gu, '');
 }
 
 describe('fillHeight', () => {
