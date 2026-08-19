@@ -5,6 +5,15 @@ import React, { useEffect, useRef, type RefObject } from 'react';
 
 import { SettingsStatusMarker } from './SettingsStatusMarker';
 import { TOUCH_TARGET } from './SettingsLayout.styles';
+
+/**
+ * The chip's drawn height, against `TOUCH_TARGET`'s 44 for the tappable one.
+ *
+ * The strip sits between a section's header and its first field on the width
+ * with the least room for either, so the pill is sized to its text rather than
+ * to the thumb — and the thumb is served by the hit area instead.
+ */
+const CHIP_HEIGHT = 34;
 import type { SettingsLayoutProps, SettingsNavItem } from './SettingsLayout.types';
 
 export interface SettingsSectionChipsProps {
@@ -106,7 +115,15 @@ function SectionChip({
         alignItems: 'center',
         gap: 0.75,
         flex: '0 0 auto',
-        minHeight: TOUCH_TARGET,
+        position: 'relative',
+        // The chip LOOKS this tall; it is still tapped at `TOUCH_TARGET`.
+        //
+        // Shrinking `minHeight` alone would have bought a slimmer strip with a
+        // smaller hit area — on the one width where the strip IS the navigation
+        // and the input is a thumb. The `::after` below keeps the tappable
+        // region at the full target while the pill itself takes less room, so
+        // this is a visual change and not an accessibility trade.
+        minHeight: CHIP_HEIGHT,
         px: 1.5,
         borderRadius: 999,
         cursor: 'pointer',
@@ -118,6 +135,17 @@ function SectionChip({
         color: active ? 'primary.main' : 'text.secondary',
         bgcolor: active ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
         border: `1px solid ${active ? alpha(theme.palette.primary.main, 0.4) : theme.palette.divider}`,
+        // Spans the chip's width only, so neighbours never overlap: the strip
+        // is a row, and the extra reach is vertical.
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          insetInlineStart: 0,
+          insetInlineEnd: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          height: TOUCH_TARGET,
+        },
       }}
     >
       {item.status ? (
@@ -163,7 +191,7 @@ export function SettingsSectionChips({
         alignItems: 'center',
         gap: 0.75,
         px: 0.25,
-        py: 0.75,
+        py: 0.25,
         overflowX: 'auto',
         overflowY: 'hidden',
         scrollbarWidth: 'none',
