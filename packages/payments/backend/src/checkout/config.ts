@@ -1,7 +1,9 @@
+import { mintBrowserKey } from '../config/browser-key';
 import type { ProviderConfigStore } from '../config/types';
 import type { ClientProviderConfig } from '../core/client-view';
 import type { PaymentsGateway } from '../core/gateway';
 import type { CredentialStore } from '../core/ports';
+import type { ProviderRegistry } from '../core/registry';
 import type { MerchantRef, PaymentMethodKind } from '../core/types';
 
 import type { BrowserKeyPort, BuyerCheckoutConfig, BuyerProviderLink } from './types';
@@ -29,8 +31,18 @@ import type { BrowserKeyPort, BuyerCheckoutConfig, BuyerProviderLink } from './t
 export interface CheckoutConfigDeps {
   gateway: PaymentsGateway;
   credentials: CredentialStore;
-  /** Read-only: the stub flag on a stored connection, for `mockTokenization`. */
-  connections: Pick<ProviderConfigStore, 'get'>;
+  /**
+   * The stub flag on a stored connection, for `mockTokenization` — and where a
+   * minted browser key is cached, which is the only write.
+   */
+  connections: Pick<ProviderConfigStore, 'get' | 'save'>;
+  /**
+   * The adapters this deployment routes to, so a key-less connection can be
+   * backfilled from its own `browserKey` capability. Omit it and a host must
+   * supply `browserKey` below or go without the backfill.
+   */
+  providers?: ProviderRegistry;
+  /** Override the capability — see {@link backfillKey}. */
   browserKey?: BrowserKeyPort;
 }
 
@@ -61,10 +73,13 @@ function chainMethods(
  * ASKED OF THE CAPABILITY, NEVER OF THE NAME. The host's version of this was
  * `entry.provider === "pagbank"` — the last provider-name check on the checkout
  * path — and it is the one thing that made this module unportable. The question
- * the library is entitled to ask is "does this connection tokenize with a
- * PUBLIC_KEY, and is it not a stub"; WHICH vendors can actually mint one on
- * demand is the host's `browserKey` port to answer, and it answers `null` for
- * the ones that cannot.
+ * this module is entitled to ask is "does this connection tokenize with a
+ * PUBLIC_KEY, and is it not a stub"; WHICH vendors can mint one is the
+ * ADAPTER's `browserKey` capability, and adapters that cannot simply omit it.
+ *
+ * The port stayed, because for a while the answer still had to come from the
+ * host — and it kept the provider name alive there instead, one repo further
+ * out. It is now an override rather than the only door.
  *
  * NEVER for a stub connection: a stub token cannot mint a real key, and the
  * doomed outbound call would run (with retries) on every checkout load of every
@@ -76,10 +91,17 @@ async function backfillKey(
   entry: ClientProviderConfig,
   isStub: boolean,
 ): Promise<string | null> {
-  if (!deps.browserKey || entry.tokenization !== 'PUBLIC_KEY' || isStub) return null;
+  if (entry.tokenization !== 'PUBLIC_KEY' || isStub) return null;
   const credentials = await deps.credentials.getCredentials(merchant, entry.provider);
   if (!credentials) return null;
-  return deps.browserKey(merchant, entry.provider, credentials);
+  if (deps.browserKey) return deps.browserKey(merchant, entry.provider, credentials);
+  if (!deps.providers) return null;
+  return mintBrowserKey(
+    { providers: deps.providers, connections: deps.connections },
+    merchant,
+    entry.provider,
+    credentials,
+  );
 }
 
 /**

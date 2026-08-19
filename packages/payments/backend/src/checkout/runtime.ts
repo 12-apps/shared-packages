@@ -2,6 +2,7 @@ import type { ProviderConfigStore } from '../config/types';
 import { providerCorrelationId } from '../core/client-view';
 import type { PaymentsGateway } from '../core/gateway';
 import type { ChargeQueryStore, ChargeStore, CredentialStore } from '../core/ports';
+import type { ProviderRegistry } from '../core/registry';
 import type { ChargeSnapshot, MerchantRef, PaymentMethodKind } from '../core/types';
 
 import type { CheckoutCopy } from './copy';
@@ -32,8 +33,17 @@ export interface PaymentFlowsBEConfig<Caller, View extends object, Display = unk
   gateway: PaymentsGateway | (() => PaymentsGateway | Promise<PaymentsGateway>);
   charges: ChargeStore & ChargeQueryStore;
   credentials: CredentialStore;
-  /** Read-only here: the stub flag on a stored connection. */
-  connections: Pick<ProviderConfigStore, 'get'>;
+  /**
+   * The stub flag on a stored connection, and the row a lazily-minted browser
+   * key is cached onto — the only write.
+   */
+  connections: Pick<ProviderConfigStore, 'get' | 'save'>;
+  /**
+   * The adapters this deployment routes to. Supplied, a key-less connection
+   * backfills its browser key from the adapter's own `browserKey` capability;
+   * omitted, only an explicit `browserKey` port can do it.
+   */
+  providers?: ProviderRegistry;
 
   /**
    * Host auth, run BEFORE anything else with the parsed intent — and ONLY for

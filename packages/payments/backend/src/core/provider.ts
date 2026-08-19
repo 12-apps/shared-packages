@@ -294,6 +294,31 @@ export interface PaymentProviderAdapterBase {
     ): Promise<ApplePayActivation>;
   };
 
+  /**
+   * Mint the PUBLIC browser key this provider tokenizes with, on demand.
+   *
+   * Declared by the adapters that CAN — a key minted under the merchant's own
+   * credentials names the merchant's own account, which is the whole reason a
+   * shared platform key cannot serve per-merchant checkouts. Adapters whose
+   * key is pasted by the merchant, or that tokenize without one, simply omit
+   * this and every caller answers null.
+   *
+   * `field` is the `credentialSchema` key the value lives under, so callers
+   * read and cache it by the adapter's own spelling instead of guessing at the
+   * union of the spellings they have met (`publicKey ?? publishableKey`).
+   * It MUST name a non-secret field: the minted value is handed to every
+   * shopper's page, and it is cached without invalidating the connection's
+   * verification proof — a path no secret may take.
+   *
+   * `mint` is best-effort by contract: null on a missing credential, a network
+   * failure, or a refusal. A checkout that falls back to a pasted key must
+   * never be blocked by this.
+   */
+  browserKey?: {
+    readonly field: string;
+    mint(credentials: ResolvedCredentials): Promise<string | null>;
+  };
+
   /** Void a not-yet-paid charge. Optional: capability-gated by the gateway. */
   cancelCharge?(providerChargeId: string, credentials: ResolvedCredentials): Promise<ChargeSnapshot>;
 
