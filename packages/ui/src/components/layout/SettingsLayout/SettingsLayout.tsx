@@ -154,6 +154,8 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
         hideOnNarrow={drilldown && atIndex}
         breakpoint={railBreakpoint}
         indexHref={indexHref}
+        sectionTitle={props.sectionTitle}
+        sectionDescription={props.sectionDescription}
         backLabel={backLabel}
         ariaLabel={ariaLabel}
         sectionChips={sectionChips}
