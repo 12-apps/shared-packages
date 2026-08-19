@@ -20,8 +20,12 @@ export interface ActivationContext {
    * Raw connection rows. Read WITHOUT the enabled gate on purpose:
    * verification runs BEFORE activation, on a provider that is by definition
    * still off — see {@link credentialsForVerification}.
+   *
+   * `save` is needed only to CACHE a browser key minted during verification,
+   * and that write invalidates nothing — see `config/browser-key.ts` for why
+   * it must not go through `saveCredentials`.
    */
-  config: Pick<ProviderConfigStore, 'get'>;
+  config: Pick<ProviderConfigStore, 'get' | 'save'>;
   /** The pending activation charge's durable home. */
   settings: Pick<SettingsService, 'getPendingVerification' | 'setPendingVerification'>;
   /**
@@ -51,9 +55,16 @@ export interface ActivationContext {
   allowStubMode?: boolean;
   /**
    * Mint a card-encryption public key with the merchant's OWN credentials
-   * when none is stored — the PagBank lazy backfill (an OAuth-connected store
-   * never pastes a key). Host-provided because the fetch and the caching are
-   * both host decisions; providers with nothing to mint simply answer null.
+   * when none is stored — the lazy backfill an OAuth-connected merchant needs,
+   * never having pasted one.
+   *
+   * OPTIONAL, and now rarely worth supplying: an adapter that can mint one
+   * declares `browserKey`, and with no hook here that capability answers,
+   * caching into the same connection row. This override remains for a host
+   * that caches somewhere else, or that must decide per merchant. It used to
+   * be the only way, on the grounds that "the fetch and the caching are both
+   * host decisions" — half of which stopped being true the moment the vendor
+   * call moved into this package.
    */
   mintCardPublicKey?: (
     merchant: MerchantRef,

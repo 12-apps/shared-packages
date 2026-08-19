@@ -42,7 +42,10 @@ export function activationAdapter(
       webhooks: true,
       tokenization: 'PUBLIC_KEY',
     },
-    credentialSchema: [{ key: 'token', label: 'Token', secret: true, required: true }],
+    credentialSchema: [
+      { key: 'token', label: 'Token', secret: true, required: true },
+      { key: 'publicKey', label: 'Chave pública', secret: false, required: false },
+    ],
     async verifyCredentials() {
       return { ok: true };
     },
@@ -56,7 +59,11 @@ export function activationAdapter(
       verify: async () => true,
       parse: async () => [],
     },
-    clientConfig: () => ({ provider: name, tokenization: 'PUBLIC_KEY' }),
+    clientConfig: (credentials) => ({
+      provider: name,
+      tokenization: 'PUBLIC_KEY',
+      publicKey: credentials.fields['publicKey'],
+    }),
     ...overrides,
   };
 }
@@ -124,10 +131,19 @@ export function activationContextFor(options: {
   returnUrl?: ActivationContext['returnUrl'];
   mintCardPublicKey?: ActivationContext['mintCardPublicKey'];
 }): ActivationContext {
-  const stored = options.config ?? null;
+  // A one-field CONTAINER, not a closed-over binding: a test can assert what a
+  // mint CACHED — the row is written back through the same `save` a host's
+  // store would receive — and the flakiness gate refuses a stub that reassigns
+  // a binding from the outer scope.
+  const row: { current: StoredProviderConfig | null } = { current: options.config ?? null };
   return {
     providers: options.providers,
-    config: { get: async () => stored },
+    config: {
+      get: async () => row.current,
+      save: async (_merchant, config) => {
+        row.current = config;
+      },
+    },
     settings: options.settings ?? fakeSettings(),
     ...(options.webhookUrl ? { webhookUrl: options.webhookUrl } : {}),
     ...(options.returnUrl ? { returnUrl: options.returnUrl } : {}),

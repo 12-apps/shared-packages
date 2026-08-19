@@ -167,6 +167,7 @@ export async function createCheckout<C, V extends object, D>(
       gateway: await runtime.gateway(),
       credentials: runtime.config.credentials,
       connections: runtime.config.connections,
+      ...(runtime.config.providers ? { providers: runtime.config.providers } : {}),
       browserKey: runtime.config.browserKey,
     },
     merchant,

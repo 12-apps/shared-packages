@@ -22,6 +22,7 @@ import type {
   ResolvedCredentials,
   WebhookDelivery,
 } from './types';
+import type { BrowserKeyCapability } from './browser-key-capability';
 import type { SettlementHints } from './settlement-hints';
 import type {
   VaultBeginInput,
@@ -293,6 +294,9 @@ export interface PaymentProviderAdapterBase {
       credentials: ResolvedCredentials,
     ): Promise<ApplePayActivation>;
   };
+
+  /** Mint this provider's public browser key on demand — most cannot. */
+  browserKey?: BrowserKeyCapability;
 
   /** Void a not-yet-paid charge. Optional: capability-gated by the gateway. */
   cancelCharge?(providerChargeId: string, credentials: ResolvedCredentials): Promise<ChargeSnapshot>;
