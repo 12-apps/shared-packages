@@ -106,7 +106,29 @@ export function SettingsSectionHeader({
         alignItems: 'center',
         gap: 1.5,
         minWidth: 0,
+        // ITS OWN SURFACE, not the panel's.
+        //
+        // The header, the chip strip and the first card were all the same
+        // white, so nothing said where "you are here" ended and the screen
+        // began — the eye had only the type sizes to go on. A tint plus the
+        // rule below turns three stacked runs of text into two blocks.
+        //
+        // `paper` against a `default` panel rather than a hand-picked grey, so
+        // it tracks the host's theme (and its dark mode) instead of being a
+        // light-mode constant that goes wrong the moment the palette does.
+        bgcolor: 'background.paper',
+        px: 1.5,
+        pt: 1.5,
         pb: 1.5,
+        mb: 1,
+        borderRadius: 1,
+        // A rule under the header, because what follows it is the sibling strip
+        // — a row of other sections. Without a line the section's own name and
+        // the chip naming a DIFFERENT section sit in one undifferentiated
+        // block, which reads as one navigation rather than as "you are here"
+        // above "go elsewhere".
+        borderBottom: 1,
+        borderColor: 'divider',
       })}
     >
       <Box
