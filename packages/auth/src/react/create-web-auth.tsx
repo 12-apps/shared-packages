@@ -102,6 +102,13 @@ export interface WebAuthConfig {
    * session is read on mount, so anything rendering this provider outside a
    * browser with a live backend — a test, a story, a design review — otherwise
    * has no way to answer it but to reach for the global.
+   *
+   * That default is resolved **per call**, not once when the surface is built.
+   * A host builds its auth surface at module scope, so "once when built" means
+   * at IMPORT time — ahead of any `beforeEach` stub, any polyfill, and anything
+   * else that replaces `globalThis.fetch` afterwards. Reading it once froze the
+   * client onto the real `fetch`, and every suite that stubs the global then
+   * hung on a session request nothing was left to answer.
    */
   fetchImpl?: typeof fetch;
 }
@@ -248,12 +255,7 @@ async function postSignOut(basePath: string, fetchImpl: typeof fetch): Promise<v
 export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
   const basePath = config.basePath ?? "/api/auth";
   const credentialsProviderId = config.credentialsProviderId ?? CREDENTIALS_PROVIDER_ID;
-  // Resolved per CALL, not once here. A host builds its auth surface at module
-  // scope, so "once here" happens at IMPORT time — before a test's `beforeEach`
-  // installs its stub, before a polyfill loads, before anything else that
-  // replaces `globalThis.fetch` has run. Capturing it froze every SPA's auth
-  // client onto the real `fetch`, and a suite that stubs the global then hung
-  // on a session request that nothing was left to answer.
+  // Per CALL, never captured here — see `fetchImpl` on WebAuthConfig for why.
   const fetchImpl: typeof fetch = config.fetchImpl ?? ((...args) => globalThis.fetch(...args));
 
   const SessionContext = createContext<SessionContextValue | null>(null);
