@@ -11,6 +11,7 @@ import {
   TOUCH_TARGET,
 } from "./SettingsLayout.styles";
 import { SettingsSectionChips } from "./SettingsSectionChips";
+import { SettingsSectionHeader } from "./SettingsSectionHeader";
 import type {
   SettingsLayoutProps,
   SettingsNavItem,
@@ -25,6 +26,10 @@ export interface SettingsPanelProps {
   breakpoint: SettingsRailBreakpoint;
   indexHref?: string;
   backLabel: string;
+  /** The open section's own name — turns the back link into a compact header. */
+  sectionTitle?: string;
+  /** One line under that name. */
+  sectionDescription?: string;
   ariaLabel: string;
   sectionChips?: SettingsNavItem[];
   activeItemId?: string;
@@ -71,6 +76,56 @@ function BackLink({
       <ChevronLeftIcon fontSize="small" />
       {label}
     </Box>
+  );
+}
+
+/**
+ * Two shapes of the same control, chosen by whether the host named the section.
+ *
+ * With a `sectionTitle` the back folds into a compact header that also says
+ * where you are; without one the original text link is kept, so no existing
+ * consumer's header grows a title and pushes their first field down the page on
+ * upgrade. Its own component so `SettingsPanel` keeps one branch rather than
+ * three.
+ */
+function PanelBack({
+  href,
+  backLabel,
+  sectionTitle,
+  sectionDescription,
+  breakpoint,
+  linkComponent,
+  testIdPrefix,
+}: {
+  href: string;
+  backLabel: string;
+  sectionTitle?: string;
+  sectionDescription?: string;
+  breakpoint: SettingsRailBreakpoint;
+  linkComponent: NonNullable<SettingsLayoutProps['linkComponent']>;
+  testIdPrefix: string;
+}): React.JSX.Element {
+  if (sectionTitle === undefined) {
+    return (
+      <BackLink
+        href={href}
+        label={backLabel}
+        breakpoint={breakpoint}
+        linkComponent={linkComponent}
+        testIdPrefix={testIdPrefix}
+      />
+    );
+  }
+  return (
+    <SettingsSectionHeader
+      href={href}
+      backLabel={backLabel}
+      title={sectionTitle}
+      description={sectionDescription}
+      breakpoint={breakpoint}
+      linkComponent={linkComponent}
+      testIdPrefix={testIdPrefix}
+    />
   );
 }
 
@@ -127,6 +182,8 @@ export function SettingsPanel({
   breakpoint,
   indexHref,
   backLabel,
+  sectionTitle,
+  sectionDescription,
   ariaLabel,
   sectionChips,
   activeItemId,
@@ -147,9 +204,11 @@ export function SettingsPanel({
       sx={panelSx(breakpoint, hideOnNarrow, fillHeight)}
     >
       {showBack ? (
-        <BackLink
+        <PanelBack
           href={indexHref}
-          label={backLabel}
+          backLabel={backLabel}
+          sectionTitle={sectionTitle}
+          sectionDescription={sectionDescription}
           breakpoint={breakpoint}
           linkComponent={linkComponent}
           testIdPrefix={testIdPrefix}

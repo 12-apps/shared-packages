@@ -181,6 +181,22 @@ export interface SettingsLayoutProps {
   /** Label on the back control. Defaults to `"Back"`. */
   backLabel?: string;
   /**
+   * The open section's own name.
+   *
+   * Supplying it turns the narrow-width back link into a compact header: a
+   * square back button beside the section's name and, optionally, one line
+   * about it. That buys back a row on the width with the least of them, and
+   * makes the header answer "where am I?" — which the chip strip cannot, since
+   * it scrolls and the marked chip can be off-screen.
+   *
+   * Optional so the plain text link stays the default: a header that grew a
+   * title and a description on upgrade would move every existing consumer's
+   * first field down the page without them asking.
+   */
+  sectionTitle?: string;
+  /** One line under {@link sectionTitle}. Ignored without it. */
+  sectionDescription?: string;
+  /**
    * The sibling sections carried by the narrow-width chip strip — usually the
    * open item's own group.
    *
