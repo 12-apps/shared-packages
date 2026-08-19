@@ -8,11 +8,13 @@ import {
   notificationUrls,
   pagbankRequest,
 } from './pagbank-http';
+import { pagbankApiBase } from './pagbank-api-base';
 import { pagbankOAuth } from './pagbank-oauth';
 import { findChargeByReference, getCharge, refund } from './pagbank-operations';
 import { pagbankVault } from './pagbank-vault';
 import { activateApplePayCertificate, requestApplePayCsr } from './pagbank-wallets';
 import { verifyPagbankCredentials } from './pagbank-probe';
+import { fetchPagbankCardPublicKey } from './pagbank-public-key';
 import {
   mapCard,
   mapPix,
@@ -244,6 +246,22 @@ const credentialSchema = [
   },
 ] as const;
 
+/**
+ * The card-encryption public key, minted with the store's OWN token when none
+ * is stored (FUT-174) — an OAuth-connected store never pastes one, and copying
+ * the platform's own key in would name a different account. Declaring it here
+ * is what lets a host stop asking `provider === 'pagbank'` on its checkout
+ * path. Hoisted for the size gate, like `credentialSchema` above.
+ */
+const browserKey = {
+  field: 'publicKey',
+  mint: (credentials: ResolvedCredentials) =>
+    fetchPagbankCardPublicKey({
+      apiBase: pagbankApiBase(credentials.environment),
+      token: credentials.fields['token'],
+    }),
+};
+
 export function pagbankProvider(): PaymentProviderAdapter {
   return {
     name: NAME,
@@ -286,6 +304,8 @@ export function pagbankProvider(): PaymentProviderAdapter {
     // No `forget`: PagBank documents no token delete, and the omission is the
     // contract's honest way to say so.
     vault: pagbankVault,
+
+    browserKey,
 
     // Apple Pay's certificate round-trip (FUT-472) — see `pagbank-wallets.ts`.
     applePay: {

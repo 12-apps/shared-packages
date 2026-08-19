@@ -1,3 +1,4 @@
+import { mintBrowserKey, storedBrowserKey } from '../config/browser-key';
 import { stubResolvedFor } from '../core/stub-mode';
 import { classifyFailure } from '../core/failover';
 import type { PaymentProviderAdapter } from '../core/provider';
@@ -106,11 +107,16 @@ export async function verificationCardPublicKey(
   const credentials = await credentialsForVerification(ctx, merchant, provider);
   if (!credentials) return null;
 
-  const stored = credentials.fields['publicKey'] ?? credentials.fields['publishableKey'];
+  const adapter = ctx.providers.get(provider);
+  const stored = storedBrowserKey(adapter, credentials);
   if (stored) return stored;
 
-  if (!ctx.mintCardPublicKey) return null;
-  return ctx.mintCardPublicKey(merchant, provider, credentials);
+  // The host hook still wins where one is supplied — a deployment that caches
+  // somewhere other than these credential rows keeps saying so. With none, the
+  // adapter's own `browserKey` capability answers, which is the default a host
+  // should now need no code at all to get.
+  if (ctx.mintCardPublicKey) return ctx.mintCardPublicKey(merchant, provider, credentials);
+  return mintBrowserKey({ providers: ctx.providers, connections: ctx.config }, merchant, provider, credentials);
 }
 
 /** Everything one card-phase attempt runs against, resolved once. */
