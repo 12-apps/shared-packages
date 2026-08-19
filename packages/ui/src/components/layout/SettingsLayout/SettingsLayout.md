@@ -137,6 +137,32 @@ const [active, setActive] = useState('profile');
 </SettingsLayout>;
 ```
 
+## Two scrollbars, or none (`fillHeight`)
+
+By default the page scrolls and the rail goes with it — fine for a handful of
+categories, wrong once there are twenty: the thing you navigate WITH disappears
+while you read the panel.
+
+`fillHeight` gives the rail and the panel a scrollbar each, at the wide shape
+only. Narrow, the rail is a disclosure or the page itself, and two independent
+scroll regions on a phone is a trap rather than a convenience.
+
+```tsx
+<SettingsLayout fillHeight railBreakpoint={1024} …>
+```
+
+**It needs a definite height from the host**, which is why it is opt-in rather
+than the default. The usual shape is a `100dvh` flex column with the settings
+area as a `flex: 1; min-height: 0` child; without one the percentage heights
+resolve against `auto` and the layout collapses. Defaulting it on would break
+every existing consumer silently on upgrade.
+
+It also changes WHICH element scrolls, and that is the second reason to want
+it: a `position: sticky` toolbar inside `children` pins to the top of the
+**panel** — under the host's own header — instead of to a document that is not
+the scroll container.
+
+
 ## Props
 
 ### SettingsLayoutProps
@@ -154,6 +180,7 @@ const [active, setActive] = useState('profile');
 | children          | ReactNode                                              | -                   | Central panel content (the selected screen)                        |
 | testIdPrefix      | string                                                 | `'settings'`        | Prefix for `data-testid` attributes                                |
 | railBreakpoint    | `'sm' \| 'md' \| 'lg' \| 'xl'`                          | `'md'`              | Width at which the rail takes its own column                       |
+| fillHeight        | boolean                                                | `false`             | Rail and panel each scroll themselves (needs a definite height)     |
 | navVariant        | `'switcher' \| 'drilldown'`                            | `'switcher'`        | Narrow-width navigation shape                                      |
 | atIndex           | boolean                                                | `false`             | `drilldown`: the router is at the area's index, not in a section    |
 | indexHref         | string                                                 | -                   | `drilldown`: where the back link goes                              |
