@@ -1,16 +1,21 @@
-'use client';
+"use client";
 
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import { Box } from '@mui/material';
-import React from 'react';
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import type { CSSObject, Theme } from "@mui/material";
+import { Box } from "@mui/material";
+import React from "react";
 
-import { atLeastRail, displayAcrossRail, TOUCH_TARGET } from './SettingsLayout.styles';
-import { SettingsSectionChips } from './SettingsSectionChips';
+import {
+  atLeastRail,
+  displayAcrossRail,
+  TOUCH_TARGET,
+} from "./SettingsLayout.styles";
+import { SettingsSectionChips } from "./SettingsSectionChips";
 import type {
   SettingsLayoutProps,
   SettingsNavItem,
   SettingsRailBreakpoint,
-} from './SettingsLayout.types';
+} from "./SettingsLayout.types";
 
 export interface SettingsPanelProps {
   /** True in `drilldown`, inside a section rather than at the index. */
@@ -23,7 +28,7 @@ export interface SettingsPanelProps {
   ariaLabel: string;
   sectionChips?: SettingsNavItem[];
   activeItemId?: string;
-  linkComponent?: SettingsLayoutProps['linkComponent'];
+  linkComponent?: SettingsLayoutProps["linkComponent"];
   onSelectItem?: (id: string) => void;
   testIdPrefix: string;
   children: React.ReactNode;
@@ -42,7 +47,7 @@ function BackLink({
   href: string;
   label: string;
   breakpoint: SettingsRailBreakpoint;
-  linkComponent: NonNullable<SettingsLayoutProps['linkComponent']>;
+  linkComponent: NonNullable<SettingsLayoutProps["linkComponent"]>;
   testIdPrefix: string;
 }): React.JSX.Element {
   return (
@@ -52,21 +57,59 @@ function BackLink({
       aria-label={label}
       data-testid={`${testIdPrefix}-back`}
       sx={(theme) => ({
-        ...displayAcrossRail(theme, breakpoint, 'inline-flex', 'none'),
-        alignItems: 'center',
+        ...displayAcrossRail(theme, breakpoint, "inline-flex", "none"),
+        alignItems: "center",
         gap: 0.5,
         minHeight: TOUCH_TARGET,
         pr: 1,
-        textDecoration: 'none',
-        color: 'text.secondary',
-        font: 'inherit',
-        fontSize: '0.875rem',
+        textDecoration: "none",
+        color: "text.secondary",
+        font: "inherit",
+        fontSize: "0.875rem",
       })}
     >
       <ChevronLeftIcon fontSize="small" />
       {label}
     </Box>
   );
+}
+
+/**
+ * The panel's own box, as ONE object per media query rather than two.
+ *
+ * Both the `display` rule and `fillHeight`'s belong at the same wide-shape
+ * query, and spreading them as separate `{ [query]: … }` objects makes the
+ * second REPLACE the first — so turning `fillHeight` on silently dropped the
+ * `display: block` that `hideOnNarrow` puts there and left the panel
+ * `display: none` at every width. That only shows at a drilldown INDEX, where
+ * `hideOnNarrow` is true, which is why a section route looked fine.
+ *
+ * `overflowY` here is also what lets a `position: sticky` toolbar inside
+ * `children` pin to the TOP OF THE PANEL — under the host's header — instead
+ * of to a document that is not the scroller.
+ */
+function panelSx(
+  breakpoint: SettingsRailBreakpoint,
+  hideOnNarrow: boolean,
+  fillHeight: boolean,
+): (theme: Theme) => CSSObject {
+  return (theme) => ({
+    display: hideOnNarrow ? "none" : "block",
+    flex: "1 1 auto",
+    minWidth: 0,
+    width: "100%",
+    [atLeastRail(theme, breakpoint)]: {
+      ...(hideOnNarrow ? { display: "block" } : {}),
+      ...(fillHeight
+        ? {
+            height: "100%",
+            minHeight: 0,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+          }
+        : {}),
+    },
+  });
 }
 
 /**
@@ -93,41 +136,15 @@ export function SettingsPanel({
   fillHeight = false,
   children,
 }: SettingsPanelProps): React.JSX.Element {
-  const showBack = inSection && indexHref !== undefined && linkComponent !== undefined;
-  const showChips = inSection && sectionChips !== undefined && sectionChips.length > 0;
+  const showBack =
+    inSection && indexHref !== undefined && linkComponent !== undefined;
+  const showChips =
+    inSection && sectionChips !== undefined && sectionChips.length > 0;
 
   return (
     <Box
       data-testid={`${testIdPrefix}-panel`}
-      sx={(theme) => ({
-        display: hideOnNarrow ? 'none' : 'block',
-        flex: '1 1 auto',
-        minWidth: 0,
-        width: '100%',
-        // ONE object for the wide shape, not two.
-        //
-        // Both of these rules live at the same media query, and spreading them
-        // as separate `{ [query]: … }` objects makes the second REPLACE the
-        // first — so turning `fillHeight` on silently dropped the `display:
-        // block` that `hideOnNarrow` puts there, leaving the panel `display:
-        // none` at every width. That only shows at a drilldown INDEX, where
-        // `hideOnNarrow` is true, which is why a section route looked fine.
-        [atLeastRail(theme, breakpoint)]: {
-          ...(hideOnNarrow ? { display: 'block' } : {}),
-          ...(fillHeight
-            ? {
-                // The panel scrolls itself, which is what lets a `position:
-                // sticky` toolbar inside `children` pin to the TOP OF THE PANEL
-                // — under the host's header — rather than to a document that is
-                // not the scroller.
-                height: '100%',
-                minHeight: 0,
-                overflowY: 'auto' as const,
-                overscrollBehavior: 'contain' as const,
-              }
-            : {}),
-        },
-      })}
+      sx={panelSx(breakpoint, hideOnNarrow, fillHeight)}
     >
       {showBack ? (
         <BackLink
@@ -142,7 +159,7 @@ export function SettingsPanel({
       {showChips ? (
         <Box
           sx={(theme) => ({
-            ...displayAcrossRail(theme, breakpoint, 'block', 'none'),
+            ...displayAcrossRail(theme, breakpoint, "block", "none"),
             mb: 1,
             minWidth: 0,
           })}
