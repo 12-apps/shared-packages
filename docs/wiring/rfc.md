@@ -70,7 +70,7 @@ that already exists, so today's packages satisfy them without imports:
 | `WirePermissionsContribution` | `@12-apps/rbac`'s `PermissionContribution` | — |
 | `WireNotificationBlueprint` | `@12-apps/notifications`' `NotificationGenerator` | `category` widened to `string` (suggestion; the host's taxonomy decides) |
 | `EmailPort` / `EmailContribution` | `EmailDriver` / the `createAuthMailer` pattern | a dependency-free home |
-| `PrismaContribution` | the `packages/<pkg>/prisma/**` convention | a machine-readable declaration |
+| `PrismaContribution` | the `packages/<pkg>/prisma/**` convention | a machine-readable declaration, now a **union of two modes** — `composed` (default: the partial the host copies into its schema folder, the shape every package has today) and `isolated` (the package owns its whole Prisma stack — schema, client, migrations — inside its own Postgres schema via `?schema=<pgSchema>`, so nothing is copied and its `_prisma_migrations` is its own; the cost is the seam: no shared transaction and no host client extensions, so a package qualifies only when its models carry no relation into host tables). Because host assemblers are plain Node that cannot execute a TS manifest, the contribution is **mirrored in `package.json` under `"wiring": { "db": ... }`** and `assertDbMirror` pins the mirror in the package's own test run |
 | `WebSurfaceContribution` / `AreaContribution` | the `createWeb*` convention / the harness page-registry + `ReportBuilderSurface`→nav projection | route/nav/gate rows as data |
 
 Twins stay twins deliberately — the heavy packages keep their own local
