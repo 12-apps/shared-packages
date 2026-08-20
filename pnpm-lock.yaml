@@ -1195,6 +1195,9 @@ importers:
       '@12-apps/ui':
         specifier: workspace:*
         version: link:../ui
+      '@12-apps/wiring':
+        specifier: workspace:*
+        version: link:../wiring
       zod:
         specifier: ^4.3.5
         version: 4.4.3

@@ -19,18 +19,22 @@
  * entity opens with, and which clock a day is measured on.
  */
 import { createMemoryDataSource, reportSpecSchema, type ReportSpec } from '@12-apps/report-builder';
-import { reportBuilderRouter } from '@12-apps/report-builder/hono';
+import { reportBuilderManifest } from '@12-apps/report-builder/manifest';
+import { reportBuilderServerManifest } from '@12-apps/report-builder/manifest/server';
 import {
   type ReportActor,
   type SavedReportDb,
   type SystemReportDef,
 } from '@12-apps/report-builder/server';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
+import type { MountedRoute } from '@12-apps/wiring';
 import type { Hono } from 'hono';
 
 import { HARNESS_CATALOG } from './fixtures/report-catalog';
 import { fixtureTables } from './fixtures/report-fixture-tables';
 import { HARNESS_TIME_ZONE, NOW } from './fixtures/report-fixture-window';
 import { HARNESS_CLIENT_ID } from './saved-report-db';
+import { honoRouterFor } from './wire-hono';
 
 /** This host's own tiers, over this host's own entities. */
 const SALES = 'reports:sales:read';
@@ -175,25 +179,61 @@ const ACTOR: ReportActor = {
   permissions: PERMISSIONS,
 };
 
+/** Where `mount-surfaces.ts` hangs the reports router — the adoption's claim. */
+export const REPORTS_MOUNT_PATH = '/api/admin/:tenantSlug';
+
 /**
- * The reports router, mounted the way a host mounts it.
+ * The reports surface, adopted through `@12-apps/wiring/consumer` (12-27).
+ *
+ * The config object is the SAME one the per-package Hono adapter used to
+ * take — bindings are typed from the manifest's own factory, so nothing about
+ * the host's obligations changed. What changed is who counts them: the
+ * consumer refuses an unanswered capability, conflict-checks the route
+ * claims, and answers a wiring report a test can pin. The bridge
+ * (`wire-hono.ts`) is the host's one framework adapter, shared by every
+ * adopted package instead of shipped per package.
  *
  * The clock is FROZEN and passed in — the single most load-bearing line here.
  * Against the machine's clock every rolling preset would empty the moment the
  * fixture's July 2026 fell out of the last thirty days, and the cases that
  * assert an exact window ("20/06 – 25/06") would go red and stay red. Moving
- * the router to a server changes where the clock is read, not which one.
+ * the router behind the consumer changes where the mount is counted, not
+ * which clock a day is measured on.
  */
-export function reportsRouter(db: SavedReportDb): Hono {
-  return reportBuilderRouter({
-    catalog: HARNESS_CATALOG,
-    adapter: ({ window }) => createMemoryDataSource(fixtureTables(window)),
-    db: () => Promise.resolve(db),
-    timeZone: HARNESS_TIME_ZONE,
-    now: () => NOW,
-    entityPermission: ENTITY_PERMISSION,
-    systemReports: SYSTEM_REPORTS,
-    starters: HARNESS_STARTERS,
-    resolveActor: () => ACTOR,
+export function wireReports(db: SavedReportDb): {
+  router: Hono;
+  report: WiringReport;
+  routes: readonly MountedRoute[];
+} {
+  const host = createWiringHost({ name: 'harness-backend', kind: 'server' });
+  host.adoptServer({
+    manifest: reportBuilderManifest,
+    server: reportBuilderServerManifest,
+    bindings: {
+      http: {
+        mountPath: REPORTS_MOUNT_PATH,
+        config: {
+          catalog: HARNESS_CATALOG,
+          adapter: ({ window }) => createMemoryDataSource(fixtureTables(window)),
+          db: () => Promise.resolve(db),
+          timeZone: HARNESS_TIME_ZONE,
+          now: () => NOW,
+          entityPermission: ENTITY_PERMISSION,
+          systemReports: SYSTEM_REPORTS,
+          starters: HARNESS_STARTERS,
+        },
+      },
+    },
   });
+  const wired = host.assemble();
+  return {
+    router: honoRouterFor(wired.routes, () => ACTOR),
+    report: wired.report,
+    routes: wired.routes,
+  };
+}
+
+/** The mounted router alone, for `mount-surfaces.ts` — same shape as before. */
+export function reportsRouter(db: SavedReportDb): Hono {
+  return wireReports(db).router;
 }
