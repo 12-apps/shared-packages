@@ -242,3 +242,23 @@ export {
  * taking a direct dependency on the backend package.
  */
 export type { PaymentEnvironment } from '@12-apps/payments-backend';
+
+// ---------------------------------------------------------------------------
+// The ACTIVATION CHARGE (FUT-463, packaged by FUT-763) — proving a connection
+// can charge, for a provider whose payer pays HERE.
+//
+// A connection is not a capability: a completed grant says the owner authorized
+// us, not that the account can take money. The owner's own card goes through
+// the SAME path a shopper's does — same fields, same validation, same
+// browser-side encryption — for one cent, refunded immediately.
+//
+// The sibling of `useRedirectActivation` for the other half of the same step.
+// As there, the SCREEN stays the host's.
+// ---------------------------------------------------------------------------
+export {
+  useActivationCharge,
+  type ActivationCharge,
+  type ActivationChargeOptions,
+  type ActivationChargeState,
+} from './activation/use-activation-charge';
+export { type ActivationChargeCopy } from './activation/charge-copy';
