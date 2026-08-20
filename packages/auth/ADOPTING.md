@@ -13,6 +13,42 @@ const credentials = createEmailCredentials({ store, mailer, settings, appUrl });
 const { SessionProvider, useSession } = createWebAuth();
 ```
 
+## Migrating 4.x → 5.0 — one entry point per peer
+
+This package shipped **fifteen** entry points; report-builder ships five. Eleven
+of ours named a *module* rather than a boundary, so adopting this package meant
+learning a map before you could import anything.
+
+An entry point now marks a distinct **peer**, which is the rule report-builder
+already follows: `./react` needs react, `./hono` needs hono, `./e2e` needs
+playwright, `./notifications` needs `@12-apps/notifications`, and `.` needs none
+of them.
+
+### Removed exports, and what replaces each
+
+| Removed | Replacement |
+|---|---|
+| `@12-apps/auth/config` | `@12-apps/auth` — same symbols (`authConfig`, `setSignInGate`, `setSessionAdminResolver`, `ExtendedSession`). Had no consumer anywhere. |
+| `@12-apps/auth/admin` | `@12-apps/auth` — `isAdminEmail`, `parseAdminEmails`. |
+| `@12-apps/auth/device-detection` | `@12-apps/auth` — `detectAppleDevice`, `DeviceInfo`. |
+| `@12-apps/auth/password` | `@12-apps/auth` — the policy helpers and `PasswordPolicy`. Had no consumer anywhere. |
+| `@12-apps/auth/tokens` | `@12-apps/auth` — `hashToken`, `issueToken`, `buildTokenLink`, `isTokenExpired`, `DEFAULT_TOKEN_TTL_MS`, `IssuedToken`, `IssueTokenOptions`. Had no consumer anywhere. |
+| `@12-apps/auth/email-credentials` | `@12-apps/auth` — `createEmailCredentials` and its types. |
+| `@12-apps/auth/react/screens` | `@12-apps/auth/react` — `createEmailAuthScreens`, `PT_BR`, `failureMessage`. |
+| `@12-apps/auth/react/settings` | `@12-apps/auth/react` — `createEmailAuthSettingsScreen`, `PT_BR_SETTINGS`. |
+| `@12-apps/auth/react/pages` | `@12-apps/auth/react` — `createAuthPages`, `PT_BR_PAGES`. |
+| `@12-apps/auth/prisma` | `@12-apps/auth/server` — `createPrismaEmailCredentialsStore`, `createAuthSettingsStore`, `AuthDb`, `AuthSettingsDb`, `EmailIdentityDelegate`. This is where report-builder keeps `SavedReportDb`: a seam over a duck-typed client, not a dependency on a generated one. |
+
+Unchanged: `.`, `./server`, `./react`, `./hono`, `./e2e`, `./notifications`.
+
+### The one cost, stated
+
+`.` value-imports `@auth/core`. A caller that wanted only `hashToken` used to
+reach `/tokens` and now loads Auth.js with it. The fix is to move the Auth.js
+bridge behind `./server` — where report-builder keeps its runtime-bound half —
+and `authHandler`, `handlers` and `authConfig` have no consumers, so it is
+cheap. It is not in 5.0 so the collapse could be reviewed on its own.
+
 ## The one thing to know first
 
 **This package owns no database tables.**
@@ -165,14 +201,41 @@ replacement. That is what lets one account carry both, which is the point: a
 person who signed up with Google can add a password later and afterwards use
 either.
 
-### It still owns no tables
+### It owns its tables now
 
-Same as the rest of the package. `store` is ~10 methods over rows you define,
-and the only thing this package insists on is that `consumeToken` be a
-CONDITIONAL write (`UPDATE … WHERE consumed_at IS NULL`) that reports whether
-it affected a row. That return value *is* the single-use guarantee — two clicks
-of one link race, both read an unconsumed row, and a fake that just stamps the
-field lets both through.
+This used to say the opposite, and the change is the point of the 5.0 release.
+
+`prisma/auth.prisma` owns `auth_credentials`, `auth_tokens` and
+`auth_platform_settings`, with migrations beside them. Adopt them the way you
+adopt report-builder's:
+
+```bash
+pnpm --filter @12-apps/auth prisma:sync   # copy the partial into your schema folder
+# then your own plugin-migration sweep, which finds prisma/migrations here
+```
+
+The partial is **COPIED, never symlinked** — `npm pack` drops symlinked
+entries, `turbo prune` dangles a link whose owner is not a declared dependency,
+and Prisma `lstat`s a migration directory, so a symlinked one is silently
+skipped: a green deploy that applied no schema.
+
+Every user reference is an opaque `user_id` with **no foreign key into any host
+table**, so these migrations apply in a repo whose users live under another
+name, in another database, or not yet at all. That constraint is why the
+credential columns are a table rather than columns on your `users`: a package
+cannot add columns to a model it does not own.
+
+**You still supply one thing** — who your users are. `EmailIdentityDelegate` is
+three methods (`findByEmail`, `findById`, `upsert`) over your own user table.
+Hand it to `createPrismaEmailCredentialsStore` from `./server` and the
+credential rows, the tokens and the switches are handled here.
+
+If you'd rather implement the store yourself, the seam is unchanged and the one
+thing this package insists on still holds: `consumeToken` must be a CONDITIONAL
+write (`UPDATE … WHERE consumed_at IS NULL`) that reports whether it affected a
+row. That return value *is* the single-use guarantee — two clicks of one link
+race, both read an unconsumed row, and a fake that just stamps the field lets
+both through.
 
 ### The flows
 
