@@ -9,8 +9,8 @@ one, you already know this one's layout.
 
 | Entry point | Needs | What is in it |
 |---|---|---|
-| `.` | nothing | Auth.js bridge, `createEmailCredentials`, password policy, tokens, the admin allowlist, the rate limiter |
-| `./server` | nothing | routes, status vocabulary, mail templates, and the duck-typed credential + settings **store seams** |
+| `.` | **nothing** | `createEmailCredentials`, password policy, tokens, the admin allowlist, the rate limiter, device detection |
+| `./server` | nothing (Node) | the **Auth.js bridge** (`createApiAuth`, `auth`, `handlers`, `authConfig`, `credentialsProvider`), routes, status vocabulary, mail templates, and the duck-typed credential + settings **store seams** |
 | `./react` | react, react-dom, `@12-apps/ui` | the screens, the whole login/sign-up **pages**, the platform settings screen |
 | `./hono` | hono | one `mount` call for the whole backend surface |
 | `./notifications` | `@12-apps/notifications` | `createAuthMailer` — the four auth e-mails over an `EmailDriver` |
@@ -18,6 +18,13 @@ one, you already know this one's layout.
 
 An entry point marks a distinct **peer**, never merely a module. Every peer is
 optional, so a backend that never renders a page installs no react.
+
+**`.` is the light half, and that is enforced.** It value-imports nothing — no
+`@auth/core`, no react, no hono — so a background job that expires stale tokens
+can `import { hashToken } from '@12-apps/auth'` and load only that. The Auth.js
+runtime lives in `./server` for the same reason report-builder keeps
+`createReportBuilder` there. `src/__tests__/light-root.test.ts` walks the root's
+import graph and fails if that ever stops being true.
 
 ## The tables are the package's
 

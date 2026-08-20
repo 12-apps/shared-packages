@@ -17,7 +17,9 @@ const { SessionProvider, useSession } = createWebAuth();
 
 This package shipped **fifteen** entry points; report-builder ships five. Eleven
 of ours named a *module* rather than a boundary, so adopting this package meant
-learning a map before you could import anything.
+learning a map before you could import anything. The root was heavy on top of
+that, so the split below is two moves, not one: subpaths fold inward, and the
+runtime-bound half folds out to `./server`.
 
 An entry point now marks a distinct **peer**, which is the rule report-builder
 already follows: `./react` needs react, `./hono` needs hono, `./e2e` needs
@@ -41,13 +43,36 @@ of them.
 
 Unchanged: `.`, `./server`, `./react`, `./hono`, `./e2e`, `./notifications`.
 
-### The one cost, stated
+### The root is now the LIGHT half — the bridge moved with it
 
-`.` value-imports `@auth/core`. A caller that wanted only `hashToken` used to
-reach `/tokens` and now loads Auth.js with it. The fix is to move the Auth.js
-bridge behind `./server` — where report-builder keeps its runtime-bound half —
-and `authHandler`, `handlers` and `authConfig` have no consumers, so it is
-cheap. It is not in 5.0 so the collapse could be reviewed on its own.
+Collapsing the subpaths would have made `.` expensive: it value-imported
+`@auth/core` and applied the `AUTH_*` environment defaults as a module side
+effect, so `import { hashToken }` loaded the whole framework and mutated config
+from the environment. That is the opposite of report-builder, whose `.` is the
+pure spec engine and whose `./server` is the runtime-bound half.
+
+So the Auth.js bridge moved too:
+
+| Also moved to `/server` | Why |
+|---|---|
+| `createApiAuth`, `ApiAuth`, `ApiAuthConfig` | the sanctioned adoption factory — exactly where report-builder keeps `createReportBuilder` |
+| `auth`, `authHandler`, `handlers`, `authConfig` | the Auth.js runtime, plus the `setEnvDefaults` side effect |
+| `credentialsProvider`, `CredentialsProviderConfig` | value-imports `@auth/core` |
+| `setSignInGate`, `setSessionAdminResolver`, `ExtendedSession`, `SignInGate`, `SessionAdminResolver` | the config they mutate is the Auth.js one |
+| `AuthConfig`, `DefaultSession`, `Session`, `User` | re-exported `@auth/core` types |
+
+**`CREDENTIALS_PROVIDER_ID` deliberately stays on the root.** A browser
+comparing `session.provider` needs that string and must not pull `@auth/core`
+in to get it, which is why the id has always had its own module.
+
+What `.` still gives you, with no peer at all: `createEmailCredentials` and its
+types, the password policy and hashing, the token primitives, the admin
+allowlist, `createInProcessRateLimiter`, and device detection.
+
+`src/__tests__/light-root.test.ts` walks the root's import graph and fails if
+anything in it ever reaches `@auth/core`, react, react-dom, hono or playwright
+again — and fails the other way too, if the bridge stops being reachable from
+`./server`, so the guard cannot be satisfied by deleting it.
 
 ## The one thing to know first
 
