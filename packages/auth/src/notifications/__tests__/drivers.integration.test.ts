@@ -1,3 +1,14 @@
+/**
+ * Named `.integration.` for the FILESYSTEM, not for a database.
+ *
+ * The sink driver's whole subject is that it really appends to a real file and
+ * that a harness can really read the link back out; a mocked `fs` would leave
+ * that assertion testing the mock. This repo already has a tier for a test that
+ * legitimately touches the disk — `INTEGRATION_GLOBS` in
+ * `eslint.quality.shared.mjs` — and this is one, so it says so rather than
+ * weakening the test to fit the unit tier. It still runs in the ordinary unit
+ * lane: the package's vitest `include` covers every `.test.ts` under `src`.
+ */
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

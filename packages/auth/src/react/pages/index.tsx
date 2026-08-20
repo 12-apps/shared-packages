@@ -214,84 +214,110 @@ function Footer({
   );
 }
 
-export function createAuthPages(config: AuthPagesConfig): AuthPages {
-  const { screens, copy, routes, Link, maxWidth = 460 } = config;
-  const { EmailPasswordForm, EmailSignupForm } = screens;
+/** The config with its defaults resolved, as the two views below read it. */
+interface ResolvedPagesConfig extends AuthPagesConfig {
+  maxWidth: number;
+}
 
-  function LoginPage({
-    callbackUrl,
-    onSignedIn,
-    onForgotPassword,
-    emailEnabled,
-    providers,
-    branding,
-    notice,
-  }: LoginPageProps): JSX.Element {
-    return (
-      <Container variant="centered" padding="lg">
-        {branding}
-        <SocialLoginContainer title={copy.login.title} showDivider={false} maxWidth={maxWidth}>
-          <Subtitle text={copy.login.subtitle} />
-          {notice}
-          {emailEnabled && (
-            <EmailPasswordForm
-              callbackUrl={callbackUrl}
-              onSignedIn={onSignedIn}
-              onForgotPassword={onForgotPassword}
-            />
-          )}
-          <Providers label={copy.login.providerDivider}>{providers}</Providers>
-          {routes.signup !== undefined && (
-            <Footer
-              prompt={copy.login.signupPrompt}
-              linkText={copy.login.signupLink}
-              to={routes.signup}
-              Link={Link}
-              dataTestId="go-to-signup"
-            />
-          )}
-        </SocialLoginContainer>
-      </Container>
-    );
+function LoginView({
+  cfg,
+  callbackUrl,
+  onSignedIn,
+  onForgotPassword,
+  emailEnabled,
+  providers,
+  branding,
+  notice,
+}: LoginPageProps & { cfg: ResolvedPagesConfig }): JSX.Element {
+  const { screens, copy, routes, Link, maxWidth } = cfg;
+  const { EmailPasswordForm } = screens;
+  return (
+    <Container variant="centered" padding="lg">
+      {branding}
+      <SocialLoginContainer title={copy.login.title} showDivider={false} maxWidth={maxWidth}>
+        <Subtitle text={copy.login.subtitle} />
+        {notice}
+        {emailEnabled && (
+          <EmailPasswordForm
+            callbackUrl={callbackUrl}
+            onSignedIn={onSignedIn}
+            onForgotPassword={onForgotPassword}
+          />
+        )}
+        <Providers label={copy.login.providerDivider}>{providers}</Providers>
+        {routes.signup !== undefined && (
+          <Footer
+            prompt={copy.login.signupPrompt}
+            linkText={copy.login.signupLink}
+            to={routes.signup}
+            Link={Link}
+            dataTestId="go-to-signup"
+          />
+        )}
+      </SocialLoginContainer>
+    </Container>
+  );
+}
+
+function SignupView({
+  cfg,
+  callbackUrl,
+  onBeforeSubmit,
+  onSignedIn,
+  disabled,
+  emailEnabled,
+  providers,
+  branding,
+  notice,
+  termsGate,
+}: SignupPageProps & { cfg: ResolvedPagesConfig }): JSX.Element {
+  const { screens, copy, routes, Link, maxWidth } = cfg;
+  const { EmailSignupForm } = screens;
+  return (
+    <Container variant="centered" padding="lg">
+      {branding}
+      <SocialLoginContainer title={copy.signup.title} showDivider={false} maxWidth={maxWidth}>
+        <Subtitle text={copy.signup.subtitle} />
+        {notice}
+        {termsGate}
+        {emailEnabled && (
+          <EmailSignupForm
+            callbackUrl={callbackUrl}
+            onBeforeSubmit={onBeforeSubmit}
+            onSignedIn={onSignedIn}
+            disabled={disabled}
+          />
+        )}
+        <Providers label={copy.signup.providerDivider}>{providers}</Providers>
+        <Footer
+          prompt={copy.signup.loginPrompt}
+          linkText={copy.signup.loginLink}
+          to={routes.login}
+          Link={Link}
+          dataTestId="go-to-login"
+        />
+      </SocialLoginContainer>
+    </Container>
+  );
+}
+
+/**
+ * Bind one configuration to both pages.
+ *
+ * The markup lives at module scope rather than inside this closure. A factory
+ * that also HELD both pages ran past the size budget, and it read badly for the
+ * same reason it measured badly: someone chasing the login layout had to scroll
+ * through the sign-up page to reach it.
+ */
+export function createAuthPages(config: AuthPagesConfig): AuthPages {
+  const cfg: ResolvedPagesConfig = { ...config, maxWidth: config.maxWidth ?? 460 };
+
+  function LoginPage(props: LoginPageProps): JSX.Element {
+    return <LoginView cfg={cfg} {...props} />;
   }
 
-  function SignupPage({
-    callbackUrl,
-    onBeforeSubmit,
-    onSignedIn,
-    disabled,
-    emailEnabled,
-    providers,
-    branding,
-    notice,
-    termsGate,
-  }: SignupPageProps): JSX.Element {
-    return (
-      <Container variant="centered" padding="lg">
-        {branding}
-        <SocialLoginContainer title={copy.signup.title} showDivider={false} maxWidth={maxWidth}>
-          <Subtitle text={copy.signup.subtitle} />
-          {notice}
-          {termsGate}
-          {emailEnabled && (
-            <EmailSignupForm
-              callbackUrl={callbackUrl}
-              onBeforeSubmit={onBeforeSubmit}
-              onSignedIn={onSignedIn}
-              disabled={disabled}
-            />
-          )}
-          <Providers label={copy.signup.providerDivider}>{providers}</Providers>
-          <Footer
-            prompt={copy.signup.loginPrompt}
-            linkText={copy.signup.loginLink}
-            to={routes.login}
-            Link={Link}
-            dataTestId="go-to-login"
-          />
-        </SocialLoginContainer>
-      </Container>
-    );
+  function SignupPage(props: SignupPageProps): JSX.Element {
+    return <SignupView cfg={cfg} {...props} />;
   }
 
   return { LoginPage, SignupPage };

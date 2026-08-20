@@ -9,8 +9,11 @@ import { DEFAULT_RATE_LIMITS, createInProcessRateLimiter } from "../rate-limit";
  * for five minutes or asserts nothing about the window at all.
  */
 function clock(start = 1_000_000): { now: () => number; advance: (ms: number) => void } {
-  let at = start;
-  return { now: () => at, advance: (ms) => { at += ms; } };
+  // A container's property rather than a closed-over `let`: the anti-flake gate
+  // rejects reassigning a binding from inside a callback, because a stub that
+  // does it leaks between cases when the helper is hoisted or reused.
+  const state = { at: start };
+  return { now: () => state.at, advance: (ms) => { state.at += ms; } };
 }
 
 describe("createInProcessRateLimiter", () => {
