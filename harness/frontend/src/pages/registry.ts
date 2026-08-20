@@ -4,6 +4,7 @@ import { AppShellPage } from './app-shell';
 import { AuditLogPage } from './audit-log';
 import { AUTH_PAGES, AUTH_SETTINGS_PAGE } from './auth-pages';
 import { EntitlementsPlanPage } from './entitlements-plan';
+import { FeatureFlagsPage } from './feature-flags';
 import { ImpersonationPage } from './impersonation';
 import { LifecycleAdminPage } from './lifecycle-admin';
 import { NotificationsCenterPage } from './notifications-center';
@@ -388,5 +389,12 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/audit',
     group: 'backoffice',
     Component: AuditLogPage,
+  },
+  {
+    slug: 'feature-flags',
+    title: 'Beta flags',
+    pkg: '@12-apps/feature-flags',
+    group: 'backoffice',
+    Component: FeatureFlagsPage,
   },
 ];

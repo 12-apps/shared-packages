@@ -2,6 +2,7 @@ import type { Hono } from 'hono';
 import type { PGlite } from '@electric-sql/pglite';
 
 import type { Hosts } from './app';
+import { FEATURE_FLAGS_MOUNT_PATH, featureFlagsRouter } from './feature-flags-host';
 import { IMPERSONATION_PLATFORM_PATH } from './impersonation-host';
 import { demoEntityRoutes } from './lifecycle-demo-crud';
 import { reportsRouter } from './reports-host';
@@ -29,6 +30,11 @@ export function mountSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
   // is more-specific-first, and Hono resolves by registration order.
   app.route('/api/admin/:tenantSlug/desk-session', hosts.impersonation.tenant);
   app.route(IMPERSONATION_PLATFORM_PATH, hosts.impersonation.platform);
+
+  // @12-apps/feature-flags (FUT-884): user-level beta grants, the platform
+  // operator's surface. Its own prefix, so it sits with the other platform
+  // mounts and ahead of the broader `/api` routes below.
+  app.route(FEATURE_FLAGS_MOUNT_PATH, featureFlagsRouter());
 
   app.route('/api/admin/:tenantSlug', hosts.entitlements.router);
   app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
