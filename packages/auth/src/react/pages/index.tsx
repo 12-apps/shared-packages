@@ -8,7 +8,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 import type { EmailAuthScreens } from "../screens";
 
 /**
- * `@12-apps/auth/react/pages` — whole login and sign-up PAGES, not fragments.
+ * `@12-apps/auth/react` — whole login and sign-up PAGES, not fragments.
  *
  * ## Why the pages and not only the forms
  *

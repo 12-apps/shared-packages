@@ -133,10 +133,14 @@ export type { ApiAuth, ApiAuthConfig } from "./create-api-auth";
  * Auth.js bridge that `createApiAuth({ emailPassword })` builds for you, and is
  * exported for a host assembling its own provider list.
  *
- * Also available as `@12-apps/auth/email-credentials`, `/password` and
- * `/tokens` for callers that want the primitives without pulling in
- * `@auth/core` — a background job that expires stale tokens, for instance,
- * needs `hashToken` and nothing else.
+ * `hashToken`, `issueToken` and the password helpers come from this root too.
+ * They used to have subpaths of their own (`/password`, `/tokens`) so a caller
+ * could take a primitive without loading `@auth/core`; the surface now follows
+ * report-builder, where an entry point marks a PEER boundary rather than a
+ * module, and those two had none of their own. The root still value-imports
+ * `@auth/core`, so a job that wants only `hashToken` loads Auth.js with it —
+ * the one cost of the collapse, and the reason the Auth.js bridge below is a
+ * candidate to move behind `./server`.
  */
 export { createEmailCredentials } from "./email-credentials";
 export type { EmailCredentials } from "./email-credentials";
@@ -172,12 +176,12 @@ export {
 } from "./password";
 export type { PasswordPolicy, PasswordPolicyViolation } from "./password";
 export { DEFAULT_TOKEN_TTL_MS, buildTokenLink, hashToken, isTokenExpired, issueToken } from "./tokens";
-export type { IssuedToken } from "./tokens";
+export type { IssuedToken, IssueTokenOptions } from "./tokens";
 
 /**
- * Re-export the config (and its `ExtendedSession` type) so consumers can reach
- * it from the package root, while `@12-apps/auth/config` stays importable without
- * applying the env defaults (tests).
+ * Re-export the config (and its `ExtendedSession` type) so consumers reach it
+ * from the package root — the only place it is reachable from now that
+ * `./config` is gone.
  *
  * @deprecated Prefer `createApiAuth`.
  */
@@ -186,8 +190,7 @@ export { setSignInGate, setSessionAdminResolver } from "./config";
 export type { ExtendedSession, SignInGate, SessionAdminResolver } from "./config";
 
 /**
- * Admin allowlist helpers (also available via `@12-apps/auth/admin` for
- * dependency-free contexts such as unit tests).
+ * Admin allowlist helpers.
  */
 export { isAdminEmail, parseAdminEmails };
 
@@ -201,3 +204,13 @@ export {
   DEFAULT_RATE_LIMITS,
   type InProcessRateLimiterConfig,
 } from "./rate-limit";
+
+/**
+ * Device detection.
+ *
+ * Folded into the root rather than kept on its own subpath: it is pure — no
+ * peer and no runtime of its own — and this package follows report-builder,
+ * where an export exists for a distinct PEER boundary (react, hono, playwright,
+ * the notification transport) and never merely to name a module.
+ */
+export * from "./device-detection";

@@ -1,7 +1,7 @@
 /**
  * Apple-device detection for a SPA's social-login buttons, as a hook.
  *
- * The DETECTION itself is `@12-apps/auth/device-detection`'s `detectAppleDevice`,
+ * The DETECTION itself is `@12-apps/auth`'s `detectAppleDevice`,
  * imported rather than re-implemented: platform quirks (iPadOS 13+ reporting as a
  * Mac being the famous one) are exactly the thing that must have one answer, and
  * this used to be a second copy of that function inside a private SPA package.
@@ -15,7 +15,7 @@
  */
 import { useEffect, useState } from 'react';
 
-import { detectAppleDevice, type DeviceInfo } from '@12-apps/auth/device-detection';
+import { detectAppleDevice, type DeviceInfo } from '@12-apps/auth';
 
 /** Device info plus an `isHydrated` flag (false on the first render). */
 export interface DeviceDetection extends DeviceInfo {

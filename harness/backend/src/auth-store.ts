@@ -6,8 +6,8 @@ import type {
   EmailCredentialUser,
   EmailCredentialsStore,
   StoredAuthToken,
-} from '@12-apps/auth/email-credentials';
-import type { EmailAuthSettings } from '@12-apps/auth/email-credentials';
+} from '@12-apps/auth';
+import type { EmailAuthSettings } from '@12-apps/auth';
 import type { EmailAuthSettingsStore } from '@12-apps/auth/server';
 
 /**

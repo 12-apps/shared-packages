@@ -24,3 +24,13 @@ export type {
 
 export { PT_BR_MAIL, renderAuthMail } from "./mail-templates";
 export type { MailCopy, MailPack, RenderedMail } from "./mail-templates";
+
+/**
+ * The Prisma-shaped store seam.
+ *
+ * Here rather than on a `./prisma` subpath because it is the same kind of thing
+ * report-builder keeps in `./server`: a seam over a DUCK-TYPED client, with no
+ * dependency on a generated Prisma package. A host implementing the seam itself
+ * imports these types and installs nothing extra.
+ */
+export * from "../prisma";

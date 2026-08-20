@@ -3,45 +3,21 @@
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
+  "description": "Plug-and-play authentication plugin: Auth.js wiring and the e-mail + password flow (.), host-mounted backend surface (./server: routes, messages, mail templates, the duck-typed credential and settings store seams), auth UI (./react: screens, whole login/sign-up pages, the platform settings screen), a Hono mount (./hono), delivery through @12-apps/notifications (./notifications) and packaged Gherkin journeys (./e2e) \u2014 plus the package-owned Prisma fragment synced into the host schema. Who the users are is the host's and arrives as config. Adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
-    "./config": "./src/config.ts",
-    "./admin": "./src/admin.ts",
-    "./device-detection": "./src/device-detection.ts",
+    "./server": "./src/server/index.ts",
     "./react": "./src/react/index.ts",
-    "./email-credentials": "./src/email-credentials/index.ts",
-    "./password": "./src/password.ts",
-    "./tokens": "./src/tokens.ts",
-    "./react/screens": "./src/react/screens/index.tsx",
-    "./server": {
-      "types": "./src/server/index.ts",
-      "default": "./src/server/index.ts"
-    },
-    "./hono": {
-      "types": "./src/hono/index.ts",
-      "default": "./src/hono/index.ts"
-    },
-    "./react/settings": {
-      "types": "./src/react/settings/index.tsx",
-      "default": "./src/react/settings/index.tsx"
+    "./hono": "./src/hono/index.ts",
+    "./notifications": {
+      "types": "./src/notifications/index.ts",
+      "default": "./src/notifications/index.ts"
     },
     "./e2e": {
       "types": "./dist/e2e/index.d.ts",
       "default": "./dist/e2e/index.js"
     },
-    "./package.json": "./package.json",
-    "./notifications": {
-      "types": "./src/notifications/index.ts",
-      "default": "./src/notifications/index.ts"
-    },
-    "./prisma": {
-      "types": "./src/prisma/index.ts",
-      "default": "./src/prisma/index.ts"
-    },
-    "./react/pages": {
-      "types": "./src/react/pages/index.tsx",
-      "default": "./src/react/pages/index.tsx"
-    }
+    "./package.json": "./package.json"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
@@ -53,7 +29,9 @@
     "storybook:build": "storybook build",
     "build": "tsc -p tsconfig.e2e.json",
     "prisma:sync": "node scripts/sync-auth-schema.mjs",
-    "prisma:sync:check": "node scripts/sync-auth-schema.mjs --check"
+    "prisma:sync:check": "node scripts/sync-auth-schema.mjs --check",
+    "clean": "rm -rf node_modules coverage dist",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@auth/core": "0.41.0",
