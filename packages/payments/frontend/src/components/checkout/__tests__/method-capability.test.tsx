@@ -14,7 +14,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PaymentStep } from "../checkout-steps";
-import { googlePayConfig } from "../method-capability";
+import { googlePayConfig, handOffMethod } from "../method-capability";
 import { MethodPicker } from "../method-picker";
 import type { CheckoutProviderConfig } from "../types";
 
@@ -181,5 +181,27 @@ describe("googlePayConfig — the wallet gate fails CLOSED (FUT-471)", () => {
     };
     const config_ = chained({});
     expect(googlePayConfig({ ...config_, chain: [...(config_.chain ?? []), tail] })).toBeNull();
+  });
+});
+
+describe("handOffMethod — what a hand-off store charges on the buyer's behalf", () => {
+  it("asks for PIX when the chain offers it", () => {
+    // PIX is the one method whose first charge is ALWAYS raised immediately, so
+    // it is the one that always comes back with a link to hand the buyer to. A
+    // CARD request at a store that can tokenize somewhere in its chain is
+    // answered with the bare order instead — nowhere to send anyone.
+    expect(handOffMethod(["PIX", "CARD"])).toBe("PIX");
+    expect(handOffMethod(["CARD", "PIX"])).toBe("PIX");
+  });
+
+  it("falls back to the chain's own method when it cannot PIX", () => {
+    // The walk refuses a method the provider never declared, so asking for PIX
+    // at a card-only store would fail the charge rather than raise it.
+    expect(handOffMethod(["CARD"])).toBe("CARD");
+  });
+
+  it("reads an unknown or empty offer as PIX", () => {
+    expect(handOffMethod(null)).toBe("PIX");
+    expect(handOffMethod([])).toBe("PIX");
   });
 });

@@ -26,8 +26,10 @@
  * to an empty pane.
  */
 import { CapabilityDefaultScreen } from "./capability-default";
+import { handsBuyerOver } from "./hands-over";
 import { HostedLinkScreen } from "./hosted-link";
 import { PixAndCardScreen } from "./pix-and-card";
+import type { CheckoutProviderConfig } from "../types";
 import type { ProviderCheckoutScreen } from "./types";
 
 /**
@@ -75,4 +77,32 @@ export function resolveCheckoutScreen(
   chainHeadScreen: string | null | undefined,
 ): ProviderCheckoutScreen {
   return screenFor(chainHeadScreen) ?? CapabilityDefaultScreen;
+}
+
+/**
+ * Does the buyer choose PIX-or-card on the PROVIDER's page rather than on ours?
+ *
+ * The shell asks this before rendering its method picker, and hides the picker
+ * when the answer is yes (FUT-596 follow-up). A hand-off store asks the
+ * question twice otherwise: once here, where the answer changes nothing —
+ * every method mints the same checkout link — and again on the provider's own
+ * page, where it is finally binding. The first ask is not merely redundant, it
+ * is misleading: the buyer who picked PIX here has picked nothing, and finding
+ * the same two options waiting for them on another site reads as a checkout
+ * that lost their answer.
+ *
+ * Resolved in the SAME order as {@link resolveCheckoutScreen} — a declared id
+ * wins, and an undeclared or unknown one falls back to the capability read —
+ * so the picker and the pane can never disagree about which flow this is. That
+ * is why the test is an identity check against the hand-off screen rather than
+ * a second table of ids: a table would be the copy that drifts, and it would
+ * drift the moment a new hand-off adapter declared its own id.
+ */
+export function methodChosenAtProvider(
+  chainHeadScreen: string | null | undefined,
+  config: CheckoutProviderConfig | null,
+): boolean {
+  const declared = screenFor(chainHeadScreen);
+  if (declared) return declared === HostedLinkScreen;
+  return handsBuyerOver(config);
 }
