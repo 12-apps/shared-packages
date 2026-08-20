@@ -127,8 +127,7 @@ the test that would have caught the working-copy 404.
 
 ## Status
 
-Proposal-stage: `"private": true` and not in `release-packages.txt`, so
-nothing publishes on merge. Accepting the proposal means dropping `private`
-and adding `packages/wiring` to the release list (it has no dependencies, so
-it slots in first). The RFC and the per-package adaptation report live in
+Released: the package is in `release-packages.txt` (first — it has no
+dependencies) and `@12-apps/report-builder` is the first producer, adopted by
+the consumer harness. The RFC and the per-package adaptation report live in
 `docs/wiring/`.

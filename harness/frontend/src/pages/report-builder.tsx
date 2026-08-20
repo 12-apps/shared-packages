@@ -3,11 +3,10 @@ import { useEffect, useRef, type JSX } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 import { reportSpecSchema, type ReportSpec } from '@12-apps/report-builder';
-import {
-  createWebReportBuilder,
-  type BlockTemplateGroup,
-  type ReportBuilderSurface,
-} from '@12-apps/report-builder/react';
+import { reportBuilderManifest } from '@12-apps/report-builder/manifest';
+import { reportBuilderWebManifest } from '@12-apps/report-builder/manifest/web';
+import type { BlockTemplateGroup, ReportBuilderSurface } from '@12-apps/report-builder/react';
+import { createWiringHost } from '@12-apps/wiring/consumer';
 
 /**
  * The whole wiring a frontend host performs for this package.
@@ -202,16 +201,35 @@ const SURFACE: ReportBuilderSurface = {
   timeZone: 'America/Sao_Paulo',
 };
 
-const { page: ReportSurface } = createWebReportBuilder({
-  tenantSlug: TENANT_SLUG,
-  surface: SURFACE,
-  // NOT standalone. `standalone` wraps the surface in a `MemoryRouter`, which
-  // is what a host with no router at all needs — and a memory router keeps its
-  // location in a variable, so opening a report changed the screen and left the
-  // address bar saying `#/report-builder`. Nothing could be linked to, reloaded
-  // or backed out of. This page has a router, so the surface uses it.
-  standalone: false,
+/**
+ * The surface, adopted through `@12-apps/wiring/consumer` (12-27): the same
+ * config `createWebReportBuilder` has always taken, handed through a typed
+ * binding. Module scope IS the memoisation — the binder builds the surface
+ * once, which is the rule every hand wiring used to carry as a comment (the
+ * factory returns component TYPES; a rebuild unmounts the whole tree).
+ */
+const webWiring = createWiringHost({ name: 'harness-frontend', kind: 'web' });
+const { surface: reportsSurface } = webWiring.adoptWeb({
+  manifest: reportBuilderManifest,
+  web: reportBuilderWebManifest,
+  bindings: {
+    surface: {
+      config: {
+        tenantSlug: TENANT_SLUG,
+        surface: SURFACE,
+        // NOT standalone. `standalone` wraps the surface in a `MemoryRouter`,
+        // which is what a host with no router at all needs — and a memory
+        // router keeps its location in a variable, so opening a report changed
+        // the screen and left the address bar saying `#/report-builder`.
+        // Nothing could be linked to, reloaded or backed out of. This page has
+        // a router, so the surface uses it.
+        standalone: false,
+      },
+    },
+  },
 });
+webWiring.assemble();
+const ReportSurface = reportsSurface.page;
 
 /**
  * The cache the surface shares with its host.
