@@ -79,6 +79,24 @@ describe("the package root stays light", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("never reaches a NODE BUILTIN — the root has to run in a browser", () => {
+    // The one this test did not have, and the omission shipped a broken build.
+    //
+    // `.` was treated as light because it pulled no runtime PEER. But
+    // `password.ts` and `tokens.ts` import `node:crypto`, and `@12-apps/app-shell`
+    // value-imports this root from a BROWSER bundle to get `detectAppleDevice`.
+    // Vite externalises `node:crypto`, Rollup then cannot find `scrypt` in the
+    // browser shim, and every SPA build fails. A peer is not the only way to bind
+    // a runtime; a builtin is the other, and it is the one a bundler cannot shim.
+    const offenders = reachable("index.ts").flatMap((file) =>
+      valueImports(readFileSync(join(SRC, file), "utf8"))
+        .filter((spec) => spec.startsWith("node:"))
+        .map((spec) => `${file} -> ${spec}`),
+    );
+
+    expect(offenders).toEqual([]);
+  });
+
   it("never reaches react, react-dom or hono either", () => {
     // Same rule, the other peers. An entry point marks a PEER boundary here, so
     // the root reaching one would mean the boundary is in the wrong place.
@@ -88,6 +106,24 @@ describe("the package root stays light", () => {
         .filter((s) => heavy.includes(s))
         .map((s) => `${file} -> ${s}`),
     );
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("holds the same line for ./react — the entry an SPA actually imports", () => {
+    // The root is browser-safe only because `@12-apps/app-shell` reaches it.
+    // `./react` is reached by every SPA directly and by definition renders in a
+    // browser, so it has strictly more to lose. Guarded here rather than assumed:
+    // the root's version of this rule was assumed once, and the assumption
+    // shipped a build that could not bundle.
+    const heavy = ["hono", "@playwright/test", "playwright-bdd"];
+    const offenders = reachable("react/index.ts").flatMap((file) => {
+      const specs = valueImports(readFileSync(join(SRC, file), "utf8"));
+      return [
+        ...specs.filter((s) => s.startsWith("node:")).map((s) => `${file} -> ${s}`),
+        ...specs.filter((s) => heavy.includes(s)).map((s) => `${file} -> ${s}`),
+      ];
+    });
 
     expect(offenders).toEqual([]);
   });
