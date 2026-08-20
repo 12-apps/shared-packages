@@ -55,8 +55,14 @@ interface Call {
   body: Record<string, unknown> | null;
 }
 
-/** Records every ask; answers the key GET and a queue of POST bodies. */
-function stubFetch(answers: { publicKey?: string | null; post?: unknown[] } = {}) {
+/** What the verification endpoint's `GET` says about the charge to come. */
+interface ProbeAnswers {
+  publicKey?: string | null;
+  amountCents?: number | null;
+}
+
+/** Records every ask; answers the probe GET and a queue of POST bodies. */
+function stubFetch(answers: ProbeAnswers & { post?: unknown[] } = {}) {
   const calls: Call[] = [];
   const posts = [...(answers.post ?? [])];
   vi.stubGlobal(
@@ -71,9 +77,12 @@ function stubFetch(answers: { publicKey?: string | null; post?: unknown[] } = {}
       // `in`, not `??`: the store having NO key is the case that matters most
       // here, and `null ?? 'PUBKEY'` would hand it one.
       const publicKey = 'publicKey' in answers ? answers.publicKey : 'PUBKEY';
+      // Same reason as the key: a host that answers NO amount is a case, and
+      // `null ?? 1` would quietly invent the very cent this hook refuses to.
+      const amountCents = 'amountCents' in answers ? answers.amountCents : 1;
       const payload =
         method === 'GET'
-          ? { publicKey }
+          ? { publicKey, amountCents }
           : (posts.shift() ?? { ok: true, refunded: true });
       return { ok: true, json: async () => payload } as unknown as Response;
     }),
@@ -362,5 +371,139 @@ describe('useActivationCharge — trying again', () => {
     expect(result.current.state).toEqual({ kind: 'idle' });
     expect(result.current.fieldErrors).toEqual({});
     expect(result.current.cpfError).toBeUndefined();
+  });
+});
+
+/** A second provider's endpoint, for the tests about moving between them. */
+const OTHER_URL = '/api/admin/loja/payments/providers/infinitepay/verify-charge';
+
+/** Render against a URL the test can change, as a provider switch would. */
+function renderForUrl(url: string) {
+  return renderHook(
+    ({ verifyChargeUrl }: { verifyChargeUrl: string }) =>
+      useActivationCharge(options({ verifyChargeUrl })),
+    { initialProps: { verifyChargeUrl: url } },
+  );
+}
+
+describe('useActivationCharge — what the charge will cost', () => {
+  it('reports the amount the endpoint answers, rather than the cent everyone expects', async () => {
+    // Not hypothetical: at least one provider refuses a one-cent total, so its
+    // activation charge is worth R$ 1,01. A screen promising R$ 0,01 while
+    // charging that is the kind of lie this whole flow exists to remove.
+    stubFetch({ amountCents: 101 });
+    const { result } = renderHook(usingOptions(options()));
+
+    await waitFor(() => expect(result.current.amountCents).toBe(101));
+  });
+
+  it('asks ONCE for both the key and the amount', async () => {
+    const io = stubFetch({ publicKey: 'PUBKEY', amountCents: 101 });
+    stubTokenizer();
+    const { result } = renderHook(usingOptions(options()));
+    await waitFor(() => expect(result.current.amountCents).toBe(101));
+
+    fillIn(result);
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    // One GET, and both facts came out of it — the amount on screen and the key
+    // the card was encrypted with are the same endpoint's same answer.
+    expect(io.calls.filter((call) => call.method === 'GET')).toHaveLength(1);
+    expect(tokenizeCard).toHaveBeenCalledWith(expect.anything(), 'PUBKEY', expect.anything());
+  });
+
+  it('says nothing about the cost until the endpoint has answered', async () => {
+    const gate: { release: () => void } = { release: () => undefined };
+    const answered = new Promise<void>((resolve) => {
+      gate.release = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        await answered;
+        return { ok: true, json: async () => ({ amountCents: 101 }) } as unknown as Response;
+      }),
+    );
+    const { result } = renderHook(usingOptions(options()));
+
+    // The gap is the point: a guess here would be shown, and then corrected.
+    expect(result.current.amountCents).toBeNull();
+
+    gate.release();
+    await waitFor(() => expect(result.current.amountCents).toBe(101));
+  });
+
+  it('stays unknown when the host answers no amount at all', async () => {
+    const io = stubFetch({ publicKey: 'ONLY-KEY', amountCents: null });
+    stubTokenizer();
+    const { result } = renderHook(usingOptions(options()));
+    await waitFor(() => expect(io.calls).toHaveLength(1));
+
+    fillIn(result);
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    // The body WAS read — its key reached the tokenizer — so the null is the
+    // host's answer, not a request that failed.
+    expect(tokenizeCard).toHaveBeenCalledWith(expect.anything(), 'ONLY-KEY', expect.anything());
+    expect(result.current.amountCents).toBeNull();
+  });
+
+  it('ignores an amount that is not a number', async () => {
+    const io = stubFetch({ publicKey: 'ONLY-KEY', amountCents: '101' as unknown as number });
+    stubTokenizer();
+    const { result } = renderHook(usingOptions(options()));
+    await waitFor(() => expect(io.calls).toHaveLength(1));
+
+    fillIn(result);
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    // Read through the SAME body that carried the key, so the null is the
+    // guard's doing rather than an answer that had not arrived yet.
+    expect(tokenizeCard).toHaveBeenCalledWith(expect.anything(), 'ONLY-KEY', expect.anything());
+    expect(result.current.amountCents).toBeNull();
+  });
+});
+
+describe('useActivationCharge — moving between providers', () => {
+  it('forgets the previous provider’s answers the moment the URL changes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown) => {
+        // The second provider's endpoint never answers. What the hook reports
+        // in that gap is the whole question.
+        if (String(input) !== URL_UNDER_TEST) return new Promise<Response>(() => undefined);
+        return {
+          ok: true,
+          json: async () => ({ publicKey: 'PAGBANK-KEY', amountCents: 101 }),
+        } as unknown as Response;
+      }),
+    );
+    const view = renderForUrl(URL_UNDER_TEST);
+    await waitFor(() => expect(view.result.current.amountCents).toBe(101));
+
+    view.rerender({ verifyChargeUrl: OTHER_URL });
+
+    // The cost is unknown again rather than the last provider's.
+    expect(view.result.current.amountCents).toBeNull();
+
+    // And so is the key — which matters more: encrypting the card with one
+    // vendor's key and sending the blob to another arrives as the SECOND
+    // provider's refusal, reading exactly like a bad card.
+    fillIn(view.result);
+    await act(async () => {
+      await view.result.current.submit();
+    });
+    expect(view.result.current.state).toMatchObject({ kind: 'failed' });
+    expect(tokenizeCard).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'PAGBANK-KEY',
+      expect.anything(),
+    );
   });
 });
