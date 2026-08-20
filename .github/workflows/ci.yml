@@ -29,6 +29,7 @@ permissions:
 # verified — or verified but never published.
 env:
   PUBLISH_DIRS: >-
+    packages/wiring
     packages/eslint-config
     packages/typescript-config
     packages/request-scope
