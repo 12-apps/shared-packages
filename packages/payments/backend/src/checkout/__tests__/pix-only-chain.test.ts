@@ -46,6 +46,7 @@ const cardAcquirer = {
 function link(over: Partial<BuyerProviderLink>): BuyerProviderLink {
   return {
     provider: 'p',
+    displayName: 'P',
     tokenization: 'PUBLIC_KEY',
     publicKey: null,
     mockTokenization: false,

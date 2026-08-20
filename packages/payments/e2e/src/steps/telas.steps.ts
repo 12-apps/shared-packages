@@ -43,5 +43,9 @@ Given('a loja declara uma tela que este pacote não conhece', async ({ page }) =
 });
 
 Then('ela é avisada de que vai ser levada para o provedor', async ({ page }) => {
-  await expect(page.getByTestId('checkout-handoff-pending')).toBeVisible();
+  // BEFORE she goes, not while she is going. The hand-off screen states the
+  // trip and offers the one action that starts it; the pending state is what
+  // the same screen becomes once she presses it, and a warning that only
+  // appears after the decision is not a warning.
+  await expect(page.getByTestId('checkout-handoff-invite')).toBeVisible();
 });

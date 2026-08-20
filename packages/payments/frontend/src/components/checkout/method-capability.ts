@@ -217,6 +217,33 @@ export function selectableMethods(
 }
 
 /**
+ * The method a HAND-OFF checkout raises on the buyer's behalf, when the buyer
+ * was never asked (see `providers/registry.ts`'s `methodChosenAtProvider`).
+ *
+ * A charge still has to be raised with SOME method — that is the wire's shape,
+ * and the link is minted by raising it — but for a hand-off store the value is
+ * provisional by construction: the buyer picks for real on the provider's page,
+ * and the settlement reports back which one they actually used. So the choice
+ * here is about which request the SERVER will honour, not about what the buyer
+ * gets.
+ *
+ * PIX when the chain offers it, because PIX is the one method whose first
+ * charge is always raised immediately: a CARD request at a store that can
+ * tokenize somewhere in its chain is answered with the bare order instead, and
+ * there is no hand-off link on that answer to send anyone anywhere. Otherwise
+ * the chain's first declared method, since a store that cannot PIX would have
+ * the walk refuse a PIX charge outright.
+ *
+ * `null` offered — still loading, or a fetch blip — cannot reach here: the
+ * picker is only hidden for a store whose config already said it hands over.
+ * PIX is the safe reading of it anyway, for the reason above.
+ */
+export function handOffMethod(offered: PaymentMethod[] | null): PaymentMethod {
+  if (!offered || offered.includes("PIX")) return "PIX";
+  return offered[0] ?? "PIX";
+}
+
+/**
  * A SOLE remaining method is not a choice — take it (FUT-697 review, widened by
  * FUT-741).
  *

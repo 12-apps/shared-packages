@@ -250,6 +250,17 @@ export interface CheckoutCustomerField {
  */
 export interface CheckoutChainLink {
   provider: string;
+  /**
+   * The provider's own name as a BUYER should read it ("InfinitePay"), which
+   * `GET /api/checkout/config` publishes per entry.
+   *
+   * Optional, and the DEGRADE DIRECTION IS "SAY NOTHING": an older host serves
+   * no name, and a hand-off screen then describes where the buyer is going
+   * without naming it, rather than printing the internal `provider` id — a
+   * buyer shown "infinitepay" learns less than one shown nothing, and learns
+   * it in a vocabulary that is ours rather than theirs.
+   */
+  displayName?: string | null;
   tokenization: "NONE" | "PUBLIC_KEY" | "SDK" | "REDIRECT";
   publicKey: string | null;
   mockTokenization: boolean;

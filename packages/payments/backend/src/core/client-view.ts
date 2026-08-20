@@ -100,6 +100,16 @@ export function isSettled(status: ChargeStatus): boolean {
  */
 export interface ClientProviderConfig {
   provider: ProviderName;
+  /**
+   * The provider's own name, as a BUYER should read it ("InfinitePay").
+   *
+   * Stamped from `adapter.displayName` for the same reason `methods` is: the
+   * adapter's declaration is the single source, and a second copy inside each
+   * `clientConfig` is the one that drifts. It is published to the buyer — not
+   * only to the merchant's settings page — because a checkout that hands the
+   * buyer to another site owes them the site's name before they leave it.
+   */
+  displayName: string;
   tokenization: ClientTokenization;
   /** e.g. publishable/public key for PUBLIC_KEY and SDK flows. */
   publicKey?: string;
@@ -148,6 +158,7 @@ export function toClientProviderConfig(
   const config = adapter.clientConfig(credentials);
   return {
     ...config,
+    displayName: adapter.displayName,
     customerSchema: adapter.customerSchema ?? [],
     methods: adapter.capabilities.methods,
     wallets: adapter.capabilities.wallets ?? [],

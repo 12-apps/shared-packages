@@ -64,6 +64,8 @@ interface AdapterOptions {
   methods?: readonly PaymentMethodKind[];
   /** Answer every charge with a hosted-checkout link instead of a payload. */
   hosted?: boolean;
+  /** The vendor's own name as a buyer reads it; defaults to the adapter's id. */
+  displayName?: string;
   /** Refuse every charge, provably creating nothing. */
   refuses?: boolean;
   cancelable?: boolean;
@@ -74,7 +76,7 @@ interface AdapterOptions {
 export function testAdapter(name: string, options: AdapterOptions = {}): PaymentProviderAdapter {
   const adapter: PaymentProviderAdapter = {
     name,
-    displayName: name,
+    displayName: options.displayName ?? name,
     capabilities: {
       methods: options.methods ?? ['PIX', 'CARD'],
       savedCards: true,

@@ -31,9 +31,16 @@ When('ela informa o CPF e segue para o pagamento', async ({ page }) => {
 });
 
 When('ela escolhe pagar com cartão', async ({ page }) => {
-  // Deliberately does NOT wait for the card form: in a store that hands the
-  // buyer over there will never be one, and that is a scenario of its own.
+  // Deliberately does NOT wait for the card form: a store may answer the card
+  // choice with something other than a form, and that is a scenario of its own.
   await page.getByTestId('checkout-method-CARD').click();
+});
+
+When('ela segue para o pagamento no provedor', async ({ page }) => {
+  // The ONE action a hand-off store offers in place of the picker. There is
+  // nothing to choose here: every method mints the same checkout link, so the
+  // PIX-or-card question is binding on the provider's page and nowhere else.
+  await page.getByTestId('checkout-handoff-start').click();
 });
 
 When('ela paga com um cartão novo', async ({ page }) => {
@@ -65,6 +72,15 @@ When('ela volta da página do provedor', async ({ page }) => {
 // ---------------------------------------------------------------------------
 // What she sees
 // ---------------------------------------------------------------------------
+
+Then('não lhe perguntam entre PIX e cartão', async ({ page }) => {
+  // The picker is ABSENT, not merely narrowed to one tile. A one-option
+  // "choice" at a store that hands the buyer over still says the answer decides
+  // something, and it decides nothing until she is on the provider's own page.
+  await expect(page.getByTestId('checkout-method')).toHaveCount(0);
+  await expect(page.getByTestId('checkout-method-PIX')).toHaveCount(0);
+  await expect(page.getByTestId('checkout-method-CARD')).toHaveCount(0);
+});
 
 Then('só a opção PIX é oferecida', async ({ page }) => {
   await expect(page.getByTestId('checkout-method-PIX')).toBeVisible();

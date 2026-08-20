@@ -13,11 +13,12 @@ Feature: Pagando na página do provedor
   Background:
     Given a compradora abre o checkout de uma loja de página externa
 
-  Scenario: Nenhum formulário de cartão é oferecido, e a saída fica registrada
+  Scenario: Nada é escolhido aqui, e a saída fica registrada
     When ela informa o CPF e segue para o pagamento
-    And ela escolhe pagar com cartão
-    Then nenhum formulário de cartão é mostrado
-    And a loja registrou para onde ela seria levada
+    Then não lhe perguntam entre PIX e cartão
+    And nenhum formulário de cartão é mostrado
+    When ela segue para o pagamento no provedor
+    Then a loja registrou para onde ela seria levada
 
   Scenario: A tela de transferência guarda o pedido e oferece um link de verdade
     When a loja gera o pagamento hospedado

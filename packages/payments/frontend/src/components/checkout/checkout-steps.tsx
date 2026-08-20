@@ -3,12 +3,7 @@ import { useEffect, useRef, type JSX, type ReactNode } from "react";
 
 import { BuyerInfoForm } from "./buyer-info-form";
 import { LockOutlinedIcon } from "./icons";
-import {
-  cardPathAvailable,
-  offeredMethods,
-  selectableMethods,
-  usePreselectSoleMethod,
-} from "./method-capability";
+import { useMethodChoice } from "./method-choice";
 import { MethodPicker } from "./method-picker";
 import { PaymentErrorPanel } from "./payment-error-panel";
 import { PayerSummary } from "./payer-summary";
@@ -42,8 +37,8 @@ function useAutoRaiseOrder(
       requestedFor.current = null;
       return;
     }
-    // No method chosen yet ⇒ show only the picker; raise the order once the
-    // buyer selects PIX or card.
+    // No method chosen yet ⇒ show only the picker (or, for a hand-off store,
+    // its "Seguir para o pagamento"); raise the order once the buyer commits.
     if (!method || creating || createError || requestedFor.current === method) return;
     requestedFor.current = method;
     onGenerate(method);
@@ -70,6 +65,8 @@ function PaymentBody({
   method,
   tenantSlug,
   onResolved,
+  onStart,
+  creating,
   pollIntervalMs,
   validateApplePayMerchant,
 }: {
@@ -79,6 +76,9 @@ function PaymentBody({
   method: PaymentMethod | null;
   tenantSlug?: string;
   onResolved: (status: OrderStatus) => void;
+  /** Set only when the shell hid its picker — see {@link PaymentStep}. */
+  onStart?: () => void;
+  creating: boolean;
   pollIntervalMs?: number;
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
 }): JSX.Element | null {
@@ -91,6 +91,8 @@ function PaymentBody({
       method={method}
       tenantSlug={tenantSlug}
       onResolved={onResolved}
+      onStart={onStart}
+      creating={creating}
       pollIntervalMs={pollIntervalMs}
       validateApplePayMerchant={validateApplePayMerchant}
     />
@@ -303,6 +305,17 @@ interface PaymentStepProps {
  * Step 2 "Pagamento" — pick PIX or card and pay on the SAME page. Selecting a
  * method auto-raises its order and reveals its UI (PIX QR / card form) with no
  * intermediate tap; switching method clears the previous order (controller).
+ *
+ * ## Unless the choice is not ours to ask
+ *
+ * A store that finishes checkout on the provider's own page gets NO picker
+ * here (`methodChosenAtProvider`). Its screen renders a single "Seguir para o
+ * pagamento" instead, and pressing it selects the store's hand-off method —
+ * which is the same event a tile press is, so the auto-raise, the error panel
+ * and the retry below all keep working unchanged. Preselection is suppressed
+ * for the same flow, and deliberately: it exists to spare a buyer a tap that
+ * buys them nothing, but here the tap is the buyer's consent to LEAVE, and
+ * taking it for them would redirect a checkout the moment it rendered.
  */
 export function PaymentStep({
   method,
@@ -323,30 +336,33 @@ export function PaymentStep({
   onResolved,
 }: PaymentStepProps): JSX.Element {
   const { LoadingState } = useCheckoutComponents();
-  const cardUnavailable = !cardPathAvailable(providerConfig ?? null);
-  const offered = offeredMethods(providerConfig ?? null);
+  const config = providerConfig ?? null;
+  const choice = useMethodChoice(config, method, onMethodChange);
   useAutoRaiseOrder(order, method, creating, createError, onGenerate);
-  usePreselectSoleMethod(selectableMethods(offered, cardUnavailable), method, onMethodChange);
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       {/* Self-hiding: renders only for a flow whose Dados step was skipped. */}
       <PayerSummary name={buyer.name} taxId={buyer.taxId} onEdit={onEditBuyer} />
 
-      <MethodPicker
-        value={method}
-        onChange={onMethodChange}
-        cardUnavailable={cardUnavailable}
-        offered={offered}
-      />
+      {choice.atProvider ? null : (
+        <MethodPicker
+          value={method}
+          onChange={onMethodChange}
+          cardUnavailable={choice.cardUnavailable}
+          offered={choice.offered}
+        />
+      )}
 
       <PaymentBody
         order={order}
         buyer={buyer}
-        providerConfig={providerConfig ?? null}
+        providerConfig={config}
         method={method}
         tenantSlug={tenantSlug}
         onResolved={onResolved}
+        onStart={choice.onStart}
+        creating={creating}
         pollIntervalMs={pollIntervalMs}
         validateApplePayMerchant={validateApplePayMerchant}
       />
