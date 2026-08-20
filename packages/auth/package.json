@@ -9,6 +9,9 @@
     "./server": "./src/server/index.ts",
     "./react": "./src/react/index.ts",
     "./hono": "./src/hono/index.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./manifest/server": "./src/manifest/server.ts",
+    "./manifest/web": "./src/manifest/web.tsx",
     "./notifications": {
       "types": "./src/notifications/index.ts",
       "default": "./src/notifications/index.ts"
@@ -34,6 +37,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@12-apps/wiring": "workspace:*",
     "@auth/core": "0.41.0",
     "zod": "^4.3.5"
   },
