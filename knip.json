@@ -205,11 +205,20 @@
         "src/index.ts",
         "// The published subpaths — each is an `exports` target consumed by",
         "// hosts, never imported package-internally, so knip needs them named.",
+        "// `./e2e`'s exports target is BUILT output (dist), which does not",
+        "// exist in a checkout, so its source is named directly; the step",
+        "// definitions are reached by playwright-bdd's `steps` GLOB, never by",
+        "// an import (the report-builder shape).",
         "src/server/index.ts",
         "src/react/index.ts",
         "src/manifest/index.ts",
         "src/manifest/server.ts",
-        "src/manifest/web.ts"
+        "src/manifest/web.ts",
+        "src/e2e/index.ts",
+        "src/e2e/steps/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "playwright-bdd"
       ]
     },
     "packages/report-builder": {
