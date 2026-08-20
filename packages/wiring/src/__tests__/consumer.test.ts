@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createWiringHost, renderWiringReport, unclaimedRoutes } from "../consumer";
+import { isIsolatedDb } from "../contract/db";
 import { WiringAssemblyError } from "../errors";
 import { memoryEmailPort } from "../ports";
 import { defineManifest, defineServerManifest } from "../producer";
@@ -57,7 +58,8 @@ describe("a server host adopting the fixture package", () => {
     // Absolutized from the http binding's mountPath, in OpenAPI form.
     expect(assembled.mcpEndpoints[0]?.path).toBe("/api/admin/{tenantSlug}/notes");
     expect(assembled.mcpEndpoints[0]?.annotations?.readOnly).toBe(true);
-    expect(assembled.db[0]?.contribution.partial).toBe("prisma/delivery-notes.prisma");
+    const db = assembled.db[0]?.contribution;
+    expect(db && !isIsolatedDb(db) ? db.partial : undefined).toBe("prisma/delivery-notes.prisma");
 
     const job = assembled.jobs[0];
     expect(job?.name).toBe("notes.digest");
@@ -111,6 +113,31 @@ describe("a server host adopting the fixture package", () => {
       .routes.filter((mounted) => mounted.route.method === "GET")
       .map((mounted) => mounted.route.path);
     expect(paths).toEqual(["/notes/drafts", "/notes/:id", "/notes"]);
+  });
+
+  it("collects an isolated db contribution and names its pg schema in the report", () => {
+    const host = createWiringHost({ name: "api", kind: "server", ports: {} });
+    host.adoptServer({
+      manifest: {
+        name: "@12-apps/ledger",
+        contract: 1,
+        db: {
+          mode: "isolated",
+          schema: "prisma/schema.prisma",
+          migrations: "prisma/migrations",
+          pgSchema: "ledger",
+        },
+      },
+      server: { name: "@12-apps/ledger" },
+    });
+    const assembled = host.assemble();
+    const contribution = assembled.db[0]?.contribution;
+    expect(contribution && isIsolatedDb(contribution) ? contribution.pgSchema : undefined).toBe(
+      "ledger",
+    );
+    const entry = assembled.report.packages[0]?.capabilities.find((c) => c.kind === "db");
+    expect(entry?.status).toBe("collected");
+    expect(entry?.detail).toContain('isolated in pg schema "ledger"');
   });
 
   it("reports every capability with its status", () => {

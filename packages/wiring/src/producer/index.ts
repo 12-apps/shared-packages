@@ -9,6 +9,8 @@
  */
 
 import { WiringDefinitionError } from "../errors";
+import { isIsolatedDb } from "../contract/db";
+import type { PrismaContribution } from "../contract/db";
 import type {
   AnyServerManifest,
   AnyWebManifest,
@@ -77,18 +79,86 @@ function assertIdentity(manifest: PackageManifest): void {
   }
 }
 
+/**
+ * Postgres folds unquoted identifiers to lowercase and truncates at 63 bytes;
+ * demanding that shape up front means the name in the manifest IS the name in
+ * the database, with no quoting anywhere between.
+ */
+const PG_SCHEMA_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
+
+function assertDb(name: string, db: PrismaContribution): void {
+  if (isIsolatedDb(db)) {
+    if (db.schema.trim() === "") fail(name, "db.schema must not be blank.");
+    if (db.migrations.trim() === "") {
+      fail(name, "an isolated db must name its migrations folder — deploy applies it.");
+    }
+    if (db.pgSchema === "public") {
+      fail(name, 'db.pgSchema must not be "public" — that schema is the host\'s.');
+    }
+    if (!PG_SCHEMA_NAME.test(db.pgSchema)) {
+      fail(name, `db.pgSchema "${db.pgSchema}" is not a plain lowercase Postgres identifier.`);
+    }
+  } else if (!db.partial.endsWith(".prisma")) {
+    fail(name, `db.partial must point at a .prisma file, got "${db.partial}".`);
+  }
+}
+
 /** Declare the shared manifest. Returns its argument, validated. */
 export function defineManifest(manifest: PackageManifest): PackageManifest {
   assertIdentity(manifest);
   if (manifest.permissions) assertPermissions(manifest.name, manifest.permissions);
   if (manifest.notifications) assertNotifications(manifest.name, manifest.notifications);
   if (manifest.mcp) assertMcp(manifest.name, manifest.mcp);
-  if (manifest.db && !manifest.db.partial.endsWith(".prisma")) {
-    fail(manifest.name, `db.partial must point at a .prisma file, got "${manifest.db.partial}".`);
-  }
+  if (manifest.db) assertDb(manifest.name, manifest.db);
   if (manifest.server) assertUnique(manifest.name, "server inventory entry", manifest.server);
   if (manifest.web) assertUnique(manifest.name, "web inventory entry", manifest.web);
   return manifest;
+}
+
+/**
+ * Host-side assemblers are plain Node reading `node_modules` — they cannot
+ * execute this manifest. The db contribution is therefore mirrored into the
+ * package's `package.json` under `"wiring": { "db": ... }`, and this
+ * assertion — run in the package's own test suite, like every producer
+ * check — is what keeps the mirror and the manifest the same object shape.
+ * Both directions: a manifest with no db capability must not advertise one
+ * in `package.json` either.
+ */
+export function assertDbMirror(
+  manifest: PackageManifest,
+  packageJson: { readonly name?: string; readonly wiring?: { readonly db?: unknown } },
+): void {
+  if (packageJson.name !== undefined && packageJson.name !== manifest.name) {
+    fail(manifest.name, `package.json is named "${packageJson.name}" — the two must match.`);
+  }
+  const mirrored = packageJson.wiring?.db;
+  if (manifest.db === undefined) {
+    if (mirrored !== undefined) {
+      fail(manifest.name, "package.json wiring.db is set but the manifest declares no db capability.");
+    }
+    return;
+  }
+  if (mirrored === undefined) {
+    fail(manifest.name, 'the db contribution must be mirrored under package.json "wiring": { "db": ... }.');
+  }
+  if (stableJson(mirrored) !== stableJson(manifest.db)) {
+    fail(
+      manifest.name,
+      `package.json wiring.db drifted from the manifest: ${stableJson(mirrored)} !== ${stableJson(manifest.db)}.`,
+    );
+  }
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([k, v]) => `${JSON.stringify(k)}:${stableJson(v)}`);
+    return `{${entries.join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "undefined";
 }
 
 /**

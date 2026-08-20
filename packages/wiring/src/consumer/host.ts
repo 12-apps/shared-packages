@@ -17,6 +17,7 @@ import type { BoundJob } from "../contract/jobs";
 import type { WireMcpTool } from "../contract/mcp";
 import type { AnyNotificationBlueprint } from "../contract/notifications";
 import type { WirePermissionsContribution } from "../contract/permissions";
+import { isIsolatedDb } from "../contract/db";
 import type { PrismaContribution } from "../contract/db";
 import type { AreaContribution } from "../contract/web";
 import type { AnyServerManifest, AnyWebManifest, PackageManifest } from "../contract/manifest";
@@ -191,7 +192,13 @@ export class WiringHost {
     }
     if (manifest.db) {
       this.db.push({ packageName: manifest.name, contribution: manifest.db });
-      capabilities.push({ kind: "db", status: "collected", detail: manifest.db.partial });
+      capabilities.push({
+        kind: "db",
+        status: "collected",
+        detail: isIsolatedDb(manifest.db)
+          ? `isolated in pg schema "${manifest.db.pgSchema}"`
+          : manifest.db.partial,
+      });
     }
     if (manifest.e2e) {
       capabilities.push({ kind: "e2e", status: "collected", detail: manifest.e2e.entry });

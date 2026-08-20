@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defineManifest, defineServerManifest, defineWebManifest } from "../producer";
+import { assertDbMirror, defineManifest, defineServerManifest, defineWebManifest } from "../producer";
 import { WiringDefinitionError } from "../errors";
 import { notesManifest } from "./fixture-package";
 
@@ -70,6 +70,59 @@ describe("defineManifest", () => {
   it("refuses a db partial that is not a .prisma file", () => {
     expect(() => defineManifest({ ...base, db: { partial: "prisma/x.sql" } })).toThrow(
       /must point at a .prisma file/,
+    );
+  });
+
+  it("accepts an isolated db and refuses the shapes Postgres or deploy would choke on", () => {
+    const isolated = {
+      mode: "isolated" as const,
+      schema: "prisma/schema.prisma",
+      migrations: "prisma/migrations",
+      pgSchema: "delivery_notes",
+    };
+    expect(defineManifest({ ...base, db: isolated }).db).toBe(isolated);
+    expect(() => defineManifest({ ...base, db: { ...isolated, schema: " " } })).toThrow(
+      /db.schema must not be blank/,
+    );
+    expect(() => defineManifest({ ...base, db: { ...isolated, migrations: "" } })).toThrow(
+      /must name its migrations folder/,
+    );
+    expect(() => defineManifest({ ...base, db: { ...isolated, pgSchema: "public" } })).toThrow(
+      /must not be "public"/,
+    );
+    expect(() => defineManifest({ ...base, db: { ...isolated, pgSchema: "Has-Caps" } })).toThrow(
+      /not a plain lowercase Postgres identifier/,
+    );
+  });
+});
+
+describe("assertDbMirror", () => {
+  const composed = { partial: "prisma/x.prisma", migrations: "prisma/migrations" };
+  const withDb = defineManifest({ ...base, db: composed });
+
+  it("passes when package.json wiring.db matches, whatever the key order", () => {
+    expect(() =>
+      assertDbMirror(withDb, {
+        name: base.name,
+        wiring: { db: { migrations: "prisma/migrations", partial: "prisma/x.prisma" } },
+      }),
+    ).not.toThrow();
+  });
+
+  it("fails a missing mirror, a drifted mirror, and a mirror with no manifest half", () => {
+    expect(() => assertDbMirror(withDb, { name: base.name })).toThrow(/must be mirrored/);
+    expect(() =>
+      assertDbMirror(withDb, { name: base.name, wiring: { db: { partial: "prisma/other.prisma" } } }),
+    ).toThrow(/drifted from the manifest/);
+    expect(() =>
+      assertDbMirror(defineManifest(base), { name: base.name, wiring: { db: composed } }),
+    ).toThrow(/manifest declares no db capability/);
+    expect(() => assertDbMirror(defineManifest(base), { name: base.name })).not.toThrow();
+  });
+
+  it("refuses a package.json named for another package", () => {
+    expect(() => assertDbMirror(withDb, { name: "@12-apps/other", wiring: { db: composed } })).toThrow(
+      /must match/,
     );
   });
 });

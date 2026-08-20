@@ -51,7 +51,12 @@ export type {
 
 export type { EmailContribution, EmailPort, WireEmailMessage } from "./contract/email";
 
-export type { PrismaContribution } from "./contract/db";
+export { isIsolatedDb } from "./contract/db";
+export type {
+  ComposedPrismaContribution,
+  IsolatedPrismaContribution,
+  PrismaContribution,
+} from "./contract/db";
 
 export type {
   AreaContribution,
