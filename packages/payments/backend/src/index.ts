@@ -231,6 +231,7 @@ export {
 export { hasUsableCredentials } from './config/usable-credentials';
 export { mintBrowserKey, storedBrowserKey, type BrowserKeyDeps } from './config/browser-key';
 export { createCycleCollector } from './core/cycle-collection';
+export { merchantWebhookUrl, type MerchantWebhookUrlOptions } from './config/webhook-url';
 export { envOAuthAppCredentials, DEFAULT_OAUTH_APP_EXTRAS, type EnvOAuthAppOptions } from './config/oauth-env';
 export type { BillingInstrument, CollectableCycle, CollectionResult, CollectionSkip, CycleCollectionDeps, CycleCollector, CycleStore, InstrumentLookup } from './core/cycle-collection';
 // Account-level downgrade rule (FUT-761) — see `config/account-downgrade.ts`.
