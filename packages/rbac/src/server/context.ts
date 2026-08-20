@@ -228,7 +228,10 @@ export const DEFAULT_GATE_PERMISSIONS: RbacGatePermissions = {
 /** The scope key that satisfies any requested scope. */
 export const GLOBAL_SCOPE = 'GLOBAL' as const;
 
-export interface RbacServerConfig<P extends string = string> {
+export interface RbacServerConfig<
+  P extends string = string,
+  E extends Record<string, unknown> = Record<string, unknown>,
+> {
   /** Prisma-shaped client for the five owned models, through the seam. */
   db: RbacDbProvider;
   /**
@@ -311,13 +314,43 @@ export interface RbacServerConfig<P extends string = string> {
   /**
    * Extra payload merged into `GET /permissions` (e.g. an entitlement
    * snapshot) so a host extends the shell read with zero route code.
+   *
+   * Whatever this resolves to becomes part of the answer, so it is part of the
+   * CONTRACT — see {@link MyPermissionsPayload}, which is the shape a host
+   * should hold its advertised schema to.
    */
-  permissionsExtras?: (actor: RbacActor) => Promise<Record<string, unknown>>;
+  permissionsExtras?: (actor: RbacActor) => Promise<E>;
   /** Gate permission ids, when the host's catalog spells them differently. */
   gatePermissions?: Partial<RbacGatePermissions>;
   /** User-facing copy overrides. */
   messages?: Partial<RbacMessages>;
 }
+
+/**
+ * What `GET /permissions` answers — the payload behind a host's shell read.
+ *
+ * Published because the package BUILDS it and the host ADVERTISES it. Those
+ * were two unrelated descriptions of one payload until FUT-760: the host's
+ * advertised schema listed `permissions` alone while the route had been
+ * merging {@link RbacServerConfig.permissionsExtras} into the answer for as
+ * long as the option had existed, so an entitlement snapshot reached callers
+ * that no manifest mentioned. Nothing could have caught it — there was no type
+ * to disagree with.
+ *
+ * A host holds its advertised schema to this:
+ *
+ * ```ts
+ * const myPermissionsSchema = z.object({ ... })
+ *   satisfies z.ZodType<MyPermissionsPayload<MyExtras>>;
+ * ```
+ *
+ * `E` defaults to `Record<string, unknown>` so a host that merges nothing, or
+ * that has not yet named its extras, is unaffected.
+ */
+export type MyPermissionsPayload<E extends Record<string, unknown> = Record<string, unknown>> = {
+  /** The caller's OWN resolved ids, sorted — Set iteration is insertion-defined. */
+  permissions: string[];
+} & E;
 
 /** A user-safe API error carrying the HTTP status the wire promises. */
 export class RbacApiError extends Error {

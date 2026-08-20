@@ -14,6 +14,7 @@ export {
   ok,
   fail,
   foldApiError,
+  type MyPermissionsPayload,
   paginationMeta,
   type PaginationMeta,
   type RbacActor,
