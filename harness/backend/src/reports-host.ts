@@ -34,7 +34,7 @@ import { HARNESS_CATALOG } from './fixtures/report-catalog';
 import { fixtureTables } from './fixtures/report-fixture-tables';
 import { HARNESS_TIME_ZONE, NOW } from './fixtures/report-fixture-window';
 import { HARNESS_CLIENT_ID } from './saved-report-db';
-import { honoRouterFor } from './wire-hono';
+import { honoRouterFor, harnessLoggerFor } from './wire-hono';
 
 /** This host's own tiers, over this host's own entities. */
 const SALES = 'reports:sales:read';
@@ -211,13 +211,7 @@ export function wireReports(db: SavedReportDb): {
     kind: 'server',
     // The reference consumer shows the BOUND path: one namespaced logger
     // factory for every adopted package. The harness's sink is the console.
-    ports: {
-      loggerFor: (namespace) => ({
-        info: (message, ...meta) => console.info(`[${namespace}] ${message}`, ...meta),
-        warn: (message, ...meta) => console.warn(`[${namespace}] ${message}`, ...meta),
-        error: (message, ...meta) => console.error(`[${namespace}] ${message}`, ...meta),
-      }),
-    },
+    ports: { loggerFor: harnessLoggerFor },
   });
   host.adoptServer({
     manifest: reportBuilderManifest,

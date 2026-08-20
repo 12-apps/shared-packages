@@ -67,3 +67,20 @@ export function honoRouterFor(
   });
   return app;
 }
+
+/**
+ * The harness's namespaced logger factory — its telemetry sink IS the
+ * console, which is the one legitimate console call in the system (a real
+ * host hands `createFeatureLogger` here instead).
+ */
+export function harnessLoggerFor(namespace: string): {
+  info: (message: string, ...meta: unknown[]) => void;
+  warn: (message: string, ...meta: unknown[]) => void;
+  error: (message: string, ...meta: unknown[]) => void;
+} {
+  return {
+    info: (message, ...meta) => console.info(`[${namespace}] ${message}`, ...meta),
+    warn: (message, ...meta) => console.warn(`[${namespace}] ${message}`, ...meta),
+    error: (message, ...meta) => console.error(`[${namespace}] ${message}`, ...meta),
+  };
+}
