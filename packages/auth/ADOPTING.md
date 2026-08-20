@@ -434,3 +434,97 @@ which the descriptors' own tests cannot reach.
 
 What stays in a host is the part a host genuinely owns: who may call these, and
 which status a refusal answers.
+
+## Adopting through `@12-apps/wiring`
+
+The package now ships a **producer manifest**, so a host on the wiring contract
+declares what it wants rather than writing mounts:
+
+```ts
+import { createWiringHost } from '@12-apps/wiring/consumer';
+import { authManifest, authPlatformManifest } from '@12-apps/auth/manifest';
+import { authServerManifest, authPlatformServerManifest } from '@12-apps/auth/manifest/server';
+
+const host = createWiringHost({
+  name: 'my-app',
+  kind: 'server',
+  // ONE delivery port, for every package that mails.
+  ports: { email: { send: (to, message) => driver.send(to, message) } },
+});
+
+host.adoptServer({
+  manifest: authManifest,
+  server: authServerManifest({ loginUrl: `${origin}/login` }),
+  bindings: {
+    http: { mountPath: '/api/auth/email', config: { credentials, messages: PT_BR_MESSAGES } },
+    email: {},                         // takes the host port above
+  },
+});
+
+host.adoptServer({
+  manifest: authPlatformManifest,
+  server: authPlatformServerManifest,
+  bindings: { http: { mountPath: '/api/platform/auth-settings', config: { store } } },
+});
+
+const { routes, mailers, db, areas, report } = host.assemble();
+```
+
+### Why there are two manifests
+
+An `http` capability binds ONE mount path, and this package has two surfaces
+that cannot share one:
+
+| | mounted at | reachable by |
+|---|---|---|
+| `@12-apps/auth` | wherever the packaged browser client points | anybody |
+| `@12-apps/auth-platform` | a path the host gates for operators | superadmins |
+
+They differ in audience, path and gate — and in the origin host, in MCP
+exposure too: the platform pair is off the tool surface by exclusion, because a
+tool that could turn verification off would open unverified registration on the
+whole platform in one call. Folding them into one manifest would mean the
+aggregate could not express that difference.
+
+The manifest **name** is a wiring identity, not an npm package name. The
+consumer keys adoption and its report on it.
+
+### The actor inverts
+
+Under `emailAuthRouter` the package held a `resolveUserId` callback and turned
+`null` into 401. Under the contract the HOST resolves the caller and hands it in
+as `WireRequest.actor`. That is the better half of the seam: `resolveUserId`
+could only ever express one refusal, so a host whose gate has a second one —
+signed in, but not permitted, a **403** — had nowhere to put it, and collapsing
+the two bounces somebody to a sign-in they are already past.
+
+What the ROUTE still decides is whether it needed anybody at all: `session` is
+a property of the endpoint, not of the host, and a host restating it per route
+would eventually restate one of them wrong.
+
+`emailAuthRouter`, `mountEmailAuth` and the raw descriptors are all unchanged,
+so a host not on the contract is untouched.
+
+### The web half
+
+`createWebEmailAuth` is the `surface` capability, and it is also just the
+composition every host was writing by hand: build the transport, hand it to the
+screens, hand those to the pages, re-export the nine components. In the origin
+host that was a 44-line barrel in a shared SPA package, doing nothing a second
+host would do differently — and a recipe hosts can get subtly wrong: forget
+`useSession` and the two sign-in forms render but cannot sign anybody in, with
+nothing red until somebody tries.
+
+```ts
+export const auth = createWebEmailAuth({
+  basePath: '/api/auth/email',
+  copy: PT_BR, pages: PT_BR_PAGES, useSession, Link,
+});
+// auth.LoginPage, auth.SignupPage, auth.ForgotPasswordScreen, … auth.client
+```
+
+`areas` travel with the version, which is the point: an area a release adds
+shows up in `assemble()`'s report rather than in a bug about a page nobody
+mounted. Screen names are the KEYS of the built surface, and a test asserts
+they resolve — a rename that did not reach the surface is a host-side undefined
+component, which renders as a blank page with nothing in any log.
