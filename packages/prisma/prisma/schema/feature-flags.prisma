@@ -1,0 +1,37 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// OWNED BY @12-apps/feature-flags — the host's multi-file schema folder holds
+// only a COPY of this file (created/verified by `pnpm --filter
+// @12-apps/feature-flags prisma:sync`): the user-level flag grants live here,
+// in the package, never in the application.
+//
+// Deliberately self-contained (the payments-backend doctrine): `user_id` is a
+// by-value String column — NO foreign key into any host table — so the model
+// works in every repo without schema coupling. The host may add its own FK in
+// a host migration if it wants the cascade.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// One user-level flag grant (FUT-884). NO row means the flag's default (off —
+// a beta fails CLOSED); a row with `enabled: false` is an EXPLICIT opt-out
+// that survives a future default-on rollout. The flag CATALOG is host code on
+// purpose — a flag with no code behind it does nothing, so a new flag ships
+// with a deploy anyway, and a grant whose key left the catalog is an orphan
+// the management surface reports. `granted_by` is the granting superadmin's
+// email, kept as an opaque scalar (a platform admin may have no users row).
+// USER-GLOBAL by design: the grant follows the person, and staying a VEIL
+// (ANDed over the tenant axes — plan, lifecycle, tenant settings, RBAC) is
+// exactly what makes that safe — in a store whose tenant axes deny the
+// feature, the grant lights nothing.
+model UserFeatureGrant {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  flagKey   String   @map("flag_key")
+  enabled   Boolean  @default(true)
+  grantedBy String   @map("granted_by")
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, flagKey])
+  @@index([flagKey])
+  @@map("user_feature_grants")
+}
