@@ -4,7 +4,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { EmailAuthScreens } from "../../screens";
-import { createAuthRoutes, authErrorMessage, AUTH_ERROR_CODES } from "../routes";
+import { createAuthRoutes } from "../routes";
+import { authErrorMessage, AUTH_ERROR_CODES } from "../errors";
 import type { AuthRoutesConfig } from "../routes";
 import { PT_BR_AUTH_ERRORS, PT_BR_PAGES } from "../pt-BR";
 
@@ -312,5 +313,53 @@ describe("createAuthRoutes — a refused callbackUrl", () => {
     const { LoginRoute } = createAuthRoutes(config);
     render(<LoginRoute />);
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/pedidos", { replace: true }));
+  });
+});
+
+describe("createAuthRoutes — the gate tells the provider slot", () => {
+  it("reports the gate as unsatisfied so the slot can disable itself", async () => {
+    const seen: boolean[] = [];
+    const { config } = harness({
+      signupGate: {
+        render: ({ satisfied, setSatisfied }) => (
+          <input
+            type="checkbox"
+            data-testid="accept"
+            checked={satisfied}
+            onChange={(event) => setSatisfied(event.target.checked)}
+          />
+        ),
+        failureMessage: "não deu",
+      },
+      renderProviders: ({ gateSatisfied }) => {
+        seen.push(gateSatisfied);
+        return <button type="button" data-testid="google" disabled={!gateSatisfied} />;
+      },
+    });
+    const { SignupRoute } = createAuthRoutes(config);
+    render(<SignupRoute />);
+
+    // A button that looks clickable and silently does nothing is worse than
+    // one that shows it is not ready — `start` refuses either way.
+    expect((await screen.findByTestId("google")).hasAttribute("disabled")).toBe(true);
+    fireEvent.click(await screen.findByTestId("accept"));
+    await waitFor(() =>
+      expect((screen.getByTestId("google") as HTMLButtonElement).disabled).toBe(false),
+    );
+    expect(seen[0]).toBe(false);
+  });
+
+  it("reports satisfied on a route with no gate at all", async () => {
+    const seen: boolean[] = [];
+    const { config } = harness({
+      renderProviders: ({ gateSatisfied }) => {
+        seen.push(gateSatisfied);
+        return <div data-testid="providers" />;
+      },
+    });
+    const { LoginRoute } = createAuthRoutes(config);
+    render(<LoginRoute />);
+    await screen.findByTestId("providers");
+    expect(seen.every(Boolean)).toBe(true);
   });
 });

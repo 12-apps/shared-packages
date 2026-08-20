@@ -1,5 +1,5 @@
 import type { AuthPagesCopy } from "./index";
-import type { AuthErrorCopy } from "./routes";
+import type { AuthErrorCopy } from "./errors";
 
 /**
  * Brazilian Portuguese page chrome.

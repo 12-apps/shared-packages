@@ -7,6 +7,8 @@ import { Container } from "@12-apps/ui/layout/Container";
 import type { EmailAuthSettings } from "../../email-credentials/types";
 import { sameOriginCallbackUrl } from "../create-web-auth";
 import type { SessionStatus } from "../create-web-auth";
+import { failureNotice } from "./errors";
+import type { AuthErrorCopy } from "./errors";
 import { createAuthPages } from "./index";
 import type { AuthPages, AuthPagesConfig } from "./index";
 
@@ -44,45 +46,6 @@ import type { AuthPages, AuthPagesConfig } from "./index";
  * **The words**, via the copy pack.
  */
 
-/**
- * Every Auth.js error code these pages can receive, mapped to a copy key.
- *
- * The list is Auth.js's, not this package's, which is exactly why it belongs to
- * a package rather than to each host: a host cannot know the set, and the ones
- * that guessed got four of nine.
- */
-export const AUTH_ERROR_CODES = [
-  "AccessDenied",
-  "Configuration",
-  "Verification",
-  "OAuthSignin",
-  "OAuthCallback",
-  "OAuthAccountNotLinked",
-  "OAuthCreateAccount",
-  "EmailCreateAccount",
-  "Callback",
-  "CredentialsSignin",
-  "SessionRequired",
-] as const;
-
-export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
-
-/** The sentence shown for each code, plus the catch-all for one not listed. */
-export type AuthErrorCopy = Record<AuthErrorCode, string> & { fallback: string };
-
-/**
- * Which codes are the user's own doing rather than a fault.
- *
- * They render as a warning instead of an error: "sign up first" is an
- * instruction, and painting it red tells somebody a normal step went wrong.
- */
-const ADVISORY_CODES = new Set<string>(["AccessDenied", "Verification", "SessionRequired"]);
-
-/** The sentence for a code, falling back for anything the list does not name. */
-export function authErrorMessage(code: string, copy: AuthErrorCopy): string {
-  return (copy as Record<string, string>)[code] ?? copy.fallback;
-}
-
 /** Minimum this package needs from a host's session hook. */
 export interface AuthRouteSession {
   status: SessionStatus;
@@ -97,6 +60,16 @@ export interface AuthProvidersContext {
   start: (provider: string) => void;
   /** Which provider is mid-handoff, if any. */
   pending: string | null;
+  /**
+   * Whether the sign-up gate is satisfied — `true` wherever there is no gate.
+   *
+   * The slot needs this to DISABLE its buttons. `start` already refuses while
+   * the gate is unsatisfied, so nothing unsafe gets through either way, but a
+   * button that looks clickable and silently does nothing is worse than one
+   * that shows it is not ready. This package will not reach into a node it was
+   * handed, so it says so instead.
+   */
+  gateSatisfied: boolean;
 }
 
 /**
@@ -253,20 +226,12 @@ function useRouteState(config: AuthRoutesConfig): RouteState {
   };
 }
 
-/** The notice slot — one Alert, from one map. */
-function failureNotice(failure: string | null, errors: AuthErrorCopy): ReactNode {
-  if (failure === null) return null;
-  return (
-    <Alert
-      variant={ADVISORY_CODES.has(failure) ? "warning" : "danger"}
-      description={authErrorMessage(failure, errors)}
-      data-testid="login-error"
-    />
-  );
-}
-
 /** The provider slot, or a spinner while the host is still discovering them. */
-function providersSlot(config: AuthRoutesConfig, state: RouteState): ReactNode {
+function providersSlot(
+  config: AuthRoutesConfig,
+  state: RouteState,
+  gateSatisfied = true,
+): ReactNode {
   if (config.providersPending === true) {
     return <LoadingState variant="spinner" size="sm" dataTestId="providers-loading" />;
   }
@@ -274,6 +239,7 @@ function providersSlot(config: AuthRoutesConfig, state: RouteState): ReactNode {
     callbackUrl: state.callbackUrl,
     start: state.start,
     pending: state.pending,
+    gateSatisfied,
   });
 }
 
@@ -372,7 +338,7 @@ function SignupView({ config, pages }: RouteViewProps): JSX.Element {
             .then(() => state.start(provider))
             .catch(() => undefined);
         },
-      })}
+      }, satisfied)}
     />
   );
 }
