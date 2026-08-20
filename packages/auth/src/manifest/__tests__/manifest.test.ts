@@ -109,10 +109,17 @@ describe("authServerManifest", () => {
 });
 
 describe("authWebManifest", () => {
-  /** Every screen name any area suggests, across both manifests. */
-  const suggested = [...(authWebManifest.areas ?? []), ...(authPlatformWebManifest.areas ?? [])]
-    .flatMap((area) => area.routes ?? [])
-    .map((route) => route.screen);
+  /**
+   * Every screen name any area suggests, across both manifests.
+   *
+   * A function rather than a describe-scoped const: shared state at that level
+   * makes tests order-dependent, which the flakiness gate rejects — and here
+   * it would be shared across files that never asked for it.
+   */
+  const suggestedScreens = (): string[] =>
+    [...(authWebManifest.areas ?? []), ...(authPlatformWebManifest.areas ?? [])]
+      .flatMap((area) => area.routes ?? [])
+      .map((route) => route.screen);
 
   it("names screens that the built surface actually exposes", () => {
     // The integrity property the docs promise: a host projecting a route looks
@@ -126,7 +133,7 @@ describe("authWebManifest", () => {
       Link: (() => null) as never,
     }) as unknown as Record<string, unknown>;
 
-    for (const name of suggested.filter((n) => n !== "page")) {
+    for (const name of suggestedScreens().filter((n) => n !== "page")) {
       expect(surface[name], `${name} is suggested by an area but not on the surface`).toBeTypeOf(
         "function",
       );

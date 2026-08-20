@@ -31,8 +31,15 @@ import {
  * exactly as they are, so a host not on the wiring contract is untouched.
  */
 
-/** The signed-in caller, as this package needs it: an opaque user id. */
-export type AuthActor = string | null;
+/**
+ * The signed-in caller, as this package needs it: an opaque user id, or `null`
+ * for nobody.
+ *
+ * Local rather than exported — a host reads it off `WireRoute`'s own parameter
+ * and never needs to name it, and an exported alias nothing imports is exactly
+ * what the unused-exports gate exists to catch.
+ */
+type AuthActor = string | null;
 
 /** Turn one descriptor into a wire route, keeping the session refusal. */
 function toWireRoute(route: EmailAuthRoute): WireRoute<AuthActor> {
