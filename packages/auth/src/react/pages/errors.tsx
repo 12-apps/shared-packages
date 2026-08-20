@@ -1,4 +1,4 @@
-import { useState, type JSX } from "react";
+import { useState, type JSX, type ReactNode } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 
@@ -100,3 +100,57 @@ export function FailureNotice({
   );
 }
 
+
+/**
+ * A gate's own refusal — its heading, its sentence, and a way out.
+ *
+ * Structural props rather than the gate object: this module is the notices,
+ * and it should not need to know what a sign-up gate is to draw one.
+ */
+export function GateNotice({
+  title,
+  description,
+  onDismiss,
+}: {
+  title?: string;
+  description: string;
+  onDismiss: () => void;
+}): JSX.Element {
+  return (
+    <div data-testid="login-error">
+      <Alert
+        variant="danger"
+        {...(title === undefined ? {} : { title })}
+        description={description}
+        closable
+        onClose={onDismiss}
+      />
+    </div>
+  );
+}
+
+/**
+ * Which refusal the sign-up page is showing: the gate's, or the URL's.
+ *
+ * Outside the component so the branch does not count against its complexity —
+ * the page has enough of its own.
+ */
+export function signupNotice(input: {
+  gate: { failureTitle?: string; failureMessage: string } | undefined;
+  gateFailed: boolean;
+  onDismiss: () => void;
+  failure: string | null;
+  errors: AuthErrorCopy;
+}): ReactNode {
+  const { gate, gateFailed, onDismiss, failure, errors } = input;
+  if (gateFailed && gate !== undefined) {
+    return (
+      <GateNotice
+        {...(gate.failureTitle === undefined ? {} : { title: gate.failureTitle })}
+        description={gate.failureMessage}
+        onDismiss={onDismiss}
+      />
+    );
+  }
+  return <FailureNotice failure={failure} errors={errors} />;
+}

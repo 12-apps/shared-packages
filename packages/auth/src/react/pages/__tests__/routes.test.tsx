@@ -400,3 +400,55 @@ describe("createAuthRoutes — the notice keeps its heading and its close button
     await waitFor(() => expect(screen.queryByText("Falha ao entrar")).toBeNull());
   });
 });
+
+describe("createAuthRoutes — the words the hosts had", () => {
+  it("distinguishes the loading spinner from the redirecting one", async () => {
+    const copy = { loading: "Carregando...", redirecting: "Redirecionando..." };
+
+    const a = harness({ spinnerCopy: copy, useSession: () => ({ status: "loading", signIn: vi.fn() }) });
+    const { LoginRoute: Loading } = createAuthRoutes(a.config);
+    const first = render(<Loading />);
+    expect(await first.findByText("Carregando...")).toBeTruthy();
+
+    // Same spinner, different answer: "the session is resolving" vs "it
+    // resolved, you are signed in and are being sent on".
+    const b = harness({
+      spinnerCopy: copy,
+      useSession: () => ({ status: "authenticated", signIn: vi.fn() }),
+    });
+    const { LoginRoute: Redirecting } = createAuthRoutes(b.config);
+    const second = render(<Redirecting />);
+    expect(await second.findByText("Redirecionando...")).toBeTruthy();
+  });
+
+  it("gives the gate's failure a heading and a way to dismiss it", async () => {
+    const { config } = harness({
+      signupGate: {
+        render: ({ satisfied, setSatisfied }) => (
+          <input
+            type="checkbox"
+            data-testid="accept"
+            checked={satisfied}
+            onChange={(event) => setSatisfied(event.target.checked)}
+          />
+        ),
+        onBeforeProceed: () => Promise.reject(new Error("offline")),
+        failureTitle: "Falha no cadastro",
+        failureMessage: "Não foi possível registrar o consentimento.",
+      },
+      renderProviders: ({ start, gateSatisfied }) => (
+        <button type="button" data-testid="google" disabled={!gateSatisfied} onClick={() => start("google")} />
+      ),
+    });
+    const { SignupRoute } = createAuthRoutes(config);
+    render(<SignupRoute />);
+    fireEvent.click(await screen.findByTestId("accept"));
+    fireEvent.click(await screen.findByTestId("google"));
+
+    // A bare sentence in a red box reads as a system error rather than as
+    // "this step did not complete".
+    expect(await screen.findByText("Falha no cadastro")).toBeTruthy();
+    fireEvent.click(await screen.findByTestId("alert-close"));
+    await waitFor(() => expect(screen.queryByText("Falha no cadastro")).toBeNull());
+  });
+});

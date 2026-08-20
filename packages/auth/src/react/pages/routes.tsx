@@ -1,13 +1,12 @@
 import { useEffect, useState, type JSX, type ReactNode } from "react";
 
-import { Alert } from "@12-apps/ui/data-display/Alert";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
 import { Container } from "@12-apps/ui/layout/Container";
 
 import type { EmailAuthSettings } from "../../email-credentials/types";
 import { sameOriginCallbackUrl } from "../create-web-auth";
 import type { SessionStatus } from "../create-web-auth";
-import { FailureNotice } from "./errors";
+import { FailureNotice, signupNotice } from "./errors";
 import type { AuthErrorCopy } from "./errors";
 import { createAuthPages } from "./index";
 import type { AuthPages, AuthPagesConfig } from "./index";
@@ -99,6 +98,12 @@ export interface AuthSignupGate {
   onBeforeProceed?: () => Promise<void>;
   /** What to say when `onBeforeProceed` rejects. The host's words. */
   failureMessage: string;
+  /**
+   * The heading above it. Optional, but a bare sentence in a red box reads as
+   * a system error rather than as "this step did not complete" — the host this
+   * replaced said "Falha no cadastro".
+   */
+  failureTitle?: string;
 }
 
 export interface AuthRoutesConfig extends Omit<AuthPagesConfig, "screens"> {
@@ -144,6 +149,15 @@ export interface AuthRoutesConfig extends Omit<AuthPagesConfig, "screens"> {
    * never arrives anywhere.
    */
   homePath?: string;
+  /**
+   * What the two spinners say.
+   *
+   * A spinner with no words is not the same screen: the hosts this replaced
+   * distinguished "Carregando..." (the session is resolving) from
+   * "Redirecionando..." (it resolved, you are already signed in and are being
+   * sent on), and those answer different questions for somebody watching.
+   */
+  spinnerCopy?: { loading?: string; redirecting?: string };
 }
 
 export interface AuthRouteComponents {
@@ -244,10 +258,15 @@ function providersSlot(
 }
 
 /** The centred spinner both routes show while the session resolves. */
-function RouteSpinner({ testId }: { testId: string }): JSX.Element {
+function RouteSpinner({ testId, message }: { testId: string; message?: string }): JSX.Element {
   return (
     <Container variant="centered" padding="lg">
-      <LoadingState variant="spinner" size="md" dataTestId={testId} />
+      <LoadingState
+        variant="spinner"
+        size="md"
+        {...(message === undefined ? {} : { message })}
+        dataTestId={testId}
+      />
     </Container>
   );
 }
@@ -265,7 +284,11 @@ function LoginView({ config, pages }: RouteViewProps): JSX.Element {
 
   if (denied !== undefined && denied !== null) return <>{denied}</>;
   if (state.status === "loading" || state.status === "authenticated") {
-    return <RouteSpinner testId="login-loading" />;
+    const message =
+      state.status === "loading"
+        ? config.spinnerCopy?.loading
+        : config.spinnerCopy?.redirecting;
+    return <RouteSpinner testId="login-loading" {...(message === undefined ? {} : { message })} />;
   }
 
   return (
@@ -291,7 +314,11 @@ function SignupView({ config, pages }: RouteViewProps): JSX.Element {
   const [gateFailed, setGateFailed] = useState(false);
 
   if (state.status === "loading" || state.status === "authenticated") {
-    return <RouteSpinner testId="signup-loading" />;
+    const message =
+      state.status === "loading"
+        ? config.spinnerCopy?.loading
+        : config.spinnerCopy?.redirecting;
+    return <RouteSpinner testId="signup-loading" {...(message === undefined ? {} : { message })} />;
   }
 
   /**
@@ -312,14 +339,13 @@ function SignupView({ config, pages }: RouteViewProps): JSX.Element {
     }
   };
 
-  const notice =
-    gateFailed && gate !== undefined ? (
-      <div data-testid="login-error">
-          <Alert variant="danger" description={gate.failureMessage} />
-        </div>
-    ) : (
-      <FailureNotice failure={state.failure} errors={config.errors} />
-    );
+  const notice = signupNotice({
+    gate,
+    gateFailed,
+    onDismiss: () => setGateFailed(false),
+    failure: state.failure,
+    errors: config.errors,
+  });
 
   return (
     <pages.SignupPage
