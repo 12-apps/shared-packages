@@ -12,8 +12,8 @@ import type { LoggerPort, WiringPorts } from "../ports";
 import { isDeclined, type DeclinedBinding } from "./bindings";
 import type { CapabilityReportEntry } from "./report";
 
-export type E2eAnswer = { featuresRoot: string } | DeclinedBinding | undefined;
-export type EnvAnswer =
+type E2eAnswer = { featuresRoot: string } | DeclinedBinding | undefined;
+type EnvAnswer =
   | Readonly<Record<string, string | undefined>>
   | DeclinedBinding
   | undefined;
