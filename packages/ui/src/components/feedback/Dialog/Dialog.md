@@ -9,7 +9,7 @@ The Dialog component provides a powerful, flexible modal dialog system with mult
 - **Multiple Variants**: Default, glass, fullscreen, and drawer modes
 - **Flexible Sizing**: Five size options (xs, sm, md, lg, xl)
 - **Composable Architecture**: Separate DialogHeader, DialogContent, and DialogActions components
-- **Padded By Default**: Raw children (no DialogContent/DialogActions) get comfortable body padding automatically; composed dialogs keep managing their own spacing
+- **Padded By Default**: Raw children (no DialogContent/DialogActions) get comfortable body padding automatically; composed dialogs keep managing their own spacing — including when the slot arrives through a fragment or from inside your own component (see [Body padding](#body-padding))
 - **Advanced Styling**: Glass morphism, gradient backgrounds, glow, and pulse effects
 - **Persistent Mode**: Prevent dismissal via backdrop click or escape key
 - **Customizable Border Radius**: Five border radius options (none, sm, md, lg, xl)
@@ -517,6 +517,45 @@ describe('Dialog Component', () => {
   });
 });
 ```
+
+## Body padding
+
+A dialog handed raw children pads them for you (24px sides, comfortable top and
+bottom). A dialog handed `DialogContent` / `DialogActions` does not — those
+slots pay their own spacing, and the paper is a flex column that wants them as
+its DIRECT children, so that a `DialogContent` is the thing that scrolls and a
+`DialogActions` stays pinned under it.
+
+**It does not matter how the slot reaches the dialog.** All four of these are
+"manages its own spacing":
+
+```tsx
+<Dialog open>                        {/* the slot itself */}
+  <DialogContent>…</DialogContent>
+</Dialog>
+
+<Dialog open>                        {/* grouped in a fragment */}
+  <>
+    <DialogContent>…</DialogContent>
+    <DialogActions>…</DialogActions>
+  </>
+</Dialog>
+
+<Dialog open><Body /></Dialog>       {/* Body renders a DialogContent */}
+<Dialog open><Footer /></Dialog>     {/* Footer renders a DialogActions */}
+```
+
+The last two are the ones worth knowing about. Splitting a long dialog's body or
+footer into its own component is an ordinary refactor — the size gates push you
+toward it — and React cannot tell what a component renders until it has rendered
+it. The dialog therefore settles the question in CSS (`:has()`), one step later,
+where the answer exists: a wrapper that turns out to hold a slot generates no box
+(`display: contents`), so its padding never applies and its children land in the
+paper's column as if it were not there.
+
+A `DialogContent` genuinely nested inside your own markup (`<div><DialogContent/></div>`)
+is that div's content, not the dialog's slot, and stays padded. If you want the
+slot behaviour, make it a direct child.
 
 ## Related Components
 

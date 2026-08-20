@@ -22,19 +22,62 @@ import type {
 } from './Dialog.types';
 
 /**
+ * Does this hand us a spacing slot? Fragments are transparent: `<>` is a way of
+ * passing several children, not a child that owns them, and a consumer who
+ * groups a `DialogContent` and a `DialogActions` in one has still passed both.
+ *
+ * Only the slots themselves count, and only at the top. A `DialogContent`
+ * genuinely nested inside a `<div>` is that div's content, and the dialog
+ * padding the div is right.
+ */
+function hasSpacingSlot(children: React.ReactNode): boolean {
+  return React.Children.toArray(children).some((child) => {
+    if (!React.isValidElement(child)) return false;
+    if (child.type === DialogContent || child.type === DialogActions) return true;
+    if (child.type !== React.Fragment) return false;
+    return hasSpacingSlot((child.props as { children?: React.ReactNode }).children);
+  });
+}
+
+/**
+ * The padding a dialog gives children that are not managing their own — and the
+ * rule that takes it back when it turns out they are.
+ *
+ * `:has()` is doing what {@link hasSpacingSlot} cannot. A slot passed through a
+ * COMPONENT (`<Body />` rendering a `DialogContent`) is invisible to any check
+ * on element type: React does not know what a component renders until it has
+ * rendered it, and by then the wrapper is already in the tree. The selector
+ * asks the question one step later, of the DOM, where the answer exists.
+ *
+ * `display: contents` rather than `padding: 0`, because the padding is only
+ * half of what a wrapper does. The other half is standing between the paper and
+ * its children: MUI's `scroll="paper"` makes the paper a flex column with
+ * `overflow-y: auto`, so a `DialogContent` that is no longer its direct child
+ * cannot be the thing that scrolls — the whole dialog scrolls instead and
+ * carries the `DialogActions` off the bottom with it. An element with
+ * `display: contents` generates no box at all: its children become the paper's
+ * flex items, and its padding is never applied. Both halves, one declaration.
+ *
+ * A browser without `:has()` falls back to the padded box — the layout this
+ * had before, not a broken one.
+ */
+const BODY_SX = {
+  px: 3,
+  pb: 2.5,
+  '&:has(> .MuiDialogContent-root), &:has(> .MuiDialogActions-root)': {
+    display: 'contents',
+  },
+} as const;
+
+/**
  * The dialog body. Consumers that pass raw children (no <DialogContent>) used
  * to render them flush against the paper edges — give them comfortable default
  * padding; <DialogContent>/<DialogActions> users keep managing their own
  * spacing.
  */
 function bodyOf(children: React.ReactNode, hasTitle: boolean): React.ReactNode {
-  const managesOwnSpacing = React.Children.toArray(children).some(
-    (child) =>
-      React.isValidElement(child) &&
-      (child.type === DialogContent || child.type === DialogActions),
-  );
-  if (managesOwnSpacing) return children;
-  return <Box sx={{ px: 3, pb: 2.5, pt: hasTitle ? 0.5 : 2.5 }}>{children}</Box>;
+  if (hasSpacingSlot(children)) return children;
+  return <Box sx={{ ...BODY_SX, pt: hasTitle ? 0.5 : 2.5 }}>{children}</Box>;
 }
 
 const DIALOG_DEFAULTS = {
