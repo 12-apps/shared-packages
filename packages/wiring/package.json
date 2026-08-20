@@ -1,0 +1,59 @@
+{
+  "name": "@12-apps/wiring",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "The package-to-host wiring contract: a producer half for packages (capability manifests — HTTP routes, job blueprints, MCP tools with annotations, permissions, notification blueprints, mailers, Prisma partials, web surfaces) and a consumer half for hosts (a typed binder that adopts manifests, binds every declared capability against shared ports, refuses the unbound, orders and conflict-checks the aggregate). Zero dependencies; every capability shape is a structural twin of the seam a package already ships.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./producer": "./src/producer/index.ts",
+    "./consumer": "./src/consumer/index.ts",
+    "./ports": "./src/ports/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/jobs": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/wiring"
+  },
+  "files": [
+    "src",
+    "dist",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*",
+    "!**/*.stories.*",
+    "!**/*.test-story.*",
+    "!**/test-helpers.*"
+  ]
+}

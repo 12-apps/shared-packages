@@ -9,8 +9,10 @@
 # resolves workspace:* interdeps to a version that already exists.
 #
 # Paths rather than names because payments ships as a nested workspace.
+packages/wiring
 packages/eslint-config
 packages/typescript-config
+packages/feature-flags
 packages/request-scope
 packages/observability-backend
 packages/auth

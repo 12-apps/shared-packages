@@ -228,7 +228,10 @@ export const DEFAULT_GATE_PERMISSIONS: RbacGatePermissions = {
 /** The scope key that satisfies any requested scope. */
 export const GLOBAL_SCOPE = 'GLOBAL' as const;
 
-export interface RbacServerConfig<P extends string = string> {
+export interface RbacServerConfig<
+  P extends string = string,
+  E extends Record<string, unknown> = Record<string, unknown>,
+> {
   /** Prisma-shaped client for the five owned models, through the seam. */
   db: RbacDbProvider;
   /**
@@ -311,8 +314,12 @@ export interface RbacServerConfig<P extends string = string> {
   /**
    * Extra payload merged into `GET /permissions` (e.g. an entitlement
    * snapshot) so a host extends the shell read with zero route code.
+   *
+   * Whatever this resolves to becomes part of the answer, so it is part of the
+   * CONTRACT — see `MyPermissionsPayload` in `./payloads`, which is the shape
+   * a host should hold its advertised schema to.
    */
-  permissionsExtras?: (actor: RbacActor) => Promise<Record<string, unknown>>;
+  permissionsExtras?: (actor: RbacActor) => Promise<E>;
   /** Gate permission ids, when the host's catalog spells them differently. */
   gatePermissions?: Partial<RbacGatePermissions>;
   /** User-facing copy overrides. */

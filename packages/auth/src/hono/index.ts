@@ -109,3 +109,10 @@ export type {
   EmailAuthSettingsStore,
   EmailAuthSettingsRoutesConfig,
 } from "../server/settings-routes";
+
+export {
+  mountEmailAuth,
+  mountEmailAuthSettings,
+  type AuthMountOptions,
+  type AuthRouteHandlers,
+} from "./mount";

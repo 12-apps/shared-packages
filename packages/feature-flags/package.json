@@ -1,0 +1,84 @@
+{
+  "name": "@12-apps/feature-flags",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "User-level feature flags (FUT-884): per-user beta grants composed as a VEIL over the tenant axes — never a key past them. Core reader (.), framework-neutral superadmin management endpoints (./server), management screen (./react), wiring manifests (./manifest*), and the package-owned Prisma fragment synced into the host schema. The flag catalog is the host's and arrives as config.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server/index.ts",
+    "./react": "./src/react/index.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./manifest/server": "./src/manifest/server.ts",
+    "./manifest/web": "./src/manifest/web.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage dist",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "prisma:sync": "node scripts/sync-feature-flags-schema.mjs",
+    "prisma:sync:check": "node scripts/sync-feature-flags-schema.mjs --check"
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "jsdom": "^25.0.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "wiring": {
+    "db": {
+      "partial": "prisma/feature-flags.prisma",
+      "migrations": "prisma/migrations"
+    }
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@12-apps/wiring": ">=1.0.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@12-apps/wiring": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/feature-flags"
+  },
+  "files": [
+    "src",
+    "prisma",
+    "*.js",
+    "*.mjs",
+    "*.md",
+    "scripts",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*"
+  ]
+}

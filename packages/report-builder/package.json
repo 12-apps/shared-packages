@@ -8,6 +8,9 @@
     "./server": "./src/server/index.ts",
     "./react": "./src/react/index.ts",
     "./hono": "./src/hono/index.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./manifest/server": "./src/manifest/server.ts",
+    "./manifest/web": "./src/manifest/web.ts",
     "./e2e": {
       "types": "./dist/e2e/index.d.ts",
       "default": "./dist/e2e/index.js"
@@ -32,6 +35,7 @@
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
     "@playwright/test": "^1.56.1",
     "@tanstack/react-query": "^5.62.0",
     "@testing-library/react": "^16.1.0",
@@ -51,8 +55,15 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "wiring": {
+    "db": {
+      "partial": "prisma/report-builder.prisma",
+      "migrations": "prisma/migrations"
+    }
+  },
   "license": "MIT",
   "peerDependencies": {
+    "@12-apps/wiring": ">=1.0.0",
     "@playwright/test": ">=1.40.0",
     "@tanstack/react-query": ">=5.0.0",
     "hono": ">=4.0.0",
@@ -62,7 +73,16 @@
     "react-router-dom": ">=6.0.0"
   },
   "peerDependenciesMeta": {
+    "@12-apps/wiring": {
+      "optional": true
+    },
     "@playwright/test": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "hono": {
       "optional": true
     },
     "playwright-bdd": {
@@ -75,12 +95,6 @@
       "optional": true
     },
     "react-router-dom": {
-      "optional": true
-    },
-    "@tanstack/react-query": {
-      "optional": true
-    },
-    "hono": {
       "optional": true
     }
   },

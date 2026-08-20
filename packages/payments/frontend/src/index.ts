@@ -209,6 +209,15 @@ export {
   type SetupGuideSectionProps,
 } from './components/SetupGuideSection';
 export { ProviderStatusBar, statusBadge } from './components/ProviderStatusBar';
+// The START of the connect round trip (FUT-763): the `prepareConnect` a host
+// hands to the settings screen, built from its own prepare route. The route is
+// the host's; the exchange — method, shape, and what counts as a failure — is
+// this package's, and a hand-written one casts the answer instead of checking
+// it.
+export {
+  createConnectPreparer,
+  type ConnectPreparerOptions,
+} from './components/connect-preparer';
 export {
   PaymentProviderSettings,
   type PaymentProviderSettingsProps,
@@ -275,6 +284,19 @@ export {
   takeReturnedSettlement,
   RETURNED_SETTLEMENT_KEY,
 } from './activation/returned-settlement';
+
+// ---------------------------------------------------------------------------
+// The connect ROUND TRIP's other end (FUT-763): what the OAuth callback
+// redirected back with, taken out of the address bar once. The codes are a
+// union so a host's copy map is exhaustiveness-checked; the sentences stay the
+// host's, as everywhere else in this package.
+// ---------------------------------------------------------------------------
+export {
+  takeConnectReturn,
+  useConnectReturn,
+  type ConnectErrorCode,
+  type ConnectReturn,
+} from './components/connect-return';
 
 // ---------------------------------------------------------------------------
 // The ACTIVATION CHARGE (FUT-463, packaged by FUT-763) — proving a connection
