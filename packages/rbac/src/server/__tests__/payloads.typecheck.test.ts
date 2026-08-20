@@ -1,5 +1,5 @@
 /**
- * COMPILE-TIME fixtures for the shell read's payload contract (12-13 / FUT-760).
+ * COMPILE-TIME fixtures for the response contracts (12-13 / FUT-760).
  *
  * The real assertion is `tsc --noEmit` (the package's `check-types` script).
  * Every `@ts-expect-error` line MUST fail to compile without the directive; if
@@ -15,12 +15,20 @@
  * disagreed: the host listed `permissions` alone while the route had been
  * merging an entitlement snapshot in for as long as the option had existed.
  * `MyPermissionsPayload` is now the single description, so a host can bind its
- * schema to the same type the route is built against.
+ * schema to the same type the route is built against. `MemberDetailPayload`
+ * covers the other route-assembled answer, which is a projection rather than a
+ * store row and so cannot borrow one.
  */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import type { MyPermissionsPayload, RbacActor, RbacServerConfig } from '../index';
+import type {
+  MemberDetailPayload,
+  MyPermissionsPayload,
+  RbacActor,
+  RbacServerConfig,
+  TeamMemberDetail,
+} from '../index';
 
 /** A host's extras — the shape `permissionsExtras` resolves to. */
 interface DemoExtras extends Record<string, unknown> {
@@ -66,6 +74,45 @@ export function payloadContractFixtures(): void {
     }),
   };
   void wrongExtras;
+}
+
+/**
+ * The detail read answers a PROJECTION of the store's row, and the two are
+ * easy to mistake for each other — they share six of eight field names. A host
+ * that bound its schema to `TeamMemberDetail` would advertise `active` and
+ * `status`, which the route drops, and would type the two timestamps as `Date`,
+ * which no caller ever receives.
+ */
+export function memberDetailContractFixtures(): void {
+  // The record is NOT the payload: the store's row has fields the route drops
+  // and `Date`s where the wire carries strings.
+  const record: TeamMemberDetail = {
+    userId: 'u1',
+    role: 'BRANCH_LEAD',
+    email: 'a@b.c',
+    name: null,
+    image: null,
+    active: true,
+    status: 'ENABLED',
+    memberSince: new Date('2026-01-15T09:30:00.000Z'),
+    lastLoginAt: null,
+    customRoles: [],
+  };
+  // @ts-expect-error the row is not assignable to the wire shape it projects to
+  const wrong: MemberDetailPayload = record;
+  void wrong;
+
+  const payload: MemberDetailPayload = {
+    userId: record.userId,
+    name: record.name,
+    email: record.email,
+    image: record.image,
+    role: record.role,
+    customRoles: record.customRoles,
+    memberSince: record.memberSince.toISOString(),
+    lastLoginAt: record.lastLoginAt?.toISOString() ?? null,
+  };
+  void payload;
 }
 
 describe('the shell read payload', () => {

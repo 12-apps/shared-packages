@@ -13,6 +13,7 @@ import {
 import type { RbacActorTier } from './roster-policy';
 import type { GrantGovernance } from './grant-governance';
 import type { RbacGuards } from './guards';
+import type { MemberDetailPayload } from './payloads';
 import type { RolesStore } from './roles-store';
 import type { TeamStore } from './team-store';
 import { parseBody, parseTeamListQuery, requireParam, type RoleWireSchemas } from './wire';
@@ -207,6 +208,11 @@ function memberDetailRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
         );
         // A non-member id is a 404 that reveals nothing.
         if (!member) throw new RbacApiError(404, messages.memberNotFound);
+        // `satisfies` because this is a PROJECTION, not the record: it drops
+        // `active`/`status` and sends the two timestamps as ISO strings. A host
+        // advertises this shape, so it needs a published type of its own —
+        // binding to `TeamMemberDetail` would make it declare two fields that
+        // never arrive.
         return ok({
           userId: member.userId,
           name: member.name,
@@ -216,7 +222,7 @@ function memberDetailRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
           customRoles: member.customRoles,
           memberSince: member.memberSince.toISOString(),
           lastLoginAt: member.lastLoginAt?.toISOString() ?? null,
-        });
+        } satisfies MemberDetailPayload);
       } catch (error) {
         return foldApiError(error);
       }

@@ -9,11 +9,21 @@
  * `permissionsExtras` into the answer for as long as the option existed
  * (FUT-760). Nothing could have caught it: there was no type to disagree with.
  *
- * Most answers already had one. `RoleRecord`, `RoleListRecord`,
- * `TeamMemberDetail` and `TeamMemberRecord` are the stores' own return types and
- * are exported from `./index`, so a host can bind to them today. This module is
- * for the answers the package assembles AT THE ROUTE, which belong to no store
- * and so had no published shape.
+ * Some answers already had one. Three routes return a store's record UNCHANGED,
+ * and those records are exported from `./index`, so a host can bind to them
+ * today:
+ *
+ *   GET  /roles                      RoleListRecord[]   (paged)
+ *   POST /roles, PATCH /roles/:id    RoleRecord
+ *   PUT  /roles/templates/:name      RoleRecord
+ *   GET  /team                       TeamMemberRecord[] (paged)
+ *
+ * This module is for the rest — the answers the package assembles AT THE ROUTE,
+ * which belong to no store and so had no published shape. There are two, and the
+ * second is a trap worth naming: `GET /team/:userId` does NOT answer
+ * `TeamMemberDetail`. It answers a PROJECTION of it, and a host that bound its
+ * schema to the record would be forced to advertise two fields the route does
+ * not send.
  *
  * Its own module rather than more of `context.ts`, which sits near the 400-line
  * ceiling the complexity gate enforces — and because a response contract is a
@@ -39,3 +49,38 @@ export type MyPermissionsPayload<E extends Record<string, unknown> = Record<stri
   /** The caller's OWN resolved ids, sorted — Set iteration is insertion-defined. */
   permissions: string[];
 } & E;
+
+/**
+ * What `GET /team/:userId` answers — NOT `TeamMemberDetail`, which is the store's
+ * row.
+ *
+ * Two deliberate differences, and both are why this type has to exist
+ * separately:
+ *
+ *  - `active` and `status` are DROPPED. The detail read is the profile page; a
+ *    membership's enabled state is the roster's column and the status route's
+ *    business, and answering it here would be a second place to read it from.
+ *  - `memberSince` and `lastLoginAt` are ISO STRINGS, not `Date`. They cross a
+ *    wire, and `Date` does not — `JSON.stringify` would produce the same string
+ *    while the TYPE went on claiming a `Date` no caller ever receives.
+ *
+ * A host binds its advertised schema to this rather than to the record:
+ *
+ * ```ts
+ * const teamMemberDetailSchema = z.object({ ... })
+ *   satisfies z.ZodType<MemberDetailPayload>;
+ * ```
+ */
+export interface MemberDetailPayload {
+  userId: string;
+  name: string | null;
+  email: string;
+  image: string | null;
+  role: string;
+  /** The member's additive custom-role grants, by name. */
+  customRoles: string[];
+  /** ISO timestamp of when the user joined this store's roster. */
+  memberSince: string;
+  /** ISO timestamp of the last successful sign-in, or null if never recorded. */
+  lastLoginAt: string | null;
+}

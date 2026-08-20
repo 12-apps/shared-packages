@@ -122,4 +122,4 @@ export {
   parseTeamListQuery,
   type RoleWireSchemas,
 } from './wire';
-export type { MyPermissionsPayload } from './payloads';
+export type { MemberDetailPayload, MyPermissionsPayload } from './payloads';
