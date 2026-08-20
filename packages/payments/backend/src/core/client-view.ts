@@ -54,16 +54,25 @@ export function toClientChargeView(snapshot: ChargeSnapshot): ClientChargeView {
  * charge id (PagBank's `ORDE_…`), falling back to the charge id.
  *
  * Hosts persist it because some providers' webhooks and status reconciles key
- * on it rather than on the charge id. It is read from `raw` — the verbatim
- * provider payload — because the normalized model has no place for a second
- * identifier most vendors do not have, and widening `ChargeSnapshot` for one
- * vendor's quirk is worse than one guarded read.
+ * on it rather than on the charge id.
  *
- * It lives HERE rather than in each host (FUT-740) so the guarded read exists
- * once. Every access is checked: a provider whose payload carries no top-level
- * `id` simply yields the charge id — no cast, no crash.
+ * ASKED OF THE ADAPTER FIRST. `settlementHints.orderId` is the NORMALIZED
+ * answer — the adapter states which of its ids the read API is keyed by — and
+ * it is preferred over everything below it. Reading a field named `id` off an
+ * arbitrary vendor payload is a guess that happens to be right for one
+ * provider; it was deleted from the first adopting host for exactly that
+ * reason (FUT-760), and leaving it as the FIRST choice here would have kept
+ * the same guess alive one layer down.
+ *
+ * The `raw` read stays as the fallback, for adapters that declare no hints
+ * yet — for PagBank the two agree, so nothing moves. It remains guarded: a
+ * payload with no top-level string `id` simply yields the charge id, no cast
+ * and no crash.
  */
 export function providerCorrelationId(snapshot: ChargeSnapshot): string {
+  const declared = snapshot.settlementHints?.orderId;
+  if (typeof declared === 'string' && declared !== '') return declared;
+
   const raw: unknown = snapshot.raw;
   if (raw && typeof raw === 'object') {
     const id = (raw as Record<string, unknown>).id;
