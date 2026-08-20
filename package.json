@@ -11,7 +11,7 @@
     "quality": "pnpm quality:complexity && pnpm quality:flakiness && pnpm quality:portability && pnpm quality:release",
     "quality:complexity": "eslint --config eslint.complexity.config.mjs .",
     "quality:flakiness": "eslint --config eslint.flakiness.config.mjs .",
-    "quality:portability": "pnpm quality:portability:selftest && node scripts/host-brand-gate.mjs && node scripts/migration-freeze-gate.mjs && node packages/payments/backend/scripts/pagbank-api-base-gate.mjs && eslint --config eslint.payments-portability.config.mjs .",
+    "quality:portability": "pnpm quality:portability:selftest && node scripts/host-brand-gate.mjs && node scripts/copy-portability-gate.mjs && node scripts/migration-freeze-gate.mjs && node packages/payments/backend/scripts/pagbank-api-base-gate.mjs && eslint --config eslint.payments-portability.config.mjs .",
     "quality:portability:selftest": "node scripts/payments-portability-selftest.mjs",
     "quality:release": "node scripts/publish-selftest.mjs && node scripts/release-tags-selftest.mjs && node scripts/release-alert-selftest.mjs && node scripts/recover-orphans-selftest.mjs && node scripts/verify-released-selftest.mjs && node scripts/next-versions-selftest.mjs && node scripts/breaking-change-guard-selftest.mjs",
     "quality:dup": "jscpd --min-tokens 50 --threshold 3 --gitignore --reporters consoleFull --format \"typescript,tsx,javascript,jsx\" --ignore \"**/*.test.*,**/*.spec.*,**/tests/**,**/__tests__/**,**/*.stories.*,**/generated/**,**/*.d.ts,**/dist/**,**/build/**,**/.turbo/**,**/coverage/**,**/storybook-static/**\" .",
