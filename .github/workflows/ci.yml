@@ -85,7 +85,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    uses: 12-apps/ci/.github/workflows/detect-changes.yml@v2
+    uses: 12-apps/ci/.github/workflows/detect-changes.yml@v2.5.3
     with:
       # On a stacked PR, diff against the STACK's base rather than this PR's
       # immediate base (the layer below). Without it the coarse `code` gate
@@ -1185,7 +1185,7 @@ jobs:
     permissions:
       pull-requests: write
       actions: read
-    uses: 12-apps/ci/.github/workflows/cost-report.yml@v2
+    uses: 12-apps/ci/.github/workflows/cost-report.yml@v2.5.3
     secrets: inherit
 
   # Required-checks aggregation: one status that branch protection can gate on,
