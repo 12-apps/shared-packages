@@ -31,6 +31,7 @@
     "20260813120000_add_audit_log",
     "20260813120000_add_entity_lifecycle_tables",
     "20260813140000_add_notification_tables",
-    "20260813180000_add_realtime_outbox"
+    "20260813180000_add_realtime_outbox",
+    "20260819230000_auth_email_password"
   ]
 }

@@ -1,11 +1,11 @@
 import { createWebAuth } from '@12-apps/auth/react';
 import { createEmailAuth } from '@12-apps/auth/react';
-import { createEmailAuthScreens, PT_BR } from '@12-apps/auth/react/screens';
+import { createEmailAuthScreens, PT_BR } from '@12-apps/auth/react';
 import {
   createEmailAuthSettingsClient,
   createEmailAuthSettingsScreen,
   PT_BR_SETTINGS,
-} from '@12-apps/auth/react/settings';
+} from '@12-apps/auth/react';
 
 /**
  * `@12-apps/auth`'s browser half, wired ONCE (12-25).

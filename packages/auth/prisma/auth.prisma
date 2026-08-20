@@ -1,0 +1,90 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// OWNED BY @12-apps/auth — the host's multi-file schema folder holds a COPY of
+// this file, written by `pnpm --filter @12-apps/auth prisma:sync`. The
+// credential persistence model lives here, in the package, never in the
+// application.
+//
+// COPIED, never symlinked (the entity-lifecycle doctrine): `npm pack` silently
+// drops symlinked entries, `turbo prune` dangles a link whose owner is not a
+// declared dependency, and Prisma silently SKIPS a symlinked migration
+// directory — a green deploy that applied no schema.
+//
+// Deliberately self-contained (the payments-backend doctrine, and the same rule
+// `report-builder.prisma` states): every user reference is a `user_id` String
+// column — NO foreign key into any host table — so these models work in a repo
+// whose user table is called something else, or is in another database, or does
+// not exist yet at migrate time.
+//
+// That constraint is why the three credential columns are a TABLE here rather
+// than columns on the host's `users`, which is where they started. A package
+// cannot add columns to a table it does not own, and a host should not have to
+// hand-edit its own model to install a login flow.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// One account's password state, keyed by the host's user id as an OPAQUE
+/// scalar. A row exists only once the address has a credential — an account
+/// that has only ever signed in with Google has none, which is exactly the
+/// "no password yet" state the security card reads.
+model AuthCredential {
+  /// The host's user id. No relation by design: a stale id simply matches no
+  /// row, which is the same answer a deleted user should produce.
+  userId            String    @id @map("user_id")
+  /// `@12-apps/auth`'s self-describing scrypt string. Nullable because a row
+  /// may be created by verification before any password is set.
+  passwordHash      String?   @map("password_hash")
+  passwordUpdatedAt DateTime? @map("password_updated_at")
+  /// Answers "has this address been proven to belong to its owner", which is
+  /// not the same question as "does this account have a password".
+  emailVerifiedAt   DateTime? @map("email_verified_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@map("auth_credentials")
+}
+
+/// A single-use link: e-mail confirmation, or password reset.
+///
+/// Only the HASH is stored. The raw token exists in the mail and nowhere else,
+/// so a database read cannot mint a working link.
+model AuthToken {
+  id         String    @id @default(uuid())
+  /// The host's user id, opaque. See the header — no FK.
+  userId     String    @map("user_id")
+  /// EMAIL_VERIFICATION | PASSWORD_RESET — a String + DB CHECK, the house style
+  /// used elsewhere rather than a Prisma enum. The two purposes never share a
+  /// namespace: a verification token presented to the reset endpoint is not a
+  /// token at all.
+  purpose    String
+  /// SHA-256 of the raw token, lower-case hex. Unique because it IS the lookup
+  /// key, and a collision would mean two accounts sharing one link.
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  /// The sweep-on-password-change query, and the resend path's "does this user
+  /// already have one".
+  @@index([userId, purpose])
+  /// The retention job drops abandoned rows cheaply.
+  @@index([expiresAt])
+  @@map("auth_tokens")
+}
+
+/// Platform-wide switches, read on every sign-in attempt.
+///
+/// Prefixed `auth_` rather than the bare `platform_settings` it started as: a
+/// host may well own a settings table of its own, and a package must not claim
+/// a name that generic. Deliberately NOT tenant-scoped — sign-in happens before
+/// a tenant is known.
+model AuthPlatformSetting {
+  key       String   @id
+  value     Json
+  /// Who last changed it, by e-mail, for the audit trail the settings screen
+  /// shows. A plain string rather than a relation: the person may be an env
+  /// allowlist superadmin with no user row of their own.
+  updatedBy String?  @map("updated_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("auth_platform_settings")
+}

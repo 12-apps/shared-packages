@@ -2,7 +2,7 @@ import type { StorybookConfig } from '@storybook/react-vite';
 import { mergeConfig } from 'vite';
 
 /**
- * Storybook for the e-mail auth SCREENS (`@12-apps/auth/react/screens`).
+ * Storybook for the e-mail auth SCREENS (`@12-apps/auth/react`).
  *
  * Modelled on `packages/payments/frontend/.storybook/main.ts` — same framework,
  * same addons, same tunnel-host handling — because a third, differently-shaped

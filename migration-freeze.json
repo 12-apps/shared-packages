@@ -1,5 +1,6 @@
 {
   "packages/audit/prisma/migrations/20260813120000_add_audit_log/migration.sql": "06f18dc3f4ba5c975a3446ccd2332ce7cebf6299c31bc44803236327c3e72a73",
+  "packages/auth/prisma/migrations/20260819230000_auth_email_password/migration.sql": "e0d2ee4a595f18307b00a19707d4253da78a03f8d0f823d38fa4c18b7250c977",
   "packages/entitlements/prisma/migrations/20260812120000_add_retention_watermarks/migration.sql": "3725ad5b5d4fbd75819285614b77bd6dbbcad439b2117fc215d32d8e598197f1",
   "packages/entity-lifecycle/prisma/migrations/20260813120000_add_entity_lifecycle_tables/migration.sql": "5d8ff9c0dbeceec590842d9a83a6fdab93de6bc8ea188c5bd9d358267fa2a14f",
   "packages/jobs/prisma/migrations/20260727190000_sweep_leases/migration.sql": "c5c5441ea0d6629d9b32b066e5fb01ce76ff109db3f5c3d3df55eba628378997",
@@ -43,6 +44,7 @@
   "packages/prisma/prisma/migrations/20260813120000_add_entity_lifecycle_tables/migration.sql": "5d8ff9c0dbeceec590842d9a83a6fdab93de6bc8ea188c5bd9d358267fa2a14f",
   "packages/prisma/prisma/migrations/20260813140000_add_notification_tables/migration.sql": "7beba52758509e159d618337ca9a8087041538fd3fbaabaedb2646f52364a235",
   "packages/prisma/prisma/migrations/20260813180000_add_realtime_outbox/migration.sql": "a2da5ad7028eb0d64bdb9c84c87621cad1889bf2c1700358b2baf5d4923eda40",
+  "packages/prisma/prisma/migrations/20260819230000_auth_email_password/migration.sql": "e0d2ee4a595f18307b00a19707d4253da78a03f8d0f823d38fa4c18b7250c977",
   "packages/product-research/prisma/migrations/20260728120000_add_product_research/migration.sql": "1da080bdc4facd970b73cdaaf9739aa678267ea314e636d40f19ed108d0d2e2d",
   "packages/product-research/prisma/migrations/20260728170000_add_manual_price_entries/migration.sql": "2667f2660a8745bcf451b82dcf108f4d0b5fdcf528f8a80ca158424d9c47d660",
   "packages/product-research/prisma/migrations/20260729090000_integration_source_singleton/migration.sql": "ffa88e3bd6a2f78dade022c913d8931c0a202572ebe087bfb85637c7802b6aaf",

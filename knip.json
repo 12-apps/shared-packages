@@ -92,6 +92,7 @@
         "// file COPY (or a symlink) made by scripts/sync-*-schema.mjs, never an",
         "// import, so knip cannot see it.",
         "@12-apps/audit",
+        "@12-apps/auth",
         "@12-apps/entitlements",
         "@12-apps/entity-lifecycle",
         "@12-apps/jobs",

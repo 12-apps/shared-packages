@@ -28,3 +28,14 @@ export type {
   WebAuth,
   WebAuthConfig,
 } from "./create-web-auth";
+
+/**
+ * The screens, the settings screen and the whole pages.
+ *
+ * ONE react entry point, as report-builder has one. These were three separate
+ * subpaths, and all three carry exactly this one's peers — react, react-dom and
+ * `@12-apps/ui` — so the split bought a consumer nothing and cost it a decision.
+ */
+export * from "./screens";
+export * from "./settings";
+export * from "./pages";

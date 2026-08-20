@@ -16,8 +16,11 @@ import type { EmailAuthSettingsCopy } from "./copy";
 export const PT_BR_SETTINGS: EmailAuthSettingsCopy = {
   title: "Login",
   intro:
-    "Como as pessoas entram na plataforma. As duas opções valem para todas as " +
-    "lojas e passam a valer na próxima requisição — não é preciso publicar nada.",
+    // "toda a plataforma", not "todas as lojas": these switches are platform-
+    // wide, and a package's own pack must not assume its host sells anything.
+    // A backoffice adopting this had a sentence about stores it does not have.
+    "Como as pessoas entram na plataforma. As duas opções valem para toda a " +
+    "plataforma e passam a valer na próxima requisição — não é preciso publicar nada.",
 
   methodLabel: "Login com e-mail e senha",
   methodDescription:
