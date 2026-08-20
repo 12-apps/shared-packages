@@ -7,8 +7,14 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { defineManifest, defineServerManifest, defineWebManifest } from "@12-apps/wiring/producer";
+import {
+  assertDbMirror,
+  defineManifest,
+  defineServerManifest,
+  defineWebManifest,
+} from "@12-apps/wiring/producer";
 
+import packageJson from "../../../package.json";
 import { createWebFeatureFlags } from "../../react/create-feature-flags";
 import { createApiFeatureFlags } from "../../server/index";
 import { featureFlagsManifest } from "../index";
@@ -47,6 +53,13 @@ describe("the shared manifest", () => {
       partial: "prisma/feature-flags.prisma",
       migrations: "prisma/migrations",
     });
+  });
+
+  it("mirrors the db contribution into package.json for host assemblers", () => {
+    // Host-side sync tooling is plain Node reading node_modules — it cannot
+    // execute this TS manifest, so the contribution lives in package.json
+    // too, and this pin is what keeps the two the same shape (#291).
+    expect(() => assertDbMirror(featureFlagsManifest, packageJson)).not.toThrow();
   });
 });
 

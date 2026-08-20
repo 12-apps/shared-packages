@@ -40,6 +40,12 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "wiring": {
+    "db": {
+      "partial": "prisma/feature-flags.prisma",
+      "migrations": "prisma/migrations"
+    }
+  },
   "license": "MIT",
   "peerDependencies": {
     "@12-apps/wiring": ">=1.0.0",
