@@ -91,6 +91,10 @@ function handoffStore(screen: string | null): CheckoutProviderConfig {
     chain: [
       {
         provider: "boreal",
+        // The name a BUYER reads. Published per chain entry so the hand-off
+        // screen can say where it is sending them; a host that serves none
+        // gets the provider-neutral sentence instead.
+        displayName: "Boreal",
         tokenization: "REDIRECT",
         publicKey: null,
         mockTokenization: false,
@@ -166,12 +170,29 @@ export const AwaitingTheMethodChoice: StoryObj = {
   ),
 };
 
+export const HandoffInvite: StoryObj = {
+  name: "hosted-link — a única ação",
+  render: () => (
+    // THE state this screen exists for. The shell hides its PIX/card picker
+    // here, because every method mints the same link and the choice is only
+    // binding on the provider's own page — so the screen says where the buyer
+    // is going, that they come back, and offers the one action that goes.
+    <Mounted
+      screen={HostedLinkScreen}
+      config={handoffStore("hosted-link")}
+      method={null}
+      onStart={() => undefined}
+    />
+  ),
+};
+
 export const HandoffNotice: StoryObj = {
   name: "hosted-link — indo para a página do provedor",
   render: () => (
-    // The moment this screen exists for: a method is chosen, the charge is
-    // being raised, and the buyer is about to leave. Before FUT-596 the pane
-    // rendered nothing here, which reads as a checkout that has stalled.
+    // The moment after the press: the charge is being raised and the buyer is
+    // about to leave. It repeats the invite's sentence word for word — a screen
+    // that reworded the destination at the moment of commitment read as one
+    // changing its mind.
     <Mounted screen={HostedLinkScreen} config={handoffStore("hosted-link")} method="CARD" />
   ),
 };
