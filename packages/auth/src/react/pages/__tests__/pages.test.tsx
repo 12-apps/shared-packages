@@ -118,6 +118,21 @@ describe("LoginPage", () => {
     expect(screen.getByTestId("go-to-signup").getAttribute("href")).toBe("/signup");
   });
 
+  it("renders no footer at all when the host has no sign-up route", () => {
+    // A backoffice provisions its accounts. A link to a page that does not
+    // exist is worse than no link.
+    const noSignup = createAuthPages({
+      screens: screensStub(),
+      copy: PT_BR_PAGES,
+      routes: { login: "/login" },
+      Link,
+    });
+    const { container } = render(<noSignup.LoginPage {...loginProps} />);
+
+    expect(screen.getByText(PT_BR_PAGES.login.title)).toBeTruthy();
+    expect(container.innerHTML).not.toContain("go-to-signup");
+  });
+
   it("renders the host's notice above the form", () => {
     const { LoginPage } = pages();
     render(<LoginPage {...loginProps} notice={<div>Sessão expirada</div>} />);

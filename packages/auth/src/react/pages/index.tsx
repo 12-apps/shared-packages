@@ -49,13 +49,22 @@ export type AuthLink = ComponentType<{
  */
 export interface AuthRoutes {
   login: string;
-  signup: string;
+  /**
+   * Where "create an account" goes — OPTIONAL.
+   *
+   * Absent means this deployment has no self-service sign-up, and the login
+   * page then renders no footer at all rather than a link to nothing. A
+   * backoffice whose accounts are provisioned by an admin is exactly that case.
+   */
+  signup?: string;
 }
 
 /** The page-level words. The forms carry their own pack; this is the chrome. */
 export interface AuthPagesCopy {
   login: {
     title: string;
+    /** A line under the title. Optional: not every product wants one. */
+    subtitle?: string;
     /** "or continue with" — sits between the form and the providers. */
     providerDivider: string;
     /** "Don't have an account?" */
@@ -65,6 +74,7 @@ export interface AuthPagesCopy {
   };
   signup: {
     title: string;
+    subtitle?: string;
     providerDivider: string;
     /** "Already have an account?" */
     loginPrompt: string;
@@ -146,6 +156,16 @@ export interface AuthPages {
   SignupPage: ComponentType<SignupPageProps>;
 }
 
+/** The line under the title, when a product wants one. */
+function Subtitle({ text }: { text?: string }): JSX.Element | null {
+  if (!text) return null;
+  return (
+    <Text color="secondary" size="sm" style={{ textAlign: "center", marginBottom: "1rem" }}>
+      {text}
+    </Text>
+  );
+}
+
 /** The divider + provider block, identical on both pages. */
 function Providers({
   label,
@@ -211,6 +231,7 @@ export function createAuthPages(config: AuthPagesConfig): AuthPages {
       <Container variant="centered" padding="lg">
         {branding}
         <SocialLoginContainer title={copy.login.title} showDivider={false} maxWidth={maxWidth}>
+          <Subtitle text={copy.login.subtitle} />
           {notice}
           {emailEnabled && (
             <EmailPasswordForm
@@ -220,13 +241,15 @@ export function createAuthPages(config: AuthPagesConfig): AuthPages {
             />
           )}
           <Providers label={copy.login.providerDivider}>{providers}</Providers>
-          <Footer
-            prompt={copy.login.signupPrompt}
-            linkText={copy.login.signupLink}
-            to={routes.signup}
-            Link={Link}
-            dataTestId="go-to-signup"
-          />
+          {routes.signup !== undefined && (
+            <Footer
+              prompt={copy.login.signupPrompt}
+              linkText={copy.login.signupLink}
+              to={routes.signup}
+              Link={Link}
+              dataTestId="go-to-signup"
+            />
+          )}
         </SocialLoginContainer>
       </Container>
     );
@@ -247,6 +270,7 @@ export function createAuthPages(config: AuthPagesConfig): AuthPages {
       <Container variant="centered" padding="lg">
         {branding}
         <SocialLoginContainer title={copy.signup.title} showDivider={false} maxWidth={maxWidth}>
+          <Subtitle text={copy.signup.subtitle} />
           {notice}
           {termsGate}
           {emailEnabled && (

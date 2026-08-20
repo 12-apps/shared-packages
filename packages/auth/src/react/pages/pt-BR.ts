@@ -11,12 +11,14 @@ import type { AuthPagesCopy } from "./index";
 export const PT_BR_PAGES: AuthPagesCopy = {
   login: {
     title: "Entrar",
+    subtitle: "Entre na sua conta",
     providerDivider: "ou entre com",
     signupPrompt: "Não tem uma conta?",
     signupLink: "Cadastre-se",
   },
   signup: {
     title: "Criar conta",
+    subtitle: "Crie sua conta",
     providerDivider: "ou cadastre-se com",
     loginPrompt: "Já tem uma conta?",
     loginLink: "Entrar",
