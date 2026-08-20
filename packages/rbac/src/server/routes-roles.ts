@@ -2,7 +2,6 @@ import {
   foldApiError,
   gatesOf,
   messagesOf,
-  type MyPermissionsPayload,
   ok,
   pageResponse,
   type RbacActor,
@@ -11,6 +10,7 @@ import {
 } from './context';
 import type { GrantGovernance } from './grant-governance';
 import type { RbacGuards } from './guards';
+import type { MyPermissionsPayload } from './payloads';
 import type { RolesStore } from './roles-store';
 import {
   parseBody,

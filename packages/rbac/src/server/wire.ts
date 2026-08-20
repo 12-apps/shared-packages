@@ -29,7 +29,8 @@ import type { TeamListQuery } from './team-store';
  *
  * WHAT DOES COVER RESPONSES, and where to reach for it:
  *
- *  - `MyPermissionsPayload` for the shell read this module cannot describe;
+ *  - `MyPermissionsPayload` in `./payloads` for the shell read this module
+ *    cannot describe;
  *  - `RoleRecord` / `RoleListRecord` / `TeamMemberDetail` / `TeamMemberRecord`
  *    for the payloads the stores return, all already exported from `./index`.
  *
