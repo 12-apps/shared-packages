@@ -27,6 +27,7 @@ let appDir: string;
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "mcp-coverage-"));
   appDir = join(root, "app");
+  mkdirSync(appDir, { recursive: true });
 });
 
 afterEach(() => {
@@ -310,3 +311,42 @@ describe("action coverage", () => {
     expect(actionCount).toBe(0);
   });
 });
+
+describe("declared routes (the wiring route-table pathway)", () => {
+  it("serves registry entries from declarations, and demands registration back", () => {
+    // Direction 2: the twelve-tools-of-a-wired-package case — registry entries
+    // whose routes have no files stop failing once declared.
+    const clean = runMcpCoverage({
+      appDir,
+      endpoints: [{ method: "GET", path: "/api/admin/{tenantSlug}/reports", operationId: "listReports" }],
+      exclusionsPath: json("exclusions.json", NO_EXCLUSIONS),
+      declaredRoutes: [{ method: "GET", path: "/api/admin/{tenantSlug}/reports" }],
+    });
+    expect(clean.failures).toEqual([]);
+    expect(clean.routeMethodCount).toBe(1);
+
+    // Direction 1 still bites: a declared route nothing registers is exactly
+    // as unregistered as a scanned one.
+    const { failures } = runMcpCoverage({
+      appDir,
+      endpoints: [],
+      exclusionsPath: json("exclusions.json", NO_EXCLUSIONS),
+      declaredRoutes: [{ method: "POST", path: "/api/admin/{tenantSlug}/reports/run" }],
+    });
+    expect(failures.some((f) => f.includes("unregistered route: POST /api/admin/{tenantSlug}/reports/run"))).toBe(
+      true,
+    );
+  });
+
+  it("refuses a declaration that shadows a route file", () => {
+    route("api/orders", "export const GET = h;");
+    const { failures } = runMcpCoverage({
+      appDir,
+      endpoints: [{ method: "GET", path: "/api/orders", operationId: "listOrders" }],
+      exclusionsPath: json("exclusions.json", NO_EXCLUSIONS),
+      declaredRoutes: [{ method: "get", path: "/api/orders" }],
+    });
+    expect(failures.some((f) => f.includes("shadows a route file: GET /api/orders"))).toBe(true);
+  });
+});
+

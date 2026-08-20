@@ -251,3 +251,82 @@ describe('runRbacCoverage', () => {
     expect(failures[0]).toContain('nakedAction');
   });
 });
+
+describe('declared routes (the wiring route-table pathway)', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'rbac-cov-declared-'));
+    mkdirSync(join(dir, 'app'), { recursive: true });
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  function writeRoute(path: string, source: string): void {
+    const full = join(dir, 'app', path);
+    mkdirSync(join(full, '..'), { recursive: true });
+    writeFileSync(full, source);
+  }
+
+  function run(
+    declaredRoutes: Parameters<typeof runRbacCoverage>[0]['declaredRoutes'],
+    exclusions: object = { actions: {}, routes: {} },
+  ) {
+    const exclusionsPath = join(dir, 'exclusions.json');
+    writeFileSync(exclusionsPath, JSON.stringify(exclusions));
+    return runRbacCoverage({
+      appDir: join(dir, 'app'),
+      webRoot: dir,
+      exclusionsPath,
+      rbacGuards: GUARDS,
+      entitlementGuards: ['requireEntitlement'],
+      declaredRoutes,
+    });
+  }
+
+  it('accounts a declared route as protected-by-declaration', () => {
+    const result = run([
+      { method: 'GET', path: '/api/admin/{tenantSlug}/reports', kind: 'authenticated' },
+      {
+        method: 'POST',
+        path: '/api/admin/{tenantSlug}/reports/custom',
+        kind: 'authenticated',
+        permission: 'reports:manage',
+        quota: 'reports.custom',
+      },
+    ]);
+    expect(result.failures).toEqual([]);
+    expect(result.declaredRouteCount).toBe(2);
+  });
+
+  it('refuses a declaration that shadows a route file — one URL, one source of truth', () => {
+    writeRoute(
+      'api/admin/[tenantSlug]/reports/route.ts',
+      'export const GET = () => requirePermission("x", {});',
+    );
+    const { failures } = run([
+      { method: 'GET', path: '/api/admin/{tenantSlug}/reports', kind: 'authenticated' },
+    ]);
+    expect(failures.some((failure) => failure.includes('shadows a route file'))).toBe(true);
+  });
+
+  it('refuses a permission on an unauthenticated kind, and a duplicate declaration', () => {
+    const { failures } = run([
+      { method: 'POST', path: '/api/hooks/pix', kind: 'webhook', permission: 'notes:manage' },
+      { method: 'GET', path: '/api/x', kind: 'authenticated' },
+      { method: 'GET', path: '/api/x', kind: 'authenticated' },
+    ]);
+    expect(failures.some((failure) => failure.includes('no actor to check'))).toBe(true);
+    expect(failures.some((failure) => failure.includes('duplicate declared route'))).toBe(true);
+  });
+
+  it('keeps an exclusion prefix alive when only a declared route matches it', () => {
+    const { failures } = run(
+      [{ method: 'GET', path: '/api/public/menu', kind: 'public' }],
+      { actions: {}, routes: { '/api/public': 'storefront reads are anonymous by design' } },
+    );
+    expect(failures).toEqual([]);
+  });
+});
+

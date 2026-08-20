@@ -58,6 +58,31 @@ export interface RbacCoverageExclusions {
   routes: Record<string, string>;
 }
 
+/**
+ * One route a PACKAGE declares through its wiring manifest, policy attached —
+ * a structural twin of `@12-apps/wiring`'s `RoutePolicyRow` (restated here so
+ * this gate depends on no sibling), with the path already in the `{param}`
+ * form `urlPathOf` yields, so exclusion matching and messages speak one
+ * grammar.
+ *
+ * A declared route has no file to grep: its protection IS the declaration.
+ * The host's dispatcher enforces the declared policy (the wiring consumer
+ * refuses the inconsistent shapes at adoption, and the host pins declaration
+ * against enforcement in its own suite), so this gate's job shrinks to the
+ * two things only it can see: that a declaration never SHADOWS a route file
+ * (two sources of truth for one URL), and that an unauthenticated kind never
+ * smuggles a permission.
+ */
+export interface DeclaredRoute {
+  method: string;
+  /** Absolute URL path, `{param}` form (`/api/admin/{tenantSlug}/reports`). */
+  path: string;
+  kind: 'authenticated' | 'webhook' | 'public';
+  permission?: string;
+  entitlement?: string;
+  quota?: string;
+}
+
 export interface RbacCoverageOptions {
   /** The framework routes folder (the WHOLE `app`, never `app/api`). */
   appDir: string;
@@ -88,11 +113,19 @@ export interface RbacCoverageOptions {
    * for a host with no billing tier.
    */
   entitlementGuards: readonly string[];
+  /**
+   * Routes served WITHOUT a route file — declared by an adopted package's
+   * wiring manifest and registered wholesale. Feed it
+   * `routePolicyTable(assembled.routes)` (paths converted to `{param}`
+   * form); each row is accounted protected-by-declaration.
+   */
+  declaredRoutes?: readonly DeclaredRoute[];
 }
 
 export interface RbacCoverageResult {
   failures: string[];
   routeFileCount: number;
+  declaredRouteCount: number;
   actionCount: number;
 }
 
@@ -103,20 +136,66 @@ interface GateContext {
   rbacGuards: readonly string[];
   entitlementGuards: readonly string[];
   exclusions: RbacCoverageExclusions;
+  declaredRoutes: readonly DeclaredRoute[];
+}
+
+/**
+ * Declared-route coverage. The routes have no files to grep; what CAN go
+ * wrong lives in the declarations themselves and in their relationship to
+ * the filesystem, and both directions fail loudly here.
+ */
+function declaredRouteFailures(
+  ctx: GateContext,
+  fileUrlPaths: ReadonlySet<string>,
+  seenRoutePrefixes: Set<string>,
+): string[] {
+  const failures: string[] = [];
+  const excludedRoutePrefixes = Object.keys(ctx.exclusions.routes);
+  const seenDeclared = new Set<string>();
+  for (const declared of ctx.declaredRoutes) {
+    const key = `${declared.method.toUpperCase()} ${declared.path}`;
+    if (seenDeclared.has(key)) {
+      failures.push(`duplicate declared route: ${key} — one declaration per method+path`);
+    }
+    seenDeclared.add(key);
+    if (fileUrlPaths.has(declared.path)) {
+      failures.push(
+        `declared route shadows a route file: ${declared.path} — one URL, one source of truth; ` +
+          `delete the file or drop the declaration`,
+      );
+    }
+    if (declared.kind !== 'authenticated' && declared.permission !== undefined) {
+      failures.push(
+        `${declared.kind} route with a permission: ${key} requires "${declared.permission}" — ` +
+          `an unauthenticated route has no actor to check`,
+      );
+    }
+    // A prefix exclusion matching a declared route is not stale — mark it
+    // seen so the pruning check below stays honest across both sources.
+    const matchedPrefix = segmentPrefixMatch(declared.path, excludedRoutePrefixes);
+    if (matchedPrefix) seenRoutePrefixes.add(matchedPrefix);
+  }
+  return failures;
 }
 
 const SEQUENCING_TAIL =
   'an entitlement guard is the 402 axis and must run AFTER an RBAC guard; it does not authorize';
 
 /** Route coverage — file-level (a route file is one URL surface). */
-function routeFailures(ctx: GateContext): { failures: string[]; routeFileCount: number } {
+function routeFailures(ctx: GateContext): {
+  failures: string[];
+  routeFileCount: number;
+  declaredRouteCount: number;
+} {
   const excludedRoutePrefixes = Object.keys(ctx.exclusions.routes);
   const failures: string[] = [];
   const routeFiles = walkRouteFiles(ctx.appDir);
   const seenRoutePrefixes = new Set<string>();
+  const fileUrlPaths = new Set<string>();
 
   for (const file of routeFiles) {
     const urlPath = urlPathOf(file, ctx.appDir);
+    fileUrlPaths.add(urlPath);
     const source = readFileSync(file, 'utf8');
     const protectedByRbac = isRbacProtected(source, ctx.rbacGuards);
     // Sequencing invariant — checked for EVERY route file, excluded (public)
@@ -141,6 +220,8 @@ function routeFailures(ctx: GateContext): { failures: string[]; routeFileCount: 
     }
   }
 
+  failures.push(...declaredRouteFailures(ctx, fileUrlPaths, seenRoutePrefixes));
+
   for (const prefix of excludedRoutePrefixes) {
     if (!seenRoutePrefixes.has(prefix)) {
       failures.push(
@@ -148,7 +229,11 @@ function routeFailures(ctx: GateContext): { failures: string[]; routeFileCount: 
       );
     }
   }
-  return { failures, routeFileCount: routeFiles.length };
+  return {
+    failures,
+    routeFileCount: routeFiles.length,
+    declaredRouteCount: ctx.declaredRoutes.length,
+  };
 }
 
 /** Action coverage — per exported symbol (the piggyback defense). */
@@ -207,12 +292,14 @@ export function runRbacCoverage(options: RbacCoverageOptions): RbacCoverageResul
     rbacGuards: options.rbacGuards,
     entitlementGuards: options.entitlementGuards,
     exclusions: JSON.parse(readFileSync(options.exclusionsPath, 'utf8')) as RbacCoverageExclusions,
+    declaredRoutes: options.declaredRoutes ?? [],
   };
   const routes = routeFailures(ctx);
   const actions = actionFailures(ctx);
   return {
     failures: [...routes.failures, ...actions.failures],
     routeFileCount: routes.routeFileCount,
+    declaredRouteCount: routes.declaredRouteCount,
     actionCount: actions.actionCount,
   };
 }
@@ -222,13 +309,14 @@ export function runRbacCoverage(options: RbacCoverageOptions): RbacCoverageResul
  * `scripts/rbac/coverage.ts` is then one import + one call.
  */
 export function rbacCoverageCli(options: RbacCoverageOptions): void {
-  const { failures, routeFileCount, actionCount } = runRbacCoverage(options);
+  const { failures, routeFileCount, declaredRouteCount, actionCount } = runRbacCoverage(options);
   if (failures.length > 0) {
     console.error(`[rbac:coverage] ${failures.length} violation(s):`);
     for (const failure of failures) console.error(`  ✗ ${failure}`);
     process.exit(1);
   }
+  const declared = declaredRouteCount > 0 ? ` + ${declaredRouteCount} declared route(s)` : '';
   console.log(
-    `[rbac:coverage] OK — ${routeFileCount} route file(s) + ${actionCount} action(s) protected or excluded.`,
+    `[rbac:coverage] OK — ${routeFileCount} route file(s)${declared} + ${actionCount} action(s) protected or excluded.`,
   );
 }
