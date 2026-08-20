@@ -13,7 +13,7 @@ const credentials = createEmailCredentials({ store, mailer, settings, appUrl });
 const { SessionProvider, useSession } = createWebAuth();
 ```
 
-## Migrating 4.x → 5.0 — one entry point per peer
+## Migrating 1.x → 2.0 — one entry point per peer
 
 This package shipped **fifteen** entry points; report-builder ships five. Eleven
 of ours named a *module* rather than a boundary, so adopting this package meant
@@ -228,7 +228,7 @@ either.
 
 ### It owns its tables now
 
-This used to say the opposite, and the change is the point of the 5.0 release.
+This used to say the opposite, and the change is the point of the 2.0 release.
 
 `prisma/auth.prisma` owns `auth_credentials`, `auth_tokens` and
 `auth_platform_settings`, with migrations beside them. Adopt them the way you
