@@ -30,12 +30,12 @@
   },
   "dependencies": {
     "@12-apps/ui": "workspace:*",
-    "@12-apps/wiring": "workspace:*",
     "zod": "^4.3.5"
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
     "@playwright/test": "^1.56.1",
     "@tanstack/react-query": "^5.62.0",
     "@testing-library/react": "^16.1.0",
@@ -57,6 +57,7 @@
   },
   "license": "MIT",
   "peerDependencies": {
+    "@12-apps/wiring": ">=1.0.0",
     "@playwright/test": ">=1.40.0",
     "@tanstack/react-query": ">=5.0.0",
     "hono": ">=4.0.0",
@@ -66,7 +67,16 @@
     "react-router-dom": ">=6.0.0"
   },
   "peerDependenciesMeta": {
+    "@12-apps/wiring": {
+      "optional": true
+    },
     "@playwright/test": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "hono": {
       "optional": true
     },
     "playwright-bdd": {
@@ -79,12 +89,6 @@
       "optional": true
     },
     "react-router-dom": {
-      "optional": true
-    },
-    "@tanstack/react-query": {
-      "optional": true
-    },
-    "hono": {
       "optional": true
     }
   },

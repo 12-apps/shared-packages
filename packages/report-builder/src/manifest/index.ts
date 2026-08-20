@@ -2,20 +2,24 @@
  * `@12-apps/report-builder/manifest` — the SHARED wiring manifest.
  *
  * Data every runtime can hold: identity, the permission contribution, the
- * Prisma contribution and the e2e pointer, plus the INVENTORY of the two
- * runtime manifests (`./manifest/server`, `./manifest/web`). A host adopts
- * this through `@12-apps/wiring/consumer`, and the inventory is what makes an
- * unanswered capability a red `assemble()` instead of a silent gap — the
- * working-copy endpoints shipped for a release with no host mounting them,
- * and nothing said so; this file is the mechanism that says so.
+ * MCP tools, the Prisma contribution and the e2e pointer, plus the INVENTORY
+ * of the two runtime manifests (`./manifest/server`, `./manifest/web`). A
+ * host adopts this through `@12-apps/wiring/consumer`, and the inventory is
+ * what makes an unanswered capability a red `assemble()` instead of a silent
+ * gap — the working-copy endpoints shipped for a release with no host
+ * mounting them, and nothing said so; this file is the mechanism that says
+ * so.
  *
- * Everything here is a declaration of what already exists: the permission
- * contribution is the same object `composePermissions` consumers import from
- * `/server`, and the Prisma paths are the ones `prisma:sync` copies. Nothing
- * moved; it is now findable by machines.
+ * `@12-apps/wiring` is a TYPE-ONLY devDependency here, on purpose: the
+ * manifests are plain values `satisfies`-checked against the contract, and
+ * the producer factories' assertions run in this package's own test suite
+ * (`__tests__/manifest.test.ts`) — the same "fails in the package's own test
+ * run" guarantee with zero runtime dependencies added, so this package's
+ * release never waits on the contract package's, and a host that never
+ * adopts the contract never installs it.
  */
 
-import { defineManifest } from '@12-apps/wiring/producer';
+import type { PackageManifest } from '@12-apps/wiring';
 
 import { REPORT_BUILDER_PERMISSIONS } from '../server/contribution';
 import { REPORT_BUILDER_MCP_TOOLS } from './mcp';
@@ -26,7 +30,7 @@ export {
   type ReportBuilderMcpConfig,
 } from './mcp';
 
-export const reportBuilderManifest = defineManifest({
+export const reportBuilderManifest = {
   name: '@12-apps/report-builder',
   contract: 1,
   permissions: REPORT_BUILDER_PERMISSIONS,
@@ -35,4 +39,4 @@ export const reportBuilderManifest = defineManifest({
   e2e: { entry: '@12-apps/report-builder/e2e' },
   server: ['http'],
   web: ['surface', 'areas'],
-});
+} as const satisfies PackageManifest;
