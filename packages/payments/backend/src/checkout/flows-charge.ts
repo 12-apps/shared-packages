@@ -1,8 +1,9 @@
-import { chargeSnapshotMismatch, hostedSnapshotMismatch } from '../core/charge-identity';
+import { chargeSnapshotMismatch } from '../core/charge-identity';
 import type { ChargeSnapshot, PaymentMethodKind } from '../core/types';
 
 import { buyerCheckoutConfig, usesHostedCheckout } from './config';
 import { chargeDraftOf } from './draft';
+import { classifyFirstCharge, type FirstChargeSettlement } from './first-charge';
 import { chargeMismatchRefusal } from './failure';
 import { raiseCharge } from './raise';
 import type { CheckoutCard } from './reuse';
@@ -46,61 +47,32 @@ async function refreshedView<C, V extends object, D>(
 }
 
 /**
- * Guard, record and answer a snapshot that settles on the provider's OWN page.
+ * Record and answer a classified settlement — the half that needs the runtime.
  *
- * A snapshot with no `hostedCheckoutUrl` is a genuine provider failure and is
- * reported as one: without a link there is nowhere to send the buyer, and
- * returning the bare view would strand them on a payment step with no way to
- * pay and no error.
+ * WHAT it is (QR vs link) and whether it is this payable's charge at all are
+ * `classifyFirstCharge`'s, in `first-charge.ts`, so this module and an adopting
+ * host cannot drift about it. What is left here is transport: write the
+ * correlation, refresh the view, respond.
  */
-async function attachHosted<C, V extends object, D>(
+async function answerSettlement<C, V extends object, D>(
   runtime: Runtime<C, V, D>,
   payable: Payable,
   view: V,
-  snapshot: ChargeSnapshot,
+  settled: FirstChargeSettlement,
 ): Promise<Response> {
-  // Amount and currency only — see `hostedSnapshotMismatch`. Comparing the
-  // METHOD here is what still refused a reused link: it was minted under
-  // whichever method the buyer picked first, and they are free to pick another.
-  const mismatch = hostedSnapshotMismatch(snapshot, { amount: payable.amount });
-  if (mismatch) {
+  if (settled.kind === 'MISMATCH') {
     const context = failureContext(runtime, payable.ref, payable.method);
-    return sendRefusal(runtime, chargeMismatchRefusal(context, snapshot, mismatch));
+    return sendRefusal(runtime, chargeMismatchRefusal(context, settled.charge, settled.reason));
   }
-  const hostedCheckoutUrl = snapshot.hostedCheckoutUrl;
-  if (!hostedCheckoutUrl) {
-    throw new Error('The provider returned no hosted-checkout URL for a redirect charge.');
-  }
-  await runtime.config.correlation.attachPending(payable.ref, attachedChargeOf(snapshot));
+
+  await runtime.config.correlation.attachPending(payable.ref, settled.charge);
   const fresh = await refreshedView(runtime, payable.ref, view);
+  if (settled.kind === 'PIX') return runtime.respond.ok(fresh);
+
   // Spread, not nest: the view is the host's own body and the handover URL rides
   // beside it, which is the shape the published frontend already reads. The
   // library still never READS a `View` — merging is not interpreting.
-  return runtime.respond.ok({ ...fresh, hostedCheckoutUrl });
-}
-
-/** Guard, record and answer a PIX snapshot. */
-async function attachPix<C, V extends object, D>(
-  runtime: Runtime<C, V, D>,
-  payable: Payable,
-  view: V,
-  snapshot: ChargeSnapshot,
-): Promise<Response> {
-  // FUT-377/378 — the QR shown must be THIS payable's, for THIS total. A
-  // snapshot answered out of the gateway's store under a stale key would
-  // otherwise be attached as the current charge, which is precisely the reported
-  // symptom: the new total displayed next to the previous QR code.
-  const mismatch = chargeSnapshotMismatch(snapshot, {
-    method: 'PIX',
-    amount: payable.amount,
-  });
-  if (mismatch) {
-    const context = failureContext(runtime, payable.ref, 'PIX');
-    return sendRefusal(runtime, chargeMismatchRefusal(context, snapshot, mismatch));
-  }
-  if (!snapshot.pix) throw new Error('The provider returned no PIX payload for a PIX charge.');
-  await runtime.config.correlation.attachPending(payable.ref, attachedChargeOf(snapshot));
-  return runtime.respond.ok(await refreshedView(runtime, payable.ref, view));
+  return runtime.respond.ok({ ...fresh, hostedCheckoutUrl: settled.hostedCheckoutUrl });
 }
 
 /**
@@ -137,12 +109,12 @@ async function firstChargeResponse<C, V extends object, D>(
 
   const deps = { gateway: await runtime.gateway(), charges: runtime.charges, log: runtime.log };
   const snapshot = await raiseCharge(deps, payable, { method: payable.method });
-  if (payable.method === 'PIX' && !snapshot.hostedCheckoutUrl) {
-    return attachPix(runtime, payable, view, snapshot);
-  }
-  // A minted link, or a hosted-only card charge. `attachHosted` reports a
-  // snapshot with no link as the provider failure it is.
-  return attachHosted(runtime, payable, view, snapshot);
+  return answerSettlement(
+    runtime,
+    payable,
+    view,
+    classifyFirstCharge(snapshot, { amount: payable.amount, method: payable.method }),
+  );
 }
 
 /**
