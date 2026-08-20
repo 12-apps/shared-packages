@@ -99,6 +99,35 @@ export interface AuthProvidersContext {
   pending: string | null;
 }
 
+/**
+ * A condition the visitor must satisfy before an account can be created.
+ *
+ * Terms of service, an age check, an invite code — the CONTENT is the product's
+ * and the package never inspects it. What is generic is the shape: something
+ * rendered above the form, a boolean the form and the provider buttons both
+ * respect, and a side effect that must run BEFORE either path proceeds.
+ *
+ * That last part is why this is not simply a `disabled` prop. The consent stamp
+ * has to happen before the OAuth handoff, not after the redirect comes back —
+ * a visitor who accepts the terms and is then bounced to Google has already
+ * consented, and the record of it cannot depend on them making it back.
+ */
+export interface AuthSignupGate {
+  /** Rendered above the form, handed the state it is meant to drive. */
+  render: (state: {
+    satisfied: boolean;
+    setSatisfied: (next: boolean) => void;
+  }) => ReactNode;
+  /**
+   * Runs before the account is created, on BOTH paths — the e-mail form and
+   * the OAuth handoff. A rejection stops the sign-up and shows
+   * `failureMessage`.
+   */
+  onBeforeProceed?: () => Promise<void>;
+  /** What to say when `onBeforeProceed` rejects. The host's words. */
+  failureMessage: string;
+}
+
 export interface AuthRoutesConfig extends Omit<AuthPagesConfig, "screens"> {
   screens: AuthPagesConfig["screens"];
   /** The words for each Auth.js code. */
@@ -128,6 +157,20 @@ export interface AuthRoutesConfig extends Omit<AuthPagesConfig, "screens"> {
   onForgotPassword?: (navigate: (to: string) => void) => void;
   /** Runs before an account is created — a consent stamp, analytics. */
   onBeforeSignup?: () => Promise<void>;
+  /** A condition the visitor must satisfy before signing up. */
+  signupGate?: AuthSignupGate;
+  /**
+   * Where a REFUSED `?callbackUrl` falls back to. Defaults to the app root.
+   *
+   * Not the login path, which is the trap: `sameOriginCallbackUrl` returns this
+   * value for an off-origin URL, and the same value is what an
+   * already-authenticated visitor is redirected to. Point it at `/login` and a
+   * poisoned callbackUrl sends a signed-in visitor to the login route, which
+   * sees them signed in and sends them to the login route. The refusal is still
+   * safe either way — nothing follows the attacker's URL — but the visitor
+   * never arrives anywhere.
+   */
+  homePath?: string;
 }
 
 export interface AuthRouteComponents {
@@ -181,7 +224,7 @@ function useRouteState(config: AuthRoutesConfig): RouteState {
   // Sanitised against the real location, so an `?callbackUrl=` pointing at
   // another origin cannot turn a sign-in into an open redirect.
   const navigateTo = sameOriginCallbackUrl(params.get("callbackUrl") ?? undefined, {
-    href: config.routes.login,
+    href: config.homePath ?? "/",
     origin: globalThis.location?.origin ?? "",
   });
   const callbackUrl = `${base}${navigateTo}`;
@@ -222,73 +265,127 @@ function failureNotice(failure: string | null, errors: AuthErrorCopy): ReactNode
   );
 }
 
+/** The provider slot, or a spinner while the host is still discovering them. */
+function providersSlot(config: AuthRoutesConfig, state: RouteState): ReactNode {
+  if (config.providersPending === true) {
+    return <LoadingState variant="spinner" size="sm" dataTestId="providers-loading" />;
+  }
+  return config.renderProviders?.({
+    callbackUrl: state.callbackUrl,
+    start: state.start,
+    pending: state.pending,
+  });
+}
+
+/** The centred spinner both routes show while the session resolves. */
+function RouteSpinner({ testId }: { testId: string }): JSX.Element {
+  return (
+    <Container variant="centered" padding="lg">
+      <LoadingState variant="spinner" size="md" dataTestId={testId} />
+    </Container>
+  );
+}
+
+interface RouteViewProps {
+  config: AuthRoutesConfig;
+  pages: AuthPages;
+}
+
+function LoginView({ config, pages }: RouteViewProps): JSX.Element {
+  const state = useRouteState(config);
+  const navigate = config.useNavigate();
+  const emailEnabled = useEmailEnabled(config.getSettings);
+  const denied = config.renderDenied?.();
+
+  if (denied !== undefined && denied !== null) return <>{denied}</>;
+  if (state.status === "loading" || state.status === "authenticated") {
+    return <RouteSpinner testId="login-loading" />;
+  }
+
+  return (
+    <pages.LoginPage
+      callbackUrl={state.callbackUrl}
+      onSignedIn={() => navigate(state.navigateTo, { replace: true })}
+      onForgotPassword={() =>
+        config.onForgotPassword?.((to) => navigate(to)) ?? navigate("/forgot-password")
+      }
+      emailEnabled={emailEnabled}
+      notice={failureNotice(state.failure, config.errors)}
+      providers={providersSlot(config, state)}
+    />
+  );
+}
+
+function SignupView({ config, pages }: RouteViewProps): JSX.Element {
+  const state = useRouteState(config);
+  const navigate = config.useNavigate();
+  const emailEnabled = useEmailEnabled(config.getSettings);
+  const gate = config.signupGate;
+  const [satisfied, setSatisfied] = useState(gate === undefined);
+  const [gateFailed, setGateFailed] = useState(false);
+
+  if (state.status === "loading" || state.status === "authenticated") {
+    return <RouteSpinner testId="signup-loading" />;
+  }
+
+  /**
+   * The gate's side effect, then the account.
+   *
+   * Shared by both paths deliberately: the e-mail form calls it through
+   * `onBeforeSubmit`, and the provider buttons call it before the handoff.
+   * Running it in only one of the two is how consent goes unrecorded for
+   * exactly the visitors who chose the other button.
+   */
+  const runGate = async (): Promise<void> => {
+    setGateFailed(false);
+    try {
+      await (gate?.onBeforeProceed?.() ?? config.onBeforeSignup?.() ?? Promise.resolve());
+    } catch (error) {
+      setGateFailed(true);
+      throw error;
+    }
+  };
+
+  const notice =
+    gateFailed && gate !== undefined ? (
+      <Alert variant="danger" description={gate.failureMessage} data-testid="login-error" />
+    ) : (
+      failureNotice(state.failure, config.errors)
+    );
+
+  return (
+    <pages.SignupPage
+      callbackUrl={state.callbackUrl}
+      onBeforeSubmit={runGate}
+      onSignedIn={() => navigate(state.navigateTo, { replace: true })}
+      emailEnabled={emailEnabled}
+      disabled={!satisfied}
+      termsGate={gate?.render({ satisfied, setSatisfied })}
+      notice={notice}
+      providers={providersSlot(config, {
+        ...state,
+        // An unsatisfied gate must stop the handoff too, not merely grey the
+        // form: a provider button is a second door to the same account.
+        start: (provider) => {
+          if (!satisfied) return;
+          void runGate()
+            .then(() => state.start(provider))
+            .catch(() => undefined);
+        },
+      })}
+    />
+  );
+}
+
 export function createAuthRoutes(config: AuthRoutesConfig): AuthRouteComponents {
   const pages = createAuthPages(config);
-
-  function providersSlot(state: RouteState): ReactNode {
-    if (config.providersPending === true) {
-      return <LoadingState variant="spinner" size="sm" dataTestId="providers-loading" />;
-    }
-    return config.renderProviders?.({
-      callbackUrl: state.callbackUrl,
-      start: state.start,
-      pending: state.pending,
-    });
-  }
-
-  function LoginRoute(): JSX.Element {
-    const state = useRouteState(config);
-    const navigate = config.useNavigate();
-    const emailEnabled = useEmailEnabled(config.getSettings);
-    const denied = config.renderDenied?.();
-
-    if (denied !== undefined && denied !== null) return <>{denied}</>;
-    if (state.status === "loading" || state.status === "authenticated") {
-      return (
-        <Container variant="centered" padding="lg">
-          <LoadingState variant="spinner" size="md" dataTestId="login-loading" />
-        </Container>
-      );
-    }
-
-    return (
-      <pages.LoginPage
-        callbackUrl={state.callbackUrl}
-        onSignedIn={() => navigate(state.navigateTo, { replace: true })}
-        onForgotPassword={() =>
-          config.onForgotPassword?.((to) => navigate(to)) ?? navigate("/forgot-password")
-        }
-        emailEnabled={emailEnabled}
-        notice={failureNotice(state.failure, config.errors)}
-        providers={providersSlot(state)}
-      />
-    );
-  }
-
-  function SignupRoute(): JSX.Element {
-    const state = useRouteState(config);
-    const navigate = config.useNavigate();
-    const emailEnabled = useEmailEnabled(config.getSettings);
-
-    if (state.status === "loading" || state.status === "authenticated") {
-      return (
-        <Container variant="centered" padding="lg">
-          <LoadingState variant="spinner" size="md" dataTestId="signup-loading" />
-        </Container>
-      );
-    }
-
-    return (
-      <pages.SignupPage
-        callbackUrl={state.callbackUrl}
-        onBeforeSubmit={config.onBeforeSignup ?? (() => Promise.resolve())}
-        onSignedIn={() => navigate(state.navigateTo, { replace: true })}
-        emailEnabled={emailEnabled}
-        notice={failureNotice(state.failure, config.errors)}
-        providers={providersSlot(state)}
-      />
-    );
-  }
-
-  return { LoginRoute, SignupRoute, pages };
+  return {
+    LoginRoute: function LoginRoute(): JSX.Element {
+      return <LoginView config={config} pages={pages} />;
+    },
+    SignupRoute: function SignupRoute(): JSX.Element {
+      return <SignupView config={config} pages={pages} />;
+    },
+    pages,
+  };
 }
