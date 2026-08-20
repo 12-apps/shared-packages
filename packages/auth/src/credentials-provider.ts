@@ -39,7 +39,10 @@ import type { AuthenticateResult, EmailAuthFailure } from "./email-credentials/t
  * here — see that file for why.
  */
 
-export { CREDENTIALS_PROVIDER_ID };
+// The id is NOT re-exported here. It has its own pure module and the package
+// ROOT exports it from there, so a browser comparing `session.provider` can
+// have the string without pulling `@auth/core` in behind it — which is the
+// whole reason the id was split out in the first place.
 
 /** An Auth.js error carrying the flow's refusal reason as its `code`. */
 class EmailPasswordSignin extends CredentialsSignin {

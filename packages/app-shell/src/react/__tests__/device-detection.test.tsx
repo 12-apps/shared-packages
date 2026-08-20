@@ -6,7 +6,7 @@
  * OPTIMISTICALLY before hydration so it never flashes in on a fast device — which
  * means a caller has to be able to tell the two phases apart. `isHydrated` is that,
  * and it is the only thing this module adds: the detection itself is
- * `@12-apps/auth/device-detection`'s, imported rather than re-implemented, because a
+ * `@12-apps/auth`'s, imported rather than re-implemented, because a
  * second copy of "does an iPad claim to be a Mac" is how the two answers drift.
  */
 import { render, screen, waitFor } from '@testing-library/react';
