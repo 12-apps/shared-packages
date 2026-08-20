@@ -40,6 +40,8 @@ export function createApiFeatureFlags(config: FeatureFlagsServerConfig): {
   };
 }
 
+export { type FeatureFlagsServerCopy } from "./copy";
+export { PT_BR_FEATURE_FLAGS_SERVER_COPY } from "./pt-BR";
 export {
   type DirectoryUser,
   type FeatureFlagsActor,
