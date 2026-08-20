@@ -29,52 +29,23 @@
 // A TLS blip on the runner. semantic-release maps ANY failure of that preflight
 // dry-run push onto EGITNOPERMISSION, so a five-second network fault and a
 // genuinely unauthorised token are indistinguishable from the error code — see
-// classify() for how this reads the git error underneath instead.
+// classifyGitFailure() for how this reads the git error underneath instead.
 import { spawnSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 
+import { MAX_OUTPUT, classifyGitFailure, sleep } from "./lib/git-transience.mjs";
+import { bumpFor } from "./lib/major-bump.mjs";
+
 const DIRS = (process.env.PUBLISH_DIRS ?? "").split(/\s+/).filter(Boolean);
 
-// git/curl transport failures, in git's own words. Every one of these is a
-// property of the network between the runner and github.com at one instant, so
-// the same command a few seconds later is a genuinely different question.
-//
-// `server certificate verification failed` is first because it is the one this
-// repo has actually been bitten by; the rest are the neighbouring faults from
-// git's transport layer that would behave identically and should not each need
-// their own outage to get added.
-const TRANSIENT_GIT =
-  /server certificate verification failed|unable to access|Could not resolve host|Temporary failure in name resolution|Connection (?:timed out|reset)|Operation timed out|early EOF|RPC failed|gnutls_handshake|GnuTLS recv error|SSL(?:_ERROR|read|write| connect)|TLS connect error|the remote end hung up|HTTP 5\d\d|The requested URL returned error: 5\d\d|502 Bad Gateway|503 Service Unavailable/i;
-
-// semantic-release's verdict when its preflight `git push --dry-run` fails, for
-// ANY reason. Ambiguous by construction: it covers both a token that genuinely
-// cannot push and a runner that could not reach github.com for a moment.
-const NO_PERMISSION = /\bEGITNOPERMISSION\b/;
-
-// The stale-ref race. Push runs are keyed by SHA (see the concurrency block in
-// ci.yml), so two merges landing minutes apart release CONCURRENTLY on purpose.
-// The older run's `HEAD:main` is then behind the ref it is pushing to, and git
-// refuses it — which is correct, and which the next run resolves by definition.
-const STALE_REF = /non-fast-forward|fetch first|Updates were rejected|cannot lock ref|reference already exists/i;
+// The retry policy lives in ./lib/git-transience.mjs, shared with
+// scripts/next-versions.mjs — the dry-run that gates a major bump meets the
+// same transport faults as the release itself, and a second copy of that
+// knowledge would drift silently toward reporting a blip as a real failure.
 
 const BACKOFF_MS = [5_000, 15_000, 30_000];
 const ATTEMPTS = BACKOFF_MS.length + 1;
-
-// Explicit, because spawnSync's 1 MB default does not truncate — it KILLS the
-// child and returns `status: null`, so a release that actually happened comes
-// back looking like a failure. semantic-release at this repo's package count is
-// comfortably into the megabytes.
-const MAX_OUTPUT = 64 * 1024 * 1024;
-
-/**
- * Synchronous on purpose: there is nothing to overlap with, and the point of a
- * backoff is that the next attempt does NOT start until the fault has had time
- * to clear.
- */
-function sleep(ms) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
 
 /**
  * One package's release, run exactly as the workflow's bash loop used to.
@@ -109,33 +80,6 @@ function semanticRelease(dir, pkg) {
   return { ok: run.status === 0, output: `${run.stdout ?? ""}${run.stderr ?? ""}` };
 }
 
-/**
- * Whether another attempt could plausibly change the answer.
- *
- * The git transport error is read BEFORE the semantic-release error code,
- * because the code is a lossy summary of it: EGITNOPERMISSION means "the
- * preflight push did not succeed" and nothing more.
- *
- * A bare EGITNOPERMISSION with no transport error underneath is still retried,
- * on the same reasoning scripts/publish.mjs applies to ENEEDAUTH: if the token
- * really cannot push, three more attempts cost ~50s of a run that was going to
- * fail anyway, and the diagnosis at the end is unchanged. If it was the network,
- * retrying is the entire fix. The asymmetry is not close.
- */
-function classify(output) {
-  if (TRANSIENT_GIT.test(output)) return { retry: true, why: "a git transport failure" };
-  if (STALE_REF.test(output)) return { retry: true, why: "a concurrent push to main" };
-  if (NO_PERMISSION.test(output)) {
-    return {
-      retry: true,
-      why:
-        "EGITNOPERMISSION, which semantic-release reports for ANY failure of its " +
-        "preflight `git push --dry-run` — including a transient one",
-    };
-  }
-  return { retry: false, why: null };
-}
-
 /** npm/semantic-release chatter that says nothing once the run has failed. */
 const NOISE = /does not provide step|No more plugins|Start step|Completed step/;
 
@@ -166,7 +110,7 @@ function releasePackage(dir, pkg) {
     console.log(tail(output, 60));
     if (run.ok) return { failure: null, output };
 
-    const { retry, why } = classify(output);
+    const { retry, why } = classifyGitFailure(output);
     if (retry && attempt < ATTEMPTS) {
       const wait = BACKOFF_MS[attempt - 1] / 1000;
       console.log(
@@ -229,39 +173,6 @@ function silentNoRelease(output) {
   return Number((output.match(COMMITS_IN_RANGE) ?? [, "0"])[1]);
 }
 
-const NEXT_VERSION = /The next release version is (\d+)\.\d+\.\d+/;
-const LAST_VERSION = /associated with version (\d+)\.\d+\.\d+/;
-// A footer, not a mention: anchored to the start of a line, which is exactly
-// the test conventional-commits-parser applies when deciding a commit breaks.
-const BREAKING_FOOTER = /^BREAKING CHANGE/m;
-
-/**
- * The mirror of silentNoRelease(): a MAJOR nobody asked for.
- *
- * A major is rare, it is the one bump a consumer cannot take without reading,
- * and here it is decided by prose. `BREAKING CHANGE` at the start of any line
- * in the body IS the footer — the parser does not care whether the sentence
- * around it was describing one or merely mentioning it.
- *
- * That is not a hypothetical either. The commit that fixed 12-53 explained the
- * bug it was fixing, and its body said "The major came from the BREAKING CHANGE
- * footer on a fix(app-shell) commit …". The commit guard wraps bodies at 100
- * characters, the wrap landed on that phrase, and a sentence ABOUT a breaking
- * change became one — `@12-apps/request-scope` went out as 2.0.0 for a change
- * that adds a `.releaserc.json` the tarball does not even ship.
- *
- * So every major is named while the run is still on screen, with the footer
- * called out when one is present. Nothing here can read intent, and a major is
- * often correct — but the version a consumer has to act on should never be the
- * one thing the job says least about.
- */
-function majorBump(output) {
-  const next = output.match(NEXT_VERSION);
-  const last = output.match(LAST_VERSION);
-  if (!next || !last || Number(next[1]) <= Number(last[1])) return null;
-  return BREAKING_FOOTER.test(output) ? "a BREAKING CHANGE footer" : "the commit analysis";
-}
-
 function summarize(lines) {
   console.log(lines.join("\n"));
   if (!process.env.GITHUB_STEP_SUMMARY) return;
@@ -305,8 +216,8 @@ for (const dir of DIRS) {
     // `pkg:detail`, with no space in it, because handOff() joins on spaces.
     const count = silentNoRelease(output);
     if (count > 0) silent.push(`${pkg}:${count}`);
-    const why = majorBump(output);
-    if (why) majors.push({ pkg, why });
+    const bump = bumpFor(output);
+    if (bump?.major) majors.push({ pkg, why: bump.why });
   }
   console.log("::endgroup::");
 }

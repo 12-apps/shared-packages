@@ -1,0 +1,68 @@
+name: Major guard
+
+# Catches a pull request that would cut a MAJOR while its commit message is
+# still editable.
+#
+# The approval gate in ci.yml (`detect-majors` -> `approve-majors`) is the safety
+# net; this is the feedback. By the time that gate runs the commit is already on
+# main, and the only choices left are "approve" or "leave the package
+# unreleased". Here the footer can simply be reworded.
+#
+# `labeled`/`unlabeled` are load-bearing: `allow-major` is the escape hatch, and
+# a check that did not re-run on the label would stay red after someone applied
+# it, which trains people to merge past a red check. `edited` matters for the
+# same reason commitlint.yml needs it — this repo squashes with
+# COMMIT_OR_PR_TITLE, so the PR TITLE can be what lands, and a title fixed after
+# the first run has to re-trigger the check.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: major-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  major-guard:
+    name: Breaking change
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Every commit in the PR, not just the head one: the squash keeps each
+      # commit's body, so a `BREAKING CHANGE:` footer anywhere in the branch
+      # lands on main and cuts the major.
+      #
+      # Written as a JSON array rather than piped through a variable because a
+      # commit message is multi-line, and no environment variable can carry the
+      # separator that would keep the boundaries unambiguous.
+      - name: Collect the PR's commit messages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # `--slurp` cannot be combined with `--jq` (gh refuses the pair), so the
+          # pages are flattened in node instead. `.flat()` is correct whether gh
+          # returns an array of pages or one already-merged array.
+          gh api "repos/$REPO/pulls/$NUMBER/commits" --paginate --slurp > pages.json
+          node -e '
+            const { readFileSync, writeFileSync } = require("node:fs");
+            const messages = JSON.parse(readFileSync("pages.json", "utf8"))
+              .flat()
+              .map((commit) => commit.commit.message);
+            writeFileSync("commits.json", JSON.stringify(messages));
+            console.log(`collected ${messages.length} commit(s)`);
+          '
+
+      - name: Check for a breaking change
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          COMMIT_FILE: commits.json
+        run: node scripts/breaking-change-guard.mjs
