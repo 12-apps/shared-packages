@@ -27,7 +27,7 @@ import {
   type SystemReportDef,
 } from '@12-apps/report-builder/server';
 import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
-import type { MountedRoute } from '@12-apps/wiring';
+import type { MountedRoute, WireMcpTool } from '@12-apps/wiring';
 import type { Hono } from 'hono';
 
 import { HARNESS_CATALOG } from './fixtures/report-catalog';
@@ -204,6 +204,7 @@ export function wireReports(db: SavedReportDb): {
   router: Hono;
   report: WiringReport;
   routes: readonly MountedRoute[];
+  mcpEndpoints: readonly WireMcpTool[];
 } {
   const host = createWiringHost({ name: 'harness-backend', kind: 'server' });
   host.adoptServer({
@@ -230,6 +231,7 @@ export function wireReports(db: SavedReportDb): {
     router: honoRouterFor(wired.routes, () => ACTOR),
     report: wired.report,
     routes: wired.routes,
+    mcpEndpoints: wired.mcpEndpoints,
   };
 }
 

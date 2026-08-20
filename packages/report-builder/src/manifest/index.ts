@@ -18,11 +18,19 @@
 import { defineManifest } from '@12-apps/wiring/producer';
 
 import { REPORT_BUILDER_PERMISSIONS } from '../server/contribution';
+import { REPORT_BUILDER_MCP_TOOLS } from './mcp';
+
+export {
+  REPORT_BUILDER_MCP_TOOLS,
+  reportBuilderMcpTools,
+  type ReportBuilderMcpConfig,
+} from './mcp';
 
 export const reportBuilderManifest = defineManifest({
   name: '@12-apps/report-builder',
   contract: 1,
   permissions: REPORT_BUILDER_PERMISSIONS,
+  mcp: { endpoints: REPORT_BUILDER_MCP_TOOLS },
   db: { partial: 'prisma/report-builder.prisma', migrations: 'prisma/migrations' },
   e2e: { entry: '@12-apps/report-builder/e2e' },
   server: ['http'],
