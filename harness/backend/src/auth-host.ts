@@ -6,7 +6,8 @@ import { getCookie, setCookie } from 'hono/cookie';
 import type { PGlite } from '@electric-sql/pglite';
 
 import { createApiAuth } from '@12-apps/auth/server';
-import { createEmailCredentials, type EmailCredentials } from '@12-apps/auth';
+import type { EmailCredentials } from '@12-apps/auth';
+import { createEmailCredentials } from '@12-apps/auth/server';
 import { emailAuthRouter, emailAuthSettingsRouter } from '@12-apps/auth/hono';
 import { createAuthMailer } from '@12-apps/auth/notifications';
 import { PT_BR_MESSAGES } from '@12-apps/auth/server';

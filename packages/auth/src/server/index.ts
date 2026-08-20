@@ -61,3 +61,33 @@ export type { ExtendedSession, SignInGate, SessionAdminResolver } from "../confi
 /** Auth.js types, re-exported so a host need not depend on `@auth/core` itself. */
 export type { AuthConfig } from "@auth/core";
 export type { DefaultSession, Session, User } from "@auth/core/types";
+
+/**
+ * The NODE-BOUND half of the flow.
+ *
+ * `createEmailCredentials`, the password policy and the token primitives all
+ * reach `node:crypto`, so none of them can sit on a root that a browser bundle
+ * value-imports. Here they cost a browser nothing and a server nothing extra —
+ * a host already importing `./server` for the routes has them in hand.
+ *
+ * The matching TYPES are exported from the root as well, deliberately: they are
+ * erased, and an SPA naming a refusal should not have to reach for a server
+ * entry point to do it.
+ */
+export { createEmailCredentials } from "../email-credentials";
+export {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  checkPasswordPolicy,
+  hashPassword,
+  isPasswordAcceptable,
+  needsRehash,
+  verifyPassword,
+} from "../password";
+export {
+  DEFAULT_TOKEN_TTL_MS,
+  buildTokenLink,
+  hashToken,
+  isTokenExpired,
+  issueToken,
+} from "../tokens";
