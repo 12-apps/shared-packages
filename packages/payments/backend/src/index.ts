@@ -230,6 +230,8 @@ export {
 } from './config/service';
 export { hasUsableCredentials } from './config/usable-credentials';
 export { mintBrowserKey, storedBrowserKey, type BrowserKeyDeps } from './config/browser-key';
+export { createCycleCollector } from './core/cycle-collection';
+export type { BillingInstrument, CollectableCycle, CollectionResult, CollectionSkip, CycleCollectionDeps, CycleCollector, CycleStore, InstrumentLookup } from './core/cycle-collection';
 // Account-level downgrade rule (FUT-761) — see `config/account-downgrade.ts`.
 export { downgradeOnAccountError } from './config/account-downgrade';
 export { type VerifiedProviderConfig } from './config/verify';
