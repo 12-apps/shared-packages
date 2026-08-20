@@ -7,6 +7,7 @@ import { CircularProgress } from '@mui/material';
 import { TextField } from '@mui/material';
 import { useId, useMemo } from 'react';
 
+import { stackedOverlayZIndex } from '../../../tokens/layers';
 import { FormControl, FormLabel, FormMessage } from '../Form';
 import type { CreatableSelectOption, CreatableSelectProps } from './CreatableSelect.types';
 import type { SizeValue } from '../../../tokens/scales';
@@ -216,8 +217,10 @@ export function CreatableSelect({
         noOptionsText={noOptionsText}
         // Lift the dropdown above stacked modals: the default popup z-index is
         // `modal` (1300), but a stacked sheet at depth ≥2 sits at 1300 + depth*10,
-        // which would otherwise cover the options. +100 clears ~10 stack levels.
-        slotProps={{ popper: { sx: { zIndex: (theme) => theme.zIndex.modal + 100 } } }}
+        // which would otherwise cover the options. The height is the token's
+        // now — this component used to be the only place the rule was written
+        // down, which is how `CategorySelect` came to be missing it (12-57).
+        slotProps={{ popper: { sx: { zIndex: stackedOverlayZIndex } } }}
         getOptionLabel={(option) => (typeof option === 'string' ? option : option.label)}
         isOptionEqualToValue={(option, current) => option.value === current.value}
         renderOption={renderIndentedOption}
