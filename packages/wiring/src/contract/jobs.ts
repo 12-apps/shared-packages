@@ -45,8 +45,35 @@ export interface WireJobContext {
 }
 
 /**
+ * A sub-minute cadence — what cron cannot say. A realtime outbox drains
+ * every ten seconds; a 5-field pattern bottoms out at one minute. A
+ * blueprint declares EITHER a `schedule` or an `interval`, never both.
+ * A host whose runtime cannot repeat sub-minute must decline the jobs
+ * binding rather than silently rounding up.
+ */
+export interface WireJobInterval {
+  everyMs: number;
+}
+
+/**
+ * A single-flight lease around the handler — the `withSweepLease` shape
+ * hosts wrap sweeps in by hand today. Declared, the HOST's runner owns the
+ * wrapping; the ttl is the package's claim about how long one run may hold
+ * the name.
+ */
+export interface WireJobLease {
+  ttlMs: number;
+}
+
+/**
  * Twin of `JobBlueprint`: one job a package declares, deps left open.
  * Inert data — declaring one registers nothing and starts nothing.
+ *
+ * A handler needing a HOST-COMPUTED argument (a retention window cut from a
+ * billing watermark, a per-tenant duration) does not get a field here: that
+ * argument is a dep. The host closes it over at bind time — a function dep
+ * the handler calls per run — which keeps the blueprint inert and the
+ * computation where the vocabulary lives.
  */
 export interface WireJobBlueprint<TPayload, TDeps> {
   /** Short name within the module — namespaced at bind time. */
@@ -57,6 +84,10 @@ export interface WireJobBlueprint<TPayload, TDeps> {
   backoff?: WireJobBackoff;
   /** Present ⇒ the job also runs on a schedule, with no payload. */
   schedule?: WireJobSchedule;
+  /** Present ⇒ the job repeats sub-minute. Mutually exclusive with `schedule`. */
+  interval?: WireJobInterval;
+  /** Present ⇒ the host's runner must hold this single-flight lease per run. */
+  lease?: WireJobLease;
   concurrency?: number;
   handle(payload: TPayload, deps: TDeps, context: WireJobContext): Promise<void>;
 }
@@ -88,6 +119,14 @@ export interface BoundJob {
   attempts?: number;
   backoff?: WireJobBackoff;
   schedule?: WireJobSchedule;
+  /**
+   * Carried through from the blueprint. `defineJob` ignores both (extra
+   * optional properties survive the structural assignment) — a host runner
+   * that supports sub-minute repeats or leases reads them off the bound job;
+   * one that does not should have declined the binding.
+   */
+  interval?: WireJobInterval;
+  lease?: WireJobLease;
   concurrency?: number;
   handle(payload: never, context: WireJobContext): Promise<void>;
 }

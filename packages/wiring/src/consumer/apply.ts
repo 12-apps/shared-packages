@@ -26,10 +26,39 @@ export interface BindContext {
   packageName: string;
   sinks: WiringSinks;
   hostEmailPort?: EmailPort;
+  /** The package's declared permission ids, when it declares any. */
+  permissionIds?: readonly string[];
 }
 
 function refuse(context: BindContext, message: string): never {
   throw new WiringAssemblyError(context.hostName, `${context.packageName}: ${message}`);
+}
+
+/**
+ * The route-policy consistency rules, enforced where routes enter the
+ * aggregate. A `permission` on an unauthenticated route can never be
+ * checked, so declaring one is a wiring mistake, not a stricter gate; an
+ * `entitlement` on a webhook drops a provider callback on a plan boundary —
+ * money events lost to billing state. And a permission id the package's own
+ * permissions contribution does not declare is drift between the two
+ * halves of the same manifest.
+ */
+function assertRoutePolicy(context: BindContext, route: WireRoute<never>): void {
+  const kind = route.kind ?? "authenticated";
+  const at = `route ${route.method} ${route.path}`;
+  if (route.permission !== undefined && kind !== "authenticated") {
+    refuse(context, `${at} is "${kind}" but requires permission "${route.permission}" — an unauthenticated route has no actor to check.`);
+  }
+  if (route.entitlement !== undefined && kind === "webhook") {
+    refuse(context, `${at} is a webhook but carries entitlement "${route.entitlement}" — a plan gate on a provider callback drops events.`);
+  }
+  if (
+    route.permission !== undefined &&
+    context.permissionIds !== undefined &&
+    !context.permissionIds.includes(route.permission)
+  ) {
+    refuse(context, `${at} requires permission "${route.permission}", which the package's permissions contribution does not declare.`);
+  }
 }
 
 export function bindHttp(
@@ -45,6 +74,7 @@ export function bindHttp(
   }
   const { routes } = contribution.create(value.config);
   routes.forEach((route) => {
+    assertRoutePolicy(context, route);
     context.sinks.routes.push({
       packageName: context.packageName,
       mountPath: value.mountPath,
@@ -73,6 +103,8 @@ export function bindJobs(
       attempts: blueprint.attempts,
       backoff: blueprint.backoff,
       schedule: blueprint.schedule,
+      interval: blueprint.interval,
+      lease: blueprint.lease,
       concurrency: blueprint.concurrency,
       handle: (payload, jobContext) => blueprint.handle(payload, deps, jobContext),
     }),

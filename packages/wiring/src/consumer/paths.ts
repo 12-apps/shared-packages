@@ -9,7 +9,7 @@
  * position, and a longer path outranks its own prefix, deterministically.
  */
 
-import type { MountedRoute } from "../contract/http";
+import type { MountedRoute, WireHttpMethod, WireRouteKind } from "../contract/http";
 
 /**
  * A mount prefix in OpenAPI `{param}` form, for MCP tool paths:
@@ -30,6 +30,36 @@ export function joinRoutePath(mountPath: string, path: string): string {
   const right = path.startsWith("/") ? path : `/${path}`;
   const joined = `${left}${right}`;
   return joined === "" ? "/" : joined;
+}
+
+/** One row of the assembled policy table — what a coverage gate consumes. */
+export interface RoutePolicyRow {
+  packageName: string;
+  method: WireHttpMethod;
+  /** Absolute, `:param` form — mount and route path joined. */
+  path: string;
+  kind: WireRouteKind;
+  permission?: string;
+  entitlement?: string;
+  quota?: string;
+}
+
+/**
+ * The declared policy of every mounted route, flattened — the table a host's
+ * RBAC and entitlement coverage gates can assert over INSTEAD of scanning
+ * route files for guard literals, which is what lets a package's routes be
+ * registered wholesale rather than one thin file per endpoint.
+ */
+export function routePolicyTable(routes: readonly MountedRoute[]): RoutePolicyRow[] {
+  return routes.map((mounted) => ({
+    packageName: mounted.packageName,
+    method: mounted.route.method,
+    path: joinRoutePath(mounted.mountPath, mounted.route.path),
+    kind: mounted.route.kind ?? "authenticated",
+    permission: mounted.route.permission,
+    entitlement: mounted.route.entitlement,
+    quota: mounted.route.quota,
+  }));
 }
 
 const PARAM = ":param";

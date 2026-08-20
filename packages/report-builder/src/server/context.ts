@@ -81,6 +81,17 @@ export interface ReportRoute {
   path: string;
   /** True when the actor must be able to author — the host may gate earlier. */
   authoring?: boolean;
+  /**
+   * The declared policy — structural twins of `@12-apps/wiring`'s
+   * `WireRoutePolicy`, restated so `/server` stays dependency-free. Keys are
+   * THIS package's vocabulary: `permission` is one of its own declared
+   * permission ids; `entitlement`/`quota` are plan-feature keys the host maps
+   * onto its billing catalog. Every route here is `authenticated`, so no
+   * `kind` field: the package has no webhooks and no public reads.
+   */
+  permission?: string;
+  entitlement?: string;
+  quota?: string;
   handle(request: ReportRequest): Promise<ReportResponse>;
 }
 

@@ -1,5 +1,6 @@
 import { config as baseConfig } from "@12-apps/eslint-config/base";
 import testFlakiness from "eslint-plugin-test-flakiness";
+import { observabilityConfig } from "@12-apps/eslint-config/observability";
 
 /**
  * The everyday DX lint for this package. Mirrors `packages/jobs`:
@@ -10,6 +11,7 @@ import testFlakiness from "eslint-plugin-test-flakiness";
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
+  ...observabilityConfig,
   ...baseConfig,
   {
     files: ["**/__tests__/**", "**/*.test.ts"],
