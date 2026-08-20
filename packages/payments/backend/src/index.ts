@@ -231,6 +231,7 @@ export {
 export { hasUsableCredentials } from './config/usable-credentials';
 export { mintBrowserKey, storedBrowserKey, type BrowserKeyDeps } from './config/browser-key';
 export { createCycleCollector } from './core/cycle-collection';
+export { envOAuthAppCredentials, DEFAULT_OAUTH_APP_EXTRAS, type EnvOAuthAppOptions } from './config/oauth-env';
 export type { BillingInstrument, CollectableCycle, CollectionResult, CollectionSkip, CycleCollectionDeps, CycleCollector, CycleStore, InstrumentLookup } from './core/cycle-collection';
 // Account-level downgrade rule (FUT-761) — see `config/account-downgrade.ts`.
 export { downgradeOnAccountError } from './config/account-downgrade';
@@ -242,11 +243,7 @@ export { ensurePlatformCredentials, type PlatformCredentialSeed } from './config
  * own settings route — rather than `createPaymentsHttp` — refuses the same
  * bodies this package does instead of re-deriving the rules from the schema.
  */
-export {
-  assertFieldsMatchSchema,
-  assertSaveCredentialsInput,
-  parseSaveCredentialsBody,
-} from './config/credential-input';
+export { assertFieldsMatchSchema, assertSaveCredentialsInput, parseSaveCredentialsBody } from './config/credential-input';
 export {
   createOAuthConnectService,
   type OAuthAppCredentialsResolver,
@@ -340,19 +337,9 @@ export {
   type ConnectStateConfig,
   type MintedConnectState,
 } from './config/connect-state';
-export {
-  attemptIdempotencyKey,
-  attemptReference,
-  baseReference,
-  attemptReferencePrefix,
-  ownsReference,
-  suffixedReference,
-} from './core/reference';
+export { attemptIdempotencyKey, attemptReference, baseReference, attemptReferencePrefix, ownsReference, suffixedReference } from './core/reference';
 
-export {
-  createPrismaAttemptLedger,
-  type ChargeAttemptDelegate,
-} from './prisma/attempt-ledger';
+export { createPrismaAttemptLedger, type ChargeAttemptDelegate } from './prisma/attempt-ledger';
 export { createPrismaChargeStore, type ChargeDelegate, type Cipher } from './prisma/stores';
 export {
   createPrismaProviderConfigStore,
