@@ -327,14 +327,13 @@ export { PT_BR_PAGES } from "./pt-BR";
 export { PT_BR_AUTH_ERRORS } from "./pt-BR";
 export {
   createAuthRoutes,
-  authErrorMessage,
-  AUTH_ERROR_CODES,
 } from "./routes";
+export { authErrorMessage, AUTH_ERROR_CODES } from "./errors";
+export type { AuthErrorCode, AuthErrorCopy } from "./errors";
 export type {
-  AuthErrorCode,
-  AuthErrorCopy,
   AuthProvidersContext,
   AuthRouteComponents,
   AuthRoutesConfig,
   AuthRouteSession,
+  AuthSignupGate,
 } from "./routes";
