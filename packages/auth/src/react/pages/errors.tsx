@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type JSX } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 
@@ -25,8 +25,21 @@ export const AUTH_ERROR_CODES = [
 
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
 
-/** The sentence shown for each code, plus the catch-all for one not listed. */
-export type AuthErrorCopy = Record<AuthErrorCode, string> & { fallback: string };
+/**
+ * The sentence shown for each code, plus the catch-all for one not listed.
+ *
+ * `titles` is the alert's HEADING, and it is optional only for compatibility:
+ * a notice reads badly without one. The two hosts this replaced both had one —
+ * the storefront switched between "Cadastro necessário" and "Falha ao entrar"
+ * on the code, the backoffice always said the latter — and collapsing them
+ * onto a description-only Alert dropped it. `titleFallback` covers every code
+ * a pack does not name individually.
+ */
+export type AuthErrorCopy = Record<AuthErrorCode, string> & {
+  fallback: string;
+  titles?: Partial<Record<AuthErrorCode, string>>;
+  titleFallback?: string;
+};
 
 /**
  * Which codes are the user's own doing rather than a fault.
@@ -41,15 +54,49 @@ export function authErrorMessage(code: string, copy: AuthErrorCopy): string {
   return (copy as Record<string, string>)[code] ?? copy.fallback;
 }
 
-/** The notice slot — one Alert, from one map. */
-export function failureNotice(failure: string | null, errors: AuthErrorCopy): ReactNode {
-  if (failure === null) return null;
+/** The heading for a code, if the pack names one. */
+export function authErrorTitle(code: string, copy: AuthErrorCopy): string | undefined {
+  return copy.titles?.[code as AuthErrorCode] ?? copy.titleFallback;
+}
+
+/**
+ * The notice slot — one Alert, from one map, and DISMISSIBLE.
+ *
+ * Closable because the code lives in the URL: without a dismiss the notice
+ * stays for as long as the visitor is on the page, including while they are
+ * typing the password that will fix it. Both hosts this replaced had a close
+ * button; collapsing them onto a bare Alert lost it, which is why this is a
+ * component rather than a function returning one.
+ */
+export function FailureNotice({
+  failure,
+  errors,
+}: {
+  failure: string | null;
+  errors: AuthErrorCopy;
+}): JSX.Element | null {
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  if (failure === null || dismissed === failure) return null;
+  const title = authErrorTitle(failure, errors);
+  /*
+   * The test id sits on a WRAPPER, not on the Alert.
+   *
+   * `Alert`'s types accept `data-testid` while its runtime reads the camelCase
+   * `dataTestId`, and passing the raw attribute suppresses the close button
+   * entirely — measured, and the reason this notice first shipped
+   * undismissable. Rather than pick a spelling that satisfies one of the two,
+   * the Alert keeps its own defaults and the id goes outside it.
+   */
   return (
-    <Alert
-      variant={ADVISORY_CODES.has(failure) ? "warning" : "danger"}
-      description={authErrorMessage(failure, errors)}
-      data-testid="login-error"
-    />
+    <div data-testid="login-error">
+      <Alert
+        variant={ADVISORY_CODES.has(failure) ? "warning" : "danger"}
+        {...(title === undefined ? {} : { title })}
+        description={authErrorMessage(failure, errors)}
+        closable
+        onClose={() => setDismissed(failure)}
+      />
+    </div>
   );
 }
 

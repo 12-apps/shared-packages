@@ -7,7 +7,7 @@ import { Container } from "@12-apps/ui/layout/Container";
 import type { EmailAuthSettings } from "../../email-credentials/types";
 import { sameOriginCallbackUrl } from "../create-web-auth";
 import type { SessionStatus } from "../create-web-auth";
-import { failureNotice } from "./errors";
+import { FailureNotice } from "./errors";
 import type { AuthErrorCopy } from "./errors";
 import { createAuthPages } from "./index";
 import type { AuthPages, AuthPagesConfig } from "./index";
@@ -276,7 +276,7 @@ function LoginView({ config, pages }: RouteViewProps): JSX.Element {
         config.onForgotPassword?.((to) => navigate(to)) ?? navigate("/forgot-password")
       }
       emailEnabled={emailEnabled}
-      notice={failureNotice(state.failure, config.errors)}
+      notice={<FailureNotice failure={state.failure} errors={config.errors} />}
       providers={providersSlot(config, state)}
     />
   );
@@ -314,9 +314,11 @@ function SignupView({ config, pages }: RouteViewProps): JSX.Element {
 
   const notice =
     gateFailed && gate !== undefined ? (
-      <Alert variant="danger" description={gate.failureMessage} data-testid="login-error" />
+      <div data-testid="login-error">
+          <Alert variant="danger" description={gate.failureMessage} />
+        </div>
     ) : (
-      failureNotice(state.failure, config.errors)
+      <FailureNotice failure={state.failure} errors={config.errors} />
     );
 
   return (

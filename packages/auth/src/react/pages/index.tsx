@@ -328,7 +328,7 @@ export { PT_BR_AUTH_ERRORS } from "./pt-BR";
 export {
   createAuthRoutes,
 } from "./routes";
-export { authErrorMessage, AUTH_ERROR_CODES } from "./errors";
+export { authErrorMessage, authErrorTitle, AUTH_ERROR_CODES } from "./errors";
 export type { AuthErrorCode, AuthErrorCopy } from "./errors";
 export type {
   AuthProvidersContext,
