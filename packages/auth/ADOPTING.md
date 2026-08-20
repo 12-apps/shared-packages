@@ -320,3 +320,211 @@ Your six endpoints must answer `2xx { data }` on success and non-2xx
 `{ error, reason }` on refusal, where `reason` is an `EmailAuthFailure`. That
 code is what lets a screen say "that link has expired" instead of "something
 went wrong" while the sentence itself stays in your language.
+
+## 2.1 — the host drops to configuration
+
+Everything below already worked in 2.0; what changed is that a host no longer
+writes it. Three additions, each replacing a block every adopter was copying.
+Nothing is removed, so a 2.0 host upgrades without editing anything.
+
+### `createEnvAuthMailer` — the driver tree
+
+`createAuthMailer` takes a RESOLVED driver, which left every host writing the
+same thirty lines to decide *which* driver:
+
+```ts
+function driver(): EmailDriver {
+  const provider = process.env.NOTIFICATIONS_EMAIL_PROVIDER;
+  if (provider === "log") return sinkDriver;
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.NOTIFICATIONS_EMAIL_FROM;
+  if (provider !== "resend" || !apiKey || !from) return unconfiguredDriver;
+  return EMAIL_DRIVERS.resend({ channel: "EMAIL", driver: "resend", apiKey, from });
+}
+```
+
+Not one decision in that belongs to a product. "The log provider means the
+sink", "a vendor with no key refuses rather than pretends", "an unknown vendor
+name refuses rather than throwing at import" — each is a property of the auth
+mail path, and getting any of them wrong fails the same way in every host:
+reset links written to a log aggregator, or a sign-in flow that 500s at boot
+because a secret is missing.
+
+```ts
+export const authMailer = createEnvAuthMailer({
+  env: {
+    provider: "NOTIFICATIONS_EMAIL_PROVIDER",
+    apiKey: "RESEND_API_KEY",
+    from: "NOTIFICATIONS_EMAIL_FROM",
+    sinkFile: "AUTH_EMAIL_LOG_FILE",
+    origin: ["APP_PUBLIC_URL", "AUTH_URL"],
+  },
+  drivers: EMAIL_DRIVERS,
+  log: createFeatureLogger("auth-email"),
+});
+```
+
+The variable NAMES stay yours, which is what keeps `@12-apps/notifications`'
+rule intact — that package refuses to read `process.env` because "it cannot
+know a host's variable names, and it must not be the thing that decides whether
+a channel is on". Your deployment still decides, by which variables it sets.
+This only performs the lookup those names describe, and performs it PER SEND:
+a preview box reconfigured under a running process would otherwise keep sending
+through whatever was set when the module first loaded.
+
+`resolveAppOrigin` is the same fallback list on its own, for `appUrl` — the
+origin host had that three-term chain written out in two files, and two
+spellings of one fallback is how a deployment mails links built against a
+different host than the flow uses.
+
+### `mountEmailAuth` / `mountEmailAuthSettings` — the route file
+
+`emailAuthRouter` returns a `Hono`, and a host on the `app/**/route.ts` layout
+cannot export one of those. So both mounts ended with the same block: wrap in a
+prefix, set a `notFound`, then re-export `GET`, `POST` and `PUT` as three
+one-line functions. Copied twice in one repo is copied in every repo, and the
+copy is where the two drift — forget `PUT` on one and the reset endpoint
+answers 405 with nothing red anywhere, because no test drives a verb the file
+does not export.
+
+```ts
+export const { GET, POST, PUT } = mountEmailAuth({
+  path: "/api/auth/email",
+  credentials: emailCredentials(),
+  messages: PT_BR_MESSAGES,
+  onSignedUp: stampTermsConsent,
+  resolveUserId: async () => (await session())?.userId ?? null,
+  notFound: () => Response.json({ error: "Not found." }, { status: 404 }),
+});
+```
+
+`notFound` is optional and has no default: a 404 body is part of an API's own
+vocabulary, and this package will not invent an envelope your other endpoints
+do not use.
+
+`before` is the seam for a gate whose refusals are not all 401. `resolveUserId`
+answers `string | null`, and `null` becomes 401 for every refusal it can
+express — so a host with a second refusal (signed in, but not permitted: a
+**403**) cannot say so through it, and collapsing the two bounces somebody to a
+sign-in they are already past. `before` runs in front of the router, in the
+host's own statuses, and `resolveUserId` is then a pure read of somebody
+already proven:
+
+```ts
+export const { GET, PUT } = mountEmailAuthSettings<{ operator: string }>({
+  path: "/api/platform/auth-settings",
+  before: async (c, next) => {
+    try { c.set("operator", (await requireSuperadmin()).email); }
+    catch (error) { return errorResponse(error); }
+    return next();
+  },
+  resolveUserId: (c) => c.get("operator") ?? null,
+  store,
+});
+```
+
+### The tests came with the code
+
+Behaviour this package owns is now asserted here rather than downstream. The
+settings routes had **no test in this package at all** — their only coverage
+was a host's `route.test.ts`, so a change to `patchOf` was covered by one
+downstream repo and only until that repo stopped asserting it. Likewise the
+settings SCREEN, and the status/401/body-parse behaviour of the Hono adapter,
+which the descriptors' own tests cannot reach.
+
+What stays in a host is the part a host genuinely owns: who may call these, and
+which status a refusal answers.
+
+## Adopting through `@12-apps/wiring`
+
+The package now ships a **producer manifest**, so a host on the wiring contract
+declares what it wants rather than writing mounts:
+
+```ts
+import { createWiringHost } from '@12-apps/wiring/consumer';
+import { authManifest, authPlatformManifest } from '@12-apps/auth/manifest';
+import { authServerManifest, authPlatformServerManifest } from '@12-apps/auth/manifest/server';
+
+const host = createWiringHost({
+  name: 'my-app',
+  kind: 'server',
+  // ONE delivery port, for every package that mails.
+  ports: { email: { send: (to, message) => driver.send(to, message) } },
+});
+
+host.adoptServer({
+  manifest: authManifest,
+  server: authServerManifest({ loginUrl: `${origin}/login` }),
+  bindings: {
+    http: { mountPath: '/api/auth/email', config: { credentials, messages: PT_BR_MESSAGES } },
+    email: {},                         // takes the host port above
+  },
+});
+
+host.adoptServer({
+  manifest: authPlatformManifest,
+  server: authPlatformServerManifest,
+  bindings: { http: { mountPath: '/api/platform/auth-settings', config: { store } } },
+});
+
+const { routes, mailers, db, areas, report } = host.assemble();
+```
+
+### Why there are two manifests
+
+An `http` capability binds ONE mount path, and this package has two surfaces
+that cannot share one:
+
+| | mounted at | reachable by |
+|---|---|---|
+| `@12-apps/auth` | wherever the packaged browser client points | anybody |
+| `@12-apps/auth-platform` | a path the host gates for operators | superadmins |
+
+They differ in audience, path and gate — and in the origin host, in MCP
+exposure too: the platform pair is off the tool surface by exclusion, because a
+tool that could turn verification off would open unverified registration on the
+whole platform in one call. Folding them into one manifest would mean the
+aggregate could not express that difference.
+
+The manifest **name** is a wiring identity, not an npm package name. The
+consumer keys adoption and its report on it.
+
+### The actor inverts
+
+Under `emailAuthRouter` the package held a `resolveUserId` callback and turned
+`null` into 401. Under the contract the HOST resolves the caller and hands it in
+as `WireRequest.actor`. That is the better half of the seam: `resolveUserId`
+could only ever express one refusal, so a host whose gate has a second one —
+signed in, but not permitted, a **403** — had nowhere to put it, and collapsing
+the two bounces somebody to a sign-in they are already past.
+
+What the ROUTE still decides is whether it needed anybody at all: `session` is
+a property of the endpoint, not of the host, and a host restating it per route
+would eventually restate one of them wrong.
+
+`emailAuthRouter`, `mountEmailAuth` and the raw descriptors are all unchanged,
+so a host not on the contract is untouched.
+
+### The web half
+
+`createWebEmailAuth` is the `surface` capability, and it is also just the
+composition every host was writing by hand: build the transport, hand it to the
+screens, hand those to the pages, re-export the nine components. In the origin
+host that was a 44-line barrel in a shared SPA package, doing nothing a second
+host would do differently — and a recipe hosts can get subtly wrong: forget
+`useSession` and the two sign-in forms render but cannot sign anybody in, with
+nothing red until somebody tries.
+
+```ts
+export const auth = createWebEmailAuth({
+  basePath: '/api/auth/email',
+  copy: PT_BR, pages: PT_BR_PAGES, useSession, Link,
+});
+// auth.LoginPage, auth.SignupPage, auth.ForgotPasswordScreen, … auth.client
+```
+
+`areas` travel with the version, which is the point: an area a release adds
+shows up in `assemble()`'s report rather than in a bug about a page nobody
+mounted. Screen names are the KEYS of the built surface, and a test asserts
+they resolve — a rename that did not reach the surface is a host-side undefined
+component, which renders as a blank page with nothing in any log.
