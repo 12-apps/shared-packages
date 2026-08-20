@@ -77,7 +77,13 @@ export interface CollectableCycle {
 export interface BillingInstrument {
   provider: ProviderName;
   providerInstrumentId: string;
-  providerCustomerId?: string | undefined;
+  /**
+   * Nullable, not just optional: "this provider needs no customer ref" arrives
+   * from a host's own column, and a nullable column is the ordinary shape for
+   * it. Normalized before the charge — making every host map `null` to
+   * `undefined` at the seam is friction a port should absorb.
+   */
+  providerCustomerId?: string | null | undefined;
 }
 
 /**
@@ -221,7 +227,7 @@ export function createCycleCollector(deps: CycleCollectionDeps): CycleCollector 
         customer: cycle.customer,
         card: {
           savedCardToken: instrument.providerInstrumentId,
-          customerRef: instrument.providerCustomerId,
+          customerRef: instrument.providerCustomerId ?? undefined,
           // Names the instrument's OWNER, so the gateway can never offer a
           // Stripe `pm_…` to PagBank and burn the chain on garbage input.
           tokenProvider: instrument.provider,
