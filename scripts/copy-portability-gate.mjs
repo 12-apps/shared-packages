@@ -50,58 +50,51 @@ const CATEGORY_EXCLUDED =
   /(?:__tests__|__stories__|\.test\.|\.spec\.|\.stories\.|\.test-story\.|(?:^|\/)e2e\/|(?:^|\/)features\/|test-helpers)/;
 const NAMED_PACK = /(?:pt-?br[^/]*\.(?:ts|tsx|js|jsx|mjs)$|(?:^|\/)locales\/)/i;
 
+const STRING_OPENERS = { "'": "single", '"': "double", "`": "template" };
+const STRING_CLOSERS = { single: "'", double: '"', template: "`" };
+
+function stepCode(ch, next) {
+  if (ch === "/" && next === "/") return { state: "line", emit: "", skip: 1 };
+  if (ch === "/" && next === "*") return { state: "block", emit: "", skip: 1 };
+  return { state: STRING_OPENERS[ch] ?? "code", emit: ch, skip: 0 };
+}
+
+function stepLineComment(ch) {
+  if (ch === "\n") return { state: "code", emit: "\n", skip: 0 };
+  return { state: "line", emit: "", skip: 0 };
+}
+
+function stepBlockComment(ch, next) {
+  if (ch === "*" && next === "/") return { state: "code", emit: "", skip: 1 };
+  // Newlines survive so reported line numbers stay stable.
+  return { state: "block", emit: ch === "\n" ? "\n" : "", skip: 0 };
+}
+
+function stepString(state, ch, next) {
+  if (ch === "\\") return { state, emit: ch + (next ?? ""), skip: 1 };
+  return { state: ch === STRING_CLOSERS[state] ? "code" : state, emit: ch, skip: 0 };
+}
+
 /**
  * Strip `//` and `/* *\/` comments, KEEPING string/template contents — the
  * leak is what ships to a user, and that lives in strings and JSX text. A
- * small state machine rather than regexes: a `//` inside a string is copy,
- * not a comment.
+ * small state machine (one step function per state) rather than regexes: a
+ * `//` inside a string is copy, not a comment.
  */
 export function stripComments(source) {
   let out = "";
-  let state = "code"; // code | line | block | single | double | template
+  let state = "code";
   for (let i = 0; i < source.length; i += 1) {
     const ch = source[i];
     const next = source[i + 1];
-    if (state === "code") {
-      if (ch === "/" && next === "/") {
-        state = "line";
-        i += 1;
-      } else if (ch === "/" && next === "*") {
-        state = "block";
-        i += 1;
-      } else {
-        if (ch === "'") state = "single";
-        else if (ch === '"') state = "double";
-        else if (ch === "`") state = "template";
-        out += ch;
-      }
-    } else if (state === "line") {
-      if (ch === "\n") {
-        state = "code";
-        out += ch;
-      }
-    } else if (state === "block") {
-      if (ch === "*" && next === "/") {
-        state = "code";
-        i += 1;
-      } else if (ch === "\n") {
-        out += ch; // keep line numbers stable
-      }
-    } else {
-      if (ch === "\\") {
-        out += ch + (next ?? "");
-        i += 1;
-        continue;
-      }
-      if (
-        (state === "single" && ch === "'") ||
-        (state === "double" && ch === '"') ||
-        (state === "template" && ch === "`")
-      ) {
-        state = "code";
-      }
-      out += ch;
-    }
+    let step;
+    if (state === "code") step = stepCode(ch, next);
+    else if (state === "line") step = stepLineComment(ch);
+    else if (state === "block") step = stepBlockComment(ch, next);
+    else step = stepString(state, ch, next);
+    out += step.emit;
+    i += step.skip;
+    state = step.state;
   }
   return out;
 }
