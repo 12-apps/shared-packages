@@ -15,6 +15,8 @@ import {
   type FeatureFlagsDb,
   type FlagDefinition,
 } from "../index";
+import { missingServerCopy } from "./copy";
+import type { FeatureFlagsServerCopy } from "./copy";
 
 /**
  * Whoever the host resolved. Authorization is the HOST's, done before a
@@ -60,6 +62,8 @@ export interface FeatureFlagsServerConfig {
   /** The host's flag catalog. `[]` is valid: "no beta running". */
   catalog: readonly FlagDefinition[];
   directory: FeatureFlagsDirectory;
+  /** Every human-readable sentence the API answers with — host vocabulary, no defaults. */
+  copy: FeatureFlagsServerCopy;
   /** Optional sink for the host's audit trail; awaited when it returns one. */
   audit?: (event: FeatureFlagsAuditEvent) => void | Promise<void>;
 }
@@ -97,5 +101,13 @@ export function assertFeatureFlagsConfig(config: FeatureFlagsServerConfig): void
   }
   if (typeof config.directory.findUserByEmail !== "function") {
     throw new FeatureFlagsError("invalid_config", "directory.findUserByEmail is required.");
+  }
+  const missing = missingServerCopy(config.copy);
+  if (missing.length > 0) {
+    throw new FeatureFlagsError(
+      "invalid_config",
+      `copy is required, with every key non-blank — missing: ${missing.join(", ")}. ` +
+        "Copy is host vocabulary; a pt-BR host passes PT_BR_FEATURE_FLAGS_SERVER_COPY by hand.",
+    );
   }
 }

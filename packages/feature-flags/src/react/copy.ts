@@ -1,7 +1,9 @@
 /**
- * Every string the management surface renders, overridable per host. The
- * DEFAULTS are pt-BR — the origin host's audience — so a pt-BR host writes
- * zero copy; any other host overrides the whole object.
+ * Every string the management surface renders — REQUIRED host config, with
+ * no defaults (the payments doctrine, FUT-760, enforced repo-wide by the
+ * copy-portability gate). A pt-BR host imports
+ * `PT_BR_FEATURE_FLAGS_COPY` from `./pt-BR` and passes it by hand — one
+ * reviewable line, never a silence.
  */
 
 export interface FeatureFlagsCopy {
@@ -34,35 +36,6 @@ export interface FeatureFlagsCopy {
   /** Placeholders: `{enabled}`, `{total}`. */
   readonly tally: string;
 }
-
-export const DEFAULT_FEATURE_FLAGS_COPY: FeatureFlagsCopy = {
-  title: "Recursos beta",
-  subtitle: "Conceda recursos em teste a usuários específicos.",
-  flagsEmpty: "Nenhum recurso beta no catálogo.",
-  selectPrompt: "Selecione um recurso para gerenciar os testadores.",
-  grantsEmpty: "Nenhum usuário neste recurso.",
-  loadError: "Não foi possível carregar.",
-  addEmailLabel: "E-mail do usuário",
-  addNoteLabel: "Observação (opcional)",
-  addSubmit: "Conceder acesso",
-  adding: "Concedendo...",
-  enable: "Ativar",
-  disable: "Desativar",
-  revoke: "Revogar",
-  statusOn: "Ativo",
-  statusOff: "Desativado",
-  thUser: "Usuário",
-  thNote: "Observação",
-  thStatus: "Situação",
-  thActions: "Ações",
-  grantedByPrefix: "concedido por",
-  prev: "Anterior",
-  next: "Próxima",
-  pageOf: "Página {page} de {pages} — {total} concessões",
-  orphansTitle: "Concessões órfãs",
-  orphansHint: "Concessões de recursos que saíram do catálogo. Revogue-as ao aposentar um recurso.",
-  tally: "{enabled} de {total} ativos",
-};
 
 export function formatCopy(template: string, values: Record<string, number>): string {
   return template.replace(/\{(\w+)\}/g, (match, name: string) => {

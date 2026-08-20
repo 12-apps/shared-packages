@@ -2,6 +2,7 @@ import type { JSX } from 'react';
 
 import { featureFlagsManifest } from '@12-apps/feature-flags/manifest';
 import { featureFlagsWebManifest } from '@12-apps/feature-flags/manifest/web';
+import { PT_BR_FEATURE_FLAGS_COPY } from '@12-apps/feature-flags/react';
 import type { FeatureFlagsApiClient } from '@12-apps/feature-flags/react';
 import { createWiringHost } from '@12-apps/wiring/consumer';
 
@@ -65,7 +66,7 @@ const host = createWiringHost({
 host.adoptWeb({
   manifest: featureFlagsManifest,
   web: featureFlagsWebManifest,
-  bindings: { surface: { config: { api } } },
+  bindings: { surface: { config: { api, copy: PT_BR_FEATURE_FLAGS_COPY } } },
 });
 
 const surface = host.assemble().surfaces['@12-apps/feature-flags'] as {

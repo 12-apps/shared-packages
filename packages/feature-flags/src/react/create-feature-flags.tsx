@@ -12,14 +12,15 @@ import type { JSX } from "react";
 
 import { FeatureFlagsError } from "../index";
 import type { FeatureFlagsApiClient } from "./api";
-import { DEFAULT_FEATURE_FLAGS_COPY, type FeatureFlagsCopy } from "./copy";
+import type { FeatureFlagsCopy } from "./copy";
 import { FeatureFlagsPage } from "./page";
 
 export interface FeatureFlagsWebConfig {
   /** The host's authenticated client for the mounted server surface. */
   api: FeatureFlagsApiClient;
   /** Overrides for the pt-BR defaults. */
-  copy?: Partial<FeatureFlagsCopy>;
+  /** Every rendered string — REQUIRED, no defaults; pass a named pack or your own. */
+  copy: FeatureFlagsCopy;
 }
 
 export function createWebFeatureFlags(config: FeatureFlagsWebConfig): {
@@ -28,7 +29,7 @@ export function createWebFeatureFlags(config: FeatureFlagsWebConfig): {
   if (typeof config.api?.listFlags !== "function") {
     throw new FeatureFlagsError("invalid_config", "api is required — the host's client.");
   }
-  const copy: FeatureFlagsCopy = { ...DEFAULT_FEATURE_FLAGS_COPY, ...config.copy };
+  const copy: FeatureFlagsCopy = config.copy;
   const api = config.api;
 
   function FeatureFlags(): JSX.Element {

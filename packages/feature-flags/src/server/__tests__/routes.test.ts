@@ -9,6 +9,7 @@ import type {
   FeatureFlagsRoute,
   FeatureFlagsServerConfig,
 } from "../index";
+import { PT_BR_FEATURE_FLAGS_SERVER_COPY } from "../pt-BR";
 
 const CATALOG = [
   { key: "delivery-beta", label: "Delivery (beta)", description: "Entrega em teste" },
@@ -35,6 +36,7 @@ function harness(
   const { routes } = createApiFeatureFlags({
     db: () => Promise.resolve(db),
     catalog: CATALOG,
+    copy: PT_BR_FEATURE_FLAGS_SERVER_COPY,
     directory: {
       getUsers: (ids) => Promise.resolve(PEOPLE.filter((person) => ids.includes(person.id))),
       findUserByEmail: (email) =>

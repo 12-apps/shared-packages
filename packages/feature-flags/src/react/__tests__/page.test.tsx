@@ -6,6 +6,7 @@ import type { FlagSummary, GrantView } from "../../index";
 import type { FeatureFlagsApiClient } from "../api";
 import { createWebFeatureFlags } from "../create-feature-flags";
 import { FeatureFlagsError } from "../../index";
+import { PT_BR_FEATURE_FLAGS_COPY } from "../pt-BR";
 
 const FLAGS: FlagSummary[] = [
   {
@@ -44,14 +45,14 @@ afterEach(cleanup);
 
 describe("createWebFeatureFlags", () => {
   it("refuses a config without the host api client", () => {
-    expect(() => createWebFeatureFlags({ api: undefined as unknown as FeatureFlagsApiClient })).toThrow(
+    expect(() => createWebFeatureFlags({ api: undefined as unknown as FeatureFlagsApiClient, copy: PT_BR_FEATURE_FLAGS_COPY })).toThrow(
       FeatureFlagsError,
     );
   });
 
   it("renders the catalog and prompts for a selection", async () => {
     const api = stubApi();
-    const { page: Page } = createWebFeatureFlags({ api });
+    const { page: Page } = createWebFeatureFlags({ api, copy: PT_BR_FEATURE_FLAGS_COPY });
     render(<Page />);
     expect(await screen.findByTestId("ff-flag-delivery-beta")).toBeTruthy();
     expect(screen.getByTestId("ff-select-prompt")).toBeTruthy();
@@ -60,7 +61,7 @@ describe("createWebFeatureFlags", () => {
 
   it("selecting a flag loads its grants", async () => {
     const api = stubApi();
-    const { page: Page } = createWebFeatureFlags({ api });
+    const { page: Page } = createWebFeatureFlags({ api, copy: PT_BR_FEATURE_FLAGS_COPY });
     render(<Page />);
     fireEvent.click(await screen.findByTestId("ff-flag-delivery-beta"));
     expect(await screen.findByTestId("ff-grant-u1")).toBeTruthy();
@@ -69,7 +70,7 @@ describe("createWebFeatureFlags", () => {
 
   it("granting by email posts to the selected flag and refetches", async () => {
     const api = stubApi();
-    const { page: Page } = createWebFeatureFlags({ api });
+    const { page: Page } = createWebFeatureFlags({ api, copy: PT_BR_FEATURE_FLAGS_COPY });
     render(<Page />);
     fireEvent.click(await screen.findByTestId("ff-flag-delivery-beta"));
     await screen.findByTestId("ff-grant-u1");
@@ -90,7 +91,7 @@ describe("createWebFeatureFlags", () => {
 
   it("toggle and revoke call the api with the row's identity", async () => {
     const api = stubApi();
-    const { page: Page } = createWebFeatureFlags({ api });
+    const { page: Page } = createWebFeatureFlags({ api, copy: PT_BR_FEATURE_FLAGS_COPY });
     render(<Page />);
     fireEvent.click(await screen.findByTestId("ff-flag-delivery-beta"));
     fireEvent.click(await screen.findByTestId("ff-toggle-u1"));
@@ -107,7 +108,7 @@ describe("createWebFeatureFlags", () => {
     const api = stubApi({
       listFlags: vi.fn(() => Promise.reject(new Error("Não foi possível carregar as concessões"))),
     });
-    const { page: Page } = createWebFeatureFlags({ api });
+    const { page: Page } = createWebFeatureFlags({ api, copy: PT_BR_FEATURE_FLAGS_COPY });
     render(<Page />);
     const alert = await screen.findByTestId("ff-error");
     expect(alert.textContent).toBe("Não foi possível carregar as concessões");
@@ -117,7 +118,7 @@ describe("createWebFeatureFlags", () => {
     const api = stubApi();
     const { page: Page } = createWebFeatureFlags({
       api,
-      copy: { title: "Feature toggles" },
+      copy: { ...PT_BR_FEATURE_FLAGS_COPY, title: "Feature toggles" },
     });
     render(<Page />);
     expect(await screen.findByText("Feature toggles")).toBeTruthy();

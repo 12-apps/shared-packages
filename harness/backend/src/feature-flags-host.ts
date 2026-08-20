@@ -14,6 +14,7 @@
 import type { FeatureFlagsDb, FlagDefinition } from '@12-apps/feature-flags';
 import { featureFlagsManifest } from '@12-apps/feature-flags/manifest';
 import { featureFlagsServerManifest } from '@12-apps/feature-flags/manifest/server';
+import { PT_BR_FEATURE_FLAGS_SERVER_COPY } from '@12-apps/feature-flags/server';
 import type { FeatureFlagsActor } from '@12-apps/feature-flags/server';
 import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
 import type { MountedRoute } from '@12-apps/wiring';
@@ -70,6 +71,9 @@ export function wireFeatureFlags(): {
           db: () => Promise.resolve(store),
           catalog: HARNESS_FLAGS,
           directory: harnessDirectory,
+          // The pack, passed BY HAND — this harness is a pt-BR host, and
+          // choosing that is now a reviewable line, never a silent default.
+          copy: PT_BR_FEATURE_FLAGS_SERVER_COPY,
         },
       },
     },

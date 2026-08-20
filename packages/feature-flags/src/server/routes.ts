@@ -16,6 +16,7 @@ import type {
   FeatureFlagsRoute,
   FeatureFlagsServerConfig,
 } from "./context";
+import type { FeatureFlagsServerCopy } from "./copy";
 
 const PER_PAGE_DEFAULT = 20;
 const PER_PAGE_MAX = 100;
@@ -29,17 +30,20 @@ function failure(status: number, error: string, message: string): FeatureFlagsRe
   return reply(status, { error, message });
 }
 
-function unauthenticated(request: FeatureFlagsRequest): FeatureFlagsResponse | null {
+function unauthenticated(
+  request: FeatureFlagsRequest,
+  copy: FeatureFlagsServerCopy,
+): FeatureFlagsResponse | null {
   // The host's guard runs long before this; refusing a blank actor here only
   // keeps a miswired bridge from stamping writes with an empty grantedBy.
   if (typeof request.actor?.email !== "string" || request.actor.email.trim() === "") {
-    return failure(401, "unauthenticated", "Não autenticado.");
+    return failure(401, "unauthenticated", copy.unauthenticated);
   }
   return null;
 }
 
-function unknownFlag(): FeatureFlagsResponse {
-  return failure(404, "unknown_flag", "Recurso desconhecido.");
+function unknownFlag(copy: FeatureFlagsServerCopy): FeatureFlagsResponse {
+  return failure(404, "unknown_flag", copy.unknownFlag);
 }
 
 function flagOf(
@@ -107,7 +111,7 @@ export function flagsIndexRoute(config: FeatureFlagsServerConfig): FeatureFlagsR
     method: "GET",
     path: "/",
     async handle(request) {
-      const denied = unauthenticated(request);
+      const denied = unauthenticated(request, config.copy);
       if (denied) return denied;
       const db = await config.db();
       // One unbounded read, deliberately: grants are a beta cohort, bounded by
@@ -144,11 +148,11 @@ export function userFlagsRoute(config: FeatureFlagsServerConfig): FeatureFlagsRo
     method: "GET",
     path: "/users/:userId",
     async handle(request) {
-      const denied = unauthenticated(request);
+      const denied = unauthenticated(request, config.copy);
       if (denied) return denied;
       const userId = request.params["userId"];
       if (userId === undefined || userId.trim() === "") {
-        return failure(422, "invalid_user", "Informe o usuário.");
+        return failure(422, "invalid_user", config.copy.invalidUser);
       }
       const db = await config.db();
       const rows = await db.userFeatureGrant.findMany({
@@ -175,10 +179,10 @@ export function grantsListRoute(config: FeatureFlagsServerConfig): FeatureFlagsR
     method: "GET",
     path: "/:key/grants",
     async handle(request) {
-      const denied = unauthenticated(request);
+      const denied = unauthenticated(request, config.copy);
       if (denied) return denied;
       const flag = flagOf(config.catalog, request.params);
-      if (!flag) return unknownFlag();
+      if (!flag) return unknownFlag(config.copy);
       const page = positiveInt(request.query["page"], 1);
       const perPage = Math.min(positiveInt(request.query["perPage"], PER_PAGE_DEFAULT), PER_PAGE_MAX);
       const db = await config.db();
@@ -205,14 +209,17 @@ interface EmailGrantInput {
   note: string | null | undefined;
 }
 
-function parseEmailGrant(request: FeatureFlagsRequest): EmailGrantInput | FeatureFlagsResponse {
+function parseEmailGrant(
+  request: FeatureFlagsRequest,
+  copy: FeatureFlagsServerCopy,
+): EmailGrantInput | FeatureFlagsResponse {
   const body = bodyOf(request);
   const email = typeof body?.["email"] === "string" ? body["email"].trim() : "";
   if (body === null || !email.includes("@")) {
-    return failure(422, "invalid_email", "Informe um e-mail válido.");
+    return failure(422, "invalid_email", copy.invalidEmail);
   }
   const note = noteOf(body);
-  if (!note.ok) return failure(422, "invalid_note", "A observação é longa demais.");
+  if (!note.ok) return failure(422, "invalid_note", copy.noteTooLong);
   return { email, note: note.value };
 }
 
@@ -249,14 +256,14 @@ export function grantByEmailRoute(config: FeatureFlagsServerConfig): FeatureFlag
     method: "POST",
     path: "/:key/grants",
     async handle(request) {
-      const denied = unauthenticated(request);
+      const denied = unauthenticated(request, config.copy);
       if (denied) return denied;
       const flag = flagOf(config.catalog, request.params);
-      if (!flag) return unknownFlag();
-      const input = parseEmailGrant(request);
+      if (!flag) return unknownFlag(config.copy);
+      const input = parseEmailGrant(request, config.copy);
       if ("status" in input) return input;
       const person = await config.directory.findUserByEmail(input.email);
-      if (!person) return failure(404, "user_not_found", "Nenhum usuário com este e-mail.");
+      if (!person) return failure(404, "user_not_found", config.copy.userNotFound);
       const { row, existed } = await regrant(config, request, flag.key, person, input.note);
       await config.audit?.({
         action: existed ? "updated" : "granted",
@@ -276,15 +283,18 @@ interface GrantPatch {
   note: string | null | undefined;
 }
 
-function parseGrantPatch(request: FeatureFlagsRequest): GrantPatch | FeatureFlagsResponse {
+function parseGrantPatch(
+  request: FeatureFlagsRequest,
+  copy: FeatureFlagsServerCopy,
+): GrantPatch | FeatureFlagsResponse {
   const body = bodyOf(request);
-  if (body === null) return failure(422, "invalid_body", "Corpo inválido.");
+  if (body === null) return failure(422, "invalid_body", copy.invalidBody);
   const enabled = body["enabled"];
   if ("enabled" in body && typeof enabled !== "boolean") {
-    return failure(422, "invalid_enabled", "O campo enabled deve ser booleano.");
+    return failure(422, "invalid_enabled", copy.invalidEnabled);
   }
   const note = noteOf(body);
-  if (!note.ok) return failure(422, "invalid_note", "A observação é longa demais.");
+  if (!note.ok) return failure(422, "invalid_note", copy.noteTooLong);
   return { enabled: typeof enabled === "boolean" ? enabled : undefined, note: note.value };
 }
 
@@ -324,16 +334,16 @@ export function grantUpdateRoute(config: FeatureFlagsServerConfig): FeatureFlags
     method: "PUT",
     path: "/:key/grants/:userId",
     async handle(request) {
-      const denied = unauthenticated(request);
+      const denied = unauthenticated(request, config.copy);
       if (denied) return denied;
       const flag = flagOf(config.catalog, request.params);
-      if (!flag) return unknownFlag();
-      const patch = parseGrantPatch(request);
+      if (!flag) return unknownFlag(config.copy);
+      const patch = parseGrantPatch(request, config.copy);
       if ("status" in patch) return patch;
       const userId = request.params["userId"] ?? "";
       const row = await patchGrant(config, request, flag.key, userId, patch);
       if (row === null) {
-        return failure(404, "grant_not_found", "Este usuário não tem acesso a este recurso.");
+        return failure(404, "grant_not_found", config.copy.grantNotFound);
       }
       await config.audit?.({
         action: "updated",
@@ -354,16 +364,16 @@ export function grantRevokeRoute(config: FeatureFlagsServerConfig): FeatureFlags
     method: "DELETE",
     path: "/:key/grants/:userId",
     async handle(request) {
-      const denied = unauthenticated(request);
+      const denied = unauthenticated(request, config.copy);
       if (denied) return denied;
       const flag = flagOf(config.catalog, request.params);
-      if (!flag) return unknownFlag();
+      if (!flag) return unknownFlag(config.copy);
       const userId = request.params["userId"] ?? "";
       const db = await config.db();
       const where = { userId_flagKey: { userId, flagKey: flag.key } };
       const existing = await db.userFeatureGrant.findUnique({ where });
       if (!existing) {
-        return failure(404, "grant_not_found", "Este usuário não tem acesso a este recurso.");
+        return failure(404, "grant_not_found", config.copy.grantNotFound);
       }
       await db.userFeatureGrant.delete({ where });
       await config.audit?.({
