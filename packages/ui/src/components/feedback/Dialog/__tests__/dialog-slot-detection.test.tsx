@@ -48,8 +48,8 @@ const paper = (element: HTMLElement): HTMLElement | null =>
 describe('Dialog slot detection', () => {
   /**
    * Body and footer are siblings IN THE PAPER'S COLUMN, whichever component
-   * rendered them. This is the property the storefront's product sheet lost,
-   * and being siblings is not enough on its own to have it: inside the padded
+   * rendered them. This is the property an adopter's product sheet lost to
+   * this, and being siblings is not enough on its own to have it: inside the padded
    * wrapper they were siblings too, one level below the column that gives the
    * body its bounded height. So the test follows them up to the paper and
    * insists nothing between generates a box.
@@ -129,7 +129,7 @@ describe('Dialog slot detection', () => {
   /**
    * The other half of the contract, and the reason this is not simply "always
    * skip the padding": a dialog handed raw children still gets them padded.
-   * `AppHeader.details` and the storefront's order history both rely on it.
+   * `AppHeader.details` and an adopter's order-history sheet both rely on it.
    */
   it('still pads a body that is not a slot at all', () => {
     render(

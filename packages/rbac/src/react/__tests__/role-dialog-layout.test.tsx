@@ -29,7 +29,7 @@ import type { MemberWithRoles } from '../team-role-dialog';
 const MEMBER: MemberWithRoles = {
   userId: 'u-1',
   role: 'MANAGER',
-  email: 'alguem@futurepay.test',
+  email: 'alguem@example.com',
   name: 'Alguém',
   image: null,
   active: true,
