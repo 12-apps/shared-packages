@@ -195,3 +195,9 @@ export { isAdminEmail, parseAdminEmails };
  * Type exports for consumers
  */
 export type { AuthConfig, DefaultSession, Session, User };
+
+export {
+  createInProcessRateLimiter,
+  DEFAULT_RATE_LIMITS,
+  type InProcessRateLimiterConfig,
+} from "./rate-limit";

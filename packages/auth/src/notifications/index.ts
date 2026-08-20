@@ -120,3 +120,10 @@ export function createAuthMailer(config: AuthMailerConfig): EmailCredentialsMail
       }),
   };
 }
+
+export {
+  createSinkDriver,
+  createUnconfiguredDriver,
+  type SinkDriverConfig,
+  type UnconfiguredDriverConfig,
+} from "./drivers";

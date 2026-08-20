@@ -37,6 +37,10 @@
     "./prisma": {
       "types": "./src/prisma/index.ts",
       "default": "./src/prisma/index.ts"
+    },
+    "./react/pages": {
+      "types": "./src/react/pages/index.tsx",
+      "default": "./src/react/pages/index.tsx"
     }
   },
   "scripts": {
