@@ -253,6 +253,39 @@ export {
 export type { PaymentEnvironment } from '@12-apps/payments-backend';
 
 // ---------------------------------------------------------------------------
+// The REDIRECT ACTIVATION protocol (FUT-463, packaged by FUT-763) — proving a
+// connection can charge, for a provider whose payer pays on its own page.
+//
+// `renderVerification` above stays what it was: the package decides where the
+// step appears and the host owns the screen. What moved is the protocol behind
+// it — resume-on-mount, the return trip's ids, the refusal/expiry/transport
+// distinctions, the bounded wait. Every one of those was learned from a payment
+// that went wrong, and no second host should have to learn them again.
+// ---------------------------------------------------------------------------
+export {
+  useRedirectActivation,
+  type RedirectActivation,
+  type RedirectActivationOptions,
+} from './activation/use-redirect-activation';
+export { type RedirectActivationCopy } from './activation/copy';
+export {
+  creationFailure,
+  postActivation,
+  refusedByProvider,
+  settleActivationPoll,
+  type ActivationClock,
+  type ActivationPendingBody,
+  type ActivationPollBody,
+  type RedirectActivationState,
+  type SettlePollIo,
+} from './activation/redirect-state';
+export {
+  clearReturnedSettlement,
+  takeReturnedSettlement,
+  RETURNED_SETTLEMENT_KEY,
+} from './activation/returned-settlement';
+
+// ---------------------------------------------------------------------------
 // The connect ROUND TRIP's other end (FUT-763): what the OAuth callback
 // redirected back with, taken out of the address bar once. The codes are a
 // union so a host's copy map is exhaustiveness-checked; the sentences stay the
