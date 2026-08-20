@@ -30,9 +30,9 @@ import type { ActivationChargeCopy } from './charge-copy';
  * been homologated.
  *
  * So the owner puts their own card through the SAME path a shopper takes — same
- * fields, same validation, same browser-side encryption — for one cent,
- * refunded immediately. Whatever would break for a buyer breaks here, in front
- * of the person who can fix it.
+ * fields, same validation, same browser-side encryption — for the smallest
+ * amount that provider will actually accept, refunded immediately. Whatever
+ * would break for a buyer breaks here, in front of the person who can fix it.
  *
  * The sibling of `useRedirectActivation`, for the other half of the same step:
  * that one is for a provider whose payer leaves for its own page. Both prove
@@ -86,6 +86,20 @@ export interface ActivationCharge {
   cpf: string;
   setCpf: (value: string) => void;
   cpfError: string | undefined;
+  /**
+   * What this charge will COST, in cents — `null` until the endpoint answers.
+   *
+   * Not always one cent, which is the whole reason it is asked for rather than
+   * assumed: at least one provider refuses a one-cent total outright, so its
+   * verification charge is worth more, and the minimum is a fact about that
+   * provider's API rather than a number this package may pick.
+   *
+   * `null` rather than a fallback for the same reason the copy has no
+   * defaults: what to put on a button before the truth arrives is the host's
+   * sentence to write, and a package guessing here would have the screen
+   * promise one amount and charge another.
+   */
+  amountCents: number | null;
   state: ActivationChargeState;
   submit: () => Promise<void>;
   /** Back to the form from a settled state, to try another card. */
@@ -93,20 +107,54 @@ export interface ActivationCharge {
 }
 
 /**
- * The store's own card public key, fetched through the VERIFICATION endpoint.
+ * What the verification endpoint says about the charge BEFORE it is made.
  *
- * Not the checkout one: that reads credentials through the enabled gate, and a
- * provider being verified is by definition still disabled.
+ * Two facts, one request, because the endpoint answers both in one body and
+ * they are needed on the same screen at the same moment. They were two asks
+ * for the same URL — the key read here, the amount read by the host — which is
+ * one request per render pass more than the truth costs, and two places for
+ * the answer to be interpreted differently.
+ *
+ * The endpoint is the VERIFICATION one, not checkout's: that reads credentials
+ * through the enabled gate, and a provider being verified is by definition
+ * still disabled.
  */
-function usePublicKey(verifyChargeUrl: string): string | null {
-  const [publicKey, setPublicKey] = useState<string | null>(null);
+interface ActivationProbe {
+  publicKey: string | null;
+  amountCents: number | null;
+}
+
+/** Before the endpoint has answered, both facts are simply unknown. */
+const UNKNOWN_PROBE: ActivationProbe = { publicKey: null, amountCents: null };
+
+/** The endpoint's `GET` body — every field optional; a host may answer neither. */
+interface ProbeBody {
+  publicKey?: string | null;
+  amountCents?: number | null;
+}
+
+function readProbe(body: ProbeBody | null): ActivationProbe {
+  return {
+    publicKey: body?.publicKey ? body.publicKey : null,
+    amountCents: typeof body?.amountCents === 'number' ? body.amountCents : null,
+  };
+}
+
+function useActivationProbe(verifyChargeUrl: string): ActivationProbe {
+  const [probe, setProbe] = useState<ActivationProbe>(UNKNOWN_PROBE);
 
   useEffect(() => {
     const alive = { current: true };
+    // Forgotten FIRST, before the new answer is asked for. A screen that moves
+    // between providers keeps this hook mounted, and holding the previous
+    // provider's key across the gap would tokenize the card with one vendor's
+    // key and send the blob to another — which arrives as that second
+    // provider's refusal, reading exactly like a bad card.
+    setProbe(UNKNOWN_PROBE);
     void fetch(verifyChargeUrl)
-      .then((res) => (res.ok ? (res.json() as Promise<{ publicKey?: string | null }>) : null))
+      .then((res) => (res.ok ? (res.json() as Promise<ProbeBody>) : null))
       .then((body) => {
-        if (alive.current && body?.publicKey) setPublicKey(body.publicKey);
+        if (alive.current) setProbe(readProbe(body));
       })
       .catch(() => undefined);
     return () => {
@@ -114,7 +162,7 @@ function usePublicKey(verifyChargeUrl: string): string | null {
     };
   }, [verifyChargeUrl]);
 
-  return publicKey;
+  return probe;
 }
 
 /** Local validation — nothing reaches the provider until the card is well-formed. */
@@ -205,7 +253,7 @@ function useCardForm() {
 
 export function useActivationCharge(options: ActivationChargeOptions): ActivationCharge {
   const { verifyChargeUrl, provider, email, onVerified, copy } = options;
-  const publicKey = usePublicKey(verifyChargeUrl);
+  const probe = useActivationProbe(verifyChargeUrl);
   const form = useCardForm();
   const [state, setState] = useState<ActivationChargeState>({ kind: 'idle' });
   const { card, cpf, setFieldErrors, setCpfError, clear } = form;
@@ -222,7 +270,7 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
       provider,
       card,
       cpf,
-      publicKey,
+      publicKey: probe.publicKey,
       email,
       copy,
     });
@@ -235,7 +283,7 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
   }, [
     card,
     cpf,
-    publicKey,
+    probe.publicKey,
     verifyChargeUrl,
     provider,
     email,
@@ -260,6 +308,7 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
     cpf: form.cpf,
     setCpf: form.setCpf,
     cpfError: form.cpfError,
+    amountCents: probe.amountCents,
     state,
     submit,
     reset,
