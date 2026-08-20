@@ -85,6 +85,7 @@ export const notesManifest = defineManifest({
   },
   db: { partial: "prisma/delivery-notes.prisma", migrations: "prisma/migrations" },
   e2e: { entry: "@12-apps/delivery-notes/e2e" },
+  observability: { namespace: "delivery-notes" },
   server: ["http", "jobs", "email"],
   web: ["surface", "areas"],
 });

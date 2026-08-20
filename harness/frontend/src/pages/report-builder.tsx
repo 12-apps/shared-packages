@@ -208,10 +208,26 @@ const SURFACE: ReportBuilderSurface = {
  * once, which is the rule every hand wiring used to carry as a comment (the
  * factory returns component TYPES; a rebuild unmounts the whole tree).
  */
-const webWiring = createWiringHost({ name: 'harness-frontend', kind: 'web' });
+const webWiring = createWiringHost({
+  name: 'harness-frontend',
+  kind: 'web',
+  // The browser half of the observability capability: errors tag with the
+  // package's namespace. The harness's sink is the console.
+  ports: {
+    loggerFor: (namespace) => ({
+      info: (message, ...meta) => console.info(`[${namespace}] ${message}`, ...meta),
+      warn: (message, ...meta) => console.warn(`[${namespace}] ${message}`, ...meta),
+      error: (message, ...meta) => console.error(`[${namespace}] ${message}`, ...meta),
+    }),
+  },
+});
 const { surface: reportsSurface } = webWiring.adoptWeb({
   manifest: reportBuilderManifest,
   web: reportBuilderWebManifest,
+  // This host really runs the declared world: `tests/e2e/steps/reports-world.ts`
+  // calls `defineReportsWorld` and playwright.config.ts compiles the package's
+  // journeys under this root. The binding is the report's proof of that.
+  e2e: { featuresRoot: '.features-gen' },
   bindings: {
     surface: {
       config: {

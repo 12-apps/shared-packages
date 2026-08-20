@@ -34,7 +34,7 @@ import { HARNESS_CATALOG } from './fixtures/report-catalog';
 import { fixtureTables } from './fixtures/report-fixture-tables';
 import { HARNESS_TIME_ZONE, NOW } from './fixtures/report-fixture-window';
 import { HARNESS_CLIENT_ID } from './saved-report-db';
-import { honoRouterFor } from './wire-hono';
+import { honoRouterFor, harnessLoggerFor } from './wire-hono';
 
 /** This host's own tiers, over this host's own entities. */
 const SALES = 'reports:sales:read';
@@ -206,10 +206,20 @@ export function wireReports(db: SavedReportDb): {
   routes: readonly MountedRoute[];
   mcpEndpoints: readonly WireMcpTool[];
 } {
-  const host = createWiringHost({ name: 'harness-backend', kind: 'server' });
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    // The reference consumer shows the BOUND path: one namespaced logger
+    // factory for every adopted package. The harness's sink is the console.
+    ports: { loggerFor: harnessLoggerFor },
+  });
   host.adoptServer({
     manifest: reportBuilderManifest,
     server: reportBuilderServerManifest,
+    // The declared world is the FRONTEND harness's to run — the journeys
+    // drive screens. Declining here (with the reason in the report) is the
+    // honest server-host answer; silence would be a red assemble().
+    e2e: { declined: 'the journeys drive screens — the web harness answers for the world' },
     bindings: {
       http: {
         mountPath: REPORTS_MOUNT_PATH,

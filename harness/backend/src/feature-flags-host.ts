@@ -20,7 +20,7 @@ import type { MountedRoute } from '@12-apps/wiring';
 import { Hono } from 'hono';
 
 import { harnessDirectory, memoryFeatureFlagsDb } from './feature-flags-db';
-import { honoRouterFor } from './wire-hono';
+import { honoRouterFor, harnessLoggerFor } from './wire-hono';
 
 /** The betas this host is running — pt-BR copy, the operator reads it. */
 export const HARNESS_FLAGS: readonly FlagDefinition[] = [
@@ -53,7 +53,13 @@ export function wireFeatureFlags(): {
   // `let` + a closure, so the suite's reset swaps the store under the same
   // adoption — the packaged journeys start every scenario from this seed.
   let store = seededStore();
-  const host = createWiringHost({ name: 'harness-backend', kind: 'server' });
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    // The mandatory observability capability (wiring 1.3.0): the binder
+    // scopes a logger to the manifest's namespace.
+    ports: { loggerFor: harnessLoggerFor },
+  });
   host.adoptServer({
     manifest: featureFlagsManifest,
     server: featureFlagsServerManifest,

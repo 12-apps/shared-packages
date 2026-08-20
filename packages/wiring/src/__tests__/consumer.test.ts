@@ -31,6 +31,7 @@ function adoptNotes(host: ReturnType<typeof createWiringHost>, deps: NotesJobDep
   return host.adoptServer({
     manifest: notesManifest,
     server: notesServerManifest,
+    observability: { declined: "the capabilities suite owns this" },
     bindings: {
       http: { mountPath: MOUNT, config: { store: deps.store } },
       jobs: { deps },
@@ -83,6 +84,7 @@ describe("a server host adopting the fixture package", () => {
     host.adoptServer({
       manifest: notesManifest,
       server: notesServerManifest,
+      observability: { declined: "the capabilities suite owns this" },
       bindings: {
         http: { mountPath: MOUNT, config: { store: deps.store } },
         jobs: { deps },
@@ -99,6 +101,7 @@ describe("a server host adopting the fixture package", () => {
       other.adoptServer({
         manifest: notesManifest,
         server: notesServerManifest,
+        observability: { declined: "the capabilities suite owns this" },
         mcpOverrides: { nope: { summary: "?" } },
       }),
     ).toThrow(/does not declare/);
@@ -174,6 +177,7 @@ describe("refusals", () => {
     host.adoptServer({
       manifest: notesManifest,
       server: notesServerManifest,
+      observability: { declined: "the capabilities suite owns this" },
       bindings: {
         http: { mountPath: MOUNT, config: { store: memoryStore() } },
         jobs: { declined: "no worker in this harness" },
@@ -188,6 +192,7 @@ describe("refusals", () => {
     host.adoptServer({
       manifest: notesManifest,
       server: notesServerManifest,
+      observability: { declined: "the capabilities suite owns this" },
       bindings: {
         http: { mountPath: MOUNT, config: { store: memoryStore() } },
         jobs: { declined: "no worker in this harness" },
@@ -222,7 +227,13 @@ describe("refusals", () => {
 
   it("refuses two packages claiming one route", () => {
     const host = createWiringHost({ name: "api", kind: "server" });
-    const rival = defineManifest({ name: "@12-apps/rival", contract: 1, server: ["http"] });
+    const rival = defineManifest({
+      name: "@12-apps/rival",
+      contract: 1,
+      server: ["http"],
+      observability: { namespace: "rival" },
+    });
+    const rivalAnswers = { observability: { declined: "collision is the subject here" } };
     const rivalServer = defineServerManifest(rival, {
       name: rival.name,
       http: {
@@ -238,6 +249,7 @@ describe("refusals", () => {
       },
     });
     host.adoptServer({
+      ...rivalAnswers,
       manifest: rival,
       server: rivalServer,
       bindings: { http: { mountPath: MOUNT, config: {} } },
@@ -245,6 +257,7 @@ describe("refusals", () => {
     host.adoptServer({
       manifest: notesManifest,
       server: notesServerManifest,
+      observability: { declined: "the capabilities suite owns this" },
       bindings: {
         http: { mountPath: MOUNT, config: { store: memoryStore() } },
         jobs: { declined: "not this test's subject" },
@@ -260,6 +273,7 @@ describe("refusals", () => {
     host.adoptServer({
       manifest: notesManifest,
       server: notesServerManifest,
+      observability: { declined: "the capabilities suite owns this" },
       bindings: {
         http: { mountPath: MOUNT, config: { store: memoryStore() } },
         jobs: { declined: "not this test's subject" },
@@ -275,6 +289,7 @@ describe("a web host adopting the fixture package", () => {
     const host = createWiringHost({ name: "admin", kind: "web" });
     const { surface } = host.adoptWeb({
       manifest: notesManifest,
+      observability: { declined: "the capabilities suite owns this" },
       web: notesWebManifest,
       bindings: { surface: { config: { apiBase: "/api/admin/loja" } } },
     });

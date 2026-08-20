@@ -17,6 +17,8 @@ import type { SavedReportRecord, SavedReportStore } from './saved';
 import { toSummary } from './summary';
 import { canViewSavedReport, visibilityRoleIds } from './visibility';
 import { parksEditsInWorkingCopy, reportWorkingCopySchema } from './working-copy';
+import { DEFAULT_AUTHOR_PERMISSION } from './contribution';
+import { REPORT_BUILDER_FEATURES } from './features';
 
 /**
  * Unpublished changes to a PUBLISHED report (FUT-755): park, publish, discard.
@@ -81,6 +83,8 @@ function saveRoute(config: ReportBuilderServerConfig, store: SavedReportStore): 
   return {
     method: 'PUT',
     path: '/reports/custom/:id/working-copy',
+    permission: DEFAULT_AUTHOR_PERMISSION,
+    entitlement: REPORT_BUILDER_FEATURES.custom,
     authoring: true,
     async handle({ actor, params, body }) {
       if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
@@ -110,6 +114,8 @@ function publishRoute(config: ReportBuilderServerConfig, store: SavedReportStore
   return {
     method: 'POST',
     path: '/reports/custom/:id/working-copy/publish',
+    permission: DEFAULT_AUTHOR_PERMISSION,
+    entitlement: REPORT_BUILDER_FEATURES.custom,
     authoring: true,
     async handle({ actor, params, body }) {
       if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
@@ -133,6 +139,7 @@ function discardRoute(config: ReportBuilderServerConfig, store: SavedReportStore
   return {
     method: 'DELETE',
     path: '/reports/custom/:id/working-copy',
+    permission: DEFAULT_AUTHOR_PERMISSION,
     authoring: true,
     async handle({ actor, params }) {
       if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');

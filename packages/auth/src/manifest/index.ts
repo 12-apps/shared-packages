@@ -39,7 +39,16 @@ export const authManifest = defineManifest({
   // Declared HERE and not on the platform manifest: one package owns the
   // schema, including the settings rows the other surface writes.
   db: { partial: "prisma/auth.prisma", migrations: "prisma/migrations" },
-  e2e: { entry: "@12-apps/auth/e2e" },
+  /**
+   * The world is DECLARED, not just shipped: a host adopting this manifest
+   * must bind `defineAuthWorld` with its featuresRoot or decline in writing.
+   * The first host adoption re-derived the whole mail-sink world by hand
+   * without discovering `./e2e` existed — this line is what makes that
+   * impossible to repeat.
+   */
+  e2e: { entry: "@12-apps/auth/e2e", world: { factory: "defineAuthWorld" } },
+  /** Mandatory for runtime manifests (wiring 1.3.0): sign-in failures file under `auth`, not nowhere. */
+  observability: { namespace: "auth" },
   server: ["http", "email"],
   web: ["surface", "areas"],
 });
@@ -48,6 +57,7 @@ export const authManifest = defineManifest({
 export const authPlatformManifest = defineManifest({
   name: "@12-apps/auth-platform",
   contract: 1,
+  observability: { namespace: "auth-platform" },
   server: ["http"],
   web: ["surface", "areas"],
 });

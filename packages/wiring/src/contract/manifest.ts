@@ -25,6 +25,7 @@
  */
 
 import type { EmailContribution } from "./email";
+import type { WireEnvVar } from "./env";
 import type { HttpContribution } from "./http";
 import type { JobsContribution } from "./jobs";
 import type { McpContribution } from "./mcp";
@@ -45,7 +46,9 @@ export type SharedCapabilityKind =
   | "notifications"
   | "mcp"
   | "db"
-  | "e2e";
+  | "e2e"
+  | "env"
+  | "observability";
 
 export type CapabilityKind =
   | ServerCapabilityKind
@@ -56,6 +59,35 @@ export type CapabilityKind =
 export interface E2eContribution {
   /** The subpath exporting the features + steps (`@12-apps/<pkg>/e2e`). */
   readonly entry: string;
+  /**
+   * The world the entry exports and a host must feed (`defineReportsWorld`,
+   * `defineAuthWorld`). Declaring it changes the capability's posture: a host
+   * must BIND it (with the `featuresRoot` the compiled specs land under) or
+   * decline it in writing — because both known failure modes are silent. An
+   * unset `featuresRoot` drops every compiled spec under `node_modules`,
+   * where Playwright's `testIgnore` skips them and the suite passes GREEN
+   * with zero tests; and a shipped world nobody adopts is a few hundred
+   * lines of journeys re-derived by hand in the host, undiscovered — the
+   * documented fate of `defineAuthWorld` on its first host adoption.
+   */
+  readonly world?: {
+    /** The exported factory's name, for the report and the adopting human. */
+    readonly factory: string;
+  };
+}
+
+/**
+ * The OBSERVABILITY capability: the namespace this package's telemetry files
+ * under. The server half of the seam hangs off namespaced feature loggers —
+ * a bare `console.error` is invisible to it BY DESIGN — and the browser half
+ * attributes an issue to whichever namespace tagged it. A package that
+ * declares its namespace gets a logger already scoped to it from the binder
+ * (the host supplies `ports.loggerFor` once); a package that does not is the
+ * one whose failures file under the host app, or nowhere.
+ */
+export interface ObservabilityContribution {
+  /** Lowercase, dash-separated (`reports`, `product-research`). */
+  readonly namespace: string;
 }
 
 /**
@@ -72,6 +104,9 @@ export interface PackageManifest {
   readonly mcp?: McpContribution;
   readonly db?: PrismaContribution;
   readonly e2e?: E2eContribution;
+  /** The variables the package reads from the environment — see `./env`. */
+  readonly env?: readonly WireEnvVar[];
+  readonly observability?: ObservabilityContribution;
   /** Inventory of the server manifest — must match its keys exactly. */
   readonly server?: readonly ServerCapabilityKind[];
   /** Inventory of the web manifest — must match its keys exactly. */

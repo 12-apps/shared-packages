@@ -14,6 +14,7 @@ import {
 } from './context';
 import type { SystemReportDef } from './system-reports';
 import { REPORT_GRAINS } from './wire';
+import { REPORT_BUILDER_FEATURES } from './features';
 
 /**
  * The built-in ("system") reports: hardcoded, non-editable presets over the
@@ -52,6 +53,7 @@ function systemListRoute(config: ReportBuilderServerConfig): ReportRoute {
   return {
     method: 'GET',
     path: '/reports/system',
+    entitlement: REPORT_BUILDER_FEATURES.system,
     handle({ actor }) {
       const presets = config.systemReports;
       const reports = presets
@@ -71,6 +73,7 @@ function systemRunRoute(config: ReportBuilderServerConfig): ReportRoute {
   return {
     method: 'GET',
     path: '/reports/system/:key',
+    entitlement: REPORT_BUILDER_FEATURES.system,
     async handle({ actor, params, query }) {
       const report = config.systemReports.find((candidate) => candidate.key === params.key);
       // An unknown key is 404 before the permission check: there is no id to

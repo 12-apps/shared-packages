@@ -18,6 +18,8 @@ export type {
   WireRequest,
   WireResponse,
   WireRoute,
+  WireRouteKind,
+  WireRoutePolicy,
 } from "./contract/http";
 
 export type {
@@ -26,9 +28,14 @@ export type {
   WireJobBackoff,
   WireJobBlueprint,
   WireJobContext,
+  WireJobInterval,
+  WireJobLease,
   WireJobLogger,
   WireJobSchedule,
 } from "./contract/jobs";
+
+export { envScopesOf } from "./contract/env";
+export type { WireEnvScope, WireEnvValues, WireEnvVar } from "./contract/env";
 
 export type {
   McpContribution,
@@ -71,6 +78,7 @@ export type {
   AnyWebManifest,
   CapabilityKind,
   E2eContribution,
+  ObservabilityContribution,
   PackageManifest,
   ServerCapabilityKind,
   SharedCapabilityKind,

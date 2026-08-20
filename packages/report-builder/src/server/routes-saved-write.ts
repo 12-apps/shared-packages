@@ -16,6 +16,8 @@ import type { SavedReportInput, SavedReportRecord, SavedReportStore } from './sa
 import { toSummary } from './summary';
 import { canViewSavedReport, visibilityRoleIds } from './visibility';
 import { saveReportBody } from './wire';
+import { DEFAULT_AUTHOR_PERMISSION } from './contribution';
+import { REPORT_BUILDER_FEATURES } from './features';
 
 /**
  * Writing saved documents. Separate from the reads because every route here is
@@ -99,6 +101,8 @@ function createRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
   return {
     method: 'POST',
     path: '/reports/custom',
+    permission: DEFAULT_AUTHOR_PERMISSION,
+    quota: REPORT_BUILDER_FEATURES.custom,
     authoring: true,
     async handle({ actor, body }) {
       if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para criar relatórios.');
@@ -122,6 +126,8 @@ function updateRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
   return {
     method: 'PUT',
     path: '/reports/custom/:id',
+    permission: DEFAULT_AUTHOR_PERMISSION,
+    entitlement: REPORT_BUILDER_FEATURES.custom,
     authoring: true,
     async handle({ actor, params, body }) {
       if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
@@ -151,6 +157,7 @@ function deleteRoute(
   return {
     method: 'DELETE',
     path: '/reports/custom/:id',
+    permission: DEFAULT_AUTHOR_PERMISSION,
     authoring: true,
     async handle({ actor, params }) {
       if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para remover relatórios.');

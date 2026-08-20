@@ -37,6 +37,8 @@ describe("the shared manifest", () => {
     expect(featureFlagsManifest.contract).toBe(1);
     expect(featureFlagsManifest.server).toEqual(["http"]);
     expect(featureFlagsManifest.web).toEqual(["surface", "areas"]);
+    // Mandatory for runtime manifests — the namespace the binder scopes a logger to.
+    expect(featureFlagsManifest.observability).toEqual({ namespace: "feature-flags" });
   });
 
   it("declares NO mcp and NO permissions contribution — both absences are the design", () => {

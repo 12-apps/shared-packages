@@ -29,6 +29,9 @@ export {
   reportBuilderMcpTools,
   type ReportBuilderMcpConfig,
 } from './mcp';
+/** The policy vocabulary next to the manifest, so a host maps tokens, not strings. */
+export { REPORT_BUILDER_FEATURES, type ReportBuilderFeature } from '../server/features';
+export { DEFAULT_AUTHOR_PERMISSION } from '../server/contribution';
 
 export const reportBuilderManifest = {
   name: '@12-apps/report-builder',
@@ -36,7 +39,16 @@ export const reportBuilderManifest = {
   permissions: REPORT_BUILDER_PERMISSIONS,
   mcp: { endpoints: REPORT_BUILDER_MCP_TOOLS },
   db: { partial: 'prisma/report-builder.prisma', migrations: 'prisma/migrations' },
-  e2e: { entry: '@12-apps/report-builder/e2e' },
+  /**
+   * Declaring the WORLD is what obliges a host to answer for the journeys:
+   * bind a `featuresRoot` or decline in writing. Both silent failures are
+   * documented history — a blank featuresRoot compiles the specs under
+   * `node_modules` where the runner ignores them (green with zero tests),
+   * and a shipped world nobody adopts gets re-derived by hand in the host.
+   */
+  e2e: { entry: '@12-apps/report-builder/e2e', world: { factory: 'defineReportsWorld' } },
+  /** The server half logs through the binder's namespaced logger; the browser half tags errors with the same namespace. */
+  observability: { namespace: 'reports' },
   server: ['http'],
   web: ['surface', 'areas'],
 } as const satisfies PackageManifest;

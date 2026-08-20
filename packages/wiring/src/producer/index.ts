@@ -11,6 +11,7 @@
 import { WiringDefinitionError } from "../errors";
 import { isIsolatedDb } from "../contract/db";
 import type { PrismaContribution } from "../contract/db";
+import type { WireEnvVar } from "../contract/env";
 import type {
   AnyServerManifest,
   AnyWebManifest,
@@ -103,15 +104,67 @@ function assertDb(name: string, db: PrismaContribution): void {
   }
 }
 
-/** Declare the shared manifest. Returns its argument, validated. */
-export function defineManifest(manifest: PackageManifest): PackageManifest {
-  assertIdentity(manifest);
+/** `AUTH_SECRET`, `REDIS_URL` — the exact key read off `process.env`. */
+const ENV_VAR_NAME = /^[A-Z][A-Z0-9_]*$/;
+
+function assertEnv(name: string, vars: readonly WireEnvVar[]): void {
+  assertUnique(name, "env var name", vars.map((declared) => declared.name));
+  for (const declared of vars) {
+    if (!ENV_VAR_NAME.test(declared.name)) {
+      fail(name, `env var "${declared.name}" is not UPPER_SNAKE — declare the exact process.env key.`);
+    }
+  }
+}
+
+/** `reports`, `product-research` — lowercase, dash-separated. */
+const OBSERVABILITY_NAMESPACE = /^[a-z][a-z0-9-]*$/;
+
+/** The data contributions — each validated by its own assertion. */
+function assertContributions(manifest: PackageManifest): void {
   if (manifest.permissions) assertPermissions(manifest.name, manifest.permissions);
   if (manifest.notifications) assertNotifications(manifest.name, manifest.notifications);
   if (manifest.mcp) assertMcp(manifest.name, manifest.mcp);
   if (manifest.db) assertDb(manifest.name, manifest.db);
+  if (manifest.env) assertEnv(manifest.name, manifest.env);
+}
+
+function assertObservability(manifest: PackageManifest): void {
+  const hasRuntime =
+    (manifest.server?.length ?? 0) > 0 || (manifest.web?.length ?? 0) > 0;
+  if (hasRuntime && !manifest.observability) {
+    // MANDATORY for runtime packages, deliberately: a package whose failures
+    // file nowhere is the incident class the capability exists to end, and
+    // "declare it or fail your own test suite" is the only enforcement an
+    // agent cannot forget. Pure-data manifests (permissions, mcp, db only)
+    // ship no running code, so they are exempt.
+    fail(
+      manifest.name,
+      "a manifest with runtime capabilities must declare observability: { namespace } — running code with no logging story is not wireable.",
+    );
+  }
+  if (manifest.observability && !OBSERVABILITY_NAMESPACE.test(manifest.observability.namespace)) {
+    fail(
+      manifest.name,
+      `observability.namespace "${manifest.observability.namespace}" is not lowercase-dash.`,
+    );
+  }
+}
+
+/** The pointer declarations: observability, the e2e world, the inventories. */
+function assertDeclarations(manifest: PackageManifest): void {
+  assertObservability(manifest);
+  if (manifest.e2e?.world && manifest.e2e.world.factory.trim() === "") {
+    fail(manifest.name, "e2e.world.factory must name the exported world factory.");
+  }
   if (manifest.server) assertUnique(manifest.name, "server inventory entry", manifest.server);
   if (manifest.web) assertUnique(manifest.name, "web inventory entry", manifest.web);
+}
+
+/** Declare the shared manifest. Returns its argument, validated. */
+export function defineManifest(manifest: PackageManifest): PackageManifest {
+  assertIdentity(manifest);
+  assertContributions(manifest);
+  assertDeclarations(manifest);
   return manifest;
 }
 
@@ -126,7 +179,10 @@ export function defineManifest(manifest: PackageManifest): PackageManifest {
  */
 export function assertDbMirror(
   manifest: PackageManifest,
-  packageJson: { readonly name?: string; readonly wiring?: { readonly db?: unknown } },
+  packageJson: {
+    readonly name?: string;
+    readonly wiring?: { readonly db?: unknown; readonly env?: unknown };
+  },
 ): void {
   if (packageJson.name !== undefined && packageJson.name !== manifest.name) {
     fail(manifest.name, `package.json is named "${packageJson.name}" — the two must match.`);
@@ -145,6 +201,40 @@ export function assertDbMirror(
     fail(
       manifest.name,
       `package.json wiring.db drifted from the manifest: ${stableJson(mirrored)} !== ${stableJson(manifest.db)}.`,
+    );
+  }
+}
+
+/**
+ * The env twin of `assertDbMirror`: the declaration must be readable by
+ * host tooling that cannot execute TypeScript, so it is mirrored under
+ * `package.json` `"wiring": { "env": ... }` and pinned here, in the
+ * package's own test run, in both directions.
+ */
+export function assertEnvMirror(
+  manifest: PackageManifest,
+  packageJson: {
+    readonly name?: string;
+    readonly wiring?: { readonly db?: unknown; readonly env?: unknown };
+  },
+): void {
+  if (packageJson.name !== undefined && packageJson.name !== manifest.name) {
+    fail(manifest.name, `package.json is named "${packageJson.name}" — the two must match.`);
+  }
+  const mirrored = packageJson.wiring?.env;
+  if (manifest.env === undefined) {
+    if (mirrored !== undefined) {
+      fail(manifest.name, "package.json wiring.env is set but the manifest declares no env capability.");
+    }
+    return;
+  }
+  if (mirrored === undefined) {
+    fail(manifest.name, 'the env contribution must be mirrored under package.json "wiring": { "env": ... }.');
+  }
+  if (stableJson(mirrored) !== stableJson(manifest.env)) {
+    fail(
+      manifest.name,
+      `package.json wiring.env drifted from the manifest: ${stableJson(mirrored)} !== ${stableJson(manifest.env)}.`,
     );
   }
 }
@@ -190,12 +280,28 @@ function assertJobs(name: string, jobs: JobsContribution<never>): void {
   if (jobs.namespace.includes(".")) {
     fail(name, `jobs.namespace "${jobs.namespace}" must not contain dots — it is the prefix.`);
   }
-  const names = Object.values(jobs.blueprints).map((blueprint) => blueprint.name);
-  assertUnique(name, "job blueprint name", names);
-  for (const blueprintName of names) {
-    if (blueprintName.includes(".")) {
-      fail(name, `job blueprint "${blueprintName}" must not contain dots — namespacing is the bind's job.`);
-    }
+  const blueprints = Object.values(jobs.blueprints);
+  assertUnique(name, "job blueprint name", blueprints.map((blueprint) => blueprint.name));
+  for (const blueprint of blueprints) {
+    assertJobBlueprint(name, blueprint);
+  }
+}
+
+function assertJobBlueprint(
+  name: string,
+  blueprint: JobsContribution<never>["blueprints"][string],
+): void {
+  if (blueprint.name.includes(".")) {
+    fail(name, `job blueprint "${blueprint.name}" must not contain dots — namespacing is the bind's job.`);
+  }
+  if (blueprint.schedule && blueprint.interval) {
+    fail(name, `job blueprint "${blueprint.name}" declares both a schedule and an interval — pick one cadence.`);
+  }
+  if (blueprint.interval && blueprint.interval.everyMs <= 0) {
+    fail(name, `job blueprint "${blueprint.name}" declares a non-positive interval.`);
+  }
+  if (blueprint.lease && blueprint.lease.ttlMs <= 0) {
+    fail(name, `job blueprint "${blueprint.name}" declares a non-positive lease ttl.`);
   }
 }
 

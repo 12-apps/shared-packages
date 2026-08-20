@@ -69,7 +69,13 @@ describe('report-builder adopted through @12-apps/wiring', () => {
     expect(statuses.get('http')).toBe('bound');
     expect(statuses.get('permissions')).toBe('collected');
     expect(statuses.get('db')).toBe('collected');
-    expect(statuses.get('e2e')).toBe('collected');
+    // The manifest declares a WORLD now, so "collected" is no longer on the
+    // menu: this server host declines (the journeys drive screens), and the
+    // web harness binds its featuresRoot — the pair that makes an unadopted
+    // world impossible to ship silently.
+    expect(statuses.get('e2e')).toBe('declined');
+    // Bound through ports.loggerFor — the package logs under its namespace.
+    expect(statuses.get('observability')).toBe('bound');
     // The web half is the frontend harness's to answer, and the report says so.
     expect(statuses.get('surface')).toBe('out-of-scope');
     expect(statuses.get('areas')).toBe('out-of-scope');

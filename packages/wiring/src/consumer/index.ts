@@ -9,7 +9,9 @@ export {
   type HostKind,
   type PackageAreaContribution,
   type PackageDbContribution,
+  type PackageEnvContribution,
   type ServerAdoption,
+  type SharedCapabilityAnswers,
   type WebAdoption,
   type WiringHostOptions,
 } from "./host";
@@ -30,10 +32,12 @@ export {
 export {
   joinRoutePath,
   routeClaimKey,
+  routePolicyTable,
   sortRoutes,
   findRouteConflicts,
   unclaimedRoutes,
   type RouteConflict,
+  type RoutePolicyRow,
 } from "./paths";
 
 export {

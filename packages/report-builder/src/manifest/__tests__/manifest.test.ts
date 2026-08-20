@@ -7,9 +7,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { WirePermissionsContribution } from '@12-apps/wiring';
+import type { PackageManifest, WirePermissionsContribution } from '@12-apps/wiring';
 import {
   assertDbMirror,
+  assertEnvMirror,
   defineManifest,
   defineServerManifest,
   defineWebManifest,
@@ -20,7 +21,11 @@ import { defineCatalog } from '../../index';
 import { REPORT_BUILDER_PERMISSIONS } from '../../server/contribution';
 import { createApiReportBuilder } from '../../server/create-report-builder';
 import { createWebReportBuilder } from '../../react/create-report-builder';
-import { reportBuilderManifest } from '../index';
+import {
+  DEFAULT_AUTHOR_PERMISSION,
+  REPORT_BUILDER_FEATURES,
+  reportBuilderManifest,
+} from '../index';
 import { REPORT_BUILDER_MCP_TOOLS, reportBuilderMcpTools } from '../mcp';
 import { reportBuilderServerManifest } from '../server';
 import { reportBuilderWebManifest } from '../web';
@@ -67,6 +72,79 @@ describe('the shared manifest', () => {
     // execute this TS manifest, so the contribution lives in package.json
     // too, and this assertion is what keeps the two the same shape.
     expect(() => assertDbMirror(reportBuilderManifest, packageJson)).not.toThrow();
+  });
+
+  it('declares no env capability, and package.json agrees', () => {
+    // Every runtime input is config, deliberately — the day this package
+    // reads process.env, the manifest must say so and this pin must move.
+    const shared: PackageManifest = reportBuilderManifest;
+    expect(shared.env).toBeUndefined();
+    expect(() => assertEnvMirror(reportBuilderManifest, packageJson)).not.toThrow();
+  });
+
+  it('declares the observability namespace and the e2e world by its exported name', () => {
+    expect(reportBuilderManifest.observability).toEqual({ namespace: 'reports' });
+    expect(reportBuilderManifest.e2e).toEqual({
+      entry: '@12-apps/report-builder/e2e',
+      world: { factory: 'defineReportsWorld' },
+    });
+  });
+});
+
+describe('the route policy', () => {
+  it('declares gates in the package vocabulary, per route, exactly', () => {
+    const { routes } = createApiReportBuilder({
+      catalog: defineCatalog({
+        entities: {
+          orders: {
+            label: 'Pedidos',
+            fields: {
+              method: { label: 'Forma', type: 'string', role: 'dimension' },
+              totalCents: { label: 'Receita', type: 'money', role: 'measure' },
+            },
+          },
+        },
+      }),
+      entityPermission: { orders: 'reports:sales:read' },
+      systemReports: [],
+      starters: {},
+      adapter: { execute: () => Promise.resolve([]) },
+      db: () => Promise.reject(new Error('not this suite')),
+      timeZone: 'UTC',
+    });
+    const table = Object.fromEntries(
+      routes.map((route) => [
+        `${route.method} ${route.path}`,
+        { permission: route.permission, entitlement: route.entitlement, quota: route.quota },
+      ]),
+    );
+    expect(table).toEqual({
+      'GET /reports/fields': { permission: undefined, entitlement: undefined, quota: undefined },
+      'GET /reports/system': { permission: undefined, entitlement: 'reports.system', quota: undefined },
+      'GET /reports/system/:key': { permission: undefined, entitlement: 'reports.system', quota: undefined },
+      'GET /reports/custom': { permission: undefined, entitlement: undefined, quota: undefined },
+      'GET /reports/custom/:id': { permission: undefined, entitlement: undefined, quota: undefined },
+      'POST /reports/custom': { permission: 'reports:manage', entitlement: undefined, quota: 'reports.custom' },
+      'PUT /reports/custom/:id': { permission: 'reports:manage', entitlement: 'reports.custom', quota: undefined },
+      'DELETE /reports/custom/:id': { permission: 'reports:manage', entitlement: undefined, quota: undefined },
+      'PUT /reports/custom/:id/working-copy': { permission: 'reports:manage', entitlement: 'reports.custom', quota: undefined },
+      'DELETE /reports/custom/:id/working-copy': { permission: 'reports:manage', entitlement: undefined, quota: undefined },
+      'POST /reports/custom/:id/working-copy/publish': { permission: 'reports:manage', entitlement: 'reports.custom', quota: undefined },
+      'POST /reports/run': { permission: undefined, entitlement: undefined, quota: undefined },
+    });
+    // Every declared permission is one the package itself contributes.
+    routes.forEach((route) => {
+      if (route.permission !== undefined) {
+        expect(REPORT_BUILDER_PERMISSIONS.ids).toContain(route.permission);
+      }
+    });
+  });
+
+  it('pins the vocabulary constants to their wire values', () => {
+    // The constants exist so nobody retypes these strings; the LITERALS here
+    // are deliberate — a test asserting constant === constant pins nothing.
+    expect(REPORT_BUILDER_FEATURES).toEqual({ system: 'reports.system', custom: 'reports.custom' });
+    expect(DEFAULT_AUTHOR_PERMISSION).toBe('reports:manage');
   });
 });
 

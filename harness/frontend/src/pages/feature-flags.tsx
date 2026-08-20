@@ -48,7 +48,20 @@ const api: FeatureFlagsApiClient = {
     call(`/${encodeURIComponent(key)}/grants/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
 };
 
-const host = createWiringHost({ name: 'harness-frontend', kind: 'web' });
+const host = createWiringHost({
+  name: 'harness-frontend',
+  kind: 'web',
+  // The browser half of the observability capability (mandatory since
+  // wiring 1.3.0): errors tag with the package's namespace. The harness's
+  // sink is the console.
+  ports: {
+    loggerFor: (namespace) => ({
+      info: (message, ...meta) => console.info(`[${namespace}] ${message}`, ...meta),
+      warn: (message, ...meta) => console.warn(`[${namespace}] ${message}`, ...meta),
+      error: (message, ...meta) => console.error(`[${namespace}] ${message}`, ...meta),
+    }),
+  },
+});
 host.adoptWeb({
   manifest: featureFlagsManifest,
   web: featureFlagsWebManifest,

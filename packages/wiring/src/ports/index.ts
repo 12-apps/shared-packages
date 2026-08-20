@@ -81,13 +81,63 @@ export interface ClockPort {
   now(): Date;
 }
 
+/**
+ * The actor a host resolved for a request — the floor thirteen packages
+ * currently duck-type for themselves. Packages needing more declare their
+ * own extension of this shape; the port stays the host's ONE resolution
+ * path, so impersonation ceilings and machine-token flags are applied in
+ * a single place instead of once per package seam.
+ */
+export interface WireActor {
+  id: string;
+  /** The tenant the request is scoped to, when it is. */
+  tenantId?: string;
+  permissions?: readonly string[];
+  /** A machine token, not a person — several packages refuse these writes. */
+  isMachine?: boolean;
+}
+
+/**
+ * Resolve who is calling. `null` means "nobody" — the caller turns that
+ * into its 401; resolution failures THROW (a broken session store must not
+ * masquerade as an anonymous request).
+ */
+export interface ActorPort<TActor = WireActor> {
+  resolve(context: unknown): Promise<TActor | null>;
+}
+
+/** The user-directory row packages render (audit trails, team lists). */
+export interface WireDirectoryUser {
+  id: string;
+  name: string;
+  email?: string;
+}
+
+/**
+ * Look users up in the host's directory. `getUsers` answers only the ids it
+ * finds — a missing id is absent from the result, never an error, because
+ * a departed teammate must not break the audit page that mentions them.
+ */
+export interface DirectoryPort {
+  getUsers(ids: readonly string[]): Promise<readonly WireDirectoryUser[]>;
+}
+
 /** Everything a host offers its adopted packages, each optional. */
 export interface WiringPorts {
   email?: EmailPort;
   notify?: NotifyPort;
   logger?: LoggerPort;
+  /**
+   * A namespace-scoped logger factory (`createFeatureLogger`-shaped). When a
+   * manifest declares an `observability` namespace, the binder uses this to
+   * build the package's logger; with only `logger` present it falls back to
+   * prefixing the namespace onto each line.
+   */
+  loggerFor?: (namespace: string) => LoggerPort;
   jobs?: JobsEnqueuePort;
   clock?: ClockPort;
+  actor?: ActorPort<never>;
+  directory?: DirectoryPort;
 }
 
 /** One recorded email send. */
@@ -133,5 +183,17 @@ export function memoryLogger(): { port: LoggerPort; lines: string[] } {
   return {
     lines,
     port: { info: record("info"), warn: record("warn"), error: record("error") },
+  };
+}
+
+/** An `ActorPort` that always answers the given actor — for tests. */
+export function memoryActorPort<TActor>(actor: TActor | null): ActorPort<TActor> {
+  return { resolve: () => Promise.resolve(actor) };
+}
+
+/** A `DirectoryPort` over a fixed roster — for tests. */
+export function memoryDirectoryPort(users: readonly WireDirectoryUser[]): DirectoryPort {
+  return {
+    getUsers: (ids) => Promise.resolve(users.filter((user) => ids.includes(user.id))),
   };
 }
