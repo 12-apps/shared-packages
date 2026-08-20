@@ -32,6 +32,7 @@ env:
     packages/wiring
     packages/eslint-config
     packages/typescript-config
+    packages/feature-flags
     packages/request-scope
     packages/observability-backend
     packages/auth
