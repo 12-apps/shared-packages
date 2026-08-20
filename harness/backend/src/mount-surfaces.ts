@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import type { PGlite } from '@electric-sql/pglite';
 
 import type { Hosts } from './app';
-import { FEATURE_FLAGS_MOUNT_PATH, featureFlagsRouter } from './feature-flags-host';
+import { FEATURE_FLAGS_MOUNT_PATH, wireFeatureFlags } from './feature-flags-host';
 import { IMPERSONATION_PLATFORM_PATH } from './impersonation-host';
 import { demoEntityRoutes } from './lifecycle-demo-crud';
 import { reportsRouter } from './reports-host';
@@ -33,8 +33,11 @@ export function mountSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
 
   // @12-apps/feature-flags (FUT-884): user-level beta grants, the platform
   // operator's surface. Its own prefix, so it sits with the other platform
-  // mounts and ahead of the broader `/api` routes below.
-  app.route(FEATURE_FLAGS_MOUNT_PATH, featureFlagsRouter());
+  // mounts and ahead of the broader `/api` routes below. The reset control is
+  // the packaged journeys' way back to the seeded cohort.
+  const featureFlags = wireFeatureFlags();
+  app.route(FEATURE_FLAGS_MOUNT_PATH, featureFlags.router);
+  app.route('/__harness/feature-flags', featureFlags.harnessRoutes);
 
   app.route('/api/admin/:tenantSlug', hosts.entitlements.router);
   app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
