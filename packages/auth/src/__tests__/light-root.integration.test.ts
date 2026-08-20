@@ -128,6 +128,23 @@ describe("the package root stays light", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("keeps ./manifest pure DATA — every runtime holds it, so nothing may be heavy", () => {
+    // The shared manifest is what a browser bundle, a worker and a server all
+    // import in order to READ what this package provides. The two runtime
+    // manifests beside it carry the factories and are deliberately separate
+    // entry points; if the shared one ever reached one of them, declaring a
+    // capability would drag React into a worker and `node:crypto` into a
+    // browser — the exact failure that shipped 2.0.0 unbundlable.
+    const heavy = ["react", "react-dom", "hono", "@auth/core"];
+    const offenders = reachable("manifest/index.ts").flatMap((file) =>
+      valueImports(readFileSync(join(SRC, file), "utf8"))
+        .filter((spec) => spec.startsWith("node:") || heavy.includes(spec))
+        .map((spec) => `${file} -> ${spec}`),
+    );
+
+    expect(offenders).toEqual([]);
+  });
+
   it("keeps the bridge reachable from ./server, so it did not merely vanish", () => {
     // Guards the other direction: a root that passed the two tests above by
     // DELETING the bridge would be a regression, not a fix.

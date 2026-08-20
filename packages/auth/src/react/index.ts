@@ -39,3 +39,5 @@ export type {
 export * from "./screens";
 export * from "./settings";
 export * from "./pages";
+export { createWebEmailAuth } from "./create-web-email-auth";
+export type { WebEmailAuth, WebEmailAuthConfig } from "./create-web-email-auth";

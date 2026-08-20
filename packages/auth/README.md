@@ -58,9 +58,27 @@ Alongside that, the choices that are genuinely a product's:
 - **the branding** — a slot on the pages, completely opaque to this package;
 - **the providers** — a node you render, because an OAuth button carries a
   callback URL, a consent gate and a redirect this package cannot own;
-- **the mail vendor** — you pass an `EmailDriver`; which service, which key and
-  which from-address are yours. The sink and the refusal drivers ship here,
-  because both are about *correctness* rather than preference.
+- **the mail vendor** — you name the environment VARIABLES; which service, which
+  key and which from-address are yours. The resolution between them is not:
+  `createEnvAuthMailer` owns the sink / vendor / refuse tree, because every
+  branch of it is a correctness property rather than a preference.
+
+Config, and only config. The origin host's whole wiring is now:
+
+```ts
+export const authMailer = createEnvAuthMailer({
+  env: { provider: "NOTIFICATIONS_EMAIL_PROVIDER", apiKey: "RESEND_API_KEY",
+         from: "NOTIFICATIONS_EMAIL_FROM", sinkFile: "AUTH_EMAIL_LOG_FILE",
+         origin: ["APP_PUBLIC_URL", "AUTH_URL"] },
+  drivers: EMAIL_DRIVERS,
+  log: createFeatureLogger("auth-email"),
+});
+
+export const { GET, POST, PUT } = mountEmailAuth({
+  path: "/api/auth/email",
+  credentials, messages: PT_BR_MESSAGES, resolveUserId, onSignedUp,
+});
+```
 
 ## Security model
 
