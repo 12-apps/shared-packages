@@ -14,7 +14,7 @@ defaults for host vocabulary, assembly-time assertion, structural DB seams,
 wire schemas authored once.
 
 What does **not** exist is anything that ties the surfaces together, and the
-cost of that gap is measurable in the origin host (future-pay):
+cost of that gap is measurable in the origin host:
 
 - **Wiring is rediscovered per package.** Adding one packaged screen touches
   ~7 files across 2 apps (bound-surface module, routes file, nav file, icon
@@ -128,7 +128,7 @@ const wired = host.assemble();
   pinnable in a test. Today "what did this host wire" is only answerable by
   reading the wiring code.
 - **`unclaimedRoutes()`** serves hosts that must keep one route file per
-  endpoint (future-pay's `mcp:coverage` / `rbac:coverage` read guards out of
+  endpoint (the origin host's `mcp:coverage` / `rbac:coverage` read guards out of
   route files, so it cannot mount the aggregate directly): a unit test pins
   the uncovered set to `[]`. That test is precisely what the working-copy 404
   was missing.
@@ -167,10 +167,10 @@ new subpath beside existing exports.
 **Phase 1 — the two dead seams, made alive.**
 1. payments-backend: type `PaymentsJobBlueprint` against `WireJobBlueprint`
    (dev-only assignability test), ship `manifest` + `manifest/server` wrapping
-   `paymentsJobBlueprints()`; future-pay deletes its hand-rolled
+   `paymentsJobBlueprints()`; the origin host deletes its hand-rolled
    `payments.reconcile-orders` and binds the blueprint.
 2. report-builder: ship manifests wrapping `createApiReportBuilder` /
-   `createWebReportBuilder`; future-pay adopts and pins `unclaimedRoutes` to
+   `createWebReportBuilder`; the origin host adopts and pins `unclaimedRoutes` to
    `[]` — which immediately surfaces the three unmounted working-copy
    endpoints as the red test they should have been.
 

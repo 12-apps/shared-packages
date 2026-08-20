@@ -64,7 +64,7 @@ Adaptation:
    copy baked in (unrelated to wiring; its own labels-port work), the
    undeclared `GET /roles` dependency (document as a required host endpoint in
    the manifest until it becomes config).
-4. Host effect: future-pay pins `unclaimedRoutes(...) === []` — immediately
+4. Host effect: the origin host pins `unclaimedRoutes(...) === []` — immediately
    red on the three unmounted working-copy endpoints (`PUT/POST/DELETE
    /reports/custom/:id/working-copy*`), which is the bug the contract exists
    to catch. Fixing that is three thin route files, budgeted by the MCP test
@@ -86,7 +86,7 @@ binding.
 ### payments-backend (S code, M host)
 
 The jobs seam exists and is dead: `paymentsJobBlueprints()` +
-`PAYMENTS_SWEEP_QUEUE` ship today with zero consumers, while future-pay
+`PAYMENTS_SWEEP_QUEUE` ship today with zero consumers, while the origin host
 hand-rolls the identical `payments.reconcile-orders` (same queue, cadence,
 concurrency, lease). Adaptation:
 1. Dev-only assignability test: `PaymentsJobBlueprint` ⇄ `WireJobBlueprint`
@@ -101,7 +101,7 @@ concurrency, lease). Adaptation:
 4. "want": an `EmailPort`-based receipt mailer and `notes`-style notification
    blueprints for the seven host-side payment notification generators
    (order-paid, over/short-payment, reversal, reconnect, billing) — Phase 2+.
-5. Host effect: future-pay deletes `lib/jobs/payments.ts`'s duplicated sweep
+5. Host effect: the origin host deletes `lib/jobs/payments.ts`'s duplicated sweep
    and binds `jobs: { deps }`; `.payments-surface.json` debt shrinks.
 
 ### payments-frontend (S)
@@ -137,7 +137,7 @@ The pivotal adaptation, all additive:
    descriptors through its own route files, which stays possible),
    `jobs` (dispatch/drain as blueprints — they are host code today in
    `lib/jobs/notifications.ts`), `db`, `surface` (Bell/Panel/Preferences —
-   adopting would also retire future-pay's two hand-rolled duplicates of the
+   adopting would also retire the origin host's two hand-rolled duplicates of the
    preferences screen and push client).
 
 ### auth (S)
@@ -166,7 +166,7 @@ The harness's `recordingDriver` becomes a `memoryEmailPort` usage.
 The driver stays the package's own port (it predates and outranks this
 contract). Manifest: `http` (`createApiEvents` surfaces + ticket routes),
 `jobs` (the outbox drain as a blueprint — hosts that enable the outbox bind
-it; future-pay currently declines the outbox deliberately, which is exactly
+it; the origin host currently declines the outbox deliberately, which is exactly
 what a written decline is for), `db` (outbox partial), `surface`
 (`createWebEvents`). The gateway remains a third process shape — out of the
 contract's scope, documented in the manifest.
@@ -227,7 +227,7 @@ host-wired capabilities carry.
 
 ## Host-side adaptations
 
-### future-pay `apps/web` (the API host)
+### The origin host's API server
 
 - One `lib/wiring/host.ts`: `createWiringHost({ name: "web", kind: "server",
   ports })` with `EmailPort` (today's Resend driver), `NotifyPort`
@@ -241,7 +241,7 @@ host-wired capabilities carry.
   `@12-apps/*` bump that adds a capability turns the Renovate PR red with a
   named reason instead of green with a silent gap.
 
-### future-pay SPAs (web hosts)
+### The origin host's SPAs (web hosts)
 
 One `createWiringHost({ kind: "web" })` per SPA; `adoptWeb` replaces the
 memoised bound-surface modules (`lifecycleFor`, reports `useMemo`, …) — the

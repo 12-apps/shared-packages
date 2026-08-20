@@ -127,5 +127,8 @@ the test that would have caught the working-copy 404.
 
 ## Status
 
-Proposal-stage: in the workspace, not yet in `release-packages.txt`. The RFC
-and the per-package adaptation report live in `docs/wiring/`.
+Proposal-stage: `"private": true` and not in `release-packages.txt`, so
+nothing publishes on merge. Accepting the proposal means dropping `private`
+and adding `packages/wiring` to the release list (it has no dependencies, so
+it slots in first). The RFC and the per-package adaptation report live in
+`docs/wiring/`.
