@@ -79,6 +79,24 @@ describe("the package root stays light", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("never reaches a NODE BUILTIN — the root has to run in a browser", () => {
+    // The one this test did not have, and the omission shipped a broken build.
+    //
+    // `.` was treated as light because it pulled no runtime PEER. But
+    // `password.ts` and `tokens.ts` import `node:crypto`, and `@12-apps/app-shell`
+    // value-imports this root from a BROWSER bundle to get `detectAppleDevice`.
+    // Vite externalises `node:crypto`, Rollup then cannot find `scrypt` in the
+    // browser shim, and every SPA build fails. A peer is not the only way to bind
+    // a runtime; a builtin is the other, and it is the one a bundler cannot shim.
+    const offenders = reachable("index.ts").flatMap((file) =>
+      valueImports(readFileSync(join(SRC, file), "utf8"))
+        .filter((spec) => spec.startsWith("node:"))
+        .map((spec) => `${file} -> ${spec}`),
+    );
+
+    expect(offenders).toEqual([]);
+  });
+
   it("never reaches react, react-dom or hono either", () => {
     // Same rule, the other peers. An entry point marks a PEER boundary here, so
     // the root reaching one would mean the boundary is in the wrong place.
