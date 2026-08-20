@@ -209,6 +209,15 @@ export {
   type SetupGuideSectionProps,
 } from './components/SetupGuideSection';
 export { ProviderStatusBar, statusBadge } from './components/ProviderStatusBar';
+// The START of the connect round trip (FUT-763): the `prepareConnect` a host
+// hands to the settings screen, built from its own prepare route. The route is
+// the host's; the exchange — method, shape, and what counts as a failure — is
+// this package's, and a hand-written one casts the answer instead of checking
+// it.
+export {
+  createConnectPreparer,
+  type ConnectPreparerOptions,
+} from './components/connect-preparer';
 export {
   PaymentProviderSettings,
   type PaymentProviderSettingsProps,
