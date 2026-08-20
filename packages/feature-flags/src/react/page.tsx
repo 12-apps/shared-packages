@@ -38,6 +38,11 @@ function FlagList(props: {
             type="button"
             className={flag.key === props.selected ? "ff-flag ff-flag--selected" : "ff-flag"}
             data-testid={`ff-flag-${flag.key}`}
+            // The machine-readable tally beside the copy: the packaged
+            // journeys assert these, so a host that overrides every string
+            // still runs them unchanged.
+            data-grant-count={flag.grantCount}
+            data-enabled-count={flag.enabledCount}
             aria-pressed={flag.key === props.selected}
             onClick={() => props.onSelect(flag.key)}
           >
@@ -85,7 +90,7 @@ function GrantRow(props: {
 }): JSX.Element {
   const { copy, grant } = props;
   return (
-    <tr data-testid={`ff-grant-${grant.userId}`}>
+    <tr data-testid={`ff-grant-${grant.userId}`} data-enabled={grant.enabled ? "true" : "false"}>
       <td>
         <span className="ff-grant__email">{grant.email ?? grant.userId}</span>
         {grant.name === null ? null : <span className="ff-grant__name"> {grant.name}</span>}

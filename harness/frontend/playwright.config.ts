@@ -4,6 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from '@playwright/test';
 import { authFeatures, authFeaturesRoot, authSteps } from '@12-apps/auth/e2e';
 import {
+  featureFlagsFeatures,
+  featureFlagsFeaturesRoot,
+  featureFlagsSteps,
+} from '@12-apps/feature-flags/e2e';
+import {
   impersonationFeatures,
   impersonationFeaturesRoot,
   impersonationSteps,
@@ -89,7 +94,13 @@ function journeysRoot(...featureDirs: string[]): string {
  * scenario and its compiled spec drift.
  */
 const journeys = defineBddConfig({
-  features: [paymentsFeatures, reportsFeatures, impersonationFeatures, authFeatures],
+  features: [
+    paymentsFeatures,
+    reportsFeatures,
+    impersonationFeatures,
+    authFeatures,
+    featureFlagsFeatures,
+  ],
   // Without this the compiled specs mirror each package's node_modules path and
   // Playwright's default testIgnore drops every one of them — bddgen reports
   // the features compiled and the journeys project collects nothing, green.
@@ -98,10 +109,18 @@ const journeys = defineBddConfig({
     reportsFeaturesRoot,
     impersonationFeaturesRoot,
     authFeaturesRoot,
+    featureFlagsFeaturesRoot,
   ),
   // This app's own steps glob stays: it is where every `define…World` call
   // lives, and playwright-bdd imports every step file before the first Given.
-  steps: [paymentsSteps, reportsSteps, impersonationSteps, authSteps, 'tests/e2e/steps/**/*.ts'],
+  steps: [
+    paymentsSteps,
+    reportsSteps,
+    impersonationSteps,
+    authSteps,
+    featureFlagsSteps,
+    'tests/e2e/steps/**/*.ts',
+  ],
   outputDir: '.features-gen',
 });
 

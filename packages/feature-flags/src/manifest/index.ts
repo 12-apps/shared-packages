@@ -26,6 +26,7 @@ export const featureFlagsManifest = {
   name: "@12-apps/feature-flags",
   contract: 1,
   db: { partial: "prisma/feature-flags.prisma", migrations: "prisma/migrations" },
+  e2e: { entry: "@12-apps/feature-flags/e2e" },
   server: ["http"],
   web: ["surface", "areas"],
 } as const satisfies PackageManifest;

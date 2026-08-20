@@ -10,9 +10,14 @@
     "./manifest": "./src/manifest/index.ts",
     "./manifest/server": "./src/manifest/server.ts",
     "./manifest/web": "./src/manifest/web.ts",
+    "./e2e": {
+      "types": "./dist/e2e/index.d.ts",
+      "default": "./dist/e2e/index.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.e2e.json",
     "clean": "rm -rf node_modules coverage dist",
     "test": "node ../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest watch",
@@ -26,7 +31,10 @@
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@12-apps/wiring": "workspace:*",
+    "@playwright/test": "^1.56.1",
     "@testing-library/react": "^16.1.0",
+    "@types/node": "^22.10.6",
+    "playwright-bdd": "^8.4.1",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "eslint": "^9.39.1",
@@ -49,10 +57,18 @@
   "license": "MIT",
   "peerDependencies": {
     "@12-apps/wiring": ">=1.0.0",
+    "@playwright/test": ">=1.40.0",
+    "playwright-bdd": ">=8.0.0",
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
     "@12-apps/wiring": {
+      "optional": true
+    },
+    "@playwright/test": {
+      "optional": true
+    },
+    "playwright-bdd": {
       "optional": true
     },
     "react": {
@@ -70,6 +86,8 @@
   },
   "files": [
     "src",
+    "dist",
+    "features",
     "prisma",
     "*.js",
     "*.mjs",
