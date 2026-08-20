@@ -250,9 +250,16 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // Pinned EMPTINESS: no payable yet, so the screen deliberately stays out of
   // the way — anything on screen here (an error alert included) is a failure.
   "ProviderScreens/AwaitingTheMethodChoice": { empty: true },
+  "ProviderScreens/HandoffInvite": {
+    testIds: ["checkout-handoff-invite", "checkout-handoff-start"],
+    // Named destination, and the return trip promised before the buyer commits.
+    text: ["Você será levado à página de pagamento da Boreal", "Seguir para o pagamento"],
+    absentTestIds: ["checkout-method", "checkout-method-PIX", "checkout-method-CARD"],
+  },
   "ProviderScreens/HandoffNotice": {
     testIds: ["checkout-handoff-pending"],
-    text: ["Você será levado à página segura do provedor"],
+    // The SAME sentence the invite made — see the story's own comment.
+    text: ["Você será levado à página de pagamento da Boreal"],
   },
   "ProviderScreens/DeclaresNothingAndStillWorks": {
     testIds: ["pix-view", "pix-code"],

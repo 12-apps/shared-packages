@@ -111,8 +111,15 @@ function HandOffInvite({
   );
 }
 
-/** The moment after the button: the charge is being raised, then we navigate. */
-function HandOffPending(): JSX.Element {
+/**
+ * The moment after the button: the charge is being raised, then we navigate.
+ *
+ * Says the SAME sentence the invite did, from the same helper. It used to word
+ * the destination differently — "a página segura do provedor" against the
+ * invite's named one — so the screen appeared to change its mind about where
+ * the buyer was going at the exact moment they committed to going there.
+ */
+function HandOffPending({ config }: { config: CheckoutProviderConfig | null }): JSX.Element {
   const { Text, LoadingState } = useCheckoutComponents();
   return (
     <Box
@@ -121,10 +128,10 @@ function HandOffPending(): JSX.Element {
     >
       <LoadingState variant="spinner" message="Preparando o pagamento" size="md" />
       <Text variant="body" size="md" as="p">
-        Você será levado à página segura do provedor para concluir o pagamento.
+        {handoffMessage(config)}
       </Text>
       <Text variant="caption" size="sm" as="p" color="secondary">
-        Assim que terminar, você volta para cá e nós confirmamos o pedido.
+        Assim que o pagamento for concluído, você volta para cá e nós confirmamos o pedido.
       </Text>
     </Box>
   );
@@ -138,7 +145,7 @@ export function HostedLinkScreen({
   // A method is only ever set here once the buyer has committed — either by
   // pressing the CTA below, or (on a host whose shell still renders a picker)
   // by choosing a tile. Both mean the same thing: the hand-off is underway.
-  if (method) return <HandOffPending />;
+  if (method) return <HandOffPending config={config} />;
   // No method and no CTA to offer ⇒ the shell is still showing its picker, and
   // the pane stays out of the way exactly as every other screen does.
   if (!onStart) return null;

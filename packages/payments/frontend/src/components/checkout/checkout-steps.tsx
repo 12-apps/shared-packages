@@ -367,7 +367,11 @@ export function PaymentStep({
         validateApplePayMerchant={validateApplePayMerchant}
       />
 
-      {!order && creating ? (
+      {/* The shell's own busy spinner, SUPPRESSED for a hand-off screen: that
+          screen renders its own "Preparando o pagamento" while the charge is
+          raised, and two stacked spinners saying the same thing is what the
+          buyer actually saw. */}
+      {!order && creating && !choice.atProvider ? (
         <LoadingState variant="spinner" size="md" message="Gerando pagamento…" dataTestId="payment-generating" />
       ) : null}
 
