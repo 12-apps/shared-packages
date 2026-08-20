@@ -52,4 +52,15 @@ export const PT_BR_AUTH_ERRORS: AuthErrorCopy = {
   CredentialsSignin: "E-mail ou senha incorretos.",
   SessionRequired: "Entre na sua conta para continuar.",
   fallback: "Ocorreu um erro inesperado. Tente novamente.",
+  /**
+   * The headings the two hosts used. `AccessDenied` is not a failure — it is an
+   * instruction to sign up first — so it keeps its own, and everything else
+   * falls back to the one the backoffice showed for every code.
+   */
+  titles: {
+    AccessDenied: "Cadastro necessário",
+    Verification: "Link expirado",
+    SessionRequired: "Entre para continuar",
+  },
+  titleFallback: "Falha ao entrar",
 };
