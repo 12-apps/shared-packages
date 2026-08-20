@@ -19,12 +19,15 @@ import type { AnyNotificationBlueprint } from "../contract/notifications";
 import type { WirePermissionsContribution } from "../contract/permissions";
 import { isIsolatedDb } from "../contract/db";
 import type { PrismaContribution } from "../contract/db";
+import type { WireEnvValues, WireEnvVar } from "../contract/env";
 import type { AreaContribution } from "../contract/web";
 import type { AnyServerManifest, AnyWebManifest, PackageManifest } from "../contract/manifest";
-import type { WiringPorts } from "../ports";
+import type { LoggerPort, WiringPorts } from "../ports";
+import { answerE2e, answerEnv, answerObservability } from "./answers";
+import { collectMcpTools, httpMountPathOf, type CollectMcpInput } from "./mcp";
 import { bindEmail, bindHttp, bindJobs, bindSurface, type BindContext, type WiringSinks } from "./apply";
-import { isDeclined, type MailerOf, type RuntimeBindings, type ServerBindings, type SurfaceOf, type WebBindings } from "./bindings";
-import { findRouteConflicts, openApiMountPrefix, sortRoutes } from "./paths";
+import { isDeclined, type DeclinedBinding, type MailerOf, type RuntimeBindings, type ServerBindings, type SurfaceOf, type WebBindings } from "./bindings";
+import { findRouteConflicts, sortRoutes } from "./paths";
 import { unboundEntries, type CapabilityReportEntry, type PackageReportEntry, type WiringReport } from "./report";
 
 export type HostKind = "server" | "web";
@@ -36,8 +39,29 @@ export interface WiringHostOptions {
   ports?: WiringPorts;
 }
 
+/**
+ * The answers to the ANSWERABLE shared capabilities. Data capabilities
+ * (permissions, notifications, mcp, db) are collected without asking; these
+ * three each have a host-side half a package cannot supply:
+ *
+ * - `env`  — the host's actual environment (usually `process.env`). Required
+ *   whenever the manifest declares variables for this host's runtime.
+ * - `observability` — bound automatically from `ports.loggerFor`/`ports.logger`;
+ *   this field only DECLINES it.
+ * - `e2e`  — required whenever the manifest declares a WORLD: the
+ *   `featuresRoot` its compiled journeys land under, or a written decline.
+ *   This is the refusal that would have caught a shipped world going
+ *   unadopted while its host re-derived the same journeys by hand.
+ */
+export interface SharedCapabilityAnswers {
+  env?: WireEnvValues | DeclinedBinding;
+  observability?: DeclinedBinding;
+  e2e?: { featuresRoot: string } | DeclinedBinding;
+}
+
 /** One package handed to a server host: manifests plus the host's answers. */
-export interface ServerAdoption<TManifest extends AnyServerManifest = AnyServerManifest> {
+export interface ServerAdoption<TManifest extends AnyServerManifest = AnyServerManifest>
+  extends SharedCapabilityAnswers {
   manifest: PackageManifest;
   server?: TManifest;
   bindings?: ServerBindings<TManifest>;
@@ -59,10 +83,17 @@ export interface ServerAdoption<TManifest extends AnyServerManifest = AnyServerM
 }
 
 /** One package handed to a web host. */
-export interface WebAdoption<TManifest extends AnyWebManifest = AnyWebManifest> {
+export interface WebAdoption<TManifest extends AnyWebManifest = AnyWebManifest>
+  extends SharedCapabilityAnswers {
   manifest: PackageManifest;
   web?: TManifest;
   bindings?: WebBindings<TManifest>;
+}
+
+/** One package's declared env vars — assembled for deploy tooling to union. */
+export interface PackageEnvContribution {
+  packageName: string;
+  vars: readonly WireEnvVar[];
 }
 
 export interface PackageDbContribution {
@@ -86,6 +117,10 @@ export interface AssembledWiring {
   notifications: readonly AnyNotificationBlueprint[];
   mcpEndpoints: readonly WireMcpTool[];
   db: readonly PackageDbContribution[];
+  /** Every adopted package's declared env vars — union it for deploy tooling. */
+  env: readonly PackageEnvContribution[];
+  /** Namespace-scoped loggers, keyed by package name — the observability half. */
+  loggers: Readonly<Record<string, LoggerPort>>;
   areas: readonly PackageAreaContribution[];
   report: WiringReport;
 }
@@ -99,6 +134,8 @@ export class WiringHost {
   private readonly notifications: AnyNotificationBlueprint[] = [];
   private readonly mcpEndpoints: WireMcpTool[] = [];
   private readonly db: PackageDbContribution[] = [];
+  private readonly env: PackageEnvContribution[] = [];
+  private readonly loggers: Record<string, LoggerPort> = {};
   private readonly areas: PackageAreaContribution[] = [];
 
   constructor(options: WiringHostOptions) {
@@ -109,7 +146,7 @@ export class WiringHost {
     adoption: ServerAdoption<TManifest>,
   ): { mailer: MailerOf<TManifest> } {
     this.assertKind("server", adoption.manifest.name);
-    const capabilities = this.beginAdoption(adoption.manifest);
+    const capabilities = this.beginAdoption(adoption.manifest, adoption);
     this.applyRuntime(adoption.manifest, {
       applicable: adoption.manifest.server ?? [],
       foreign: adoption.manifest.web ?? [],
@@ -120,7 +157,7 @@ export class WiringHost {
     this.collectMcp(adoption.manifest, capabilities, {
       extra: adoption.mcpEndpoints,
       overrides: adoption.mcpOverrides,
-      mountPath: this.httpMountPathOf(adoption.bindings as RuntimeBindings | undefined),
+      mountPath: httpMountPathOf(adoption.bindings as RuntimeBindings | undefined),
     });
     this.entries.push({ packageName: adoption.manifest.name, capabilities });
     return { mailer: this.sinks.mailers[adoption.manifest.name] as MailerOf<TManifest> };
@@ -130,7 +167,7 @@ export class WiringHost {
     adoption: WebAdoption<TManifest>,
   ): { surface: SurfaceOf<TManifest> } {
     this.assertKind("web", adoption.manifest.name);
-    const capabilities = this.beginAdoption(adoption.manifest);
+    const capabilities = this.beginAdoption(adoption.manifest, adoption);
     this.collectMcp(adoption.manifest, capabilities, {});
     this.applyRuntime(adoption.manifest, {
       applicable: adoption.manifest.web ?? [],
@@ -161,6 +198,8 @@ export class WiringHost {
       notifications: [...this.notifications],
       mcpEndpoints: [...this.mcpEndpoints],
       db: [...this.db],
+      env: [...this.env],
+      loggers: { ...this.loggers },
       areas: [...this.areas],
       report: { host: this.options.name, kind: this.options.kind, packages: [...this.entries] },
     };
@@ -175,8 +214,11 @@ export class WiringHost {
     }
   }
 
-  /** Duplicate-adoption check plus collection of the shared data capabilities. */
-  private beginAdoption(manifest: PackageManifest): CapabilityReportEntry[] {
+  /** Duplicate-adoption check plus the shared capabilities: data collected, answers judged. */
+  private beginAdoption(
+    manifest: PackageManifest,
+    answers: SharedCapabilityAnswers,
+  ): CapabilityReportEntry[] {
     if (this.adopted.has(manifest.name)) {
       throw new WiringAssemblyError(this.options.name, `${manifest.name} was adopted twice.`);
     }
@@ -201,51 +243,31 @@ export class WiringHost {
       });
     }
     if (manifest.e2e) {
-      capabilities.push({ kind: "e2e", status: "collected", detail: manifest.e2e.entry });
+      capabilities.push(answerE2e(manifest.e2e, answers.e2e));
+    }
+    if (manifest.env) {
+      this.env.push({ packageName: manifest.name, vars: manifest.env });
+      capabilities.push(answerEnv(this.options.kind, manifest.env, answers.env));
+    }
+    if (manifest.observability) {
+      const answered = answerObservability(
+        manifest.observability.namespace,
+        answers.observability,
+        this.options.ports,
+      );
+      if (answered.logger) this.loggers[manifest.name] = answered.logger;
+      capabilities.push(answered.entry);
     }
     return capabilities;
   }
 
-  /** The mount the http binding named, when http was bound rather than declined. */
-  private httpMountPathOf(bindings: RuntimeBindings | undefined): string | undefined {
-    const binding = bindings?.["http"];
-    if (binding === undefined || isDeclined(binding)) return undefined;
-    const mountPath = (binding as { mountPath?: unknown }).mountPath;
-    return typeof mountPath === "string" ? mountPath : undefined;
-  }
-
-  /**
-   * MCP tools, collected AFTER the bindings so the manifest's mount-relative
-   * paths can be absolutized against the http binding's `mountPath` — one
-   * source of truth for a tool's URL: the route descriptor it proxies to.
-   * Host overrides are shallow-merged by operationId; host-built extras
-   * (vocabulary factories) pass through untouched.
-   */
+  /** Delegates to `./mcp` — override-merged, mount-absolutized, sunk here. */
   private collectMcp(
     manifest: PackageManifest,
     capabilities: CapabilityReportEntry[],
-    input: {
-      extra?: readonly WireMcpTool[];
-      overrides?: Readonly<Record<string, Partial<WireMcpTool>>>;
-      mountPath?: string;
-    },
+    input: CollectMcpInput,
   ): void {
-    const declared = manifest.mcp?.endpoints ?? [];
-    const known = new Set(declared.map((tool) => tool.operationId));
-    Object.keys(input.overrides ?? {}).forEach((operationId) => {
-      if (!known.has(operationId)) {
-        throw new WiringAssemblyError(
-          this.options.name,
-          `${manifest.name}: an MCP override targets "${operationId}", which the manifest does not declare.`,
-        );
-      }
-    });
-    const prefix = input.mountPath === undefined ? "" : openApiMountPrefix(input.mountPath);
-    const fromManifest = declared.map((tool) => {
-      const overridden = { ...tool, ...(input.overrides?.[tool.operationId] ?? {}) };
-      return { ...overridden, path: `${prefix}${overridden.path}` };
-    });
-    const tools = [...fromManifest, ...(input.extra ?? [])];
+    const tools = collectMcpTools(this.options.name, manifest, input);
     if (tools.length === 0) return;
     this.mcpEndpoints.push(...tools);
     capabilities.push({ kind: "mcp", status: "collected", detail: `${tools.length} tools` });
@@ -283,6 +305,7 @@ export class WiringHost {
       packageName: manifest.name,
       sinks: this.sinks,
       hostEmailPort: this.options.ports?.email,
+      permissionIds: manifest.permissions?.ids,
     };
     Object.keys(walk.bindings).forEach((key) => {
       if (!walk.applicable.includes(key)) {

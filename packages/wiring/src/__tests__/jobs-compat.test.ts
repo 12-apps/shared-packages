@@ -54,6 +54,7 @@ describe("the jobs twins against @12-apps/jobs itself", () => {
     const deps: NotesJobDeps = { store, ran: [] };
     host.adoptServer({
       manifest: notesManifest,
+      observability: { declined: "jobs compat is the subject here" },
       server: notesServerManifest,
       bindings: {
         http: { mountPath: "/api/admin/:tenantSlug", config: { store } },

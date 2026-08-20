@@ -38,8 +38,43 @@ export interface WireResponse {
   body: unknown;
 }
 
+/**
+ * What kind of caller a route expects — the property the host's gates need
+ * before they can guard it.
+ *
+ * - `authenticated` (the default) — behind the host's session/actor
+ *   resolution and its RBAC.
+ * - `webhook` — an unauthenticated provider callback, verified by signature
+ *   inside the handler; must NOT sit behind tenant guards, must often see
+ *   the raw body. A webhook route may not carry `permission` or
+ *   `entitlement` — a plan gate on a provider callback drops money events.
+ * - `public` — anonymous by design (a storefront read). May carry an
+ *   `entitlement` (plan-gated but unauthenticated), never a `permission`.
+ */
+export type WireRouteKind = "authenticated" | "webhook" | "public";
+
+/**
+ * The policy half of a route: what the host's coverage gates today recover
+ * by scanning route FILES for guard literals. Declared here, the gates can
+ * consume the assembled table instead of the filesystem — which is what lets
+ * a host register a package's routes wholesale rather than one thin file per
+ * endpoint. Keys are the PACKAGE's vocabulary: `permission` must be one of
+ * the package's own declared permission ids; `entitlement`/`quota` are
+ * abstract plan-feature keys the host maps onto its billing catalog.
+ */
+export interface WireRoutePolicy {
+  /** Defaults to `authenticated`. */
+  kind?: WireRouteKind;
+  /** Required permission id from this package's own permissions contribution. */
+  permission?: string;
+  /** Plan-feature key the host's entitlements must allow. */
+  entitlement?: string;
+  /** Plan-feature key whose QUOTA this call consumes (a create, typically). */
+  quota?: string;
+}
+
 /** One framework-neutral endpoint a package serves. */
-export interface WireRoute<TActor = unknown> {
+export interface WireRoute<TActor = unknown> extends WireRoutePolicy {
   method: WireHttpMethod;
   /**
    * Path relative to the host's mount for this package, in `:param` form.

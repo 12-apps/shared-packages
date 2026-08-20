@@ -73,6 +73,19 @@ describe("defineManifest", () => {
     );
   });
 
+  it("refuses runtime capabilities with no observability namespace — logging is not optional", () => {
+    expect(() => defineManifest({ ...base, server: ["http"] })).toThrow(
+      /must declare observability/,
+    );
+    expect(() => defineManifest({ ...base, web: ["surface"] })).toThrow(
+      /must declare observability/,
+    );
+    // Pure-data manifests ship no running code, so they stay exempt.
+    expect(() =>
+      defineManifest({ ...base, db: { partial: "prisma/x.prisma" } }),
+    ).not.toThrow();
+  });
+
   it("accepts an isolated db and refuses the shapes Postgres or deploy would choke on", () => {
     const isolated = {
       mode: "isolated" as const,
@@ -128,7 +141,7 @@ describe("assertDbMirror", () => {
 });
 
 describe("defineServerManifest", () => {
-  const shared = defineManifest({ ...base, server: ["http"] });
+  const shared = defineManifest({ ...base, server: ["http"], observability: { namespace: "example" } });
 
   it("refuses a name mismatch", () => {
     expect(() =>
@@ -147,7 +160,7 @@ describe("defineServerManifest", () => {
   });
 
   it("refuses a dotted jobs namespace and duplicate blueprint names", () => {
-    const withJobs = defineManifest({ ...base, server: ["jobs"] });
+    const withJobs = defineManifest({ ...base, server: ["jobs"], observability: { namespace: "example" } });
     const blueprint = {
       name: "sweep",
       handle: () => Promise.resolve(),
@@ -169,7 +182,7 @@ describe("defineServerManifest", () => {
 
 describe("defineWebManifest", () => {
   it("refuses a nav row pointing at an undeclared route", () => {
-    const shared = defineManifest({ ...base, web: ["areas"] });
+    const shared = defineManifest({ ...base, web: ["areas"], observability: { namespace: "example" } });
     expect(() =>
       defineWebManifest(shared, {
         name: shared.name,
