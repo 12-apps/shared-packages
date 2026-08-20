@@ -286,3 +286,31 @@ describe("createAuthRoutes — the sign-up gate", () => {
     expect(signIn).not.toHaveBeenCalled();
   });
 });
+
+describe("createAuthRoutes — a refused callbackUrl", () => {
+  it("falls back to the app root, not to the login route", async () => {
+    const { config, navigate } = harness({
+      // The protocol-relative shape a browser resolves as EXTERNAL.
+      useSearchParams: () => new URLSearchParams("callbackUrl=//evil.example.com/steal"),
+      useSession: () => ({ status: "authenticated", signIn: vi.fn() }),
+    });
+    const { LoginRoute } = createAuthRoutes(config);
+    render(<LoginRoute />);
+
+    // Falling back to `/login` would send a signed-in visitor to the route that
+    // redirects signed-in visitors — safe, but they never arrive anywhere.
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/", { replace: true }));
+    expect(navigate).not.toHaveBeenCalledWith("/login", expect.anything());
+  });
+
+  it("honours a host served under a sub-path when it refuses one", async () => {
+    const { config, navigate } = harness({
+      homePath: "/pedidos",
+      useSearchParams: () => new URLSearchParams("callbackUrl=https://evil.example.com"),
+      useSession: () => ({ status: "authenticated", signIn: vi.fn() }),
+    });
+    const { LoginRoute } = createAuthRoutes(config);
+    render(<LoginRoute />);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/pedidos", { replace: true }));
+  });
+});

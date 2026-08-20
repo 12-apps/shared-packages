@@ -159,6 +159,18 @@ export interface AuthRoutesConfig extends Omit<AuthPagesConfig, "screens"> {
   onBeforeSignup?: () => Promise<void>;
   /** A condition the visitor must satisfy before signing up. */
   signupGate?: AuthSignupGate;
+  /**
+   * Where a REFUSED `?callbackUrl` falls back to. Defaults to the app root.
+   *
+   * Not the login path, which is the trap: `sameOriginCallbackUrl` returns this
+   * value for an off-origin URL, and the same value is what an
+   * already-authenticated visitor is redirected to. Point it at `/login` and a
+   * poisoned callbackUrl sends a signed-in visitor to the login route, which
+   * sees them signed in and sends them to the login route. The refusal is still
+   * safe either way — nothing follows the attacker's URL — but the visitor
+   * never arrives anywhere.
+   */
+  homePath?: string;
 }
 
 export interface AuthRouteComponents {
@@ -212,7 +224,7 @@ function useRouteState(config: AuthRoutesConfig): RouteState {
   // Sanitised against the real location, so an `?callbackUrl=` pointing at
   // another origin cannot turn a sign-in into an open redirect.
   const navigateTo = sameOriginCallbackUrl(params.get("callbackUrl") ?? undefined, {
-    href: config.routes.login,
+    href: config.homePath ?? "/",
     origin: globalThis.location?.origin ?? "",
   });
   const callbackUrl = `${base}${navigateTo}`;
