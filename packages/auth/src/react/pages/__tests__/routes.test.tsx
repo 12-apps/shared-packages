@@ -175,3 +175,114 @@ describe("createAuthRoutes — a failed OAuth handoff", () => {
     await waitFor(() => expect(seen.at(-1)).toBeNull());
   });
 });
+
+describe("createAuthRoutes — the sign-up gate", () => {
+  function gated(overrides: Partial<AuthRoutesConfig> = {}): Harness {
+    return harness({
+      signupGate: {
+        render: ({ satisfied, setSatisfied }) => (
+          <input
+            type="checkbox"
+            data-testid="accept"
+            checked={satisfied}
+            onChange={(event) => setSatisfied(event.target.checked)}
+          />
+        ),
+        failureMessage: "Não foi possível registrar o consentimento.",
+      },
+      ...overrides,
+    });
+  }
+
+  it("stops the OAuth handoff too, not only the form", async () => {
+    const { config, signIn } = gated({
+      renderProviders: ({ start }) => (
+        <button type="button" data-testid="google" onClick={() => start("google")}>
+          google
+        </button>
+      ),
+    });
+    const { SignupRoute } = createAuthRoutes(config);
+    render(<SignupRoute />);
+
+    // A provider button is a second door to the same account.
+    fireEvent.click(await screen.findByTestId("google"));
+    expect(signIn).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByTestId("accept"));
+    fireEvent.click(await screen.findByTestId("google"));
+    await waitFor(() => expect(signIn).toHaveBeenCalledWith("google", expect.any(String)));
+  });
+
+  it("records consent BEFORE the handoff, not after the redirect returns", async () => {
+    const order: string[] = [];
+    const { config } = gated({
+      signupGate: {
+        render: ({ satisfied, setSatisfied }) => (
+          <input
+            type="checkbox"
+            data-testid="accept"
+            checked={satisfied}
+            onChange={(event) => setSatisfied(event.target.checked)}
+          />
+        ),
+        onBeforeProceed: () => {
+          order.push("consent");
+          return Promise.resolve();
+        },
+        failureMessage: "Não foi possível registrar o consentimento.",
+      },
+      useSession: () => ({
+        status: "unauthenticated",
+        signIn: vi.fn(() => {
+          order.push("signIn");
+          return Promise.resolve();
+        }),
+      }),
+      renderProviders: ({ start }) => (
+        <button type="button" data-testid="google" onClick={() => start("google")}>
+          google
+        </button>
+      ),
+    });
+    const { SignupRoute } = createAuthRoutes(config);
+    render(<SignupRoute />);
+    fireEvent.click(await screen.findByTestId("accept"));
+    fireEvent.click(await screen.findByTestId("google"));
+
+    // A visitor bounced to Google has already consented; the record of it
+    // cannot depend on them making it back.
+    await waitFor(() => expect(order).toEqual(["consent", "signIn"]));
+  });
+
+  it("says so, in the host's words, when the consent stamp fails", async () => {
+    const { config, signIn } = gated({
+      signupGate: {
+        render: ({ satisfied, setSatisfied }) => (
+          <input
+            type="checkbox"
+            data-testid="accept"
+            checked={satisfied}
+            onChange={(event) => setSatisfied(event.target.checked)}
+          />
+        ),
+        onBeforeProceed: () => Promise.reject(new Error("offline")),
+        failureMessage: "Não foi possível registrar o consentimento.",
+      },
+      renderProviders: ({ start }) => (
+        <button type="button" data-testid="google" onClick={() => start("google")}>
+          google
+        </button>
+      ),
+    });
+    const { SignupRoute } = createAuthRoutes(config);
+    render(<SignupRoute />);
+    fireEvent.click(await screen.findByTestId("accept"));
+    fireEvent.click(await screen.findByTestId("google"));
+
+    expect(
+      await screen.findByText("Não foi possível registrar o consentimento."),
+    ).toBeTruthy();
+    expect(signIn).not.toHaveBeenCalled();
+  });
+});
