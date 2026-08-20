@@ -26,6 +26,12 @@ export const featureFlagsManifest = {
   name: "@12-apps/feature-flags",
   contract: 1,
   db: { partial: "prisma/feature-flags.prisma", migrations: "prisma/migrations" },
+  /**
+   * Mandatory for runtime manifests since wiring 1.3.0: the binder hands
+   * this package a logger scoped to the namespace, so a grant check that
+   * fails files under `feature-flags`, not nowhere.
+   */
+  observability: { namespace: "feature-flags" },
   server: ["http"],
   web: ["surface", "areas"],
 } as const satisfies PackageManifest;
