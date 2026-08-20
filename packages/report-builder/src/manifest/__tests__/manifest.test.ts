@@ -6,8 +6,6 @@
  * rather than parallel restatements that could drift.
  */
 
-import { readFileSync } from 'node:fs';
-
 import { describe, expect, it } from 'vitest';
 import type { WirePermissionsContribution } from '@12-apps/wiring';
 import {
@@ -17,6 +15,7 @@ import {
   defineWebManifest,
 } from '@12-apps/wiring/producer';
 
+import packageJson from '../../../package.json';
 import { defineCatalog } from '../../index';
 import { REPORT_BUILDER_PERMISSIONS } from '../../server/contribution';
 import { createApiReportBuilder } from '../../server/create-report-builder';
@@ -67,9 +66,6 @@ describe('the shared manifest', () => {
     // Host-side sync tooling is plain Node reading node_modules — it cannot
     // execute this TS manifest, so the contribution lives in package.json
     // too, and this assertion is what keeps the two the same shape.
-    const packageJson = JSON.parse(
-      readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'),
-    ) as { name?: string; wiring?: { db?: unknown } };
     expect(() => assertDbMirror(reportBuilderManifest, packageJson)).not.toThrow();
   });
 });
