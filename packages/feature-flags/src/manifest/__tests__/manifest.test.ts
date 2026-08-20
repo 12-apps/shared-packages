@@ -57,6 +57,10 @@ describe("the shared manifest", () => {
     });
   });
 
+  it("declares the packaged journeys' entry subpath", () => {
+    expect(featureFlagsManifest.e2e).toEqual({ entry: "@12-apps/feature-flags/e2e" });
+  });
+
   it("mirrors the db contribution into package.json for host assemblers", () => {
     // Host-side sync tooling is plain Node reading node_modules — it cannot
     // execute this TS manifest, so the contribution lives in package.json

@@ -26,6 +26,7 @@ export const featureFlagsManifest = {
   name: "@12-apps/feature-flags",
   contract: 1,
   db: { partial: "prisma/feature-flags.prisma", migrations: "prisma/migrations" },
+  e2e: { entry: "@12-apps/feature-flags/e2e" },
   /**
    * Mandatory for runtime manifests since wiring 1.3.0: the binder hands
    * this package a logger scoped to the namespace, so a grant check that
