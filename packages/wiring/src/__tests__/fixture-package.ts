@@ -63,19 +63,21 @@ export const notesManifest = defineManifest({
       },
     },
   ],
+  // Mount-relative, like the route descriptors: the consumer absolutizes
+  // them from the http binding's mountPath.
   mcp: {
     endpoints: [
       {
         operationId: "listDeliveryNotes",
         method: "GET",
-        path: "/api/admin/{tenantSlug}/notes",
+        path: "/notes",
         summary: "List the tenant's delivery notes.",
         annotations: { readOnly: true },
       },
       {
         operationId: "addDeliveryNote",
         method: "POST",
-        path: "/api/admin/{tenantSlug}/notes",
+        path: "/notes",
         summary: "Add one delivery note.",
         annotations: { readOnly: false, destructive: false },
       },

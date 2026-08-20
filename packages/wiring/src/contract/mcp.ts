@@ -41,7 +41,15 @@ export interface WireMcpTool<TSchema = unknown> {
   /** Becomes the tool name; unique across the whole assembled surface. */
   operationId: string;
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  /** OpenAPI `{param}` template path, absolute in the host's URL space. */
+  /**
+   * OpenAPI `{param}` template path. In a MANIFEST whose package also
+   * declares an `http` capability, this is RELATIVE to that capability's
+   * mount — the consumer prefixes the adoption's `mountPath` (converted to
+   * `{param}` form), so a tool's URL and its route's URL cannot drift apart.
+   * Everywhere else (host-built tools joined through an adoption's
+   * `mcpEndpoints`, packages with no http capability) it is absolute in the
+   * host's URL space.
+   */
   path: string;
   /** The agent-facing sentence. The words stay whoever wrote them's. */
   summary: string;

@@ -195,9 +195,29 @@ bang). The reference harness (`harness/backend`) adopts alongside, replacing
 per-package host files where the capability is covered — the harness becomes
 the living consumer example, which it already almost is.
 
-**Phase 5 — the gate.** Once ≥3 packages ship manifests: a `wiring:check`
-CLI that renders the report and asserts no `unbound`; hosts commit the report
-alongside the route table so a bump's new capability shows in the diff.
+**Phase 5 — the gates adapt to packages.** Once ≥3 packages ship manifests,
+the host-side gates stop scanning the filesystem and start consuming the
+wiring aggregate, which is what lets a host collapse a package's surface to
+ONE mount:
+
+- **The route table spreads package routes.** `routes:generate` learns a
+  second contribution form — a mount module exporting the adoption's
+  assembled routes — so the generated table reads
+  `export const routes: RouteTableEntry[] = [...hostRoutes, ...reportsWiring.tableEntries]`
+  and one `[[...path]]/route.ts` per package replaces the per-endpoint files.
+- **`mcp:coverage` and `rbac:coverage` read the aggregate.** A route that
+  arrived through an adoption is covered by its manifest tool and by the
+  per-descriptor guard/gate table the mount module declares (the staff/admin
+  and entitlement split the per-file layout carries today must survive the
+  collapse — it moves into declared data the gate reads, never into a helper
+  it cannot).
+- **Store/docs artifacts generate at deploy time.** `chatgpt-app-submission`
+  and the docs connector stop being committed host files: the data they need
+  is package-exported (the manifests), and CD generates them during
+  deployment — the same trajectory that already uncommitted `openapi.json`
+  and `manifest.json`.
+- A `wiring:check` CLI renders the report and asserts no `unbound`; hosts
+  commit the report so a bump's new capability shows in the diff.
 
 ## 5. Alternatives considered
 

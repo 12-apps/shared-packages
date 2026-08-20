@@ -8,15 +8,32 @@
 
 import { describe, expect, it } from 'vitest';
 import type { WirePermissionsContribution } from '@12-apps/wiring';
+import { defineManifest, defineServerManifest, defineWebManifest } from '@12-apps/wiring/producer';
 
+import { defineCatalog } from '../../index';
 import { REPORT_BUILDER_PERMISSIONS } from '../../server/contribution';
 import { createApiReportBuilder } from '../../server/create-report-builder';
 import { createWebReportBuilder } from '../../react/create-report-builder';
 import { reportBuilderManifest } from '../index';
+import { REPORT_BUILDER_MCP_TOOLS, reportBuilderMcpTools } from '../mcp';
 import { reportBuilderServerManifest } from '../server';
 import { reportBuilderWebManifest } from '../web';
 
 describe('the shared manifest', () => {
+  it('passes the producer assertions — the contract is a devDependency, so the check lives here', () => {
+    // The manifests are plain `satisfies`-checked values (zero runtime deps);
+    // the factories' runtime validation — inventory drift both ways included —
+    // runs in THIS suite, keeping the "fails in the package's own test run"
+    // guarantee.
+    expect(defineManifest(reportBuilderManifest)).toBe(reportBuilderManifest);
+    expect(defineServerManifest(reportBuilderManifest, reportBuilderServerManifest)).toBe(
+      reportBuilderServerManifest,
+    );
+    expect(defineWebManifest(reportBuilderManifest, reportBuilderWebManifest)).toBe(
+      reportBuilderWebManifest,
+    );
+  });
+
   it('declares the package identity and the runtime inventory', () => {
     expect(reportBuilderManifest.name).toBe('@12-apps/report-builder');
     expect(reportBuilderManifest.contract).toBe(1);
@@ -37,6 +54,50 @@ describe('the shared manifest', () => {
       partial: 'prisma/report-builder.prisma',
       migrations: 'prisma/migrations',
     });
+  });
+});
+
+describe('the MCP contribution', () => {
+  it('cannot drift from the route descriptors: one tool per descriptor, same URLs', () => {
+    const { routes } = createApiReportBuilder({
+      catalog: defineCatalog({
+        entities: {
+          orders: {
+            label: 'Pedidos',
+            fields: {
+              method: { label: 'Forma', type: 'string', role: 'dimension' },
+              totalCents: { label: 'Receita', type: 'money', role: 'measure' },
+            },
+          },
+        },
+      }),
+      entityPermission: { orders: 'reports:sales:read' },
+      systemReports: [],
+      starters: {},
+      adapter: { execute: () => Promise.resolve([]) },
+      db: () => Promise.reject(new Error('not this suite')),
+      timeZone: 'UTC',
+    });
+    const fromDescriptors = routes.map((route) => `${route.method} ${route.path}`).sort();
+    const fromTools = REPORT_BUILDER_MCP_TOOLS.map(
+      (tool) => `${tool.method} ${tool.path.replace(/\{(\w+)\}/g, ':$1')}`,
+    ).sort();
+    expect(fromTools).toEqual(fromDescriptors);
+  });
+
+  it('declares behavior defaults on every tool, mount-relative', () => {
+    REPORT_BUILDER_MCP_TOOLS.forEach((tool) => {
+      expect(tool.path.startsWith('/reports')).toBe(true);
+      expect(tool.annotations).toBeDefined();
+    });
+  });
+
+  it('absolutizes through the standalone factory — the whole hand registry', () => {
+    const tools = reportBuilderMcpTools({ basePath: '/api/admin/{tenantSlug}' });
+    expect(tools.map((tool) => tool.operationId)).toEqual(
+      REPORT_BUILDER_MCP_TOOLS.map((tool) => tool.operationId),
+    );
+    expect(tools[0]?.path).toBe('/api/admin/{tenantSlug}/reports/system');
   });
 });
 

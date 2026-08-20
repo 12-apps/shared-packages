@@ -11,6 +11,19 @@
 
 import type { MountedRoute } from "../contract/http";
 
+/**
+ * A mount prefix in OpenAPI `{param}` form, for MCP tool paths:
+ * `/api/admin/:tenantSlug` → `/api/admin/{tenantSlug}`. What lets a manifest
+ * declare its tools against the SAME relative paths as its route descriptors.
+ */
+export function openApiMountPrefix(mountPath: string): string {
+  const prefix = mountPath
+    .split("/")
+    .map((segment) => (segment.startsWith(":") ? `{${segment.slice(1)}}` : segment))
+    .join("/");
+  return prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+}
+
 /** Join a host mount prefix and a package-relative path. */
 export function joinRoutePath(mountPath: string, path: string): string {
   const left = mountPath.endsWith("/") ? mountPath.slice(0, -1) : mountPath;

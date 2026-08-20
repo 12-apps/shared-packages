@@ -51,6 +51,16 @@ describe('report-builder adopted through @12-apps/wiring', () => {
     expect(body.data.reports).toEqual([]);
   });
 
+  it('carries the package-declared MCP tools, absolutized against the mount', () => {
+    const { mcpEndpoints, routes } = wireReports(emptySavedReportDb());
+    expect(mcpEndpoints.length).toBe(routes.length);
+    mcpEndpoints.forEach((tool) => {
+      expect(tool.path.startsWith('/api/admin/{tenantSlug}/reports')).toBe(true);
+    });
+    const readonlyTools = mcpEndpoints.filter((tool) => tool.annotations?.readOnly === true);
+    expect(readonlyTools.map((tool) => tool.operationId)).toContain('listReportFields');
+  });
+
   it('answers a wiring report with every declared capability accounted for', () => {
     const { report, routes } = wireReports(emptySavedReportDb());
     const statuses = new Map(
