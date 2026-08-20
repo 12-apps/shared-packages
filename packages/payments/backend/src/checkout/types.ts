@@ -104,6 +104,8 @@ export interface CheckoutChargeDraft {
 /** ONE enabled provider, as the buyer's checkout sees it. */
 export interface BuyerProviderLink {
   provider: ProviderName;
+  /** The vendor's own name as a BUYER reads it ("InfinitePay"). */
+  displayName: string;
   tokenization: ClientTokenization;
   /** Its PUBLIC browser key, when it has one. Never a credential. */
   publicKey: string | null;

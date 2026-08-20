@@ -122,6 +122,7 @@ async function toBuyerLink(
     (entry.publicKey || null) ?? (await backfillKey(deps, merchant, entry, isStub));
   return {
     provider: entry.provider,
+    displayName: entry.displayName,
     tokenization: entry.tokenization,
     publicKey,
     mockTokenization: isStub && publicKey === null,

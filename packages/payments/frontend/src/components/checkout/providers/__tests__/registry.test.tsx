@@ -22,7 +22,7 @@ import type { CheckoutProviderConfig } from "../../types";
 import { CapabilityDefaultScreen } from "../capability-default";
 import { HostedLinkScreen } from "../hosted-link";
 import { PixAndCardScreen } from "../pix-and-card";
-import { resolveCheckoutScreen, screenFor } from "../registry";
+import { methodChosenAtProvider, resolveCheckoutScreen, screenFor } from "../registry";
 import type { ProviderCheckoutScreenProps } from "../types";
 
 // The card view reaches for a provider SDK and the vault; neither is the
@@ -115,6 +115,59 @@ describe("resolveCheckoutScreen", () => {
     for (const id of [null, undefined, "", "pix-and-card", "hosted-link", "nonsense"]) {
       expect(resolveCheckoutScreen(id)).toBeTruthy();
     }
+  });
+});
+
+describe("who asks the buyer PIX-or-card", () => {
+  /** A store whose card is taken on the provider's own page. */
+  function hostedStore(screenId: string | null): CheckoutProviderConfig {
+    return {
+      provider: "acme",
+      tokenization: "REDIRECT",
+      publicKey: null,
+      mockTokenization: false,
+      methods: ["PIX", "CARD"],
+      chain: [
+        {
+          provider: "acme",
+          tokenization: "REDIRECT",
+          publicKey: null,
+          mockTokenization: false,
+          methods: ["PIX", "CARD"],
+          checkoutScreen: screenId,
+        },
+      ],
+    };
+  }
+
+  it("is the provider, for a declared hand-off screen", () => {
+    expect(methodChosenAtProvider("hosted-link", hostedStore("hosted-link"))).toBe(true);
+  });
+
+  it("is us, for a screen that collects on our page", () => {
+    expect(methodChosenAtProvider("pix-and-card", storeWith("pix-and-card"))).toBe(false);
+  });
+
+  it("follows the CAPABILITY read when nothing is declared", () => {
+    // Same resolution order as `resolveCheckoutScreen`, so the picker and the
+    // pane cannot disagree about which flow this is.
+    expect(methodChosenAtProvider(null, hostedStore(null))).toBe(true);
+    expect(methodChosenAtProvider(null, storeWith(null))).toBe(false);
+  });
+
+  it("follows the capability read for an id from a NEWER server too", () => {
+    // The version-skew case: an unknown id is not a hand-off declaration, and
+    // must not silently take the picker away from a store that needs one.
+    expect(methodChosenAtProvider("a-screen-from-a-newer-server", hostedStore(null))).toBe(true);
+    expect(methodChosenAtProvider("a-screen-from-a-newer-server", storeWith(null))).toBe(false);
+  });
+
+  it("keeps the picker while the config is still loading", () => {
+    // Fail OPEN, like every other capability read here: a `null` config is
+    // "we do not know yet", and taking the choice away on a guess would send a
+    // buyer off-site for a store that never hands anyone over.
+    expect(methodChosenAtProvider(null, null)).toBe(false);
+    expect(methodChosenAtProvider(undefined, null)).toBe(false);
   });
 });
 

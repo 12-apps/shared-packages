@@ -46,8 +46,26 @@ export interface ProviderCheckoutScreenProps {
    * those readings call the helpers themselves.
    */
   config: CheckoutProviderConfig | null;
-  /** What the shell's picker currently has selected; `null` before a choice. */
+  /**
+   * What the shell currently has selected; `null` before a choice.
+   *
+   * `null` is also the resting state of a screen that OWNS the choice (see
+   * {@link ProviderCheckoutScreenProps.onStart}): nothing is selected until
+   * the buyer presses that screen's own CTA.
+   */
   method: PaymentMethod | null;
+  /**
+   * Present ⇒ this screen owns the "how do I start paying" affordance, because
+   * the shell has hidden its method picker for it (FUT-596 follow-up). Calling
+   * it commits the buyer to the store's hand-off method and raises the charge,
+   * exactly as choosing a tile in the picker does.
+   *
+   * Absent for every screen where the picker is still on the page — those
+   * screens must not grow a second way to start the same charge.
+   */
+  onStart?: () => void;
+  /** A charge is being raised right now — the shell's own busy flag. */
+  creating?: boolean;
   /** Scopes the saved-card list to the store being paid. */
   tenantSlug?: string;
   /** The shell's polling cadence, passed through so tests can shorten it. */

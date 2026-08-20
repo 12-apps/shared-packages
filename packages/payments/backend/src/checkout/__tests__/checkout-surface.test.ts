@@ -127,6 +127,26 @@ describe('the checkout config read', () => {
     expect(JSON.stringify(data)).not.toContain('secretKey');
   });
 
+  it("publishes each provider's own name, for a checkout that hands the buyer over", async () => {
+    // A hand-off screen has to tell the buyer WHOSE page they are about to be
+    // sent to, and the adapter's `displayName` is the only place that name
+    // exists. Published per entry rather than once for the head, because the
+    // walk may charge on any of them.
+    const { routes } = setupCheckoutWorld({
+      chain: [
+        {
+          name: 'alpha',
+          adapter: testAdapter('alpha', { tokenization: 'REDIRECT', displayName: 'Alpha Pay' }),
+        },
+        { name: 'beta', adapter: testAdapter('beta', { displayName: 'Beta Bank' }) },
+      ],
+    });
+    const { body } = await call(routes, 'GET', '/config');
+    const chain = (body.data as Record<string, unknown>).chain as { displayName: string }[];
+
+    expect(chain.map((entry) => entry.displayName)).toEqual(['Alpha Pay', 'Beta Bank']);
+  });
+
   it('answers a merchant with no connected provider without inventing one', async () => {
     const { routes, credentials } = setupCheckoutWorld();
     credentials.clear();
