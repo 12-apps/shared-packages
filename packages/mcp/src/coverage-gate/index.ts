@@ -51,6 +51,16 @@ export interface McpActionMap {
   mapped: Record<string, string>;
 }
 
+/**
+ * A route served WITHOUT a route file — declared by an adopted package's
+ * wiring manifest and registered wholesale from the assembled aggregate.
+ * `{param}`-form path, the same grammar the filesystem scan yields.
+ */
+export interface DeclaredRouteMethod {
+  method: string;
+  path: string;
+}
+
 export interface McpCoverageOptions {
   /** The framework routes folder (the WHOLE `app`, never `app/api`). */
   appDir: string;
@@ -58,6 +68,14 @@ export interface McpCoverageOptions {
   webRoot?: string;
   /** The host's registry entries (its `endpoints` array). */
   endpoints: readonly McpRegistryEndpoint[];
+  /**
+   * Routes with no file behind them, declared by wiring manifests. Each
+   * feeds BOTH directions of the route check: it must be registered like
+   * any scanned method, and it lets a registry entry count as served. A
+   * declared method duplicating a scanned file's method is refused — one
+   * URL, one source of truth.
+   */
+  declaredRoutes?: readonly DeclaredRouteMethod[];
   /** Path to the exclusions JSON ({@link McpCoverageExclusions}). */
   exclusionsPath: string;
   /**
@@ -80,6 +98,7 @@ interface GateContext {
   endpoints: readonly McpRegistryEndpoint[];
   exclusions: McpCoverageExclusions;
   actionMap: McpActionMap | null;
+  declaredRoutes: readonly DeclaredRouteMethod[];
 }
 
 function readJson<T>(path: string): T {
@@ -90,7 +109,28 @@ function readJson<T>(path: string): T {
 function routeFailures(ctx: GateContext): { failures: string[]; routeMethodCount: number } {
   const failures: string[] = [];
   const infraPrefixes = Object.keys(ctx.exclusions.routes);
-  const routeMethods = collectRouteMethods(ctx.appDir, ctx.webRoot);
+  const scanned = collectRouteMethods(ctx.appDir, ctx.webRoot);
+  // Declared routes join the scanned set on equal footing: registered like
+  // any method (direction 1), serving their registry entries (direction 2).
+  // A declaration duplicating a scanned method is two sources of truth for
+  // one URL — refused here, not silently deduplicated.
+  const scannedKeys = new Set(scanned.map(({ method, urlPath }) => `${method} ${urlPath}`));
+  for (const declared of ctx.declaredRoutes) {
+    const key = `${declared.method.toUpperCase()} ${declared.path}`;
+    if (scannedKeys.has(key)) {
+      failures.push(
+        `declared route shadows a route file: ${key} — delete the file or drop the declaration`,
+      );
+    }
+  }
+  const routeMethods = [
+    ...scanned,
+    ...ctx.declaredRoutes.map((declared) => ({
+      urlPath: declared.path,
+      method: declared.method.toUpperCase(),
+      file: "<declared by a wiring manifest>",
+    })),
+  ];
   const registered = new Set(
     ctx.endpoints.map((endpoint) => `${endpoint.method.toUpperCase()} ${endpoint.path}`),
   );
@@ -207,6 +247,7 @@ export function runMcpCoverage(options: McpCoverageOptions): McpCoverageResult {
     endpoints: options.endpoints,
     exclusions: readJson<McpCoverageExclusions>(options.exclusionsPath),
     actionMap: options.actionMapPath ? readJson<McpActionMap>(options.actionMapPath) : null,
+    declaredRoutes: options.declaredRoutes ?? [],
   };
   const routes = routeFailures(ctx);
   const actions = actionFailures(ctx);
