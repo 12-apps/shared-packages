@@ -16,13 +16,20 @@ import { openPage, reachPayment } from './helpers/checkout';
  * nothing parked drops the buyer on a blank confirmation after they have paid.
  */
 
-test('a REDIRECT chain never shows a card form, and the departure is observable', async ({
+test('a REDIRECT chain asks for no method, and the departure is observable', async ({
   page,
 }) => {
   await openPage(page, 'payments-checkout-redirect');
   await reachPayment(page);
 
-  await page.getByTestId('checkout-method-CARD').click();
+  // NO PICKER. Every method at this store mints the same checkout link, so the
+  // PIX-or-card question is only binding on the provider's own page — asking it
+  // here as well told the buyer their first answer decided something when it
+  // decided nothing.
+  await expect(page.getByTestId('checkout-method')).toHaveCount(0);
+  await expect(page.getByTestId('checkout-method-CARD')).toHaveCount(0);
+
+  await page.getByTestId('checkout-handoff-start').click();
 
   // Nobody in this chain tokenizes in the browser, so the card is typed on the
   // provider's own page — asking for a PAN here would be asking for something

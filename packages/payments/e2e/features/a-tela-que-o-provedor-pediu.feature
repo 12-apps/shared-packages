@@ -22,12 +22,12 @@ Feature: A tela que o provedor pediu
     And ela escolhe pagar com cartão
     Then ela vê o formulário de cartão
 
-  Scenario: Quem cobra na página dele não oferece formulário nenhum
+  Scenario: Quem cobra na página dele não pergunta nada — só avisa e leva
     Given a loja declara que a compradora termina no provedor
     When ela informa o CPF e segue para o pagamento
-    And ela escolhe pagar com cartão
-    Then nenhum formulário de cartão é mostrado
+    Then não lhe perguntam entre PIX e cartão
     And ela é avisada de que vai ser levada para o provedor
+    And nenhum formulário de cartão é mostrado
 
   Scenario: Um provedor que não declara tela nenhuma continua vendendo
     Given a loja não declara tela nenhuma
