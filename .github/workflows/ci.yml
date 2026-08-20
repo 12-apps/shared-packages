@@ -1001,7 +1001,15 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # `write`, even though this job only ANALYSES and never publishes.
+      #
+      # semantic-release verifies that it COULD push before it will tell you
+      # what it would push: `--dry-run` skips the publish and success steps but
+      # not `verifyConditions`, so a read-only token fails the whole run with
+      # EGITNOPERMISSION and no version is ever reported. That took every
+      # release on main down the moment this job landed — the two merges after
+      # it went green as PRs, failed on main, and published nothing.
+      contents: write
     outputs:
       has_major: ${{ steps.scan.outputs.has_major }}
       majors: ${{ steps.scan.outputs.majors }}
