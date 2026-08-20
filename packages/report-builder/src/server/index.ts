@@ -64,6 +64,8 @@ export {
   type ReportPermissionOf,
   type ReportPermissionSpec,
 } from './contribution';
+/** The plan-feature keys the route policy declares — map them, never retype them. */
+export { REPORT_BUILDER_FEATURES, type ReportBuilderFeature } from './features';
 /** The wiring check every mount runs, and the error it throws. */
 export { assertReportBuilderConfig, ReportBuilderConfigError } from './config';
 /** The SHAPE of a host's built-in reports, and the projections over them. */

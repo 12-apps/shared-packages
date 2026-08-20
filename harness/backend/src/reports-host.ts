@@ -206,10 +206,26 @@ export function wireReports(db: SavedReportDb): {
   routes: readonly MountedRoute[];
   mcpEndpoints: readonly WireMcpTool[];
 } {
-  const host = createWiringHost({ name: 'harness-backend', kind: 'server' });
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    // The reference consumer shows the BOUND path: one namespaced logger
+    // factory for every adopted package. The harness's sink is the console.
+    ports: {
+      loggerFor: (namespace) => ({
+        info: (message, ...meta) => console.info(`[${namespace}] ${message}`, ...meta),
+        warn: (message, ...meta) => console.warn(`[${namespace}] ${message}`, ...meta),
+        error: (message, ...meta) => console.error(`[${namespace}] ${message}`, ...meta),
+      }),
+    },
+  });
   host.adoptServer({
     manifest: reportBuilderManifest,
     server: reportBuilderServerManifest,
+    // The declared world is the FRONTEND harness's to run — the journeys
+    // drive screens. Declining here (with the reason in the report) is the
+    // honest server-host answer; silence would be a red assemble().
+    e2e: { declined: 'the journeys drive screens — the web harness answers for the world' },
     bindings: {
       http: {
         mountPath: REPORTS_MOUNT_PATH,
