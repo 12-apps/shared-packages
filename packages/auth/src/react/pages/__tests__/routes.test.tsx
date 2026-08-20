@@ -363,3 +363,40 @@ describe("createAuthRoutes — the gate tells the provider slot", () => {
     expect(seen.every(Boolean)).toBe(true);
   });
 });
+
+describe("createAuthRoutes — the notice keeps its heading and its close button", () => {
+  it("shows the code's own title, not just the sentence", async () => {
+    const { config } = harness({
+      useSearchParams: () => new URLSearchParams("error=AccessDenied"),
+    });
+    const { LoginRoute } = createAuthRoutes(config);
+    render(<LoginRoute />);
+    // The storefront switched heading on this code; a description-only Alert
+    // dropped it, and an e2e spec caught the loss.
+    expect(await screen.findByText("Cadastro necessário")).toBeTruthy();
+    expect(await screen.findByText(PT_BR_AUTH_ERRORS.AccessDenied)).toBeTruthy();
+  });
+
+  it("falls back to one heading for a code with none of its own", async () => {
+    const { config } = harness({
+      useSearchParams: () => new URLSearchParams("error=OAuthCallback"),
+    });
+    const { LoginRoute } = createAuthRoutes(config);
+    render(<LoginRoute />);
+    expect(await screen.findByText("Falha ao entrar")).toBeTruthy();
+  });
+
+  it("can be dismissed — the code lives in the URL and would otherwise persist", async () => {
+    const { config } = harness({
+      useSearchParams: () => new URLSearchParams("error=OAuthCallback"),
+    });
+    const { LoginRoute } = createAuthRoutes(config);
+    render(<LoginRoute />);
+    await screen.findByText("Falha ao entrar");
+
+    // Asserted, not probed: a guarded click would pass silently the day the
+    // close button stops rendering, which is the regression this pins.
+    fireEvent.click(await screen.findByTestId("alert-close"));
+    await waitFor(() => expect(screen.queryByText("Falha ao entrar")).toBeNull());
+  });
+});
