@@ -7,11 +7,37 @@ import type { RoleListQuery } from './roles-store';
 import type { TeamListQuery } from './team-store';
 
 /**
- * The wire schemas (12-13) — ported from the origin host's
+ * The REQUEST schemas (12-13) — ported from the origin host's
  * `lib/mcp/registry/roles.ts` + `team.ts`, built per-config because the
  * permission enum is the HOST's catalog, not a constant. Authored once, so an
- * advertised tool surface built on these can never drift from the runtime
- * validators.
+ * advertised tool surface built on these cannot drift from the runtime
+ * validators for the half they cover.
+ *
+ * THAT HALF IS INPUTS ONLY, and the distinction is not pedantry. Everything in
+ * this module — the six `*Body` schemas, {@link parseBody},
+ * {@link requireParam}, {@link parseRoleListQuery}, {@link parseTeamListQuery}
+ * — validates what arrives. Not one line describes what a route ANSWERS, so
+ * nothing here can keep an advertised RESPONSE honest.
+ *
+ * The file used to claim that a surface built on these "can never drift". It
+ * was already untrue when written, and drifted in exactly the uncovered half:
+ * the host's advertised `getMyPermissions` listed `permissions` alone while
+ * `GET /permissions` had been merging `permissionsExtras` into the answer for
+ * as long as the option existed (FUT-760). A guarantee that names only the
+ * direction that cannot break is worse than none — it is why nobody checked
+ * the other one.
+ *
+ * WHAT DOES COVER RESPONSES, and where to reach for it:
+ *
+ *  - `MyPermissionsPayload` in `./payloads` for the shell read this module
+ *    cannot describe;
+ *  - `RoleRecord` / `RoleListRecord` / `TeamMemberDetail` / `TeamMemberRecord`
+ *    for the payloads the stores return, all already exported from `./index`.
+ *
+ * A host binds its advertised schema to those with `satisfies z.ZodType<…>`.
+ * Nothing in the package can force it to — a schema it never sees is a schema
+ * it cannot check — so the binding is the host's to write, and its absence is
+ * what this module must stop implying is impossible.
  */
 
 export interface RoleWireSchemas {

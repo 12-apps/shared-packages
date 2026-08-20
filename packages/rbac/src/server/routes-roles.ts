@@ -10,6 +10,7 @@ import {
 } from './context';
 import type { GrantGovernance } from './grant-governance';
 import type { RbacGuards } from './guards';
+import type { MyPermissionsPayload } from './payloads';
 import type { RolesStore } from './roles-store';
 import {
   parseBody,
@@ -238,7 +239,16 @@ function permissionsRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
         );
         const extras = (await deps.config.permissionsExtras?.(actor)) ?? {};
         // Sorted for a stable wire shape (Set iteration is insertion-defined).
-        return ok({ permissions: [...permissions].sort(), ...extras });
+        //
+        // `satisfies` rather than a bare object: this payload is the one a host
+        // ADVERTISES, and until FUT-760 nothing tied the two together. The
+        // annotation makes `MyPermissionsPayload` the single description of it,
+        // so a field added here cannot silently stop matching the type hosts
+        // hold their schemas to.
+        return ok({
+          permissions: [...permissions].sort(),
+          ...extras,
+        } satisfies MyPermissionsPayload);
       } catch (error) {
         return foldApiError(error);
       }
