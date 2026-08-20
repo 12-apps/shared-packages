@@ -72,6 +72,49 @@ BREAKING CHANGE: `<Button kind="…">` is replaced by `variant`. Callers passing
 `kind` must rename the prop; the values are unchanged.
 ```
 
+## A major needs a human
+
+A major is the one bump a consumer cannot take without reading. Consumers pin
+`@12-apps/*` **exactly**, so an unplanned major is not picked up and quietly
+ignored — it stalls the pin, and the consumer drifts further behind with every
+later release. Two checks make spending one deliberate.
+
+**At pull-request time**, the `Major guard` check fails a PR whose title or any
+commit body carries a `BREAKING CHANGE:` footer. If the major is intended, add
+the **`allow-major`** label and the check passes. This is where a major is
+cheapest to reconsider: the message is still editable.
+
+It also fails the `!` shorthand — `fix(prisma)!:` — and the `allow-major` label
+does **not** excuse that one, because it is not a major. `.releaserc.json` runs
+the angular preset, whose `headerPattern` rejects `!`, so the header does not
+parse and the commit is worth **no release at all**. That exact commit once was
+the only one in range for five packages and released none of them, silently.
+Put the breaking change in a `BREAKING CHANGE:` footer instead.
+
+**At release time**, the `Detect major bumps` job in `ci.yml` re-runs the
+analysis against `main` with `semantic-release --dry-run` — which tags and
+publishes nothing — and, when a major is pending, holds the run at the
+`Approve major release` job. That job belongs to the `release-major`
+environment, so GitHub shows **Review deployments** in the Actions tab and
+notifies its reviewers. Approve and the release continues; reject and it stops
+having written no tag, so the next merge re-cuts the version normally.
+
+Only a pending major holds the run. An ordinary minor or patch release never
+waits for anyone.
+
+> **Setup, once per repository:** Settings → Environments → New environment →
+> `release-major`, then add Required reviewers. **Without that protection rule
+> the approval job passes straight through and the gate silently does nothing**
+> — which looks exactly like a healthy release. If a major reaches npm without
+> anyone approving it, check this first.
+
+A footer is anchored to the start of a line, which is what
+conventional-commits-parser tests. A sentence that merely *mentions* a breaking
+change mid-line is not one — but the commit guard wraps bodies at 100
+characters, and a wrap that lands on the phrase turns a mention into a footer.
+That is how `@12-apps/request-scope` went out as `2.0.0` for a change that adds
+a `.releaserc.json` the tarball does not even ship.
+
 ## Scope
 
 Use the package name — `feat(ui):`, `fix(payments-frontend):`. A change that
