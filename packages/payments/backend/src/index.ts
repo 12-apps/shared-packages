@@ -231,6 +231,7 @@ export {
 export { hasUsableCredentials } from './config/usable-credentials';
 export { mintBrowserKey, storedBrowserKey, type BrowserKeyDeps } from './config/browser-key';
 export { createCycleCollector } from './core/cycle-collection';
+export { merchantWebhookUrl, type MerchantWebhookUrlOptions } from './config/webhook-url';
 export { classifyFirstCharge } from './checkout/first-charge';
 export type { FirstChargeSettlement, FirstChargeExpectation, FirstChargeOptions } from './checkout/first-charge';
 export { envOAuthAppCredentials, DEFAULT_OAUTH_APP_EXTRAS, type EnvOAuthAppOptions } from './config/oauth-env';
