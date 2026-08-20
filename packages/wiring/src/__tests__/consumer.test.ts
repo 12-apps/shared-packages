@@ -54,6 +54,8 @@ describe("a server host adopting the fixture package", () => {
       "listDeliveryNotes",
       "addDeliveryNote",
     ]);
+    // Absolutized from the http binding's mountPath, in OpenAPI form.
+    expect(assembled.mcpEndpoints[0]?.path).toBe("/api/admin/{tenantSlug}/notes");
     expect(assembled.mcpEndpoints[0]?.annotations?.readOnly).toBe(true);
     expect(assembled.db[0]?.contribution.partial).toBe("prisma/delivery-notes.prisma");
 
@@ -71,6 +73,33 @@ describe("a server host adopting the fixture package", () => {
     await mailer.sendDigest("owner@example.com", 2);
     expect(email.sent[0]?.to).toBe("owner@example.com");
     expect(email.sent[0]?.message.subject).toContain("2");
+  });
+
+  it("applies MCP overrides by operationId and refuses one for an undeclared tool", () => {
+    const host = createWiringHost({ name: "api", kind: "server", ports: { email: memoryEmailPort().port } });
+    const deps: NotesJobDeps = { store: memoryStore(), ran: [] };
+    host.adoptServer({
+      manifest: notesManifest,
+      server: notesServerManifest,
+      bindings: {
+        http: { mountPath: MOUNT, config: { store: deps.store } },
+        jobs: { deps },
+        email: {},
+      },
+      mcpOverrides: { listDeliveryNotes: { summary: "List notes for THIS host." } },
+    });
+    const { mcpEndpoints } = host.assemble();
+    expect(mcpEndpoints[0]?.summary).toBe("List notes for THIS host.");
+    expect(mcpEndpoints[0]?.path).toBe("/api/admin/{tenantSlug}/notes");
+
+    const other = createWiringHost({ name: "api2", kind: "server" });
+    expect(() =>
+      other.adoptServer({
+        manifest: notesManifest,
+        server: notesServerManifest,
+        mcpOverrides: { nope: { summary: "?" } },
+      }),
+    ).toThrow(/does not declare/);
   });
 
   it("orders routes most-specific-first", () => {

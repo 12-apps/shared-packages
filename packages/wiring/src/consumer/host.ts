@@ -23,7 +23,7 @@ import type { AnyServerManifest, AnyWebManifest, PackageManifest } from "../cont
 import type { WiringPorts } from "../ports";
 import { bindEmail, bindHttp, bindJobs, bindSurface, type BindContext, type WiringSinks } from "./apply";
 import { isDeclined, type MailerOf, type RuntimeBindings, type ServerBindings, type SurfaceOf, type WebBindings } from "./bindings";
-import { findRouteConflicts, sortRoutes } from "./paths";
+import { findRouteConflicts, openApiMountPrefix, sortRoutes } from "./paths";
 import { unboundEntries, type CapabilityReportEntry, type PackageReportEntry, type WiringReport } from "./report";
 
 export type HostKind = "server" | "web";
@@ -44,8 +44,17 @@ export interface ServerAdoption<TManifest extends AnyServerManifest = AnyServerM
    * Host-built, vocabulary-dependent MCP tools (the
    * `lifecycleMcpEndpoints(vocabulary)` pattern) — joined with the
    * manifest's own so the aggregate still uniqueness-checks every tool.
+   * Absolute paths: the host authored them.
    */
   mcpEndpoints?: readonly WireMcpTool[];
+  /**
+   * Host specializations of the MANIFEST's tools, keyed by operationId and
+   * shallow-merged — a narrowed schema (an enum of THIS host's preset keys),
+   * a richer summary, a policy nudge. The escape valve that keeps a host from
+   * forking the package's whole list to change one field; an unknown id is a
+   * wiring error, so an override cannot silently outlive its tool.
+   */
+  mcpOverrides?: Readonly<Record<string, Partial<WireMcpTool>>>;
 }
 
 /** One package handed to a web host. */
@@ -99,13 +108,18 @@ export class WiringHost {
     adoption: ServerAdoption<TManifest>,
   ): { mailer: MailerOf<TManifest> } {
     this.assertKind("server", adoption.manifest.name);
-    const capabilities = this.beginAdoption(adoption.manifest, adoption.mcpEndpoints);
+    const capabilities = this.beginAdoption(adoption.manifest);
     this.applyRuntime(adoption.manifest, {
       applicable: adoption.manifest.server ?? [],
       foreign: adoption.manifest.web ?? [],
       bindings: (adoption.bindings ?? {}) as RuntimeBindings,
       bind: (kind, context, binding) => this.bindServerKind(kind, context, adoption.server, binding),
       capabilities,
+    });
+    this.collectMcp(adoption.manifest, capabilities, {
+      extra: adoption.mcpEndpoints,
+      overrides: adoption.mcpOverrides,
+      mountPath: this.httpMountPathOf(adoption.bindings as RuntimeBindings | undefined),
     });
     this.entries.push({ packageName: adoption.manifest.name, capabilities });
     return { mailer: this.sinks.mailers[adoption.manifest.name] as MailerOf<TManifest> };
@@ -115,7 +129,8 @@ export class WiringHost {
     adoption: WebAdoption<TManifest>,
   ): { surface: SurfaceOf<TManifest> } {
     this.assertKind("web", adoption.manifest.name);
-    const capabilities = this.beginAdoption(adoption.manifest, undefined);
+    const capabilities = this.beginAdoption(adoption.manifest);
+    this.collectMcp(adoption.manifest, capabilities, {});
     this.applyRuntime(adoption.manifest, {
       applicable: adoption.manifest.web ?? [],
       foreign: adoption.manifest.server ?? [],
@@ -160,21 +175,11 @@ export class WiringHost {
   }
 
   /** Duplicate-adoption check plus collection of the shared data capabilities. */
-  private beginAdoption(
-    manifest: PackageManifest,
-    extraMcp: readonly WireMcpTool[] | undefined,
-  ): CapabilityReportEntry[] {
+  private beginAdoption(manifest: PackageManifest): CapabilityReportEntry[] {
     if (this.adopted.has(manifest.name)) {
       throw new WiringAssemblyError(this.options.name, `${manifest.name} was adopted twice.`);
     }
     this.adopted.add(manifest.name);
-    return this.collectShared(manifest, extraMcp);
-  }
-
-  private collectShared(
-    manifest: PackageManifest,
-    extraMcp: readonly WireMcpTool[] | undefined,
-  ): CapabilityReportEntry[] {
     const capabilities: CapabilityReportEntry[] = [];
     if (manifest.permissions) {
       this.permissions.push(manifest.permissions);
@@ -184,11 +189,6 @@ export class WiringHost {
       this.notifications.push(...manifest.notifications);
       capabilities.push({ kind: "notifications", status: "collected", detail: `${manifest.notifications.length} blueprints` });
     }
-    const tools = [...(manifest.mcp?.endpoints ?? []), ...(extraMcp ?? [])];
-    if (tools.length > 0) {
-      this.mcpEndpoints.push(...tools);
-      capabilities.push({ kind: "mcp", status: "collected", detail: `${tools.length} tools` });
-    }
     if (manifest.db) {
       this.db.push({ packageName: manifest.name, contribution: manifest.db });
       capabilities.push({ kind: "db", status: "collected", detail: manifest.db.partial });
@@ -197,6 +197,51 @@ export class WiringHost {
       capabilities.push({ kind: "e2e", status: "collected", detail: manifest.e2e.entry });
     }
     return capabilities;
+  }
+
+  /** The mount the http binding named, when http was bound rather than declined. */
+  private httpMountPathOf(bindings: RuntimeBindings | undefined): string | undefined {
+    const binding = bindings?.["http"];
+    if (binding === undefined || isDeclined(binding)) return undefined;
+    const mountPath = (binding as { mountPath?: unknown }).mountPath;
+    return typeof mountPath === "string" ? mountPath : undefined;
+  }
+
+  /**
+   * MCP tools, collected AFTER the bindings so the manifest's mount-relative
+   * paths can be absolutized against the http binding's `mountPath` — one
+   * source of truth for a tool's URL: the route descriptor it proxies to.
+   * Host overrides are shallow-merged by operationId; host-built extras
+   * (vocabulary factories) pass through untouched.
+   */
+  private collectMcp(
+    manifest: PackageManifest,
+    capabilities: CapabilityReportEntry[],
+    input: {
+      extra?: readonly WireMcpTool[];
+      overrides?: Readonly<Record<string, Partial<WireMcpTool>>>;
+      mountPath?: string;
+    },
+  ): void {
+    const declared = manifest.mcp?.endpoints ?? [];
+    const known = new Set(declared.map((tool) => tool.operationId));
+    Object.keys(input.overrides ?? {}).forEach((operationId) => {
+      if (!known.has(operationId)) {
+        throw new WiringAssemblyError(
+          this.options.name,
+          `${manifest.name}: an MCP override targets "${operationId}", which the manifest does not declare.`,
+        );
+      }
+    });
+    const prefix = input.mountPath === undefined ? "" : openApiMountPrefix(input.mountPath);
+    const fromManifest = declared.map((tool) => {
+      const overridden = { ...tool, ...(input.overrides?.[tool.operationId] ?? {}) };
+      return { ...overridden, path: `${prefix}${overridden.path}` };
+    });
+    const tools = [...fromManifest, ...(input.extra ?? [])];
+    if (tools.length === 0) return;
+    this.mcpEndpoints.push(...tools);
+    capabilities.push({ kind: "mcp", status: "collected", detail: `${tools.length} tools` });
   }
 
   /** `areas` is data — collected without a binding, like the shared capabilities. */
