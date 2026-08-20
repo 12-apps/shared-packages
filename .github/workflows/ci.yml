@@ -1000,8 +1000,25 @@ jobs:
     needs: [lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, backend-harness, portability, release-scripts]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    # `write`, on a job that writes nothing — and the reason is the whole
+    # awkwardness of simulating a release. semantic-release's verifyConditions
+    # runs a preflight `git push --dry-run`, in a dry run too, because proving
+    # the release COULD complete is part of answering what it would do. Refused,
+    # it reports EGITNOPERMISSION.
+    #
+    # With `contents: read` that refusal is unconditional, so every package
+    # fails to analyse and next-versions.mjs does what it should — refuses to
+    # guess — and the whole release train stops behind it: this job gates
+    # `release`, so nothing publishes at all. Four consecutive pushes to main
+    # released nothing before this was spotted.
+    #
+    # The permission buys the CHECK, not a push. `--dry-run` skips the tag,
+    # publish and success steps; the `release` job below already carries the
+    # same `contents: write` for the same command, which is the point — the
+    # analysis is only meaningful while it stays identical to the release it is
+    # describing (see the header of scripts/next-versions.mjs).
     permissions:
-      contents: read
+      contents: write
     outputs:
       has_major: ${{ steps.scan.outputs.has_major }}
       majors: ${{ steps.scan.outputs.majors }}
