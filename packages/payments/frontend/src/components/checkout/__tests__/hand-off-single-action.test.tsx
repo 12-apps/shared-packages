@@ -151,6 +151,19 @@ describe("Pagamento at a store that finishes on the provider's page", () => {
     expect(createOrder.mock.calls[0]?.[0]).toMatchObject({ method: "PIX" });
   });
 
+  it("shows ONE busy state while the charge is raised, not two", async () => {
+    // The screen renders its own "Preparando o pagamento", so the shell's
+    // generic spinner is suppressed for this flow — stacked side by side they
+    // were two spinners telling the buyer the same thing.
+    const createOrder = vi.fn(handsOver());
+    renderHandOff({ createOrder });
+
+    fireEvent.click(await screen.findByTestId("checkout-handoff-start"));
+
+    await waitFor(() => expect(screen.getByTestId("checkout-handoff-pending")).toBeTruthy());
+    expect(screen.queryAllByTestId("payment-generating")).toHaveLength(0);
+  });
+
   it("promises only the methods the store actually takes", async () => {
     renderHandOff({
       createOrder: vi.fn(handsOver()),
