@@ -21,7 +21,7 @@ import {
   stubRefund,
 } from '../../providers/shared';
 import type { CheckoutCopy } from '../copy';
-import { createPaymentFlowsBE } from '../factory';
+import { createWirePaymentFlows } from '../wire-view';
 import type { PaymentFlowsBEConfig } from '../runtime';
 import type {
   AttachedCharge,
@@ -248,7 +248,7 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
     state: world.payable.state,
   });
 
-  const routes = createPaymentFlowsBE<TestCaller, InvoiceView>({
+  const routes = createWirePaymentFlows<TestCaller, InvoiceView>({
     gateway,
     charges,
     credentials,

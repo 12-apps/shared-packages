@@ -12,11 +12,15 @@
 
 import { describe, expect, it } from "vitest";
 
-import { paymentsBackendManifest } from "@12-apps/payments-backend/manifest";
-import { paymentsBackendServerManifest } from "@12-apps/payments-backend/manifest/server";
+import { paymentsBackendManifest, paymentsCheckoutManifest } from "@12-apps/payments-backend/manifest";
+import {
+  paymentsBackendServerManifest,
+  paymentsCheckoutServerManifest,
+} from "@12-apps/payments-backend/manifest/server";
 import paymentsPackageJson from "@12-apps/payments-backend/package.json";
 import type { AnyServerManifest } from "../contract/manifest";
 import type { PackageManifest } from "../contract/manifest";
+import type { EmailPort } from "../contract/email";
 import {
   assertDbMirror,
   assertEnvMirror,
@@ -26,37 +30,57 @@ import {
 } from "../producer";
 
 const manifest: PackageManifest = paymentsBackendManifest;
-const server: AnyServerManifest = paymentsBackendServerManifest;
+const checkout: PackageManifest = paymentsCheckoutManifest;
 
-describe("the payments-backend manifest, through wiring's own producer", () => {
-  it("passes the producer assertions, server half included", () => {
+/** The words a compliance run supplies where a host would supply its own. */
+const COPY = {
+  subject: (receipt: { reference: string }) => `r ${receipt.reference}`,
+  text: () => "t",
+  html: () => "<p>t</p>",
+};
+
+/** Read afresh per test — the flakiness lane refuses shared test-scope bindings. */
+function serverOf(): AnyServerManifest {
+  return paymentsBackendServerManifest({ receiptCopy: COPY }) as AnyServerManifest;
+}
+
+describe("the payments-backend manifests, through wiring's own producer", () => {
+  it("passes the producer assertions, both identities, server halves included", () => {
     expect(defineManifest(manifest)).toBe(manifest);
+    expect(defineManifest(checkout)).toBe(checkout);
+    const server = serverOf();
     expect(defineServerManifest(manifest, server)).toBe(server);
+    expect(
+      defineServerManifest(checkout, paymentsCheckoutServerManifest as AnyServerManifest),
+    ).toBe(paymentsCheckoutServerManifest);
   });
 
-  it("declares identity, db, observability and jobs — nothing else", () => {
+  it("declares the library surface whole: http, jobs and the receipt mailer", () => {
     expect(manifest.name).toBe("@12-apps/payments-backend");
     expect(manifest.contract).toBe(1);
     expect(manifest.db).toEqual({
       partial: "prisma/payments.prisma",
       migrations: "prisma/migrations",
     });
-    // Where a wiring host files the bound handlers' reports. The package
-    // itself still binds no logger anywhere — that trait is load-bearing.
     expect(manifest.observability).toEqual({ namespace: "payments" });
-    expect(manifest.server).toEqual(["jobs"]);
+    expect(manifest.server).toEqual(["http", "jobs", "email"]);
     // Absences pinned, with their reasons in the manifest's own docblock:
-    // http (two privilege-separated dispatch tables behind framework-free
-    // mounts, not WireRoute descriptors), mcp and permissions (host ports),
-    // e2e (the journeys ship in the SIBLING @12-apps/payments-e2e), env
-    // (zero process.env reads; PAYMENTS_STUB is host-read and the OAuth
-    // names are computed per provider).
+    // mcp and permissions (host ports), e2e (the journeys ship in the
+    // SIBLING @12-apps/payments-e2e), env (zero process.env reads).
     expect(manifest.web).toBeUndefined();
     expect(manifest.env).toBeUndefined();
     expect(manifest.e2e).toBeUndefined();
   });
 
+  it("keeps the privilege split as two manifests — the buyer surface has one capability", () => {
+    expect(checkout.name).toBe("@12-apps/payments-checkout");
+    expect(checkout.server).toEqual(["http"]);
+    expect(checkout.db).toBeUndefined();
+    expect(checkout.observability).toEqual({ namespace: "payments-checkout" });
+  });
+
   it("declares the reconcile sweep whole: cadence, no-retry posture and lease", () => {
+    const server = serverOf();
     expect(server.jobs?.namespace).toBe("payments");
     const blueprint = server.jobs?.blueprints["reconcilePending"];
     expect(blueprint).toMatchObject({
@@ -70,9 +94,27 @@ describe("the payments-backend manifest, through wiring's own producer", () => {
       attempts: 1,
       lease: { ttlMs: 5 * 60_000 },
     });
-    // Enqueue-free: no interval beside the schedule (the producer asserts
-    // the XOR), and the handler takes no payload.
     expect(blueprint).not.toHaveProperty("interval");
+  });
+
+  it("builds the receipt mailer over the contract's own port shape", async () => {
+    const sent: { to: string; subject: string }[] = [];
+    const port: EmailPort = {
+      send: async (to, message) => {
+        sent.push({ to, subject: message.subject });
+      },
+    };
+    const mailer = serverOf().email?.createMailer(port) as {
+      sendReceipt(to: string, receipt: unknown): Promise<void>;
+    };
+    await mailer.sendReceipt("ana@example.com", {
+      reference: "inv_1",
+      amountCents: 7500,
+      currency: "BRL",
+      method: "pix",
+      paidAt: new Date(0),
+    });
+    expect(sent).toEqual([{ to: "ana@example.com", subject: "r inv_1" }]);
   });
 
   it("mirrors db into package.json, and the exports map matches the declarations", () => {

@@ -355,6 +355,12 @@ export {
   type WebhookEventDelegate,
 } from './prisma/webhook-inbox';
 
+// ---- The wiring producer half (FUT-889) ----------------------------------
+// Countable views over the two mounts and the receipt-mailer seam. The
+// explicit export list lives in `wire/index.ts` (this file is at the size
+// gate), exactly as the activation and platform blocks below do.
+export * from './wire/index';
+
 export {
   createMemoryAttemptLedger,
   createMemoryChargeStore,
