@@ -166,22 +166,39 @@ function Subtitle({ text }: { text?: string }): JSX.Element | null {
   );
 }
 
-/** The divider + provider block, identical on both pages. */
+/**
+ * The divider + provider block, identical on both pages.
+ *
+ * `label` is what the divider SAYS — "ou entre com", "ou cadastre-se com" —
+ * and both sentences begin with "ou". They are only true when there is another
+ * way to sign in directly above them. With the platform's e-mail method
+ * switched off the form is not rendered, and the label then sits at the top of
+ * the card offering an alternative to nothing: the screen reads as though a
+ * form failed to load rather than as a Google-only sign-in.
+ *
+ * So the label is OPTIONAL, and the caller passes it only when it has rendered
+ * something above. Omitted, the buttons still render — they are the whole
+ * method now, not the alternative to one.
+ */
 function Providers({
   label,
   children,
 }: {
-  label: string;
+  label?: string;
   children: ReactNode;
 }): JSX.Element | null {
   if (!children) return null;
   return (
     <>
       <Spacer size="lg" />
-      <Text color="secondary" size="sm" style={{ textAlign: "center" }}>
-        {label}
-      </Text>
-      <Spacer size="sm" />
+      {label !== undefined && (
+        <>
+          <Text color="secondary" size="sm" style={{ textAlign: "center" }}>
+            {label}
+          </Text>
+          <Spacer size="sm" />
+        </>
+      )}
       {children}
     </>
   );
@@ -244,7 +261,7 @@ function LoginView({
             onForgotPassword={onForgotPassword}
           />
         )}
-        <Providers label={copy.login.providerDivider}>{providers}</Providers>
+        <Providers label={emailEnabled ? copy.login.providerDivider : undefined}>{providers}</Providers>
         {routes.signup !== undefined && (
           <Footer
             prompt={copy.login.signupPrompt}
@@ -288,7 +305,7 @@ function SignupView({
             disabled={disabled}
           />
         )}
-        <Providers label={copy.signup.providerDivider}>{providers}</Providers>
+        <Providers label={emailEnabled ? copy.signup.providerDivider : undefined}>{providers}</Providers>
         <Footer
           prompt={copy.signup.loginPrompt}
           linkText={copy.signup.loginLink}
