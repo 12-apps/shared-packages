@@ -18,10 +18,16 @@ kind.
 | **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma, a symlinked partial dangles under `turbo prune`, and `npm pack` drops it from the tarball). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 | **E2E journeys** | `@12-apps/report-builder/e2e` | Implement `defineReportsWorld({ ... })` in a module inside your own playwright-bdd `steps` glob, then add `reportsFeatures` / `reportsFeaturesRoot` / `reportsSteps` to `defineBddConfig`. The Gherkin ships HERE; nothing is copied, so a scenario added upstream runs on your next version bump. See *The journeys ship with the package* below. |
 
-## Migrating 5.4.x → 6.0.0 — the host now declares its own WORDS (FUT-760)
+## Migrating 5.4.x → 5.5.0 — the host now declares its own WORDS (FUT-760)
 
 4.0.0 moved the host's DATA out of this package. This move is the same argument
 one level down: its **copy**.
+
+**It is a MINOR, despite being breaking.** This repo maps a `BREAKING CHANGE:`
+footer and the `!` shorthand alike to a minor; only an explicit `RELEASE-MAJOR`
+line spends a major, and this change does not carry one. So the upgrade is
+5.4.x → 5.5.0 and every signature below still changes — read the table before
+bumping the pin.
 
 Fourteen files compiled in pt-BR — the spec sentence a block is described by
 (`soma de receita em pedidos por data`), the column, axis and series headings,
