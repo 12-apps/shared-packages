@@ -4,7 +4,11 @@
   "type": "module",
   "description": "Generic, portable research-to-buy engine: multi-source current-price discovery (store connectors, SERP, manual price lists), no-AI relevance scoring, unit-price ranking. Framework-free core with host ports (db/cache/budget/catalog). Zero app coupling.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./jobs": "./src/jobs.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./manifest/server": "./src/manifest/server.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "clean": "rm -rf node_modules coverage",
@@ -20,6 +24,7 @@
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
     "eslint": "^9.39.1",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
@@ -52,5 +57,19 @@
     "!**/*.stories.*",
     "!**/*.test-story.*",
     "!**/test-helpers.*"
-  ]
+  ],
+  "wiring": {
+    "db": {
+      "partial": "prisma/product-research.prisma",
+      "migrations": "prisma/migrations"
+    }
+  },
+  "peerDependencies": {
+    "@12-apps/wiring": ">=1.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@12-apps/wiring": {
+      "optional": true
+    }
+  }
 }
