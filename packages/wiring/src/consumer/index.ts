@@ -48,3 +48,11 @@ export {
   type PackageReportEntry,
   type WiringReport,
 } from "./report";
+
+export {
+  createWireRouteTable,
+  forwardWireParams,
+  parseWireRouteKey,
+  wireResponse,
+  type WireRouteTable,
+} from "./endpoint";
