@@ -39,7 +39,7 @@
 // forbids it, and bash's `$(...)` strips it before that. Any single-character
 // separator that CAN survive is a character a commit body may legitimately
 // contain, so the boundary would be guesswork. JSON has no such ambiguity.
-import { readFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 
 const ESCAPE_LABEL = "allow-major";
 
@@ -142,10 +142,35 @@ export function report(env = process.env) {
   return { lines, failed };
 }
 
+/**
+ * Hand the VERDICT to the workflow, separately from this check's own outcome.
+ *
+ * The two are not the same question any more. This check going red is feedback —
+ * a human can still clear it, and an agent holding the repo's token can clear it
+ * too, by adding the `allow-major` label through the API. That is not a
+ * hypothetical: it is how the label got onto #319.
+ *
+ * So the label no longer decides whether the MERGE is possible. `major-guard.yml`
+ * reads this output and, when it is true, starts a job bound to the
+ * `major-approval` environment, which sits waiting for a deployment approval that
+ * an App installation token cannot give. The label silences the red; only a human
+ * clicking Review deployments unblocks the merge.
+ *
+ * Written unconditionally — on a major the step below also exits 1, and a job's
+ * outputs must survive that, which is why the workflow reads them under
+ * `always()`.
+ */
+function publishVerdict(major) {
+  const file = process.env.GITHUB_OUTPUT;
+  if (!file) return;
+  appendFileSync(file, `major=${major ? "true" : "false"}\n`);
+}
+
 // Guarded so the selftest can import report() without the module deciding
 // anything on the way in.
 if (process.argv[1] && process.argv[1].endsWith("breaking-change-guard.mjs")) {
   const { lines, failed } = report();
   for (const line of lines) console.log(line);
+  publishVerdict(inspect().breaking);
   process.exitCode = failed ? 1 : 0;
 }
