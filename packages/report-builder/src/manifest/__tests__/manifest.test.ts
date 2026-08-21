@@ -11,6 +11,7 @@ import type { PackageManifest, WirePermissionsContribution } from '@12-apps/wiri
 import {
   assertDbMirror,
   assertEnvMirror,
+  assertExportsMirror,
   defineManifest,
   defineServerManifest,
   defineWebManifest,
@@ -72,6 +73,13 @@ describe('the shared manifest', () => {
     // execute this TS manifest, so the contribution lives in package.json
     // too, and this assertion is what keeps the two the same shape.
     expect(() => assertDbMirror(reportBuilderManifest, packageJson)).not.toThrow();
+  });
+
+  it('keeps exports subpaths and manifest declarations the same set — the #1008 tripwire', () => {
+    // A capability shipped as an exports subpath the manifest never mentions
+    // is invisible to the adopting host; the reverse is a declaration whose
+    // module no longer resolves. Both directions fail this package's own run.
+    expect(() => assertExportsMirror(reportBuilderManifest, packageJson)).not.toThrow();
   });
 
   it('declares no env capability, and package.json agrees', () => {

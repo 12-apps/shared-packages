@@ -9,6 +9,7 @@
     "./hono": "./src/hono/index.ts",
     "./bullmq": "./src/drivers/bullmq.ts",
     "./inline": "./src/drivers/inline.ts",
+    "./manifest": "./src/manifest/index.ts",
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -68,5 +69,26 @@
     "!**/*.stories.*",
     "!**/*.test-story.*",
     "!**/test-helpers.*"
-  ]
+  ],
+  "wiring": {
+    "env": [
+      {
+        "name": "REDIS_URL",
+        "description": "Set it and the queue turns itself on; unset selects the inline/off driver."
+      },
+      {
+        "name": "JOBS_DRIVER",
+        "description": "bullmq | inline | off; unset picks by REDIS_URL and NODE_ENV."
+      },
+      {
+        "name": "JOBS_WORKER",
+        "scope": "worker",
+        "description": "\"1\" on the ONE process that consumes the queue and runs schedules."
+      },
+      {
+        "name": "JOBS_QUEUE_PREFIX",
+        "description": "Optional key prefix, to share one Redis across environments."
+      }
+    ]
+  }
 }
