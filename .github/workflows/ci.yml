@@ -1134,6 +1134,43 @@ jobs:
           node-version: 24
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
+      # A run releases the commit it was STARTED for, and `Approve major release`
+      # can hold it for as long as a human takes. semantic-release refuses a
+      # checkout that is behind its branch — "The local branch main is behind the
+      # remote one, therefore a new version won't be published" — once per
+      # package, in a collapsed log group, and then the job carries on and goes
+      # GREEN. So the failure mode is a release that reports success and ships
+      # nothing, which is the one thing this job's own alerting exists to catch.
+      #
+      # Measured: majors merged at 13:06, approved at 14:27, eight commits landed
+      # in between, every package skipped.
+      #
+      # Behind + nobody approved anything is ordinary — two pushes in quick
+      # succession, and the newer run releases both. Say so and stop; a red there
+      # would be noise on every busy morning.
+      #
+      # Behind + a human approved a major is the trap: they were asked a
+      # question, they answered it, and the answer bought nothing. That is worth
+      # a red that names the remedy, because the alternative is a version nobody
+      # can find and a pin nobody can bump.
+      - name: Refuse to release a checkout that is behind main
+        shell: bash
+        env:
+          APPROVED: ${{ needs.approve-majors.result }}
+        run: |
+          set -o pipefail
+          git fetch origin main --quiet
+          head="$(git rev-parse HEAD)"
+          tip="$(git rev-parse origin/main)"
+          [ "$head" = "$tip" ] && exit 0
+          remedy="Re-run Release from the newest commit on main (push, or re-run that commit's CI); approve the gate promptly so main cannot move underneath it."
+          if [ "$APPROVED" = 'success' ]; then
+            echo "::error::A major was approved for ${head:0:7}, but main is now ${tip:0:7}. semantic-release would skip every package and publish nothing. $remedy"
+            exit 1
+          fi
+          # Not a failure: the newer run carries these commits, and a red here
+          # would mark a commit that released perfectly well one run later.
+          echo "::notice::Nothing to release from ${head:0:7}: main is now ${tip:0:7} and the newer run covers these commits."
       - name: Install dependencies
         shell: bash
         run: |
