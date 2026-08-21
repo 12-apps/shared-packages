@@ -18,8 +18,20 @@
  * the port and nothing else.
  */
 
+import type { CheckoutViewCopy } from "../components/checkout/view-copy";
+
+export type { CheckoutViewCopy };
+
 /** Every buyer-facing string the factory's own screens render. */
 export interface CheckoutCopyFE {
+  /**
+   * Everything the wrapped `CheckoutFlow` itself renders — stepper labels,
+   * the Dados step, the empty cart, the whole confirmation screen. FUT-741
+   * scoped those screens out as "already carried their own product copy";
+   * that copy was one application's Portuguese, so the scope-out WAS the
+   * leak. A pt-BR host passes `PT_BR_CHECKOUT_VIEW_COPY` here by hand.
+   */
+  views: CheckoutViewCopy;
   /** No provider connected AND no host remedy: the store simply does not charge. */
   unavailableTitle: string;
   unavailableBody: string;
@@ -47,9 +59,6 @@ export interface CheckoutCopyFE {
    * part only a host can own.
    */
   returnTimedOut?: string;
-  /** Nothing to check out (cart mode only). */
-  emptyCartTitle: string;
-  emptyCartAction: string;
   /** The Dados step's primary action. */
   continueAction: string;
   /**

@@ -17,6 +17,8 @@ interface ConfirmDialogProps {
   title: string;
   body: string;
   confirmLabel: string;
+  /** The back-out action — REQUIRED, the host's words, like every label here. */
+  cancelLabel: string;
   busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -42,7 +44,7 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
               disabled={props.busy}
               dataTestId="confirm-cancel"
             >
-              Cancelar
+              {props.cancelLabel}
             </Button>
             <Button
               onClick={props.onConfirm}

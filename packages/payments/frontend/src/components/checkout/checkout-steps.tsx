@@ -17,6 +17,7 @@ import type {
   OrderStatus,
   PaymentMethod,
 } from "./types";
+import type { DadosStepCopy, EmptyCartCopy } from "./view-copy";
 import { useCheckoutComponents } from "./ui";
 
 /**
@@ -100,15 +101,15 @@ function PaymentBody({
 }
 
 /** Empty-cart state shown when there's nothing to check out. */
-export function EmptyCart({ onBack }: { onBack: () => void }): JSX.Element {
+export function EmptyCart({ copy, onBack }: { copy: EmptyCartCopy; onBack: () => void }): JSX.Element {
   const { Button, Text } = useCheckoutComponents();
   return (
     <Box data-testid="checkout-empty" sx={{ py: 8, textAlign: "center", display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
       <Text variant="heading" size="md" as="p">
-        Seu carrinho está vazio.
+        {copy.title}
       </Text>
       <Button variant="solid" color="primary" size="md" onClick={onBack} dataTestId="checkout-empty-back">
-        Ver cardápio
+        {copy.action}
       </Button>
     </Box>
   );
@@ -158,6 +159,7 @@ function PayBarTotal({
  * — no charge yet.
  */
 export function DadosStep({
+  copy,
   buyer,
   onBuyerChange,
   saveProfile,
@@ -170,6 +172,8 @@ export function DadosStep({
   discountLines,
   totalOverride,
 }: {
+  /** The step's own sentences — the HOST's words (see `./view-copy`). */
+  copy: DadosStepCopy;
   buyer: BuyerInfo;
   onBuyerChange: (buyer: BuyerInfo) => void;
   saveProfile: boolean;
@@ -206,12 +210,13 @@ export function DadosStep({
         <Checkbox
           checked={saveProfile}
           onChange={(_event, checked) => onSaveProfileChange(checked)}
-          label="Salvar meus dados para a próxima compra"
+          label={copy.saveProfile}
           data-testid="buyer-save-profile"
         />
       </Box>
 
       <DadosPayBar
+        copy={copy}
         totalLabel={totalLabel}
         totalItems={totalItems}
         createError={createError}
@@ -227,12 +232,14 @@ export function DadosStep({
 
 /** The sticky "Continuar" bar: the refusal, the money, and the one action. */
 function DadosPayBar({
+  copy,
   totalLabel,
   totalItems,
   createError,
   onContinue,
   children,
 }: {
+  copy: DadosStepCopy;
   totalLabel: string;
   totalItems: number;
   createError: string | null;
@@ -244,20 +251,22 @@ function DadosPayBar({
     <ActionBar dataTestId="checkout-pay-bar">
       <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 1.5 }}>
         {createError ? (
-          <Alert variant="danger" title="Não foi possível continuar" description={createError} showIcon data-testid="checkout-error" />
+          <Alert variant="danger" title={copy.cannotContinueTitle} description={createError} showIcon data-testid="checkout-error" />
         ) : null}
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <PayBarTotal totalLabel={totalLabel} totalItems={totalItems}>{children}</PayBarTotal>
           <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5, minWidth: 0 }}>
             <Button variant="solid" color="primary" size="lg" fullWidth onClick={onContinue} dataTestId="checkout-continue">
-              Continuar
+              {copy.continueAction}
             </Button>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "text.secondary" }}>
-              <LockOutlinedIcon sx={{ fontSize: 13 }} />
-              <Text variant="caption" size="xs" color="secondary" as="span">
-                Pagamento seguro
-              </Text>
-            </Box>
+            {copy.secureNotice ? (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "text.secondary" }}>
+                <LockOutlinedIcon sx={{ fontSize: 13 }} />
+                <Text variant="caption" size="xs" color="secondary" as="span">
+                  {copy.secureNotice}
+                </Text>
+              </Box>
+            ) : null}
           </Box>
         </Box>
       </Box>

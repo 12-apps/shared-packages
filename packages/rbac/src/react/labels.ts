@@ -12,7 +12,8 @@ import type { PermissionRegistry } from '../core/types';
  * not authorization. They now arrive with the contribution that owns the ids
  * they label, are merged by `composePermissions`, and reach the screens as
  * `catalog.labels` — this file is the composer, and the words this package
- * does own (`Papéis`, `Equipe`) ride in its own contribution beside its ids.
+ * does own (`roles`, `team`) arrive with the REQUIRED web copy
+ * (`RbacWebCopy.permissionLabels`), never as a shipped default.
  *
  * The composer's promise is unchanged: a label is built from the permission's
  * colon-separated SEGMENTS, and an unknown segment falls back to its raw text,
