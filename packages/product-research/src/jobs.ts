@@ -11,8 +11,14 @@
  *
  * This is the first PAYLOAD-CARRYING blueprint (shift's auto-close is a
  * scheduled sweep): one buyer request enqueues one run, and the payload is
- * `RunResearchInput`. No schedule, no interval, no lease — idempotency is
- * per-`runId`, not a single-flight name.
+ * the request's IDENTITY — `ResearchRunRef`, ids only. Not
+ * `RunResearchInput`: the query is derivable state, and a payload that
+ * carried it would hand a retry (or a days-later orphan re-enqueue) a stale
+ * copy while skipping the exists/tenant re-read the origin host has always
+ * run first. The dep re-reads, rebuilds and runs; answering `null` says the
+ * request is gone — a completed job, never a retryable failure. No schedule,
+ * no interval, no lease — idempotency is per-`runId`, not a single-flight
+ * name.
  *
  * The host binds ONE dep: `runResearch`, its registry, connector context and
  * config overrides closed over — the contract's host-computed-argument rule,
@@ -26,17 +32,23 @@
 
 import type { JobsContribution } from '@12-apps/wiring';
 
-import type { RunResearchInput } from './pipeline/run-research';
 import type { RunResult } from './types';
+
+/** The wire payload: which request, for which tenant — and nothing else. */
+export interface ResearchRunRef {
+  clientId: string;
+  requestId: string;
+}
 
 export interface ResearchJobDeps {
   /**
-   * Run one research pipeline for one request. The host closes its
-   * `ConnectorRegistry`, `ConnectorContext` and config overrides over this;
-   * the pipeline reports through its own LoggerPort, so the handler adds the
-   * retry policy and the wire name, never a second log stream.
+   * Resolve the ref and run one research pipeline for it. The host closes
+   * its request read, its `ConnectorRegistry`, `ConnectorContext` and config
+   * overrides over this; the pipeline reports through its own LoggerPort, so
+   * the handler adds the retry policy and the wire name, never a second log
+   * stream. `null` means the request no longer exists — done, not failed.
    */
-  runResearch(input: RunResearchInput): Promise<RunResult>;
+  runResearch(ref: ResearchRunRef): Promise<RunResult | null>;
 }
 
 export const RESEARCH_JOBS = {
@@ -48,7 +60,7 @@ export const RESEARCH_JOBS = {
       attempts: 3,
       /** 5s → 10s → 20s, the spacing the source-budget truncation assumes. */
       backoff: { type: 'exponential', delayMs: 5_000 },
-      async handle(payload: RunResearchInput, deps: ResearchJobDeps) {
+      async handle(payload: ResearchRunRef, deps: ResearchJobDeps) {
         await deps.runResearch(payload);
       },
     },
