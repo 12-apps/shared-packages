@@ -20,6 +20,9 @@ packages/entity-lifecycle
 packages/forms-core
 packages/jobs
 packages/payments/backend
+# billing peers on payments/backend for the failure taxonomy it maps decisions
+# onto, so it is released after it.
+packages/billing
 packages/product-research
 packages/rbac
 packages/realtime

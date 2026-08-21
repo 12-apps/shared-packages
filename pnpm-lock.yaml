@@ -258,6 +258,36 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(@vitest/browser@3.2.7)(jiti@2.7.0)(jsdom@25.0.1)(tsx@4.23.1)(yaml@2.9.0)
 
+  packages/billing:
+    devDependencies:
+      '@12-apps/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@12-apps/payments-backend':
+        specifier: workspace:*
+        version: link:../payments/backend
+      '@12-apps/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@12-apps/wiring':
+        specifier: workspace:*
+        version: link:../wiring
+      '@types/node':
+        specifier: ^22.10.6
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      eslint-plugin-test-flakiness:
+        specifier: ^1.4.0
+        version: 1.8.0(eslint@9.39.5(jiti@2.7.0))
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(@vitest/browser@3.2.7)(jiti@2.7.0)(jsdom@26.1.0)(tsx@4.23.1)(yaml@2.9.0)
+
   packages/entitlements:
     dependencies:
       '@12-apps/ui':
