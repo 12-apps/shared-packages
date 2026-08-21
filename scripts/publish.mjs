@@ -22,6 +22,7 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { publisherTarget } from "./lib/publisher-target.mjs";
 import { publishDirs } from "./lib/release-state.mjs";
 
 // Through the helper, so this still resolves when no PUBLISH_DIRS is set —
@@ -216,6 +217,8 @@ function headline(name, version, evidence) {
   );
 }
 
+const TARGET = publisherTarget();
+
 // npm's ENEEDAUTH says "log in". Nobody can: this step publishes tokenlessly on
 // purpose, so the fix is a settings page rather than a credential. Say so, say
 // which of the several things that produce ENEEDAUTH npm actually reported, and
@@ -241,17 +244,14 @@ function noCredentialDiagnosis(name, version, output, evidence) {
           "npm logs the refusal here.",
         ]),
     "",
-    "The state this repo produces more often than any other, and the one worth",
-    "checking as soon as npm names a refusal: a package's first publish is made",
-    "with NPM_TOKEN by scripts/first-publish.mjs, and that creates the NAME but not",
-    "the Trusted Publisher — the two are separate, and the second one is manual. A",
-    "package left that way is stuck: first-publish.mjs skips it (the name exists)",
-    "and this step can never authenticate for it, so it will publish NO further",
-    "version until a Trusted Publisher is configured.",
+    "Two states look identical here. A token-based first publish creates the NAME",
+    "but not the publisher — separate steps, the second manual. Or a publisher names",
+    "a DIFFERENT workflow file; it names one, so moving the publish job refuses all",
+    "of them at once (#351: eleven). Either way the package is stuck and will publish",
+    "NO further version until fixed.",
     "",
-    `Configure one by hand: npmjs.com → ${name} → Settings → Trusted Publisher →`,
-    "GitHub Actions, repository `12-apps/shared-packages`, workflow `ci.yml`.",
-    `(https://www.npmjs.com/package/${name}/access)`,
+    `Set it by hand at https://www.npmjs.com/package/${name}/access → Trusted`,
+    `Publisher → GitHub Actions, \`${TARGET.repository}\`, \`${TARGET.workflow}\`.`,
     "",
     "npm said:",
     tail(output),
@@ -385,9 +385,10 @@ summarize([
     ? [
         `**npm obtained no credential** for these, so a plain re-run is unlikely ` +
           `to help — the annotation above carries what npm reported about the OIDC ` +
-          `exchange, and the commonest answer is a package with no Trusted ` +
-          `Publisher (npmjs.com → package → Settings → Trusted Publisher → GitHub ` +
-          `Actions, 12-apps/shared-packages, ci.yml): ${wedged.join(", ")}`,
+          `exchange, and the answer is a Trusted Publisher that is missing or names ` +
+          `a workflow other than this one (npmjs.com → package → Settings → Trusted ` +
+          `Publisher → GitHub Actions, ${TARGET.repository}, ${TARGET.workflow}): ` +
+          `${wedged.join(", ")}`,
       ]
     : []),
   ...(blocked.length > 0 ? [`not attempted, dependency failed: ${blocked.join(", ")}`] : []),

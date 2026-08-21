@@ -99,8 +99,14 @@ function workspace(packages) {
   return { root, bin, dirs };
 }
 
-/** Runs the real scripts/publish.mjs over a scripted registry. */
-function release(packages, plan) {
+/**
+ * Runs the real scripts/publish.mjs over a scripted registry.
+ *
+ * `extraEnv` exists for the Trusted Publisher coordinates: the remedy names the
+ * workflow THIS run is publishing from, read from GITHUB_WORKFLOW_REF, so a
+ * case can state which workflow it is pretending to be.
+ */
+function release(packages, plan, extraEnv = {}) {
   const { root, bin, dirs } = workspace(packages);
   const calls = join(root, "calls.log");
   const planFile = join(root, "plan.json");
@@ -123,6 +129,9 @@ function release(packages, plan) {
       FAKE_NPM_ARGV: argv,
       GITHUB_STEP_SUMMARY: summary,
       GITHUB_ENV: handoff,
+      GITHUB_REPOSITORY: "12-apps/shared-packages",
+      GITHUB_WORKFLOW_REF: "12-apps/shared-packages/.github/workflows/cd.yml@refs/heads/main",
+      ...extraEnv,
     },
   });
 
@@ -184,10 +193,29 @@ check(
 );
 check(
   "the diagnosis gives the remedy's coordinates",
-  [/trusted publisher/i, /npmjs\.com/i, /12-apps\/shared-packages/, /ci\.yml/].every((part) =>
+  [/trusted publisher/i, /npmjs\.com/i, /12-apps\/shared-packages/, /cd\.yml/].every((part) =>
     part.test(eneedauth.output),
   ),
   "the remedy does not name the Trusted Publisher setting, npmjs.com, the repo and the workflow",
+);
+
+// ── …and names THIS run's workflow, not a hardcoded one ────────────────────
+//
+// A Trusted Publisher names one workflow FILE, and a publisher pointing at a
+// different file is refused exactly like a missing one. The line above used to
+// assert `ci.yml` against a hardcoded string; when #351 moved publishing to
+// cd.yml, every publisher still named ci.yml, eleven packages were refused —
+// and this message told the reader to configure the file that had just stopped
+// publishing. It is read from GITHUB_WORKFLOW_REF now, and this case is what
+// makes that real rather than a coincidence of two matching literals.
+const elsewhere = release([{ name: WEDGED }], { [WEDGED]: [{ status: 1, out: ENEEDAUTH }] }, {
+  GITHUB_WORKFLOW_REF: "12-apps/shared-packages/.github/workflows/publish-somewhere-else.yml@refs/heads/main",
+});
+check(
+  "the remedy names the workflow actually publishing, not a hardcoded file",
+  /publish-somewhere-else\.yml/.test(elsewhere.output) && !/cd\.yml/.test(elsewhere.output),
+  `advice that is wrong exactly when it is read is worse than none. The remedy\n    ` +
+    `said:\n    ${elsewhere.output.split("\n").filter((l) => /Trusted/i.test(l)).join("\n    ")}`,
 );
 check(
   "ENEEDAUTH with no retryable marker is NOT retried",
