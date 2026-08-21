@@ -24,6 +24,8 @@ export { ApiError, apiFetch, type ApiFetchOptions } from './core/api';
 
 export { joinApiPath, stripTrailingSlashes } from './core/paths';
 
+export { restResult, type Result } from './core/rest-result';
+
 export { formatBRL, formatMinutesLabel, formatMoney, type MoneyFormat } from './core/format';
 
 export {
