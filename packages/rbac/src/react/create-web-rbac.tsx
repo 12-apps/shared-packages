@@ -12,6 +12,7 @@ import type { PermissionRegistry } from '../core/types';
 
 import { createRbacApiClient, type RbacApiClient } from './api';
 import { RbacProvider } from './context';
+import type { RbacWebCopy } from './copy';
 import { createRbacLabels, type RbacLabels } from './labels';
 import { RolesScreen } from './roles-screen';
 import { TeamScreen } from './team-screen';
@@ -23,7 +24,8 @@ import { httpRbacTransport, type RbacTransport } from './transport';
  * Everything the roles + team admin IS — the catalog grid, the permission
  * picker with its governance affordances, the roster, the unified role-edit
  * dialog, the wire calls between them — lives inside this package. The host
- * names where the API is mounted, and that is the whole wiring.
+ * names where the API is mounted and supplies every sentence the screens
+ * render, and that is the whole wiring.
  *
  * The screens sit on the package's own `./react` context: the surface fetches
  * the caller's resolved permission set from `GET <apiBase>/permissions` and
@@ -41,6 +43,12 @@ export interface RbacWebConfig<P extends string = string> {
    * pass its own registry and silently keep somebody else's governance.
    */
   catalog: RbacCatalog<P>;
+  /**
+   * Every sentence the screens render — REQUIRED, the host's words.
+   * pt-BR hosts pass `PT_BR_RBAC_WEB_COPY` from `./pt-BR` (re-exported at
+   * `@12-apps/rbac/react`).
+   */
+  copy: RbacWebCopy;
   /** How the surface reaches its data. Default: same-origin fetch. */
   transport?: RbacTransport;
   /** Label overrides layered over the catalog's own. */
@@ -63,6 +71,7 @@ interface SurfaceParts {
   permissions: PermissionRegistry<string>;
   governance: GovernanceCatalog;
   labels: RbacLabels;
+  copy: RbacWebCopy;
   systemRoles: string[];
   ownerRoles: string[];
   manageRoles: string;
@@ -70,6 +79,7 @@ interface SurfaceParts {
 }
 
 function surfaceParts(config: RbacWebConfig): SurfaceParts {
+  const { copy } = config;
   const { permissions, governance, roleTemplates, labels } = config.catalog;
   // The assignable SYSTEM roles — every template except the owner tier,
   // which is never assignable from the roster.
@@ -77,10 +87,20 @@ function surfaceParts(config: RbacWebConfig): SurfaceParts {
     .filter((role) => !governance.ownerRoles.includes(role.name))
     .map((role) => role.name);
   return {
-    api: createRbacApiClient(config.apiBase, config.transport ?? httpRbacTransport()),
+    api: createRbacApiClient(
+      config.apiBase,
+      config.transport ?? httpRbacTransport(copy.operationFailed),
+    ),
     permissions,
     governance,
-    labels: createRbacLabels(mergeLabelVocabulary(labels, config.labels)),
+    // The copy's words for this package's own segments sit UNDER the catalog
+    // merge — the position its contribution's pt-BR labels used to hold — so
+    // a host relabelling a shared segment in its own contribution still wins,
+    // and explicit `labels` overrides still win over everything.
+    labels: createRbacLabels(
+      mergeLabelVocabulary(mergeLabelVocabulary(copy.permissionLabels, labels), config.labels),
+    ),
+    copy,
     systemRoles,
     ownerRoles: [...governance.ownerRoles],
     manageRoles: config.gatePermissions?.manageRoles ?? 'roles:manage',
@@ -107,7 +127,7 @@ function WithPermissions({
         if (!cancelled) setPermissions(list);
       })
       .catch(() => {
-        if (!cancelled) setError('Não foi possível carregar suas permissões.');
+        if (!cancelled) setError(parts.copy.permissionsLoadFailed);
       });
     return () => {
       cancelled = true;
@@ -115,7 +135,7 @@ function WithPermissions({
   }, [parts]);
 
   if (error) return <Text as="p">{error}</Text>;
-  if (!permissions) return <Text as="p">Carregando…</Text>;
+  if (!permissions) return <Text as="p">{parts.copy.loading}</Text>;
   return <RbacProvider permissions={permissions}>{children}</RbacProvider>;
 }
 
@@ -127,6 +147,9 @@ function BoundRolesScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
       governance={parts.governance}
       labels={parts.labels}
       managePermission={parts.manageRoles}
+      copy={parts.copy.rolesList}
+      tableCopy={parts.copy.rolesTable}
+      formCopy={parts.copy.roleForm}
     />
   );
 }
@@ -139,23 +162,30 @@ function BoundTeamScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
       systemRoles={parts.systemRoles}
       ownerRoles={parts.ownerRoles}
       managePermission={parts.manageTeam}
+      copy={parts.copy.teamScreen}
+      tableCopy={parts.copy.teamTable}
+      dialogCopy={parts.copy.teamRoleDialog}
+      menuCopy={parts.copy.teamRowMenu}
     />
   );
 }
 
 type TabKey = 'roles' | 'team';
 
-const TABS: readonly { key: TabKey; label: string }[] = [
-  { key: 'roles', label: 'Papéis' },
-  { key: 'team', label: 'Equipe' },
-];
+/** The two tabs in display order — keys fixed, labels the host's. */
+function tabsOf(copy: RbacWebCopy): readonly { key: TabKey; label: string }[] {
+  return [
+    { key: 'roles', label: copy.tabs.roles },
+    { key: 'team', label: copy.tabs.team },
+  ];
+}
 
 function RbacAdminTabs({ parts }: { parts: SurfaceParts }): JSX.Element {
   const [tab, setTab] = useState<TabKey>('roles');
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={1} role="tablist">
-        {TABS.map((entry) => (
+        {tabsOf(parts.copy).map((entry) => (
           <Button
             key={entry.key}
             variant={tab === entry.key ? 'solid' : 'text'}

@@ -12,7 +12,7 @@
  */
 import type { PGlite } from '@electric-sql/pglite';
 import { rbacRouter } from '@12-apps/rbac/hono';
-import type { RbacUserIdentity } from '@12-apps/rbac/server';
+import { PT_BR_RBAC_MESSAGES, type RbacUserIdentity } from '@12-apps/rbac/server';
 
 import { HARNESS_CATALOG } from './rbac-catalog';
 import { rbacDb } from './rbac-db';
@@ -112,6 +112,8 @@ export function rbacHost(pg: PGlite) {
     // read `['OWNER']` and protected nothing here.
     adminRoles: ['DIRECTOR', 'HEAD_LIBRARIAN'],
     customerRole: 'PATRON',
+    // The refusal sentences are required host config; this host is pt-BR.
+    messages: PT_BR_RBAC_MESSAGES,
     directory: {
       getUsers: async (ids) =>
         ids.flatMap((id) => {

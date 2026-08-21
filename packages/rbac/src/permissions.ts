@@ -54,16 +54,12 @@ export const RBAC_PERMISSIONS = definePermissionContribution({
     /** Member base-role set, enable/disable, invite cancel. */
     'team:manage': { kind: 'class' },
   },
-  /**
-   * pt-BR, matching `DEFAULT_MESSAGES` and the tab labels the screens already
-   * ship — and overridable per host, the same way those are. Only the segments
-   * THESE three ids use: a host's own vocabulary arrives with its own
-   * contribution, and an unlabelled segment still renders as its raw text.
-   */
-  labels: {
-    domains: { roles: 'Papéis', team: 'Equipe' },
-    actions: { read: 'Ver', manage: 'Gerenciar' },
-  },
+  // NO labels, deliberately. The words these three ids read in are UI copy,
+  // and copy is REQUIRED host config (`RbacWebCopy.permissionLabels` on the
+  // web factory) — this contribution used to ship them in pt-BR, which handed
+  // one application's voice to every adopter through the catalog merge. A
+  // host's own vocabulary still arrives with its own contribution, and an
+  // unlabelled segment still renders as its raw text.
 });
 
 /** The permission union this package contributes. */

@@ -25,6 +25,7 @@ import type { JSX, ReactNode } from "react";
 import { CheckoutClientProvider } from "../client-context";
 import { rememberHostedOrder } from "../hosted-return";
 import { PaymentStatus } from "../payment-status";
+import { PT_BR_PAYMENT_STATUS_COPY } from "../pt-BR";
 import type { CheckoutClient } from "../transport";
 import type { CheckoutOrder, OrderStatus } from "../types";
 import { useCheckoutController, type CheckoutHostPorts } from "../use-checkout-controller";
@@ -246,6 +247,7 @@ describe("what the buyer reads once it has given up", () => {
   it("says nothing has arrived yet, and drops the spinner", () => {
     render(
       <PaymentStatus
+        copy={PT_BR_PAYMENT_STATUS_COPY}
         status="AWAITING_PAYMENT"
         totalLabel="R$ 24,00"
         onBackToMenu={vi.fn()}
@@ -262,6 +264,7 @@ describe("what the buyer reads once it has given up", () => {
   it("still offers the way out it always did", () => {
     render(
       <PaymentStatus
+        copy={PT_BR_PAYMENT_STATUS_COPY}
         status="AWAITING_PAYMENT"
         totalLabel="R$ 24,00"
         onBackToMenu={vi.fn()}
@@ -273,7 +276,14 @@ describe("what the buyer reads once it has given up", () => {
   });
 
   it("spins as before while the wait is still running", () => {
-    render(<PaymentStatus status="AWAITING_PAYMENT" totalLabel="R$ 24,00" onBackToMenu={vi.fn()} />);
+    render(
+      <PaymentStatus
+        copy={PT_BR_PAYMENT_STATUS_COPY}
+        status="AWAITING_PAYMENT"
+        totalLabel="R$ 24,00"
+        onBackToMenu={vi.fn()}
+      />,
+    );
 
     expect(screen.getByTestId("payment-pending")).toBeTruthy();
     expect(screen.queryAllByTestId("payment-awaiting-timeout")).toHaveLength(0);
@@ -281,7 +291,13 @@ describe("what the buyer reads once it has given up", () => {
 
   it("ignores the flag on a settled order, which has already resolved", () => {
     render(
-      <PaymentStatus status="PAID" totalLabel="R$ 24,00" onBackToMenu={vi.fn()} awaitingTimedOut />,
+      <PaymentStatus
+        copy={PT_BR_PAYMENT_STATUS_COPY}
+        status="PAID"
+        totalLabel="R$ 24,00"
+        onBackToMenu={vi.fn()}
+        awaitingTimedOut
+      />,
     );
 
     expect(screen.getByTestId("payment-paid")).toBeTruthy();

@@ -18,6 +18,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckoutFlow } from "../checkout-flow";
+import { PT_BR_CHECKOUT_VIEW_COPY } from "../pt-BR";
 import { CheckoutNavigateProvider } from "../navigate-context";
 import type {
   CheckoutChainLink,
@@ -94,6 +95,7 @@ function renderHandOff(options: {
   render(
     <CheckoutNavigateProvider navigate={options.navigate ?? vi.fn()}>
       <CheckoutFlow
+        copy={PT_BR_CHECKOUT_VIEW_COPY}
         cart={{ empty: false, totalLabel: "R$ 42,00", totalItems: 1 }}
         createOrder={options.createOrder}
         onExitToMenu={vi.fn()}
