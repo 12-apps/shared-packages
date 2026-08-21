@@ -1,15 +1,28 @@
-// Flags a pull request that would cut a MAJOR, while its commit message is
-// still editable.
+// Says what a pull request would release, and arms the gate when that is a
+// MAJOR — while the commit message is still editable.
 //
-// The approval gate in ci.yml is the safety net and this is the feedback. They
-// answer the same question at different moments, and the difference matters: by
-// the time `detect-majors` runs, the commit is on `main` and the only remaining
-// choices are "approve" or "leave the package unreleased". Here the message can
-// simply be reworded.
+// This script DECIDES NOTHING about whether the PR can merge. It prints, and it
+// writes one output. The block lives in `major-guard.yml`'s `Major approval`
+// job, which binds to the `major-approval` environment and simply waits; a
+// pending required check is a pull request nobody can merge, and an App
+// installation token cannot grant a deployment. So the only ways past a
+// declared major are the two a human has: approve it, or reword the message so
+// it is no longer one.
 //
-// TWO SYNTAXES CUT A MAJOR HERE, and they are equals: a `BREAKING CHANGE:`
-// footer, and the `!` shorthand in the header. Both are gated the same way,
-// because both say the same thing.
+// THERE IS NO ESCAPE LABEL. `allow-major` used to silence the red, and that was
+// the hole: a label is applied through the API exactly as easily as through the
+// UI, and an agent holding this repo's token did precisely that on #319. Any
+// consent expressed as repository CONTENT — a label, a tag, a magic line — is
+// consent the automation can give itself. Repository settings are the one thing
+// the token cannot reach (the branch-protection API answers `Resource not
+// accessible by integration`), which is why the environment is the whole gate
+// and this file is only the explanation.
+//
+// TWO SYNTAXES DECLARE A BREAKING CHANGE, and they are equals: a
+// `BREAKING CHANGE:` footer, and the `!` shorthand in the header. Neither cuts
+// a major here — every `.releaserc.json` maps a breaking note to `minor` — so
+// neither arms the gate. They are read only so the log can name which one an
+// author wrote and say what it actually bought.
 //
 // `!` did not always work. The angular preset's headerPattern is
 // `^(\w*)(?:\((.*)\))?: (.*)$` — a `!` before the colon makes the whole header
@@ -31,7 +44,6 @@
 // Reads its inputs from the environment so the whole decision is testable
 // without a GitHub API call:
 //   PR_TITLE       the pull request title
-//   PR_LABELS      comma-separated label names
 //   COMMIT_FILE    path to a JSON array of the PR's commit messages
 //
 // The commits arrive through a FILE rather than a variable because a commit
@@ -40,8 +52,6 @@
 // separator that CAN survive is a character a commit body may legitimately
 // contain, so the boundary would be guesswork. JSON has no such ambiguity.
 import { appendFileSync, readFileSync } from "node:fs";
-
-const ESCAPE_LABEL = "allow-major";
 
 // Anchored to a line start, matching conventional-commits-parser's own test.
 const BREAKING_FOOTER = /^BREAKING[ -]CHANGE:/m;
@@ -67,24 +77,18 @@ export function messagesOf(env = process.env) {
   return { title: (env.PR_TITLE ?? "").trim(), bodies };
 }
 
-export function labelsOf(env = process.env) {
-  return (env.PR_LABELS ?? "")
-    .split(",")
-    .map((label) => label.trim())
-    .filter(Boolean);
-}
-
 /**
- * What this PR would do, as `{ breaking, bang, footer, allowed }`.
+ * What this PR would do, as `{ breaking, bang, footer, major }`.
  *
- * `breaking` is the union: either syntax cuts a major, so either one needs
- * consent. `bang` and `footer` are kept apart only so the message can name
- * which one the author wrote.
+ * `breaking` is the union: either syntax says "this breaks", and here both buy
+ * a minor. `bang` and `footer` are kept apart only so the message can name
+ * which one the author wrote. `major` is separate and is the ONLY thing the
+ * gate reads.
  *
- * `breaking` reads the commit BODIES and the title alike. GitHub squashes with
+ * All of it reads the commit BODIES and the title alike. GitHub squashes with
  * COMMIT_OR_PR_TITLE — the single commit's subject when there is one commit and
  * the PR title when there are several — so either can be what lands, and a
- * footer in a body survives the squash into the merge commit's message either
+ * marker in a body survives the squash into the merge commit's message either
  * way.
  */
 export function inspect(env = process.env) {
@@ -95,13 +99,7 @@ export function inspect(env = process.env) {
   const bang = all.some((message) => BANG_HEADER.test(message.split("\n")[0] ?? ""));
   const major = all.some((message) => MAJOR_MARKER.test(message));
 
-  return {
-    breaking: footer || bang,
-    bang,
-    footer,
-    major,
-    allowed: labelsOf(env).includes(ESCAPE_LABEL),
-  };
+  return { breaking: footer || bang, bang, footer, major };
 }
 
 /**
@@ -115,7 +113,7 @@ function phrasing(bang, footer) {
   if (bang && footer) {
     return {
       declaration: "a `!` in the header and a `BREAKING CHANGE:` footer",
-      undo: "drop the `!` and remove the footer — either one alone still cuts the major",
+      undo: "drop the `!` and remove the footer — either one alone still says it breaks",
     };
   }
   if (bang) return { declaration: "a `!` in the header", undo: "drop the `!`" };
@@ -127,30 +125,30 @@ function phrasing(bang, footer) {
   };
 }
 
-/** The lines to print, and whether to fail. Pure, so the selftest can read it. */
+/**
+ * The lines to print, and the verdict. Pure, so the selftest can read it.
+ *
+ * Nothing here fails. A `::warning::` on a declared major is FEEDBACK — the
+ * author sees what the PR would spend, next to the `Major approval` check that
+ * is holding it. Failing here as well would be a second red with no human way
+ * to clear it, now that the label is gone, and "red until you edit the message"
+ * is not the choice a deliberate major deserves.
+ */
 export function report(env = process.env) {
-  const { breaking, bang, footer, major, allowed } = inspect(env);
+  const { breaking, bang, footer, major } = inspect(env);
   const lines = [];
-  let failed = false;
 
   const { declaration } = phrasing(bang, footer);
 
-  if (major && !allowed) {
+  if (major) {
     lines.push(
-      `::error::This pull request carries a \`RELEASE-MAJOR\` marker, so merging it spends a ` +
+      `::warning::This pull request carries a \`RELEASE-MAJOR\` marker, so merging it spends a ` +
         `MAJOR. Consumers pin @12-apps/* exactly, so a major is a migration someone has to ` +
-        `schedule — not a number, and one nobody scheduled just stalls the pin. Reserve it ` +
-        `for a component-wide refactor. If that is intended, add the \`${ESCAPE_LABEL}\` ` +
-        `label and re-run. If it is not, drop the marker — an ordinary breaking change ` +
-        `ships as a MINOR here.`,
-    );
-    failed = true;
-  }
-
-  if (major && allowed) {
-    lines.push(
-      `::notice::Major release intended — \`${ESCAPE_LABEL}\` is set. It still needs ` +
-        `approval in the \`release-major\` environment after merge.`,
+        `schedule — not a number, and one nobody scheduled just stalls the pin. The ` +
+        `\`Major approval\` check is now waiting on the \`major-approval\` environment: a ` +
+        `maintainer clicks Review deployments → Approve to let this merge, or Reject to refuse ` +
+        `it. If the major was not intended, drop the marker instead — an ordinary breaking ` +
+        `change ships as a MINOR here, and the check goes away on its own.`,
     );
   }
 
@@ -161,7 +159,8 @@ export function report(env = process.env) {
     lines.push(
       `::notice::This pull request carries ${declaration}, which cuts a MINOR here — ` +
         `every .releaserc.json maps \`breaking\` to \`minor\`. If you meant to spend a ` +
-        `major, add a \`RELEASE-MAJOR:\` line to the body and the \`${ESCAPE_LABEL}\` label.`,
+        `major, add a \`RELEASE-MAJOR:\` line to the body; a maintainer then approves it ` +
+        `on the \`major-approval\` environment before this can merge.`,
     );
   }
 
@@ -169,26 +168,22 @@ export function report(env = process.env) {
     lines.push("::notice::No breaking change declared — this PR cuts no major");
   }
 
-  return { lines, failed };
+  return { lines, major };
 }
 
 /**
- * Hand the VERDICT to the workflow, separately from this check's own outcome.
+ * Hand the VERDICT to the workflow.
  *
- * The two are not the same question any more. This check going red is feedback —
- * a human can still clear it, and an agent holding the repo's token can clear it
- * too, by adding the `allow-major` label through the API. That is not a
- * hypothetical: it is how the label got onto #319.
+ * The output is `major`, and it is the MARKER — not `breaking`. Those came
+ * apart in #336, when a breaking change stopped cutting a major here, and this
+ * line kept writing `breaking`: every routine "this config is required now"
+ * tightening armed the human gate and sat waiting for a click it never needed.
+ * A gate that fires on the ordinary case is one people learn to clear without
+ * reading, which costs the case it exists for.
  *
- * So the label no longer decides whether the MERGE is possible. `major-guard.yml`
- * reads this output and, when it is true, starts a job bound to the
- * `major-approval` environment, which sits waiting for a deployment approval that
- * an App installation token cannot give. The label silences the red; only a human
- * clicking Review deployments unblocks the merge.
- *
- * Written unconditionally — on a major the step below also exits 1, and a job's
- * outputs must survive that, which is why the workflow reads them under
- * `always()`.
+ * `major-guard.yml` reads this and, when it is true, starts a job bound to the
+ * `major-approval` environment, which sits waiting for a deployment approval an
+ * App installation token cannot give.
  */
 function publishVerdict(major) {
   const file = process.env.GITHUB_OUTPUT;
@@ -199,8 +194,7 @@ function publishVerdict(major) {
 // Guarded so the selftest can import report() without the module deciding
 // anything on the way in.
 if (process.argv[1] && process.argv[1].endsWith("breaking-change-guard.mjs")) {
-  const { lines, failed } = report();
+  const { lines, major } = report();
   for (const line of lines) console.log(line);
-  publishVerdict(inspect().breaking);
-  process.exitCode = failed ? 1 : 0;
+  publishVerdict(major);
 }

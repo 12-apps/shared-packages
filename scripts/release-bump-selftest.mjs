@@ -19,7 +19,7 @@
  * `parserOpts.breakingHeaderPattern` so the shorthand parses and raises a
  * breaking note. That makes `!` and a `BREAKING CHANGE:` footer interchangeable
  * — which is what `scripts/breaking-change-guard.mjs` now tells authors, and
- * what the `release-major` approval gate is wired to. Three things now depend on
+ * what the `major-approval` gate is wired to. Three things now depend on
  * a claim about a regex in a JSON file. This is the one that CHECKS it.
  *
  * Two properties, and the second is as load-bearing as the first:
