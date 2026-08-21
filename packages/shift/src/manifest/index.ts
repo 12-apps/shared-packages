@@ -1,15 +1,18 @@
 /**
  * `@12-apps/shift/manifest` — the SHARED wiring manifest.
  *
- * Identity, the Prisma contribution and the one runtime capability: `jobs`.
- * The HTTP surface deliberately stays undeclared — this package exports a
- * SERVICE (`createShiftService`), not route descriptors, and the origin
- * host's three shift routes are host code over that service; inventorying
- * `http` here would claim a factory that does not exist. No `mcp` (the
- * host's four shift tools are host-authored), no `permissions` (the ids the
- * routes check are host vocabulary), no `e2e` (no packaged journeys), no
- * `env` (zero `process.env` reads — every deployment decision is an
- * argument).
+ * Identity, the Prisma contribution and the two runtime capabilities:
+ * `http` and `jobs`. The HTTP surface is `createApiShift` (`./http`): the
+ * three descriptors that used to be origin-host route files, over a port the
+ * host implements with its policy layer. What the routes deliberately do NOT
+ * declare is policy: which permission gates a close depends on the request
+ * BODY's mode, so the guards stay in the host's adapter, and the ids it
+ * checks stay host vocabulary — which is also why there is still no
+ * `permissions` contribution. No `mcp` (the host's four shift tools are
+ * host-authored), no `e2e` (no packaged journeys), no `env` (zero
+ * `process.env` reads — every deployment decision is an argument). The
+ * host's station-switch route stays host code too: it is that host's
+ * resource vocabulary end to end.
  *
  * `@12-apps/wiring` is a TYPE-ONLY devDependency (the report-builder move):
  * the manifests are plain `satisfies`-checked values, and the producer
@@ -27,5 +30,5 @@ export const shiftManifest = {
    * files under `shift`, not nowhere.
    */
   observability: { namespace: 'shift' },
-  server: ['jobs'],
+  server: ['http', 'jobs'],
 } as const satisfies PackageManifest;
