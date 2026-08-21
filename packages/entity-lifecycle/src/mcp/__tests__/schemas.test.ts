@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { draftJson, writeOutcome } from '../../server/context';
+import { lifecycleMcpEndpoints } from '../endpoints';
 import {
   draftResponse,
   type LifecycleSchemasMatchTheWire,
@@ -68,5 +70,56 @@ describe('the advertised schemas accept what the routes produce', () => {
     expect(Object.keys(parsed.data.draft!).sort()).toEqual(Object.keys(produced.draft!).sort());
     // The absent-draft answer is a real answer, not an error.
     expect(draftResponse.parse({ data: draftJson(null) }).data).toEqual({ draft: null });
+  });
+});
+
+describe('every advertised schema is representable in JSON Schema', () => {
+  /**
+   * The property 4.3.0 broke: `z.custom` typed two snapshot fields nicely and
+   * threw in `z.toJSONSchema` under its DEFAULT `unrepresentable: "throw"` —
+   * which is precisely how the origin host renders every one of these schemas
+   * into its MCP tool surface, so the bump failed its surface build. This pin
+   * runs the same conversion the host runs, over every schema of every tool
+   * the factory emits, so an unrepresentable construct fails here first.
+   *
+   * The `$ref` half is the second trap: a recursive JSON-value union DOES
+   * convert, but only as a cyclic `$defs` reference, and the MCP inliner
+   * refuses recursion ("Recursive schema not supported"). Ref-free output is
+   * what keeps these schemas consumable by an inlining host.
+   */
+  it('converts every tool schema under zod defaults, with no $refs', () => {
+    const tools = lifecycleMcpEndpoints({
+      collectionPath: '/api/admin/{tenantSlug}/suppliers',
+      noun: 'Supplier',
+      summaries: {
+        getVersions: 'history',
+        restoreVersion: 'restore',
+        getDraft: 'read draft',
+        saveDraft: 'write draft',
+        publishDraft: 'publish',
+        discardDraft: 'discard',
+        listDrafts: 'list drafts',
+        createDraft: 'new draft',
+      },
+    });
+    expect(tools).toHaveLength(8);
+    for (const tool of tools) {
+      const schemas: Array<[string, z.ZodType | undefined]> = [
+        ['params', tool.params],
+        ['query', tool.query],
+        ['body', tool.body],
+        ['response', tool.response],
+      ];
+      for (const [slot, schema] of schemas) {
+        if (!schema) continue;
+        for (const io of ['input', 'output'] as const) {
+          const rendered = z.toJSONSchema(schema, { target: 'draft-2020-12', io });
+          expect(
+            JSON.stringify(rendered).includes('"$ref"'),
+            `${tool.operationId} ${slot} (${io}) emits a $ref an inlining host cannot take`,
+          ).toBe(false);
+        }
+      }
+    }
   });
 });
