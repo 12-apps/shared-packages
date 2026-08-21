@@ -56,6 +56,17 @@ export interface DiscountsServerCopy {
   readonly freeUnitsExceedCombo: string;
   /** 422 — a per-cart combo cap of zero or less. */
   readonly invalidMaxComboApplications: string;
+  /**
+   * 422 — a target id that is not this tenant's, or no longer exists.
+   *
+   * Reported against `targets` whichever dimension it came from, and whether
+   * it arrived as a scope target or inside a combo slot: an operator picks
+   * from a list this surface handed them, so the only way to reach this is a
+   * crafted request or a row deleted while the form was open. One sentence
+   * covers both, and it must not name WHICH id — an id the caller did not
+   * already have is a fact about another store's catalog.
+   */
+  readonly foreignTarget: string;
 }
 
 const COPY_KEYS: readonly (keyof DiscountsServerCopy)[] = [
@@ -79,6 +90,7 @@ const COPY_KEYS: readonly (keyof DiscountsServerCopy)[] = [
   "invalidFreeUnits",
   "freeUnitsExceedCombo",
   "invalidMaxComboApplications",
+  "foreignTarget",
 ];
 
 /** Every key present and non-blank — checked at assembly, like the rest. */

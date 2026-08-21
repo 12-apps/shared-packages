@@ -33,6 +33,7 @@ export {
   COMBO_ONLY_DISCOUNT_TYPES,
   DISCOUNT_REJECTION_REASONS,
   DISCOUNT_SCOPES,
+  DISCOUNT_TARGET_TYPES,
   DISCOUNT_TRIGGERS,
   DISCOUNT_TYPES,
   MAX_COMBO_SLOTS,
@@ -42,6 +43,7 @@ export {
   normalizeDiscountCode,
   type DiscountRejectionReason,
   type DiscountScope,
+  type DiscountTargetType,
   type DiscountTrigger,
   type DiscountType,
 } from "./engine/kinds";

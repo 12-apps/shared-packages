@@ -32,4 +32,5 @@ export const PT_BR_DISCOUNTS_SERVER_COPY: DiscountsServerCopy = {
   freeUnitsExceedCombo: "O combo precisa cobrar por pelo menos um item.",
   invalidMaxComboApplications:
     "O limite de combos por carrinho deve ser maior que zero (ou deixe em branco).",
+  foreignTarget: "Selecione categorias e produtos desta loja.",
 };
