@@ -1,0 +1,66 @@
+{
+  "name": "@12-apps/billing",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Subscription billing: the period arithmetic a renewal anchor survives, the lifecycle a read ages against its own dates, the collection retry policy that never re-presents a card the issuer refused for funds, and the card-on-file surface over a provider vault. Every number, table and sentence with a commercial opinion in it arrives as required config; the package owns the mechanism and none of the policy.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server/index.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./manifest/server": "./src/manifest/server.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@12-apps/payments-backend": ">=4.14.0",
+    "@12-apps/wiring": ">=1.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@12-apps/wiring": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/payments-backend": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
+    "@types/node": "^22.10.6",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/billing"
+  },
+  "files": [
+    "src",
+    "dist",
+    "*.js",
+    "*.mjs",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*"
+  ]
+}

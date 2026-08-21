@@ -8,6 +8,7 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { RbacApiClient, TeamMemberWire } from './api';
+import type { TeamRoleDialogCopy } from './copy';
 import type { RbacLabels } from './labels';
 
 /**
@@ -15,7 +16,8 @@ import type { RbacLabels } from './labels';
  * `role-edit-dialog.tsx` + `use-role-editor.ts`. One checklist over ALL
  * roles: exactly one SYSTEM role is the member's base, any custom picks are
  * additive; the save maps the diff onto the existing set-role +
- * grant/revoke endpoints, so no new server surface exists for it.
+ * grant/revoke endpoints, so no new server surface exists for it. Every
+ * sentence comes from the host's {@link TeamRoleDialogCopy}.
  */
 
 export interface MemberWithRoles extends TeamMemberWire {
@@ -61,6 +63,7 @@ interface RoleEditBodyProps {
   systemRoles: readonly string[];
   availableCustomRoles: readonly string[];
   labels: RbacLabels;
+  copy: TeamRoleDialogCopy;
   busy: boolean;
   error: string | null;
   onClose: () => void;
@@ -69,7 +72,7 @@ interface RoleEditBodyProps {
 
 /** The editor body — owns the selection state; mounts fresh per member. */
 function RoleEditBody(props: RoleEditBodyProps): JSX.Element {
-  const { member, systemRoles, availableCustomRoles, labels, busy, error } = props;
+  const { member, systemRoles, availableCustomRoles, labels, copy, busy, error } = props;
   const systemSet = useMemo(() => new Set(systemRoles), [systemRoles]);
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set([member.role, ...member.customRoles]),
@@ -115,27 +118,27 @@ function RoleEditBody(props: RoleEditBodyProps): JSX.Element {
   return (
     <DialogContent>
       <Stack spacing={2}>
-        {group('Papel do sistema (escolha um)', systemRoles, labels.roleLabel)}
+        {group(copy.systemGroupTitle, systemRoles, labels.roleLabel)}
         {availableCustomRoles.length > 0 &&
-          group('Papéis personalizados (opcional)', availableCustomRoles, (name) => name)}
+          group(copy.customGroupTitle, availableCustomRoles, (name) => name)}
         {!valid && (
           <Alert
             variant="warning"
-            description="Selecione exatamente um papel do sistema."
+            description={copy.exactlyOneSystemRole}
             data-testid="role-edit-invalid"
           />
         )}
         {error && <Alert variant="danger" description={error} data-testid="role-edit-error" />}
         <Stack direction="row" spacing={1} justifyContent="flex-end">
           <Button variant="text" onClick={props.onClose} disabled={busy}>
-            Cancelar
+            {copy.cancelAction}
           </Button>
           <Button
             onClick={() => props.onSave([...selected])}
             disabled={!valid || busy}
             dataTestId="role-edit-save"
           >
-            Salvar
+            {copy.saveAction}
           </Button>
         </Stack>
       </Stack>
@@ -149,12 +152,12 @@ interface RoleEditDialogProps extends Omit<RoleEditBodyProps, 'member'> {
 }
 
 export function RoleEditDialog(props: RoleEditDialogProps): JSX.Element {
-  const { member, onClose } = props;
+  const { member, copy, onClose } = props;
   return (
     <Dialog
       open={member !== null}
       onClose={onClose}
-      title={member ? `Papéis de ${member.name ?? member.email}` : 'Editar papéis'}
+      title={member ? copy.title(member.name ?? member.email) : copy.fallbackTitle}
       size="sm"
       showCloseButton
       dataTestId="role-edit-dialog"

@@ -4,6 +4,7 @@
  * (FUT-420's acceptance criterion — the package renders on its own.)
  */
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { PT_BR_RESEARCH_MESSAGES } from './pt-BR';
 
 import { BestOfferCard } from './best-offer-card';
 import { BestPricesWidget } from './best-prices-widget';
@@ -84,12 +85,12 @@ export default meta;
 
 export const Form: StoryObj = {
   render: () => (
-    <ResearchForm client={mockClient()} onStarted={() => {}} defaultRegion="01310-200" />
+    <ResearchForm messages={PT_BR_RESEARCH_MESSAGES} client={mockClient()} onStarted={() => {}} defaultRegion="01310-200" />
   ),
 };
 
 export const BestOffer: StoryObj = {
-  render: () => <BestOfferCard offer={offer()} quantity={24} />,
+  render: () => <BestOfferCard messages={PT_BR_RESEARCH_MESSAGES} offer={offer()} quantity={24} />,
 };
 
 /**
@@ -97,20 +98,20 @@ export const BestOffer: StoryObj = {
  * total is a MINIMUM. It still leads — the caveat rides the number.
  */
 export const BestOfferShippingUnknown: StoryObj = {
-  render: () => <BestOfferCard offer={offer({ shippingCents: null })} quantity={24} />,
+  render: () => <BestOfferCard messages={PT_BR_RESEARCH_MESSAGES} offer={offer({ shippingCents: null })} quantity={24} />,
 };
 
 export const Offers: StoryObj = {
-  render: () => <OffersTable offers={OFFERS} />,
+  render: () => <OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={OFFERS} />,
 };
 
 export const OffersEmpty: StoryObj = {
-  render: () => <OffersTable offers={[]} />,
+  render: () => <OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={[]} />,
 };
 
 export const SourceStatusRunning: StoryObj = {
   render: () => (
-    <SourceStatusList
+    <SourceStatusList messages={PT_BR_RESEARCH_MESSAGES}
       sources={[
         { id: 's1', type: 'MANUAL', name: 'Distribuidora Solar', enabled: true, status: 'ACTIVE' },
         { id: 's2', type: 'VTEX', name: 'Giga Atacado', enabled: true, status: 'ACTIVE' },
@@ -123,7 +124,7 @@ export const SourceStatusRunning: StoryObj = {
 
 export const SourceStatusDegraded: StoryObj = {
   render: () => (
-    <SourceStatusList
+    <SourceStatusList messages={PT_BR_RESEARCH_MESSAGES}
       sources={[]}
       stats={[
         { sourceId: 's1', type: 'MANUAL', name: 'Solar', status: 'OK', offerCount: 4, ms: 8 },
@@ -149,6 +150,7 @@ export const SourceStatusDegraded: StoryObj = {
 export const History: StoryObj = {
   render: () => (
     <ResearchHistoryList
+      messages={PT_BR_RESEARCH_MESSAGES}
       requests={[
         requestView({
           latestRun: { id: 'run-1', status: 'COMPLETED', startedAt: null, finishedAt: null },
@@ -161,12 +163,12 @@ export const History: StoryObj = {
 };
 
 export const RunCompleted: StoryObj = {
-  render: () => <ResearchRunScreen client={mockClient()} requestId="req-1" />,
+  render: () => <ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={mockClient()} requestId="req-1" />,
 };
 
 export const RunDegraded: StoryObj = {
   render: () => (
-    <ResearchRunScreen
+    <ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES}
       client={mockClient({
         getRun: () =>
           Promise.resolve(
@@ -190,7 +192,7 @@ export const RunDegraded: StoryObj = {
  */
 export const RunOutsideDeliveryArea: StoryObj = {
   render: () => (
-    <ResearchRunScreen
+    <ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES}
       client={mockClient({
         getRun: () =>
           Promise.resolve(
@@ -217,7 +219,7 @@ export const RunOutsideDeliveryArea: StoryObj = {
 
 export const RunNoOffers: StoryObj = {
   render: () => (
-    <ResearchRunScreen
+    <ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES}
       client={mockClient({ getRun: () => Promise.resolve(runView({ offers: [] })) })}
       requestId="req-1"
     />
@@ -226,7 +228,7 @@ export const RunNoOffers: StoryObj = {
 
 export const Widget: StoryObj = {
   render: () => (
-    <BestPricesWidget
+    <BestPricesWidget messages={PT_BR_RESEARCH_MESSAGES}
       client={mockClient()}
       term="Coca-Cola Lata 350ml"
       onOpenRequest={() => {}}
@@ -237,7 +239,7 @@ export const Widget: StoryObj = {
 
 export const WidgetEmpty: StoryObj = {
   render: () => (
-    <BestPricesWidget
+    <BestPricesWidget messages={PT_BR_RESEARCH_MESSAGES}
       client={mockClient({
         listRequests: () =>
           Promise.resolve({
@@ -254,10 +256,10 @@ export const WidgetEmpty: StoryObj = {
 
 export const EnglishMessages: StoryObj = {
   render: () => (
-    <ResearchRunScreen
+    <ResearchRunScreen 
       client={mockClient()}
       requestId="req-1"
-      messages={{
+      messages={{ ...PT_BR_RESEARCH_MESSAGES,
         bestOfferTitle: 'Best price',
         offersTitle: 'All offers',
         statusTitle: 'Sources queried',

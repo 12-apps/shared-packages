@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // fireEvent/render from @testing-library/react — no user-event, no jest-dom.
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { PT_BR_RESEARCH_MESSAGES } from '../pt-BR';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ResearchForm } from '../research-form';
@@ -9,7 +10,7 @@ import { fakeClient } from './fake-client';
 describe('ResearchForm', () => {
   it('rejects a too-short term before touching the client', async () => {
     const onStarted = vi.fn();
-    render(<ResearchForm client={fakeClient()} onStarted={onStarted} />);
+    render(<ResearchForm messages={PT_BR_RESEARCH_MESSAGES} client={fakeClient()} onStarted={onStarted} />);
 
     fireEvent.change(screen.getByTestId('research-term'), { target: { value: 'x' } });
     fireEvent.click(screen.getByTestId('research-submit'));
@@ -27,7 +28,7 @@ describe('ResearchForm', () => {
       },
     });
     const onStarted = vi.fn();
-    render(<ResearchForm client={client} onStarted={onStarted} defaultRegion="01310-200" />);
+    render(<ResearchForm messages={PT_BR_RESEARCH_MESSAGES} client={client} onStarted={onStarted} defaultRegion="01310-200" />);
 
     fireEvent.change(screen.getByTestId('research-term'), {
       target: { value: '  Guaraná 1L  ' },
@@ -45,7 +46,7 @@ describe('ResearchForm', () => {
     const client = fakeClient({
       startResearch: () => Promise.reject(new Error('sem permissão')),
     });
-    render(<ResearchForm client={client} onStarted={vi.fn()} />);
+    render(<ResearchForm messages={PT_BR_RESEARCH_MESSAGES} client={client} onStarted={vi.fn()} />);
 
     fireEvent.change(screen.getByTestId('research-term'), { target: { value: 'Café' } });
     fireEvent.click(screen.getByTestId('research-submit'));

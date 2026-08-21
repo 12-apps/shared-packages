@@ -31,7 +31,8 @@ export interface ResearchHomeScreenProps {
   defaultTerm?: string;
   defaultQuantity?: number;
   historyPageSize?: number;
-  messages?: Partial<ResearchMessages>;
+  /** Every string this screen renders — the HOST's words (see `./messages`). */
+  messages: ResearchMessages;
 }
 
 export function ResearchHomeScreen({

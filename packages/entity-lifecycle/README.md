@@ -26,7 +26,7 @@ instead of wiring it:
   declaration each, over the four tables the package owns.
 - `@12-apps/entity-lifecycle/hono` — `entityLifecycleRouter({ ...config,
   resolveActor })`, a one-call mount (`hono` is an optional peer).
-- `@12-apps/entity-lifecycle/react` — `createWebEntityLifecycle({ apiBase })`:
+- `@12-apps/entity-lifecycle/react` — `createWebEntityLifecycle({ apiBase, copy })`:
   the Lixeira + Aprovações page, plus the `VersionHistoryDialog` and
   `DraftBanner` a host drops into its own editors.
 - `@12-apps/entity-lifecycle/mcp` — `lifecycleMcpEndpoints({ collectionPath,

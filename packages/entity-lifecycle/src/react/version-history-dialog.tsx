@@ -2,41 +2,33 @@ import { Fragment, useCallback, useEffect, useState, type JSX } from 'react';
 
 import { Alert } from '@12-apps/ui/data-display/Alert';
 import { AlertDialog } from '@12-apps/ui/data-display/AlertDialog';
-import { Chip } from '@12-apps/ui/data-display/Chip';
 import { ErrorState } from '@12-apps/ui/data-display/ErrorState';
 import { LoadingState } from '@12-apps/ui/data-display/LoadingState';
 import { Dialog, DialogContent } from '@12-apps/ui/feedback/Dialog';
-import { Button } from '@12-apps/ui/form/Button';
-import { Box } from '@12-apps/ui/mui/Box';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { LifecycleApiClient, VersionsWire, VersionWire } from './api';
-import { DATE_TIME } from './labels';
+import type { LifecycleApiClient, VersionsWire } from './api';
+import type { VersionComparisonCopy, VersionHistoryCopy } from './copy';
 import { LifecycleHttpError } from './transport';
 import { VersionComparisonSection } from './version-comparison-panel';
+import { VersionRow } from './version-row';
 
 /**
  * Reusable, entity-agnostic version-history dialog (12-17), ported from
- * the origin host's `shared/lifecycle/VersionHistoryDialog` with its test ids and
- * pt-BR copy intact: lists `GET <apiBase>/{resourcePath}/versions` newest
+ * the origin host's `shared/lifecycle/VersionHistoryDialog` with its test ids
+ * intact: lists `GET <apiBase>/{resourcePath}/versions` newest
  * first and lets the admin restore any non-current version (behind an
  * AlertDialog confirm). A 403 (feature off for the tenant) renders a friendly
  * notice; a parked restore (202 → `applied: false`) surfaces the
- * pending-approval notice.
+ * pending-approval notice. Every sentence comes from the host's
+ * {@link VersionHistoryCopy}.
  *
  * CLICKING a row opens the comparison panel under it (FUT-247): that version
  * beside its previous, its next and the current one, field by field. The list
  * alone can only name the fields a version touched — the row stores nothing
  * else — so "what did it actually say" is a second, deliberate read.
  */
-
-/** pt-BR labels for the version kinds. */
-const KIND_LABELS: Record<VersionWire['kind'], string> = {
-  CREATE: 'Criação',
-  UPDATE: 'Alteração',
-  RESTORE: 'Restauração',
-};
 
 export interface VersionHistoryDialogProps {
   /** Entity resource path under the mount, e.g. `products/${id}`. */
@@ -47,93 +39,6 @@ export interface VersionHistoryDialogProps {
   onClose: () => void;
   /** Called after a restore is applied (so the owning page can refresh). */
   onRestored?: () => void;
-}
-
-/**
- * One version row: number, kind chip, date, author, field chips + restore.
- *
- * The whole row is the affordance that opens the comparison — the ticket's
- * "click an item" — so it carries the button role and the keyboard handling
- * itself rather than growing a second control the mouse would race with. The
- * restore button inside it stops propagation: restoring is not selecting.
- */
-function VersionRow({
-  entry,
-  isCurrent,
-  isSelected,
-  onSelect,
-  onRestore,
-}: {
-  entry: VersionWire;
-  isCurrent: boolean;
-  isSelected: boolean;
-  onSelect: (version: number) => void;
-  onRestore: (version: number) => void;
-}): JSX.Element {
-  return (
-    <Box
-      data-testid={`version-row-${entry.version}`}
-      role="button"
-      tabIndex={0}
-      aria-expanded={isSelected}
-      aria-label={`Comparar a versão v${entry.version}`}
-      onClick={() => onSelect(entry.version)}
-      onKeyDown={(event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        onSelect(entry.version);
-      }}
-      sx={{
-        p: 1.5,
-        borderRadius: 1,
-        cursor: 'pointer',
-        border: (theme) =>
-          `1px solid ${isSelected ? theme.palette.primary.main : theme.palette.divider}`,
-      }}
-    >
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
-        <Text variant="heading" size="sm" as="span">
-          {`v${entry.version}`}
-        </Text>
-        <Chip label={KIND_LABELS[entry.kind]} size="sm" variant="outlined" />
-        {isCurrent && <Chip label="Versão atual" size="sm" color="primary" />}
-        {entry.restoredFromVersion !== null && (
-          <Chip
-            label={`a partir da v${entry.restoredFromVersion}`}
-            size="sm"
-            variant="outlined"
-          />
-        )}
-        <Box sx={{ flex: 1 }} />
-        {!isCurrent && (
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={(event) => {
-              event.stopPropagation();
-              onRestore(entry.version);
-            }}
-            dataTestId={`version-restore-${entry.version}`}
-          >
-            Restaurar
-          </Button>
-        )}
-      </Stack>
-      <Text variant="caption" as="p" color="secondary">
-        {DATE_TIME.format(new Date(entry.createdAt))} · {entry.actorName ?? 'Sistema'}
-      </Text>
-      {(entry.changedFields.length > 0 || entry.removedFields.length > 0) && (
-        <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-          {entry.changedFields.map((field) => (
-            <Chip key={`c-${field}`} label={field} size="sm" variant="outlined" />
-          ))}
-          {entry.removedFields.map((field) => (
-            <Chip key={`r-${field}`} label={`− ${field}`} size="sm" variant="outlined" />
-          ))}
-        </Stack>
-      )}
-    </Box>
-  );
 }
 
 interface HistoryLoad {
@@ -186,6 +91,7 @@ interface RestoreFlow {
 function useRestoreFlow(
   api: LifecycleApiClient,
   props: VersionHistoryDialogProps,
+  copy: VersionHistoryCopy,
   refetch: () => void,
 ): RestoreFlow {
   const [confirming, setConfirming] = useState<number | null>(null);
@@ -202,12 +108,12 @@ function useRestoreFlow(
         return;
       }
       if (result.data.applied) {
-        setNotice({ variant: 'success', message: `Versão v${confirming} restaurada.` });
+        setNotice({ variant: 'success', message: copy.restored(confirming) });
         refetch();
         props.onRestored?.();
       } else {
         // 202 — parked for approval; nothing changed yet.
-        setNotice({ variant: 'info', message: 'Alteração enviada para aprovação.' });
+        setNotice({ variant: 'info', message: copy.sentToApproval });
       }
     } finally {
       setBusy(false);
@@ -246,6 +152,9 @@ function useSelectedVersion(data: VersionsWire | null): {
 interface VersionsBodyProps {
   api: LifecycleApiClient;
   resourcePath: string;
+  copy: VersionHistoryCopy;
+  comparisonCopy: VersionComparisonCopy;
+  systemActor: string;
   load: HistoryLoad;
   selected: number | null;
   onSelect: (version: number) => void;
@@ -256,6 +165,9 @@ interface VersionsBodyProps {
 function VersionsBody({
   api,
   resourcePath,
+  copy,
+  comparisonCopy,
+  systemActor,
   load,
   selected,
   onSelect,
@@ -267,16 +179,16 @@ function VersionsBody({
       return (
         <Alert
           variant="info"
-          description="O histórico de versões não está ativo para esta loja."
+          description={copy.featureOffBody}
           data-testid="version-history-feature-off"
         />
       );
     }
     return (
       <ErrorState
-        title="Não foi possível carregar o histórico"
+        title={copy.loadFailedTitle}
         message={load.error.message}
-        retryLabel="Tentar novamente"
+        retryLabel={copy.retryAction}
         onRetry={load.refetch}
       />
     );
@@ -287,7 +199,7 @@ function VersionsBody({
   if (load.data.versions.length === 0) {
     return (
       <Text variant="body" as="p">
-        Nenhuma versão registrada.
+        {copy.emptyBody}
       </Text>
     );
   }
@@ -298,6 +210,8 @@ function VersionsBody({
         <Fragment key={entry.version}>
           <VersionRow
             entry={entry}
+            copy={copy}
+            systemActor={systemActor}
             isCurrent={entry.version === publishedVersion}
             isSelected={selected === entry.version}
             onSelect={onSelect}
@@ -309,6 +223,8 @@ function VersionsBody({
             <VersionComparisonSection
               api={api}
               resourcePath={resourcePath}
+              copy={comparisonCopy}
+              systemActor={systemActor}
               version={entry.version}
             />
           )}
@@ -324,17 +240,25 @@ function VersionsBody({
  */
 export function VersionHistoryDialog({
   api,
+  copy,
+  comparisonCopy,
+  systemActor,
   ...props
-}: VersionHistoryDialogProps & { api: LifecycleApiClient }): JSX.Element {
+}: VersionHistoryDialogProps & {
+  api: LifecycleApiClient;
+  copy: VersionHistoryCopy;
+  comparisonCopy: VersionComparisonCopy;
+  systemActor: string;
+}): JSX.Element {
   const load = useHistory(api, props.resourcePath, props.open);
-  const restore = useRestoreFlow(api, props, load.refetch);
+  const restore = useRestoreFlow(api, props, copy, load.refetch);
   const comparison = useSelectedVersion(load.data);
 
   return (
     <Dialog
       open={props.open}
       onClose={props.onClose}
-      title={`Histórico de versões — ${props.itemLabel}`}
+      title={copy.title(props.itemLabel)}
       // The list alone is a narrow dialog; a four-column comparison is not.
       size={comparison.selected === null ? 'sm' : 'lg'}
       showCloseButton
@@ -354,6 +278,9 @@ export function VersionHistoryDialog({
           <VersionsBody
             api={api}
             resourcePath={props.resourcePath}
+            copy={copy}
+            comparisonCopy={comparisonCopy}
+            systemActor={systemActor}
             load={load}
             selected={comparison.selected}
             onSelect={comparison.toggle}
@@ -363,10 +290,11 @@ export function VersionHistoryDialog({
       </DialogContent>
       <AlertDialog
         open={restore.confirming !== null}
-        title="Restaurar versão"
-        description={`O conteúdo atual será substituído pela versão v${restore.confirming ?? ''}. Uma nova versão será registrada no histórico.`}
-        confirmText="Restaurar"
-        cancelText="Cancelar"
+        // `0` never renders: the dialog is closed while nothing is confirming.
+        title={copy.restoreDialogTitle}
+        description={copy.restoreDialogBody(restore.confirming ?? 0)}
+        confirmText={copy.restoreConfirm}
+        cancelText={copy.cancelAction}
         loading={restore.busy}
         onConfirm={() => void restore.confirmRestore()}
         onCancel={() => restore.setConfirming(null)}

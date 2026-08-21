@@ -13,7 +13,7 @@ reusable across repositories, exposing standardized surfaces. A host repo only
 | **Core engine** | `@12-apps/rbac` | The framework-free PDP (`createRbac`), the contribution/composition API (`definePermissionContribution`, `composePermissions`), caveats, the governance validator (`validateGrant`) and the tenant-role-seed projection. The package declares the three permissions guarding its OWN surfaces (`RBAC_PERMISSIONS`) and ships no application catalog — you compose yours. |
 | **Server** | `@12-apps/rbac/server` | Call `createApiRbac(config)` and mount the `routes` it returns — role CRUD, template overrides, `GET /permissions` and the whole team roster, with parsing, statuses, governance and the envelope inside. Also returns the **guard helpers** (`guards.requirePermission`, `getActorPermissions`, `visibleResources`, `listVisibility`), the grant governance and the stores, so every OTHER host surface authorizes through the same wiring. |
 | **Hono** | `@12-apps/rbac/hono` | `const rbac = rbacRouter({ ...serverConfig, resolveActor }); app.route('/api/admin/:tenantSlug', rbac.router)`. A one-call mount; `hono` is an OPTIONAL peer, so importing the root or `/server` never resolves it. |
-| **React** | `@12-apps/rbac/react` | Call `createWebRbac({ apiBase, catalog })` and mount the `page` it returns (Papéis + Equipe), or route `RolesScreen` / `TeamScreen` yourself — in which case `TeamScreen` takes `ownerRoles` as a REQUIRED prop (feed it `catalog.governance.ownerRoles`; it decides which rows hide "Desativar"/"Remover", and a default would show them on rows the server refuses). Pass the SAME catalog object the server mount got. Built on the same `RbacProvider`/`useCan` context the package always shipped. |
+| **React** | `@12-apps/rbac/react` | Call `createWebRbac({ apiBase, catalog, copy })` and mount the `page` it returns (the roles + team screens behind the package's own tabs), or route `RolesScreen` / `TeamScreen` yourself — in which case `TeamScreen` takes `ownerRoles` as a REQUIRED prop (feed it `catalog.governance.ownerRoles`; it decides which rows hide "Desativar"/"Remover", and a default would show them on rows the server refuses). Pass the SAME catalog object the server mount got. `copy` is REQUIRED — every sentence the screens render is the host's; the origin host's pt-BR ships as the named `PT_BR_RBAC_WEB_COPY` pack. Built on the same `RbacProvider`/`useCan` context the package always shipped. |
 | **Coverage gate** | `@12-apps/rbac/coverage` | Your `rbac:coverage` script becomes a one-line call: `rbacCoverageCli({ appDir, exclusionsPath, rbacGuards, entitlementGuards })`. Name your OWN guard helpers — the gate greps your source for your identifiers, so there is no generic list to default to, and `rbacGuards: []` is REFUSED (an empty accept-list would make every file's verdict meaningless, and it used to make every file read as guarded). The CI workflow that shells out to the consumer's package script keeps working unchanged. |
 | **Prisma** | `prisma/rbac.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/rbac prisma:sync -- <host schema dir>` (or wire your own copy script): the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma; a symlinked partial dangles under `turbo prune`). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 
@@ -125,7 +125,7 @@ reusable across repositories, exposing standardized surfaces. A host repo only
 | `ownership` | no | none | entity-gate owner map for INSTANCE permissions |
 | `expandAssignments` | no | identity | e.g. the origin host's sector → mesas expansion |
 | `permissionsExtras` | no | `{}` | merged into `GET /permissions` (e.g. an entitlement snapshot) |
-| `messages` | no | pt-BR product copy | every user-facing string, overridable per host |
+| `messages` | yes | — | every refusal the surface answers with — the host's words (pt-BR hosts pass `PT_BR_RBAC_MESSAGES` from `/server`) |
 
 **Three ROLE-NAME defaults were removed rather than translated**, because each
 one failed OPEN when it was wrong for a host, and silently:
@@ -145,8 +145,10 @@ and the grant protection cannot name different sets by accident; pass
 `ownerRoles` only to deliberately narrow it (the origin host protects grants for
 `OWNER` + `SUPERADMIN` and runs the roster invariants on `OWNER` alone).
 
-The remaining defaults (`gatePermissions`, `messages`) are ids and pt-BR copy,
-not role names, and each is a field a second host overrides in one line. What
+The remaining default (`gatePermissions`) is permission ids, not words, and a
+second host overrides it in one line. `messages` stopped being a default with
+the copy port: every sentence is the host's, and the origin host's ship only
+as the named `PT_BR_RBAC_MESSAGES` pack. What
 is NOT a default any more is the catalog: it used to be the origin host's, so a host
 that passed its own registry to the server and said nothing to the browser got
 a screen governed by a different application's policy. There is nothing to fall
@@ -212,6 +214,7 @@ exactly as their permissions already resolve to nothing.
 
 ```ts
 import { rbacRouter } from '@12-apps/rbac/hono';
+import { PT_BR_RBAC_MESSAGES } from '@12-apps/rbac/server';
 import {
   composePermissions,
   RBAC_PERMISSIONS,
@@ -238,6 +241,7 @@ const rbac = rbacRouter({
   catalog: CATALOG,
   adminRoles: ['OWNER', 'MANAGER'],          // this host's coarse roster tier
   customerRole: null,                        // …and it has no customer tier
+  messages: PT_BR_RBAC_MESSAGES,             // required: the wire's sentences are yours
   directory: {
     getUsers: (ids) => users.byIds(ids),
     searchUsers: (q) => users.searchIds(q),
@@ -259,12 +263,15 @@ app.route('/api/admin/:tenantSlug', rbac.router);
 ## Minimal host (React)
 
 ```tsx
-import { createWebRbac } from '@12-apps/rbac/react';
+import { createWebRbac, PT_BR_RBAC_WEB_COPY } from '@12-apps/rbac/react';
 import { CATALOG } from './authz/catalog';
 
 const { page: RbacAdmin } = createWebRbac({
   apiBase: `/api/admin/${tenantSlug}`,
   catalog: CATALOG,   // the SAME object the server mount received
+  // Required: the surface's sentences are the host's. The pack is the origin
+  // host's exact copy, chosen here by name rather than inherited by silence.
+  copy: PT_BR_RBAC_WEB_COPY,
 });
 // <RbacAdmin /> renders Papéis + Equipe; or take RolesScreen / TeamScreen
 // individually and put them behind your own routes.
@@ -323,10 +330,11 @@ insulation; a `@deprecated` tag is not.
 | the host-branded permission union type | `PermissionOf<typeof CATALOG>` (the type argument is not optional) |
 | `CLIENT_CAPABILITIES` | a host constant — it was never a role assignment |
 | `config.permissions` / `roleTemplates` / `governance` / `tenantRoleSeeds` | `config.catalog` |
-| `createWebRbac({ apiBase })` | `createWebRbac({ apiBase, catalog })` |
+| `createWebRbac({ apiBase })` | `createWebRbac({ apiBase, catalog, copy })` |
 | `RbacLabelOverrides` (from `@12-apps/rbac/react`) | `RbacLabelVocabulary`, from the ROOT barrel `@12-apps/rbac` — see below |
 | the host-branded guard-name lists | required `rbacGuards` / `entitlementGuards` options |
 | `adminRoles` / `customerRole` defaults | REQUIRED config fields (`customerRole: null` for a host with no customer tier) |
+| `DEFAULT_MESSAGES` and the screens' compiled-in pt-BR | REQUIRED `messages` (server) and `copy` (react); the origin host's words ship as the named `PT_BR_RBAC_MESSAGES` / `PT_BR_RBAC_WEB_COPY` packs |
 | `ownerRoles` default `['OWNER']` | derived from `catalog.governance.ownerRoles`; pass it only to NARROW that set |
 | `PermissionContribution` (bare) | `PermissionContribution<P>` — the `= string` default is gone; prefer no annotation at all |
 
