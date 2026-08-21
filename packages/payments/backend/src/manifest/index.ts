@@ -9,15 +9,21 @@
  * exist (the `@12-apps/jobs` manifest's move), so a drift still fails a test
  * run before any host sees it.
  *
- * The absences are deliberate, and that suite pins each one:
+ * TWO manifests, because the package ships TWO route tables that must never
+ * merge (`http/mount.ts` argues the privilege split: every library row is
+ * merchant-admin, machine or merchant-scoped; every checkout row is the
+ * BUYER). The auth-platform split is the precedent: a host binds each
+ * surface behind its own gate, and a version bump can never widen one mount
+ * with the other's rows. Both `http` capabilities are COUNTABLE VIEWS
+ * (`http/wire-view`, `checkout/wire-view`) over the mounts, which stay
+ * exactly what they were — the raw request in and the raw response out are
+ * what the handlers always needed (webhook signatures over exact bytes,
+ * provider-shaped bodies, OAuth redirects), and the contract now carries
+ * both. `email` is the receipt mailer seam; its words arrive at
+ * manifest-build time (`./server` is a FUNCTION for auth's reason).
  *
- * - **No `http`.** The package ships TWO route tables that must never merge
- *   (`http/mount.ts` argues the privilege split: admin `requireAuth` vs
- *   buyer), as segment-array dispatch closures behind framework-free mounts
- *   with host-provided intents (`extensions`) — not `WireRoute` descriptors
- *   a consumer could count. `mountPayments`/`createPaymentFlowsBE` stay
- *   direct host calls, exactly what `.payments-surface.json`'s `wiring`
- *   class exists to keep small.
+ * The remaining absences are deliberate, and the suite pins each one:
+ *
  * - **No `mcp`, no `permissions`.** The package advertises no tools, and
  *   every authorization question is a host port (`requireAuth`).
  * - **No `e2e`.** The journeys ship in the SIBLING package
@@ -38,5 +44,16 @@ export const paymentsBackendManifest = {
   contract: 1,
   db: { partial: 'prisma/payments.prisma', migrations: 'prisma/migrations' },
   observability: { namespace: 'payments' },
-  server: ['jobs'],
+  server: ['http', 'jobs', 'email'],
+} as const;
+
+/**
+ * The buyer-checkout surface's own identity. No `db` (the schema is the
+ * library manifest's), no jobs, no email — one capability, one gate.
+ */
+export const paymentsCheckoutManifest = {
+  name: '@12-apps/payments-checkout',
+  contract: 1,
+  observability: { namespace: 'payments-checkout' },
+  server: ['http'],
 } as const;
