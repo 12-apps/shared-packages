@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 // render/screen from @testing-library/react — plain DOM asserts, no jest-dom.
 import { render, screen, waitFor } from '@testing-library/react';
+import type { ResearchMessages } from '../messages';
+import { PT_BR_RESEARCH_MESSAGES } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_MESSAGES } from '../messages';
+
 import { SourceStatusList } from '../source-status';
 import type { SourceStatView } from '../types';
 
@@ -26,8 +28,15 @@ const BLOCKED =
   'Busca no catálogo VTEX falhou: a loja recusou nosso acesso (HTTP 403 — bloqueio de bot ' +
   'ou de IP). Endereço: https://www.atacadao.com.br/api/catalog_system/pub/products/search';
 
-const renderList = (stats: SourceStatView[], messages?: Parameters<typeof SourceStatusList>[0]['messages']) =>
-  render(<SourceStatusList sources={[]} stats={stats} running={false} messages={messages} />);
+const renderList = (stats: SourceStatView[], messages?: Partial<ResearchMessages>) =>
+  render(
+    <SourceStatusList
+      sources={[]}
+      stats={stats}
+      running={false}
+      messages={{ ...PT_BR_RESEARCH_MESSAGES, ...messages }}
+    />,
+  );
 
 describe('SourceStatusList — failure reasons (FUT-495)', () => {
   it('shows the recorded reason under the failed row, not just the status word', () => {
@@ -114,7 +123,7 @@ describe('SourceStatusList — failure reasons (FUT-495)', () => {
     renderList([sourceStat({})]);
 
     expect(screen.getByTestId('source-status-reason-s1').textContent).toContain(
-      DEFAULT_MESSAGES.statusReasonUnknown,
+      PT_BR_RESEARCH_MESSAGES.statusReasonUnknown,
     );
   });
 
