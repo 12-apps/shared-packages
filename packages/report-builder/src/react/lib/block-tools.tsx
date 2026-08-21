@@ -27,6 +27,7 @@ import type { ReportRender } from "../reports-api";
 import { exportRows } from "./export-rows";
 import { Glyph } from "./glyph";
 import { OverflowToolCluster, type BlockTool } from "./tool-cluster";
+import { useReportEngineCopy } from "../transport-context";
 
 /** Grid — "show me the numbers this was drawn from". */
 function TableGlyph(): JSX.Element {
@@ -121,6 +122,7 @@ export function BlockToolCluster({
   /** Omitted where the page exports from its own toolbar instead. */
   csv?: { filename: string; dataTestId: string };
 }): JSX.Element | null {
+  const copy = useReportEngineCopy();
   const { render } = view;
   const tools: BlockTool[] = [];
   if (view.canToggle) {
@@ -139,7 +141,7 @@ export function BlockToolCluster({
       label: "Baixar CSV",
       icon: <DownloadGlyph />,
       onSelect: () => {
-        exportRows("csv", render.rows, exportColumnsFor(render), csv.filename);
+        exportRows("csv", render.rows, exportColumnsFor(render, copy.values), csv.filename);
       },
       dataTestId: csv.dataTestId,
     });

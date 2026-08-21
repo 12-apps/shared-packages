@@ -1,3 +1,4 @@
+import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { ReportBuilderError } from '../errors';
@@ -8,6 +9,7 @@ import { orderRows, salesCatalog } from './fixtures';
 const options = {
   catalog: salesCatalog,
   adapter: createMemoryDataSource({ orders: orderRows }),
+  copy: PT_BR_REPORT_ENGINE_COPY,
 };
 
 describe('runReport', () => {

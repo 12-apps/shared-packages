@@ -19,6 +19,7 @@ import { AGGREGATION_LABELS, aggregationOptions, editMeasureRow } from "./builde
 import { chartOptions, GRAIN_LABELS, stackedOption, type BuilderDraft } from "./builder-model";
 import { SECTION_LABEL_STYLE } from "./lib/report-surface";
 import type { ReportGrain } from "./reports-api";
+import { useReportEngineCopy } from "./transport-context";
 
 type Patch = (patch: Partial<BuilderDraft>) => void;
 
@@ -276,12 +277,13 @@ export function PresentationSection({ draft, fields, update }: SectionProps): JS
   // grey (FUT-391): grey says "no" without saying why, leaving the author to
   // guess which of their choices caused it when the compiler already knows.
   const byName = new Map(fields.map((field) => [field.field, field]));
-  const stacking = stackedOption(draft, byName);
+  const copy = useReportEngineCopy();
+  const stacking = stackedOption(draft, byName, copy.presentation);
   return (
     <Stack spacing={1}>
       <SectionHeading>Visualização</SectionHeading>
       <VizPicker
-        options={chartOptions(draft, byName)}
+        options={chartOptions(draft, byName, copy.presentation)}
         value={draft.chartType}
         onChange={(chartType) => update({ chartType })}
       />

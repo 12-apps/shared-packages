@@ -9,6 +9,7 @@ import { ReportEditorPage } from "./report-editor";
 import { ReportsPage } from "./reports-page";
 import { SystemDashboardPage } from "./system-dashboard";
 import { SystemReportPage } from "./system-report";
+import type { ReportBuilderCopy } from "./copy";
 import { ReportBuilderProvider, type ReportBuilderSurface } from "./transport-context";
 import { httpTransport, type ReportBuilderTransport } from "./transport";
 
@@ -43,6 +44,17 @@ export interface ReportBuilderConfig {
    * built-ins.
    */
   surface: ReportBuilderSurface;
+  /**
+   * The words this surface renders: the spec sentence a block is described by,
+   * the column and axis headings, the reasons a presentation is unavailable,
+   * and what a boolean cell reads as.
+   *
+   * REQUIRED, like `surface` and for the same reason. The package used to
+   * compile in its own pt-BR, so a host that said nothing published another
+   * product's Portuguese and had no field to decline it with.
+   * `PT_BR_REPORT_ENGINE_COPY` is that exact wording, chosen by name.
+   */
+  copy: ReportBuilderCopy;
   /**
    * How to reach the backend. Omit for same-origin `fetch`, which is what a
    * real host wants; supply one to mount the surface against something else —
@@ -175,7 +187,7 @@ function assertSurface(surface: ReportBuilderSurface): void {
 export function createWebReportBuilder(config: ReportBuilderConfig): {
   page: () => JSX.Element;
 } {
-  const { tenantSlug, transport, surface, standalone = false } = config;
+  const { tenantSlug, transport, surface, copy, standalone = false } = config;
   const initialPath = config.initialPath ?? surfaceRoot(tenantSlug);
   assertSurface(surface);
 
@@ -187,7 +199,12 @@ export function createWebReportBuilder(config: ReportBuilderConfig): {
     const resolved = useMemo(() => transport ?? httpTransport(), []);
 
     const tree = (
-      <ReportBuilderProvider transport={resolved} tenantSlug={tenantSlug} surface={surface}>
+      <ReportBuilderProvider
+        transport={resolved}
+        tenantSlug={tenantSlug}
+        surface={surface}
+        copy={copy}
+      >
         <ReportBuilderRoutes tenantSlug={tenantSlug} />
       </ReportBuilderProvider>
     );

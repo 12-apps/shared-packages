@@ -1,3 +1,4 @@
+import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { compileReport } from '../compile';
@@ -23,7 +24,7 @@ import { orderRows, salesCatalog, splitRows } from './fixtures';
 function modelFor(input: ReportSpecInput, rows: Array<Record<string, unknown>>) {
   const spec = reportSpecSchema.parse(input);
   const query = compileReport(spec, salesCatalog);
-  return renderReport(query, spec.presentation, salesCatalog, executeCompiledQuery(rows, query));
+  return renderReport(query, spec.presentation, salesCatalog, executeCompiledQuery(rows, query), PT_BR_REPORT_ENGINE_COPY.labels);
 }
 
 function chartTypeFor(input: ReportSpecInput, rows = orderRows): string {

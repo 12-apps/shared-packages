@@ -130,14 +130,10 @@ export const REPORT_BUILDER_PERMISSIONS = definePermissionContribution({
      */
     'reports:manage': { kind: 'class' },
   },
-  /**
-   * pt-BR, matching the copy the screens already ship — and overridable per
-   * host the same way those are. Only the segments THIS id uses.
-   */
-  labels: {
-    domains: { reports: 'Relatórios' },
-    actions: { manage: 'Gerenciar' },
-  },
+  // No `labels`. A label is COPY, and a package that shipped "Relatórios" was
+  // handing the origin host's Portuguese to every adopter of its ids — the same
+  // call `@12-apps/rbac` made in 4.2.0. The host declares the words for the
+  // segments this id uses; the package declares the id.
 });
 
 /** The permission union this package contributes. */

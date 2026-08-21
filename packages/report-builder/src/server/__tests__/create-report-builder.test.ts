@@ -1,3 +1,5 @@
+import { PT_BR_REPORT_SERVER_MESSAGES } from '../pt-BR';
+import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { defineCatalog } from '../../catalog';
@@ -181,6 +183,8 @@ function setup(
 
   const { routes } = createApiReportBuilder({
     catalog: CATALOG,
+    copy: PT_BR_REPORT_ENGINE_COPY,
+    messages: PT_BR_REPORT_SERVER_MESSAGES,
     // A FACTORY, so the window each request resolves is observable: an adapter
     // that never saw the window would silently report on all of history.
     adapter: ({ window }) => {

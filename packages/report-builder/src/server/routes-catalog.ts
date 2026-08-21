@@ -39,7 +39,7 @@ export function catalogRoute(config: ReportBuilderServerConfig): ReportRoute {
       // may not author reports: 403 rather than a builder that renders an
       // entity picker with nothing in it.
       const denied = entities.length === 0 && Object.keys(config.entityPermission).length > 0;
-      return Promise.resolve(denied ? forbidden() : ok({ entities }));
+      return Promise.resolve(denied ? forbidden(config) : ok({ entities }));
     },
   };
 }

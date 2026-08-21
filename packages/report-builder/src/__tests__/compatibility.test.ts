@@ -1,3 +1,4 @@
+import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -82,7 +83,7 @@ function compiles(input: ReportSpecInput): boolean {
 describe('presentationCompatibility — what a split blocks, and what it says', () => {
   const SPLIT: SpecShape = { dimensionCount: 2, measureCount: 1, firstDimensionIsOrdered: true };
   const reasonOf = (shape: SpecShape, option: string): string | null =>
-    presentationCompatibility(shape).find((entry) => entry.option === option)?.disabledReason ??
+    presentationCompatibility(shape, PT_BR_REPORT_ENGINE_COPY.presentation).find((entry) => entry.option === option)?.disabledReason ??
     null;
 
   it.each(['line', 'area', 'bar'])('lets %s chart a split', (option) => {
@@ -129,7 +130,7 @@ describe('presentationCompatibility — no grouping means Número, and only Núm
     firstDimensionIsOrdered: false,
   });
   const reasonOf = (shape: SpecShape, option: string): string | null =>
-    presentationCompatibility(shape).find((entry) => entry.option === option)?.disabledReason ??
+    presentationCompatibility(shape, PT_BR_REPORT_ENGINE_COPY.presentation).find((entry) => entry.option === option)?.disabledReason ??
     null;
 
   it.each([1, 2, 3, 10])('offers Número for %i ungrouped measure(s)', (measureCount) => {
@@ -177,22 +178,22 @@ describe('stackedCompatibility', () => {
   });
 
   it.each(['bar', 'area'] as const)('offers %s stacking once a SPLIT exists', (option) => {
-    expect(stackedCompatibility(option, shape(2, 1))?.disabledReason).toBeNull();
+    expect(stackedCompatibility(option, shape(2, 1), PT_BR_REPORT_ENGINE_COPY.presentation)?.disabledReason).toBeNull();
   });
 
   it.each(['bar', 'area'] as const)(
     'offers %s stacking once there are two MEASURES',
     (option) => {
-      expect(stackedCompatibility(option, shape(1, 2))?.disabledReason).toBeNull();
+      expect(stackedCompatibility(option, shape(1, 2), PT_BR_REPORT_ENGINE_COPY.presentation)?.disabledReason).toBeNull();
     },
   );
 
   it.each(['bar', 'area'] as const)('refuses %s stacking with one series', (option) => {
-    expect(stackedCompatibility(option, shape(1, 1))?.disabledReason).not.toBeNull();
+    expect(stackedCompatibility(option, shape(1, 1), PT_BR_REPORT_ENGINE_COPY.presentation)?.disabledReason).not.toBeNull();
   });
 
   it('names the control to change, in the same register as the rest', () => {
-    const reason = stackedCompatibility('bar', shape(1, 1))?.disabledReason ?? '';
+    const reason = stackedCompatibility('bar', shape(1, 1), PT_BR_REPORT_ENGINE_COPY.presentation)?.disabledReason ?? '';
     expect(reason).toContain('“separar em séries”');
     expect(reason).toContain('medida');
   });
@@ -202,7 +203,7 @@ describe('stackedCompatibility', () => {
     (option) => {
       // `null` is "this control does not apply", which is a different answer
       // from a toggle that is on screen and refused.
-      expect(stackedCompatibility(option, shape(2, 1))).toBeNull();
+      expect(stackedCompatibility(option, shape(2, 1), PT_BR_REPORT_ENGINE_COPY.presentation)).toBeNull();
     },
   );
 });
@@ -247,7 +248,7 @@ describe('isOrderedDimension — the type rule, and the catalog override', () =>
  */
 describe('presentationCompatibility — line and area need an ordered axis', () => {
   const reasonOf = (shape: SpecShape, option: string): string | null =>
-    presentationCompatibility(shape).find((entry) => entry.option === option)?.disabledReason ??
+    presentationCompatibility(shape, PT_BR_REPORT_ENGINE_COPY.presentation).find((entry) => entry.option === option)?.disabledReason ??
     null;
   const ordered = (firstDimensionIsOrdered: boolean): SpecShape => ({
     dimensionCount: 1,
@@ -331,7 +332,7 @@ describe('presentationCompatibility ⟺ compiler', () => {
       const fullShape = { ...shape, measureCount };
       const axis = dimensions?.[0]?.field ?? 'no axis';
       it(`agrees on ${fullShape.dimensionCount} dim(s) × ${measureCount} measure(s) over ${axis}`, () => {
-        const matrix = presentationCompatibility(fullShape);
+        const matrix = presentationCompatibility(fullShape, PT_BR_REPORT_ENGINE_COPY.presentation);
         expect(matrix.map((entry) => entry.option)).toEqual([...PRESENTATION_OPTIONS]);
         for (const entry of matrix) {
           const accepted = compiles({
@@ -426,7 +427,7 @@ describe('defaultPresentation', () => {
         // picker greys out, or the form would open on a disabled tile.
         const option = picked.kind === 'chart' ? picked.chartType : picked.kind;
         expect(
-          presentationCompatibility(fullShape).find((entry) => entry.option === option)
+          presentationCompatibility(fullShape, PT_BR_REPORT_ENGINE_COPY.presentation).find((entry) => entry.option === option)
             ?.disabledReason,
           label,
         ).toBeNull();

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+import { renderWithCopy } from "./with-copy";
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import type { DashboardBlockRender, SavedReportView } from '../custom-reports-api';
 import { ReportViewCanvas } from '../report-view';
@@ -148,7 +149,7 @@ afterEach(() => {
 
 describe('gap B — the CSV export is an icon, and it still exports', () => {
   it('is named, and carries a glyph rather than the word CSV', () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
     const csv = screen.getByTestId('report-block-grafico-export');
 
     // An icon with no accessible name is a worse screen than the text it
@@ -159,14 +160,14 @@ describe('gap B — the CSV export is an icon, and it still exports', () => {
   });
 
   it('keeps the test id the reports e2e drives, on every block', () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK, TABLE_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK, TABLE_BLOCK])} />);
 
     expect(screen.getByTestId('report-block-grafico-export')).not.toBeNull();
     expect(screen.getByTestId('report-block-tabela-export')).not.toBeNull();
   });
 
   it("downloads the block's rows when pressed", () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
 
     fireEvent.click(screen.getByTestId('report-block-grafico-export'));
 
@@ -176,7 +177,7 @@ describe('gap B — the CSV export is an icon, and it still exports', () => {
   });
 
   it('offers no cluster at all on a block that failed to run', () => {
-    render(<ReportViewCanvas view={viewOf([ERROR_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([ERROR_BLOCK])} />);
     const block = screen.getByTestId('report-block-quebrado');
 
     // Positive control first: the block IS on the canvas, showing why it
@@ -191,7 +192,7 @@ describe('gap B — the CSV export is an icon, and it still exports', () => {
 
 describe('the cluster is revealed by hover — and by focus, and always on touch', () => {
   it('hides itself, and stops being clickable while hidden', () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
     const hidden = declarationsOf(HIDDEN_RULE);
 
     expect(hidden).toContain('opacity:0');
@@ -201,7 +202,7 @@ describe('the cluster is revealed by hover — and by focus, and always on touch
   });
 
   it('is revealed by hovering the BLOCK, not the cluster', () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
 
     // `prototype.html`'s `.block:hover .block-tools`. A rule on the cluster
     // itself would ask the pointer to find a control it cannot see.
@@ -209,7 +210,7 @@ describe('the cluster is revealed by hover — and by focus, and always on touch
   });
 
   it('is revealed by focus too — a keyboard user never hovers', () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
     const focused = declarationsOf(FOCUS_RULE);
 
     expect(focused).toContain('opacity:1');
@@ -219,7 +220,7 @@ describe('the cluster is revealed by hover — and by focus, and always on touch
   });
 
   it('never uses display:none — the controls stay in the tab order', async () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
     const csv = screen.getByTestId('report-block-grafico-export');
 
     // Positive control: there IS a rule hiding the cluster. Without it the
@@ -240,7 +241,7 @@ describe('the cluster is revealed by hover — and by focus, and always on touch
   });
 
   it('reaches BOTH tools with the keyboard, in the order they are read', async () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
     const toggle = screen.getByTestId('report-block-grafico-render-as-table');
     const csv = screen.getByTestId('report-block-grafico-export');
 
@@ -262,7 +263,7 @@ describe('the cluster is revealed by hover — and by focus, and always on touch
   });
 
   it('is permanently visible where there is no hover at all', () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
     const css = emittedCss();
     const at = css.search(/@media\s*\(\s*hover:\s*none\s*\)/);
 
@@ -277,7 +278,7 @@ describe('the cluster is revealed by hover — and by focus, and always on touch
 
 describe('gap C — "Ver como tabela" is a toggle in the cluster, not a link in the body', () => {
   it('is an icon button in the block\'s tool cluster', () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
     const toggle = screen.getByTestId('report-block-grafico-render-as-table');
 
     expect(toggle.tagName).toBe('BUTTON');
@@ -290,7 +291,7 @@ describe('gap C — "Ver como tabela" is a toggle in the cluster, not a link in 
   });
 
   it('carries aria-pressed reflecting the current mode', () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
     const toggle = screen.getByTestId('report-block-grafico-render-as-table');
 
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
@@ -301,7 +302,7 @@ describe('gap C — "Ver como tabela" is a toggle in the cluster, not a link in 
   });
 
   it('names its destination: "Ver como tabela", then "Ver como gráfico"', () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
     const toggle = screen.getByTestId('report-block-grafico-render-as-table');
 
     expect(toggle.getAttribute('aria-label')).toBe('Ver como tabela');
@@ -310,7 +311,7 @@ describe('gap C — "Ver como tabela" is a toggle in the cluster, not a link in 
   });
 
   it('swaps the rendering IN PLACE — nothing is stacked above or below it', () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
     const toggle = screen.getByTestId('report-block-grafico-render-as-table');
     const body = screen.getByTestId('report-block-grafico-render');
     const header = toggle.closest('[data-block-tools]')?.parentElement;
@@ -337,7 +338,7 @@ describe('gap C — "Ver como tabela" is a toggle in the cluster, not a link in 
   });
 
   it('applies to that block only', () => {
-    render(<ReportViewCanvas view={viewOf([CHART_BLOCK, OTHER_CHART_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK, OTHER_CHART_BLOCK])} />);
 
     fireEvent.click(screen.getByTestId('report-block-grafico-render-as-table'));
 
@@ -352,7 +353,7 @@ describe('gap C — "Ver como tabela" is a toggle in the cluster, not a link in 
   it('is not saved to the report', () => {
     const view = viewOf([CHART_BLOCK]);
     const before = JSON.stringify(view);
-    const canvas = render(<ReportViewCanvas view={view} />);
+    const canvas = renderWithCopy(<ReportViewCanvas view={view} />);
 
     fireEvent.click(screen.getByTestId('report-block-grafico-render-as-table'));
     expect(screen.getByTestId('report-block-grafico-render-table')).not.toBeNull();
@@ -363,7 +364,7 @@ describe('gap C — "Ver como tabela" is a toggle in the cluster, not a link in 
     // is deliberate: the toggle is how someone wants to read this block right
     // now, and saving it would change what every other viewer sees.
     canvas.unmount();
-    render(<ReportViewCanvas view={view} />);
+    renderWithCopy(<ReportViewCanvas view={view} />);
     expect(screen.getByTestId('report-block-grafico-render-chart')).not.toBeNull();
     expect(
       screen.getByTestId('report-block-grafico-render-as-table').getAttribute('aria-pressed'),
@@ -371,7 +372,7 @@ describe('gap C — "Ver como tabela" is a toggle in the cluster, not a link in 
   });
 
   it('is offered only where there is a chart to switch', () => {
-    render(<ReportViewCanvas view={viewOf([TABLE_BLOCK, ERROR_BLOCK])} />);
+    renderWithCopy(<ReportViewCanvas view={viewOf([TABLE_BLOCK, ERROR_BLOCK])} />);
 
     // A table has no other view of itself, and a failed block has no view at
     // all — but the table still exports, so its cluster is not empty.

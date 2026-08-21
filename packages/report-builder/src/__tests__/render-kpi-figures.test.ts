@@ -1,3 +1,4 @@
+import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { compileReport } from '../compile';
@@ -23,7 +24,7 @@ function kpiModelFor(input: ReportSpecInput) {
   const spec = reportSpecSchema.parse(input);
   const query = compileReport(spec, salesCatalog);
   const rows = executeCompiledQuery(orderRows, query);
-  const model = renderReport(query, spec.presentation, salesCatalog, rows);
+  const model = renderReport(query, spec.presentation, salesCatalog, rows, PT_BR_REPORT_ENGINE_COPY.labels);
   if (model.kind !== 'kpi') throw new Error(`Expected a kpi model, got "${model.kind}".`);
   return model;
 }
@@ -132,7 +133,7 @@ describe('renderReport — a KPI with several measures', () => {
     // In a dashboard grid the metric's ABSENCE should still say which metric.
     const spec = reportSpecSchema.parse(THREE_MEASURES);
     const query = compileReport(spec, salesCatalog);
-    const model = renderReport(query, spec.presentation, salesCatalog, []);
+    const model = renderReport(query, spec.presentation, salesCatalog, [], PT_BR_REPORT_ENGINE_COPY.labels);
     if (model.kind !== 'kpi') throw new Error(`Expected a kpi model, got "${model.kind}".`);
     expect(model.figures).toHaveLength(3);
     expect(model.figures.map((figure) => figure.value)).toEqual([null, null, null]);

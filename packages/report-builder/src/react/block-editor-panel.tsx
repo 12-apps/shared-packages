@@ -82,6 +82,7 @@ import {
   type SentencePart,
 } from "./lib/spec-sentence";
 import { REPORT_MAX_BLOCKS } from "./report-model";
+import { useReportEngineCopy } from "./transport-context";
 
 /**
  * The panel's own name for itself, in the prototype's two states.
@@ -117,15 +118,16 @@ function useSelectedBlock(
   spec: ReportSpecWire | null,
   entities: ReportEntityFields[],
 ): SelectedBlock | null {
+  const copy = useReportEngineCopy();
   const catalog = useMemo(() => catalogFromEntities(entities), [entities]);
   return useMemo(() => {
     if (spec === null) return null;
     return {
       spec,
-      parts: sentenceParts(blockSentence(spec, catalog)),
-      autoTitle: blockAutoTitle(spec, catalog),
+      parts: sentenceParts(blockSentence(spec, catalog, copy.spec)),
+      autoTitle: blockAutoTitle(spec, catalog, copy.spec),
     };
-  }, [spec, catalog]);
+  }, [spec, catalog, copy]);
 }
 
 /** The form half: seeded once per selection, applied live on every edit. */
@@ -152,6 +154,7 @@ function PanelForm({
   onTitleChange: (title: string) => void;
   testId: string;
 }): JSX.Element {
+  const copy = useReportEngineCopy();
   const seed = block.spec;
   // Seeded once per opening (the caller remounts via `key`): the draft keeps
   // half-finished rows — a blank "+ Medida" line, a filter with no value yet —
@@ -160,7 +163,7 @@ function PanelForm({
 
   const apply = (next: BuilderDraft): void => {
     const map = fieldMapOf(entities.find((candidate) => candidate.entity === next.entity));
-    const valid = withValidChart(next, map);
+    const valid = withValidChart(next, map, copy.presentation);
     setDraft(valid);
     onChange(specFromDraft(valid, map));
   };

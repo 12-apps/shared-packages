@@ -4,6 +4,7 @@ import { requireEntityForRender } from './catalog';
 import { isOrderedDimension } from './compatibility';
 import { pivotSplit } from './pivot';
 import { toKpiModel, type ReportKpiFigure } from './render-kpi';
+import type { RenderLabelCopy } from './copy';
 import { dimensionLabel, measureLabel } from './render-labels';
 import type { ReportPresentation } from './spec';
 import {
@@ -141,6 +142,7 @@ function toChartSpec(
   query: CompiledQuery,
   presentation: Extract<ReportPresentation, { kind: 'chart' }>,
   catalog: FieldCatalog,
+  copy: RenderLabelCopy,
 ): ChartSpec {
   const entity = requireEntityForRender(catalog, query.entity);
   const dimension = query.dimensions[0];
@@ -162,7 +164,7 @@ function toChartSpec(
     xAxis: { key: dimension.alias },
     series: query.measures.map((measure) => ({
       key: measure.alias,
-      label: measureLabel(entity.fields[measure.field], measure),
+      label: measureLabel(entity.fields[measure.field], measure, copy),
     })),
     stacked: presentation.stacked,
     // Straight segments, always (FUT-391). A smoothed line between two points
@@ -210,6 +212,7 @@ function toSplitChartModel(
   presentation: Extract<ReportPresentation, { kind: 'chart' }>,
   catalog: FieldCatalog,
   rows: ReportRow[],
+  copy: RenderLabelCopy,
 ): ReportRenderModel {
   const entity = requireEntityForRender(catalog, query.entity);
   const axis = query.dimensions[0];
@@ -239,7 +242,7 @@ function toSplitChartModel(
     tableColumns: [
       {
         key: axis.alias,
-        label: dimensionLabel(entity.fields[axis.field], axis.alias, axis.timeGrain),
+        label: dimensionLabel(entity.fields[axis.field], axis.alias, copy, axis.timeGrain),
         format: 'text' as const,
       },
       ...pivot.series.map((series) => ({
@@ -292,23 +295,24 @@ export function renderReport(
   presentation: ReportPresentation,
   catalog: FieldCatalog,
   rows: ReportRow[],
+  copy: RenderLabelCopy,
 ): ReportRenderModel {
   if (presentation.kind === 'chart') {
     const drawable = withDrawableChartType(query, presentation, catalog);
     if (query.dimensions.length > 1) {
-      return toSplitChartModel(query, drawable, catalog, rows);
+      return toSplitChartModel(query, drawable, catalog, rows, copy);
     }
     return {
       kind: 'chart',
-      chartSpec: toChartSpec(query, drawable, catalog),
-      tableColumns: tableColumnsFor(query, catalog),
+      chartSpec: toChartSpec(query, drawable, catalog, copy),
+      tableColumns: tableColumnsFor(query, catalog, copy),
       rows: withoutSuppressedCells(rows),
     };
   }
   if (presentation.kind === 'kpi') {
-    return toKpiModel(query, presentation, catalog, rows);
+    return toKpiModel(query, presentation, catalog, rows, copy);
   }
-  return { kind: 'table', columns: tableColumnsFor(query, catalog), rows };
+  return { kind: 'table', columns: tableColumnsFor(query, catalog, copy), rows };
 }
 
 /**
@@ -316,17 +320,21 @@ export function renderReport(
  * asks for them. Shared by the table presentation and by a chart's table
  * fallback so the two can never name the same column differently.
  */
-function tableColumnsFor(query: CompiledQuery, catalog: FieldCatalog): ReportTableColumn[] {
+function tableColumnsFor(
+  query: CompiledQuery,
+  catalog: FieldCatalog,
+  copy: RenderLabelCopy,
+): ReportTableColumn[] {
   const entity = requireEntityForRender(catalog, query.entity);
   return [
     ...query.dimensions.map((dimension) => ({
       key: dimension.alias,
-      label: dimensionLabel(entity.fields[dimension.field], dimension.alias, dimension.timeGrain),
+      label: dimensionLabel(entity.fields[dimension.field], dimension.alias, copy, dimension.timeGrain),
       format: 'text' as const,
     })),
     ...query.measures.map((measure) => ({
       key: measure.alias,
-      label: measureLabel(entity.fields[measure.field], measure),
+      label: measureLabel(entity.fields[measure.field], measure, copy),
       format: measure.format,
     })),
   ];

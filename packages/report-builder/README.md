@@ -161,13 +161,44 @@ const { routes } = createApiReportBuilder({
   entityPermission: { loans: 'library:lending:read' },   // yours, every entity
   systemReports: [],                         // yours; `[]` is a complete answer
   starters: { loans: … },                    // yours; `{}` is a complete answer
+  copy: PT_BR_REPORT_ENGINE_COPY,            // yours — the words a run renders
+  messages: PT_BR_REPORT_SERVER_MESSAGES,    // yours — the words a refusal reads
 });
 
 const { page } = createWebReportBuilder({
   tenantSlug,
   surface: { systemReports, systemDashboards, sections, blockTemplates, timeZone },
+  copy: {
+    engine: PT_BR_REPORT_ENGINE_COPY,        // the same object the API takes
+    blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+  },
 });
 ```
+
+### The words are yours, and there is no default (FUT-760)
+
+`copy` and `messages` are required, and the package ships no fallback. It used
+to compile in pt-BR — the spec sentence, the column headings, the reasons a
+presentation is unavailable, every refusal the API answers with — which made one
+product's Portuguese the silent default for every adopter, with no field to
+decline it and nothing that failed to say so.
+
+The retired wording ships as NAMED packs (`PT_BR_REPORT_ENGINE_COPY`,
+`PT_BR_REPORT_SERVER_MESSAGES`, `PT_BR_BLANK_BLOCK_TEMPLATE_COPY`), so adopting
+them changes nothing on screen — the difference is that the choice is now in your
+diff. Pass the SAME `ReportEngineCopy` object to both halves: a host that runs
+reports server-side and renders them in the browser would otherwise be able to
+print one column heading in an export and another on screen.
+
+Translating means writing your own object, not editing the package. Note that
+`copy.spec.sentence` is a TEMPLATE, not a concatenation: it receives the
+assembled clauses (measures, entity, groupBy, splitBy, filters, limit) and
+decides the order they are spoken in, because word order is the part that does
+not survive translation.
+
+Mounting a screen component directly, outside `createWebReportBuilder`, throws:
+copy has no meaningful empty value, so a missing provider is named at the first
+render rather than hidden behind blank labels.
 
 Both throw at ASSEMBLY on a wiring mistake — an unmapped entity, a built-in that
 does not compile against your catalog, a dashboard block naming a report nobody

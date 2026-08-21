@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+import { renderWithCopy } from "./with-copy";
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { JSX } from 'react';
 
@@ -148,13 +149,13 @@ function renderEditorBlock(width: number): void {
       />
     </QueryClientProvider>
   );
-  render(tree());
+  renderWithCopy(tree());
 }
 
 /** The viewer's canvas, at a measured width. */
 function renderViewBlock(width: number): void {
   stubResizeObserver(width);
-  render(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
+  renderWithCopy(<ReportViewCanvas view={viewOf([CHART_BLOCK])} />);
 }
 
 /** Open a block's ⋮ and hand back the ids of what is in it. */

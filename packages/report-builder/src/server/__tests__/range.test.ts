@@ -1,3 +1,4 @@
+import { PT_BR_REPORT_SERVER_MESSAGES } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { ReportBuilderError } from '../../errors';
@@ -23,7 +24,7 @@ const DINNER = new Date('2026-07-14T23:00:00Z');
 
 describe('rolling presets are calendar days on the tenant’s clock', () => {
   it('“hoje” spans the tenant’s midnight-to-midnight, not UTC’s', () => {
-    const range = resolveReportRange({ preset: 'today' }, DINNER, SAO_PAULO);
+    const range = resolveReportRange({ preset: 'today' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
 
     // 00:00 on the 14th in São Paulo is 03:00Z; the window ends at the next.
     expect(range.from.toISOString()).toBe('2026-07-14T03:00:00.000Z');
@@ -34,18 +35,18 @@ describe('rolling presets are calendar days on the tenant’s clock', () => {
     // The regression this guards, stated as the contrast: at 23:00Z the UTC
     // day has already rolled over, so a UTC "today" starts after the meal
     // being reported on and excludes it entirely.
-    const utc = resolveReportRange({ preset: 'today' }, DINNER);
+    const utc = resolveReportRange({ preset: 'today' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range);
 
     expect(utc.from.toISOString()).toBe('2026-07-14T00:00:00.000Z');
     expect(DINNER >= utc.from).toBe(true);
     // ...and on the tenant's clock the same instant is inside a window that
     // began three hours later, which is the point: the two disagree.
-    const local = resolveReportRange({ preset: 'today' }, DINNER, SAO_PAULO);
+    const local = resolveReportRange({ preset: 'today' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
     expect(local.from.getTime()).toBeGreaterThan(utc.from.getTime());
   });
 
   it('“7d” is today plus the six days before it, never six-and-a-bit', () => {
-    const range = resolveReportRange({ preset: '7d' }, DINNER, SAO_PAULO);
+    const range = resolveReportRange({ preset: '7d' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
 
     expect(range.from.toISOString()).toBe('2026-07-08T03:00:00.000Z');
     expect(range.toExclusive.toISOString()).toBe('2026-07-15T03:00:00.000Z');
@@ -54,8 +55,8 @@ describe('rolling presets are calendar days on the tenant’s clock', () => {
   });
 
   it('“30d” ends at the same next-midnight the shorter presets do', () => {
-    const week = resolveReportRange({ preset: '7d' }, DINNER, SAO_PAULO);
-    const month = resolveReportRange({ preset: '30d' }, DINNER, SAO_PAULO);
+    const week = resolveReportRange({ preset: '7d' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
+    const month = resolveReportRange({ preset: '30d' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
 
     expect(month.toExclusive.getTime()).toBe(week.toExclusive.getTime());
   });
@@ -73,7 +74,7 @@ describe('rolling presets are calendar days on the tenant’s clock', () => {
  */
 describe('“este mês” is the calendar month to date', () => {
   it('opens on the 1st, not a number of days back', () => {
-    const range = resolveReportRange({ preset: 'month' }, DINNER, SAO_PAULO);
+    const range = resolveReportRange({ preset: 'month' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
 
     // 00:00 on 1 July in São Paulo is 03:00Z; the window still ends at the
     // next local midnight, so the partial current day is inside it.
@@ -85,8 +86,8 @@ describe('“este mês” is the calendar month to date', () => {
     // The whole reason the preset exists: on the 14th, "this month" is fourteen
     // days while "30 dias" reaches back into June. A resolver that treated
     // month as another day count would make the new pill a duplicate.
-    const monthToDate = resolveReportRange({ preset: 'month' }, DINNER, SAO_PAULO);
-    const thirty = resolveReportRange({ preset: '30d' }, DINNER, SAO_PAULO);
+    const monthToDate = resolveReportRange({ preset: 'month' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
+    const thirty = resolveReportRange({ preset: '30d' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
 
     expect(monthToDate.from.getTime()).toBeGreaterThan(thirty.from.getTime());
     expect(monthToDate.toExclusive.getTime()).toBe(thirty.toExclusive.getTime());
@@ -97,7 +98,7 @@ describe('“este mês” is the calendar month to date', () => {
     // its shortest exactly when a merchant is most likely to open the report
     // and doubt it.
     const firstOfMonth = new Date('2026-08-02T00:00:00Z');
-    const range = resolveReportRange({ preset: 'month' }, firstOfMonth, SAO_PAULO);
+    const range = resolveReportRange({ preset: 'month' }, firstOfMonth, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
 
     expect(range.from.toISOString()).toBe('2026-08-01T03:00:00.000Z');
     expect(range.toExclusive.getTime() - range.from.getTime()).toBe(86_400_000);
@@ -110,13 +111,13 @@ describe('“este mês” is the calendar month to date', () => {
     // three hours early, on the one evening a merchant is closing the month.
     const lastNightOfJuly = new Date('2026-08-01T00:30:00Z');
 
-    const local = resolveReportRange({ preset: 'month' }, lastNightOfJuly, SAO_PAULO);
+    const local = resolveReportRange({ preset: 'month' }, lastNightOfJuly, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
     expect(local.from.toISOString()).toBe('2026-07-01T03:00:00.000Z');
     expect(lastNightOfJuly.getTime()).toBeGreaterThan(local.from.getTime());
     expect(lastNightOfJuly.getTime()).toBeLessThan(local.toExclusive.getTime());
 
     // …and the contrast that makes the assertion above mean something.
-    const utc = resolveReportRange({ preset: 'month' }, lastNightOfJuly);
+    const utc = resolveReportRange({ preset: 'month' }, lastNightOfJuly, PT_BR_REPORT_SERVER_MESSAGES.range);
     expect(utc.from.toISOString()).toBe('2026-08-01T00:00:00.000Z');
     expect(utc.from.getTime()).toBeGreaterThan(local.from.getTime());
   });
@@ -125,7 +126,7 @@ describe('“este mês” is the calendar month to date', () => {
     // 00:30 on 1 August in São Paulo (03:30Z) — the same boundary from the
     // other side: August IS the tenant's month now, and July's window is over.
     const firstMinutesOfAugust = new Date('2026-08-01T03:30:00Z');
-    const range = resolveReportRange({ preset: 'month' }, firstMinutesOfAugust, SAO_PAULO);
+    const range = resolveReportRange({ preset: 'month' }, firstMinutesOfAugust, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
 
     expect(range.from.toISOString()).toBe('2026-08-01T03:00:00.000Z');
   });
@@ -133,11 +134,7 @@ describe('“este mês” is the calendar month to date', () => {
 
 describe('a custom range is inclusive at both ends', () => {
   it('runs to the END of the final day, not to its midnight', () => {
-    const range = resolveReportRange(
-      { preset: 'custom', from: '2026-07-01', to: '2026-07-31' },
-      DINNER,
-      SAO_PAULO,
-    );
+    const range = resolveReportRange({ preset: 'custom', from: '2026-07-01', to: '2026-07-31' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
 
     expect(range.from.toISOString()).toBe('2026-07-01T03:00:00.000Z');
     // The 31st is INCLUDED, so the exclusive bound is the 1st of August.
@@ -145,11 +142,7 @@ describe('a custom range is inclusive at both ends', () => {
   });
 
   it('accepts a single-day window', () => {
-    const range = resolveReportRange(
-      { preset: 'custom', from: '2026-07-14', to: '2026-07-14' },
-      DINNER,
-      SAO_PAULO,
-    );
+    const range = resolveReportRange({ preset: 'custom', from: '2026-07-14', to: '2026-07-14' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
 
     expect(range.toExclusive.getTime() - range.from.getTime()).toBe(86_400_000);
   });
@@ -163,26 +156,26 @@ describe('an incoherent period is the caller’s mistake', () => {
    * into our server fault.
    */
   it('rejects a custom range missing a bound', () => {
-    expect(() => resolveReportRange({ preset: 'custom', from: '2026-07-01' }, DINNER)).toThrow(
+    expect(() => resolveReportRange({ preset: 'custom', from: '2026-07-01' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range)).toThrow(
       ReportBuilderError,
     );
   });
 
   it('rejects an inverted range', () => {
     expect(() =>
-      resolveReportRange({ preset: 'custom', from: '2026-07-31', to: '2026-07-01' }, DINNER),
+      resolveReportRange({ preset: 'custom', from: '2026-07-31', to: '2026-07-01' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range),
     ).toThrow(/posterior/);
   });
 
   it('rejects an unparseable bound', () => {
     expect(() =>
-      resolveReportRange({ preset: 'custom', from: 'ontem', to: '2026-07-01' }, DINNER),
+      resolveReportRange({ preset: 'custom', from: 'ontem', to: '2026-07-01' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range),
     ).toThrow(ReportBuilderError);
   });
 
   it(`rejects a window wider than ${REPORT_MAX_RANGE_DAYS} days`, () => {
     expect(() =>
-      resolveReportRange({ preset: 'custom', from: '2024-01-01', to: '2026-01-01' }, DINNER),
+      resolveReportRange({ preset: 'custom', from: '2024-01-01', to: '2026-01-01' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range),
     ).toThrow(new RegExp(String(REPORT_MAX_RANGE_DAYS)));
   });
 });
@@ -215,7 +208,7 @@ describe('reading a period off a query string', () => {
 
 describe('the wire view', () => {
   it('echoes the resolved instants, not the request’s words', () => {
-    const range = resolveReportRange({ preset: 'today' }, DINNER, SAO_PAULO);
+    const range = resolveReportRange({ preset: 'today' }, DINNER, PT_BR_REPORT_SERVER_MESSAGES.range, SAO_PAULO);
 
     expect(toReportRangeView(range)).toEqual({
       preset: 'today',

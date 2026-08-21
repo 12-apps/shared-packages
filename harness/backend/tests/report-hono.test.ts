@@ -1,6 +1,13 @@
-import { createMemoryDataSource, defineCatalog } from '@12-apps/report-builder';
+import {
+  createMemoryDataSource,
+  defineCatalog,
+  PT_BR_REPORT_ENGINE_COPY,
+} from '@12-apps/report-builder';
 import { reportBuilderRouter } from '@12-apps/report-builder/hono';
-import type { ReportActor } from '@12-apps/report-builder/server';
+import {
+  PT_BR_REPORT_SERVER_MESSAGES,
+  type ReportActor,
+} from '@12-apps/report-builder/server';
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 
@@ -143,6 +150,9 @@ function setup(actor: ReportActor | null = OWNER): {
     '/api/admin/:tenantSlug',
     reportBuilderRouter({
       catalog,
+      // Named, not inherited: the package ships no default sentence.
+      copy: PT_BR_REPORT_ENGINE_COPY,
+      messages: PT_BR_REPORT_SERVER_MESSAGES,
       // The FACTORY form, which is what a real host passes: the window has to
       // reach the database, or a "last 7 days" report quietly reads all of
       // history and filters it in memory.

@@ -1,3 +1,4 @@
+import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { defineCatalog, listCatalogFields } from '../../catalog';
@@ -190,21 +191,22 @@ describe('blockSentence', () => {
     // The anti-drift case. Not "contains the right words" — the identical
     // string, produced the two ways the two surfaces produce it.
     const wire = wireEntities(salesCatalog);
-    const engine = specSentence(reportSpecSchema.parse(SPEC), salesCatalog);
+    const engine = specSentence(reportSpecSchema.parse(SPEC), salesCatalog, PT_BR_REPORT_ENGINE_COPY.spec);
 
-    expect(blockSentence(SPEC, catalogFromEntities(wire))).toBe(engine);
-    expect(blockSentence(SPEC, catalogFromEntities(wire))).toBe(
+    expect(blockSentence(SPEC, catalogFromEntities(wire), PT_BR_REPORT_ENGINE_COPY.spec)).toBe(engine);
+    expect(blockSentence(SPEC, catalogFromEntities(wire), PT_BR_REPORT_ENGINE_COPY.spec)).toBe(
       'soma de receita em pedidos por data (dia), onde forma de pagamento é PIX',
     );
   });
 
   it('tracks an edit to the spec', () => {
     const catalog = catalogFromEntities(wireEntities(salesCatalog));
-    const before = blockSentence(SPEC, catalog);
+    const before = blockSentence(SPEC, catalog, PT_BR_REPORT_ENGINE_COPY.spec);
     const after = blockSentence(
       { ...SPEC, measures: [{ field: 'totalCents', aggregation: 'avg' }] },
       catalog,
-    );
+    PT_BR_REPORT_ENGINE_COPY.spec,
+);
 
     expect(before).toBe(
       'soma de receita em pedidos por data (dia), onde forma de pagamento é PIX',
@@ -221,7 +223,7 @@ describe('blockSentence', () => {
     const halfWritten: ReportSpecWire = { ...SPEC, measures: [], filters: [] };
 
     expect(() =>
-      blockSentence(halfWritten, catalogFromEntities(wireEntities(salesCatalog))),
+      blockSentence(halfWritten, catalogFromEntities(wireEntities(salesCatalog)), PT_BR_REPORT_ENGINE_COPY.spec),
     ).not.toThrow();
   });
 
@@ -237,7 +239,7 @@ describe('blockSentence', () => {
       presentation: { kind: 'table' },
     };
 
-    expect(blockSentence(orphan, catalogFromEntities(wireEntities(salesCatalog)))).toBe(
+    expect(blockSentence(orphan, catalogFromEntities(wireEntities(salesCatalog)), PT_BR_REPORT_ENGINE_COPY.spec)).toBe(
       'contagem de whatever em ghosts',
     );
   });
@@ -247,7 +249,7 @@ describe('blockAutoTitle', () => {
   it('is the sentence, capitalised', () => {
     const catalog = catalogFromEntities(wireEntities(salesCatalog));
 
-    expect(blockAutoTitle(SPEC, catalog)).toBe(
+    expect(blockAutoTitle(SPEC, catalog, PT_BR_REPORT_ENGINE_COPY.spec)).toBe(
       'Soma de receita em pedidos por data (dia), onde forma de pagamento é PIX',
     );
   });
@@ -271,13 +273,13 @@ describe('sentenceParts', () => {
     // The invariant that makes this a presentation pass rather than a second
     // sentence builder. Anything else it gets wrong costs a bold run; break
     // this and it is rewriting the text.
-    const sentence = blockSentence(SPEC, catalog);
+    const sentence = blockSentence(SPEC, catalog, PT_BR_REPORT_ENGINE_COPY.spec);
 
     expect(sentenceParts(sentence).map((part) => part.text).join('')).toBe(sentence);
   });
 
   it('emphasises the author’s terms and not the words joining them', () => {
-    const parts = sentenceParts(blockSentence(SPEC, catalog));
+    const parts = sentenceParts(blockSentence(SPEC, catalog, PT_BR_REPORT_ENGINE_COPY.spec));
 
     expect(parts.filter((part) => part.strong).map((part) => part.text)).toEqual([
       'soma de receita',
@@ -293,7 +295,7 @@ describe('sentenceParts', () => {
   });
 
   it('emphasises the top-N count, which is a choice the author made', () => {
-    const parts = sentenceParts(blockSentence(TOP_N, catalog));
+    const parts = sentenceParts(blockSentence(TOP_N, catalog, PT_BR_REPORT_ENGINE_COPY.spec));
 
     expect(parts.filter((part) => part.strong).map((part) => part.text)).toEqual([
       'soma de receita',
@@ -312,7 +314,7 @@ describe('sentenceParts', () => {
       dimensions: [{ field: 'createdAt', timeGrain: 'day' }, { field: 'method' }],
       filters: [],
     };
-    const parts = sentenceParts(blockSentence(split, catalog));
+    const parts = sentenceParts(blockSentence(split, catalog, PT_BR_REPORT_ENGINE_COPY.spec));
 
     expect(parts.filter((part) => part.strong).map((part) => part.text)).toEqual([
       'soma de receita',
@@ -330,7 +332,7 @@ describe('sentenceParts', () => {
         { field: 'product', operator: 'eq', value: 'Café' },
       ],
     };
-    const parts = sentenceParts(blockSentence(twoFilters, catalog));
+    const parts = sentenceParts(blockSentence(twoFilters, catalog, PT_BR_REPORT_ENGINE_COPY.spec));
 
     expect(parts.filter((part) => part.strong).map((part) => part.text)).toEqual([
       'soma de receita',

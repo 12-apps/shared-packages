@@ -18,7 +18,10 @@ import { StatCard } from "@12-apps/ui/data-display/StatCard";
 import { Table } from "@12-apps/ui/data-display/Table";
 import { Box } from "@12-apps/ui/mui/Box";
 
+import type { ValueFormatCopy } from "../copy";
 import { formatKpiFigure, formatReportValue } from "../format";
+
+import { useReportEngineCopy } from "./transport-context";
 import { chartColumnsOf } from "./chart-as-table";
 import type { ExportColumn } from "./lib/export-rows";
 import {
@@ -151,6 +154,7 @@ function ReportTable({
   rows: ReportRow[];
   dataTestId: string;
 }): JSX.Element {
+  const copy = useReportEngineCopy();
   return (
     <Box sx={REPORT_TABLE_SX}>
       <Table
@@ -174,7 +178,7 @@ function ReportTable({
           // lets a reader compare magnitudes down a column at a glance.
           align: column.format === "text" ? ("left" as const) : ("right" as const),
           render: (value: unknown) =>
-            formatReportCell((value ?? null) as ReportRow[string], column.format),
+            formatReportCell((value ?? null) as ReportRow[string], column.format, copy.values),
         }))}
         data={rows}
         data-testid={`${dataTestId}-table`}
@@ -187,8 +191,9 @@ function ReportTable({
 function formatReportCell(
   value: ReportRow[string],
   format: ReportTableColumn["format"],
+  copy: ValueFormatCopy,
 ): string {
-  return formatReportValue(value, format);
+  return formatReportValue(value, format, copy);
 }
 
 /** The KPI tile figure (FUT-309); a suppressed tile shows the same em-dash. */
@@ -248,11 +253,14 @@ function KpiFigures({
 }
 
 /** Export columns matching exactly what the render model displays. */
-export function exportColumnsFor(render: ReportRender): ExportColumn<ReportRow>[] {
+export function exportColumnsFor(
+  render: ReportRender,
+  copy: ValueFormatCopy,
+): ExportColumn<ReportRow>[] {
   if (render.kind === "table") {
     return render.columns.map((column) => ({
       header: column.label,
-      value: (row) => formatReportCell(row[column.key] ?? null, column.format),
+      value: (row) => formatReportCell(row[column.key] ?? null, column.format, copy),
     }));
   }
   if (render.kind === "kpi") {
@@ -267,7 +275,7 @@ export function exportColumnsFor(render: ReportRender): ExportColumn<ReportRow>[
   // screen and be missing from the download.
   return chartColumnsOf(render).map((column) => ({
     header: column.label,
-    value: (row: ReportRow) => formatReportCell(row[column.key] ?? null, column.format),
+    value: (row: ReportRow) => formatReportCell(row[column.key] ?? null, column.format, copy),
   }));
 }
 

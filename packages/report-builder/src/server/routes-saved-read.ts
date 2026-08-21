@@ -8,7 +8,6 @@ import {
   mayAuthor,
   mayQueryAll,
   mayQueryAnything,
-  NOT_FOUND,
   ok,
   runOptions,
   toReportRangeView,
@@ -126,7 +125,7 @@ function listRoute(config: ReportBuilderServerConfig, store: SavedReportStore): 
       // caller the feature was never granted to — the same answer
       // `/reports/fields` and `/reports/system` give, so the three routes of
       // one area cannot disagree about whether it is visible.
-      if (!mayQueryAnything(config, actor)) return forbidden();
+      if (!mayQueryAnything(config, actor)) return forbidden(config);
       const records = await store.list(actor.clientId);
       // Visibility is applied HERE, not in the query: `roles` needs the
       // actor's role ids, and a database-level filter would have to encode
@@ -150,18 +149,18 @@ function getRoute(config: ReportBuilderServerConfig, store: SavedReportStore): R
     path: '/reports/custom/:id',
     async handle({ actor, params, query }) {
       const record = await store.get(actor.clientId, params.id ?? '');
-      if (!record || !canViewSavedReport(record, actor)) return fail(404, NOT_FOUND);
+      if (!record || !canViewSavedReport(record, actor)) return fail(404, config.messages.notFound);
       // The entity gate reads the STORED shape rather than the parsed
       // document, so a document that no longer compiles is still refused to an
       // actor who may not read its entities — authorization before validation.
-      if (!mayQueryAll(config, actor, documentShape(record.spec).entities)) return forbidden();
+      if (!mayQueryAll(config, actor, documentShape(record.spec).entities)) return forbidden(config);
       try {
         const document = parseReportDocument(record.spec);
         // Re-checked against the PARSED entities: the lenient probe above is
         // deliberately forgiving, and a document whose real entities differ
         // from the ones it appeared to name must not slip past on the
         // appearance.
-        if (!mayQueryAll(config, actor, documentEntities(document))) return forbidden();
+        if (!mayQueryAll(config, actor, documentEntities(document))) return forbidden(config);
         const range = windowOf(config, { query });
         return ok(await renderSaved(record, document, range, actor, config));
       } catch (error) {

@@ -1,10 +1,12 @@
 import { ReportBuilderError } from '../errors';
+import type { ReportEngineCopy } from '../copy';
 import type { ReportSpec } from '../spec';
 import type { FieldCatalog, ReportDataSource } from '../types';
 
 import type { ReportWindow } from './adapter-shared';
 import { DEFAULT_AUTHOR_PERMISSION } from './contribution';
 import { REPORT_RUN_MAX_ROWS } from './policy';
+import type { ReportServerMessages } from './messages';
 import type { SystemReportDef } from './system-reports';
 import {
   rangeFromQuery,
@@ -110,6 +112,19 @@ export type ReportAdapterFactory = (context: {
 }) => ReportDataSource | Promise<ReportDataSource>;
 
 export interface ReportBuilderServerConfig {
+  /**
+   * Every sentence this API answers with. REQUIRED: the routes used to carry
+   * their own pt-BR, which made the origin host's Portuguese the silent default
+   * for every adopter. `PT_BR_REPORT_SERVER_MESSAGES` is that exact wording.
+   */
+  messages: ReportServerMessages;
+  /**
+   * The sentences and headings a RUN renders — the spec sentence a dashboard
+   * block carries, and the column, axis and series labels. Separate from
+   * `messages` because they answer different questions: these describe a
+   * report, those refuse a request.
+   */
+  copy: ReportEngineCopy;
   /** The semantic model every spec is validated against. The host's. */
   catalog: FieldCatalog;
   /** How rows are read. The host owns the database; this owns the query. */
@@ -186,10 +201,9 @@ export const fail = (status: number, error: string): ReportResponse => ({
   body: { error },
 });
 
-/** 403 with the message the host's own forbidden error carries. */
-export const forbidden = (): ReportResponse => fail(403, 'Acesso negado.');
-
-export const NOT_FOUND = 'Relatório não encontrado.';
+/** 403, in the host's own words. */
+export const forbidden = (config: ReportBuilderServerConfig): ReportResponse =>
+  fail(403, config.messages.forbidden);
 
 /**
  * A spec (or period) error is the CALLER's mistake, not a server fault: it
@@ -267,7 +281,7 @@ export function windowOf(
   request: Pick<ReportRequest, 'query'>,
 ): ResolvedReportRange {
   const now = config.now ? config.now() : new Date();
-  return resolveReportRange(rangeFromQuery(request.query), now, config.timeZone);
+  return resolveReportRange(rangeFromQuery(request.query), now, config.messages.range, config.timeZone);
 }
 
 /** A period named in a REQUEST BODY (the dry run) rather than in the query. */
@@ -300,6 +314,7 @@ export async function runOptions(
   adapter: ReportDataSource;
   timeZone: string;
   maxRows: number;
+  copy: ReportEngineCopy;
 }> {
   const window: ReportWindow = { from: range.from, toExclusive: range.toExclusive };
   const adapter =
@@ -309,5 +324,6 @@ export async function runOptions(
     adapter,
     timeZone: config.timeZone,
     maxRows: config.maxRows ?? REPORT_RUN_MAX_ROWS,
+    copy: config.copy,
   };
 }

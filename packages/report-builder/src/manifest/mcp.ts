@@ -23,6 +23,8 @@
 import { z } from 'zod';
 import type { WireMcpTool } from '@12-apps/wiring';
 
+import type { ReportRangeMessages } from '../server/messages';
+
 import {
   fieldListingSchema,
   REPORT_MAX_RANGE_DAYS,
@@ -42,6 +44,29 @@ import {
 } from '../server/index';
 
 const data = (schema: z.ZodType): z.ZodType => z.object({ data: schema });
+
+/**
+ * The date-range refusals the MCP schemas carry.
+ *
+ * ENGLISH, and deliberately not the host's pack. This manifest is a static
+ * declaration consumed by `@12-apps/wiring`, and its audience is the AGENT
+ * reading the tool schema before it calls — a developer-facing contract, not
+ * the store owner's screen. The pt-BR a person actually reads comes from the
+ * route, which answers with `config.messages`; these are what an agent is told
+ * about the shape of an argument it got wrong.
+ *
+ * Being module-scope English is what keeps the manifest static, which
+ * `manifest/index.ts` requires: a factory here would have to be threaded
+ * through the wiring manifest for no gain to any reader.
+ */
+const MCP_RANGE_MESSAGES = {
+  datesRequired: 'Provide both `from` and `to` for a custom range.',
+  invalidDate: 'Not a valid calendar date.',
+  endBeforeStart: '`to` must be the same day as `from` or later.',
+  tooLong: (maxDays: number) => `The range may not exceed ${maxDays} days.`,
+  isoFormat: 'Use the format YYYY-MM-DD.',
+  customNeedsBothDates: 'Provide both `from` and `to` for a custom range.',
+} satisfies ReportRangeMessages;
 
 /** The tools, mount-relative — the form the shared manifest carries. */
 export const REPORT_BUILDER_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
@@ -65,7 +90,7 @@ export const REPORT_BUILDER_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
       `${REPORT_MAX_RANGE_DAYS} days); reports that support it bucket dates by \`grain\` (day | week | month). Money values are integer cents.`,
     tags: ['reports'],
     params: systemReportParams,
-    query: reportRangeQuery,
+    query: reportRangeQuery(MCP_RANGE_MESSAGES),
     response: data(systemReportResultSchema),
     annotations: { readOnly: true },
   },
@@ -89,7 +114,7 @@ export const REPORT_BUILDER_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
       `${REPORT_RUN_MAX_ROWS}. Invalid specs return a 400 whose error message lists what IS available — read it and correct the spec.`,
     tags: ['reports'],
     params: reportsParams,
-    body: runReportBody,
+    body: runReportBody(MCP_RANGE_MESSAGES),
     response: data(runResultSchema),
     annotations: { readOnly: true },
   },
@@ -124,7 +149,7 @@ export const REPORT_BUILDER_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
       "Open one saved document and run it for a period. A dashboard runs every block in parallel and returns per-block renders (a stale block yields an inline error instead of failing the report); a legacy single report returns the stored spec plus its result. Requires the permission tier of every entity the document queries; a draft, archived or out-of-visibility document is a 404 for anyone but its author and admins.",
     tags: ['reports'],
     params: savedReportParams,
-    query: reportRangeQuery,
+    query: reportRangeQuery(MCP_RANGE_MESSAGES),
     response: data(savedReportViewSchema),
     annotations: { readOnly: true },
   },

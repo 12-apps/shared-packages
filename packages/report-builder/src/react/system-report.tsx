@@ -25,7 +25,7 @@ import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
 import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
 import { exportColumnsFor, ReportRenderView } from "./report-render";
 import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
-import { useReportSurface } from "./transport-context";
+import { useReportEngineCopy, useReportSurface } from "./transport-context";
 
 export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.Element {
   const { reportKey = "" } = useParams();
@@ -36,6 +36,7 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
   // the run has resolved. `undefined` simply means "no tools yet".
   const tableView = useBlockTableView(query.data?.render);
   const surface = useReportSurface();
+  const copy = useReportEngineCopy();
 
   if (query.isError) {
     return (
@@ -78,7 +79,7 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
           exportRows(
             "csv",
             report.render.rows,
-            exportColumnsFor(report.render),
+            exportColumnsFor(report.render, copy.values),
             `relatorio-${report.key}`,
           )
         }

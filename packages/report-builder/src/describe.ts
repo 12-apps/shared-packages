@@ -1,4 +1,5 @@
-import type { Aggregation, FieldCatalog, FieldDef, FilterOperator, TimeGrain } from './types';
+import type { SpecSentenceCopy } from './copy';
+import type { Aggregation, FieldCatalog, FieldDef, TimeGrain } from './types';
 import type { ReportDimension, ReportFilter, ReportMeasure, ReportSpec } from './spec';
 
 /**
@@ -18,53 +19,26 @@ import type { ReportDimension, ReportFilter, ReportMeasure, ReportSpec } from '.
  * `compileReport`'s job and reports its own errors.
  */
 
-const AGGREGATION_PHRASES: Record<Aggregation, string> = {
-  sum: 'soma',
-  avg: 'média',
-  count: 'contagem',
-  count_distinct: 'contagem distinta',
-  min: 'mínimo',
-  max: 'máximo',
-  p50: 'mediana',
-  p90: 'p90',
-  p95: 'p95',
-  ratio: 'proporção',
-};
-
-const GRAIN_PHRASES: Record<TimeGrain, string> = {
-  day: 'dia',
-  week: 'semana',
-  month: 'mês',
-};
-
-/**
- * Read as `<campo> <operador> <valor>`, so each phrase completes a sentence
- * about the field: "status é Pago", "total é maior ou igual a 100".
- */
-const OPERATOR_PHRASES: Record<FilterOperator, string> = {
-  eq: 'é',
-  neq: 'não é',
-  in: 'é um de',
-  gte: 'é maior ou igual a',
-  lte: 'é menor ou igual a',
-  between: 'está entre',
-};
-
 /** Numeric types default to `sum`, everything else to `count` (mirrors the compiler). */
 const NUMERIC_TYPES = new Set(['number', 'money']);
 
-function entityLabel(catalog: FieldCatalog, entity: string): string {
+function entityLabel(catalog: FieldCatalog, entity: string, locale: string): string {
   const label = catalog.entities[entity]?.label;
-  return (label ?? entity).toLocaleLowerCase('pt-BR');
+  return (label ?? entity).toLocaleLowerCase(locale);
 }
 
 function fieldDef(catalog: FieldCatalog, entity: string, field: string): FieldDef | undefined {
   return catalog.entities[entity]?.fields[field];
 }
 
-function fieldLabel(catalog: FieldCatalog, entity: string, field: string): string {
+function fieldLabel(
+  catalog: FieldCatalog,
+  entity: string,
+  field: string,
+  locale: string,
+): string {
   const label = fieldDef(catalog, entity, field)?.label;
-  return (label ?? field).toLocaleLowerCase('pt-BR');
+  return (label ?? field).toLocaleLowerCase(locale);
 }
 
 function resolveAggregation(
@@ -83,11 +57,15 @@ function measurePhrase(
   measure: ReportMeasure,
   catalog: FieldCatalog,
   entity: string,
+  copy: SpecSentenceCopy,
 ): string {
   const aggregation = resolveAggregation(measure, catalog, entity);
-  const base = `${AGGREGATION_PHRASES[aggregation]} de ${fieldLabel(catalog, entity, measure.field)}`;
+  const base = copy.measure(
+    copy.aggregations[aggregation],
+    fieldLabel(catalog, entity, measure.field, copy.locale),
+  );
   if (aggregation === 'ratio' && measure.denominator) {
-    return `${base} por ${fieldLabel(catalog, entity, measure.denominator)}`;
+    return copy.ratio(base, fieldLabel(catalog, entity, measure.denominator, copy.locale));
   }
   return base;
 }
@@ -97,10 +75,11 @@ function dimensionPhrase(
   dimension: ReportDimension,
   catalog: FieldCatalog,
   entity: string,
+  copy: SpecSentenceCopy,
 ): string {
-  const label = fieldLabel(catalog, entity, dimension.field);
+  const label = fieldLabel(catalog, entity, dimension.field, copy.locale);
   if (!dimension.timeGrain) return label;
-  return `${label} (${GRAIN_PHRASES[dimension.timeGrain as TimeGrain]})`;
+  return copy.dimension(label, copy.grains[dimension.timeGrain as TimeGrain]);
 }
 
 /**
@@ -108,53 +87,57 @@ function dimensionPhrase(
  * enum value labels yet, so `PAID` cannot become "Pago" here without inventing
  * a mapping this function has no business owning.
  */
-function filterOperand(filter: ReportFilter): string {
-  if (filter.operator === 'between') return `${String(filter.from)} e ${String(filter.to)}`;
+function filterOperand(filter: ReportFilter, copy: SpecSentenceCopy): string {
+  if (filter.operator === 'between') {
+    return copy.between(String(filter.from), String(filter.to));
+  }
   if (filter.operator === 'in') return (filter.values ?? []).map(String).join(', ');
   return String(filter.value);
 }
 
-function filterPhrase(filter: ReportFilter, catalog: FieldCatalog, entity: string): string {
-  const label = fieldLabel(catalog, entity, filter.field);
-  return `${label} ${OPERATOR_PHRASES[filter.operator]} ${filterOperand(filter)}`;
-}
-
-/** Joins with a serial "e" so the tail reads as prose: `a, b e c`. */
-function joinPt(parts: string[]): string {
-  if (parts.length <= 1) return parts[0] ?? '';
-  return `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}`;
+function filterPhrase(
+  filter: ReportFilter,
+  catalog: FieldCatalog,
+  entity: string,
+  copy: SpecSentenceCopy,
+): string {
+  return copy.filter(
+    fieldLabel(catalog, entity, filter.field, copy.locale),
+    copy.operators[filter.operator],
+    filterOperand(filter, copy),
+  );
 }
 
 /**
  * The spec sentence for a single report spec. No trailing period — callers
  * place it in headings, captions and subtitles where a full stop is wrong as
  * often as it is right.
+ *
+ * The clauses are assembled here; the ORDER they are spoken in is the host
+ * pack's (`copy.sentence`), because that is the part that does not survive
+ * translation.
  */
-export function specSentence(spec: ReportSpec, catalog: FieldCatalog): string {
+export function specSentence(
+  spec: ReportSpec,
+  catalog: FieldCatalog,
+  copy: SpecSentenceCopy,
+): string {
   const entity = spec.entity;
-  const measures = joinPt(spec.measures.map((m) => measurePhrase(m, catalog, entity)));
-
-  let sentence = `${measures} em ${entityLabel(catalog, entity)}`;
-
   const [groupBy, splitBy] = spec.dimensions;
-  if (groupBy) {
-    sentence += ` por ${dimensionPhrase(groupBy, catalog, entity)}`;
-    // The second dimension is the SPLIT — it draws one SERIES per value rather
-    // than adding another level of grouping. The clause borrows the control's
-    // own words ("Separar em séries"), so the sentence under a chart and the
-    // field that produced it say the same thing.
-    if (splitBy) sentence += `, separado por ${dimensionPhrase(splitBy, catalog, entity)}`;
-  }
 
-  if (spec.filters.length > 0) {
-    sentence += `, onde ${joinPt(spec.filters.map((f) => filterPhrase(f, catalog, entity)))}`;
-  }
-
-  // A limit without a sort is still a top N — the compiler applies the spec's
-  // default ordering — so it is worth saying either way.
-  if (spec.limit !== undefined) sentence += `, top ${spec.limit}`;
-
-  return sentence;
+  return copy.sentence({
+    measures: copy.list(spec.measures.map((m) => measurePhrase(m, catalog, entity, copy))),
+    entity: entityLabel(catalog, entity, copy.locale),
+    ...(groupBy ? { groupBy: dimensionPhrase(groupBy, catalog, entity, copy) } : {}),
+    // Only meaningful alongside a grouping: it splits that axis into series.
+    ...(groupBy && splitBy
+      ? { splitBy: dimensionPhrase(splitBy, catalog, entity, copy) }
+      : {}),
+    ...(spec.filters.length > 0
+      ? { filters: copy.list(spec.filters.map((f) => filterPhrase(f, catalog, entity, copy))) }
+      : {}),
+    ...(spec.limit !== undefined ? { limit: spec.limit } : {}),
+  });
 }
 
 /**
@@ -162,8 +145,12 @@ export function specSentence(spec: ReportSpec, catalog: FieldCatalog): string {
  * block that has never been named tracks its spec, and renaming a measure
  * renames the block.
  */
-export function autoTitle(spec: ReportSpec, catalog: FieldCatalog): string {
-  const sentence = specSentence(spec, catalog);
+export function autoTitle(
+  spec: ReportSpec,
+  catalog: FieldCatalog,
+  copy: SpecSentenceCopy,
+): string {
+  const sentence = specSentence(spec, catalog, copy);
   if (!sentence) return '';
-  return sentence.charAt(0).toLocaleUpperCase('pt-BR') + sentence.slice(1);
+  return sentence.charAt(0).toLocaleUpperCase(copy.locale) + sentence.slice(1);
 }
