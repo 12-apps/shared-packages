@@ -87,9 +87,11 @@ function buildBuyerDetails(runtime: FlowsRuntime): CheckoutScreens["BuyerDetails
             {runtime.copy.continueAction}
           </Button>
         </Box>
-        <Text variant="caption" size="xs" color="secondary" as="p">
-          Pagamento seguro
-        </Text>
+        {runtime.copy.secureNotice ? (
+          <Text variant="caption" size="xs" color="secondary" as="p">
+            {runtime.copy.secureNotice}
+          </Text>
+        ) : null}
       </Box>
     );
   }

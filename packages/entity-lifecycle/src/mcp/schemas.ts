@@ -34,6 +34,26 @@ type Exact<Schema, Wire> = [Schema] extends [Wire]
 type Assert<T extends true> = T;
 
 /**
+ * Runtime `z.unknown()`, typed as the JSON the producer actually puts there.
+ *
+ * NOT `z.custom<T>()`, which held these two spots first (#265): zod's
+ * `toJSONSchema` REFUSES custom types under its default
+ * `unrepresentable: "throw"`, and the origin host renders every one of these
+ * schemas into its MCP tool surface with exactly that default — so 4.3.0
+ * threw building the surface of any host that took it. And NOT a recursive
+ * `jsonValueSchema` union either: that converts, but only as a cyclic
+ * `$ref`, and the MCP schema inliner refuses recursion outright.
+ *
+ * `{}` — accept any JSON — is what `z.unknown()` advertises and the honest
+ * schema for a snapshot cell, whose keys the package cannot know. The TYPE
+ * is this package's own knowledge of what its producer writes, carried by
+ * annotation; the cast compiles because a `ZodType`'s output is covariant.
+ * `schemas.test.ts` pins the whole tool surface as convertible under zod's
+ * defaults, so the next "identical JSON Schema" claim gets measured.
+ */
+const jsonWire = <T>(): z.ZodType<T> => z.unknown() as z.ZodType<T>;
+
+/**
  * The wire schemas every lifecycle-plugged collection shares.
  *
  * Authored ONCE, here, rather than per collection. A host that plugs six
@@ -116,11 +136,10 @@ const comparisonRowSchema = z.object({
     z.object({
       version: z.number(),
       present: z.boolean(),
-      // `z.custom` rather than `z.unknown`: identical JSON Schema (`{}`) and
-      // identical parse behaviour — verified, not assumed — but it carries the
-      // TYPE the core promises, so the assertion below can check it. A cell
-      // value is JSON or null; `unknown` said nothing and agreed with nothing.
-      value: z.custom<JsonValue | null>(),
+      // A cell value is JSON or null; a bare `unknown` said nothing and
+      // agreed with nothing, so the type rides the annotation — see
+      // `jsonWire` for why it is not `z.custom`.
+      value: jsonWire<JsonValue | null>(),
     }),
   ),
 });
@@ -166,10 +185,10 @@ export const draftItemParams = z.object({
 const draftSchema = z.object({
   id: z.string(),
   entityId: z.string().nullable(),
-  // A `Snapshot`, which is what the routes actually put here — same JSON Schema
-  // as `z.unknown()`, same parse behaviour, but a type the assertion can hold
-  // to. The draft BODY above stays open on purpose; this is the read.
-  data: z.record(z.string(), z.custom<JsonValue>()),
+  // A `Snapshot`, which is what the routes actually put here — a type the
+  // assertion can hold to, over the same open runtime schema (see `jsonWire`).
+  // The draft BODY above stays open on purpose; this is the read.
+  data: z.record(z.string(), jsonWire<JsonValue>()),
   status: z.enum(['OPEN', 'PUBLISHED', 'DISCARDED']),
   updatedAt: z.string(),
 }) satisfies z.ZodType<DraftWire>;
