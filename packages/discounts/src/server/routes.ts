@@ -2,6 +2,13 @@ import type { z } from "zod";
 
 import type { WireRequest, WireResponse, WireRoute } from "@12-apps/wiring";
 
+import {
+  assertCollections,
+  assertTargetsOwned,
+  ForeignTargetError,
+  loadTargetGroups,
+  type DiscountableCollection,
+} from "./collections";
 import { missingServerCopy, type DiscountsServerCopy } from "./copy";
 import { logWrite, observed, type DiscountsLogger } from "./logging";
 import { listDiscountsQuery } from "./mcp";
@@ -57,6 +64,18 @@ export interface DiscountsApiConfig {
    */
   logger: DiscountsLogger;
   /**
+   * The host tables a discount may be pointed at — see `./collections`.
+   *
+   * OPTIONAL, and the omission is a real configuration rather than an
+   * oversight: a host that sells one undifferentiated thing has no catalog
+   * dimension to register, and ORDER-scoped promotions need none. What it
+   * costs is stated plainly rather than defaulted around — with no collection
+   * registered for a dimension, `GET /discounts/targets` reports nothing for
+   * it and the cross-tenant check on ITS ids does not run here, so the store
+   * remains responsible for refusing a foreign target.
+   */
+  collections?: readonly DiscountableCollection[];
+  /**
    * The schema the list query is validated against. Optional ONLY because a
    * mechanical default is portable: the package's own, built from the search
    * config's defaults. A host that tunes page-size ceilings by environment, or
@@ -72,9 +91,10 @@ function ok(body: unknown): WireResponse {
 }
 
 /** The `{ error, issues }` shape a form reads its per-input errors out of. */
-function fieldError(error: DiscountValidationError): WireResponse {
+function fieldError(error: DiscountValidationError | ForeignTargetError): WireResponse {
+  const status = error instanceof DiscountValidationError ? error.status : 422;
   return {
-    status: error.status,
+    status,
     body: { error: error.message, issues: { [error.field]: error.message } },
   };
 }
@@ -85,14 +105,22 @@ function acknowledged(id: string): WireResponse {
 }
 
 /**
- * Fold a validated body into what the store persists.
+ * Fold a validated body into what the store persists, and refuse a target that
+ * is not this tenant's.
  *
  * Both writes go through it, so the rules run exactly once per write and a
- * second caller cannot half-apply them.
+ * second caller cannot half-apply them. The ownership check is here rather than
+ * in each route for the same reason, and it runs AFTER the fold because the
+ * fold is what narrows the targets to the scope — checking the raw body would
+ * reject ids a COMBO-scoped write was about to drop anyway.
  */
-function writeFrom(body: unknown, copy: DiscountsServerCopy) {
+async function prepareWrite(config: DiscountsApiConfig, clientId: string, body: unknown) {
   const input = toDiscountWriteInput(body as DiscountWriteBody);
-  return { scalars: toDiscountScalars(input, copy), targets: targetsForScope(input) };
+  const write = { scalars: toDiscountScalars(input, config.copy), targets: targetsForScope(input) };
+  if (config.collections) {
+    await assertTargetsOwned(config.collections, clientId, write.targets, config.copy.foreignTarget);
+  }
+  return write;
 }
 
 /**
@@ -119,7 +147,8 @@ function endpoint(
     try {
       return await observedHandle(request);
     } catch (error) {
-      if (error instanceof DiscountValidationError) return fieldError(error);
+      const refusal = error instanceof DiscountValidationError || error instanceof ForeignTargetError;
+      if (refusal) return fieldError(error);
       throw error;
     }
   };
@@ -144,6 +173,35 @@ function listRoute(config: DiscountsApiConfig): DiscountRoute {
   };
 }
 
+/**
+ * What an operator may point a discount at: every registered collection's rows,
+ * in one round trip.
+ *
+ * It exists so the FORM stops assembling its own reference data. The origin
+ * host's page side-loaded the tenant's whole category list and whole product
+ * list from two unrelated admin endpoints, at a page size it had to know
+ * (`?pageSize=500`), and gated its own render on both — three coupled decisions
+ * in a screen that only wanted "what can I tick".
+ *
+ * The route exists even with NO collection registered, answering an empty list.
+ * A route table that varied with config would make the advertised tool surface
+ * vary with it too, and "which endpoints does this package have" must be
+ * answerable without knowing how one host wired it.
+ *
+ * `discounts:write` rather than `discounts:read`: the grid needs none of this,
+ * only the editor does, and the narrower gate is the one that says so.
+ */
+function targetsRoute(config: DiscountsApiConfig): DiscountRoute {
+  return {
+    method: "GET",
+    path: "/discounts/targets",
+    permission: DISCOUNTS_WRITE,
+    handle: endpoint(config, "GET /discounts/targets", async ({ actor }) =>
+      ok({ data: await loadTargetGroups(config.collections ?? [], actor.clientId) }),
+    ),
+  };
+}
+
 function readRoute(config: DiscountsApiConfig): DiscountRoute {
   return {
     method: "GET",
@@ -164,7 +222,8 @@ function createRoute(config: DiscountsApiConfig): DiscountRoute {
     permission: DISCOUNTS_WRITE,
     handle: endpoint(config, "POST /discounts", async (request) => {
       const { actor, body } = request;
-      const created = await config.store.create(actor.clientId, writeFrom(body, config.copy));
+      const write = await prepareWrite(config, actor.clientId, body);
+      const created = await config.store.create(actor.clientId, write);
       logWrite(config.logger, "created", request, created.id);
       return ok({ data: created });
     }),
@@ -179,7 +238,8 @@ function updateRoute(config: DiscountsApiConfig): DiscountRoute {
     handle: endpoint(config, "PATCH /discounts/:id", async (request) => {
       const { actor, params, body } = request;
       const id = String(params.id);
-      await config.store.update(actor.clientId, id, writeFrom(body, config.copy));
+      const write = await prepareWrite(config, actor.clientId, body);
+      await config.store.update(actor.clientId, id, write);
       logWrite(config.logger, "re-stated", request, id);
       return acknowledged(id);
     }),
@@ -236,9 +296,14 @@ export function createApiDiscounts(config: DiscountsApiConfig): {
     );
   }
   assertLogger(config.logger);
+  assertCollections(config.collections ?? []);
   return {
     routes: [
       listRoute(config),
+      // BEFORE the `:id` read, because `/discounts/targets` would otherwise be
+      // matched by it in any router that resolves in declaration order — and
+      // the answer would be a 404 for a discount named "targets".
+      targetsRoute(config),
       readRoute(config),
       createRoute(config),
       updateRoute(config),

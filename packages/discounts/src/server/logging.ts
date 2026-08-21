@@ -1,5 +1,6 @@
 import type { WireRequest, WireResponse } from "@12-apps/wiring";
 
+import { ForeignTargetError } from "./collections";
 import type { DiscountsActor } from "./routes";
 import { DiscountValidationError } from "./validate";
 
@@ -46,6 +47,21 @@ export interface DiscountsLogger {
   error(message: string): void;
 }
 
+/**
+ * The form input a refusal names, or null when the throw was not one.
+ *
+ * Two classes rather than one shared base: a validation failure carries its own
+ * HTTP status and a foreign target is always a 422, and folding them into one
+ * error type to save this function would put a status field on a class that has
+ * exactly one. What they share is the FIELD, which is the only half a log line
+ * wants.
+ */
+function refusedField(error: unknown): string | null {
+  if (error instanceof DiscountValidationError) return error.field;
+  if (error instanceof ForeignTargetError) return error.field;
+  return null;
+}
+
 /** The cause as a log line — never the object. See the module note. */
 export function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -68,7 +84,7 @@ function subject(route: string, request: WireRequest<DiscountsActor>): string {
  * Three outcomes, three levels, and the split is about who has to act:
  *
  *  - a REFUSAL the package itself decided (a 4xx it returned, or the 422 a
- *    {@link DiscountValidationError} folds into) is `warn` — the operator
+ *    {@link refusedField} error folds into) is `warn` — the operator
  *    typed something the rules do not allow, which is worth seeing when a
  *    store reports "it will not let me save" and worth nobody's pager;
  *  - anything else THROWN is `error` and is re-thrown unchanged: the store's
@@ -97,8 +113,9 @@ export function observed(
       }
       return response;
     } catch (error) {
-      if (error instanceof DiscountValidationError) {
-        logger.warn(`${subject(route, request)} refused with 422 on field "${error.field}"`);
+      const field = refusedField(error);
+      if (field !== null) {
+        logger.warn(`${subject(route, request)} refused with 422 on field "${field}"`);
         throw error;
       }
       logger.error(`${subject(route, request)} failed: ${errorText(error)}`);
