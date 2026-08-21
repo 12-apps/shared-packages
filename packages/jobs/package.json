@@ -71,6 +71,10 @@
     "!**/test-helpers.*"
   ],
   "wiring": {
+    "db": {
+      "partial": "prisma/jobs.prisma",
+      "migrations": "prisma/migrations"
+    },
     "env": [
       {
         "name": "REDIS_URL",
