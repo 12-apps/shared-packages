@@ -1,5 +1,5 @@
 /**
- * The one thing this package exposes to a BACKEND host (FUT-884).
+ * The one thing this package exposes to a BACKEND host.
  *
  * Routes are FRAMEWORK-NEUTRAL descriptors, not a router — the report-builder
  * shape, and the wiring contract's `WireRoute` structurally. The host mounts

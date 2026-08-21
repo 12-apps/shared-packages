@@ -1,5 +1,5 @@
 /**
- * `@12-apps/feature-flags/e2e` — the packaged beta-cohort journeys (FUT-884).
+ * `@12-apps/feature-flags/e2e` — the packaged beta-cohort journeys.
  *
  * The `.feature` files under `features/` are the operator's own story; the
  * steps compiled into `dist/e2e/steps/` drive this package's screen by its

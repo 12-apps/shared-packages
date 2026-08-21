@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 
 /**
  * The port a HOST implements to run the packaged beta-cohort journeys
- * (FUT-884) — the report-builder arrangement: the scenarios and their steps
+ * — the report-builder arrangement: the scenarios and their steps
  * ship here, every assertion reads a test id or data attribute this package's
  * own screen renders (`ff-flag-<key>`, `ff-grant-<userId>`, `data-enabled`,
  * `data-grant-count`), and what is NOT portable is everything around them.

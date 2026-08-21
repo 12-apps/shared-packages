@@ -1,8 +1,7 @@
 # @12-apps/feature-flags
 
-User-level feature flags (FUT-884): a superadmin grants a feature in beta to
-individual **people** — a store owner and a couple of users — and only they see
-it.
+User-level feature flags: a superadmin grants a feature in beta to individual
+**people** — an owner and a couple of users — and only they see it.
 
 ## The one rule: a flag is a veil, never a key
 
@@ -32,8 +31,15 @@ upsold a feature that is not purchasable yet.
   behind it does nothing — every flag ships with a deploy anyway. A grant
   whose key left the catalog is an **orphan**: reported by the management
   surface, invisible to the reader.
-- **Copy** defaults to pt-BR (the origin host's audience) and is overridable
-  wholesale.
+- **Every word is the host's.** The screen's `copy` (`FeatureFlagsCopy`) and
+  the routes' denial sentences (`FeatureFlagsServerCopy`) are REQUIRED config
+  with no defaults — the package ships no silent language, and server
+  assembly fails naming every missing key. pt-BR still ships, as NAMED packs
+  (`PT_BR_FEATURE_FLAGS_COPY` from `./react`,
+  `PT_BR_FEATURE_FLAGS_SERVER_COPY` from `./server`): a host imports one and
+  passes it by hand, so choosing the language is a reviewable line. The
+  machine `error` codes (`unknown_flag`, `user_not_found`, …) are the stable
+  half a client may branch on; the sentences beside them are the host's.
 
 ## Surfaces
 
@@ -63,7 +69,9 @@ host.adoptServer({
   bindings: {
     http: {
       mountPath: '/api/platform/feature-flags',
-      config: { db, catalog, directory, audit },
+      // `copy` is every denial sentence — required; pass a named pack or
+      // your own object.
+      config: { db, catalog, directory, copy, audit },
     },
   },
 });

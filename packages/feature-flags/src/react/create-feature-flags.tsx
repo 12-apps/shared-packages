@@ -1,5 +1,5 @@
 /**
- * The one thing this package exposes to a frontend host (FUT-884).
+ * The one thing this package exposes to a frontend host.
  *
  * Returns a single component under the name `page`, mirroring the backend
  * half's `routes` (the report-builder convention). The host supplies only
@@ -18,7 +18,6 @@ import { FeatureFlagsPage } from "./page";
 export interface FeatureFlagsWebConfig {
   /** The host's authenticated client for the mounted server surface. */
   api: FeatureFlagsApiClient;
-  /** Overrides for the pt-BR defaults. */
   /** Every rendered string — REQUIRED, no defaults; pass a named pack or your own. */
   copy: FeatureFlagsCopy;
 }
