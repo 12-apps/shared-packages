@@ -10,6 +10,7 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { InstallInvite } from "../react/install-invite";
+import { PT_BR_PWA_MESSAGES } from "../pt-BR";
 
 const IOS_SAFARI =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1";
@@ -46,7 +47,7 @@ afterEach(() => {
 describe("the iOS instruction", () => {
   it("leads with the REASON, not with the instruction", () => {
     setUserAgent(IOS_SAFARI);
-    render(<InstallInvite what="FutureDrink" enabled />);
+    render(<InstallInvite what="FutureDrink" messages={PT_BR_PWA_MESSAGES} enabled />);
 
     // The first version opened with "Adicione à sua tela de início" and buried
     // the payoff in grey caption text. Nobody adds a site to their Home Screen
@@ -58,7 +59,7 @@ describe("the iOS instruction", () => {
 
   it("shows the share GLYPH rather than the word", () => {
     setUserAgent(IOS_SAFARI);
-    const { container } = render(<InstallInvite what="FutureDrink" enabled />);
+    const { container } = render(<InstallInvite what="FutureDrink" messages={PT_BR_PWA_MESSAGES} enabled />);
 
     // "Toque em Compartilhar" asks somebody to translate a word into a control.
     // The glyph is the same shape that is in the browser chrome.
@@ -68,7 +69,7 @@ describe("the iOS instruction", () => {
 
   it("anchors to the bottom, where the share control actually is", () => {
     setUserAgent(IOS_SAFARI);
-    render(<InstallInvite what="FutureDrink" enabled />);
+    render(<InstallInvite what="FutureDrink" messages={PT_BR_PWA_MESSAGES} enabled />);
 
     // A banner at the top of the page pointing at a control in the bottom bar
     // is pointing at nothing.
@@ -79,7 +80,7 @@ describe("the iOS instruction", () => {
 
   it("can be rendered inline when the host places it itself", () => {
     setUserAgent(IOS_SAFARI);
-    render(<InstallInvite what="FutureDrink" enabled placement="inline" />);
+    render(<InstallInvite what="FutureDrink" messages={PT_BR_PWA_MESSAGES} enabled placement="inline" />);
     expect(screen.getByTestId("install-invite-ios").style.position).toBe("");
   });
 
@@ -87,7 +88,7 @@ describe("the iOS instruction", () => {
     // iOS 16.4 put "Add to Home Screen" in every browser's share sheet.
     // Excluding CriOS told a large share of iPhone users nothing at all.
     setUserAgent(IOS_CHROME);
-    render(<InstallInvite what="FutureDrink" enabled />);
+    render(<InstallInvite what="FutureDrink" messages={PT_BR_PWA_MESSAGES} enabled />);
     expect(screen.getByTestId("install-invite-ios")).toBeDefined();
   });
 });
@@ -96,7 +97,7 @@ describe("the rest of the invite", () => {
   it("offers nothing on a desktop with no held prompt", () => {
     // No `beforeinstallprompt` means Chromium did not judge it installable.
     setUserAgent(DESKTOP_CHROME);
-    const { container } = render(<InstallInvite what="FutureDrink" enabled />);
+    const { container } = render(<InstallInvite what="FutureDrink" messages={PT_BR_PWA_MESSAGES} enabled />);
     // Nothing rendered at all — a stronger claim than "this test id is absent",
     // and the accurate one: the component returns null.
     expect(container.innerHTML).toBe("");
@@ -105,13 +106,13 @@ describe("the rest of the invite", () => {
   it("offers nothing to an already-installed app", () => {
     setUserAgent(IOS_SAFARI);
     setEnvironment({ standalone: true });
-    const { container } = render(<InstallInvite what="FutureDrink" enabled />);
+    const { container } = render(<InstallInvite what="FutureDrink" messages={PT_BR_PWA_MESSAGES} enabled />);
     expect(container.innerHTML).toBe("");
   });
 
   it("stays inert when the host's gate is closed", () => {
     setUserAgent(IOS_SAFARI);
-    const { container } = render(<InstallInvite what="FutureDrink" enabled={false} />);
+    const { container } = render(<InstallInvite what="FutureDrink" messages={PT_BR_PWA_MESSAGES} enabled={false} />);
     expect(container.innerHTML).toBe("");
   });
 
@@ -121,7 +122,7 @@ describe("the rest of the invite", () => {
       <InstallInvite
         what="Acme"
         enabled
-        messages={{ iosBenefit: (what) => `Get notified — install ${what}.`, dismiss: "Not now" }}
+        messages={{ ...PT_BR_PWA_MESSAGES, iosBenefit: (what) => `Get notified — install ${what}.`, dismiss: "Not now" }}
       />,
     );
     const invite = screen.getByTestId("install-invite-ios");
@@ -132,7 +133,7 @@ describe("the rest of the invite", () => {
   it("says why it declined, so a broken invite is not a healthy-looking page", () => {
     setUserAgent(DESKTOP_CHROME);
     const onDiagnostic = vi.fn();
-    render(<InstallInvite what="FutureDrink" enabled onDiagnostic={onDiagnostic} />);
+    render(<InstallInvite what="FutureDrink" messages={PT_BR_PWA_MESSAGES} enabled onDiagnostic={onDiagnostic} />);
 
     expect(onDiagnostic).toHaveBeenCalledWith(
       "install-invite: nothing to offer",
