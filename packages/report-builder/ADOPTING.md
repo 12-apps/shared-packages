@@ -18,6 +18,102 @@ kind.
 | **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma, a symlinked partial dangles under `turbo prune`, and `npm pack` drops it from the tarball). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 | **E2E journeys** | `@12-apps/report-builder/e2e` | Implement `defineReportsWorld({ ... })` in a module inside your own playwright-bdd `steps` glob, then add `reportsFeatures` / `reportsFeaturesRoot` / `reportsSteps` to `defineBddConfig`. The Gherkin ships HERE; nothing is copied, so a scenario added upstream runs on your next version bump. See *The journeys ship with the package* below. |
 
+## Migrating 5.4.x → 6.0.0 — the host now declares its own WORDS (FUT-760)
+
+4.0.0 moved the host's DATA out of this package. This move is the same argument
+one level down: its **copy**.
+
+Fourteen files compiled in pt-BR — the spec sentence a block is described by
+(`soma de receita em pedidos por data`), the column, axis and series headings,
+the eight reasons a presentation cannot draw a shape, the two words a boolean
+cell reads as, and every sentence the API refuses a request with. None of it was
+configurable, so a host with another audience published one product's Portuguese
+and nothing failed to say so.
+
+**Nothing changes on screen or on the wire if you adopt the packs.** They are the
+retired wording, verbatim.
+
+### What every host must add
+
+```ts
+import {
+  PT_BR_REPORT_ENGINE_COPY,          // '@12-apps/report-builder'
+} from '@12-apps/report-builder';
+import {
+  PT_BR_REPORT_SERVER_MESSAGES,      // '@12-apps/report-builder/server'
+  PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+} from '@12-apps/report-builder/server';
+
+createApiReportBuilder({ …, copy: PT_BR_REPORT_ENGINE_COPY,
+                            messages: PT_BR_REPORT_SERVER_MESSAGES });
+
+createWebReportBuilder({ …, copy: { engine: PT_BR_REPORT_ENGINE_COPY,
+                                    blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY } });
+```
+
+Pass the **same** `ReportEngineCopy` object to both halves, or an export and the
+screen it came from can disagree about a column heading.
+
+### Changed signatures
+
+Every display function now takes the copy it renders. The copy argument is LAST
+except where noted.
+
+| before | after |
+|---|---|
+| `specSentence(spec, catalog)` | `specSentence(spec, catalog, copy.spec)` |
+| `autoTitle(spec, catalog)` | `autoTitle(spec, catalog, copy.spec)` |
+| `renderReport(query, presentation, catalog, rows)` | `…, rows, copy.labels)` |
+| `toKpiModel(query, presentation, catalog, rows)` | `…, rows, copy.labels)` |
+| `measureLabel(field, measure)` | `measureLabel(field, measure, copy.labels)` |
+| `dimensionLabel(field, alias, timeGrain?)` | `dimensionLabel(field, alias, copy.labels, timeGrain?)` — copy is 3rd, `timeGrain` stays optional and last |
+| `formatReportValue(value, format)` | `formatReportValue(value, format, copy.values)` |
+| `presentationCompatibility(shape)` | `presentationCompatibility(shape, copy.presentation)` |
+| `stackedCompatibility(option, shape)` | `stackedCompatibility(option, shape, copy.presentation)` |
+| `resolveReportRange(input, now, timeZone?)` | `resolveReportRange(input, now, messages.range, timeZone?)` — messages is 3rd |
+| `blockTemplateGroups(groups)` | `blockTemplateGroups(groups, blankTemplateCopy)` |
+| `exportColumnsFor(render)` | `exportColumnsFor(render, copy.values)` |
+| `runReport(spec, options)` | `options` gains a required `copy` |
+
+### Schemas that became factories
+
+`reportRangeQuery` and `runReportBody` carry refusal sentences, so they are now
+functions of them and live in `server/wire-range.ts` (re-exported from `wire.ts`,
+so the import path is unchanged):
+
+```ts
+runReportBody(PT_BR_REPORT_SERVER_MESSAGES.range).safeParse(body)
+```
+
+`saveReportBody` is unchanged — it carries no copy.
+
+### Removed
+
+- **`BLANK_BLOCK_TEMPLATE`** → `blankBlockTemplate(copy)`. Its two words and its
+  group's heading are copy; the ids (`blank`, `em-branco`) stay the package's,
+  because they are keys.
+- **`REPORT_BUILDER_PERMISSIONS.labels`**. A label is copy, and shipping
+  `{ reports: 'Relatórios' }` handed this product's Portuguese to every adopter
+  of the id — the same call `@12-apps/rbac` made in 4.2.0. Declare the words for
+  the `reports` domain and the `manage` action in your own catalog. The
+  permission id itself is unchanged.
+
+### A screen mounted outside the provider now throws
+
+`useReportCopy` refuses rather than falling back. `useTransport` and
+`useReportSurface` keep their empty answers — same-origin fetch, and a surface
+with no built-ins — because those are meaningful. Copy is not: a screen with no
+words is broken, and any default would be the Portuguese this release removes.
+If you mount page components directly rather than through
+`createWebReportBuilder`, wrap them in `ReportBuilderProvider` with a `copy`.
+
+### The MCP manifest stays English
+
+`REPORT_BUILDER_MCP_TOOLS` keeps module-scope English refusals. Its reader is the
+agent inspecting a tool schema before it calls, not a store owner, and staying
+static is what lets `manifest/index.ts` consume it. The pt-BR a person reads
+still comes from the route, which answers with your `messages`.
+
 ## Migrating 3.0.1 → 4.0.0 — the host now declares its own vocabulary
 
 **Nothing here changes a schema, a stored spec or a URL.** Every saved report,
