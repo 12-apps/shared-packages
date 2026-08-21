@@ -14,8 +14,12 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { publishDirs } from "./lib/release-state.mjs";
+
 const REGISTRY = "https://registry.npmjs.org";
-const DIRS = (process.env.PUBLISH_DIRS ?? "").split(/\s+/).filter(Boolean);
+// Through the helper, so this still resolves when no PUBLISH_DIRS is set —
+// cd.yml sets none. See publishDirs() for why that is not a bug there.
+const DIRS = publishDirs();
 
 function npm(args, cwd = process.cwd()) {
   const run = spawnSync("npm", args, { cwd, encoding: "utf8" });

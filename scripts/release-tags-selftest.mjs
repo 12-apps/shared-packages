@@ -333,6 +333,33 @@ check(
   `the two must not drift.\n    ci.yml (${inWorkflow.length}): ${inWorkflow.join(" ")}\n    release-packages.txt (${inFile.length}): ${inFile.join(" ")}`,
 );
 
+// ── …and every publish-path script must find it WITHOUT the env ────────────
+//
+// cd.yml sets no PUBLISH_DIRS. When the release moved there in #351 the
+// workflow-level list stayed in ci.yml, and the three scripts on the publish
+// path read `process.env.PUBLISH_DIRS` directly rather than calling
+// publishDirs() — so all three threw "PUBLISH_DIRS is empty" and the repo
+// published nothing, while verify-released.mjs (which does call it) reported
+// 34 healthy packages in the same job. Read from the SOURCE: running these
+// needs a real git history and a real registry, and the property is one line.
+const PUBLISH_PATH = ["release-tags.mjs", "first-publish.mjs", "publish.mjs"];
+const srcOf = (n) => readFileSync(join(HERE, n), "utf8");
+const directReaders = PUBLISH_PATH.filter((n) => /process\.env\.PUBLISH_DIRS/.test(srcOf(n)));
+const helperUsers = PUBLISH_PATH.filter((n) => /publishDirs\(\)/.test(srcOf(n)));
+
+check(
+  "the publish-path scripts read the list through publishDirs(), not process.env",
+  directReaders.length === 0,
+  `a direct env read is an empty list under cd.yml, and a repo that publishes\n    ` +
+    `nothing. Reading process.env directly: ${directReaders.join(", ")}`,
+);
+
+check(
+  "and all three actually call it — the anti-vacuity half",
+  helperUsers.length === PUBLISH_PATH.length,
+  `a script dropping the env read AND the helper would pass the check above while\n    ` +
+    `resolving no packages. Calling publishDirs(): ${helperUsers.join(", ") || "(none)"}`,
+);
 // ── Every released package must carry its own release config ───────────────
 //
 // semantic-release resolves its config with cosmiconfig, which searches UPWARD
