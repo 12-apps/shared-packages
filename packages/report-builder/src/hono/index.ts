@@ -69,7 +69,7 @@ export function reportBuilderRouter(config: ReportBuilderHonoConfig): Hono {
   for (const route of routes) {
     const handler = async (c: Context) => {
       const actor = await config.resolveActor(c);
-      if (!actor) return c.json({ error: 'Não autenticado.' }, 401);
+      if (!actor) return c.json({ error: config.messages.unauthenticated }, 401);
 
       const response = await route.handle({
         actor,

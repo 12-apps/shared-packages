@@ -47,19 +47,39 @@ export interface BlockTemplateGroup {
  * the BUILDER rather than about any host's data, which is why it is the one
  * this package still ships.
  */
-export const BLANK_BLOCK_TEMPLATE: BlockTemplate = {
-  id: 'blank',
-  title: 'Bloco em branco',
-  description: 'Escolha os dados e as medidas você mesmo',
-  spec: null,
-};
+/**
+ * The words the blank template and its group read as.
+ *
+ * REQUIRED, because they are the only copy left in a module that is otherwise
+ * pure host data — and copy shipped as a default is exactly what a host cannot
+ * see to decline. The ids stay the package's: they are keys, not words.
+ */
+export interface BlankBlockTemplateCopy {
+  /** The template's own name in the picker. */
+  title: string;
+  /** What choosing it will leave the author holding. */
+  description: string;
+  /** The heading of the group it sits alone in. */
+  groupTitle: string;
+}
+
+export function blankBlockTemplate(copy: BlankBlockTemplateCopy): BlockTemplate {
+  return {
+    id: 'blank',
+    title: copy.title,
+    description: copy.description,
+    spec: null,
+  };
+}
 
 /** The blank template's own group. */
-const BLANK_GROUP: BlockTemplateGroup = {
-  id: 'em-branco',
-  title: 'Do zero',
-  templates: [BLANK_BLOCK_TEMPLATE],
-};
+function blankGroup(copy: BlankBlockTemplateCopy): BlockTemplateGroup {
+  return {
+    id: 'em-branco',
+    title: copy.groupTitle,
+    templates: [blankBlockTemplate(copy)],
+  };
+}
 
 /**
  * The picker's contents: the host's groups, then the blank one on its own.
@@ -70,6 +90,7 @@ const BLANK_GROUP: BlockTemplateGroup = {
  */
 export function blockTemplateGroups(
   groups: readonly BlockTemplateGroup[],
+  copy: BlankBlockTemplateCopy,
 ): BlockTemplateGroup[] {
-  return [...groups.filter((group) => group.templates.length > 0), BLANK_GROUP];
+  return [...groups.filter((group) => group.templates.length > 0), blankGroup(copy)];
 }

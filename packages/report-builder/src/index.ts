@@ -17,6 +17,15 @@
  * (LLM-friendly) errors, and row output is capped via `maxRows`.
  */
 
+export type {
+  PresentationCopy,
+  RenderLabelCopy,
+  ReportEngineCopy,
+  SpecSentenceCopy,
+  SpecSentenceParts,
+  ValueFormatCopy,
+} from './copy';
+export { PT_BR_REPORT_ENGINE_COPY } from './pt-BR';
 export {
   defineCatalog,
   listCatalogFields,

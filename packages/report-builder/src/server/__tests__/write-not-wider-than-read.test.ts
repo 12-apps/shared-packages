@@ -1,3 +1,5 @@
+import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
+import { PT_BR_REPORT_SERVER_MESSAGES } from '../../server/pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { defineCatalog } from '../../catalog';
@@ -142,6 +144,8 @@ function setup(seed: SavedReportRecord = privateReport()): Harness {
   const { routes } = createApiReportBuilder({
     catalog: CATALOG,
     adapter: () => createMemoryDataSource({ loans: [] }),
+    copy: PT_BR_REPORT_ENGINE_COPY,
+    messages: PT_BR_REPORT_SERVER_MESSAGES,
     db: () => Promise.resolve(db),
     entityPermission: { loans: LENDING },
     systemReports: [],

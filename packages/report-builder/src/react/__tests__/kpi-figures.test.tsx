@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 
@@ -107,7 +108,7 @@ describe('ReportRenderView — a KPI with several measures', () => {
 
 describe('exportColumnsFor — the download shows the same numbers as the tile', () => {
   const headersOf = (render: ReportRender): string[] =>
-    exportColumnsFor(render).map((column) => column.header);
+    exportColumnsFor(render, PT_BR_REPORT_ENGINE_COPY.values).map((column) => column.header);
 
   it('emits one column per figure', () => {
     expect(headersOf(THREE_MEASURES)).toEqual(['Receita', 'Pedidos', 'Ticket médio']);
@@ -119,7 +120,7 @@ describe('exportColumnsFor — the download shows the same numbers as the tile',
   });
 
   it('prints each column in its own format', () => {
-    const columns = exportColumnsFor(THREE_MEASURES);
+    const columns = exportColumnsFor(THREE_MEASURES, PT_BR_REPORT_ENGINE_COPY.values);
     const row: ReportRow = THREE_MEASURES.rows[0] ?? {};
     expect(columns[1]?.value(row)).toBe('42');
   });

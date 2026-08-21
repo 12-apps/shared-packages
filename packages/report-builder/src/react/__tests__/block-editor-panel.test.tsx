@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
+import { renderWithCopy } from "./with-copy";
 import { useState, type ComponentProps, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 
 import { Drawer, DrawerContent, DrawerHeader } from '@12-apps/ui/layout/Drawer';
 
@@ -125,7 +126,7 @@ function panelElement(
 }
 
 function renderPanel(): void {
-  render(panelElement());
+  renderWithCopy(panelElement());
 }
 
 /**
@@ -268,7 +269,7 @@ function renderedBackdrops(): Element[] {
 
 /** The panel rendered inside the canvas region that yields width to it. */
 function renderDockedEditor(withPanel: boolean, spec: ReportSpecWire | null = SPEC): void {
-  render(
+  renderWithCopy(
     <DockedPanelRegion>
       <div data-testid="canvas-probe" />
       {withPanel ? panelElement(spec) : null}
@@ -478,7 +479,7 @@ describe('the settings drawer stays modal', () => {
    * what this pins.
    */
   function renderSettingsDrawer(): void {
-    render(
+    renderWithCopy(
       <Drawer open onClose={() => undefined} anchor="right" dataTestId="settings-drawer">
         <DrawerHeader dataTestId="settings-drawer-header">Ajustes</DrawerHeader>
         <DrawerContent dataTestId="settings-drawer-content">
@@ -675,7 +676,7 @@ describe('BlockEditorPanel — GAP 7: the panel explains the block', () => {
 
   it('re-writes the sentence when the canvas re-points the panel', () => {
     setViewport(DESKTOP_PX);
-    const { rerender } = render(panelElement());
+    const { rerender } = renderWithCopy(panelElement());
     expect(sentenceText()).toContain('soma de receita');
 
     rerender(
@@ -687,7 +688,7 @@ describe('BlockEditorPanel — GAP 7: the panel explains the block', () => {
 
   it('re-writes the sentence as the form is edited', async () => {
     setViewport(DESKTOP_PX);
-    render(<LivePanel />);
+    renderWithCopy(<LivePanel />);
     expect(sentenceText()).toContain('soma de receita');
 
     // The scenario's own gesture: change the aggregation to "Média".
@@ -729,7 +730,7 @@ describe('BlockEditorPanel — GAP 7: the panel explains the block', () => {
   it('reports each keystroke in the title field', () => {
     setViewport(DESKTOP_PX);
     const onTitleChange = vi.fn();
-    render(panelElement(SPEC, { onTitleChange }));
+    renderWithCopy(panelElement(SPEC, { onTitleChange }));
 
     fireEvent.change(screen.getByTestId('report-block-b1-editor-title-override'), {
       target: { value: 'Faturamento diário' },
@@ -740,7 +741,7 @@ describe('BlockEditorPanel — GAP 7: the panel explains the block', () => {
 
   it('shows the title it was given rather than the placeholder', () => {
     setViewport(DESKTOP_PX);
-    render(panelElement(SPEC, { title: 'Faturamento diário' }));
+    renderWithCopy(panelElement(SPEC, { title: 'Faturamento diário' }));
 
     const field = screen.getByTestId('report-block-b1-editor-title-override');
     expect((field as HTMLInputElement).value).toBe('Faturamento diário');
@@ -775,7 +776,7 @@ describe('BlockEditorPanel — GAP 6: Duplicar and Remover', () => {
   it('asks the canvas to duplicate', () => {
     setViewport(DESKTOP_PX);
     const onDuplicate = vi.fn();
-    render(panelElement(SPEC, { onDuplicate }));
+    renderWithCopy(panelElement(SPEC, { onDuplicate }));
 
     fireEvent.click(screen.getByTestId('report-block-b1-editor-duplicate'));
 
@@ -785,7 +786,7 @@ describe('BlockEditorPanel — GAP 6: Duplicar and Remover', () => {
   it('asks the canvas to remove, and confirms nothing itself', () => {
     setViewport(DESKTOP_PX);
     const onRemove = vi.fn();
-    render(panelElement(SPEC, { onRemove }));
+    renderWithCopy(panelElement(SPEC, { onRemove }));
 
     fireEvent.click(screen.getByTestId('report-block-b1-editor-remove'));
 
@@ -811,7 +812,7 @@ describe('BlockEditorPanel — GAP 6: Duplicar and Remover', () => {
 
   it('keeps Duplicar reachable at the block ceiling, and says why', () => {
     setViewport(DESKTOP_PX);
-    render(panelElement(SPEC, { canDuplicate: false }));
+    renderWithCopy(panelElement(SPEC, { canDuplicate: false }));
 
     const duplicate = screen.getByTestId('report-block-b1-editor-duplicate');
     // `aria-disabled`, never `disabled`: a disabled button leaves the tab order
@@ -831,7 +832,7 @@ describe('BlockEditorPanel — GAP 6: Duplicar and Remover', () => {
   it('does nothing when Duplicar is refused', () => {
     setViewport(DESKTOP_PX);
     const onDuplicate = vi.fn();
-    render(panelElement(SPEC, { canDuplicate: false, onDuplicate }));
+    renderWithCopy(panelElement(SPEC, { canDuplicate: false, onDuplicate }));
 
     fireEvent.click(screen.getByTestId('report-block-b1-editor-duplicate'));
 

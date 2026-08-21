@@ -62,7 +62,7 @@ function systemListRoute(config: ReportBuilderServerConfig): ReportRoute {
       // An actor who may run none of them cannot see the area at all — the
       // same answer the entity narrowing gives on `/reports/fields`. A host
       // that serves NO presets is a different thing, and answers an empty list.
-      const response = reports.length === 0 && presets.length > 0 ? forbidden() : ok({ reports });
+      const response = reports.length === 0 && presets.length > 0 ? forbidden(config) : ok({ reports });
       return Promise.resolve(response);
     },
   };
@@ -79,8 +79,8 @@ function systemRunRoute(config: ReportBuilderServerConfig): ReportRoute {
       // An unknown key is 404 before the permission check: there is no id to
       // disclose here, and a 403 on a key that does not exist reads as "you
       // nearly had it".
-      if (!report) return fail(404, 'Relatório não encontrado.');
-      if (!actor.permissions.includes(report.permission)) return forbidden();
+      if (!report) return fail(404, config.messages.notFound);
+      if (!actor.permissions.includes(report.permission)) return forbidden(config);
 
       const grain = grainOf(query);
       try {

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+import { renderWithCopy } from "./with-copy";
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, screen } from "@testing-library/react";
 
 import { createTheme } from '@12-apps/ui/mui/styles';
 
@@ -113,7 +114,7 @@ const ROW_HOVER = '.MuiTable-root .MuiTableBody-root .MuiTableRow-root:hover';
 
 /** Renders a table block and hands back its `<table>`. */
 function renderTableBlock(): HTMLElement {
-  render(<ReportRenderView render={TABLE_RENDER} dataTestId="bloco" />);
+  renderWithCopy(<ReportRenderView render={TABLE_RENDER} dataTestId="bloco" />);
   return screen.getByTestId('bloco-table');
 }
 
@@ -126,7 +127,7 @@ function renderTableBlock(): HTMLElement {
  * this file is about is the table that comes out either way.
  */
 function renderChartAsTable(): HTMLElement {
-  render(<ReportRenderView render={CHART_RENDER} dataTestId="grafico" asTable />);
+  renderWithCopy(<ReportRenderView render={CHART_RENDER} dataTestId="grafico" asTable />);
   return screen.getByTestId('grafico-table');
 }
 
@@ -227,7 +228,7 @@ describe('report table — one style for both call sites', () => {
   });
 
   it('keeps the test ids the reports e2e drives', () => {
-    const { rerender } = render(<ReportRenderView render={CHART_RENDER} dataTestId="grafico" />);
+    const { rerender } = renderWithCopy(<ReportRenderView render={CHART_RENDER} dataTestId="grafico" />);
 
     expect(screen.getByTestId('grafico-chart')).not.toBeNull();
     rerender(<ReportRenderView render={CHART_RENDER} dataTestId="grafico" asTable />);

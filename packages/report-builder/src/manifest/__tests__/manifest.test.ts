@@ -6,6 +6,8 @@
  * rather than parallel restatements that could drift.
  */
 
+import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
+import { PT_BR_REPORT_SERVER_MESSAGES } from '../../server/pt-BR';
 import { describe, expect, it } from 'vitest';
 import type { PackageManifest, WirePermissionsContribution } from '@12-apps/wiring';
 import {
@@ -117,6 +119,8 @@ describe('the route policy', () => {
       systemReports: [],
       starters: {},
       adapter: { execute: () => Promise.resolve([]) },
+      copy: PT_BR_REPORT_ENGINE_COPY,
+      messages: PT_BR_REPORT_SERVER_MESSAGES,
       db: () => Promise.reject(new Error('not this suite')),
       timeZone: 'UTC',
     });
@@ -174,6 +178,8 @@ describe('the MCP contribution', () => {
       systemReports: [],
       starters: {},
       adapter: { execute: () => Promise.resolve([]) },
+      copy: PT_BR_REPORT_ENGINE_COPY,
+      messages: PT_BR_REPORT_SERVER_MESSAGES,
       db: () => Promise.reject(new Error('not this suite')),
       timeZone: 'UTC',
     });

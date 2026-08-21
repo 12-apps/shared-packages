@@ -1,3 +1,4 @@
+import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { compileReport } from '../compile';
@@ -114,7 +115,7 @@ describe('top-N with an "Outros" bucket', () => {
         sort: [{ by: 'sum_cents', direction: 'desc' }],
         limit: 10_000,
       },
-      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }), maxRows: 5 },
+      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }), maxRows: 5, copy: PT_BR_REPORT_ENGINE_COPY },
     );
 
     expect(result.render.rows).toHaveLength(5);
@@ -135,7 +136,7 @@ describe('top-N with an "Outros" bucket', () => {
         sort: [{ by: 'sum_cents', direction: 'desc' }],
         limit: 5,
       },
-      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }), maxRows: 5 },
+      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }), maxRows: 5, copy: PT_BR_REPORT_ENGINE_COPY },
     );
 
     expect(result.render.rows).toHaveLength(6);
@@ -247,6 +248,7 @@ describe('the bucket survives the whole pipeline', () => {
     const result = await runReport(TOP_5, {
       catalog,
       adapter: createMemoryDataSource({ sales: salesRows() }),
+      copy: PT_BR_REPORT_ENGINE_COPY,
     });
 
     expect(result.rows).toHaveLength(6);
@@ -259,7 +261,7 @@ describe('the bucket survives the whole pipeline', () => {
   it('is present in the rendered table model too', async () => {
     const result = await runReport(
       { ...TOP_5, presentation: { kind: 'table' } },
-      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }) },
+      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }), copy: PT_BR_REPORT_ENGINE_COPY },
     );
 
     if (result.render.kind !== 'table') throw new Error('expected a table render');

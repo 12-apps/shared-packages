@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
+import { PT_BR_BLANK_BLOCK_TEMPLATE_COPY } from '../../server/pt-BR';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
@@ -160,6 +162,7 @@ afterEach(() => {
 function renderSurfaceAt(url: string): void {
   const { page: Surface } = createWebReportBuilder({
     surface: TEST_SURFACE,
+    copy: { engine: PT_BR_REPORT_ENGINE_COPY, blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY },
     tenantSlug: TENANT,
     transport: stubTransport(),
     standalone: true,

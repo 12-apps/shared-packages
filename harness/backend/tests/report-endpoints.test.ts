@@ -2,6 +2,7 @@ import {
   createMemoryDataSource,
   defineCatalog,
   type FieldCatalog,
+  PT_BR_REPORT_ENGINE_COPY,
 } from '@12-apps/report-builder';
 import {
   createApiReportBuilder,
@@ -9,6 +10,7 @@ import {
   type ReportActor,
   type ReportRoute,
   type SystemReportDef,
+  PT_BR_REPORT_SERVER_MESSAGES,
 } from '@12-apps/report-builder/server';
 import { describe, expect, it } from 'vitest';
 
@@ -214,6 +216,9 @@ function setup(options: { maxRows?: number } = {}): {
   const db = memoryDb(seedRows());
   const { routes } = createApiReportBuilder({
     catalog,
+    // Named, not inherited: the package ships no default sentence.
+    copy: PT_BR_REPORT_ENGINE_COPY,
+    messages: PT_BR_REPORT_SERVER_MESSAGES,
     // A plain source rather than a factory: this harness's rows do not move,
     // so every window sees the same two orders. The factory form is what a
     // real host passes, and `report-hono.test.ts` drives that one.

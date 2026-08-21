@@ -9,6 +9,7 @@
  * (FUT-755). A dedicated test pins both halves — that everything the matrix
  * offers still compiles, and that this is the only rule the two differ on.
  */
+import type { PresentationCopy } from './copy';
 import type { ReportPresentation } from './spec';
 
 /** The shape facts the chart rules depend on. */
@@ -64,38 +65,9 @@ export type PresentationOption = (typeof PRESENTATION_OPTIONS)[number];
 
 export interface PresentationCompatibility {
   option: PresentationOption;
-  /** null = the compiler accepts this presentation; else a pt-BR reason. */
+  /** null = the compiler accepts this presentation; else the host's reason. */
   disabledReason: string | null;
 }
-
-/**
- * Every reason names the CONTROL the author has to change, and quotes it
- * ("Tire o «agrupar por»"), rather than restating the rule that blocked them.
- * The register is `prototype.html`'s `vizBlocked`: the author is holding a
- * form, and the useful sentence is which field to touch next.
- */
-const NEEDS_GROUPING = 'Um gráfico precisa de um agrupamento. Escolha um “agrupar por” ou use Número.';
-const KPI_TAKES_NO_GROUPING =
-  'Um número único não usa agrupamento. Tire o “agrupar por” para escolher.';
-/**
- * The inversion (FUT-755). Without a grouping the query returns EXACTLY ONE
- * row, so a table draws a header and a single line of figures — a worse Número
- * rather than a table. `Tabela` is therefore the one presentation that is
- * available for every shape that HAS a grouping and for none that does not,
- * which is why the sentence sends the author to the grouping first.
- */
-const TABLE_TAKES_A_GROUPING =
-  'Sem agrupamento a tabela teria uma linha só. Escolha um “agrupar por” ou use Número.';
-const STACK_TAKES_TWO_SERIES =
-  'Empilhar precisa de mais de uma série. Escolha um “separar em séries” ou adicione outra medida.';
-const ROUND_TAKES_NO_SPLIT =
-  'Pizza e rosca mostram a composição de uma série só. Tire o “separar em séries” para escolher.';
-const ROUND_TAKES_ONE_MEASURE =
-  'Pizza e rosca mostram uma medida só. Deixe apenas uma medida para escolher.';
-const SPLIT_TAKES_ONE_MEASURE =
-  'Separar em séries já usa uma série por valor. Deixe apenas uma medida, ou tire o “separar em séries”.';
-const LINE_NEEDS_ORDERED_AXIS =
-  'Linha e área ligam um ponto ao outro, então o “agrupar por” precisa ter ordem — data, hora ou dia da semana. Troque o agrupamento ou use Barras.';
 
 /**
  * The ordered-axis rule (FUT-755): a line or an area draws the space BETWEEN
@@ -109,22 +81,30 @@ const LINE_NEEDS_ORDERED_AXIS =
  * either way). A split over a DATE axis stays legitimate — its second
  * dimension becomes series, and the x-axis is still time.
  */
-function unorderedAxisReason(option: PresentationOption, shape: SpecShape): string | null {
+function unorderedAxisReason(
+  option: PresentationOption,
+  shape: SpecShape,
+  copy: PresentationCopy,
+): string | null {
   const drawsSlopes = option === 'line' || option === 'area';
-  return drawsSlopes && !shape.firstDimensionIsOrdered ? LINE_NEEDS_ORDERED_AXIS : null;
+  return drawsSlopes && !shape.firstDimensionIsOrdered ? copy.lineNeedsOrderedAxis : null;
 }
 
-function chartReason(option: PresentationOption, shape: SpecShape): string | null {
+function chartReason(
+  option: PresentationOption,
+  shape: SpecShape,
+  copy: PresentationCopy,
+): string | null {
   const isRound = option === 'pie' || option === 'donut';
   if (shape.dimensionCount > 1) {
-    if (isRound) return ROUND_TAKES_NO_SPLIT;
+    if (isRound) return copy.roundTakesNoSplit;
     // A split already spends the series axis; a second measure would need a
     // third one. The compiler rejects it, so the picker must too.
-    if (shape.measureCount !== 1) return SPLIT_TAKES_ONE_MEASURE;
-    return unorderedAxisReason(option, shape);
+    if (shape.measureCount !== 1) return copy.splitTakesOneMeasure;
+    return unorderedAxisReason(option, shape, copy);
   }
-  if (isRound && shape.measureCount !== 1) return ROUND_TAKES_ONE_MEASURE;
-  return unorderedAxisReason(option, shape);
+  if (isRound && shape.measureCount !== 1) return copy.roundTakesOneMeasure;
+  return unorderedAxisReason(option, shape, copy);
 }
 
 /**
@@ -139,23 +119,30 @@ function chartReason(option: PresentationOption, shape: SpecShape): string | nul
  * measures WITHOUT a grouping is a legitimate KPI block ("Número" renders one
  * figure each), so the old one-measure ceiling is gone from both halves.
  */
-function ungroupedReason(option: PresentationOption): string | null {
+function ungroupedReason(option: PresentationOption, copy: PresentationCopy): string | null {
   if (option === 'kpi') return null;
-  return option === 'table' ? TABLE_TAKES_A_GROUPING : NEEDS_GROUPING;
+  return option === 'table' ? copy.tableTakesAGrouping : copy.needsGrouping;
 }
 
-function reasonFor(option: PresentationOption, shape: SpecShape): string | null {
-  if (shape.dimensionCount === 0) return ungroupedReason(option);
-  if (option === 'kpi') return KPI_TAKES_NO_GROUPING;
+function reasonFor(
+  option: PresentationOption,
+  shape: SpecShape,
+  copy: PresentationCopy,
+): string | null {
+  if (shape.dimensionCount === 0) return ungroupedReason(option, copy);
+  if (option === 'kpi') return copy.kpiTakesNoGrouping;
   if (option === 'table') return null;
-  return chartReason(option, shape);
+  return chartReason(option, shape, copy);
 }
 
 /** The full option list with per-option availability for a spec shape. */
-export function presentationCompatibility(shape: SpecShape): PresentationCompatibility[] {
+export function presentationCompatibility(
+  shape: SpecShape,
+  copy: PresentationCopy,
+): PresentationCompatibility[] {
   return PRESENTATION_OPTIONS.map((option) => ({
     option,
-    disabledReason: reasonFor(option, shape),
+    disabledReason: reasonFor(option, shape, copy),
   }));
 }
 
@@ -182,10 +169,11 @@ const STACKABLE_OPTIONS: ReadonlySet<PresentationOption> = new Set(['bar', 'area
 export function stackedCompatibility(
   option: PresentationOption,
   shape: SpecShape,
+  copy: PresentationCopy,
 ): PresentationCompatibility | null {
   if (!STACKABLE_OPTIONS.has(option)) return null;
   const hasSeveralSeries = shape.dimensionCount > 1 || shape.measureCount > 1;
-  return { option, disabledReason: hasSeveralSeries ? null : STACK_TAKES_TWO_SERIES };
+  return { option, disabledReason: hasSeveralSeries ? null : copy.stackTakesTwoSeries };
 }
 
 /**

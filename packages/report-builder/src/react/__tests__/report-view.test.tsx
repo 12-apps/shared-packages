@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
+import { renderWithCopy } from "./with-copy";
+import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
+import { PT_BR_BLANK_BLOCK_TEMPLATE_COPY } from '../../server/pt-BR';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { MemoryRouter } from 'react-router-dom';
 
 import { createWebReportBuilder } from '../create-report-builder';
@@ -162,12 +165,13 @@ function stubTransport(): ReportBuilderTransport {
 function renderSurfaceAt(url: string): void {
   const { page: Surface } = createWebReportBuilder({
     surface: TEST_SURFACE,
+    copy: { engine: PT_BR_REPORT_ENGINE_COPY, blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY },
     tenantSlug: TENANT,
     transport: stubTransport(),
     standalone: true,
     initialPath: url,
   });
-  render(<Surface />);
+  renderWithCopy(<Surface />);
 }
 
 /** The accessible name a screen reader would resolve, without jest-dom. */
@@ -215,7 +219,7 @@ afterEach(() => {
 
 describe('entry 6 — view mode renders no save or cancel control', () => {
   it('offers the ⋮ menu and the canvas, and nothing that saves or cancels', () => {
-    render(
+    renderWithCopy(
       <MemoryRouter>
         <ReportViewCanvas view={VIEW} />
         <ReportActionsMenu tenantSlug={TENANT} view={VIEW} onChanged={() => undefined} />
@@ -235,7 +239,7 @@ describe('entry 6 — view mode renders no save or cancel control', () => {
   });
 
   it.each(SAVE_OR_CANCEL)('renders no control named %s', (copy) => {
-    render(
+    renderWithCopy(
       <MemoryRouter>
         <ReportViewCanvas view={VIEW} />
         <ReportActionsMenu tenantSlug={TENANT} view={VIEW} onChanged={() => undefined} />
@@ -250,7 +254,7 @@ describe('entry 6 — view mode renders no save or cancel control', () => {
   });
 
   it('keeps the ⋮ menu itself to Editar and Arquivar', async () => {
-    render(
+    renderWithCopy(
       <MemoryRouter>
         <ReportViewCanvas view={VIEW} />
         <ReportActionsMenu tenantSlug={TENANT} view={VIEW} onChanged={() => undefined} />

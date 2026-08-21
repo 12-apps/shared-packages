@@ -24,7 +24,7 @@ import { useEffect, useState, type JSX, type MouseEvent as ReactMouseEvent } fro
 import { Box } from "@12-apps/ui/mui/Box";
 
 import { blockTemplateGroups, type BlockTemplate } from "../server/block-templates";
-import { useReportSurface } from "./transport-context";
+import { useReportCopy, useReportSurface } from "./transport-context";
 import { BlockTemplatePicker } from "./block-template-picker";
 import type { ReportEntityFields } from "./custom-reports-api";
 import {
@@ -317,6 +317,7 @@ function CanvasOverlays({
   onChange: (next: (draft: ReportDraft) => ReportDraft) => void;
 }): JSX.Element {
   const surface = useReportSurface();
+  const copy = useReportCopy();
   return (
     <>
       {/* "Adicionar bloco" opens the templates rather than dropping an empty
@@ -326,7 +327,7 @@ function CanvasOverlays({
        * someone who knows exactly what they want is not forced through it. */}
       <BlockTemplatePicker
         open={actions.picking}
-        groups={blockTemplateGroups(surface.blockTemplates)}
+        groups={blockTemplateGroups(surface.blockTemplates, copy.blankTemplate)}
         onClose={actions.closePicker}
         onSelect={actions.chooseTemplate}
       />

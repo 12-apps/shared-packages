@@ -86,7 +86,7 @@ export { REPORT_RUN_MAX_ROWS } from './policy';
  * template and the composition that always appends it.
  */
 export {
-  BLANK_BLOCK_TEMPLATE,
+  blankBlockTemplate,
   blockTemplateGroups,
   type BlockTemplate,
   type BlockTemplateGroup,
@@ -137,3 +137,7 @@ export {
   systemReportResultSchema,
   systemReportSummarySchema,
 } from './wire';
+
+export type { ReportRangeMessages, ReportServerMessages } from './messages';
+export type { BlankBlockTemplateCopy } from './block-templates';
+export { PT_BR_BLANK_BLOCK_TEMPLATE_COPY, PT_BR_REPORT_SERVER_MESSAGES } from './pt-BR';
