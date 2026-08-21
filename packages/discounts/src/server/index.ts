@@ -15,6 +15,8 @@ export {
 
 export { missingServerCopy, type DiscountsServerCopy } from "./copy";
 
+export { errorText, type DiscountsLogger } from "./logging";
+
 export {
   DISCOUNTS_PERMISSIONS,
   DISCOUNTS_READ,
