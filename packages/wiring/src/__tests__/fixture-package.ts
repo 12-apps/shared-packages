@@ -131,6 +131,10 @@ export const notesServerManifest = defineServerManifest(notesManifest, {
               Promise.resolve({ status: 200, body: { data: request.params["id"] ?? null } }),
           },
         ],
+        // Beside the routes, deliberately: the contract is a floor, and the
+        // consumer must expose the WHOLE factory result (assembled.http) for
+        // hosts whose own code funnels through extra members.
+        store: config.store,
       };
     },
   },
