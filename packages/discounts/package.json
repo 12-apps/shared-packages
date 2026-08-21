@@ -29,8 +29,10 @@
   },
   "dependencies": {
     "@12-apps/app-shell": "workspace:*",
+    "@12-apps/forms-core": "workspace:*",
     "@12-apps/shared-helpers": "workspace:*",
     "@12-apps/ui": "workspace:*",
+    "@mui/icons-material": "^6.5.0",
     "zod": "^4.3.5"
   },
   "peerDependencies": {
@@ -55,13 +57,11 @@
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
-    "@12-apps/forms-core": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@12-apps/wiring": "workspace:*",
     "@electric-sql/pglite": "^0.2.17",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
-    "@mui/icons-material": "^6.5.0",
     "@mui/material": "^6.5.0",
     "@storybook/addon-docs": "^9.1.10",
     "@storybook/addon-links": "^9.1.10",
