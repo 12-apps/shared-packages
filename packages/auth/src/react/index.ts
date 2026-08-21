@@ -39,5 +39,12 @@ export type {
 export * from "./screens";
 export * from "./settings";
 export * from "./pages";
+/**
+ * The "Acesso à conta" surface — the states, the arrangements and the flow the
+ * prototype settled. Same entry point as everything else here for the same
+ * reason: it carries the identical peers, so a subpath would cost a consumer a
+ * decision and buy it nothing.
+ */
+export * from "./access";
 export { createWebEmailAuth } from "./create-web-email-auth";
 export type { WebEmailAuth, WebEmailAuthConfig } from "./create-web-email-auth";
