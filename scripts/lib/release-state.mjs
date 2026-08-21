@@ -72,9 +72,17 @@ function newestTag(prefix) {
  * publish, which scripts/first-publish.mjs owns. Callers must keep the two
  * apart — treating an unpublished name as an orphan would have this delete the
  * tag of a package that is merely new.
+ *
+ * `preferOnline` bypasses npm's local cache, which will otherwise happily serve
+ * a packument it fetched minutes ago. It is OFF for the first read of each
+ * package — 32 revalidating reads on every run, to catch something rare — and
+ * ON for every re-read, where a stale answer is the entire question being
+ * asked.
  */
-function registryVersions(name) {
-  const run = spawnSync("npm", ["view", name, "versions", "--json"], { encoding: "utf8" });
+function registryVersions(name, { preferOnline = false } = {}) {
+  const args = ["view", name, "versions", "--json"];
+  if (preferOnline) args.push("--prefer-online");
+  const run = spawnSync("npm", args, { encoding: "utf8" });
   if (run.status !== 0) return null;
   try {
     const parsed = JSON.parse(`${run.stdout}`);
@@ -82,6 +90,107 @@ function registryVersions(name) {
   } catch {
     return null;
   }
+}
+
+/**
+ * How long to keep re-reading the registry before calling a tagged version
+ * absent, one wait in milliseconds per attempt.
+ *
+ * WHY there is a wait at all. `npm publish` answering `ok` does not mean the
+ * next `npm view` can see the version — the write is accepted by the registry
+ * and the read is served by a CDN that has not caught up yet. Measured here
+ * twice in one night: run 32430666577 published `@12-apps/feature-flags@2.0.0`
+ * and its verification called the package STUCK at 00:15:58Z, while the
+ * registry recorded that version at 00:17:47Z — 109 seconds later. 2.0.1
+ * repeated it on the next merge, on a shorter lag.
+ *
+ * The cost of being impatient is not a slow job, it is the WRONG INSTRUCTION.
+ * Every consumer of this module reads an absent version as an orphaned tag,
+ * and an orphan's remedy is to DELETE the tag so the version re-cuts —
+ * verify-released.mjs prints that at a human and recover-orphans.mjs performs
+ * it unattended. Aimed at a package that was merely propagating, it discards a
+ * good tag, spends a version number and turns a healthy release into churn.
+ * The schedule is therefore longer than the worst lag observed, and it is paid
+ * only when something already looks wrong.
+ *
+ * Comma-separated milliseconds in RELEASE_ABSENCE_RECHECK_MS override it. Empty
+ * disables re-reading altogether, which is both the behaviour that shipped this
+ * bug and what the self-tests use to stay instant.
+ */
+const DEFAULT_RECHECK_MS = [10_000, 20_000, 30_000, 60_000, 60_000, 60_000];
+
+export function recheckSchedule(env = process.env) {
+  const raw = env.RELEASE_ABSENCE_RECHECK_MS;
+  if (raw === undefined) return DEFAULT_RECHECK_MS;
+  return raw
+    .split(",")
+    .map((part) => Number.parseInt(part.trim(), 10))
+    .filter((ms) => Number.isFinite(ms) && ms >= 0);
+}
+
+/** Total wall-clock the schedule can spend, in whole seconds — for the messages. */
+export function recheckSeconds(schedule = recheckSchedule()) {
+  return Math.round(schedule.reduce((total, ms) => total + ms, 0) / 1000);
+}
+
+/**
+ * Block this thread for `ms`.
+ *
+ * Synchronous deliberately: every read in this module is `spawnSync` and
+ * verify-released.mjs is a straight-line script, so going async would turn
+ * three callers inside out to buy nothing. There is no other work for this
+ * process to do while the registry catches up.
+ */
+function sleep(ms) {
+  if (ms <= 0) return;
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Re-read the registry for the packages whose tagged version was missing, and
+ * return the ones still missing once the schedule runs out.
+ *
+ * The rounds are SHARED rather than per package: ten suspects wait the same
+ * wall-clock as one. Waiting per package would multiply a rare fault by the
+ * size of the monorepo and turn a two-minute lag into a job timeout.
+ */
+/**
+ * One round of re-reads: which suspects are still missing, and which turned up.
+ *
+ * Extracted from the loop below rather than nested inside it — the complexity
+ * gate reads a loop within a loop as a suspected quadratic, and here the two
+ * are measuring different things (attempts, and packages) rather than compounding.
+ */
+function rereadOnce(pending) {
+  const missing = [];
+  const found = [];
+  for (const suspect of pending) {
+    const versions = registryVersions(suspect.name, { preferOnline: true });
+    if (versions !== null && versions.includes(suspect.version)) found.push(suspect);
+    else missing.push(suspect);
+  }
+  return { missing, found };
+}
+
+function confirmAbsent(suspects, schedule) {
+  let pending = suspects;
+  const appeared = [];
+  for (const wait of schedule) {
+    if (pending.length === 0) break;
+    console.log(
+      `::notice::${pending.length} package(s) tagged for a version the registry did not serve ` +
+        `(${pending.map(({ tag }) => tag).join(", ")}). Re-reading in ${Math.round(wait / 1000)}s — ` +
+        `npm can take minutes to serve a version it has already accepted.`,
+    );
+    sleep(wait);
+    const { missing, found } = rereadOnce(pending);
+    appeared.push(...found);
+    pending = missing;
+  }
+  for (const { name, tag } of appeared) {
+    console.log(`::notice::${tag} reached the registry on a re-read — ${name} is healthy, not stuck.`);
+  }
+  return { orphans: pending, appeared };
 }
 
 /**
@@ -113,8 +222,11 @@ function registryVersions(name) {
  * rather than one "stuck" list: an orphan is fixed by DELETING its tag so the
  * version re-cuts, and this is fixed by CREATING the missing one.
  */
-export function releaseState(dirs = publishDirs()) {
-  const orphans = [];
+export function releaseState(dirs = publishDirs(), { schedule = recheckSchedule() } = {}) {
+  // Tagged for a version the FIRST read did not find. Not yet an orphan: that
+  // verdict is what `confirmAbsent` below is for, and reaching it in one read
+  // is how a propagating publish gets its tag deleted.
+  const suspects = [];
   const untagged = [];
   const unpublished = [];
   const healthy = [];
@@ -149,9 +261,12 @@ export function releaseState(dirs = publishDirs()) {
     } else if (versions.includes(tag.version)) {
       healthy.push({ name, ...tag });
     } else {
-      orphans.push({ name, ...tag });
+      suspects.push({ name, ...tag });
     }
   }
+
+  const { orphans, appeared } = confirmAbsent(suspects, schedule);
+  healthy.push(...appeared);
 
   return { orphans, untagged, unpublished, healthy };
 }

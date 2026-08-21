@@ -33,11 +33,28 @@
 // the names it did not get onto the registry (PUBLISH_INCOMPLETE, and the
 // no-credential subset PUBLISH_WEDGED) and those orphans get the remedy in the
 // right ORDER: fix the publish first, delete the tag second.
+//
+// Running right after the publish is also what makes this the step most exposed
+// to the registry's read-after-write lag, and "absent" here is an instruction to
+// DELETE A TAG. It reported @12-apps/feature-flags STUCK twice in one night over
+// versions npm went on to serve minutes later — a red main, an alert, and a
+// remedy that would have thrown away a good tag had anyone followed it. The wait
+// that makes the verdict trustworthy lives in lib/release-state.mjs, shared with
+// the two other steps that ask the same question; the messages below say how
+// long it waited so the reader can weigh the answer.
 import { appendFileSync } from "node:fs";
 
-import { handedOver, newestPublished, publishDirs, releaseState } from "./lib/release-state.mjs";
+import {
+  handedOver,
+  newestPublished,
+  publishDirs,
+  recheckSchedule,
+  recheckSeconds,
+  releaseState,
+} from "./lib/release-state.mjs";
 
 const DIRS = publishDirs();
+const WAITED = recheckSeconds(recheckSchedule());
 
 const INCOMPLETE = handedOver("PUBLISH_INCOMPLETE");
 const WEDGED = handedOver("PUBLISH_WEDGED");
@@ -91,7 +108,11 @@ function remedy(name, tag) {
       `GitHub Release: ${del}`
     );
   }
-  return `Delete the orphaned tag and its GitHub Release, then re-run: ${del}`;
+  return (
+    `The registry was re-read for ${WAITED}s before concluding this, so it is not ` +
+    `propagation lag. Delete the orphaned tag and its GitHub Release, then ` +
+    `re-run: ${del}`
+  );
 }
 
 for (const { name, tag, version } of orphans) {
