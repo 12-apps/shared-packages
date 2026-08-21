@@ -152,7 +152,7 @@ export interface RbacInvitesPort {
   cancel(tenantId: string, inviteId: string): Promise<void>;
 }
 
-/** The user-facing copy this surface emits (pt-BR product copy by default). */
+/** Every user-facing string this surface emits — REQUIRED host config; pt-BR ships as `./pt-BR`. */
 export interface RbacMessages {
   forbidden: string;
   notAMember: string;
@@ -180,34 +180,6 @@ export interface RbacMessages {
     fallback: string;
   };
 }
-
-export const DEFAULT_MESSAGES: RbacMessages = {
-  forbidden: 'Você não tem permissão para esta ação.',
-  notAMember: 'Este usuário não faz parte da equipe.',
-  memberNotFound: 'Membro não encontrado.',
-  roleNotFound: 'Papel não encontrado.',
-  duplicateRoleName: 'Já existe um papel com esse nome.',
-  reservedRoleName:
-    'Esse nome é reservado para um papel do sistema. Edite o papel do sistema.',
-  lastOwner: 'É necessário manter ao menos um proprietário.',
-  onlyOwnerRemovesOwner: 'Apenas o proprietário pode remover outro proprietário.',
-  ownerNotDisableable: 'Não é possível desativar um proprietário.',
-  templateNotEditable: 'Este papel do sistema não pode ser editado.',
-  invalidEmail: 'Informe um e-mail válido.',
-  invalidBody: 'Dados inválidos',
-  notFound: 'Não encontrado.',
-  invitesNotConfigured: 'Convites não estão configurados.',
-  unauthenticated: 'Não autenticado.',
-  baseRoleNotAssignable: 'Este papel não pode ser definido como papel principal.',
-  governance: {
-    escalation: 'Você não pode conceder um papel com permissões que você mesmo não possui.',
-    scopeCeiling: 'Este papel não pode ser atribuído neste nível de acesso.',
-    separationOfDuties: 'Este papel viola a separação de funções e não pode ser atribuído.',
-    ownerProtected: 'Este papel é protegido e não pode ser atribuído por aqui.',
-    unknownRole: 'Papel desconhecido.',
-    fallback: 'Não foi possível atribuir este papel.',
-  },
-};
 
 /** The permission ids gating each surface, overridable per host catalog. */
 export interface RbacGatePermissions {
@@ -322,8 +294,13 @@ export interface RbacServerConfig<
   permissionsExtras?: (actor: RbacActor) => Promise<E>;
   /** Gate permission ids, when the host's catalog spells them differently. */
   gatePermissions?: Partial<RbacGatePermissions>;
-  /** User-facing copy overrides. */
-  messages?: Partial<RbacMessages>;
+  /**
+   * The refusal sentences this surface answers with — REQUIRED, the host's
+   * words. A pt-BR host passes `PT_BR_RBAC_MESSAGES` from `./pt-BR`, which is
+   * verbatim what the origin host's routes said; requiring it turns that
+   * choice into a line in the host's diff instead of a silence.
+   */
+  messages: RbacMessages;
 }
 
 /** A user-safe API error carrying the HTTP status the wire promises. */
@@ -371,13 +348,9 @@ export function pageResponse(data: unknown[], pagination: PaginationMeta): RbacR
   return { status: 200, body: { data, pagination } };
 }
 
-/** The messages in force, defaulted to the pt-BR product copy. */
-export function messagesOf(config: { messages?: Partial<RbacMessages> }): RbacMessages {
-  return {
-    ...DEFAULT_MESSAGES,
-    ...config.messages,
-    governance: { ...DEFAULT_MESSAGES.governance, ...config.messages?.governance },
-  };
+/** The messages in force — REQUIRED host config; pt-BR ships as `./pt-BR`. */
+export function messagesOf(config: { messages: RbacMessages }): RbacMessages {
+  return config.messages;
 }
 
 /** The gate permission ids in force. */

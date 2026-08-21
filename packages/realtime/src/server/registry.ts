@@ -1,7 +1,6 @@
 import { isValidTopic } from "../core/topics";
 
 import {
-  DEFAULT_EVENTS_MESSAGES,
   EventsDenial,
   type EventsMessages,
   type EventsTopicSpec,
@@ -59,15 +58,14 @@ export function toTopicSpec(
  * Parse and validate a comma-separated topic list. Throws {@link EventsDenial}
  * (400) on an empty list, a list over `max`, or any refused entry.
  *
- * The default messages are the pt-BR wire contract the origin host's SPAs already read;
- * `messages` is the seam a differently-localised host overrides them through (see
- * {@link EventsMessages}).
+ * `messages` is REQUIRED — the refusal sentences are the host's (see
+ * {@link EventsMessages}); a pt-BR host passes `PT_BR_EVENTS_MESSAGES`.
  */
 export function parseTopicList(
   raw: string,
   registry: TopicRegistry,
-  max: number = DEFAULT_MAX_TOPICS_PER_CONNECTION,
-  messages: EventsMessages = DEFAULT_EVENTS_MESSAGES,
+  max: number,
+  messages: EventsMessages,
 ): EventsTopicSpec[] {
   const names = [...new Set(raw.split(",").map((name) => name.trim()))].filter(Boolean);
   if (names.length === 0 || names.length > max) {

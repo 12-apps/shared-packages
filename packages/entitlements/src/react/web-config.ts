@@ -4,6 +4,8 @@
  */
 import type { ComponentType, ReactNode } from 'react';
 
+import type { EntitlementsWebCopy } from './copy';
+
 /** Where the tenant's own switch for a feature lives, as the HOST routes it. */
 export interface TenantSwitchLocation {
   /** App-relative path, handed to {@link WebEntitlementsConfig.LinkComponent}. */
@@ -41,6 +43,12 @@ export interface WebEntitlementsConfig {
    */
   canRequestPlanChange: boolean;
   /**
+   * Every sentence the screens render — REQUIRED, the host's words. pt-BR
+   * hosts pass `PT_BR_ENTITLEMENTS_WEB_COPY` from `./pt-BR` (re-exported at
+   * `@12-apps/entitlements/react`).
+   */
+  copy: EntitlementsWebCopy;
+  /**
    * Where the tenant's own switch for a `disabled-by-tenant` feature lives.
    * Return null for a feature with no dedicated screen; the row then renders
    * without a link. Host routes are the host's — this package cannot know
@@ -61,6 +69,7 @@ export interface ResolvedWebConfig {
   apiBase: string;
   fetchImpl: typeof fetch;
   canRequestPlanChange: boolean;
+  copy: EntitlementsWebCopy;
   switchLocation: (feature: string) => TenantSwitchLocation | null;
   plansPath: string | null;
   LinkComponent: ComponentType<EntitlementsLinkProps>;

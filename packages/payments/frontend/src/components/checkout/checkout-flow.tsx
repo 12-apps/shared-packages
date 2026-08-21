@@ -7,13 +7,17 @@ import { ArrowBackIcon } from "./icons";
 import { PaymentStatus } from "./payment-status";
 import type { BuyerInfo, CheckoutProviderConfig, SettlementCheckout } from "./types";
 import { CheckoutComponentsProvider, useCheckoutComponents, type CheckoutComponents } from "./ui";
+import type { CheckoutViewCopy } from "./view-copy";
 import { useCheckoutController, type CheckoutHostPorts } from "./use-checkout-controller";
 
-const STEPPER_STEPS = [
-  { id: "dados", label: "Dados" },
-  { id: "payment", label: "Pagamento" },
-  { id: "status", label: "Confirmação" },
-];
+/** Step ids are the flow's own contract; the labels beside them are host copy. */
+function stepperSteps(copy: CheckoutViewCopy): { id: string; label: string }[] {
+  return [
+    { id: "dados", label: copy.steps.dados },
+    { id: "payment", label: copy.steps.payment },
+    { id: "status", label: copy.steps.status },
+  ];
+}
 
 /** What the flow reads off the host's cart — display facts, never money math. */
 export interface CheckoutCartView {
@@ -35,6 +39,14 @@ export interface CheckoutCartView {
  * pixels render through the slot contract (`components`, see `ui.tsx`).
  */
 export interface CheckoutFlowProps extends CheckoutHostPorts {
+  /**
+   * Every sentence the flow's own chrome renders — stepper labels, the Dados
+   * step, the empty cart, the confirmation screen. REQUIRED, with no default:
+   * a pt-BR host passes `PT_BR_CHECKOUT_VIEW_COPY` from the package root by
+   * hand, so choosing Portuguese is a line in the host's diff, never a
+   * silence (FUT-760's doctrine, finally applied to the legacy flow too).
+   */
+  copy: CheckoutViewCopy;
   /** The host's cart, reduced to what the flow displays. */
   cart: CheckoutCartView;
   defaultBuyer?: BuyerInfo;
@@ -97,23 +109,23 @@ function statusTotalLabel(
  * per-line remove. Offering it here put a destructive control next to the form
  * a buyer is filling in, one tap away from the field they are typing into.
  */
-function CheckoutHeader({ step, onBack }: { step: string; onBack: () => void }): JSX.Element {
+function CheckoutHeader({ copy, step, onBack }: { copy: CheckoutViewCopy; step: string; onBack: () => void }): JSX.Element {
   const { Button } = useCheckoutComponents();
   return (
     <Box sx={{ minHeight: 36, display: "flex", alignItems: "center", gap: 1 }}>
       <Button variant="text" color="neutral" size="sm" icon={<ArrowBackIcon fontSize="small" />} iconPosition="left" onClick={onBack} dataTestId="checkout-back">
-        {step === "dados" ? "Continuar comprando" : "Voltar"}
+        {step === "dados" ? copy.dados.keepShopping : copy.dados.back}
       </Button>
     </Box>
   );
 }
 
 /** Compact 50px progress header so the form stays above the fold on mobile. */
-function ProgressHeader({ step, completed }: { step: string; completed: Set<string> }): JSX.Element {
+function ProgressHeader({ copy, step, completed }: { copy: CheckoutViewCopy; step: string; completed: Set<string> }): JSX.Element {
   const { Stepper } = useCheckoutComponents();
   return (
     <Box sx={{ height: 50, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      <Stepper steps={STEPPER_STEPS} activeId={step} completed={completed} orientation="horizontal" size="sm" data-testid="checkout-stepper" />
+      <Stepper steps={stepperSteps(copy)} activeId={step} completed={completed} orientation="horizontal" size="sm" data-testid="checkout-stepper" />
     </Box>
   );
 }
@@ -124,8 +136,37 @@ function ProgressHeader({ step, completed }: { step: string; completed: Set<stri
  * chrome (reduced to {@link CheckoutCartView} here), and the provider SDK +
  * card public key are loaded lazily by the card path (order-scoped REST).
  */
+/** Step 3, with the controller's facts mapped onto the status screen. */
+function StatusStep({
+  copy,
+  c,
+  settlement,
+  cart,
+  confirmationExtra,
+}: {
+  copy: CheckoutViewCopy;
+  c: ReturnType<typeof useCheckoutController>;
+  settlement: SettlementCheckout | null | undefined;
+  cart: CheckoutCartView;
+  confirmationExtra: ReactNode;
+}): JSX.Element {
+  return (
+    <PaymentStatus
+      copy={copy.status}
+      status={c.finalStatus}
+      totalLabel={statusTotalLabel(c.order, settlement, cart)}
+      {...confirmationFacts(c.order, c.buyer)}
+      onRetry={c.retry}
+      onRegenerate={() => { c.setStep("payment"); void c.startPayment("PIX"); }}
+      onBackToMenu={c.goToMenu}
+      paidExtra={confirmationExtra}
+      awaitingTimedOut={c.resumeTimedOut}
+    />
+  );
+}
+
 function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Element {
-  const { cart, defaultBuyer, settlement, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, validateApplePayMerchant, ...ports } = props;
+  const { copy, cart, defaultBuyer, settlement, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, validateApplePayMerchant, ...ports } = props;
   // Resolved for NO method on purpose (FUT-595): the Dados step opens before
   // the picker, and the form is filled once — so it asks for the union of what
   // any chain member may need rather than re-opening after the choice. A chain
@@ -141,17 +182,18 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
   // method picker. It holds until an order exists — once one does, its lines are
   // snapshotted server-side and the cart no longer speaks for it.
   if (!settlement && cart.empty && !c.order && c.step !== "status") {
-    return <EmptyCart onBack={c.goToMenu} />;
+    return <EmptyCart copy={copy.emptyCart} onBack={c.goToMenu} />;
   }
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, sm: 3 } }}>
-      <CheckoutHeader step={c.step} onBack={c.back} />
+      <CheckoutHeader copy={copy} step={c.step} onBack={c.back} />
 
-      <ProgressHeader step={c.step} completed={c.completed} />
+      <ProgressHeader copy={copy} step={c.step} completed={c.completed} />
 
       {c.step === "dados" ? (
         <DadosStep
+          copy={copy.dados}
           buyer={c.buyer}
           onBuyerChange={c.setBuyer}
           saveProfile={c.saveProfile}
@@ -189,16 +231,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
       ) : null}
 
       {c.step === "status" ? (
-        <PaymentStatus
-          status={c.finalStatus}
-          totalLabel={statusTotalLabel(c.order, settlement, cart)}
-          {...confirmationFacts(c.order, c.buyer)}
-          onRetry={c.retry}
-          onRegenerate={() => { c.setStep("payment"); void c.startPayment("PIX"); }}
-          onBackToMenu={c.goToMenu}
-          paidExtra={confirmationExtra}
-          awaitingTimedOut={c.resumeTimedOut}
-        />
+        <StatusStep copy={copy} c={c} settlement={settlement} cart={cart} confirmationExtra={confirmationExtra} />
       ) : null}
     </Box>
   );

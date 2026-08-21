@@ -1,7 +1,7 @@
 /** The version-history dialog, and the click that opens a comparison in it. */
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { BY_SELECTION, HISTORY, API_BASE } from './__stories__/fixtures';
+import { BY_SELECTION, COPY, HISTORY, API_BASE } from './__stories__/fixtures';
 import { createWebEntityLifecycle } from './create-web-entity-lifecycle';
 import type { VersionsWire } from './api';
 import type { LifecycleResult, LifecycleTransport } from './transport';
@@ -30,7 +30,11 @@ const transport: LifecycleTransport = {
   },
 };
 
-const { VersionHistoryDialog } = createWebEntityLifecycle({ apiBase: API_BASE, transport });
+const { VersionHistoryDialog } = createWebEntityLifecycle({
+  apiBase: API_BASE,
+  copy: COPY,
+  transport,
+});
 
 /**
  * The dialog as an admin meets it. Click any row to open its comparison; click

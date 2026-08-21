@@ -32,7 +32,16 @@ export {
   createWebEntitlements,
   type WebEntitlements,
 } from './create-web-entitlements';
-export { withEntitlement } from './with-entitlement';
+export { createWithEntitlement, type EntitlementGate } from './with-entitlement';
+export type {
+  EntitlementsWebCopy,
+  PageLockCopy,
+  PlanPageCopy,
+  ReasonCopy,
+  TierCardsCopy,
+  UpsellHostCopy,
+} from './copy';
+export { PT_BR_ENTITLEMENTS_WEB_COPY } from './pt-BR';
 export {
   raiseUpsell,
   subscribeToUpsell,

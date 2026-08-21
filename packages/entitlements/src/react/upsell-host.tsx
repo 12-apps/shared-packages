@@ -30,29 +30,6 @@ import { createPlanApi, useRead } from './plan-api';
 import { subscribeToUpsell } from './upsell-channel';
 import type { ResolvedWebConfig } from './web-config';
 
-const COPY: Record<UpsellReason, { title: string; body: string }> = {
-  'not-entitled': {
-    title: 'Recurso não incluído no seu plano',
-    body: 'Seu plano atual não inclui este recurso.',
-  },
-  'quota-exceeded': {
-    title: 'Limite do plano atingido',
-    body: 'Você usou todo o limite que o seu plano inclui para este recurso.',
-  },
-  restricted: {
-    title: 'Pagamento pendente',
-    body: 'Há uma pendência de pagamento na assinatura, por isso este recurso está temporariamente indisponível. Regularize o pagamento para voltar a usá-lo.',
-  },
-  suspended: {
-    title: 'Assinatura suspensa',
-    body: 'A assinatura está suspensa e este recurso ficou indisponível. Regularize a assinatura ou fale com o nosso suporte.',
-  },
-  'disabled-by-tenant': {
-    title: 'Recurso desativado',
-    body: 'Este recurso está desativado nas configurações — não é uma questão de plano.',
-  },
-};
-
 /** The two reasons an upgrade honestly fixes. */
 function isUpgradeable(reason: UpsellReason): boolean {
   return reason === 'not-entitled' || reason === 'quota-exceeded';
@@ -78,29 +55,28 @@ function UpgradeCta({
     pending: false,
     error: null,
   });
+  const copy = config.copy.upsell;
   const { requiredPlan } = prompt;
   if (requiredPlan === null) return null;
   if (!config.canRequestPlanChange) {
     return (
       <Text as="div" size="sm" color="secondary" data-testid="upsell-ask-admin">
-        Peça a quem administra a conta para solicitar a mudança de plano.
+        {copy.askAdmin}
       </Text>
     );
   }
   if (state.sent) {
     // Never the raw plan key, not even here: while the commercial name is
-    // still loading the sentence simply drops the clause.
+    // still loading, `requestReceived` gets null and drops the clause.
     return (
       <Alert severity="info" data-testid="upsell-request-sent">
-        {planName === null
-          ? 'Recebemos seu pedido de mudança de plano. Vamos entrar em contato para combinar os detalhes.'
-          : `Recebemos seu pedido para o plano ${planName}. Vamos entrar em contato para combinar os detalhes.`}
+        {copy.requestReceived({ planName })}
       </Alert>
     );
   }
   const ask = (): void => {
     setState({ sent: false, pending: true, error: null });
-    createPlanApi(config.apiBase, config.fetchImpl)
+    createPlanApi(config.apiBase, config.fetchImpl, config.copy.requestFailed)
       .requestPlanChange({ requestedPlan: requiredPlan, feature: prompt.feature })
       .then(
         () => setState({ sent: true, pending: false, error: null }),
@@ -120,7 +96,7 @@ function UpgradeCta({
         </Alert>
       )}
       <Button size="sm" fullWidth disabled={state.pending} data-testid="upsell-cta" onClick={ask}>
-        Quero este plano
+        {copy.requestAction}
       </Button>
     </Stack>
   );
@@ -146,30 +122,47 @@ function LockedElsewhereLink({
   const Link = config.LinkComponent;
   return (
     <Link to={location.path} onClick={onClose} data-testid="upsell-config-link">
-      Abrir {location.label}
+      {config.copy.upsell.openSwitch({ label: location.label })}
     </Link>
   );
 }
 
-function QuotaLine({ quota }: { quota: UpsellPrompt['quota'] }): JSX.Element | null {
+function QuotaLine({
+  quota,
+  config,
+}: {
+  quota: UpsellPrompt['quota'];
+  config: ResolvedWebConfig;
+}): JSX.Element | null {
   if (quota === undefined || typeof quota.limit !== 'number') return null;
   return (
     <Text as="div" size="sm" color="secondary" data-testid="upsell-quota">
-      Você está usando {quota.used} de {quota.limit}.
+      {config.copy.upsell.quotaUsage({ used: quota.used, limit: quota.limit })}
     </Text>
   );
 }
 
 /**
- * "Disponível no plano X." — only once the catalog resolves the COMMERCIAL
- * name: the raw plan key must never face a customer, not even as a loading
- * fallback, and a null `requiredPlan` must never leave "Disponível no plano ".
+ * The pitch line — only once the catalog resolves the COMMERCIAL name: the
+ * raw plan key must never face a customer, not even as a loading fallback,
+ * and a null `requiredPlan` must never leave the pitch dangling around a
+ * blank. The name slot is markup, so the sentence ships as prefix + suffix
+ * around it, each half carrying its own spacing.
  */
-function PlanPitchLine({ planName }: { planName: string | null }): JSX.Element | null {
+function PlanPitchLine({
+  planName,
+  config,
+}: {
+  planName: string | null;
+  config: ResolvedWebConfig;
+}): JSX.Element | null {
   if (planName === null) return null;
+  const { prefix, suffix } = config.copy.upsell.planPitch;
   return (
     <Text as="div" data-testid="upsell-plan-name">
-      Disponível no plano <strong>{planName}</strong>.
+      {prefix}
+      <strong>{planName}</strong>
+      {suffix}
     </Text>
   );
 }
@@ -190,7 +183,7 @@ function UpsellDialogBody({
   const planRead = useRead(() =>
     requiredPlan === null
       ? Promise.resolve(null)
-      : createPlanApi(config.apiBase, config.fetchImpl).getPlan(),
+      : createPlanApi(config.apiBase, config.fetchImpl, config.copy.requestFailed).getPlan(),
   );
   const planName =
     planRead.data?.plan.comparison.find((tier) => tier.key === requiredPlan)?.name ?? null;
@@ -198,9 +191,9 @@ function UpsellDialogBody({
 
   return (
     <Stack spacing={2}>
-      <Text as="div">{COPY[prompt.reason].body}</Text>
-      <QuotaLine quota={prompt.quota} />
-      <PlanPitchLine planName={planName} />
+      <Text as="div">{config.copy.upsell.reasons[prompt.reason].body}</Text>
+      <QuotaLine quota={prompt.quota} config={config} />
+      <PlanPitchLine planName={planName} config={config} />
       {upgradeable ? (
         <UpgradeCta prompt={prompt} planName={planName} config={config} />
       ) : (
@@ -213,7 +206,7 @@ function UpsellDialogBody({
       )}
       {upgradeable && config.plansPath !== null ? (
         <Link to={config.plansPath} onClick={onClose} data-testid="upsell-planos-link">
-          Ver todos os planos
+          {config.copy.upsell.allPlansLink}
         </Link>
       ) : null}
     </Stack>
@@ -236,7 +229,7 @@ export function UpsellPromptHost({ config }: { config: ResolvedWebConfig }): JSX
     <Dialog
       open
       size="sm"
-      title={COPY[prompt.reason].title}
+      title={config.copy.upsell.reasons[prompt.reason].title}
       onClose={close}
       dataTestId="upsell-modal"
     >

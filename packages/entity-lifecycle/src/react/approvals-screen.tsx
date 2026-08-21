@@ -13,37 +13,34 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { ApprovalRequestWire, ApprovalStatusWire, LifecycleApiClient } from './api';
+import type { ApprovalsCopy } from './copy';
 import { DATE_TIME, entityTypeLabel, type EntityTypeLabels } from './labels';
 import { LifecycleHttpError, type LifecycleResult } from './transport';
 
 /**
  * Aprovações (12-17) — the parked-change-request inbox of the
  * entity-lifecycle machinery, ported from the origin host's `pages/approvals`
- * with its test ids and pt-BR copy intact: filter chips (Pendentes /
- * Aprovadas / Rejeitadas); a PENDING row offers "Aprovar" and "Rejeitar"
- * (the reject dialog takes an optional note). A 403 (feature off for the
- * tenant) renders a friendly notice.
+ * with its test ids intact: filter chips (pending / approved / rejected); a
+ * PENDING row offers approve and reject (the reject dialog takes an optional
+ * note). A 403 (feature off for the tenant) renders a friendly notice. Every
+ * sentence comes from the host's {@link ApprovalsCopy}.
  */
 
 /** The status filter chips, in display order. */
-const STATUS_FILTERS: { value: ApprovalStatusWire; label: string }[] = [
-  { value: 'PENDING', label: 'Pendentes' },
-  { value: 'APPROVED', label: 'Aprovadas' },
-  { value: 'REJECTED', label: 'Rejeitadas' },
-];
+const STATUS_ORDER: readonly ApprovalStatusWire[] = ['PENDING', 'APPROVED', 'REJECTED'];
 
-/** pt-BR labels for the request actions. */
-const ACTION_LABELS: Record<ApprovalRequestWire['action'], string> = {
-  CREATE: 'Criação',
-  UPDATE: 'Alteração',
-  DELETE: 'Exclusão',
+/** Wire status → the copy key `statusFilters` and `emptyByStatus` share. */
+const STATUS_COPY_KEYS: Record<ApprovalStatusWire, keyof ApprovalsCopy['statusFilters']> = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
 };
 
-/** Per-status empty-state copy. */
-const EMPTY_LABELS: Record<ApprovalStatusWire, string> = {
-  PENDING: 'Nenhuma solicitação pendente.',
-  APPROVED: 'Nenhuma solicitação aprovada.',
-  REJECTED: 'Nenhuma solicitação rejeitada.',
+/** Wire action → the copy key naming what the request wants to do. */
+const ACTION_COPY_KEYS: Record<ApprovalRequestWire['action'], keyof ApprovalsCopy['actions']> = {
+  CREATE: 'create',
+  UPDATE: 'update',
+  DELETE: 'delete',
 };
 
 interface DecisionActions {
@@ -96,10 +93,12 @@ function useDecisionActions(api: LifecycleApiClient, refetch: () => void): Decis
 /** The reject dialog: optional decision note + confirm. */
 function RejectDialog({
   request,
+  copy,
   onClose,
   onConfirm,
 }: {
   request: ApprovalRequestWire | null;
+  copy: ApprovalsCopy;
   onClose: () => void;
   onConfirm: (note: string) => void;
 }): JSX.Element {
@@ -108,7 +107,7 @@ function RejectDialog({
     <Dialog
       open={request !== null}
       onClose={onClose}
-      title={request ? `Rejeitar "${request.label}"` : 'Rejeitar solicitação'}
+      title={request ? copy.rejectDialogTitle(request.label) : copy.rejectDialogTitleNoTarget}
       size="sm"
       showCloseButton
       dataTestId="approval-reject-dialog"
@@ -116,14 +115,14 @@ function RejectDialog({
       <DialogContent>
         <Stack spacing={2}>
           <Textarea
-            label="Motivo (opcional)"
+            label={copy.rejectNoteLabel}
             value={note}
             onChange={(event) => setNote(event.target.value)}
             dataTestId="approval-reject-note"
           />
           <Stack direction="row" spacing={1} justifyContent="flex-end">
             <Button variant="text" onClick={onClose} dataTestId="approval-reject-cancel">
-              Cancelar
+              {copy.cancelAction}
             </Button>
             <Button
               color="danger"
@@ -133,7 +132,7 @@ function RejectDialog({
               }}
               dataTestId="approval-reject-confirm"
             >
-              Rejeitar
+              {copy.rejectAction}
             </Button>
           </Stack>
         </Stack>
@@ -146,12 +145,16 @@ function RejectDialog({
 function RequestCard({
   request,
   labels,
+  copy,
+  systemActor,
   busy,
   onApprove,
   onReject,
 }: {
   request: ApprovalRequestWire;
   labels: EntityTypeLabels;
+  copy: ApprovalsCopy;
+  systemActor: string;
   busy: boolean;
   onApprove: () => void;
   onReject: () => void;
@@ -165,7 +168,7 @@ function RequestCard({
         <Text variant="heading" size="sm" as="h3">
           {request.label}
         </Text>
-        <Chip label={ACTION_LABELS[request.action]} size="sm" variant="outlined" />
+        <Chip label={copy.actions[ACTION_COPY_KEYS[request.action]]} size="sm" variant="outlined" />
         <Chip
           label={entityTypeLabel(labels, request.entityType)}
           size="sm"
@@ -180,7 +183,7 @@ function RequestCard({
               onClick={onApprove}
               dataTestId={`approval-approve-${request.id}`}
             >
-              Aprovar
+              {copy.approveAction}
             </Button>
             <Button
               variant="outline"
@@ -190,13 +193,13 @@ function RequestCard({
               onClick={onReject}
               dataTestId={`approval-reject-${request.id}`}
             >
-              Rejeitar
+              {copy.rejectAction}
             </Button>
           </>
         )}
       </Stack>
       <Text variant="caption" as="p" color="secondary">
-        Solicitado por {request.requestedByName ?? 'Sistema'} em{' '}
+        {copy.requestedBy(request.requestedByName ?? systemActor)}{' '}
         {DATE_TIME.format(new Date(request.requestedAt))}
       </Text>
       {request.decidedAt && (
@@ -213,12 +216,16 @@ function RequestCard({
 function ApprovalsBody({
   api,
   labels,
+  copy,
+  systemActor,
   status,
   requests,
   refetch,
 }: {
   api: LifecycleApiClient;
   labels: EntityTypeLabels;
+  copy: ApprovalsCopy;
+  systemActor: string;
   status: ApprovalStatusWire;
   requests: ApprovalRequestWire[];
   refetch: () => void;
@@ -230,7 +237,7 @@ function ApprovalsBody({
       {actions.error && (
         <Alert
           variant="danger"
-          title="Não foi possível concluir a decisão"
+          title={copy.decisionFailedTitle}
           description={actions.error}
           closable
           onClose={actions.clearError}
@@ -238,13 +245,15 @@ function ApprovalsBody({
         />
       )}
       {requests.length === 0 ? (
-        <EmptyState title={EMPTY_LABELS[status]} dataTestId="approvals-empty" />
+        <EmptyState title={copy.emptyByStatus[STATUS_COPY_KEYS[status]]} dataTestId="approvals-empty" />
       ) : (
         requests.map((request) => (
           <RequestCard
             key={request.id}
             request={request}
             labels={labels}
+            copy={copy}
+            systemActor={systemActor}
             busy={actions.busyId === request.id}
             onApprove={() => void actions.approve(request)}
             onReject={() => actions.setRejecting(request)}
@@ -253,6 +262,7 @@ function ApprovalsBody({
       )}
       <RejectDialog
         request={actions.rejecting}
+        copy={copy}
         onClose={() => actions.setRejecting(null)}
         onConfirm={(note) => void actions.reject(note)}
       />
@@ -305,9 +315,13 @@ function useApprovalsLoad(api: LifecycleApiClient, status: ApprovalStatusWire): 
 export function ApprovalsScreen({
   api,
   labels,
+  copy,
+  systemActor,
 }: {
   api: LifecycleApiClient;
   labels: EntityTypeLabels;
+  copy: ApprovalsCopy;
+  systemActor: string;
 }): JSX.Element {
   const [status, setStatus] = useState<ApprovalStatusWire>('PENDING');
   const { requests, loadError, refetch } = useApprovalsLoad(api, status);
@@ -318,14 +332,14 @@ export function ApprovalsScreen({
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={1} data-testid="approvals-status-filter">
-        {STATUS_FILTERS.map((filter) => (
+        {STATUS_ORDER.map((value) => (
           <Chip
-            key={filter.value}
-            label={filter.label}
+            key={value}
+            label={copy.statusFilters[STATUS_COPY_KEYS[value]]}
             selectable
-            selected={status === filter.value}
-            onClick={() => setStatus(filter.value)}
-            dataTestId={`approvals-filter-${filter.value}`}
+            selected={status === value}
+            onClick={() => setStatus(value)}
+            dataTestId={`approvals-filter-${value}`}
           />
         ))}
       </Stack>
@@ -333,15 +347,15 @@ export function ApprovalsScreen({
       {featureOff && (
         <Alert
           variant="info"
-          description="O recurso de aprovações não está ativo para esta loja."
+          description={copy.featureOffBody}
           data-testid="approvals-feature-off"
         />
       )}
       {loadError !== null && !featureOff && (
         <ErrorState
-          title="Não foi possível carregar as aprovações"
+          title={copy.loadFailedTitle}
           message={loadError.message}
-          retryLabel="Tentar novamente"
+          retryLabel={copy.retryAction}
           onRetry={refetch}
         />
       )}
@@ -349,6 +363,8 @@ export function ApprovalsScreen({
         <ApprovalsBody
           api={api}
           labels={labels}
+          copy={copy}
+          systemActor={systemActor}
           status={status}
           requests={requests}
           refetch={refetch}

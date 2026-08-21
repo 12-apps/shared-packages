@@ -21,7 +21,6 @@ import { resolveRealtimeDriver } from "./resolve-driver";
 import { createEventStreamResponse } from "./sse";
 import { createTicketSecretResolver, type TicketSecretSource } from "./ticket-secret";
 import {
-  DEFAULT_EVENTS_MESSAGES,
   EventsDenial,
   isEventsDenial,
   type EventsAuthorization,
@@ -92,11 +91,13 @@ export interface EventsServerConfig {
    */
   connectionCap?: number;
   /**
-   * Override the strings this surface puts on the wire. Defaults are today's pt-BR,
-   * unchanged — see {@link EventsMessages}, which explains why they are the contract and
-   * why they are nonetheless overridable.
+   * The strings this surface puts on the wire — REQUIRED, the host's words
+   * (see {@link EventsMessages}). A pt-BR host passes `PT_BR_EVENTS_MESSAGES`
+   * from `./pt-BR`, which is the exact set the origin host's SPAs already
+   * read; requiring it is what turns that choice into a line in the host's
+   * diff instead of a silence.
    */
-  messages?: Partial<EventsMessages>;
+  messages: EventsMessages;
   /** Enable the transactional outbox by saying where its rows live. */
   outbox?: Omit<RealtimeOutboxOptions, "logger">;
   /**
@@ -299,7 +300,7 @@ export function createApiEvents(config: EventsServerConfig): EventsApi {
     ticketSecret: createTicketSecretResolver(config.ticketSecret, logger),
     // Resolved ONCE, and per field, so a host overriding one string keeps the defaults for
     // the other three rather than having to restate the wire contract to change a word.
-    messages: { ...DEFAULT_EVENTS_MESSAGES, ...config.messages },
+    messages: config.messages,
   };
   const outbox = config.outbox ? createRealtimeOutbox({ ...config.outbox, logger }) : null;
   const state = { started: false };

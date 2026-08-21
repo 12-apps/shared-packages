@@ -11,8 +11,12 @@ import type { JSX } from 'react';
 
 import type { EntitlementDecision, EntitlementSnapshot } from '../../core/types';
 import { EntitlementsProvider } from '../context';
+import { PT_BR_ENTITLEMENTS_WEB_COPY } from '../pt-BR';
 import { subscribeToUpsell, type UpsellPrompt } from '../upsell-channel';
-import { withEntitlement } from '../with-entitlement';
+import { createWithEntitlement } from '../with-entitlement';
+
+/** The gate bound the way the factory binds it — to the required lock copy. */
+const withEntitlement = createWithEntitlement(PT_BR_ENTITLEMENTS_WEB_COPY.pageLock);
 
 function snapshotWith(decision: Partial<EntitlementDecision<string>>): EntitlementSnapshot<string> {
   return {

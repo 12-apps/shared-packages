@@ -18,6 +18,7 @@ capability itself does not exist yet and is real design work.
 | report-builder | ✔ | — | want | want | ✔ schemas | ✔ | ✔ | ✔ | ✔ | **S** | reference producer; exposes the working-copy gap |
 | entity-lifecycle | ✔ | — | — | want | ✔ +annot. | ✔ | ✔ | ✔ | ✔ | **S** | already the MCP example |
 | payments-backend | ✔ | ✔ (dead seam) | want | want | schemas | — | ✔ | — | — | **S/M** | blueprints exist, unconsumed |
+| billing | ✔ | want | — | want | — | — | — (host FKs) | — | — | **shipped** | extracted from the origin host; every number, table and sentence is host config |
 | payments-frontend | — | — | — | — | — | — | — | ✔ | ✔ | **S** | slots stay config |
 | jobs | — | n/a (runtime) | — | — | — | — | ✔ | — | — | **S** | consumer-side runtime; `BoundJob` feeds `defineJob` |
 | notifications | ✔ | ✔ | n/a (owns port) | n/a (owns runtime) | — | — | ✔ | ✔ | — | **M** | re-home `EmailDriver` as `EmailPort`; accept blueprints |
@@ -103,6 +104,31 @@ concurrency, lease). Adaptation:
    (order-paid, over/short-payment, reversal, reconnect, billing) — Phase 2+.
 5. Host effect: the origin host deletes `lib/jobs/payments.ts`'s duplicated sweep
    and binds `jobs: { deps }`; `.payments-surface.json` debt shrinks.
+
+### billing (shipped)
+
+`http` (the card-on-file surface: read the cards, open a vault session, finish
+one, remove them all), `observability` under `billing`. Declares **no** `db`
+contribution and will not until subscriptions, cycles and stored instruments
+lose their foreign keys into the adopting host's account table — a package
+partial cannot declare a relation into a table it does not own, which is the
+same graduation rule every other model set is held to.
+
+The interesting half is what the package refused to take. Period arithmetic,
+status ageing, the retry ladder and the billing-to-entitlements mapping were
+all classified `app-specific` in the origin host's payment-surface ledger, each
+with a written reason amounting to *this is our commercial policy*. Every one
+of those reasons survives extraction intact, because the policy is now a
+required argument: the two lifecycle windows, the ladder and its cap, the two
+gate tables, and every sentence the HTTP surface can answer with. A
+`BillingConfigError` at construction is what replaces the defaults — the same
+posture `assertReportBuilderConfig` takes toward host vocabulary.
+
+"want": `jobs` blueprints for the collection tick and the charge attempt, which
+stay in the host today because their handlers reach its notification copy and
+its cycle repository; and a `subscription.charge_failed` notification
+blueprint, which needs the notify port before it can carry anything but a
+type.
 
 ### payments-frontend (S)
 

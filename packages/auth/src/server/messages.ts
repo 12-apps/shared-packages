@@ -66,4 +66,10 @@ export const EMAIL_AUTH_STATUS: Record<EmailAuthFailure, number> = {
   "current-password-required": 400,
   "current-password-invalid": 403,
   "no-account": 200,
+  // 503, not 400: nothing about the request is wrong, the deployment is
+  // missing a provider. It is the one refusal here that is the operator's to
+  // fix rather than the caller's, and a 5xx is what says so — to a monitor as
+  // much as to a person, since a sign-up surface answering 400 forever looks
+  // like users typing badly.
+  "verification-unavailable": 503,
 };

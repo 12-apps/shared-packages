@@ -62,7 +62,7 @@ export function isValidCep(raw: string): boolean {
 
 /** Empty ⇒ valid (optional field); otherwise the value must be a full CEP. */
 export const cep =
-  (message = 'CEP inválido — use o formato 00000-000.'): Validator =>
+  (message: string): Validator =>
   (value) =>
     value.trim() === '' || isValidCep(value) ? undefined : message;
 
@@ -155,7 +155,7 @@ export function isValidCnpj(raw: string): boolean {
 
 /** Empty ⇒ valid (optional field); otherwise the check digits must match. */
 export const cnpj =
-  (message = 'CNPJ inválido — confira os dígitos.'): Validator =>
+  (message: string): Validator =>
   (value) =>
     value.trim() === '' || isValidCnpj(value) ? undefined : message;
 

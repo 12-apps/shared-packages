@@ -329,14 +329,27 @@ describe('composePermissions — labels travel with the ids they label', () => {
   it('merges each source\'s segment words and its per-id overrides', () => {
     const composed = composePermissions(RBAC_PERMISSIONS, LIFECYCLE, DOMAIN);
     expect(composed.labels.domains).toMatchObject({
-      roles: 'Papéis',
       posts: 'Publicações',
+      money: 'Dinheiro',
     });
     expect(composed.labels.actions).toMatchObject({
-      manage: 'Gerenciar',
+      write: 'Editar',
       approve: 'Aprovar',
     });
     expect(composed.labels.permissions).toEqual({ 'posts:read:own': 'Ver os seus' });
+  });
+
+  it('composes no words from this package — its own ride the web copy port', () => {
+    // `RBAC_PERMISSIONS` used to label `roles`/`team` (and `read`/`manage`)
+    // in pt-BR, which shipped one application's voice to every adopter
+    // through this very merge. Those words are now the REQUIRED
+    // `RbacWebCopy.permissionLabels`, so the contribution composes to an
+    // empty vocabulary — if a word ever shows up here again, it is the same
+    // leak and this fails.
+    const { labels } = composePermissions(RBAC_PERMISSIONS);
+    expect(labels.domains).toEqual({});
+    expect(labels.actions).toEqual({});
+    expect(labels.permissions).toEqual({});
   });
 });
 
