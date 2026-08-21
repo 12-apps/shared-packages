@@ -70,12 +70,12 @@ export {
   STORAGE_PROBLEM_STATUS,
   StorageNotConfiguredError,
   StorageProblemError,
-  defaultStorageMessages,
   isStorageProblem,
   type StorageMessageContext,
   type StorageMessages,
   type StorageProblem,
 } from './problems';
+export { PT_BR_STORAGE_MESSAGES, PT_BR_STORAGE_UNAUTHENTICATED } from './pt-BR';
 
 export {
   imageSources,
