@@ -12,7 +12,7 @@ import { Box } from "../../../mui/Box";
 
 import { BaseCard } from "./base-card";
 import { BaseListCard } from "./base-list-card";
-import { queryPedidos, type ServerPage, type ServerRow } from "./pedidos.server";
+import { queryPedidos, type ServerPage, type ServerRow } from "./data-views-table.stories.server";
 import { DataViewsTableBase } from "./DataViewsTableBase";
 import type { BoardConfig } from "./DataViewsBoard";
 import type { DataViewExport } from "./data-views-export";
