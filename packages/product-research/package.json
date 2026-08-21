@@ -6,6 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./jobs": "./src/jobs.ts",
+    "./http": "./src/http/index.ts",
+    "./pt-BR": "./src/pt-BR.ts",
     "./manifest": "./src/manifest/index.ts",
     "./manifest/server": "./src/manifest/server.ts",
     "./package.json": "./package.json"
