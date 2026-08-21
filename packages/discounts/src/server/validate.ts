@@ -5,7 +5,9 @@ import {
   type DiscountTrigger,
   type DiscountType,
 } from "../engine/kinds";
+import type { ComboRequirement } from "../engine/types";
 import type { DiscountsServerCopy } from "./copy";
+import { comboRequirementsForScope, toComboColumns } from "./validate-combo";
 
 /**
  * The write-time rule set for a discount (FUT-244).
@@ -37,6 +39,10 @@ export interface DiscountWriteInput {
   percentOffBp: number | null;
   /** Cents, > 0. Required iff `type === "FIXED_AMOUNT"`. */
   amountOffCents: number | null;
+  /** Cents the matched group costs. Required iff `type === "BUNDLE_PRICE"`. */
+  bundlePriceCents: number | null;
+  /** Free units of the group. Required iff `type === "FREE_UNITS"`. */
+  freeUnits: number | null;
   scope: DiscountScope;
   trigger: DiscountTrigger;
   /** Raw code as typed; normalized here. Required iff `trigger === "CODE"`. */
@@ -53,6 +59,10 @@ export interface DiscountWriteInput {
   categoryIds: readonly string[];
   /** Target menu-item ids — read only when `scope === "ITEM"`. */
   menuItemIds: readonly string[];
+  /** The combo's slots — read only when `scope === "COMBO"`. */
+  comboRequirements: readonly ComboRequirement[];
+  /** Cap on how often one cart may take the combo; null = uncapped. */
+  maxComboApplications: number | null;
 }
 
 /**
@@ -81,7 +91,12 @@ function invalid(field: string, message: string): DiscountValidationError {
   return new DiscountValidationError(field, message);
 }
 
-/** The value half: exactly one of the two columns, inside its legal range. */
+/**
+ * The value half: exactly one of the FOUR value columns, inside its legal
+ * range. The two combo rewards are asserted in `./validate-combo.ts`, which
+ * also refuses them at any scope but `COMBO`; the two that read a plain base
+ * are asserted here.
+ */
 function assertValue(input: DiscountWriteInput, copy: DiscountsServerCopy): void {
   if (input.type === "PERCENTAGE") {
     const bp = input.percentOffBp;
@@ -90,6 +105,7 @@ function assertValue(input: DiscountWriteInput, copy: DiscountsServerCopy): void
     }
     return;
   }
+  if (input.type !== "FIXED_AMOUNT") return;
   const cents = input.amountOffCents;
   if (cents === null || !Number.isInteger(cents) || cents <= 0) {
     throw invalid("amountOff", copy.invalidAmount);
@@ -113,6 +129,9 @@ function assertTrigger(input: DiscountWriteInput, copy: DiscountsServerCopy): st
  * count rows in another table, so a CATEGORY-scoped discount with an empty
  * target list would be accepted by the database and then silently cover
  * NOTHING — a promotion that exists, looks live in the list, and never fires.
+ *
+ * `COMBO` has the same rule against a different table — its slots — and it
+ * lives in `./validate-combo.ts` beside the rest of the combo shape.
  */
 function assertTargets(input: DiscountWriteInput, copy: DiscountsServerCopy): void {
   if (input.scope === "CATEGORY" && input.categoryIds.length === 0) {
@@ -167,6 +186,9 @@ export interface DiscountScalars {
   type: DiscountType;
   percentOffBp: number | null;
   amountOffCents: number | null;
+  bundlePriceCents: number | null;
+  freeUnits: number | null;
+  maxComboApplications: number | null;
   scope: DiscountScope;
   trigger: DiscountTrigger;
   code: string | null;
@@ -179,10 +201,18 @@ export interface DiscountScalars {
   active: boolean;
 }
 
-/** The target ids of one write, de-duplicated and narrowed to the scope. */
+/**
+ * The targets of one write, de-duplicated and narrowed to the scope.
+ *
+ * The combo slots ride here rather than with the scalars because that is what
+ * they ARE: rows in a child table, like the two id arrays beside them, not
+ * columns on the discount row. A store persisting this writes three join
+ * tables and one row.
+ */
 export interface DiscountTargets {
   categoryIds: string[];
   menuItemIds: string[];
+  comboRequirements: ComboRequirement[];
 }
 
 /**
@@ -204,13 +234,16 @@ export function toDiscountScalars(
   assertTargets(input, copy);
   const { startsAt, endsAt } = assertWindow(input, copy);
   assertLimits(input, copy);
+  const combo = toComboColumns(input, copy);
 
-  const isPercentage = input.type === "PERCENTAGE";
   return {
     name: input.name.trim(),
     type: input.type,
-    percentOffBp: isPercentage ? input.percentOffBp : null,
-    amountOffCents: isPercentage ? null : input.amountOffCents,
+    percentOffBp: input.type === "PERCENTAGE" ? input.percentOffBp : null,
+    amountOffCents: input.type === "FIXED_AMOUNT" ? input.amountOffCents : null,
+    bundlePriceCents: combo.bundlePriceCents,
+    freeUnits: combo.freeUnits,
+    maxComboApplications: combo.maxComboApplications,
     scope: input.scope,
     trigger: input.trigger,
     code,
@@ -237,6 +270,8 @@ export interface DiscountWriteBody {
   type: DiscountType;
   percentOffBp?: number | null;
   amountOffCents?: number | null;
+  bundlePriceCents?: number | null;
+  freeUnits?: number | null;
   scope: DiscountScope;
   trigger: DiscountTrigger;
   code?: string | null;
@@ -249,6 +284,8 @@ export interface DiscountWriteBody {
   active: boolean;
   categoryIds?: string[];
   menuItemIds?: string[];
+  comboRequirements?: ComboRequirement[];
+  maxComboApplications?: number | null;
 }
 
 /**
@@ -267,6 +304,8 @@ export function toDiscountWriteInput(body: DiscountWriteBody): DiscountWriteInpu
     type: body.type,
     percentOffBp: orNull(body.percentOffBp),
     amountOffCents: orNull(body.amountOffCents),
+    bundlePriceCents: orNull(body.bundlePriceCents),
+    freeUnits: orNull(body.freeUnits),
     scope: body.scope,
     trigger: body.trigger,
     code: orNull(body.code),
@@ -279,6 +318,8 @@ export function toDiscountWriteInput(body: DiscountWriteBody): DiscountWriteInpu
     active: body.active,
     categoryIds: orEmpty(body.categoryIds),
     menuItemIds: orEmpty(body.menuItemIds),
+    comboRequirements: body.comboRequirements ?? [],
+    maxComboApplications: orNull(body.maxComboApplications),
   };
 }
 
@@ -292,5 +333,6 @@ export function targetsForScope(input: DiscountWriteInput): DiscountTargets {
   return {
     categoryIds: input.scope === "CATEGORY" ? [...new Set(input.categoryIds)] : [],
     menuItemIds: input.scope === "ITEM" ? [...new Set(input.menuItemIds)] : [],
+    comboRequirements: comboRequirementsForScope(input),
   };
 }

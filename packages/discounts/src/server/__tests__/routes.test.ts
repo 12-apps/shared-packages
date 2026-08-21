@@ -194,13 +194,63 @@ describe("POST /discounts", () => {
       body: body({ categoryIds: ["c1"], menuItemIds: ["m1"] }),
     });
     expect(response.status).toBe(200);
-    expect(calls.create[0]?.write.targets).toEqual({ categoryIds: [], menuItemIds: [] });
+    expect(calls.create[0]?.write.targets).toEqual({
+      categoryIds: [],
+      menuItemIds: [],
+      comboRequirements: [],
+    });
     expect(calls.create[0]?.write.scalars).toMatchObject({
       name: "Ten off",
       percentOffBp: 1_000,
       // The other branch's column is forced to NULL rather than passed through.
       amountOffCents: null,
     });
+  });
+
+  it("carries a combo's slots and reward through to the store", async () => {
+    const endpoint = routeFor(fakeStore(calls), "POST", "/discounts");
+    const response = await endpoint.handle({
+      actor: ACTOR,
+      params: {},
+      query: {},
+      body: body({
+        name: "Combo pipoca",
+        type: "BUNDLE_PRICE",
+        percentOffBp: null,
+        bundlePriceCents: 2_500,
+        scope: "COMBO",
+        comboRequirements: [
+          { menuItemIds: ["popcorn-lg"], categoryIds: [], quantity: 1 },
+          { menuItemIds: [], categoryIds: ["drinks"], quantity: 2 },
+        ],
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(calls.create[0]?.write.targets.comboRequirements).toHaveLength(2);
+    expect(calls.create[0]?.write.scalars).toMatchObject({
+      type: "BUNDLE_PRICE",
+      bundlePriceCents: 2_500,
+      // Every column the other three types read is forced to NULL.
+      percentOffBp: null,
+      amountOffCents: null,
+      freeUnits: null,
+    });
+  });
+
+  it("rejects a combo reward on a discount that is not a combo, naming the scope", async () => {
+    const endpoint = routeFor(fakeStore(calls), "POST", "/discounts");
+    const response = await endpoint.handle({
+      actor: ACTOR,
+      params: {},
+      query: {},
+      body: body({ type: "FREE_UNITS", percentOffBp: null, freeUnits: 1 }),
+    });
+    expect(response.status).toBe(422);
+    expect(response.body).toEqual({
+      error: PT_BR_DISCOUNTS_SERVER_COPY.comboScopeRequired,
+      issues: { scope: PT_BR_DISCOUNTS_SERVER_COPY.comboScopeRequired },
+    });
+    expect(calls.create).toEqual([]);
   });
 
   it("de-duplicates the targets it does keep", async () => {

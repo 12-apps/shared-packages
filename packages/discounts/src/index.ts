@@ -12,6 +12,14 @@
  * browser bundle that only prices a cart never resolves it. The wiring
  * manifests are at `@12-apps/discounts/manifest` and `./manifest/server`.
  *
+ * COMBOS (FUT-268) live here too, as a SCOPE rather than as a catalog entity:
+ * a `COMBO`-scoped rule matches quantified slots against the cart's units and
+ * prices the group ("1 large popcorn + 2 sodas for R$ 25", "3 burgers for the
+ * price of 2"). What is NOT here — and cannot be, for the same reason the
+ * database is not — is a combo as a SELLABLE product: its own menu card, its
+ * own cart line, its own order snapshot. That is a host catalog entity with
+ * foreign keys into host tables. The pricing RULE travels; the product does not.
+ *
  * The DATABASE is deliberately NOT here, and the manifest declares no `db`
  * capability. A discount's rows relate to a host's own catalog and orders —
  * targets point at categories and items, redemptions at orders and buyers —
@@ -22,10 +30,13 @@
  */
 
 export {
+  COMBO_ONLY_DISCOUNT_TYPES,
   DISCOUNT_REJECTION_REASONS,
   DISCOUNT_SCOPES,
   DISCOUNT_TRIGGERS,
   DISCOUNT_TYPES,
+  MAX_COMBO_SLOTS,
+  MAX_COMBO_SLOT_QUANTITY,
   MAX_PERCENT_OFF_BP,
   MIN_PAYABLE_TOTAL_CENTS,
   normalizeDiscountCode,
@@ -37,6 +48,7 @@ export {
 
 export type {
   AppliedDiscount,
+  ComboRequirement,
   DiscountCartLine,
   DiscountEvaluation,
   DiscountEvaluationInput,
@@ -52,6 +64,31 @@ export {
   type ItemDiscountPreview,
   type ItemDiscountPreviewInput,
 } from "./engine/preview";
+
+/**
+ * The COMBO half of the catalog surface (FUT-268). A combo has no single-item
+ * price to badge, so a card advertises PARTICIPATION instead — see
+ * `./engine/combo-offer.ts` for why that is the only honest thing a card can
+ * say about one.
+ */
+export {
+  comboOffersForItem,
+  type ComboOffer,
+  type ComboOffersInput,
+} from "./engine/combo-offer";
+
+/**
+ * The combo matcher, exported because a host that wants to EXPLAIN a combo —
+ * "aplicado 2x", "faltam 2 refrigerantes" — needs the same match the evaluator
+ * priced, and re-deriving it host-side is how a receipt and a cart start
+ * disagreeing about what was in the bundle.
+ */
+export {
+  freshComboPool,
+  matchCombo,
+  type ComboMatch,
+  type ComboPool,
+} from "./engine/combo-match";
 
 export {
   discountRejectionMessage,

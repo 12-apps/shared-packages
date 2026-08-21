@@ -40,6 +40,22 @@ export interface DiscountsServerCopy {
   readonly invalidUsageLimit: string;
   /** 422 — a per-buyer redemption cap of zero or less. */
   readonly invalidPerBuyerLimit: string;
+  /** 422 — a BUNDLE_PRICE or FREE_UNITS reward on a discount that is not a combo. */
+  readonly comboScopeRequired: string;
+  /** 422 — a combo with no slots at all, or more than `MAX_COMBO_SLOTS`. */
+  readonly invalidComboSlots: string;
+  /** 422 — a combo slot naming neither a product nor a category. */
+  readonly comboTargetRequired: string;
+  /** 422 — a slot asking for zero units, or more than `MAX_COMBO_SLOT_QUANTITY`. */
+  readonly invalidComboQuantity: string;
+  /** 422 — a BUNDLE_PRICE combo without a positive price in cents. */
+  readonly invalidBundlePrice: string;
+  /** 422 — a FREE_UNITS combo without a positive count of free units. */
+  readonly invalidFreeUnits: string;
+  /** 422 — a combo giving away every unit it asks for, which sells nothing. */
+  readonly freeUnitsExceedCombo: string;
+  /** 422 — a per-cart combo cap of zero or less. */
+  readonly invalidMaxComboApplications: string;
 }
 
 const COPY_KEYS: readonly (keyof DiscountsServerCopy)[] = [
@@ -55,6 +71,14 @@ const COPY_KEYS: readonly (keyof DiscountsServerCopy)[] = [
   "invalidMinSubtotal",
   "invalidUsageLimit",
   "invalidPerBuyerLimit",
+  "comboScopeRequired",
+  "invalidComboSlots",
+  "comboTargetRequired",
+  "invalidComboQuantity",
+  "invalidBundlePrice",
+  "invalidFreeUnits",
+  "freeUnitsExceedCombo",
+  "invalidMaxComboApplications",
 ];
 
 /** Every key present and non-blank — checked at assembly, like the rest. */

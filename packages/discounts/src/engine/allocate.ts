@@ -22,14 +22,29 @@ import type { DiscountRule } from "./types";
  * drifting negative. `FIXED_AMOUNT` is clamped to the base, so "R$ 20 off" on a
  * base of R$ 12 removes R$ 12 and never issues a credit. A result of 0 means
  * the discount must NOT be applied — an `R$ 0,00` line is not a promotion.
+ *
+ * The two COMBO reward types return 0 here, and that is deliberate rather than
+ * a gap: `BUNDLE_PRICE` and `FREE_UNITS` are not functions of a base at all.
+ * One needs to know which UNITS the combo matched (the cheapest of them are the
+ * free ones) and the other needs to know how many TIMES it matched, and a
+ * single `baseCents` has thrown both facts away. `applicationReward` in
+ * `./combo-match.ts` is where they are computed, per application, and it calls
+ * back into this function for the two types that ARE a function of a base.
+ *
+ * Returning 0 rather than throwing keeps the failure the safe one: a combo
+ * reward that somehow reached this path removes nothing, which the evaluator
+ * reports as `ZERO_VALUE`, instead of a wrong number reaching a charge.
  */
 export function rawAmountCents(rule: DiscountRule, baseCents: number): number {
   if (baseCents <= 0) return 0;
-  const raw =
-    rule.type === "PERCENTAGE"
-      ? Math.floor((baseCents * (rule.percentOffBp ?? 0)) / MAX_PERCENT_OFF_BP)
-      : (rule.amountOffCents ?? 0);
-  return Math.max(0, Math.min(raw, baseCents));
+  if (rule.type === "PERCENTAGE") {
+    const raw = Math.floor((baseCents * (rule.percentOffBp ?? 0)) / MAX_PERCENT_OFF_BP);
+    return Math.max(0, Math.min(raw, baseCents));
+  }
+  if (rule.type === "FIXED_AMOUNT") {
+    return Math.max(0, Math.min(rule.amountOffCents ?? 0, baseCents));
+  }
+  return 0;
 }
 
 /**
