@@ -4,7 +4,6 @@ import type {
   Shift,
   ShiftAuditInput,
   ShiftDb,
-  ShiftKind,
   ShiftListInput,
   ShiftPage,
   ShiftTransaction,
@@ -101,7 +100,7 @@ function createQuery(state: MemoryState) {
       );
       return shift ? cloneShift(shift) : null;
     },
-    async listOpenShifts(clientId: string, kind?: ShiftKind): Promise<Shift[]> {
+    async listOpenShifts(clientId: string, kind?: string): Promise<Shift[]> {
       return state.shifts
         .filter(
           (row) =>

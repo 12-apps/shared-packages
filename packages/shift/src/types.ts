@@ -1,41 +1,27 @@
 import type { ShiftErrorCode } from './errors';
-
-export const SHIFT_KINDS = ['kitchen', 'service'] as const;
-export type ShiftKind = (typeof SHIFT_KINDS)[number];
+import type { ShiftKindTuple } from './vocabulary';
 
 export const SHIFT_END_REASONS = ['user', 'supervisor', 'auto'] as const;
 export type ShiftEndReason = (typeof SHIFT_END_REASONS)[number];
 
 /**
- * The `ResourceAssignment.resourceType` a kitchen-station claim is stored under.
+ * A shift's `kind` is a plain string HERE, on purpose.
  *
- * It must equal the NAMESPACE of the action whose entity gate reads it, because
- * a host's RBAC point check derives the resource type from the action prefix
- * (`kitchen:read:station` -> `kitchen`). Spelling it `kitchen-stations` — the
- * admin CRUD surface's name — made `can(cook, 'kitchen:read:station', station)`
- * look up a type nothing was ever written under, so an open kitchen shift
- * granted nothing.
+ * This package used to export a two-entry union naming the staff structure of
+ * the application it was extracted from, and validate against it. Those values
+ * were never facts about work periods, and a union is the worst shape for such
+ * a value to take: it reaches an adopter's generated types and its published
+ * wire contract, where removing it is a breaking change rather than a setting.
+ *
+ * A host declares its own kinds and passes them to `createShiftService`, which
+ * narrows the input side to them (see {@link ShiftServiceOptions}). The READ
+ * side stays `string`, because a row is whatever the column holds: a host that
+ * wants its union back on the way out narrows explicitly, with the guard
+ * `defineShiftVocabulary` returns.
+ *
+ * This is what `resourceType` and `resourceId` have always done — the same
+ * class of value, carried by value, with the host owning what the values mean.
  */
-export const KITCHEN_STATIONS_RESOURCE_TYPE = 'kitchen';
-
-/**
- * The `ResourceAssignment.resourceType` a dining-room SECTOR claim is stored
- * under (FUT-450/452), written when a waiter opens a `service` shift.
- *
- * Note this deliberately does NOT follow the rule above, and the difference is
- * the point. A station claim is stored under the namespace of the action that
- * reads it (`kitchen:read:station` -> `kitchen`) because the claim and the
- * question are about the same thing. A sector claim is not: the rows carry
- * SECTOR ids, but the question asked of them is `tables:read:assigned` — about
- * MESAS. Storing them under `tables` would put a sector id in a column every
- * other reader treats as a mesa id.
- *
- * So the rows say what they are, and the host's `assignmentResolver` expands
- * them into the mesa ids the question is about. Keeping the storage honest is
- * what lets that expansion be a live query, which is in turn what makes a mesa
- * moved between sectors mid-shift take effect on the waiter's next request.
- */
-export const SECTORS_RESOURCE_TYPE = 'sectors';
 
 export interface ShiftResource {
   type: string;
@@ -47,7 +33,7 @@ export interface Shift {
   id: string;
   clientId: string;
   userId: string;
-  kind: ShiftKind;
+  kind: string;
   startedAt: Date;
   endedAt: Date | null;
   endedReason: ShiftEndReason | null;
@@ -77,10 +63,10 @@ export interface ShiftAuditInput {
   after: Record<string, string | null>;
 }
 
-export interface OpenShiftInput {
+export interface OpenShiftInput<Kind extends string = string> {
   clientId: string;
   userId: string;
-  kind: ShiftKind;
+  kind: Kind;
   actorUserId: string;
   resource?: ShiftResource;
   startedAt?: Date;
@@ -108,10 +94,10 @@ export interface ForceCloseShiftInput {
   endedAt?: Date;
 }
 
-export interface ShiftListInput {
+export interface ShiftListInput<Kind extends string = string> {
   clientId: string;
   userId?: string;
-  kind?: ShiftKind;
+  kind?: Kind;
   from?: Date;
   to?: Date;
   cursor?: string;
@@ -126,7 +112,7 @@ export interface ShiftPage {
 export interface ShiftQuery {
   getShift(clientId: string, shiftId: string): Promise<Shift | null>;
   getOpenShift(clientId: string, userId: string): Promise<Shift | null>;
-  listOpenShifts(clientId: string, kind?: ShiftKind): Promise<Shift[]>;
+  listOpenShifts(clientId: string, kind?: string): Promise<Shift[]>;
   listShifts(
     input: Required<Pick<ShiftListInput, 'clientId' | 'limit'>> &
       Omit<ShiftListInput, 'clientId' | 'limit'>,
@@ -189,7 +175,19 @@ export interface ShiftDb extends ShiftQuery {
   isUniqueViolation(error: unknown, constraint: ShiftUniqueConstraint): boolean;
 }
 
-export interface ShiftServiceOptions {
+export interface ShiftServiceOptions<Kinds extends ShiftKindTuple = ShiftKindTuple> {
+  /**
+   * The kinds of shift this host works in — REQUIRED, and the reason this
+   * package no longer names any.
+   *
+   * There is deliberately no default. A default would be one application's
+   * staff structure wearing the word "default", and the failure mode is
+   * silence: the next host inherits it, every type checks, every test passes,
+   * and the wrong vocabulary reaches production in that host's own API. Pass an
+   * `as const` tuple and the service's input side narrows to exactly these
+   * values.
+   */
+  kinds: Kinds;
   now?: () => Date;
   createId?: () => string;
 }
@@ -217,13 +215,13 @@ export interface AutoCloseResult {
   failures: AutoCloseFailure[];
 }
 
-export interface ShiftService {
-  openShift(input: OpenShiftInput): Promise<Shift>;
+export interface ShiftService<Kind extends string = string> {
+  openShift(input: OpenShiftInput<Kind>): Promise<Shift>;
   closeOwnShift(input: CloseOwnShiftInput): Promise<Shift>;
   forceCloseShift(input: ForceCloseShiftInput): Promise<Shift>;
   getShift(input: { clientId: string; shiftId: string }): Promise<Shift | null>;
   getOpenShift(input: { clientId: string; userId: string }): Promise<Shift | null>;
-  listOpenShifts(input: { clientId: string; kind?: ShiftKind }): Promise<Shift[]>;
-  listShifts(input: ShiftListInput): Promise<ShiftPage>;
+  listOpenShifts(input: { clientId: string; kind?: Kind }): Promise<Shift[]>;
+  listShifts(input: ShiftListInput<Kind>): Promise<ShiftPage>;
   autoCloseOverdue(input: AutoCloseInput): Promise<AutoCloseResult>;
 }

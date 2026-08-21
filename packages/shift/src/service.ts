@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { autoCloseOverdue, type CloseStoredShift } from './auto-close';
 import { ShiftError } from './errors';
+import { defineShiftVocabulary, type ShiftKindTuple, type ShiftVocabulary } from './vocabulary';
 import type {
   AutoCloseInput,
   AutoCloseResult,
@@ -101,12 +102,22 @@ function validateStartedAt(startedAt: Date | undefined, now: Date): void {
   }
 }
 
-function validateOpenInput(input: OpenShiftInput, now: Date): void {
+function validateOpenInput(
+  input: OpenShiftInput,
+  vocabulary: ShiftVocabulary,
+  now: Date,
+): void {
   requireText(input.clientId, 'clientId');
   requireText(input.userId, 'userId');
   requireText(input.actorUserId, 'actorUserId');
-  if (input.kind !== 'kitchen' && input.kind !== 'service') {
-    throw new ShiftError('INVALID_SHIFT', `Unknown shift kind: ${String(input.kind)}.`);
+  // Against the HOST's declared kinds. This used to be two literals — the same
+  // claim the dropped CHECK constraint made in SQL, that this package knows
+  // what work an adopter does.
+  if (!vocabulary.has(input.kind)) {
+    throw new ShiftError(
+      'INVALID_SHIFT',
+      `Unknown shift kind: ${String(input.kind)}. Declared kinds: ${vocabulary.kinds.join(', ')}.`,
+    );
   }
   if (input.resource) {
     requireText(input.resource.type, 'resource.type');
@@ -265,10 +276,11 @@ function openClock(input: OpenShiftInput, now: Date): OpenClock {
 async function openStoredShift(
   db: ShiftDb,
   input: OpenShiftInput,
+  vocabulary: ShiftVocabulary,
   now: Date,
   createId: CreateId,
 ): Promise<Shift> {
-  validateOpenInput(input, now);
+  validateOpenInput(input, vocabulary, now);
   const clock = openClock(input, now);
   try {
     return await db.transaction((tx) => persistOpenShift(tx, input, clock, createId));
@@ -328,14 +340,27 @@ function createCloseStoredShift(db: ShiftDb, now: () => Date): CloseStoredShift 
   };
 }
 
-export function createShiftService(db: ShiftDb, options: ShiftServiceOptions = {}): ShiftService {
+/**
+ * The service, over a host's own vocabulary.
+ *
+ * `options` is REQUIRED because `options.kinds` is: there is no shift kind this
+ * package could supply that would not be some other application's. Passing an
+ * `as const` tuple narrows every input on the returned service to exactly those
+ * kinds, so a host keeps the compile-time safety the removed union used to give
+ * it — over its own words.
+ */
+export function createShiftService<const Kinds extends ShiftKindTuple>(
+  db: ShiftDb,
+  options: ShiftServiceOptions<Kinds>,
+): ShiftService<Kinds[number]> {
   const now = options.now ?? (() => new Date());
   const createId = options.createId ?? randomUUID;
+  const vocabulary = defineShiftVocabulary(options.kinds);
   const closeShift = createCloseStoredShift(db, now);
 
   return {
     openShift(input) {
-      return openStoredShift(db, input, now(), createId);
+      return openStoredShift(db, input, vocabulary, now(), createId);
     },
     closeOwnShift(input: CloseOwnShiftInput) {
       requireText(input.userId, 'userId');
@@ -362,7 +387,7 @@ export function createShiftService(db: ShiftDb, options: ShiftServiceOptions = {
     listOpenShifts(input) {
       return db.listOpenShifts(input.clientId, input.kind);
     },
-    listShifts(input: ShiftListInput): Promise<ShiftPage> {
+    listShifts(input: ShiftListInput<Kinds[number]>): Promise<ShiftPage> {
       return db.listShifts({ ...input, limit: normalizePageSize(input.limit) });
     },
     autoCloseOverdue(input: AutoCloseInput): Promise<AutoCloseResult> {
