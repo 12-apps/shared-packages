@@ -101,6 +101,12 @@ export interface DiscountsFormCopy {
   /** The example inside the empty percentage input. */
   readonly percentPlaceholder: string;
   readonly amountOff: string;
+  /** The combo's total price, shown only for a BUNDLE_PRICE rule. */
+  readonly bundlePrice: string;
+  /** How many of the matched units are given away, for a FREE_UNITS rule. */
+  readonly freeUnits: string;
+  /** Under it: what "leve 3 pague 2" means in this rule's own numbers. */
+  readonly freeUnitsHint: string;
   readonly trigger: string;
   readonly code: string;
   /** The example inside the empty coupon input. */
@@ -111,6 +117,9 @@ export interface DiscountsFormCopy {
   readonly minSubtotal: string;
   readonly usageLimit: string;
   readonly perBuyerLimit: string;
+  /** How many times ONE cart may claim the combo. Blank = as often as it fits. */
+  readonly maxComboApplications: string;
+  readonly maxComboApplicationsHint: string;
   readonly active: string;
   readonly activeHint: string;
   readonly stackable: string;
@@ -123,10 +132,57 @@ export interface DiscountsFormCopy {
   readonly nameRequired: string;
   readonly invalidPercent: string;
   readonly invalidAmount: string;
+  readonly invalidBundlePrice: string;
+  readonly invalidFreeUnits: string;
+  /**
+   * "Take 3, three free" is a giveaway, not a promotion — the free count has to
+   * be smaller than what one application takes out of the cart. `{units}` is
+   * that number, so the operator is told the ceiling rather than just refused.
+   */
+  readonly freeUnitsExceedCombo: string;
   readonly codeRequired: string;
   readonly categoryTargetRequired: string;
   readonly itemTargetRequired: string;
+  /** COMBO scope with no groups: there is nothing for the reward to apply to. */
+  readonly comboSlotsRequired: string;
+  /** A group naming nothing can never be filled, so the combo never fires. */
+  readonly comboSlotTargetRequired: string;
+  readonly invalidComboQuantity: string;
+  readonly invalidMaxComboApplications: string;
   readonly endsBeforeStarts: string;
+}
+
+/**
+ * The combo builder — the "2 refrigerantes + 2 hambúrgueres + 2 batatas" half
+ * of a promotion (FUT-268).
+ *
+ * A combo is a list of GROUPS, each a quantity and the rows that can fill it,
+ * and the reward is whichever value the type asks for. So this group covers the
+ * builder's chrome; the reward's own input is a `form` key beside the other
+ * value fields, because to the operator it is one.
+ */
+export interface DiscountsComboCopy {
+  /** The section heading over the group list. */
+  readonly title: string;
+  /** One sentence saying what a group is, in the merchant's terms. */
+  readonly hint: string;
+  /** The button that appends a group. */
+  readonly addSlot: string;
+  /** The accessible name of one group's remove control. `{position}`. */
+  readonly removeSlot: string;
+  /** One group's heading. `{position}` is 1-based — an operator counts from 1. */
+  readonly slot: string;
+  /** The units this group takes. */
+  readonly quantity: string;
+  /** The group's picker label, `{collection}` — the registration's own label. */
+  readonly pick: string;
+  /** Shown when COMBO is chosen and no group exists yet. */
+  readonly empty: string;
+  /**
+   * The offer read back in the operator's own numbers, so a combo can be
+   * checked without saving it. `{units}` and `{groups}`.
+   */
+  readonly summary: string;
 }
 
 /** The target pickers, and what an empty selection says. */
@@ -185,6 +241,7 @@ export interface DiscountsWebCopy {
   readonly labels: DiscountsVocabularyCopy;
   readonly window: DiscountsWindowCopy;
   readonly form: DiscountsFormCopy;
+  readonly combo: DiscountsComboCopy;
   readonly targets: DiscountsTargetCopy;
   readonly actions: DiscountsActionsCopy;
   readonly card: DiscountsCardCopy;

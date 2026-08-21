@@ -30,6 +30,8 @@ function Harness({ scope, groups }: { scope: string; groups: typeof STORY_GROUPS
         selection={{
           categoryIds,
           menuItemIds,
+          comboRequirements: [],
+          onComboRequirementsChange: () => {},
           onCategoryIdsChange: setCategoryIds,
           onMenuItemIdsChange: setMenuItemIds,
         }}
