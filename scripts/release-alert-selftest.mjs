@@ -139,6 +139,10 @@ async function alert({ plan, issues = [], env = {}, createStatus = 201 }) {
         PATH: `${bin}:${process.env.PATH}`,
         PUBLISH_DIRS: dirs.join(" "),
         FAKE_PLAN: planFile,
+        // No waiting: the re-read schedule that rules out npm's propagation lag
+        // is minutes long (lib/release-state.mjs), which is right in CI and
+        // would make this suite unrunnable.
+        RELEASE_ABSENCE_RECHECK_MS: "",
         GITHUB_API_URL: `http://127.0.0.1:${port}`,
         GITHUB_REPOSITORY: "12-apps/shared-packages",
         GITHUB_TOKEN: "selftest-token",

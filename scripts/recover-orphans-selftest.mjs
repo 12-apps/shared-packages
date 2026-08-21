@@ -73,14 +73,25 @@ process.exit(0);
 
 /** An `npm view` that answers from the plan; a missing `versions` means "not on the registry". */
 const FAKE_NPM = `#!/usr/bin/env node
-const { readFileSync } = require("node:fs");
+const { existsSync, readFileSync, writeFileSync } = require("node:fs");
 const plan = JSON.parse(readFileSync(process.env.FAKE_PLAN, "utf8"));
 const args = process.argv.slice(2);
 if (args[0] === "view") {
   const pkg = args[1].replace(/^@selftest\\//, "");
   const entry = plan[pkg];
   if (!entry || !entry.versions) process.exit(1);
-  process.stdout.write(JSON.stringify(entry.versions));
+  // \`lateVersion\` is npm's read-after-write lag: accepted, not yet served.
+  // The first \`lateAfter\` reads answer without it; later reads include it.
+  let versions = entry.versions;
+  if (entry.lateVersion) {
+    const counts = existsSync(process.env.FAKE_NPM_CALLS)
+      ? JSON.parse(readFileSync(process.env.FAKE_NPM_CALLS, "utf8"))
+      : {};
+    counts[pkg] = (counts[pkg] || 0) + 1;
+    writeFileSync(process.env.FAKE_NPM_CALLS, JSON.stringify(counts));
+    if (counts[pkg] > (entry.lateAfter || 1)) versions = [...versions, entry.lateVersion];
+  }
+  process.stdout.write(JSON.stringify(versions));
 }
 process.exit(0);
 `;
@@ -131,8 +142,10 @@ async function recover({ plan, hasRelease = true, pushFails = false, tagPushFail
   const { root, bin, dirs } = workspace(Object.keys(plan));
   const planFile = join(root, "plan.json");
   const gitCalls = join(root, "git.log");
+  const npmCalls = join(root, "npm-calls.json");
   writeFileSync(planFile, JSON.stringify(plan));
   writeFileSync(gitCalls, "");
+  writeFileSync(npmCalls, "{}");
 
   const { server, calls } = githubStub(hasRelease);
   const port = await listen(server);
@@ -147,6 +160,10 @@ async function recover({ plan, hasRelease = true, pushFails = false, tagPushFail
         PUBLISH_DIRS: dirs.join(" "),
         FAKE_PLAN: planFile,
         FAKE_GIT_CALLS: gitCalls,
+        FAKE_NPM_CALLS: npmCalls,
+        // No waiting unless a case asks for it: the real schedule is minutes
+        // long (lib/release-state.mjs), which is right in CI and unrunnable here.
+        RELEASE_ABSENCE_RECHECK_MS: "",
         FAKE_PUSH_FAILS: pushFails ? "1" : "0",
         FAKE_TAG_PUSH_FAILS: tagPushFails ? "1" : "0",
         GITHUB_API_URL: `http://127.0.0.1:${port}`,
@@ -336,6 +353,43 @@ check(
     !untaggedOff.git.some((call) => /^tag scope-v/.test(call)) &&
     /no scope-v\* tag/.test(untaggedOff.output),
   `the escape hatch must cover both repairs, or turning it off still mutates\n    the repository. Output:\n    ${untaggedOff.output}\n    git saw:\n    ${untaggedOff.git.join("\n    ")}`,
+);
+
+// ── The registry's read-after-write lag, against the script that DELETES ────
+//
+// npm answers `publish` with `ok` before it serves the version, so a read taken
+// straight afterwards is honestly, temporarily wrong — @12-apps/feature-flags
+// was called stuck twice in one night over versions npm served minutes later.
+// Here that answer is not a wrong report but a deletion: the tag of a PUBLISHED
+// version goes, semantic-release re-cuts a version npm already has, publish.mjs
+// says "skipped", and the package silently stops releasing. It is the HEALTHY
+// case above reached through a slow registry, and one read cannot tell them apart.
+const propagating = await recover({
+  plan: { auth: { tag: "auth-v1.22.0", versions: ["1.21.0"], lateVersion: "1.22.0" } },
+  env: { RELEASE_ABSENCE_RECHECK_MS: "1,1,1" },
+});
+
+check(
+  "a tag whose version arrives on a re-read is left alone",
+  propagating.deletedTags.length === 0 && propagating.deletedLocal.length === 0,
+  `deleting it re-cuts a PUBLISHED version, npm refuses it, and the package stops shipping while every step reports success. git saw:\n    ${propagating.git.join("\n    ")}`,
+);
+
+check(
+  "and its GitHub Release survives too",
+  propagating.deletedReleases.length === 0,
+  `it carries the notes for a version that IS on the registry. API saw:\n    ${JSON.stringify(propagating.api)}`,
+);
+
+// Patience must not become blindness: a tag whose version never arrives is the
+// orphan this script exists for, and still has to go.
+const stillAbsent = await recover({ plan: ORPHAN, env: { RELEASE_ABSENCE_RECHECK_MS: "1,1,1" } });
+
+check(
+  "a version that never arrives is still recovered after the re-reads",
+  stillAbsent.deletedTags.some((call) => call.includes("auth-v1.22.0")),
+  `waiting removes false orphans, not real ones — a real one left in place is\n    ` +
+    `the four-day auth-v1.22.0 outage again. git saw:\n    ${stillAbsent.git.join("\n    ")}`,
 );
 
 if (failures.length > 0) {
