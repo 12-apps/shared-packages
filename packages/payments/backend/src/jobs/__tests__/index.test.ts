@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { StoredCharge } from '../../core/ports';
 import type { ChargeSnapshot, MerchantRef } from '../../core/types';
 import {
+  PAYMENTS_JOBS,
   PAYMENTS_SWEEP_QUEUE,
   paymentsJobBlueprints,
   RECONCILE_CRON,
@@ -87,7 +88,24 @@ describe('paymentsJobBlueprints', () => {
       queue: PAYMENTS_SWEEP_QUEUE,
       concurrency: 1,
       schedule: { pattern: RECONCILE_CRON },
+      // The rest of the policy the origin host used to state by hand: never
+      // queue-retried (the next tick IS the retry), and one pass may hold the
+      // single-flight name for the cadence itself.
+      attempts: 1,
+      lease: { ttlMs: 5 * 60_000 },
     });
+  });
+
+  it('exposes the SAME declaration as a wiring jobs contribution', () => {
+    // Namespace plus blueprints — the shape `@12-apps/wiring` binds. The
+    // contract itself cannot be imported here (payments/no-host-imports), so
+    // this pins identity and the wiring suite's payments-manifest.test.ts
+    // runs the producer assertions one package over.
+    expect(PAYMENTS_JOBS.namespace).toBe('payments');
+    expect(PAYMENTS_JOBS.blueprints.reconcilePending).toBe(
+      PAYMENTS_JOBS.blueprints.reconcilePending,
+    );
+    expect(PAYMENTS_JOBS.blueprints.reconcilePending.name).toBe('reconcile-pending');
   });
 
   it('names the same sweep queue `@12-apps/jobs` exports as SWEEP_QUEUE', () => {

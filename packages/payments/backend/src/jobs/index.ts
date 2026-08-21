@@ -75,6 +75,14 @@ export interface PaymentsJobBlueprint<TPayload = void> {
   queue?: string;
   concurrency?: number;
   schedule?: { pattern: string; timezone?: string };
+  /** Total tries. `1` means the next scheduled tick IS the retry. */
+  attempts?: number;
+  /**
+   * Single-flight fence: a runner that can hold leases takes the name for
+   * `ttlMs` before running, and a tick that finds it held skips silently.
+   * Concurrency alone bounds one process; the lease bounds ALL of them.
+   */
+  lease?: { ttlMs: number };
   handle: (
     payload: TPayload,
     deps: PaymentsJobDeps,
@@ -109,6 +117,13 @@ const reconcilePending: PaymentsJobBlueprint = {
   queue: PAYMENTS_SWEEP_QUEUE,
   concurrency: 1,
   schedule: { pattern: RECONCILE_CRON },
+  // Never retried by the queue: the handler never throws (see below), and the
+  // next five-minute tick re-finds everything from durable state anyway.
+  attempts: 1,
+  // One pass may hold the single-flight name for up to five minutes — the
+  // cadence itself. The origin host stated this by hand for as long as it was
+  // the only host with a sweep; it is the sweep's own claim.
+  lease: { ttlMs: 5 * 60_000 },
   handle: async (_payload, deps, context) => {
     const report = await reconcilePendingCharges(deps, {
       now: (deps.now ?? (() => new Date()))(),
@@ -134,3 +149,21 @@ export function paymentsJobBlueprints(): {
 } {
   return { reconcilePending };
 }
+
+/**
+ * The same declaration as a `@12-apps/wiring` jobs contribution — namespace
+ * plus blueprints — so a wiring host binds it through `adoptServer` instead
+ * of hand-wiring `defineJobModule`.
+ *
+ * UNTYPED on purpose: `payments/no-host-imports` allows no `@12-apps/wiring`
+ * import here, type-only included — this package must vendor into a repo
+ * that has neither the job library nor the wiring contract. The blueprint
+ * shape is the structural twin the file header describes, and the wiring
+ * suite's `payments-manifest.test.ts` runs the producer assertions over this
+ * value along the dependency edge that DOES exist — the jobs-manifest move,
+ * one package over.
+ */
+export const PAYMENTS_JOBS = {
+  namespace: 'payments',
+  blueprints: { reconcilePending },
+} as const;
