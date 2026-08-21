@@ -53,7 +53,7 @@ export class OnboardingApiError extends Error {
   }
 }
 
-/** Every user-facing string, pt-BR by default and overridable per host. */
+/** Every user-facing string — REQUIRED host config; pt-BR ships as `./pt-BR`. */
 export interface OnboardingMessages {
   /** `reset` refused because the deployment is not a development one. */
   resetUnavailable: string;
@@ -63,16 +63,8 @@ export interface OnboardingMessages {
   unknownFeature: string;
 }
 
-const DEFAULT_MESSAGES: OnboardingMessages = {
-  // pt-BR, verbatim from the origin host's route (product copy never gets
-  // "translated" while tidying code).
-  resetUnavailable: "Reset de onboarding indisponível em produção.",
-  invalidOperation: "Operação de onboarding inválida.",
-  unknownFeature: "Recurso de onboarding desconhecido.",
-};
-
 export function messagesOf(config: OnboardingServerConfig): OnboardingMessages {
-  return { ...DEFAULT_MESSAGES, ...config.messages };
+  return config.messages;
 }
 
 export interface OnboardingServerConfig {
@@ -96,7 +88,13 @@ export interface OnboardingServerConfig {
    */
   resetEnabled?: () => boolean;
   /** Override any user-facing string (pt-BR defaults). */
-  messages?: Partial<OnboardingMessages>;
+  /**
+   * The refusal sentences this surface answers with — REQUIRED, the host's
+   * words. A pt-BR host passes `PT_BR_ONBOARDING_MESSAGES` from `./pt-BR`,
+   * which is verbatim what the origin host's route said; requiring it turns
+   * that choice into a line in the host's diff instead of a silence.
+   */
+  messages: OnboardingMessages;
 }
 
 /** The `{ data }` success envelope (the report-builder / rbac house shape). */

@@ -2,6 +2,7 @@
    which builds a FRESH in-memory store per case; the rule matches the identifier
    across the file rather than its scope. */
 import { describe, expect, it } from "vitest";
+import { PT_BR_ONBOARDING_MESSAGES } from "../server/pt-BR";
 
 import { createApiOnboarding } from "../server/create-api-onboarding";
 import type { OnboardingRoute } from "../server/context";
@@ -43,6 +44,7 @@ function harness(options?: {
 }): Harness {
   const db = fakeOnboardingDb();
   const api = createApiOnboarding({
+    messages: PT_BR_ONBOARDING_MESSAGES,
     db: async () => db,
     ...(options?.featureKeys ? { featureKeys: options.featureKeys } : {}),
     ...(options?.resetEnabled ? { resetEnabled: options.resetEnabled } : {}),
@@ -70,7 +72,7 @@ function snapshotOf(body: unknown): OnboardingStateSnapshot | null {
 describe("routes — the surface's own contract", () => {
   it("mounts GET and PATCH on the same path, in that order", () => {
     // The packaged store builds these URLs; the SHAPE is part of the contract.
-    const api = createApiOnboarding({ db: async () => fakeOnboardingDb() });
+    const api = createApiOnboarding({ messages: PT_BR_ONBOARDING_MESSAGES, db: async () => fakeOnboardingDb() });
     expect(api.routes.map((route) => `${route.method} ${route.path}`)).toEqual([
       "GET /onboarding/:featureKey",
       "PATCH /onboarding/:featureKey",
@@ -210,7 +212,7 @@ describe("isolation — the actor IS the scope", () => {
 describe("repository — the reach-out list the routes do not expose", () => {
   it("scopes the mid-integration list to a single tenant", async () => {
     const db = fakeOnboardingDb();
-    const api = createApiOnboarding({ db: async () => db });
+    const api = createApiOnboarding({ messages: PT_BR_ONBOARDING_MESSAGES, db: async () => db });
     await api.repository.upsertOnboardingState(USER, TENANT_A, FEATURE, { status: "in_progress" });
     await api.repository.upsertOnboardingState(USER, TENANT_B, FEATURE, { status: "in_progress" });
 

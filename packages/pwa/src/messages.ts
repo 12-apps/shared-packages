@@ -1,7 +1,9 @@
 /**
- * Every user-facing string of the install invite, overridable via
- * `messages?: Partial<PwaMessages>` — pt-BR by default, so another product can
- * rebrand or translate without forking the component.
+ * Every user-facing string of the install invite — REQUIRED host config, with
+ * no defaults (the copy-portability doctrine): the old pt-BR defaults meant a
+ * host that passed nothing shipped another product's voice, silently. A pt-BR
+ * host imports {@link PT_BR_PWA_MESSAGES} from `./pt-BR` (re-exported at the
+ * package root) and passes it by hand — one reviewable line.
  *
  * ## The wording is the feature, not decoration
  *
@@ -36,22 +38,3 @@ export interface PwaMessages {
   dismiss: string;
 }
 
-export const defaultMessages: PwaMessages = {
-  promptHandheld: (what) => `Instale ${what} no seu celular para pedir mais rápido da próxima vez.`,
-  promptDesktop: (what) => `Instale ${what} neste computador para pedir mais rápido da próxima vez.`,
-  promptAccept: "Instalar app",
-
-  // Benefit first. On iOS this is also literally true and not marketing: web
-  // push does not exist outside an installed app, so "get told when it is
-  // ready" is unavailable until they do this.
-  iosBenefit: (what) => `Receba um aviso quando o pedido ficar pronto — instale ${what}.`,
-  iosHow: "Toque em",
-  iosWhere: "na barra do navegador e depois em “Adicionar à Tela de Início”.",
-
-  dismiss: "Agora não",
-};
-
-/** Merge a host's overrides over the defaults. */
-export function resolveMessages(overrides?: Partial<PwaMessages>): PwaMessages {
-  return overrides ? { ...defaultMessages, ...overrides } : defaultMessages;
-}

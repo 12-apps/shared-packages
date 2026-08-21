@@ -26,9 +26,15 @@ export interface NotificationsTransport {
   send<T>(path: string, method: string, body?: unknown): Promise<NotificationsResult<T>>;
 }
 
-const FALLBACK_ERROR = 'Não foi possível concluir a operação.';
-
-export function httpNotificationsTransport(fallbackError = FALLBACK_ERROR): NotificationsTransport {
+/**
+ * @param fallbackError What a failed write says when the server sent no
+ * sentence of its own — REQUIRED, the host's words. `createWebNotifications`
+ * already passes its (equally required) `messages.operationFailed`; only a
+ * host constructing the transport directly writes it here. The old default
+ * was one application's Portuguese, and the only string in this package the
+ * required-messages port did not cover.
+ */
+export function httpNotificationsTransport(fallbackError: string): NotificationsTransport {
   return {
     async get<T>(path: string): Promise<T> {
       const response = await fetch(path, {

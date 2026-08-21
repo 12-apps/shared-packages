@@ -5,6 +5,7 @@
    misread. Isolation is enforced by construction — a fresh fixture per test — plus the
    `afterEach` resets below. */
 import { Hono } from "hono";
+import { PT_BR_EVENTS_MESSAGES } from "../../server/pt-BR";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { resetRealtimeRuntime } from "../../core/runtime";
@@ -28,6 +29,7 @@ afterEach(() => {
 
 async function mounted(options: { denyWith?: EventsDenial } = {}) {
   const events = eventsRouter({
+    messages: PT_BR_EVENTS_MESSAGES,
     logger: silentLogger,
     driver: createInlineRealtimeDriver({ logger: silentLogger }),
     ticketSecret: "hono-secret",

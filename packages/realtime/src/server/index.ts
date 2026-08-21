@@ -69,7 +69,6 @@ export {
 } from "./outbox";
 
 export {
-  DEFAULT_EVENTS_MESSAGES,
   EventsDenial,
   isEventsDenial,
   type EventsAuthorization,
@@ -81,3 +80,4 @@ export {
   type EventsSurfaceConfig,
   type EventsTopicSpec,
 } from "./types";
+export { PT_BR_EVENTS_MESSAGES } from "./pt-BR";

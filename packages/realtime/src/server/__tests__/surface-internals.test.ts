@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { PT_BR_EVENTS_MESSAGES } from "../pt-BR";
+import { DEFAULT_MAX_TOPICS_PER_CONNECTION } from "../registry";
 
 import { resetRealtimeRuntime } from "../../core/runtime";
 import { createInlineRealtimeDriver } from "../../drivers/inline";
@@ -48,22 +50,22 @@ describe("topic registry", () => {
   });
 
   it("de-duplicates and trims a comma list", () => {
-    expect(parseTopicList(" orders , orders ,kitchen", registry)).toEqual([
+    expect(parseTopicList(" orders , orders ,kitchen", registry, DEFAULT_MAX_TOPICS_PER_CONNECTION, PT_BR_EVENTS_MESSAGES)).toEqual([
       { domain: "orders", qualifiers: [] },
       { domain: "kitchen", qualifiers: [] },
     ]);
   });
 
   it("refuses an empty list", () => {
-    expect(() => parseTopicList(" , ", registry)).toThrow(EventsDenial);
+    expect(() => parseTopicList(" , ", registry, DEFAULT_MAX_TOPICS_PER_CONNECTION, PT_BR_EVENTS_MESSAGES)).toThrow(EventsDenial);
   });
 
   it("refuses a list over the cap", () => {
-    expect(() => parseTopicList("orders,kitchen", registry, 1)).toThrow(EventsDenial);
+    expect(() => parseTopicList("orders,kitchen", registry, 1, PT_BR_EVENTS_MESSAGES)).toThrow(EventsDenial);
   });
 
   it("names the refused entry in the message", () => {
-    expect(() => parseTopicList("orders,payroll", registry)).toThrow(/payroll/);
+    expect(() => parseTopicList("orders,payroll", registry, DEFAULT_MAX_TOPICS_PER_CONNECTION, PT_BR_EVENTS_MESSAGES)).toThrow(/payroll/);
   });
 });
 

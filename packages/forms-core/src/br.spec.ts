@@ -74,17 +74,17 @@ describe('forms-core/br', () => {
 
   describe('cep validator', () => {
     it('treats empty as valid (the field is optional)', () => {
-      expect(cep()('')).toBeUndefined();
-      expect(cep()('   ')).toBeUndefined();
+      expect(cep('CEP inválido — use o formato 00000-000.')('')).toBeUndefined();
+      expect(cep('CEP inválido — use o formato 00000-000.')('   ')).toBeUndefined();
     });
 
     it('returns a message for a malformed CEP', () => {
-      expect(cep()('123')).toBeTruthy();
+      expect(cep('CEP inválido — use o formato 00000-000.')('123')).toBeTruthy();
       expect(cep('Informe o CEP')('123')).toBe('Informe o CEP');
     });
 
     it('returns undefined for a well-formed CEP', () => {
-      expect(cep()('01310-100')).toBeUndefined();
+      expect(cep('CEP inválido — use o formato 00000-000.')('01310-100')).toBeUndefined();
     });
   });
 
@@ -156,18 +156,18 @@ describe('forms-core/br', () => {
 
   describe('cnpj validator', () => {
     it('treats empty as valid (the field is optional)', () => {
-      expect(cnpj()('')).toBeUndefined();
-      expect(cnpj()('   ')).toBeUndefined();
+      expect(cnpj('CNPJ inválido — confira os dígitos.')('')).toBeUndefined();
+      expect(cnpj('CNPJ inválido — confira os dígitos.')('   ')).toBeUndefined();
     });
 
     it('returns a message for an invalid CNPJ', () => {
-      expect(cnpj()('11222333000182')).toBeTruthy();
+      expect(cnpj('CNPJ inválido — confira os dígitos.')('11222333000182')).toBeTruthy();
       expect(cnpj('Confira o CNPJ')('123')).toBe('Confira o CNPJ');
     });
 
     it('returns undefined for a valid CNPJ', () => {
-      expect(cnpj()(VALID_NUMERIC)).toBeUndefined();
-      expect(cnpj()(VALID_ALPHANUMERIC)).toBeUndefined();
+      expect(cnpj('CNPJ inválido — confira os dígitos.')(VALID_NUMERIC)).toBeUndefined();
+      expect(cnpj('CNPJ inválido — confira os dígitos.')(VALID_ALPHANUMERIC)).toBeUndefined();
     });
   });
 });

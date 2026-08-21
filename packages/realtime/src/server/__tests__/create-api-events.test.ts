@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { PT_BR_EVENTS_MESSAGES } from "../pt-BR";
 
 import { resetRealtimeRuntime } from "../../core/runtime";
 import { verifyRealtimeTicket } from "../../core/ticket";
@@ -69,6 +70,7 @@ interface HarnessOptions {
  */
 async function harness(options: HarnessOptions = {}) {
   const api = createApiEvents({
+    messages: PT_BR_EVENTS_MESSAGES,
     logger: silentLogger,
     driver: createInlineRealtimeDriver({ logger: silentLogger }),
     ticketSecret: options.ticketSecret ?? "test-secret",
@@ -128,6 +130,7 @@ describe("createApiEvents — the routes it mounts", () => {
 
   it("exposes no outbox route — the drain is never reachable over HTTP", () => {
     const api = createApiEvents({
+    messages: PT_BR_EVENTS_MESSAGES,
       logger: silentLogger,
       installSignalHooks: false,
       surfaces: [],
@@ -256,6 +259,7 @@ describe("createApiEvents — unavailability is never information", () => {
       throw new EventsDenial(403, "Sem permissão para o tópico: kitchen.");
     });
     const api = createApiEvents({
+    messages: PT_BR_EVENTS_MESSAGES,
       logger: silentLogger,
       // No driver, and `start()` is never called.
       installSignalHooks: false,
@@ -277,6 +281,7 @@ describe("createApiEvents — unavailability is never information", () => {
 
   it("answers 503 when the process has no driver", async () => {
     const api = createApiEvents({
+    messages: PT_BR_EVENTS_MESSAGES,
       logger: silentLogger,
       installSignalHooks: false,
       surfaces: [
@@ -362,6 +367,7 @@ describe("createApiEvents — lifecycle", () => {
     const driver = createInlineRealtimeDriver({ logger: silentLogger });
     const close = vi.spyOn(driver, "close");
     const api = createApiEvents({
+    messages: PT_BR_EVENTS_MESSAGES,
       logger: silentLogger,
       driver,
       installSignalHooks: false,

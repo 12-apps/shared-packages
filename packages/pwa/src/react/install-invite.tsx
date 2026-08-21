@@ -38,15 +38,15 @@ import type { JSX } from "react";
 import { useState } from "react";
 
 import { isHandheld, useInstallPrompt, type UseInstallPromptOptions } from "../install-prompt";
-import { resolveMessages, type PwaMessages } from "../messages";
+import type { PwaMessages } from "../messages";
 
 import { ShareIcon } from "./share-icon";
 
 export interface InstallInviteProps extends UseInstallPromptOptions {
   /** What is being installed — the store or app name, shown to the user. */
   what: string;
-  /** Override any string. Defaults are pt-BR. */
-  messages?: Partial<PwaMessages>;
+  /** Every string the invite renders — the HOST's words, no defaults. */
+  messages: PwaMessages;
   /**
    * Where the iOS instruction sits.
    *
@@ -176,13 +176,12 @@ function PromptInvite({
 
 export function InstallInvite({
   what,
-  messages: overrides,
+  messages,
   placement = "anchored",
   enabled,
   onDiagnostic,
 }: InstallInviteProps): JSX.Element | null {
   const { offer, install, dismiss } = useInstallPrompt({ enabled, onDiagnostic });
-  const messages = resolveMessages(overrides);
 
   if (offer === "none") return null;
 

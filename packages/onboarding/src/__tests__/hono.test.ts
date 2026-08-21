@@ -2,6 +2,7 @@
    `mounted()`, a new Hono app per case; the rule matches the identifier across the
    file rather than its scope. */
 import { Hono } from "hono";
+import { PT_BR_ONBOARDING_MESSAGES, PT_BR_ONBOARDING_UNAUTHENTICATED } from "../server/pt-BR";
 import { describe, expect, it } from "vitest";
 
 import { createOnboardingApiStore, fetchOnboardingState } from "../api-store";
@@ -28,6 +29,8 @@ function mounted(options?: { actor?: { userId: string; clientId: string } | null
   const db = fakeOnboardingDb();
   const app = new Hono();
   const onboarding = onboardingRouter({
+    messages: PT_BR_ONBOARDING_MESSAGES,
+    unauthenticatedMessage: PT_BR_ONBOARDING_UNAUTHENTICATED,
     db: async () => db,
     featureKeys: [FEATURE],
     resetEnabled: () => true,
