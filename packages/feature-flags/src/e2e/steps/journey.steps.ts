@@ -101,7 +101,7 @@ Then(
 Then("the surface refuses with the server's own words", async ({ page }) => {
   const refusal = page.getByTestId("ff-error");
   await expect(refusal).toBeVisible();
-  // The words are the server's (pt-BR in the package's defaults) — what this
-  // pins is that they REACHED the operator, not which language they are in.
+  // The words are the host's own server copy port — what this pins is that
+  // they REACHED the operator, not which language the host wrote them in.
   await expect(refusal).not.toBeEmpty();
 });

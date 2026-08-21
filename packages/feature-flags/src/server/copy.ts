@@ -1,6 +1,6 @@
 /**
  * Every string the API surface answers a HUMAN with — required host config,
- * with NO defaults, deliberately (the payments doctrine, FUT-760, now
+ * with NO defaults, deliberately (the payments extraction's doctrine, now
  * enforced repo-wide by the copy-portability gate): a default in the origin
  * host's language reads as finished to the next host right up until a user
  * sees it. The machine-readable halves of a failure — the status and the

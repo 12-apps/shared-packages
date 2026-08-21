@@ -1,5 +1,5 @@
 /**
- * `@12-apps/feature-flags` — user-level feature flags (FUT-884).
+ * `@12-apps/feature-flags` — user-level feature flags.
  *
  * The per-USER axis the tenant machinery cannot express: a beta feature is
  * granted to individual people, not to stores. A flag is a VEIL, never a key
