@@ -1,37 +1,54 @@
 name: Major guard
 
-# Catches a pull request that would cut a MAJOR while its commit message is
-# still editable.
+# Holds a pull request that would cut a MAJOR until a person says yes, while its
+# commit message is still editable.
 #
-# The approval gate in ci.yml (`detect-majors` -> `approve-majors`) is the safety
-# net; this is the feedback. By the time that gate runs the commit is already on
-# main, and the only choices left are "approve" or "leave the package
-# unreleased". Here the footer can simply be reworded.
+# Deliberately at PULL-REQUEST time. The gate this replaced sat in ci.yml on
+# `push`, where by the time it ran the commit was already on main and the only
+# remaining choices were "approve" or "leave the package unreleased" — and one
+# batch sat there long enough to hold thirteen majors unpublished. Here the
+# major is still a proposal: the cheapest possible moment to reconsider it,
+# because rewording the footer undoes it entirely.
 #
-# `labeled`/`unlabeled` are load-bearing: `allow-major` silences the red, and a
-# check that did not re-run on the label would stay red after someone applied it,
-# which trains people to merge past a red check. `edited` matters for the same
-# reason commitlint.yml needs it — this repo squashes with COMMIT_OR_PR_TITLE, so
-# the PR TITLE can be what lands, and a title fixed after the first run has to
-# re-trigger the check.
+# TWO JOBS, AND ONLY ONE OF THEM BLOCKS.
 #
-# WHAT THE LABEL NO LONGER DOES is let the merge happen. `allow-major` is applied
-# through the API as easily as through the UI — an agent holding this repo's
-# token did exactly that on #319 — so a label cannot be consent. Neither can a
-# tag, for the same reason. The consent lives in the `Major approval` job below,
-# which binds to the `major-approval` ENVIRONMENT: it starts the moment a major is
-# declared and then WAITS, and a GitHub App installation token cannot approve a
-# deployment. Making that job a required check is what makes the pull request
-# un-mergeable until a person clicks Review deployments → Approve.
+# `Breaking change` never fails. It reads the PR's commits and prints what they
+# would spend, and it writes one output. `Major approval` is the block: it binds
+# to the `major-approval` environment, so GitHub holds it in `waiting` and
+# reports the check as pending — and a pending REQUIRED check is a pull request
+# that cannot be merged, by anyone, including whoever opened it and including
+# automation acting with their credentials.
 #
-# Deliberately at PULL-REQUEST time, not after merge. The old gate sat in ci.yml
-# on `push`, where by the time it ran the commit was already on main and the only
-# remaining choices were "approve" or "leave the package unreleased". Here the
-# major is still a proposal.
+# So a declared major has exactly the two exits a person has, and the automation
+# has neither: click Review deployments → Approve, or reword the message to drop
+# the `RELEASE-MAJOR` marker, after which this job does not run at all (a job
+# skipped by its own `if:` counts as passing for a required check).
+#
+# WHY AN ENVIRONMENT AND NOTHING ELSE. Every other mechanism is reachable by
+# this repository's own token: it adds labels, it pushes tags, it opens and
+# closes pull requests, and it acts AS the account that owns them, so no rule
+# phrased in terms of identity can separate the person from the agent. There
+# used to be an `allow-major` label here and it was applied through the API on
+# #319 by an agent holding this token — which is the whole argument, made once,
+# concretely. Repository settings are the exception: the token gets
+# `Resource not accessible by integration` from the branch-protection API and
+# cannot grant a deployment. The approval has to live where the token cannot
+# reach, and this is the only such place.
+#
+# `edited` is load-bearing for the same reason commitlint.yml needs it — this
+# repo squashes with COMMIT_OR_PR_TITLE, so the PR TITLE can be what lands, and
+# a title edited after the first run has to re-trigger the check. There are no
+# `labeled`/`unlabeled` triggers because nothing here reads labels any more.
+#
+# ONE-TIME SETUP, without which the second job is decoration rather than a gate:
+# create the `major-approval` environment (Settings → Environments), add at
+# least one required reviewer, and mark `Major approval` a required status check
+# on `main`. Nothing in this repository can verify that for you — that is the
+# same wall that makes it work.
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+    types: [opened, edited, synchronize, reopened]
 
 permissions:
   contents: read
@@ -44,17 +61,15 @@ jobs:
   major-guard:
     name: Breaking change
     runs-on: ubuntu-latest
-    # Read by the gate below. A major makes the last step exit 1, and a failed
-    # job still has to hand its verdict on, which is why the gate reads this
-    # under `always()`.
+    # Read by the gate below.
     outputs:
       major: ${{ steps.guard.outputs.major }}
     steps:
       - uses: actions/checkout@v4
 
       # Every commit in the PR, not just the head one: the squash keeps each
-      # commit's body, so a `BREAKING CHANGE:` footer anywhere in the branch
-      # lands on main and cuts the major.
+      # commit's body, so a `RELEASE-MAJOR:` marker anywhere in the branch lands
+      # on main and cuts the major.
       #
       # Written as a JSON array rather than piped through a variable because a
       # commit message is multi-line, and no environment variable can carry the
@@ -79,43 +94,20 @@ jobs:
             console.log(`collected ${messages.length} commit(s)`);
           '
 
-      - name: Check for a breaking change
+      - name: Say what this pull request would release
         id: guard
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           COMMIT_FILE: commits.json
         run: node scripts/breaking-change-guard.mjs
 
   # ── The gate a token cannot open ──────────────────────────────────────────
   #
-  # No steps worth running: the job IS the question. Binding it to an
-  # environment that carries required reviewers means GitHub holds it in
-  # `waiting` and reports the check as pending, and a pending REQUIRED check is
-  # a pull request that cannot be merged — by anyone, including whoever opened
-  # it and including automation acting with their credentials.
-  #
-  # Why an environment rather than a review, a label or a tag. Every other
-  # mechanism is reachable by this repository's own token: it adds labels, it
-  # pushes tags, it opens and closes pull requests, and it acts AS the account
-  # that owns them, so no rule phrased in terms of identity can separate the
-  # person from the agent. Repository settings are the exception — the token
-  # gets `Resource not accessible by integration` from the branch-protection
-  # API, and cannot grant a deployment. So the approval has to live where the
-  # token cannot reach, and it does.
-  #
-  # ONE-TIME SETUP, without which this job is decoration rather than a gate:
-  # create the `major-approval` environment (Settings → Environments), add at
-  # least one required reviewer, and mark `Major approval` a required status
-  # check on `main`. Nothing in this repository can verify that for you — that
-  # is the same wall that makes it work.
+  # No steps worth running: the job IS the question.
   major-approval:
     name: Major approval
     needs: major-guard
-    # `always()` because a declared major fails the job above by design, and a
-    # skipped gate on a failed guard would be a major that merges the moment
-    # someone clears the red.
-    if: always() && needs.major-guard.outputs.major == 'true'
+    if: needs.major-guard.outputs.major == 'true'
     runs-on: ubuntu-latest
     environment: major-approval
     steps:

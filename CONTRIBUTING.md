@@ -100,16 +100,46 @@ merely *describing* one.
 A major is the one bump a consumer cannot take without reading. Consumers pin
 `@12-apps/*` **exactly**, so an unplanned major is not picked up and quietly
 ignored — it stalls the pin, and the consumer drifts further behind with every
-later release. Two checks make spending one deliberate.
+later release. One click makes spending one deliberate, and it happens **at
+pull-request time**, where the major is still a proposal and rewording the
+message undoes it entirely.
 
-**At pull-request time**, the `Major guard` check fails a PR carrying a
-`RELEASE-MAJOR` line in the title or any commit body. If the major is intended,
-add the **`allow-major`** label and the check passes. This is where a major is
-cheapest to reconsider: the message is still editable.
+`major-guard.yml` runs two jobs and only one of them blocks. **`Breaking
+change`** never fails: it reads the PR's title and every commit body, prints
+what they would release, and hands over a single verdict. **`Major approval`**
+is the block — it starts only when that verdict is a major, binds to the
+`major-approval` environment, and then just waits. GitHub reports a waiting
+environment job as a pending check, and a pending *required* check is a pull
+request nobody can merge.
 
-A `!` or a `BREAKING CHANGE:` footer does **not** fail the check — it cuts a
+So a `RELEASE-MAJOR` line in the title or any commit body leaves exactly two
+ways forward, and both belong to a person:
+
+- **Review deployments → Approve** on the pending check, and it merges;
+- **drop the marker**, after which the job does not run at all (a job skipped by
+  its own `if:` counts as passing) — an ordinary breaking change ships as a
+  minor here, so this is usually the right answer.
+
+Rejecting the deployment is the third option and it fails the check, which
+leaves the PR blocked until the message is reworded.
+
+**There is no escape label.** `allow-major` used to silence the red and it is
+gone: a label is applied through the API exactly as easily as through the UI,
+and an agent holding this repo's own token added it to #319. The same goes for a
+tag, or any other consent expressible as repository *content* — the automation
+can give it to itself. Repository settings are the one thing that token cannot
+touch (the branch-protection API answers `Resource not accessible by
+integration`, and an App installation token cannot approve a deployment), which
+is why the environment is the whole gate and everything else is explanation.
+
+A `!` or a `BREAKING CHANGE:` footer does **not** arm that gate — it cuts a
 minor. The guard says so in the log rather than staying silent, so that someone
-who wrote the footer expecting a major finds out here instead of on npm.
+who wrote the footer expecting a major finds out here instead of on npm. That
+separation is load-bearing and was once wrong in the code: the verdict handed to
+the gate was "is this breaking" rather than "is this a major", so every routine
+*this config is required now* tightening sat waiting for a click it never
+needed. A gate that fires on the ordinary case is one people learn to clear
+without reading, which costs it the case it exists for.
 
 The two syntaxes are equals, and both are legible. That is a deliberate repair,
 not a given: the angular preset's `headerPattern` is
@@ -123,7 +153,7 @@ Every `.releaserc.json` overrides `parserOpts.headerPattern` and
 note — and then `releaseRules` maps that note to a **minor**, so `!` now means
 exactly what its author meant (this breaks) and spends a minor saying it.
 
-Three things now rest on that override — this document, the guard's error
+Three things now rest on that override — this document, the guard's log
 message, and the approval gate the major is routed to — so
 `scripts/release-bump-selftest.mjs` asserts it against the real analyzer and the
 committed configs, loading the same copy of `commit-analyzer` semantic-release
