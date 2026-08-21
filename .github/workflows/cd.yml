@@ -63,6 +63,15 @@ jobs:
           node-version: 24
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
+      # The package list stays declared ONCE, in ci.yml (its consumer
+      # verification reads it there); this workflow reads that block rather
+      # than carrying a copy that rots — a package added to one file and not
+      # the other would be silently absent from half the pipeline. Every
+      # release script below throws when the list is empty, and #351 shipped
+      # exactly that: the job moved here, the env stayed behind, and three
+      # steps discovered the emptiness one at a time.
+      - name: Read PUBLISH_DIRS from ci.yml
+        run: node scripts/publish-dirs.mjs
       - name: Install dependencies
         shell: bash
         run: |
