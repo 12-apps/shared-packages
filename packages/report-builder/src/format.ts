@@ -1,3 +1,4 @@
+import type { ValueFormatCopy } from './copy';
 import { isSuppressed, type ReportCellValue, type ReportKpiFormat, type ReportValueFormat } from './types';
 
 /**
@@ -65,9 +66,10 @@ function formatNumber(value: number, format: ReportValueFormat | 'compact'): str
 export function formatReportValue(
   value: ReportCellValue | undefined,
   format: ReportValueFormat,
+  copy: ValueFormatCopy,
 ): string {
   if (value === null || value === undefined || isSuppressed(value)) return SUPPRESSED_PLACEHOLDER;
-  if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
+  if (typeof value === 'boolean') return value ? copy.booleanTrue : copy.booleanFalse;
   if (typeof value === 'number') return formatNumber(value, format);
   return value;
 }

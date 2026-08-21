@@ -3,6 +3,7 @@
  * and its mapping to/from the declarative ReportSpec. Pure functions — the
  * page owns state, the server owns validation.
  */
+import type { PresentationCopy } from "../copy";
 import {
   defaultPresentation,
   isOrderedDimension,
@@ -180,8 +181,9 @@ function draftShape(draft: BuilderDraft, fields: Map<string, ReportField>): Spec
 export function chartOptions(
   draft: BuilderDraft,
   fields: Map<string, ReportField>,
+  copy: PresentationCopy,
 ): Array<{ value: ChartKind; label: string; disabledReason: string | null }> {
-  return presentationCompatibility(draftShape(draft, fields)).map((entry) => ({
+  return presentationCompatibility(draftShape(draft, fields), copy).map((entry) => ({
     value: entry.option,
     label: CHART_LABELS[entry.option],
     disabledReason: entry.disabledReason,
@@ -198,9 +200,10 @@ export function chartOptions(
 export function stackedOption(
   draft: BuilderDraft,
   fields: Map<string, ReportField>,
+  copy: PresentationCopy,
 ): { disabledReason: string | null } | null {
   if (draft.chartType === "table" || draft.chartType === "kpi") return null;
-  const entry = stackedCompatibility(draft.chartType, draftShape(draft, fields));
+  const entry = stackedCompatibility(draft.chartType, draftShape(draft, fields), copy);
   return entry === null ? null : { disabledReason: entry.disabledReason };
 }
 
@@ -213,9 +216,12 @@ export function stackedOption(
 export function withValidChart(
   draft: BuilderDraft,
   fields: Map<string, ReportField>,
+  copy: PresentationCopy,
 ): BuilderDraft {
   const shape = draftShape(draft, fields);
-  const current = presentationCompatibility(shape).find((entry) => entry.option === draft.chartType);
+  const current = presentationCompatibility(shape, copy).find(
+    (entry) => entry.option === draft.chartType,
+  );
   if (!current || current.disabledReason === null) return draft;
   const picked = defaultPresentation(shape);
   return { ...draft, chartType: picked.kind === "chart" ? picked.chartType : picked.kind };

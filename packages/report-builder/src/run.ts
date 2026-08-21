@@ -1,4 +1,5 @@
 import { compileReport } from './compile';
+import type { ReportEngineCopy } from './copy';
 import { specSentence } from './describe';
 import { invalidSpecError, ReportBuilderError } from './errors';
 import { renderReport, type ReportRenderModel } from './render';
@@ -17,6 +18,13 @@ import type { CompiledQuery, FieldCatalog, ReportDataSource, ReportRow } from '.
 export interface RunReportOptions {
   catalog: FieldCatalog;
   adapter: ReportDataSource;
+  /**
+   * The sentences and headings this run renders. REQUIRED: the package used to
+   * compile in its own pt-BR, which made the origin host's Portuguese every
+   * adopter's silent default. `PT_BR_REPORT_ENGINE_COPY` is that exact wording,
+   * now named at the call site.
+   */
+  copy: ReportEngineCopy;
   /** Hard host-side row cap (e.g. for LLM-facing endpoints). */
   maxRows?: number;
   /**
@@ -57,7 +65,7 @@ export async function runReport(input: unknown, options: RunReportOptions): Prom
   // the very row that keeps the totals balancing.
   const cap = query.topN !== undefined ? query.topN + 1 : query.limit;
   const rows = (await options.adapter.execute(query)).slice(0, cap);
-  const render = renderReport(query, spec.presentation, options.catalog, rows);
+  const render = renderReport(query, spec.presentation, options.catalog, rows, options.copy.labels);
   return { spec, query, rows, render };
 }
 
@@ -142,7 +150,7 @@ export async function runDashboard(
         title: block.title,
         span: block.span,
         height: block.height,
-        sentence: specSentence(block.spec, options.catalog),
+        sentence: specSentence(block.spec, options.catalog, options.copy.spec),
       };
       try {
         const result = await runReport(block.spec, options);

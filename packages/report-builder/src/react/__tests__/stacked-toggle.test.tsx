@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+import { renderWithCopy } from "./with-copy";
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import { PresentationSection } from '../builder-sections';
 import type { BuilderDraft, ChartKind } from '../builder-model';
@@ -46,7 +47,7 @@ function draft(patch: Partial<BuilderDraft>): BuilderDraft {
 /** Render the section and hand back the patch spy. */
 function renderSection(patch: Partial<BuilderDraft>): ReturnType<typeof vi.fn> {
   const update = vi.fn();
-  render(<PresentationSection draft={draft(patch)} fields={FIELDS} update={update} />);
+  renderWithCopy(<PresentationSection draft={draft(patch)} fields={FIELDS} update={update} />);
   return update;
 }
 

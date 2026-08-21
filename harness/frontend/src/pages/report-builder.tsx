@@ -1,3 +1,5 @@
+import { PT_BR_REPORT_ENGINE_COPY } from "@12-apps/report-builder";
+import { PT_BR_BLANK_BLOCK_TEMPLATE_COPY } from "@12-apps/report-builder/server";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useRef, type JSX } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
@@ -233,6 +235,12 @@ const { surface: reportsSurface } = webWiring.adoptWeb({
       config: {
         tenantSlug: TENANT_SLUG,
         surface: SURFACE,
+        // The words this host renders. Named, not inherited: the package ships
+        // no default, so this line is where the surface's Portuguese is chosen.
+        copy: {
+          engine: PT_BR_REPORT_ENGINE_COPY,
+          blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+        },
         // NOT standalone. `standalone` wraps the surface in a `MemoryRouter`,
         // which is what a host with no router at all needs — and a memory
         // router keeps its location in a variable, so opening a report changed

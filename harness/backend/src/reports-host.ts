@@ -18,6 +18,8 @@
  * permission reaches each entity, which built-ins exist, which starter each
  * entity opens with, and which clock a day is measured on.
  */
+import { PT_BR_REPORT_ENGINE_COPY } from '@12-apps/report-builder';
+import { PT_BR_REPORT_SERVER_MESSAGES } from '@12-apps/report-builder/server';
 import { createMemoryDataSource, reportSpecSchema, type ReportSpec } from '@12-apps/report-builder';
 import { reportBuilderManifest } from '@12-apps/report-builder/manifest';
 import { reportBuilderServerManifest } from '@12-apps/report-builder/manifest/server';
@@ -226,6 +228,10 @@ export function wireReports(db: SavedReportDb): {
         config: {
           catalog: HARNESS_CATALOG,
           adapter: ({ window }) => createMemoryDataSource(fixtureTables(window)),
+          // Named, not inherited — the package ships no default sentence, so
+          // this is where this host's Portuguese is chosen.
+          copy: PT_BR_REPORT_ENGINE_COPY,
+          messages: PT_BR_REPORT_SERVER_MESSAGES,
           db: () => Promise.resolve(db),
           timeZone: HARNESS_TIME_ZONE,
           now: () => NOW,

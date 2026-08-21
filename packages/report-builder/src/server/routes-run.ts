@@ -26,17 +26,17 @@ export function runRoute(config: ReportBuilderServerConfig): ReportRoute {
     path: '/reports/run',
     async handle({ actor, body }) {
       try {
-        const parsed = runReportBody.safeParse(body);
+        const parsed = runReportBody(config.messages.range).safeParse(body);
         if (!parsed.success) {
           const first = parsed.error.issues[0];
           throw invalidSpecError(
-            first ? `${first.path.join('.') || 'body'}: ${first.message}` : 'Corpo inválido.',
+            first ? `${first.path.join('.') || 'body'}: ${first.message}` : config.messages.invalidBody,
           );
         }
         // The entity gate runs BEFORE the spec reaches the adapter: a spec is
         // the caller's own text, and the only thing standing between it and a
         // table is this check.
-        if (!mayQueryEntity(config, actor, parsed.data.spec.entity)) return forbidden();
+        if (!mayQueryEntity(config, actor, parsed.data.spec.entity)) return forbidden(config);
         const range = windowOfBody(config, parsed.data);
         const result = await runReport(parsed.data.spec, await runOptions(config, actor, range));
         return ok({ range: toReportRangeView(range), render: result.render });

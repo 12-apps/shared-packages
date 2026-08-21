@@ -2,12 +2,12 @@ import { invalidSpecError } from '../errors';
 import { parseReportDocument } from '../run';
 
 import { compileDocument } from './compile-document';
+import type { ReportServerMessages } from './messages';
 import {
   fail,
   foldSpecError,
   isDuplicateName,
   mayAuthor,
-  NOT_FOUND,
   ok,
   type ReportActor,
   type ReportBuilderServerConfig,
@@ -35,11 +35,6 @@ import { REPORT_BUILDER_FEATURES } from './features';
  * changed, and that must not destroy work its author has not looked at since.
  */
 
-const NOT_PUBLISHED =
-  'Só um relatório publicado guarda alterações não publicadas. Salve o rascunho normalmente.';
-const NO_WORKING_COPY = 'Este relatório não tem alterações não publicadas.';
-const DUPLICATE_NAME = 'Já existe um relatório com esse nome.';
-
 /**
  * The stored row, or the 404 every route on this surface answers with.
  *
@@ -54,11 +49,14 @@ async function loadPublished(
   store: SavedReportStore,
   actor: ReportActor,
   id: string,
+  messages: ReportServerMessages,
 ): Promise<SavedReportRecord | { error: ReturnType<typeof fail> }> {
   const record = await store.get(actor.clientId, id);
-  if (!record) return { error: fail(404, NOT_FOUND) };
-  if (!canViewSavedReport(record, actor)) return { error: fail(404, NOT_FOUND) };
-  if (!parksEditsInWorkingCopy(record.status)) return { error: fail(400, NOT_PUBLISHED) };
+  if (!record) return { error: fail(404, messages.notFound) };
+  if (!canViewSavedReport(record, actor)) return { error: fail(404, messages.notFound) };
+  if (!parksEditsInWorkingCopy(record.status)) {
+    return { error: fail(400, messages.publishedOnlyKeepsDraft) };
+  }
   return record;
 }
 
@@ -87,16 +85,16 @@ function saveRoute(config: ReportBuilderServerConfig, store: SavedReportStore): 
     entitlement: REPORT_BUILDER_FEATURES.custom,
     authoring: true,
     async handle({ actor, params, body }) {
-      if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
+      if (!mayAuthor(config, actor)) return fail(403, config.messages.forbiddenEdit);
       const parsed = reportWorkingCopySchema.safeParse(body);
       if (!parsed.success) {
         const first = parsed.error.issues[0];
-        return fail(400, first ? `${first.path.join('.') || 'body'}: ${first.message}` : 'Corpo inválido.');
+        return fail(400, first ? `${first.path.join('.') || 'body'}: ${first.message}` : config.messages.invalidBody);
       }
-      const record = await loadPublished(store, actor, params.id ?? '');
+      const record = await loadPublished(store, actor, params.id ?? '', config.messages);
       if (isFailure(record)) return record.error;
       const saved = await store.saveWorkingCopy(actor.clientId, record.id, parsed.data);
-      return saved ? ok({ saved: true }) : fail(404, NOT_FOUND);
+      return saved ? ok({ saved: true }) : fail(404, config.messages.notFound);
     },
   };
 }
@@ -118,16 +116,16 @@ function publishRoute(config: ReportBuilderServerConfig, store: SavedReportStore
     entitlement: REPORT_BUILDER_FEATURES.custom,
     authoring: true,
     async handle({ actor, params, body }) {
-      if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
-      const record = await loadPublished(store, actor, params.id ?? '');
+      if (!mayAuthor(config, actor)) return fail(403, config.messages.forbiddenEdit);
+      const record = await loadPublished(store, actor, params.id ?? '', config.messages);
       if (isFailure(record)) return record.error;
       try {
-        const input = parsePublishBody(body, record);
+        const input = parsePublishBody(body, record, config.messages);
         compileDocument(parseReportDocument(input.spec), config.catalog);
         const saved = await store.publishWorkingCopy(actor.clientId, record.id, input);
-        return saved ? ok(toSummary(saved, actor.userId)) : fail(404, NOT_FOUND);
+        return saved ? ok(toSummary(saved, actor.userId)) : fail(404, config.messages.notFound);
       } catch (error) {
-        if (isDuplicateName(error)) return fail(409, DUPLICATE_NAME);
+        if (isDuplicateName(error)) return fail(409, config.messages.duplicateName);
         return foldSpecError(error);
       }
     },
@@ -142,17 +140,17 @@ function discardRoute(config: ReportBuilderServerConfig, store: SavedReportStore
     permission: DEFAULT_AUTHOR_PERMISSION,
     authoring: true,
     async handle({ actor, params }) {
-      if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
-      const record = await loadPublished(store, actor, params.id ?? '');
+      if (!mayAuthor(config, actor)) return fail(403, config.messages.forbiddenEdit);
+      const record = await loadPublished(store, actor, params.id ?? '', config.messages);
       if (isFailure(record)) return record.error;
       // A 404 rather than a silent 200: "discard" that discarded nothing would
       // tell the editor to reset to a published version it is already showing,
       // hiding the fact that the parked edit is still on the server.
       if (record.workingCopy === null || record.workingCopy === undefined) {
-        return fail(404, NO_WORKING_COPY);
+        return fail(404, config.messages.noWorkingCopy);
       }
       const discarded = await store.discardWorkingCopy(actor.clientId, record.id);
-      return discarded ? ok({ discarded: true }) : fail(404, NOT_FOUND);
+      return discarded ? ok({ discarded: true }) : fail(404, config.messages.notFound);
     },
   };
 }
@@ -168,6 +166,7 @@ function discardRoute(config: ReportBuilderServerConfig, store: SavedReportStore
 function parsePublishBody(
   body: unknown,
   current: SavedReportRecord,
+  messages: ReportServerMessages,
 ): {
   name: string;
   description: string | null;
@@ -181,11 +180,11 @@ function parsePublishBody(
   if (!parsed.success) {
     const first = parsed.error.issues[0];
     throw invalidSpecError(
-      first ? `${first.path.join('.') || 'body'}: ${first.message}` : 'Corpo inválido.',
+      first ? `${first.path.join('.') || 'body'}: ${first.message}` : messages.invalidBody,
     );
   }
   const input = parsed.data;
-  if (input.name.trim() === '') throw invalidSpecError('name: Dê um nome ao relatório.');
+  if (input.name.trim() === '') throw invalidSpecError(messages.nameRequired);
   return {
     name: input.name,
     description: input.description ?? null,

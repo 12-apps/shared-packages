@@ -1,3 +1,4 @@
+import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { compileReport } from '../compile';
@@ -47,30 +48,30 @@ describe('formatDurationSeconds', () => {
 
 describe('formatReportValue', () => {
   it('renders a percent measure from a 0-1 ratio, one decimal where meaningful', () => {
-    expect(formatReportValue(0.84, 'percent')).toBe('84%');
-    expect(formatReportValue(0.8437, 'percent')).toBe('84,4%');
-    expect(formatReportValue(1, 'percent')).toBe('100%');
-    expect(formatReportValue(0.005, 'percent')).toBe('0,5%');
+    expect(formatReportValue(0.84, 'percent', PT_BR_REPORT_ENGINE_COPY.values)).toBe('84%');
+    expect(formatReportValue(0.8437, 'percent', PT_BR_REPORT_ENGINE_COPY.values)).toBe('84,4%');
+    expect(formatReportValue(1, 'percent', PT_BR_REPORT_ENGINE_COPY.values)).toBe('100%');
+    expect(formatReportValue(0.005, 'percent', PT_BR_REPORT_ENGINE_COPY.values)).toBe('0,5%');
   });
 
   it('renders a duration measure from seconds', () => {
-    expect(formatReportValue(5025, 'duration')).toBe('1h 23m');
+    expect(formatReportValue(5025, 'duration', PT_BR_REPORT_ENGINE_COPY.values)).toBe('1h 23m');
   });
 
   it('keeps the existing money/integer/decimal/text semantics', () => {
-    expect(formatReportValue(1234, 'brl')).toBe(
+    expect(formatReportValue(1234, 'brl', PT_BR_REPORT_ENGINE_COPY.values)).toBe(
       new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(12.34),
     );
-    expect(formatReportValue(1234, 'integer')).toBe('1.234');
-    expect(formatReportValue(1.5, 'decimal')).toBe('1,5');
-    expect(formatReportValue('PIX', 'text')).toBe('PIX');
-    expect(formatReportValue(true, 'text')).toBe('Sim');
+    expect(formatReportValue(1234, 'integer', PT_BR_REPORT_ENGINE_COPY.values)).toBe('1.234');
+    expect(formatReportValue(1.5, 'decimal', PT_BR_REPORT_ENGINE_COPY.values)).toBe('1,5');
+    expect(formatReportValue('PIX', 'text', PT_BR_REPORT_ENGINE_COPY.values)).toBe('PIX');
+    expect(formatReportValue(true, 'text', PT_BR_REPORT_ENGINE_COPY.values)).toBe('Sim');
   });
 
   it('renders null and the suppression marker as the same placeholder', () => {
-    expect(formatReportValue(null, 'duration')).toBe(SUPPRESSED_PLACEHOLDER);
-    expect(formatReportValue(SUPPRESSED, 'duration')).toBe(SUPPRESSED_PLACEHOLDER);
-    expect(formatReportValue(SUPPRESSED, 'percent')).toBe(SUPPRESSED_PLACEHOLDER);
+    expect(formatReportValue(null, 'duration', PT_BR_REPORT_ENGINE_COPY.values)).toBe(SUPPRESSED_PLACEHOLDER);
+    expect(formatReportValue(SUPPRESSED, 'duration', PT_BR_REPORT_ENGINE_COPY.values)).toBe(SUPPRESSED_PLACEHOLDER);
+    expect(formatReportValue(SUPPRESSED, 'percent', PT_BR_REPORT_ENGINE_COPY.values)).toBe(SUPPRESSED_PLACEHOLDER);
   });
 });
 
@@ -118,7 +119,11 @@ describe('compiled measure formats', () => {
 });
 
 describe('render model format metadata', () => {
-  const options = { catalog: salesCatalog, adapter: createMemoryDataSource({ orders: [] }) };
+  const options = {
+    catalog: salesCatalog,
+    adapter: createMemoryDataSource({ orders: [] }),
+    copy: PT_BR_REPORT_ENGINE_COPY,
+  };
 
   it('carries the duration format on the table column', async () => {
     const result = await runReport(
@@ -150,6 +155,7 @@ describe('render model format metadata', () => {
       {
         catalog: salesCatalog,
         adapter: createMemoryDataSource({ orders: [{ prepSeconds: 42 }] }),
+        copy: PT_BR_REPORT_ENGINE_COPY,
       },
     );
     expect(result.render).toMatchObject({ kind: 'kpi', value: null, suppressed: true });
@@ -166,6 +172,7 @@ describe('render model format metadata', () => {
       {
         catalog: salesCatalog,
         adapter: createMemoryDataSource({ orders: [{ prepSeconds: 42 }] }),
+        copy: PT_BR_REPORT_ENGINE_COPY,
       },
     );
     expect(result.render).toMatchObject({

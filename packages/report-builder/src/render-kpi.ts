@@ -13,6 +13,7 @@
  * branches both produce columns over many rows, this produces figures over one.
  */
 import { requireEntityForRender } from './catalog';
+import type { RenderLabelCopy } from './copy';
 import { measureLabel } from './render-labels';
 import type { ReportPresentation } from './spec';
 import {
@@ -54,10 +55,11 @@ function toKpiFigure(
   overrides: { label?: string; numberFormat?: ReportKpiFormat },
   fields: Record<string, FieldDef>,
   row: ReportRow | undefined,
+  copy: RenderLabelCopy,
 ): ReportKpiFigure {
   const raw = row?.[measure.alias];
   return {
-    label: overrides.label ?? measureLabel(fields[measure.field], measure),
+    label: overrides.label ?? measureLabel(fields[measure.field], measure, copy),
     // A suppressed tile carries no figure at all — same shape as an empty period.
     value: typeof raw === 'number' ? raw : null,
     suppressed: isSuppressed(raw),
@@ -79,6 +81,7 @@ export function toKpiModel(
   presentation: Extract<ReportPresentation, { kind: 'kpi' }>,
   catalog: FieldCatalog,
   rows: ReportRow[],
+  copy: RenderLabelCopy,
 ): {
   kind: 'kpi';
   label: string;
@@ -91,7 +94,7 @@ export function toKpiModel(
   const entity = requireEntityForRender(catalog, query.entity);
   const row = rows[0];
   const figures = query.measures.map((measure, index) =>
-    toKpiFigure(measure, index === 0 ? presentation : {}, entity.fields, row),
+    toKpiFigure(measure, index === 0 ? presentation : {}, entity.fields, row, copy),
   );
   const first = figures[0];
   if (!first) {

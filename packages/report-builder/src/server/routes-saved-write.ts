@@ -2,11 +2,11 @@ import { invalidSpecError } from '../errors';
 import { parseReportDocument } from '../run';
 
 import { compileDocument } from './compile-document';
+import type { ReportServerMessages } from './messages';
 import {
   fail,
   foldSpecError,
   isDuplicateName,
-  NOT_FOUND,
   mayAuthor,
   ok,
   type ReportBuilderServerConfig,
@@ -38,8 +38,6 @@ import { REPORT_BUILDER_FEATURES } from './features';
  * exist.
  */
 
-const DUPLICATE_NAME = 'Já existe um relatório com esse nome.';
-
 type SaveBody = ReturnType<typeof saveReportBody.parse>;
 
 /**
@@ -48,12 +46,12 @@ type SaveBody = ReturnType<typeof saveReportBody.parse>;
  * is authored here, so it is enforced here, and a host on a framework with no
  * schema layer gets the same 400s as one with it.
  */
-function parseSaveBody(body: unknown): SaveBody {
+function parseSaveBody(body: unknown, messages: ReportServerMessages): SaveBody {
   const parsed = saveReportBody.safeParse(body);
   if (parsed.success) return parsed.data;
   const first = parsed.error.issues[0];
   throw invalidSpecError(
-    first ? `${first.path.join('.') || 'body'}: ${first.message}` : 'Corpo inválido.',
+    first ? `${first.path.join('.') || 'body'}: ${first.message}` : messages.invalidBody,
   );
 }
 
@@ -105,9 +103,9 @@ function createRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
     quota: REPORT_BUILDER_FEATURES.custom,
     authoring: true,
     async handle({ actor, body }) {
-      if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para criar relatórios.');
+      if (!mayAuthor(config, actor)) return fail(403, config.messages.forbiddenCreate);
       try {
-        const input = parseSaveBody(body);
+        const input = parseSaveBody(body, config.messages);
         compileDocument(parseReportDocument(input.spec), config.catalog);
         // Authorship comes from the ACTOR, never from the body — a client
         // that could name its own `createdBy` could author as someone else,
@@ -115,7 +113,7 @@ function createRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
         const record = await store.create(actor.clientId, toInput(input, null), actor.userId);
         return ok(toSummary(record, actor.userId));
       } catch (error) {
-        if (isDuplicateName(error)) return fail(409, DUPLICATE_NAME);
+        if (isDuplicateName(error)) return fail(409, config.messages.duplicateName);
         return foldSpecError(error);
       }
     },
@@ -130,20 +128,20 @@ function updateRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
     entitlement: REPORT_BUILDER_FEATURES.custom,
     authoring: true,
     async handle({ actor, params, body }) {
-      if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para editar relatórios.');
+      if (!mayAuthor(config, actor)) return fail(403, config.messages.forbiddenEdit);
       const id = params.id ?? '';
       try {
-        const input = parseSaveBody(body);
+        const input = parseSaveBody(body, config.messages);
         compileDocument(parseReportDocument(input.spec), config.catalog);
         const current = await store.get(actor.clientId, id);
         // Absent, or present-but-invisible: the same 404 the reader gets, so an
         // author-permission holder learns nothing here they could not learn
         // from `GET /reports/custom/:id`.
-        if (!current || !canViewSavedReport(current, actor)) return fail(404, NOT_FOUND);
+        if (!current || !canViewSavedReport(current, actor)) return fail(404, config.messages.notFound);
         const record = await store.update(actor.clientId, id, toInput(input, current));
-        return record ? ok(toSummary(record, actor.userId)) : fail(404, NOT_FOUND);
+        return record ? ok(toSummary(record, actor.userId)) : fail(404, config.messages.notFound);
       } catch (error) {
-        if (isDuplicateName(error)) return fail(409, DUPLICATE_NAME);
+        if (isDuplicateName(error)) return fail(409, config.messages.duplicateName);
         return foldSpecError(error);
       }
     },
@@ -160,19 +158,19 @@ function deleteRoute(
     permission: DEFAULT_AUTHOR_PERMISSION,
     authoring: true,
     async handle({ actor, params }) {
-      if (!mayAuthor(config, actor)) return fail(403, 'Sem permissão para remover relatórios.');
+      if (!mayAuthor(config, actor)) return fail(403, config.messages.forbiddenDelete);
       const id = params.id ?? '';
       // READ BEFORE DELETE. The store's `remove` is tenant-scoped and would
       // happily destroy a document this actor may not open, which is the widest
       // possible version of the fail-open: the only feedback is that the row is
       // gone.
       const current = await store.get(actor.clientId, id);
-      if (!current || !canViewSavedReport(current, actor)) return fail(404, NOT_FOUND);
+      if (!current || !canViewSavedReport(current, actor)) return fail(404, config.messages.notFound);
       const removed = await store.remove(actor.clientId, id);
       // 204 with NO body: there is nothing to say about a document that no
       // longer exists, and an envelope here would be the only write on this
       // surface answering with one.
-      return removed ? { status: 204, body: undefined } : fail(404, NOT_FOUND);
+      return removed ? { status: 204, body: undefined } : fail(404, config.messages.notFound);
     },
   };
 }

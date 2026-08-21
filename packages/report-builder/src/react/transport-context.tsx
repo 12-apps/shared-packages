@@ -1,5 +1,8 @@
 import { createContext, useContext, useMemo, type JSX, type ReactNode } from "react";
 
+import type { ReportEngineCopy } from "../copy";
+
+import type { ReportBuilderCopy } from "./copy";
 import type {
   SystemDashboardDef,
   SystemReportNavEntry,
@@ -61,6 +64,7 @@ interface ReportBuilderContextValue {
   transport: ReportBuilderTransport;
   tenantSlug: string;
   surface: ReportBuilderSurface;
+  copy: ReportBuilderCopy;
 }
 
 const ReportBuilderContext = createContext<ReportBuilderContextValue | null>(null);
@@ -69,16 +73,18 @@ export function ReportBuilderProvider({
   transport,
   tenantSlug,
   surface,
+  copy,
   children,
 }: {
   transport: ReportBuilderTransport;
   tenantSlug: string;
   surface: ReportBuilderSurface;
+  copy: ReportBuilderCopy;
   children: ReactNode;
 }): JSX.Element {
   const value = useMemo(
-    () => ({ transport, tenantSlug, surface }),
-    [transport, tenantSlug, surface],
+    () => ({ transport, tenantSlug, surface, copy }),
+    [transport, tenantSlug, surface, copy],
   );
   return <ReportBuilderContext.Provider value={value}>{children}</ReportBuilderContext.Provider>;
 }
@@ -100,4 +106,32 @@ export function useTransport(): ReportBuilderTransport {
 /** The host's vocabulary in scope; empty outside a provider. */
 export function useReportSurface(): ReportBuilderSurface {
   return useContext(ReportBuilderContext)?.surface ?? EMPTY_SURFACE;
+}
+
+/**
+ * The engine copy in scope — the spec sentence's words, the column headings,
+ * the reasons a presentation is unavailable, and what a boolean cell reads as.
+ *
+ * THROWS outside a provider, unlike {@link useTransport} and
+ * {@link useReportSurface}, which fall back. Those two have a meaningful empty
+ * answer — same-origin fetch, and a surface with no built-ins. Copy does not:
+ * a screen with no words is broken, and a default here would be the origin
+ * host's Portuguese, which is the exact thing this config exists to stop being
+ * silent. Failing at the first render names the wiring mistake; blank labels
+ * would hide it.
+ */
+export function useReportCopy(): ReportBuilderCopy {
+  const value = useContext(ReportBuilderContext);
+  if (!value) {
+    throw new Error(
+      "Report screens must be mounted inside <ReportBuilderProvider>, which supplies `copy`. " +
+        "Mount the surface with createWebReportBuilder({ copy, ... }).",
+    );
+  }
+  return value.copy;
+}
+
+/** The engine half of the copy in scope — the shorthand most screens want. */
+export function useReportEngineCopy(): ReportEngineCopy {
+  return useReportCopy().engine;
 }

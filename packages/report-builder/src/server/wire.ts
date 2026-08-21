@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { dashboardSpecSchema, reportDocumentSchema, reportSpecSchema } from '../spec';
+
 import { REPORT_DEFAULT_RANGES, REPORT_MAX_RANGE_DAYS, REPORT_RANGE_PRESETS } from './range';
 import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
 import { reportWorkingCopySchema } from './working-copy';
@@ -64,64 +65,6 @@ export const savedReportParams = z.object({
   tenantSlug: z.string().min(1),
   id: z.string().min(1),
 });
-
-/** A calendar date (`YYYY-MM-DD`), interpreted at UTC midnight by the API. */
-const isoDateSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use o formato AAAA-MM-DD.')
-  .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)), 'Data inválida.');
-
-function spanInDays(from: string, to: string): number {
-  const ms = Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`);
-  return ms / (24 * 60 * 60 * 1000) + 1;
-}
-
-interface CustomRangeFields {
-  preset: string;
-  from?: string;
-  to?: string;
-}
-
-/** The custom-range rules, applied to every schema that carries a window. */
-function withRangeRules<T extends z.ZodType<CustomRangeFields>>(schema: T): T {
-  return schema
-    .refine((value) => value.preset !== 'custom' || (value.from && value.to), {
-      message: 'Informe `from` e `to` para o período personalizado.',
-      path: ['from'],
-    })
-    .refine(
-      (value) => value.preset !== 'custom' || !value.from || !value.to || value.from <= value.to,
-      { message: 'A data final deve ser igual ou posterior à inicial.', path: ['to'] },
-    )
-    .refine(
-      (value) =>
-        value.preset !== 'custom' ||
-        !value.from ||
-        !value.to ||
-        spanInDays(value.from, value.to) <= REPORT_MAX_RANGE_DAYS,
-      { message: `O período não pode exceder ${REPORT_MAX_RANGE_DAYS} dias.`, path: ['to'] },
-    ) as unknown as T;
-}
-
-/** Report window + grain (rolling presets or an inclusive custom range). */
-export const reportRangeQuery = withRangeRules(
-  z.object({
-    preset: z.enum(REPORT_RANGE_PRESETS).default('30d'),
-    from: isoDateSchema.optional(),
-    to: isoDateSchema.optional(),
-    grain: z.enum(REPORT_GRAINS).default('day'),
-  }),
-);
-
-/** Body of a dry run: the declarative spec plus the window. */
-export const runReportBody = withRangeRules(
-  z.object({
-    spec: reportSpecSchema,
-    preset: z.enum(REPORT_RANGE_PRESETS).default('30d'),
-    from: isoDateSchema.optional(),
-    to: isoDateSchema.optional(),
-  }),
-);
 
 export const saveReportBody = z.object({
   name: z.string().min(1).max(120),
@@ -384,3 +327,8 @@ export const fieldListingSchema = z.object({
     }),
   ),
 });
+
+export {
+  reportRangeQuery,
+  runReportBody,
+} from './wire-range';

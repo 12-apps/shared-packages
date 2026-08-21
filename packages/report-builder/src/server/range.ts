@@ -1,5 +1,7 @@
 import { ReportBuilderError } from '../errors';
 
+import type { ReportRangeMessages } from './messages';
+
 /**
  * The period a report runs over (FUT-391) — calendar arithmetic, moved here
  * from the host along with the endpoints that use it.
@@ -220,22 +222,23 @@ function invalidRange(message: string): ReportBuilderError {
 function resolveCustomWindow(
   input: ReportRangeInput,
   timeZone: string | undefined,
+  messages: ReportRangeMessages,
 ): { from: Date; toExclusive: Date } {
   if (!input.from || !input.to) {
-    throw invalidRange('Informe as datas inicial e final do período.');
+    throw invalidRange(messages.datesRequired);
   }
   const from = startOfDay(input.from, timeZone);
   // `to` is an INCLUSIVE calendar day, so the exclusive bound is the next
   // midnight — a row at 23:59 on the last day still counts.
   const toExclusive = startOfNextDay(input.to, timeZone);
   if (Number.isNaN(from.getTime()) || Number.isNaN(toExclusive.getTime())) {
-    throw invalidRange('Data inválida.');
+    throw invalidRange(messages.invalidDate);
   }
   if (toExclusive <= from) {
-    throw invalidRange('A data final deve ser igual ou posterior à inicial.');
+    throw invalidRange(messages.endBeforeStart);
   }
   if (toExclusive.getTime() - from.getTime() > REPORT_MAX_RANGE_DAYS * DAY_MS) {
-    throw invalidRange(`O período não pode exceder ${REPORT_MAX_RANGE_DAYS} dias.`);
+    throw invalidRange(messages.tooLong(REPORT_MAX_RANGE_DAYS));
   }
   return { from, toExclusive };
 }
@@ -282,11 +285,12 @@ function resolveRollingWindow(
 export function resolveReportRange(
   input: ReportRangeInput,
   now: Date,
+  messages: ReportRangeMessages,
   timeZone?: string,
 ): ResolvedReportRange {
   const window =
     input.preset === 'custom'
-      ? resolveCustomWindow(input, timeZone)
+      ? resolveCustomWindow(input, timeZone, messages)
       : resolveRollingWindow(input.preset, now, timeZone);
   return { preset: input.preset, ...window };
 }

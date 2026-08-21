@@ -1,3 +1,4 @@
+import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { reportSpecSchema } from '../../spec';
@@ -72,7 +73,8 @@ describe('chartOptions', () => {
         ],
       }),
       byName,
-    );
+    PT_BR_REPORT_ENGINE_COPY.presentation,
+);
     const reasonOf = (value: string): string | null | undefined =>
       options.find((option) => option.value === value)?.disabledReason;
 
@@ -95,7 +97,8 @@ describe('chartOptions', () => {
         ],
       }),
       byName,
-    );
+    PT_BR_REPORT_ENGINE_COPY.presentation,
+);
     expect(options.find((option) => option.value === 'bar')?.disabledReason).toContain('medida');
     expect(options.find((option) => option.value === 'table')?.disabledReason).toBeNull();
   });
@@ -104,7 +107,7 @@ describe('chartOptions', () => {
     // The bug report: an AREA chart whose x-axis was CARD → PIX. A line or an
     // area asserts the space BETWEEN two points is a value; half-way between
     // two payment methods is not one.
-    const options = chartOptions(draft({ dimensions: [{ field: 'method', timeGrain: 'day' }] }), byName);
+    const options = chartOptions(draft({ dimensions: [{ field: 'method', timeGrain: 'day' }] }), byName, PT_BR_REPORT_ENGINE_COPY.presentation);
     const reasonOf = (value: string): string | null | undefined =>
       options.find((option) => option.value === value)?.disabledReason;
 
@@ -121,14 +124,15 @@ describe('chartOptions', () => {
     const options = chartOptions(
       draft({ dimensions: [{ field: 'hourOfDay', timeGrain: 'day' }] }),
       byName,
-    );
+    PT_BR_REPORT_ENGINE_COPY.presentation,
+);
 
     expect(options.find((option) => option.value === 'line')?.disabledReason).toBeNull();
     expect(options.find((option) => option.value === 'area')?.disabledReason).toBeNull();
   });
 
   it('refuses line and area over a BOOLEAN axis', () => {
-    const options = chartOptions(draft({ dimensions: [{ field: 'closed', timeGrain: 'day' }] }), byName);
+    const options = chartOptions(draft({ dimensions: [{ field: 'closed', timeGrain: 'day' }] }), byName, PT_BR_REPORT_ENGINE_COPY.presentation);
 
     expect(options.find((option) => option.value === 'line')?.disabledReason).not.toBeNull();
     expect(options.find((option) => option.value === 'bar')?.disabledReason).toBeNull();
@@ -143,7 +147,8 @@ describe('chartOptions', () => {
         ],
       }),
       byName,
-    );
+    PT_BR_REPORT_ENGINE_COPY.presentation,
+);
     expect(options.find((option) => option.value === 'bar')?.disabledReason).toBeNull();
     expect(options.find((option) => option.value === 'pie')?.disabledReason).toContain(
       'uma medida só',
@@ -164,7 +169,7 @@ describe('chartOptions', () => {
 describe('chartOptions — no grouping', () => {
   const reasonsFor = (measures: BuilderDraft['measures']): Map<string, string | null> =>
     new Map(
-      chartOptions(draft({ dimensions: [], measures }), byName).map((option) => [
+      chartOptions(draft({ dimensions: [], measures }), byName, PT_BR_REPORT_ENGINE_COPY.presentation).map((option) => [
         option.value,
         option.disabledReason,
       ]),
@@ -194,7 +199,7 @@ describe('chartOptions — no grouping', () => {
   });
 
   it('offers the table again the moment a grouping exists', () => {
-    const options = chartOptions(draft({ measures: THREE }), byName);
+    const options = chartOptions(draft({ measures: THREE }), byName, PT_BR_REPORT_ENGINE_COPY.presentation);
     expect(options.find((option) => option.value === 'table')?.disabledReason).toBeNull();
   });
 });
@@ -218,17 +223,17 @@ describe('stackedOption', () => {
         { field: 'method', timeGrain: 'day' },
       ],
     });
-    expect(stackedOption(current, byName)?.disabledReason).toBeNull();
+    expect(stackedOption(current, byName, PT_BR_REPORT_ENGINE_COPY.presentation)?.disabledReason).toBeNull();
   });
 
   it.each(['bar', 'area'] as const)('offers %s stacking with two measures', (chartType) => {
     expect(
-      stackedOption(draft({ chartType, measures: TWO_MEASURES }), byName)?.disabledReason,
+      stackedOption(draft({ chartType, measures: TWO_MEASURES }), byName, PT_BR_REPORT_ENGINE_COPY.presentation)?.disabledReason,
     ).toBeNull();
   });
 
   it.each(['bar', 'area'] as const)('refuses %s stacking with one series', (chartType) => {
-    const reason = stackedOption(draft({ chartType }), byName)?.disabledReason ?? '';
+    const reason = stackedOption(draft({ chartType }), byName, PT_BR_REPORT_ENGINE_COPY.presentation)?.disabledReason ?? '';
     // Names the control to change, in the register the other reasons use.
     expect(reason).toContain('“separar em séries”');
     expect(reason).toContain('medida');
@@ -239,7 +244,7 @@ describe('stackedOption', () => {
     (chartType) => {
       // `null` is "this control does not apply here", which is a different
       // answer from a toggle that is on screen and refused.
-      expect(stackedOption(draft({ chartType, measures: TWO_MEASURES }), byName)).toBeNull();
+      expect(stackedOption(draft({ chartType, measures: TWO_MEASURES }), byName, PT_BR_REPORT_ENGINE_COPY.presentation)).toBeNull();
     },
   );
 });
@@ -247,11 +252,11 @@ describe('stackedOption', () => {
 describe('withValidChart', () => {
   it('keeps a still-valid selection untouched', () => {
     const current = draft({});
-    expect(withValidChart(current, byName)).toBe(current);
+    expect(withValidChart(current, byName, PT_BR_REPORT_ENGINE_COPY.presentation)).toBe(current);
   });
 
   it('falls back to the KPI tile when the last grouping is removed (FUT-309)', () => {
-    const next = withValidChart(draft({ dimensions: [], chartType: 'pie' }), byName);
+    const next = withValidChart(draft({ dimensions: [], chartType: 'pie' }), byName, PT_BR_REPORT_ENGINE_COPY.presentation);
     expect(next.chartType).toBe('kpi');
   });
 
@@ -262,7 +267,8 @@ describe('withValidChart', () => {
     const next = withValidChart(
       draft({ dimensions: [{ field: 'method', timeGrain: 'day' }], chartType: 'line' }),
       byName,
-    );
+    PT_BR_REPORT_ENGINE_COPY.presentation,
+);
 
     expect(next.chartType).toBe('bar');
   });
@@ -271,7 +277,8 @@ describe('withValidChart', () => {
     const next = withValidChart(
       draft({ dimensions: [{ field: 'method', timeGrain: 'day' }], chartType: 'area' }),
       byName,
-    );
+    PT_BR_REPORT_ENGINE_COPY.presentation,
+);
 
     expect(next.chartType).toBe('bar');
   });
@@ -282,7 +289,7 @@ describe('withValidChart', () => {
       chartType: 'line',
     });
 
-    expect(withValidChart(current, byName)).toBe(current);
+    expect(withValidChart(current, byName, PT_BR_REPORT_ENGINE_COPY.presentation)).toBe(current);
   });
 
   it('opens an hour-of-day grouping ON a line rather than bars', () => {
@@ -294,7 +301,8 @@ describe('withValidChart', () => {
         { field: 'quantity', aggregation: 'sum' },
       ] }),
       byName,
-    );
+    PT_BR_REPORT_ENGINE_COPY.presentation,
+);
 
     expect(next.chartType).toBe('line');
   });
@@ -308,7 +316,8 @@ describe('withValidChart', () => {
         ],
       }),
       byName,
-    );
+    PT_BR_REPORT_ENGINE_COPY.presentation,
+);
     expect(next.chartType).toBe('bar');
   });
 
@@ -320,7 +329,8 @@ describe('withValidChart', () => {
           { field: 'quantity', aggregation: 'sum' },
         ] }),
         byName,
-      ).chartType,
+      PT_BR_REPORT_ENGINE_COPY.presentation,
+).chartType,
     ).toBe('line');
     // Adding a split while on a pie used to drop the author all the way to a
     // table. The axis here is a plain category, so bars are the smart default.
@@ -333,7 +343,8 @@ describe('withValidChart', () => {
           ],
         }),
         byName,
-      ).chartType,
+      PT_BR_REPORT_ENGINE_COPY.presentation,
+).chartType,
     ).toBe('bar');
   });
 
@@ -351,7 +362,8 @@ describe('withValidChart', () => {
           ],
         }),
         byName,
-      ).chartType,
+      PT_BR_REPORT_ENGINE_COPY.presentation,
+).chartType,
     ).toBe('table');
   });
 });

@@ -29,6 +29,7 @@
  * from rather than an assumption about it: the server derived each one FROM the
  * union it is being narrowed to.
  */
+import type { SpecSentenceCopy } from "../../copy";
 import { autoTitle, specSentence } from "../../describe";
 import type { ReportSpec } from "../../spec";
 import type {
@@ -124,13 +125,21 @@ function describableSpec(spec: ReportSpecWire): ReportSpec {
 }
 
 /** What this block asks for, in Portuguese. No trailing period — see `describe.ts`. */
-export function blockSentence(spec: ReportSpecWire, catalog: FieldCatalog): string {
-  return specSentence(describableSpec(spec), catalog);
+export function blockSentence(
+  spec: ReportSpecWire,
+  catalog: FieldCatalog,
+  copy: SpecSentenceCopy,
+): string {
+  return specSentence(describableSpec(spec), catalog, copy);
 }
 
 /** What an untitled block is called: the same sentence, capitalised. */
-export function blockAutoTitle(spec: ReportSpecWire, catalog: FieldCatalog): string {
-  return autoTitle(describableSpec(spec), catalog);
+export function blockAutoTitle(
+  spec: ReportSpecWire,
+  catalog: FieldCatalog,
+  copy: SpecSentenceCopy,
+): string {
+  return autoTitle(describableSpec(spec), catalog, copy);
 }
 
 /** One run of the sentence: `strong` marks the terms the author chose. */

@@ -1,3 +1,4 @@
+import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { compileReport } from '../compile';
@@ -20,7 +21,7 @@ import { orderRows, productSplitRows, salesCatalog, splitRows } from './fixtures
 function chartSpecFor(input: ReportSpecInput) {
   const spec = reportSpecSchema.parse(input);
   const query = compileReport(spec, salesCatalog);
-  const model = renderReport(query, spec.presentation, salesCatalog, orderRows);
+  const model = renderReport(query, spec.presentation, salesCatalog, orderRows, PT_BR_REPORT_ENGINE_COPY.labels);
   if (model.kind !== 'chart') throw new Error(`Expected a chart model, got "${model.kind}".`);
   return model.chartSpec;
 }
@@ -123,7 +124,7 @@ function runSplit(input: ReportSpecInput, rows: Array<Record<string, unknown>> =
   const spec = reportSpecSchema.parse(input);
   const query = compileReport(spec, salesCatalog);
   const executed = executeCompiledQuery(rows, query);
-  const model = renderReport(query, spec.presentation, salesCatalog, executed);
+  const model = renderReport(query, spec.presentation, salesCatalog, executed, PT_BR_REPORT_ENGINE_COPY.labels);
   return { executed, model };
 }
 

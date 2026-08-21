@@ -44,7 +44,7 @@ export type {
 } from '../server/system-reports';
 export { systemReportNav } from '../server/system-reports';
 export {
-  BLANK_BLOCK_TEMPLATE,
+  blankBlockTemplate,
   blockTemplateGroups,
   type BlockTemplate,
   type BlockTemplateGroup,
@@ -66,3 +66,6 @@ export type {
   SavedReportSummary,
   SavedReportView,
 } from './custom-reports-api';
+
+export type { ReportBuilderCopy } from './copy';
+export { useReportCopy, useReportEngineCopy } from './transport-context';

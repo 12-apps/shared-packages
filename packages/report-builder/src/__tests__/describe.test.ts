@@ -1,3 +1,4 @@
+import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { autoTitle, specSentence } from '../describe';
@@ -11,7 +12,7 @@ import { salesCatalog } from './fixtures';
  */
 
 function sentence(input: ReportSpecInput): string {
-  return specSentence(reportSpecSchema.parse(input), salesCatalog);
+  return specSentence(reportSpecSchema.parse(input), salesCatalog, PT_BR_REPORT_ENGINE_COPY.spec);
 }
 
 describe('specSentence', () => {
@@ -153,7 +154,7 @@ describe('specSentence', () => {
       dimensions: [{ field: 'ghostField' }],
       measures: [{ field: 'goneField' }],
     });
-    expect(specSentence(stale, salesCatalog)).toBe(
+    expect(specSentence(stale, salesCatalog, PT_BR_REPORT_ENGINE_COPY.spec)).toBe(
       'contagem de gonefield em pedidos por ghostfield',
     );
   });
@@ -163,7 +164,7 @@ describe('specSentence', () => {
       entity: 'ghosts',
       measures: [{ field: 'whatever' }],
     });
-    expect(specSentence(orphan, salesCatalog)).toBe('contagem de whatever em ghosts');
+    expect(specSentence(orphan, salesCatalog, PT_BR_REPORT_ENGINE_COPY.spec)).toBe('contagem de whatever em ghosts');
   });
 });
 
@@ -177,7 +178,8 @@ describe('autoTitle', () => {
           measures: [{ field: 'totalCents' }],
         }),
         salesCatalog,
-      ),
+      PT_BR_REPORT_ENGINE_COPY.spec,
+),
     ).toBe('Soma de receita em pedidos por data (dia)');
   });
 
@@ -185,14 +187,16 @@ describe('autoTitle', () => {
     const before = autoTitle(
       reportSpecSchema.parse({ entity: 'orders', measures: [{ field: 'totalCents' }] }),
       salesCatalog,
-    );
+    PT_BR_REPORT_ENGINE_COPY.spec,
+);
     const after = autoTitle(
       reportSpecSchema.parse({
         entity: 'orders',
         measures: [{ field: 'itemCount', aggregation: 'avg' }],
       }),
       salesCatalog,
-    );
+    PT_BR_REPORT_ENGINE_COPY.spec,
+);
     expect(before).toBe('Soma de receita em pedidos');
     expect(after).toBe('Média de itens em pedidos');
   });
