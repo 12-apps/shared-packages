@@ -131,22 +131,32 @@ itself will run. It also pins the ordinary levels, because a `parserOpts` typo
 that broke plain `fix:` commits would be a repo-wide outage that looked exactly
 like the majors working.
 
-**At release time**, the `Detect major bumps` job in `ci.yml` re-runs the
-analysis against `main` with `semantic-release --dry-run` — which tags and
-publishes nothing — and, when a major is pending, holds the run at the
-`Approve major release` job. That job belongs to the `release-major`
-environment, so GitHub shows **Review deployments** in the Actions tab and
-notifies its reviewers. Approve and the release continues; reject and it stops
-having written no tag, so the next merge re-cuts the version normally.
+**At release time, nobody is asked anything.** The pull-request gate above is
+the whole decision: a commit only reaches `main` once `Major approval` has been
+granted, so asking a second time after merge could only ever answer a question
+already settled — and while it waited, an approved change sat unpublished.
 
-Only a pending major holds the run. An ordinary minor or patch release never
-waits for anyone.
+`ci.yml` therefore runs checks and only checks. It has no `environment:`, mints
+no Deployment and publishes nothing; a pull request cannot release. Publishing
+lives in **`cd.yml`**, which starts on CI succeeding on `main` (`workflow_run`,
+so it cannot outrun the gates) and then simply publishes.
 
-> **Setup, once per repository:** Settings → Environments → New environment →
-> `release-major`, then add Required reviewers. **Without that protection rule
-> the approval job passes straight through and the gate silently does nothing**
-> — which looks exactly like a healthy release. If a major reaches npm without
-> anyone approving it, check this first.
+Two details there are deliberate. It checks out `main` rather than the commit
+that triggered it, because semantic-release validates the branch it is *on* and
+a detached SHA is not a release branch. And it never cancels in flight: a
+half-run release leaves tags the registry never received, which is the shape of
+the `auth-v1.22.0` incident.
+
+Nothing watches `cd.yml` from inside CI — a workflow cannot depend on another
+workflow's run. Two things that do not share CI's failure modes cover it
+instead: `cd.yml`'s own red run on the commit, and `release-watchdog.yml`,
+which compares every package's newest tag against the registry daily and is the
+only check that still fires when the release workflow cannot run at all.
+
+> **Setup, once per package on npm:** OIDC Trusted Publishing names the workflow
+> file it trusts. Publishing moved from `ci.yml` to `cd.yml`, so each package's
+> Trusted Publisher must name **`cd.yml`** or the publish is refused — there is
+> no token fallback except a package's first publish.
 
 A footer is anchored to the start of a line, which is what
 conventional-commits-parser tests. A sentence that merely *mentions* a breaking
