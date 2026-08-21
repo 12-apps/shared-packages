@@ -12,8 +12,10 @@ import {
 } from "@12-apps/ui/form/total-form";
 import { Stack } from "@12-apps/ui/mui/Stack";
 
+import type { ComboRequirement } from "../engine/types";
+
 import type { DiscountFormPayload, DiscountsApiClient, DiscountWireRecord, WireTargetGroup } from "./api";
-import type { DiscountsWebCopy } from "./copy";
+import { fill, type DiscountsWebCopy } from "./copy";
 import {
   DiscountSwitches,
   LimitFields,
@@ -22,6 +24,7 @@ import {
   WindowFields,
   type CurrencyFieldComponent,
 } from "./discount-form-fields";
+import { comboUnits } from "./combo-slot-builder";
 import { DiscountTargetPicker } from "./discount-target-picker";
 import type { DiscountsFormatters } from "./format";
 
@@ -46,6 +49,9 @@ interface DiscountFormValues extends Record<string, string> {
   type: string;
   percentOff: string;
   amountOff: string;
+  bundlePrice: string;
+  freeUnits: string;
+  maxComboApplications: string;
   scope: string;
   trigger: string;
   code: string;
@@ -67,6 +73,9 @@ const BLANK: DiscountFormValues = {
   type: "PERCENTAGE",
   percentOff: "",
   amountOff: "",
+  bundlePrice: "",
+  freeUnits: "",
+  maxComboApplications: "",
   scope: "ORDER",
   trigger: "AUTOMATIC",
   code: "",
@@ -89,6 +98,10 @@ function initialValues(
     type: editing.type,
     percentOff: editing.percentOffBp === null ? "" : formatters.toInput(editing.percentOffBp / 100),
     amountOff: cents(editing.amountOffCents),
+    bundlePrice: cents(editing.bundlePriceCents ?? null),
+    freeUnits: editing.freeUnits == null ? "" : String(editing.freeUnits),
+    maxComboApplications:
+      editing.maxComboApplications == null ? "" : String(editing.maxComboApplications),
     scope: editing.scope,
     trigger: editing.trigger,
     code: editing.code ?? "",
@@ -100,31 +113,125 @@ function initialValues(
   };
 }
 
-/** The value half: a rate in (0, 100], or an amount above zero. */
-function checkValue(
-  values: DiscountFormValues,
+/** A whole number above zero, as typed. `null` when it is neither. */
+function positiveCount(typed: string): number | null {
+  const trimmed = typed.trim();
+  if (trimmed === "") return null;
+  const value = Number(trimmed);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+/** A money field that has to hold something above zero. */
+function checkMoney(
+  typed: string,
+  field: string,
+  message: string,
+  formatters: DiscountsFormatters,
+): Record<string, string> {
+  const amount = formatters.parseDecimal(typed);
+  return amount === null || amount <= 0 ? { [field]: message } : {};
+}
+
+/**
+ * The free count, which is the one reward bounded by another field.
+ *
+ * "Take 3, three free" is a giveaway rather than a promotion, so it is compared
+ * against what ONE application of the combo takes out of the cart. The ceiling
+ * is named in the message: an operator told only "too many" has to guess the
+ * number.
+ */
+function checkFreeUnits(
+  typed: string,
+  slots: readonly ComboRequirement[],
+  copy: DiscountsWebCopy,
+): Record<string, string> {
+  const free = positiveCount(typed);
+  if (free === null) return { freeUnits: copy.form.invalidFreeUnits };
+  const units = comboUnits(slots);
+  if (free >= units) {
+    return {
+      freeUnits: fill(copy.form.freeUnitsExceedCombo, { units, max: Math.max(units - 1, 0) }),
+    };
+  }
+  return {};
+}
+
+/** The rate, in the 0–100 an operator thinks in rather than basis points. */
+function checkPercent(
+  typed: string,
   formatters: DiscountsFormatters,
   copy: DiscountsWebCopy,
 ): Record<string, string> {
-  if (values.type === "PERCENTAGE") {
-    const percent = formatters.parseDecimal(values.percentOff);
-    if (percent === null || percent <= 0 || percent > 100) {
-      return { percentOff: copy.form.invalidPercent };
-    }
-    return {};
+  const percent = formatters.parseDecimal(typed);
+  return percent === null || percent <= 0 || percent > 100
+    ? { percentOff: copy.form.invalidPercent }
+    : {};
+}
+
+/** The reward, checked against the input the chosen type actually mounted. */
+function checkValue(
+  values: DiscountFormValues,
+  slots: readonly ComboRequirement[],
+  formatters: DiscountsFormatters,
+  copy: DiscountsWebCopy,
+): Record<string, string> {
+  if (values.type === "FIXED_AMOUNT") {
+    return checkMoney(values.amountOff, "amountOff", copy.form.invalidAmount, formatters);
   }
-  const amount = formatters.parseDecimal(values.amountOff);
-  return amount === null || amount <= 0 ? { amountOff: copy.form.invalidAmount } : {};
+  if (values.type === "BUNDLE_PRICE") {
+    return checkMoney(values.bundlePrice, "bundlePrice", copy.form.invalidBundlePrice, formatters);
+  }
+  if (values.type === "FREE_UNITS") return checkFreeUnits(values.freeUnits, slots, copy);
+  return checkPercent(values.percentOff, formatters, copy);
+}
+
+/**
+ * The combo half: the groups themselves, and the per-cart cap.
+ *
+ * Every rule here is also the server's (`validate-combo.ts`), and deliberately
+ * so — this half exists to attach the refusal to the input the operator is
+ * looking at, never to be the authority.
+ */
+function checkCombo(
+  values: DiscountFormValues,
+  slots: readonly ComboRequirement[],
+  copy: DiscountsWebCopy,
+): Record<string, string> {
+  if (values.scope !== "COMBO") return {};
+  if (slots.length === 0) return { scope: copy.form.comboSlotsRequired };
+  const errors: Record<string, string> = {};
+  if (slots.some((slot) => !Number.isInteger(slot.quantity) || slot.quantity <= 0)) {
+    errors.scope = copy.form.invalidComboQuantity;
+  } else if (
+    slots.some((slot) => slot.categoryIds.length === 0 && slot.menuItemIds.length === 0)
+  ) {
+    errors.scope = copy.form.comboSlotTargetRequired;
+  }
+  if (values.maxComboApplications.trim() !== "" && positiveCount(values.maxComboApplications) === null) {
+    errors.maxComboApplications = copy.form.invalidMaxComboApplications;
+  }
+  return errors;
+}
+
+/** What the pickers and the builder currently hold, in one argument. */
+interface FormTargets {
+  categoryIds: string[];
+  menuItemIds: string[];
+  comboRequirements: ComboRequirement[];
 }
 
 /** The cross-field rules a per-input schema cannot express. */
 function validate(
   values: DiscountFormValues,
-  targets: { categoryIds: string[]; menuItemIds: string[] },
+  targets: FormTargets,
   formatters: DiscountsFormatters,
   copy: DiscountsWebCopy,
 ): Record<string, string> {
-  const errors: Record<string, string> = { ...checkValue(values, formatters, copy) };
+  const slots = targets.comboRequirements;
+  const errors: Record<string, string> = {
+    ...checkValue(values, slots, formatters, copy),
+    ...checkCombo(values, slots, copy),
+  };
   if (values.trigger === "CODE" && values.code.trim() === "") {
     errors.code = copy.form.codeRequired;
   }
@@ -148,15 +255,23 @@ function useNonStringState(editing: DiscountWireRecord | null) {
   const [stackable, setStackable] = useState<boolean>(editing?.stackable ?? true);
   const [categoryIds, setCategoryIds] = useState<string[]>(editing?.categoryIds ?? []);
   const [menuItemIds, setMenuItemIds] = useState<string[]>(editing?.menuItemIds ?? []);
+  // The combo's groups are the third array, and the one whose ORDER matters:
+  // the list the operator built is the list a card reads back, and the server
+  // stamps each group's index as its stored `position`.
+  const [comboRequirements, setComboRequirements] = useState<ComboRequirement[]>(() =>
+    editing?.comboRequirements ? [...editing.comboRequirements] : [],
+  );
   return {
     active,
     stackable,
     categoryIds,
     menuItemIds,
+    comboRequirements,
     setActive,
     setStackable,
     setCategoryIds,
     setMenuItemIds,
+    setComboRequirements,
   };
 }
 
@@ -190,7 +305,11 @@ function makeSubmit(
   const { api, copy, formatters, editing, onSaved, onError } = props;
   return async function handleSubmit(values, { setFieldErrors }): Promise<void> {
     setError(null);
-    const targets = { categoryIds: extra.categoryIds, menuItemIds: extra.menuItemIds };
+    const targets: FormTargets = {
+      categoryIds: extra.categoryIds,
+      menuItemIds: extra.menuItemIds,
+      comboRequirements: extra.comboRequirements,
+    };
     const invalid = validate(values, targets, formatters, copy);
     if (Object.keys(invalid).length > 0) {
       setFieldErrors(invalid);
@@ -241,8 +360,10 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
           selection={{
             categoryIds: extra.categoryIds,
             menuItemIds: extra.menuItemIds,
+            comboRequirements: extra.comboRequirements,
             onCategoryIdsChange: extra.setCategoryIds,
             onMenuItemIdsChange: extra.setMenuItemIds,
+            onComboRequirementsChange: extra.setComboRequirements,
           }}
         />
         <WindowFields copy={copy} />
