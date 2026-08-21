@@ -20,7 +20,13 @@
  * keeps its own paragraph.
  */
 
-import type { MountedRoute, WireHttpMethod, WireResponse, WireRoute } from "../contract/http";
+import type {
+  MountedRoute,
+  WireHttpMethod,
+  WireResponse,
+  WireRoute,
+  WireRouteAnswer,
+} from "../contract/http";
 
 const WIRE_METHODS: readonly WireHttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
@@ -42,9 +48,9 @@ export function parseWireRouteKey(key: string): { method: WireHttpMethod; path: 
   return { method, path };
 }
 
-export interface WireRouteTable {
+export interface WireRouteTable<TAnswer extends WireRouteAnswer = WireResponse> {
   /** The descriptor at `method path`, or a throw naming the package. */
-  route(method: WireHttpMethod, path: string): WireRoute<never>;
+  route(method: WireHttpMethod, path: string): WireRoute<never, TAnswer>;
 }
 
 /**
@@ -55,10 +61,10 @@ export interface WireRouteTable {
  * the unit test that imports the file, or per request where module-load
  * construction is impossible — the table itself does not care.
  */
-export function createWireRouteTable(
+export function createWireRouteTable<TAnswer extends WireRouteAnswer = WireResponse>(
   packageName: string,
-  routes: readonly (WireRoute<never> | MountedRoute)[],
-): WireRouteTable {
+  routes: readonly (WireRoute<never, TAnswer> | MountedRoute<TAnswer>)[],
+): WireRouteTable<TAnswer> {
   const byKey = new Map(
     routes
       .map((entry) => ("route" in entry ? entry.route : entry))
@@ -106,4 +112,15 @@ export function forwardWireParams(
 export function wireResponse(response: WireResponse): Response {
   if (response.body === undefined) return new Response(null, { status: response.status });
   return Response.json(response.body, { status: response.status });
+}
+
+/**
+ * The full answer union as a fetch `Response`: the raw half passes through
+ * untouched (a stream must not be read, a redirect's headers ARE the
+ * payload), the JSON half goes through `wireResponse` and its 204 rule.
+ * Discriminates on `status` — the one field the JSON half requires and the
+ * raw half cannot have.
+ */
+export function wireAnswer(answer: WireRouteAnswer): Response {
+  return "status" in answer ? wireResponse(answer) : answer.response;
 }

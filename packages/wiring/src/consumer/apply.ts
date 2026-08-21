@@ -6,7 +6,7 @@
  */
 
 import { WiringAssemblyError } from "../errors";
-import type { MountedRoute, WireRoute } from "../contract/http";
+import type { MountedRoute, WireRoute, WireRouteAnswer } from "../contract/http";
 import type { BoundJob, JobsContribution, WireJobBlueprint } from "../contract/jobs";
 import type { AnyServerManifest, AnyWebManifest } from "../contract/manifest";
 import type { EmailPort } from "../contract/email";
@@ -52,7 +52,7 @@ function refuse(context: BindContext, message: string): never {
  * permissions contribution does not declare is drift between the two
  * halves of the same manifest.
  */
-function assertRoutePolicy(context: BindContext, route: WireRoute<never>): void {
+function assertRoutePolicy(context: BindContext, route: WireRoute<never, WireRouteAnswer>): void {
   const kind = route.kind ?? "authenticated";
   const at = `route ${route.method} ${route.path}`;
   if (route.permission !== undefined && kind !== "authenticated") {
@@ -89,7 +89,7 @@ export function bindHttp(
     context.sinks.routes.push({
       packageName: context.packageName,
       mountPath: value.mountPath,
-      route: route as WireRoute<never>,
+      route: route as WireRoute<never, WireRouteAnswer>,
     });
   });
   return {

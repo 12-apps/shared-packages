@@ -53,6 +53,7 @@ export {
   createWireRouteTable,
   forwardWireParams,
   parseWireRouteKey,
+  wireAnswer,
   wireResponse,
   type WireRouteTable,
 } from "./endpoint";

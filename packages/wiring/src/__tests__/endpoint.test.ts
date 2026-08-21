@@ -5,6 +5,7 @@ import {
   createWireRouteTable,
   forwardWireParams,
   parseWireRouteKey,
+  wireAnswer,
   wireResponse,
 } from "../consumer/endpoint";
 
@@ -99,5 +100,24 @@ describe("wireResponse", () => {
   it("serializes an explicit null body, which is a value, not absence", async () => {
     const response = wireResponse({ status: 200, body: null });
     expect(await response.text()).toBe("null");
+  });
+});
+
+describe("wireAnswer", () => {
+  it("sends the JSON half through wireResponse and its 204 rule", async () => {
+    const json = wireAnswer({ status: 201, body: { data: { id: "r1" } } });
+    expect(json.status).toBe(201);
+    expect(await json.json()).toEqual({ data: { id: "r1" } });
+    expect(await wireAnswer({ status: 204, body: undefined }).text()).toBe("");
+  });
+
+  it("returns the raw half UNTOUCHED — headers and body identity included", () => {
+    // A redirect's headers ARE the payload, and a stream must not be read;
+    // the discriminant is `status`, the one field the JSON half requires
+    // and the raw half cannot have.
+    const raw = new Response(null, { status: 302, headers: { location: "/next" } });
+    const answered = wireAnswer({ response: raw });
+    expect(answered).toBe(raw);
+    expect(answered.headers.get("location")).toBe("/next");
   });
 });
