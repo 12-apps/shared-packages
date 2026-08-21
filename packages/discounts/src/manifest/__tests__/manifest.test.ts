@@ -29,6 +29,8 @@ import { recordingLogger } from "../../server/__tests__/recording-logger";
 import { createApiDiscounts } from "../../server/routes";
 import { discountsManifest } from "../index";
 import { discountsServerManifest } from "../server";
+import { discountsWebManifest } from "../web";
+import { PT_BR_DISCOUNTS_WEB_COPY } from "../../react/pt-BR";
 
 /** Every copy key, filled with its own name — the sentences are not the subject here. */
 const FULL_COPY = Object.fromEntries(
@@ -174,6 +176,50 @@ describe("the shared manifest", () => {
     // is invisible to the adopting host; the reverse is a declaration whose
     // subpath does not resolve.
     expect(() => assertExportsMirror(discountsManifest, packageJson)).not.toThrow();
+  });
+
+  it("declares the WEB half, and ships a subpath for each contribution", () => {
+    // The capability list and the exports map are two statements of one fact,
+    // and `assertExportsMirror` below already pins them against each other —
+    // this names what they should say, so a capability quietly dropped from
+    // the manifest fails as a missing declaration rather than as a mirror that
+    // agrees about nothing.
+    expect(discountsManifest.web).toEqual(["surface", "areas"]);
+    expect(Object.keys(packageJson.exports)).toEqual(
+      expect.arrayContaining(["./react", "./react/pt-BR", "./manifest/web"]),
+    );
+  });
+
+  it("suggests a route and a nav row, and gates BOTH on the read permission", () => {
+    // Suggestions, structurally: a host composes, reorders, relabels and vetoes
+    // at its single call site. What it must not have to re-derive is which
+    // permission the surface needs — that is the package's own contribution,
+    // and a nav row visible to somebody the route refuses is a dead link.
+    const [area] = discountsWebManifest.areas;
+    expect(area?.area).toBe("admin");
+    expect(area?.routes[0]).toMatchObject({ path: "discounts", screen: "Screen" });
+    expect(area?.routes[0]?.permission).toBe("discounts:read");
+    expect(area?.nav[0]?.permission).toBe(area?.routes[0]?.permission);
+    expect(area?.nav[0]?.path).toBe(area?.routes[0]?.path);
+  });
+
+  it("names a screen the surface actually builds", () => {
+    // An `AreaRouteDeclaration` references a surface member BY KEY, so a typo
+    // is a host rendering `undefined` at a route that looks wired.
+    const surface = discountsWebManifest.surface.create({
+      apiBase: "/api",
+      copy: PT_BR_DISCOUNTS_WEB_COPY,
+      locale: "pt-BR",
+      currency: "BRL",
+      currencyField: () => null as never,
+      onError: () => {},
+      transport: {
+        get: () => Promise.reject(new Error("unused")),
+        send: () => Promise.reject(new Error("unused")),
+      },
+    });
+    const screen = discountsWebManifest.areas[0]?.routes[0]?.screen ?? "";
+    expect(surface).toHaveProperty(screen);
   });
 
   it("files its telemetry under its own namespace", () => {
