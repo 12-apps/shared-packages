@@ -79,6 +79,14 @@ Components for displaying data, visualizations, and information to users.
 **Location**: `src/components/data-display/Chip`
 **Docs**: `src/components/data-display/Chip/Chip.md`
 
+### CardKit
+**Purpose**: The furniture an admin list's cards and row menus sit in — everything above `BaseCard` that is the same shape for every entity
+**Use Cases**: Kind cards and their kebab menus, expanded list-card bodies, confirm-before-deleting from a row or a selection
+**Features**: `CardKebab` (accessible name required, never defaulted), `rowActionsToMenuItems` so one `RowAction[]` drives the grid and the card alike, `CardActionsProvider` (tenant + refresh + one shared error snackbar, and it throws outside its provider), the body parts `DetailColumns`/`Fact`/`Ledger`/`BodyHeading`/`TagList`, and the two confirm hooks — `useRowConfirm` for a grid selection, `useRemoveConfirm` for a self-contained menu
+**Types**: `KindCardProps`, `KindListCardProps`, `RowConfirmCopy`, `CardWriteResult`, `CardFactProps`, `CardLedgerLine`
+**Location**: `src/components/data-display/CardKit`
+**Docs**: `src/components/data-display/CardKit/CardKit.md`
+
 ### DataGrid
 **Purpose**: Advanced data table with sorting, filtering, pagination, and editing
 **Use Cases**: Complex data tables, admin panels, data management interfaces

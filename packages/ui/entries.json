@@ -128,5 +128,6 @@
   "utility/Portal": "src/components/utility/Portal/index.ts",
   "utility/Transition": "src/components/utility/Transition/index.ts",
   "utility/VirtualList": "src/components/utility/VirtualList/index.ts",
-  "utility/WorkflowStep": "src/components/utility/WorkflowStep/index.ts"
+  "utility/WorkflowStep": "src/components/utility/WorkflowStep/index.ts",
+  "data-display/CardKit": "src/components/data-display/CardKit/index.ts"
 }
