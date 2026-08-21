@@ -39,11 +39,39 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 
-const require_ = createRequire(import.meta.url);
-const fromSemanticRelease = createRequire(require_.resolve('semantic-release'));
-const { analyzeCommits } = await import(
-  pathToFileURL(fromSemanticRelease.resolve('@semantic-release/commit-analyzer')).href
-);
+/**
+ * The analyzer, resolved through semantic-release's own module graph.
+ *
+ * Not imported by name: `@semantic-release/commit-analyzer` is a transitive
+ * dependency, and adding it as a direct one would let this test pin a different
+ * version from the one a release actually runs — asserting the right answer
+ * about the wrong code, which is the failure mode this whole file exists to
+ * prevent one level up.
+ *
+ * The diagnosis matters because this is the first script under `quality:release`
+ * that needs an install at all; the lane ran without one for its whole life, and
+ * the bare MODULE_NOT_FOUND it throws otherwise names neither the cause nor the
+ * fix.
+ */
+async function loadAnalyzer() {
+  const require_ = createRequire(import.meta.url);
+  try {
+    const fromSemanticRelease = createRequire(require_.resolve('semantic-release'));
+    return await import(
+      pathToFileURL(fromSemanticRelease.resolve('@semantic-release/commit-analyzer')).href
+    );
+  } catch (error) {
+    console.log(
+      '::error::Could not load @semantic-release/commit-analyzer through semantic-release. ' +
+        'This self-test runs the REAL analyzer over the committed .releaserc.json files, so it ' +
+        'needs the dependency tree — run `pnpm install` first. ' +
+        `Underlying error: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exit(1);
+  }
+}
+
+const { analyzeCommits } = await loadAnalyzer();
 
 const config = (path) => JSON.parse(readFileSync(join(ROOT, path), 'utf8'));
 

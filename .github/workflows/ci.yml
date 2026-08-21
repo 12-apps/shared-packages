@@ -970,6 +970,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: 'pnpm'
+      # This job ran without an install for its whole life, because every script
+      # under `quality:release` was pure logic over fixtures. `release-bump-selftest`
+      # is the one that cannot be: it asserts what each commit syntax actually
+      # releases by running the REAL @semantic-release/commit-analyzer over the
+      # committed configs, resolved through semantic-release's own module graph so
+      # it cannot drift into testing a different copy. Stubbing that would assert
+      # the fixture, not the release.
+      #
+      # It adds no failure class to publishing that publishing did not already
+      # have: `release` installs before it can release anything, so an install
+      # that cannot succeed already blocks every publish. What it does add is
+      # ~15s to a lane `release` needs — worth it, because the alternative is a
+      # second lane, and a second lane is one that can silently lose its caller.
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
       # The package script, not `node scripts/…` spelled out again — same reason
       # the portability job calls `pnpm quality:portability`: one command, so what
       # CI runs and what a developer runs cannot drift apart.
