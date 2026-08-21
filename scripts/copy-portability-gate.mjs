@@ -18,14 +18,15 @@
 // union) are a REAL smell this gate does not see; those stay with the
 // per-package portability suites, which judge vocabulary, not language.
 //
-// WHAT MAY SHIP PORTUGUESE, by category (not allowlist):
-//   - a NAMED PACK — a file whose name says what it is (`pt-BR.ts`,
-//     `copy.pt-br.ts`, anything under `locales/`). That is the sanctioned
-//     pattern: a host imports `PT_BR_MESSAGES` and passes it BY HAND, so
-//     choosing Portuguese is a line in the host's diff, never a silence.
-//   - tests, stories, e2e worlds and Gherkin features — a spec that clicks
-//     "Continuar com Google" or seeds "Cantina do Porto" is exercising
-//     product copy, not shipping it.
+// WHAT MAY SHIP PORTUGUESE, by category (not allowlist): a NAMED PACK, and
+// anything that is not shipped source at all — tests, stories, e2e worlds,
+// Gherkin features. Those rules live in `./lib/shipped-source.mjs`, which the
+// vocabulary gate reads too, because two gates asking one question from two
+// hand-kept copies is the drift both exist to prevent.
+//
+// A COMPANION, not a competitor: `vocabulary-portability-gate.mjs` bans the
+// origin host's domain NOUNS, in English and in unaccented Portuguese, which
+// is exactly the class the paragraph above says this gate cannot see.
 //
 // THE RATCHET: `.copy-portability-exceptions.json` grandfathers the leaks
 // that predate the gate, each with a written reason. Shrink-only in both
@@ -37,6 +38,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
+import { inScope } from "./lib/shipped-source.mjs";
+
+export { inScope };
+
 const LABEL = "[copy-portability]";
 const EXCEPTIONS_PATH = ".copy-portability-exceptions.json";
 
@@ -44,11 +49,6 @@ const EXCEPTIONS_PATH = ".copy-portability-exceptions.json";
 // out on purpose: they would only widen the net toward other languages this
 // repo does not ship.
 const PT_BR_DIACRITICS = /[àáâãçéêíóôõú]/i;
-
-const SHIPPED_SOURCE = /^packages\/[^/]+(?:\/[^/]+)?\/src\/.+\.(?:ts|tsx|js|jsx|mjs)$/;
-const CATEGORY_EXCLUDED =
-  /(?:__tests__|__stories__|\.test\.|\.spec\.|\.stories\.|\.test-story\.|(?:^|\/)e2e\/|(?:^|\/)features\/|test-helpers)/;
-const NAMED_PACK = /(?:pt-?br[^/]*\.(?:ts|tsx|js|jsx|mjs)$|(?:^|\/)locales\/)/i;
 
 const STRING_OPENERS = { "'": "single", '"': "double", "`": "template" };
 const STRING_CLOSERS = { single: "'", double: '"', template: "`" };
@@ -108,11 +108,6 @@ export function firstLeakLine(source) {
   return null;
 }
 
-/** Whether a tracked path is in scope for the scan at all. */
-export function inScope(path) {
-  return SHIPPED_SOURCE.test(path) && !CATEGORY_EXCLUDED.test(path) && !NAMED_PACK.test(path);
-}
-
 function scanRepo() {
   const tracked = execFileSync("git", ["ls-files"], { encoding: "utf8" })
     .split("\n")
@@ -142,6 +137,10 @@ function selftest() {
     [!inScope("packages/x/src/react/pt-BR.ts"), "a named pack may ship Portuguese"],
     [!inScope("packages/x/src/__tests__/copy.test.ts"), "tests are out of scope"],
     [!inScope("packages/x/src/e2e/steps.ts"), "e2e worlds are out of scope"],
+    [
+      !inScope("packages/payments/frontend/src/stories/store.ts"),
+      "a path the package's own `files` excludes does not ship",
+    ],
     [!inScope("apps/anything/src/page.ts"), "only packages/* ships"],
   ];
   const failed = cases.filter(([ok]) => !ok);
