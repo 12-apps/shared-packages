@@ -10,6 +10,7 @@ import type { WireMcpTool } from "@12-apps/wiring";
 
 import {
   DISCOUNT_SCOPES,
+  DISCOUNT_TARGET_TYPES,
   DISCOUNT_TRIGGERS,
   DISCOUNT_TYPES,
   MAX_COMBO_SLOTS,
@@ -164,6 +165,27 @@ export const createDiscountBody = z.object(discountWriteShape);
 /** Body for updating a discount (every field re-stated). */
 export const updateDiscountBody = z.object(discountWriteShape);
 
+/**
+ * One collection of things a discount may be pointed at, and its rows.
+ *
+ * `targets` is the WHOLE collection rather than a page, deliberately: a picker
+ * that paginated would let an operator save a discount whose existing targets
+ * were never on screen. See `DiscountableOps.list`.
+ */
+export const discountTargetGroupSchema = z.object({
+  targetType: z.enum(DISCOUNT_TARGET_TYPES),
+  slug: z.string(),
+  label: z.string(),
+  nests: z.boolean(),
+  targets: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      parentId: z.string().nullable().optional(),
+    }),
+  ),
+});
+
 /** `{ data: { id } }` acknowledgement for update/delete. */
 const discountIdResponse = z.object({ data: z.object({ id: z.string() }) });
 
@@ -184,6 +206,17 @@ export const DISCOUNTS_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
     params: discountCollectionParams,
     query: listDiscountsQuery,
     response: createSearchOutput(discountSchema),
+    annotations: { readOnly: true },
+  },
+  {
+    operationId: "listDiscountTargets",
+    method: "GET",
+    path: "/discounts/targets",
+    summary:
+      "List what a discount can be pointed at in this store: every registered collection (categories, products) with its rows. Read this before creating or updating a CATEGORY- or ITEM-scoped discount, or a combo slot — an id from anywhere else is refused as not belonging to the store.",
+    tags: ["discounts"],
+    params: discountCollectionParams,
+    response: z.object({ data: z.array(discountTargetGroupSchema) }),
     annotations: { readOnly: true },
   },
   {

@@ -61,6 +61,26 @@ export const DISCOUNT_SCOPES = ["ORDER", "CATEGORY", "ITEM", "COMBO"] as const;
 export type DiscountScope = (typeof DISCOUNT_SCOPES)[number];
 
 /**
+ * The DIMENSIONS a discount can be pointed at — the two scopes above that name
+ * rows in a host's catalog, as opposed to `ORDER` (which names nothing) and
+ * `COMBO` (which names its own slots).
+ *
+ * Split out from the scopes because they are the key of a different thing: a
+ * `DiscountableCollection` is a host's answer for ONE of these
+ * (`./server/collections`), and a combo slot names both of them at once, so
+ * neither list is a subset of the other in use even though it is here.
+ *
+ * This set is closed today and that is a boundary rather than a principle. A
+ * third dimension — "every item from this supplier", "every item on this
+ * shelf" — is expressible the moment targets are stored BY VALUE
+ * (`(target_type, target_id)`) rather than as a join table per member, and the
+ * registration seam is deliberately shaped so that widening this array plus
+ * registering one more collection is the whole change.
+ */
+export const DISCOUNT_TARGET_TYPES = ["CATEGORY", "ITEM"] as const;
+export type DiscountTargetType = (typeof DISCOUNT_TARGET_TYPES)[number];
+
+/**
  * What makes a discount fire: the engine picks `AUTOMATIC` ones up on its own,
  * while a `CODE` one only becomes a candidate when the buyer types its coupon.
  */

@@ -201,6 +201,73 @@ keystroke on the storefront and would need a logger threaded through a browser
 bundle. A rejected coupon is already a `DiscountRejection` in the result, which
 is the host's to report if it wants to.
 
+## Letting a host table opt in — `DiscountableCollection`
+
+A discount points at rows this package will never see: a store's categories, its
+products, and — the day a host wants it — its suppliers or its shelves. Every
+question about them ("which exist", "are they this tenant's", "what is this one
+filed under") is answerable only by the host, so the host DECLARES the table:
+
+```ts
+const categories: DiscountableCollection = {
+  targetType: "CATEGORY",
+  slug: "categories",
+  label: "Categorias",          // host vocabulary, host language
+  nests: true,
+  ops: {
+    list: (clientId) => …,      // the picker's rows
+    ownsAll: (clientId, ids) => …,   // the cross-tenant guard
+    parents: (clientId) => …,   // child → parent, for the ancestry walk
+  },
+};
+
+createApiDiscounts({ store, copy, logger, collections: [categories, products] });
+```
+
+Three pieces of hand-written host code collapse into it:
+
+| host code | becomes |
+|---|---|
+| a per-table cross-tenant `count` before every write | `ops.ownsAll`, run once per write for every dimension |
+| the tenant's category tree loaded, and an ancestor walk with a cycle guard | `ops.parents` + the package's own `buildTargetPath` |
+| an admin page side-loading two catalogs at `?pageSize=500` to feed a picker | `GET /discounts/targets`, one round trip |
+
+Two things it fixes as a side effect. The ownership check now covers the ids
+inside a **combo's slots** — a combo scope drops the top-level target pair and
+carries its targets in the slots, so a host checking only the pair let a crafted
+combo name another store's products. And the ancestry walk stops being a second
+implementation: the host builds the cart lines this package prices, so both
+sides now read the same `buildTargetPath`.
+
+The check runs OUTSIDE the store's transaction, and that is enough for the leak
+that matters: a catalog row's tenant never changes, so an id owned by this
+tenant now cannot belong to another one by the time the write lands. The only
+race left is a target deleted in between, whose outcome is a discount pointing
+at a row that no longer exists — which the evaluator already tolerates.
+
+`collections` is **optional**, and the omission is a real configuration: a host
+that sells one undifferentiated thing has no dimension to register. What it
+costs is stated rather than defaulted around — with nothing registered,
+`GET /discounts/targets` answers `[]` and the cross-tenant check stays the
+store's job.
+
+### Why this is not a wiring capability yet
+
+`@12-apps/wiring`'s contract folder holds http, web, mcp, db, env, jobs, email,
+notifications and permissions — there is no registration or extension concept,
+so promoting this would mint a new capability on two instances that are less
+alike than they look: `@12-apps/entity-lifecycle` registers a collection it
+DRIVES, with write ops, while this registers a catalog dimension it only
+QUERIES. Abstracting one contract over both risks fitting neither. It ships
+here, shaped deliberately like its sibling so the family resemblance is visible,
+and a third consumer is what would earn it a place in the contract.
+
+`DISCOUNT_TARGET_TYPES` is closed at two today. That is a boundary, not a
+principle: a third dimension is expressible the moment targets are stored **by
+value** (`(target_type, target_id)`) instead of as a join table per member, and
+the registration is shaped so that widening the array plus registering one more
+collection is the whole change.
+
 ## What the host still owns
 
 **The database.** A discount's rows relate to a host's own catalog and orders —

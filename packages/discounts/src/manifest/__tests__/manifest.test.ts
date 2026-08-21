@@ -51,6 +51,7 @@ const FULL_COPY = Object.fromEntries(
     "invalidFreeUnits",
     "freeUnitsExceedCombo",
     "invalidMaxComboApplications",
+    "foreignTarget",
   ].map((key) => [key, key]),
 ) as never;
 
@@ -96,6 +97,10 @@ describe("the shared manifest", () => {
       routes.map((route) => `${route.method} ${route.path} -> ${route.permission}`),
     ).toEqual([
       "GET /discounts -> discounts:read",
+      // Before the `:id` read on purpose: a router resolving in declaration
+      // order would otherwise answer `/discounts/targets` with a 404 for a
+      // discount named "targets".
+      "GET /discounts/targets -> discounts:write",
       "GET /discounts/:id -> discounts:read",
       "POST /discounts -> discounts:write",
       "PATCH /discounts/:id -> discounts:write",

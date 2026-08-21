@@ -18,6 +18,20 @@ export { missingServerCopy, type DiscountsServerCopy } from "./copy";
 export { errorText, type DiscountsLogger } from "./logging";
 
 export {
+  assertCollections,
+  assertTargetsOwned,
+  buildTargetPath,
+  ForeignTargetError,
+  loadTargetGroups,
+  targetIdsByType,
+  targetPathResolver,
+  type DiscountableCollection,
+  type DiscountableOps,
+  type DiscountTarget,
+  type DiscountTargetGroup,
+} from "./collections";
+
+export {
   DISCOUNTS_PERMISSIONS,
   DISCOUNTS_READ,
   DISCOUNTS_WRITE,
@@ -48,6 +62,7 @@ export { discountSearchConfig } from "./search";
 
 export {
   comboRequirementSchema,
+  discountTargetGroupSchema,
   createDiscountBody,
   createDiscountListQuery,
   discountCollectionParams,
