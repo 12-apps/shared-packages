@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "node scripts/sync-lifecycle-schema.mjs && node scripts/sync-research-schema.mjs && node scripts/sync-shift-schema.mjs --check && node scripts/sync-jobs-schema.mjs --check && node scripts/sync-entitlements-schema.mjs --check && node scripts/sync-payments-schema.mjs --check && node scripts/sync-report-builder-schema.mjs --check && node scripts/sync-feature-flags-schema.mjs --check && node scripts/sync-rbac-schema.mjs --check && node scripts/sync-notifications-schema.mjs --check && node scripts/sync-onboarding-schema.mjs --check && node scripts/sync-mcp-schema.mjs --check && node scripts/sync-realtime-schema.mjs --check && node scripts/sync-audit-schema.mjs --check && node scripts/sync-prisma-plugins.mjs --check && prisma generate && tsc",
+    "build": "node scripts/sync-lifecycle-schema.mjs && node scripts/sync-research-schema.mjs && node scripts/sync-shift-schema.mjs --check && node scripts/sync-jobs-schema.mjs --check && node scripts/sync-entitlements-schema.mjs --check && node scripts/sync-payments-schema.mjs --check && node scripts/sync-report-builder-schema.mjs --check && node scripts/sync-feature-flags-schema.mjs --check && node scripts/sync-rbac-schema.mjs --check && node scripts/sync-notifications-schema.mjs --check && node scripts/sync-onboarding-schema.mjs --check && node scripts/sync-mcp-schema.mjs --check && node scripts/sync-realtime-schema.mjs --check && node scripts/sync-audit-schema.mjs --check && node scripts/sync-discounts-schema.mjs --check && node scripts/sync-prisma-plugins.mjs --check && prisma generate && tsc",
     "clean": "rm -rf dist node_modules coverage",
     "test": "node ../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest watch",
@@ -20,7 +20,7 @@
     "lint": "pnpm run lint:files .",
     "lint:fix": "bash -c 'eslint \"${@:-.}\" --max-warnings 0 --fix' _",
     "typecheck": "tsc --noEmit",
-    "prisma:generate": "node scripts/sync-lifecycle-schema.mjs && node scripts/sync-research-schema.mjs && node scripts/sync-shift-schema.mjs --check && node scripts/sync-jobs-schema.mjs --check && node scripts/sync-entitlements-schema.mjs --check && node scripts/sync-payments-schema.mjs --check && node scripts/sync-auth-schema.mjs --check && node scripts/sync-report-builder-schema.mjs --check && node scripts/sync-feature-flags-schema.mjs --check && node scripts/sync-rbac-schema.mjs --check && node scripts/sync-notifications-schema.mjs --check && node scripts/sync-onboarding-schema.mjs --check && node scripts/sync-mcp-schema.mjs --check && node scripts/sync-realtime-schema.mjs --check && node scripts/sync-audit-schema.mjs --check && node scripts/sync-prisma-plugins.mjs --check && prisma generate",
+    "prisma:generate": "node scripts/sync-lifecycle-schema.mjs && node scripts/sync-research-schema.mjs && node scripts/sync-shift-schema.mjs --check && node scripts/sync-jobs-schema.mjs --check && node scripts/sync-entitlements-schema.mjs --check && node scripts/sync-payments-schema.mjs --check && node scripts/sync-auth-schema.mjs --check && node scripts/sync-report-builder-schema.mjs --check && node scripts/sync-feature-flags-schema.mjs --check && node scripts/sync-rbac-schema.mjs --check && node scripts/sync-notifications-schema.mjs --check && node scripts/sync-onboarding-schema.mjs --check && node scripts/sync-mcp-schema.mjs --check && node scripts/sync-realtime-schema.mjs --check && node scripts/sync-audit-schema.mjs --check && node scripts/sync-discounts-schema.mjs --check && node scripts/sync-prisma-plugins.mjs --check && prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
@@ -53,7 +53,9 @@
     "prisma:sync-audit": "node scripts/sync-audit-schema.mjs",
     "prisma:sync-audit:check": "node scripts/sync-audit-schema.mjs --check",
     "prisma:sync-auth": "node scripts/sync-auth-schema.mjs",
-    "prisma:sync-auth:check": "node scripts/sync-auth-schema.mjs --check"
+    "prisma:sync-auth:check": "node scripts/sync-auth-schema.mjs --check",
+    "prisma:sync-discounts": "node scripts/sync-discounts-schema.mjs",
+    "prisma:sync-discounts:check": "node scripts/sync-discounts-schema.mjs --check"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.2.17",
@@ -65,6 +67,7 @@
   "devDependencies": {
     "@12-apps/audit": "workspace:*",
     "@12-apps/auth": "workspace:*",
+    "@12-apps/discounts": "workspace:*",
     "@12-apps/entitlements": "workspace:*",
     "@12-apps/entity-lifecycle": "workspace:*",
     "@12-apps/eslint-config": "workspace:*",

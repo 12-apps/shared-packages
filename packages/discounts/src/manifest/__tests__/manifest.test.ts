@@ -10,6 +10,8 @@
  * not declare.
  */
 
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 import type { WirePermissionsContribution } from "@12-apps/wiring";
 import {
@@ -108,13 +110,55 @@ describe("the shared manifest", () => {
     ]);
   });
 
-  it("declares NO db capability, and mirrors that absence into package.json", () => {
-    // A discount's rows relate to a host's catalog and orders, so neither db
-    // mode qualifies — the host owns the schema and answers `DiscountStore`.
-    // Both directions are checked: a `wiring.db` key here with no manifest
-    // capability would fail just as loudly.
-    expect(discountsManifest).not.toHaveProperty("db");
+  it("ships its schema as a COMPOSED partial, mirrored into package.json", () => {
+    // Both directions are checked by `assertDbMirror`: a `wiring.db` key in the
+    // manifest that package.json does not mirror is invisible to a host's
+    // plain-Node assembler, and a mirror with no capability is a copy nothing
+    // declared.
+    expect(discountsManifest.db).toEqual({
+      partial: "prisma/discounts.prisma",
+      migrations: "prisma/migrations",
+    });
     expect(() => assertDbMirror(discountsManifest, packageJson)).not.toThrow();
+  });
+
+  it("ships the partial and the migrations in the TARBALL, not just in the repo", () => {
+    // The mirror above says where they are; `files` is what decides whether a
+    // consumer installing this package can actually reach them. A composed
+    // contribution whose partial is not published is a host sync that fails at
+    // `pnpm install`, on a path that exists in the monorepo.
+    expect(packageJson.files).toContain("prisma");
+    expect(packageJson.files).toContain("scripts");
+  });
+
+  it("names NO host table anywhere in the partial", () => {
+    // The property that makes the partial shippable at all, asserted over the
+    // shipped FILE rather than over the docstring that claims it: a `@relation`
+    // to a table this package cannot know is exactly the thing that used to
+    // make `db` undeclarable, and it would come back as an ordinary-looking
+    // convenience.
+    /* eslint-disable-next-line test-flakiness/no-unmocked-fs --
+       the SHIPPED partial is the subject: a mocked read would assert against a
+       fixture, and pass forever while the published file said whatever it
+       liked. This is the app-shell portability suite's own argument. */
+    const partial = readFileSync(
+      new URL("../../../prisma/discounts.prisma", import.meta.url),
+      "utf8",
+    );
+    // Comment-stripped, the way the repo's copy-portability gate reads source:
+    // the header EXPLAINS which host tables are deliberately absent, and a
+    // scan that could not tell prose from schema would forbid saying so.
+    const schema = partial
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("//"))
+      .join("\n");
+    const relations = schema.match(/@relation\(/g) ?? [];
+    // The only relations are the three INTERNAL ones, between this package's
+    // own three models.
+    expect(relations).toHaveLength(3);
+    for (const table of ["product_categories", "menu_items", "clients", "orders"]) {
+      expect(schema).not.toContain(table);
+    }
   });
 
   it("reads nothing from the environment, and mirrors that absence too", () => {
