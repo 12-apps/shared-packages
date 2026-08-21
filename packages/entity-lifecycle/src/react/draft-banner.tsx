@@ -6,6 +6,7 @@ import { Box } from '@12-apps/ui/mui/Box';
 import { Stack } from '@12-apps/ui/mui/Stack';
 
 import type { DraftWire, LifecycleApiClient } from './api';
+import type { DraftBannerCopy } from './copy';
 import { DATE_TIME } from './labels';
 
 /**
@@ -32,8 +33,8 @@ export interface DraftBannerProps {
   onDiscarded: () => void;
   /** Test-id namespace; the origin host's product editor passes `product-draft`. */
   testIdPrefix?: string;
-  /** The notice, when the generic copy is wrong for the collection
-   * (the origin host's product editor says "Este produto tem…"). */
+  /** The notice, when the host's generic `copy.title` is wrong for the
+   * collection (the origin host's product editor says "Este produto tem…"). */
   title?: string;
 }
 
@@ -86,8 +87,9 @@ function useDraftBannerActions(api: LifecycleApiClient, props: DraftBannerProps)
 /** The banner itself: notice + the load / publish / discard actions. */
 export function DraftBanner({
   api,
+  copy,
   ...props
-}: DraftBannerProps & { api: LifecycleApiClient }): JSX.Element {
+}: DraftBannerProps & { api: LifecycleApiClient; copy: DraftBannerCopy }): JSX.Element {
   const { draft, onLoad, testIdPrefix = 'draft' } = props;
   const actions = useDraftBannerActions(api, props);
 
@@ -95,8 +97,8 @@ export function DraftBanner({
     <Box data-testid={`${testIdPrefix}-banner`} sx={{ mb: 2 }}>
       <Alert
         variant="info"
-        title={props.title ?? 'Este item tem um rascunho não publicado.'}
-        description={`Atualizado em ${DATE_TIME.format(new Date(draft.updatedAt))}.`}
+        title={props.title ?? copy.title}
+        description={`${copy.updatedAtPrefix} ${DATE_TIME.format(new Date(draft.updatedAt))}.`}
         data-testid={`${testIdPrefix}-banner-alert`}
       />
       <Stack direction="row" spacing={1} sx={{ mt: 1 }}>

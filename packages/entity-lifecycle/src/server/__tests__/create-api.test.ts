@@ -3,6 +3,7 @@
    `buildApi()` created INSIDE its own `it`, backed by a fresh in-memory db.
    The rule flags the names, not an actual cross-test dependency. */
 import { describe, expect, it } from 'vitest';
+import { PT_BR_LIFECYCLE_MESSAGES } from '../pt-BR';
 
 import type { EntityOps, Snapshot } from '../../types';
 import { createApiEntityLifecycle } from '../create-api-entity-lifecycle';
@@ -60,6 +61,7 @@ function buildApi(registrations?: Partial<LifecycleEntityRegistration>[]) {
   const db = createMemoryLifecycleDb();
   const { ops, rows } = memoryEntityOps();
   const api = createApiEntityLifecycle({
+    messages: PT_BR_LIFECYCLE_MESSAGES,
     db: async () => db,
     entities: (registrations ?? [{}]).map((overrides, index) => ({
       entityType: overrides.entityType ?? (index === 0 ? 'product' : `type-${index}`),

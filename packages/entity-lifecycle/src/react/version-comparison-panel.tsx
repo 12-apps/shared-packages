@@ -10,10 +10,10 @@ import { Text } from '@12-apps/ui/typography/Text';
 import type {
   ComparisonCellWire,
   ComparisonColumnWire,
-  ComparisonRoleWire,
   LifecycleApiClient,
   VersionComparisonWire,
 } from './api';
+import type { VersionComparisonCopy } from './copy';
 import { DATE_TIME } from './labels';
 
 /**
@@ -38,14 +38,6 @@ import { DATE_TIME } from './labels';
  * than rendering an empty table.
  */
 
-/** pt-BR for the four roles a column can play. */
-const ROLE_LABELS: Record<ComparisonRoleWire, string> = {
-  previous: 'Anterior',
-  selected: 'Selecionada',
-  next: 'Seguinte',
-  current: 'Atual',
-};
-
 const CELL_SX = {
   p: 1,
   borderBottom: (theme: { palette: { divider: string } }) =>
@@ -62,20 +54,28 @@ const CELL_SX = {
  * The three empties are deliberately different words. A field the version does
  * not carry at all ("—") is not a field set to null ("vazio"), and neither is
  * the string "null" a user might have typed — collapsing them would make the
- * table lie about what changed.
+ * table lie about what changed. The boolean words are the host's.
  */
-export function formatCellValue(cell: ComparisonCellWire): string {
+export function formatCellValue(cell: ComparisonCellWire, copy: VersionComparisonCopy): string {
   if (!cell.present) return '—';
   const { value } = cell;
   if (value === null) return 'vazio';
-  if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
+  if (typeof value === 'boolean') return value ? copy.booleanTrue : copy.booleanFalse;
   if (typeof value === 'number') return String(value);
   if (typeof value === 'string') return value === '' ? 'vazio' : value;
   return JSON.stringify(value);
 }
 
 /** A column header: the version, what it is to the selection, and its stamp. */
-function ColumnHeader({ column }: { column: ComparisonColumnWire }): JSX.Element {
+function ColumnHeader({
+  column,
+  copy,
+  systemActor,
+}: {
+  column: ComparisonColumnWire;
+  copy: VersionComparisonCopy;
+  systemActor: string;
+}): JSX.Element {
   return (
     <Box
       component="th"
@@ -90,14 +90,14 @@ function ColumnHeader({ column }: { column: ComparisonColumnWire }): JSX.Element
           </Text>
           {column.roles.map((role) =>
             role === 'selected' ? (
-              <Chip key={role} label={ROLE_LABELS[role]} size="sm" color="primary" />
+              <Chip key={role} label={copy.roles[role]} size="sm" color="primary" />
             ) : (
-              <Chip key={role} label={ROLE_LABELS[role]} size="sm" variant="outlined" />
+              <Chip key={role} label={copy.roles[role]} size="sm" variant="outlined" />
             ),
           )}
         </Stack>
         <Text variant="caption" as="span" color="secondary">
-          {`${DATE_TIME.format(new Date(column.createdAt))} · ${column.actorName ?? 'Sistema'}`}
+          {`${DATE_TIME.format(new Date(column.createdAt))} · ${column.actorName ?? systemActor}`}
         </Text>
       </Stack>
     </Box>
@@ -109,10 +109,12 @@ function FieldRow({
   field,
   changed,
   cells,
+  copy,
 }: {
   field: string;
   changed: boolean;
   cells: ComparisonCellWire[];
+  copy: VersionComparisonCopy;
 }): JSX.Element {
   return (
     <Box component="tr" data-testid={`comparison-row-${field}`} data-changed={String(changed)}>
@@ -127,7 +129,7 @@ function FieldRow({
           data-present={String(cell.present)}
           sx={{ ...CELL_SX, color: cell.present ? undefined : 'text.disabled' }}
         >
-          {formatCellValue(cell)}
+          {formatCellValue(cell, copy)}
         </Box>
       ))}
     </Box>
@@ -138,9 +140,13 @@ function FieldRow({
 function ComparisonTable({
   comparison,
   rows,
+  copy,
+  systemActor,
 }: {
   comparison: VersionComparisonWire;
   rows: VersionComparisonWire['rows'];
+  copy: VersionComparisonCopy;
+  systemActor: string;
 }): JSX.Element {
   return (
     <Box sx={{ overflowX: 'auto' }}>
@@ -157,7 +163,12 @@ function ComparisonTable({
               </Text>
             </Box>
             {comparison.columns.map((column) => (
-              <ColumnHeader key={column.version} column={column} />
+              <ColumnHeader
+                key={column.version}
+                column={column}
+                copy={copy}
+                systemActor={systemActor}
+              />
             ))}
           </Box>
         </Box>
@@ -168,6 +179,7 @@ function ComparisonTable({
               field={row.field}
               changed={row.changed}
               cells={row.cells}
+              copy={copy}
             />
           ))}
         </Box>
@@ -178,11 +190,17 @@ function ComparisonTable({
 
 export interface VersionComparisonPanelProps {
   comparison: VersionComparisonWire;
+  /** The host's words — pt-BR hosts pass `PT_BR_LIFECYCLE_WEB_COPY.comparison`. */
+  copy: VersionComparisonCopy;
+  /** Who acted when no user is recorded (`PT_BR_LIFECYCLE_WEB_COPY.systemActor`). */
+  systemActor: string;
 }
 
 /** The panel a clicked history row opens: its version beside the neighbours. */
 export function VersionComparisonPanel({
   comparison,
+  copy,
+  systemActor,
 }: VersionComparisonPanelProps): JSX.Element {
   // One column means one version exists (or the neighbours all collapsed into
   // it): there is nothing to diff, so every field is shown instead of none.
@@ -192,21 +210,21 @@ export function VersionComparisonPanel({
   return (
     <Stack spacing={1} data-testid="version-comparison">
       <Text variant="heading" size="sm" as="h3">
-        {`Comparando a v${comparison.selectedVersion}`}
+        {copy.heading(comparison.selectedVersion)}
       </Text>
       {lone && (
         <Alert
           variant="info"
-          description="Esta é a única versão registrada — não há outra para comparar."
+          description={copy.singleVersionBody}
           data-testid="comparison-single"
         />
       )}
       {rows.length === 0 ? (
         <Text variant="body" as="p" data-testid="comparison-empty">
-          Nenhuma diferença entre estas versões.
+          {copy.noDifferences}
         </Text>
       ) : (
-        <ComparisonTable comparison={comparison} rows={rows} />
+        <ComparisonTable comparison={comparison} rows={rows} copy={copy} systemActor={systemActor} />
       )}
     </Stack>
   );
@@ -250,6 +268,10 @@ export interface VersionComparisonSectionProps {
   api: LifecycleApiClient;
   /** Entity resource path under the mount, e.g. `products/${id}`. */
   resourcePath: string;
+  /** The host's words — pt-BR hosts pass `PT_BR_LIFECYCLE_WEB_COPY.comparison`. */
+  copy: VersionComparisonCopy;
+  /** Who acted when no user is recorded (`PT_BR_LIFECYCLE_WEB_COPY.systemActor`). */
+  systemActor: string;
   /** The version the admin clicked. */
   version: number;
 }
@@ -262,6 +284,8 @@ export interface VersionComparisonSectionProps {
 export function VersionComparisonSection({
   api,
   resourcePath,
+  copy,
+  systemActor,
   version,
 }: VersionComparisonSectionProps): JSX.Element {
   const load = useComparison(api, resourcePath, version);
@@ -270,7 +294,7 @@ export function VersionComparisonSection({
     return (
       <Alert
         variant="danger"
-        description="Não foi possível carregar a comparação desta versão."
+        description={copy.loadFailedBody}
         data-testid="version-comparison-error"
       />
     );
@@ -278,5 +302,5 @@ export function VersionComparisonSection({
   if (load.data === null) {
     return <LoadingState dataTestId="version-comparison-loading" />;
   }
-  return <VersionComparisonPanel comparison={load.data} />;
+  return <VersionComparisonPanel comparison={load.data} copy={copy} systemActor={systemActor} />;
 }

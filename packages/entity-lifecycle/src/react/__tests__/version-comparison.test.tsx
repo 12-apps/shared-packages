@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { VersionComparisonWire, VersionsWire } from '../api';
 import { createWebEntityLifecycle } from '../create-web-entity-lifecycle';
+import { PT_BR_LIFECYCLE_WEB_COPY } from '../pt-BR';
 import type { LifecycleResult, LifecycleTransport } from '../transport';
 import { formatCellValue } from '../version-comparison-panel';
 
@@ -114,7 +115,11 @@ function fakeTransport(payloads: { list: VersionsWire; comparison: VersionsWire 
 
 function renderDialog(payloads: { list: VersionsWire; comparison: VersionsWire }) {
   const { transport, paths } = fakeTransport(payloads);
-  const { VersionHistoryDialog } = createWebEntityLifecycle({ apiBase: API_BASE, transport });
+  const { VersionHistoryDialog } = createWebEntityLifecycle({
+    apiBase: API_BASE,
+    copy: PT_BR_LIFECYCLE_WEB_COPY,
+    transport,
+  });
   render(
     <VersionHistoryDialog
       resourcePath="products/p1"
@@ -222,16 +227,18 @@ describe('a record with a single version', () => {
 });
 
 describe('value rendering', () => {
+  const copy = PT_BR_LIFECYCLE_WEB_COPY.comparison;
+
   it('tells a missing field apart from an empty one', () => {
-    expect(formatCellValue(cell(1, null, false))).toBe('—');
-    expect(formatCellValue(cell(1, null))).toBe('vazio');
-    expect(formatCellValue(cell(1, ''))).toBe('vazio');
+    expect(formatCellValue(cell(1, null, false), copy)).toBe('—');
+    expect(formatCellValue(cell(1, null), copy)).toBe('vazio');
+    expect(formatCellValue(cell(1, ''), copy)).toBe('vazio');
   });
 
   it('renders booleans, numbers and nested values readably', () => {
-    expect(formatCellValue(cell(1, true))).toBe('Sim');
-    expect(formatCellValue(cell(1, false))).toBe('Não');
-    expect(formatCellValue(cell(1, 0))).toBe('0');
-    expect(formatCellValue(cell(1, ['a', 'b']))).toBe('["a","b"]');
+    expect(formatCellValue(cell(1, true), copy)).toBe('Sim');
+    expect(formatCellValue(cell(1, false), copy)).toBe('Não');
+    expect(formatCellValue(cell(1, 0), copy)).toBe('0');
+    expect(formatCellValue(cell(1, ['a', 'b']), copy)).toBe('["a","b"]');
   });
 });

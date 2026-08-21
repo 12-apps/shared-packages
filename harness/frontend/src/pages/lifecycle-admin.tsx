@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState, type JSX } from 'react';
 
-import { createWebEntityLifecycle } from '@12-apps/entity-lifecycle/react';
+import {
+  createWebEntityLifecycle,
+  PT_BR_LIFECYCLE_WEB_COPY,
+} from '@12-apps/entity-lifecycle/react';
 import type { DraftWire } from '@12-apps/entity-lifecycle/react';
 
 /**
@@ -36,6 +39,8 @@ const ENTITY_TYPE_LABELS = { product: 'Produto', supplier: 'Fornecedor' };
 
 const lifecycle = createWebEntityLifecycle({
   apiBase: '/api/admin/harness',
+  // The screens' sentences are required host config; this host is pt-BR.
+  copy: PT_BR_LIFECYCLE_WEB_COPY,
   entityTypeLabels: ENTITY_TYPE_LABELS,
 });
 const { page: LifecycleSurface, VersionHistoryDialog, DraftBanner, api } = lifecycle;

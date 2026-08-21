@@ -13,7 +13,6 @@ export {
 } from './create-api-entity-lifecycle';
 export type { LifecycleEntityRegistration } from './registration';
 export {
-  DEFAULT_MESSAGES,
   LifecycleApiError,
   contextOf,
   draftJson,
@@ -28,6 +27,7 @@ export {
   type LifecycleRoute,
   type LifecycleUserDirectory,
 } from './context';
+export { PT_BR_LIFECYCLE_MESSAGES } from './pt-BR';
 export { createDbLifecycleStores } from './stores';
 export type {
   ChangeRequestCreateData,

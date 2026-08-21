@@ -12,16 +12,18 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { LifecycleApiClient, RecycleBinEntryWire } from './api';
+import type { RecycleBinCopy } from './copy';
 import { DATE_TIME, entityTypeLabel, type EntityTypeLabels } from './labels';
 import type { LifecycleResult } from './transport';
 
 /**
  * Lixeira (12-17) — the soft-delete recycle bin of the entity-lifecycle
  * machinery, ported from the origin host's `pages/recycle-bin` with its test ids
- * and pt-BR copy intact: every binned entry (all registered collections) as
- * simple cards, each restorable ("Restaurar") or permanently purgeable
- * ("Excluir definitivamente", behind the FUT-546 type-to-confirm popup — the
- * bin is itself the undo for everything else, and purge empties it).
+ * intact: every binned entry (all registered collections) as simple cards,
+ * each restorable or permanently purgeable (behind the FUT-546
+ * type-to-confirm popup — the bin is itself the undo for everything else, and
+ * purge empties it). Every sentence comes from the host's
+ * {@link RecycleBinCopy}.
  */
 
 interface BinActions {
@@ -33,7 +35,11 @@ interface BinActions {
   purgeDialog: JSX.Element | null;
 }
 
-function useBinActions(api: LifecycleApiClient, refetch: () => void): BinActions {
+function useBinActions(
+  api: LifecycleApiClient,
+  copy: RecycleBinCopy,
+  refetch: () => void,
+): BinActions {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [purging, setPurging] = useState<RecycleBinEntryWire | null>(null);
@@ -63,7 +69,7 @@ function useBinActions(api: LifecycleApiClient, refetch: () => void): BinActions
     const target = purging;
     await run(target.id, () => api.purgeEntry(target.id));
     setPurging(null);
-  }, 'Não foi possível excluir definitivamente.');
+  }, copy.purgeFailed);
 
   return {
     busyId,
@@ -77,12 +83,12 @@ function useBinActions(api: LifecycleApiClient, refetch: () => void): BinActions
     purgeDialog: purging ? (
       <ConfirmActionDialog
         state={purgeState}
-        title="Excluir definitivamente"
+        title={copy.purgeDialogTitle}
         entityName={purging.label}
-        description={`"${purging.label}" será excluído para sempre, junto com seus itens vinculados. Esta ação não pode ser desfeita.`}
-        confirmText="Excluir definitivamente"
+        description={copy.purgeBody(purging.label)}
+        confirmText={copy.purgeConfirmText}
         typeToConfirm={purging.label}
-        typeToConfirmLabel={`Digite "${purging.label}" para confirmar.`}
+        typeToConfirmLabel={copy.purgeTypeToConfirmLabel(purging.label)}
         dataTestId="recycle-bin-purge-confirm"
       />
     ) : null,
@@ -93,12 +99,14 @@ function useBinActions(api: LifecycleApiClient, refetch: () => void): BinActions
 function BinEntryCard({
   entry,
   labels,
+  copy,
   busy,
   onRestore,
   onPurge,
 }: {
   entry: RecycleBinEntryWire;
   labels: EntityTypeLabels;
+  copy: RecycleBinCopy;
   busy: boolean;
   onRestore: () => void;
   onPurge: () => void;
@@ -121,7 +129,7 @@ function BinEntryCard({
           onClick={onRestore}
           dataTestId={`recycle-bin-restore-${entry.id}`}
         >
-          Restaurar
+          {copy.restoreAction}
         </Button>
         <Button
           variant="text"
@@ -131,12 +139,12 @@ function BinEntryCard({
           onClick={onPurge}
           dataTestId={`recycle-bin-purge-${entry.id}`}
         >
-          Excluir definitivamente
+          {copy.purgeAction}
         </Button>
       </Stack>
       <Text variant="caption" as="p" color="secondary">
-        Excluído em {DATE_TIME.format(new Date(entry.deletedAt))}
-        {entry.deletedByName ? ` por ${entry.deletedByName}` : ''}
+        {copy.deletedAtPrefix} {DATE_TIME.format(new Date(entry.deletedAt))}
+        {entry.deletedByName ? copy.deletedBy(entry.deletedByName) : ''}
       </Text>
       {entry.children.length > 0 && (
         <Text variant="caption" as="p" color="secondary">
@@ -151,21 +159,23 @@ function BinEntryCard({
 function BinBody({
   api,
   labels,
+  copy,
   entries,
   refetch,
 }: {
   api: LifecycleApiClient;
   labels: EntityTypeLabels;
+  copy: RecycleBinCopy;
   entries: RecycleBinEntryWire[];
   refetch: () => void;
 }): JSX.Element {
-  const actions = useBinActions(api, refetch);
+  const actions = useBinActions(api, copy, refetch);
 
   if (entries.length === 0) {
     return (
       <EmptyState
-        title="A lixeira está vazia."
-        description="Itens excluídos aparecem aqui e podem ser restaurados."
+        title={copy.emptyTitle}
+        description={copy.emptyBody}
         dataTestId="recycle-bin-empty"
       />
     );
@@ -175,7 +185,7 @@ function BinBody({
       {actions.error && (
         <Alert
           variant="danger"
-          title="Não foi possível concluir a ação"
+          title={copy.actionFailedTitle}
           description={actions.error}
           closable
           onClose={actions.clearError}
@@ -187,6 +197,7 @@ function BinBody({
           key={entry.id}
           entry={entry}
           labels={labels}
+          copy={copy}
           busy={actions.busyId === entry.id}
           onRestore={() => void actions.restore(entry)}
           onPurge={() => actions.requestPurge(entry)}
@@ -200,9 +211,11 @@ function BinBody({
 export function RecycleBinScreen({
   api,
   labels,
+  copy,
 }: {
   api: LifecycleApiClient;
   labels: EntityTypeLabels;
+  copy: RecycleBinCopy;
 }): JSX.Element {
   const [entries, setEntries] = useState<RecycleBinEntryWire[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -231,9 +244,9 @@ export function RecycleBinScreen({
   if (loadError) {
     return (
       <ErrorState
-        title="Não foi possível carregar a lixeira"
+        title={copy.loadFailedTitle}
         message={loadError}
-        retryLabel="Tentar novamente"
+        retryLabel={copy.retryAction}
         onRetry={refetch}
       />
     );
@@ -241,5 +254,5 @@ export function RecycleBinScreen({
   if (entries === null) {
     return <LoadingState dataTestId="recycle-bin-loading" />;
   }
-  return <BinBody api={api} labels={labels} entries={entries} refetch={refetch} />;
+  return <BinBody api={api} labels={labels} copy={copy} entries={entries} refetch={refetch} />;
 }

@@ -1,9 +1,10 @@
 /**
  * `@12-apps/entity-lifecycle/react` — the frontend half (12-17):
- * `createWebEntityLifecycle({ apiBase })` returns the Lixeira + Aprovações
- * page, plus the version-history dialog and draft banner a host mounts
- * inside its own editors. pt-BR product copy and the origin host's test ids are
- * preserved so the admin specs port verbatim.
+ * `createWebEntityLifecycle({ apiBase, copy })` returns the Lixeira +
+ * Aprovações page, plus the version-history dialog and draft banner a host
+ * mounts inside its own editors. Copy is REQUIRED host config; the origin
+ * host's test ids are preserved so the admin specs port verbatim, and its
+ * sentences ship as the named `PT_BR_LIFECYCLE_WEB_COPY` pack.
  */
 
 export {
@@ -11,6 +12,15 @@ export {
   type EntityLifecycleWebConfig,
   type WebEntityLifecycle,
 } from './create-web-entity-lifecycle';
+export type {
+  ApprovalsCopy,
+  DraftBannerCopy,
+  LifecycleWebCopy,
+  RecycleBinCopy,
+  VersionComparisonCopy,
+  VersionHistoryCopy,
+} from './copy';
+export { PT_BR_LIFECYCLE_WEB_COPY } from './pt-BR';
 export {
   createLifecycleApiClient,
   type ApprovalRequestWire,

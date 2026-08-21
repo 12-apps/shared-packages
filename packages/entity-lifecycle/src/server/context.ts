@@ -104,28 +104,9 @@ export interface LifecycleMessages {
   unauthenticated: string;
 }
 
-/** The origin host's exact copy (lib/lifecycle/api.ts + auth/tenant.ts) — the product default. */
-export const DEFAULT_MESSAGES: LifecycleMessages = {
-  entityNotFound: 'Este item não existe mais — ele pode ter sido excluído.',
-  versionNotFound: 'Esta versão não existe mais.',
-  entryNotFound: 'Este item não está mais na lixeira.',
-  draftNotFound: 'Este rascunho não existe mais.',
-  requestNotFound: 'Esta solicitação não existe mais.',
-  requestAlreadyDecided: 'Esta solicitação já foi decidida.',
-  featureDisabled: 'Este recurso não está ativo para esta loja.',
-  notAuthorized: 'Você não tem permissão para aprovar alterações.',
-  routeNotAllowed: 'Você não tem permissão para gerenciar esta loja.',
-  operationFailed: 'Não foi possível concluir a operação.',
-  unknownEntityType: 'Este tipo de item não está habilitado para o ciclo de vida.',
-  invalidBody: 'Dados inválidos.',
-  unauthenticated: 'Não autenticado.',
-};
-
-/** The messages in force, defaulted to the pt-BR product copy. */
-export function messagesOf(config: {
-  messages?: Partial<LifecycleMessages>;
-}): LifecycleMessages {
-  return { ...DEFAULT_MESSAGES, ...config.messages };
+/** The messages in force — REQUIRED host config; pt-BR ships as `./pt-BR`. */
+export function messagesOf(config: { messages: LifecycleMessages }): LifecycleMessages {
+  return config.messages;
 }
 
 /** A user-safe API error carrying the HTTP status the wire promises. */

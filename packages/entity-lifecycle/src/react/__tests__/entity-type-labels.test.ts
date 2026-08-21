@@ -28,8 +28,13 @@ const REACT_SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 describe('entity-type labels', () => {
   it('exports no label catalog of its own', () => {
     // Read off the public entry rather than asserting one name is gone: a
-    // catalog reintroduced under any other name fails this too.
-    const exported = Object.entries(reactEntry as Record<string, unknown>);
+    // catalog reintroduced under any other name fails this too. The one
+    // sanctioned string-carrying export is the NAMED pt-BR copy pack — its
+    // name says which language it is, and a host passes it by hand, which is
+    // the opposite of the silent default this test forbids.
+    const exported = Object.entries(reactEntry as Record<string, unknown>).filter(
+      ([name]) => !name.startsWith('PT_BR_'),
+    );
     const catalogs = exported.filter(
       ([, value]) =>
         value !== null &&

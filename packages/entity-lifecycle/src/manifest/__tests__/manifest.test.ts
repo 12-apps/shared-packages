@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { PT_BR_LIFECYCLE_MESSAGES } from '../../server/pt-BR';
 import {
   assertDbMirror,
   assertEnvMirror,
@@ -86,6 +87,7 @@ describe('the server manifest', () => {
     // the SHAPE against a fixture registration rather than a static table.
     const create = entityLifecycleServerManifest.http.create;
     const api = create({
+      messages: PT_BR_LIFECYCLE_MESSAGES,
       db: async () => createMemoryLifecycleDb(),
       entities: [
         {

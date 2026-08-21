@@ -26,8 +26,6 @@ export interface LifecycleTransport {
   send<T>(path: string, method: string, body?: unknown): Promise<LifecycleResult<T>>;
 }
 
-const FALLBACK_ERROR = 'Não foi possível concluir a operação.';
-
 async function readJson<T>(path: string): Promise<T> {
   const response = await fetch(path, {
     credentials: 'same-origin',
@@ -43,7 +41,15 @@ async function readJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function httpLifecycleTransport(): LifecycleTransport {
+/**
+ * @param fallbackError What a failed write says when the server sent no
+ * sentence of its own — REQUIRED, the host's words. `createWebEntityLifecycle`
+ * already passes its (equally required) `copy.operationFailed`; only a host
+ * constructing the transport directly writes it here. The old default was one
+ * application's Portuguese, and the only string in this file the required-copy
+ * port did not cover.
+ */
+export function httpLifecycleTransport(fallbackError: string): LifecycleTransport {
   return {
     get: readJson,
     async send<T>(path: string, method: string, body?: unknown): Promise<LifecycleResult<T>> {
@@ -62,11 +68,11 @@ export function httpLifecycleTransport(): LifecycleTransport {
           | { data?: T; error?: string }
           | null;
         if (!response.ok) {
-          return { ok: false, error: payload?.error ?? FALLBACK_ERROR };
+          return { ok: false, error: payload?.error ?? fallbackError };
         }
         return { ok: true, data: (payload?.data ?? payload) as T };
       } catch {
-        return { ok: false, error: FALLBACK_ERROR };
+        return { ok: false, error: fallbackError };
       }
     },
   };

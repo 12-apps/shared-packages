@@ -53,8 +53,11 @@ export interface EntityLifecycleServerConfig {
   entities: readonly LifecycleEntityRegistration[];
   /** The host's user directory (actor names on history/bin/approvals). */
   directory?: LifecycleUserDirectory;
-  /** User-facing copy overrides. */
-  messages?: Partial<LifecycleMessages>;
+  /**
+   * The refusal sentences this surface answers with — REQUIRED, the host's
+   * words. pt-BR hosts pass `PT_BR_LIFECYCLE_MESSAGES` from `../server/pt-BR`.
+   */
+  messages: LifecycleMessages;
 }
 
 /** A registered collection's service + per-request context builder. */

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createWebEntityLifecycle } from '../create-web-entity-lifecycle';
+import { PT_BR_LIFECYCLE_WEB_COPY } from '../pt-BR';
 import type { LifecycleResult, LifecycleTransport } from '../transport';
 
 /**
@@ -62,11 +63,13 @@ describe('createWebEntityLifecycle', () => {
         ],
       },
     });
-    // `entityTypeLabels` is supplied the way a HOST supplies it. The package
-    // no longer ships a catalog to fall back on, so the chip below renders this
-    // map's word or the raw key — never a word this package chose.
+    // `entityTypeLabels` and `copy` are supplied the way a HOST supplies them.
+    // The package no longer ships a catalog or a sentence to fall back on, so
+    // everything below renders this test's words — never a word this package
+    // chose.
     const { page: Page } = createWebEntityLifecycle({
       apiBase: '/api/admin/loja',
+      copy: PT_BR_LIFECYCLE_WEB_COPY,
       transport,
       entityTypeLabels: { product: 'Produto' },
     });
@@ -86,6 +89,7 @@ describe('createWebEntityLifecycle', () => {
     const { transport } = fakeTransport({ '/api/admin/loja/approvals': { requests: [] } });
     const { ApprovalsScreen } = createWebEntityLifecycle({
       apiBase: '/api/admin/loja',
+      copy: PT_BR_LIFECYCLE_WEB_COPY,
       transport,
     });
     render(<ApprovalsScreen />);
@@ -102,7 +106,11 @@ describe('createWebEntityLifecycle', () => {
       {},
       { ok: true, data: { applied: true, entityId: 'p1', requestId: null } },
     );
-    const { DraftBanner } = createWebEntityLifecycle({ apiBase: '/api/admin/loja', transport });
+    const { DraftBanner } = createWebEntityLifecycle({
+      apiBase: '/api/admin/loja',
+      copy: PT_BR_LIFECYCLE_WEB_COPY,
+      transport,
+    });
     const onPublished = vi.fn();
     render(
       <DraftBanner
