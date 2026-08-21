@@ -17,7 +17,16 @@ const LAST_VERSION = /associated with version ((\d+)\.\d+\.\d+)/;
 
 // A footer, not a mention: anchored to the start of a line, which is exactly
 // the test conventional-commits-parser applies when deciding a commit breaks.
+//
+// It no longer DECIDES the major — every `.releaserc.json` maps `breaking` to
+// `minor` — so reaching a major with only this present means the config and this
+// module have drifted apart, and `whyMajor` says so rather than inventing a
+// cause.
 const BREAKING_FOOTER = /^BREAKING CHANGE/m;
+
+// What actually spends a major, kept in step with the `releaseRules` entry in
+// every `.releaserc.json`.
+const MAJOR_MARKER = /^RELEASE-MAJOR/m;
 
 /**
  * The bump one package's run reports, or null when it releases nothing.
@@ -39,6 +48,17 @@ const BREAKING_FOOTER = /^BREAKING CHANGE/m;
  * change became one — `@12-apps/request-scope` went out as 2.0.0 for a change
  * that adds a `.releaserc.json` the tarball does not even ship.
  */
+function whyMajor(output) {
+  if (MAJOR_MARKER.test(output)) return "a RELEASE-MAJOR marker";
+  // A major with no marker should not be reachable under the current
+  // releaseRules. Name that rather than guess: an unexplained major is config
+  // drift worth chasing, and a confident wrong answer would bury it.
+  if (BREAKING_FOOTER.test(output)) {
+    return "a BREAKING CHANGE footer, which should cut a MINOR — check .releaserc.json";
+  }
+  return "the commit analysis";
+}
+
 export function bumpFor(output) {
   const next = output.match(NEXT_VERSION);
   if (!next) return null;
@@ -50,6 +70,6 @@ export function bumpFor(output) {
     next: next[1],
     last: last ? last[1] : null,
     major,
-    why: major ? (BREAKING_FOOTER.test(output) ? "a BREAKING CHANGE footer" : "the commit analysis") : null,
+    why: major ? whyMajor(output) : null,
   };
 }
