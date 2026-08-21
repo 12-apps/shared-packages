@@ -10,6 +10,7 @@ import type { PermissionRegistry } from '../core/types';
 import { useCan } from './context';
 
 import type { RbacApiClient, RoleListRowWire } from './api';
+import type { RoleFormCopy, RolesListCopy, RolesTableCopy } from './copy';
 import type { RbacLabels } from './labels';
 import { Alert } from '@12-apps/ui/data-display/Alert';
 
@@ -24,7 +25,8 @@ import { useConfirmable } from './use-confirmable';
  * the tenant's custom roles, with compose/edit/override/reset/delete. Ported
  * from the origin host's `apps/admin/src/pages/roles/*`; the grid keeps the same
  * test ids (`roles-grid`, `roles-search-all`, `add-role-button`,
- * `role-dialog`) so the e2e specs moved with the screen.
+ * `role-dialog`) so the e2e specs moved with the screen. Every sentence comes
+ * from the host's {@link RolesListCopy} (and its table/form siblings).
  */
 
 interface RolesScreenProps {
@@ -34,6 +36,9 @@ interface RolesScreenProps {
   labels: RbacLabels;
   /** The gate permission for the write affordances. */
   managePermission: string;
+  copy: RolesListCopy;
+  tableCopy: RolesTableCopy;
+  formCopy: RoleFormCopy;
 }
 
 type DialogState =
@@ -45,25 +50,23 @@ type DialogState =
 /** A destructive act awaiting its confirm step (FUT-546's shape). */
 type PendingAction = { kind: 'delete' | 'reset'; role: RoleListRowWire } | null;
 
-const CONFIRM_COPY = {
-  delete: {
-    title: 'Excluir o papel?',
-    // The delete is an ARCHIVE (the row survives for 12-17's restore surface),
-    // but what the admin must weigh is the immediate consequence:
-    body: 'Quem tem este papel perde os acessos dele imediatamente.',
-    confirmLabel: 'Excluir',
-  },
-  reset: {
-    title: 'Restaurar padrão do papel?',
-    body: 'As permissões voltam ao padrão do sistema. Esta ação não pode ser desfeita.',
-    confirmLabel: 'Restaurar padrão',
-  },
-} as const;
+/**
+ * The confirm step's words for the pending act. The delete is an ARCHIVE (the
+ * row survives for 12-17's restore surface), but what the admin must weigh is
+ * the immediate consequence — which is what the host's `deleteConfirm.body`
+ * states.
+ */
+function confirmWordsOf(
+  copy: RolesListCopy,
+  kind: 'delete' | 'reset',
+): { title: string; body: string; confirmLabel: string } {
+  return kind === 'delete' ? copy.deleteConfirm : copy.resetConfirm;
+}
 
-function dialogTitle(dialog: DialogState): string {
-  if (dialog.mode === 'create') return 'Novo papel';
-  if (dialog.mode === 'override') return `Editar papel do sistema ${dialog.role.name}`;
-  if (dialog.mode === 'edit') return `Editar ${dialog.role.name}`;
+function dialogTitle(dialog: DialogState, copy: RolesListCopy): string {
+  if (dialog.mode === 'create') return copy.dialogTitles.create;
+  if (dialog.mode === 'override') return copy.dialogTitles.override(dialog.role.name);
+  if (dialog.mode === 'edit') return copy.dialogTitles.edit(dialog.role.name);
   return '';
 }
 
@@ -95,16 +98,20 @@ function submitDialog(
 /** The confirm step for the two destructive role writes. */
 function RolesConfirm({
   confirmable,
+  copy,
 }: {
   confirmable: ReturnType<typeof useConfirmable<NonNullable<PendingAction>>>;
+  copy: RolesListCopy;
 }): JSX.Element {
   const pending = confirmable.pending;
+  const words = pending ? confirmWordsOf(copy, pending.kind) : null;
   return (
     <ConfirmDialog
       open={pending !== null}
-      title={pending ? CONFIRM_COPY[pending.kind].title : ''}
-      body={pending ? CONFIRM_COPY[pending.kind].body : ''}
-      confirmLabel={pending ? CONFIRM_COPY[pending.kind].confirmLabel : ''}
+      title={words?.title ?? ''}
+      body={words?.body ?? ''}
+      confirmLabel={words?.confirmLabel ?? ''}
+      cancelLabel={copy.cancelAction}
       busy={confirmable.busy}
       onConfirm={() => void confirmable.confirm()}
       onCancel={confirmable.cancel}
@@ -113,7 +120,7 @@ function RolesConfirm({
 }
 
 /** The list read + refresh cycle, isolated from the screen's rendering. */
-function useRolesPage(api: RbacApiClient, query: string): {
+function useRolesPage(api: RbacApiClient, query: string, loadFailed: string): {
   rows: RoleListRowWire[] | null;
   loadError: string | null;
   refresh: () => void;
@@ -133,12 +140,12 @@ function useRolesPage(api: RbacApiClient, query: string): {
         }
       })
       .catch(() => {
-        if (!cancelled) setLoadError('Não foi possível carregar os papéis.');
+        if (!cancelled) setLoadError(loadFailed);
       });
     return () => {
       cancelled = true;
     };
-  }, [api, query, generation]);
+  }, [api, query, generation, loadFailed]);
 
   return {
     rows,
@@ -161,7 +168,7 @@ function RoleFormDialog(props: {
     <Dialog
       open={dialog.mode !== 'closed'}
       onClose={props.onClose}
-      title={dialogTitle(dialog)}
+      title={dialogTitle(dialog, props.screen.copy)}
       size="md"
       showCloseButton
       dataTestId="role-dialog"
@@ -172,6 +179,7 @@ function RoleFormDialog(props: {
             permissions={props.screen.permissions}
             governance={props.screen.governance}
             labels={props.screen.labels}
+            copy={props.screen.formCopy}
             initial={dialogInitial(dialog)}
             template={dialog.mode === 'override'}
             busy={props.busy}
@@ -186,11 +194,11 @@ function RoleFormDialog(props: {
 }
 
 export function RolesScreen(props: RolesScreenProps): JSX.Element {
-  const { api } = props;
+  const { api, copy } = props;
   const can = useCan();
   const canManage = can(props.managePermission);
   const [query, setQuery] = useState('');
-  const { rows, loadError, refresh } = useRolesPage(api, query);
+  const { rows, loadError, refresh } = useRolesPage(api, query, copy.loadFailed);
   const [dialog, setDialog] = useState<DialogState>({ mode: 'closed' });
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -224,15 +232,15 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
     <Stack spacing={2}>
       <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
         <Text variant="heading" size="lg" as="h1">
-          Papéis
+          {copy.title}
         </Text>
         {canManage && (
           <Button dataTestId="add-role-button" onClick={() => setDialog({ mode: 'create' })}>
-            Novo papel
+            {copy.newRoleAction}
           </Button>
         )}
       </Stack>
-      <SearchField placeholder="Buscar papel" testId="roles-search-all" onCommit={setQuery} />
+      <SearchField placeholder={copy.searchPlaceholder} testId="roles-search-all" onCommit={setQuery} />
       {loadError && <Text as="p">{loadError}</Text>}
       {confirmable.error && (
         <Alert variant="danger" description={confirmable.error} data-testid="roles-error" />
@@ -240,6 +248,7 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
       {rows && (
         <RolesTable
           rows={rows}
+          copy={props.tableCopy}
           canManage={canManage}
           onEdit={(role) =>
             setDialog(role.kind === 'SYSTEM' ? { mode: 'override', role } : { mode: 'edit', role })
@@ -248,7 +257,7 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
           onDelete={(role) => confirmable.request({ kind: 'delete', role })}
         />
       )}
-      <RolesConfirm confirmable={confirmable} />
+      <RolesConfirm confirmable={confirmable} copy={copy} />
       <RoleFormDialog
         screen={props}
         dialog={dialog}

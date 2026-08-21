@@ -11,6 +11,7 @@ import { Text } from '@12-apps/ui/typography/Text';
 import type { GovernanceCatalog } from '../governance';
 import type { PermissionRegistry } from '../core/types';
 
+import type { RoleFormCopy } from './copy';
 import { groupPermissions, sodCounterpart, type RbacLabels } from './labels';
 
 /**
@@ -19,6 +20,7 @@ import { groupPermissions, sodCounterpart, type RbacLabels } from './labels';
  * never composable; a separation-of-duties pair disables its counterpart —
  * except for a curated TEMPLATE override, whose duty pairs are intrinsic to
  * the vetted catalog (governance skips the composition guards there too).
+ * Every sentence comes from the host's {@link RoleFormCopy}.
  */
 
 export interface RoleFormValue {
@@ -34,6 +36,7 @@ export interface RoleFormProps {
   permissions: FormPermissions;
   governance: FormGovernance;
   labels: RbacLabels;
+  copy: RoleFormCopy;
   /** The role being edited, or null to compose a new one. */
   initial: RoleFormValue | null;
   /** Template-override mode: the name is fixed and SoD pairs stay enabled. */
@@ -80,6 +83,7 @@ interface PermissionGroupProps {
   permissions: FormPermissions;
   governance: FormGovernance;
   labels: RbacLabels;
+  copy: RoleFormCopy;
   selected: ReadonlySet<string>;
   ownerMarkers: ReadonlySet<string>;
   template: boolean;
@@ -133,9 +137,7 @@ function PermissionRow(
   const kind = props.permissions.kind(permission);
   return (
     <Checkbox
-      label={`${props.labels.permissionActionLabel(permission)} · ${
-        kind === 'instance' ? 'instância' : 'classe'
-      }`}
+      label={`${props.labels.permissionActionLabel(permission)} · ${props.copy.kinds[kind]}`}
       checked={selected.has(permission)}
       disabled={busy || sodBlocked || ownerBlocked}
       data-testid={`perm-${permission}`}
@@ -172,6 +174,7 @@ function useSelection(initial: readonly string[]): {
 function RoleFormFields(props: {
   name: string;
   description: string;
+  copy: RoleFormCopy;
   busy: boolean;
   template: boolean;
   onName: (value: string) => void;
@@ -181,8 +184,8 @@ function RoleFormFields(props: {
     <>
       <Input
         fullWidth
-        placeholder="Nome do papel"
-        aria-label="Nome do papel"
+        placeholder={props.copy.nameLabel}
+        aria-label={props.copy.nameLabel}
         value={props.name}
         disabled={props.busy || props.template}
         data-testid="role-name"
@@ -190,8 +193,8 @@ function RoleFormFields(props: {
       />
       <Input
         fullWidth
-        placeholder="Descrição (opcional)"
-        aria-label="Descrição"
+        placeholder={props.copy.descriptionPlaceholder}
+        aria-label={props.copy.descriptionLabel}
         value={props.description}
         disabled={props.busy}
         data-testid="role-description"
@@ -201,8 +204,9 @@ function RoleFormFields(props: {
   );
 }
 
-/** The Cancelar / submit row. */
+/** The cancel / submit row. */
 function RoleFormFooter(props: {
+  copy: RoleFormCopy;
   editing: boolean;
   busy: boolean;
   submittable: boolean;
@@ -212,10 +216,10 @@ function RoleFormFooter(props: {
   return (
     <Stack direction="row" spacing={1} justifyContent="flex-end">
       <Button variant="text" onClick={props.onCancel} disabled={props.busy} dataTestId="role-cancel">
-        Cancelar
+        {props.copy.cancelAction}
       </Button>
       <Button onClick={props.onSubmit} disabled={!props.submittable} dataTestId="role-submit">
-        {props.editing ? 'Salvar' : 'Criar papel'}
+        {props.editing ? props.copy.saveAction : props.copy.createAction}
       </Button>
     </Stack>
   );
@@ -240,13 +244,8 @@ function toValue(name: string, description: string, selected: ReadonlySet<string
   };
 }
 
-/** pt-BR counter: "Permissões (N selecionada(s))". */
-function selectionLabel(count: number): string {
-  return `Permissões (${count} selecionada${count === 1 ? '' : 's'})`;
-}
-
 export function RoleForm(props: RoleFormProps): JSX.Element {
-  const { initial, template = false, busy, error } = props;
+  const { copy, initial, template = false, busy, error } = props;
   const defaults = formDefaults(initial);
   const [name, setName] = useState(defaults.name);
   const [description, setDescription] = useState(defaults.description ?? '');
@@ -258,13 +257,14 @@ export function RoleForm(props: RoleFormProps): JSX.Element {
       <RoleFormFields
         name={name}
         description={description}
+        copy={copy}
         busy={busy}
         template={template}
         onName={setName}
         onDescription={setDescription}
       />
       <Text variant="heading" size="xs" as="p">
-        {selectionLabel(selected.size)}
+        {copy.selectionCount(selected.size)}
       </Text>
       <Box sx={{ maxHeight: 360, overflowY: 'auto', pr: 1 }}>
         {groupPermissions(props.permissions).map(({ domain, permissions }) => (
@@ -275,6 +275,7 @@ export function RoleForm(props: RoleFormProps): JSX.Element {
             permissions={props.permissions}
             governance={props.governance}
             labels={props.labels}
+            copy={copy}
             selected={selected}
             ownerMarkers={ownerMarkers}
             template={template}
@@ -286,6 +287,7 @@ export function RoleForm(props: RoleFormProps): JSX.Element {
       </Box>
       {error && <Alert variant="danger" description={error} data-testid="role-form-error" />}
       <RoleFormFooter
+        copy={copy}
         editing={initial !== null}
         busy={busy}
         submittable={name.trim().length > 0 && selected.size > 0 && !busy}
