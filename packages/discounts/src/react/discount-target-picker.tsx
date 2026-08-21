@@ -1,23 +1,24 @@
 "use client";
 
-import { useState, type JSX } from "react";
+import type { JSX } from "react";
 
-import { Autocomplete } from "@12-apps/ui/form/Autocomplete";
-import { CategorySelect } from "@12-apps/ui/form/CategorySelect";
-import { FormControl, FormLabel, FormMessage } from "@12-apps/ui/form/Form";
 import { useFormContext } from "@12-apps/ui/form/total-form";
 
+import type { ComboRequirement } from "../engine/types";
+
+import type { WireTargetGroup } from "./api";
+import { ComboSlotBuilder } from "./combo-slot-builder";
 import { fill, type DiscountsWebCopy } from "./copy";
-import type { WireTarget, WireTargetGroup } from "./api";
+import { TargetPickerField } from "./target-picker-field";
 
 /**
  * What a scoped discount points at, picked from the host's own collections.
  *
- * There is no shared multi-select in `@12-apps/ui`, so this composes
- * `Autocomplete` in multiple mode — chips plus type-to-filter, the same control
- * `AddressAutocomplete` is built on. A collection that NESTS gets
- * `CategorySelect` instead: a flat combobox would put a subcategory beside its
- * parent with nothing to tell them apart.
+ * This file is the ROUTER: it reads the scope and decides which shape the
+ * targets take. The controls themselves live next door — one collection's
+ * picker in `target-picker-field`, the quantified group list in
+ * `combo-slot-builder` — because the combo builder needs the former per group
+ * and a file cannot import its own importer.
  *
  * Which collections exist is not decided here. The surface reads them from
  * `GET /discounts/targets`, which answers whatever the host registered — so
@@ -32,62 +33,15 @@ import type { WireTarget, WireTargetGroup } from "./api";
  * leaving a stale one on screen would suggest otherwise.
  */
 
-/** One labelled multi-select of targets, with its own input-text state. */
-function TargetField({
-  label,
-  placeholder,
-  requiredMessage,
-  options,
-  ids,
-  onChange,
-  dataTestId,
-}: {
-  label: string;
-  placeholder: string;
-  requiredMessage: string;
-  options: WireTarget[];
-  ids: readonly string[];
-  onChange: (next: string[]) => void;
-  dataTestId: string;
-}): JSX.Element {
-  const [query, setQuery] = useState("");
-  const byId = new Map(options.map((option) => [option.id, option]));
-  // An id whose option is missing — a target archived since the rule was saved
-  // — still renders as a chip, so saving cannot silently drop it.
-  const selected = ids.map((id) => byId.get(id) ?? { id, name: id });
-
-  return (
-    <FormControl fullWidth>
-      <FormLabel error={ids.length === 0}>{label}</FormLabel>
-      <div data-testid={dataTestId}>
-        <Autocomplete<WireTarget>
-          multiple
-          value={query}
-          onChange={setQuery}
-          suggestions={options}
-          selectedItems={selected}
-          onSelectedItemsChange={(items) => onChange(items.map((item) => item.id))}
-          getKey={(option) => option.id}
-          getLabel={(option) => option.name}
-          placeholder={placeholder}
-          inputAriaLabel={label}
-        />
-      </div>
-      {ids.length === 0 && (
-        <FormMessage error dataTestId={`${dataTestId}-message`}>
-          {requiredMessage}
-        </FormMessage>
-      )}
-    </FormControl>
-  );
-}
-
-/** The ids currently chosen for one dimension. */
+/** What the form currently has chosen, in every shape a scope can need. */
 interface DiscountTargetSelection {
   categoryIds: string[];
   menuItemIds: string[];
+  /** The combo's groups, in the operator's own order. Empty at every other scope. */
+  comboRequirements: readonly ComboRequirement[];
   onCategoryIdsChange: (next: string[]) => void;
   onMenuItemIdsChange: (next: string[]) => void;
+  onComboRequirementsChange: (next: ComboRequirement[]) => void;
 }
 
 /** Which selection a dimension reads and writes. */
@@ -112,6 +66,12 @@ function scopeFor(targetType: string): string {
  * Reads the LIVE `scope` from the form context, so flipping the toggle swaps
  * the picker immediately without the parent form having to mirror the value
  * into its own state.
+ *
+ * COMBO is the third branch (FUT-268) and it is a different SHAPE, not another
+ * picker: a combo is a list of quantified groups, so it gets the builder and
+ * every collection at once, while CATEGORY and ITEM each get exactly one
+ * collection's picker. ORDER still renders nothing — an order-wide discount
+ * covers everything, so a target list there is not empty, it is meaningless.
  */
 export function DiscountTargetPicker({
   groups,
@@ -124,36 +84,31 @@ export function DiscountTargetPicker({
 }): JSX.Element | null {
   const { values } = useFormContext();
   const scope = values.scope ?? "ORDER";
+
+  if (scope === "COMBO") {
+    return (
+      <ComboSlotBuilder
+        slots={selection.comboRequirements}
+        groups={groups}
+        copy={copy}
+        onChange={selection.onComboRequirementsChange}
+      />
+    );
+  }
+
   const group = groups.find((entry) => scopeFor(entry.targetType) === scope);
   if (!group) return null;
 
   const { ids, onChange } = bind(group.targetType, selection);
-  const label = fill(copy.targets.pick, { collection: group.label });
-  const dataTestId = `discount-${group.slug}-targets`;
-
-  if (group.nests) {
-    return (
-      <CategorySelect
-        label={label}
-        fullWidth
-        allowParentSelection
-        options={group.targets}
-        value={ids}
-        onChange={onChange}
-        error={ids.length === 0 ? copy.targets.required : undefined}
-        dataTestId={dataTestId}
-      />
-    );
-  }
   return (
-    <TargetField
-      label={label}
+    <TargetPickerField
+      group={group}
+      label={fill(copy.targets.pick, { collection: group.label })}
       placeholder={fill(copy.targets.search, { collection: group.label })}
       requiredMessage={copy.targets.required}
-      options={group.targets}
       ids={ids}
       onChange={onChange}
-      dataTestId={dataTestId}
+      dataTestId={`discount-${group.slug}-targets`}
     />
   );
 }

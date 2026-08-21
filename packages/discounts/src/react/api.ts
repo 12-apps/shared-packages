@@ -80,6 +80,12 @@ export interface DiscountFormPayload {
   percentOff: string;
   /** A money amount, as the currency field stores it. */
   amountOff: string;
+  /** What the matched combo group costs, as the currency field stores it. */
+  bundlePrice: string;
+  /** How many of the matched units are free, as typed. */
+  freeUnits: string;
+  /** How many combos one cart may claim. Blank = as often as it fits. */
+  maxComboApplications: string;
   scope: string;
   trigger: string;
   code: string;
@@ -92,6 +98,8 @@ export interface DiscountFormPayload {
   active: boolean;
   categoryIds: string[];
   menuItemIds: string[];
+  /** The combo's groups, in the operator's own order. Empty at every other scope. */
+  comboRequirements: readonly ComboRequirement[];
 }
 
 /** A money amount as integer cents, or null when blank. */
@@ -130,12 +138,28 @@ export function toWriteBody(
   input: DiscountFormPayload,
   formatters: DiscountsFormatters,
 ): Record<string, unknown> {
-  const isPercentage = input.type === "PERCENTAGE";
+  const isCombo = input.scope === "COMBO";
   return {
     name: input.name.trim(),
     type: input.type,
-    percentOffBp: isPercentage ? toBasisPoints(input.percentOff, formatters) : null,
-    amountOffCents: isPercentage ? null : toCents(input.amountOff, formatters),
+    // Exactly one value column, chosen by the TYPE, with the other three
+    // forced to null. The four are mutually exclusive at the database
+    // (`discounts_value_check`), so carrying a leftover from a branch the
+    // operator flipped away from is a 500 on a form they filled in correctly —
+    // the same reason the server's own folder nulls them rather than passing
+    // them through.
+    percentOffBp:
+      input.type === "PERCENTAGE" ? toBasisPoints(input.percentOff, formatters) : null,
+    amountOffCents: input.type === "FIXED_AMOUNT" ? toCents(input.amountOff, formatters) : null,
+    bundlePriceCents:
+      input.type === "BUNDLE_PRICE" ? toCents(input.bundlePrice, formatters) : null,
+    freeUnits: input.type === "FREE_UNITS" ? toCount(input.freeUnits, formatters) : null,
+    // The combo SPEC, narrowed to the scope for the reason the id lists below
+    // are: a rule whose scope moved off COMBO keeps neither its groups nor its
+    // cap, or it would go on being matched as a combo by a screen that no
+    // longer shows one.
+    comboRequirements: isCombo ? [...input.comboRequirements] : [],
+    maxComboApplications: isCombo ? toCount(input.maxComboApplications, formatters) : null,
     scope: input.scope,
     trigger: input.trigger,
     code: input.trigger === "CODE" ? toNullable(input.code) : null,

@@ -341,9 +341,44 @@ export const discounts = createWebDiscounts({
 ```
 
 What that one call replaces: a server-driven grid with eight columns, five
-filter pills and a CSV/JSON export; a create/edit form of fourteen inputs, four
-of which appear only when another says so; the target pickers; two card
-layouts; four confirmation popups; and every wire call between them.
+filter pills and a CSV/JSON export; a create/edit form whose value input and
+target block both follow the toggles above them; the target pickers and the
+combo builder; two card layouts; four confirmation popups; and every wire call
+between them.
+
+### Authoring a combo
+
+The four discount types and the four scopes are not independent, and the form
+is where that stops being a table in a README:
+
+| the offer | scope | type | what the operator fills in |
+|---|---|---|---|
+| "leve 3, pague 2" | `COMBO` | `FREE_UNITS` | one group of 3, and 1 free |
+| "2 refrigerantes, 2 hambúrgueres e 2 batatas por R$ 25" | `COMBO` | `BUNDLE_PRICE` | three groups of 2, and the price |
+| the same six items at 20% off | `COMBO` | `PERCENTAGE` | three groups of 2, and the rate |
+
+Picking `COMBO` swaps the single target picker for the **group builder**: each
+group is a quantity plus the rows that can fill it, and a group may name
+categories AND products at once, because a real menu mixes them — "any drink,
+or specifically the large fries" is one group. Every registered
+`DiscountableCollection` gets a picker inside every group, so a host that
+registers a third dimension gets it here with no change to this package.
+
+Three consequences worth stating, because each is a bug this shape prevents:
+
+- **The reward input is MOUNTED, not hidden.** The four value columns are
+  mutually exclusive at the database, so a leftover number from a branch the
+  operator flipped away from is a 500 on a form they filled in correctly.
+- **`freeUnits` is bounded by the groups.** "Take 3, three free" is a giveaway,
+  so the form compares it against what one application takes out of the cart
+  and names the ceiling when it refuses.
+- **Position is the array index.** The list an operator builds is the list a
+  card reads back; two groups of the same size are otherwise indistinguishable
+  once stored, which is why `toTargetRows` stamps the index as `position`.
+
+`maxComboApplications` appears at `COMBO` scope and nowhere else — it is the
+only scope where "how many times may one cart claim this" means anything — and
+blank means as often as it fits.
 
 **Build it once, at module scope.** The members are component TYPES, so
 rebuilding per render gives React new types every time and remounts the whole

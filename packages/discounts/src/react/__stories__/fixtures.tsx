@@ -104,8 +104,43 @@ export const STORY_DISCOUNTS: DiscountWireRecord[] = [
     stackable: true,
     active: false,
     categoryIds: [],
-    menuItemIds: ["m-burger"],
+    menuItemIds: [],
+    // The classic. ONE group of three burgers, one of them free — which is
+    // exactly what "leve 3, pague 2" is once written down, and why `freeUnits`
+    // has to be smaller than the group's quantity.
+    comboRequirements: [{ menuItemIds: ["m-burger"], categoryIds: [], quantity: 3 }],
     createdAt: "2026-07-01T00:00:00.000Z",
+  },
+  {
+    id: "d-combo-percent",
+    name: "Combo lanche 20% off",
+    type: "PERCENTAGE",
+    percentOffBp: 2_000,
+    amountOffCents: null,
+    maxComboApplications: 2,
+    scope: "COMBO",
+    trigger: "AUTOMATIC",
+    code: null,
+    startsAt: null,
+    endsAt: null,
+    minSubtotalCents: null,
+    usageLimit: null,
+    perBuyerLimit: null,
+    usageCount: 31,
+    stackable: true,
+    active: true,
+    categoryIds: [],
+    menuItemIds: [],
+    // Three groups of two — "2 refrigerantes, 2 hambúrgueres e 2 batatas" —
+    // rewarded with a RATE rather than a fixed price. A combo's reward is the
+    // type, not the scope, which is why all four types are legal here and only
+    // two of them are legal nowhere else.
+    comboRequirements: [
+      { menuItemIds: [], categoryIds: ["c-sodas"], quantity: 2 },
+      { menuItemIds: ["m-burger"], categoryIds: [], quantity: 2 },
+      { menuItemIds: ["m-fries"], categoryIds: [], quantity: 2 },
+    ],
+    createdAt: "2026-08-18T00:00:00.000Z",
   },
   {
     id: "d-item",

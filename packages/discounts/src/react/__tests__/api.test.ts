@@ -22,6 +22,9 @@ function payload(overrides: Partial<DiscountFormPayload> = {}): DiscountFormPayl
     type: "PERCENTAGE",
     percentOff: "12,5",
     amountOff: "",
+    bundlePrice: "",
+    freeUnits: "",
+    maxComboApplications: "",
     scope: "ORDER",
     trigger: "AUTOMATIC",
     code: "",
@@ -34,6 +37,7 @@ function payload(overrides: Partial<DiscountFormPayload> = {}): DiscountFormPayl
     active: true,
     categoryIds: [],
     menuItemIds: [],
+    comboRequirements: [],
     ...overrides,
   };
 }
