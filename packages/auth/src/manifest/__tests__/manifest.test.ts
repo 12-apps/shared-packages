@@ -170,7 +170,7 @@ describe("authWebManifest", () => {
     }
   });
 
-  it("offers sign-up in the storefront but not in the backoffice", () => {
+  it("offers sign-up in the client area but not in the backoffice", () => {
     // An operator account is granted, never self-served — so the admin area
     // suggests login and the two reset screens, and no signup.
     const areaScreens = (area: string): string[] =>
@@ -179,7 +179,10 @@ describe("authWebManifest", () => {
         .flatMap((entry) => entry.routes ?? [])
         .map((route) => route.screen);
 
-    expect(areaScreens("storefront")).toContain("SignupPage");
+    // `client` is the shopper-facing area id the wiring contract itself
+    // documents; `storefront` was one host's name for it, and matched nothing
+    // in a host projecting areas by the contract's ids.
+    expect(areaScreens("client")).toContain("SignupPage");
     expect(areaScreens("admin")).not.toContain("SignupPage");
     expect(areaScreens("admin")).toContain("LoginPage");
   });
