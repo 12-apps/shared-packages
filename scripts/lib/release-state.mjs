@@ -37,6 +37,15 @@ export function declaredDirs(file = PACKAGE_LIST) {
  * scripts/release-tags-selftest.mjs, so the fallback can never be a second,
  * quietly diverging answer: a package present in one and missing from the other
  * would be released but never verified, or verified but never released.
+ *
+ * The fallback is load-bearing, not a convenience for the watchdog. When #351
+ * moved the release out of ci.yml into cd.yml, the workflow-level PUBLISH_DIRS
+ * stayed behind — and the three scripts on the publish path read
+ * `process.env.PUBLISH_DIRS` directly instead of calling this. All three threw
+ * "PUBLISH_DIRS is empty" on the next two merges, so the repo published nothing
+ * while verify-released.mjs, which does call this, reported all 34 packages
+ * healthy in the same job. Every caller goes through here now, and
+ * release-tags-selftest.mjs fails if one stops.
  */
 export function publishDirs(env = process.env) {
   const fromEnv = (env.PUBLISH_DIRS ?? "").split(/\s+/).filter(Boolean);

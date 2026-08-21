@@ -36,8 +36,11 @@ import { basename, resolve } from "node:path";
 
 import { MAX_OUTPUT, classifyGitFailure, sleep } from "./lib/git-transience.mjs";
 import { bumpFor } from "./lib/major-bump.mjs";
+import { publishDirs } from "./lib/release-state.mjs";
 
-const DIRS = (process.env.PUBLISH_DIRS ?? "").split(/\s+/).filter(Boolean);
+// Through the helper, so this still resolves when no PUBLISH_DIRS is set —
+// cd.yml sets none. See publishDirs() for why that is not a bug there.
+const DIRS = publishDirs();
 
 // The retry policy lives in ./lib/git-transience.mjs, shared with
 // scripts/next-versions.mjs — the dry-run that gates a major bump meets the
