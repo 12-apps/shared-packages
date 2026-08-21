@@ -65,6 +65,18 @@ function readPackedFiles(): readonly string[] {
  * pure read of the working tree — one call is as true as three.
  */
 const packCache: { entries?: readonly string[] } = {};
+
+/**
+ * The budget for a case that shells out to npm.
+ *
+ * `npm pack` takes ~26s on a runner building every package at once, and the
+ * memoisation above puts that whole cost on whichever case runs first — so the
+ * default 5s budget fails the suite for being on a busy machine, not for
+ * anything it asserts. Raised only on the three cases that actually pack, for
+ * the same reason `vitest.config.ts` raises the HOOK budget rather than the
+ * global one: a genuinely hanging test should still fail fast.
+ */
+const PACK_TIMEOUT_MS = 120_000;
 function packedFiles(): readonly string[] {
   packCache.entries ??= readPackedFiles();
   return packCache.entries;
@@ -109,18 +121,18 @@ describe('the published tarball', () => {
     // `files` excludes `**/__tests__/**`. If that stopped holding, every file in
     // this folder would become its own first offence.
     expect(packedFiles().filter((entry) => entry.includes('__tests__'))).toEqual([]);
-  });
+  }, PACK_TIMEOUT_MS);
 
   it('carries no word belonging to the application it was extracted from', () => {
     expect(sweep(foreignPatterns())).toEqual([]);
-  });
+  }, PACK_TIMEOUT_MS);
 
   it('carries no identifier of the vocabulary that was removed', () => {
     // `SHIFT_KINDS`, `ShiftKind` and the two resource-type constants were
     // exported runtime values. A leftover mention in a doc or a comment is how
     // a removed export gets reintroduced by the next reader.
     expect(sweep(removedVocabularyPatterns())).toEqual([]);
-  });
+  }, PACK_TIMEOUT_MS);
 });
 
 describe('the sweep itself', () => {
