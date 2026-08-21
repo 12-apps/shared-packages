@@ -131,7 +131,7 @@ bundle, if a host wants one, stays the host's.
 
 ## The admin surface
 
-`createApiDiscounts({ store, copy })` returns five `WireRoute` descriptors —
+`createApiDiscounts({ store, copy, logger })` returns five `WireRoute` descriptors —
 list, read, create, re-state, archive — each **declaring the permission it
 needs** (`discounts:read` / `discounts:write`), so a host's coverage gates can
 read the policy off the assembled table instead of scanning route files.
@@ -140,7 +140,11 @@ read the policy off the assembled table instead of scanning route files.
 import { createApiDiscounts } from "@12-apps/discounts/server";
 import { PT_BR_DISCOUNTS_SERVER_COPY } from "@12-apps/discounts/server/pt-BR";
 
-const { routes } = createApiDiscounts({ store, copy: PT_BR_DISCOUNTS_SERVER_COPY });
+const { routes } = createApiDiscounts({
+  store,
+  copy: PT_BR_DISCOUNTS_SERVER_COPY,
+  logger: createFeatureLogger("discounts"),
+});
 ```
 
 Or, through the contract:
@@ -152,13 +156,50 @@ import { discountsServerManifest } from "@12-apps/discounts/manifest/server";
 host.adoptServer({
   manifest: discountsManifest,
   server: discountsServerManifest,
-  bindings: { http: { mountPath: "/api/admin/:tenantSlug", config: { store, copy } } },
+  bindings: {
+    http: { mountPath: "/api/admin/:tenantSlug", config: { store, copy, logger } },
+  },
 });
 ```
 
 Delete is a **soft archive**, and that is a product decision: the orders that
 already redeemed a discount keep their snapshot, and its redemption counter
 stays readable for reporting.
+
+### Nothing it does is silent
+
+`logger` is **required config, with no default**, for the reason `copy` is: the
+default would be a no-op, and a no-op is the exact silence it exists to end.
+Every route is wrapped, and there are three outcomes:
+
+| outcome | level | what the line names |
+|---|---|---|
+| a write that succeeded | `info` | the verb, the discount id, the tenant |
+| a refusal this package decided (400 / 404 / 422) | `warn` | the route, the status, and for a 422 the **field** a form paints red |
+| anything thrown — and it is re-thrown unchanged | `error` | the route, the tenant, the cause's message |
+
+Every line is a **string**. A host's logger is a Winston child in practice,
+whose formatter runs `util.inspect(…, { depth: 5 })` over an extra argument —
+which is how a provider error's retained response body, buyer name and CPF
+included, reaches a third party. The cause is folded into the sentence instead.
+A line names the tenant, the route, the discount id and the field; never the
+body, never a coupon code, never a name an operator typed.
+
+The `error` case **re-throws**. A uniqueness clash, a foreign target and a dead
+connection are the store's to raise in the host's own error vocabulary; a
+surface that folded one into a tidy response would turn a broken database into a
+refusal nobody investigates.
+
+A host adopting through `@12-apps/wiring/consumer` already has the logger the
+binder built from this package's declared namespace — pass
+`assembled.loggers["@12-apps/discounts"]`. A host on no wiring passes any
+`createFeatureLogger`-shaped child of its own.
+
+The evaluator is deliberately **not** wired to it. `evaluateCart` is a pure
+function called once per cart render; a logger there would file a line per
+keystroke on the storefront and would need a logger threaded through a browser
+bundle. A rejected coupon is already a `DiscountRejection` in the result, which
+is the host's to report if it wants to.
 
 ## What the host still owns
 

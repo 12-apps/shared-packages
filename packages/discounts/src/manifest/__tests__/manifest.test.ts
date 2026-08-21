@@ -23,6 +23,7 @@ import {
 import packageJson from "../../../package.json";
 import { DISCOUNTS_PERMISSIONS } from "../../server/contribution";
 import { DISCOUNTS_MCP_TOOLS } from "../../server/mcp";
+import { recordingLogger } from "../../server/__tests__/recording-logger";
 import { createApiDiscounts } from "../../server/routes";
 import { discountsManifest } from "../index";
 import { discountsServerManifest } from "../server";
@@ -78,7 +79,7 @@ describe("the shared manifest", () => {
     // The parity that lets a host validate a request against the schema its
     // advertised tool carries: look a tool up by its route's method+path and
     // it cannot miss. `{param}` here, `:param` there — one grammar per side.
-    const { routes } = createApiDiscounts({ store: {} as never, copy: FULL_COPY });
+    const { routes } = createApiDiscounts({ store: {} as never, copy: FULL_COPY, logger: recordingLogger() });
     const openApi = (wirePath: string) =>
       wirePath
         .split("/")
@@ -90,7 +91,7 @@ describe("the shared manifest", () => {
   });
 
   it("declares each route's permission, so a host's gates read a table not a file", () => {
-    const { routes } = createApiDiscounts({ store: {} as never, copy: FULL_COPY });
+    const { routes } = createApiDiscounts({ store: {} as never, copy: FULL_COPY, logger: recordingLogger() });
     expect(
       routes.map((route) => `${route.method} ${route.path} -> ${route.permission}`),
     ).toEqual([
@@ -128,5 +129,17 @@ describe("the shared manifest", () => {
 
   it("files its telemetry under its own namespace", () => {
     expect(discountsManifest.observability).toEqual({ namespace: "discounts" });
+  });
+
+  it("HONOURS that declaration — the surface cannot be built without a logger", () => {
+    // The case that would have caught the original gap. Declaring the
+    // namespace made the binder build a logger and hang it on
+    // `assembled.loggers`; nothing then took it, and the package held no log
+    // call at all, so the declaration was true of the binder and false of the
+    // code. A declaration nothing consumes is worse than none: it reads as a
+    // finished observability story.
+    expect(() =>
+      createApiDiscounts({ store: {} as never, copy: FULL_COPY, logger: undefined as never }),
+    ).toThrow(/observability namespace/);
   });
 });
