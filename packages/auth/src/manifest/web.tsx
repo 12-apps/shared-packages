@@ -27,7 +27,11 @@ export const authWebManifest = defineWebManifest(authManifest, {
     {
       // The shopper's app. All five, because a buyer can arrive at any of them
       // from a mail link rather than from inside the app.
-      area: "storefront",
+      // `client`, which is what `AreaContribution` documents ("`admin`,
+      // `super-admin`, `client`, …"). This read `storefront` — one host's
+      // name for its shopper-facing app — so a host projecting areas by the
+      // contract's own ids matched nothing here and mounted no sign-in at all.
+      area: "client",
       routes: [
         { path: "login", screen: "LoginPage" },
         { path: "signup", screen: "SignupPage" },

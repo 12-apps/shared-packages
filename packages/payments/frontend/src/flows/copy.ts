@@ -52,6 +52,21 @@ export interface CheckoutCopyFE {
   emptyCartAction: string;
   /** The Dados step's primary action. */
   continueAction: string;
+  /**
+   * The reassurance caption under that action.
+   *
+   * The screen rendered "Pagamento seguro" inline — one line below a sibling
+   * reading `runtime.copy.continueAction`, so the port was already there and
+   * already required; this string simply never asked it. That is the shape
+   * FUT-760 left behind: defaults removed from the CONFIG surface without the
+   * rendering being rewired, so a host that dutifully passes copy still gets
+   * the origin product's voice.
+   *
+   * OPTIONAL, on the {@link CheckoutCopyFE.returnTimedOut} precedent: a host
+   * that has not written the sentence gets NO caption rather than someone
+   * else's. Reassurance nobody chose is worth less than silence.
+   */
+  secureNotice?: string;
   /** The add-card screen (FUT-183): putting a card on file outside a purchase. */
   addCardTitle: string;
   addCardAction: string;

@@ -3,6 +3,16 @@ import type { DataViewQuery, RangeValue } from "./data-views-types";
 /**
  * THE "SERVER" FOR THE PEDIDOS STORY.
  *
+ * It is named for its one consumer — `data-views-table.stories.tsx` — and the
+ * `.stories.` infix is load-bearing rather than decorative: this package's
+ * `files` carries `!**\/*.stories.*`, so the name is what keeps a Storybook
+ * fixture out of the published tarball. As `pedidos.server.ts` it shipped, and
+ * a generic component library was handing every adopter a row type spelled
+ * `pedido`, `cliente`, `situacao`. The copy-portability gate could not see it
+ * (no diacritics) and the story exclusions did not match the name, so it sat in
+ * `src/` unremarked. The Portuguese itself is fine and stays: a story IS
+ * product copy. Shipping one to strangers is what was not.
+ *
  * Server mode means the grid does not filter, sort or paginate — it emits the
  * query and renders exactly the page it is handed back. A story that wires
  * `onQueryChange` to a no-op spy therefore looks broken in a specific and

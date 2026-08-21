@@ -33,6 +33,7 @@ export const STORY_CHECKOUT_COPY: CheckoutCopyFE = {
   emptyCartTitle: "Seu carrinho está vazio.",
   emptyCartAction: "Ver cardápio",
   continueAction: "Continuar",
+  secureNotice: "Pagamento seguro",
   addCardTitle: "Adicionar cartão",
   addCardAction: "Salvar cartão",
   addCardPreparing: "Preparando o formulário…",

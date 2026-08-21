@@ -5,7 +5,7 @@ import type {
   DeclineReason,
   ResolvedCredentials,
 } from '../core/types';
-import { capturedAmountCents } from './shared';
+import { capturedAmountCents, chargeDescription } from './shared';
 import { NAME } from './stripe-http';
 
 /**
@@ -379,7 +379,7 @@ export function intentPayload(
   return {
     amount: input.amount.amountCents,
     currency: currencyOf(input),
-    description: `Pedido ${input.reference}`.slice(0, 350),
+    description: chargeDescription(input, 350),
     // Correlates the Stripe dashboard back to the host's order, and is what a
     // reconciliation lookup searches on.
     metadata: { ...input.metadata, reference: input.reference },

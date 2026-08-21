@@ -26,7 +26,7 @@ import {
   type PagBankPixResponse,
 } from './pagbank-snapshots';
 import { postTransactionEvents } from './pagbank-webhook';
-import { secureEquals, sha256Hex, stubCharge } from './shared';
+import { chargeDescription, secureEquals, sha256Hex, stubCharge } from './shared';
 
 /**
  * PagBank (PagSeguro) Orders API adapter — a port of the integration this
@@ -78,7 +78,7 @@ function cardInstrument(card: NonNullable<ChargeInput['card']> | undefined) {
 function cardCharge(input: ChargeInput) {
   return {
     // PagBank requires a 1–64 char charge description.
-    description: `Pedido ${input.reference}`.slice(0, 64),
+    description: chargeDescription(input, 64),
     amount: { value: input.amount.amountCents, currency: input.amount.currency },
     payment_method: {
       type: 'CREDIT_CARD',
