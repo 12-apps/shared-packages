@@ -9,6 +9,13 @@
  */
 
 import { WiringDefinitionError } from "../errors";
+
+export {
+  assertDbMirror,
+  assertEnvMirror,
+  assertExportsMirror,
+  type MirrorPackageJson,
+} from "./mirrors";
 import { isIsolatedDb } from "../contract/db";
 import type { PrismaContribution } from "../contract/db";
 import type { WireEnvVar } from "../contract/env";
@@ -166,89 +173,6 @@ export function defineManifest(manifest: PackageManifest): PackageManifest {
   assertContributions(manifest);
   assertDeclarations(manifest);
   return manifest;
-}
-
-/**
- * Host-side assemblers are plain Node reading `node_modules` — they cannot
- * execute this manifest. The db contribution is therefore mirrored into the
- * package's `package.json` under `"wiring": { "db": ... }`, and this
- * assertion — run in the package's own test suite, like every producer
- * check — is what keeps the mirror and the manifest the same object shape.
- * Both directions: a manifest with no db capability must not advertise one
- * in `package.json` either.
- */
-export function assertDbMirror(
-  manifest: PackageManifest,
-  packageJson: {
-    readonly name?: string;
-    readonly wiring?: { readonly db?: unknown; readonly env?: unknown };
-  },
-): void {
-  if (packageJson.name !== undefined && packageJson.name !== manifest.name) {
-    fail(manifest.name, `package.json is named "${packageJson.name}" — the two must match.`);
-  }
-  const mirrored = packageJson.wiring?.db;
-  if (manifest.db === undefined) {
-    if (mirrored !== undefined) {
-      fail(manifest.name, "package.json wiring.db is set but the manifest declares no db capability.");
-    }
-    return;
-  }
-  if (mirrored === undefined) {
-    fail(manifest.name, 'the db contribution must be mirrored under package.json "wiring": { "db": ... }.');
-  }
-  if (stableJson(mirrored) !== stableJson(manifest.db)) {
-    fail(
-      manifest.name,
-      `package.json wiring.db drifted from the manifest: ${stableJson(mirrored)} !== ${stableJson(manifest.db)}.`,
-    );
-  }
-}
-
-/**
- * The env twin of `assertDbMirror`: the declaration must be readable by
- * host tooling that cannot execute TypeScript, so it is mirrored under
- * `package.json` `"wiring": { "env": ... }` and pinned here, in the
- * package's own test run, in both directions.
- */
-export function assertEnvMirror(
-  manifest: PackageManifest,
-  packageJson: {
-    readonly name?: string;
-    readonly wiring?: { readonly db?: unknown; readonly env?: unknown };
-  },
-): void {
-  if (packageJson.name !== undefined && packageJson.name !== manifest.name) {
-    fail(manifest.name, `package.json is named "${packageJson.name}" — the two must match.`);
-  }
-  const mirrored = packageJson.wiring?.env;
-  if (manifest.env === undefined) {
-    if (mirrored !== undefined) {
-      fail(manifest.name, "package.json wiring.env is set but the manifest declares no env capability.");
-    }
-    return;
-  }
-  if (mirrored === undefined) {
-    fail(manifest.name, 'the env contribution must be mirrored under package.json "wiring": { "env": ... }.');
-  }
-  if (stableJson(mirrored) !== stableJson(manifest.env)) {
-    fail(
-      manifest.name,
-      `package.json wiring.env drifted from the manifest: ${stableJson(mirrored)} !== ${stableJson(manifest.env)}.`,
-    );
-  }
-}
-
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-  if (value !== null && typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, v]) => v !== undefined)
-      .sort(([a], [b]) => (a < b ? -1 : 1))
-      .map(([k, v]) => `${JSON.stringify(k)}:${stableJson(v)}`);
-    return `{${entries.join(",")}}`;
-  }
-  return JSON.stringify(value) ?? "undefined";
 }
 
 /**

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { assertDbMirror, defineManifest, defineServerManifest, defineWebManifest } from "../producer";
+import {
+  assertDbMirror,
+  assertExportsMirror,
+  defineManifest,
+  defineServerManifest,
+  defineWebManifest,
+} from "../producer";
 import { WiringDefinitionError } from "../errors";
 import { notesManifest } from "./fixture-package";
 
@@ -137,6 +143,96 @@ describe("assertDbMirror", () => {
     expect(() => assertDbMirror(withDb, { name: "@12-apps/other", wiring: { db: composed } })).toThrow(
       /must match/,
     );
+  });
+});
+
+describe("assertExportsMirror", () => {
+  const runtime = defineManifest({
+    ...base,
+    server: ["http"],
+    web: ["surface"],
+    e2e: { entry: "@12-apps/example/e2e" },
+    observability: { namespace: "example" },
+  });
+  const fullExports = {
+    ".": "./dist/index.js",
+    "./manifest": "./dist/manifest/index.js",
+    "./manifest/server": "./dist/manifest/server.js",
+    "./manifest/web": "./dist/manifest/web.js",
+    "./e2e": "./dist/e2e/index.js",
+    "./react": "./dist/react/index.js",
+  };
+
+  it("passes when every declaration has its subpath, ignoring the package's own API subpaths", () => {
+    expect(() => assertExportsMirror(runtime, { name: base.name, exports: fullExports })).not.toThrow();
+    expect(() =>
+      assertExportsMirror(defineManifest(base), {
+        name: base.name,
+        exports: { ".": "./dist/index.js", "./manifest": "./dist/manifest/index.js" },
+      }),
+    ).not.toThrow();
+  });
+
+  it("fails a package with no exports map, and one whose ./manifest is missing", () => {
+    expect(() => assertExportsMirror(runtime, { name: base.name })).toThrow(/no exports map/);
+    expect(() =>
+      assertExportsMirror(runtime, { name: base.name, exports: { ".": "./dist/index.js" } }),
+    ).toThrow(/no "\.\/manifest" subpath/);
+  });
+
+  it("fails a declared inventory whose runtime subpath is not exported", () => {
+    const rest = Object.fromEntries(
+      Object.entries(fullExports).filter(([subpath]) => subpath !== "./manifest/server"),
+    );
+    expect(() => assertExportsMirror(runtime, { name: base.name, exports: rest })).toThrow(
+      /exports no "\.\/manifest\/server"/,
+    );
+  });
+
+  it("fails an exported subpath the manifest never declares — the adoption-blindness direction", () => {
+    // The #1008 shape: the capability ships as an exports subpath, the
+    // manifest says nothing, and the adopting host cannot see it.
+    expect(() =>
+      assertExportsMirror(defineManifest(base), {
+        name: base.name,
+        exports: {
+          "./manifest": "./dist/manifest/index.js",
+          "./e2e": "./dist/e2e/index.js",
+        },
+      }),
+    ).toThrow(/manifest declares no e2e capability/);
+    expect(() =>
+      assertExportsMirror(defineManifest(base), {
+        name: base.name,
+        exports: {
+          "./manifest": "./dist/manifest/index.js",
+          "./manifest/web": "./dist/manifest/web.js",
+        },
+      }),
+    ).toThrow(/declares no web inventory/);
+  });
+
+  it("fails an e2e entry that is not this package's own resolvable subpath", () => {
+    const foreign = defineManifest({ ...base, e2e: { entry: "@12-apps/other/e2e" } });
+    expect(() =>
+      assertExportsMirror(foreign, {
+        name: base.name,
+        exports: { "./manifest": "./dist/manifest/index.js", "./e2e": "./dist/e2e/index.js" },
+      }),
+    ).toThrow(/does not start with/);
+    const dangling = defineManifest({ ...base, e2e: { entry: "@12-apps/example/journeys" } });
+    expect(() =>
+      assertExportsMirror(dangling, {
+        name: base.name,
+        exports: { "./manifest": "./dist/manifest/index.js", "./e2e": "./dist/e2e/index.js" },
+      }),
+    ).toThrow(/does not export it/);
+  });
+
+  it("refuses a package.json named for another package", () => {
+    expect(() =>
+      assertExportsMirror(runtime, { name: "@12-apps/other", exports: fullExports }),
+    ).toThrow(/must match/);
   });
 });
 

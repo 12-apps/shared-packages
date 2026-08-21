@@ -49,6 +49,31 @@ export const authManifest = defineManifest({
   e2e: { entry: "@12-apps/auth/e2e", world: { factory: "defineAuthWorld" } },
   /** Mandatory for runtime manifests (wiring 1.3.0): sign-in failures file under `auth`, not nowhere. */
   observability: { namespace: "auth" },
+  /**
+   * Every literal `process.env` key this package reads (`build-config.ts` and
+   * the handlers), so a host can see its whole environment surface without
+   * reading the source, and deploy tooling can union `.env.example` from the
+   * mirrors. Two classes stay deliberately UNDECLARED because they are not
+   * this package's names to state: the mailer reads keys the HOST chooses
+   * (`AuthMailerEnvNames`), and `coreSetEnvDefaults` hands the whole
+   * environment to Auth.js core, which honours further `AUTH_*` keys of its
+   * own. `NODE_ENV` is platform vocabulary, not a contribution.
+   */
+  env: [
+    { name: "AUTH_SECRET", required: true, secret: true, description: "Signs sessions and tokens; the runtime refuses to start without it." },
+    { name: "AUTH_URL", description: "Public origin of the sign-in surface; defaults to the mount path." },
+    { name: "AUTH_TRUST_HOST", description: "\"true\" to trust the reverse proxy's Host header." },
+    { name: "AUTH_DEBUG", description: "Verbose Auth.js logging; keep off in production." },
+    { name: "GOOGLE_CLIENT_ID", description: "Google OAuth app; the provider is offered only when both halves are set." },
+    { name: "GOOGLE_CLIENT_SECRET", secret: true, description: "Second half of the Google OAuth app." },
+    { name: "FACEBOOK_CLIENT_ID", description: "Facebook OAuth app; offered only when both halves are set." },
+    { name: "FACEBOOK_CLIENT_SECRET", secret: true, description: "Second half of the Facebook OAuth app." },
+    { name: "APPLE_CLIENT_ID", description: "Apple OAuth app; offered only when both halves are set." },
+    { name: "APPLE_CLIENT_SECRET", secret: true, description: "Second half of the Apple OAuth app." },
+    { name: "ADMIN_EMAILS", description: "Comma-separated superadmin allowlist; empty denies everyone." },
+    { name: "OAUTH_MOCK_ISSUER", description: "Points the Google provider at the e2e mock OpenID issuer; tests only." },
+    { name: "SKIP_ENV_VALIDATION", description: "Skips the env schema — build steps that never serve a request." },
+  ],
   server: ["http", "email"],
   web: ["surface", "areas"],
 });

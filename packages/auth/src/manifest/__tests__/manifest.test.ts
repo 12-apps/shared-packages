@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import { assertDbMirror, assertEnvMirror, assertExportsMirror } from "@12-apps/wiring/producer";
 
+import packageJson from "../../../package.json";
 import { emailAuthRoutes } from "../../server/email-routes";
 import { emailAuthSettingsRoutes } from "../../server/settings-routes";
 import {
@@ -50,6 +52,33 @@ describe("authManifest", () => {
     // share one: different audience, different path, different gate.
     expect(authPlatformManifest.name).toBe("@12-apps/auth-platform");
     expect(authPlatformManifest.server).toEqual(["http"]);
+  });
+
+  it("declares the env surface — the exact keys build-config reads", () => {
+    const names = (authManifest.env ?? []).map((declared) => declared.name);
+    expect(names).toHaveLength(13);
+    expect(names).toContain("AUTH_SECRET");
+    // Only the signing secret is REQUIRED — every provider pair, the
+    // allowlist and the toggles degrade by design when unset.
+    const required = (authManifest.env ?? []).filter((declared) => declared.required);
+    expect(required.map((declared) => declared.name)).toEqual(["AUTH_SECRET"]);
+    // Everything that is a credential never has its value reported.
+    for (const name of ["AUTH_SECRET", "GOOGLE_CLIENT_SECRET", "FACEBOOK_CLIENT_SECRET", "APPLE_CLIENT_SECRET"]) {
+      expect((authManifest.env ?? []).find((declared) => declared.name === name)?.secret).toBe(true);
+    }
+    // The platform surface reads no env of its own.
+    expect(authPlatformManifest.env).toBeUndefined();
+  });
+
+  it("mirrors db and env into package.json, and the exports map matches the declarations", () => {
+    // The mirrors are what host tooling that cannot execute TypeScript reads;
+    // the exports check is the #1008 tripwire — a capability shipped as a
+    // subpath the manifest never mentioned, invisible to the adopting host.
+    // The platform manifest is a wiring identity with no package.json of its
+    // own, so only the package-named manifest is pinned here.
+    expect(() => assertDbMirror(authManifest, packageJson)).not.toThrow();
+    expect(() => assertEnvMirror(authManifest, packageJson)).not.toThrow();
+    expect(() => assertExportsMirror(authManifest, packageJson)).not.toThrow();
   });
 });
 

@@ -9,6 +9,8 @@
 import { describe, expect, it } from "vitest";
 import {
   assertDbMirror,
+  assertEnvMirror,
+  assertExportsMirror,
   defineManifest,
   defineServerManifest,
   defineWebManifest,
@@ -66,6 +68,16 @@ describe("the shared manifest", () => {
     // execute this TS manifest, so the contribution lives in package.json
     // too, and this pin is what keeps the two the same shape (#291).
     expect(() => assertDbMirror(featureFlagsManifest, packageJson)).not.toThrow();
+  });
+
+  it("keeps exports subpaths and manifest declarations the same set — the #1008 tripwire", () => {
+    // A capability shipped as an exports subpath the manifest never mentions
+    // is invisible to the adopting host; the reverse is a declaration whose
+    // module no longer resolves. Both directions fail this package's own run.
+    expect(() => assertExportsMirror(featureFlagsManifest, packageJson)).not.toThrow();
+    // No env read anywhere in shipped source — config-object only, by design.
+    expect(() => assertEnvMirror(featureFlagsManifest, packageJson)).not.toThrow();
+    expect(featureFlagsManifest).not.toHaveProperty("env");
   });
 });
 
