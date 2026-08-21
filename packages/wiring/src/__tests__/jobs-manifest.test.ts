@@ -26,13 +26,23 @@ describe("the jobs manifest, through wiring's own producer", () => {
     expect(defineManifest(manifest)).toBe(manifest);
   });
 
-  it("declares a pure-data manifest: identity and env, no runtime inventory", () => {
+  it("declares a pure-data manifest: identity, env and db, no runtime inventory", () => {
     expect(manifest.name).toBe("@12-apps/jobs");
     expect(manifest.contract).toBe(1);
     // Hosts mount the queue directly today; declaring `server` would oblige
     // every one of them to adopt or decline through the consumer.
     expect(manifest.server).toBeUndefined();
     expect(manifest.web).toBeUndefined();
+  });
+
+  it("declares the SweepLease partial — composed mode, migrations alongside", () => {
+    // The one capability the tarball shipped that no manifest said so: the
+    // lease table `withSweepLease` claims its names in. Composed, because the
+    // lease names a JOB — no relation into any host table.
+    expect(manifest.db).toEqual({
+      partial: "prisma/jobs.prisma",
+      migrations: "prisma/migrations",
+    });
   });
 
   it("declares the env surface — every key optional, because absence selects a driver", () => {
@@ -43,7 +53,7 @@ describe("the jobs manifest, through wiring's own producer", () => {
     expect(declaredEnvOf().find((declared) => declared.name === "JOBS_WORKER")?.scope).toBe("worker");
   });
 
-  it("mirrors env into package.json, and the exports map matches the declarations", () => {
+  it("mirrors env and db into package.json, and the exports map matches the declarations", () => {
     expect(() => assertDbMirror(manifest, jobsPackageJson)).not.toThrow();
     expect(() => assertEnvMirror(manifest, jobsPackageJson)).not.toThrow();
     expect(() => assertExportsMirror(manifest, jobsPackageJson)).not.toThrow();
