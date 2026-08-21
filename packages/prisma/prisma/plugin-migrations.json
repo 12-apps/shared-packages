@@ -33,6 +33,7 @@
     "20260813140000_add_notification_tables",
     "20260813180000_add_realtime_outbox",
     "20260819230000_auth_email_password",
-    "20260820120000_add_user_feature_grants"
+    "20260820120000_add_user_feature_grants",
+    "20260821050000_shift_kind_is_host_vocabulary"
   ]
 }

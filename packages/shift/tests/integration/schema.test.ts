@@ -42,12 +42,12 @@ beforeEach(async () => {
   await applyMigrations(db);
   await db.exec(`
     INSERT INTO "clients" ("id") VALUES ('tenant-a');
-    INSERT INTO "users" ("id") VALUES ('cook-a'), ('cook-b');
+    INSERT INTO "users" ("id") VALUES ('nurse-a'), ('nurse-b');
     INSERT INTO "resource_assignments"
       ("id", "user_id", "client_id", "resource_type", "resource_id")
     VALUES
-      ('assignment-a', 'cook-a', 'tenant-a', 'kitchen', 'grill'),
-      ('assignment-b', 'cook-b', 'tenant-a', 'kitchen', 'grill');
+      ('assignment-a', 'nurse-a', 'tenant-a', 'ward', 'bay-1'),
+      ('assignment-b', 'nurse-b', 'tenant-a', 'ward', 'bay-1');
   `);
 });
 
@@ -60,24 +60,24 @@ describe('shift PostgreSQL schema', () => {
     await db.exec(`
       INSERT INTO "shifts"
         ("id", "client_id", "user_id", "kind", "started_at")
-      VALUES ('shift-a', 'tenant-a', 'cook-a', 'kitchen', CURRENT_TIMESTAMP);
+      VALUES ('shift-a', 'tenant-a', 'nurse-a', 'ward', CURRENT_TIMESTAMP);
     `);
     await expect(
       db.exec(`
         INSERT INTO "shifts"
           ("id", "client_id", "user_id", "kind", "started_at")
-        VALUES ('shift-b', 'tenant-a', 'cook-a', 'kitchen', CURRENT_TIMESTAMP);
+        VALUES ('shift-b', 'tenant-a', 'nurse-a', 'ward', CURRENT_TIMESTAMP);
       `),
     ).rejects.toThrow(/shifts_open_client_user_key/);
     await db.exec(`
       UPDATE "shifts"
          SET "ended_at" = CURRENT_TIMESTAMP,
              "ended_reason" = 'user',
-             "ended_by_user_id" = 'cook-a'
+             "ended_by_user_id" = 'nurse-a'
        WHERE "id" = 'shift-a';
       INSERT INTO "shifts"
         ("id", "client_id", "user_id", "kind", "started_at")
-      VALUES ('shift-b', 'tenant-a', 'cook-a', 'kitchen', CURRENT_TIMESTAMP);
+      VALUES ('shift-b', 'tenant-a', 'nurse-a', 'ward', CURRENT_TIMESTAMP);
     `);
   });
 
@@ -87,16 +87,16 @@ describe('shift PostgreSQL schema', () => {
         ("id", "client_id", "user_id", "kind", "started_at",
          "resource_assignment_id", "resource_type", "resource_id")
       VALUES
-        ('shift-a', 'tenant-a', 'cook-a', 'kitchen', CURRENT_TIMESTAMP,
-         'assignment-a', 'kitchen', 'grill'),
-        ('shift-b', 'tenant-a', 'cook-b', 'kitchen', CURRENT_TIMESTAMP,
-         'assignment-b', 'kitchen', 'grill');
+        ('shift-a', 'tenant-a', 'nurse-a', 'ward', CURRENT_TIMESTAMP,
+         'assignment-a', 'ward', 'bay-1'),
+        ('shift-b', 'tenant-a', 'nurse-b', 'ward', CURRENT_TIMESTAMP,
+         'assignment-b', 'ward', 'bay-1');
     `);
     await db.exec(`
       UPDATE "shifts"
          SET "ended_at" = CURRENT_TIMESTAMP,
              "ended_reason" = 'user',
-             "ended_by_user_id" = 'cook-b'
+             "ended_by_user_id" = 'nurse-b'
        WHERE "id" = 'shift-b';
     `);
     await expect(
@@ -105,25 +105,32 @@ describe('shift PostgreSQL schema', () => {
           ("id", "client_id", "user_id", "kind", "started_at",
            "resource_assignment_id", "resource_type", "resource_id")
         VALUES
-          ('shift-c', 'tenant-a', 'cook-b', 'kitchen', CURRENT_TIMESTAMP,
-           'assignment-a', 'kitchen', 'grill');
+          ('shift-c', 'tenant-a', 'nurse-b', 'ward', CURRENT_TIMESTAMP,
+           'assignment-a', 'ward', 'bay-1');
       `),
     ).rejects.toThrow(/shifts_resource_assignment_id_key/);
   });
 
-  it('keeps resourceAssignmentId nullable and validates kind/end reason', async () => {
+  it('accepts any kind a host declares, and refuses only a blank one', async () => {
+    // Three rosters no version of this package ever enumerated. Until 4.0.0 the
+    // column carried `CHECK ("kind" IN (…))` listing the two kinds of the one
+    // application this package came out of, so each of these was a constraint
+    // violation in every adopter's database — unwidenable short of a fork.
     await db.exec(`
       INSERT INTO "shifts"
         ("id", "client_id", "user_id", "kind", "started_at")
       VALUES
-        ('shift-a', 'tenant-a', 'cook-a', 'service', CURRENT_TIMESTAMP),
-        ('shift-b', 'tenant-a', 'cook-b', 'kitchen', CURRENT_TIMESTAMP);
+        ('shift-a', 'tenant-a', 'nurse-a', 'reception', CURRENT_TIMESTAMP),
+        ('shift-b', 'tenant-a', 'nurse-b', 'ward', CURRENT_TIMESTAMP),
+        ('shift-c', 'tenant-a', 'nurse-c', 'payroll', CURRENT_TIMESTAMP);
     `);
+
+    // What the column still guarantees is the half that is true for every host.
     await expect(
       db.exec(`
         INSERT INTO "shifts"
           ("id", "client_id", "user_id", "kind", "started_at")
-        VALUES ('bad', 'tenant-a', 'cook-a', 'payroll', CURRENT_TIMESTAMP);
+        VALUES ('bad', 'tenant-a', 'nurse-d', '   ', CURRENT_TIMESTAMP);
       `),
     ).rejects.toThrow(/shifts_kind_check/);
   });
@@ -160,30 +167,30 @@ describe('shift PostgreSQL schema', () => {
         ("id", "client_id", "user_id", "kind", "started_at",
          "ended_at", "ended_reason", "ended_by_user_id")
       VALUES
-        ('shift-a', 'tenant-a', 'cook-a', 'kitchen',
-         '2026-07-30T10:00:00Z', '2026-07-30T18:00:00Z', 'user', 'cook-a');
+        ('shift-a', 'tenant-a', 'nurse-a', 'ward',
+         '2026-07-30T10:00:00Z', '2026-07-30T18:00:00Z', 'user', 'nurse-a');
     `);
 
     await expect(
-      db.exec(`UPDATE "shifts" SET "kind" = 'service' WHERE "id" = 'shift-a'`),
+      db.exec(`UPDATE "shifts" SET "kind" = 'reception' WHERE "id" = 'shift-a'`),
     ).rejects.toThrow(/closed shifts are immutable/i);
   });
 
   it('keeps an open shift identity immutable under UPDATE', async () => {
     await db.exec(`
       INSERT INTO "shifts" ("id", "client_id", "user_id", "kind", "started_at")
-      VALUES ('shift-a', 'tenant-a', 'cook-a', 'kitchen', CURRENT_TIMESTAMP);
+      VALUES ('shift-a', 'tenant-a', 'nurse-a', 'ward', CURRENT_TIMESTAMP);
     `);
 
     await expect(
-      db.exec(`UPDATE "shifts" SET "user_id" = 'cook-b' WHERE "id" = 'shift-a'`),
+      db.exec(`UPDATE "shifts" SET "user_id" = 'nurse-b' WHERE "id" = 'shift-a'`),
     ).rejects.toThrow(/identity and resource snapshots are immutable/i);
     // Closing it — the one edit the service performs — still works.
     await db.exec(`
       UPDATE "shifts"
          SET "ended_at" = CURRENT_TIMESTAMP,
              "ended_reason" = 'user',
-             "ended_by_user_id" = 'cook-a'
+             "ended_by_user_id" = 'nurse-a'
        WHERE "id" = 'shift-a';
     `);
   });
@@ -198,10 +205,10 @@ describe('shift PostgreSQL schema', () => {
         ("id", "client_id", "user_id", "kind", "started_at",
          "ended_at", "ended_reason", "ended_by_user_id")
       VALUES
-        ('closed', 'tenant-a', 'cook-a', 'kitchen',
-         '2026-07-30T10:00:00Z', '2026-07-30T18:00:00Z', 'user', 'cook-a');
+        ('closed', 'tenant-a', 'nurse-a', 'ward',
+         '2026-07-30T10:00:00Z', '2026-07-30T18:00:00Z', 'user', 'nurse-a');
       INSERT INTO "shifts" ("id", "client_id", "user_id", "kind", "started_at")
-      VALUES ('open', 'tenant-a', 'cook-b', 'kitchen', CURRENT_TIMESTAMP);
+      VALUES ('open', 'tenant-a', 'nurse-b', 'ward', CURRENT_TIMESTAMP);
     `);
 
     await db.exec(`DELETE FROM "shifts" WHERE "client_id" = 'tenant-a'`);
