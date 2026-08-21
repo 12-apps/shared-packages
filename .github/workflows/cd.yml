@@ -1,0 +1,227 @@
+name: CD
+
+# Publishing. Nothing else, and nothing to approve.
+#
+# This workflow exists so that `ci.yml` is only ever CHECKS. A pull request must
+# never be able to publish, and the repo must never show a "deployment" that is
+# really the release itself — the `release-major` environment this replaces sat
+# on `push`, after merge, where the only choices left were approve or leave the
+# package unreleased.
+#
+# The human decision already happened, once, before merge: `major-guard.yml`'s
+# `Major approval` job holds the pull request on the `major-approval`
+# environment, which an installation token cannot grant. By the time a commit
+# reaches main it has been consented to, so this workflow does not ask again.
+# Asking twice is what made a merged, approved change sit unpublished.
+#
+# `workflow_run` rather than `push`, so this cannot start until CI has actually
+# passed on that commit — the same ordering the old `needs:` chain gave, across
+# two workflows instead of one.
+#
+# The checkout below deliberately takes `main` rather than the triggering commit:
+# semantic-release checks the branch it is ON against its `branches` config, and
+# a detached SHA is not a release branch. Releasing whatever main holds is also
+# the honest thing when two merges land close together — the second run finds
+# nothing left to cut rather than racing the first.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Never cancel a publish in flight: a half-run release leaves tags the registry
+# never received, which is the exact shape of the auth-v1.22.0 incident. A
+# second merge waits its turn instead.
+concurrency:
+  group: cd-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # tags + GitHub releases
+      issues: write # semantic-release's "release is failing" issue
+      statuses: write # release-alert's fallback when Issues are disabled
+      pull-requests: write # the `released` label semantic-release puts on a PR
+      id-token: write # OIDC trusted publishing — no token
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      - name: Build packages
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee build.log
+      # BEFORE anything is released, un-stick anything a previous run left stuck.
+      #
+      # A tag for a version npm never received does not merely record a past
+      # failure — it STOPS the package releasing, because semantic-release reads
+      # that tag and concludes there is nothing new. Deleting it here means the
+      # step below re-cuts the version in this same job and the publish step
+      # uploads it, so one merge is enough to recover. Doing it after the release
+      # instead would need a further merge, and "a further merge" is how
+      # auth-v1.22.0 stayed broken for four days.
+      #
+      # `continue-on-error` because recovery must never be able to WITHHOLD a
+      # release. Every step below defaults to `success()`, so without it a repo
+      # whose rules forbid deleting a tag — or any crash in this script — would
+      # skip semantic-release entirely and stop every healthy package releasing,
+      # which is a strictly worse failure than the one being recovered from. The
+      # step still goes red and says why, and the orphan it could not clear is
+      # caught again by the verification step at the end of this job, which is
+      # where the run actually fails.
+      - name: Recover tags an earlier run left orphaned
+        continue-on-error: true
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/recover-orphans.mjs
+      # Directory paths, not bare names: payments ships as a nested workspace
+      # (packages/payments/{backend,frontend}). Order is topological — a package
+      # is released only after everything it depends on, so prepare-publish.mjs
+      # always resolves workspace:* interdeps to a version that already exists.
+      #
+      # This was an inline `for` loop until run 31427350698. Under `set -e` the
+      # first package semantic-release failed for ended the step, which skipped
+      # every package after it AND the publish step below — stranding everything
+      # already tagged as a tag npm never received. It died on `realtime` (11th
+      # of 30) over a TLS blip that a retry would have cleared, and took the
+      # already-tagged `auth-v1.22.0` down with it. The script retries transient
+      # git failures and, when one is genuinely broken, keeps going so the rest
+      # still release.
+      - name: Version + tag + release (semantic-release)
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/release-tags.mjs
+      # OIDC trusted publishing needs npm >= 11.5.1 (Node 24 ships an older npm).
+      - name: Upgrade npm for OIDC
+        if: ${{ !cancelled() }}
+        run: npm install -g npm@latest
+      # A package's FIRST publish cannot go through OIDC — a Trusted Publisher is
+      # configured on a package that does not exist yet — so it is the one thing
+      # the tokenless loop below can never do. This step does exactly that much
+      # and no more: it publishes names the registry does not have and skips
+      # every package it does. Without an NPM_TOKEN secret it is a no-op.
+      - name: First publish for packages not yet on the registry
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          # setup-node's npmrc reads this variable, so the bootstrap publish is
+          # token-authenticated. The tokenless step below does not set it, and
+          # deletes that npmrc line anyway before publishing over OIDC.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -o pipefail
+          # npm cannot resolve workspace:* — rewrite interdeps to concrete versions.
+          node scripts/prepare-publish.mjs
+          node scripts/first-publish.mjs 2>&1 | tee first-publish.log
+      # `!cancelled()` rather than the default `success()`, and this is the single
+      # change that would have prevented the auth-v1.22.0 incident outright.
+      # Tagging happens per package and publishing happens once at the end, so a
+      # tag step that dies part-way has ALREADY pushed tags — and under
+      # `success()` this step then refused to run, which is precisely how those
+      # tags became versions npm never received. Publishing is idempotent
+      # (publish.mjs reports an already-published version as "skipped"), so
+      # running it after a partial tag step can only ever help.
+      - name: Publish to npm (OIDC, tokenless)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -o pipefail
+          # npm cannot resolve workspace:* — rewrite interdeps to concrete versions.
+          node scripts/prepare-publish.mjs
+          # setup-node wrote an empty _authToken=${NODE_AUTH_TOKEN} that SHADOWS
+          # OIDC (forcing anonymous auth -> 404). Remove it so npm uses the OIDC
+          # id-token for trusted publishing.
+          npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
+          node scripts/publish.mjs
+      # Tagging and publishing are separate steps above, so a run that dies
+      # between them leaves a tag for a version npm never received — and that
+      # state is silent AND self-perpetuating: semantic-release sees its own tag
+      # and cuts nothing forever after, while both steps keep reporting success.
+      #
+      # LAST, and deliberately not first: a stuck package must report itself
+      # without holding every healthy package's release hostage. The publishes
+      # above have already happened by the time this fails.
+      #
+      # `always()` is what makes "LAST" safe, and it is not a nicety. A step with
+      # no `if:` defaults to `success()`, so this one was SKIPPED exactly when a
+      # publish failed — i.e. in the one situation that MAKES orphaned tags.
+      # semantic-release has already written the tag by then; a failed publish is
+      # therefore the single most likely way to arrive here with a tag npm never
+      # received, and the guard was switching itself off precisely then. Measured:
+      # run 31682461784 failed `Publish to npm (OIDC, tokenless)` and reported
+      # this step `skipped`, which is why `auth-v1.22.0` went unreported for three
+      # days across five red runs.
+      #
+      # `always()` and `!cancelled()` differ ONLY on cancellation, and nothing is
+      # riding on that difference here: `cancel-in-progress` is
+      # `github.event_name != 'push'` — false on push — and this job is
+      # push-only, so concurrency cannot cancel a running release. (The hazard
+      # the concurrency block at the top of this file documents is a PENDING run
+      # being dropped, which never starts a job and therefore writes no tag
+      # either.) Cancelling this job takes a human or a timeout. `always()` is
+      # simply the plainer of two conditions that behave identically for the case
+      # that matters, and the check only reads git and the registry — it writes
+      # nothing, so running it in a doomed job costs ~20s and can break nothing.
+      #
+      # It reads PUBLISH_INCOMPLETE / PUBLISH_WEDGED from the step above, which
+      # is the other reason it must stay AFTER it: those name the orphans THIS
+      # run just made, and an orphan whose publish failed ten lines earlier needs
+      # the opposite of the standing "delete the tag and re-run" remedy.
+      #
+      # ~20s when everything is healthy, and up to ~4 minutes longer when it is
+      # not. Running immediately after the publish makes this the step most
+      # exposed to npm's read-after-write lag — the registry accepts a version
+      # and serves it minutes later — so a tagged version it cannot find is
+      # re-read on a schedule before being called an orphan. That patience is
+      # not politeness: "absent" here prints `git push origin --delete` at a
+      # human, and recover-orphans.mjs performs it unattended on the next merge.
+      # Details and the RELEASE_ABSENCE_RECHECK_MS override: scripts/lib/release-state.mjs.
+      - name: Verify every release tag reached the registry
+        if: always()
+        shell: bash
+        run: node scripts/verify-released.mjs
+
+      # Everything above reports into this run's log and summary, which is where
+      # nobody looks: a release runs on push to main long after its author moved
+      # on, and one red Release job sits in a list of green ones. auth-v1.22.0
+      # went unreported for four days across five red runs, and was found by a
+      # consumer in another repository rather than by anyone here.
+      #
+      # LAST, so it can see every handoff the steps above wrote to GITHUB_ENV,
+      # and `always()` for the same reason the check above it is: the runs worth
+      # alerting on are exactly the ones that failed. It maintains ONE issue —
+      # reopened, rewritten and finally CLOSED BY ITSELF once every package's
+      # newest tag is on the registry — so an open issue always means a live
+      # problem, and a fixed pipeline needs nobody to tidy up after it.
+      - name: Alert on a release that did not deliver
+        if: always()
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_JOB_STATUS: ${{ job.status }}
+          RELEASE_ALERT_WEBHOOK: ${{ secrets.RELEASE_ALERT_WEBHOOK }}
+        run: node scripts/release-alert.mjs

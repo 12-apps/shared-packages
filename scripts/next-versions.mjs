@@ -18,9 +18,12 @@
 // package twelve releases behind, when this was written. The bump itself is
 // often correct; what was missing was a human deciding WHEN to spend it.
 //
-// Output is GitHub Actions step outputs, consumed by the `detect-majors` job in
-// ci.yml:
-//   has_major  "true" | "false"   — whether the approval job runs at all
+// Output is GitHub Actions step outputs. The `detect-majors` job that consumed
+// them is gone with the post-merge gate — a major is consented to on the pull
+// request now, before it can reach main — but the analysis is kept, and kept
+// asserted by its own selftest, as the standing answer to "what would this
+// push publish":
+//   has_major  "true" | "false"   — whether this push would cut any major
 //   majors     "ui 5.0.0 -> 6.0.0, auth 1.22.0 -> 2.0.1"
 //   releases   every package that would release, major or not
 import { spawnSync } from "node:child_process";
