@@ -35,11 +35,62 @@ sidebar; the nearest one catches, so nothing doubles.
 
 | Subpath | What is in it |
 |---|---|
-| `.` | Framework-free: `apiFetch` / `ApiError`, `joinApiPath` / `stripTrailingSlashes`, the WCAG brand-palette correction, pt-BR money and duration formatters, the stale-chunk recovery, the consent wire. |
-| `./react` | `createWebAppShell` — the provider tower (boundary included), the theme, `lazyRoute`, the consent gate, `useDeviceDetection`. |
+| `.` | Framework-free: `apiFetch` / `ApiError`, `restResult`, `joinApiPath` / `stripTrailingSlashes`, the WCAG brand-palette correction, pt-BR money and duration formatters, the stale-chunk recovery, the consent wire. |
+| `./react` | `createWebAppShell` — the provider tower (boundary included), the theme, `lazyRoute`, the consent gate, `useDeviceDetection`, `useServerDataViews`. |
 | `./server` | `createApiAppShell` — the consent status/accept descriptors, framework-neutral. |
 | `./hono` | The forty-line adapter. `hono` is an optional peer. |
 | `./vite` | `appShellOptimizeDeps()` — the dependency pre-bundling preset. Compiled, and it has to be. |
+
+## Two clients, and the split is by CALLER
+
+`apiFetch` **throws** `ApiError` on a non-2xx. `restResult` **returns**
+`{ ok: false, error, fieldErrors?, status? }`. Both speak the `{ data }` /
+`{ error, issues }` envelope every `createApi*` package answers in, so a screen
+can mix them without a second adapter.
+
+Reach for `apiFetch` for reads and for anything whose failure is somebody else's
+to handle — a query, a prefetch, a background refresh. Reach for `restResult`
+for a write a human is waiting on: a submit has two ordinary outcomes, one of
+which is "the server refused it and named the fields", so writing that as a
+throw costs every handler a `try`/`catch` whose catch is the main path.
+
+`status` is deliberately ABSENT on a network failure. That is the only thing
+separating "the server said no" from "nothing answered" — one is a message to
+show, the other is a retry — and it is what lets a concurrent surface tell a 403
+("not yours", say so beside the button) from a 409 ("somebody was faster",
+refresh).
+
+## `useServerDataViews` — the URL is the query
+
+A `DataViewsGrid` in server mode filters and sorts nothing itself: it EMITS a
+`DataViewQuery` and the host fetches. This hook is the router-driven answer —
+it maps that query into search params and replaces them, and the page's query
+hook, keyed on those params, re-fetches. Keeping the state in the URL is most of
+what separates an admin list somebody can work in from one they fight: it makes
+a filtered view linkable, reloadable and back-button-able.
+
+```ts
+const server = useServerDataViews({
+  totalCount, page, pageSize,
+  toParams: (query) => ({ q: query.search || undefined, type: query.filters.type }),
+});
+```
+
+Two behaviours are load-bearing and are pinned by cases rather than left to
+comments:
+
+- **Only free text debounces.** A filter chip or a page number leaves the search
+  unchanged and applies synchronously; a click that waited 250ms feels broken.
+- **It merges against the LIVE URL**, not the router's functional snapshot. A
+  debounced search commits from a timer scheduled before an interleaving write
+  by another owner of the URL (a row click writing `?view=`), and the router's
+  snapshot can lag it — so the row selection would vanish a moment after the
+  operator made it.
+
+The basename is read from the ROUTER (`useHref('/')`), not from the bundler's
+configured base. Those are two sources for one fact that agree only while they
+are configured identically, and reading the bundler's would make the module
+unloadable outside it.
 
 ## Three things worth knowing before you read the code
 

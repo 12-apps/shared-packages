@@ -36,6 +36,7 @@ export {
 } from './consent/use-terms-consent';
 
 export { lazyRoute } from './lazy-route';
+export { useServerDataViews } from './server-data-views';
 export { useDeviceDetection, type DeviceDetection } from './device-detection';
 
 export {
