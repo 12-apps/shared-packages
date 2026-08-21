@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { EmailCredentials } from "../../email-credentials";
-import { PT_BR_MESSAGES } from "../../server/messages";
+import { PT_BR_MESSAGES } from "../../server/pt-BR";
 import { mountEmailAuth, mountEmailAuthSettings } from "../mount";
 
 /**

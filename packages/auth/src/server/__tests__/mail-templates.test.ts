@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { AuthEmailMessage } from "../../email-credentials/types";
-import { PT_BR_MAIL, renderAuthMail } from "../mail-templates";
+import { renderAuthMail } from "../mail-templates";
+import { PT_BR_MAIL } from "../mail-templates.pt-BR";
 
 /**
  * The four auth e-mails: one layout, a pack of words per language.
