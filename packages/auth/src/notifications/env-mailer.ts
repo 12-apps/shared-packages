@@ -186,6 +186,28 @@ export function createEnvAuthMailer(config: EnvAuthMailerConfig): EmailCredentia
     },
   });
 
+  /**
+   * Does the environment currently resolve to something that DELIVERS?
+   *
+   * The sink counts. It is a deliberate local-development and e2e choice
+   * ("provider = log"), the mail is written where the developer or the harness
+   * can read it, and the link in it works — so a sign-up on such a box must
+   * still succeed. What does not count is the refusal, which is reached by
+   * saying nothing at all: an unset provider, a missing key or From, or a
+   * vendor name that resolves to no factory. Those are misconfiguration, and
+   * on those the mail is simply gone.
+   *
+   * Read fresh, like the driver itself, because a preview box is reconfigured
+   * under a running process.
+   */
+  const canDeliver = (): boolean => {
+    const provider = read(env.provider);
+    if (provider === SINK_PROVIDER) return true;
+    if (!provider) return false;
+    if (!read(env.apiKey) || !read(env.from)) return false;
+    return drivers[provider] !== undefined;
+  };
+
   /** Which vendor this deployment sends through, read fresh. */
   const driver = (): EmailDriver => {
     const provider = read(env.provider);
@@ -223,6 +245,7 @@ export function createEnvAuthMailer(config: EnvAuthMailerConfig): EmailCredentia
     // `createAuthMailer` always supplies this one; the fallback satisfies the
     // port, where it is optional.
     sendPasswordChanged: (message) => mailer().sendPasswordChanged?.(message) ?? Promise.resolve(),
+    canDeliver,
   };
 }
 
