@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
-  "description": "Plug-and-play authentication plugin: Auth.js wiring and the e-mail + password flow (.), host-mounted backend surface (./server: routes, messages, mail templates, the duck-typed credential and settings store seams), auth UI (./react: screens, whole login/sign-up pages, the platform settings screen), a Hono mount (./hono), delivery through @12-apps/notifications (./notifications) and packaged Gherkin journeys (./e2e) \u2014 plus the package-owned Prisma fragment synced into the host schema. Who the users are is the host's and arrives as config. Adoption contract in ADOPTING.md.",
+  "description": "Plug-and-play authentication plugin: Auth.js wiring and the e-mail + password flow (.), host-mounted backend surface (./server: routes, messages, mail templates, the duck-typed credential and settings store seams), auth UI (./react: screens, whole login/sign-up pages, the platform settings screen), a Hono mount (./hono), delivery through @12-apps/notifications (./notifications) and packaged Gherkin journeys (./e2e) — plus the package-owned Prisma fragment synced into the host schema. Who the users are is the host's and arrives as config. Adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server/index.ts",
@@ -125,5 +125,70 @@
     "@12-apps/notifications": {
       "optional": true
     }
+  },
+  "wiring": {
+    "db": {
+      "partial": "prisma/auth.prisma",
+      "migrations": "prisma/migrations"
+    },
+    "env": [
+      {
+        "name": "AUTH_SECRET",
+        "required": true,
+        "secret": true,
+        "description": "Signs sessions and tokens; the runtime refuses to start without it."
+      },
+      {
+        "name": "AUTH_URL",
+        "description": "Public origin of the sign-in surface; defaults to the mount path."
+      },
+      {
+        "name": "AUTH_TRUST_HOST",
+        "description": "\"true\" to trust the reverse proxy's Host header."
+      },
+      {
+        "name": "AUTH_DEBUG",
+        "description": "Verbose Auth.js logging; keep off in production."
+      },
+      {
+        "name": "GOOGLE_CLIENT_ID",
+        "description": "Google OAuth app; the provider is offered only when both halves are set."
+      },
+      {
+        "name": "GOOGLE_CLIENT_SECRET",
+        "secret": true,
+        "description": "Second half of the Google OAuth app."
+      },
+      {
+        "name": "FACEBOOK_CLIENT_ID",
+        "description": "Facebook OAuth app; offered only when both halves are set."
+      },
+      {
+        "name": "FACEBOOK_CLIENT_SECRET",
+        "secret": true,
+        "description": "Second half of the Facebook OAuth app."
+      },
+      {
+        "name": "APPLE_CLIENT_ID",
+        "description": "Apple OAuth app; offered only when both halves are set."
+      },
+      {
+        "name": "APPLE_CLIENT_SECRET",
+        "secret": true,
+        "description": "Second half of the Apple OAuth app."
+      },
+      {
+        "name": "ADMIN_EMAILS",
+        "description": "Comma-separated superadmin allowlist; empty denies everyone."
+      },
+      {
+        "name": "OAUTH_MOCK_ISSUER",
+        "description": "Points the Google provider at the e2e mock OpenID issuer; tests only."
+      },
+      {
+        "name": "SKIP_ENV_VALIDATION",
+        "description": "Skips the env schema — build steps that never serve a request."
+      }
+    ]
   }
 }

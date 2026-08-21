@@ -55,14 +55,16 @@ function publishedSubpaths(): string[] {
 /* eslint-enable test-flakiness/no-unmocked-fs */
 
 describe("the published entry points", () => {
-  it("are exactly these five, plus the manifest", () => {
+  it("are exactly these six, plus the manifest", () => {
     // Pinned, so adding a subpath is a deliberate act that lands in this diff
-    // together with whatever guard the new surface needs.
+    // together with whatever guard the new surface needs. `./manifest` is the
+    // wiring declaration (pure data), guarded by src/manifest/__tests__.
     expect(publishedSubpaths()).toEqual([
       ".",
       "./bullmq",
       "./hono",
       "./inline",
+      "./manifest",
       "./package.json",
       "./server",
     ]);

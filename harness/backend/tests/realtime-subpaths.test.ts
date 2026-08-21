@@ -96,6 +96,9 @@ describe('@12-apps/realtime — every published subpath resolves', () => {
       '.',
       './gateway',
       './hono',
+      // The wiring declaration (pure data: identity + env), pinned by
+      // wiring's producer assertions in packages/realtime's own suite.
+      './manifest',
       './package.json',
       './parity',
       './react',

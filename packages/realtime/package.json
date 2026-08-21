@@ -13,6 +13,7 @@
     "./react": "./src/react/index.ts",
     "./worker": "./src/react/worker/entry.ts",
     "./parity": "./src/parity/index.ts",
+    "./manifest": "./src/manifest/index.ts",
     "./package.json": "./package.json"
   },
   "bin": {
@@ -32,6 +33,7 @@
     "ioredis": "^5.11.1"
   },
   "peerDependencies": {
+    "@12-apps/wiring": ">=1.3.0",
     "hono": ">=4.0.0",
     "react": ">=19.0.0",
     "react-dom": ">=19.0.0",
@@ -53,11 +55,15 @@
     },
     "ws": {
       "optional": true
+    },
+    "@12-apps/wiring": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
     "@testing-library/react": "^16.1.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
@@ -102,5 +108,36 @@
     "!**/*.stories.*",
     "!**/*.test-story.*",
     "!**/test-helpers.*"
-  ]
+  ],
+  "wiring": {
+    "env": [
+      {
+        "name": "REALTIME_TICKET_SECRET",
+        "secret": true,
+        "description": "Signs WS tickets; falls back to AUTH_SECRET, and without either the API serves no WS transport while the gateway refuses to boot."
+      },
+      {
+        "name": "REALTIME_DRIVER",
+        "description": "redis | off; unset picks by REDIS_URL and NODE_ENV, invalid values disable realtime with an error log."
+      },
+      {
+        "name": "REDIS_URL",
+        "description": "The fan-out bus; REALTIME_DRIVER=redis without it disables realtime with an error log."
+      },
+      {
+        "name": "REALTIME_TENANT_CONNECTION_CAP",
+        "description": "Max concurrent sockets per tenant; default 20."
+      },
+      {
+        "name": "REALTIME_GATEWAY_PORT",
+        "scope": "worker",
+        "description": "The gateway process's listen port; default 3100, malformed values throw at boot."
+      },
+      {
+        "name": "REALTIME_GATEWAY_MAX_CONNECTIONS",
+        "scope": "worker",
+        "description": "The gateway process's global socket cap; malformed values throw at boot."
+      }
+    ]
+  }
 }
