@@ -1,41 +1,33 @@
 import type { ShiftErrorCode } from './errors';
 
-export const SHIFT_KINDS = ['kitchen', 'service'] as const;
-export type ShiftKind = (typeof SHIFT_KINDS)[number];
+/**
+ * A shift's kind — one of the HOST's own ids, never one of this package's.
+ *
+ * Through 3.x this was `'kitchen' | 'service'`: a two-literal union, exported
+ * alongside a runtime `SHIFT_KINDS` array and validated against those exact
+ * strings. That put `kitchen` in the types of every adopter and in the OpenAPI
+ * generated from them — a clinic rostering hygienists shipped a wire contract
+ * naming a kitchen. A union leaks worse than a stray string does, and this is
+ * why: a string is cosmetic and stops where it is written, a union propagates
+ * into everything that reads the type.
+ *
+ * So the SET is configuration ({@link ShiftServiceOptions.kinds}, required)
+ * and the TYPE is `string`. The service still refuses a kind outside the
+ * configured set — it simply holds no opinion about which ids those are.
+ *
+ * The two `resourceType` constants that sat here went the same way, and for a
+ * plainer reason: `KITCHEN_STATIONS_RESOURCE_TYPE` and
+ * `SECTORS_RESOURCE_TYPE` were never this package's values. Each had to equal
+ * the namespace of a HOST action its own RBAC check derives, which is the
+ * definition of host vocabulary — the wiring manifest already says as much
+ * about permissions ("the ids the routes check are host vocabulary"). A host
+ * declares them beside the actions they must match, where a mismatch is
+ * visible, instead of importing them from a package that cannot know.
+ */
+export type ShiftKind = string;
 
 export const SHIFT_END_REASONS = ['user', 'supervisor', 'auto'] as const;
 export type ShiftEndReason = (typeof SHIFT_END_REASONS)[number];
-
-/**
- * The `ResourceAssignment.resourceType` a kitchen-station claim is stored under.
- *
- * It must equal the NAMESPACE of the action whose entity gate reads it, because
- * a host's RBAC point check derives the resource type from the action prefix
- * (`kitchen:read:station` -> `kitchen`). Spelling it `kitchen-stations` — the
- * admin CRUD surface's name — made `can(cook, 'kitchen:read:station', station)`
- * look up a type nothing was ever written under, so an open kitchen shift
- * granted nothing.
- */
-export const KITCHEN_STATIONS_RESOURCE_TYPE = 'kitchen';
-
-/**
- * The `ResourceAssignment.resourceType` a dining-room SECTOR claim is stored
- * under (FUT-450/452), written when a waiter opens a `service` shift.
- *
- * Note this deliberately does NOT follow the rule above, and the difference is
- * the point. A station claim is stored under the namespace of the action that
- * reads it (`kitchen:read:station` -> `kitchen`) because the claim and the
- * question are about the same thing. A sector claim is not: the rows carry
- * SECTOR ids, but the question asked of them is `tables:read:assigned` — about
- * MESAS. Storing them under `tables` would put a sector id in a column every
- * other reader treats as a mesa id.
- *
- * So the rows say what they are, and the host's `assignmentResolver` expands
- * them into the mesa ids the question is about. Keeping the storage honest is
- * what lets that expansion be a live query, which is in turn what makes a mesa
- * moved between sectors mid-shift take effect on the waiter's next request.
- */
-export const SECTORS_RESOURCE_TYPE = 'sectors';
 
 export interface ShiftResource {
   type: string;
@@ -190,6 +182,14 @@ export interface ShiftDb extends ShiftQuery {
 }
 
 export interface ShiftServiceOptions {
+  /**
+   * The kinds of shift this host runs — REQUIRED, and with no default, which
+   * is the whole point: a default here would be one application's roster
+   * spelled into every other one's types. Checked at assembly (non-empty, no
+   * blanks) rather than on first `openShift`, so a misconfigured host fails
+   * where it is wired instead of when a worker clocks in.
+   */
+  kinds: readonly ShiftKind[];
   now?: () => Date;
   createId?: () => string;
 }

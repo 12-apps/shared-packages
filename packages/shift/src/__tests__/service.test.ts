@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  KITCHEN_STATIONS_RESOURCE_TYPE,
-  ShiftError,
-  createMemoryShiftDb,
-  createShiftService,
-} from '../index';
+import { ShiftError, createMemoryShiftDb, createShiftService } from '../index';
+
+/**
+ * A HOST's vocabulary, and deliberately not the one this package was extracted
+ * from: the fixtures roster a clinic. Through 3.x they could not have — the
+ * kinds were a `'kitchen' | 'service'` union the package exported and
+ * validated against, so the only shifts its own tests could open were that one
+ * application's. That the suite now reads `ward` and `reception` end to end,
+ * with nothing imported from `../index` to say so, IS the portability claim.
+ */
+const WARD_RESOURCE_TYPE = 'ward';
+const SHIFT_KINDS = ['ward', 'reception'] as const;
 
 const START_ISO = '2026-07-30T10:00:00.000Z';
 const START = new Date(START_ISO);
@@ -21,6 +27,7 @@ function setupAt(now: () => Date) {
   const ids = { sequence: 0 };
   const db = createMemoryShiftDb();
   const service = createShiftService(db, {
+    kinds: SHIFT_KINDS,
     now,
     createId: () => `id-${++ids.sequence}`,
   });
@@ -32,28 +39,68 @@ function setup() {
 }
 
 describe('shift service', () => {
+  it('takes its kind set from the host and refuses one outside it', async () => {
+    const fixture = setup();
+
+    await expect(
+      fixture.service.openShift({
+        clientId: 'tenant-a',
+        userId: 'nurse-a',
+        // A kind from the application this package was extracted for. It was a
+        // member of the exported union through 3.x; here it is just a string no
+        // host configured, which is the whole of the change.
+        kind: 'kitchen',
+        actorUserId: 'nurse-a',
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SHIFT' });
+    expect(fixture.db.snapshot().shifts).toHaveLength(0);
+
+    // The message names the configured set: the failure a host really hits is a
+    // typo or a kind it forgot to declare, and neither reads off the value.
+    await expect(
+      fixture.service.openShift({
+        clientId: 'tenant-a',
+        userId: 'nurse-a',
+        kind: 'kitchen',
+        actorUserId: 'nurse-a',
+      }),
+    ).rejects.toThrow(/Configured kinds: ward, reception/);
+  });
+
+  it('refuses to assemble without a kind set, at the wiring line', () => {
+    const db = createMemoryShiftDb();
+
+    // Not a ShiftError: those carry a code a host maps onto an HTTP response,
+    // and a missing option is not a request outcome. Thrown at assembly rather
+    // than on first use, so the stack points at the line that wired it.
+    expect(() => createShiftService(db, { kinds: [] })).toThrow(/must name at least one shift kind/);
+    expect(() => createShiftService(db, { kinds: ['  '] })).toThrow(
+      /must name at least one shift kind/,
+    );
+  });
+
   it('opens an assignment, shift and audit event in one transaction', async () => {
     const fixture = setup();
 
     const shift = await fixture.service.openShift({
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen',
-      actorUserId: 'cook-a',
+      userId: 'nurse-a',
+      kind: 'ward',
+      actorUserId: 'nurse-a',
       resource: {
-        type: KITCHEN_STATIONS_RESOURCE_TYPE,
-        id: 'grill',
+        type: WARD_RESOURCE_TYPE,
+        id: 'bay-1',
       },
     });
 
     expect(shift).toMatchObject({
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen',
-      // Equal to the `kitchen:*` action namespace a host's RBAC point check
+      userId: 'nurse-a',
+      kind: 'ward',
+      // Equal to the `ward:*` action namespace a host's RBAC point check
       // derives its resource type from — not the admin CRUD surface's name.
-      resourceType: 'kitchen',
-      resourceId: 'grill',
+      resourceType: 'ward',
+      resourceId: 'bay-1',
       endedAt: null,
     });
     const state = fixture.db.snapshot();
@@ -64,7 +111,7 @@ describe('shift service', () => {
         clientId: 'tenant-a',
         action: 'shift.start',
         resourceType: 'shift',
-        actorUserId: 'cook-a',
+        actorUserId: 'nurse-a',
       }),
     ]);
   });
@@ -73,9 +120,9 @@ describe('shift service', () => {
     const fixture = setup();
     const input = {
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen' as const,
-      actorUserId: 'cook-a',
+      userId: 'nurse-a',
+      kind: 'ward' as const,
+      actorUserId: 'nurse-a',
     };
     await fixture.service.openShift(input);
 
@@ -89,39 +136,39 @@ describe('shift service', () => {
     await expect(
       fixture.service.openShift({
         clientId: 'tenant-a',
-        userId: 'cook-a',
+        userId: 'nurse-a',
         kind: 'payroll' as never,
-        actorUserId: 'cook-a',
+        actorUserId: 'nurse-a',
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SHIFT' });
   });
 
   it('allows several workers on one station unless the caller requests exclusivity', async () => {
     const fixture = setup();
-    const resource = { type: KITCHEN_STATIONS_RESOURCE_TYPE, id: 'grill' };
+    const resource = { type: WARD_RESOURCE_TYPE, id: 'bay-1' };
 
     await fixture.service.openShift({
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen',
-      actorUserId: 'cook-a',
+      userId: 'nurse-a',
+      kind: 'ward',
+      actorUserId: 'nurse-a',
       resource,
     });
     await expect(
       fixture.service.openShift({
         clientId: 'tenant-a',
-        userId: 'cook-b',
-        kind: 'kitchen',
-        actorUserId: 'cook-b',
+        userId: 'nurse-b',
+        kind: 'ward',
+        actorUserId: 'nurse-b',
         resource,
       }),
-    ).resolves.toMatchObject({ resourceId: 'grill' });
+    ).resolves.toMatchObject({ resourceId: 'bay-1' });
     await expect(
       fixture.service.openShift({
         clientId: 'tenant-a',
-        userId: 'cook-c',
-        kind: 'kitchen',
-        actorUserId: 'cook-c',
+        userId: 'nurse-c',
+        kind: 'ward',
+        actorUserId: 'nurse-c',
         resource: { ...resource, exclusive: true },
       }),
     ).rejects.toMatchObject({ code: 'RESOURCE_TAKEN' });
@@ -130,26 +177,26 @@ describe('shift service', () => {
   it('treats a still-unreleased exclusive claim as occupied, whenever it starts', async () => {
     const fixture = setup();
     const resource = {
-      type: KITCHEN_STATIONS_RESOURCE_TYPE,
-      id: 'grill',
+      type: WARD_RESOURCE_TYPE,
+      id: 'bay-1',
       exclusive: true as const,
     };
     // A claim that has not been released occupies the station even though it
     // is dated to begin AFTER this open — the scheduled incumbent keeps it.
     fixture.db.seedAssignment({
       clientId: 'tenant-a',
-      userId: 'cook-z',
-      resourceType: KITCHEN_STATIONS_RESOURCE_TYPE,
-      resourceId: 'grill',
+      userId: 'nurse-z',
+      resourceType: WARD_RESOURCE_TYPE,
+      resourceId: 'bay-1',
       validFrom: new Date('2026-07-30T12:00:00.000Z'),
       validTo: null,
     });
     await expect(
       fixture.service.openShift({
         clientId: 'tenant-a',
-        userId: 'cook-a',
-        kind: 'kitchen',
-        actorUserId: 'cook-a',
+        userId: 'nurse-a',
+        kind: 'ward',
+        actorUserId: 'nurse-a',
         resource,
       }),
     ).rejects.toMatchObject({ code: 'RESOURCE_TAKEN' });
@@ -157,8 +204,8 @@ describe('shift service', () => {
     // Released before this open: free.
     fixture.db.seedAssignment({
       clientId: 'tenant-a',
-      userId: 'cook-y',
-      resourceType: KITCHEN_STATIONS_RESOURCE_TYPE,
+      userId: 'nurse-y',
+      resourceType: WARD_RESOURCE_TYPE,
       resourceId: 'fryer',
       validFrom: new Date('2026-07-29T00:00:00.000Z'),
       validTo: new Date('2026-07-30T09:00:00.000Z'),
@@ -166,9 +213,9 @@ describe('shift service', () => {
     await expect(
       fixture.service.openShift({
         clientId: 'tenant-a',
-        userId: 'cook-b',
-        kind: 'kitchen',
-        actorUserId: 'cook-b',
+        userId: 'nurse-b',
+        kind: 'ward',
+        actorUserId: 'nurse-b',
         resource: { ...resource, id: 'fryer' },
       }),
     ).resolves.toMatchObject({ resourceId: 'fryer' });
@@ -176,8 +223,8 @@ describe('shift service', () => {
     // Released only later: still occupied.
     fixture.db.seedAssignment({
       clientId: 'tenant-a',
-      userId: 'cook-x',
-      resourceType: KITCHEN_STATIONS_RESOURCE_TYPE,
+      userId: 'nurse-x',
+      resourceType: WARD_RESOURCE_TYPE,
       resourceId: 'oven',
       validFrom: new Date('2026-07-29T00:00:00.000Z'),
       validTo: new Date('2026-07-31T00:00:00.000Z'),
@@ -185,9 +232,9 @@ describe('shift service', () => {
     await expect(
       fixture.service.openShift({
         clientId: 'tenant-a',
-        userId: 'cook-c',
-        kind: 'kitchen',
-        actorUserId: 'cook-c',
+        userId: 'nurse-c',
+        kind: 'ward',
+        actorUserId: 'nurse-c',
         resource: { ...resource, id: 'oven' },
       }),
     ).rejects.toMatchObject({ code: 'RESOURCE_TAKEN' });
@@ -196,15 +243,15 @@ describe('shift service', () => {
   it('judges exclusivity at max(startedAt, now), so backdating cannot free a station', async () => {
     const fixture = setup();
     const resource = {
-      type: KITCHEN_STATIONS_RESOURCE_TYPE,
-      id: 'grill',
+      type: WARD_RESOURCE_TYPE,
+      id: 'bay-1',
       exclusive: true as const,
     };
     await fixture.service.openShift({
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen',
-      actorUserId: 'cook-a',
+      userId: 'nurse-a',
+      kind: 'ward',
+      actorUserId: 'nurse-a',
       resource,
     });
 
@@ -213,9 +260,9 @@ describe('shift service', () => {
     await expect(
       fixture.service.openShift({
         clientId: 'tenant-a',
-        userId: 'cook-b',
-        kind: 'kitchen',
-        actorUserId: 'cook-b',
+        userId: 'nurse-b',
+        kind: 'ward',
+        actorUserId: 'nurse-b',
         resource,
         startedAt: new Date('2026-07-30T02:00:00.000Z'),
       }),
@@ -229,9 +276,9 @@ describe('shift service', () => {
     const fixture = setup();
     const base = {
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen' as const,
-      actorUserId: 'cook-a',
+      userId: 'nurse-a',
+      kind: 'ward' as const,
+      actorUserId: 'nurse-a',
     };
 
     // A future start is unclosable: the sweep's cutoff is later still and a
@@ -256,15 +303,15 @@ describe('shift service', () => {
         ...base,
         startedAt: fromStart(MINUTE_MS),
       }),
-    ).resolves.toMatchObject({ userId: 'cook-a' });
+    ).resolves.toMatchObject({ userId: 'nurse-a' });
     await expect(
       fixture.service.openShift({
         ...base,
-        userId: 'cook-b',
-        actorUserId: 'cook-b',
+        userId: 'nurse-b',
+        actorUserId: 'nurse-b',
         startedAt: fromStart(-2 * HOUR_MS),
       }),
-    ).resolves.toMatchObject({ userId: 'cook-b' });
+    ).resolves.toMatchObject({ userId: 'nurse-b' });
   });
 
   it('maps each open-path unique violation to its own typed error', async () => {
@@ -279,9 +326,9 @@ describe('shift service', () => {
     const open = () =>
       fixture.service.openShift({
         clientId: 'tenant-a',
-        userId: 'cook-a',
-        kind: 'kitchen',
-        actorUserId: 'cook-a',
+        userId: 'nurse-a',
+        kind: 'ward',
+        actorUserId: 'nurse-a',
       });
 
     thrown.constraint = 'resource_assignments_active_unique_idx';
@@ -303,15 +350,15 @@ describe('shift service', () => {
     const fixture = setup();
     const shift = await fixture.service.openShift({
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen',
-      actorUserId: 'cook-a',
-      resource: { type: KITCHEN_STATIONS_RESOURCE_TYPE, id: 'grill' },
+      userId: 'nurse-a',
+      kind: 'ward',
+      actorUserId: 'nurse-a',
+      resource: { type: WARD_RESOURCE_TYPE, id: 'bay-1' },
     });
     const unrelatedId = fixture.db.seedAssignment({
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      resourceType: KITCHEN_STATIONS_RESOURCE_TYPE,
+      userId: 'nurse-a',
+      resourceType: WARD_RESOURCE_TYPE,
       resourceId: 'fryer',
       validFrom: START,
     });
@@ -320,14 +367,14 @@ describe('shift service', () => {
     const closed = await fixture.service.closeOwnShift({
       clientId: 'tenant-a',
       shiftId: shift.id,
-      userId: 'cook-a',
+      userId: 'nurse-a',
       endedAt,
     });
 
     expect(closed).toMatchObject({
       endedAt,
       endedReason: 'user',
-      endedByUserId: 'cook-a',
+      endedByUserId: 'nurse-a',
     });
     const state = fixture.db.snapshot();
     expect(
@@ -338,7 +385,7 @@ describe('shift service', () => {
     ).toBeNull();
     expect(state.audits.at(-1)).toMatchObject({
       action: 'shift.end',
-      actorUserId: 'cook-a',
+      actorUserId: 'nurse-a',
     });
   });
 
@@ -349,10 +396,10 @@ describe('shift service', () => {
     await expect(
       fixture.service.openShift({
         clientId: 'tenant-a',
-        userId: 'cook-a',
-        kind: 'kitchen',
-        actorUserId: 'cook-a',
-        resource: { type: KITCHEN_STATIONS_RESOURCE_TYPE, id: 'grill' },
+        userId: 'nurse-a',
+        kind: 'ward',
+        actorUserId: 'nurse-a',
+        resource: { type: WARD_RESOURCE_TYPE, id: 'bay-1' },
       }),
     ).rejects.toThrow('injected audit failure');
     expect(fixture.db.snapshot()).toMatchObject({
@@ -363,10 +410,10 @@ describe('shift service', () => {
 
     const shift = await fixture.service.openShift({
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen',
-      actorUserId: 'cook-a',
-      resource: { type: KITCHEN_STATIONS_RESOURCE_TYPE, id: 'grill' },
+      userId: 'nurse-a',
+      kind: 'ward',
+      actorUserId: 'nurse-a',
+      resource: { type: WARD_RESOURCE_TYPE, id: 'bay-1' },
     });
     fixture.db.failNext('audit');
     await expect(
@@ -379,7 +426,7 @@ describe('shift service', () => {
     expect(
       await fixture.service.getOpenShift({
         clientId: 'tenant-a',
-        userId: 'cook-a',
+        userId: 'nurse-a',
       }),
     ).toMatchObject({
       id: shift.id,
@@ -397,13 +444,13 @@ describe('shift service', () => {
     const a = await fixture.service.openShift({
       clientId: 'tenant-a',
       userId: 'cook',
-      kind: 'kitchen',
+      kind: 'ward',
       actorUserId: 'cook',
     });
     await fixture.service.openShift({
       clientId: 'tenant-b',
       userId: 'cook',
-      kind: 'service',
+      kind: 'reception',
       actorUserId: 'cook',
     });
 
@@ -421,9 +468,9 @@ describe('shift service', () => {
     const fixture = setup();
     await fixture.service.openShift({
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen',
-      actorUserId: 'cook-a',
+      userId: 'nurse-a',
+      kind: 'ward',
+      actorUserId: 'nurse-a',
     });
 
     // A Prisma-backed host raises on an unresolvable cursor; a driver that
@@ -438,10 +485,10 @@ describe('shift service', () => {
     const fixture = setupAt(() => clock.now);
     const shift = await fixture.service.openShift({
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen',
-      actorUserId: 'cook-a',
-      resource: { type: KITCHEN_STATIONS_RESOURCE_TYPE, id: 'grill' },
+      userId: 'nurse-a',
+      kind: 'ward',
+      actorUserId: 'nurse-a',
+      resource: { type: WARD_RESOURCE_TYPE, id: 'bay-1' },
     });
     clock.now = new Date('2026-07-30T20:13:00.000Z');
 
@@ -469,15 +516,15 @@ describe('shift service', () => {
     const fixture = setupAt(() => clock.now);
     const poisoned = await fixture.service.openShift({
       clientId: 'tenant-poison',
-      userId: 'cook-a',
-      kind: 'kitchen',
-      actorUserId: 'cook-a',
+      userId: 'nurse-a',
+      kind: 'ward',
+      actorUserId: 'nurse-a',
     });
     const healthy = await fixture.service.openShift({
       clientId: 'tenant-ok',
-      userId: 'cook-b',
-      kind: 'kitchen',
-      actorUserId: 'cook-b',
+      userId: 'nurse-b',
+      kind: 'ward',
+      actorUserId: 'nurse-b',
     });
     clock.now = new Date('2026-07-30T20:00:00.000Z');
 
@@ -506,7 +553,7 @@ describe('shift service', () => {
     expect(
       await fixture.service.getOpenShift({
         clientId: 'tenant-poison',
-        userId: 'cook-a',
+        userId: 'nurse-a',
       }),
     ).toMatchObject({ id: poisoned.id, endedAt: null });
   });
@@ -516,9 +563,9 @@ describe('shift service', () => {
     const fixture = setupAt(() => clock.now);
     const shift = await fixture.service.openShift({
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen',
-      actorUserId: 'cook-a',
+      userId: 'nurse-a',
+      kind: 'ward',
+      actorUserId: 'nurse-a',
     });
     clock.now = new Date('2026-07-30T20:00:00.000Z');
 
@@ -562,22 +609,22 @@ describe('shift service', () => {
     const fixture = setup();
     const shift = await fixture.service.openShift({
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen',
-      actorUserId: 'cook-a',
+      userId: 'nurse-a',
+      kind: 'ward',
+      actorUserId: 'nurse-a',
     });
 
     await expect(
       fixture.service.closeOwnShift({
         clientId: 'tenant-a',
         shiftId: shift.id,
-        userId: 'cook-b',
+        userId: 'nurse-b',
       }),
     ).rejects.toMatchObject({ code: 'SHIFT_NOT_OWNED' });
     expect(
       await fixture.service.getOpenShift({
         clientId: 'tenant-a',
-        userId: 'cook-a',
+        userId: 'nurse-a',
       }),
     ).toMatchObject({
       id: shift.id,
@@ -589,21 +636,21 @@ describe('shift service', () => {
     const fixture = setup();
     const shift = await fixture.service.openShift({
       clientId: 'tenant-a',
-      userId: 'cook-a',
-      kind: 'kitchen',
-      actorUserId: 'cook-a',
+      userId: 'nurse-a',
+      kind: 'ward',
+      actorUserId: 'nurse-a',
     });
     await fixture.service.closeOwnShift({
       clientId: 'tenant-a',
       shiftId: shift.id,
-      userId: 'cook-a',
+      userId: 'nurse-a',
     });
 
     await expect(
       fixture.service.closeOwnShift({
         clientId: 'tenant-a',
         shiftId: shift.id,
-        userId: 'cook-a',
+        userId: 'nurse-a',
       }),
     ).rejects.toMatchObject({ code: 'SHIFT_ALREADY_ENDED' });
   });

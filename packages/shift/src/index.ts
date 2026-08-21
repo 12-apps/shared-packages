@@ -2,10 +2,7 @@ export { ShiftError, type ShiftErrorCode } from './errors';
 export { createMemoryShiftDb, type MemoryShiftDb } from './memory';
 export { createShiftService } from './service';
 export {
-  KITCHEN_STATIONS_RESOURCE_TYPE,
-  SECTORS_RESOURCE_TYPE,
   SHIFT_END_REASONS,
-  SHIFT_KINDS,
   type AutoCloseFailure,
   type AutoCloseInput,
   type AutoCloseResult,

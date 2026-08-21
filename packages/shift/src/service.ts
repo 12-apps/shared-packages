@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { autoCloseOverdue, type CloseStoredShift } from './auto-close';
 import { ShiftError } from './errors';
+import { requireKinds } from './kinds';
 import type {
   AutoCloseInput,
   AutoCloseResult,
@@ -12,6 +13,7 @@ import type {
   Shift,
   ShiftAuditInput,
   ShiftDb,
+  ShiftKind,
   ShiftListInput,
   ShiftPage,
   ShiftService,
@@ -101,12 +103,23 @@ function validateStartedAt(startedAt: Date | undefined, now: Date): void {
   }
 }
 
-function validateOpenInput(input: OpenShiftInput, now: Date): void {
+function validateOpenInput(
+  input: OpenShiftInput,
+  now: Date,
+  kinds: readonly ShiftKind[],
+): void {
   requireText(input.clientId, 'clientId');
   requireText(input.userId, 'userId');
   requireText(input.actorUserId, 'actorUserId');
-  if (input.kind !== 'kitchen' && input.kind !== 'service') {
-    throw new ShiftError('INVALID_SHIFT', `Unknown shift kind: ${String(input.kind)}.`);
+  // Against the CONFIGURED set, not against two literals this package used to
+  // spell. The message names the set, because the failure a host actually hits
+  // here is a typo or a kind it forgot to configure, and neither is diagnosable
+  // from the rejected value alone.
+  if (!kinds.includes(input.kind)) {
+    throw new ShiftError(
+      'INVALID_SHIFT',
+      `Unknown shift kind: ${String(input.kind)}. Configured kinds: ${kinds.join(', ')}.`,
+    );
   }
   if (input.resource) {
     requireText(input.resource.type, 'resource.type');
@@ -267,8 +280,9 @@ async function openStoredShift(
   input: OpenShiftInput,
   now: Date,
   createId: CreateId,
+  kinds: readonly ShiftKind[],
 ): Promise<Shift> {
-  validateOpenInput(input, now);
+  validateOpenInput(input, now, kinds);
   const clock = openClock(input, now);
   try {
     return await db.transaction((tx) => persistOpenShift(tx, input, clock, createId));
@@ -328,14 +342,15 @@ function createCloseStoredShift(db: ShiftDb, now: () => Date): CloseStoredShift 
   };
 }
 
-export function createShiftService(db: ShiftDb, options: ShiftServiceOptions = {}): ShiftService {
+export function createShiftService(db: ShiftDb, options: ShiftServiceOptions): ShiftService {
+  const kinds = requireKinds(options.kinds);
   const now = options.now ?? (() => new Date());
   const createId = options.createId ?? randomUUID;
   const closeShift = createCloseStoredShift(db, now);
 
   return {
     openShift(input) {
-      return openStoredShift(db, input, now(), createId);
+      return openStoredShift(db, input, now(), createId, kinds);
     },
     closeOwnShift(input: CloseOwnShiftInput) {
       requireText(input.userId, 'userId');
