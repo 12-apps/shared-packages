@@ -37,12 +37,16 @@ import type {
  *      `subtotalCents` is their sum. An empty cart short-circuits to a zero
  *      evaluation, with `EMPTY_CART` for any coupon the buyer supplied.
  * R2 — Eligibility screen (`./eligibility.ts`). A failing AUTOMATIC discount is
- *      dropped silently; a failing CODE discount the buyer typed is reported.
- * R3 — Covered set (`./eligibility.ts`).
+ *      dropped silently; a failing CODE discount the buyer typed is reported. A
+ *      combo the cart cannot assemble is reported as `COMBO_NOT_MATCHED` rather
+ *      than `NO_ELIGIBLE_ITEMS`, because it is the one failure here a buyer can
+ *      act on.
+ * R3 — Covered set (`./eligibility.ts`). For a combo this is a MATCH against the
+ *      pristine cart, not a target intersection.
  * R4 — A discount's base is what is STILL discountable on its covered lines, so
  *      a later discount never discounts money an earlier one already removed.
  * R5 — Raw amount (`./allocate.ts`).
- * R6 — Scope precedence `ITEM → CATEGORY → ORDER`, in three passes
+ * R6 — Scope precedence `COMBO → ITEM → CATEGORY → ORDER`, in four passes
  *      (`./evaluate-passes.ts`). Narrowest first, so an order-wide percentage is
  *      computed on the already item-discounted amount and an order-wide fixed
  *      amount is clamped to what is actually left.
@@ -55,6 +59,15 @@ import type {
  *      stackable ⇒ it forces A.
  * R9 — Payable floor: `totalCents = subtotalCents - discountTotalCents`, and a
  *      discounted order never lands below `MIN_PAYABLE_TOTAL_CENTS` (R$ 0,01).
+ * R10 — Combos (`./combo-match.ts`, `./evaluate-passes.ts`). A `COMBO`-scoped
+ *      rule matches UNITS against quantified slots, repeatedly, and prices each
+ *      application. Every combo draws from ONE shared unit pool, so two combos
+ *      can never both be paid for the same burger; and the units a combo
+ *      consumed are OPAQUE to the `ITEM` and `CATEGORY` passes, so a
+ *      component-targeted promotion cannot stack on top of a bundle price the
+ *      merchant set deliberately. `ORDER` is not blocked and applies to the
+ *      combo price, because an order-wide promotion is a statement about the
+ *      basket rather than about the components.
  *
  * ─── R9 CONTRADICTS THE FUT-235 SPEC ON PURPOSE. DO NOT "FIX" IT BACK. ───
  *

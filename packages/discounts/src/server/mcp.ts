@@ -8,7 +8,14 @@ import {
 } from "@12-apps/shared-helpers/search";
 import type { WireMcpTool } from "@12-apps/wiring";
 
-import { DISCOUNT_SCOPES, DISCOUNT_TRIGGERS, DISCOUNT_TYPES, MAX_PERCENT_OFF_BP } from "../engine/kinds";
+import {
+  DISCOUNT_SCOPES,
+  DISCOUNT_TRIGGERS,
+  DISCOUNT_TYPES,
+  MAX_COMBO_SLOTS,
+  MAX_COMBO_SLOT_QUANTITY,
+  MAX_PERCENT_OFF_BP,
+} from "../engine/kinds";
 import { discountSearchConfig } from "./search";
 
 /**
@@ -47,6 +54,18 @@ export const discountItemParams = z.object({
 const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 /**
+ * One combo slot: what fills it, and how many units of it one application
+ * needs. Both target lists default to empty and at least one must be
+ * non-empty — a rule `./validate-combo.ts` enforces with the host's own
+ * sentence, because a Zod refinement here could only answer in a Zod path.
+ */
+export const comboRequirementSchema = z.object({
+  menuItemIds: z.array(z.string().min(1)).default([]),
+  categoryIds: z.array(z.string().min(1)).default([]),
+  quantity: z.number().int().min(1).max(MAX_COMBO_SLOT_QUANTITY),
+});
+
+/**
  * A discount as the API returns it (JSON-serialized: dates become ISO
  * strings). The two join tables are flattened into id arrays.
  */
@@ -58,6 +77,16 @@ export const discountSchema = z.object({
   percentOffBp: z.number().int().nullable(),
   /** Cents off. Non-null iff `type = FIXED_AMOUNT`. */
   amountOffCents: z.number().int().nullable(),
+  /**
+   * The COMBO half. OPTIONAL in the RESPONSE, unlike in the body, because the
+   * record is assembled by a host's store: an adopter that has not added the
+   * columns still answers a valid discount, and one that has says so. See
+   * `DiscountRecord` in `./store`.
+   */
+  bundlePriceCents: z.number().int().nullable().optional(),
+  freeUnits: z.number().int().nullable().optional(),
+  maxComboApplications: z.number().int().nullable().optional(),
+  comboRequirements: z.array(comboRequirementSchema).optional(),
   scope: z.enum(DISCOUNT_SCOPES),
   trigger: z.enum(DISCOUNT_TRIGGERS),
   code: z.string().nullable(),
@@ -101,15 +130,20 @@ export const listDiscountsQuery = createDiscountListQuery(searchConfigSchema.par
  * The write body, shared by create and update: a discount is always saved
  * WHOLE (the form re-states every field), so there is no partial-patch shape
  * to diverge from. The cross-field rules — a rate iff PERCENTAGE, a code iff
- * CODE, a target iff CATEGORY/ITEM, `endsAt` strictly after `startsAt` — are
- * enforced in `./validate`, where they produce a sentence naming the field
- * instead of a Zod path.
+ * CODE, a target iff CATEGORY/ITEM, a slot list iff COMBO, a combo reward ONLY
+ * at COMBO scope, `endsAt` strictly after `startsAt` — are enforced in
+ * `./validate` and `./validate-combo`, where they produce a sentence naming the
+ * field instead of a Zod path.
  */
 const discountWriteShape = {
   name: z.string().min(2).max(120),
   type: z.enum(DISCOUNT_TYPES),
   percentOffBp: z.number().int().min(1).max(MAX_PERCENT_OFF_BP).nullable().optional(),
   amountOffCents: z.number().int().positive().nullable().optional(),
+  bundlePriceCents: z.number().int().positive().nullable().optional(),
+  freeUnits: z.number().int().positive().nullable().optional(),
+  comboRequirements: z.array(comboRequirementSchema).max(MAX_COMBO_SLOTS).optional(),
+  maxComboApplications: z.number().int().positive().nullable().optional(),
   scope: z.enum(DISCOUNT_SCOPES),
   trigger: z.enum(DISCOUNT_TRIGGERS),
   code: z.string().min(1).max(64).nullable().optional(),
@@ -145,7 +179,7 @@ export const DISCOUNTS_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
     method: "GET",
     path: "/discounts",
     summary:
-      "List a store's discounts and promotions (admin). Backend filter (`q` over name and coupon code, `type_in` PERCENTAGE|FIXED_AMOUNT, `scope_in` ORDER|CATEGORY|ITEM, `trigger_in` AUTOMATIC|CODE, `active`), `sort` (field:asc|desc), and pagination (`page`/`pageSize`). Returns the page plus `pagination` (total, pageCount, hasNextPage).",
+      "List a store's discounts and promotions (admin). Backend filter (`q` over name and coupon code, `type_in` PERCENTAGE|FIXED_AMOUNT|BUNDLE_PRICE|FREE_UNITS, `scope_in` ORDER|CATEGORY|ITEM|COMBO, `trigger_in` AUTOMATIC|CODE, `active`), `sort` (field:asc|desc), and pagination (`page`/`pageSize`). Returns the page plus `pagination` (total, pageCount, hasNextPage).",
     tags: ["discounts"],
     params: discountCollectionParams,
     query: listDiscountsQuery,
@@ -167,7 +201,7 @@ export const DISCOUNTS_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
     method: "POST",
     path: "/discounts",
     summary:
-      "Create a discount for a store (admin). A percentage is basis points (1..10000); a fixed amount is integer cents. A CODE-triggered discount needs a coupon code, unique within the store; a CATEGORY/ITEM-scoped one needs at least one target.",
+      "Create a discount for a store (admin). A percentage is basis points (1..10000); a fixed amount is integer cents. A CODE-triggered discount needs a coupon code, unique within the store; a CATEGORY/ITEM-scoped one needs at least one target. A COMBO-scoped one is a bundle: `comboRequirements` lists its slots (products and/or categories, with a per-slot `quantity`), and the reward is either `BUNDLE_PRICE` (what the whole matched group costs, in cents) or `FREE_UNITS` (how many of its cheapest units are free — \"3 for the price of 2\" is one slot of quantity 3 with `freeUnits` 1), or an ordinary percentage/fixed amount off the group.",
     tags: ["discounts"],
     params: discountCollectionParams,
     body: createDiscountBody,

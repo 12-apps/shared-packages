@@ -40,9 +40,12 @@ export {
   type DiscountWriteInput,
 } from "./validate";
 
+export { comboRequirementsForScope, toComboColumns, type ComboColumns } from "./validate-combo";
+
 export { discountSearchConfig } from "./search";
 
 export {
+  comboRequirementSchema,
   createDiscountBody,
   createDiscountListQuery,
   discountCollectionParams,

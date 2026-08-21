@@ -1,6 +1,7 @@
 import type { PaginatedResult, ParsedSearchInput } from "@12-apps/shared-helpers/search";
 
 import type { DiscountScope, DiscountTrigger, DiscountType } from "../engine/kinds";
+import type { ComboRequirement } from "../engine/types";
 import type { DiscountScalars, DiscountTargets } from "./validate";
 
 /**
@@ -44,6 +45,21 @@ export interface DiscountRecord {
    */
   categoryIds: string[];
   menuItemIds: string[];
+  /**
+   * The COMBO half (FUT-268), OPTIONAL because this record is built by the
+   * HOST's store and combos are a capability a host opts into. A host that has
+   * not added the columns keeps compiling and keeps answering the same record
+   * it always did; one that has, fills them in.
+   *
+   * The asymmetry with {@link DiscountWrite} is deliberate and runs the other
+   * way for the same reason: what this package PRODUCES is always complete, so
+   * a store is handed every combo column whether it stores them or not, while
+   * what a host BUILDS may predate the feature.
+   */
+  bundlePriceCents?: number | null;
+  freeUnits?: number | null;
+  maxComboApplications?: number | null;
+  comboRequirements?: ComboRequirement[];
   createdAt: Date;
 }
 

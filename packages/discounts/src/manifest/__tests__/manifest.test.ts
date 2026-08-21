@@ -42,6 +42,14 @@ const FULL_COPY = Object.fromEntries(
     "invalidMinSubtotal",
     "invalidUsageLimit",
     "invalidPerBuyerLimit",
+    "comboScopeRequired",
+    "invalidComboSlots",
+    "comboTargetRequired",
+    "invalidComboQuantity",
+    "invalidBundlePrice",
+    "invalidFreeUnits",
+    "freeUnitsExceedCombo",
+    "invalidMaxComboApplications",
   ].map((key) => [key, key]),
 ) as never;
 

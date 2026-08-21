@@ -11,6 +11,38 @@ import type {
  */
 
 /**
+ * One SLOT of a combo: what may fill it, and how many units it needs for ONE
+ * application of the combo.
+ *
+ * "1 large popcorn + 2 sodas" is two slots — `{ menuItemIds: ["popcorn-lg"],
+ * quantity: 1 }` and `{ categoryIds: ["sodas"], quantity: 2 }`. "3 burgers for
+ * the price of 2" is ONE slot of quantity 3, whose rule carries
+ * `type: "FREE_UNITS"`, `freeUnits: 1`.
+ *
+ * A slot is satisfied from either list — an item id OR a category — because a
+ * merchant thinks in both at once ("a soda" is a category, "the large popcorn"
+ * is an item). At least one of the two must be non-empty; a slot naming
+ * neither can never be filled, and `toDiscountScalars` refuses it rather than
+ * storing a combo that silently never fires.
+ */
+export interface ComboRequirement {
+  /**
+   * Menu-item ids that fill this slot, matched against a line's BASE item OR
+   * its chosen variation — the same reach an `ITEM`-scoped discount has, so
+   * "a Coke" still fills the slot when the buyer picked "Coke zero can".
+   */
+  menuItemIds: readonly string[];
+  /**
+   * Category ids that fill this slot, matched against a line's category PATH,
+   * so a slot naming a top-level category is filled by its subcategories' items
+   * — the same reach a `CATEGORY`-scoped discount has.
+   */
+  categoryIds: readonly string[];
+  /** Units this slot needs per application. An integer >= 1. */
+  quantity: number;
+}
+
+/**
  * One discount as the evaluator sees it: a plain value object with every
  * stored and every counted fact already resolved. The evaluator never touches
  * a database and never reads the clock — the host's loader builds these from
@@ -24,11 +56,42 @@ export interface DiscountRule {
   percentOffBp: number | null;
   /** Cents off, > 0. Non-null iff `type === "FIXED_AMOUNT"`. */
   amountOffCents: number | null;
+  /**
+   * What the matched combo group costs, in cents. Non-null iff
+   * `type === "BUNDLE_PRICE"`. The discount is the group's gross value minus
+   * this, per application.
+   */
+  bundlePriceCents?: number | null;
+  /**
+   * How many units of the matched group are free. Non-null iff
+   * `type === "FREE_UNITS"`. The CHEAPEST units of each application are the
+   * free ones, which is the buyer-favourable reading of "3 for the price of 2"
+   * and the one every merchant means by it.
+   */
+  freeUnits?: number | null;
   scope: DiscountScope;
   /** Target category ids. Non-empty iff `scope === "CATEGORY"`. */
   targetCategoryIds: readonly string[];
   /** Target menu-item ids. Non-empty iff `scope === "ITEM"`. */
   targetMenuItemIds: readonly string[];
+  /**
+   * The combo's slots, in the merchant's own declaration order. Non-empty iff
+   * `scope === "COMBO"`; ignored at every other scope.
+   *
+   * OPTIONAL, unlike the two target arrays above, and that asymmetry is the
+   * point: every discount has a scope and a type, so those fields are facts
+   * about all of them, while a combo is a CAPABILITY a host opts into. A host
+   * that does not sell combos never stores a `COMBO`-scoped rule, so it never
+   * has a value to put here, and requiring one would have made adding combos a
+   * breaking change for every adopter that does not want them.
+   */
+  comboRequirements?: readonly ComboRequirement[];
+  /**
+   * How many times this combo may apply to ONE cart; null or omitted means as
+   * often as the cart can fill its slots. A cart with six burgers takes "3 for
+   * the price of 2" twice unless this says otherwise.
+   */
+  maxComboApplications?: number | null;
   trigger: DiscountTrigger;
   /** Normalized (trimmed, upper-cased) code. Non-null iff `trigger === "CODE"`. */
   code: string | null;
@@ -110,6 +173,17 @@ export interface AppliedDiscount {
   amountOffCents: number | null;
   /** Cents removed from the order by THIS discount. Always > 0. */
   amountCents: number;
+  /**
+   * How many times a `COMBO`-scoped discount applied to this cart; absent for
+   * every other scope.
+   *
+   * It is on the SNAPSHOT rather than merely in the evaluation because it is
+   * the one combo fact an order cannot re-derive later: the rule's slots may
+   * have been re-stated, and the line quantities the combo consumed are not
+   * recoverable from the per-line cents alone. A receipt saying "Combo leve 3
+   * pague 2 (2x)" needs this number.
+   */
+  comboApplications?: number;
 }
 
 /** Per-line outcome. `Σ discountCents` equals the order's `discountTotalCents`. */

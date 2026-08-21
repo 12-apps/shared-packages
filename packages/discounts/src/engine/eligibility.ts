@@ -1,3 +1,4 @@
+import { comboCoveredLineIds } from "./combo-match";
 import type { DiscountRejectionReason } from "./kinds";
 import type { DiscountCartLine, DiscountRule } from "./types";
 
@@ -90,6 +91,15 @@ function addAll(target: Set<string>, lineIds: readonly string[] | undefined): vo
  * discount on a top-level category automatically reaches items filed under its
  * subcategories; `ITEM` covers every line whose base or variation menu item is
  * targeted.
+ *
+ * `COMBO` is the one scope the reverse index cannot answer, because its
+ * coverage is not a set intersection but a MATCH: whether the cart holds enough
+ * units to fill every slot at once. It is delegated to `./combo-match.ts`, and
+ * the answer here is deliberately the PRISTINE one — what the whole cart could
+ * fill — because this is the screen, and the screen's job is to tell a combo
+ * that can never fire ("no soda in the cart") from one that merely lost its
+ * units to a combo that ran first. The second is not a screen failure; it is a
+ * combo that removed nothing, and `./evaluate.ts` reports it as `ZERO_VALUE`.
  */
 export function coveredLineIds(
   rule: DiscountRule,
@@ -97,6 +107,7 @@ export function coveredLineIds(
   index: LineIndex,
 ): ReadonlySet<string> {
   if (rule.scope === "ORDER") return new Set(lines.map((line) => line.lineId));
+  if (rule.scope === "COMBO") return comboCoveredLineIds(rule, lines);
   const byCategory = rule.scope === "CATEGORY";
   const targets = byCategory ? rule.targetCategoryIds : rule.targetMenuItemIds;
   const bucket = byCategory ? index.byCategory : index.byMenuItem;
@@ -147,6 +158,11 @@ function screenLimits(rule: DiscountRule, ctx: ScreenContext): DiscountRejection
  * The coupon-match predicate is NOT here: a CODE-triggered rule the buyer did
  * not type is not a rejection, it is simply not a candidate, and the caller
  * drops it silently.
+ *
+ * The last predicate splits by scope for one reason only: a combo that could
+ * not be assembled is the one failure in this set the buyer can DO something
+ * about, so it earns its own sentence rather than the shared "not for the items
+ * in your cart". See `DISCOUNT_REJECTION_REASONS` in `./kinds.ts`.
  */
 export function screenRule(
   rule: DiscountRule,
@@ -156,5 +172,6 @@ export function screenRule(
   if (scheduling !== null) return scheduling;
   const limits = screenLimits(rule, ctx);
   if (limits !== null) return limits;
-  return ctx.hasEligibleItems ? null : "NO_ELIGIBLE_ITEMS";
+  if (ctx.hasEligibleItems) return null;
+  return rule.scope === "COMBO" ? "COMBO_NOT_MATCHED" : "NO_ELIGIBLE_ITEMS";
 }

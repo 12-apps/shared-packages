@@ -11,7 +11,7 @@ No database, no framework, no clock, and **no baked user copy**.
 
 | entry | what it is |
 |---|---|
-| `@12-apps/discounts` | the engine: `evaluateDiscounts`, `previewItemDiscount`, the vocabulary, the rejection copy port |
+| `@12-apps/discounts` | the engine: `evaluateDiscounts`, `previewItemDiscount`, `comboOffersForItem`, `matchCombo`, the vocabulary, the rejection copy port |
 | `@12-apps/discounts/pt-BR` | the pt-BR rejection pack, imported by hand |
 | `@12-apps/discounts/server` | `createApiDiscounts`, the `DiscountStore` port, the permission contribution, the MCP tools |
 | `@12-apps/discounts/server/pt-BR` | the pt-BR pack for the admin surface's sentences |
@@ -21,10 +21,11 @@ No database, no framework, no clock, and **no baked user copy**.
 ## The model
 
 A discount is a **percentage** (basis points, 1..10000) or a **fixed amount**
-(integer cents), scoped to the whole **order**, to **categories**, or to
-specific **items**, fired either **automatically** when its conditions hold or
-by the buyer typing a **coupon code**. Money is integer cents throughout; a
-percentage is basis points, so "12,5%" needs no decimal column anywhere.
+(integer cents), scoped to the whole **order**, to **categories**, to specific
+**items**, or to a **combo**, fired either **automatically** when its conditions
+hold or by the buyer typing a **coupon code**. Money is integer cents
+throughout; a percentage is basis points, so "12,5%" needs no decimal column
+anywhere.
 
 The evaluator is a pure function of `{ lines, rules, couponCode, now }`:
 
@@ -52,6 +53,81 @@ Three properties it holds to the cent, and the suite pins each:
 `previewItemDiscount` answers the other question — what a catalog card should
 strike through *before* there is a cart — from the same rules, so a card and a
 cart cannot quote different numbers.
+
+## Combos
+
+A **combo** is a discount scoped to a group the merchant defines: a list of
+**slots**, each naming products and/or categories and how many units it needs.
+The evaluator matches those slots against the cart's **units**, repeatedly, and
+prices each match.
+
+```ts
+// "1 pipoca grande + 2 refrigerantes por R$ 25,00"
+{
+  scope: "COMBO",
+  type: "BUNDLE_PRICE",
+  bundlePriceCents: 2_500,
+  comboRequirements: [
+    { menuItemIds: ["popcorn-lg"], categoryIds: [], quantity: 1 },
+    { menuItemIds: [], categoryIds: ["drinks"], quantity: 2 },
+  ],
+}
+
+// "3 hambúrgueres pelo preço de 2" — one slot of three, the cheapest one free
+{
+  scope: "COMBO",
+  type: "FREE_UNITS",
+  freeUnits: 1,
+  comboRequirements: [{ menuItemIds: ["burger"], categoryIds: [], quantity: 3 }],
+}
+```
+
+Four rewards, and the type picks which column is read:
+
+| type | column | the group's discount |
+|---|---|---|
+| `BUNDLE_PRICE` | `bundlePriceCents` | its value above the bundle price |
+| `FREE_UNITS` | `freeUnits` | its N cheapest units |
+| `PERCENTAGE` | `percentOffBp` | that rate off it |
+| `FIXED_AMOUNT` | `amountOffCents` | that many cents off it |
+
+The last two are the ordinary columns, doing the ordinary thing against a group
+instead of against a line. The first two only mean something against a matched
+group, so they are legal at `COMBO` scope and nowhere else — the write path
+refuses the combination and a host's CHECK constraint should too.
+
+Every reward is **per application**. A cart of seven burgers takes "3 for the
+price of 2" twice and pays full price for the seventh; `maxComboApplications`
+caps that when a merchant wants it capped.
+
+Four decisions worth knowing before you wire it up:
+
+- **Combos run first.** The pass order is `COMBO → ITEM → CATEGORY → ORDER`.
+- **What a combo consumed is opaque to `ITEM` and `CATEGORY`.** A combo price is
+  a number the merchant set deliberately; a component-targeted promotion
+  stacking on top of it is a double discount. So a line of five burgers with
+  three inside a combo offers exactly two burgers, at full price, to an
+  item-level promotion. **`ORDER` is not blocked** and applies to the combo
+  price, because an order-wide promise is about the basket, not the components.
+- **One pool.** Every combo draws from the same units, so two combos can never
+  both be paid for the same burger. The richer one claims them first.
+- **A combo is not badged.** Its price does not exist until the other components
+  are in the cart, so `previewItemDiscount` skips it. `comboOffersForItem` is
+  what a card can honestly show instead — that the item takes part in a combo,
+  as a label rather than a price.
+
+A combo the cart cannot assemble is rejected `COMBO_NOT_MATCHED`, which is the
+one rejection reason this package refuses to coarsen: a buyer one soda short
+can finish the combo, and telling them so is the difference between a dead end
+and a sale.
+
+### What a combo is NOT, here
+
+It is a **pricing rule**, not a catalog entity. There is no `Combo` product with
+its own menu card, its own single cart line and its own order snapshot — that is
+a host table with foreign keys into the host's own catalog, which is exactly why
+this package declares no `db` capability. What travels is the rule; the sellable
+bundle, if a host wants one, stays the host's.
 
 ## The admin surface
 
@@ -92,6 +168,16 @@ buyers — so neither wiring `db` mode qualifies and the manifest declares none.
 The host owns the schema, the tenant scoping, the transactions and the
 uniqueness conflicts, and answers the `DiscountStore` port. What travels is the
 RULE, not the storage.
+
+Combos add three nullable columns to that table — `bundle_price_cents`,
+`free_units`, `max_combo_applications` — and one child table for the slots, each
+row carrying a quantity plus its own product and category id lists. `DiscountWrite`
+hands a store exactly that: the columns on `scalars`, the slots on
+`targets.comboRequirements`, already validated and narrowed to the scope. A host
+that does not sell combos adds nothing: the fields are optional on everything
+this package asks a host to BUILD (`DiscountRule`, `DiscountRecord`) and
+complete on everything it PRODUCES, so adopting the version that introduced them
+is a no-op until a `COMBO`-scoped row exists.
 
 **Every sentence a human reads.** `DiscountRejectionCopy` (buyer-facing) and
 `DiscountsServerCopy` (operator-facing) are required config with **no
