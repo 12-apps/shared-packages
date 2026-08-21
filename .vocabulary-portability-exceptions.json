@@ -1,5 +1,4 @@
 {
-  "packages/auth/src/manifest/web.tsx": "shipped before the vocabulary gate",
   "packages/entitlements/src/react/plan-page.tsx": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/entitlements/src/react/upsell-host.tsx": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/entitlements/src/react/with-entitlement.tsx": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
@@ -18,11 +17,9 @@
   "packages/payments/backend/src/platform/homologacao-anexo.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/payments/backend/src/platform/homologacao-guide.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/payments/backend/src/providers/infinitepay-setup-guide.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
-  "packages/payments/backend/src/providers/infinitepay.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/payments/backend/src/providers/pagbank.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/payments/backend/src/providers/stone-orders.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/payments/backend/src/providers/stone-setup-guide.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
-  "packages/payments/backend/src/providers/stripe-charges.ts": "shipped before the vocabulary gate",
   "packages/payments/backend/src/providers/stripe-credential-checks.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/payments/backend/src/providers/stripe-setup-guide.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/payments/frontend/src/card/tokenize.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
@@ -48,8 +45,6 @@
   "packages/payments/frontend/src/components/checkout/providers/hosted-link.tsx": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/payments/frontend/src/components/checkout/wallet-pane.tsx": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/payments/frontend/src/components/platform/HomologacaoOutcomeCard.tsx": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
-  "packages/payments/frontend/src/flows/screens-buyer.tsx": "shipped before the vocabulary gate",
-  "packages/product-research-ui/src/messages.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/product-research/src/connectors/fetch-reason.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/product-research/src/connectors/vtex-errors.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/product-research/src/connectors/vtex-validate.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
@@ -67,6 +62,5 @@
   "packages/storage/src/react/failures.ts": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/ui/src/components/data-display/DataViews/SaveViewModal.tsx": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
   "packages/ui/src/components/data-display/DataViews/data-views-scopes.tsx": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both",
-  "packages/ui/src/components/data-display/DataViews/pedidos.server.ts": "shipped before the vocabulary gate",
   "packages/ui/src/components/form/CategorySelect/CategoryPanelList.tsx": "shipped before the vocabulary gate, and also on the copy ratchet — the same pt-BR sentence names the origin host's domain, so that file's adoption wave clears both"
 }
