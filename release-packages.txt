@@ -9,6 +9,10 @@
 # resolves workspace:* interdeps to a version that already exists.
 #
 # Paths rather than names because payments ships as a nested workspace.
+#
+# `packages/discounts` sits LAST because it depends on shared-helpers (the
+# search engine its admin list is built on), and shared-helpers is itself last
+# among the packages that came before it.
 packages/wiring
 packages/eslint-config
 packages/typescript-config
@@ -41,3 +45,4 @@ packages/notifications
 packages/mcp
 packages/prisma
 packages/shared-helpers
+packages/discounts
