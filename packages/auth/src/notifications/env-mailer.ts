@@ -134,8 +134,8 @@ export interface EnvAuthMailerConfig {
    */
   drivers: Record<string, EmailDriverFactory | undefined>;
   log: AuthMailerLog;
-  /** Which words. `PT_BR_MAIL` when omitted, as `createAuthMailer` defaults. */
-  pack?: MailPack;
+  /** Which words — REQUIRED, forwarded to `createAuthMailer` unchanged. */
+  pack: MailPack;
   /** The sign-in path the "password changed" notice points at. `/login`. */
   loginPath?: string;
   /** Where links point when no origin variable is set. Dev's own server. */

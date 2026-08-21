@@ -1,6 +1,4 @@
 {
-  "packages/auth/src/server/mail-templates.ts": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
-  "packages/auth/src/server/messages.ts": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
   "packages/mcp/src/guide.ts": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
   "packages/mcp/src/react/ai-capabilities.tsx": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
   "packages/mcp/src/react/ai-connection-utils.ts": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
