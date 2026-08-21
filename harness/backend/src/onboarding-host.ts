@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { PGlite } from '@electric-sql/pglite';
 import { onboardingRouter } from '@12-apps/onboarding/hono';
+import { PT_BR_ONBOARDING_MESSAGES, PT_BR_ONBOARDING_UNAUTHENTICATED } from '@12-apps/onboarding/server';
 import type { OnboardingPrisma } from '@12-apps/onboarding/server';
 
 import { onboardingDb } from './onboarding-db';
@@ -61,6 +62,9 @@ export async function reseedOnboarding(pg: PGlite): Promise<void> {
 
 export function onboardingHost(pg: PGlite) {
   return onboardingRouter({
+    // Required host copy — the refusal sentences and the router's 401.
+    messages: PT_BR_ONBOARDING_MESSAGES,
+    unauthenticatedMessage: PT_BR_ONBOARDING_UNAUTHENTICATED,
     db: async () => onboardingDb(pg) as unknown as OnboardingPrisma,
     featureKeys: ONBOARDING_FEATURES,
     // The harness is not production, and the DEV-only reset is one of the three

@@ -41,3 +41,4 @@ export type {
   OnboardingStateSnapshot,
   OnboardingStatus,
 } from "../types";
+export { PT_BR_ONBOARDING_MESSAGES, PT_BR_ONBOARDING_UNAUTHENTICATED } from './pt-BR';

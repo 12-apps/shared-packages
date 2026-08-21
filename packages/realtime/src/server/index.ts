@@ -80,3 +80,4 @@ export {
   type EventsSurfaceConfig,
   type EventsTopicSpec,
 } from "./types";
+export { PT_BR_EVENTS_MESSAGES } from "./pt-BR";
