@@ -87,20 +87,45 @@ check(
   `the label is consent to CUT the major, not to publish it unreviewed.\n    Lines:\n    ${labelled.lines}`,
 );
 
-// ── The silent one: `!`, which this preset cannot read ──────────────────────
+// ── The `!` shorthand, which is now a major like any other ──────────────────
+//
+// It used to be the SILENT one: the angular headerPattern rejects `!`, so
+// `fix(prisma)!:` parsed to no type and released nothing at all — it was once
+// the only commit in range for five packages and released none of them. Every
+// `.releaserc.json` now overrides the parser so the shorthand cuts a major,
+// which means the guard has to gate it exactly like a footer rather than warn
+// about it. `scripts/release-bump-selftest.mjs` holds the parser end.
 const bang = run({ PR_TITLE: "fix(prisma)!: correct the migration order" });
 check(
-  "the `!` shorthand fails, because it releases NOTHING under the angular preset",
-  bang.failed && bang.lines.join(" ").includes("NOT release"),
-  `\`fix(prisma)!:\` on main was the only commit in range for five packages and\n    ` +
-    `released none of them, silently. Lines:\n    ${bang.lines}`,
+  "the `!` shorthand needs consent, because it now cuts a MAJOR",
+  bang.failed && bang.lines.join(" ").includes("allow-major"),
+  `\`!\` and a footer say the same thing, so they are gated the same way.\n    ` +
+    `Lines:\n    ${bang.lines}`,
 );
 
 check(
-  "and allow-major does not excuse it, because it is not a major — it is nothing",
-  run({ PR_TITLE: "fix(prisma)!: correct the migration order", PR_LABELS: "allow-major" }).failed,
-  `the label says "yes, cut the major"; this header cuts no release at all, so\n    ` +
-    `the label cannot be consent to it`,
+  "and it never repeats the old advice that `!` releases nothing",
+  !/NOT release|no release at all|worth no release/i.test(bang.lines.join(" ")),
+  `that advice was true against the angular preset and is now exactly backwards:\n    ` +
+    `following it would have someone strip the \`!\` from a real major.\n    Lines:\n    ${bang.lines}`,
+);
+
+check(
+  "it names the `!`, not a footer the author never wrote",
+  /`!`/.test(bang.lines.join(" ")) && !/remove the footer/.test(bang.lines.join(" ")),
+  `"remove the footer" is unfollowable for someone who wrote \`feat(x)!:\` — the\n    ` +
+    `message has to name the syntax actually used. Lines:\n    ${bang.lines}`,
+);
+
+const bangAllowed = run({
+  PR_TITLE: "fix(prisma)!: correct the migration order",
+  PR_LABELS: "allow-major",
+});
+check(
+  "allow-major excuses a `!` exactly as it excuses a footer",
+  !bangAllowed.failed && bangAllowed.lines.join(" ").includes("release-major"),
+  `the label is consent to CUT the major; the environment is consent to PUBLISH\n    ` +
+    `it. Both apply whichever syntax declared it. Lines:\n    ${bangAllowed.lines}`,
 );
 
 // ── Multi-commit PRs ────────────────────────────────────────────────────────

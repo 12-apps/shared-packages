@@ -7,13 +7,21 @@
 // choices are "approve" or "leave the package unreleased". Here the message can
 // simply be reworded.
 //
-// WHAT ACTUALLY CUTS A MAJOR HERE is the `BREAKING CHANGE:` footer, not the `!`
-// shorthand. `.releaserc.json` runs the ANGULAR preset, whose headerPattern does
-// not accept `!` — so `fix(prisma)!: …` does not parse AT ALL and is worth NO
-// release rather than the major its author intended. Both are reported, with
-// opposite advice, because both are failures of the same expectation and the
-// second one is silent: the commit merges, CI is green, and the package on npm
-// simply does not have the change.
+// TWO SYNTAXES CUT A MAJOR HERE, and they are equals: a `BREAKING CHANGE:`
+// footer, and the `!` shorthand in the header. Both are gated the same way,
+// because both say the same thing.
+//
+// `!` did not always work. The angular preset's headerPattern is
+// `^(\w*)(?:\((.*)\))?: (.*)$` — a `!` before the colon makes the whole header
+// fail to parse, so `fix(prisma)!: …` came out with no type at all and
+// @semantic-release/commit-analyzer returned NO RELEASE: not the major its
+// author intended, not even a patch. It merged, CI was green, and the package
+// on npm simply did not have the change. Every `.releaserc.json` now overrides
+// `parserOpts.headerPattern` and `parserOpts.breakingHeaderPattern` so the
+// shorthand parses and raises a breaking note, which is what makes the two
+// syntaxes interchangeable. `scripts/release-bump-selftest.mjs` asserts that
+// against the real analyzer and the committed config, so this comment cannot
+// quietly stop being true.
 //
 // A footer is anchored to the start of a line — exactly the test
 // conventional-commits-parser applies. A sentence that merely MENTIONS a
@@ -58,7 +66,11 @@ export function labelsOf(env = process.env) {
 }
 
 /**
- * What this PR would do, as `{ breaking, bang, allowed }`.
+ * What this PR would do, as `{ breaking, bang, footer, allowed }`.
+ *
+ * `breaking` is the union: either syntax cuts a major, so either one needs
+ * consent. `bang` and `footer` are kept apart only so the message can name
+ * which one the author wrote.
  *
  * `breaking` reads the commit BODIES and the title alike. GitHub squashes with
  * COMMIT_OR_PR_TITLE — the single commit's subject when there is one commit and
@@ -70,48 +82,62 @@ export function inspect(env = process.env) {
   const { title, bodies } = messagesOf(env);
   const all = [title, ...bodies];
 
+  const footer = all.some((message) => BREAKING_FOOTER.test(message));
+  const bang = all.some((message) => BANG_HEADER.test(message.split("\n")[0] ?? ""));
+
+  return { breaking: footer || bang, bang, footer, allowed: labelsOf(env).includes(ESCAPE_LABEL) };
+}
+
+/**
+ * How to NAME the declaration, and how to undo it.
+ *
+ * Split out so the advice can be specific: "remove the footer" is unfollowable
+ * for someone who wrote `feat(x)!:` and never typed a footer, and the reverse
+ * sends a footer author hunting for a `!` that is not there.
+ */
+function phrasing(bang, footer) {
+  if (bang && footer) {
+    return {
+      declaration: "a `!` in the header and a `BREAKING CHANGE:` footer",
+      undo: "drop the `!` and remove the footer — either one alone still cuts the major",
+    };
+  }
+  if (bang) return { declaration: "a `!` in the header", undo: "drop the `!`" };
   return {
-    breaking: all.some((message) => BREAKING_FOOTER.test(message)),
-    bang: all.some((message) => BANG_HEADER.test(message.split("\n")[0] ?? "")),
-    allowed: labelsOf(env).includes(ESCAPE_LABEL),
+    declaration: "a `BREAKING CHANGE:` footer",
+    undo:
+      "remove the footer (a line that merely MENTIONS a breaking change still " +
+      "counts when it starts the line — the body wrap can put it there)",
   };
 }
 
 /** The lines to print, and whether to fail. Pure, so the selftest can read it. */
 export function report(env = process.env) {
-  const { breaking, bang, allowed } = inspect(env);
+  const { breaking, bang, footer, allowed } = inspect(env);
   const lines = [];
   let failed = false;
 
-  if (bang) {
-    lines.push(
-      "::error::A `!` breaking-change shorthand will NOT release this package at all. " +
-        ".releaserc.json runs the angular preset, whose headerPattern rejects `!`, so the " +
-        "header does not parse and the commit is worth no release. Use a `BREAKING CHANGE:` " +
-        "footer in the body instead.",
-    );
-    failed = true;
-  }
+  const { declaration, undo } = phrasing(bang, footer);
 
   if (breaking && !allowed) {
     lines.push(
-      `::error::This pull request carries a \`BREAKING CHANGE:\` footer, so merging it cuts a ` +
-        `MAJOR. Consumers pin @12-apps/* exactly, so a major is a migration someone has to ` +
-        `schedule — not a number. If that is intended, add the \`${ESCAPE_LABEL}\` label and ` +
-        `re-run. If it is not, remove the footer (a line that merely MENTIONS a breaking ` +
-        `change still counts when it starts the line — the body wrap can put it there).`,
+      `::error::This pull request carries ${declaration}, so merging it cuts a MAJOR. ` +
+        `Consumers pin @12-apps/* exactly, so a major is a migration someone has to ` +
+        `schedule — not a number. If that is intended, add the \`${ESCAPE_LABEL}\` label ` +
+        `and re-run. If it is not, ${undo}.`,
     );
     failed = true;
   }
 
   if (breaking && allowed) {
     lines.push(
-      `::notice::Major release intended — \`${ESCAPE_LABEL}\` is set. It still needs approval ` +
-        `in the \`release-major\` environment after merge.`,
+      `::notice::Major release intended — \`${ESCAPE_LABEL}\` is set, declared by ` +
+        `${declaration}. It still needs approval in the \`release-major\` environment ` +
+        `after merge.`,
     );
   }
 
-  if (!breaking && !bang) lines.push("::notice::No breaking change declared — this PR cuts no major");
+  if (!breaking) lines.push("::notice::No breaking change declared — this PR cuts no major");
 
   return { lines, failed };
 }
