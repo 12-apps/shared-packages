@@ -174,3 +174,19 @@ read the same way:
 ```ts
 import { fillCard, payCard, reachPayment, VALID_CPF } from '@12-apps/payments-e2e';
 ```
+
+## Why there is a 2.0.0 with no breaking change
+
+There isn't one. The 2.x line was opened deliberately, by a commit carrying a
+`BREAKING CHANGE:` footer and changing nothing else, to prove that the
+`release-major` environment actually holds a major for a human.
+
+That gate had been detecting majors correctly and then approving them itself,
+because the environment carried no required reviewers — a protection rule is
+configured in repository settings, so nothing in this repo could show whether
+it was set. The only honest test was a real major, and this package is where it
+costs least: nothing consumes it, in this repository or in any host.
+
+Read the version as "the gate was exercised here", not as an API change. The
+port, the globs and the exported gestures are the same as 1.x, so an upgrade
+is a version bump and no code edit.
