@@ -18,6 +18,20 @@ import type {
 import { applyStubChargeFault } from './stub-fault';
 
 /**
+ * The charge description a provider is sent, capped at that provider's own
+ * limit (Stripe 350, Stone 255, InfinitePay 120, PagBank 64 — each measured
+ * from its API docs, and each the reason this cannot simply be one constant).
+ *
+ * Four adapters composed this line themselves before FUT-760's doctrine
+ * reached them, so there were four chances for one to drift; now there is one,
+ * and the words in it are the host's.
+ */
+export function chargeDescription(input: ChargeInput, maxLength: number): string {
+  const written = input.description?.trim();
+  return (written && written.length > 0 ? written : input.reference).slice(0, maxLength);
+}
+
+/**
  * Internal helpers shared by the provider adapters.
  *
  * Every adapter's STUB mode is fully functional (deterministic fakes, zero
