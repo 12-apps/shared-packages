@@ -88,6 +88,25 @@ describe('@12-apps/realtime — every published subpath resolves', () => {
     expect(typeof parity.DEFAULT_SILENT_BASELINE).toBe('string');
   });
 
+  it('./jobs — the outbox blueprints', async () => {
+    const jobs = await import('@12-apps/realtime/jobs');
+    expect(jobs.REALTIME_JOBS.namespace).toBe('realtime');
+    expect(typeof jobs.REALTIME_JOBS.blueprints.outboxDrain.handle).toBe('function');
+    expect(typeof jobs.REALTIME_JOBS.blueprints.outboxPurge.handle).toBe('function');
+  });
+
+  it('./manifest/server — the server capabilities', async () => {
+    const server = await import('@12-apps/realtime/manifest/server');
+    expect(typeof server.createWireApiEvents).toBe('function');
+    expect(server.realtimeServerManifest.name).toBe('@12-apps/realtime');
+  });
+
+  it('./manifest/web — the browser surface', async () => {
+    const web = await import('@12-apps/realtime/manifest/web');
+    expect(web.realtimeWebManifest.name).toBe('@12-apps/realtime');
+    expect(typeof web.realtimeWebManifest.surface.create).toBe('function');
+  });
+
   it('./package.json — the manifest, and it declares every subpath above', async () => {
     const manifest = (await import('@12-apps/realtime/package.json')) as unknown as {
       default: { exports: Record<string, string>; bin: Record<string, string> };
@@ -96,9 +115,13 @@ describe('@12-apps/realtime — every published subpath resolves', () => {
       '.',
       './gateway',
       './hono',
+      './jobs',
       // The wiring declaration (pure data: identity + env), pinned by
-      // wiring's producer assertions in packages/realtime's own suite.
+      // wiring's producer assertions in packages/realtime's own suite —
+      // the server/web halves beside it carry the runnable capabilities.
       './manifest',
+      './manifest/server',
+      './manifest/web',
       './package.json',
       './parity',
       './react',
