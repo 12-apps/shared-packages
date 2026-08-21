@@ -10,10 +10,10 @@
  * and none of those is reachable from an engine call. The axis that leaked
  * was the axis that was never varied.
  *
- * So this suite MOUNTS both published surfaces, with the package's own
- * defaults in place (there is nothing here to override them with, which is the
- * point) and a vocabulary sharing zero words with the application this package
- * was extracted from:
+ * So this suite MOUNTS both published surfaces, passing the pt-BR packs the
+ * way a pt-BR host would (copy is REQUIRED config now — there are no defaults
+ * left to leak) and a vocabulary sharing zero words with the application this
+ * package was extracted from:
  *
  *   - the framework-neutral descriptors, through the real Hono adapter, over
  *     real HTTP requests;
@@ -35,9 +35,11 @@ import type { ComparisonTier, OpenPlanRequest } from '../plan-wire';
 import type { PlanChangeRequestPort } from '../server/routes';
 import { entitlementsRouter } from '../hono/index';
 import { createPlanImpact } from '../server/plan-impact';
+import { PT_BR_ENTITLEMENTS_MESSAGES } from '../server/pt-BR';
 import { createWebEntitlements } from '../react/create-web-entitlements';
+import { PT_BR_ENTITLEMENTS_WEB_COPY } from '../react/pt-BR';
 import { raiseUpsell } from '../react/upsell-channel';
-import { withEntitlement } from '../react/with-entitlement';
+import { createWithEntitlement } from '../react/with-entitlement';
 import { EntitlementsProvider } from '../react/context';
 import type { EntitlementSnapshot } from '../core/types';
 
@@ -156,6 +158,7 @@ function mountHall(options: { permissions?: readonly string[]; used?: number } =
     formatPrice,
     comparison,
     planChangeRequests: leads,
+    messages: PT_BR_ENTITLEMENTS_MESSAGES,
     resolveActor: () => ({
       tenantId: TENANT,
       userId: 'maestro-1',
@@ -295,6 +298,7 @@ describe('the mounted SERVER surface speaks only the hall’s vocabulary', () =>
     const impact = createPlanImpact<Feature, 'scores' | 'invites', PlanKey>({
       plans: PLANS,
       defaultPlanKey: 'ensemble',
+      messages: PT_BR_ENTITLEMENTS_MESSAGES,
       surfaces: {
         scores: { feature: 'scores.library', label: 'partituras' },
         invites: { feature: 'soloist.invites', label: 'convites' },
@@ -317,6 +321,7 @@ describe('the mounted WEB surface speaks only the hall’s vocabulary', () => {
       apiBase: '/api/halls/hall-1',
       fetchImpl: hall.fetchImpl,
       canRequestPlanChange: true,
+      copy: PT_BR_ENTITLEMENTS_WEB_COPY,
       switchLocation: (feature) =>
         feature === 'programme.read' ? { path: '/ajustes/programa', label: 'Ajustes › Programa' } : null,
       plansPath: '/planos',
@@ -350,7 +355,9 @@ describe('the mounted WEB surface speaks only the hall’s vocabulary', () => {
       apiBase: '/api/halls/hall-1',
       fetchImpl: hall.fetchImpl,
       canRequestPlanChange: true,
+      copy: PT_BR_ENTITLEMENTS_WEB_COPY,
     });
+    const withEntitlement = createWithEntitlement(PT_BR_ENTITLEMENTS_WEB_COPY.pageLock);
     const Locked = withEntitlement('rehearsal.recording', () => <div>the recordings</div>);
 
     const { container } = render(
@@ -377,6 +384,7 @@ describe('the mounted WEB surface speaks only the hall’s vocabulary', () => {
       apiBase: '/api/halls/hall-1',
       fetchImpl: hall.fetchImpl,
       canRequestPlanChange: false,
+      copy: PT_BR_ENTITLEMENTS_WEB_COPY,
       switchLocation: () => ({ path: '/ajustes/programa', label: 'Ajustes › Programa' }),
     });
     render(<UpsellHost />);

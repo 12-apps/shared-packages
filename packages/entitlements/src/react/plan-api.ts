@@ -23,13 +23,16 @@ interface PlanApi {
  * descriptors produce, and is unwrapped here; error bodies are never
  * enveloped, so the failure path reads `error` off the bare body.
  */
-async function readJson<T>(response: Response): Promise<T> {
+async function readJson<T>(
+  response: Response,
+  requestFailed: (context: { status: number }) => string,
+): Promise<T> {
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
     const message =
       body !== null && typeof body.error === 'string'
         ? body.error
-        : `Falha na requisição (${response.status}).`;
+        : requestFailed({ status: response.status });
     throw new Error(message);
   }
   const envelope = (await response.json()) as { data: T } | null;
@@ -39,9 +42,19 @@ async function readJson<T>(response: Response): Promise<T> {
   return (envelope?.data ?? null) as T;
 }
 
-export function createPlanApi(apiBase: string, fetchImpl: typeof fetch): PlanApi {
+/**
+ * @param requestFailed What a failed call says when the server sent no
+ * sentence of its own — REQUIRED, the host's words (the surface passes its
+ * equally required `copy.requestFailed`). The old fallback was one
+ * application's Portuguese, and the only string in this file.
+ */
+export function createPlanApi(
+  apiBase: string,
+  fetchImpl: typeof fetch,
+  requestFailed: (context: { status: number }) => string,
+): PlanApi {
   const request = async <T>(path: string, init?: RequestInit): Promise<T> =>
-    readJson<T>(await fetchImpl(`${apiBase}${path}`, init));
+    readJson<T>(await fetchImpl(`${apiBase}${path}`, init), requestFailed);
   return {
     getPlan: () => request('/plan'),
     getOpenRequest: () => request('/plan/request'),

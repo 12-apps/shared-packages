@@ -4,15 +4,18 @@
  * sentences a customer actually reads. The whole reason both halves live in
  * one package is that neither the machine half nor the human half may drift.
  *
- * The sentences are this SURFACE's own, and they name nothing outside it: not
- * a tier, not a currency, and not what a tenant is (they used to say "da
- * loja", one host's word for its customers).
+ * The sentences are the HOST's (required `messages`); this suite passes the
+ * pt-BR pack and pins that the mapping puts each of its sentences on the
+ * right status — and that they name nothing outside the surface: not a tier,
+ * not a currency, and not what a tenant is (they used to say "da loja", one
+ * host's word for its customers).
  */
 import { describe, expect, it } from 'vitest';
 
 import { EntitlementRequiredError, QuotaExceededError } from '../../core/errors';
 import type { EntitlementDecision, QuotaDecision } from '../../core/types';
-import { entitlementDenialResponse, PAYMENT_REQUIRED_MESSAGE } from '../wire';
+import { PT_BR_ENTITLEMENTS_MESSAGES } from '../pt-BR';
+import { entitlementDenialResponse } from '../wire';
 
 function decision(over: Partial<EntitlementDecision<string>>): EntitlementDecision<string> {
   return {
@@ -30,6 +33,7 @@ describe('entitlementDenialResponse', () => {
   it('answers a plan gap with 402 — the human sentence beside the machine half', () => {
     const denial = entitlementDenialResponse(
       new EntitlementRequiredError('t1', decision({})),
+      PT_BR_ENTITLEMENTS_MESSAGES,
     );
     expect(denial.status).toBe(402);
     expect(denial.body).toEqual({
@@ -39,9 +43,9 @@ describe('entitlementDenialResponse', () => {
       reason: 'not-entitled',
       requiredPlan: 'network',
     });
-    // The exported constant IS the sentence — a host reusing it must get the
+    // The pack's key IS the sentence — a host reusing the pack must get the
     // same words the routes produce.
-    expect(denial.body.error).toBe(PAYMENT_REQUIRED_MESSAGE);
+    expect(denial.body.error).toBe(PT_BR_ENTITLEMENTS_MESSAGES.paymentRequired);
   });
 
   it("answers the tenant's own switch with 409 and its own sentence — never a payment problem", () => {
@@ -50,6 +54,7 @@ describe('entitlementDenialResponse', () => {
         't1',
         decision({ reason: 'disabled-by-tenant', requiredPlan: null }),
       ),
+      PT_BR_ENTITLEMENTS_MESSAGES,
     );
     expect(denial.status).toBe(409);
     expect(denial.body).toEqual({
@@ -64,6 +69,7 @@ describe('entitlementDenialResponse', () => {
         't1',
         decision({ reason: 'not-supported', requiredPlan: null }),
       ),
+      PT_BR_ENTITLEMENTS_MESSAGES,
     );
     expect(denial.status).toBe(404);
     expect(denial.body).toEqual({ error: 'Recurso indisponível.' });
@@ -76,7 +82,10 @@ describe('entitlementDenialResponse', () => {
       remaining: 0,
       exceeded: true,
     };
-    const denial = entitlementDenialResponse(new QuotaExceededError('t1', quota));
+    const denial = entitlementDenialResponse(
+      new QuotaExceededError('t1', quota),
+      PT_BR_ENTITLEMENTS_MESSAGES,
+    );
     expect(denial.status).toBe(402);
     expect(denial.body).toEqual({
       error: 'Este recurso não está incluído no seu plano.',

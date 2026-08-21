@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { TenantPlanPayload } from '../../plan-wire';
 import { createWebEntitlements } from '../create-web-entitlements';
+import { PT_BR_ENTITLEMENTS_WEB_COPY } from '../pt-BR';
 import { raiseUpsell } from '../upsell-channel';
 import type { WebEntitlementsConfig } from '../web-config';
 
@@ -63,6 +64,7 @@ function mountHost(over: Partial<WebEntitlementsConfig> = {}, host = fakeHost())
     apiBase: '/api/admin/acme',
     fetchImpl: host.fetchImpl,
     canRequestPlanChange: true,
+    copy: PT_BR_ENTITLEMENTS_WEB_COPY,
     plansPath: '/acme/planos',
     switchLocation: () => ({ path: '/acme/alertas', label: 'Ajustes › Alertas' }),
     ...over,

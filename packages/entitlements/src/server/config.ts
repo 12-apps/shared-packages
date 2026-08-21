@@ -25,6 +25,7 @@ import type {
   UsageCounter,
 } from '../core/types';
 import type { ComparisonTier } from '../plan-wire';
+import type { EntitlementsMessages } from './copy';
 import type { PricingRow } from './plan-view';
 import type { PlanChangeRequestPort } from './routes';
 
@@ -93,6 +94,13 @@ export interface ApiEntitlementsConfig<F extends string, K extends string> {
    * that is a default rather than an assumption about the host.
    */
   planRequestPermission?: string;
+  /**
+   * Every sentence this surface answers with — REQUIRED, the host's words,
+   * exactly like `formatPrice` is the host's money: the refusals, the denial
+   * bodies, the plan screen's situation notes, and the adapter's 401. pt-BR
+   * hosts pass `PT_BR_ENTITLEMENTS_MESSAGES` from `./pt-BR`.
+   */
+  messages: EntitlementsMessages;
 }
 
 /** A wiring mistake in the HOST's configuration of this surface. */
@@ -111,6 +119,11 @@ function failConfig(message: string): never {
 /** `''`, `'   '` and a non-string all read as "not answered". */
 function isBlank(value: unknown): boolean {
   return typeof value !== 'string' || value.trim() === '';
+}
+
+/** An object field that was not answered at all (plain-JS hosts included). */
+function isMissing(value: unknown): boolean {
+  return value === undefined || value === null;
 }
 
 /**
@@ -255,6 +268,13 @@ export function assertApiEntitlementsConfig<F extends string, K extends string>(
     failConfig(
       '`formatPrice` is required. This package words a price it is handed but must ' +
         'not decide whose money it is — the removed default spelled Brazilian Reais.',
+    );
+  }
+  if (isMissing(config.messages)) {
+    failConfig(
+      '`messages` is required. Every sentence this surface answers with is the ' +
+        "host's — the removed defaults spelled one product's Portuguese. Pass " +
+        'PT_BR_ENTITLEMENTS_MESSAGES for the original copy, or your own.',
     );
   }
   if (config.comparison !== undefined && typeof config.comparison !== 'function') {
