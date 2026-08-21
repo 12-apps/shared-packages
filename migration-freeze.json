@@ -64,5 +64,6 @@
   "packages/report-builder/prisma/migrations/20260810160000_report_default_range_month/migration.sql": "43e26a5966c4115e4981bb70ff1c6602f396016986f5badca1718991482d2472",
   "packages/report-builder/prisma/migrations/20260810180000_add_report_working_copy/migration.sql": "7bf10a19f0da1a7a734f10e3be0eaaaf3121896723f72df446e770dc0714912d",
   "packages/shift/prisma/migrations/20260730210000_add_shifts/migration.sql": "4c647d92314f7b8f1b34e78403e5f55867492cd3d95bbec964a09ca728f962f0",
-  "packages/shift/prisma/migrations/20260731210000_shift_delete_guard/migration.sql": "e1e78eeb8bfe81323003b996c02123a59566348af9cd0c874b29af5d9ecd1c1f"
+  "packages/shift/prisma/migrations/20260731210000_shift_delete_guard/migration.sql": "e1e78eeb8bfe81323003b996c02123a59566348af9cd0c874b29af5d9ecd1c1f",
+  "packages/shift/prisma/migrations/20260821120000_shift_kind_host_vocabulary/migration.sql": "462ac12ba1466bcfbf258bf6e162bc02dd169e21a77021ff8128698382ac3bdb"
 }
