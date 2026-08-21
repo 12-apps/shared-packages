@@ -58,6 +58,14 @@ export {
 
 export { comboRequirementsForScope, toComboColumns, type ComboColumns } from "./validate-combo";
 
+export {
+  fromTargetRows,
+  toTargetRows,
+  type DiscountComboSlotRow,
+  type DiscountTargetRow,
+  type DiscountTargetRows,
+} from "./targets";
+
 export { discountSearchConfig } from "./search";
 
 export {

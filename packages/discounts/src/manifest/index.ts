@@ -13,17 +13,28 @@
  * (`__tests__/manifest.test.ts`) — the same "fails in the package's own test
  * run" guarantee with zero runtime dependencies added.
  *
- * ## Two capabilities this package deliberately does NOT declare
+ * ## The `db` capability, and what had to change to earn it
  *
- * **`db`.** A discount's rows relate to a host's own catalog and orders:
- * targets point at its categories and items, redemptions at its orders and
- * buyers. A `composed` partial may in principle relate to host models, but one
- * shipped from here would only compile inside a host that already has those
- * tables under those names — and `isolated` is ruled out by the same
- * relations, which is exactly the qualification the wiring db contract states
- * ("a package qualifies only when its models carry no relation into host
- * tables"). What is portable is the RULE, not the storage: the host owns the
- * schema and answers `DiscountStore`.
+ * This manifest used to declare none, on the reasoning that a discount's rows
+ * relate to a host's own catalog: a partial literally naming `product_categories`
+ * and `menu_items` only compiles inside a host that has tables under those
+ * names. That half was right. The half that was not is the conclusion — the
+ * shape was not a given.
+ *
+ * `@12-apps/entity-lifecycle` had already solved it in this repo and written
+ * the answer at the top of its own partial: name the record BY VALUE. Applied
+ * here, the two target join tables collapse into one `discount_targets` keyed
+ * `(target_type, target_id)`, the tenant becomes a scalar `client_id`, and
+ * WHICH collections are discountable becomes a runtime `DiscountableCollection`
+ * registration rather than a schema fact. Nothing in the partial names a host
+ * table, so `composed` qualifies on the contract's own terms.
+ *
+ * What stays behind is the REDEMPTION snapshot (`order_discounts`): a child of
+ * the host's order, with a cascade, whose whole purpose is to freeze what a
+ * buyer received on an order the host owns. Shipping the rule and leaving the
+ * receipt is the clean cut.
+ *
+ * ## The capability this package still does NOT declare
  *
  * **`web`.** The admin grid, the form and the target pickers stay host
  * surfaces for now. They are three quarters product copy and host design
@@ -55,5 +66,14 @@ export const discountsManifest = {
    * undeclared one, because it reads as finished.
    */
   observability: { namespace: "discounts" },
+  /**
+   * `composed`, not `isolated`. The models carry no relation into host tables,
+   * which is the qualification isolation asks for — but isolation costs the
+   * seam, and this is the one package where that cost is unpayable: the
+   * redemption counter is incremented INSIDE the host's PAID confirmation
+   * transaction, and a rule whose counter cannot move in the same transaction
+   * as the order that redeemed it is a rule that can be redeemed twice.
+   */
+  db: { partial: "prisma/discounts.prisma", migrations: "prisma/migrations" },
   server: ["http"],
 } as const satisfies PackageManifest;

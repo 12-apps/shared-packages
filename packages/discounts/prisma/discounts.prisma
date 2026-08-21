@@ -1,0 +1,181 @@
+// ---------------------------------------------------------------------------
+// @12-apps/discounts — CANONICAL Prisma model partial (plug-and-play).
+//
+// The single source of truth for the three tables a promotions surface owns. A
+// host does NOT copy these models into its schema by hand: it uses Prisma's
+// multi-file schema folder and SYNCS this file into it
+// (`scripts/sync-discounts-schema.mjs`), then discovers the migrations beside
+// it structurally.
+//
+// Host-agnostic by design, and this is the whole reason the shape differs from
+// the origin's:
+//
+//   - The TENANT is a by-value `client_id` scalar — no relation to the host's
+//     tenant model, whose name this package cannot know.
+//   - A TARGET is named BY VALUE via (target_type, target_id) — no FK into the
+//     host's catalog tables, so any collection plugs in with zero schema change
+//     here. That replaces one join table per dimension, which is what made the
+//     old shape unshippable: a partial literally naming `product_categories`
+//     and `menu_items` only compiles inside a host that has tables under those
+//     names. Which collections are discountable is answered at RUNTIME by a
+//     `DiscountableCollection` registration (`src/server/collections.ts`), not
+//     by the schema.
+//   - `type` / `scope` / `trigger` / `target_type` are Strings; the migration
+//     adds the CHECK constraints for the closed sets `src/engine/kinds.ts`
+//     declares. Those arrays and these CHECKs are two halves of ONE set.
+//
+// WHAT THE HOST STILL OWNS: the REDEMPTION snapshot (`order_discounts`). It is
+// a child of the host's own order with a cascade, and its whole purpose is to
+// freeze what a buyer received on an order the host owns. Shipping the rule and
+// leaving the receipt behind is the clean cut.
+//
+// WHAT THE BY-VALUE TARGET COSTS, stated plainly: this schema no longer
+// guarantees that deleting a category cannot leave a discount pointing at a
+// ghost. Three things carry that instead — the evaluator already tolerates an
+// unmatched target (it simply covers nothing), `DiscountableOps.ownsAll`
+// refuses a foreign or missing id on every write, and a host that wants the
+// constraint back may add it in its own migration.
+// ---------------------------------------------------------------------------
+
+// The rule itself: what it takes off, from what, when, and how often.
+//
+// `usage_count` is the live redemption counter, incremented inside the host's
+// PAID confirmation transaction by a predicated UPDATE. That predicate is what
+// makes `usage_count <= usage_limit` an invariant the CHECK can assert; a plain
+// read-then-write under READ COMMITTED would lose increments and break it.
+model Discount {
+  id                   String    @id @default(uuid())
+  // BY VALUE — no relation to the host's tenant model. Every read and every
+  // write carries it: a discount is a direct lever on what a buyer is charged,
+  // so a query that forgot its tenant would let one store reprice another's.
+  clientId             String    @map("client_id")
+  name                 String
+  // PERCENTAGE | FIXED_AMOUNT | BUNDLE_PRICE | FREE_UNITS (CHECK in migration).
+  type                 String
+  // Basis points off, 1..10000. Set iff type = PERCENTAGE.
+  percentOffBp         Int?      @map("percent_off_bp")
+  // Cents off. Set iff type = FIXED_AMOUNT. Clamped at application time to what
+  // is left, so it can never credit the buyer.
+  amountOffCents       Int?      @map("amount_off_cents")
+  // The matched combo group costs exactly this. Set iff type = BUNDLE_PRICE.
+  bundlePriceCents     Int?      @map("bundle_price_cents")
+  // The cheapest N units of the matched group are free. Set iff type =
+  // FREE_UNITS, and always fewer than the units one application requires — a
+  // combo that gives away everything it asks for sells nothing.
+  freeUnits            Int?      @map("free_units")
+  // How many times one cart may claim this combo. NULL = as often as it matches.
+  maxComboApplications Int?      @map("max_combo_applications")
+  // ORDER | CATEGORY | ITEM | COMBO (CHECK in migration). ORDER carries no
+  // targets; CATEGORY/ITEM resolve through `discount_targets`; COMBO resolves by
+  // MATCHING the cart against its quantified slots.
+  scope                String
+  // AUTOMATIC | CODE (CHECK in migration).
+  trigger              String
+  // The coupon the buyer types, upper-cased and unmasked. Non-null iff
+  // trigger = CODE. Unique per tenant among LIVE rows only — see the note below.
+  code                 String?
+  // Active window, half-open [starts_at, ends_at): `ends_at` is EXCLUSIVE, so
+  // an operator setting midnight of the next day means exactly that. Null on
+  // either side = open-ended.
+  startsAt             DateTime? @map("starts_at")
+  endsAt               DateTime? @map("ends_at")
+  // Minimum PRE-DISCOUNT cart subtotal, in cents. Always compared against the
+  // untouched subtotal, never a running total — which is what makes the result
+  // independent of the order the discounts are applied in.
+  minSubtotalCents     Int?      @map("min_subtotal_cents")
+  // Redemptions allowed across every buyer, and per buyer. Null = no cap.
+  usageLimit           Int?      @map("usage_limit")
+  perBuyerLimit        Int?      @map("per_buyer_limit")
+  usageCount           Int       @default(0) @map("usage_count")
+  // When false this rule stacks with nothing: if it wins it is the only one
+  // applied to the order ("best single discount wins").
+  stackable            Boolean   @default(true)
+  // The operator's on/off switch, ORTHOGONAL to `archived_at` (deleted) and to
+  // the window (scheduled).
+  active               Boolean   @default(true)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  // Change attribution: the host's user id, by value, nullable for system rows.
+  createdBy            String?   @map("created_by")
+  updatedBy            String?   @map("updated_by")
+  // Accent/case-insensitive search key over `name`, written by the host.
+  searchName           String?   @map("search_name")
+  // Soft delete. A non-null timestamp hides the rule from every live read while
+  // its redemption history and its counter survive. Null = live.
+  archivedAt           DateTime? @map("archived_at")
+
+  targets   DiscountTarget[]
+  comboSlots DiscountComboSlot[]
+
+  // NO @@unique here, and that is an honest declaration rather than an
+  // omission. The tenant uniques on (client_id, name) and (client_id, code)
+  // exist in the database as PARTIAL indexes, both `WHERE archived_at IS NULL`.
+  // Prisma cannot express a filtered unique, and declaring an unconditional one
+  // here would be a lie the generated client acts on: it would expose a
+  // `clientId_code` findUnique the index cannot serve.
+  //
+  // Partial because deleting is a SOFT archive: an unconditional unique lets a
+  // soft-deleted coupon squat its code forever, so an operator could never
+  // recreate a code they had deleted. Live rows still own one name and one code
+  // per tenant; archived rows leave the index.
+  @@index([clientId, active, archivedAt])
+  @@map("discounts")
+}
+
+// One quantified slot of a combo: "2 units of anything in Drinks".
+//
+// A child table rather than a JSON column, for the reason the target rows are
+// rows: the slot's own targets need the same by-value shape and the same
+// reverse read, and a JSON blob would put half the combo behind a scan.
+//
+// `position` is the operator's order, which is also the order a card describes
+// the combo in — a stable order matters because two slots of the same size are
+// otherwise indistinguishable in a UI that lists them.
+model DiscountComboSlot {
+  id         String @id @default(uuid())
+  discountId String @map("discount_id")
+  position   Int
+  // Units of this slot ONE application consumes. Bounded by
+  // MAX_COMBO_SLOT_QUANTITY (CHECK in migration).
+  quantity   Int
+
+  discount Discount         @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  targets  DiscountTarget[]
+
+  @@unique([discountId, position])
+  @@map("discount_combo_slots")
+}
+
+// What a discount points at, BY VALUE.
+//
+// One table for both jobs, told apart by `slot_id`: NULL means a SCOPE target
+// (what a CATEGORY- or ITEM-scoped rule covers), non-null means the target of
+// one combo slot. One table because they are the same fact — "this rule cares
+// about this row of this collection" — and two would need every reverse read,
+// every ownership check and every cascade written twice.
+//
+// The uniques are PARTIAL (`WHERE slot_id IS NULL` / `IS NOT NULL`) and
+// therefore live only in the migration, for the same reason the tenant uniques
+// on `Discount` do: NULLs are distinct in Postgres, so one unconditional unique
+// over a nullable column would not constrain the scope rows at all.
+model DiscountTarget {
+  id         String  @id @default(uuid())
+  discountId String  @map("discount_id")
+  // NULL = a scope target. Non-null = a target of that combo slot.
+  slotId     String? @map("slot_id")
+  // CATEGORY | ITEM (CHECK in migration) — which host collection `targetId`
+  // names. Widening this set is a host registering one more
+  // `DiscountableCollection`, plus this CHECK.
+  targetType String  @map("target_type")
+  // The host row's id. No FK: see the partial's header.
+  targetId   String  @map("target_id")
+
+  discount Discount           @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  slot     DiscountComboSlot? @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  // The reverse read a menu badge does: "which rules touch this row".
+  @@index([targetType, targetId])
+  @@index([discountId])
+  @@index([slotId])
+  @@map("discount_targets")
+}

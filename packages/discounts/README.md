@@ -268,24 +268,69 @@ value** (`(target_type, target_id)`) instead of as a join table per member, and
 the registration is shaped so that widening the array plus registering one more
 collection is the whole change.
 
+## The schema travels too
+
+The package ships a **composed Prisma partial** and its migrations
+(`prisma/discounts.prisma`, `wiring.db`). A host syncs the partial into its
+schema folder and discovers the migration structurally:
+
+```bash
+pnpm --filter @12-apps/discounts prisma:sync         # copy the partial
+pnpm --filter @12-apps/discounts prisma:sync:check   # drift gate, for CI
+```
+
+Three tables — `discounts`, `discount_combo_slots`, `discount_targets` — and
+what makes them shippable at all is that **nothing in them names a host table**:
+
+| the origin had | the partial has | why |
+|---|---|---|
+| `client Client @relation(...)` | a scalar `client_id` | this package cannot know a host's tenant model's name |
+| `discount_categories` + `discount_items`, one FK each | one `discount_targets`, keyed `(target_type, target_id)` | a partial naming `product_categories` only compiles inside a host that has that table |
+| the scope's targets and a combo slot's, separately | one table, told apart by a nullable `slot_id` | they are the same fact; two tables need every reverse read, ownership check and cascade written twice |
+
+Which collections are discountable is answered at RUNTIME by a
+`DiscountableCollection` registration, not by the schema. That is the whole
+move, and it is `@12-apps/entity-lifecycle`'s, applied here.
+
+**The redemption snapshot stays with the host.** `order_discounts` is a child of
+the host's own order, with a cascade, and its purpose is to freeze what a buyer
+received on an order the host owns. Shipping the rule and leaving the receipt is
+the clean cut.
+
+**What the by-value target costs**, stated plainly: the schema no longer
+guarantees that deleting a category cannot leave a rule pointing at a ghost.
+Three things carry that instead — the evaluator already tolerates an unmatched
+target (it covers nothing), `DiscountableOps.ownsAll` refuses a foreign or
+missing id on every write, and a host that wants the constraint back may add it
+in its own migration.
+
+### The migration adopts an existing table
+
+Every statement is idempotent, because the first host to adopt this package
+already HAS a `discounts` table from its own, earlier migration — and a package
+migration sorts AFTER the host's by name, so a bare `CREATE TABLE` would fail
+`migrate deploy` on every database that already has one. A fresh host gets
+everything; an existing host gets only what it is missing (the three combo
+columns, the two new tables, and the widened `type`/`scope`/value CHECKs);
+replaying the whole folder is a no-op.
+
+It deliberately does NOT move a host's existing target rows into
+`discount_targets`. Only that host knows what its catalog tables are called, so
+backfilling and dropping the old join tables is one migration in the host,
+written once, sorting after this one.
+
+`src/prisma/__tests__/migration.test.ts` applies the SQL to real Postgres
+(PGlite) in all three situations — 17 cases, including the partial uniques, both
+cascades, and the CHECK widening a schema diff cannot see.
+
 ## What the host still owns
 
-**The database.** A discount's rows relate to a host's own catalog and orders —
-targets point at its categories and items, redemptions at its orders and its
-buyers — so neither wiring `db` mode qualifies and the manifest declares none.
-The host owns the schema, the tenant scoping, the transactions and the
-uniqueness conflicts, and answers the `DiscountStore` port. What travels is the
-RULE, not the storage.
-
-Combos add three nullable columns to that table — `bundle_price_cents`,
-`free_units`, `max_combo_applications` — and one child table for the slots, each
-row carrying a quantity plus its own product and category id lists. `DiscountWrite`
-hands a store exactly that: the columns on `scalars`, the slots on
-`targets.comboRequirements`, already validated and narrowed to the scope. A host
-that does not sell combos adds nothing: the fields are optional on everything
-this package asks a host to BUILD (`DiscountRule`, `DiscountRecord`) and
-complete on everything it PRODUCES, so adopting the version that introduced them
-is a no-op until a `COMBO`-scoped row exists.
+**Persistence itself.** The package owns the schema; the host owns the client,
+the tenant scoping, the transactions and the uniqueness conflicts, and answers
+the `DiscountStore` port. `toTargetRows` / `fromTargetRows` do the fold between
+the id arrays this package speaks and the by-value rows the schema stores, so a
+store stays persistence and nothing else — that mapping is exactly where a
+dropped `slotId` produces a combo whose slots have silently merged.
 
 **Every sentence a human reads.** `DiscountRejectionCopy` (buyer-facing) and
 `DiscountsServerCopy` (operator-facing) are required config with **no

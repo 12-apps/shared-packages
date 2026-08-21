@@ -34,6 +34,7 @@
     "20260813180000_add_realtime_outbox",
     "20260819230000_auth_email_password",
     "20260820120000_add_user_feature_grants",
-    "20260821120000_shift_kind_host_vocabulary"
+    "20260821120000_shift_kind_host_vocabulary",
+    "20260821140000_discounts_package_owned"
   ]
 }
