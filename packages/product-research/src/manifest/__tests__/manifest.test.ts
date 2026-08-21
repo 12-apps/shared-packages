@@ -14,6 +14,7 @@ import {
 } from '@12-apps/wiring/producer';
 
 import packageJson from '../../../package.json';
+import { createApiProductResearch, PT_BR_RESEARCH_MESSAGES } from '../../http';
 import { RESEARCH_JOBS } from '../../jobs';
 import { productResearchManifest } from '../index';
 import { productResearchServerManifest } from '../server';
@@ -26,20 +27,68 @@ describe('the shared manifest', () => {
     );
   });
 
-  it('declares the package identity and the one runtime capability', () => {
+  it('declares the package identity and the two runtime capabilities', () => {
     expect(productResearchManifest.name).toBe('@12-apps/product-research');
     expect(productResearchManifest.contract).toBe(1);
-    expect(productResearchManifest.server).toEqual(['jobs']);
+    expect(productResearchManifest.server).toEqual(['http', 'jobs']);
     expect(productResearchManifest.observability).toEqual({ namespace: 'product-research' });
-    // Library-with-ports: no route descriptors, no createApi* factory — the
-    // origin host's research routes are host code over the ports.
+    // No web surface, no packaged journeys, zero process.env reads.
     expect(productResearchManifest).not.toHaveProperty('web');
-    // Host-authored tools over host-mounted routes; with no http capability
-    // a declared tool path would guess at the host's URL space.
-    expect(productResearchManifest).not.toHaveProperty('mcp');
-    expect(productResearchManifest).not.toHaveProperty('permissions');
     expect(productResearchManifest).not.toHaveProperty('e2e');
     expect(productResearchManifest).not.toHaveProperty('env');
+  });
+
+  it('contributes its two permission ids, and every route declares one of them', () => {
+    expect(productResearchManifest.permissions?.ids).toEqual(['research:read', 'research:write']);
+    const { routes } = createApiProductResearch({
+      store: {} as never,
+      checks: {} as never,
+      credentials: {} as never,
+      messages: PT_BR_RESEARCH_MESSAGES,
+      connectors: { isMounted: () => false, types: () => [], credentialFieldsFor: () => undefined },
+    });
+    expect(routes).toHaveLength(16);
+    for (const route of routes) {
+      expect(['research:read', 'research:write']).toContain(route.permission);
+    }
+    // The history LISTING stays host code (its query grammar is the host's
+    // search-grid config), so the GET beside the declared start POST is
+    // deliberately absent here.
+    expect(
+      routes.some((route) => route.method === 'GET' && route.path === '/research'),
+    ).toBe(false);
+  });
+
+  it('declares MCP tools only for operations whose whole wire contract it states', () => {
+    const ids = productResearchManifest.mcp?.endpoints.map((tool) => tool.operationId);
+    expect(ids).toEqual([
+      'startResearch',
+      'getResearchRequest',
+      'getResearchRun',
+      'listManualPrices',
+      'importManualPrices',
+      'addManualQuote',
+    ]);
+    // Reads are marked; the start spends outbound calls beyond the host's data.
+    const byId = new Map(productResearchManifest.mcp?.endpoints.map((tool) => [tool.operationId, tool]));
+    expect(byId.get('getResearchRun')?.annotations).toEqual({ readOnly: true });
+    expect(byId.get('startResearch')?.annotations).toEqual({ openWorld: true });
+  });
+
+  it('declares the budget blueprint, phrased by the pt-BR pack the origin host uses', () => {
+    const blueprint = productResearchManifest.notifications?.[0];
+    expect(blueprint?.type).toBe('research.budget-exhausted');
+    expect(blueprint?.category).toBe('system');
+    const content = blueprint?.generate({
+      scope: 'TENANT_DAY',
+      sourceType: 'SERP',
+      period: '2026-08-21',
+      capUnits: 5,
+      tenantSlug: 'acme',
+    } as never);
+    expect(content?.title).toBe('Cota diária de busca paga esgotada');
+    expect(content?.link).toBe('/admin/acme/research');
+    expect(content?.data).toMatchObject({ scope: 'TENANT_DAY', capUnits: 5 });
   });
 
   it('declares the Prisma contribution prisma:sync actually copies', () => {
