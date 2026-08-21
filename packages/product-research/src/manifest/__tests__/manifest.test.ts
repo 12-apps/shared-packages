@@ -14,7 +14,9 @@ import {
 } from '@12-apps/wiring/producer';
 
 import packageJson from '../../../package.json';
-import { createApiProductResearch, PT_BR_RESEARCH_MESSAGES } from '../../http';
+import { createApiProductResearch } from '../../http';
+import { createResearchBudgetBlueprint } from '../../notifications';
+import { PT_BR_RESEARCH_BUDGET_COPY, PT_BR_RESEARCH_MESSAGES } from '../../pt-BR';
 import { RESEARCH_JOBS } from '../../jobs';
 import { productResearchManifest } from '../index';
 import { productResearchServerManifest } from '../server';
@@ -75,20 +77,21 @@ describe('the shared manifest', () => {
     expect(byId.get('startResearch')?.annotations).toEqual({ openWorld: true });
   });
 
-  it('declares the budget blueprint, phrased by the pt-BR pack the origin host uses', () => {
-    const blueprint = productResearchManifest.notifications?.[0];
-    expect(blueprint?.type).toBe('research.budget-exhausted');
-    expect(blueprint?.category).toBe('system');
-    const content = blueprint?.generate({
+  it('ships the budget blueprint as a factory — no static pt-BR default in the manifest', () => {
+    expect(productResearchManifest).not.toHaveProperty('notifications');
+    const blueprint = createResearchBudgetBlueprint(PT_BR_RESEARCH_BUDGET_COPY);
+    expect(blueprint.type).toBe('research.budget-exhausted');
+    expect(blueprint.category).toBe('system');
+    const content = blueprint.generate({
       scope: 'TENANT_DAY',
       sourceType: 'SERP',
       period: '2026-08-21',
       capUnits: 5,
       tenantSlug: 'acme',
     } as never);
-    expect(content?.title).toBe('Cota diária de busca paga esgotada');
-    expect(content?.link).toBe('/admin/acme/research');
-    expect(content?.data).toMatchObject({ scope: 'TENANT_DAY', capUnits: 5 });
+    expect(content.title).toBe('Cota diária de busca paga esgotada');
+    expect(content.link).toBe('/admin/acme/research');
+    expect(content.data).toMatchObject({ scope: 'TENANT_DAY', capUnits: 5 });
   });
 
   it('declares the Prisma contribution prisma:sync actually copies', () => {

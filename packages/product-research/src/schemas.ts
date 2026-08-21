@@ -189,14 +189,14 @@ export const importManualPricesBody = z
       .string()
       .trim()
       .refine((value) => !Number.isNaN(new Date(value).getTime()), {
-        message: 'Data de validade inválida.',
+        message: 'invalid validUntil date',
       })
       .optional(),
     /** Supplier for rows without one; the source's name when absent. */
     defaultSupplierName: z.string().trim().min(1).max(160).optional(),
   })
   .refine((body) => body.rows !== undefined || body.csv !== undefined, {
-    message: 'Envie rows ou csv.',
+    message: 'rows or csv required',
   });
 
 /** Body for a one-off typed quote (phone/WhatsApp) — one row, appended. */

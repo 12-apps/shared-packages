@@ -13,9 +13,10 @@
  * descriptor with one of the two), so a host adopting the http capability
  * composes the ids from the same place the routes come from.
  *
- * Labels are pt-BR, matching the copy the origin host's role editor already
- * shows — and overridable per host the same way every segment label is.
- * Only the segments these ids use.
+ * The declaration carries NO label words: segment labels are host copy, so
+ * the pt-BR vocabulary ships as `PT_BR_RESEARCH_PERMISSION_LABELS` in the
+ * `./pt-BR` named pack, for a host to compose beside this contribution by
+ * hand — a line in its diff, never a silent default.
  */
 
 /** Twin of the wiring contract's `WirePermissionSpec` (kind required). */
@@ -29,7 +30,7 @@ export interface ResearchPermissionsContribution {
   readonly source: string;
   readonly ids: readonly string[];
   readonly permissions: Readonly<Record<string, ResearchPermissionSpec>>;
-  readonly labels: {
+  readonly labels?: {
     readonly domains?: Readonly<Record<string, string>>;
     readonly actions?: Readonly<Record<string, string>>;
   };
@@ -43,9 +44,5 @@ export const PRODUCT_RESEARCH_PERMISSIONS: ResearchPermissionsContribution = {
     'research:read': { kind: 'class' },
     /** Start researches; configure sources, keys and integrations. */
     'research:write': { kind: 'class' },
-  },
-  labels: {
-    domains: { research: 'Pesquisa de preços' },
-    actions: { read: 'Ver', write: 'Editar' },
   },
 };

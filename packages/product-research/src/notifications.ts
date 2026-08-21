@@ -13,10 +13,13 @@
  * that single winner emits.
  *
  * The words and the CTA link are HOST copy, so the blueprint is built by a
- * factory taking them; `PT_BR_RESEARCH_BUDGET_COPY` is the origin host's
- * pack, verbatim, and `RESEARCH_NOTIFICATIONS` (what the manifest declares)
- * is the blueprint built with it — a host with other words builds its own
- * through the same factory and feeds it to its notifications mount.
+ * factory taking them — the same carve-out the MCP capability documents for
+ * vocabulary-dependent tools. The manifest therefore declares NO static
+ * `notifications` capability: a blueprint pre-worded here would be a silent
+ * pt-BR default, the exact anti-pattern the copy gate refuses. A host calls
+ * {@link createResearchBudgetBlueprint} with its words (`./pt-BR` ships the
+ * origin host's pack) and feeds the result to its notifications mount — a
+ * line in the host's diff, which is the point.
  */
 
 /** Which limit was hit — the two scopes the spend counters track. */
@@ -58,25 +61,6 @@ export interface ResearchBudgetCopy {
   link(payload: ResearchBudgetPayload): string;
 }
 
-/** The origin host's pack, verbatim. */
-export const PT_BR_RESEARCH_BUDGET_COPY: ResearchBudgetCopy = {
-  title: (payload) =>
-    payload.scope === 'TENANT_DAY'
-      ? 'Cota diária de busca paga esgotada'
-      : 'Orçamento mensal de busca paga esgotado',
-  body: (payload) => {
-    const tail =
-      'As pesquisas continuam funcionando com as fontes gratuitas; ' +
-      'a busca paga volta automaticamente no próximo período.';
-    return payload.scope === 'TENANT_DAY'
-      ? `A loja atingiu a cota diária de ${payload.capUnits} busca(s) paga(s) ` +
-          `(${payload.sourceType}) em ${payload.period}. ${tail}`
-      : `A plataforma atingiu o orçamento mensal de ${payload.capUnits} busca(s) paga(s) ` +
-          `(${payload.sourceType}) em ${payload.period}. ${tail}`;
-  },
-  link: (payload) => `/admin/${payload.tenantSlug}/research`,
-};
-
 /**
  * Build the blueprint with a host's copy. `category` suggests "system" — an
  * operational platform notice, not an order/payment/stock event — and stays
@@ -101,8 +85,3 @@ export function createResearchBudgetBlueprint(
     }),
   };
 }
-
-/** What the shared manifest declares: the blueprint with the pt-BR pack. */
-export const RESEARCH_NOTIFICATIONS: readonly ResearchNotificationBlueprint[] = [
-  createResearchBudgetBlueprint(PT_BR_RESEARCH_BUDGET_COPY),
-];

@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   createApiProductResearch,
-  PT_BR_RESEARCH_MESSAGES,
   type ResearchApiConfig,
   type ResearchHttpStore,
   type ResearchRoute,
 } from '../http';
+import { PT_BR_RESEARCH_MESSAGES } from '../pt-BR';
 
 /**
  * The sixteen descriptors, driven the way a host adapter drives them. The
