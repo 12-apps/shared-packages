@@ -15,6 +15,7 @@ import {
 import type { WireJobContext } from '@12-apps/wiring';
 
 import packageJson from '../../../package.json';
+import { createApiShift } from '../../http';
 import { SHIFT_JOBS } from '../../jobs';
 import { shiftManifest } from '../index';
 import { shiftServerManifest } from '../server';
@@ -25,17 +26,35 @@ describe('the shared manifest', () => {
     expect(defineServerManifest(shiftManifest, shiftServerManifest)).toBe(shiftServerManifest);
   });
 
-  it('declares the package identity and the one runtime capability', () => {
+  it('declares the package identity and the two runtime capabilities', () => {
     expect(shiftManifest.name).toBe('@12-apps/shift');
     expect(shiftManifest.contract).toBe(1);
-    expect(shiftManifest.server).toEqual(['jobs']);
+    expect(shiftManifest.server).toEqual(['http', 'jobs']);
     expect(shiftManifest.observability).toEqual({ namespace: 'shift' });
-    // No http: this package exports a SERVICE, not route descriptors — the
-    // origin host's shift routes are host code over it. No web either.
+    // The routes carry no policy on purpose — which permission gates a close
+    // depends on the BODY's mode, so guards stay in the host's adapter and
+    // the ids stay host vocabulary. No web, no packaged journeys either.
     expect(shiftManifest).not.toHaveProperty('web');
     expect(shiftManifest).not.toHaveProperty('mcp');
     expect(shiftManifest).not.toHaveProperty('permissions');
     expect(shiftManifest).not.toHaveProperty('e2e');
+  });
+
+  it('inventories http as createApiShift, and its routes declare no policy', () => {
+    expect(shiftServerManifest.http.create).toBe(createApiShift);
+    const { routes } = createApiShift({
+      shifts: {} as never,
+      serialize: () => null,
+    });
+    expect(routes.map((route) => `${route.method} ${route.path}`)).toEqual([
+      'GET /shifts',
+      'POST /shifts',
+      'PATCH /shifts/:shiftId',
+    ]);
+    for (const route of routes) {
+      expect(route).not.toHaveProperty('permission');
+      expect(route).not.toHaveProperty('entitlement');
+    }
   });
 
   it('declares the Prisma contribution prisma:sync actually copies', () => {
