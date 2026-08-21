@@ -4,7 +4,7 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import { DEFAULT_MAX_UPLOAD_BYTES, megabytes } from '../limits';
-import type { WebStorageMessages } from './failures';
+import type { WebStorageMessageContext, WebStorageMessages } from './failures';
 import { ImageField, type ImageFieldProps } from './image-field';
 import type { ImageProfile } from './optimize-image';
 import { useUpload, type UploadState, type UseUploadConfig } from './use-upload';
@@ -33,13 +33,14 @@ export interface WebStorageConfig {
   /** How requests are made. Default: same-origin `fetch`. */
   fetchImpl?: typeof fetch;
   /**
-   * pt-BR refusal copy overrides, mirroring the server mount's `messages`.
-   *
-   * Override `forbidden` to name YOUR reason: the package states only that the
-   * account may not upload, because `mayUpload` is one host-computed boolean and a
-   * package that named a role model would be wrong for every host but the first.
+   * Every sentence this surface renders — REQUIRED, the host's own factory of
+   * the mount's ceiling, mirroring the server mount's `messages` (pt-BR
+   * hosts: `PT_BR_WEB_STORAGE_MESSAGES` from `./pt-BR`). Write `forbidden` to
+   * name YOUR reason: the package states only that the account may not
+   * upload, because `mayUpload` is one host-computed boolean and a package
+   * that named a role model would be wrong for every host but the first.
    */
-  messages?: Partial<WebStorageMessages>;
+  messages: (context: WebStorageMessageContext) => WebStorageMessages;
 }
 
 export interface WebStorage {
@@ -60,7 +61,7 @@ export function createWebStorage(config: WebStorageConfig): WebStorage {
     maxBytes,
     ...(config.profile ? { profile: config.profile } : {}),
     ...(config.fetchImpl ? { fetchImpl: config.fetchImpl } : {}),
-    ...(config.messages ? { messages: config.messages } : {}),
+    messages: config.messages,
   };
   const useBoundUpload = (): UploadState => useUpload(uploadConfig);
 
@@ -75,17 +76,16 @@ export function createWebStorage(config: WebStorageConfig): WebStorage {
    */
   function UploadPage(): JSX.Element {
     const [imageKey, setImageKey] = useState<string | null>(null);
+    const messages = config.messages({ limit: megabytes(maxBytes) });
     return (
       <Stack spacing={2} data-testid="storage-upload-page">
-        <Text as="h2">Imagens da loja</Text>
-        <Text as="p">
-          {`Envie um PNG, JPG, WebP ou GIF de até ${megabytes(maxBytes)}.`}
-        </Text>
+        <Text as="h2">{messages.pageTitle}</Text>
+        <Text as="p">{messages.pageIntro}</Text>
         <BoundImageField
           value={imageKey}
           onChange={setImageKey}
-          label="Foto do produto"
-          helperText="A imagem é reduzida no navegador antes do envio."
+          label={messages.fieldLabel}
+          helperText={messages.fieldHelper}
         />
       </Stack>
     );

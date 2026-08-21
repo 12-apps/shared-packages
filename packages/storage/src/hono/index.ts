@@ -38,8 +38,13 @@ export type ResolveStorageActor = (
 
 export interface StorageHonoConfig extends ApiStorageConfig {
   resolveActor: ResolveStorageActor;
-  /** 401 body message. pt-BR by default, like every other refusal here. */
-  unauthenticatedMessage?: string;
+  /**
+   * The 401 body's sentence when `resolveActor` answers null — REQUIRED, the
+   * host's words (pt-BR hosts: `PT_BR_STORAGE_UNAUTHENTICATED` from
+   * `../pt-BR`). The old default was the same silent leak every other surface
+   * here just paid down.
+   */
+  unauthenticatedMessage: string;
 }
 
 export interface StorageHono extends ApiStorage {
@@ -67,7 +72,7 @@ function send(c: Context, response: StorageRouteResponse): Response {
 export function storageRouter(config: StorageHonoConfig): StorageHono {
   const { resolveActor, unauthenticatedMessage, ...apiConfig } = config;
   const api = createApiStorage(apiConfig);
-  const unauthenticated = unauthenticatedMessage ?? 'Não autenticado.';
+  const unauthenticated = unauthenticatedMessage;
   const router = new Hono();
 
   for (const route of api.routes) {

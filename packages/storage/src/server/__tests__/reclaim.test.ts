@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PT_BR_STORAGE_MESSAGES } from "../../pt-BR";
 
 import { DEFAULT_MAX_UPLOAD_BYTES } from '../../limits';
 import { CATALOG_RENDITIONS } from '../../renditions';
@@ -43,6 +44,7 @@ function harness(
   const memory = memoryDriver();
   const sink = recordingLogger();
   const mounted = createApiStorage({
+    messages: PT_BR_STORAGE_MESSAGES,
     driver: memory,
     maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
     imagePipeline: fakePipeline(),

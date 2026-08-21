@@ -1,7 +1,7 @@
 import { ACCEPTED_CONTENT_TYPES } from '../content-types';
 import { DEFAULT_KEY_PREFIX } from '../keys';
 import { megabytes } from '../limits';
-import { defaultStorageMessages, type StorageMessages } from '../problems';
+import type { StorageMessageContext, StorageMessages } from '../problems';
 import { CATALOG_RENDITIONS, type RenditionSpec } from '../renditions';
 import { imageSources, objectUrl, versionedObjectUrl, type ImageSources } from '../urls';
 import { inlineImageSchema, objectKeySchema, type InlineImage } from '../wire';
@@ -94,8 +94,13 @@ export interface ApiStorageConfig {
   renditions?: readonly RenditionSpec[];
   /** Top-level key segment. Default `products`. */
   keyPrefix?: string;
-  /** pt-BR refusal copy overrides. */
-  messages?: Partial<StorageMessages>;
+  /**
+   * The sentence each refusal is stated in — REQUIRED, the host's words. A
+   * factory of the mount's own context so a host that raises `maxBytes`
+   * cannot end up with copy naming the old ceiling. pt-BR hosts pass
+   * `PT_BR_STORAGE_MESSAGES` from `../pt-BR`.
+   */
+  messages: (context: StorageMessageContext) => StorageMessages;
 }
 
 /** What the mount reports about itself — the anti-drift surface. */
@@ -167,10 +172,7 @@ const SILENT: StorageLogger = { error: () => undefined };
 export function createApiStorage(config: ApiStorageConfig): ApiStorage {
   const specs = config.renditions ?? CATALOG_RENDITIONS;
   const keyPrefix = config.keyPrefix ?? DEFAULT_KEY_PREFIX;
-  const messages: StorageMessages = {
-    ...defaultStorageMessages({ limit: megabytes(config.maxBytes) }),
-    ...config.messages,
-  };
+  const messages: StorageMessages = config.messages({ limit: megabytes(config.maxBytes) });
   const writeDeps: StoreImageDeps = {
     driver: config.driver,
     pipeline: config.imagePipeline,
