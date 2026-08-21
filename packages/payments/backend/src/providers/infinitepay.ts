@@ -30,7 +30,7 @@ import {
 export { STUB_OUTCOME_FIELD } from './infinitepay-stub';
 import { checkSnapshot, isPaidCheck } from './infinitepay-shared';
 import { infinitePayDeliveryReference, parseInfinitePayEvent, verifyInfinitePayWebhook } from './infinitepay-webhook';
-import { stubCharge, stubChargeId, stubPendingSnapshot } from './shared';
+import { chargeDescription, stubCharge, stubChargeId, stubPendingSnapshot } from './shared';
 
 /**
  * InfinitePay adapter — live against the Checkout Integrado API.
@@ -70,7 +70,7 @@ import { stubCharge, stubChargeId, stubPendingSnapshot } from './shared';
 function itemsPayload(input: ChargeInput): Array<Record<string, unknown>> {
   return [
     {
-      description: `Pedido ${input.reference}`.slice(0, 120),
+      description: chargeDescription(input, 120),
       price: input.amount.amountCents,
       quantity: 1,
     },
