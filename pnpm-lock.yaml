@@ -306,6 +306,9 @@ importers:
       '@12-apps/wiring':
         specifier: workspace:*
         version: link:../wiring
+      '@electric-sql/pglite':
+        specifier: ^0.2.17
+        version: 0.2.17
       '@types/node':
         specifier: ^22.10.6
         version: 22.20.1
@@ -1029,6 +1032,9 @@ importers:
       '@12-apps/auth':
         specifier: workspace:*
         version: link:../auth
+      '@12-apps/discounts':
+        specifier: workspace:*
+        version: link:../discounts
       '@12-apps/entitlements':
         specifier: workspace:*
         version: link:../entitlements
