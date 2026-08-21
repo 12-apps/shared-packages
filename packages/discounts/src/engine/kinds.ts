@@ -88,6 +88,48 @@ export const DISCOUNT_TRIGGERS = ["AUTOMATIC", "CODE"] as const;
 export type DiscountTrigger = (typeof DISCOUNT_TRIGGERS)[number];
 
 /**
+ * Where a rule sits relative to its window RIGHT NOW.
+ *
+ * A derived fact rather than a stored one — it is `startsAt`/`endsAt` compared
+ * against an instant, so storing it would mean a column that is wrong between
+ * the moment a promotion starts and the next time something wrote to it.
+ *
+ * The values are English wire tokens on purpose. They are read in three places
+ * that must agree — an admin grid's filter pill, the query the backend
+ * receives, and the badge on a row — and the moment one of those three is a
+ * word in a language, the set stops being a set: the origin host filtered on
+ * `Vigente`, so its pill values WERE its pt-BR labels, and a second host in
+ * another language could not use its own words without changing the wire.
+ * Labels come from the web copy pack; these do not.
+ */
+export const DISCOUNT_WINDOW_STATES = ["RUNNING", "SCHEDULED", "ENDED"] as const;
+export type DiscountWindowState = (typeof DISCOUNT_WINDOW_STATES)[number];
+
+/**
+ * Which of the three a rule is in, at `now`.
+ *
+ * Domain logic rather than presentation, which is why it lives beside the
+ * vocabulary and not in the web surface: the badge on a row and the filter the
+ * backend applies must answer this the same way, and two implementations of
+ * "has it ended" is how a grid shows a rule as running on a row the filter
+ * excludes.
+ *
+ * The window is half-open `[startsAt, endsAt)` — `endsAt` is EXCLUSIVE, so a
+ * promotion ends the instant its end date begins.
+ */
+export function discountWindowState(
+  rule: { startsAt: Date | string | null; endsAt: Date | string | null },
+  now: Date,
+): DiscountWindowState {
+  const instant = now.getTime();
+  const starts = rule.startsAt === null ? null : new Date(rule.startsAt).getTime();
+  const ends = rule.endsAt === null ? null : new Date(rule.endsAt).getTime();
+  if (starts !== null && starts > instant) return "SCHEDULED";
+  if (ends !== null && ends <= instant) return "ENDED";
+  return "RUNNING";
+}
+
+/**
  * Why a discount the buyer explicitly asked for was not applied. Only ever
  * surfaced for a coupon the buyer typed or for a promo displaced by an
  * exclusive one — a failing AUTOMATIC discount is silently skipped, because a

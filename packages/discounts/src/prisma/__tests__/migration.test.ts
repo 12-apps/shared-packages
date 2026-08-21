@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { PGlite } from "@electric-sql/pglite";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { DISCOUNT_SCOPES, DISCOUNT_TARGET_TYPES, DISCOUNT_TYPES } from "../../engine/kinds";
 
@@ -41,6 +41,24 @@ import { DISCOUNT_SCOPES, DISCOUNT_TARGET_TYPES, DISCOUNT_TYPES } from "../../en
    `const`. The long literals are table and column names, which is what a schema
    assertion is made of. Reads only, and an in-memory database that exists for
    the length of one case. */
+
+/**
+ * Every case here boots its own PGlite and applies the whole migration folder
+ * to it — real Postgres, from nothing, seventeen times. That is ~700ms on an
+ * idle machine and comfortably over vitest's 5s default on the two-core runner
+ * that runs the whole workspace at once: the suite passes alone and times out
+ * in CI, on the FIRST case, which reads as a broken migration rather than a
+ * slow one.
+ *
+ * The budget is raised per FILE rather than per package, because it buys
+ * nothing anywhere else: this is the only suite in `@12-apps/discounts` that
+ * touches a database, and every other one answers in milliseconds. `shift`
+ * raises `hookTimeout` for the same reason and keeps the test budget tight —
+ * here the boot is deliberately inside each case (that is what makes them
+ * independent, and what the file-scoped isolation waiver above rests on), so
+ * the test budget is the one that has to move.
+ */
+vi.setConfig({ testTimeout: 60_000 });
 
 const MIGRATION = readFileSync(
   new URL("../../../prisma/migrations/20260821140000_discounts_package_owned/migration.sql", import.meta.url),

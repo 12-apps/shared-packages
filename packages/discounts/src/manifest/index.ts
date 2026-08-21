@@ -34,13 +34,20 @@
  * buyer received on an order the host owns. Shipping the rule and leaving the
  * receipt is the clean cut.
  *
- * ## The capability this package still does NOT declare
+ * ## The `web` capability, and what had to move first
  *
- * **`web`.** The admin grid, the form and the target pickers stay host
- * surfaces for now. They are three quarters product copy and host design
- * system, and a surface declared before its copy is host config is the exact
- * anti-pattern the copy-portability gate exists to refuse. The permission ids
- * and the tool schemas are enough for a host to build them against.
+ * This manifest also used to refuse `web`, and the refusal was right at the
+ * time: the screens were three quarters product copy and host design system,
+ * and a surface declared before its copy is host config is the exact
+ * anti-pattern the copy-portability gate exists to refuse.
+ *
+ * Neither half holds now. The copy IS host config — `DiscountsWebCopy`,
+ * required and defaultless, the third such port here. And what was genuinely
+ * host-grown underneath the screens — the kebab, the card context, the two
+ * confirm hooks, the server-grid hook, the row export — moved into
+ * `@12-apps/ui` and `@12-apps/app-shell` first, which is the only reason this
+ * could follow rather than dragging a private copy of an admin framework along
+ * with it.
  */
 
 import type { PackageManifest } from "@12-apps/wiring";
@@ -76,4 +83,5 @@ export const discountsManifest = {
    */
   db: { partial: "prisma/discounts.prisma", migrations: "prisma/migrations" },
   server: ["http"],
+  web: ["surface", "areas"],
 } as const satisfies PackageManifest;

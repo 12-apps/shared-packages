@@ -323,6 +323,74 @@ written once, sorting after this one.
 (PGlite) in all three situations — 17 cases, including the partial uniques, both
 cascades, and the CHECK widening a schema diff cannot see.
 
+## The admin screens travel too — `@12-apps/discounts/react`
+
+```ts
+// ONCE, at module scope. The members are component TYPES.
+export const discounts = createWebDiscounts({
+  apiBase: `/api/admin/${slug}`,
+  copy: PT_BR_DISCOUNTS_WEB_COPY,   // required, no defaults
+  locale: "pt-BR",
+  currency: "BRL",
+  currencyField: MyCurrencyField,   // currency entry is a host decision
+  onError: reportToSentry,          // required — see below
+  breadcrumb: [{ label: "Início", href: "/admin" }, { label: "Descontos" }],
+});
+
+// <discounts.Screen /> is the whole promotions admin.
+```
+
+What that one call replaces: a server-driven grid with eight columns, five
+filter pills and a CSV/JSON export; a create/edit form of fourteen inputs, four
+of which appear only when another says so; the target pickers; two card
+layouts; four confirmation popups; and every wire call between them.
+
+**Build it once, at module scope.** The members are component TYPES, so
+rebuilding per render gives React new types every time and remounts the whole
+tree below — a form then cannot be typed into, and nothing says why.
+`useWebDiscounts` is the memoised form for a genuinely dynamic mount path.
+
+### `onError` is required, and it is the browser twin of the server's logger
+
+These screens already tell the OPERATOR what went wrong. That is not the same as
+anybody knowing. A refused write, a catalog that would not load, a page read
+that failed — each reaches a person only if a host routes it somewhere, and a
+no-op default would make *nothing is broken* and *nothing is watching* look
+identical. `context` is a stable dotted token (`discounts.list`,
+`discounts.create`, `discounts.targets`) so a reporter can group on it.
+
+### One vocabulary, in English, on the wire
+
+`DISCOUNT_WINDOW_STATES` are `RUNNING` / `SCHEDULED` / `ENDED`, and the words on
+the pill come from the copy pack. They are read in three places that must agree
+— the filter pill, the query the backend receives, and the badge on a row — and
+the moment one of those is a word in a language, the set stops being a set. The
+origin filtered on `Vigente`, so its wire protocol *was* its language.
+
+`discountWindowState()` lives in the engine rather than in this surface for the
+same reason: the badge and the backend filter must answer "has it ended" the
+same way, and two implementations is how a grid shows a rule as running on a row
+the filter excludes.
+
+### What a host still supplies, and why each one
+
+| config | why it cannot be defaulted |
+|---|---|
+| `copy` | a default in one language reads as finished to the next host until a user sees it |
+| `locale` + `currency` | "12,5" is not a translation of "12.5" — it decides PARSING as much as rendering |
+| `currencyField` | masking, which side the symbol sits on, whether cents are typed — no neutral answer exists |
+| `onError` | above |
+| `breadcrumb` | the host owns its own information hierarchy |
+
+### Storybook
+
+`pnpm --filter @12-apps/discounts dev` (port 6009). Every ported component has
+stories, including the states nobody can produce on demand in a real
+environment: a refused write, a backend that will not answer, a catalog that
+failed while the grid loaded fine. The stories substitute a **transport**, not a
+stubbed client, so they exercise the real path building and envelope unwrapping
+and only the bytes are pretend.
+
 ## What the host still owns
 
 **Persistence itself.** The package owns the schema; the host owns the client,
