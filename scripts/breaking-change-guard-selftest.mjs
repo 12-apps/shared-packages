@@ -53,26 +53,51 @@ check(
     `this. Lines:\n    ${mention.lines}`,
 );
 
-// ── The real major ──────────────────────────────────────────────────────────
+// ── An ordinary breaking change: a MINOR, and not a failure ─────────────────
+//
+// These assertions are INVERTED from what they said before, deliberately. Every
+// `.releaserc.json` now maps `breaking` to `minor`, so a footer no longer spends
+// a major and must no longer block the PR. A test still demanding a failure here
+// would be pinning in place the version inflation this replaces — five majors
+// were pending at once, all of them from routine "this config is required now"
+// tightenings.
 const breaking = run({
   PR_TITLE: "feat(ui): replace the Button API",
   commits: ["feat(ui): replace the Button API\n\nBREAKING CHANGE: `kind` is replaced by `variant`."],
 });
 check(
-  "a BREAKING CHANGE footer fails the PR",
-  breaking.failed && breaking.lines.join(" ").includes("cuts a"),
-  `Lines:\n    ${breaking.lines}`,
+  "a BREAKING CHANGE footer does NOT fail the PR — it cuts a minor",
+  !breaking.failed,
+  `a required-config tightening is not a migration anyone schedules.\n    Lines:\n    ${breaking.lines}`,
+);
+
+check(
+  "and it says so, because that is the opposite of the angular default",
+  breaking.lines.join(" ").includes("MINOR"),
+  `silence would let someone who wrote the footer expecting a major discover it\n    ` +
+    `on npm instead. Lines:\n    ${breaking.lines}`,
+);
+
+// ── The real major: an explicit marker nobody types by accident ─────────────
+const major = run({
+  PR_TITLE: "feat(ui): rebuild the component API",
+  commits: ["feat(ui): rebuild the component API\n\nRELEASE-MAJOR: every component takes copy."],
+});
+check(
+  "a RELEASE-MAJOR marker fails the PR without the label",
+  major.failed && major.lines.join(" ").includes("MAJOR"),
+  `Lines:\n    ${major.lines}`,
 );
 
 check(
   "and the message says how to proceed deliberately",
-  breaking.lines.join(" ").includes("allow-major"),
-  `an error that does not name its escape hatch just blocks people. Lines:\n    ${breaking.lines}`,
+  major.lines.join(" ").includes("allow-major"),
+  `an error that does not name its escape hatch just blocks people. Lines:\n    ${major.lines}`,
 );
 
 const labelled = run({
-  PR_TITLE: "feat(ui): replace the Button API",
-  commits: ["feat(ui): replace the Button API\n\nBREAKING CHANGE: `kind` is replaced by `variant`."],
+  PR_TITLE: "feat(ui): rebuild the component API",
+  commits: ["feat(ui): rebuild the component API\n\nRELEASE-MAJOR: every component takes copy."],
   PR_LABELS: "needs-review, allow-major",
 });
 check(
@@ -87,19 +112,20 @@ check(
   `the label is consent to CUT the major, not to publish it unreviewed.\n    Lines:\n    ${labelled.lines}`,
 );
 
-// ── The `!` shorthand, which is now a major like any other ──────────────────
+// ── The `!` shorthand, which is a MINOR like any other breaking change ──────
 //
 // It used to be the SILENT one: the angular headerPattern rejects `!`, so
 // `fix(prisma)!:` parsed to no type and released nothing at all — it was once
 // the only commit in range for five packages and released none of them. Every
-// `.releaserc.json` now overrides the parser so the shorthand cuts a major,
-// which means the guard has to gate it exactly like a footer rather than warn
-// about it. `scripts/release-bump-selftest.mjs` holds the parser end.
+// `.releaserc.json` overrides the parser so the shorthand is legible, and then
+// maps `breaking` to `minor` like the footer. So `!` now means what its author
+// meant — this breaks — and spends a minor saying it.
+// `scripts/release-bump-selftest.mjs` holds the parser end.
 const bang = run({ PR_TITLE: "fix(prisma)!: correct the migration order" });
 check(
-  "the `!` shorthand needs consent, because it now cuts a MAJOR",
-  bang.failed && bang.lines.join(" ").includes("allow-major"),
-  `\`!\` and a footer say the same thing, so they are gated the same way.\n    ` +
+  "the `!` shorthand does not fail the PR — it cuts a MINOR",
+  !bang.failed && bang.lines.join(" ").includes("MINOR"),
+  `\`!\` and a footer say the same thing, so they are treated the same way.\n    ` +
     `Lines:\n    ${bang.lines}`,
 );
 
@@ -117,26 +143,29 @@ check(
     `message has to name the syntax actually used. Lines:\n    ${bang.lines}`,
 );
 
+// The marker is what the label and the environment are for now, so a `!` needs
+// neither — and must not silently acquire a major by carrying the label for some
+// other reason.
 const bangAllowed = run({
   PR_TITLE: "fix(prisma)!: correct the migration order",
   PR_LABELS: "allow-major",
 });
 check(
-  "allow-major excuses a `!` exactly as it excuses a footer",
-  !bangAllowed.failed && bangAllowed.lines.join(" ").includes("release-major"),
-  `the label is consent to CUT the major; the environment is consent to PUBLISH\n    ` +
-    `it. Both apply whichever syntax declared it. Lines:\n    ${bangAllowed.lines}`,
+  "allow-major does not turn a `!` into a major on its own",
+  !bangAllowed.failed && bangAllowed.lines.join(" ").includes("MINOR"),
+  `the label is consent to spend a major, not a declaration of one. Only the\n    ` +
+    `RELEASE-MAJOR marker declares it. Lines:\n    ${bangAllowed.lines}`,
 );
 
 // ── Multi-commit PRs ────────────────────────────────────────────────────────
 const buried = run({
   PR_TITLE: "feat(ui): several changes",
-  commits: ["feat(ui): one", "feat(ui): two\n\nBREAKING CHANGE: gone"],
+  commits: ["feat(ui): one", "feat(ui): two\n\nRELEASE-MAJOR: gone"],
 });
 check(
-  "a footer in any commit of a multi-commit PR is found",
+  "a marker in any commit of a multi-commit PR is found",
   buried.failed,
-  `the squash keeps every commit's body, so a footer anywhere in the PR lands\n    ` +
+  `the squash keeps every commit's body, so a marker anywhere in the PR lands\n    ` +
     `on main. Lines:\n    ${buried.lines}`,
 );
 

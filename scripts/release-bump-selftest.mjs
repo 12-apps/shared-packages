@@ -151,11 +151,23 @@ const context = (message) => ({
  * outage, and it would look exactly like the majors working.
  */
 const EXPECTED = [
-  ['feat(cart)!: drop the legacy port', 'major', 'the `!` shorthand, scoped'],
-  ['feat!: drop the legacy port', 'major', 'the `!` shorthand, unscoped'],
-  ['fix(cart)!: drop the legacy port', 'major', '`!` on a non-feat type'],
-  ['feat(cart): add x\n\nBREAKING CHANGE: the port is gone', 'major', 'the footer'],
-  ['feat(cart)!: both\n\nBREAKING CHANGE: gone', 'major', 'both at once'],
+  // Every way of SAYING "this breaks" now lands as a MINOR. The parserOpts above
+  // are still what makes `!` parse at all — before them the header matched
+  // nothing and the commit was worth no release, silently. What changed is only
+  // where "breaking" is spent: `releaseRules` maps it to `minor`, because a
+  // routine "this config is required now" tightening is not a migration anyone
+  // schedules, and both of these vectors are one keystroke or one line-wrap
+  // from being written by accident.
+  ['feat(cart)!: drop the legacy port', 'minor', 'the `!` shorthand, scoped'],
+  ['feat!: drop the legacy port', 'minor', 'the `!` shorthand, unscoped'],
+  ['fix(cart)!: drop the legacy port', 'minor', '`!` on a non-feat type'],
+  ['feat(cart): add x\n\nBREAKING CHANGE: the port is gone', 'minor', 'the footer'],
+  ['feat(cart)!: both\n\nBREAKING CHANGE: gone', 'minor', 'both at once'],
+
+  // The one thing that spends a major, and it has to be typed on purpose.
+  ['feat(cart): rebuild the API\n\nRELEASE-MAJOR: every port moves', 'major', 'the RELEASE-MAJOR marker'],
+  ['feat(cart)!: x\n\nRELEASE-MAJOR: deliberate', 'major', 'the marker wins over a mere `!`'],
+
   ['feat(cart): add a port', 'minor', 'an ordinary feat'],
   ['fix(cart): correct the total', 'patch', 'an ordinary fix'],
   ['chore(cart): tidy the imports', null, 'a chore, which releases nothing'],

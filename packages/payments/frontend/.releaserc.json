@@ -10,7 +10,17 @@
         "parserOpts": {
           "headerPattern": "^(\\w*)(?:\\((.*)\\))?!?: (.*)$",
           "breakingHeaderPattern": "^(\\w*)(?:\\((.*)\\))?!: (.*)$"
-        }
+        },
+        "releaseRules": [
+          {
+            "body": "*RELEASE-MAJOR*",
+            "release": "major"
+          },
+          {
+            "breaking": true,
+            "release": "minor"
+          }
+        ]
       }
     ],
     [
