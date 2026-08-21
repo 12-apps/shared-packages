@@ -18,6 +18,15 @@ export interface WiringSinks {
   routes: MountedRoute[];
   jobs: BoundJob[];
   mailers: Record<string, unknown>;
+  /**
+   * The full result of each package's `http.create(config)` call, keyed by
+   * package name — the surfaces pattern, one capability over. `bindHttp`
+   * mounts the ROUTES; a factory may return more beside them (the contract
+   * is a floor: entity-lifecycle returns `entity` and `stores`), and a host
+   * whose own code funnels through those members reads them off the
+   * aggregate with a cast, exactly as it casts `surfaces[name]`.
+   */
+  http: Record<string, unknown>;
   surfaces: Record<string, unknown>;
 }
 
@@ -72,7 +81,9 @@ export function bindHttp(
   if (typeof value.mountPath !== "string" || value.mountPath === "") {
     refuse(context, 'the "http" binding needs a non-empty mountPath.');
   }
-  const { routes } = contribution.create(value.config);
+  const created = contribution.create(value.config);
+  context.sinks.http[context.packageName] = created;
+  const { routes } = created;
   routes.forEach((route) => {
     assertRoutePolicy(context, route);
     context.sinks.routes.push({
