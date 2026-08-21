@@ -5,7 +5,7 @@ import type {
   DeclineReason,
   PaymentMethodKind,
 } from '../core/types';
-import { capturedAmountCents } from './shared';
+import { capturedAmountCents, chargeDescription } from './shared';
 import { NAME, customerType, documentDigits } from './stone-http';
 
 /**
@@ -181,7 +181,7 @@ function itemsPayload(input: ChargeInput): Array<Record<string, unknown>> {
   return [
     {
       amount: input.amount.amountCents,
-      description: `Pedido ${input.reference}`.slice(0, 255),
+      description: chargeDescription(input, 255),
       quantity: 1,
       code: input.reference,
     },

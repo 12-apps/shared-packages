@@ -48,7 +48,7 @@ async function provision(schema: string): Promise<Client> {
   await applyMigrations(admin);
   await admin.query(`
     INSERT INTO "clients" ("id") VALUES ('tenant-a');
-    INSERT INTO "users" ("id") VALUES ('cook-a'), ('cook-b');
+    INSERT INTO "users" ("id") VALUES ('tech-a'), ('tech-b');
   `);
   return admin;
 }
@@ -68,8 +68,8 @@ async function waitUntilBlocked(observer: Client): Promise<void> {
 }
 
 const TENANT = 'tenant-a';
-const RESOURCE_TYPE = 'kitchen';
-const RESOURCE_ID = 'grill';
+const RESOURCE_TYPE = 'tower';
+const RESOURCE_ID = 'tower-14';
 
 /**
  * `ShiftTransaction.lockExclusiveResource`, as the Prisma host adapter issues
@@ -126,7 +126,7 @@ async function claim(client: Client, user: string, suffix: string): Promise<void
     `INSERT INTO "shifts"
        ("id", "client_id", "user_id", "kind",
         "resource_assignment_id", "resource_type", "resource_id")
-     VALUES ($1, $2, $3, 'kitchen', $4, $5, $6)`,
+     VALUES ($1, $2, $3, 'climb', $4, $5, $6)`,
     [`shift-${suffix}`, TENANT, user, `assignment-${suffix}`, RESOURCE_TYPE, RESOURCE_ID],
   );
 }
@@ -144,14 +144,14 @@ describePostgres('shift real PostgreSQL concurrency', () => {
       await racer.query('BEGIN');
       await winner.query(`
         INSERT INTO "shifts" ("id", "client_id", "user_id", "kind")
-        VALUES ('winner', 'tenant-a', 'cook-a', 'kitchen')
+        VALUES ('winner', 'tenant-a', 'tech-a', 'climb')
       `);
 
       const racingInsert = racer
         .query(
           `
           INSERT INTO "shifts" ("id", "client_id", "user_id", "kind")
-          VALUES ('racer', 'tenant-a', 'cook-a', 'kitchen')
+          VALUES ('racer', 'tenant-a', 'tech-a', 'climb')
         `,
         )
         .then(
@@ -189,7 +189,7 @@ describePostgres('shift real PostgreSQL concurrency', () => {
       await racer.query(`SET application_name = 'shift-concurrency-racer'`);
       await winner.query('BEGIN');
       expect(await exclusivePrecheck(winner)).toBe(true);
-      await claim(winner, 'cook-a', 'a');
+      await claim(winner, 'tech-a', 'a');
 
       const racingClaim = (async (): Promise<'taken' | 'opened'> => {
         await racer.query('BEGIN');
@@ -201,7 +201,7 @@ describePostgres('shift real PostgreSQL concurrency', () => {
           await racer.query('ROLLBACK');
           return 'taken';
         }
-        await claim(racer, 'cook-b', 'b');
+        await claim(racer, 'tech-b', 'b');
         await racer.query('COMMIT');
         return 'opened';
       })();
@@ -234,7 +234,7 @@ describePostgres('shift real PostgreSQL concurrency', () => {
       await admin.query(
         `INSERT INTO "resource_assignments"
            ("id", "user_id", "client_id", "resource_type", "resource_id", "valid_from")
-         VALUES ('assignment-future', 'cook-a', $1, $2, $3, NOW() + INTERVAL '1 hour')`,
+         VALUES ('assignment-future', 'tech-a', $1, $2, $3, NOW() + INTERVAL '1 hour')`,
         [TENANT, RESOURCE_TYPE, RESOURCE_ID],
       );
 
