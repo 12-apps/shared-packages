@@ -23,6 +23,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { JSX } from 'react';
 
 import { createRbacLabels } from '../labels';
+import { PT_BR_RBAC_WEB_COPY } from '../pt-BR';
 import { RoleEditDialog } from '../team-role-dialog';
 import type { MemberWithRoles } from '../team-role-dialog';
 
@@ -44,6 +45,7 @@ function open(): JSX.Element {
       systemRoles={['OWNER', 'MANAGER', 'WAITER']}
       availableCustomRoles={['Caixa']}
       labels={createRbacLabels()}
+      copy={PT_BR_RBAC_WEB_COPY.teamRoleDialog}
       busy={false}
       error={null}
       onClose={vi.fn()}

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DEMO_CATALOG } from '../../__tests__/demo-catalog';
 
 import { createRbacLabels, groupPermissions, sodCounterpart } from '../labels';
+import { PT_BR_RBAC_WEB_COPY } from '../pt-BR';
 import { RoleForm } from '../role-form';
 import { splitRoleSelection } from '../team-screen';
 
@@ -88,6 +89,7 @@ describe('RoleForm', () => {
         permissions={FORM_PERMISSIONS}
         governance={DEMO_CATALOG.governance}
         labels={createRbacLabels(DEMO_CATALOG.labels)}
+        copy={PT_BR_RBAC_WEB_COPY.roleForm}
         initial={null}
         busy={false}
         error={null}

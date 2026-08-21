@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 
-import { createWebRbac } from '@12-apps/rbac/react';
+import { createWebRbac, PT_BR_RBAC_WEB_COPY } from '@12-apps/rbac/react';
 
 import { HARNESS_CATALOG } from '../../../backend/src/rbac-catalog';
 
@@ -32,6 +32,8 @@ import { HARNESS_CATALOG } from '../../../backend/src/rbac-catalog';
 const { page: RbacAdminSurface } = createWebRbac({
   apiBase: '/api/admin/harness',
   catalog: HARNESS_CATALOG,
+  // The screens' sentences are required host config; this host is pt-BR.
+  copy: PT_BR_RBAC_WEB_COPY,
 });
 
 export function RbacAdminPage(): JSX.Element {

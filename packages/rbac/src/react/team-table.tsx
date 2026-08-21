@@ -4,6 +4,7 @@ import { Chip } from '@12-apps/ui/data-display/Chip';
 import { Box } from '@12-apps/ui/mui/Box';
 import { Stack } from '@12-apps/ui/mui/Stack';
 
+import type { TeamRowMenuCopy, TeamTableCopy } from './copy';
 import type { RbacLabels } from './labels';
 import { RowMenu } from './team-row-menu';
 import type { MemberWithRoles } from './team-role-dialog';
@@ -12,12 +13,15 @@ import type { MemberWithRoles } from './team-role-dialog';
  * The Equipe roster rows (12-13) — split from `team-screen.tsx` so the
  * screen stays within the size gate. A plain table with the same test id the
  * origin host's grid carried (`team-grid`; rows are `tr` elements the specs
- * locate by text).
+ * locate by text); every heading and status word comes from the host's
+ * {@link TeamTableCopy}.
  */
 
 interface TeamTableProps {
   rows: MemberWithRoles[];
   labels: RbacLabels;
+  copy: TeamTableCopy;
+  menuCopy: TeamRowMenuCopy;
   canManage: boolean;
   /** The owner tier — rows whose disable/remove affordances are withheld. */
   ownerRoles: ReadonlySet<string>;
@@ -29,16 +33,16 @@ interface TeamTableProps {
 const CELL = { p: 1 } as const;
 
 export function TeamTable(props: TeamTableProps): JSX.Element {
-  const { rows, labels, canManage, ownerRoles } = props;
+  const { rows, labels, copy, canManage, ownerRoles } = props;
   return (
     <Box data-testid="team-grid" sx={{ overflowX: 'auto' }}>
       <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
         <Box component="thead">
           <Box component="tr" sx={{ textAlign: 'left' }}>
-            <Box component="th" sx={CELL}>Nome</Box>
-            <Box component="th" sx={CELL}>E-mail</Box>
-            <Box component="th" sx={CELL}>Papéis</Box>
-            <Box component="th" sx={CELL}>Status</Box>
+            <Box component="th" sx={CELL}>{copy.headers.name}</Box>
+            <Box component="th" sx={CELL}>{copy.headers.email}</Box>
+            <Box component="th" sx={CELL}>{copy.headers.roles}</Box>
+            <Box component="th" sx={CELL}>{copy.headers.status}</Box>
             <Box component="th" sx={CELL} />
           </Box>
         </Box>
@@ -56,11 +60,12 @@ export function TeamTable(props: TeamTableProps): JSX.Element {
                 </Stack>
               </Box>
               <Box component="td" sx={CELL}>
-                {member.active ? 'Ativo' : 'Desativado'}
+                {member.active ? copy.status.active : copy.status.disabled}
               </Box>
               <Box component="td" sx={CELL}>
                 <RowMenu
                   member={member}
+                  copy={props.menuCopy}
                   canManage={canManage}
                   ownerRole={ownerRoles.has(member.role)}
                   onEditRoles={() => props.onEditRoles(member)}

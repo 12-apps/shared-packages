@@ -4,15 +4,18 @@ import { Button } from '@12-apps/ui/form/Button';
 import { Box } from '@12-apps/ui/mui/Box';
 
 import type { TeamMemberWire } from './api';
+import type { TeamRowMenuCopy } from './copy';
 
 /**
  * The roster row's ⋮ menu (12-13) — plain ARIA roles so the surface needs no
  * menu library; a spec addresses it exactly as it addressed the origin host
- * kebab (`team-actions-<userId>`, `menuitem` by name).
+ * kebab (`team-actions-<userId>`, `menuitem` by name). Every item's label
+ * comes from the host's {@link TeamRowMenuCopy}.
  */
 
 interface RowMenuProps {
   member: TeamMemberWire;
+  copy: TeamRowMenuCopy;
   canManage: boolean;
   /** The roles protected from disable/remove (owner tier). */
   ownerRole: boolean;
@@ -45,7 +48,7 @@ const MENU_SX = {
 } as const;
 
 export function RowMenu(props: RowMenuProps): JSX.Element {
-  const { member, canManage, ownerRole } = props;
+  const { member, copy, canManage, ownerRole } = props;
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -89,12 +92,12 @@ export function RowMenu(props: RowMenuProps): JSX.Element {
       </Button>
       {open && (
         <Box role="menu" sx={MENU_SX}>
-          {canManage && item('Editar papéis', props.onEditRoles)}
+          {canManage && item(copy.editRoles, props.onEditRoles)}
           {canManage &&
             !ownerRole &&
-            item(member.active ? 'Desativar' : 'Ativar', props.onToggleActive)}
-          {canManage && !ownerRole && item('Remover', props.onRemove)}
-          {!canManage && item('Sem ações disponíveis', () => undefined)}
+            item(member.active ? copy.deactivate : copy.activate, props.onToggleActive)}
+          {canManage && !ownerRole && item(copy.remove, props.onRemove)}
+          {!canManage && item(copy.noActions, () => undefined)}
         </Box>
       )}
     </Box>

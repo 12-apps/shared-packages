@@ -7,6 +7,7 @@ import { DEMO_CATALOG } from '../../__tests__/demo-catalog';
 import type { RbacApiClient } from '../api';
 import { RbacProvider } from '../context';
 import { createRbacLabels } from '../labels';
+import { PT_BR_RBAC_WEB_COPY } from '../pt-BR';
 import { RolesScreen } from '../roles-screen';
 import { TeamScreen } from '../team-screen';
 
@@ -78,6 +79,9 @@ function mountRoles(api: RbacApiClient, permissions: string[]): void {
         governance={DEMO_CATALOG.governance}
         labels={createRbacLabels(DEMO_CATALOG.labels)}
         managePermission="roles:manage"
+        copy={PT_BR_RBAC_WEB_COPY.rolesList}
+        tableCopy={PT_BR_RBAC_WEB_COPY.rolesTable}
+        formCopy={PT_BR_RBAC_WEB_COPY.roleForm}
       />
     </RbacProvider>,
   );
@@ -92,6 +96,10 @@ function mountTeam(api: RbacApiClient, permissions: string[]): void {
         systemRoles={['HEAD_LIBRARIAN', 'BRANCH_LEAD', 'CLERK', 'CONSERVATOR']}
         ownerRoles={DEMO_CATALOG.governance.ownerRoles}
         managePermission="team:manage"
+        copy={PT_BR_RBAC_WEB_COPY.teamScreen}
+        tableCopy={PT_BR_RBAC_WEB_COPY.teamTable}
+        dialogCopy={PT_BR_RBAC_WEB_COPY.teamRoleDialog}
+        menuCopy={PT_BR_RBAC_WEB_COPY.teamRowMenu}
       />
     </RbacProvider>,
   );

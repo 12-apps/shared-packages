@@ -6,15 +6,18 @@ import { Box } from '@12-apps/ui/mui/Box';
 import { Stack } from '@12-apps/ui/mui/Stack';
 
 import type { RoleListRowWire } from './api';
+import type { RolesTableCopy } from './copy';
 
 /**
  * The Papéis grid rows (12-13) — split from `roles-screen.tsx` so the screen
  * stays within the size gate. A plain table with the same test ids the
- * origin host's grid carried (`roles-grid`, per-row action test ids).
+ * origin host's grid carried (`roles-grid`, per-row action test ids); every
+ * heading and action label comes from the host's {@link RolesTableCopy}.
  */
 
 interface RolesTableProps {
   rows: RoleListRowWire[];
+  copy: RolesTableCopy;
   canManage: boolean;
   onEdit(role: RoleListRowWire): void;
   onReset(role: RoleListRowWire): void;
@@ -23,12 +26,13 @@ interface RolesTableProps {
 
 const CELL = { p: 1 } as const;
 
-function permissionCount(role: RoleListRowWire): string {
-  return role.permissions === '*' ? 'todas' : String(role.permissions.length);
+function permissionCount(role: RoleListRowWire, copy: RolesTableCopy): string {
+  return role.permissions === '*' ? copy.allPermissions : String(role.permissions.length);
 }
 
 function RoleRowActions({
   role,
+  copy,
   onEdit,
   onReset,
   onDelete,
@@ -42,7 +46,7 @@ function RoleRowActions({
         dataTestId={`edit-role-${role.name}`}
         onClick={() => onEdit(role)}
       >
-        Editar
+        {copy.editAction}
       </Button>
       {role.kind === 'SYSTEM' ? (
         <Button
@@ -51,7 +55,7 @@ function RoleRowActions({
           dataTestId={`reset-role-${role.name}`}
           onClick={() => onReset(role)}
         >
-          Restaurar padrão
+          {copy.resetAction}
         </Button>
       ) : (
         <Button
@@ -60,7 +64,7 @@ function RoleRowActions({
           dataTestId={`delete-role-${role.name}`}
           onClick={() => onDelete(role)}
         >
-          Excluir
+          {copy.deleteAction}
         </Button>
       )}
     </Stack>
@@ -68,17 +72,17 @@ function RoleRowActions({
 }
 
 export function RolesTable(props: RolesTableProps): JSX.Element {
-  const { rows, canManage } = props;
+  const { rows, copy, canManage } = props;
   return (
     <Box data-testid="roles-grid" sx={{ overflowX: 'auto' }}>
       <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
         <Box component="thead">
           <Box component="tr" sx={{ textAlign: 'left' }}>
-            <Box component="th" sx={CELL}>Nome</Box>
-            <Box component="th" sx={CELL}>Descrição</Box>
-            <Box component="th" sx={CELL}>Tipo</Box>
-            <Box component="th" sx={CELL}>Permissões</Box>
-            {canManage && <Box component="th" sx={CELL}>Ações</Box>}
+            <Box component="th" sx={CELL}>{copy.headers.name}</Box>
+            <Box component="th" sx={CELL}>{copy.headers.description}</Box>
+            <Box component="th" sx={CELL}>{copy.headers.kind}</Box>
+            <Box component="th" sx={CELL}>{copy.headers.permissions}</Box>
+            {canManage && <Box component="th" sx={CELL}>{copy.headers.actions}</Box>}
           </Box>
         </Box>
         <Box component="tbody">
@@ -88,12 +92,12 @@ export function RolesTable(props: RolesTableProps): JSX.Element {
               <Box component="td" sx={CELL}>{role.description ?? '—'}</Box>
               <Box component="td" sx={CELL}>
                 <Chip
-                  label={role.kind === 'SYSTEM' ? 'Sistema' : 'Personalizado'}
+                  label={role.kind === 'SYSTEM' ? copy.kinds.system : copy.kinds.custom}
                   size="sm"
                   variant="filled"
                 />
               </Box>
-              <Box component="td" sx={CELL}>{permissionCount(role)}</Box>
+              <Box component="td" sx={CELL}>{permissionCount(role, copy)}</Box>
               {canManage && (
                 <Box component="td" sx={CELL}>
                   <RoleRowActions {...props} role={role} />

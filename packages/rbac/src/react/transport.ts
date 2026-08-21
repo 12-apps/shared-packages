@@ -24,9 +24,15 @@ async function readJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-const FALLBACK_ERROR = 'Não foi possível concluir a operação.';
-
-export function httpRbacTransport(): RbacTransport {
+/**
+ * @param fallbackError What a failed write says when the server sent no
+ * sentence of its own — REQUIRED, the host's words. `createWebRbac` already
+ * passes its (equally required) `copy.operationFailed`; only a host
+ * constructing the transport directly writes it here. The old default was one
+ * application's Portuguese, and the only string in this file the required-copy
+ * port did not cover.
+ */
+export function httpRbacTransport(fallbackError: string): RbacTransport {
   return {
     get: readJson,
     async send<T>(path: string, method: string, body?: unknown): Promise<RbacResult<T>> {
@@ -44,11 +50,11 @@ export function httpRbacTransport(): RbacTransport {
           | { data?: T; error?: string }
           | null;
         if (!response.ok) {
-          return { ok: false, error: payload?.error ?? FALLBACK_ERROR };
+          return { ok: false, error: payload?.error ?? fallbackError };
         }
         return { ok: true, data: (payload?.data ?? payload) as T };
       } catch {
-        return { ok: false, error: FALLBACK_ERROR };
+        return { ok: false, error: fallbackError };
       }
     },
   };

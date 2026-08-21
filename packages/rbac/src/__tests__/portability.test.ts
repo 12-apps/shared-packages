@@ -29,6 +29,7 @@ import type { RoleAssignment, RoleDef } from '../core/types';
 import { validateGrant, type GovernanceCatalog } from '../governance';
 import { RBAC_PERMISSIONS } from '../permissions';
 import { createApiRbac } from '../server/create-api-rbac';
+import { PT_BR_RBAC_MESSAGES } from '../server/pt-BR';
 import { createFakeRbacDb, enrolMember } from '../server/__tests__/fake-db';
 
 // ── The blog's own catalog (nothing shared with any other host) ─────────────
@@ -330,6 +331,10 @@ function mountBlog() {
     // states them — in words the package has never heard of.
     adminRoles: ['SITE_OWNER', 'STAFF_ADMIN', 'SUPERADMIN'],
     customerRole: 'SUBSCRIBER',
+    // Copy is required config too — nothing here asserts a sentence, so the
+    // blog reuses the named pack; what matters is that the choice is a line
+    // in ITS wiring, not a default it never saw.
+    messages: PT_BR_RBAC_MESSAGES,
     directory: {
       getUsers: async (ids) =>
         ids.flatMap((id) => {

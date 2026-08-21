@@ -8,7 +8,6 @@ export { createApiRbac, type ApiRbac } from './create-api-rbac';
 
 export {
   GLOBAL_SCOPE,
-  DEFAULT_MESSAGES,
   DEFAULT_GATE_PERMISSIONS,
   RbacApiError,
   ok,
@@ -30,6 +29,7 @@ export {
   type RbacUserDirectory,
   type RbacUserIdentity,
 } from './context';
+export { PT_BR_RBAC_MESSAGES } from './pt-BR';
 
 export {
   isUniqueViolation,

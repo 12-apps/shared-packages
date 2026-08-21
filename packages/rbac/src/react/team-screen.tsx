@@ -8,6 +8,12 @@ import { Alert } from '@12-apps/ui/data-display/Alert';
 import { useCan } from './context';
 
 import type { RbacApiClient, TeamContextWire } from './api';
+import type {
+  TeamRoleDialogCopy,
+  TeamRowMenuCopy,
+  TeamScreenCopy,
+  TeamTableCopy,
+} from './copy';
 import type { RbacLabels } from './labels';
 import { ConfirmDialog } from './confirm-dialog';
 import { SearchField } from './search-field';
@@ -25,7 +31,9 @@ import { TeamTable } from './team-table';
  * `apps/admin/src/pages/team/*`: the members grid, the unified role-edit
  * dialog (in `team-role-dialog.tsx`), enable/disable and remove. Same test
  * ids (`team-grid`, `team-search-all`, `team-actions-<userId>`,
- * `role-edit-dialog`) so the e2e specs moved with the screen.
+ * `role-edit-dialog`) so the e2e specs moved with the screen. Every sentence
+ * comes from the host's {@link TeamScreenCopy} (and its table/dialog/menu
+ * siblings).
  */
 
 export { splitRoleSelection };
@@ -48,10 +56,14 @@ interface TeamScreenProps {
    */
   ownerRoles: readonly string[];
   managePermission: string;
+  copy: TeamScreenCopy;
+  tableCopy: TeamTableCopy;
+  dialogCopy: TeamRoleDialogCopy;
+  menuCopy: TeamRowMenuCopy;
 }
 
 /** The roster + context read, joined into rows with their custom roles. */
-function useTeamPage(api: RbacApiClient, query: string): {
+function useTeamPage(api: RbacApiClient, query: string, loadFailed: string): {
   rows: MemberWithRoles[] | null;
   context: TeamContextWire | null;
   loadError: string | null;
@@ -80,12 +92,12 @@ function useTeamPage(api: RbacApiClient, query: string): {
         setLoadError(null);
       })
       .catch(() => {
-        if (!cancelled) setLoadError('Não foi possível carregar a equipe.');
+        if (!cancelled) setLoadError(loadFailed);
       });
     return () => {
       cancelled = true;
     };
-  }, [api, query, generation]);
+  }, [api, query, generation, loadFailed]);
 
   return {
     rows,
@@ -142,15 +154,18 @@ function useRoleEditor(
 /** The confirm step for the roster's one destructive act. */
 function RemoveConfirm({
   removal,
+  copy,
 }: {
   removal: ReturnType<typeof useConfirmable<MemberWithRoles>>;
+  copy: TeamScreenCopy;
 }): JSX.Element {
   return (
     <ConfirmDialog
       open={removal.pending !== null}
-      title="Remover da equipe?"
-      body="A pessoa perde o acesso ao painel imediatamente."
-      confirmLabel="Remover"
+      title={copy.removeConfirm.title}
+      body={copy.removeConfirm.body}
+      confirmLabel={copy.removeConfirm.confirmLabel}
+      cancelLabel={copy.cancelAction}
       busy={removal.busy}
       onConfirm={() => void removal.confirm()}
       onCancel={removal.cancel}
@@ -162,19 +177,21 @@ function RemoveConfirm({
 function PendingInvites({
   context,
   labels,
+  copy,
 }: {
   context: TeamContextWire | null;
   labels: RbacLabels;
+  copy: TeamScreenCopy;
 }): JSX.Element | null {
   if (!context || context.pendingInvites.length === 0) return null;
   return (
     <Stack spacing={0.5}>
       <Text variant="caption" as="p" color="secondary">
-        Convites pendentes
+        {copy.pendingInvitesTitle}
       </Text>
       {context.pendingInvites.map((invite) => (
         <Text key={invite.id} as="p">
-          {invite.email} — {labels.roleLabel(invite.role)} (Pendente)
+          {copy.pendingInviteLine(invite.email, labels.roleLabel(invite.role))}
         </Text>
       ))}
     </Stack>
@@ -182,11 +199,11 @@ function PendingInvites({
 }
 
 export function TeamScreen(props: TeamScreenProps): JSX.Element {
-  const { api, labels, systemRoles } = props;
+  const { api, labels, copy, systemRoles } = props;
   const can = useCan();
   const canManage = can(props.managePermission);
   const [query, setQuery] = useState('');
-  const { rows, context, loadError, refresh } = useTeamPage(api, query);
+  const { rows, context, loadError, refresh } = useTeamPage(api, query, copy.loadFailed);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const removal = useConfirmable<MemberWithRoles>(
     (member) => api.removeMember(member.userId),
@@ -213,9 +230,9 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
   return (
     <Stack spacing={2}>
       <Text variant="heading" size="lg" as="h1">
-        Equipe
+        {copy.title}
       </Text>
-      <SearchField placeholder="Buscar membro" testId="team-search-all" onCommit={setQuery} />
+      <SearchField placeholder={copy.searchPlaceholder} testId="team-search-all" onCommit={setQuery} />
       {loadError && <Text as="p">{loadError}</Text>}
       {actionError && (
         <Alert variant="danger" description={actionError} data-testid="team-error" />
@@ -224,6 +241,8 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
         <TeamTable
           rows={rows}
           labels={labels}
+          copy={props.tableCopy}
+          menuCopy={props.menuCopy}
           canManage={canManage}
           ownerRoles={ownerRoles}
           onEditRoles={editor.open}
@@ -231,13 +250,14 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
           onRemove={removal.request}
         />
       )}
-      <PendingInvites context={context} labels={labels} />
-      <RemoveConfirm removal={removal} />
+      <PendingInvites context={context} labels={labels} copy={copy} />
+      <RemoveConfirm removal={removal} copy={copy} />
       <RoleEditDialog
         member={editor.editing}
         systemRoles={systemRoles}
         availableCustomRoles={availableCustomRoles}
         labels={labels}
+        copy={props.dialogCopy}
         busy={editor.busy}
         error={editor.error}
         onClose={editor.close}
