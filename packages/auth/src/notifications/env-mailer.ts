@@ -134,8 +134,8 @@ export interface EnvAuthMailerConfig {
    */
   drivers: Record<string, EmailDriverFactory | undefined>;
   log: AuthMailerLog;
-  /** Which words. `PT_BR_MAIL` when omitted, as `createAuthMailer` defaults. */
-  pack?: MailPack;
+  /** Which words — REQUIRED, forwarded to `createAuthMailer` unchanged. */
+  pack: MailPack;
   /** The sign-in path the "password changed" notice points at. `/login`. */
   loginPath?: string;
   /** Where links point when no origin variable is set. Dev's own server. */
@@ -146,6 +146,40 @@ export interface EnvAuthMailerConfig {
 
 /** The provider value that selects the sink rather than a vendor. */
 const SINK_PROVIDER = "log";
+
+/**
+ * What the environment resolves to right now.
+ *
+ * `"sink"` and `"refuse"` are the two ends; a vendor name in between means the
+ * lookup succeeded and `drivers[vendor]` is known to exist.
+ */
+type MailMode = "sink" | "refuse" | { vendor: string };
+
+/**
+ * The whole driver decision, in one place.
+ *
+ * Extracted because it is asked TWICE — once to pick a driver, once to answer
+ * `canDeliver` — and two copies of this tree is precisely the drift that would
+ * let a deployment report it can send and then not send. Whatever the answer,
+ * both callers now get it from the same eight lines.
+ *
+ * Read fresh on every call rather than captured: a preview box is reconfigured
+ * under a running process, and a decision made at import would outlive it.
+ */
+function resolveMailMode(
+  env: AuthMailerEnvNames,
+  drivers: Record<string, EmailDriverFactory | undefined>,
+  read: (name: string) => string | undefined,
+): MailMode {
+  const provider = read(env.provider);
+  if (provider === SINK_PROVIDER) return "sink";
+  if (!provider) return "refuse";
+  if (!read(env.apiKey) || !read(env.from)) return "refuse";
+  // An unknown name refuses rather than throwing: a typo in a deploy variable
+  // must not take the sign-in flow down at import, and the refusal already
+  // logs which name it could not resolve.
+  return drivers[provider] === undefined ? "refuse" : { vendor: provider };
+}
 
 /**
  * Build a mailer that resolves its driver from the environment on every send.
@@ -186,22 +220,29 @@ export function createEnvAuthMailer(config: EnvAuthMailerConfig): EmailCredentia
     },
   });
 
+  /**
+   * Does the environment currently resolve to something that DELIVERS?
+   *
+   * The sink counts: "provider = log" is a deliberate development and e2e
+   * choice, the mail is written where a developer or the harness can read it,
+   * and the link in it works — so a sign-up on such a box must still succeed.
+   * Only the refusal is a no, and it is reached by saying nothing at all.
+   */
+  const canDeliver = (): boolean => resolveMailMode(env, drivers, read) !== "refuse";
+
   /** Which vendor this deployment sends through, read fresh. */
   const driver = (): EmailDriver => {
-    const provider = read(env.provider);
-    if (provider === SINK_PROVIDER) return sink;
-    if (!provider) return refuse;
-
-    const apiKey = read(env.apiKey);
-    const from = read(env.from);
-    if (!apiKey || !from) return refuse;
-
-    // An unknown name refuses rather than throwing: a typo in a deploy
-    // variable must not take the sign-in flow down at import, and the refusal
-    // already logs which name it could not resolve.
-    const factory = drivers[provider];
-    if (!factory) return refuse;
-    return factory({ channel: "EMAIL", driver: provider, apiKey, from });
+    const mode = resolveMailMode(env, drivers, read);
+    if (mode === "sink") return sink;
+    if (mode === "refuse") return refuse;
+    // `resolveMailMode` already proved the factory, the key and the From are
+    // all there, so the non-null assertions below cannot fire.
+    return drivers[mode.vendor]!({
+      channel: "EMAIL",
+      driver: mode.vendor,
+      apiKey: read(env.apiKey)!,
+      from: read(env.from)!,
+    });
   };
 
   /** The public origin, first named variable that is actually set. */
@@ -223,6 +264,7 @@ export function createEnvAuthMailer(config: EnvAuthMailerConfig): EmailCredentia
     // `createAuthMailer` always supplies this one; the fallback satisfies the
     // port, where it is optional.
     sendPasswordChanged: (message) => mailer().sendPasswordChanged?.(message) ?? Promise.resolve(),
+    canDeliver,
   };
 }
 

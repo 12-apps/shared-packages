@@ -31,7 +31,8 @@ export interface BestPricesWidgetProps {
   /** Start a fresh research for this product (host navigates, prefilled). */
   onStartResearch: () => void;
   maxOffers?: number;
-  messages?: Partial<ResearchMessages>;
+  /** Every string this screen renders — the HOST's words (see `./messages`). */
+  messages: ResearchMessages;
 }
 
 type WidgetState =

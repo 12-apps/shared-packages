@@ -10,6 +10,7 @@ import type { EmailCredentials } from '@12-apps/auth';
 import { createEmailCredentials } from '@12-apps/auth/server';
 import { emailAuthRouter, emailAuthSettingsRouter } from '@12-apps/auth/hono';
 import { createAuthMailer } from '@12-apps/auth/notifications';
+import { PT_BR_MAIL } from '@12-apps/auth/server';
 import { PT_BR_MESSAGES } from '@12-apps/auth/server';
 import type { EmailDriver } from '@12-apps/notifications/server';
 
@@ -213,6 +214,9 @@ export function authHost(pg: PGlite): AuthHost {
      */
     mailer: createAuthMailer({
       driver: recordingDriver(pg),
+      // The pack is required now — the journeys read these very sentences out
+      // of auth_sent_mail, so the pt-BR pack is the fixture, chosen by name.
+      pack: PT_BR_MAIL,
       loginUrl: `${APP_URL}${LOGIN_PATH}`,
     }),
     // A RESOLVER, not a fixed object: both switches are flipped mid-scenario by

@@ -42,6 +42,11 @@ export interface EntitlementsHonoConfig<F extends string, K extends string>
   resolveActor: ResolveEntitlementsActor;
 }
 
+// The copy port, re-exported so a hono host wires the whole surface — router
+// and messages — from the one subpath it already imports.
+export type { EntitlementsMessages } from '../server/copy';
+export { PT_BR_ENTITLEMENTS_MESSAGES } from '../server/pt-BR';
+
 /** Reads the JSON body, tolerating an absent or malformed one. */
 async function readBody(c: Context): Promise<unknown> {
   if (c.req.method === 'GET') return undefined;
@@ -64,7 +69,9 @@ export function entitlementsRouter<F extends string, K extends string>(
   for (const route of api.routes) {
     const handler = async (c: Context) => {
       const actor = await resolveActor(c);
-      if (!actor) return c.json({ error: 'Não autenticado.' }, 401);
+      // The host's sentence, from the same required `messages` the rest of
+      // the surface answers with — the adapter adds no words of its own.
+      if (!actor) return c.json({ error: config.messages.unauthenticated }, 401);
 
       const response = await route.handle({ actor, body: await readBody(c) });
 

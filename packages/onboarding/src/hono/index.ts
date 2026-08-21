@@ -36,7 +36,13 @@ export type ResolveOnboardingActor = (
 export interface OnboardingHonoConfig extends OnboardingServerConfig {
   resolveActor: ResolveOnboardingActor;
   /** The 401 body's message. pt-BR default, like every other string here. */
-  unauthenticatedMessage?: string;
+  /**
+   * The 401 body's sentence when `resolveActor` answers null — REQUIRED, the
+   * host's words (pt-BR hosts: `PT_BR_ONBOARDING_UNAUTHENTICATED`). The old
+   * default was the exact silent leak the feature-flags extraction already
+   * paid for once.
+   */
+  unauthenticatedMessage: string;
 }
 
 export interface OnboardingHono extends ApiOnboarding {
@@ -58,7 +64,7 @@ async function readBody(c: Context): Promise<unknown> {
 export function onboardingRouter(config: OnboardingHonoConfig): OnboardingHono {
   const api = createApiOnboarding(config);
   const router = new Hono();
-  const unauthenticated = config.unauthenticatedMessage ?? "Não autenticado.";
+  const unauthenticated = config.unauthenticatedMessage;
 
   for (const route of api.routes) {
     const handler = async (c: Context): Promise<Response> => {

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { EmailDriver, EmailMessage } from "@12-apps/notifications/server";
 
 import type { AuthEmailMessage } from "../../email-credentials/types";
-import { PT_BR_MAIL } from "../../server/mail-templates";
+import { PT_BR_MAIL } from "../../server/mail-templates.pt-BR";
 import { createAuthMailer } from "../index";
 
 /**
@@ -43,7 +43,7 @@ function message(overrides: Partial<AuthEmailMessage> = {}): AuthEmailMessage {
 describe("createAuthMailer", () => {
   it("delivers through the notifications driver rather than a mailer of its own", async () => {
     const driver = recordingDriver();
-    const mailer = createAuthMailer({ driver, now: () => NOW });
+    const mailer = createAuthMailer({ driver, pack: PT_BR_MAIL, now: () => NOW });
 
     await mailer.sendVerification(message());
 
@@ -60,7 +60,7 @@ describe("createAuthMailer", () => {
 
   it("sends each of the four with its own subject, so an inbox can tell them apart", async () => {
     const driver = recordingDriver();
-    const mailer = createAuthMailer({ driver, now: () => NOW });
+    const mailer = createAuthMailer({ driver, pack: PT_BR_MAIL, now: () => NOW });
 
     await mailer.sendVerification(message());
     await mailer.sendPasswordReset(message());
@@ -78,6 +78,7 @@ describe("createAuthMailer", () => {
   it("puts the login URL in the password-changed notice, which carries no token", async () => {
     const driver = recordingDriver();
     const mailer = createAuthMailer({
+      pack: PT_BR_MAIL,
       driver,
       now: () => NOW,
       loginUrl: "https://loja.example.test/entrar",
@@ -107,7 +108,7 @@ describe("createAuthMailer", () => {
 
   it("words the lifetime from the token's own expiry, not from a constant", async () => {
     const driver = recordingDriver();
-    const mailer = createAuthMailer({ driver, now: () => NOW });
+    const mailer = createAuthMailer({ driver, pack: PT_BR_MAIL, now: () => NOW });
 
     await mailer.sendPasswordReset(message({ expiresAt: new Date(NOW + 3_600_000) }));
 

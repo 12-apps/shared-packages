@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { EmailCredentials } from "../../email-credentials";
 import { emailAuthRoutes, type EmailAuthRoute } from "../email-routes";
-import { PT_BR_MESSAGES } from "../messages";
+import { PT_BR_MESSAGES } from "../pt-BR";
 
 /**
  * The eight descriptors — the contract every host now mounts instead of writing.

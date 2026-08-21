@@ -85,6 +85,20 @@ export {
 } from './components/checkout/transport';
 export { type CheckoutHostPorts } from './components/checkout/use-checkout-controller';
 export { PaymentsUnavailable } from './components/checkout/payments-unavailable';
+export type {
+  CheckoutStepperCopy,
+  CheckoutViewCopy,
+  DadosStepCopy,
+  EmptyCartCopy,
+  PaymentStatusCopy,
+  PaymentsUnavailableCopy,
+  StatusOutcomeCopy,
+} from './components/checkout/view-copy';
+export {
+  PT_BR_CHECKOUT_VIEW_COPY,
+  PT_BR_PAYMENTS_UNAVAILABLE_COPY,
+  PT_BR_PAYMENT_STATUS_COPY,
+} from './components/checkout/pt-BR';
 export { fetchCheckoutConfig } from './components/checkout/client';
 /**
  * The `sessionStorage` key the hosted-checkout return leg parks the raised

@@ -25,7 +25,8 @@
  * The shape is `@12-apps/rbac`'s `PermissionContribution`, declared here rather
  * than imported: this package does not depend on that one (a host may run any
  * RBAC, or none), and the contribution is plain data, so
- * `composePermissions(ENTITLEMENTS_PERMISSIONS, …)` accepts it structurally.
+ * `composePermissions(entitlementsPermissions(labels), …)` accepts it
+ * structurally.
  */
 
 /** How a permission is decided once the actor holds it. */
@@ -110,36 +111,43 @@ export function definePermissionContribution<
   };
 }
 
-/** The permission guarding this package's own write. */
-export const ENTITLEMENTS_PERMISSIONS = definePermissionContribution({
-  source: '@12-apps/entitlements',
-  permissions: {
-    /**
-     * File a plan-change request — the one write on this surface.
-     *
-     * CLASS, not instance: what is gated is asking at all. There is no second
-     * entity gate, because the ask is always about the caller's own tenant and
-     * the route resolves that tenant server-side.
-     *
-     * NOT an owner marker. It moves no money and grants no capability: it
-     * writes a LEAD for a human to answer, so a tenant must be able to give it
-     * to whoever talks to us about their plan.
-     */
-    'plan:request': { kind: 'class' },
-  },
-  /**
-   * Only the segments THIS id uses. Overridable per host exactly like every
-   * other source's, through whatever composition the host's RBAC provides.
-   */
-  labels: {
-    domains: { plan: 'Plano' },
-    actions: { request: 'Solicitar mudança' },
-  },
-});
+/**
+ * The permission guarding this package's own write.
+ *
+ * A factory over the LABELS rather than a finished constant, because the ids
+ * and their specs are mechanism and the segment words are copy: they render
+ * in the host's role editor, and shipping them compiled in was this package
+ * deciding the host's vocabulary (the copy-portability doctrine). Only the
+ * segments THIS id uses are needed; pt-BR hosts pass
+ * `PT_BR_ENTITLEMENTS_PERMISSION_LABELS` from `./pt-BR` at the same
+ * composition seam the rest of their catalog is assembled at.
+ */
+export function entitlementsPermissions(
+  labels: EntitlementPermissionLabels,
+): EntitlementPermissionContribution<'plan:request'> {
+  return definePermissionContribution({
+    source: '@12-apps/entitlements',
+    permissions: {
+      /**
+       * File a plan-change request — the one write on this surface.
+       *
+       * CLASS, not instance: what is gated is asking at all. There is no second
+       * entity gate, because the ask is always about the caller's own tenant and
+       * the route resolves that tenant server-side.
+       *
+       * NOT an owner marker. It moves no money and grants no capability: it
+       * writes a LEAD for a human to answer, so a tenant must be able to give it
+       * to whoever talks to us about their plan.
+       */
+      'plan:request': { kind: 'class' },
+    },
+    labels,
+  });
+}
 
 /** The permission union this package contributes. */
 export type EntitlementsPermission = EntitlementPermissionOf<
-  typeof ENTITLEMENTS_PERMISSIONS
+  ReturnType<typeof entitlementsPermissions>
 >;
 
 /**

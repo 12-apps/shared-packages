@@ -34,7 +34,8 @@ export interface ResearchRunScreenProps {
    * referentially stable for the life of the screen (it is used as a hook).
    */
   runChannel?: UseResearchRunChannel;
-  messages?: Partial<ResearchMessages>;
+  /** Every string this screen renders — the HOST's words (see `./messages`). */
+  messages: ResearchMessages;
 }
 
 /** The roster read once — the status rows shown while the run is in flight. */
@@ -85,7 +86,8 @@ function CompletedOutcome({
 }: {
   run: ResearchRunView;
   request: ResearchRequestView;
-  messages?: Partial<ResearchMessages>;
+  /** Every string this screen renders — the HOST's words (see `./messages`). */
+  messages: ResearchMessages;
   t: ResearchMessages;
 }): JSX.Element {
   const best = run.offers[0];
@@ -143,7 +145,8 @@ function PendingOutcome({
 }: {
   phase: ResearchPhase;
   run: ResearchRunView | null;
-  messages?: Partial<ResearchMessages>;
+  /** Every string this screen renders — the HOST's words (see `./messages`). */
+  messages: ResearchMessages;
   t: ResearchMessages;
 }): JSX.Element {
   return (
@@ -177,7 +180,8 @@ function RunOutcome({
   phase: ResearchPhase;
   run: ResearchRunView | null;
   request: ResearchRequestView | null;
-  messages?: Partial<ResearchMessages>;
+  /** Every string this screen renders — the HOST's words (see `./messages`). */
+  messages: ResearchMessages;
   t: ResearchMessages;
 }): JSX.Element | null {
   if (phase === 'queued' || phase === 'running') {

@@ -67,14 +67,6 @@ export interface EventsMessages {
   tooMany: string;
 }
 
-/** Today's strings, unchanged — see {@link EventsMessages}. */
-export const DEFAULT_EVENTS_MESSAGES: EventsMessages = {
-  unavailable: "Atualizações em tempo real indisponíveis.",
-  invalidTopics: "Tópicos inválidos.",
-  unknownTopic: (name) => `Tópico desconhecido: ${name}.`,
-  tooMany: "Muitas conexões simultâneas.",
-};
-
 /** What the host's `authorize` seam receives, per connection attempt. */
 export interface EventsAuthorizeContext {
   /** Route params in the host adapter's spelling (e.g. `tenantSlug`). */

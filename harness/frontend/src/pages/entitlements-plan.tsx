@@ -1,6 +1,10 @@
 import { useEffect, useState, type JSX } from 'react';
 
-import { EntitlementsProvider, createWebEntitlements } from '@12-apps/entitlements/react';
+import {
+  EntitlementsProvider,
+  PT_BR_ENTITLEMENTS_WEB_COPY,
+  createWebEntitlements,
+} from '@12-apps/entitlements/react';
 import type { EntitlementSnapshot } from '@12-apps/entitlements/react';
 
 /**
@@ -24,6 +28,9 @@ const API_BASE = '/api/admin/harness';
 const { page: PlanPage, UpsellHost, withEntitlement } = createWebEntitlements({
   apiBase: API_BASE,
   canRequestPlanChange: true,
+  // The screens' sentences, passed by hand — required config; the package no
+  // longer ships a default voice.
+  copy: PT_BR_ENTITLEMENTS_WEB_COPY,
   // The host's own route map: where each tenant switch actually lives.
   switchLocation: (feature) =>
     feature === 'submissions.notes'
