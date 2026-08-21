@@ -10,7 +10,7 @@
 // a host migration if it wants the cascade.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// One user-level flag grant (FUT-884). NO row means the flag's default (off —
+// One user-level flag grant. NO row means the flag's default (off —
 // a beta fails CLOSED); a row with `enabled: false` is an EXPLICIT opt-out
 // that survives a future default-on rollout. The flag CATALOG is host code on
 // purpose — a flag with no code behind it does nothing, so a new flag ships

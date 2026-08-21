@@ -1,7 +1,7 @@
 /**
  * Every string the management surface renders — REQUIRED host config, with
- * no defaults (the payments doctrine, FUT-760, enforced repo-wide by the
- * copy-portability gate). A pt-BR host imports
+ * no defaults (the payments extraction's doctrine, enforced repo-wide by
+ * the copy-portability gate). A pt-BR host imports
  * `PT_BR_FEATURE_FLAGS_COPY` from `./pt-BR` and passes it by hand — one
  * reviewable line, never a silence.
  */

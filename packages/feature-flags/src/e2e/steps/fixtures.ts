@@ -1,7 +1,7 @@
 import { test as base, createBdd } from "playwright-bdd";
 
 /**
- * The BDD world for the beta-cohort journeys (FUT-884) — deliberately tiny,
+ * The BDD world for the beta-cohort journeys — deliberately tiny,
  * and deliberately host-free (the payments-e2e rule): everything about the
  * APP is asked of the installed `FeatureFlagsWorld`; the only thing a
  * scenario has to remember for itself is which beta the operator opened, so
