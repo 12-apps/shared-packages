@@ -24,7 +24,8 @@ export interface BestOfferCardProps {
   offer: OfferOutput;
   /** The requested quantity the total was computed for. */
   quantity: number;
-  messages?: Partial<ResearchMessages>;
+  /** Every string this screen renders — the HOST's words (see `./messages`). */
+  messages: ResearchMessages;
 }
 
 /** pt-BR availability label, tolerant of unknown wire values. */

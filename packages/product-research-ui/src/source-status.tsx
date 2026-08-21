@@ -34,7 +34,8 @@ export interface SourceStatusListProps {
    */
   stats: SourceStatView[] | null;
   running: boolean;
-  messages?: Partial<ResearchMessages>;
+  /** Every string this screen renders — the HOST's words (see `./messages`). */
+  messages: ResearchMessages;
 }
 
 /** Long enough to read a reason at a glance, short enough for a chip row. */

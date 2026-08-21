@@ -36,7 +36,8 @@ export interface ResearchHistoryListProps {
   onRepeat?: (request: ResearchRequestView) => void;
   /** Leave the bounded block for the host's full history page. */
   onViewAll?: () => void;
-  messages?: Partial<ResearchMessages>;
+  /** Every string this screen renders — the HOST's words (see `./messages`). */
+  messages: ResearchMessages;
 }
 
 function statusChip(request: ResearchRequestView, t: ResearchMessages): JSX.Element {

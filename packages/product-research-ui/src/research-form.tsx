@@ -28,7 +28,8 @@ export interface ResearchFormProps {
   defaultTerm?: string;
   /** Pre-filled quantity (e.g. the gap to the restock level). */
   defaultQuantity?: number;
-  messages?: Partial<ResearchMessages>;
+  /** Every string this screen renders — the HOST's words (see `./messages`). */
+  messages: ResearchMessages;
 }
 
 interface FormValues {

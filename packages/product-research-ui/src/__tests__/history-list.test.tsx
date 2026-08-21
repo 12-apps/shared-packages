@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ResearchHistoryList } from '../history-list';
-import { DEFAULT_MESSAGES } from '../messages';
+import { PT_BR_RESEARCH_MESSAGES } from '../pt-BR';
 import { RESEARCH_RUN_STALE_AFTER_MS } from '../repeat-guard';
 import { requestView } from './fake-client';
 
@@ -41,7 +41,7 @@ afterEach(() => {
 
 describe('ResearchHistoryList — repeat', () => {
   it('renders no repeat action when the host passes no callback', async () => {
-    render(<ResearchHistoryList requests={[settled]} onOpen={vi.fn()} />);
+    render(<ResearchHistoryList messages={PT_BR_RESEARCH_MESSAGES} requests={[settled]} onOpen={vi.fn()} />);
 
     // The existing affordance is untouched, and no repeat joins it.
     expect(screen.getByTestId('research-history-open-req-1')).not.toBeNull();
@@ -52,7 +52,7 @@ describe('ResearchHistoryList — repeat', () => {
 
   it('hands the whole request back so the host can re-send its query', () => {
     const onRepeat = vi.fn();
-    render(<ResearchHistoryList requests={[settled]} onOpen={vi.fn()} onRepeat={onRepeat} />);
+    render(<ResearchHistoryList messages={PT_BR_RESEARCH_MESSAGES} requests={[settled]} onOpen={vi.fn()} onRepeat={onRepeat} />);
 
     fireEvent.click(screen.getByTestId('research-history-repeat-req-1'));
 
@@ -65,7 +65,7 @@ describe('ResearchHistoryList — repeat', () => {
   it('offers the repeat on a FAILED research too — retrying is the point', () => {
     const onRepeat = vi.fn();
     render(
-      <ResearchHistoryList
+      <ResearchHistoryList messages={PT_BR_RESEARCH_MESSAGES}
         requests={[requestView({ id: 'req-2', latestRun: FAILED })]}
         onOpen={vi.fn()}
         onRepeat={onRepeat}
@@ -84,7 +84,7 @@ describe('ResearchHistoryList — repeat', () => {
   ])('disables the repeat while the run is %s', (_label, latestRun) => {
     const onRepeat = vi.fn();
     render(
-      <ResearchHistoryList
+      <ResearchHistoryList messages={PT_BR_RESEARCH_MESSAGES}
         requests={[requestView({ id: 'req-3', latestRun })]}
         onOpen={vi.fn()}
         onRepeat={onRepeat}
@@ -93,7 +93,7 @@ describe('ResearchHistoryList — repeat', () => {
 
     const button = screen.getByTestId('research-history-repeat-req-3') as HTMLButtonElement;
     expect(button.disabled).toBe(true);
-    expect(button.title).toBe(DEFAULT_MESSAGES.historyRepeatRunningHint);
+    expect(button.title).toBe(PT_BR_RESEARCH_MESSAGES.historyRepeatRunningHint);
     fireEvent.click(button);
     expect(onRepeat).not.toHaveBeenCalled();
   });
@@ -103,7 +103,7 @@ describe('ResearchHistoryList — repeat', () => {
     vi.setSystemTime(NOW);
     const onRepeat = vi.fn();
     render(
-      <ResearchHistoryList
+      <ResearchHistoryList messages={PT_BR_RESEARCH_MESSAGES}
         requests={[
           requestView({ id: 'req-4', latestRun: runningSince(RESEARCH_RUN_STALE_AFTER_MS - 60_000) }),
         ]}
@@ -114,7 +114,7 @@ describe('ResearchHistoryList — repeat', () => {
 
     const button = screen.getByTestId('research-history-repeat-req-4') as HTMLButtonElement;
     expect(button.disabled).toBe(true);
-    expect(button.title).toBe(DEFAULT_MESSAGES.historyRepeatRunningHint);
+    expect(button.title).toBe(PT_BR_RESEARCH_MESSAGES.historyRepeatRunningHint);
   });
 
   it('offers the repeat once a run has been in flight past the stale horizon', () => {
@@ -124,7 +124,7 @@ describe('ResearchHistoryList — repeat', () => {
     vi.setSystemTime(NOW);
     const onRepeat = vi.fn();
     render(
-      <ResearchHistoryList
+      <ResearchHistoryList messages={PT_BR_RESEARCH_MESSAGES}
         requests={[
           requestView({ id: 'req-5', latestRun: runningSince(RESEARCH_RUN_STALE_AFTER_MS + 60_000) }),
         ]}
@@ -144,7 +144,7 @@ describe('ResearchHistoryList — repeat', () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     render(
-      <ResearchHistoryList
+      <ResearchHistoryList messages={PT_BR_RESEARCH_MESSAGES}
         requests={[
           requestView({ id: 'req-6', latestRun: runningSince(RESEARCH_RUN_STALE_AFTER_MS + 60_000) }),
         ]}
@@ -154,17 +154,17 @@ describe('ResearchHistoryList — repeat', () => {
     );
 
     expect(screen.getByTestId('research-history-req-6').textContent).toContain(
-      DEFAULT_MESSAGES.historyStatusRunning,
+      PT_BR_RESEARCH_MESSAGES.historyStatusRunning,
     );
   });
 
   it('takes the repeat label from the messages layer', () => {
     render(
-      <ResearchHistoryList
+      <ResearchHistoryList 
         requests={[settled]}
         onOpen={vi.fn()}
         onRepeat={vi.fn()}
-        messages={{ historyRepeat: 'Buscar de novo' }}
+        messages={{ ...PT_BR_RESEARCH_MESSAGES, historyRepeat: 'Buscar de novo' }}
       />,
     );
 
@@ -174,7 +174,7 @@ describe('ResearchHistoryList — repeat', () => {
 
 describe('ResearchHistoryList — ver todas', () => {
   it('renders no link when the host has no history page', async () => {
-    render(<ResearchHistoryList requests={[settled]} onOpen={vi.fn()} />);
+    render(<ResearchHistoryList messages={PT_BR_RESEARCH_MESSAGES} requests={[settled]} onOpen={vi.fn()} />);
 
     expect(screen.getByTestId('research-history')).not.toBeNull();
     await waitFor(() => expect(screen.queryByTestId('research-history-view-all')).toBeNull());
@@ -182,17 +182,17 @@ describe('ResearchHistoryList — ver todas', () => {
 
   it('calls the host navigation once clicked', () => {
     const onViewAll = vi.fn();
-    render(<ResearchHistoryList requests={[]} onOpen={vi.fn()} onViewAll={onViewAll} />);
+    render(<ResearchHistoryList messages={PT_BR_RESEARCH_MESSAGES} requests={[]} onOpen={vi.fn()} onViewAll={onViewAll} />);
 
     const link = screen.getByTestId('research-history-view-all');
-    expect(link.textContent).toBe(DEFAULT_MESSAGES.historyViewAll);
+    expect(link.textContent).toBe(PT_BR_RESEARCH_MESSAGES.historyViewAll);
     fireEvent.click(link);
 
     expect(onViewAll).toHaveBeenCalledTimes(1);
   });
 
   it('stays visible on an empty block — the page explains the emptiness', () => {
-    render(<ResearchHistoryList requests={[]} onOpen={vi.fn()} onViewAll={vi.fn()} />);
+    render(<ResearchHistoryList messages={PT_BR_RESEARCH_MESSAGES} requests={[]} onOpen={vi.fn()} onViewAll={vi.fn()} />);
 
     expect(screen.getByTestId('research-history-empty')).not.toBeNull();
     expect(screen.getByTestId('research-history-view-all')).not.toBeNull();

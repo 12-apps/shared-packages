@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // render/waitFor from @testing-library/react — plain DOM asserts, no jest-dom.
 import { render, screen, waitFor } from '@testing-library/react';
+import { PT_BR_RESEARCH_MESSAGES } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { BestOfferCard } from '../best-offer-card';
@@ -40,7 +41,7 @@ const singleCan = offer({
 
 describe('OffersTable — 6-pack unit price (FUT-436)', () => {
   it('renders the per-unit cell from unitPriceCents with the pack math spelled out', () => {
-    const { container } = render(<OffersTable offers={[sixPack, singleCan]} />);
+    const { container } = render(<OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={[sixPack, singleCan]} />);
 
     // The unit cell shows total ÷ 6, not the pack total.
     const unitCell = container.querySelector('[title="R$ 22,74 ÷ 6 un = R$ 3,79"]');
@@ -54,7 +55,7 @@ describe('OffersTable — 6-pack unit price (FUT-436)', () => {
   });
 
   it('orders by unit price: the 6-pack outranks the can despite the higher pack total', () => {
-    render(<OffersTable offers={[sixPack, singleCan]} />);
+    render(<OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={[sixPack, singleCan]} />);
 
     const text = screen.getByTestId('offers-table').textContent ?? '';
     const sixPackAt = text.indexOf('6 Unidades');
@@ -86,7 +87,7 @@ const outOfArea = offer({
 
 describe('OffersTable — out-of-area badge (FUT-491)', () => {
   it('badges the flagged offer and explains the caveat in its tooltip', () => {
-    render(<OffersTable offers={[outOfArea, singleCan]} />);
+    render(<OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={[outOfArea, singleCan]} />);
 
     const badge = screen.getByTestId('offer-outside-area-out-of-area');
     expect(badge.textContent).toContain('Fora da área de entrega');
@@ -102,7 +103,7 @@ describe('OffersTable — out-of-area badge (FUT-491)', () => {
    * every surface that shows a flagged price.
    */
   it('announces the caveat and is reachable without a pointer', async () => {
-    render(<OffersTable offers={[outOfArea, singleCan]} />);
+    render(<OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={[outOfArea, singleCan]} />);
 
     const badge = screen.getByTestId('offer-outside-area-out-of-area');
     expect(badge.textContent).toContain('Esta loja não entrega no CEP informado');
@@ -110,7 +111,7 @@ describe('OffersTable — out-of-area badge (FUT-491)', () => {
   });
 
   it('leaves an ordinary offer unbadged', () => {
-    render(<OffersTable offers={[singleCan]} />);
+    render(<OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={[singleCan]} />);
 
     // Absence asserted on the rendered TEXT: nothing was removed here, so a
     // null-element check would be the flakiness gate's false-negative shape.
@@ -120,7 +121,7 @@ describe('OffersTable — out-of-area badge (FUT-491)', () => {
   });
 
   it('translates the badge through the messages layer', () => {
-    render(<OffersTable offers={[outOfArea]} messages={{ outsideAreaBadge: 'Out of area' }} />);
+    render(<OffersTable  offers={[outOfArea]} messages={{ ...PT_BR_RESEARCH_MESSAGES, outsideAreaBadge: 'Out of area' }} />);
 
     expect(screen.getByTestId('offer-outside-area-out-of-area').textContent).toContain(
       'Out of area',
@@ -149,7 +150,7 @@ describe('OffersTable — rows from a run still in flight (FUT-519)', () => {
   ];
 
   it('numbers unranked rows 1..n in the order the API returned them', () => {
-    const { container } = render(<OffersTable offers={partial} />);
+    const { container } = render(<OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={partial} />);
 
     // The "#" column is the second cell (the first is the selection box).
     const numbering = [...container.querySelectorAll('tbody tr')].map(
@@ -159,7 +160,7 @@ describe('OffersTable — rows from a run still in flight (FUT-519)', () => {
   });
 
   it('draws no suspect badge while the API is still withholding the verdict', () => {
-    render(<OffersTable offers={partial} />);
+    render(<OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={partial} />);
 
     // Absence on the rendered TEXT: nothing was removed here, so a null-element
     // check would be the flakiness gate's false-negative shape.
@@ -171,7 +172,7 @@ describe('OffersTable — rows from a run still in flight (FUT-519)', () => {
 
 describe('BestOfferCard — out-of-area badge (FUT-491)', () => {
   it('caveats the hero price when the store does not deliver here', () => {
-    render(<BestOfferCard offer={outOfArea} quantity={12} />);
+    render(<BestOfferCard messages={PT_BR_RESEARCH_MESSAGES} offer={outOfArea} quantity={12} />);
 
     const badge = screen.getByTestId('best-offer-outside-area');
     expect(badge.textContent).toContain('Fora da área de entrega');
@@ -181,7 +182,7 @@ describe('BestOfferCard — out-of-area badge (FUT-491)', () => {
   });
 
   it('announces the hero caveat too, on the same accessible shape', async () => {
-    render(<BestOfferCard offer={outOfArea} quantity={12} />);
+    render(<BestOfferCard messages={PT_BR_RESEARCH_MESSAGES} offer={outOfArea} quantity={12} />);
 
     const badge = screen.getByTestId('best-offer-outside-area');
     expect(badge.textContent).toContain('Esta loja não entrega no CEP informado');
@@ -189,7 +190,7 @@ describe('BestOfferCard — out-of-area badge (FUT-491)', () => {
   });
 
   it('shows no badge for a deliverable offer', () => {
-    render(<BestOfferCard offer={singleCan} quantity={6} />);
+    render(<BestOfferCard messages={PT_BR_RESEARCH_MESSAGES} offer={singleCan} quantity={6} />);
 
     expect(screen.getByTestId('best-offer-card').textContent).not.toContain(
       'Fora da área de entrega',
@@ -220,7 +221,7 @@ const shippingUnknown = offer({
 
 describe('OffersTable — unknown shipping badge (FUT-518)', () => {
   it('badges the total whose freight the source never stated', () => {
-    render(<OffersTable offers={[shippingUnknown, singleCan]} />);
+    render(<OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={[shippingUnknown, singleCan]} />);
 
     const badge = screen.getByTestId('offer-shipping-unknown-shipping-unknown');
     expect(badge.textContent).toContain('Frete não informado');
@@ -232,7 +233,7 @@ describe('OffersTable — unknown shipping badge (FUT-518)', () => {
   });
 
   it('announces the caveat and is reachable without a pointer', async () => {
-    render(<OffersTable offers={[shippingUnknown]} />);
+    render(<OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={[shippingUnknown]} />);
 
     const badge = screen.getByTestId('offer-shipping-unknown-shipping-unknown');
     expect(badge.textContent).toContain('não informou o valor do frete');
@@ -242,7 +243,7 @@ describe('OffersTable — unknown shipping badge (FUT-518)', () => {
   it('leaves a STATED free-shipping row unbadged — 0 is an answer', () => {
     // `singleCan` carries shippingCents 0, which means the source SAID free.
     // Badging it would re-create the conflation this ticket removed, inverted.
-    render(<OffersTable offers={[singleCan]} />);
+    render(<OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={[singleCan]} />);
 
     // Absence asserted on the rendered TEXT: nothing was removed here, so a
     // null-element check would be the flakiness gate's false-negative shape.
@@ -251,7 +252,7 @@ describe('OffersTable — unknown shipping badge (FUT-518)', () => {
 
   it('translates the badge through the messages layer', () => {
     render(
-      <OffersTable offers={[shippingUnknown]} messages={{ shippingUnknownBadge: 'Shipping unknown' }} />,
+      <OffersTable  offers={[shippingUnknown]} messages={{ ...PT_BR_RESEARCH_MESSAGES, shippingUnknownBadge: 'Shipping unknown' }} />,
     );
 
     expect(screen.getByTestId('offer-shipping-unknown-shipping-unknown').textContent).toContain(
@@ -262,7 +263,7 @@ describe('OffersTable — unknown shipping badge (FUT-518)', () => {
 
 describe('BestOfferCard — unknown shipping badge (FUT-518)', () => {
   it('caveats the hero total when the store never stated a freight cost', () => {
-    render(<BestOfferCard offer={shippingUnknown} quantity={12} />);
+    render(<BestOfferCard messages={PT_BR_RESEARCH_MESSAGES} offer={shippingUnknown} quantity={12} />);
 
     const badge = screen.getByTestId('best-offer-shipping-unknown');
     expect(badge.textContent).toContain('Frete não informado');
@@ -273,7 +274,7 @@ describe('BestOfferCard — unknown shipping badge (FUT-518)', () => {
   });
 
   it('shows no badge when the store stated free shipping', () => {
-    render(<BestOfferCard offer={singleCan} quantity={6} />);
+    render(<BestOfferCard messages={PT_BR_RESEARCH_MESSAGES} offer={singleCan} quantity={6} />);
 
     expect(screen.getByTestId('best-offer-card').textContent).not.toContain('Frete não informado');
   });
@@ -281,7 +282,7 @@ describe('BestOfferCard — unknown shipping badge (FUT-518)', () => {
 
 describe('BestOfferCard — 6-pack unit price (FUT-436)', () => {
   it('shows R$ 3,79 as the headline unit price and the pack total only in the math', () => {
-    render(<BestOfferCard offer={sixPack} quantity={6} />);
+    render(<BestOfferCard messages={PT_BR_RESEARCH_MESSAGES} offer={sixPack} quantity={6} />);
 
     expect(screen.getByTestId('best-offer-unit-price').textContent).toContain('R$ 3,79');
     expect(screen.getByTestId('best-offer-total').textContent).toContain('R$ 22,74');

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // render/waitFor from @testing-library/react — plain DOM asserts, no jest-dom.
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { PT_BR_RESEARCH_MESSAGES } from '../pt-BR';
 import { describe, expect, it, vi } from 'vitest';
 
 import { BestPricesWidget } from '../best-prices-widget';
@@ -33,7 +34,7 @@ describe('BestPricesWidget', () => {
     });
     const onOpen = vi.fn();
     render(
-      <BestPricesWidget
+      <BestPricesWidget messages={PT_BR_RESEARCH_MESSAGES}
         client={client}
         term="Coca-Cola Lata 350ml"
         onOpenRequest={onOpen}
@@ -60,7 +61,7 @@ describe('BestPricesWidget', () => {
     });
     const onStart = vi.fn();
     render(
-      <BestPricesWidget
+      <BestPricesWidget messages={PT_BR_RESEARCH_MESSAGES}
         client={client}
         term="Café Torrado 1kg"
         onOpenRequest={vi.fn()}
@@ -79,7 +80,7 @@ describe('BestPricesWidget', () => {
       listRequests: () => Promise.reject(new Error('rede fora')),
     });
     render(
-      <BestPricesWidget
+      <BestPricesWidget messages={PT_BR_RESEARCH_MESSAGES}
         client={client}
         term="Água 500ml"
         onOpenRequest={vi.fn()}
@@ -119,7 +120,7 @@ describe('BestPricesWidget', () => {
         ),
     });
     render(
-      <BestPricesWidget
+      <BestPricesWidget messages={PT_BR_RESEARCH_MESSAGES}
         client={client}
         term="Coca-Cola Lata 350ml"
         onOpenRequest={vi.fn()}
@@ -163,7 +164,7 @@ describe('BestPricesWidget', () => {
         ),
     });
     render(
-      <BestPricesWidget
+      <BestPricesWidget messages={PT_BR_RESEARCH_MESSAGES}
         client={client}
         term="Coca-Cola Lata 350ml"
         onOpenRequest={vi.fn()}
@@ -192,7 +193,7 @@ describe('BestPricesWidget', () => {
         }),
     });
     render(
-      <BestPricesWidget
+      <BestPricesWidget messages={PT_BR_RESEARCH_MESSAGES}
         client={client}
         term="Coca-Cola Lata 350ml"
         onOpenRequest={vi.fn()}

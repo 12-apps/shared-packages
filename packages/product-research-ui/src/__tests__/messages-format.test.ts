@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
 import { formatCentsBRL, redactQueryStrings } from '../format';
-import { DEFAULT_MESSAGES, resolveMessages } from '../messages';
+import { resolveMessages } from '../messages';
+import { PT_BR_RESEARCH_MESSAGES } from '../pt-BR';
 
 describe('resolveMessages', () => {
-  it('returns the pt-BR defaults untouched with no overrides', () => {
-    expect(resolveMessages()).toBe(DEFAULT_MESSAGES);
+  it('returns the host table untouched — there is no silent base to fold over', () => {
+    expect(resolveMessages(PT_BR_RESEARCH_MESSAGES)).toBe(PT_BR_RESEARCH_MESSAGES);
   });
 
-  it('folds overrides over the defaults without losing the rest', () => {
-    const merged = resolveMessages({ formSubmit: 'Search prices' });
-    expect(merged.formSubmit).toBe('Search prices');
-    expect(merged.formTitle).toBe(DEFAULT_MESSAGES.formTitle);
-    expect(merged.statusOk(3)).toBe('3 oferta(s)');
+  it('a host rewrites one sentence by spreading the pack it chose by name', () => {
+    const own = { ...PT_BR_RESEARCH_MESSAGES, formSubmit: 'Search prices' };
+    expect(resolveMessages(own).formSubmit).toBe('Search prices');
+    expect(resolveMessages(own).formTitle).toBe(PT_BR_RESEARCH_MESSAGES.formTitle);
+    expect(resolveMessages(own).statusOk(3)).toBe('3 oferta(s)');
   });
 });
 

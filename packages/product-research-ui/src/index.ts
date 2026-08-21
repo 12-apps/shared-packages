@@ -7,7 +7,8 @@
  * same screens serve any vertical the engine serves.
  */
 export type { ResearchApiClient } from './client';
-export { DEFAULT_MESSAGES, resolveMessages } from './messages';
+export { resolveMessages } from './messages';
+export { PT_BR_RESEARCH_MESSAGES } from './pt-BR';
 export type { ResearchMessages } from './messages';
 export type {
   CatalogRef,

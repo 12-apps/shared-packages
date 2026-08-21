@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // render from @testing-library/react — plain DOM asserts, no jest-dom.
 import { render, screen } from '@testing-library/react';
+import { PT_BR_RESEARCH_MESSAGES } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { OffersTable } from '../offers-table';
@@ -41,7 +42,7 @@ const can = offer({
 
 describe('OffersTable — suspect unit price (FUT-497)', () => {
   it('badges the implausible unit price and explains the suspicion', () => {
-    render(<OffersTable offers={[can, suspect]} />);
+    render(<OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={[can, suspect]} />);
 
     const badge = screen.getByTestId('offer-suspect-unit-suspect');
     expect(badge.textContent).toContain('Preço unitário suspeito');
@@ -55,7 +56,7 @@ describe('OffersTable — suspect unit price (FUT-497)', () => {
   });
 
   it('leaves a plausible offer unbadged', () => {
-    render(<OffersTable offers={[can]} />);
+    render(<OffersTable messages={PT_BR_RESEARCH_MESSAGES} offers={[can]} />);
 
     // Absence asserted on the rendered TEXT: nothing was removed here, so a
     // null-element check would be the flakiness gate's false-negative shape.
@@ -66,7 +67,7 @@ describe('OffersTable — suspect unit price (FUT-497)', () => {
 
   it('translates the badge through the messages layer', () => {
     render(
-      <OffersTable offers={[suspect]} messages={{ suspectUnitPriceBadge: 'Suspect unit price' }} />,
+      <OffersTable  offers={[suspect]} messages={{ ...PT_BR_RESEARCH_MESSAGES, suspectUnitPriceBadge: 'Suspect unit price' }} />,
     );
 
     expect(screen.getByTestId('offer-suspect-unit-suspect').textContent).toContain(

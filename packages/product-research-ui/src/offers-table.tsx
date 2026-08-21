@@ -25,7 +25,8 @@ import type { OfferOutput } from './types';
 
 export interface OffersTableProps {
   offers: OfferOutput[];
-  messages?: Partial<ResearchMessages>;
+  /** Every string this screen renders — the HOST's words (see `./messages`). */
+  messages: ResearchMessages;
 }
 
 interface OfferRow extends Record<string, unknown> {

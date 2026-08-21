@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // render/waitFor from @testing-library/react — plain DOM asserts, no jest-dom.
 import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { PT_BR_RESEARCH_MESSAGES } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { ResearchRunScreen } from '../research-run-screen';
@@ -21,7 +22,7 @@ const completedClient = (overrides: Parameters<typeof runView>[0] = {}) =>
 describe('ResearchRunScreen', () => {
   it('renders the hero card with unit price, pack math and the ranked table', async () => {
     render(
-      <ResearchRunScreen client={completedClient()} requestId="req-1" />,
+      <ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={completedClient()} requestId="req-1" />,
     );
 
     await waitFor(() => expect(screen.queryByTestId('best-offer-card')).not.toBeNull());
@@ -44,7 +45,7 @@ describe('ResearchRunScreen', () => {
         { sourceId: 's2', type: 'VTEX', name: 'Giga', status: 'FAILED', offerCount: 0, ms: 90 },
       ],
     });
-    render(<ResearchRunScreen client={client} requestId="req-1" />);
+    render(<ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={client} requestId="req-1" />);
 
     await waitFor(() => expect(screen.queryByTestId('research-degraded')).not.toBeNull());
     // The failed source is named in its status row too.
@@ -68,7 +69,7 @@ describe('ResearchRunScreen', () => {
         },
       ],
     });
-    render(<ResearchRunScreen client={client} requestId="req-1" />);
+    render(<ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={client} requestId="req-1" />);
 
     await waitFor(() => expect(screen.queryByTestId('source-status-reason-s2')).not.toBeNull());
     expect(screen.getByTestId('source-status-reason-s2').textContent).toContain('HTTP 403');
@@ -77,7 +78,7 @@ describe('ResearchRunScreen', () => {
 
   it('teaches next steps on zero offers instead of shrugging', async () => {
     render(
-      <ResearchRunScreen
+      <ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES}
         client={completedClient({ offers: [], sourceStats: [] })}
         requestId="req-1"
       />,
@@ -87,10 +88,10 @@ describe('ResearchRunScreen', () => {
 
   it('overrides strings through the messages layer', async () => {
     render(
-      <ResearchRunScreen
+      <ResearchRunScreen 
         client={completedClient()}
         requestId="req-1"
-        messages={{ bestOfferTitle: 'Best price' }}
+        messages={{ ...PT_BR_RESEARCH_MESSAGES, bestOfferTitle: 'Best price' }}
       />,
     );
     await waitFor(() => expect(screen.queryByTestId('best-offer-card')).not.toBeNull());
@@ -116,7 +117,7 @@ describe('ResearchRunScreen', () => {
     const channel = channelHarness();
 
     render(
-      <ResearchRunScreen client={client} requestId="req-1" runChannel={channel.useChannel} />,
+      <ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={client} requestId="req-1" runChannel={channel.useChannel} />,
     );
     await waitFor(() => expect(screen.queryByTestId('source-status-src-a')).not.toBeNull());
     expect(screen.getByTestId('source-status-src-a').textContent).toContain('consultando…');
@@ -162,7 +163,7 @@ describe('ResearchRunScreen', () => {
     const channel = channelHarness();
 
     render(
-      <ResearchRunScreen client={client} requestId="req-1" runChannel={channel.useChannel} />,
+      <ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={client} requestId="req-1" runChannel={channel.useChannel} />,
     );
 
     await waitFor(() => expect(screen.queryByTestId('research-partial-offers')).not.toBeNull());
@@ -189,7 +190,7 @@ describe('ResearchRunScreen', () => {
         ),
       getRun: () => Promise.resolve(runView({ status: 'RUNNING', sourceStats: [], offers: [] })),
     });
-    render(<ResearchRunScreen client={client} requestId="req-1" />);
+    render(<ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={client} requestId="req-1" />);
 
     await waitFor(() => expect(screen.queryByTestId('research-run-pending')).not.toBeNull());
     // An empty table would teach the buyer nothing the pending line does not.
@@ -215,7 +216,7 @@ describe('ResearchRunScreen', () => {
         },
       ],
     });
-    render(<ResearchRunScreen client={client} requestId="req-1" />);
+    render(<ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={client} requestId="req-1" />);
 
     await waitFor(() => expect(screen.queryByTestId('source-status-s1')).not.toBeNull());
     const row = screen.getByTestId('source-status-s1');
@@ -239,7 +240,7 @@ describe('ResearchRunScreen', () => {
     const channel = channelHarness();
 
     render(
-      <ResearchRunScreen client={client} requestId="req-1" runChannel={channel.useChannel} />,
+      <ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={client} requestId="req-1" runChannel={channel.useChannel} />,
     );
     await waitFor(() => expect(screen.queryByTestId('source-status-src-a')).not.toBeNull());
 
@@ -263,7 +264,7 @@ describe('ResearchRunScreen', () => {
         { sourceId: 's1', type: 'VTEX', name: 'Giga', status: 'OK', offerCount: 4, ms: 42 },
       ],
     });
-    render(<ResearchRunScreen client={client} requestId="req-1" />);
+    render(<ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={client} requestId="req-1" />);
 
     await waitFor(() => expect(screen.queryByTestId('source-status-s1')).not.toBeNull());
     const row = screen.getByTestId('source-status-s1');
@@ -282,7 +283,7 @@ describe('ResearchRunScreen', () => {
       getRun: () =>
         Promise.resolve(runView({ status: 'FAILED', error: 'orquestração caiu', offers: [] })),
     });
-    render(<ResearchRunScreen client={client} requestId="req-1" />);
+    render(<ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={client} requestId="req-1" />);
     await waitFor(() => expect(screen.queryByTestId('research-run-failed')).not.toBeNull());
     expect(screen.getByTestId('research-run-failed').textContent).toContain('orquestração caiu');
   });
@@ -302,7 +303,7 @@ describe('ResearchRunScreen — unknown shipping caveat (FUT-518)', () => {
         offer({ id: 'solar', rank: 2, supplierName: 'Solar', unitPriceCents: 399 }),
       ],
     });
-    render(<ResearchRunScreen client={client} requestId="req-1" />);
+    render(<ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={client} requestId="req-1" />);
 
     await waitFor(() => expect(screen.queryByTestId('best-offer-shipping-unknown')).not.toBeNull());
     const hero = screen.getByTestId('best-offer-card');
@@ -322,7 +323,7 @@ describe('OffersTable ordering', () => {
         offer({ id: 'b', rank: 2, unitPriceCents: 399, supplierName: 'Giga' }),
       ],
     });
-    render(<ResearchRunScreen client={client} requestId="req-1" />);
+    render(<ResearchRunScreen messages={PT_BR_RESEARCH_MESSAGES} client={client} requestId="req-1" />);
     await waitFor(() => expect(screen.queryByTestId('offers-table')).not.toBeNull());
     const text = screen.getByTestId('offers-table').textContent ?? '';
     expect(text.indexOf('Solar')).toBeGreaterThan(-1);
