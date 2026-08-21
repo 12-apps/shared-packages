@@ -16,6 +16,7 @@ import { defineFeatures } from '../../core/registry';
 import type { FeatureRegistry, ResolvedFeatureDef } from '../../core/types';
 import { createMemorySource } from '../../memory';
 import { createApiEntitlements } from '../create-api-entitlements';
+import { PT_BR_ENTITLEMENTS_MESSAGES } from '../pt-BR';
 import { EntitlementsConfigError } from '../config';
 import type { ApiEntitlementsConfig } from '../config';
 
@@ -64,6 +65,7 @@ function config(
     defaultPlanKey: 'hobby',
     pricing: PRICING,
     formatPrice: priceLabel,
+    messages: PT_BR_ENTITLEMENTS_MESSAGES,
     ...over,
   };
 }
@@ -170,6 +172,13 @@ describe('assertApiEntitlementsConfig', () => {
   it('refuses a missing price formatter rather than picking a currency', () => {
     const error = buildWith({ formatPrice: undefined as never });
     expect(String(error)).toMatch(/`formatPrice` is required/);
+  });
+
+  it("refuses missing messages rather than answering in another product's words", () => {
+    // The runtime half of the copy port, for a host on plain JS: the compiled
+    // TS type already requires `messages`.
+    const error = buildWith({ messages: undefined as never });
+    expect(String(error)).toMatch(/`messages` is required/);
   });
 
   it('refuses a nonsensical cache TTL and a blank permission id', () => {

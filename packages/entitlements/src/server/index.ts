@@ -23,7 +23,7 @@ export {
 } from './create-api-entitlements';
 export {
   definePermissionContribution,
-  ENTITLEMENTS_PERMISSIONS,
+  entitlementsPermissions,
   PLAN_REQUEST_PERMISSION,
   type EntitlementPermissionContribution,
   type EntitlementPermissionKind,
@@ -32,10 +32,20 @@ export {
   type EntitlementPermissionSpec,
   type EntitlementsPermission,
 } from './contribution';
+export type {
+  EntitlementDenialMessages,
+  EntitlementsMessages,
+  PlanDiffMessages,
+  PlanImpactMessages,
+  PlanViewMessages,
+} from './copy';
+export {
+  PT_BR_ENTITLEMENTS_MESSAGES,
+  PT_BR_ENTITLEMENTS_PERMISSION_LABELS,
+} from './pt-BR';
 export {
   entitlementDenialResponse,
   isEntitlementDenial,
-  PAYMENT_REQUIRED_MESSAGE,
   type WireResponse,
 } from './wire';
 export {

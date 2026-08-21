@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { definePlans } from '../../core/plans';
 import { defineFeatures } from '../../core/registry';
 import { createPlanImpact } from '../plan-impact';
+import { PT_BR_ENTITLEMENTS_MESSAGES } from '../pt-BR';
 
 const FEATURES = defineFeatures({
   'stations.online': { kind: 'quota', onRevoke: 'readonly' },
@@ -30,6 +31,7 @@ function calc() {
   return createPlanImpact({
     plans: PLANS,
     defaultPlanKey: 'hobby',
+    messages: PT_BR_ENTITLEMENTS_MESSAGES,
     surfaces: {
       stations: { feature: 'stations.online', label: 'estações' },
       digests: { feature: 'alerts.digest', label: 'resumos' },
@@ -140,7 +142,12 @@ describe('the assembly check', () => {
     // `losingOnCurrent` is zero — a green light to downgrade the whole fleet,
     // produced without measuring one of them.
     expect(() =>
-      createPlanImpact({ plans: PLANS, defaultPlanKey: 'hobby', surfaces: {} }),
+      createPlanImpact({
+        plans: PLANS,
+        defaultPlanKey: 'hobby',
+        surfaces: {},
+        messages: PT_BR_ENTITLEMENTS_MESSAGES,
+      }),
     ).toThrow(/`surfaces` is empty/);
   });
 
@@ -150,6 +157,7 @@ describe('the assembly check', () => {
         plans: PLANS,
         defaultPlanKey: 'legacy' as 'hobby',
         surfaces: { stations: { feature: 'stations.online', label: 'estações' } },
+        messages: PT_BR_ENTITLEMENTS_MESSAGES,
       }),
     ).toThrow(/does not declare/);
   });

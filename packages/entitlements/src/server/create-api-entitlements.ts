@@ -32,6 +32,9 @@
  *    as already-formatted display data, and the ask writes through the
  *    {@link PlanChangeRequestPort} — a lead for a human, never a checkout, and
  *    never a package-owned table.
+ *  - **The words** — `messages` is required for the same reason `formatPrice`
+ *    is: every sentence this surface answers with is host vocabulary, and the
+ *    compiled-in defaults were one product's Portuguese.
  *
  * Every one of those is checked at ASSEMBLY (`assertApiEntitlementsConfig`):
  * a required option nobody validates is still fail-open, and an empty
@@ -136,6 +139,7 @@ export function createApiEntitlements<F extends string, K extends string>(
     pricing: config.pricing,
     comparison: config.comparison,
     formatPrice: config.formatPrice,
+    messages: config.messages,
   });
 
   const routes = buildEntitlementsRoutes({
@@ -149,6 +153,7 @@ export function createApiEntitlements<F extends string, K extends string>(
         ? (plans.list as readonly string[]).includes(key)
         : config.pricing.some((row) => row.key === key),
     requestPermission: config.planRequestPermission ?? PLAN_REQUEST_PERMISSION,
+    messages: config.messages,
   });
 
   return {

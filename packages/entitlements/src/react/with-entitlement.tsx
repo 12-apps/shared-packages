@@ -1,5 +1,5 @@
 /**
- * `withEntitlement` — the sanctioned way to plan-gate a page.
+ * `createWithEntitlement(copy)` — the sanctioned way to plan-gate a page.
  *
  * Wrap the page module's export, never the route element: the wrap is then
  * statically greppable, which is what lets the coverage gate
@@ -8,8 +8,12 @@
  * tier is still wrapped where a key exists for it — "ungated" must be a
  * decision in the diff, not an omission.
  *
- * Reason semantics mirror `<Locked>` and a sidebar's lock resolution, so the
- * surfaces can never disagree:
+ * A factory over the lock's COPY rather than a bare HOC, because the lock is
+ * a full screen of sentences and those are required host config
+ * (`createWebEntitlements` binds its own required `copy.pageLock`; only a
+ * host composing the gate directly builds one here). The reason SEMANTICS
+ * stay the package's, mirroring `<Locked>` and a sidebar's lock resolution
+ * so the surfaces can never disagree:
  *   - `enabled`            → the page.
  *   - `disabled-by-tenant` → the page. The tenant's own switch is not a plan
  *     problem; the page's existing tenant-off UX stays authoritative.
@@ -30,6 +34,7 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { UpsellReason } from '../plan-wire';
+import type { PageLockCopy } from './copy';
 import { useEntitlement } from './context';
 import { raiseUpsell } from './upsell-channel';
 
@@ -42,39 +47,22 @@ const PASS_THROUGH = new Set(['enabled', 'disabled-by-tenant', 'not-supported'])
  */
 const LOCK_REASONS: readonly UpsellReason[] = ['not-entitled', 'restricted', 'suspended'];
 
-const LOCK_COPY: Record<UpsellReason, { title: string; body: string }> = {
-  'not-entitled': {
-    title: 'Recurso não incluído no seu plano',
-    body: 'Seu plano atual não inclui esta área. Conheça as opções de plano para desbloqueá-la.',
-  },
-  'quota-exceeded': {
-    title: 'Limite do plano atingido',
-    body: 'Você usou todo o limite que o seu plano inclui para este recurso.',
-  },
-  restricted: {
-    title: 'Pagamento pendente',
-    body: 'Há uma pendência de pagamento na assinatura, por isso esta área está temporariamente indisponível.',
-  },
-  suspended: {
-    title: 'Assinatura suspensa',
-    body: 'A assinatura está suspensa e esta área ficou indisponível.',
-  },
-  // Never reached (disabled-by-tenant passes through) — present so the record
-  // stays total over UpsellReason and the type system keeps it that way.
-  'disabled-by-tenant': {
-    title: 'Recurso desativado',
-    body: 'Este recurso está desativado nas configurações.',
-  },
-};
-
 /**
  * The full-page lock. Kept deliberately thin: the upsell prompt host is the
  * single surface that owns the plan name and the request-the-plan CTA, so the
  * page states WHY and the button funnels into that surface.
  */
-function PageLock({ feature, reason }: { feature: string; reason: UpsellReason }): JSX.Element {
+function PageLock({
+  feature,
+  reason,
+  copy,
+}: {
+  feature: string;
+  reason: UpsellReason;
+  copy: PageLockCopy;
+}): JSX.Element {
   const decision = useEntitlement(feature);
-  const copy = LOCK_COPY[reason];
+  const reasonCopy = copy.reasons[reason];
   return (
     <Stack
       spacing={2}
@@ -84,10 +72,10 @@ function PageLock({ feature, reason }: { feature: string; reason: UpsellReason }
       sx={{ maxWidth: 560, p: 2 }}
     >
       <Text variant="heading" size="lg" as="h1">
-        {copy.title}
+        {reasonCopy.title}
       </Text>
       <Text variant="body" as="p">
-        {copy.body}
+        {reasonCopy.body}
       </Text>
       <Button
         data-testid="page-locked-upsell"
@@ -95,29 +83,38 @@ function PageLock({ feature, reason }: { feature: string; reason: UpsellReason }
           raiseUpsell({ feature, requiredPlan: decision.requiredPlan ?? null, reason })
         }
       >
-        Saiba mais
+        {copy.learnMore}
       </Button>
     </Stack>
   );
 }
 
-/**
- * Gate `Component` behind `feature`. Composes with lazy routes because the
- * wrap happens on the module's exported component — the lazy chunk resolves
- * to the already-wrapped page.
- */
-export function withEntitlement<P extends object>(
+/** The bound gate `createWithEntitlement` returns. */
+export type EntitlementGate = <P extends object>(
   feature: string,
   Component: ComponentType<P>,
-): ComponentType<P> {
-  function Gated(props: P): JSX.Element {
-    const decision = useEntitlement(feature);
-    if (decision.enabled || PASS_THROUGH.has(decision.reason)) {
-      return <Component {...props} />;
+) => ComponentType<P>;
+
+/**
+ * Bind the lock's copy once; the returned gate wraps `Component` behind
+ * `feature`. Composes with lazy routes because the wrap happens on the
+ * module's exported component — the lazy chunk resolves to the
+ * already-wrapped page.
+ */
+export function createWithEntitlement(copy: PageLockCopy): EntitlementGate {
+  return function withEntitlement<P extends object>(
+    feature: string,
+    Component: ComponentType<P>,
+  ): ComponentType<P> {
+    function Gated(props: P): JSX.Element {
+      const decision = useEntitlement(feature);
+      if (decision.enabled || PASS_THROUGH.has(decision.reason)) {
+        return <Component {...props} />;
+      }
+      const reason = LOCK_REASONS.find((known) => known === decision.reason) ?? 'not-entitled';
+      return <PageLock feature={feature} reason={reason} copy={copy} />;
     }
-    const reason = LOCK_REASONS.find((known) => known === decision.reason) ?? 'not-entitled';
-    return <PageLock feature={feature} reason={reason} />;
-  }
-  Gated.displayName = `withEntitlement(${Component.displayName ?? Component.name ?? 'Page'})`;
-  return Gated;
+    Gated.displayName = `withEntitlement(${Component.displayName ?? Component.name ?? 'Page'})`;
+    return Gated;
+  };
 }

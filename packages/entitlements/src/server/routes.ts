@@ -5,6 +5,7 @@
  */
 import type { EntitlementsEngine } from '../core/engine';
 import type { FiledPlanRequest, OpenPlanRequest } from '../plan-wire';
+import type { EntitlementsMessages } from './copy';
 import type { PlanService } from './plan-service';
 import { entitlementDenialResponse, isEntitlementDenial, type WireResponse } from './wire';
 
@@ -21,7 +22,7 @@ export interface EntitlementsActor {
    * Every permission id this caller holds, resolved by the host's RBAC.
    *
    * REQUIRED, and a list rather than a boolean: the write on this surface is
-   * gated by an id this package OWNS and exports (`ENTITLEMENTS_PERMISSIONS`),
+   * gated by an id this package OWNS and exports (`entitlementsPermissions`),
    * so it can be granted, revoked, audited and shown in a role editor like any
    * other. It used to be `canRequestPlanChange?: boolean`, which meant every
    * host spelled this package's own decision in a permission of its own — and
@@ -127,11 +128,14 @@ function parseRequestBody(raw: unknown, isKnownPlan: (key: string) => boolean): 
 const ok = (data: Record<string, unknown>): WireResponse => ({ status: 200, body: { data } });
 
 /** Run a handler, mapping the engine's own denials onto the wire contract. */
-async function answering(body: () => Promise<WireResponse>): Promise<WireResponse> {
+async function answering(
+  messages: EntitlementsMessages,
+  body: () => Promise<WireResponse>,
+): Promise<WireResponse> {
   try {
     return await body();
   } catch (error) {
-    if (isEntitlementDenial(error)) return entitlementDenialResponse(error);
+    if (isEntitlementDenial(error)) return entitlementDenialResponse(error, messages);
     throw error;
   }
 }
@@ -141,6 +145,7 @@ function askRoute(
   leads: PlanChangeRequestPort,
   isKnownPlan: (key: string) => boolean,
   requestPermission: string,
+  messages: EntitlementsMessages,
 ): EntitlementsRoute {
   return {
     // "I want a bigger plan." Writes a LEAD, never a plan: moving a tenant
@@ -150,16 +155,16 @@ function askRoute(
     method: 'POST',
     path: '/plan/request',
     handle: ({ actor, body }) =>
-      answering(async () => {
+      answering(messages, async () => {
         if (!actor.permissions.includes(requestPermission)) {
           return {
             status: 403,
-            body: { error: 'Sem permissão para solicitar mudança de plano.' },
+            body: { error: messages.planRequestForbidden },
           };
         }
         const parsed = parseRequestBody(body, isKnownPlan);
         if (parsed === null) {
-          return { status: 400, body: { error: 'Pedido inválido.' } };
+          return { status: 400, body: { error: messages.invalidPlanRequest } };
         }
         // From the engine, not the caller: a client that could name its own
         // current tier could file a lead saying the tenant is on a tier it is
@@ -191,8 +196,10 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
   isKnownPlan: (key: string) => boolean;
   /** The permission id `POST /plan/request` requires of the actor. */
   requestPermission: string;
+  /** The refusal/denial sentences — REQUIRED, the host's words. */
+  messages: EntitlementsMessages;
 }): EntitlementsRoute[] {
-  const { engine, service, leads } = deps;
+  const { engine, service, leads, messages } = deps;
 
   const routes: EntitlementsRoute[] = [
     {
@@ -201,7 +208,7 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
       method: 'GET',
       path: '/entitlements',
       handle: ({ actor }) =>
-        answering(async () => ok({ snapshot: await engine.toSnapshot(actor.tenantId) })),
+        answering(messages, async () => ok({ snapshot: await engine.toSnapshot(actor.tenantId) })),
     },
     {
       // What plan this tenant is on. READ-ONLY, permissionless, and it
@@ -211,7 +218,7 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
       method: 'GET',
       path: '/plan',
       handle: ({ actor }) =>
-        answering(async () => ok({ plan: await service.getPlanPayload(actor.tenantId) })),
+        answering(messages, async () => ok({ plan: await service.getPlanPayload(actor.tenantId) })),
     },
   ];
 
@@ -224,9 +231,9 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
         method: 'GET',
         path: '/plan/request',
         handle: ({ actor }) =>
-          answering(async () => ok({ request: await leads.getOpen(actor.tenantId) })),
+          answering(messages, async () => ok({ request: await leads.getOpen(actor.tenantId) })),
       },
-      askRoute(service, leads, deps.isKnownPlan, deps.requestPermission),
+      askRoute(service, leads, deps.isKnownPlan, deps.requestPermission, messages),
     );
   }
 

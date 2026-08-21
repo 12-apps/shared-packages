@@ -39,11 +39,13 @@ export class QuotaRecountError extends Error {
 /**
  * Thrown when the database aborts the loser of a serialization race
  * (SQLSTATE 40001). The honest answer is "try again", not a 500 — map to
- * **409**.
+ * **409**. The message is REQUIRED — it used to default to one product's
+ * Portuguese; `createWithinQuota` fills it from its own required
+ * `raceMessage`.
  */
 export class QuotaRaceError extends Error {
   readonly status = 409 as const;
-  constructor(message = 'Não foi possível concluir agora. Tente novamente.') {
+  constructor(message: string) {
     super(message);
     this.name = 'QuotaRaceError';
     Object.setPrototypeOf(this, QuotaRaceError.prototype);
@@ -73,6 +75,13 @@ export async function createWithinQuota<T, Tx>(
     count: (tx: Tx, tenantId: string) => Promise<number>;
     /** The 402 body when the re-count refuses, e.g. "Você atingiu o limite do seu plano." */
     message: string;
+    /**
+     * The 409 body when the transaction loses a serialization race —
+     * REQUIRED, the host's words, like `message` above. pt-BR hosts pass
+     * `PT_BR_ENTITLEMENTS_MESSAGES.quotaRaceRetry`; the removed default was
+     * that same sentence, compiled in.
+     */
+    raceMessage: string;
   },
   body: (tx: Tx) => Promise<T>,
 ): Promise<T> {
@@ -91,7 +100,7 @@ export async function createWithinQuota<T, Tx>(
     );
   } catch (error) {
     if (error instanceof QuotaRecountError) throw error;
-    if (isSerializationFailure(error)) throw new QuotaRaceError();
+    if (isSerializationFailure(error)) throw new QuotaRaceError(options.raceMessage);
     throw error;
   }
 }

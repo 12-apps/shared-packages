@@ -11,6 +11,7 @@ import type {
   UsageCounter,
 } from '../core/types';
 import type { ComparisonTier, TenantPlanPayload, TenantPlanView } from '../plan-wire';
+import type { PlanViewMessages } from './copy';
 import { buildTenantPlanView, type PricingRow, type QuotaUsageView } from './plan-view';
 
 interface PlanServiceConfig<F extends string> {
@@ -23,6 +24,8 @@ interface PlanServiceConfig<F extends string> {
   comparison?: ((currentPlanKey: string) => ComparisonTier[]) | undefined;
   /** Required — the host's currency wording. See `plan-view.ts`. */
   formatPrice: (priceCents: number | null) => string | null;
+  /** Required — the host's situation notes. See `plan-view.ts`. */
+  messages: PlanViewMessages;
 }
 
 export interface PlanService {
@@ -76,6 +79,7 @@ export function createPlanService<F extends string>(config: PlanServiceConfig<F>
       (feature) => (features.has(feature) ? features.def(feature).description : null),
       usage,
       config.formatPrice,
+      config.messages,
     );
   }
 

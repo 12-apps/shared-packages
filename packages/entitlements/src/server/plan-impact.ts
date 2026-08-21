@@ -22,6 +22,7 @@
  */
 import { toLimit } from '../core/quota';
 import type { PlanCatalog } from '../core/types';
+import type { PlanImpactMessages } from './copy';
 
 /** One measured surface: the feature key that gates it, and its report label. */
 export interface ImpactSurface<F extends string> {
@@ -134,6 +135,13 @@ export interface PlanImpactConfig<F extends string, S extends string, K extends 
   defaultPlanKey: K;
   /** Every measured surface: the gating feature key and the printed label. */
   surfaces: Record<S, ImpactSurface<F>>;
+  /**
+   * The report's sentences — REQUIRED, the host's words (pt-BR hosts:
+   * `PT_BR_ENTITLEMENTS_MESSAGES`, which satisfies the slice). What stays
+   * here is WHEN a note exists and how the breakdown is ordered; what a
+   * caveat says about the operator's fleet is copy.
+   */
+  messages: PlanImpactMessages;
 }
 
 /** Type guard over the catalog's own key list. */
@@ -184,25 +192,19 @@ function formatters<F extends string, K extends string>(
   plans: PlanCatalog<F, K>,
   defaultPlanKey: K,
   isPlanKey: (value: string) => value is K,
+  messages: PlanImpactMessages,
 ): Pick<PlanImpact<string, K>, 'formatOffLadderNote' | 'formatUnscorableNote' | 'formatTierBreakdown'> {
   return {
-    // Neither note names WHAT a tenant is. It used to carry one host's own
-    // word for its customers, which is simply false for the next one.
+    // Whether a note exists is the package's (zero means no caveat); the
+    // sentence is the host's, and it never names WHAT a tenant is — the
+    // compiled-in copy once carried one host's own word for its customers.
     formatOffLadderNote(offLadder, total) {
       if (offLadder <= 0) return null;
-      return (
-        `${offLadder}/${total} em um tier fora da escada (chave aposentada ` +
-        `ou escrita à mão) SEM assinatura ativa. O resolvedor já os trata como ` +
-        `"${defaultPlanKey}", e é contra esse teto que foram medidos acima.`
-      );
+      return messages.offLadderNote({ offLadder, total, defaultPlanKey });
     },
     formatUnscorableNote(unscorable, total) {
       if (unscorable <= 0) return null;
-      return (
-        `${unscorable}/${total} têm assinatura ativa em um plano fora da escada. ` +
-        `Os limites deles vêm do snapshot congelado da assinatura, que o catálogo não ` +
-        `modela — ficaram FORA da conta acima e precisam ser conferidos à mão.`
-      );
+      return messages.unscorableNote({ unscorable, total });
     },
     formatTierBreakdown(counts) {
       const known = plans.list
@@ -217,7 +219,9 @@ function formatters<F extends string, K extends string>(
         .filter((key) => !isPlanKey(key) && (counts[key] ?? 0) > 0)
         .sort()
         .map((key) =>
-          key === 'none' ? `⚠️ acima do ${richest} ${counts[key]}` : `⚠️ ${key} ${counts[key]}`,
+          key === 'none'
+            ? messages.tierBreakdownAboveTop({ topTier: richest, count: counts[key] ?? 0 })
+            : messages.tierBreakdownOffLadder({ tier: key, count: counts[key] ?? 0 }),
         );
       return [...known, ...unknown].join(', ');
     },
@@ -299,6 +303,6 @@ export function createPlanImpact<F extends string, S extends string, K extends s
       return usage;
     },
     summarizeImpact: (report) => summarize(report, isPlanKey, defaultPlanKey),
-    ...formatters(plans, defaultPlanKey, isPlanKey),
+    ...formatters(plans, defaultPlanKey, isPlanKey, config.messages),
   };
 }

@@ -21,9 +21,9 @@ the package. See ADOPTING.md §10.
 they are called, what they cost, the currency they read in, the interval they
 recur on and the permission that may ask for a change all arrive as config,
 checked at ASSEMBLY by `assertApiEntitlementsConfig`. The one thing this
-package contributes back is `ENTITLEMENTS_PERMISSIONS` — the single id
-(`plan:request`) guarding its own write — which the host composes into its RBAC
-catalog. See [`ADOPTING.md`](./ADOPTING.md) §11.
+package contributes back is `entitlementsPermissions(labels)` — the single id
+(`plan:request`) guarding its own write, worded by the host — which the host
+composes into its RBAC catalog. See [`ADOPTING.md`](./ADOPTING.md) §11.
 
 ---
 

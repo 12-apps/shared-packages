@@ -12,6 +12,7 @@ import {
   QuotaRaceError,
   QuotaRecountError,
 } from '../quota-guard';
+import { PT_BR_ENTITLEMENTS_MESSAGES } from '../pt-BR';
 
 /** The transaction client the callback receives — carries the counted model. */
 interface Tx {
@@ -44,6 +45,7 @@ function harness(used: number) {
       limit: 1 as number | 'unlimited' | null,
       count: (txc: Tx, tenantId: string) => txc.count(tenantId),
       message: 'Você atingiu o limite do seu plano.',
+      raceMessage: PT_BR_ENTITLEMENTS_MESSAGES.quotaRaceRetry,
     },
   };
 }

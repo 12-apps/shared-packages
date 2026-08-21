@@ -15,8 +15,9 @@ import type { EntitlementReason } from './core/types';
 /**
  * The reasons a tenant can be shown (`not-supported` rows are dropped).
  * DERIVED from the engine's own union — never hand-written — so adding a
- * reason to `EntitlementReason` fails typecheck at the `NOTE` copy table
- * instead of blanking a note at runtime.
+ * reason to `EntitlementReason` fails typecheck at `featureNotes` (the
+ * required messages port, and every pack of it) instead of blanking a note
+ * at runtime.
  */
 export type TenantFeatureReason = Exclude<EntitlementReason, 'not-supported'>;
 

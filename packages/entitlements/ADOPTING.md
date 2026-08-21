@@ -285,7 +285,7 @@ can instead mount both halves and keep only config:
 
 ```ts
 // server — Hono host (other frameworks: adapt `api.routes`, ~40 lines)
-import { entitlementsRouter } from '@12-apps/entitlements/hono';
+import { entitlementsRouter, PT_BR_ENTITLEMENTS_MESSAGES } from '@12-apps/entitlements/hono';
 
 const { app: entitlements, api } = entitlementsRouter({
   features: FEATURES,
@@ -295,6 +295,7 @@ const { app: entitlements, api } = entitlementsRouter({
   defaultPlanKey: 'solo',                     // must be a tier the ladder declares
   pricing: PRICING_ROWS,                      // display data from YOUR billing
   formatPrice: moneyInYourCurrency,           // REQUIRED — your currency, your wording
+  messages: PT_BR_ENTITLEMENTS_MESSAGES,      // REQUIRED — every sentence the surface answers with
   comparison: buildTierComparison,            // your pricing cards (each with `priceNote`)
   planChangeRequests: planRequestPort,        // your lead table, behind the port
   resolveActor: async (c) => {
@@ -312,11 +313,12 @@ app.route('/api/admin/:tenantSlug', entitlements);
 
 ```tsx
 // browser
-import { createWebEntitlements } from '@12-apps/entitlements/react';
+import { createWebEntitlements, PT_BR_ENTITLEMENTS_WEB_COPY } from '@12-apps/entitlements/react';
 
 const { page: PlanPage, UpsellHost, withEntitlement } = createWebEntitlements({
   apiBase: `/api/admin/${tenantSlug}`,       // REQUIRED, and refused when blank
   canRequestPlanChange: can('plan:request'), // REQUIRED — resolved by YOUR RBAC
+  copy: PT_BR_ENTITLEMENTS_WEB_COPY,         // REQUIRED — every sentence the screens render
   switchLocation: tenantSwitchLocation,      // feature -> { path, label } in YOUR routes
   plansPath: `/${tenantSlug}/planos`,
   LinkComponent: RouterLink,                 // your router's Link
@@ -352,6 +354,7 @@ them as a deliberate lockout:
 | a tier with no `pricing` row | the plan screen falls back to the raw plan key, which this surface promises a customer never sees |
 | a declared quota with no `usage` | the ceiling reads `used = 0` forever and is never enforced |
 | a missing `formatPrice` | the package would have to pick a currency |
+| missing `messages` | the package would have to answer in another product's words — pass `PT_BR_ENTITLEMENTS_MESSAGES`, or your own `EntitlementsMessages` |
 
 `createPlanImpact` and `createRetention` do the same for their own empty
 collections — an empty `surfaces` map made the grandfathering report answer
@@ -440,9 +443,14 @@ through a default, so upgrading is a set of things you now have to **say**.
 | removed | replace it with |
 |---|---|
 | `formatPrice` (export from `./server`) | your own function, passed as the required `formatPrice` config. The old body worded Brazilian Reais and said "free" in pt-BR at zero — reproduce it in your host verbatim if that is genuinely your currency. |
-| `buildTenantPlanView(…)`'s defaulted `usage` and `priceLabel` parameters | both are positional and REQUIRED now: `buildTenantPlanView(planKey, decisions, pricing, describe, usage, priceLabel)`. Pass `{}` for no measured usage. |
+| `buildTenantPlanView(…)`'s defaulted `usage` and `priceLabel` parameters | both are positional and REQUIRED now — and the copy wave appended a seventh: `buildTenantPlanView(planKey, decisions, pricing, describe, usage, priceLabel, messages)`. Pass `{}` for no measured usage. |
 | `EntitlementsActor.canRequestPlanChange` | `EntitlementsActor.permissions: readonly string[]`, which must contain `plan:request` (or whatever `planRequestPermission` names). |
 | the pricing card's hardcoded `/mês` | `ComparisonTier.priceNote: string \| null` — your interval, per card, or `null`. |
+| `PAYMENT_REQUIRED_MESSAGE` (export from `./server`) | the required `messages.paymentRequired` — the same words live on `PT_BR_ENTITLEMENTS_MESSAGES.paymentRequired`, and `entitlementDenialResponse(error, messages)` now takes the messages beside the error. |
+| `ENTITLEMENTS_PERMISSIONS` (constant) | `entitlementsPermissions(labels)` — the ids and specs unchanged, the role-editor words now yours (pt-BR: `PT_BR_ENTITLEMENTS_PERMISSION_LABELS`). |
+| `withEntitlement` (standalone export from `./react`) | `createWithEntitlement(copy.pageLock)` — or take the already-bound gate off `createWebEntitlements(...)`, which is the common path. |
+| `QuotaRaceError`'s default pt-BR message | `createWithinQuota`'s required `raceMessage` (pt-BR hosts: `PT_BR_ENTITLEMENTS_MESSAGES.quotaRaceRetry`). |
+| `describeLoss(loss)`'s compiled-in sentence | `describeLoss(loss, messages)` — the line is `messages.lossLine(loss)`, the host's words. |
 | the hardcoded top-tier name in `formatTierBreakdown` | nothing: the ladder's own richest tier is read off `plans.list`. |
 
 ### What became required
@@ -453,28 +461,38 @@ through a default, so upgrading is a set of things you now have to **say**.
 | `pricing` | `ApiEntitlementsConfig` | same — and it must name every tier in the ladder |
 | `plans` | `ApiEntitlementsConfig` | same — pass `null` explicitly for hand-assigned maps |
 | `usage` | `ApiEntitlementsConfig`, when the catalog declares a quota | same |
+| `messages` | `ApiEntitlementsConfig` | same — every sentence the surface answers with (pt-BR hosts pass `PT_BR_ENTITLEMENTS_MESSAGES`) |
 | `canRequestPlanChange` | `WebEntitlementsConfig` | throws from `createWebEntitlements` |
 | `apiBase` non-blank | `WebEntitlementsConfig` | same |
+| `copy` | `WebEntitlementsConfig` | same — every sentence the screens render (pt-BR hosts pass `PT_BR_ENTITLEMENTS_WEB_COPY`) |
+| `raceMessage` | `createWithinQuota` options | typecheck failure — the 409 retry sentence, beside the `message` you already write |
 | `priceNote` | every `ComparisonTier` your `comparison` builds | typecheck failure |
 | `permissions` | every `EntitlementsActor` your `resolveActor` returns | typecheck failure |
 
 ### What this package now contributes back
 
 ```ts
-import { ENTITLEMENTS_PERMISSIONS } from '@12-apps/entitlements/server';
+import {
+  entitlementsPermissions,
+  PT_BR_ENTITLEMENTS_PERMISSION_LABELS,
+} from '@12-apps/entitlements/server';
 
 export const PERMISSIONS = composePermissions(
-  ENTITLEMENTS_PERMISSIONS,   // `plan:request` — this surface's own write
+  // `plan:request` — this surface's own write. The labels are YOUR role
+  // editor's words for it; the pack is the origin host's pt-BR.
+  entitlementsPermissions(PT_BR_ENTITLEMENTS_PERMISSION_LABELS),
   YOUR_OWN_PERMISSIONS,
   …,
 );
 ```
 
-`ENTITLEMENTS_PERMISSIONS` is plain data in `@12-apps/rbac`'s
+`entitlementsPermissions(labels)` returns plain data in `@12-apps/rbac`'s
 `PermissionContribution` shape, declared locally so this package takes no
-dependency on your RBAC. Compose it, grant it to whichever role may commit the
-tenant to a price conversation, and hand the resolved answer to both halves:
-`permissions` on the server actor, `canRequestPlanChange` in the browser.
+dependency on your RBAC. The labels are a required argument because they render
+in your role editor — segment words are copy, not mechanism. Compose the
+contribution, grant the id to whichever role may commit the tenant to a price
+conversation, and hand the resolved answer to both halves: `permissions` on the
+server actor, `canRequestPlanChange` in the browser.
 
 Annotate it with `satisfies`, never with an explicit
 `EntitlementPermissionContribution` annotation carrying a `string` type

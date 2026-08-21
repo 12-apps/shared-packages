@@ -68,7 +68,11 @@
 import { Hono } from 'hono';
 import type { PGlite } from '@electric-sql/pglite';
 
-import { entitlementDenialResponse, isEntitlementDenial } from '@12-apps/entitlements/server';
+import {
+  entitlementDenialResponse,
+  isEntitlementDenial,
+  PT_BR_ENTITLEMENTS_MESSAGES,
+} from '@12-apps/entitlements/server';
 import {
   createInlineRealtimeDriver,
   publishRealtimeEvent,
@@ -261,7 +265,7 @@ function mountEntitlementDemo(app: Hono, hosts: Hosts): void {
       return c.json({ entries: [] });
     } catch (error) {
       if (!isEntitlementDenial(error)) throw error;
-      const denial = entitlementDenialResponse(error);
+      const denial = entitlementDenialResponse(error, PT_BR_ENTITLEMENTS_MESSAGES);
       return c.json(denial.body, denial.status as 402);
     }
   });

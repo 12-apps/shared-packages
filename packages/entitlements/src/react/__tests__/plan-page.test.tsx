@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ComparisonTier, OpenPlanRequest, TenantPlanPayload } from '../../plan-wire';
 import { createWebEntitlements } from '../create-web-entitlements';
+import { PT_BR_ENTITLEMENTS_WEB_COPY } from '../pt-BR';
 import type { WebEntitlementsConfig } from '../web-config';
 
 /**
@@ -113,6 +114,7 @@ function renderPage(over: Partial<WebEntitlementsConfig> = {}, host = fakeHost()
     apiBase: '/api/admin/acme',
     fetchImpl: host.fetchImpl,
     canRequestPlanChange: true,
+    copy: PT_BR_ENTITLEMENTS_WEB_COPY,
     switchLocation: (feature) =>
       feature === 'alerts.digest' ? { path: '/acme/alertas', label: 'Ajustes › Alertas' } : null,
     ...over,
@@ -185,13 +187,25 @@ describe('the plan screen', () => {
     // to the app's own origin (a 404 rendered as "could not load your plan"),
     // and an omitted `canRequestPlanChange` rendered a plan screen with no way
     // to ask for a plan on it.
-    expect(() => createWebEntitlements({ apiBase: '', canRequestPlanChange: true })).toThrow(
-      /`apiBase` is empty/,
-    );
+    expect(() =>
+      createWebEntitlements({
+        apiBase: '',
+        canRequestPlanChange: true,
+        copy: PT_BR_ENTITLEMENTS_WEB_COPY,
+      }),
+    ).toThrow(/`apiBase` is empty/);
     expect(() =>
       createWebEntitlements({
         apiBase: '/api',
       } as unknown as WebEntitlementsConfig),
     ).toThrow(/`canRequestPlanChange` is required/);
+    // The third required answer: the surface's copy, which used to be a
+    // compiled-in default in one product's language.
+    expect(() =>
+      createWebEntitlements({
+        apiBase: '/api',
+        canRequestPlanChange: true,
+      } as unknown as WebEntitlementsConfig),
+    ).toThrow(/`copy` is required/);
   });
 });

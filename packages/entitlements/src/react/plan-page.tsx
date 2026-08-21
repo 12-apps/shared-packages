@@ -30,6 +30,7 @@ import { Heading } from '@12-apps/ui/typography/Heading';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { ComparisonTier, OpenPlanRequest, TenantFeatureView } from '../plan-wire';
+import type { PlanPageCopy } from './copy';
 import { createPlanApi, useRead } from './plan-api';
 import { TierCards } from './tier-cards';
 import type { ResolvedWebConfig } from './web-config';
@@ -37,19 +38,19 @@ import type { ResolvedWebConfig } from './web-config';
 /**
  * A quota ceiling, or nothing at all for an on/off capability.
  *
- * A ZERO ceiling returns null rather than `até 0` — "até 0" is not a limit a
- * customer can act on, it is a denial pretending to be one, and the row's own
- * note already says the feature is not included.
+ * A ZERO ceiling returns null rather than the "up to 0" wording — that is
+ * not a limit a customer can act on, it is a denial pretending to be one,
+ * and the row's own note already says the feature is not included.
  */
-function ceilingLabel(limit: TenantFeatureView['limit']): string | null {
+function ceilingLabel(limit: TenantFeatureView['limit'], copy: PlanPageCopy): string | null {
   if (limit === null) return null;
-  if (limit === 'unlimited') return 'ilimitado';
+  if (limit === 'unlimited') return copy.ceilingUnlimited;
   if (limit === 0) return null;
-  return `até ${String(limit)}`;
+  return copy.ceilingUpTo({ limit });
 }
 
 /**
- * "Ativar em <the host's screen name>" — the way back to their own switch.
+ * The way back to their own switch, named by the host (`copy.openSwitch`).
  *
  * Rendered ONLY for `disabled-by-tenant`, and keyed off that code rather than
  * off `enabled === false`: a tenant-switched feature can equally be dark
@@ -69,7 +70,7 @@ function TenantSwitchLink({
   const Link = config.LinkComponent;
   return (
     <Text as="div" size="sm" data-testid={`plan-switch-${feature.feature}`}>
-      <Link to={location.path}>Ativar em {location.label}</Link>
+      <Link to={location.path}>{config.copy.planPage.openSwitch({ label: location.label })}</Link>
     </Text>
   );
 }
@@ -81,7 +82,8 @@ function FeatureRow({
   feature: TenantFeatureView;
   config: ResolvedWebConfig;
 }): JSX.Element {
-  const ceiling = ceilingLabel(feature.limit);
+  const copy = config.copy.planPage;
+  const ceiling = ceilingLabel(feature.limit, copy);
   return (
     <Box
       data-testid={`plan-feature-${feature.feature}`}
@@ -117,16 +119,18 @@ function FeatureRow({
             color="secondary"
             data-testid={`plan-upsell-${feature.feature}`}
           >
-            Disponível no plano {feature.requiredPlanLabel}.
+            {copy.availableOn({
+              planLabel: feature.requiredPlanLabel ?? feature.requiredPlan,
+            })}
           </Text>
         )}
         {/* The mirror image of the upsell line: this row is off because of a
-            switch the store owns, so the useful thing to hand them is the way
-            back to it. */}
+            switch the tenant owns, so the useful thing to hand them is the
+            way back to it. */}
         <TenantSwitchLink feature={feature} config={config} />
       </Box>
       <Badge color={feature.enabled ? 'success' : 'neutral'}>
-        {feature.enabled ? 'Ativo' : 'Indisponível'}
+        {feature.enabled ? copy.statusBadge.enabled : copy.statusBadge.disabled}
       </Badge>
     </Box>
   );
@@ -140,15 +144,16 @@ function FeatureRow({
 function RequestBanners({
   openRequest,
   error,
+  copy,
 }: {
   openRequest: OpenPlanRequest | null;
   error: Error | null;
+  copy: PlanPageCopy;
 }): JSX.Element | null {
   if (openRequest !== null) {
     return (
       <Alert severity="info" data-testid="plan-request-open">
-        Recebemos seu pedido para o plano {openRequest.requestedPlanKey}. Vamos entrar em
-        contato para combinar os detalhes.
+        {copy.requestReceived({ plan: openRequest.requestedPlanKey })}
       </Alert>
     );
   }
@@ -176,16 +181,17 @@ function CurrentStatus({
   features: TenantFeatureView[];
   config: ResolvedWebConfig;
 }): JSX.Element {
+  const copy = config.copy.planPage;
   return (
     <Box>
-      <Heading level="h3">Seu plano hoje</Heading>
+      <Heading level="h3">{copy.statusHeading}</Heading>
       <Box sx={{ mb: 1 }}>
         <Text as="div" color="secondary" size="sm">
-          O que está ativo agora — e, quando não está, por quê.
+          {copy.statusIntro}
         </Text>
       </Box>
       {features.length === 0 ? (
-        <Text color="secondary">Nenhum recurso gerenciado por plano no momento.</Text>
+        <Text color="secondary">{copy.statusEmpty}</Text>
       ) : (
         features.map((feature) => (
           <FeatureRow key={feature.feature} feature={feature} config={config} />
@@ -205,7 +211,7 @@ function useAskForPlan(
   const askFor = (tier: ComparisonTier): void => {
     setAsking(true);
     setAskError(null);
-    createPlanApi(config.apiBase, config.fetchImpl)
+    createPlanApi(config.apiBase, config.fetchImpl, config.copy.requestFailed)
       .requestPlanChange({ requestedPlan: tier.key })
       .then(
         () => {
@@ -244,7 +250,8 @@ function mayAsk(
 }
 
 export function PlanScreen({ config }: { config: ResolvedWebConfig }): JSX.Element {
-  const api = createPlanApi(config.apiBase, config.fetchImpl);
+  const copy = config.copy.planPage;
+  const api = createPlanApi(config.apiBase, config.fetchImpl, config.copy.requestFailed);
   const planRead = useRead(api.getPlan);
   const requestRead = useRead(api.getOpenRequest);
   const { asking, askError, askFor } = useAskForPlan(config, requestRead.reload);
@@ -252,10 +259,7 @@ export function PlanScreen({ config }: { config: ResolvedWebConfig }): JSX.Eleme
   if (planRead.pending) return <LoadingState dataTestId="plan-loading" />;
   if (planRead.error !== null || planRead.data === null) {
     return (
-      <ErrorState
-        title="Não foi possível carregar seu plano"
-        message={planRead.error?.message ?? ''}
-      />
+      <ErrorState title={copy.loadFailedTitle} message={planRead.error?.message ?? ''} />
     );
   }
 
@@ -266,18 +270,27 @@ export function PlanScreen({ config }: { config: ResolvedWebConfig }): JSX.Eleme
   return (
     <Stack spacing={3} data-testid="plan-page">
       <Box>
-        <Heading level="h2">Planos</Heading>
+        <Heading level="h2">{copy.title}</Heading>
         <Box sx={{ mt: 0.5 }}>
+          {/* The name slot is markup, so the sentence ships as prefix +
+              detail around it — each half carries its own spacing and the
+              detail carries the closing punctuation. */}
           <Text as="div" color="secondary" size="sm">
-            Seu plano hoje é <strong data-testid="plan-name">{plan.name}</strong>
-            {plan.price === null ? '' : ` · ${plan.price}`}.
+            {copy.currentPlanPrefix}
+            <strong data-testid="plan-name">{plan.name}</strong>
+            {copy.currentPlanDetail({ price: plan.price })}
           </Text>
         </Box>
       </Box>
 
-      <RequestBanners openRequest={openRequest} error={askError} />
+      <RequestBanners openRequest={openRequest} error={askError} copy={copy} />
 
-      <TierCards tiers={plan.comparison} onRequest={canRequest ? askFor : null} pending={asking} />
+      <TierCards
+        tiers={plan.comparison}
+        onRequest={canRequest ? askFor : null}
+        pending={asking}
+        copy={config.copy.tierCards}
+      />
 
       <CurrentStatus features={plan.features} config={config} />
     </Stack>

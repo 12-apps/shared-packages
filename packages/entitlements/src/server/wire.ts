@@ -19,15 +19,13 @@
  * | `not-supported`      | this build has no such feature | 404    |
  */
 import { EntitlementRequiredError, QuotaExceededError } from '../core/errors';
+import type { EntitlementDenialMessages } from './copy';
 
 /** A framework-neutral response: the adapter serializes it, never reshapes it. */
 export interface WireResponse {
   status: number;
   body: Record<string, unknown>;
 }
-
-/** The human sentence on every 402 — the machine half rides beside it. */
-export const PAYMENT_REQUIRED_MESSAGE = 'Este recurso não está incluído no seu plano.';
 
 /** Is this one of the engine's own denial errors? */
 export function isEntitlementDenial(
@@ -42,25 +40,31 @@ export function isEntitlementDenial(
  * `toPayload()` names its machine discriminator `error`; this surface's
  * `error` is always the human message. Re-keying it to `code` keeps both
  * instead of the code silently overwriting the sentence.
+ *
+ * `messages` is the host's — this used to compile one product's sentences in
+ * (the exported `PAYMENT_REQUIRED_MESSAGE` constant among them). The pack's
+ * `paymentRequired` is the same words for a pt-BR host; a host mapping
+ * denials in its own handlers passes the same object it handed the config.
  */
 export function entitlementDenialResponse(
   error: EntitlementRequiredError | QuotaExceededError,
+  messages: EntitlementDenialMessages,
 ): WireResponse {
   const reason = error instanceof EntitlementRequiredError ? error.decision.reason : null;
 
   if (reason === 'disabled-by-tenant') {
     return {
       status: 409,
-      body: { error: 'Este recurso está desativado nas configurações.' },
+      body: { error: messages.featureDisabledByTenant },
     };
   }
   if (reason === 'not-supported') {
-    return { status: 404, body: { error: 'Recurso indisponível.' } };
+    return { status: 404, body: { error: messages.featureUnavailable } };
   }
 
   const { error: code, ...detail } = error.toPayload();
   return {
     status: 402,
-    body: { error: PAYMENT_REQUIRED_MESSAGE, code, ...detail },
+    body: { error: messages.paymentRequired, code, ...detail },
   };
 }
