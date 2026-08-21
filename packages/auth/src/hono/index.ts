@@ -101,7 +101,8 @@ export type {
   EmailAuthResponse,
   EmailAuthRoutesConfig,
 } from "../server/email-routes";
-export { EMAIL_AUTH_STATUS, PT_BR_MESSAGES } from "../server/messages";
+export { EMAIL_AUTH_STATUS } from "../server/messages";
+export { PT_BR_MESSAGES } from "../server/pt-BR";
 export type { EmailAuthMessages } from "../server/messages";
 
 export { emailAuthSettingsRoutes } from "../server/settings-routes";

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { PT_BR_MAIL } from "../../server/mail-templates.pt-BR";
 import { assertDbMirror, assertEnvMirror, assertExportsMirror } from "@12-apps/wiring/producer";
 
 import packageJson from "../../../package.json";
@@ -84,7 +85,7 @@ describe("authManifest", () => {
 
 describe("authServerManifest", () => {
   it("hands hosts the existing factories, not wrappers that could drift", () => {
-    expect(authServerManifest().http?.create).toBe(createApiEmailAuth);
+    expect(authServerManifest({ pack: PT_BR_MAIL }).http?.create).toBe(createApiEmailAuth);
     expect(authPlatformServerManifest.http?.create).toBe(createApiEmailAuthSettings);
   });
 
@@ -110,7 +111,7 @@ describe("authServerManifest", () => {
     // The whole point of the email capability: the host implements `send` once,
     // for every package that mails, and this package keeps its own sentences.
     const sent: { to: string; subject: string }[] = [];
-    const mailer = authServerManifest().email?.createMailer({
+    const mailer = authServerManifest({ pack: PT_BR_MAIL }).email?.createMailer({
       send: async (to, message) => {
         sent.push({ to, subject: message.subject });
       },

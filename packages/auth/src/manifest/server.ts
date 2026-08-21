@@ -26,8 +26,8 @@ import { authManifest, authPlatformManifest } from "./index";
  * made — at the call, by name.
  */
 export interface AuthServerManifestOptions {
-  /** Which words the four mails use. `PT_BR_MAIL` when omitted. */
-  pack?: MailPack;
+  /** Which words the four mails use — REQUIRED, the host's choice by name. */
+  pack: MailPack;
   /**
    * Where the "your password changed" notice points — the sign-in page.
    *
@@ -38,7 +38,7 @@ export interface AuthServerManifestOptions {
   loginUrl?: string;
 }
 
-export function authServerManifest(options: AuthServerManifestOptions = {}): ReturnType<
+export function authServerManifest(options: AuthServerManifestOptions): ReturnType<
   typeof defineServerManifest
 > {
   return defineServerManifest(authManifest, {

@@ -13,7 +13,8 @@ export type {
   EmailAuthRoutesConfig,
 } from "./email-routes";
 
-export { EMAIL_AUTH_STATUS, PT_BR_MESSAGES } from "./messages";
+export { EMAIL_AUTH_STATUS } from "./messages";
+export { PT_BR_MESSAGES } from "./pt-BR";
 export type { EmailAuthMessages } from "./messages";
 
 export { emailAuthSettingsRoutes } from "./settings-routes";
@@ -22,7 +23,8 @@ export type {
   EmailAuthSettingsRoutesConfig,
 } from "./settings-routes";
 
-export { PT_BR_MAIL, renderAuthMail } from "./mail-templates";
+export { renderAuthMail } from "./mail-templates";
+export { PT_BR_MAIL } from "./mail-templates.pt-BR";
 export type { MailCopy, MailPack, RenderedMail } from "./mail-templates";
 
 /**

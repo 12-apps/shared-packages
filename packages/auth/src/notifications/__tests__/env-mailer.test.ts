@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { PT_BR_MAIL } from "../../server/mail-templates.pt-BR";
 
 import type { EmailDriver } from "@12-apps/notifications/server";
 
@@ -62,6 +63,7 @@ describe("createEnvAuthMailer", () => {
   it("sends through the named vendor when it is fully configured", async () => {
     const vendor = vendorTable();
     const mailer = createEnvAuthMailer({
+      pack: PT_BR_MAIL,
       env: NAMES,
       drivers: vendor.drivers,
       log: logStub(),
@@ -81,6 +83,7 @@ describe("createEnvAuthMailer", () => {
     // journeys" require a secret nobody should need to hold.
     const log = logStub();
     const mailer = createEnvAuthMailer({
+      pack: PT_BR_MAIL,
       env: NAMES,
       drivers: vendorTable().drivers,
       log,
@@ -104,6 +107,7 @@ describe("createEnvAuthMailer", () => {
     const vendor = vendorTable();
     const log = logStub();
     const mailer = createEnvAuthMailer({
+      pack: PT_BR_MAIL,
       env: NAMES,
       drivers: vendor.drivers,
       log,
@@ -123,6 +127,7 @@ describe("createEnvAuthMailer", () => {
     const vendor = vendorTable();
     const log = logStub();
     const mailer = createEnvAuthMailer({
+      pack: PT_BR_MAIL,
       env: NAMES,
       drivers: vendor.drivers,
       log,
@@ -142,6 +147,7 @@ describe("createEnvAuthMailer", () => {
     // thing an operator needs to see.
     const log = logStub();
     const mailer = createEnvAuthMailer({
+      pack: PT_BR_MAIL,
       env: NAMES,
       drivers: vendorTable().drivers,
       log,
@@ -163,6 +169,7 @@ describe("createEnvAuthMailer", () => {
     const vendor = vendorTable();
     const env: Record<string, string> = { MAIL_PROVIDER: "log" };
     const mailer = createEnvAuthMailer({
+      pack: PT_BR_MAIL,
       env: NAMES,
       drivers: vendor.drivers,
       log: logStub(),
@@ -183,6 +190,7 @@ describe("createEnvAuthMailer", () => {
   it("points the password-changed notice at the first origin variable that is set", async () => {
     const vendor = vendorTable();
     const mailer = createEnvAuthMailer({
+      pack: PT_BR_MAIL,
       env: NAMES,
       drivers: vendor.drivers,
       log: logStub(),

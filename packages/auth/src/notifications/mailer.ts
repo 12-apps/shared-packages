@@ -4,7 +4,7 @@ import type {
   AuthEmailMessage,
   EmailCredentialsMailer,
 } from "../email-credentials/types";
-import { PT_BR_MAIL, renderAuthMail, type MailPack } from "../server/mail-templates";
+import { renderAuthMail, type MailPack } from "../server/mail-templates";
 
 /**
  * `@12-apps/auth/notifications` — the four auth e-mails, delivered through
@@ -57,13 +57,13 @@ export interface AuthMailerConfig {
    */
   driver: EmailDriver;
   /**
-   * Which words. `PT_BR_MAIL` when omitted — the only pack bundled today.
-   *
-   * Defaulted here and NOT in `renderAuthMail`, deliberately: a host reaching
-   * for this adapter has already chosen "the standard auth e-mails", where one
-   * writing its own mailer is choosing something else and should say what.
+   * Which words — REQUIRED, no default (the copy-portability doctrine): the
+   * old silent `PT_BR_MAIL` fallback meant a host wiring mail and saying
+   * nothing sent another product's Portuguese, and nothing failed. A pt-BR
+   * host passes `PT_BR_MAIL` from `../server/mail-templates.pt-BR` — one
+   * reviewable line, never a silence.
    */
-  pack?: MailPack;
+  pack: MailPack;
   /**
    * Where the "your password changed" notice points — the sign-in page.
    *
@@ -89,7 +89,7 @@ export interface AuthMailerConfig {
  * this package has.
  */
 export function createAuthMailer(config: AuthMailerConfig): EmailCredentialsMailer {
-  const { driver, pack = PT_BR_MAIL, now = Date.now } = config;
+  const { driver, pack, now = Date.now } = config;
 
   const deliver = async (
     kind: "verification" | "passwordReset" | "alreadyRegistered" | "passwordChanged",
