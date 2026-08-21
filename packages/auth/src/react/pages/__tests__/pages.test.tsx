@@ -98,6 +98,15 @@ describe("LoginPage", () => {
     // the form is not REMOVED here, it is never rendered, and saying so this
     // way cannot be read as a race the way a null lookup can.
     expect(container.innerHTML).not.toContain("email-password-form");
+    // …and the divider goes with it. "ou entre com" offers an ALTERNATIVE to
+    // the form above it; with no form it sits at the top of the card promising
+    // a second method that does not exist, which reads as a page that failed to
+    // load rather than as a Google-only sign-in.
+    //
+    // This case is the one that shipped broken. The two assertions above were
+    // already here and both passed, because neither of them looks at the
+    // divider — the state was rendered by this very test and walked past.
+    expect(container.textContent).not.toContain(PT_BR_PAGES.login.providerDivider);
   });
 
   it("omits the divider entirely when there are no providers", () => {
@@ -162,6 +171,23 @@ describe("SignupPage", () => {
     render(<SignupPage {...signupProps} />);
 
     expect(screen.getByTestId("go-to-login").getAttribute("href")).toBe("/login");
+  });
+
+  it("drops the divider when e-mail sign-up is off, keeping the providers", () => {
+    // The sign-up twin of the login case: "ou cadastre-se com" is an
+    // alternative to the form, so with no form it has nothing to be an
+    // alternative to.
+    const { SignupPage } = pages();
+    const { container } = render(
+      <SignupPage
+        {...signupProps}
+        emailEnabled={false}
+        providers={<button type="button">Continue with Google</button>}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /continue with google/i })).toBeTruthy();
+    expect(container.textContent).not.toContain(PT_BR_PAGES.signup.providerDivider);
   });
 });
 

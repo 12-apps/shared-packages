@@ -66,6 +66,12 @@ export const EMAIL_AUTH_STATUS: Record<EmailAuthFailure, number> = {
   "current-password-required": 400,
   "current-password-invalid": 403,
   "no-account": 200,
+  // 503, not 400: nothing about the request is wrong, the deployment is
+  // missing a provider. It is the one refusal here that is the operator's to
+  // fix rather than the caller's, and a 5xx is what says so — to a monitor as
+  // much as to a person, since a sign-up surface answering 400 forever looks
+  // like users typing badly.
+  "verification-unavailable": 503,
 };
 
 /**
@@ -96,4 +102,10 @@ export const PT_BR_MESSAGES: EmailAuthMessages = {
   "current-password-required": "Informe sua senha atual.",
   "current-password-invalid": "Senha atual incorreta.",
   "no-account": "Se existir uma conta, enviamos as instruções por e-mail.",
+  // Says the cadastro did not happen, and points at the only person who can
+  // fix it. It deliberately does not say "e-mail is not configured": the
+  // visitor cannot act on that, and naming a deployment's missing credentials
+  // on a public sign-up screen tells an attacker which box is half-built.
+  "verification-unavailable":
+    "Não foi possível concluir o cadastro agora. Tente novamente mais tarde ou fale com o suporte.",
 };

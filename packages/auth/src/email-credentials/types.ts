@@ -114,6 +114,21 @@ export interface EmailCredentialsMailer {
   sendAccountExists(message: AuthEmailMessage): Promise<void>;
   /** Optional courtesy notice after a successful password change. */
   sendPasswordChanged?(message: Omit<AuthEmailMessage, "link" | "token" | "expiresAt">): Promise<void>;
+  /**
+   * Can this deployment actually deliver mail right now?
+   *
+   * Asked BEFORE an account is created, and only where a link is the only way
+   * in — see `verification-unavailable`. The four `send*` methods deliberately
+   * do not throw when there is no provider (a misconfigured mailbox must not
+   * turn sign-up into a 500, and a reset link must never be written somewhere
+   * it can be read), which leaves the flow unable to tell delivery from
+   * silence. This is how it asks.
+   *
+   * OPTIONAL, and absent means "assume yes". A host that hard-wires one real
+   * vendor has nothing to answer, and making this required would break every
+   * existing mailer to describe a state they cannot be in.
+   */
+  canDeliver?(): boolean | Promise<boolean>;
 }
 
 /**
@@ -170,7 +185,19 @@ export type EmailAuthFailure =
   | "rate-limited"
   | "current-password-required"
   | "current-password-invalid"
-  | "no-account";
+  | "no-account"
+  /**
+   * Verification is required and this deployment cannot send mail.
+   *
+   * Not a refusal ABOUT the caller — it is the same answer for every address,
+   * which is what keeps it clear of the enumeration rule the rest of sign-up
+   * is built around. It exists because the alternative is worse: with no
+   * provider configured the mailer accepts the call, delivers nothing and
+   * logs, so the flow succeeds and the screen tells somebody to go and check
+   * an inbox that will never receive anything, on an account that can never
+   * sign in.
+   */
+  | "verification-unavailable";
 
 export interface EmailAuthRefusal {
   ok: false;

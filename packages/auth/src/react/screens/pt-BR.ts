@@ -46,6 +46,10 @@ export const PT_BR: EmailAuthCopy = {
     "current-password-required": "Informe sua senha atual.",
     "current-password-invalid": "Senha atual incorreta.",
     "no-account": "Conta não encontrada.",
+    // The person at the form cannot fix a missing provider, so this says
+    // what happened and who can, and nothing about the deployment.
+    "verification-unavailable":
+      "Não foi possível concluir o cadastro agora. Tente novamente mais tarde ou fale com o suporte.",
     unknown: "Não foi possível concluir. Tente novamente.",
   },
   passwordField: {

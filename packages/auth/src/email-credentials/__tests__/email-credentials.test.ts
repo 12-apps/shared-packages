@@ -70,6 +70,35 @@ describe("signUp", () => {
     expect(host.lastEmail("verification")?.link).toContain(`${APP_URL}/verify-email?token=`);
   });
 
+  it("refuses, and creates NOTHING, when the deployment cannot send the link", async () => {
+    // The failure this replaces: the mailer's unconfigured driver accepts the
+    // call, logs, and delivers nothing — so sign-up succeeded, the screen said
+    // "confira seu e-mail", and the account sat unverifiable forever because
+    // the only way to verify it was never sent.
+    host.deliverable = false;
+
+    const result = await flow.signUp({ email: "ana@example.com", password: GOOD_PASSWORD });
+
+    expect(result).toEqual({ ok: false, reason: "verification-unavailable" });
+    // The account is the part that matters: a created-but-unverifiable user
+    // also blocks the address from being registered again once mail is fixed.
+    expect(await host.findByEmail("ana@example.com")).toBeFalsy();
+    expect(host.lastEmail("verification")).toBeUndefined();
+  });
+
+  it("still signs up with mail down when verification is not required", async () => {
+    // Delivery is only load-bearing when a link is the ONLY way in. With
+    // verification off the credentials work immediately, so refusing here
+    // would take sign-up down over a mail path nothing was going to use.
+    host.deliverable = false;
+    settings.requireEmailVerification = false;
+
+    const result = await flow.signUp({ email: "ana@example.com", password: GOOD_PASSWORD });
+
+    expect(result.ok).toBe(true);
+    expect(await host.findByEmail("ana@example.com")).toBeTruthy();
+  });
+
   it("stores a hash, never the password", async () => {
     await flow.signUp({ email: "ana@example.com", password: GOOD_PASSWORD });
     const user = await host.findByEmail("ana@example.com");
@@ -233,6 +262,22 @@ describe("resendVerification", () => {
 
   it("acknowledges an unknown address without sending anything", async () => {
     await expect(flow.resendVerification("nobody@example.com")).resolves.toEqual({ ok: true });
+    expect(host.sent).toHaveLength(0);
+  });
+
+  it("refuses rather than acknowledging when it cannot send", async () => {
+    // The uniform `{ ok: true }` above exists to hide whether an address is
+    // registered. It must not also hide that the resend is impossible for
+    // everybody — that turns "peça um novo link" into a button that reports
+    // success and does nothing, forever.
+    await flow.signUp({ email: "ana@example.com", password: GOOD_PASSWORD });
+    host.sent.length = 0;
+    host.deliverable = false;
+
+    await expect(flow.resendVerification("ana@example.com")).resolves.toEqual({
+      ok: false,
+      reason: "verification-unavailable",
+    });
     expect(host.sent).toHaveLength(0);
   });
 
