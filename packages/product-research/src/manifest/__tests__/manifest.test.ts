@@ -73,13 +73,13 @@ describe('the run blueprint — the first payload-carrying one', () => {
     expect(blueprint).not.toHaveProperty('lease');
   });
 
-  it('hands the payload to the one host dep and adds no second log stream', async () => {
+  it('hands the ids-only ref to the one host dep and adds no second log stream', async () => {
     const runResearch = vi.fn().mockResolvedValue({ status: 'succeeded' });
-    const payload = {
-      clientId: 't1',
-      requestId: 'req-1',
-      query: { term: 'farinha de trigo' },
-    };
+    // The payload is the request's IDENTITY, never the query: a retry (or an
+    // orphan re-enqueue days later) must re-read the row, not re-run a stale
+    // copy — and the dep answering null for a vanished request is a completed
+    // job, not a retryable failure.
+    const payload = { clientId: 't1', requestId: 'req-1' };
     // The handler ignores the attempt context by design — the pipeline logs
     // through its own LoggerPort — so the concrete signature takes two args.
     await RESEARCH_JOBS.blueprints.run.handle(payload as never, { runResearch });
