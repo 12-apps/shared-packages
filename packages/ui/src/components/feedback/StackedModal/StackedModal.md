@@ -92,6 +92,32 @@ function NestedModals() {
 }
 ```
 
+### Overlays that portal out of a panel
+
+Each panel takes its **own** z-index as it joins the stack — 1300 for the first,
+another 10 for every panel above it. Anything that portals out of a panel has to
+clear that ladder, and MUI's defaults do not: a `Popover` (so also a `Menu`, so
+also a `Select`) renders at `zIndex.modal`, and a temporary `Drawer` a step lower
+at `zIndex.drawer`.
+
+With one sheet open the numbers tie and portal order settles it in the overlay's
+favour, so this looks correct right until a second sheet opens over the first.
+Then the overlay renders **under** the panel that opened it — and because a
+`Popover` is a live modal, it still takes focus into itself and its backdrop is
+unreachable, so every keystroke aimed at the surrounding form disappears into an
+input nobody can see, with no way to dismiss it.
+
+Take the height from the token rather than picking one:
+
+```tsx
+import { stackedOverlayZIndex } from '@12-apps/ui/tokens/layers';
+
+<Popover sx={{ zIndex: stackedOverlayZIndex }} … />
+```
+
+It clears ten stacked panels. `CreatableSelect` and `CategorySelect` use it; a
+new component that portals should too.
+
 ## Props
 
 | Prop | Type | Default | Description |
