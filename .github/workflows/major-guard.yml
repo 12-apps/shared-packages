@@ -8,12 +8,26 @@ name: Major guard
 # main, and the only choices left are "approve" or "leave the package
 # unreleased". Here the footer can simply be reworded.
 #
-# `labeled`/`unlabeled` are load-bearing: `allow-major` is the escape hatch, and
-# a check that did not re-run on the label would stay red after someone applied
-# it, which trains people to merge past a red check. `edited` matters for the
-# same reason commitlint.yml needs it — this repo squashes with
-# COMMIT_OR_PR_TITLE, so the PR TITLE can be what lands, and a title fixed after
-# the first run has to re-trigger the check.
+# `labeled`/`unlabeled` are load-bearing: `allow-major` silences the red, and a
+# check that did not re-run on the label would stay red after someone applied it,
+# which trains people to merge past a red check. `edited` matters for the same
+# reason commitlint.yml needs it — this repo squashes with COMMIT_OR_PR_TITLE, so
+# the PR TITLE can be what lands, and a title fixed after the first run has to
+# re-trigger the check.
+#
+# WHAT THE LABEL NO LONGER DOES is let the merge happen. `allow-major` is applied
+# through the API as easily as through the UI — an agent holding this repo's
+# token did exactly that on #319 — so a label cannot be consent. Neither can a
+# tag, for the same reason. The consent lives in the `Major approval` job below,
+# which binds to the `major-approval` ENVIRONMENT: it starts the moment a major is
+# declared and then WAITS, and a GitHub App installation token cannot approve a
+# deployment. Making that job a required check is what makes the pull request
+# un-mergeable until a person clicks Review deployments → Approve.
+#
+# Deliberately at PULL-REQUEST time, not after merge. The old gate sat in ci.yml
+# on `push`, where by the time it ran the commit was already on main and the only
+# remaining choices were "approve" or "leave the package unreleased". Here the
+# major is still a proposal.
 
 on:
   pull_request:
@@ -30,6 +44,11 @@ jobs:
   major-guard:
     name: Breaking change
     runs-on: ubuntu-latest
+    # Read by the gate below. A major makes the last step exit 1, and a failed
+    # job still has to hand its verdict on, which is why the gate reads this
+    # under `always()`.
+    outputs:
+      major: ${{ steps.guard.outputs.major }}
     steps:
       - uses: actions/checkout@v4
 
@@ -61,8 +80,45 @@ jobs:
           '
 
       - name: Check for a breaking change
+        id: guard
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           COMMIT_FILE: commits.json
         run: node scripts/breaking-change-guard.mjs
+
+  # ── The gate a token cannot open ──────────────────────────────────────────
+  #
+  # No steps worth running: the job IS the question. Binding it to an
+  # environment that carries required reviewers means GitHub holds it in
+  # `waiting` and reports the check as pending, and a pending REQUIRED check is
+  # a pull request that cannot be merged — by anyone, including whoever opened
+  # it and including automation acting with their credentials.
+  #
+  # Why an environment rather than a review, a label or a tag. Every other
+  # mechanism is reachable by this repository's own token: it adds labels, it
+  # pushes tags, it opens and closes pull requests, and it acts AS the account
+  # that owns them, so no rule phrased in terms of identity can separate the
+  # person from the agent. Repository settings are the exception — the token
+  # gets `Resource not accessible by integration` from the branch-protection
+  # API, and cannot grant a deployment. So the approval has to live where the
+  # token cannot reach, and it does.
+  #
+  # ONE-TIME SETUP, without which this job is decoration rather than a gate:
+  # create the `major-approval` environment (Settings → Environments), add at
+  # least one required reviewer, and mark `Major approval` a required status
+  # check on `main`. Nothing in this repository can verify that for you — that
+  # is the same wall that makes it work.
+  major-approval:
+    name: Major approval
+    needs: major-guard
+    # `always()` because a declared major fails the job above by design, and a
+    # skipped gate on a failed guard would be a major that merges the moment
+    # someone clears the red.
+    if: always() && needs.major-guard.outputs.major == 'true'
+    runs-on: ubuntu-latest
+    environment: major-approval
+    steps:
+      - name: Record the approval
+        run: |
+          echo "::notice::A major release was approved by a human for this pull request."
