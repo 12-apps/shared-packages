@@ -154,6 +154,21 @@ export interface ChargeInput {
   card?: CardDetails;
   pix?: { expiresInSeconds?: number };
   boleto?: { dueDate?: string };
+  /**
+   * What the buyer reads for this charge on a statement, a receipt or the
+   * provider's dashboard — the host's own words, in the host's own language.
+   *
+   * All four adapters used to compose it themselves, each as `Pedido ${ref}`
+   * capped at its provider's own limit. That put one product's Portuguese on
+   * every adopter's card statements, and it was invisible to the copy gate
+   * because "Pedido" carries no diacritic.
+   *
+   * Optional, and when it is absent the adapters send the bare
+   * {@link ChargeInput.reference}: a reference alone is meaningful to whoever
+   * reconciles it, and inventing a noun for a host that supplied none is the
+   * exact silence this field replaces.
+   */
+  description?: string;
   /** Free-form pairs forwarded to the provider where supported. */
   metadata?: Record<string, string>;
   /**
