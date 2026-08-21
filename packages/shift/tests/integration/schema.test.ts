@@ -42,12 +42,12 @@ beforeEach(async () => {
   await applyMigrations(db);
   await db.exec(`
     INSERT INTO "clients" ("id") VALUES ('tenant-a');
-    INSERT INTO "users" ("id") VALUES ('cook-a'), ('cook-b');
+    INSERT INTO "users" ("id") VALUES ('tech-a'), ('tech-b');
     INSERT INTO "resource_assignments"
       ("id", "user_id", "client_id", "resource_type", "resource_id")
     VALUES
-      ('assignment-a', 'cook-a', 'tenant-a', 'kitchen', 'grill'),
-      ('assignment-b', 'cook-b', 'tenant-a', 'kitchen', 'grill');
+      ('assignment-a', 'tech-a', 'tenant-a', 'tower', 'tower-14'),
+      ('assignment-b', 'tech-b', 'tenant-a', 'tower', 'tower-14');
   `);
 });
 
@@ -60,24 +60,24 @@ describe('shift PostgreSQL schema', () => {
     await db.exec(`
       INSERT INTO "shifts"
         ("id", "client_id", "user_id", "kind", "started_at")
-      VALUES ('shift-a', 'tenant-a', 'cook-a', 'kitchen', CURRENT_TIMESTAMP);
+      VALUES ('shift-a', 'tenant-a', 'tech-a', 'climb', CURRENT_TIMESTAMP);
     `);
     await expect(
       db.exec(`
         INSERT INTO "shifts"
           ("id", "client_id", "user_id", "kind", "started_at")
-        VALUES ('shift-b', 'tenant-a', 'cook-a', 'kitchen', CURRENT_TIMESTAMP);
+        VALUES ('shift-b', 'tenant-a', 'tech-a', 'climb', CURRENT_TIMESTAMP);
       `),
     ).rejects.toThrow(/shifts_open_client_user_key/);
     await db.exec(`
       UPDATE "shifts"
          SET "ended_at" = CURRENT_TIMESTAMP,
              "ended_reason" = 'user',
-             "ended_by_user_id" = 'cook-a'
+             "ended_by_user_id" = 'tech-a'
        WHERE "id" = 'shift-a';
       INSERT INTO "shifts"
         ("id", "client_id", "user_id", "kind", "started_at")
-      VALUES ('shift-b', 'tenant-a', 'cook-a', 'kitchen', CURRENT_TIMESTAMP);
+      VALUES ('shift-b', 'tenant-a', 'tech-a', 'climb', CURRENT_TIMESTAMP);
     `);
   });
 
@@ -87,16 +87,16 @@ describe('shift PostgreSQL schema', () => {
         ("id", "client_id", "user_id", "kind", "started_at",
          "resource_assignment_id", "resource_type", "resource_id")
       VALUES
-        ('shift-a', 'tenant-a', 'cook-a', 'kitchen', CURRENT_TIMESTAMP,
-         'assignment-a', 'kitchen', 'grill'),
-        ('shift-b', 'tenant-a', 'cook-b', 'kitchen', CURRENT_TIMESTAMP,
-         'assignment-b', 'kitchen', 'grill');
+        ('shift-a', 'tenant-a', 'tech-a', 'climb', CURRENT_TIMESTAMP,
+         'assignment-a', 'tower', 'tower-14'),
+        ('shift-b', 'tenant-a', 'tech-b', 'climb', CURRENT_TIMESTAMP,
+         'assignment-b', 'tower', 'tower-14');
     `);
     await db.exec(`
       UPDATE "shifts"
          SET "ended_at" = CURRENT_TIMESTAMP,
              "ended_reason" = 'user',
-             "ended_by_user_id" = 'cook-b'
+             "ended_by_user_id" = 'tech-b'
        WHERE "id" = 'shift-b';
     `);
     await expect(
@@ -105,27 +105,47 @@ describe('shift PostgreSQL schema', () => {
           ("id", "client_id", "user_id", "kind", "started_at",
            "resource_assignment_id", "resource_type", "resource_id")
         VALUES
-          ('shift-c', 'tenant-a', 'cook-b', 'kitchen', CURRENT_TIMESTAMP,
-           'assignment-a', 'kitchen', 'grill');
+          ('shift-c', 'tenant-a', 'tech-b', 'climb', CURRENT_TIMESTAMP,
+           'assignment-a', 'tower', 'tower-14');
       `),
     ).rejects.toThrow(/shifts_resource_assignment_id_key/);
   });
 
-  it('keeps resourceAssignmentId nullable and validates kind/end reason', async () => {
+  it('accepts any host kind, and still requires one', async () => {
+    // The column carries HOST vocabulary. `shifts_kind_check` used to restrict
+    // it to two values from the application this package was extracted from,
+    // which no adopter could configure their way out of — a migration replaced
+    // it with the guarantee the package actually owns.
     await db.exec(`
       INSERT INTO "shifts"
         ("id", "client_id", "user_id", "kind", "started_at")
       VALUES
-        ('shift-a', 'tenant-a', 'cook-a', 'service', CURRENT_TIMESTAMP),
-        ('shift-b', 'tenant-a', 'cook-b', 'kitchen', CURRENT_TIMESTAMP);
+        ('shift-a', 'tenant-a', 'tech-a', 'climb', CURRENT_TIMESTAMP),
+        ('shift-b', 'tenant-a', 'tech-b', 'hygiene', CURRENT_TIMESTAMP);
     `);
     await expect(
       db.exec(`
         INSERT INTO "shifts"
           ("id", "client_id", "user_id", "kind", "started_at")
-        VALUES ('bad', 'tenant-a', 'cook-a', 'payroll', CURRENT_TIMESTAMP);
+        VALUES ('bad', 'tenant-a', 'tech-c', '  ', CURRENT_TIMESTAMP);
       `),
-    ).rejects.toThrow(/shifts_kind_check/);
+    ).rejects.toThrow(/shifts_kind_present_check/);
+  });
+
+  it('has no constraint left that names a kind', async () => {
+    // The regression guard for the drop: a CHECK holding a kind literal is the
+    // one form of this leak an adopter cannot configure, lint or type away.
+    const result = await db.query<{ definition: string }>(`
+      SELECT pg_get_constraintdef(oid) AS definition
+        FROM pg_constraint
+       WHERE conrelid = '"shifts"'::regclass AND contype = 'c';
+    `);
+
+    expect(result.rows.length).toBeGreaterThan(0);
+    const kindChecks = result.rows
+      .map(({ definition }) => definition)
+      .filter((definition) => /\bkind\b/.test(definition));
+    expect(kindChecks).toEqual(['CHECK ((btrim(kind) <> \'\'::text))']);
   });
 
   it('does not add a global active client/user/resource-type uniqueness index', async () => {
@@ -160,30 +180,30 @@ describe('shift PostgreSQL schema', () => {
         ("id", "client_id", "user_id", "kind", "started_at",
          "ended_at", "ended_reason", "ended_by_user_id")
       VALUES
-        ('shift-a', 'tenant-a', 'cook-a', 'kitchen',
-         '2026-07-30T10:00:00Z', '2026-07-30T18:00:00Z', 'user', 'cook-a');
+        ('shift-a', 'tenant-a', 'tech-a', 'climb',
+         '2026-07-30T10:00:00Z', '2026-07-30T18:00:00Z', 'user', 'tech-a');
     `);
 
     await expect(
-      db.exec(`UPDATE "shifts" SET "kind" = 'service' WHERE "id" = 'shift-a'`),
+      db.exec(`UPDATE "shifts" SET "kind" = 'dispatch' WHERE "id" = 'shift-a'`),
     ).rejects.toThrow(/closed shifts are immutable/i);
   });
 
   it('keeps an open shift identity immutable under UPDATE', async () => {
     await db.exec(`
       INSERT INTO "shifts" ("id", "client_id", "user_id", "kind", "started_at")
-      VALUES ('shift-a', 'tenant-a', 'cook-a', 'kitchen', CURRENT_TIMESTAMP);
+      VALUES ('shift-a', 'tenant-a', 'tech-a', 'climb', CURRENT_TIMESTAMP);
     `);
 
     await expect(
-      db.exec(`UPDATE "shifts" SET "user_id" = 'cook-b' WHERE "id" = 'shift-a'`),
+      db.exec(`UPDATE "shifts" SET "user_id" = 'tech-b' WHERE "id" = 'shift-a'`),
     ).rejects.toThrow(/identity and resource snapshots are immutable/i);
     // Closing it — the one edit the service performs — still works.
     await db.exec(`
       UPDATE "shifts"
          SET "ended_at" = CURRENT_TIMESTAMP,
              "ended_reason" = 'user',
-             "ended_by_user_id" = 'cook-a'
+             "ended_by_user_id" = 'tech-a'
        WHERE "id" = 'shift-a';
     `);
   });
@@ -198,10 +218,10 @@ describe('shift PostgreSQL schema', () => {
         ("id", "client_id", "user_id", "kind", "started_at",
          "ended_at", "ended_reason", "ended_by_user_id")
       VALUES
-        ('closed', 'tenant-a', 'cook-a', 'kitchen',
-         '2026-07-30T10:00:00Z', '2026-07-30T18:00:00Z', 'user', 'cook-a');
+        ('closed', 'tenant-a', 'tech-a', 'climb',
+         '2026-07-30T10:00:00Z', '2026-07-30T18:00:00Z', 'user', 'tech-a');
       INSERT INTO "shifts" ("id", "client_id", "user_id", "kind", "started_at")
-      VALUES ('open', 'tenant-a', 'cook-b', 'kitchen', CURRENT_TIMESTAMP);
+      VALUES ('open', 'tenant-a', 'tech-b', 'climb', CURRENT_TIMESTAMP);
     `);
 
     await db.exec(`DELETE FROM "shifts" WHERE "client_id" = 'tenant-a'`);
