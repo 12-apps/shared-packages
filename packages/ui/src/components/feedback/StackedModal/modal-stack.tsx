@@ -1,10 +1,17 @@
 import type { FC, ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { MODAL_STACK_BASE_Z_INDEX, MODAL_STACK_Z_INDEX_STEP } from '../../../tokens/layers';
 import type { ModalInfo, ModalPanelRole, ModalStackContextValue } from './StackedModal.types';
 
-/** MUI Dialog default z-index; each panel in the stack sits 10 above the last. */
-const BASE_Z_INDEX = 1300;
-const Z_INDEX_STEP = 10;
+/**
+ * MUI Dialog default z-index; each panel in the stack sits 10 above the last.
+ *
+ * Imported rather than declared here: anything that portals out of a panel has
+ * to clear this ladder, so the numbers are shared with the token that tells it
+ * how — see `tokens/layers`.
+ */
+const BASE_Z_INDEX = MODAL_STACK_BASE_Z_INDEX;
+const Z_INDEX_STEP = MODAL_STACK_Z_INDEX_STEP;
 
 const noop = (): void => {
   /** do nothing */

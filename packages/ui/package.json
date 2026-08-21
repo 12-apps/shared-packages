@@ -41,6 +41,10 @@
       "types": "./dist/types/tokens/scales.d.ts",
       "default": "./dist/tokens.js"
     },
+    "./tokens/layers": {
+      "types": "./dist/types/tokens/layers.d.ts",
+      "default": "./dist/tokens/layers.js"
+    },
     "./mui/Box": {
       "types": "./dist/types/mui/Box.d.ts",
       "default": "./dist/mui/Box.js"
