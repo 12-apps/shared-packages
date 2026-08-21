@@ -15,11 +15,65 @@ import type { CheckoutCopyFE } from '@12-apps/payments-frontend';
  * sentences stop appearing and the specs that read them fail — which is the
  * only way a consumer can notice a default coming back.
  *
+ * The same rule now covers `views` — the stepper, the Dados step, the empty
+ * cart and the whole confirmation screen. Those views used to carry their own
+ * compiled-in Portuguese (the `PT_BR_CHECKOUT_VIEW_COPY` pack is that text,
+ * named); this host words them itself for the same reason as everything else.
+ *
  * Every field is spelled out rather than spread over a base: the type is the
  * checklist, and a partial object would compile only because some other host's
  * table filled the gaps, which is the arrangement being removed.
  */
 export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
+  views: {
+    steps: {
+      dados: 'Identificação',
+      payment: 'Pagamento',
+      status: 'Comprovante',
+    },
+    dados: {
+      saveProfile: 'Guardar meus dados nesta loja',
+      cannotContinueTitle: 'Confira seus dados',
+      continueAction: 'Continuar',
+      secureNotice: 'Seus dados trafegam protegidos',
+      keepShopping: 'Voltar às compras',
+      back: 'Voltar',
+    },
+    emptyCart: {
+      title: 'Seu carrinho está vazio.',
+      action: 'Ver a loja',
+    },
+    status: {
+      paid: {
+        heading: 'Tudo certo com seu pedido',
+        support: 'O pagamento foi aprovado e o pedido está registrado.',
+      },
+      awaiting: {
+        heading: 'Aguardando a confirmação',
+        support: 'Em instantes o pagamento deve ser confirmado. Mantenha esta tela aberta.',
+      },
+      failed: {
+        heading: 'O pagamento não foi concluído',
+        support: 'Nada foi cobrado. Tente de novo quando quiser.',
+      },
+      expired: {
+        heading: 'Este código não vale mais',
+        support: 'Nada foi cobrado. Gere outro código para pagar.',
+      },
+      awaitingTimedOut: {
+        heading: 'A confirmação ainda não chegou',
+        support:
+          'Se você já pagou, aguarde: o pedido será confirmado assim que o banco avisar — ' +
+          'não pague uma segunda vez. Pode fechar esta tela.',
+      },
+      retryAction: 'Tentar de novo',
+      regenerateAction: 'Gerar outro código',
+      backAction: 'Voltar à loja',
+      amountLabel: 'Total pago',
+      referenceLabel: 'Referência',
+      receiptEmailLabel: 'Recibo enviado para',
+    },
+  },
   unavailableTitle: 'Pagamento online indisponível',
   unavailableBody:
     'Esta loja não recebe pagamentos por aqui. Combine o pagamento diretamente com a loja para concluir seu pedido.',
@@ -34,9 +88,8 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
   returnPending: 'Confirmando seu pagamento…',
   returnUnknown:
     'Não encontramos um pagamento em andamento nesta sessão. Verifique seus pedidos em instantes.',
-  emptyCartTitle: 'Seu carrinho está vazio.',
-  emptyCartAction: 'Ver a loja',
   continueAction: 'Continuar',
+  secureNotice: 'Seus dados trafegam protegidos',
   addCardTitle: 'Adicionar cartão',
   addCardAction: 'Salvar cartão',
   addCardPreparing: 'Preparando o formulário…',

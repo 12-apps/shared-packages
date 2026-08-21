@@ -85,6 +85,7 @@ function buildCheckout(
 
     return (
       <CheckoutFlow
+        copy={runtime.copy.views}
         cart={cart}
         createOrder={createOrder}
         saveBuyerContact={ports.saveBuyerContact}

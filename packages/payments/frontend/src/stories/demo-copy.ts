@@ -1,4 +1,5 @@
 import type { CheckoutCopyFE } from "../flows/copy";
+import { PT_BR_CHECKOUT_VIEW_COPY } from "../components/checkout/pt-BR";
 
 /**
  * THE DEMO HOST'S OWN VOICE (FUT-760).
@@ -14,6 +15,7 @@ import type { CheckoutCopyFE } from "../flows/copy";
  * adopter has, which is the point of the stories rendering it this way.
  */
 export const STORY_CHECKOUT_COPY: CheckoutCopyFE = {
+  views: PT_BR_CHECKOUT_VIEW_COPY,
   unavailableTitle: "Pagamento online indisponível",
   unavailableBody:
     "Esta loja não recebe pagamentos pelo site. Combine o pagamento diretamente com a loja para concluir seu pedido.",
@@ -30,8 +32,6 @@ export const STORY_CHECKOUT_COPY: CheckoutCopyFE = {
     "Se você já pagou, o pedido é confirmado assim que a operadora avisar — não pague de novo.",
   returnUnknown:
     "Não encontramos um pagamento em andamento nesta sessão. Verifique seus pedidos em instantes.",
-  emptyCartTitle: "Seu carrinho está vazio.",
-  emptyCartAction: "Ver cardápio",
   continueAction: "Continuar",
   secureNotice: "Pagamento seguro",
   addCardTitle: "Adicionar cartão",

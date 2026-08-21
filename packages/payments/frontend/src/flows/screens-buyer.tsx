@@ -157,7 +157,7 @@ function buildEmptyCart(runtime: FlowsRuntime): CheckoutScreens["EmptyCart"] {
   return function EmptyCart() {
     return (
       <FlowsShell runtime={runtime}>
-        <EmptyCartView onBack={runtime.config.ports.exitToCatalog} />
+        <EmptyCartView copy={runtime.copy.views.emptyCart} onBack={runtime.config.ports.exitToCatalog} />
       </FlowsShell>
     );
   };

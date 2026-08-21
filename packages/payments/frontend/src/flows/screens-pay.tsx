@@ -82,6 +82,7 @@ function buildPaymentStatus(runtime: FlowsRuntime): CheckoutScreens["PaymentStat
     return (
       <FlowsShell runtime={runtime}>
         <PaymentStatusView
+          copy={runtime.copy.views.status}
           status={status}
           totalLabel={payable?.totalLabel ?? ""}
           orderId={payable?.orderId}

@@ -23,8 +23,16 @@ import { Box } from "@mui/material";
 import type { JSX } from "react";
 
 import { useCheckoutComponents } from "./ui";
+import type { PaymentsUnavailableCopy } from "./view-copy";
 
 interface PaymentsUnavailableProps {
+  /**
+   * Every sentence this screen can say — the HOST's words (see
+   * `./view-copy`). Until 6.0.0 the two remedies and the button were compiled
+   * in, in one application's Portuguese, and a host that dutifully passed the
+   * flows copy port still got them.
+   */
+  copy: PaymentsUnavailableCopy;
   /**
    * Whether THIS shopper can settle with a waiter — mesas on AND a mesa of
    * their own. Decides which remedy is offered.
@@ -37,6 +45,7 @@ interface PaymentsUnavailableProps {
 }
 
 export function PaymentsUnavailable({
+  copy,
   waiterAvailable,
   onCallWaiter,
   calling = false,
@@ -47,8 +56,8 @@ export function PaymentsUnavailable({
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }} data-testid="checkout-payments-disabled">
         <Alert
           variant="info"
-          title="Pagamento online indisponível"
-          description="Esta loja não recebe pagamentos pelo site. Combine o pagamento diretamente com a loja para concluir seu pedido."
+          title={copy.title}
+          description={copy.body}
           showIcon
         />
       </Box>
@@ -59,8 +68,8 @@ export function PaymentsUnavailable({
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }} data-testid="checkout-call-waiter">
       <Alert
         variant="info"
-        title="Pagamento com o garçom"
-        description="Esta loja não recebe pagamentos pelo site. Chame o garçom para fechar a conta na mesa."
+        title={copy.remedyTitle}
+        description={copy.remedyBody}
         showIcon
       />
       {onCallWaiter ? (
@@ -71,7 +80,7 @@ export function PaymentsUnavailable({
           onClick={onCallWaiter}
           dataTestId="checkout-call-waiter-button"
         >
-          {calling ? "Chamando..." : "Chamar garçom"}
+          {calling ? copy.callingAction : copy.callAction}
         </Button>
       ) : null}
     </Box>

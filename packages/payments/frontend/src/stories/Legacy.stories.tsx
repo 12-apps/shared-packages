@@ -22,6 +22,7 @@ import {
 } from "../index";
 
 import { CLIENT_BASE_URL, createClientStoryStore, type ClientStorySpec } from "./client-store";
+import { PT_BR_CHECKOUT_VIEW_COPY } from "../components/checkout/pt-BR";
 import { STORY_CHECKOUT_COPY } from "./demo-copy";
 import { raisePayable, StoryFlow, withConfigRead, type StoryHost } from "./host";
 import type { StoryWorld } from "./store";
@@ -97,6 +98,7 @@ function HandMountedFlow({
   const { config } = flows.useCheckoutConfig();
   return (
     <CheckoutFlow
+      copy={PT_BR_CHECKOUT_VIEW_COPY}
       cart={{ empty: false, totalLabel: "R$ 75,00", totalItems: 2 }}
       createOrder={(input) => raisePayable(world, input)}
       onExitToMenu={() => undefined}
