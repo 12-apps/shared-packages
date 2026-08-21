@@ -23,6 +23,7 @@
  */
 import type { EntitlementDecision } from '../core/types';
 import type { TenantFeatureReason, TenantPlanView } from '../plan-wire';
+import type { PlanViewMessages } from './copy';
 
 export type { TenantFeatureView, TenantPlanView } from '../plan-wire';
 
@@ -32,28 +33,6 @@ export interface PricingRow {
   name: string;
   priceCents: number;
 }
-
-/**
- * Customer-facing wording per reason.
- *
- * `not-supported` is deliberately ABSENT: a feature this build has never heard
- * of is not something a store can buy, fix, or act on, and telling them it
- * "does not exist in the code" leaks an implementation detail as though it
- * were a product statement. Those rows are dropped entirely.
- */
-const NOTE: Record<TenantFeatureReason, string> = {
-  enabled: 'Incluído no seu plano',
-  'not-entitled': 'Não incluído no seu plano',
-  // Their own switch. Saying "not included" here would send them to buy a tier
-  // that changes nothing. Deliberately does NOT name a screen — the precise
-  // destination is a route, so the SPA that owns the routes names it, keyed
-  // off `reason` — and deliberately does not name what the tenant IS, because
-  // this package does not know whether its tenants are shops, clinics or
-  // observatories.
-  'disabled-by-tenant': 'Desligado por você nas configurações',
-  restricted: 'Suspenso enquanto houver pendência financeira',
-  suspended: 'Suspenso — fale com o suporte',
-};
 
 /** A row worth showing a tenant at all. */
 function isVisible(decision: EntitlementDecision<string>): boolean {
@@ -92,20 +71,24 @@ function isOverQuota(
 }
 
 /**
- * The over-quota wording: everything they have keeps working, only adding
- * MORE needs a bigger plan — with the upsell clause dropped when no tier would
- * actually raise the ceiling, because a wrong upsell is the single most
- * damaging thing this screen could print.
+ * The over-quota note: everything they have keeps working, only adding MORE
+ * needs a bigger plan. The WORDING is the host's (`messages.overQuotaNote`);
+ * what this resolves is the upsell clause's label — the COMMERCIAL name of
+ * the tier whose ceiling clears what they hold, or null when no tier would,
+ * because a wrong upsell is the single most damaging thing this screen could
+ * print.
  */
 function overQuotaNote(
   limit: number,
   usage: QuotaUsageView,
   pricing: readonly { key: string; name: string }[],
+  messages: PlanViewMessages,
 ): string {
-  const kept = `Seu plano inclui ${limit} e você tem ${usage.used}. Todos continuam ativos`;
-  const nextLabel = labelFor(usage.nextPlan, pricing);
-  if (nextLabel === null) return `${kept}.`;
-  return `${kept} — para criar novos, assine o ${nextLabel}.`;
+  return messages.overQuotaNote({
+    limit,
+    used: usage.used,
+    nextPlanLabel: labelFor(usage.nextPlan, pricing),
+  });
 }
 
 /**
@@ -154,6 +137,14 @@ export function buildTenantPlanView(
    * not this package's to say.
    */
   priceLabel: (priceCents: number | null) => string | null,
+  /**
+   * The situation notes — REQUIRED, the host's words (pt-BR hosts:
+   * `PT_BR_ENTITLEMENTS_MESSAGES` from `./pt-BR`). `featureNotes` has no
+   * `not-supported` key on purpose: a feature this build has never heard of
+   * is not something a tenant can buy, fix, or act on, so those rows are
+   * dropped entirely rather than worded.
+   */
+  messages: PlanViewMessages,
 ): TenantPlanView {
   const priced = pricing.find((plan) => plan.key === planKey) ?? null;
 
@@ -174,8 +165,8 @@ export function buildTenantPlanView(
         reason,
         note:
           over && typeof decision.limit === 'number'
-            ? overQuotaNote(decision.limit, quota, pricing)
-            : NOTE[reason],
+            ? overQuotaNote(decision.limit, quota, pricing, messages)
+            : messages.featureNotes[reason],
         limit: decision.limit,
         used: quota?.used ?? null,
         requiredPlan,

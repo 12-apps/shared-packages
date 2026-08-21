@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { EntitlementDecision } from "../../core/types";
 
+import { PT_BR_ENTITLEMENTS_MESSAGES } from "../pt-BR";
 import { buildTenantPlanView } from "../plan-view";
 
 /**
@@ -49,6 +50,7 @@ function view(
     describe,
     {},
     priceLabel,
+    PT_BR_ENTITLEMENTS_MESSAGES,
   );
 }
 
@@ -74,6 +76,7 @@ describe("buildTenantPlanView", () => {
       describeNothing,
       {},
       () => "seiscentos florins",
+      PT_BR_ENTITLEMENTS_MESSAGES,
     );
     expect(result.price).toBe("seiscentos florins");
     expect(result.priceCents).toBe(5900);
@@ -215,6 +218,7 @@ describe("the over-quota state", () => {
       describeNothing,
       { "stations.online": { used, nextPlan } },
       priceLabel,
+      PT_BR_ENTITLEMENTS_MESSAGES,
     );
 
   it("says the agreed over-quota words when the tenant holds MORE than its ceiling", () => {
@@ -255,6 +259,7 @@ describe("the over-quota state", () => {
       describeNothing,
       { a: { used: 9999, nextPlan: "network" } },
       priceLabel,
+      PT_BR_ENTITLEMENTS_MESSAGES,
     );
     expect(unlimited.features[0]?.note).toBe("Incluído no seu plano");
 
@@ -273,6 +278,7 @@ describe("the over-quota state", () => {
       describeNothing,
       {},
       priceLabel,
+      PT_BR_ENTITLEMENTS_MESSAGES,
     );
     expect(result.features[0]?.note).toBe("Não incluído no seu plano");
   });

@@ -7,10 +7,10 @@
  * and the eye can travel sideways — the host's `comparison` builder
  * guarantees that shape.
  *
- * All wording and every number arrive PRE-FORMATTED from the server. Nothing
- * here decides that a zero quota reads as "not included" rather than "até 0",
- * because that is a product statement and it belongs somewhere a test can
- * reach it.
+ * Every tier's wording and every number arrive PRE-FORMATTED from the server;
+ * the card chrome's own words (badges, CTAs, the unpriced slot) are required
+ * host copy. Nothing here decides how a zero quota reads, because that is a
+ * product statement and it belongs somewhere a test can reach it.
  */
 import type { JSX } from 'react';
 
@@ -22,12 +22,15 @@ import { Heading } from '@12-apps/ui/typography/Heading';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { ComparisonLine, ComparisonTier } from '../plan-wire';
+import type { TierCardsCopy } from './copy';
 
 interface TierCardsProps {
   tiers: ComparisonTier[];
   /** Press-to-ask, or null when this caller may not ask (or already has). */
   onRequest: ((tier: ComparisonTier) => void) | null;
   pending: boolean;
+  /** The cards' own words (badges, CTAs, the unpriced slot) — the host's. */
+  copy: TierCardsCopy;
 }
 
 /**
@@ -90,20 +93,25 @@ function LineRow({ line }: { line: ComparisonLine }): JSX.Element {
   );
 }
 
-/** The badge strip: at most one of "seu plano" / "melhor oferta". */
-function TierBadge({ tier }: { tier: ComparisonTier }): JSX.Element | null {
-  // "Seu plano" wins over "melhor oferta" when both apply — telling a tenant
-  // that the tier they already pay for is a great offer is noise, and knowing
-  // which card is theirs is the thing they came for.
+/** The badge strip: at most one of the current / recommended badges. */
+function TierBadge({ tier, copy }: { tier: ComparisonTier; copy: TierCardsCopy }): JSX.Element | null {
+  // The tenant's own badge wins over the recommendation when both apply —
+  // telling a tenant that the tier they already pay for is a great offer is
+  // noise, and knowing which card is theirs is the thing they came for.
   if (tier.current) {
     return (
-      <Chip label="SEU PLANO" size="sm" color="primary" data-testid={`tier-badge-${tier.key}`} />
+      <Chip
+        label={copy.currentBadge}
+        size="sm"
+        color="primary"
+        data-testid={`tier-badge-${tier.key}`}
+      />
     );
   }
   if (tier.recommended) {
     return (
       <Chip
-        label="MELHOR OFERTA"
+        label={copy.recommendedBadge}
         size="sm"
         color="success"
         data-testid={`tier-badge-${tier.key}`}
@@ -122,11 +130,11 @@ function TierBadge({ tier }: { tier: ComparisonTier }): JSX.Element | null {
  * bills monthly, and that a zero price is not a recurring charge. A host
  * billing annually rendered its yearly price as a monthly one.
  */
-function TierPrice({ tier }: { tier: ComparisonTier }): JSX.Element {
+function TierPrice({ tier, copy }: { tier: ComparisonTier; copy: TierCardsCopy }): JSX.Element {
   return (
     <Box sx={{ mt: 2 }}>
       <Text size="lg" weight="bold" data-testid={`tier-price-${tier.key}`}>
-        {tier.price ?? 'Sob consulta'}
+        {tier.price ?? copy.priceUnpriced}
       </Text>
       {tier.priceNote === null ? null : (
         <Text size="sm" color="secondary" data-testid={`tier-price-note-${tier.key}`}>
@@ -151,15 +159,17 @@ function TierCta({
   tier,
   onRequest,
   pending,
+  copy,
 }: {
   tier: ComparisonTier;
   onRequest: ((tier: ComparisonTier) => void) | null;
   pending: boolean;
+  copy: TierCardsCopy;
 }): JSX.Element | null {
   if (tier.current) {
     return (
       <Button size="sm" variant="outline" disabled fullWidth data-testid={`tier-cta-${tier.key}`}>
-        Plano atual
+        {copy.currentAction}
       </Button>
     );
   }
@@ -172,7 +182,7 @@ function TierCta({
       onClick={() => onRequest(tier)}
       data-testid={`tier-cta-${tier.key}`}
     >
-      Quero este plano
+      {copy.requestAction}
     </Button>
   );
 }
@@ -181,10 +191,12 @@ function TierCard({
   tier,
   onRequest,
   pending,
+  copy,
 }: {
   tier: ComparisonTier;
   onRequest: ((tier: ComparisonTier) => void) | null;
   pending: boolean;
+  copy: TierCardsCopy;
 }): JSX.Element {
   return (
     <Box
@@ -202,7 +214,7 @@ function TierCard({
       }}
     >
       <Box sx={{ minHeight: 28 }}>
-        <TierBadge tier={tier} />
+        <TierBadge tier={tier} copy={copy} />
       </Box>
 
       <Heading level="h3">{tier.name}</Heading>
@@ -237,15 +249,15 @@ function TierCard({
         ))}
       </Box>
 
-      <TierPrice tier={tier} />
+      <TierPrice tier={tier} copy={copy} />
       <Box sx={{ mt: 1.5 }}>
-        <TierCta tier={tier} onRequest={onRequest} pending={pending} />
+        <TierCta tier={tier} onRequest={onRequest} pending={pending} copy={copy} />
       </Box>
     </Box>
   );
 }
 
-export function TierCards({ tiers, onRequest, pending }: TierCardsProps): JSX.Element {
+export function TierCards({ tiers, onRequest, pending, copy }: TierCardsProps): JSX.Element {
   return (
     <Box
       data-testid="tier-cards"
@@ -264,7 +276,7 @@ export function TierCards({ tiers, onRequest, pending }: TierCardsProps): JSX.El
       }}
     >
       {tiers.map((tier) => (
-        <TierCard key={tier.key} tier={tier} onRequest={onRequest} pending={pending} />
+        <TierCard key={tier.key} tier={tier} onRequest={onRequest} pending={pending} copy={copy} />
       ))}
     </Box>
   );

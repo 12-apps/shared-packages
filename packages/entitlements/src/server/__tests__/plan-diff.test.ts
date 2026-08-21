@@ -10,6 +10,7 @@ import {
   summarizeDiff,
   type TenantDiff,
 } from "../plan-diff";
+import { PT_BR_ENTITLEMENTS_MESSAGES } from "../pt-BR";
 
 /**
  * The release gate reports only what a tenant would LOSE, resolved
@@ -119,7 +120,7 @@ describe("describeLoss", () => {
       after: null,
       policy: "readonly",
       requiredPlan: "pro",
-    });
+    }, PT_BR_ENTITLEMENTS_MESSAGES);
     expect(line).toContain("mantém o que já tem");
     expect(line).toContain("pro");
   });
@@ -132,7 +133,7 @@ describe("describeLoss", () => {
       after: null,
       policy: "hide",
       requiredPlan: null,
-    });
+    }, PT_BR_ENTITLEMENTS_MESSAGES);
     expect(line).toContain("a área some");
     // No plan would give it back, so it must not dangle an upsell.
     expect(line).not.toContain("volta no");
@@ -146,7 +147,7 @@ describe("describeLoss", () => {
       after: 100,
       policy: "readonly",
       requiredPlan: null,
-    });
+    }, PT_BR_ENTITLEMENTS_MESSAGES);
     expect(line).toContain("unlimited → 100");
   });
 });
