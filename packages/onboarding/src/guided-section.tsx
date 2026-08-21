@@ -70,7 +70,8 @@ export interface GuidedSectionProps {
   description?: string;
   illustration?: ReactNode;
   /** Landing CTA label — begins the flow at step 1. @default 'Começar' */
-  startLabel?: string;
+  /** The landing hero's begin action — REQUIRED, the host's words. */
+  startLabel: string;
   /** Marketing shown BELOW the default hero on the landing (e.g. capability cards). */
   landingExtra?: ReactNode;
   /**
@@ -169,7 +170,7 @@ export function GuidedSection({
   title,
   description,
   illustration,
-  startLabel = "Começar",
+  startLabel,
   landingExtra,
   configuredTitle,
   configuredSummary,

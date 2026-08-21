@@ -16,7 +16,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { tenantTopic, userTopic, type RealtimeDriver } from '@12-apps/realtime';
 import { eventsRouter, type EventsHono } from '@12-apps/realtime/hono';
-import { EventsDenial, type EventsTopicSpec } from '@12-apps/realtime/server';
+import { EventsDenial, PT_BR_EVENTS_MESSAGES, type EventsTopicSpec } from '@12-apps/realtime/server';
 
 import { realtimeOutboxDrainDb } from './realtime-db';
 import type { SqlRunner } from './rbac-db-shared';
@@ -141,6 +141,10 @@ export function realtimeHost(pg: PGlite, driver: RealtimeDriver): RealtimeHost {
   const drainDb = realtimeOutboxDrainDb(pg as unknown as SqlRunner);
 
   const events = eventsRouter({
+    // The wire sentences are the HOST's now (realtime requires them); this
+    // harness host already speaks pt-BR in its own authorize refusals below,
+    // so it passes the pack — the same one line a real host writes.
+    messages: PT_BR_EVENTS_MESSAGES,
     driver,
     ticketSecret: HARNESS_TICKET_SECRET,
     installSignalHooks: false,
