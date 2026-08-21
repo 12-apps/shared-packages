@@ -49,6 +49,15 @@ const BREAKING_FOOTER = /^BREAKING[ -]CHANGE:/m;
 // `type(scope)!:` or `type!:` — the shorthand the angular preset cannot read.
 const BANG_HEADER = /^[a-z]+(\([^)]*\))?!:/;
 
+// The DELIBERATE major, and the only thing that spends one. Every
+// `.releaserc.json` maps this marker to `major` and maps `breaking` to `minor`.
+//
+// A body marker rather than the footer or the `!`, because both of those are one
+// keystroke or one line-wrap from being written by accident — `@12-apps/request-
+// scope` shipped 2.0.0 because a wrapped sentence DESCRIBING a breaking change
+// put the phrase at column 0 (12-53). Nobody types RELEASE-MAJOR by mistake.
+const MAJOR_MARKER = /^RELEASE-MAJOR\b/m;
+
 /** Every message this PR could land on main: the title, and each commit. */
 export function messagesOf(env = process.env) {
   const file = env.COMMIT_FILE;
@@ -84,8 +93,15 @@ export function inspect(env = process.env) {
 
   const footer = all.some((message) => BREAKING_FOOTER.test(message));
   const bang = all.some((message) => BANG_HEADER.test(message.split("\n")[0] ?? ""));
+  const major = all.some((message) => MAJOR_MARKER.test(message));
 
-  return { breaking: footer || bang, bang, footer, allowed: labelsOf(env).includes(ESCAPE_LABEL) };
+  return {
+    breaking: footer || bang,
+    bang,
+    footer,
+    major,
+    allowed: labelsOf(env).includes(ESCAPE_LABEL),
+  };
 }
 
 /**
@@ -113,31 +129,45 @@ function phrasing(bang, footer) {
 
 /** The lines to print, and whether to fail. Pure, so the selftest can read it. */
 export function report(env = process.env) {
-  const { breaking, bang, footer, allowed } = inspect(env);
+  const { breaking, bang, footer, major, allowed } = inspect(env);
   const lines = [];
   let failed = false;
 
-  const { declaration, undo } = phrasing(bang, footer);
+  const { declaration } = phrasing(bang, footer);
 
-  if (breaking && !allowed) {
+  if (major && !allowed) {
     lines.push(
-      `::error::This pull request carries ${declaration}, so merging it cuts a MAJOR. ` +
-        `Consumers pin @12-apps/* exactly, so a major is a migration someone has to ` +
-        `schedule — not a number. If that is intended, add the \`${ESCAPE_LABEL}\` label ` +
-        `and re-run. If it is not, ${undo}.`,
+      `::error::This pull request carries a \`RELEASE-MAJOR\` marker, so merging it spends a ` +
+        `MAJOR. Consumers pin @12-apps/* exactly, so a major is a migration someone has to ` +
+        `schedule — not a number, and one nobody scheduled just stalls the pin. Reserve it ` +
+        `for a component-wide refactor. If that is intended, add the \`${ESCAPE_LABEL}\` ` +
+        `label and re-run. If it is not, drop the marker — an ordinary breaking change ` +
+        `ships as a MINOR here.`,
     );
     failed = true;
   }
 
-  if (breaking && allowed) {
+  if (major && allowed) {
     lines.push(
-      `::notice::Major release intended — \`${ESCAPE_LABEL}\` is set, declared by ` +
-        `${declaration}. It still needs approval in the \`release-major\` environment ` +
-        `after merge.`,
+      `::notice::Major release intended — \`${ESCAPE_LABEL}\` is set. It still needs ` +
+        `approval in the \`release-major\` environment after merge.`,
     );
   }
 
-  if (!breaking) lines.push("::notice::No breaking change declared — this PR cuts no major");
+  // Not a failure, and deliberately still said out loud: this is the opposite of
+  // the angular default, so a contributor who wrote the footer expecting a major
+  // needs to see that it bought a minor rather than discover it on npm.
+  if (breaking && !major) {
+    lines.push(
+      `::notice::This pull request carries ${declaration}, which cuts a MINOR here — ` +
+        `every .releaserc.json maps \`breaking\` to \`minor\`. If you meant to spend a ` +
+        `major, add a \`RELEASE-MAJOR:\` line to the body and the \`${ESCAPE_LABEL}\` label.`,
+    );
+  }
+
+  if (!breaking && !major) {
+    lines.push("::notice::No breaking change declared — this PR cuts no major");
+  }
 
   return { lines, failed };
 }

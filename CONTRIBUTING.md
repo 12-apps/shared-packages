@@ -50,15 +50,23 @@ subject is what picks each package's next version:
 |---|---|
 | `fix(ui): correct the disabled state` | **patch** — `1.8.1 → 1.8.2` |
 | `feat(ui): add a compact variant` | **minor** — `1.8.1 → 1.9.0` |
-| `feat(ui)!: drop the legacy Button API` | **major** — `1.8.1 → 2.0.0` |
+| `feat(ui)!: drop the legacy Button API` | **minor** — `1.8.1 → 1.9.0` |
+| `feat(ui): add x` + `BREAKING CHANGE:` footer | **minor** — `1.8.1 → 1.9.0` |
+| `feat(ui): rebuild the API` + `RELEASE-MAJOR:` line | **major** — `1.8.1 → 2.0.0` |
 | `chore` / `docs` / `style` / `test` / `ci` / `build` | no release |
+
+**A breaking change is a MINOR here.** That is deliberate and it is the opposite
+of the angular default. Both ways of declaring one — the `!` and the
+`BREAKING CHANGE:` footer — are still read, still shown in the release notes,
+and still worth writing; they just do not spend a major on their own. Tightening
+a config to be required, or making a component take its copy, is not a migration
+anyone schedules, and majors minted for those had five packages queued at once
+while consumers stayed pinned to versions behind them.
 
 Two consequences worth internalising:
 
-- **A `fix` that is really a breaking change ships as a patch**, and every
-  consumer picks it up on their next install with a semver range that promised
-  compatibility. Mark it: a `!` after the type/scope, or a `BREAKING CHANGE:`
-  footer.
+- **A `fix` that is really a breaking change ships as a patch.** Mark it with a
+  `!` or a `BREAKING CHANGE:` footer so it ships as a minor and says what it did.
 - **A `feat` typed as `chore` never ships at all.** The commit merges, CI is
   green, and the package on npm simply does not have your change. Nothing fails
   — which is why this is the failure mode that wastes the most time.
@@ -72,6 +80,21 @@ BREAKING CHANGE: `<Button kind="…">` is replaced by `variant`. Callers passing
 `kind` must rename the prop; the values are unchanged.
 ```
 
+Spend a **major** only for a component-wide refactor — the kind a consumer has
+to set aside time to adopt. Say so on its own line in the body:
+
+```
+feat(ui): rebuild every component around the copy port
+
+RELEASE-MAJOR: every component now takes its sentences as props. Adopters pass
+a copy pack per component; there is no default rendering left.
+```
+
+Nobody types `RELEASE-MAJOR` by accident, which is the point: `@12-apps/request-
+scope` once shipped `2.0.0` because the commit guard wrapped a body at 100
+characters and put the phrase `BREAKING CHANGE` at column 0 — inside a sentence
+merely *describing* one.
+
 ## A major needs a human
 
 A major is the one bump a consumer cannot take without reading. Consumers pin
@@ -79,21 +102,26 @@ A major is the one bump a consumer cannot take without reading. Consumers pin
 ignored — it stalls the pin, and the consumer drifts further behind with every
 later release. Two checks make spending one deliberate.
 
-**At pull-request time**, the `Major guard` check fails a PR that declares a
-breaking change, by either syntax — a `!` after the type/scope in the title or
-any commit subject, or a `BREAKING CHANGE:` footer in any commit body. If the
-major is intended, add the **`allow-major`** label and the check passes. This is
-where a major is cheapest to reconsider: the message is still editable.
+**At pull-request time**, the `Major guard` check fails a PR carrying a
+`RELEASE-MAJOR` line in the title or any commit body. If the major is intended,
+add the **`allow-major`** label and the check passes. This is where a major is
+cheapest to reconsider: the message is still editable.
 
-The two syntaxes are equals. That is a deliberate repair, not a given: the
-angular preset's `headerPattern` is `^(\w*)(?:\((.*)\))?: (.*)$`, which a `!`
-before the colon makes fail *entirely* — so `fix(prisma)!:` used to parse with
-no type at all and `@semantic-release/commit-analyzer` returned **no release**.
-Not the major its author meant; not even a patch. That exact commit was once the
-only one in range for five packages and released none of them, silently, with
-every check green. Every `.releaserc.json` now overrides
-`parserOpts.headerPattern` and `parserOpts.breakingHeaderPattern` so the
-shorthand parses and raises a breaking note.
+A `!` or a `BREAKING CHANGE:` footer does **not** fail the check — it cuts a
+minor. The guard says so in the log rather than staying silent, so that someone
+who wrote the footer expecting a major finds out here instead of on npm.
+
+The two syntaxes are equals, and both are legible. That is a deliberate repair,
+not a given: the angular preset's `headerPattern` is
+`^(\w*)(?:\((.*)\))?: (.*)$`, which a `!` before the colon makes fail *entirely*
+— so `fix(prisma)!:` used to parse with no type at all and
+`@semantic-release/commit-analyzer` returned **no release**. Not the major its
+author meant; not even a patch. That exact commit was once the only one in range
+for five packages and released none of them, silently, with every check green.
+Every `.releaserc.json` overrides `parserOpts.headerPattern` and
+`parserOpts.breakingHeaderPattern` so the shorthand parses and raises a breaking
+note — and then `releaseRules` maps that note to a **minor**, so `!` now means
+exactly what its author meant (this breaks) and spends a minor saying it.
 
 Three things now rest on that override — this document, the guard's error
 message, and the approval gate the major is routed to — so
