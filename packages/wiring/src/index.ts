@@ -15,9 +15,11 @@ export type {
   HttpContribution,
   MountedRoute,
   WireHttpMethod,
+  WireRawResponse,
   WireRequest,
   WireResponse,
   WireRoute,
+  WireRouteAnswer,
   WireRouteKind,
   WireRoutePolicy,
 } from "./contract/http";
