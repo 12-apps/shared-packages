@@ -49,7 +49,7 @@ if (entry.last) {
   process.stdout.write("[semantic-release] > Found git tag " + pkg + "-v" + entry.last + " associated with version " + entry.last + " on branch main\\n");
 }
 if (entry.breaking) {
-  process.stdout.write("BREAKING CHANGE: the old API is gone\\n");
+  process.stdout.write("RELEASE-MAJOR: the whole component API is rebuilt\\n");
 }
 if (entry.next) {
   process.stdout.write("[semantic-release] > The next release version is " + entry.next + "\\n");
@@ -131,7 +131,7 @@ check(
 
 check(
   "the approval prompt names the package and both versions",
-  major.outputs.majors === "ui 5.0.0 -> 6.0.0 (from a BREAKING CHANGE footer)",
+  major.outputs.majors === "ui 5.0.0 -> 6.0.0 (from a RELEASE-MAJOR marker)",
   `the reviewer approves from this string alone, so it has to carry what is\n    ` +
     `being spent. Got: ${JSON.stringify(major.outputs.majors)}`,
 );
