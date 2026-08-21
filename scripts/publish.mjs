@@ -22,7 +22,11 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const DIRS = (process.env.PUBLISH_DIRS ?? "").split(/\s+/).filter(Boolean);
+import { publishDirs } from "./lib/release-state.mjs";
+
+// Through the helper, so this still resolves when no PUBLISH_DIRS is set —
+// cd.yml sets none. See publishDirs() for why that is not a bug there.
+const DIRS = publishDirs();
 const DEP_FIELDS = ["dependencies", "peerDependencies", "optionalDependencies"];
 
 // semantic-release bumps only the packages with releasable commits, so most of
