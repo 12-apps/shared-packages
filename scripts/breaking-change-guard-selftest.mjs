@@ -6,13 +6,21 @@ import { join } from "node:path";
 import { report } from "./breaking-change-guard.mjs";
 
 /**
- * Proves scripts/breaking-change-guard.mjs fails a PR for the reason it claims.
+ * Proves scripts/breaking-change-guard.mjs arms the human gate for the reason
+ * it claims, and leaves it alone otherwise.
  *
- * The two cases that must stay QUIET carry as much weight as the ones that must
- * fail. This check runs on every pull request in the repo, so a guard that
- * fired on an ordinary `feat` — or on a sentence that merely mentions a breaking
- * change mid-line — would be bypassed by habit within a week, and the real one
- * would go with it.
+ * `report().major` is not a log line: `major-guard.yml` reads it as the job
+ * output that starts `Major approval`, the environment-bound job that holds the
+ * pull request. So the cases that must return `major: false` carry as much
+ * weight as the one that must return true. This check runs on every pull
+ * request in the repo, and a gate that fired on an ordinary `feat` — or on a
+ * routine "this config is required now" tightening — would be clicked through
+ * by habit within a week, and the real one would go with it.
+ *
+ * Nothing here fails the CHECK any more. The guard prints and hands over a
+ * verdict; the block lives in the environment, which is the one thing this
+ * repo's token cannot reach. There is no escape label to test, deliberately —
+ * `allow-major` was applied through the API by an agent holding that token.
  */
 
 let failures = 0;
@@ -32,14 +40,14 @@ function commitFile(messages) {
 }
 
 const run = ({ commits = [], ...env }) =>
-  report({ PR_TITLE: "", PR_LABELS: "", COMMIT_FILE: commitFile(commits), ...env });
+  report({ PR_TITLE: "", COMMIT_FILE: commitFile(commits), ...env });
 
 // ── The ordinary case has to stay silent ────────────────────────────────────
 const ordinary = run({ PR_TITLE: "feat(ui): add a compact variant" });
 check(
-  "an ordinary feat does not fail",
-  !ordinary.failed,
-  `a guard that fires on every PR is a guard people route around. Lines:\n    ${ordinary.lines}`,
+  "an ordinary feat does not arm the gate",
+  ordinary.major === false,
+  `a gate that waits on every PR is a gate people click through. Lines:\n    ${ordinary.lines}`,
 );
 
 const mention = run({
@@ -48,7 +56,7 @@ const mention = run({
 });
 check(
   "a mid-line mention of a breaking change is not a footer",
-  !mention.failed,
+  mention.major === false,
   `conventional-commits-parser anchors the footer to a line start, and so must\n    ` +
     `this. Lines:\n    ${mention.lines}`,
 );
@@ -66,9 +74,11 @@ const breaking = run({
   commits: ["feat(ui): replace the Button API\n\nBREAKING CHANGE: `kind` is replaced by `variant`."],
 });
 check(
-  "a BREAKING CHANGE footer does NOT fail the PR — it cuts a minor",
-  !breaking.failed,
-  `a required-config tightening is not a migration anyone schedules.\n    Lines:\n    ${breaking.lines}`,
+  "a BREAKING CHANGE footer does NOT arm the gate — it cuts a minor",
+  breaking.major === false,
+  `a required-config tightening is not a migration anyone schedules, so it must\n    ` +
+    `not sit waiting for a click. The verdict handed to major-guard.yml used to be\n    ` +
+    `\`breaking\` rather than the marker, which held every one of them.\n    Lines:\n    ${breaking.lines}`,
 );
 
 check(
@@ -84,32 +94,29 @@ const major = run({
   commits: ["feat(ui): rebuild the component API\n\nRELEASE-MAJOR: every component takes copy."],
 });
 check(
-  "a RELEASE-MAJOR marker fails the PR without the label",
-  major.failed && major.lines.join(" ").includes("MAJOR"),
-  `Lines:\n    ${major.lines}`,
+  "a RELEASE-MAJOR marker arms the gate",
+  major.major === true && major.lines.join(" ").includes("MAJOR"),
+  `this verdict IS the block — major-guard.yml starts \`Major approval\` on it.\n    ` +
+    `Lines:\n    ${major.lines}`,
 );
 
 check(
-  "and the message says how to proceed deliberately",
-  major.lines.join(" ").includes("allow-major"),
-  `an error that does not name its escape hatch just blocks people. Lines:\n    ${major.lines}`,
-);
-
-const labelled = run({
-  PR_TITLE: "feat(ui): rebuild the component API",
-  commits: ["feat(ui): rebuild the component API\n\nRELEASE-MAJOR: every component takes copy."],
-  PR_LABELS: "needs-review, allow-major",
-});
-check(
-  "the allow-major label lets a deliberate major through",
-  !labelled.failed,
-  `Lines:\n    ${labelled.lines}`,
+  "and the message names both ways out, neither of which is a label",
+  /Review deployments/.test(major.lines.join(" ")) &&
+    /drop the marker/.test(major.lines.join(" ")) &&
+    !/allow-major/.test(major.lines.join(" ")),
+  `a block that does not say how to clear it just stops people — and the two\n    ` +
+    `exits are a person's: approve the deployment, or reword the message. The\n    ` +
+    `label was neither: an agent holding this repo's token added it on #319.\n    ` +
+    `Lines:\n    ${major.lines}`,
 );
 
 check(
-  "and it still says the release itself needs approving after merge",
-  labelled.lines.join(" ").includes("release-major"),
-  `the label is consent to CUT the major, not to publish it unreviewed.\n    Lines:\n    ${labelled.lines}`,
+  "and it never sends anyone to a post-merge gate that no longer exists",
+  !/release-major|after merge/.test(major.lines.join(" ")),
+  `the \`release-major\` environment went with ci.yml's release job (#351). Advice\n    ` +
+    `pointing at it would have someone merge and then wait for a click nothing\n    ` +
+    `is going to ask for. Lines:\n    ${major.lines}`,
 );
 
 // ── The `!` shorthand, which is a MINOR like any other breaking change ──────
@@ -123,8 +130,8 @@ check(
 // `scripts/release-bump-selftest.mjs` holds the parser end.
 const bang = run({ PR_TITLE: "fix(prisma)!: correct the migration order" });
 check(
-  "the `!` shorthand does not fail the PR — it cuts a MINOR",
-  !bang.failed && bang.lines.join(" ").includes("MINOR"),
+  "the `!` shorthand does not arm the gate — it cuts a MINOR",
+  bang.major === false && bang.lines.join(" ").includes("MINOR"),
   `\`!\` and a footer say the same thing, so they are treated the same way.\n    ` +
     `Lines:\n    ${bang.lines}`,
 );
@@ -143,18 +150,24 @@ check(
     `message has to name the syntax actually used. Lines:\n    ${bang.lines}`,
 );
 
-// The marker is what the label and the environment are for now, so a `!` needs
-// neither — and must not silently acquire a major by carrying the label for some
-// other reason.
-const bangAllowed = run({
+// Both syntaxes at once is still one minor, and still no gate. Worth its own
+// case because `breaking` is a union and a marker check written against it
+// would look identical here and differ nowhere else.
+const both = run({
   PR_TITLE: "fix(prisma)!: correct the migration order",
-  PR_LABELS: "allow-major",
+  commits: ["fix(prisma)!: correct the migration order\n\nBREAKING CHANGE: the order changed."],
 });
 check(
-  "allow-major does not turn a `!` into a major on its own",
-  !bangAllowed.failed && bangAllowed.lines.join(" ").includes("MINOR"),
-  `the label is consent to spend a major, not a declaration of one. Only the\n    ` +
-    `RELEASE-MAJOR marker declares it. Lines:\n    ${bangAllowed.lines}`,
+  "a `!` and a footer together are still a MINOR and still no gate",
+  both.major === false && both.lines.join(" ").includes("MINOR"),
+  `only the RELEASE-MAJOR marker declares a major; saying "this breaks" twice\n    ` +
+    `does not add up to one. Lines:\n    ${both.lines}`,
+);
+
+check(
+  "and it names both syntaxes, so the advice is followable either way",
+  /`!`/.test(both.lines.join(" ")) && /footer/.test(both.lines.join(" ")),
+  `Lines:\n    ${both.lines}`,
 );
 
 // ── Multi-commit PRs ────────────────────────────────────────────────────────
@@ -164,14 +177,14 @@ const buried = run({
 });
 check(
   "a marker in any commit of a multi-commit PR is found",
-  buried.failed,
+  buried.major === true,
   `the squash keeps every commit's body, so a marker anywhere in the PR lands\n    ` +
     `on main. Lines:\n    ${buried.lines}`,
 );
 
 console.log(
   failures === 0
-    ? "\nbreaking-change-guard.mjs fails on real majors and stays quiet otherwise"
+    ? "\nbreaking-change-guard.mjs arms the gate on real majors and stays quiet otherwise"
     : `\n${failures} case(s) failed`,
 );
 process.exitCode = failures === 0 ? 0 : 1;
