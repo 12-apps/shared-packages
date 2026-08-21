@@ -39,10 +39,9 @@ export const STORY_COPY: EmailAuthCopy = {
     "current-password-required": "Enter your current password.",
     "current-password-invalid": "That current password is wrong.",
     "no-account": "Account not found.",
-    // The person at the form cannot fix a missing provider, so this says
-    // what happened and who can, and nothing about the deployment.
-    "verification-unavailable":
-      "Não foi possível concluir o cadastro agora. Tente novamente mais tarde ou fale com o suporte.",
+    // The person at the form cannot fix a missing provider, so this says what
+    // happened and who can, and nothing about the deployment.
+    "verification-unavailable": "Sign-up could not be completed. Try later or contact support.",
     unknown: "That did not go through. Try again.",
   },
   passwordField: {

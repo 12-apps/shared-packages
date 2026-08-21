@@ -148,6 +148,40 @@ export interface EnvAuthMailerConfig {
 const SINK_PROVIDER = "log";
 
 /**
+ * What the environment resolves to right now.
+ *
+ * `"sink"` and `"refuse"` are the two ends; a vendor name in between means the
+ * lookup succeeded and `drivers[vendor]` is known to exist.
+ */
+type MailMode = "sink" | "refuse" | { vendor: string };
+
+/**
+ * The whole driver decision, in one place.
+ *
+ * Extracted because it is asked TWICE — once to pick a driver, once to answer
+ * `canDeliver` — and two copies of this tree is precisely the drift that would
+ * let a deployment report it can send and then not send. Whatever the answer,
+ * both callers now get it from the same eight lines.
+ *
+ * Read fresh on every call rather than captured: a preview box is reconfigured
+ * under a running process, and a decision made at import would outlive it.
+ */
+function resolveMailMode(
+  env: AuthMailerEnvNames,
+  drivers: Record<string, EmailDriverFactory | undefined>,
+  read: (name: string) => string | undefined,
+): MailMode {
+  const provider = read(env.provider);
+  if (provider === SINK_PROVIDER) return "sink";
+  if (!provider) return "refuse";
+  if (!read(env.apiKey) || !read(env.from)) return "refuse";
+  // An unknown name refuses rather than throwing: a typo in a deploy variable
+  // must not take the sign-in flow down at import, and the refusal already
+  // logs which name it could not resolve.
+  return drivers[provider] === undefined ? "refuse" : { vendor: provider };
+}
+
+/**
  * Build a mailer that resolves its driver from the environment on every send.
  *
  * The refusal is the important branch. A deployment with no provider must fail
@@ -189,41 +223,26 @@ export function createEnvAuthMailer(config: EnvAuthMailerConfig): EmailCredentia
   /**
    * Does the environment currently resolve to something that DELIVERS?
    *
-   * The sink counts. It is a deliberate local-development and e2e choice
-   * ("provider = log"), the mail is written where the developer or the harness
-   * can read it, and the link in it works — so a sign-up on such a box must
-   * still succeed. What does not count is the refusal, which is reached by
-   * saying nothing at all: an unset provider, a missing key or From, or a
-   * vendor name that resolves to no factory. Those are misconfiguration, and
-   * on those the mail is simply gone.
-   *
-   * Read fresh, like the driver itself, because a preview box is reconfigured
-   * under a running process.
+   * The sink counts: "provider = log" is a deliberate development and e2e
+   * choice, the mail is written where a developer or the harness can read it,
+   * and the link in it works — so a sign-up on such a box must still succeed.
+   * Only the refusal is a no, and it is reached by saying nothing at all.
    */
-  const canDeliver = (): boolean => {
-    const provider = read(env.provider);
-    if (provider === SINK_PROVIDER) return true;
-    if (!provider) return false;
-    if (!read(env.apiKey) || !read(env.from)) return false;
-    return drivers[provider] !== undefined;
-  };
+  const canDeliver = (): boolean => resolveMailMode(env, drivers, read) !== "refuse";
 
   /** Which vendor this deployment sends through, read fresh. */
   const driver = (): EmailDriver => {
-    const provider = read(env.provider);
-    if (provider === SINK_PROVIDER) return sink;
-    if (!provider) return refuse;
-
-    const apiKey = read(env.apiKey);
-    const from = read(env.from);
-    if (!apiKey || !from) return refuse;
-
-    // An unknown name refuses rather than throwing: a typo in a deploy
-    // variable must not take the sign-in flow down at import, and the refusal
-    // already logs which name it could not resolve.
-    const factory = drivers[provider];
-    if (!factory) return refuse;
-    return factory({ channel: "EMAIL", driver: provider, apiKey, from });
+    const mode = resolveMailMode(env, drivers, read);
+    if (mode === "sink") return sink;
+    if (mode === "refuse") return refuse;
+    // `resolveMailMode` already proved the factory, the key and the From are
+    // all there, so the non-null assertions below cannot fire.
+    return drivers[mode.vendor]!({
+      channel: "EMAIL",
+      driver: mode.vendor,
+      apiKey: read(env.apiKey)!,
+      from: read(env.from)!,
+    });
   };
 
   /** The public origin, first named variable that is actually set. */
