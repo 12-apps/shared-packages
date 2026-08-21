@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PT_BR_STORAGE_MESSAGES, PT_BR_STORAGE_UNAUTHENTICATED } from "../../pt-BR";
 import { Hono } from 'hono';
 
 import { DEFAULT_MAX_UPLOAD_BYTES } from '../../limits';
@@ -35,6 +36,8 @@ function mount(actor: StorageActor | null = { scope: SCOPE, mayUpload: true }): 
   // of it.
   const memory = memoryDriver();
   const storage = storageRouter({
+    messages: PT_BR_STORAGE_MESSAGES,
+    unauthenticatedMessage: PT_BR_STORAGE_UNAUTHENTICATED,
     driver: memory,
     maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
     imagePipeline: fakePipeline(),
@@ -127,6 +130,8 @@ describe('storageRouter', () => {
 
   it('re-exports the mount surface, so a host needs one call and one object', () => {
     const mounted = storageRouter({
+    messages: PT_BR_STORAGE_MESSAGES,
+    unauthenticatedMessage: PT_BR_STORAGE_UNAUTHENTICATED,
       driver: memoryDriver(),
       maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
       imagePipeline: fakePipeline(),

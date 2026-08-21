@@ -6,6 +6,7 @@ import {
   rejectFileUpfront,
   transportFailure,
   uploadFailure,
+  type WebStorageMessageContext,
   type WebStorageMessages,
 } from './failures';
 import { optimizeImage, type ImageProfile } from './optimize-image';
@@ -56,8 +57,11 @@ export interface UseUploadConfig {
   profile?: ImageProfile;
   /** How the request is made. Default: same-origin `fetch`. */
   fetchImpl?: typeof fetch;
-  /** pt-BR refusal copy overrides, for the codes only the host can explain. */
-  messages?: Partial<WebStorageMessages>;
+  /**
+   * The refusal copy, as the host's own factory of the mount's ceiling —
+   * REQUIRED (pt-BR hosts: `PT_BR_WEB_STORAGE_MESSAGES` from `./pt-BR`).
+   */
+  messages: (context: WebStorageMessageContext) => WebStorageMessages;
 }
 
 export function useUpload(config: UseUploadConfig): UploadState {

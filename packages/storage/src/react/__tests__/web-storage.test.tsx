@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // fireEvent/render/waitFor from @testing-library/react — plain DOM asserts, no jest-dom.
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { PT_BR_WEB_STORAGE_MESSAGES } from '../pt-BR';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createWebStorage } from '../create-web-storage';
@@ -63,7 +64,7 @@ describe('createWebStorage', () => {
   it('POSTs the raw file at OUR OWN origin and hands back the key', async () => {
     installBrowserGaps();
     const { sent, fetchImpl } = stubFetch(accepted);
-    const storage = createWebStorage({ apiBase: '/api', fetchImpl });
+    const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', fetchImpl });
     const changes: (string | null)[] = [];
     render(<storage.ImageField onChange={(key) => changes.push(key)} />);
 
@@ -82,7 +83,7 @@ describe('createWebStorage', () => {
     // exactly how a swallowed storage 503 looked.
     installBrowserGaps();
     const { fetchImpl } = stubFetch(accepted);
-    const storage = createWebStorage({ apiBase: '/api', fetchImpl });
+    const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', fetchImpl });
     render(<storage.ImageField onChange={() => undefined} />);
 
     pick(png());
@@ -99,7 +100,7 @@ describe('createWebStorage', () => {
     const { fetchImpl } = stubFetch(
       () => new Response(JSON.stringify({ error: 'forbidden' }), { status: 403 }),
     );
-    const storage = createWebStorage({ apiBase: '/api', fetchImpl });
+    const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', fetchImpl });
     const changes: (string | null)[] = [];
     render(<storage.ImageField onChange={(key) => changes.push(key)} />);
 
@@ -123,7 +124,10 @@ describe('createWebStorage', () => {
     const storage = createWebStorage({
       apiBase: '/api',
       fetchImpl,
-      messages: { forbidden: 'Peça a um gerente para enviar a foto.' },
+      messages: (context) => ({
+        ...PT_BR_WEB_STORAGE_MESSAGES(context),
+        forbidden: 'Peça a um gerente para enviar a foto.',
+      }),
     });
     render(<storage.ImageField onChange={() => undefined} />);
 
@@ -142,7 +146,7 @@ describe('createWebStorage', () => {
           status: 413,
         }),
     );
-    const storage = createWebStorage({ apiBase: '/api', fetchImpl });
+    const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', fetchImpl });
     render(<storage.ImageField onChange={() => undefined} />);
 
     pick(png());
@@ -154,7 +158,7 @@ describe('createWebStorage', () => {
   it('refuses an oversize file before any request leaves the browser', async () => {
     installBrowserGaps();
     const { sent, fetchImpl } = stubFetch(accepted);
-    const storage = createWebStorage({ apiBase: '/api', maxBytes: 1024, fetchImpl });
+    const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', maxBytes: 1024, fetchImpl });
     render(<storage.ImageField onChange={() => undefined} />);
 
     pick(new File([new Uint8Array(4096)], 'p.png', { type: 'image/png' }));
@@ -164,7 +168,7 @@ describe('createWebStorage', () => {
   });
 
   it('states the limit it was given, so the copy cannot claim a ceiling it is not applying', () => {
-    const storage = createWebStorage({ apiBase: '/api', maxBytes: 2 * 1024 * 1024 });
+    const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', maxBytes: 2 * 1024 * 1024 });
 
     expect(storage.limits).toEqual({ maxBytes: 2 * 1024 * 1024, maxBytesLabel: '2 MB' });
   });
@@ -172,7 +176,7 @@ describe('createWebStorage', () => {
   it('renders a standalone page a host can mount to prove the wiring', async () => {
     installBrowserGaps();
     const { fetchImpl } = stubFetch(accepted);
-    const storage = createWebStorage({ apiBase: '/api', fetchImpl });
+    const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', fetchImpl });
     const Page = storage.page;
     render(<Page />);
 
@@ -187,7 +191,7 @@ describe('createWebStorage', () => {
   it('clears the key and the error when the image is removed', async () => {
     installBrowserGaps();
     const { fetchImpl } = stubFetch(accepted);
-    const storage = createWebStorage({ apiBase: '/api', fetchImpl });
+    const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', fetchImpl });
     const changes: (string | null)[] = [];
     render(
       <storage.ImageField

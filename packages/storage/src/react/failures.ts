@@ -88,42 +88,31 @@ export interface WebStorageMessages {
   unsupported_content_type_upfront: (context: { contentType: string }) => string;
   /** 2xx with no key in the body — accepted, and unusable. */
   missing_key: string;
+  /**
+   * A refusal whose body carried no sentence and no code this table knows —
+   * the status (and the raw code, when there was one) ride along, because
+   * they are what turns "it failed" into something greppable.
+   */
+  upload_failed_http: (context: { status: number; detail: string }) => string;
   /** Anything thrown on the way. The last resort, and it says so. */
   upload_failed: string;
+
+  /**
+   * The standalone upload page's own chrome — heading, the one-line
+   * instruction (which carries the ceiling, same rule as the refusals), the
+   * field label and its helper. These rendered as literals inside
+   * `createWebStorage` until copy became required config.
+   */
+  pageTitle: string;
+  pageIntro: string;
+  fieldLabel: string;
+  fieldHelper: string;
 }
 
 /** Copy that only makes sense with the configured ceiling in it. */
 export interface WebStorageMessageContext {
   /** `8 MB`, already formatted. */
   limit: string;
-}
-
-/**
- * The default pt-BR copy. `limit` is interpolated rather than hard-coded for the
- * same reason the server does it: a host that raises the ceiling must not end up
- * with a message naming the old number.
- */
-export function defaultWebStorageMessages(
-  context: WebStorageMessageContext,
-): WebStorageMessages {
-  return {
-    forbidden: 'Sua conta não tem permissão para enviar imagens nesta loja.',
-    unsupported_content_type: 'Formato não suportado. Envie PNG, JPG, WebP ou GIF.',
-    file_too_large: `Imagem muito grande. O limite é ${context.limit}.`,
-    invalid_key: 'Não foi possível localizar essa imagem.',
-    not_found: 'Essa imagem não está mais disponível.',
-    session_expired: 'Sua sessão expirou. Entre novamente e repita o envio.',
-    transport: 'Não foi possível falar com o servidor. Verifique sua conexão e tente de novo.',
-    empty_file: 'Arquivo vazio (0 bytes). Escolha a imagem novamente.',
-    file_too_large_upfront: ({ size, limit }) =>
-      `Imagem muito grande: ${size}. O limite é ${limit} — reduza a imagem e tente de novo.`,
-    unknown_content_type:
-      'Não foi possível identificar o tipo do arquivo. Envie um PNG, JPG ou WebP.',
-    unsupported_content_type_upfront: ({ contentType }) =>
-      `Formato não suportado (${contentType}). Envie PNG, JPG, WebP ou GIF.`,
-    missing_key: 'O servidor aceitou a imagem mas não devolveu a chave. Tente de novo.',
-    upload_failed: 'Falha ao enviar a imagem. Tente de novo em instantes.',
-  };
 }
 
 /**
@@ -135,9 +124,9 @@ export function defaultWebStorageMessages(
  */
 export function messagesOf(
   maxBytes: number,
-  overrides?: Partial<WebStorageMessages>,
+  factory: (context: WebStorageMessageContext) => WebStorageMessages,
 ): WebStorageMessages {
-  return { ...defaultWebStorageMessages({ limit: megabytes(maxBytes) }), ...overrides };
+  return factory({ limit: megabytes(maxBytes) });
 }
 
 const resolve = messagesOf;
@@ -173,9 +162,9 @@ function sentenceFor(messages: WebStorageMessages, code: string): string | undef
 export function rejectFileUpfront(
   file: File,
   maxBytes: number,
-  overrides?: Partial<WebStorageMessages>,
+  factory: (context: WebStorageMessageContext) => WebStorageMessages,
 ): string | null {
-  const messages = resolve(maxBytes, overrides);
+  const messages = resolve(maxBytes, factory);
   if (file.size === 0) {
     return messages.empty_file;
   }
@@ -230,9 +219,9 @@ async function statedError(response: Response): Promise<string | null> {
 export async function uploadFailure(
   response: Response,
   maxBytes: number,
-  overrides?: Partial<WebStorageMessages>,
+  factory: (context: WebStorageMessageContext) => WebStorageMessages,
 ): Promise<string> {
-  const messages = resolve(maxBytes, overrides);
+  const messages = resolve(maxBytes, factory);
   if (response.status === 401) return messages.session_expired;
   const stated = await statedError(response);
   // A sentence rather than a code: the server already phrased it for the owner,
@@ -245,7 +234,7 @@ export async function uploadFailure(
   // what turns a support request from "it failed" into something greppable — so it
   // rides along with the status rather than being mapped away.
   const detail = stated ? ` (${stated})` : '';
-  return `Não foi possível enviar a imagem (HTTP ${response.status}${detail}). Tente de novo em instantes.`;
+  return messages.upload_failed_http({ status: response.status, detail });
 }
 
 /**
@@ -254,8 +243,10 @@ export async function uploadFailure(
  * One sentence, and it can afford to be definite: the upload goes to our own
  * origin, so there is no cross-origin case to hedge about.
  */
-export function transportFailure(overrides?: Partial<WebStorageMessages>): string {
-  // No ceiling to interpolate on this one, so it is read without a limit rather
-  // than through a table built from a number that would be a lie.
-  return overrides?.transport ?? defaultWebStorageMessages({ limit: '' }).transport;
+export function transportFailure(
+  factory: (context: WebStorageMessageContext) => WebStorageMessages,
+): string {
+  // No ceiling to interpolate on this one, so the factory is read without a
+  // limit rather than through a table built from a number that would be a lie.
+  return factory({ limit: '' }).transport;
 }

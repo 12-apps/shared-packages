@@ -31,6 +31,7 @@
  * srcset the server builds from the key.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
+import { PT_BR_STORAGE_MESSAGES, PT_BR_STORAGE_UNAUTHENTICATED } from '@12-apps/storage';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -148,6 +149,9 @@ export async function createStorageHost(pg: PGlite): Promise<StorageHost> {
   await createHostTables(pg);
   const root = mkdtempSync(join(tmpdir(), 'harness-storage-'));
   const api = storageRouter({
+    // Required host copy: the refusal sentences and the router's 401.
+    messages: PT_BR_STORAGE_MESSAGES,
+    unauthenticatedMessage: PT_BR_STORAGE_UNAUTHENTICATED,
     driver: createLocalDiskDriver({
       root,
       // Composed, never retyped: the driver builds display URLs from this and the

@@ -1,4 +1,5 @@
 import { useState, type JSX } from 'react';
+import { PT_BR_WEB_STORAGE_MESSAGES } from '@12-apps/storage/react';
 
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
@@ -31,6 +32,9 @@ import { createWebStorage } from '@12-apps/storage/react';
 const { ImageField, limits } = createWebStorage({
   apiBase: '/api',
   maxBytes: 1024 * 1024,
+  // Required host copy, the pt-BR pack by name — the page's own strings below
+  // stay this host's, same as any adopter's.
+  messages: PT_BR_WEB_STORAGE_MESSAGES,
 });
 
 export function StorageUploadsPage(): JSX.Element {

@@ -35,10 +35,10 @@ export {
 } from './optimize-image';
 
 export {
-  defaultWebStorageMessages,
   rejectFileUpfront,
   transportFailure,
   uploadFailure,
   type WebStorageMessageContext,
   type WebStorageMessages,
 } from './failures';
+export { PT_BR_WEB_STORAGE_MESSAGES } from './pt-BR';

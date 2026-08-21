@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PT_BR_STORAGE_MESSAGES } from "../../pt-BR";
 
 import { DEFAULT_MAX_UPLOAD_BYTES } from '../../limits';
 import { createApiStorage } from '../create-api-storage';
@@ -20,6 +21,7 @@ const CROP = 'products/minha-loja/3f2504e0-4f89-41d3-9a0c-0305e82c3301/card-320.
 
 function serve(driver: StorageDriver): (key: string) => Promise<StorageRouteResponse> {
   const api = createApiStorage({
+    messages: PT_BR_STORAGE_MESSAGES,
     driver,
     maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
     imagePipeline: fakePipeline(),

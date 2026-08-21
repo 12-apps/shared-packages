@@ -57,29 +57,6 @@ export interface StorageMessageContext {
 }
 
 /**
- * The default pt-BR copy. `limit` is interpolated rather than hard-coded so a
- * host that raises `maxBytes` cannot end up with a message naming the old
- * number — the single commonest way this kind of copy goes stale.
- */
-export function defaultStorageMessages(context: StorageMessageContext): StorageMessages {
-  return {
-    invalid_base64: 'A imagem enviada não está codificada corretamente em base64.',
-    empty_file: 'A imagem enviada está vazia.',
-    file_too_large: `A imagem enviada é maior que o limite de ${context.limit}.`,
-    content_mismatch:
-      'O conteúdo da imagem não corresponde ao formato informado. Envie um PNG, JPEG, WebP ou GIF.',
-    unsupported_content_type: 'Formato não suportado. Envie PNG, JPG, WebP ou GIF.',
-    image_unreadable:
-      'Não foi possível ler a imagem enviada — o arquivo parece estar corrompido.',
-    image_dimensions_too_large:
-      'A imagem enviada tem dimensões grandes demais para ser processada.',
-    storage_not_configured: 'O armazenamento de imagens ainda não foi configurado nesta loja.',
-    storage_unavailable:
-      'Não foi possível salvar a imagem agora. Tente novamente em instantes.',
-  };
-}
-
-/**
  * A refusal, carrying the status and the finished sentence.
  *
  * Thrown by the write path so a host write (`createProduct` with bytes in the

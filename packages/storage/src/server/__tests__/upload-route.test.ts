@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { PT_BR_STORAGE_MESSAGES } from "../../pt-BR";
+import type { StorageMessageContext, StorageMessages } from '../../problems';
 
 import { DEFAULT_MAX_UPLOAD_BYTES } from '../../limits';
-import { defaultStorageMessages } from '../../problems';
 import { CATALOG_RENDITIONS } from '../../renditions';
 import { createApiStorage, type ApiStorage } from '../create-api-storage';
 import type { StorageRoute, StorageRouteResponse } from '../routes';
@@ -37,6 +38,7 @@ function harness(pipelineCuts = true): Harness {
   // mutation of it.
   const memory = memoryDriver();
   const mounted = createApiStorage({
+    messages: PT_BR_STORAGE_MESSAGES,
     driver: memory,
     maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
     imagePipeline: fakePipeline({ cuts: pipelineCuts }),
@@ -111,6 +113,7 @@ describe('POST /uploads/image', () => {
       await inner(key, bytes, contentType);
     };
     const storage = createApiStorage({
+    messages: PT_BR_STORAGE_MESSAGES,
       driver: recording,
       maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
       imagePipeline: fakePipeline(),
@@ -156,7 +159,7 @@ describe('POST /uploads/image', () => {
     expect(response.status).toBe(400);
     // The configured SENTENCE, not the bare code — see "one number, stated once".
     expect(bodyOf(response).error).toBe(
-      defaultStorageMessages({ limit: '8 MB' }).unsupported_content_type,
+      PT_BR_STORAGE_MESSAGES({ limit: '8 MB' }).unsupported_content_type,
     );
   });
 
@@ -192,7 +195,7 @@ describe('POST /uploads/image', () => {
 
     expect(response.status).toBe(413);
     expect(bodyOf(response).error).toBe(
-      defaultStorageMessages({ limit: '8 MB' }).file_too_large,
+      PT_BR_STORAGE_MESSAGES({ limit: '8 MB' }).file_too_large,
     );
   });
 
@@ -228,6 +231,7 @@ describe('POST /uploads/image', () => {
   it('explains a corrupt image in the words a host write also uses', async () => {
     const { post } = harness();
     const refusing = createApiStorage({
+    messages: PT_BR_STORAGE_MESSAGES,
       driver: memoryDriver(),
       maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
       imagePipeline: fakePipeline({ process: () => ({ ok: false, problem: 'image_unreadable' }) }),
@@ -283,6 +287,7 @@ describe('the mount reports its own limits', () => {
 
   it('builds the inline-image schema from THAT ceiling', () => {
     const tight = createApiStorage({
+    messages: PT_BR_STORAGE_MESSAGES,
       driver: memoryDriver(),
       maxBytes: 1024,
       imagePipeline: fakePipeline(),
@@ -304,6 +309,7 @@ describe('the mount reports its own limits', () => {
 
   it('states the configured limit in the refusal copy, not a hard-coded number', async () => {
     const smaller = createApiStorage({
+    messages: PT_BR_STORAGE_MESSAGES,
       driver: memoryDriver(),
       maxBytes: 2 * 1024 * 1024,
       imagePipeline: fakePipeline(),
@@ -332,14 +338,17 @@ describe('one number, stated once — the ROUTE says it too', () => {
    * "o limite é 8 MB" — a number nothing applied, in the package whose headline
    * claim is that there is exactly ONE of them.
    */
-  function mount(config: { maxBytes: number; messages?: Record<string, string> }) {
+  function mount(config: {
+    maxBytes: number;
+    messages?: (context: StorageMessageContext) => StorageMessages;
+  }) {
     const api = createApiStorage({
       driver: memoryDriver(),
       maxBytes: config.maxBytes,
       imagePipeline: fakePipeline(),
       unscopedKeys: 'reject',
       references: [],
-      ...(config.messages ? { messages: config.messages } : {}),
+      messages: config.messages ?? PT_BR_STORAGE_MESSAGES,
     });
     const entry = api.routes.find(
       (candidate: StorageRoute) => candidate.method === 'POST',
@@ -370,7 +379,11 @@ describe('one number, stated once — the ROUTE says it too', () => {
   it('carries the mount messages override into the 413', async () => {
     const post = mount({
       maxBytes: 1024,
-      messages: { file_too_large: 'A foto passou do limite combinado com a loja.' },
+      // A host's own factory: the pack, with one sentence rewritten.
+      messages: (context) => ({
+        ...PT_BR_STORAGE_MESSAGES(context),
+        file_too_large: 'A foto passou do limite combinado com a loja.',
+      }),
     });
 
     const response = await post(oversize(1024));
@@ -381,7 +394,10 @@ describe('one number, stated once — the ROUTE says it too', () => {
   it('carries the override into the unsupported-type 400 as well', async () => {
     const post = mount({
       maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
-      messages: { unsupported_content_type: 'Só aceitamos PNG nesta loja.' },
+      messages: (context) => ({
+        ...PT_BR_STORAGE_MESSAGES(context),
+        unsupported_content_type: 'Só aceitamos PNG nesta loja.',
+      }),
     });
 
     const response = await post(uploadRequest(PNG_BYTES, 'application/zip'));
@@ -421,6 +437,7 @@ describe('the byte check belongs to the WRITER, not to an entrance', () => {
 
   function permissive(): ApiStorage {
     return createApiStorage({
+    messages: PT_BR_STORAGE_MESSAGES,
       driver: memoryDriver(),
       maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
       imagePipeline: fakePipeline({ process: passthroughProcess }),
@@ -440,6 +457,7 @@ describe('the byte check belongs to the WRITER, not to an entrance', () => {
   it('stores NOTHING when it refuses', async () => {
     const driver = memoryDriver();
     const storage = createApiStorage({
+    messages: PT_BR_STORAGE_MESSAGES,
       driver,
       maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
       imagePipeline: fakePipeline({ process: passthroughProcess }),
@@ -462,6 +480,7 @@ describe('the byte check belongs to the WRITER, not to an entrance', () => {
     // it, not a property of what the codec happens to accept.
     const seen: string[] = [];
     const storage = createApiStorage({
+    messages: PT_BR_STORAGE_MESSAGES,
       driver: memoryDriver(),
       maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
       imagePipeline: {
