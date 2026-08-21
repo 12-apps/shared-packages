@@ -79,17 +79,29 @@ A major is the one bump a consumer cannot take without reading. Consumers pin
 ignored — it stalls the pin, and the consumer drifts further behind with every
 later release. Two checks make spending one deliberate.
 
-**At pull-request time**, the `Major guard` check fails a PR whose title or any
-commit body carries a `BREAKING CHANGE:` footer. If the major is intended, add
-the **`allow-major`** label and the check passes. This is where a major is
-cheapest to reconsider: the message is still editable.
+**At pull-request time**, the `Major guard` check fails a PR that declares a
+breaking change, by either syntax — a `!` after the type/scope in the title or
+any commit subject, or a `BREAKING CHANGE:` footer in any commit body. If the
+major is intended, add the **`allow-major`** label and the check passes. This is
+where a major is cheapest to reconsider: the message is still editable.
 
-It also fails the `!` shorthand — `fix(prisma)!:` — and the `allow-major` label
-does **not** excuse that one, because it is not a major. `.releaserc.json` runs
-the angular preset, whose `headerPattern` rejects `!`, so the header does not
-parse and the commit is worth **no release at all**. That exact commit once was
-the only one in range for five packages and released none of them, silently.
-Put the breaking change in a `BREAKING CHANGE:` footer instead.
+The two syntaxes are equals. That is a deliberate repair, not a given: the
+angular preset's `headerPattern` is `^(\w*)(?:\((.*)\))?: (.*)$`, which a `!`
+before the colon makes fail *entirely* — so `fix(prisma)!:` used to parse with
+no type at all and `@semantic-release/commit-analyzer` returned **no release**.
+Not the major its author meant; not even a patch. That exact commit was once the
+only one in range for five packages and released none of them, silently, with
+every check green. Every `.releaserc.json` now overrides
+`parserOpts.headerPattern` and `parserOpts.breakingHeaderPattern` so the
+shorthand parses and raises a breaking note.
+
+Three things now rest on that override — this document, the guard's error
+message, and the approval gate the major is routed to — so
+`scripts/release-bump-selftest.mjs` asserts it against the real analyzer and the
+committed configs, loading the same copy of `commit-analyzer` semantic-release
+itself will run. It also pins the ordinary levels, because a `parserOpts` typo
+that broke plain `fix:` commits would be a repo-wide outage that looked exactly
+like the majors working.
 
 **At release time**, the `Detect major bumps` job in `ci.yml` re-runs the
 analysis against `main` with `semantic-release --dry-run` — which tags and
