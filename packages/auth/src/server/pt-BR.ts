@@ -28,4 +28,10 @@ export const PT_BR_MESSAGES: EmailAuthMessages = {
   "current-password-required": "Informe sua senha atual.",
   "current-password-invalid": "Senha atual incorreta.",
   "no-account": "Se existir uma conta, enviamos as instruções por e-mail.",
+  // Says the sign-up did not happen, and points at the only person who can fix
+  // it. It deliberately does not say "e-mail is not configured": the visitor
+  // cannot act on that, and naming a deployment's missing credentials on a
+  // public sign-up screen tells an attacker which box is half-built.
+  "verification-unavailable":
+    "Não foi possível concluir o cadastro agora. Tente novamente mais tarde ou fale com o suporte.",
 };
