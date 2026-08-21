@@ -62,6 +62,7 @@ env:
     packages/mcp
     packages/prisma
     packages/shared-helpers
+    packages/discounts
 
 jobs:
   # ── Change detection ───────────────────────────────────────────────────────
