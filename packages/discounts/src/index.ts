@@ -36,6 +36,8 @@ export {
   DISCOUNT_TARGET_TYPES,
   DISCOUNT_TRIGGERS,
   DISCOUNT_TYPES,
+  DISCOUNT_WINDOW_STATES,
+  discountWindowState,
   MAX_COMBO_SLOTS,
   MAX_COMBO_SLOT_QUANTITY,
   MAX_PERCENT_OFF_BP,
@@ -46,6 +48,7 @@ export {
   type DiscountTargetType,
   type DiscountTrigger,
   type DiscountType,
+  type DiscountWindowState,
 } from "./engine/kinds";
 
 export type {

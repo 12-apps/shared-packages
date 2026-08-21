@@ -290,9 +290,15 @@ importers:
 
   packages/discounts:
     dependencies:
+      '@12-apps/app-shell':
+        specifier: workspace:*
+        version: link:../app-shell
       '@12-apps/shared-helpers':
         specifier: workspace:*
         version: link:../shared-helpers
+      '@12-apps/ui':
+        specifier: workspace:*
+        version: link:../ui
       zod:
         specifier: ^4.3.5
         version: 4.4.3
@@ -300,6 +306,9 @@ importers:
       '@12-apps/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
+      '@12-apps/forms-core':
+        specifier: workspace:*
+        version: link:../forms-core
       '@12-apps/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
@@ -309,21 +318,72 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.2.17
         version: 0.2.17
+      '@emotion/react':
+        specifier: ^11.14.0
+        version: 11.14.0(@types/react@19.2.2)(react@19.2.0)
+      '@emotion/styled':
+        specifier: ^11.14.0
+        version: 11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.0))(@types/react@19.2.2)(react@19.2.0)
+      '@mui/icons-material':
+        specifier: ^6.5.0
+        version: 6.5.0(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.0))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.0))(@types/react@19.2.2)(react@19.2.0))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(@types/react@19.2.2)(react@19.2.0)
+      '@mui/material':
+        specifier: ^6.5.0
+        version: 6.5.0(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.0))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.0))(@types/react@19.2.2)(react@19.2.0))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@storybook/addon-docs':
+        specifier: ^9.1.10
+        version: 9.1.20(@types/react@19.2.2)(storybook@9.1.20(@testing-library/dom@10.4.1)(prettier@3.9.5)(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)))
+      '@storybook/addon-links':
+        specifier: ^9.1.10
+        version: 9.1.20(react@19.2.0)(storybook@9.1.20(@testing-library/dom@10.4.1)(prettier@3.9.5)(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)))
+      '@storybook/react-vite':
+        specifier: ^9.1.10
+        version: 9.1.20(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(rollup@4.62.2)(storybook@9.1.20(@testing-library/dom@10.4.1)(prettier@3.9.5)(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.2)(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@testing-library/react':
+        specifier: ^16.1.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@types/node':
         specifier: ^22.10.6
         version: 22.20.1
+      '@types/react':
+        specifier: 19.2.2
+        version: 19.2.2
+      '@types/react-dom':
+        specifier: 19.2.2
+        version: 19.2.2(@types/react@19.2.2)
       eslint:
         specifier: ^9.39.1
         version: 9.39.5(jiti@2.7.0)
+      eslint-plugin-storybook:
+        specifier: 9.1.10
+        version: 9.1.10(eslint@9.39.5(jiti@2.7.0))(storybook@9.1.20(@testing-library/dom@10.4.1)(prettier@3.9.5)(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.2)
       eslint-plugin-test-flakiness:
         specifier: ^1.4.0
         version: 1.8.0(eslint@9.39.5(jiti@2.7.0))
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
+      react:
+        specifier: ^19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.0(react@19.2.0)
+      react-router-dom:
+        specifier: ^7.0.0
+        version: 7.18.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      storybook:
+        specifier: ^9.1.10
+        version: 9.1.20(@testing-library/dom@10.4.1)(prettier@3.9.5)(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
       typescript:
         specifier: ^5.9.2
         version: 5.9.2
+      vite:
+        specifier: ^6.4.1
+        version: 6.4.3(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
       vitest:
         specifier: ^3.2.4
-        version: 3.2.7(@types/node@22.20.1)(@vitest/browser@3.2.7)(jiti@2.7.0)(jsdom@26.1.0)(tsx@4.23.1)(yaml@2.9.0)
+        version: 3.2.7(@types/node@22.20.1)(@vitest/browser@3.2.7)(jiti@2.7.0)(jsdom@25.0.1)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/entitlements:
     dependencies:
@@ -12282,7 +12342,7 @@ snapshots:
       magic-string: 0.30.21
       sirv: 3.0.2
       tinyrainbow: 2.0.0
-      vitest: 3.2.7(@types/node@22.20.1)(@vitest/browser@3.2.7)(jiti@2.7.0)(jsdom@26.1.0)(tsx@4.23.1)(yaml@2.9.0)
+      vitest: 3.2.7(@types/node@22.20.1)(@vitest/browser@3.2.7)(jiti@2.7.0)(jsdom@25.0.1)(tsx@4.23.1)(yaml@2.9.0)
       ws: 8.21.1
     optionalDependencies:
       playwright: 1.61.1
