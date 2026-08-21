@@ -153,4 +153,15 @@ export class FakeHost implements EmailCredentialsStore, EmailCredentialsMailer {
   async sendPasswordChanged(message: { to: string; name?: string | null }): Promise<void> {
     this.sent.push({ ...message, kind: "change-notice" });
   }
+
+  /**
+   * Whether this host can deliver. A property rather than a constructor flag so
+   * a test can take delivery away mid-scenario, which is what a deployment that
+   * loses its provider actually looks like.
+   */
+  deliverable = true;
+
+  canDeliver(): boolean {
+    return this.deliverable;
+  }
 }
