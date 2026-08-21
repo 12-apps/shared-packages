@@ -1241,6 +1241,15 @@ jobs:
       # is the other reason it must stay AFTER it: those name the orphans THIS
       # run just made, and an orphan whose publish failed ten lines earlier needs
       # the opposite of the standing "delete the tag and re-run" remedy.
+      #
+      # ~20s when everything is healthy, and up to ~4 minutes longer when it is
+      # not. Running immediately after the publish makes this the step most
+      # exposed to npm's read-after-write lag — the registry accepts a version
+      # and serves it minutes later — so a tagged version it cannot find is
+      # re-read on a schedule before being called an orphan. That patience is
+      # not politeness: "absent" here prints `git push origin --delete` at a
+      # human, and recover-orphans.mjs performs it unattended on the next merge.
+      # Details and the RELEASE_ABSENCE_RECHECK_MS override: scripts/lib/release-state.mjs.
       - name: Verify every release tag reached the registry
         if: always()
         shell: bash

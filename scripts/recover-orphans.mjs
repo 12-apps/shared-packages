@@ -25,6 +25,14 @@
 // notes would already have been consumed. Re-cutting is the honest route to the
 // same version number.
 //
+// WHY "the registry does not have it" is not a single read. This script DELETES
+// a tag, so a wrong answer here is not a wrong report — it is a good tag thrown
+// away and a version number spent re-cutting something already published. npm
+// serves a version minutes after accepting it, and verify-released.mjs called
+// @12-apps/feature-flags stuck twice in one night on exactly that lag. The
+// re-reads that turn "absent" into a verdict live in lib/release-state.mjs, so
+// this script and the two that merely report share one answer rather than three.
+//
 // CHURN, and why it is acceptable. A package that is genuinely unpublishable —
 // the standing example is a name whose Trusted Publisher was never configured,
 // so scripts/publish.mjs can never authenticate for it — will have its tag
@@ -204,8 +212,9 @@ if (orphans.length === 0 && untagged.length === 0) {
     const { ok, note } = deleteTag(tag);
     if (ok) {
       console.log(
-        `::warning::${name} was tagged ${tag} but ${version} never reached the registry. ` +
-          `Recovered: ${note}, ${releaseNote}. semantic-release will re-cut ${version} in this run.`,
+        `::warning::${name} was tagged ${tag} but ${version} never reached the registry, ` +
+          `over repeated reads rather than one. Recovered: ${note}, ${releaseNote}. ` +
+          `semantic-release will re-cut ${version} in this run.`,
       );
       lines.push(`**recovered**: ${name} — removed the orphaned ${tag}, re-cutting ${version} now`);
     } else {

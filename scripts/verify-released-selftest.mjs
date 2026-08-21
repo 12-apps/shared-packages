@@ -42,7 +42,7 @@ process.exit(0);
 
 /** An `npm view` that answers from the plan; no `versions` means "not on the registry". */
 const FAKE_NPM = `#!/usr/bin/env node
-const { readFileSync } = require("node:fs");
+const { existsSync, readFileSync, writeFileSync } = require("node:fs");
 const plan = JSON.parse(readFileSync(process.env.FAKE_PLAN, "utf8"));
 const args = process.argv.slice(2);
 if (args[0] === "view") {
@@ -53,7 +53,19 @@ if (args[0] === "view") {
   );
   const entry = key ? plan[key] : null;
   if (!entry || !entry.versions) process.exit(1);
-  process.stdout.write(JSON.stringify(entry.versions));
+  // \`lateVersion\` models npm's read-after-write lag: the registry has accepted
+  // the publish but does not serve it until a later read. \`lateAfter\` reads are
+  // answered without it, everything after includes it.
+  let versions = entry.versions;
+  if (entry.lateVersion) {
+    const counts = existsSync(process.env.FAKE_NPM_CALLS)
+      ? JSON.parse(readFileSync(process.env.FAKE_NPM_CALLS, "utf8"))
+      : {};
+    counts[key] = (counts[key] || 0) + 1;
+    writeFileSync(process.env.FAKE_NPM_CALLS, JSON.stringify(counts));
+    if (counts[key] > (entry.lateAfter || 1)) versions = [...versions, entry.lateVersion];
+  }
+  process.stdout.write(JSON.stringify(versions));
 }
 process.exit(0);
 `;
@@ -88,6 +100,8 @@ function verify(plan, env = {}) {
 
   const planFile = join(root, "plan.json");
   writeFileSync(planFile, JSON.stringify(plan));
+  const npmCalls = join(root, "npm-calls.json");
+  writeFileSync(npmCalls, "{}");
 
   const run = spawnSync(process.execPath, [VERIFY], {
     encoding: "utf8",
@@ -96,6 +110,11 @@ function verify(plan, env = {}) {
       PATH: `${bin}:${process.env.PATH}`,
       PUBLISH_DIRS: dirs.join(" "),
       FAKE_PLAN: planFile,
+      FAKE_NPM_CALLS: npmCalls,
+      // No waiting unless a case asks for it. The re-read schedule is minutes
+      // long by design (lib/release-state.mjs), which is right in CI and would
+      // make this suite unrunnable.
+      RELEASE_ABSENCE_RECHECK_MS: "",
       GITHUB_STEP_SUMMARY: "",
       PUBLISH_INCOMPLETE: "",
       PUBLISH_WEDGED: "",
@@ -274,6 +293,59 @@ check(
   `"delete the tag and re-run" is right for an orphan left by an EARLIER run and\n    ` +
     `wrong for one this run just made — re-cutting walks back into the same\n    ` +
     `failure. Output:\n    ${wedged.output}`,
+);
+
+// ── The registry's read-after-write lag ─────────────────────────────────────
+//
+// The failure this suite could not see, and the one that actually happened.
+// npm answers `publish` with `ok` before it serves the version, so the read
+// immediately afterwards can be honestly, temporarily wrong. A single read
+// turns that into "STUCK" and prints `git push origin --delete` at whoever is
+// watching — @12-apps/feature-flags collected that verdict twice in one night,
+// for 2.0.0 and 2.0.1, both of which npm was serving minutes later. Following
+// the advice would have deleted a good tag and spent a version re-cutting
+// something already published.
+//
+// `lateVersion` is that registry: absent on the first read, present after it.
+const propagating = verify(
+  { scope: { tag: "scope-v2.0.0", versions: ["1.0.0"], lateVersion: "2.0.0" } },
+  { RELEASE_ABSENCE_RECHECK_MS: "1,1,1" },
+);
+
+check(
+  "a version the registry serves on a re-read is not called stuck",
+  propagating.status === 0,
+  `a publish that has not propagated yet is not an orphan, and the remedy for an\n    ` +
+    `orphan destroys a healthy tag. Output:\n    ${propagating.output}`,
+);
+
+check(
+  "and it never advises deleting that tag",
+  !/--delete/.test(propagating.output),
+  `printing the delete remedy is the whole harm — the run is red and the reader\n    ` +
+    `is told to throw away a tag npm is about to serve. Output:\n    ${propagating.output}`,
+);
+
+// The other half of the contract: patience must not become blindness. A
+// genuinely orphaned tag has to survive the re-reads and still fail, or this
+// fix trades a false alarm for a silent one — which is the failure mode the
+// whole module exists to end.
+const stillAbsent = verify(
+  { scope: { tag: "scope-v2.0.0", versions: ["1.0.0"] } },
+  { RELEASE_ABSENCE_RECHECK_MS: "1,1,1" },
+);
+
+check(
+  "a version that never arrives still fails after the re-reads",
+  stillAbsent.status !== 0 && /--delete/.test(stillAbsent.output),
+  `waiting is meant to remove false alarms, not real ones. Output:\n    ${stillAbsent.output}`,
+);
+
+check(
+  "and it says it waited, so the reader can weigh the verdict",
+  /re-read/i.test(stillAbsent.output),
+  `"delete this tag" is a destructive instruction; it should carry the evidence\n    ` +
+    `that propagation was ruled out. Output:\n    ${stillAbsent.output}`,
 );
 
 console.log(
