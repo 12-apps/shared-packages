@@ -4,6 +4,7 @@ import { PT_BR_DISCOUNTS_SERVER_COPY } from "../pt-BR";
 import { createApiDiscounts, type DiscountRoute, type DiscountsActor } from "../routes";
 import type { DiscountPage, DiscountRecord, DiscountStore, DiscountWrite } from "../store";
 import { DiscountValidationError } from "../validate";
+import { recordingLogger } from "./recording-logger";
 
 /**
  * The HTTP capability, driven through its descriptors.
@@ -104,7 +105,11 @@ function routeFor(
   method: DiscountRoute["method"],
   wirePath: string,
 ): DiscountRoute {
-  const { routes } = createApiDiscounts({ store, copy: PT_BR_DISCOUNTS_SERVER_COPY });
+  const { routes } = createApiDiscounts({
+    store,
+    copy: PT_BR_DISCOUNTS_SERVER_COPY,
+    logger: recordingLogger(),
+  });
   const route = routes.find((entry) => entry.method === method && entry.path === wirePath);
   if (!route) throw new Error(`no discounts route for ${method} ${wirePath}`);
   return route;
@@ -120,13 +125,14 @@ describe("createApiDiscounts", () => {
       createApiDiscounts({
         store: fakeStore(calls),
         copy: { ...PT_BR_DISCOUNTS_SERVER_COPY, notFound: "" },
+        logger: recordingLogger(),
       }),
     ).toThrow(/notFound/);
   });
 
   it("names every missing key at once, rather than one per attempt", () => {
     expect(() =>
-      createApiDiscounts({ store: fakeStore(calls), copy: undefined as never }),
+      createApiDiscounts({ store: fakeStore(calls), copy: undefined as never, logger: recordingLogger() }),
     ).toThrow(/invalidQuery.*notFound.*invalidPercent/s);
   });
 });

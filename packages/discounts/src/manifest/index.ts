@@ -46,6 +46,13 @@ export const discountsManifest = {
    * The server half logs through the binder's namespaced logger, so a
    * discounts failure files under `discounts` rather than under the host app
    * or nowhere.
+   *
+   * `createApiDiscounts` REFUSES to build without one, which is what makes
+   * that sentence a fact rather than an aspiration: for the whole of 1.0.x it
+   * was neither — the binder built the logger, hung it on
+   * `assembled.loggers["@12-apps/discounts"]`, and the package took nothing
+   * and logged nothing. A declared capability nobody consumes is worse than an
+   * undeclared one, because it reads as finished.
    */
   observability: { namespace: "discounts" },
   server: ["http"],

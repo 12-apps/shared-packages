@@ -3,6 +3,7 @@ import type { z } from "zod";
 import type { WireRequest, WireResponse, WireRoute } from "@12-apps/wiring";
 
 import { missingServerCopy, type DiscountsServerCopy } from "./copy";
+import { logWrite, observed, type DiscountsLogger } from "./logging";
 import { listDiscountsQuery } from "./mcp";
 import { DISCOUNTS_READ, DISCOUNTS_WRITE } from "./contribution";
 import type { DiscountListInput, DiscountRecord, DiscountStore } from "./store";
@@ -46,6 +47,16 @@ export interface DiscountsApiConfig {
   /** Every sentence this surface answers a human with. Required, no defaults. */
   copy: DiscountsServerCopy;
   /**
+   * Where this surface says what it did. Required, and for the same reason
+   * `copy` is: a default would be a no-op, and a no-op default is exactly the
+   * silence this config exists to end — the manifest declares an
+   * `observability` namespace, so a host adopting through
+   * `@12-apps/wiring/consumer` already HAS the logger and passes
+   * `assembled.loggers["@12-apps/discounts"]`; a host on no wiring passes any
+   * `createFeatureLogger`-shaped child. See `./logging`.
+   */
+  logger: DiscountsLogger;
+  /**
    * The schema the list query is validated against. Optional ONLY because a
    * mechanical default is portable: the package's own, built from the search
    * config's defaults. A host that tunes page-size ceilings by environment, or
@@ -85,18 +96,33 @@ function writeFrom(body: unknown, copy: DiscountsServerCopy) {
 }
 
 /**
- * Run a write, turning this package's own validation failure into the 422 the
+ * One descriptor's handler, observed and then folded.
+ *
+ * `observed` logs every outcome and changes none of them (see `./logging`);
+ * this fold turns THIS package's own validation failure into the 422 the
  * operator can act on. Everything else — a uniqueness clash, a foreign target,
  * a stale id — is the STORE's to raise, in the host's own error vocabulary,
  * and travels untouched to the host's error mapping.
+ *
+ * Every route goes through it, reads included. A read cannot raise a
+ * `DiscountValidationError`, but it can absolutely throw — and before this the
+ * three read routes had no catch at all, so a store that failed inside `list`
+ * reached the host's catch-all with nothing in the log naming discounts.
  */
-async function attempt(run: () => Promise<WireResponse>): Promise<WireResponse> {
-  try {
-    return await run();
-  } catch (error) {
-    if (error instanceof DiscountValidationError) return fieldError(error);
-    throw error;
-  }
+function endpoint(
+  config: DiscountsApiConfig,
+  route: string,
+  handle: (request: WireRequest<DiscountsActor>) => Promise<WireResponse>,
+): (request: WireRequest<DiscountsActor>) => Promise<WireResponse> {
+  const observedHandle = observed(config.logger, route, handle);
+  return async (request) => {
+    try {
+      return await observedHandle(request);
+    } catch (error) {
+      if (error instanceof DiscountValidationError) return fieldError(error);
+      throw error;
+    }
+  };
 }
 
 function listRoute(config: DiscountsApiConfig): DiscountRoute {
@@ -105,7 +131,7 @@ function listRoute(config: DiscountsApiConfig): DiscountRoute {
     method: "GET",
     path: "/discounts",
     permission: DISCOUNTS_READ,
-    handle: async ({ actor, query }: WireRequest<DiscountsActor>) => {
+    handle: endpoint(config, "GET /discounts", async ({ actor, query }) => {
       const parsed = schema.safeParse(query);
       if (!parsed.success) {
         return { status: 400, body: { error: config.copy.invalidQuery } };
@@ -114,7 +140,7 @@ function listRoute(config: DiscountsApiConfig): DiscountRoute {
       // pagination }` envelope the advertised response describes, and wrapping
       // it again would nest it under a second `data`.
       return ok(await config.store.list(actor.clientId, parsed.data));
-    },
+    }),
   };
 }
 
@@ -123,11 +149,11 @@ function readRoute(config: DiscountsApiConfig): DiscountRoute {
     method: "GET",
     path: "/discounts/:id",
     permission: DISCOUNTS_READ,
-    handle: async ({ actor, params }: WireRequest<DiscountsActor>) => {
+    handle: endpoint(config, "GET /discounts/:id", async ({ actor, params }) => {
       const record = await config.store.get(actor.clientId, String(params.id));
       if (record === null) return { status: 404, body: { error: config.copy.notFound } };
       return ok({ data: record as DiscountRecord });
-    },
+    }),
   };
 }
 
@@ -136,10 +162,12 @@ function createRoute(config: DiscountsApiConfig): DiscountRoute {
     method: "POST",
     path: "/discounts",
     permission: DISCOUNTS_WRITE,
-    handle: ({ actor, body }: WireRequest<DiscountsActor>) =>
-      attempt(async () =>
-        ok({ data: await config.store.create(actor.clientId, writeFrom(body, config.copy)) }),
-      ),
+    handle: endpoint(config, "POST /discounts", async (request) => {
+      const { actor, body } = request;
+      const created = await config.store.create(actor.clientId, writeFrom(body, config.copy));
+      logWrite(config.logger, "created", request, created.id);
+      return ok({ data: created });
+    }),
   };
 }
 
@@ -148,12 +176,13 @@ function updateRoute(config: DiscountsApiConfig): DiscountRoute {
     method: "PATCH",
     path: "/discounts/:id",
     permission: DISCOUNTS_WRITE,
-    handle: ({ actor, params, body }: WireRequest<DiscountsActor>) =>
-      attempt(async () => {
-        const id = String(params.id);
-        await config.store.update(actor.clientId, id, writeFrom(body, config.copy));
-        return acknowledged(id);
-      }),
+    handle: endpoint(config, "PATCH /discounts/:id", async (request) => {
+      const { actor, params, body } = request;
+      const id = String(params.id);
+      await config.store.update(actor.clientId, id, writeFrom(body, config.copy));
+      logWrite(config.logger, "re-stated", request, id);
+      return acknowledged(id);
+    }),
   };
 }
 
@@ -162,21 +191,39 @@ function archiveRoute(config: DiscountsApiConfig): DiscountRoute {
     method: "DELETE",
     path: "/discounts/:id",
     permission: DISCOUNTS_WRITE,
-    handle: async ({ actor, params }: WireRequest<DiscountsActor>) => {
+    handle: endpoint(config, "DELETE /discounts/:id", async (request) => {
+      const { actor, params } = request;
       const id = String(params.id);
       await config.store.archive(actor.clientId, id);
+      logWrite(config.logger, "archived", request, id);
       return acknowledged(id);
-    },
+    }),
   };
+}
+
+/** The three methods `observed` calls — asserted before any request arrives. */
+function assertLogger(logger: DiscountsLogger | undefined): void {
+  const complete =
+    typeof logger?.info === "function" &&
+    typeof logger.warn === "function" &&
+    typeof logger.error === "function";
+  if (complete) return;
+  throw new Error(
+    "@12-apps/discounts: createApiDiscounts needs a logger with info/warn/error — " +
+      "the manifest declares an observability namespace, so a wiring host passes " +
+      'assembled.loggers["@12-apps/discounts"]; there is no silent default.',
+  );
 }
 
 /**
  * The five descriptors, config asserted at construction.
  *
- * Copy is checked HERE rather than at first request, because a missing
- * sentence is a wiring mistake and it should fail where the wiring is written
- * — the report-builder doctrine: required fields, no defaults, asserted at
- * assembly.
+ * Copy and the logger are checked HERE rather than at first request, because a
+ * missing sentence or a missing logger is a wiring mistake and it should fail
+ * where the wiring is written — the report-builder doctrine: required fields,
+ * no defaults, asserted at assembly. The logger earned that treatment the hard
+ * way: for the whole of 1.0.x the manifest promised these routes logged, the
+ * host built the namespaced logger, and nothing connected the two.
  */
 export function createApiDiscounts(config: DiscountsApiConfig): {
   routes: readonly DiscountRoute[];
@@ -188,6 +235,7 @@ export function createApiDiscounts(config: DiscountsApiConfig): {
         "every sentence this surface answers a human with is host config, with no defaults.",
     );
   }
+  assertLogger(config.logger);
   return {
     routes: [
       listRoute(config),
