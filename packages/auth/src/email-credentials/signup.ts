@@ -34,6 +34,18 @@ export interface SignUpInput {
 }
 
 /**
+ * Can mail actually leave this deployment?
+ *
+ * A mailer that does not answer is taken at its word: absent `canDeliver`
+ * means the host wired a real vendor directly and has no unconfigured state to
+ * report, so assuming yes preserves exactly the behaviour every existing
+ * mailer already had.
+ */
+async function canDeliverMail(ctx: EmailCredentialsContext): Promise<boolean> {
+  return (await ctx.mailer.canDeliver?.()) ?? true;
+}
+
+/**
  * The taken-address branch: tell the OWNER, tell the caller nothing.
  *
  * The mail is not a verification mail — verifying would be meaningless, the
@@ -100,6 +112,19 @@ export async function signUp(
   if (weak) return weak;
 
   const { requireEmailVerification } = await ctx.readSettings();
+
+  // Asked here — after the settings, before the store is touched at all — for
+  // two reasons. It must come before `createUser`, because an account created
+  // against a mailbox that will never receive its link is one nobody can sign
+  // in to and nobody can re-register. And it must come before `findByEmail`,
+  // so the answer is reached by the same path for a taken address as for a
+  // free one: this refusal is about the DEPLOYMENT, and letting it sit behind
+  // a lookup would make how long it takes depend on whether the address
+  // exists, which is the oracle the rest of this file works to deny.
+  if (requireEmailVerification && !(await canDeliverMail(ctx))) {
+    return refuse("verification-unavailable");
+  }
+
   const existing = await ctx.store.findByEmail(email);
 
   if (existing) {
@@ -164,6 +189,12 @@ export async function resendVerification(
   const email = normalizeEmail(rawEmail);
   const blocked = await guardEntry(ctx, email, `resend:${email}`);
   if (blocked) return blocked;
+
+  // Same refusal as sign-up, and before the lookup for the same reason. This
+  // one is asked unconditionally rather than behind `requireEmailVerification`
+  // because "send that link again" has no meaning at all without delivery —
+  // there is no second way for this call to succeed.
+  if (!(await canDeliverMail(ctx))) return refuse("verification-unavailable");
 
   const user = await ctx.store.findByEmail(email);
   if (!user || !user.passwordHash || user.emailVerifiedAt) return { ok: true };

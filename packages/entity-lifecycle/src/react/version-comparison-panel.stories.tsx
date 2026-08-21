@@ -9,17 +9,21 @@
  */
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { column, comparison, NAMES, NOTES, row } from './__stories__/fixtures';
+import { column, comparison, COPY, NAMES, NOTES, row } from './__stories__/fixtures';
 import { VersionComparisonPanel } from './version-comparison-panel';
 
 const meta: Meta = { title: 'Comparison panel' };
 export default meta;
+
+/** The panel's slice of the host copy, spread into every story below. */
+const PANEL_COPY = { copy: COPY.comparison, systemActor: COPY.systemActor };
 
 /** The everyday case: a middle version between its neighbours and current. */
 export const FourRolesFourColumns: StoryObj = {
   name: 'Four roles, four columns (v2 of v1..v4)',
   render: () => (
     <VersionComparisonPanel
+      {...PANEL_COPY}
       comparison={comparison(
         2,
         [
@@ -46,6 +50,7 @@ export const NextIsAlsoCurrent: StoryObj = {
   name: 'Next is also current (v3 of v1..v4)',
   render: () => (
     <VersionComparisonPanel
+      {...PANEL_COPY}
       comparison={comparison(
         3,
         [column(2, ['previous']), column(3, ['selected']), column(4, ['next', 'current'])],
@@ -60,6 +65,7 @@ export const NewestVersion: StoryObj = {
   name: 'Newest version — no next (v4 of v1..v4)',
   render: () => (
     <VersionComparisonPanel
+      {...PANEL_COPY}
       comparison={comparison(
         4,
         [column(3, ['previous']), column(4, ['selected', 'current'])],
@@ -74,6 +80,7 @@ export const OldestVersion: StoryObj = {
   name: 'Oldest version — no previous (v1 of v1..v4)',
   render: () => (
     <VersionComparisonPanel
+      {...PANEL_COPY}
       comparison={comparison(
         1,
         [column(1, ['selected']), column(2, ['next']), column(4, ['current'])],
@@ -91,6 +98,7 @@ export const OnlyOneVersion: StoryObj = {
   name: 'Only v1 exists — nothing to compare',
   render: () => (
     <VersionComparisonPanel
+      {...PANEL_COPY}
       comparison={comparison(
         1,
         [column(1, ['selected', 'current'])],
@@ -109,6 +117,7 @@ export const NoDifferences: StoryObj = {
   name: 'Versions that agree on everything',
   render: () => (
     <VersionComparisonPanel
+      {...PANEL_COPY}
       comparison={comparison(
         2,
         [column(1, ['previous']), column(2, ['selected']), column(3, ['next', 'current'])],
@@ -127,6 +136,7 @@ export const AbsentEmptyAndNested: StoryObj = {
   name: 'Absent vs empty vs nested values',
   render: () => (
     <VersionComparisonPanel
+      {...PANEL_COPY}
       comparison={comparison(
         2,
         [column(1, ['previous']), column(2, ['selected']), column(3, ['next', 'current'])],

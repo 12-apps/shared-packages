@@ -19,7 +19,7 @@ declaration per collection rather than hand-written per entity.
 | **Core engine** | `@12-apps/entity-lifecycle` | Nothing to wire — the framework-free kernel: `createEntityLifecycle`, `resolveFeature`, diff/versioning, the store contracts and the in-memory adapters. |
 | **Server** | `@12-apps/entity-lifecycle/server` | Call `createApiEntityLifecycle({ db, entities, directory })` and mount the `routes` it returns — the versions / restore / drafts / recycle-bin / approvals endpoints for EVERY registered collection, with parsing, statuses, feature gates, approvals interception and the `{ data }` envelope inside. Also returns `entity(type)` — the handle the host's OWN entity routes use to funnel create/update/delete through the same machinery — and the `stores` bundle. |
 | **Hono** | `@12-apps/entity-lifecycle/hono` | `const lifecycle = entityLifecycleRouter({ ...serverConfig, resolveActor }); app.route('/api/admin/:tenantSlug', lifecycle.router)`. A one-call mount; `hono` is an OPTIONAL peer, so importing the root, `/server` or `/react` never resolves it. |
-| **React** | `@12-apps/entity-lifecycle/react` | Call `createWebEntityLifecycle({ apiBase })` and mount the `page` it returns (Lixeira + Aprovações behind the package's own tabs), or route `RecycleBinScreen` / `ApprovalsScreen` yourself. `VersionHistoryDialog` and `DraftBanner` are per-entity pieces you drop INTO your own editors, already bound to the same wire client. pt-BR product copy and the origin host's test ids ship inside. |
+| **React** | `@12-apps/entity-lifecycle/react` | Call `createWebEntityLifecycle({ apiBase, copy })` and mount the `page` it returns (the two screens behind the package's own tabs), or route `RecycleBinScreen` / `ApprovalsScreen` yourself. `VersionHistoryDialog` and `DraftBanner` are per-entity pieces you drop INTO your own editors, already bound to the same wire client. `copy` is REQUIRED — every sentence the surface renders is the host's; the origin host's pt-BR ships as the named `PT_BR_LIFECYCLE_WEB_COPY` pack, and its test ids ship inside. |
 | **Prisma** | `prisma/entity-lifecycle.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/entity-lifecycle prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma; a symlinked partial dangles under `turbo prune`). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 
 ## Host wiring rules (the ones that bite)
@@ -136,7 +136,7 @@ declaration per collection rather than hand-written per entity.
 | `db` | yes | — | lazy provider of the structural `LifecycleDb` seam (closed shapes in `src/server/db.ts`) |
 | `entities` | yes | — | one `LifecycleEntityRegistration` per collection (below) |
 | `directory` | no | system fallback names | `getUsers(ids)` — actor names on history/bin/approvals |
-| `messages` | no | pt-BR product copy | every user-facing string, overridable per host |
+| `messages` | yes | — | every refusal the surface answers with — the host's words (pt-BR hosts pass `PT_BR_LIFECYCLE_MESSAGES` from `/server`) |
 | `resolveActor` (hono) | yes | — | `LifecycleActor` or `null` (→ 401); includes the tenant's two feature layers |
 
 ### `LifecycleEntityRegistration`
@@ -161,6 +161,7 @@ declaration per collection rather than hand-written per entity.
 | Field | Required | Default | Notes |
 |---|---|---|---|
 | `apiBase` | yes | — | the admin mount the routes live under (`/api/admin/minha-loja`) |
+| `copy` | yes | — | every sentence the screens render (`LifecycleWebCopy`); pt-BR hosts pass `PT_BR_LIFECYCLE_WEB_COPY` |
 | `transport` | no | same-origin `fetch` | the ONLY way the screens perform I/O — substitute it and you have substituted the backend |
 | `entityTypeLabels` | no | — | the host's own pt-BR catalog; the package ships none, and an unlisted type renders as its raw key |
 
@@ -266,9 +267,14 @@ const result = await products.lifecycle.update(products.context(actor), id, snap
 ## Minimal host (React)
 
 ```tsx
-import { createWebEntityLifecycle } from '@12-apps/entity-lifecycle/react';
+import { createWebEntityLifecycle, PT_BR_LIFECYCLE_WEB_COPY } from '@12-apps/entity-lifecycle/react';
 
-const lifecycle = createWebEntityLifecycle({ apiBase: `/api/admin/${tenantSlug}` });
+const lifecycle = createWebEntityLifecycle({
+  apiBase: `/api/admin/${tenantSlug}`,
+  // Required: the surface's sentences are the host's. The pack is the origin
+  // host's exact copy, chosen here by name rather than inherited by silence.
+  copy: PT_BR_LIFECYCLE_WEB_COPY,
+});
 // <lifecycle.page /> renders Lixeira + Aprovações; or take the screens
 // individually. In your own editors:
 //   <lifecycle.DraftBanner slug="products" draft={draft} … />
