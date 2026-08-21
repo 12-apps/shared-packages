@@ -12,7 +12,16 @@
     "./providers/stone": "./src/providers/stone.ts",
     "./providers/infinitepay": "./src/providers/infinitepay.ts",
     "./providers/stripe": "./src/providers/stripe.ts",
-    "./pagbank-public-key": "./src/providers/pagbank-public-key.ts"
+    "./pagbank-public-key": "./src/providers/pagbank-public-key.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./manifest/server": "./src/manifest/server.ts",
+    "./package.json": "./package.json"
+  },
+  "wiring": {
+    "db": {
+      "partial": "prisma/payments.prisma",
+      "migrations": "prisma/migrations"
+    }
   },
   "scripts": {
     "clean": "rm -rf node_modules coverage",
