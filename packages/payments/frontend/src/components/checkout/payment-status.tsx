@@ -4,6 +4,7 @@ import type { JSX, ReactNode } from "react";
 import { CheckCircleOutlineIcon, ErrorOutlineIcon, ScheduleIcon } from "./icons";
 import type { OrderStatus } from "./types";
 import { useCheckoutComponents } from "./ui";
+import type { PaymentStatusCopy } from "./view-copy";
 
 /**
  * The last screen of checkout.
@@ -28,67 +29,38 @@ import { useCheckoutComponents } from "./ui";
  * screen says and how it is arranged has changed.
  */
 
-/** Everything the hero block needs, per outcome. */
-interface Outcome {
-  heading: string;
-  support: string;
+/**
+ * The per-outcome VISUAL grammar — icon and semantic tone. The heading and
+ * supporting line beside them come from {@link PaymentStatusCopy}: an icon is
+ * the component's own vocabulary, a sentence never is. (The FAILED support
+ * line's job — say "nothing was charged" plainly and first — and the
+ * timed-out wait's "do not pay again" now live with the host's words, where
+ * FUT-556's reasoning is documented on the copy port.)
+ */
+interface OutcomeVisual {
   icon: JSX.Element;
   /** Semantic theme token — never a raw colour. */
   tone: "success" | "danger" | "warning" | "neutral";
 }
 
-const OUTCOME: Record<OrderStatus, Outcome> = {
-  PAID: {
-    heading: "Pedido confirmado",
-    support: "Recebemos seu pagamento e já registramos o pedido.",
-    icon: <CheckCircleOutlineIcon fontSize="large" />,
-    tone: "success",
-  },
-  AWAITING_PAYMENT: {
-    heading: "Confirmando seu pagamento",
-    support: "Isso costuma levar alguns segundos. Pode deixar esta tela aberta.",
-    icon: <ScheduleIcon fontSize="large" />,
-    tone: "neutral",
-  },
-  FAILED: {
-    heading: "Pagamento não concluído",
-    // Said plainly and first: the fear on this screen is having been charged
-    // for an order that failed.
-    support: "Nenhum valor foi cobrado. Você pode tentar novamente.",
-    icon: <ErrorOutlineIcon fontSize="large" />,
-    tone: "danger",
-  },
-  EXPIRED: {
-    heading: "O código expirou",
-    support: "Nenhum valor foi cobrado. Gere um novo código para continuar.",
-    icon: <ScheduleIcon fontSize="large" />,
-    tone: "warning",
-  },
+const OUTCOME_VISUAL: Record<OrderStatus, OutcomeVisual> = {
+  PAID: { icon: <CheckCircleOutlineIcon fontSize="large" />, tone: "success" },
+  AWAITING_PAYMENT: { icon: <ScheduleIcon fontSize="large" />, tone: "neutral" },
+  FAILED: { icon: <ErrorOutlineIcon fontSize="large" />, tone: "danger" },
+  EXPIRED: { icon: <ScheduleIcon fontSize="large" />, tone: "warning" },
 };
 
-/**
- * What the screen says once it has stopped asking (FUT-556).
- *
- * NOT an `OrderStatus`: the order really is still AWAITING_PAYMENT and may yet
- * settle — the scheduled reconciliation keeps asking the provider long after
- * this tab is gone. What ran out is the WAIT, not the order, and saying
- * otherwise would be the more expensive lie: a buyer told "não concluído" who
- * has in fact paid will either pay twice or call the store.
- *
- * So it leads with what is true and unglamorous — we have not heard yet — and
- * spends its remaining words on the one instruction that matters, which is not
- * to pay again.
- */
-const AWAITING_TIMED_OUT: Outcome = {
-  heading: "Ainda não recebemos a confirmação",
-  support:
-    "Se você já pagou, o pedido é confirmado assim que a operadora avisar — " +
-    "não pague de novo. Você pode fechar esta tela.",
-  icon: <ScheduleIcon fontSize="large" />,
-  tone: "warning",
+const OUTCOME_COPY_KEY: Record<OrderStatus, keyof Pick<
+  PaymentStatusCopy,
+  "paid" | "awaiting" | "failed" | "expired"
+>> = {
+  PAID: "paid",
+  AWAITING_PAYMENT: "awaiting",
+  FAILED: "failed",
+  EXPIRED: "expired",
 };
 
-const TONE_COLOR: Record<Outcome["tone"], string> = {
+const TONE_COLOR: Record<OutcomeVisual["tone"], string> = {
   success: "success.main",
   danger: "error.main",
   warning: "warning.main",
@@ -109,14 +81,22 @@ function orderReference(orderId: string): string {
 
 /** The headline block: icon, outcome, and one supporting line. */
 function OutcomeHero({
+  copy,
   status,
   timedOut = false,
 }: {
+  copy: PaymentStatusCopy;
   status: OrderStatus;
   timedOut?: boolean;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
-  const outcome = timedOut && status === "AWAITING_PAYMENT" ? AWAITING_TIMED_OUT : OUTCOME[status];
+  const timedOutWait = timedOut && status === "AWAITING_PAYMENT";
+  // The timed-out wait keeps AWAITING's neutral clock icon but WARNING's tone:
+  // the order is not resolved, and calm-but-alert is the visual for that.
+  const visual = timedOutWait
+    ? { icon: OUTCOME_VISUAL.AWAITING_PAYMENT.icon, tone: "warning" as const }
+    : OUTCOME_VISUAL[status];
+  const outcome = timedOutWait ? copy.awaitingTimedOut : copy[OUTCOME_COPY_KEY[status]];
   return (
     <Box
       // `payment-paid` is load-bearing for the storefront journeys — it is how
@@ -133,7 +113,7 @@ function OutcomeHero({
       }
       sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, textAlign: "center" }}
     >
-      <Box sx={{ color: TONE_COLOR[outcome.tone], display: "flex" }}>{outcome.icon}</Box>
+      <Box sx={{ color: TONE_COLOR[visual.tone], display: "flex" }}>{visual.icon}</Box>
       <Text variant="heading" size="md" weight="bold" as="h2">
         {outcome.heading}
       </Text>
@@ -165,10 +145,12 @@ function Fact({ label, value, testId }: { label: string; value: string; testId?:
  * outcome these facts are either untrue or not yet knowable.
  */
 function PaidFacts({
+  copy,
   totalLabel,
   orderId,
   buyerEmail,
 }: {
+  copy: PaymentStatusCopy;
   totalLabel: string;
   orderId?: string;
   buyerEmail?: string;
@@ -185,22 +167,24 @@ function PaidFacts({
         bgcolor: "action.hover",
       }}
     >
-      <Fact label="Valor pago" value={totalLabel} testId="payment-amount" />
+      <Fact label={copy.amountLabel} value={totalLabel} testId="payment-amount" />
       {orderId ? (
-        <Fact label="Pedido" value={`#${orderReference(orderId)}`} testId="payment-reference" />
+        <Fact label={copy.referenceLabel} value={`#${orderReference(orderId)}`} testId="payment-reference" />
       ) : null}
-      {buyerEmail ? <Fact label="Comprovante enviado para" value={buyerEmail} /> : null}
+      {buyerEmail ? <Fact label={copy.receiptEmailLabel} value={buyerEmail} /> : null}
     </Box>
   );
 }
 
 /** The next-action row: retry / regenerate for failures, always back-to-menu. */
 function StatusActions({
+  copy,
   status,
   onRetry,
   onRegenerate,
   onBackToMenu,
 }: {
+  copy: PaymentStatusCopy;
   status: OrderStatus;
   onRetry?: () => void;
   onRegenerate?: () => void;
@@ -211,12 +195,12 @@ function StatusActions({
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
       {status === "FAILED" && onRetry ? (
         <Button variant="solid" color="primary" size="lg" onClick={onRetry} dataTestId="payment-retry">
-          Tentar novamente
+          {copy.retryAction}
         </Button>
       ) : null}
       {status === "EXPIRED" && onRegenerate ? (
         <Button variant="solid" color="primary" size="lg" onClick={onRegenerate} dataTestId="payment-regenerate">
-          Gerar novo código
+          {copy.regenerateAction}
         </Button>
       ) : null}
       <Button
@@ -228,13 +212,14 @@ function StatusActions({
         onClick={onBackToMenu}
         dataTestId="payment-back-to-menu"
       >
-        Voltar ao cardápio
+        {copy.backAction}
       </Button>
     </Box>
   );
 }
 
 export function PaymentStatus({
+  copy,
   status,
   totalLabel,
   orderId,
@@ -245,6 +230,8 @@ export function PaymentStatus({
   paidExtra,
   awaitingTimedOut = false,
 }: {
+  /** Every sentence and label this screen renders — the HOST's words. */
+  copy: PaymentStatusCopy;
   status: OrderStatus | null;
   totalLabel: string;
   /** The created order, when there is one — absent before the charge is raised. */
@@ -278,10 +265,10 @@ export function PaymentStatus({
       data-timed-out={awaitingTimedOut ? "true" : undefined}
       sx={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "stretch", py: 2 }}
     >
-      <OutcomeHero status={effective} timedOut={awaitingTimedOut} />
+      <OutcomeHero copy={copy} status={effective} timedOut={awaitingTimedOut} />
 
       {effective === "PAID" ? (
-        <PaidFacts totalLabel={totalLabel} orderId={orderId} buyerEmail={buyerEmail} />
+        <PaidFacts copy={copy} totalLabel={totalLabel} orderId={orderId} buyerEmail={buyerEmail} />
       ) : null}
 
       {effective === "PAID" ? paidExtra : null}
@@ -291,6 +278,7 @@ export function PaymentStatus({
       ) : null}
 
       <StatusActions
+        copy={copy}
         status={effective}
         onRetry={onRetry}
         onRegenerate={onRegenerate}

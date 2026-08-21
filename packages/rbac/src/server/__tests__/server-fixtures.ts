@@ -2,6 +2,7 @@ import { DEMO_CATALOG, type DemoPermission } from '../../__tests__/demo-catalog'
 
 import type { RbacAuditEntry, RbacServerConfig, RbacUserIdentity } from '../context';
 import { createApiRbac, type ApiRbac } from '../create-api-rbac';
+import { PT_BR_RBAC_MESSAGES } from '../pt-BR';
 
 import { createFakeRbacDb, type FakeRbacState } from './fake-db';
 
@@ -34,6 +35,9 @@ export function createTestHost(
     // the set the composed catalog actually names.
     adminRoles: ['DIRECTOR', 'HEAD_LIBRARIAN'],
     customerRole: 'PATRON',
+    // Required copy, passed the way a pt-BR host passes it — the suites
+    // assert these exact sentences on the wire.
+    messages: PT_BR_RBAC_MESSAGES,
     directory: {
       getUsers: async (ids) =>
         ids.flatMap((id) => {

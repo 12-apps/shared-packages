@@ -24,7 +24,7 @@ import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import type { Context } from 'hono';
 import type { EntityOps, FeatureFlagMap, Snapshot } from '@12-apps/entity-lifecycle';
-import type { LifecycleActor } from '@12-apps/entity-lifecycle/server';
+import { PT_BR_LIFECYCLE_MESSAGES, type LifecycleActor } from '@12-apps/entity-lifecycle/server';
 import { entityLifecycleRouter } from '@12-apps/entity-lifecycle/hono';
 
 import { lifecycleDb } from './lifecycle-db';
@@ -303,6 +303,8 @@ export function lifecycleHost(pg: PGlite) {
           return user ? [{ id: user.id, name: user.name }] : [];
         }),
     },
+    // The refusal sentences are required host config; this host is pt-BR.
+    messages: PT_BR_LIFECYCLE_MESSAGES,
     resolveActor: resolveLifecycleActor,
   });
 }

@@ -17,12 +17,16 @@ import type {
   VersionComparisonWire,
   VersionsWire,
 } from '../api';
+import { PT_BR_LIFECYCLE_WEB_COPY } from '../pt-BR';
 import { LifecycleHttpError, type LifecycleResult, type LifecycleTransport } from '../transport';
 
 export const API_BASE = '/api/admin/minha-loja';
 
 /** The host's own words for its collections — the package ships none. */
 const LABELS = { product: 'Produto', category: 'Categoria', supplier: 'Fornecedor' };
+
+/** The host's sentences, passed by hand the way a pt-BR adopter passes them. */
+export const COPY = PT_BR_LIFECYCLE_WEB_COPY;
 
 /** A fixed instant: a story that renders "now" looks different every visit. */
 const WHEN = new Date(Date.UTC(2026, 7, 14, 16, 45)).toISOString();
@@ -60,6 +64,7 @@ export function surface(
 ): WebEntityLifecycle {
   return createWebEntityLifecycle({
     apiBase: API_BASE,
+    copy: COPY,
     transport: fakeTransport(reads, writeResult),
     entityTypeLabels: LABELS,
   });

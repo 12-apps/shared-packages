@@ -17,6 +17,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CheckoutFlow } from "../checkout-flow";
+import { PT_BR_CHECKOUT_VIEW_COPY } from "../pt-BR";
 import type { CheckoutOrder, CreateOrderRequest, CreateOrderResult } from "../types";
 
 afterEach(cleanup);
@@ -43,6 +44,7 @@ describe("CheckoutFlow with no design system present (raw-MUI default slots)", (
 
     render(
       <CheckoutFlow
+        copy={PT_BR_CHECKOUT_VIEW_COPY}
         cart={{ empty: false, totalLabel: "R$ 10,00", totalItems: 1 }}
         createOrder={createOrder}
         onExitToMenu={vi.fn()}
@@ -75,6 +77,7 @@ describe("CheckoutFlow with no design system present (raw-MUI default slots)", (
   it("shows the empty-cart state for a cart with nothing to pay", () => {
     render(
       <CheckoutFlow
+        copy={PT_BR_CHECKOUT_VIEW_COPY}
         cart={{ empty: true, totalLabel: "R$ 0,00", totalItems: 0 }}
         createOrder={vi.fn()}
         onExitToMenu={vi.fn()}
