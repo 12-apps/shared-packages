@@ -27,6 +27,7 @@
  * before/after pair (a tier change, an override edit, a catalog change).
  */
 import type { EntitlementDecision, RevokePolicy } from '../core/types';
+import type { PlanDiffMessages } from './copy';
 
 /** How a capability got smaller. */
 type LossKind =
@@ -128,19 +129,13 @@ export interface TenantDiff {
 
 /**
  * Render one loss the way an operator needs to read it: what goes, and whether
- * their data goes with it.
+ * their data goes with it. The sentence is the HOST's (`messages.lossLine`, a
+ * factory of the whole loss — the pack satisfies it): what to say about a
+ * `readonly` versus a `hide` revoke is wording, and the wording used to be
+ * compiled in. What stays here is the contract that one loss is one line.
  */
-export function describeLoss(loss: FeatureLoss): string {
-  const fate =
-    loss.policy === 'readonly'
-      ? 'mantém o que já tem, não pode crescer'
-      : loss.policy === 'hide'
-        ? 'a área some'
-        : 'fica desabilitado';
-  const range =
-    loss.kind === 'narrowed' ? `${String(loss.before)} → ${String(loss.after)}` : 'perde';
-  const upsell = loss.requiredPlan === null ? '' : ` (volta no "${loss.requiredPlan}")`;
-  return `${loss.feature}: ${range} — ${fate}${upsell}`;
+export function describeLoss(loss: FeatureLoss, messages: PlanDiffMessages): string {
+  return messages.lossLine(loss);
 }
 
 /**

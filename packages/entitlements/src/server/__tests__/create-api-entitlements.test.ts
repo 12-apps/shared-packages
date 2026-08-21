@@ -20,6 +20,7 @@ import {
   type EntitlementsRoute,
   type PlanChangeRequestPort,
 } from '../create-api-entitlements';
+import { PT_BR_ENTITLEMENTS_MESSAGES } from '../pt-BR';
 import { entitlementDenialResponse, isEntitlementDenial } from '../wire';
 
 const FEATURES = defineFeatures({
@@ -109,6 +110,7 @@ function build(over: Partial<ApiEntitlementsConfig<Feature, PlanKey>> = {}) {
       pricing: PRICING,
       formatPrice: priceLabel,
       comparison: () => COMPARISON,
+      messages: PT_BR_ENTITLEMENTS_MESSAGES,
       ...over,
     }),
     source,
@@ -273,7 +275,7 @@ describe('the denial wire — produced here, parsed by the react half', () => {
       throw new Error('expected a denial');
     } catch (error) {
       if (!isEntitlementDenial(error)) throw error;
-      return entitlementDenialResponse(error);
+      return entitlementDenialResponse(error, PT_BR_ENTITLEMENTS_MESSAGES);
     }
   }
 
@@ -303,7 +305,7 @@ describe('the denial wire — produced here, parsed by the react half', () => {
       })
       .catch((error: unknown) => {
         if (!isEntitlementDenial(error)) throw error;
-        return entitlementDenialResponse(error);
+        return entitlementDenialResponse(error, PT_BR_ENTITLEMENTS_MESSAGES);
       });
     expect(denial.status).toBe(409);
     expect(denial.body.code).toBeUndefined();
@@ -324,7 +326,7 @@ describe('the denial wire — produced here, parsed by the react half', () => {
       })
       .catch((error: unknown) => {
         if (!isEntitlementDenial(error)) throw error;
-        return entitlementDenialResponse(error);
+        return entitlementDenialResponse(error, PT_BR_ENTITLEMENTS_MESSAGES);
       });
     expect(denial.status).toBe(402);
     const prompt = upsellPromptFromPaymentRequired(denial.status, denial.body);

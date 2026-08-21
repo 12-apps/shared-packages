@@ -21,6 +21,7 @@ import {
 } from '@12-apps/entitlements';
 import {
   PLAN_REQUEST_PERMISSION,
+  PT_BR_ENTITLEMENTS_MESSAGES,
   type ComparisonTier,
   type FiledPlanRequest,
   type OpenPlanRequest,
@@ -178,6 +179,9 @@ export function createEntitlementsHost(): EntitlementsHost {
     formatPrice,
     comparison,
     planChangeRequests,
+    // The surface's sentences, passed by hand — required config, exactly like
+    // `formatPrice`: the package no longer ships a default voice.
+    messages: PT_BR_ENTITLEMENTS_MESSAGES,
     resolveActor: (c) => {
       // The host's whole authentication story, reduced to a header the specs
       // can set: `x-harness-role: staff` is a caller the WRITE refuses. The
