@@ -12,15 +12,11 @@
  */
 
 import { WiringAssemblyError } from "../errors";
-import type { MountedRoute } from "../contract/http";
-import type { BoundJob } from "../contract/jobs";
 import type { WireMcpTool } from "../contract/mcp";
 import type { AnyNotificationBlueprint } from "../contract/notifications";
 import type { WirePermissionsContribution } from "../contract/permissions";
 import { isIsolatedDb } from "../contract/db";
-import type { PrismaContribution } from "../contract/db";
-import type { WireEnvValues, WireEnvVar } from "../contract/env";
-import type { AreaContribution } from "../contract/web";
+import type { WireEnvValues } from "../contract/env";
 import type { AnyServerManifest, AnyWebManifest, PackageManifest } from "../contract/manifest";
 import type { LoggerPort, WiringPorts } from "../ports";
 import { answerE2e, answerEnv, answerObservability } from "./answers";
@@ -28,7 +24,8 @@ import { collectMcpTools, httpMountPathOf, type CollectMcpInput } from "./mcp";
 import { bindEmail, bindHttp, bindJobs, bindSurface, type BindContext, type WiringSinks } from "./apply";
 import { isDeclined, type DeclinedBinding, type MailerOf, type RuntimeBindings, type ServerBindings, type SurfaceOf, type WebBindings } from "./bindings";
 import { findRouteConflicts, sortRoutes } from "./paths";
-import { unboundEntries, type CapabilityReportEntry, type PackageReportEntry, type WiringReport } from "./report";
+import { unboundEntries, type CapabilityReportEntry, type PackageReportEntry } from "./report";
+import type { AssembledWiring, PackageAreaContribution, PackageDbContribution, PackageEnvContribution } from "./assembled";
 
 export type HostKind = "server" | "web";
 
@@ -90,46 +87,18 @@ export interface WebAdoption<TManifest extends AnyWebManifest = AnyWebManifest>
   bindings?: WebBindings<TManifest>;
 }
 
-/** One package's declared env vars — assembled for deploy tooling to union. */
-export interface PackageEnvContribution {
-  packageName: string;
-  vars: readonly WireEnvVar[];
-}
-
-export interface PackageDbContribution {
-  packageName: string;
-  contribution: PrismaContribution;
-}
-
-export interface PackageAreaContribution extends AreaContribution {
-  packageName: string;
-}
-
-/** What `assemble()` answers — the aggregates plus the report. */
-export interface AssembledWiring {
-  /** Specificity-ordered, conflict-checked; register in this order. */
-  routes: readonly MountedRoute[];
-  /** `JobDefinition` twins — `jobs.map((job) => defineJob(job))` and done. */
-  jobs: readonly BoundJob[];
-  mailers: Readonly<Record<string, unknown>>;
-  surfaces: Readonly<Record<string, unknown>>;
-  permissions: readonly WirePermissionsContribution[];
-  notifications: readonly AnyNotificationBlueprint[];
-  mcpEndpoints: readonly WireMcpTool[];
-  db: readonly PackageDbContribution[];
-  /** Every adopted package's declared env vars — union it for deploy tooling. */
-  env: readonly PackageEnvContribution[];
-  /** Namespace-scoped loggers, keyed by package name — the observability half. */
-  loggers: Readonly<Record<string, LoggerPort>>;
-  areas: readonly PackageAreaContribution[];
-  report: WiringReport;
-}
+export type {
+  AssembledWiring,
+  PackageAreaContribution,
+  PackageDbContribution,
+  PackageEnvContribution,
+} from "./assembled";
 
 export class WiringHost {
   private readonly options: WiringHostOptions;
   private readonly adopted = new Set<string>();
   private readonly entries: PackageReportEntry[] = [];
-  private readonly sinks: WiringSinks = { routes: [], jobs: [], mailers: {}, surfaces: {} };
+  private readonly sinks: WiringSinks = { routes: [], jobs: [], mailers: {}, http: {}, surfaces: {} };
   private readonly permissions: WirePermissionsContribution[] = [];
   private readonly notifications: AnyNotificationBlueprint[] = [];
   private readonly mcpEndpoints: WireMcpTool[] = [];
@@ -193,6 +162,7 @@ export class WiringHost {
       routes: sortRoutes(this.sinks.routes),
       jobs: [...this.sinks.jobs],
       mailers: { ...this.sinks.mailers },
+      http: { ...this.sinks.http },
       surfaces: { ...this.sinks.surfaces },
       permissions: [...this.permissions],
       notifications: [...this.notifications],

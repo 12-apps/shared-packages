@@ -50,6 +50,12 @@ describe("a server host adopting the fixture package", () => {
     const assembled = host.assemble();
 
     expect(assembled.routes).toHaveLength(4);
+    // The FULL factory result, surfaces-style: routes are mounted above, and
+    // whatever else the factory returned rides on `http[packageName]` — the
+    // entity-lifecycle `entity`/`stores` case.
+    expect(
+      (assembled.http["@12-apps/delivery-notes"] as { store: unknown }).store,
+    ).toBe(store);
     expect(assembled.permissions[0]?.ids).toEqual(["notes:read", "notes:manage"]);
     expect(assembled.notifications[0]?.type).toBe("notes.created");
     expect(assembled.mcpEndpoints.map((tool) => tool.operationId)).toEqual([

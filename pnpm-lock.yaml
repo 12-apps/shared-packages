@@ -349,6 +349,9 @@ importers:
       '@12-apps/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@12-apps/wiring':
+        specifier: workspace:*
+        version: link:../wiring
       '@emotion/react':
         specifier: ^11.14.0
         version: 11.14.0(@types/react@19.2.2)(react@19.2.0)
@@ -1071,6 +1074,9 @@ importers:
       '@12-apps/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@12-apps/wiring':
+        specifier: workspace:*
+        version: link:../wiring
       eslint:
         specifier: ^9.39.1
         version: 9.39.5(jiti@2.7.0)
@@ -1452,6 +1458,9 @@ importers:
       '@12-apps/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@12-apps/wiring':
+        specifier: workspace:*
+        version: link:../wiring
       '@electric-sql/pglite':
         specifier: 0.2.17
         version: 0.2.17
@@ -1461,6 +1470,9 @@ importers:
       eslint:
         specifier: ^9.39.1
         version: 9.39.5(jiti@2.7.0)
+      eslint-plugin-test-flakiness:
+        specifier: ^1.4.0
+        version: 1.8.0(eslint@9.39.5(jiti@2.7.0))
       pg:
         specifier: ^8.16.3
         version: 8.22.0
@@ -1678,6 +1690,9 @@ importers:
       '@12-apps/jobs':
         specifier: workspace:*
         version: link:../jobs
+      '@12-apps/payments-backend':
+        specifier: workspace:*
+        version: link:../payments/backend
       '@12-apps/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
