@@ -8,12 +8,15 @@
     "./redis": "./src/drivers/redis.ts",
     "./ticket": "./src/core/ticket.ts",
     "./server": "./src/server/index.ts",
+    "./jobs": "./src/jobs.ts",
     "./hono": "./src/hono/index.ts",
     "./gateway": "./src/gateway/index.ts",
     "./react": "./src/react/index.ts",
     "./worker": "./src/react/worker/entry.ts",
     "./parity": "./src/parity/index.ts",
     "./manifest": "./src/manifest/index.ts",
+    "./manifest/server": "./src/manifest/server.ts",
+    "./manifest/web": "./src/manifest/web.ts",
     "./package.json": "./package.json"
   },
   "bin": {
@@ -110,6 +113,10 @@
     "!**/test-helpers.*"
   ],
   "wiring": {
+    "db": {
+      "partial": "prisma/realtime.prisma",
+      "migrations": "prisma/migrations"
+    },
     "env": [
       {
         "name": "REALTIME_TICKET_SECRET",

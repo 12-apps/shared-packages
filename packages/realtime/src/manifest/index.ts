@@ -1,9 +1,12 @@
 /**
  * `@12-apps/realtime/manifest` — the SHARED wiring manifest.
  *
- * A pure-data manifest: identity plus the env surface, nothing else — hosts
- * mount this package directly today, so no runtime inventory is declared
- * (see `@12-apps/jobs/manifest` for the same call and its rationale).
+ * Identity, the env surface, the Prisma contribution (the outbox partial)
+ * and the runtime inventory: `http` and `jobs` on the server, `surface` on
+ * the web. The gateway remains a third PROCESS shape — out of the http
+ * capability's scope on purpose: it is not a route a consumer could mount,
+ * so it stays documented here and bound by deployment, with its env vars
+ * riding the `worker` scope below.
  *
  * The `scope` split carries the package's own posture: the API half degrades
  * when a key is unset (no ticket secret means no WS transport, logged), so
@@ -26,6 +29,14 @@ import type { PackageManifest } from "@12-apps/wiring";
 export const realtimeManifest = {
   name: "@12-apps/realtime",
   contract: 1,
+  db: { partial: "prisma/realtime.prisma", migrations: "prisma/migrations" },
+  /**
+   * Mandatory for runtime manifests since wiring 1.3.0: a refused ticket or
+   * a failed drain files under `realtime`, not nowhere.
+   */
+  observability: { namespace: "realtime" },
+  server: ["http", "jobs"],
+  web: ["surface"],
   env: [
     { name: "REALTIME_TICKET_SECRET", secret: true, description: "Signs WS tickets; falls back to AUTH_SECRET, and without either the API serves no WS transport while the gateway refuses to boot." },
     { name: "REALTIME_DRIVER", description: "redis | off; unset picks by REDIS_URL and NODE_ENV, invalid values disable realtime with an error log." },
