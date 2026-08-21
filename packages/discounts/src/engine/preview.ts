@@ -15,6 +15,12 @@ import type { DiscountCartLine, DiscountRule } from "./types";
  *   item's price;
  * - `ORDER` scope is excluded — an order-wide promo is not an item price and
  *   would badge the whole menu;
+ * - `COMBO` scope is excluded, for the same reason `minSubtotalCents` is: a
+ *   combo price only exists once the OTHER components are in the cart, so
+ *   striking a single item's price through with it would advertise a number
+ *   this item alone can never reach. What a card CAN honestly say about a combo
+ *   is that the item takes part in one, which is `comboOffersForItem` in
+ *   `./combo-offer.ts` — a label, not a price;
  * - a `minSubtotalCents` threshold is excluded — a card promising a price that
  *   only materializes above some basket total is a lie;
  * - `stackable` is ignored: this previews ONE item at ONE price, and which
@@ -92,7 +98,10 @@ const PREVIEW_LINE_ID = "preview";
 
 function isBadgeable(rule: DiscountRule): boolean {
   return (
-    rule.trigger === "AUTOMATIC" && rule.scope !== "ORDER" && rule.minSubtotalCents === null
+    rule.trigger === "AUTOMATIC" &&
+    rule.scope !== "ORDER" &&
+    rule.scope !== "COMBO" &&
+    rule.minSubtotalCents === null
   );
 }
 

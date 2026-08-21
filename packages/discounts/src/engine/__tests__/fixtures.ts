@@ -2,6 +2,7 @@ import { expect } from "vitest";
 
 import { evaluateDiscounts } from "../evaluate";
 import type {
+  ComboRequirement,
   DiscountCartLine,
   DiscountEvaluation,
   DiscountRule,
@@ -74,6 +75,54 @@ export function fixedRule(
     type: "FIXED_AMOUNT",
     percentOffBp: null,
     amountOffCents,
+    ...overrides,
+  });
+}
+
+/**
+ * One combo slot. Both target lists default to empty, so a case names only the
+ * one it is about — `slot({ menuItemIds: ["burger"], quantity: 3 })`.
+ */
+export function slot(overrides: Partial<ComboRequirement> = {}): ComboRequirement {
+  return { menuItemIds: [], categoryIds: [], quantity: 1, ...overrides };
+}
+
+/**
+ * A live, stackable COMBO rule. Defaults to a 10%-off-the-group reward so a
+ * case that is about MATCHING does not have to pick a reward, exactly as
+ * {@link rule} defaults to an order-wide 10%.
+ */
+export function comboRule(
+  requirements: readonly ComboRequirement[],
+  overrides: Partial<DiscountRule> & { id: string },
+): DiscountRule {
+  return rule({ scope: "COMBO", comboRequirements: requirements, ...overrides });
+}
+
+/** A combo priced as a whole: the matched group costs `bundlePriceCents`. */
+export function bundleRule(
+  bundlePriceCents: number,
+  requirements: readonly ComboRequirement[],
+  overrides: Partial<DiscountRule> & { id: string },
+): DiscountRule {
+  return comboRule(requirements, {
+    type: "BUNDLE_PRICE",
+    percentOffBp: null,
+    bundlePriceCents,
+    ...overrides,
+  });
+}
+
+/** A "take N, pay for fewer" combo: the cheapest `freeUnits` are free. */
+export function freeUnitsRule(
+  freeUnits: number,
+  requirements: readonly ComboRequirement[],
+  overrides: Partial<DiscountRule> & { id: string },
+): DiscountRule {
+  return comboRule(requirements, {
+    type: "FREE_UNITS",
+    percentOffBp: null,
+    freeUnits,
     ...overrides,
   });
 }
