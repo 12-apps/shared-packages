@@ -29,6 +29,16 @@ export interface WireRequest<TActor = unknown> {
   query: Record<string, string | undefined>;
   /** Parsed JSON body, for writes. */
   body?: unknown;
+  /**
+   * The raw fetch `Request`, for the handlers the parsed fields cannot
+   * serve: a webhook verifying a provider signature over the exact bytes,
+   * an SSE stream reading `Last-Event-ID`, an OAuth callback echoing the
+   * whole URL. The host's adapter populates it for `webhook` and `stream`
+   * routes (and may for the rest); a JSON handler must not come to depend
+   * on it, because `params`/`query`/`body` are the halves every adapter is
+   * obliged to fill.
+   */
+  request?: Request;
 }
 
 /** What a handler answers; the host maps it onto its own response type. */
@@ -37,6 +47,26 @@ export interface WireResponse {
   /** `undefined` means NO body at all (204), which is not the same as `null`. */
   body: unknown;
 }
+
+/**
+ * An answer the adapter must return UNTOUCHED: a live SSE stream, a redirect
+ * whose headers are the payload, a provider-shaped webhook body. `{status,
+ * body}` cannot say any of those — a serialized stream is a hung request and
+ * a redirect with no `Location` is a dead end — so the raw form exists
+ * beside it rather than growing header/stream fields the JSON case would
+ * then have to ignore.
+ */
+export interface WireRawResponse {
+  response: Response;
+}
+
+/**
+ * What `handle` may answer. Discriminate on `status` (the JSON half) or
+ * `response` (the raw half) — `wireAnswer` in the consumer's endpoint
+ * primitives does exactly that, so an adapter never writes the branch by
+ * hand.
+ */
+export type WireRouteAnswer = WireResponse | WireRawResponse;
 
 /**
  * What kind of caller a route expects — the property the host's gates need
@@ -73,8 +103,22 @@ export interface WireRoutePolicy {
   quota?: string;
 }
 
-/** One framework-neutral endpoint a package serves. */
-export interface WireRoute<TActor = unknown> extends WireRoutePolicy {
+/**
+ * One framework-neutral endpoint a package serves.
+ *
+ * `TAnswer` defaults to the JSON half, which is what every route was before
+ * the raw form existed — so a package whose handlers only ever answer
+ * `{status, body}` keeps the narrow contract (and its tests keep reading
+ * `.status` off the promise) without saying anything. A package whose
+ * handlers may answer raw declares `WireRoute<Actor, WireRouteAnswer>`; the
+ * narrow form stays assignable to the wide one, which is why the AGGREGATE
+ * (`MountedRoute`, the route table) is wide — after packages mix, only the
+ * union is honest.
+ */
+export interface WireRoute<
+  TActor = unknown,
+  TAnswer extends WireRouteAnswer = WireResponse,
+> extends WireRoutePolicy {
   method: WireHttpMethod;
   /**
    * Path relative to the host's mount for this package, in `:param` form.
@@ -82,7 +126,16 @@ export interface WireRoute<TActor = unknown> extends WireRoutePolicy {
    * client builds these URLs.
    */
   path: string;
-  handle(request: WireRequest<TActor>): Promise<WireResponse>;
+  /**
+   * `stream` marks a handler whose answer stays OPEN — an SSE stream a
+   * buffering adapter would turn into a request that never completes. The
+   * default is `json`. An adapter that cannot stream must refuse to mount a
+   * `stream` route loudly, never buffer it; a `json` route may still answer
+   * the raw form (a redirect, a provider-shaped body), which any adapter
+   * can return as-is.
+   */
+  transport?: "json" | "stream";
+  handle(request: WireRequest<TActor>): Promise<TAnswer>;
 }
 
 /**
@@ -91,17 +144,19 @@ export interface WireRoute<TActor = unknown> extends WireRoutePolicy {
  * fields, no defaults, asserted at assembly (the report-builder doctrine).
  */
 export interface HttpContribution<TConfig, TActor = unknown> {
-  create(config: TConfig): { routes: readonly WireRoute<TActor>[] };
+  create(config: TConfig): { routes: readonly WireRoute<TActor, WireRouteAnswer>[] };
 }
 
 /**
  * One route after adoption: which package it came from, where the host
  * mounted it, and the descriptor itself. What `assemble()` aggregates.
+ * Wide by default: packages mix here, so only the full answer union is
+ * honest about what `handle` may return.
  */
-export interface MountedRoute {
+export interface MountedRoute<TAnswer extends WireRouteAnswer = WireRouteAnswer> {
   /** The owning package's name, for conflict reports and wiring audits. */
   packageName: string;
   /** The host prefix this package's routes hang under (`/api/admin/:tenantSlug`). */
   mountPath: string;
-  route: WireRoute<never>;
+  route: WireRoute<never, TAnswer>;
 }

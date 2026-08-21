@@ -17,7 +17,7 @@
 
 import type { EmailPort } from "../contract/email";
 import type { WireJobContext } from "../contract/jobs";
-import type { WireRoute } from "../contract/http";
+import type { WireRoute, WireRouteAnswer } from "../contract/http";
 
 /** The explicit refusal: this host will not wire this capability, because. */
 export interface DeclinedBinding {
@@ -48,7 +48,7 @@ export interface SurfaceBindingValue<TConfig> {
 type EmptyBindings = Record<never, never>;
 
 type HttpSlot<TManifest> = TManifest extends {
-  http: { create(config: infer TConfig): { routes: readonly WireRoute<never>[] } };
+  http: { create(config: infer TConfig): { routes: readonly WireRoute<never, WireRouteAnswer>[] } };
 }
   ? { http: HttpBindingValue<TConfig> | DeclinedBinding }
   : EmptyBindings;

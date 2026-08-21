@@ -82,6 +82,33 @@ describe("route policy", () => {
       ]),
     ).toThrow(/does not declare/);
   });
+
+  it("carries a stream route whole: raw answer out, transport kept on the aggregate", async () => {
+    // The webhook/stream shapes the contract names: the handler may read the
+    // raw fetch Request (typed on WireRequest; the flakiness lane bars
+    // constructing one in a test) and answers a Response the adapter must
+    // return untouched. The aggregate keeps `transport`, so an adapter that
+    // cannot stream can refuse the route loudly instead of buffering it
+    // forever.
+    const adopted = serverHostAdopting(withPermissions, [
+      {
+        method: "GET",
+        path: "/notes/events",
+        transport: "stream",
+        handle: (request: { query: Record<string, string | undefined> }) =>
+          Promise.resolve({ response: new Response(request.query["cursor"] ?? "") }),
+      },
+    ]);
+    const [mounted] = adopted.assemble().routes;
+    expect(mounted?.route.transport).toBe("stream");
+    const answer = await mounted?.route.handle({
+      actor: undefined as never,
+      params: {},
+      query: { cursor: "41" },
+    });
+    if (answer === undefined || !("response" in answer)) throw new Error("expected the raw half");
+    expect(await answer.response.text()).toBe("41");
+  });
 });
 
 describe("the env capability", () => {
