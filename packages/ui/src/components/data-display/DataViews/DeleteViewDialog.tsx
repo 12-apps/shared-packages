@@ -12,6 +12,7 @@
  * records are untouched, and warns separately when the view is SHARED, because
  * that deletion takes it from everyone rather than from one person.
  */
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { Dialog, DialogContent } from "../../feedback/Dialog";
 import { Button } from "../../form/Button";
 import { Stack } from "../../../mui/Stack";
@@ -33,12 +34,13 @@ export function DeleteViewDialog({
   entityLabel?: string;
   testIdPrefix?: string;
 }): React.JSX.Element | null {
+  const copy = useDataViewsCopy();
   if (!view) return null;
   return (
     <Dialog
       open
       onClose={onClose}
-      title="Excluir visão"
+      title={copy.deleteView.title}
       size="sm"
       showCloseButton
       dataTestId={`${testIdPrefix}-delete-modal`}
@@ -51,12 +53,12 @@ export function DeleteViewDialog({
 
           {view.shared && (
             <Text variant="body" color="warning" as="p" data-testid={`${testIdPrefix}-delete-shared`}>
-              Esta visão está compartilhada — a equipe perderá o acesso a ela.
+              {copy.deleteView.sharedWarning}
             </Text>
           )}
 
           <Text variant="body" color="secondary" as="p">
-            {entityLabel} não são afetados; apenas o recorte salvo é removido.
+            {copy.deleteView.rowsUnaffected(entityLabel)}
           </Text>
 
           <Stack direction="row" spacing={1.5} sx={{ justifyContent: "flex-end", pt: 0.5 }}>
@@ -73,7 +75,7 @@ export function DeleteViewDialog({
               onClick={() => onConfirm(view)}
               dataTestId={`${testIdPrefix}-delete-confirm`}
             >
-              Excluir visão
+              {copy.deleteView.confirm}
             </Button>
           </Stack>
         </Stack>

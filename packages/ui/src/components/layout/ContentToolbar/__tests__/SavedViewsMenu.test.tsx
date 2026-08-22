@@ -1,3 +1,4 @@
+import { PT_BR_SAVED_VIEWS_LABELS } from "../../../../pt-BR";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
@@ -21,7 +22,7 @@ function renderMenu(overrides: Partial<React.ComponentProps<typeof SavedViewsMen
     onToggleShare: vi.fn(),
     onManageAll: vi.fn(),
   };
-  render(<SavedViewsMenu views={views} testIdPrefix="views" {...handlers} {...overrides} />);
+  render(<SavedViewsMenu labels={PT_BR_SAVED_VIEWS_LABELS} views={views} testIdPrefix="views" {...handlers} {...overrides} />);
   return handlers;
 }
 
@@ -46,9 +47,9 @@ describe("SavedViewsMenu", () => {
       onToggleShare: vi.fn(),
       onManageAll: vi.fn(),
     };
-    const { rerender } = render(<SavedViewsMenu views={views} testIdPrefix="views" {...noop} />);
+    const { rerender } = render(<SavedViewsMenu labels={PT_BR_SAVED_VIEWS_LABELS} views={views} testIdPrefix="views" {...noop} />);
     expect(screen.getByTestId("views-button")).toHaveTextContent("Visão principal");
-    rerender(<SavedViewsMenu views={views} activeViewName="Meus ativos" testIdPrefix="views" {...noop} />);
+    rerender(<SavedViewsMenu labels={PT_BR_SAVED_VIEWS_LABELS} views={views} activeViewName="Meus ativos" testIdPrefix="views" {...noop} />);
     expect(screen.getByTestId("views-button")).toHaveTextContent("Meus ativos");
   });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { CategorySelect } from "../../form/CategorySelect";
 import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 
@@ -19,6 +20,7 @@ export function emitPillDiff(
   after: readonly string[],
   onTogglePill: (fieldId: string, value: string, checked: boolean) => void,
 ): void {
+  const copy = useDataViewsCopy();
   const had = new Set(before);
   const wants = new Set(after);
   after.forEach((value) => {
@@ -65,10 +67,12 @@ export function PillControl<T extends Record<string, unknown>>({
   testIdPrefix,
   layout = "pill",
 }: PillControlProps<T>): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const testId = `${testIdPrefix}-filter-${fieldId}`;
   if (pill.control === "category") {
     return (
       <CategorySelect
+        copy={copy.categorySelect}
         placeholder={pill.label}
         label={layout === "stacked" ? pill.label : undefined}
         fullWidth={layout === "stacked"}

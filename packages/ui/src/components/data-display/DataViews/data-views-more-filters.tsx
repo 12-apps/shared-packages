@@ -10,6 +10,7 @@ import FilterAltRoundedIcon from "@mui/icons-material/FilterAltRounded";
 import { Popover } from "@mui/material";
 import { useState } from "react";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
@@ -58,6 +59,7 @@ function MoreTrigger({
   onOpen: (anchor: HTMLElement) => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const applied = appliedCount > 0;
   return (
     <Button
@@ -68,8 +70,8 @@ function MoreTrigger({
       dataTestId={`${testIdPrefix}-more-filters`}
       aria-label={
         applied
-          ? `Mais filtros: ${count} sem espaço na barra, ${appliedCount} aplicado(s)`
-          : `Mais filtros: ${count} sem espaço na barra`
+          ? copy.filters.moreFiltersApplied(count, appliedCount)
+          : copy.filters.moreFilters(count)
       }
     >
       <Box
@@ -109,6 +111,7 @@ function MoreTrigger({
 
 /** The panel's heading: what these are, and why they are in here. */
 function MoreHeading(): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Box
       sx={{
@@ -128,7 +131,7 @@ function MoreHeading(): React.JSX.Element {
       </Text>
       <Text variant="caption" as="span">
         <Box component="span" sx={{ ml: "auto", color: "text.disabled" }}>
-          sem espaço na barra
+          {copy.filters.overflowNote}
         </Box>
       </Text>
     </Box>

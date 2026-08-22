@@ -1,3 +1,4 @@
+import type { ConfirmActionCopy } from "../../../copy";
 import { Alert, Stack, TextField, Typography } from '@mui/material';
 import React, { type ReactNode } from 'react';
 
@@ -22,8 +23,12 @@ const DEFAULT_TEST_ID = 'confirm-action';
  * mention it. A body with neither a name nor a description would leave the
  * operator with only the title to decide on, so a neutral fallback covers that.
  */
-function confirmBody(description: ReactNode, entityName?: string): ReactNode {
-  if (!entityName) return description ?? "Esta ação não pode ser desfeita.";
+function confirmBody(
+  description: ReactNode,
+  copy: ConfirmActionCopy,
+  entityName?: string,
+): ReactNode {
+  if (!entityName) return description ?? copy.irreversible;
   return (
     <>
       <Typography component="span" sx={{ fontWeight: 600, display: "block" }}>
@@ -86,6 +91,8 @@ function TypeToConfirmField({
 }
 
 export interface ConfirmActionDialogProps extends ConfirmOptions {
+  /** The fallback body when no entity is named. REQUIRED — no default copy. */
+  copy: ConfirmActionCopy;
   state: UseConfirmActionResult;
 }
 
@@ -107,6 +114,7 @@ export function ConfirmActionDialog({
   tone = 'destructive',
   initialFocus,
   dataTestId = DEFAULT_TEST_ID,
+  copy,
 }: ConfirmActionDialogProps): React.ReactElement {
   const [typed, setTyped] = React.useState('');
 
@@ -123,7 +131,7 @@ export function ConfirmActionDialog({
       open={state.open}
       variant={tone === 'destructive' ? 'destructive' : 'default'}
       title={title}
-      description={confirmBody(description, entityName)}
+      description={confirmBody(description, copy, entityName)}
       confirmText={confirmText}
       cancelText={cancelText}
       loading={state.pending}

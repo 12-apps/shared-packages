@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "./test-utils";
 import { ThemeProvider, createTheme } from "../../../../mui/styles";
 
 import { DataViewsTableBase } from "../DataViewsTableBase";

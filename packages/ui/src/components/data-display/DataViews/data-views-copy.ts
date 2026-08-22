@@ -1,0 +1,165 @@
+import type { CategorySelectCopy, ConfirmActionCopy } from "../../../copy";
+import type { SavedViewsLabels } from "../../layout/ContentToolbar/ContentToolbar.types";
+/**
+ * Every word the DataViews family renders, as REQUIRED host config (FUT-760).
+ *
+ * Nineteen files in this one component tree carried pt-BR — the saved-view
+ * dialogs, the display tabs, the column and filter panels, the selection strip,
+ * the nav. A design system shipping product copy is the leak at its most
+ * expensive: `@12-apps/ui` is the package every host renders, so its Portuguese
+ * reached every adopter of every OTHER package too.
+ *
+ * ONE object threaded through a context rather than a prop per component,
+ * because these nineteen files are a single surface a host mounts once, and
+ * `data-views-layout-context.tsx` already establishes that shape here for
+ * layout. A prop per leaf would make a host thread words through components it
+ * never names.
+ */
+
+/** What the board's per-page footnote says about counts and sums. */
+export interface DataViewsBoardCopy {
+  countOnPage(label: string, count: number): string;
+  onThisPage(count: number): string;
+  pageSum(sum: string): string;
+  /** Why the figures below are not the whole set. */
+  pageScopeNote: string;
+}
+
+export interface DeleteViewCopy {
+  title: string;
+  /** Shown only when the view is shared with the team. */
+  sharedWarning: string;
+  /** `entityLabel` is the host's own noun for the rows — never this package's. */
+  rowsUnaffected(entityLabel: string): string;
+  confirm: string;
+}
+
+export interface ManageViewsCopy {
+  title: string;
+  empty: string;
+  defaultTag: string;
+  otherUserTag: string;
+  deleteTitle: string;
+  deleteBody: string;
+}
+
+export interface SaveViewCopy {
+  sharedDescription: string;
+  setDefaultTitle: string;
+  setDefaultDescription: string;
+  previewHeading: string;
+  /** The view would be identical to the unsaved default. */
+  previewUnchanged: string;
+  sortRowLabel: string;
+  saveFailed: string;
+  titleEditing: string;
+  titleCreating: string;
+  descriptionLabel: string;
+  descriptionPlaceholder: string;
+  submitEditing: string;
+  submitCreating: string;
+}
+
+export interface DataViewsColumnsCopy {
+  visibleCount(visible: number, total: number): string;
+  reset: string;
+}
+
+export interface DataViewsDisplayCopy {
+  /** The three tabs of the display panel. */
+  sortTab: string;
+  columnsTab: string;
+  panelTab: string;
+  direction: string;
+  /** What each layout is good for, keyed by layout id. */
+  layoutHints: Readonly<Record<string, string>>;
+  /**
+   * What density MEANS in each layout — same three values, three different
+   * questions. A table's is how tall its rows are, a card grid's is how many
+   * fit on a line, a board's is how wide its columns are.
+   */
+  densityHeadings: Readonly<Record<string, string>>;
+  /**
+   * Density words per layout. They differ by layout on purpose: "Baixa" density
+   * on a table and "Muitos" cards describe the same setting from the reader's
+   * side, which is the register this surface is written in.
+   */
+  densityLabels: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  /** The board layout needs stages, and this screen declares none. */
+  boardUnavailable: string;
+  /** Density is unavailable because the viewport only fits one card per row. */
+  densityUnavailableNarrow: string;
+}
+
+export interface DataViewsExportCopy {
+  /** Format labels and hints, keyed by format id. */
+  formats: Readonly<Record<string, { label: string; hint: string }>>;
+  visibleColumns(columnCount: number): string;
+}
+
+export interface DataViewsGridCopy {
+  /** The per-row kebab's accessible name. */
+  rowActions: string;
+  bulkActions(selectedCount: number): string;
+}
+
+export interface DataViewsFiltersCopy {
+  moreFilters(count: number): string;
+  moreFiltersApplied(count: number, appliedCount: number): string;
+  overflowNote: string;
+  rangeEnd: string;
+  rangeInvalid: string;
+  /** The day-range presets' labels, keyed by preset id. */
+  rangePresets: Readonly<Record<string, string>>;
+  scopesLabel: string;
+}
+
+export interface DataViewsSelectionCopy {
+  selectAllOnPage: string;
+  clearSelection: string;
+  selectAll: string;
+  onThisPage(count: number): string;
+}
+
+export interface DataViewsNavCopy {
+  mainView: string;
+  defaultTag: string;
+  viewOptions(viewName: string): string;
+  emptyHint: string;
+  setDefault: string;
+  deleteView: string;
+  unsavedChanges: string;
+  label: string;
+  update: string;
+  save: string;
+  /** The inline error when a view could not be refreshed or saved. */
+  updateFailed: string;
+  saveFailed: string;
+}
+
+/** Every word this component family renders, in one object a host passes once. */
+export interface DataViewsCopy {
+  /**
+   * The words of the components this surface RENDERS but does not own — the
+   * saved-views menu, the confirm dialog behind a delete, the category pill.
+   *
+   * Here rather than threaded as props because this surface already carries a
+   * copy context: a host mounting DataViews should pass one object, not one per
+   * leaf it never names. Each of those components still takes its own copy when
+   * mounted standalone.
+   */
+  savedViewsMenu: SavedViewsLabels;
+  confirmAction: ConfirmActionCopy;
+  categorySelect: CategorySelectCopy;
+  board: DataViewsBoardCopy;
+  deleteView: DeleteViewCopy;
+  manageViews: ManageViewsCopy;
+  saveView: SaveViewCopy;
+  columns: DataViewsColumnsCopy;
+  display: DataViewsDisplayCopy;
+  export: DataViewsExportCopy;
+  grid: DataViewsGridCopy;
+  filters: DataViewsFiltersCopy;
+  selection: DataViewsSelectionCopy;
+  nav: DataViewsNavCopy;
+}

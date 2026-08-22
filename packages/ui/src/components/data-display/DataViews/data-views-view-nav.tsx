@@ -7,7 +7,7 @@
  * Two levels, both of them replacing the panel's BODY (the tabs stay put):
  * the list of views, and one view's actions. It is a drill-down and not a
  * nested menu on purpose — an absolutely positioned popover inside the panel's
- * own scroll container gets clipped by it, which is how "Excluir visão" ends
+ * own scroll container gets clipped by it, which is how copy.nav.deleteView ends
  * up unreachable. One level, no clipping, and it works on touch.
  */
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
@@ -25,6 +25,7 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
@@ -36,7 +37,7 @@ import type { SavedViewSummary } from "./data-views-types";
 export interface ViewNavHandlers {
   views: SavedViewSummary[];
   activeViewId?: string | null;
-  /** `null` selects the built-in "Visão principal". */
+  /** `null` selects the built-in "{copy.nav.mainView}". */
   onSelectView: (id: string | null) => void;
   onEditView: (view: SavedViewSummary) => void;
   onPatchView: (
@@ -74,6 +75,7 @@ export function ViewsList({
   onOpenActions: (view: SavedViewSummary) => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const { views, activeViewId, onSelectView } = handlers;
   const onMain = !activeViewId;
   return (
@@ -86,7 +88,7 @@ export function ViewsList({
         sx={{ ...rowSx, color: onMain ? "primary.main" : "text.primary", fontWeight: onMain ? 600 : 400 }}
       >
         <Box component="span" sx={{ flex: 1 }}>
-          Visão principal
+          {copy.nav.mainView}
         </Box>
         {onMain && <CheckRoundedIcon fontSize="small" />}
       </Box>
@@ -108,7 +110,7 @@ export function ViewsList({
               {/* What the row-menu toggles DID, readable without opening it:
                   a view set as default, pinned or shared says so here. */}
               {view.isDefault && (
-                <StarOutlineRoundedIcon fontSize="small" sx={{ color: "warning.main" }} titleAccess="Padrão" />
+                <StarOutlineRoundedIcon fontSize="small" sx={{ color: "warning.main" }} titleAccess={copy.nav.defaultTag} />
               )}
               {view.pinned && (
                 <PushPinOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} titleAccess="Fixada" />
@@ -121,7 +123,7 @@ export function ViewsList({
             <IconButton
               size="small"
               onClick={() => onOpenActions(view)}
-              aria-label={`Opções de ${view.name}`}
+              aria-label={copy.nav.viewOptions(view.name)}
               data-testid={`${testIdPrefix}-view-${view.id}-menu`}
             >
               <MoreVertRoundedIcon fontSize="small" />
@@ -133,7 +135,7 @@ export function ViewsList({
       {views.length === 0 && (
         <Text variant="caption" as="p">
           <Box component="span" sx={{ display: "block", px: 1.25, py: 1.5, color: "text.secondary", lineHeight: 1.6 }}>
-            Nenhuma visão salva. Ajuste filtros, colunas ou ordenação e salve abaixo.
+            {copy.nav.emptyHint}
           </Box>
         </Text>
       )}
@@ -153,6 +155,7 @@ export function ViewActions({
   onBack: () => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const { onEditView, onPatchView, onDeleteView } = handlers;
   const action = (
     key: string,
@@ -196,11 +199,11 @@ export function ViewActions({
       </Box>
       <Box sx={{ my: 0.5, borderTop: 1, borderColor: "divider" }} />
       {action("edit", EditOutlinedIcon, "Renomear e editar", () => onEditView(view))}
-      {action("default", StarOutlineRoundedIcon2, "Definir como padrão", () => onPatchView(view, { isDefault: !view.isDefault }), { on: view.isDefault })}
+      {action("default", StarOutlineRoundedIcon2, copy.nav.setDefault, () => onPatchView(view, { isDefault: !view.isDefault }), { on: view.isDefault })}
       {action("pin", PushPinOutlinedIcon, "Fixar na barra lateral", () => onPatchView(view, { pinned: !view.pinned }), { on: view.pinned })}
       {action("share", GroupOutlinedIcon, "Compartilhar com a equipe", () => onPatchView(view, { shared: !view.shared }), { on: view.shared })}
       <Box sx={{ my: 0.5, borderTop: 1, borderColor: "divider" }} />
-      {action("delete", DeleteOutlineRoundedIcon, "Excluir visão", () => onDeleteView(view), { danger: true })}
+      {action("delete", DeleteOutlineRoundedIcon, copy.nav.deleteView, () => onDeleteView(view), { danger: true })}
     </Box>
   );
 }
@@ -217,15 +220,16 @@ function ToggleContents({
   interactive: boolean;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <>
       <Box component="span" sx={{ fontWeight: 600 }} data-testid={`${testIdPrefix}-display-view-name`}>
-        {view.activeViewName ?? "Visão principal"}
+        {view.activeViewName ?? "{copy.nav.mainView}"}
       </Box>
       {view.dirty && (
         <Box
           component="span"
-          aria-label="Alterações não salvas"
+          aria-label={copy.nav.unsavedChanges}
           data-testid={`${testIdPrefix}-display-dirty`}
           sx={{ height: 6, width: 6, borderRadius: "50%", bgcolor: "primary.main" }}
         />
@@ -291,11 +295,12 @@ export function ViewHeader(props: {
   onToggle: () => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 1, borderBottom: 1, borderColor: "divider" }}>
       <Text variant="caption" as="span">
         <Box component="span" sx={{ textTransform: "uppercase", letterSpacing: 0.5, color: "text.disabled" }}>
-          Visão
+          {copy.nav.label}
         </Box>
       </Text>
       <ViewToggle {...props} />
@@ -313,6 +318,7 @@ export function ViewFooter({
   onDone: () => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Box
       sx={{
@@ -339,7 +345,7 @@ export function ViewFooter({
         Redefinir
       </Button>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        {/* Only meaningful with a view APPLIED: on Visão principal the single
+        {/* Only meaningful with a view APPLIED: on {copy.nav.mainView} the single
             "Salvar visão" already is "save as new". */}
         {view.onUpdate && (
           <Button
@@ -369,7 +375,7 @@ export function ViewFooter({
           }}
           dataTestId={`${testIdPrefix}-display-save`}
         >
-          {view.onUpdate ? "Atualizar visão" : "Salvar visão"}
+          {view.onUpdate ? copy.nav.update : copy.nav.save}
         </Button>
       </Box>
     </Box>

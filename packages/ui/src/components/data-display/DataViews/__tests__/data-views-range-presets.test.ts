@@ -1,7 +1,8 @@
+import { PT_BR_DATA_VIEWS_COPY } from "../../../../pt-BR";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  DAY_RANGE_PRESETS,
+  dayRangePresets,
   isPresetActive,
   presetsFor,
   resolvePreset,
@@ -10,7 +11,7 @@ import type { RangeFieldConfig, RangePreset } from "../data-views-types";
 
 /** One default preset by id, so a test names the window it means. */
 function preset(id: string): RangePreset {
-  const found = DAY_RANGE_PRESETS.find((p) => p.id === id);
+  const found = dayRangePresets(PT_BR_DATA_VIEWS_COPY).find((p) => p.id === id);
   if (!found) throw new Error(`no default day preset "${id}"`);
   return found;
 }
@@ -85,7 +86,7 @@ describe("which presets a field offers", () => {
   };
 
   it("gives a day field the calendar defaults when it declares none", () => {
-    expect(presetsFor(day).map((p) => p.label)).toEqual([
+    expect(presetsFor(day, PT_BR_DATA_VIEWS_COPY).map((p) => p.label)).toEqual([
       "Hoje",
       "Ontem",
       "Esta semana",
@@ -95,19 +96,19 @@ describe("which presets a field offers", () => {
   });
 
   it("gives a NUMBER field none — what counts as a big order is the host's business", () => {
-    expect(presetsFor(number)).toEqual([]);
+    expect(presetsFor(number, PT_BR_DATA_VIEWS_COPY)).toEqual([]);
   });
 
   it("honours an explicit empty list rather than falling back", () => {
     // A host suppressing the defaults is saying something; `presets: []` must
     // not read as "unset".
-    expect(presetsFor({ ...day, presets: [] })).toEqual([]);
+    expect(presetsFor({ ...day, presets: [] }, PT_BR_DATA_VIEWS_COPY)).toEqual([]);
   });
 
   it("uses the host's own windows over the defaults", () => {
     const presets: RangePreset[] = [{ id: "acima", label: "Acima de R$ 500", range: { min: 500 } }];
-    expect(presetsFor({ ...number, presets })).toEqual(presets);
-    expect(presetsFor({ ...day, presets })).toEqual(presets);
+    expect(presetsFor({ ...number, presets }, PT_BR_DATA_VIEWS_COPY)).toEqual(presets);
+    expect(presetsFor({ ...day, presets }, PT_BR_DATA_VIEWS_COPY)).toEqual(presets);
   });
 });
 

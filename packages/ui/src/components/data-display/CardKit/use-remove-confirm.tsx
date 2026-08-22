@@ -1,5 +1,6 @@
 'use client';
 
+import type { ConfirmActionCopy } from "../../../copy";
 import type { JSX } from 'react';
 
 import { ConfirmActionDialog, useConfirmAction } from '../../feedback/ConfirmAction';
@@ -29,6 +30,8 @@ interface RemoveConfirmOptions {
   confirmText: string;
   /** Used when the write fails without a message of its own. */
   fallbackError: string;
+  /** The dialog's own words. REQUIRED — this package ships no default copy. */
+  copy: ConfirmActionCopy;
   dataTestId: string;
 }
 
@@ -75,6 +78,7 @@ export function useRemoveConfirm({
   confirmText,
   fallbackError,
   dataTestId,
+  copy,
 }: RemoveConfirmOptions): RemoveConfirm {
   const { onRefresh, notifyError } = useCardActions();
 
@@ -95,6 +99,7 @@ export function useRemoveConfirm({
     dialog: (
       <ConfirmActionDialog
         state={state}
+        copy={copy}
         title={title}
         entityName={entityName}
         description={description}

@@ -64,7 +64,8 @@ export interface SectionOnboardingProps {
    * and `children` exist. Clicking it advances the hero to the in-progress view
    * (steps + form) without the parent managing state. @default 'Começar'
    */
-  startLabel?: string;
+  /** The button that begins the section. REQUIRED since FUT-760. */
+  startLabel: string;
 
   /** Optional secondary CTA of the hero — e.g. "Ver como funciona". */
   secondaryAction?: SectionOnboardingAction;

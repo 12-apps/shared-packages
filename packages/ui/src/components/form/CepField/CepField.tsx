@@ -1,5 +1,6 @@
 'use client';
 
+import type { CepFieldCopy } from "../../../copy";
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { cepDigits, formatCep, isValidCep } from '@12-apps/forms-core';
@@ -7,13 +8,6 @@ import { cepDigits, formatCep, isValidCep } from '@12-apps/forms-core';
 import { FormControl, FormLabel, FormMessage } from '../Form';
 import { Input } from '../Input';
 import type { CepAddress, CepFieldProps, CepLookupStatus } from './CepField.types';
-
-/** What the user is told for each non-idle outcome. */
-const STATUS_TEXT: Record<Exclude<CepLookupStatus, 'idle'>, string> = {
-  loading: 'Buscando endereço…',
-  found: 'Endereço preenchido pelo CEP.',
-  notfound: 'CEP não encontrado — preencha o endereço manualmente.',
-};
 
 /** Everything {@link useCepLookup} needs, so the hook signature stays flat. */
 interface LookupOptions {
@@ -103,17 +97,19 @@ function CepStatus({
   status,
   testId,
   suppressed,
+  copy,
 }: {
   status: CepLookupStatus;
   testId: string;
   suppressed: boolean;
+  copy: CepFieldCopy;
 }): React.ReactElement {
   const visible = !suppressed && status !== 'idle';
   return (
     <span id={`${testId}-status`} role="status" aria-live="polite">
       {visible && (
         <FormMessage error={status === 'notfound'} dataTestId={`${testId}-${status}`}>
-          {STATUS_TEXT[status as Exclude<CepLookupStatus, 'idle'>]}
+          {copy[status as Exclude<CepLookupStatus, 'idle'>]}
         </FormMessage>
       )}
     </span>
@@ -157,6 +153,7 @@ export function CepField({
   debounceMs = 500,
   name = 'postalCode',
   dataTestId,
+  copy,
 }: CepFieldProps): React.ReactElement {
   const testId = dataTestId ?? `cep-field-${name}`;
 
@@ -203,7 +200,7 @@ export function CepField({
           {error}
         </FormMessage>
       )}
-      <CepStatus status={status} testId={testId} suppressed={Boolean(error)} />
+      <CepStatus status={status} testId={testId} suppressed={Boolean(error)} copy={copy} />
     </FormControl>
   );
 }

@@ -167,7 +167,7 @@ const HeroView: React.FC<SectionOnboardingProps & { onStart: () => void }> = ({
   activeStepId,
   completedStepIds,
   primaryAction,
-  startLabel = 'Começar',
+  startLabel,
   secondaryAction,
   helpLink,
   children,

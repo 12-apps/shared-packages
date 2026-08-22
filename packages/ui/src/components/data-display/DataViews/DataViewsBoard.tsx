@@ -1,5 +1,6 @@
 "use client";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
@@ -134,6 +135,7 @@ function BoardColumnHeader({
   sum: string | null;
   testId: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
       <Box sx={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 1 }}>
@@ -146,10 +148,10 @@ function BoardColumnHeader({
           <Box
             component="span"
             data-testid={`${testId}-count`}
-            aria-label={`${label}: ${count} nesta página`}
+            aria-label={copy.board.countOnPage(label, count)}
             sx={{ color: "text.secondary", whiteSpace: "nowrap" }}
           >
-            {count} nesta página
+            {copy.board.onThisPage(count)}
           </Box>
         </Text>
       </Box>
@@ -158,7 +160,7 @@ function BoardColumnHeader({
           <Box
             component="span"
             data-testid={`${testId}-sum`}
-            aria-label={`Soma desta página: ${sum}`}
+            aria-label={copy.board.pageSum(sum)}
             sx={{ color: "text.secondary" }}
           >
             {sum}
@@ -283,6 +285,7 @@ export function DataViewsBoard<T extends Record<string, unknown>>({
   cardScale,
   dataTestId,
 }: DataViewsBoardProps<T>): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const columns = groupRows(rows, board);
   const width = Math.max(MIN_COLUMN_WIDTH, Math.round(BASE_COLUMN_WIDTH * cardScale));
   const testId = dataTestId ? `${dataTestId}-board` : "data-views-board";
@@ -290,7 +293,7 @@ export function DataViewsBoard<T extends Record<string, unknown>>({
     <Box sx={{ mt: 1.5 }}>
       <Text variant="caption" as="p">
         <Box component="span" data-testid={`${testId}-scale-note`} sx={{ color: "text.secondary" }}>
-          As contagens e somas abaixo referem-se apenas aos itens desta página.
+          {copy.board.pageScopeNote}
         </Box>
       </Text>
       <Box

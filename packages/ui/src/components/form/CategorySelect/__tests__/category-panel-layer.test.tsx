@@ -6,6 +6,7 @@
  * sheet that opened it, which only a z-index comparison against the sheet's own
  * ladder can state. So that comparison is the test.
  */
+import { PT_BR_CATEGORY_SELECT_COPY } from "../../../../pt-BR";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -52,7 +53,7 @@ function paintedZIndex(node: Element): number {
  */
 function renderInSheets(depth: number): void {
   const panel = (
-    <CategorySelect mode="single" value={null} onChange={() => undefined} options={OPTIONS} dataTestId="cat" />
+    <CategorySelect copy={PT_BR_CATEGORY_SELECT_COPY} mode="single" value={null} onChange={() => undefined} options={OPTIONS} dataTestId="cat" />
   );
   render(
     <StackedModalProvider>

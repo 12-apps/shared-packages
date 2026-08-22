@@ -6,6 +6,7 @@ import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import { Checkbox } from "@mui/material";
 import { useState } from "react";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
@@ -51,6 +52,7 @@ export function ColumnsTab({
   onReset,
   testIdPrefix,
 }: ColumnsTabProps): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const [dragId, setDragId] = useState<string | null>(null);
   const byId = new Map(columns.map((column) => [column.id, column]));
   const ordered = order.map((id) => byId.get(id)).filter((column): column is HideableColumn => Boolean(column));
@@ -72,12 +74,12 @@ export function ColumnsTab({
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 1.5, py: 1 }}>
         <Text variant="caption" as="span">
           <Box component="span" sx={{ color: "text.secondary" }} data-testid={`${testIdPrefix}-columns-count`}>
-            <strong>{visibleHideableCount}</strong> de {columns.length} visíveis
+            {copy.columns.visibleCount(visibleHideableCount, columns.length)}
           </Box>
         </Text>
         <Box sx={{ display: "flex", gap: 1 }}>
           <LinkButton label="Mostrar todas" onClick={onShowAll} testId={`${testIdPrefix}-columns-show-all`} />
-          <LinkButton label="Padrão" onClick={onReset} testId={`${testIdPrefix}-columns-reset`} muted />
+          <LinkButton label={copy.columns.reset} onClick={onReset} testId={`${testIdPrefix}-columns-reset`} muted />
         </Box>
       </Box>
       <Text variant="caption" as="p">
@@ -117,6 +119,7 @@ function LinkButton({
   testId: string;
   muted?: boolean;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Box
       component="button"

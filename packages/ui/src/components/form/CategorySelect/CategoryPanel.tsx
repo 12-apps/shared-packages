@@ -1,5 +1,6 @@
 'use client';
 
+import type { CategorySelectCopy } from "../../../copy";
 import { Box } from '@mui/material';
 
 import { removeChip } from './category-tree';
@@ -12,6 +13,8 @@ import type { CategoryGroup, CategorySelectionChip } from './CategorySelect.type
 import type { CategorySelectState } from './useCategorySelect';
 
 export interface CategoryPanelProps {
+  /** The words this panel renders. REQUIRED — no default copy. */
+  copy: CategorySelectCopy;
   state: CategorySelectState;
   chips: CategorySelectionChip[];
   rowIds: string[];
@@ -55,6 +58,7 @@ export function CategoryPanel({
   searchInputRef,
   listRef,
   dataTestId,
+  copy,
 }: CategoryPanelProps): React.JSX.Element {
   return (
     <Box
@@ -78,7 +82,7 @@ export function CategoryPanel({
       {!single && !loading && (
         <PinnedTray state={state} chips={chips} dataTestId={dataTestId} />
       )}
-      <CategoryPanelList
+      <CategoryPanelList copy={copy}
         groups={state.visibleGroups}
         query={state.query}
         draft={state.draft}

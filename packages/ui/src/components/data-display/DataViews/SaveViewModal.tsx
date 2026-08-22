@@ -5,6 +5,7 @@ import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import StarOutlineRoundedIcon from "@mui/icons-material/StarOutlineRounded";
 import { useState } from "react";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { Dialog, DialogContent } from "../../feedback/Dialog";
 import { Button } from "../../form/Button";
 import { Input } from "../../form/Input";
@@ -119,6 +120,7 @@ function FlagsSwitches({
   setIsDefault,
   testIdPrefix,
 }: FlagsSwitchesProps): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Stack spacing={0}>
       <FlagRow
@@ -132,15 +134,15 @@ function FlagsSwitches({
       <FlagRow
         icon={<GroupOutlinedIcon fontSize="small" />}
         title="Compartilhar com a equipe"
-        description="Qualquer pessoa da loja poderá abrir e usar esta visão."
+        description={copy.saveView.sharedDescription}
         checked={shared}
         onChange={setShared}
         testId={`${testIdPrefix}-save-shared`}
       />
       <FlagRow
         icon={<StarOutlineRoundedIcon fontSize="small" />}
-        title="Definir como padrão"
-        description="Esta tela abre nesta visão em vez da Visão principal."
+        title={copy.saveView.setDefaultTitle}
+        description={copy.saveView.setDefaultDescription}
         checked={isDefault}
         onChange={setIsDefault}
         testId={`${testIdPrefix}-save-default`}
@@ -164,6 +166,7 @@ function SummaryRow({
   items: string[];
   testId: string;
 }): React.JSX.Element | null {
+  const copy = useDataViewsCopy();
   if (items.length === 0) return null;
   return (
     <Box sx={{ display: "flex", gap: 1.5 }} data-testid={testId}>
@@ -182,6 +185,7 @@ function SummaryRow({
 }
 
 function PreviewBox({ preview, testIdPrefix }: PreviewBoxProps): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const empty =
     preview.filters.length === 0 && preview.columns.length === 0 && preview.sort.length === 0;
   return (
@@ -191,7 +195,7 @@ function PreviewBox({ preview, testIdPrefix }: PreviewBoxProps): React.JSX.Eleme
           component="span"
           sx={{ display: "block", mb: 1, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 600, color: "text.disabled" }}
         >
-          O que esta visão guarda
+          {copy.saveView.previewHeading}
         </Box>
       </Text>
       {empty ? (
@@ -199,14 +203,14 @@ function PreviewBox({ preview, testIdPrefix }: PreviewBoxProps): React.JSX.Eleme
         // purpose — but it should not be a surprise afterwards.
         <Text variant="caption" as="p">
           <Box component="span" sx={{ color: "warning.main", lineHeight: 1.6 }} data-testid={`${testIdPrefix}-preview-empty`}>
-            Nada foi alterado — esta visão ficará igual à Visão principal.
+            {copy.saveView.previewUnchanged}
           </Box>
         </Text>
       ) : (
         <Stack spacing={0.75}>
           <SummaryRow label="Filtros" items={preview.filters} testId={`${testIdPrefix}-preview-filters`} />
           <SummaryRow label="Colunas ocultas" items={preview.columns} testId={`${testIdPrefix}-preview-columns`} />
-          <SummaryRow label="Ordenação" items={preview.sort} testId={`${testIdPrefix}-preview-sort`} />
+          <SummaryRow label={copy.saveView.sortRowLabel} items={preview.sort} testId={`${testIdPrefix}-preview-sort`} />
         </Stack>
       )}
     </Box>
@@ -248,6 +252,7 @@ function useSaveViewForm(
   editing: SavedViewSummary | null | undefined,
   onSave: (payload: SaveViewPayload) => Promise<void> | void,
 ): SaveViewFormState {
+  const copy = useDataViewsCopy();
   const initial = seedForm(editing);
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
@@ -267,7 +272,7 @@ function useSaveViewForm(
     try {
       await onSave({ name: name.trim(), description: description.trim(), shared, pinned, isDefault });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Não foi possível salvar a visão.");
+      setError(cause instanceof Error ? cause.message : copy.saveView.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -305,6 +310,7 @@ export function SaveViewModal<T extends Record<string, unknown>>({
   onSave,
   testIdPrefix = "view",
 }: SaveViewModalProps<T>): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const form = useSaveViewForm(editing, onSave);
   const preview = describeViewState(currentState, fields, columns);
 
@@ -312,7 +318,7 @@ export function SaveViewModal<T extends Record<string, unknown>>({
     <Dialog
       open={open}
       onClose={onClose}
-      title={editing ? "Editar visão" : "Salvar visão"}
+      title={editing ? copy.saveView.titleEditing : copy.saveView.titleCreating}
       size="sm"
       showCloseButton
       dataTestId={`${testIdPrefix}-save-modal`}
@@ -331,8 +337,8 @@ export function SaveViewModal<T extends Record<string, unknown>>({
           <Input
             size="sm"
             fullWidth
-            label="Descrição — opcional"
-            placeholder="Para que serve esta visão"
+            label={copy.saveView.descriptionLabel}
+            placeholder={copy.saveView.descriptionPlaceholder}
             value={form.description}
             onChange={(event) => form.setDescription(event.target.value)}
             data-testid={`${testIdPrefix}-save-description`}
@@ -367,7 +373,7 @@ export function SaveViewModal<T extends Record<string, unknown>>({
               disabled={!form.canSave}
               dataTestId={`${testIdPrefix}-save-submit`}
             >
-              {editing ? "Salvar alterações" : "Salvar visão"}
+              {editing ? copy.saveView.submitEditing : copy.saveView.submitCreating}
             </Button>
           </Stack>
         </Stack>

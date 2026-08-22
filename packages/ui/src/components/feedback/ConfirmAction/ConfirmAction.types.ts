@@ -1,3 +1,4 @@
+import type { ConfirmActionCopy } from "../../../copy";
 import type { ComponentType, ReactNode } from 'react';
 
 /**
@@ -43,7 +44,6 @@ export interface ConfirmOptions {
   /** Defaults to `cancel` for the destructive tone, `confirm` otherwise. */
   initialFocus?: ConfirmInitialFocus;
   /** Shown inside the dialog when the action rejects; the dialog stays open. */
-  errorText?: string;
   /** Root test id; the dialog's parts derive theirs from it. */
   dataTestId?: string;
 }
@@ -82,6 +82,14 @@ export interface UseConfirmActionResult {
  * the trigger — a button, a menu item, an icon.
  */
 export interface ConfirmActionProps extends ConfirmOptions {
+  /**
+   * What the operator is told when the action fails and the cause carries no
+   * message. REQUIRED since FUT-760 — it used to default to this package's own
+   * pt-BR, so a host that passed nothing shipped one product's Portuguese.
+   */
+  errorText: string;
+  /** The fallback body when no entity is named. REQUIRED — see `errorText`. */
+  copy: ConfirmActionCopy;
   onConfirm: ConfirmHandler;
   children: (request: () => void, state: { pending: boolean }) => ReactNode;
 }

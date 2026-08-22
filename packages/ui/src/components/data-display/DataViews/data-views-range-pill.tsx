@@ -16,6 +16,7 @@ import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { Box, Button, Popover, Typography } from '@mui/material';
 import React, { useState } from 'react';
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { TableFilter } from '../../layout/TableFilter';
 import { DayBoundInput } from './data-views-day-input';
 import { NumberBoundInput } from './data-views-number-input';
@@ -89,13 +90,14 @@ export function RangeBounds<T extends Record<string, unknown>>({
   onChange: (range: RangeValue) => void;
   testId: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const inverted = isRangeInverted(value);
   return (
     <Box data-testid={`${testId}-panel`}>
       {/* Above the inputs, not below: the presets are the answer for most
           merchants, and the two date pickers are the escape hatch. */}
       <Box sx={{ '&:not(:empty)': { mb: 1.5 } }}>
-        <RangePresets presets={presetsFor(field)} value={value} onChange={onChange} testId={testId} />
+        <RangePresets presets={presetsFor(field, copy)} value={value} onChange={onChange} testId={testId} />
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <BoundField
@@ -107,7 +109,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
         />
         <BoundField
           field={field}
-          label="Até"
+          label={copy.filters.rangeEnd}
           value={value.max}
           onChange={(max) => onChange({ ...value, max })}
           testId={`${testId}-max`}
@@ -119,7 +121,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
           data-testid={`${testId}-inverted`}
           sx={{ mt: 0.75, fontSize: '0.75rem', color: 'error.main' }}
         >
-          O início precisa ser menor que o fim.
+          {copy.filters.rangeInvalid}
         </Typography>
       )}
       {/* BOTH days are in the result. Saying so is FUT-668's other half: the
@@ -326,6 +328,7 @@ export function PanelRangeField<T extends Record<string, unknown>>({
   onChange: (range: RangeValue) => void;
   testId: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   if (field.kind === "day") {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
@@ -348,7 +351,7 @@ export function PanelRangeField<T extends Record<string, unknown>>({
       {/* Below the numeric control here, unlike the pill's popover: this one
           renders its own label, and chips above it would separate the label
           from the field it names. */}
-      <RangePresets presets={presetsFor(field)} value={value} onChange={onChange} testId={testId} />
+      <RangePresets presets={presetsFor(field, copy)} value={value} onChange={onChange} testId={testId} />
     </Box>
   );
 }

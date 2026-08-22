@@ -1,5 +1,6 @@
 'use client';
 
+import type { CategorySelectCopy } from "../../../../copy";
 import React from 'react';
 
 import { CategorySelect } from '../../CategorySelect';
@@ -8,6 +9,8 @@ import { useFormContext } from '../FormContext';
 
 /** Props for the `total-form` {@link CategoryField}. */
 export interface CategoryFieldProps {
+  /** The picker\'s words. REQUIRED — this package ships no default copy. */
+  copy: CategorySelectCopy;
   /** Field name; also the key into the form's values/errors. */
   name: string;
   /** The categories to choose from, flat, each carrying its `parentId`. */
@@ -36,12 +39,14 @@ export function CategoryField({
   label,
   placeholder,
   allowParentSelection = true,
+  copy,
 }: CategoryFieldProps): React.ReactElement {
   const { values, errors, setFieldValue } = useFormContext();
   const error = errors[name];
 
   return (
     <CategorySelect
+      copy={copy}
       mode="single"
       fullWidth
       label={label}

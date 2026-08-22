@@ -1,3 +1,4 @@
+import type { CepFieldCopy } from "../../../copy";
 /**
  * Types for {@link CepField} — the reusable CEP auto-completer.
  */
@@ -29,6 +30,8 @@ export interface CepAddress {
 export type CepLookupStatus = 'idle' | 'loading' | 'found' | 'notfound';
 
 export interface CepFieldProps {
+  /** The lookup status wording. REQUIRED — no default copy. */
+  copy: CepFieldCopy;
   /** Current field value. Masked (`01310-100`) or bare — the field re-masks. */
   value: string;
   /**
