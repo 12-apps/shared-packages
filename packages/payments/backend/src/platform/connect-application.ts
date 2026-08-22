@@ -93,15 +93,35 @@ export interface ConsultConnectApplicationsDeps {
   /** Override the consult origin per environment. Defaults to PagBank's hosts. */
   apiBaseFor?: (environment: PaymentEnvironment) => string;
   /**
-   * Replaces the default pt-BR "account token missing" reason, so a host can
-   * name its own configuration surface (e.g. the exact env vars to set).
+   * The four sentences this consult can put in front of the platform's own
+   * operator (FUT-760).
+   *
+   * REQUIRED, and that is the change: `missingAccountTokenMessage` used to be
+   * OPTIONAL with a pt-BR default, which is the precise anti-pattern the copy
+   * gate exists to end — a host that says nothing ships another product's
+   * Portuguese and nothing fails. Naming a configuration surface is also the
+   * one thing only the host can do: "informe o campo accountToken" is right
+   * for a deployment that stores credentials in a database and wrong for one
+   * that sets env vars.
    */
-  missingAccountTokenMessage?: string;
+  copy: ConnectApplicationCopy;
 }
 
-const DEFAULT_MISSING_ACCOUNT_TOKEN =
-  'Token da conta PagBank ausente — informe o campo accountToken nas credenciais ' +
-  'da aplicação deste ambiente para consultar a aplicação.';
+/** Every sentence {@link consultConnectApplications} can produce. */
+export interface ConnectApplicationCopy {
+  /**
+   * No account token for this environment, so the consult never left the
+   * process — and the sentence has to say where to put one, which is a fact
+   * about the host's configuration surface, not about PagBank.
+   */
+  missingAccountToken: string;
+  /** PagBank answered, with a status we did not expect and its own body. */
+  consultFailed(status: number, detail: string): string;
+  /** PagBank answered 2xx with something that is not an object. */
+  unexpectedShape: string;
+  /** The consult never reached PagBank at all. */
+  unreachable: string;
+}
 
 /** First string under any of `keys`, or null — the undocumented-schema picker. */
 function pickString(body: Record<string, unknown>, keys: readonly string[]): string | null {
@@ -140,10 +160,11 @@ function parseApplication(body: Record<string, unknown>): RegisteredConnectAppli
 }
 
 /** A non-2xx consult, summarized for the operator without echoing the whole body. */
-async function consultFailure(res: Response): Promise<string> {
+async function consultFailure(res: Response, copy: ConnectApplicationCopy): Promise<string> {
   const body = await res.text().catch(() => '');
-  const detail = body.trim() === '' ? '' : ` — ${body.slice(0, 300)}`;
-  return `O PagBank respondeu ${res.status} ao consultar a aplicação${detail}`;
+  // The body is PagBank's own, truncated but never reworded — it is the part
+  // an operator forwards to support. Only the frame around it is the host's.
+  return copy.consultFailed(res.status, body.trim() === '' ? '' : body.slice(0, 300));
 }
 
 /** An unanswerable environment, in the one shape the report carries. */
@@ -168,15 +189,16 @@ async function fetchApplication(
   apiBase: string,
   clientId: string | null,
   accountToken: string,
+  copy: ConnectApplicationCopy,
 ): Promise<{ application: RegisteredConnectApplication } | { error: string }> {
   const res = await fetch(`${apiBase}/oauth2/application/${encodeURIComponent(clientId ?? '')}`, {
     headers: { Accept: 'application/json', Authorization: `Bearer ${accountToken}` },
     signal: AbortSignal.timeout(CONSULT_TIMEOUT_MS),
   });
-  if (!res.ok) return { error: await consultFailure(res) };
+  if (!res.ok) return { error: await consultFailure(res, copy) };
   const body: unknown = await res.json().catch(() => null);
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-    return { error: 'O PagBank respondeu em um formato inesperado ao consultar a aplicação.' };
+    return { error: copy.unexpectedShape };
   }
   return { application: parseApplication(body as Record<string, unknown>) };
 }
@@ -213,19 +235,14 @@ async function consultEnvironment(
   // sent, so fail with the cause named instead of relaying that riddle.
   const accountToken = credentials.fields.accountToken;
   if (!accountToken) {
-    return unanswered(
-      environment,
-      true,
-      clientId,
-      deps.missingAccountTokenMessage ?? DEFAULT_MISSING_ACCOUNT_TOKEN,
-    );
+    return unanswered(environment, true, clientId, deps.copy.missingAccountToken);
   }
 
   // Still overridable per call for tests and proxies; the default is now the
   // package's single spelling of PagBank's hosts rather than a fourth copy.
   const apiBase = deps.apiBaseFor?.(environment) ?? pagbankApiBase(environment);
   try {
-    const result = await fetchApplication(apiBase, clientId, accountToken);
+    const result = await fetchApplication(apiBase, clientId, accountToken, deps.copy);
     if ('error' in result) return unanswered(environment, true, clientId, result.error);
     return {
       environment,
@@ -236,12 +253,7 @@ async function consultEnvironment(
       error: null,
     };
   } catch {
-    return unanswered(
-      environment,
-      true,
-      clientId,
-      'Não foi possível falar com o PagBank para consultar a aplicação. Tente novamente.',
-    );
+    return unanswered(environment, true, clientId, deps.copy.unreachable);
   }
 }
 

@@ -5,6 +5,7 @@ import {
   type ConsultConnectApplicationsDeps,
 } from '../platform/connect-application';
 import type { PaymentEnvironment, ResolvedCredentials } from '../core/types';
+import { PT_BR_CONNECT_APPLICATION_COPY } from '../platform/pt-BR';
 
 /**
  * The Connect-application consult (FUT-479, packaged by FUT-573). Pinned:
@@ -30,6 +31,9 @@ function depsFor(
     appCredentials: (_provider, env): ResolvedCredentials | null =>
       environment === 'both' || env === environment ? { environment: env, fields } : null,
     expectedRedirectUri: EXPECTED,
+    // The pack a host passes. Every assertion below reads the sentences it
+    // produces, so wording that changed by accident still fails.
+    copy: PT_BR_CONNECT_APPLICATION_COPY,
     ...over,
   };
 }
@@ -58,6 +62,7 @@ describe('consultConnectApplications', () => {
     const report = await consultConnectApplications({
       appCredentials: () => null,
       expectedRedirectUri: EXPECTED,
+      copy: PT_BR_CONNECT_APPLICATION_COPY,
     });
 
     expect(report.expectedRedirectUri).toBe(EXPECTED);
@@ -158,7 +163,12 @@ describe('consultConnectApplications', () => {
       depsFor(
         'SANDBOX',
         { clientId: 'app-123' },
-        { missingAccountTokenMessage: 'Configure HOST_VAR para consultar.' },
+        {
+          copy: {
+            ...PT_BR_CONNECT_APPLICATION_COPY,
+            missingAccountToken: 'Configure HOST_VAR para consultar.',
+          },
+        },
       ),
     );
 

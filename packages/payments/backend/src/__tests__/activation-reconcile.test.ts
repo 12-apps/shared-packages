@@ -13,6 +13,7 @@ import type { MerchantRef } from '../core/types';
 import { infinitePayProvider } from '../providers/infinitepay';
 import { pagbankProvider } from '../providers/pagbank';
 import { activationAdapter, connectedConfig } from './activation-fixtures';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY } from '../providers/pt-BR';
 
 /**
  * The machine that stamps a paid activation nothing else will (FUT-463).
@@ -66,8 +67,8 @@ const linkPayProvider = (): ReturnType<typeof activationAdapter> =>
 
 // Real adapters, so the gating reads their own declarations.
 const providers = defineProviders({
-  pagbank: pagbankProvider(),
-  infinitepay: infinitePayProvider(),
+  pagbank: pagbankProvider(PT_BR_PAGBANK_COPY),
+  infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
   linkpay: linkPayProvider(),
   cardpay: activationAdapter('cardpay', {
     findChargeByReference: cure.findChargeByReference as never,

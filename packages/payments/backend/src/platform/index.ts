@@ -4,14 +4,17 @@
  * at the repo's 400-line size gate; this is the same explicit list it would
  * otherwise carry.
  */
+export { PT_BR_CONNECT_APPLICATION_COPY, PT_BR_HOMOLOGACAO_ANSWERS } from './pt-BR';
 export {
   consultConnectApplications,
+  type ConnectApplicationCopy,
   type ConnectApplicationReport,
   type ConnectApplicationStatus,
   type ConsultConnectApplicationsDeps,
   type RegisteredConnectApplication,
 } from './connect-application';
 export {
+  ACCESS_INSTRUCTIONS_MAX,
   platformHomologacaoGuide,
   type HomologacaoGuide,
   type PlatformHomologacaoGuideFacts,

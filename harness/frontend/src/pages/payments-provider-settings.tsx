@@ -30,13 +30,14 @@ import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
 import { adminCase, RawRequestButton } from '../payments/admin-cases';
 import type { AdminStoreSpec, AdminWorld } from '../payments/admin-store';
 import { CaseTabs, PageIntro, type HarnessCase } from '../payments/panel';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
 
 /** The published catalog, composed the way a host composes it. */
 const registry = defineProviders({
-  pagbank: pagbankProvider(),
-  stone: stoneProvider(),
-  infinitepay: infinitePayProvider(),
-  stripe: stripeProvider(),
+  pagbank: pagbankProvider(PT_BR_PAGBANK_COPY),
+  stone: stoneProvider(PT_BR_STONE_COPY),
+  infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
+  stripe: stripeProvider(PT_BR_STRIPE_COPY),
 });
 
 /**

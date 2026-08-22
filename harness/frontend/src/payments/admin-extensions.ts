@@ -33,6 +33,7 @@ import {
 
 import type { AdminCaller } from './admin-ports';
 import type { AdminSinks, AdminStoreSpec } from './admin-store';
+import { PT_BR_ACTIVATION_COPY } from '@12-apps/payments-backend';
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -133,6 +134,10 @@ export function activationVerifyFor(
         const input = (await request.json()) as VerifyChargeInput;
         const ctx: ActivationContext = {
           providers: ports.registry,
+          // The words this host renders. Named, not inherited: the package
+          // ships no default, so this line is where the flow's Portuguese is
+          // chosen — and the journeys read the sentences it produces.
+          copy: PT_BR_ACTIVATION_COPY,
           config: ports.store,
           settings: ports.settings,
           // The deployment's own yes: this store is a stub world by design.

@@ -4,6 +4,8 @@
  * reason `platform/index.ts` exists. Paths are relative to this folder.
  */
 export type { ActivationContext } from './context';
+export type { ActivationCopy } from './copy';
+export { PT_BR_ACTIVATION_COPY } from './pt-BR';
 export {
   ownsVerificationReference,
   parseVerificationReference,
@@ -13,7 +15,6 @@ export {
 } from './reference';
 export {
   failureFor,
-  unreachableReason,
   type PollFlags,
   type PollOutcome,
   type VerificationFailure,

@@ -1,4 +1,5 @@
 import type { ProviderSetupGuide, SetupGuideContext, SetupProgress } from '../core/types';
+import type { StoneSetupGuideCopy } from './setup-guide-copy';
 
 /**
  * Stone's onboarding walkthrough.
@@ -29,28 +30,30 @@ import type { ProviderSetupGuide, SetupGuideContext, SetupProgress } from '../co
  * registering a URL in someone else's dashboard is precisely the kind of fact
  * no API here can report.
  */
-export function stoneSetupGuide(ctx: SetupGuideContext): ProviderSetupGuide {
+export function stoneSetupGuide(
+  copy: StoneSetupGuideCopy,
+  ctx: SetupGuideContext,
+): ProviderSetupGuide {
   const guide: ProviderSetupGuide = {
     stages: [
-      { id: 'keys', label: 'Gerar chaves' },
-      { id: 'webhook', label: 'Cadastrar webhook' },
-      { id: 'activate', label: 'Ativar vendas' },
+      { id: 'keys', label: copy.stages.keys },
+      { id: 'webhook', label: copy.stages.webhook },
+      { id: 'activate', label: copy.stages.activate },
     ],
     sections: [
       {
         id: 'keys',
-        title: 'Gerar suas chaves de API',
-        intro:
-          'A Stone processa pagamentos online pela plataforma Pagar.me (tecnologia da própria Stone) — por isso as chaves são geradas no painel do Pagar.me, com a mesma conta Stone.',
+        title: copy.keys.title,
+        intro: copy.keys.intro,
         steps: [
           {
-            text: 'Abra o painel e vá em “Configurações › Chaves”. Copie a chave pública (pk_...) e gere a chave secreta (sk_...).',
-            button: { label: 'Abrir o painel', url: 'https://dash.pagar.me' },
+            text: copy.keys.generate,
+            button: { label: copy.keys.dashboardButton, url: 'https://dash.pagar.me' },
           },
           {
-            text: 'Cole as duas chaves no formulário acima. Use as chaves de teste enquanto estiver no ambiente Sandbox e as de produção só depois de validar.',
+            text: copy.keys.paste,
             link: {
-              label: 'Documentação de autenticação',
+              label: copy.keys.authDocsLink,
               url: 'https://docs.pagar.me/reference/autentica%C3%A7%C3%A3o-2',
             },
           },
@@ -58,30 +61,29 @@ export function stoneSetupGuide(ctx: SetupGuideContext): ProviderSetupGuide {
       },
       {
         id: 'webhook',
-        title: 'Cadastrar a URL de notificação',
-        intro:
-          'Sem webhook, um PIX pago só é detectado quando a tela consulta o status — o pedido pode demorar a confirmar.',
+        title: copy.webhook.title,
+        intro: copy.webhook.intro,
         steps: [
           {
-            text: 'No painel, abra “Configurações › Webhooks” e cadastre a URL desta loja:',
-            copy: { label: 'URL de notificação', text: ctx.webhookUrl },
+            text: copy.webhook.register,
+            copy: { label: copy.webhookUrlLabel, text: ctx.webhookUrl },
           },
           {
-            text: `Ao cadastrar, o painel pede um usuário e uma senha para autenticar as notificações. Defina os dois e informe exatamente os mesmos valores no formulário acima — é assim que ${ctx.brandName} confirma que a notificação veio mesmo da Stone.`,
+            text: copy.webhook.credentials(ctx.brandName),
           },
           {
-            text: 'Assine ao menos os eventos de cobrança: charge.paid, charge.payment_failed e charge.refunded.',
+            text: copy.webhook.events,
           },
           {
             // Re-homed from the `activate` section this guide used to ship. The
             // stage it belonged to has to stay empty for the activation card,
             // and the sentence is about finishing THIS step anyway.
-            text: 'Feito isso, clique em “Testar conexão” acima: o teste faz uma chamada autenticada real e avisa se a chave estiver errada.',
+            text: copy.webhook.testConnection,
           },
           { action: 'checkout-integrado-confirmado' },
         ],
-        doneSummary: { label: 'Webhook', value: 'Cadastrado no painel Pagar.me' },
-        confirmLabel: 'Já cadastrei a URL no painel',
+        doneSummary: { label: copy.webhook.doneLabel, value: copy.webhook.doneValue },
+        confirmLabel: copy.webhook.confirmLabel,
       },
     ],
   };

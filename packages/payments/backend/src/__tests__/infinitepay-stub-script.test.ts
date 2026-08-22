@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { infinitePayProvider, STUB_OUTCOME_FIELD } from '../providers/infinitepay';
+import { PT_BR_INFINITEPAY_COPY } from '../providers/pt-BR';
 
 /**
  * What the SCRIPT is allowed to answer — FUT-684's third scenario.
@@ -27,7 +28,7 @@ describe('infinitepay stub script — payment_check', () => {
   });
 
   const ask = (reference: string, outcome = 'paid') =>
-    infinitePayProvider().findChargeByReference?.(reference, scripted(outcome), {});
+    infinitePayProvider(PT_BR_INFINITEPAY_COPY).findChargeByReference?.(reference, scripted(outcome), {});
 
   it('answers not-paid when asked about a reference that names no attempt', async () => {
     // The bare base. Both mint paths append an attempt id, so no charge was

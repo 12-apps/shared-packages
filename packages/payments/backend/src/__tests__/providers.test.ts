@@ -21,6 +21,7 @@ import { sha256Hex } from '../providers/shared';
 import { stoneProvider } from '../providers/stone';
 import { stripeProvider } from '../providers/stripe';
 import { STUB_CREDS, TENANT, cardInput, pixInput } from './fixtures';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '../providers/pt-BR';
 /**
  * The platform name every guide in this suite renders under.
  *
@@ -50,7 +51,7 @@ function stripeSigned(body: string, timestamp: string, key: string): WebhookDeli
 
 describe('provider skeletons (stub mode)', () => {
   it('stone creates normalized PIX charges', async () => {
-    const snapshot = await stoneProvider().createCharge(pixInput(), STUB_CREDS);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).createCharge(pixInput(), STUB_CREDS);
     expect(snapshot).toMatchObject({
       provider: 'stone',
       status: 'PENDING',
@@ -61,14 +62,14 @@ describe('provider skeletons (stub mode)', () => {
   });
 
   it('infinitepay charges carry a hosted checkout URL (redirect flow)', async () => {
-    const adapter = infinitePayProvider();
+    const adapter = infinitePayProvider(PT_BR_INFINITEPAY_COPY);
     const snapshot = await adapter.createCharge(pixInput(), STUB_CREDS);
     expect(adapter.capabilities.tokenization).toBe('REDIRECT');
     expect(snapshot.hostedCheckoutUrl).toContain('stub_infinitepay_order-1');
   });
 
   it('stripe exposes the publishable key via clientConfig, never the secret', () => {
-    const config = stripeProvider().clientConfig({
+    const config = stripeProvider(PT_BR_STRIPE_COPY).clientConfig({
       environment: 'SANDBOX',
       fields: { secretKey: 'sk_test_x', publishableKey: 'pk_test_x' },
     });
@@ -76,13 +77,13 @@ describe('provider skeletons (stub mode)', () => {
   });
 
   it('stub credentials verify ok everywhere', async () => {
-    for (const adapter of [stoneProvider(), infinitePayProvider(), stripeProvider()]) {
+    for (const adapter of [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY), stripeProvider(PT_BR_STRIPE_COPY)]) {
       await expect(adapter.verifyCredentials(STUB_CREDS)).resolves.toMatchObject({ ok: true });
     }
   });
 
   it('stub deliveries with no secret verify OK; live ones fail closed (all adapters)', async () => {
-    for (const adapter of [stoneProvider(), infinitePayProvider(), stripeProvider()]) {
+    for (const adapter of [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY), stripeProvider(PT_BR_STRIPE_COPY)]) {
       const delivery = { provider: adapter.name, rawBody: '{}', headers: {} };
       await expect(adapter.webhook.verify(delivery, STUB_CREDS)).resolves.toBe(true);
       await expect(
@@ -92,7 +93,7 @@ describe('provider skeletons (stub mode)', () => {
   });
 
   it('pagbank runs in stub mode with the proven credential schema', async () => {
-    const adapter = pagbankProvider();
+    const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
     // The proven trio, plus the Google Pay merchant id (FUT-471) — optional,
     // non-secret, and only read by `clientConfig`.
     expect(adapter.credentialSchema.map((f) => f.key)).toEqual([
@@ -114,8 +115,8 @@ describe('provider skeletons (stub mode)', () => {
    */
   it('every provider with a setup guide names the merchant webhook URL', () => {
     const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x', publicKeyUrl: 'https://host.example/pk' };
-    expect(pagbankProvider().setupGuide).toBeUndefined();
-    for (const adapter of [stoneProvider(), infinitePayProvider(), stripeProvider()]) {
+    expect(pagbankProvider(PT_BR_PAGBANK_COPY).setupGuide).toBeUndefined();
+    for (const adapter of [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY), stripeProvider(PT_BR_STRIPE_COPY)]) {
       const guide = adapter.setupGuide?.(ctx);
       // Stage ids are each vendor's own now that the guides are real
       // walkthroughs rather than one generic template — what every guide must
@@ -143,7 +144,7 @@ describe('provider skeletons (stub mode)', () => {
    */
   it('renders the HOST platform brand, and no adopter of this package', () => {
     const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/w' };
-    const branded = [stoneProvider(), infinitePayProvider()];
+    const branded = [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY)];
     for (const adapter of branded) {
       const text = JSON.stringify(adapter.setupGuide?.(ctx));
       expect(text).toContain(HOST_BRAND);
@@ -166,7 +167,7 @@ describe('provider skeletons (stub mode)', () => {
    */
   it('infinitepay tells the owner to enable Checkout, not to register a webhook', () => {
     const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x' };
-    const guide = infinitePayProvider().setupGuide?.(ctx);
+    const guide = infinitePayProvider(PT_BR_INFINITEPAY_COPY).setupGuide?.(ctx);
     const text = JSON.stringify(guide);
 
     expect(guide?.stages.map((s) => s.id)).toContain('enable');
@@ -191,7 +192,7 @@ describe('provider skeletons (stub mode)', () => {
       configured: Record<string, boolean>;
       connected: boolean;
       proven: boolean;
-    }) => infinitePayProvider().setupGuide?.({ brandName: HOST_BRAND, webhookUrl: 'https://host.example/w', progress });
+    }) => infinitePayProvider(PT_BR_INFINITEPAY_COPY).setupGuide?.({ brandName: HOST_BRAND, webhookUrl: 'https://host.example/w', progress });
 
     const nothing = guide({ configured: {}, connected: false, proven: false });
     expect(nothing?.sections.map((s) => s.id)).toEqual(['handle', 'enable']);
@@ -242,7 +243,7 @@ describe('provider skeletons (stub mode)', () => {
    */
   it('no guide ships an unpaired section, nor a section on its last stage', () => {
     const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x' };
-    for (const adapter of [stoneProvider(), infinitePayProvider(), stripeProvider()]) {
+    for (const adapter of [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY), stripeProvider(PT_BR_STRIPE_COPY)]) {
       const guide = adapter.setupGuide?.(ctx);
       const stageIds = guide?.stages.map((s) => s.id) ?? [];
       const sectionIds = guide?.sections.map((s) => s.id) ?? [];
@@ -281,7 +282,7 @@ describe('provider skeletons (stub mode)', () => {
 
     // Derived, not counted: a mutable tally inside the loop is shared state the
     // flakiness gate refuses, and the pair is what each assertion needs anyway.
-    const pairs = [stoneProvider(), infinitePayProvider(), stripeProvider()]
+    const pairs = [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY), stripeProvider(PT_BR_STRIPE_COPY)]
       .map((adapter) => adapter.setupGuide?.(ctx))
       .filter((guide) => guide?.credentialsPath !== undefined)
       .map((guide) => ({ guide: guide!, variant: guide!.credentialsPath! }));
@@ -320,7 +321,7 @@ describe('provider skeletons (stub mode)', () => {
     const at = (adapter: PaymentProviderAdapter, progress: SetupProgress) =>
       adapter.setupGuide?.({ brandName: HOST_BRAND, webhookUrl: 'https://host.example/w', progress });
 
-    for (const adapter of [stoneProvider(), infinitePayProvider(), stripeProvider()]) {
+    for (const adapter of [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY), stripeProvider(PT_BR_STRIPE_COPY)]) {
       // Only a provider that CAN prove itself by charging is held to this: the
       // empty stage is reserved for the activation card.
       expect(adapter.capabilities.activationCharge).toBe(true);
@@ -350,14 +351,14 @@ describe('provider skeletons (stub mode)', () => {
         section.steps.some((step) => step.action === 'checkout-integrado-confirmado'),
       );
 
-    for (const adapter of [stoneProvider(), stripeProvider()]) {
+    for (const adapter of [stoneProvider(PT_BR_STONE_COPY), stripeProvider(PT_BR_STRIPE_COPY)]) {
       const label = asking(adapter)?.confirmLabel;
       expect(label).toBeTruthy();
       expect(label).not.toContain('Checkout Integrado');
     }
     // InfinitePay authors none, so the renderer's fallback leaves its guide
     // exactly as it shipped — the one screen that constant was written for.
-    expect(asking(infinitePayProvider())?.confirmLabel).toBeUndefined();
+    expect(asking(infinitePayProvider(PT_BR_INFINITEPAY_COPY))?.confirmLabel).toBeUndefined();
   });
 
   /**
@@ -369,7 +370,7 @@ describe('provider skeletons (stub mode)', () => {
    */
   it('stripe asks for one visit to the dashboard, carrying the notification URL', () => {
     const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x' };
-    const guide = stripeProvider().setupGuide?.(ctx);
+    const guide = stripeProvider(PT_BR_STRIPE_COPY).setupGuide?.(ctx);
 
     expect(guide?.stages.map((s) => s.id)).toEqual(['connect', 'dashboard', 'activate']);
     expect(guide?.sections.map((s) => s.id)).toEqual(['connect', 'dashboard']);
@@ -390,12 +391,12 @@ describe('provider skeletons (stub mode)', () => {
    * so either mode satisfies the schema.
    */
   it('stripe points a store at the manual-credentials path too', () => {
-    const guide = stripeProvider().setupGuide?.({ brandName: HOST_BRAND, webhookUrl: 'https://host.example/w' });
+    const guide = stripeProvider(PT_BR_STRIPE_COPY).setupGuide?.({ brandName: HOST_BRAND, webhookUrl: 'https://host.example/w' });
 
     expect(guide?.sections.find((s) => s.id === 'connect')?.intro).toContain(
       'credenciais manualmente',
     );
-    expect(stripeProvider().credentialSchema.every((field) => !field.required)).toBe(true);
+    expect(stripeProvider(PT_BR_STRIPE_COPY).credentialSchema.every((field) => !field.required)).toBe(true);
   });
 
   it('declares an auth mode per provider: OAuth where the vendor supports it', () => {
@@ -403,17 +404,17 @@ describe('provider skeletons (stub mode)', () => {
     // flows. Stone (key-only across every one of its APIs) and InfinitePay
     // (handle-only, no API key at all) have none — claiming otherwise would
     // render a connect button that cannot work.
-    expect(pagbankProvider().authMode).toBe('oauth');
-    expect(stripeProvider().authMode).toBe('oauth');
-    expect(stoneProvider().authMode).toBe('credentials');
-    expect(infinitePayProvider().authMode).toBe('credentials');
-    for (const adapter of [pagbankProvider(), stripeProvider()]) {
+    expect(pagbankProvider(PT_BR_PAGBANK_COPY).authMode).toBe('oauth');
+    expect(stripeProvider(PT_BR_STRIPE_COPY).authMode).toBe('oauth');
+    expect(stoneProvider(PT_BR_STONE_COPY).authMode).toBe('credentials');
+    expect(infinitePayProvider(PT_BR_INFINITEPAY_COPY).authMode).toBe('credentials');
+    for (const adapter of [pagbankProvider(PT_BR_PAGBANK_COPY), stripeProvider(PT_BR_STRIPE_COPY)]) {
       expect(adapter.oauth).toBeDefined();
     }
   });
 
   it('card stub declines on the magic -declined token suffix', async () => {
-    const snapshot = await stoneProvider().createCharge(
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).createCharge(
       cardInput('order-9', 'tok-declined'),
       STUB_CREDS,
     );
@@ -432,7 +433,7 @@ describe('stripe webhook signature verification', () => {
   }
 
   it('accepts a correctly signed delivery', async () => {
-    const verified = await stripeProvider().webhook.verify(
+    const verified = await stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(
       {
         provider: 'stripe',
         rawBody,
@@ -444,7 +445,7 @@ describe('stripe webhook signature verification', () => {
   });
 
   it('rejects a tampered body, a wrong key, and a missing header', async () => {
-    const adapter = stripeProvider();
+    const adapter = stripeProvider(PT_BR_STRIPE_COPY);
     await expect(
       adapter.webhook.verify(
         {
@@ -482,7 +483,7 @@ describe('stripe webhook signature verification', () => {
           `,v1=${stripeMac(rawBody, '1700000000', secret)}`,
       },
     };
-    await expect(stripeProvider().webhook.verify(rolled, creds)).resolves.toBe(true);
+    await expect(stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(rolled, creds)).resolves.toBe(true);
   });
 
   it('given a rotated platform secret, when the stored copy is stale and platformWebhookSecret is stamped current, then the delivery verifies', async () => {
@@ -491,12 +492,12 @@ describe('stripe webhook signature verification', () => {
       fields: { webhookSecret: 'whsec_stale_connect_copy', platformWebhookSecret: secret },
     };
     await expect(
-      stripeProvider().webhook.verify(stripeSigned(rawBody, '1700000000', secret), stamped),
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(stripeSigned(rawBody, '1700000000', secret), stamped),
     ).resolves.toBe(true);
     // And a delivery still signed by the merchant's own copy keeps verifying
     // beside the stamp — both secrets authenticate through the roll.
     await expect(
-      stripeProvider().webhook.verify(
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(
         stripeSigned(rawBody, '1700000000', 'whsec_stale_connect_copy'),
         stamped,
       ),
@@ -513,7 +514,7 @@ describe('stripe webhook signature verification', () => {
       fields: { webhookSecret: secret, stripeUserId: 'acct_B' },
     };
     await expect(
-      stripeProvider().webhook.verify(stripeSigned(storeA, '1700000000', secret), storeB),
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(stripeSigned(storeA, '1700000000', secret), storeB),
     ).resolves.toBe(false);
   });
 
@@ -532,13 +533,13 @@ describe('stripe webhook signature verification', () => {
       fields: { webhookSecret: secret, connectedAccountId: 'acct_B' },
     };
     await expect(
-      stripeProvider().webhook.verify(stripeSigned(otherAccount, '1700000000', secret), pastedKeys),
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(stripeSigned(otherAccount, '1700000000', secret), pastedKeys),
     ).resolves.toBe(false);
 
     // Its own account still arrives home.
     const own = JSON.stringify({ id: 'evt_1', account: 'acct_B', type: 'other' });
     await expect(
-      stripeProvider().webhook.verify(stripeSigned(own, '1700000000', secret), pastedKeys),
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(stripeSigned(own, '1700000000', secret), pastedKeys),
     ).resolves.toBe(true);
   });
 
@@ -550,28 +551,28 @@ describe('stripe webhook signature verification', () => {
       fields: { webhookSecret: secret, stripeUserId: 'acct_B' },
     };
     await expect(
-      stripeProvider().webhook.verify(stripeSigned(rawBody, '1700000000', secret), storeB),
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(stripeSigned(rawBody, '1700000000', secret), storeB),
     ).resolves.toBe(true);
     // And a delivery naming the credentialed account itself is at home.
     const own = JSON.stringify({ id: 'evt_1', account: 'acct_B', type: 'other' });
     await expect(
-      stripeProvider().webhook.verify(stripeSigned(own, '1700000000', secret), storeB),
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(stripeSigned(own, '1700000000', secret), storeB),
     ).resolves.toBe(true);
   });
 
   it('given SANDBOX credentials, when a signed delivery claims livemode, then the contradiction is refused', async () => {
     const liveBody = JSON.stringify({ id: 'evt_1', livemode: true, type: 'other' });
     await expect(
-      stripeProvider().webhook.verify(stripeSigned(liveBody, '1700000000', secret), creds),
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(stripeSigned(liveBody, '1700000000', secret), creds),
     ).resolves.toBe(false);
     // The agreeing environment verifies, and a body naming no livemode at
     // all is never held to one.
     const production = { environment: 'PRODUCTION' as const, fields: { webhookSecret: secret } };
     await expect(
-      stripeProvider().webhook.verify(stripeSigned(liveBody, '1700000000', secret), production),
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(stripeSigned(liveBody, '1700000000', secret), production),
     ).resolves.toBe(true);
     await expect(
-      stripeProvider().webhook.verify(stripeSigned(rawBody, '1700000000', secret), production),
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(stripeSigned(rawBody, '1700000000', secret), production),
     ).resolves.toBe(true);
   });
 
@@ -579,7 +580,7 @@ describe('stripe webhook signature verification', () => {
     // '' would collide on the inbox's unique index: the second anonymous
     // delivery reads as a duplicate of the first and is silently swallowed.
     const anonymous = JSON.stringify({ type: 'some.event' });
-    const [event] = await stripeProvider().webhook.parse(
+    const [event] = await stripeProvider(PT_BR_STRIPE_COPY).webhook.parse(
       { provider: 'stripe', rawBody: anonymous, headers: {} },
       creds,
     );
@@ -593,7 +594,7 @@ describe('stripe webhook signature verification', () => {
     // `PaymentsError` becomes the 400 every provider redelivers on, where a
     // bare `SyntaxError` escaped as a 500 about our server.
     const res = await guardedWebhook(async () => {
-      await stripeProvider().webhook.parse(malformed, creds);
+      await stripeProvider(PT_BR_STRIPE_COPY).webhook.parse(malformed, creds);
       return json({ processed: 0 });
     });
     expect(res.status).toBe(400);
@@ -610,7 +611,7 @@ describe('stripe intake freshness (FUT-690)', () => {
 
   it('given a delivery inside the five-minute window, when intake checks freshness, then it passes', () => {
     const delivery = stripeSigned(rawBody, '1700000000', secret);
-    expect(stripeProvider().webhook.intakeFreshness?.(delivery, SIGNED_AT_MS + 4 * MINUTE_MS)).toEqual(
+    expect(stripeProvider(PT_BR_STRIPE_COPY).webhook.intakeFreshness?.(delivery, SIGNED_AT_MS + 4 * MINUTE_MS)).toEqual(
       { fresh: true },
     );
   });
@@ -618,13 +619,13 @@ describe('stripe intake freshness (FUT-690)', () => {
   it('given a delivery signed longer than five minutes ago, when intake checks freshness, then it is refused with a reason', () => {
     const delivery = stripeSigned(rawBody, '1700000000', secret);
     expect(
-      stripeProvider().webhook.intakeFreshness?.(delivery, SIGNED_AT_MS + 6 * MINUTE_MS),
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.intakeFreshness?.(delivery, SIGNED_AT_MS + 6 * MINUTE_MS),
     ).toMatchObject({ fresh: false, reason: expect.stringContaining('tolerance') });
   });
 
   it('given no signature header at all (a stub delivery), then freshness passes and verify still decides', () => {
     const bare = { provider: 'stripe' as const, rawBody, headers: {} };
-    expect(stripeProvider().webhook.intakeFreshness?.(bare, SIGNED_AT_MS)).toEqual({ fresh: true });
+    expect(stripeProvider(PT_BR_STRIPE_COPY).webhook.intakeFreshness?.(bare, SIGNED_AT_MS)).toEqual({ fresh: true });
   });
 });
 
@@ -643,7 +644,7 @@ describe('stripe stale deliveries: refused at intake, replayable from the inbox'
     const credentials = createMemoryCredentialStore();
     const webhooks = createMemoryWebhookInbox();
     const gateway = createPaymentsGateway({
-      providers: defineProviders({ stripe: stripeProvider() } as const),
+      providers: defineProviders({ stripe: stripeProvider(PT_BR_STRIPE_COPY) } as const),
       credentials,
       charges: createMemoryChargeStore(),
       webhooks,

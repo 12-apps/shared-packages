@@ -7,6 +7,7 @@ import { pagbankProvider } from '../providers/pagbank';
 import { stoneProvider } from '../providers/stone';
 import { stripeProvider } from '../providers/stripe';
 import { cardInput, pixInput } from './fixtures';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '../providers/pt-BR';
 
 /**
  * Live-mode adapter tests: the request each provider actually builds and the
@@ -86,7 +87,7 @@ describe('stripe live mode', () => {
       },
     ]);
 
-    const snapshot = await stripeProvider().createCharge(pixInput(), creds);
+    const snapshot = await stripeProvider(PT_BR_STRIPE_COPY).createCharge(pixInput(), creds);
 
     const body = formOf(calls[0]!.init);
     expect(calls[0]!.url).toBe('https://api.stripe.com/v1/payment_intents');
@@ -102,7 +103,7 @@ describe('stripe live mode', () => {
 
   it('authenticates as the OAuth access token, with no Stripe-Account header', async () => {
     const calls = stubFetch([{ body: { id: 'pi_2', status: 'succeeded' } }]);
-    await stripeProvider().createCharge(cardInput(), creds);
+    await stripeProvider(PT_BR_STRIPE_COPY).createCharge(cardInput(), creds);
     const headers = calls[0]!.init.headers as Record<string, string>;
     expect(headers['Authorization']).toBe('Bearer sk_acct_1');
     expect(headers['Stripe-Account']).toBeUndefined();
@@ -110,7 +111,7 @@ describe('stripe live mode', () => {
 
   it('sends Stripe-Account when a platform key charges a connected account', async () => {
     const calls = stubFetch([{ body: { id: 'pi_3', status: 'succeeded' } }]);
-    await stripeProvider().createCharge(cardInput(), {
+    await stripeProvider(PT_BR_STRIPE_COPY).createCharge(cardInput(), {
       environment: 'PRODUCTION',
       fields: { secretKey: 'sk_platform', connectedAccountId: 'acct_9' },
     });
@@ -121,7 +122,7 @@ describe('stripe live mode', () => {
 
   it('forwards the idempotency key so a retried create cannot double-charge', async () => {
     const calls = stubFetch([{ body: { id: 'pi_4', status: 'succeeded' } }]);
-    await stripeProvider().createCharge({ ...cardInput(), idempotencyKey: 'order-2:1' }, creds);
+    await stripeProvider(PT_BR_STRIPE_COPY).createCharge({ ...cardInput(), idempotencyKey: 'order-2:1' }, creds);
     const headers = calls[0]!.init.headers as Record<string, string>;
     expect(headers['Idempotency-Key']).toBe('order-2:1');
   });
@@ -140,7 +141,7 @@ describe('stripe live mode', () => {
       },
     ]);
 
-    const snapshot = await stripeProvider().createCharge(cardInput(), creds);
+    const snapshot = await stripeProvider(PT_BR_STRIPE_COPY).createCharge(cardInput(), creds);
     expect(snapshot.status).toBe('DECLINED');
     expect(snapshot.declineReason).toBe('INSUFFICIENT_FUNDS');
     expect(snapshot.providerChargeId).toBe('pi_5');
@@ -156,7 +157,7 @@ describe('stripe live mode', () => {
   it('names the customer and flags off-session for a vaulted card', async () => {
     const calls = stubFetch([{ body: { id: 'pi_off', status: 'succeeded' } }]);
 
-    await stripeProvider().createCharge(
+    await stripeProvider(PT_BR_STRIPE_COPY).createCharge(
       {
         ...cardInput('sub-cycle-1'),
         card: {
@@ -181,7 +182,7 @@ describe('stripe live mode', () => {
     // agreement; claiming one would misdeclare the transaction to the issuer.
     const calls = stubFetch([{ body: { id: 'pi_on', status: 'succeeded' } }]);
 
-    await stripeProvider().createCharge(cardInput(), creds);
+    await stripeProvider(PT_BR_STRIPE_COPY).createCharge(cardInput(), creds);
 
     const body = formOf(calls[0]!.init);
     expect(body['customer']).toBeUndefined();
@@ -199,7 +200,7 @@ describe('stripe live mode', () => {
   it('confirms a card with the merchant return_url so 3DS can redirect', async () => {
     const calls = stubFetch([{ body: { id: 'pi_3ds', status: 'succeeded' } }]);
 
-    await stripeProvider().createCharge(cardInput(), {
+    await stripeProvider(PT_BR_STRIPE_COPY).createCharge(cardInput(), {
       ...creds,
       fields: { ...creds.fields, redirectUrl: 'https://host/acme/menu/checkout' },
     });
@@ -211,7 +212,7 @@ describe('stripe live mode', () => {
   it('omits return_url for an off-session charge — nobody is there to redirect', async () => {
     const calls = stubFetch([{ body: { id: 'pi_off2', status: 'succeeded' } }]);
 
-    await stripeProvider().createCharge(
+    await stripeProvider(PT_BR_STRIPE_COPY).createCharge(
       {
         ...cardInput('sub-cycle-2'),
         card: { savedCardToken: 'pm_saved', customerRef: 'cus_1', merchantInitiated: true },
@@ -240,7 +241,7 @@ describe('stripe live mode', () => {
       },
     ]);
 
-    const snapshot = await stripeProvider().createCharge(cardInput(), creds);
+    const snapshot = await stripeProvider(PT_BR_STRIPE_COPY).createCharge(cardInput(), creds);
 
     expect(snapshot).toMatchObject({ status: 'PENDING', method: 'CARD' });
     expect(snapshot.hostedCheckoutUrl).toBe('https://hooks.stripe.com/3ds/x');
@@ -255,7 +256,7 @@ describe('stripe live mode', () => {
   it('reuses the tenant customer and opens an off-session SetupIntent', async () => {
     const calls = stubFetch([{ body: { id: 'seti_1', client_secret: 'seti_1_secret' } }]);
 
-    const session = await stripeProvider().vault!.begin(
+    const session = await stripeProvider(PT_BR_STRIPE_COPY).vault!.begin(
       {
         reference: 'sub-1',
         customer: { name: 'Bar do Ze', email: 'dono@bar.com' },
@@ -289,7 +290,7 @@ describe('stripe live mode', () => {
       { body: { id: 'seti_2', client_secret: 'sec' } },
     ]);
 
-    const session = await stripeProvider().vault!.begin(
+    const session = await stripeProvider(PT_BR_STRIPE_COPY).vault!.begin(
       { reference: 'sub-2', customer: { name: 'Loja', email: 'l@x.com' } },
       creds,
     );
@@ -316,7 +317,7 @@ describe('stripe live mode', () => {
       },
     ]);
 
-    const vaulted = await stripeProvider().vault!.complete(
+    const vaulted = await stripeProvider(PT_BR_STRIPE_COPY).vault!.complete(
       { sessionId: 'seti_3', reference: 'sub-1', customerRef: 'cus_1' },
       creds,
     );
@@ -352,7 +353,7 @@ describe('stripe live mode', () => {
     ]);
 
     await expect(
-      stripeProvider().vault!.complete({ sessionId: 'seti_4', reference: 'sub-mine' }, creds),
+      stripeProvider(PT_BR_STRIPE_COPY).vault!.complete({ sessionId: 'seti_4', reference: 'sub-mine' }, creds),
     ).rejects.toThrow(/does not belong/i);
   });
 
@@ -373,7 +374,7 @@ describe('stripe live mode', () => {
     ]);
 
     await expect(
-      stripeProvider().vault!.complete({ sessionId: 'seti_6', reference: 'sub-mine' }, creds),
+      stripeProvider(PT_BR_STRIPE_COPY).vault!.complete({ sessionId: 'seti_6', reference: 'sub-mine' }, creds),
     ).rejects.toThrow(/does not belong/i);
   });
 
@@ -384,7 +385,7 @@ describe('stripe live mode', () => {
     // with it.
     const calls = stubFetch([{ body: { id: 'pm_9' } }]);
 
-    await stripeProvider().vault!.forget!({ instrumentId: 'pm_9' }, creds);
+    await stripeProvider(PT_BR_STRIPE_COPY).vault!.forget!({ instrumentId: 'pm_9' }, creds);
 
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toBe('https://api.stripe.com/v1/payment_methods/pm_9/detach');
@@ -397,7 +398,7 @@ describe('stripe live mode', () => {
     // deployment running on stubs must still be able to remove a card.
     const calls = stubFetch([{ body: {} }]);
 
-    await stripeProvider().vault!.forget!(
+    await stripeProvider(PT_BR_STRIPE_COPY).vault!.forget!(
       { instrumentId: 'pm_stub' },
       { ...creds, stub: true },
     );
@@ -412,7 +413,7 @@ describe('stripe live mode', () => {
     // message to reach that conclusion.
     stubFetch([{ status: 404, body: { error: { code: 'resource_missing' } } }]);
 
-    const error = await stripeProvider()
+    const error = await stripeProvider(PT_BR_STRIPE_COPY)
       .vault!.forget!({ instrumentId: 'pm_gone' }, creds)
       .catch((thrown: unknown) => thrown);
 
@@ -426,7 +427,7 @@ describe('stripe live mode', () => {
     // handle on a card that is still stored.
     stubFetch([{ status: 503, body: { error: {} } }]);
 
-    const error = await stripeProvider()
+    const error = await stripeProvider(PT_BR_STRIPE_COPY)
       .vault!.forget!({ instrumentId: 'pm_9' }, creds)
       .catch((thrown: unknown) => thrown);
 
@@ -448,7 +449,7 @@ describe('stripe live mode', () => {
     ]);
 
     await expect(
-      stripeProvider().vault!.complete(
+      stripeProvider(PT_BR_STRIPE_COPY).vault!.complete(
         { sessionId: 'seti_5', reference: 'sub-1', customerRef: 'cus_1' },
         creds,
       ),
@@ -472,7 +473,7 @@ describe('stripe live mode', () => {
       },
     ]);
 
-    const snapshot = await stripeProvider().createCharge(cardInput(), creds);
+    const snapshot = await stripeProvider(PT_BR_STRIPE_COPY).createCharge(cardInput(), creds);
     expect(snapshot.status).toBe('DECLINED');
     expect(snapshot.declineRetriable).toBe(retriable);
   });
@@ -483,7 +484,7 @@ describe('stripe live mode', () => {
     // verdict Stripe never gave.
     stubFetch([{ status: 402, body: { error: { code: 'card_declined' } } }]);
 
-    const snapshot = await stripeProvider().createCharge(cardInput(), creds);
+    const snapshot = await stripeProvider(PT_BR_STRIPE_COPY).createCharge(cardInput(), creds);
     expect(snapshot.declineReason).toBe('CARD_DECLINED');
     expect(snapshot.declineRetriable).toBeUndefined();
   });
@@ -501,7 +502,7 @@ describe('stripe live mode', () => {
       stubFetch([
         { body: { id: 'pi_x', status: stripeStatus, amount: 500, payment_method_types: ['card'] } },
       ]);
-      const snapshot = await stripeProvider().getCharge('pi_x', creds);
+      const snapshot = await stripeProvider(PT_BR_STRIPE_COPY).getCharge('pi_x', creds);
       expect(snapshot.status).toBe(expected);
     }
   });
@@ -511,7 +512,7 @@ describe('stripe live mode', () => {
       environment: 'PRODUCTION',
       fields: { clientId: 'ca_1', clientSecret: 'sk_platform', webhookSecret: 'whsec_platform' },
     };
-    const adapter = stripeProvider();
+    const adapter = stripeProvider(PT_BR_STRIPE_COPY);
 
     const request = await adapter.oauth!.buildAuthorizeUrl(app, {
       state: 'st_1',
@@ -552,7 +553,7 @@ describe('stripe live mode', () => {
 
   it('keeps the original refresh token when a refresh response omits it', async () => {
     stubFetch([{ body: { access_token: 'sk_rolled' } }]);
-    const tokens = await stripeProvider().oauth!.refresh(
+    const tokens = await stripeProvider(PT_BR_STRIPE_COPY).oauth!.refresh(
       { environment: 'PRODUCTION', fields: { refreshToken: 'rt_keep', stripeUserId: 'acct_1' } },
       { environment: 'PRODUCTION', fields: { clientId: 'ca_1', clientSecret: 'sk_p' } },
     );
@@ -561,7 +562,7 @@ describe('stripe live mode', () => {
   });
 
   it('parses payment_intent events and ignores unrelated ones', async () => {
-    const adapter = stripeProvider();
+    const adapter = stripeProvider(PT_BR_STRIPE_COPY);
     const creds: ResolvedCredentials = { environment: 'PRODUCTION', fields: { secretKey: 'sk' } };
     const paid = await adapter.webhook.parse(
       {
@@ -595,7 +596,7 @@ describe('stripe live mode', () => {
     // A fabricated zero is exactly the input a host's shortfall guard exists to
     // catch: it turns a fully-paid order into a parked one.
     await expect(
-      stripeProvider().webhook.parse(
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.parse(
         {
           provider: 'stripe',
           rawBody: JSON.stringify({
@@ -613,7 +614,7 @@ describe('stripe live mode', () => {
   it('REFUSES a succeeded intent with no amount on the poll path too', async () => {
     stubFetch([{ body: { id: 'pi_11', status: 'succeeded', currency: 'brl' } }]);
     await expect(
-      stripeProvider().getCharge('pi_11', {
+      stripeProvider(PT_BR_STRIPE_COPY).getCharge('pi_11', {
         environment: 'PRODUCTION',
         fields: { secretKey: 'sk' },
       }),
@@ -624,7 +625,7 @@ describe('stripe live mode', () => {
     // The refusal is scoped to SETTLED: an intent nobody has paid legitimately
     // has nothing to report, and throwing would break the buyer's poll.
     stubFetch([{ body: { id: 'pi_12', status: 'requires_action', currency: 'brl' } }]);
-    const snapshot = await stripeProvider().getCharge('pi_12', {
+    const snapshot = await stripeProvider(PT_BR_STRIPE_COPY).getCharge('pi_12', {
       environment: 'PRODUCTION',
       fields: { secretKey: 'sk' },
     });
@@ -651,7 +652,7 @@ describe('stone live mode (pagar.me v5)', () => {
       },
     ]);
 
-    const snapshot = await stoneProvider().createCharge(pixInput(), LIVE);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).createCharge(pixInput(), LIVE);
 
     expect(calls[0]!.url).toBe('https://api.pagar.me/core/v5/orders');
     const headers = calls[0]!.init.headers as Record<string, string>;
@@ -683,14 +684,14 @@ describe('stone live mode (pagar.me v5)', () => {
         },
       },
     ]);
-    const snapshot = await stoneProvider().createCharge(cardInput(), LIVE);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).createCharge(cardInput(), LIVE);
     expect(snapshot.status).toBe('DECLINED');
     expect(snapshot.declineReason).toBe('INSUFFICIENT_FUNDS');
   });
 
   it('sends a card token, never a PAN, and honours a saved card id', async () => {
     const calls = stubFetch([{ body: { id: 'or_3', charges: [{ id: 'ch_3', status: 'paid' }] } }]);
-    await stoneProvider().createCharge(
+    await stoneProvider(PT_BR_STONE_COPY).createCharge(
       { ...cardInput(), card: { savedCardToken: 'card_saved_1' } },
       LIVE,
     );
@@ -701,7 +702,7 @@ describe('stone live mode (pagar.me v5)', () => {
   });
 
   it('authenticates webhooks by basic auth and fails closed without credentials', async () => {
-    const adapter = stoneProvider();
+    const adapter = stoneProvider(PT_BR_STONE_COPY);
     const creds: ResolvedCredentials = {
       environment: 'PRODUCTION',
       fields: { webhookUser: 'hook', webhookPassword: 's3cr3t' },
@@ -731,7 +732,7 @@ describe('stone live mode (pagar.me v5)', () => {
 
   it('refunds by DELETEing the charge, with an amount only when partial', async () => {
     const calls = stubFetch([{ body: { id: 'ch_4', status: 'refunded', amount: 500 } }]);
-    await stoneProvider().refund!(
+    await stoneProvider(PT_BR_STONE_COPY).refund!(
       { providerChargeId: 'ch_4', amount: { amountCents: 500, currency: 'BRL' } },
       LIVE,
     );
@@ -741,10 +742,10 @@ describe('stone live mode (pagar.me v5)', () => {
 
   it('REFUSES a paid charge that carries no amount, on both the poll and the webhook', async () => {
     stubFetch([{ body: { id: 'or_9', charges: [{ id: 'ch_9', status: 'paid' }] } }]);
-    await expect(stoneProvider().getCharge('or_9', LIVE)).rejects.toThrow(ProviderRequestError);
+    await expect(stoneProvider(PT_BR_STONE_COPY).getCharge('or_9', LIVE)).rejects.toThrow(ProviderRequestError);
 
     await expect(
-      stoneProvider().webhook.parse(
+      stoneProvider(PT_BR_STONE_COPY).webhook.parse(
         {
           provider: 'stone',
           rawBody: JSON.stringify({
@@ -761,7 +762,7 @@ describe('stone live mode (pagar.me v5)', () => {
 
   it('still answers PENDING for an unpaid order with no amount', async () => {
     stubFetch([{ body: { id: 'or_10', charges: [{ id: 'ch_10', status: 'waiting_payment' }] } }]);
-    const snapshot = await stoneProvider().getCharge('or_10', LIVE);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_10', LIVE);
     expect(snapshot).toMatchObject({ status: 'PENDING', amount: { amountCents: 0 } });
   });
 });
@@ -774,7 +775,7 @@ describe('infinitepay live mode', () => {
 
   it('creates a checkout link keyed on the host reference and strips the $ from the handle', async () => {
     const calls = stubFetch([{ body: { url: 'https://checkout.infinitepay.io/abc' } }]);
-    const snapshot = await infinitePayProvider().createCharge(pixInput(), creds);
+    const snapshot = await infinitePayProvider(PT_BR_INFINITEPAY_COPY).createCharge(pixInput(), creds);
 
     expect(calls[0]!.url).toBe('https://api.checkout.infinitepay.io/links');
     const body = jsonOf(calls[0]!.init);
@@ -800,7 +801,7 @@ describe('infinitepay live mode', () => {
    */
   it('names each item `description` — InfinitePay 422s the whole link without it', async () => {
     const calls = stubFetch([{ body: { url: 'https://checkout.infinitepay.io/abc' } }]);
-    await infinitePayProvider().createCharge(pixInput(), creds);
+    await infinitePayProvider(PT_BR_INFINITEPAY_COPY).createCharge(pixInput(), creds);
 
     const items = jsonOf(calls[0]!.init)['items'] as Array<Record<string, unknown>>;
     expect(items[0]).toMatchObject({
@@ -819,7 +820,7 @@ describe('infinitepay live mode', () => {
       headers: {},
     };
 
-    await expect(infinitePayProvider().webhook.verify(delivery, creds)).resolves.toBe(true);
+    await expect(infinitePayProvider(PT_BR_INFINITEPAY_COPY).webhook.verify(delivery, creds)).resolves.toBe(true);
     expect(calls[0]!.url).toBe('https://api.checkout.infinitepay.io/payment_check');
     expect(jsonOf(calls[0]!.init)['order_nsu']).toBe('order-1');
   });
@@ -832,20 +833,20 @@ describe('infinitepay live mode', () => {
       rawBody: JSON.stringify({ order_nsu: 'order-1', paid: true, amount: 999_99 }),
       headers: {},
     };
-    await expect(infinitePayProvider().webhook.verify(forged, creds)).resolves.toBe(false);
+    await expect(infinitePayProvider(PT_BR_INFINITEPAY_COPY).webhook.verify(forged, creds)).resolves.toBe(false);
   });
 
   it('fails closed when payment_check itself errors, and when there is no reference', async () => {
     stubFetch([{ status: 500, body: { error: 'boom' } }]);
     await expect(
-      infinitePayProvider().webhook.verify(
+      infinitePayProvider(PT_BR_INFINITEPAY_COPY).webhook.verify(
         { provider: 'infinitepay', rawBody: JSON.stringify({ order_nsu: 'order-1' }), headers: {} },
         creds,
       ),
     ).resolves.toBe(false);
 
     await expect(
-      infinitePayProvider().webhook.verify(
+      infinitePayProvider(PT_BR_INFINITEPAY_COPY).webhook.verify(
         { provider: 'infinitepay', rawBody: JSON.stringify({ paid: true }), headers: {} },
         creds,
       ),
@@ -853,7 +854,7 @@ describe('infinitepay live mode', () => {
   });
 
   it('declares refunds unsupported rather than failing at the call', () => {
-    const adapter = infinitePayProvider();
+    const adapter = infinitePayProvider(PT_BR_INFINITEPAY_COPY);
     expect(adapter.capabilities.refunds).toBe(false);
     expect(adapter.refund).toBeUndefined();
   });
@@ -869,7 +870,7 @@ describe('pagbank connect oauth', () => {
   };
 
   it('sends the merchant to the production consent screen with the requested scopes', async () => {
-    const request = await pagbankProvider().oauth!.buildAuthorizeUrl(app, {
+    const request = await pagbankProvider(PT_BR_PAGBANK_COPY).oauth!.buildAuthorizeUrl(app, {
       state: 'st_9',
       redirectUri: 'https://host.example/cb',
     });
@@ -880,7 +881,7 @@ describe('pagbank connect oauth', () => {
   });
 
   it('uses the sandbox host for a SANDBOX connection', async () => {
-    const request = await pagbankProvider().oauth!.buildAuthorizeUrl(
+    const request = await pagbankProvider(PT_BR_PAGBANK_COPY).oauth!.buildAuthorizeUrl(
       { ...app, environment: 'SANDBOX' },
       { state: 's', redirectUri: 'https://host.example/cb' },
     );
@@ -891,7 +892,7 @@ describe('pagbank connect oauth', () => {
     const calls = stubFetch([
       { body: { access_token: 'at_1', refresh_token: 'rt_1', expires_in: 3600, account_id: 'acc_1' } },
     ]);
-    const tokens = await pagbankProvider().oauth!.exchangeCode('code_1', app, {
+    const tokens = await pagbankProvider(PT_BR_PAGBANK_COPY).oauth!.exchangeCode('code_1', app, {
       redirectUri: 'https://host.example/cb',
     });
 
@@ -918,7 +919,7 @@ describe('pagbank connect oauth', () => {
   it('rejects a token response with no access token instead of storing a broken connection', async () => {
     stubFetch([{ body: { refresh_token: 'rt_only' } }]);
     await expect(
-      pagbankProvider().oauth!.exchangeCode('c', app, { redirectUri: 'https://host.example/cb' }),
+      pagbankProvider(PT_BR_PAGBANK_COPY).oauth!.exchangeCode('c', app, { redirectUri: 'https://host.example/cb' }),
     ).rejects.toThrow(/no access token/i);
   });
 });
@@ -949,14 +950,14 @@ describe('pagbank refund honesty', () => {
       [undefined, 'PENDING'],
     ] as const) {
       stubFetch([{ body: { id: 'CHAR_1', status, amount: { value: 500 } } }]);
-      const snapshot = await pagbankProvider().refund!({ providerChargeId: 'CHAR_1' }, creds);
+      const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'CHAR_1' }, creds);
       expect(snapshot.status, `pagbank cancel status "${status}"`).toBe(expected);
     }
   });
 
   it('sends NO body for a full refund — never the {"amount":{}} shape', async () => {
     const calls = stubFetch([{ body: { id: 'CHAR_2', status: 'CANCELED' } }]);
-    await pagbankProvider().refund!({ providerChargeId: 'CHAR_2' }, creds);
+    await pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'CHAR_2' }, creds);
 
     expect(calls[0]!.url).toBe('https://api.pagseguro.com/charges/CHAR_2/cancel');
     expect(calls[0]!.init.method).toBe('POST');
@@ -967,7 +968,7 @@ describe('pagbank refund honesty', () => {
 
   it('still sends the explicit amount when the caller has one', async () => {
     const calls = stubFetch([{ body: { id: 'CHAR_3', status: 'CANCELED' } }]);
-    await pagbankProvider().refund!(
+    await pagbankProvider(PT_BR_PAGBANK_COPY).refund!(
       { providerChargeId: 'CHAR_3', amount: { amountCents: 500, currency: 'BRL' } },
       creds,
     );
@@ -984,7 +985,7 @@ describe('pagbank refund honesty', () => {
         },
       },
     ]);
-    const snapshot = await pagbankProvider().refund!({ providerChargeId: 'CHAR_4' }, creds);
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'CHAR_4' }, creds);
     expect(snapshot.amount).toEqual({ amountCents: 12_50, currency: 'BRL' });
     expect(snapshot.providerRefundId).toBe('CHAR_4');
   });
@@ -1011,7 +1012,7 @@ describe('review regressions', () => {
       ['something_new', 'PENDING'],
     ] as const) {
       stubFetch([{ body: { id: 're_1', status, amount: 500 } }]);
-      const snapshot = await stripeProvider().refund!(
+      const snapshot = await stripeProvider(PT_BR_STRIPE_COPY).refund!(
         { providerChargeId: 'pi_1', amount: { amountCents: 500, currency: 'BRL' } },
         creds,
       );
@@ -1021,7 +1022,7 @@ describe('review regressions', () => {
 
   it('never lets a stored apiBase field redirect Stone traffic off pagar.me', async () => {
     const calls = stubFetch([{ body: { id: 'or_1', status: 'paid', charges: [] } }]);
-    await stoneProvider().getCharge('or_1', {
+    await stoneProvider(PT_BR_STONE_COPY).getCharge('or_1', {
       environment: 'PRODUCTION',
       // A tenant-supplied field must not steer where the secret is sent.
       fields: { secretKey: 'sk_live_x', apiBase: 'https://attacker.example' },
@@ -1032,7 +1033,7 @@ describe('review regressions', () => {
   });
 
   it('records an InfinitePay card payment as CARD, not PIX', async () => {
-    const adapter = infinitePayProvider();
+    const adapter = infinitePayProvider(PT_BR_INFINITEPAY_COPY);
     const creds: ResolvedCredentials = { environment: 'PRODUCTION', fields: { handle: '$loja' } };
     // `parse` re-asks payment_check, so THAT answer is what decides the method
     // — the unsigned delivery body never gets to.
@@ -1059,7 +1060,7 @@ describe('review regressions', () => {
     // host-side shortfall guard downstream, believing its `amount` would let
     // anyone park a fully-paid order by POSTing `{order_nsu, amount: 1}`.
     stubFetch([{ body: { success: true, amount: 12_50 } }]);
-    const [event] = await infinitePayProvider().webhook.parse(
+    const [event] = await infinitePayProvider(PT_BR_INFINITEPAY_COPY).webhook.parse(
       {
         provider: 'infinitepay',
         rawBody: JSON.stringify({ order_nsu: 'o1', amount: 1 }),
@@ -1075,21 +1076,21 @@ describe('review regressions', () => {
     const creds: ResolvedCredentials = { environment: 'PRODUCTION', fields: { handle: '$loja' } };
     stubFetch([{ body: { success: true } }]);
     await expect(
-      infinitePayProvider().webhook.parse(
+      infinitePayProvider(PT_BR_INFINITEPAY_COPY).webhook.parse(
         { provider: 'infinitepay', rawBody: JSON.stringify({ order_nsu: 'o1' }), headers: {} },
         creds,
       ),
     ).rejects.toThrow(ProviderRequestError);
 
     stubFetch([{ body: { success: true } }]);
-    await expect(infinitePayProvider().getCharge('o1', creds)).rejects.toThrow(
+    await expect(infinitePayProvider(PT_BR_INFINITEPAY_COPY).getCharge('o1', creds)).rejects.toThrow(
       ProviderRequestError,
     );
   });
 
   it('still answers PENDING for an unpaid InfinitePay reference with no amount', async () => {
     stubFetch([{ body: { success: false } }]);
-    const snapshot = await infinitePayProvider().getCharge('o1', {
+    const snapshot = await infinitePayProvider(PT_BR_INFINITEPAY_COPY).getCharge('o1', {
       environment: 'PRODUCTION',
       fields: { handle: '$loja' },
     });
@@ -1117,7 +1118,7 @@ describe('reconciliation probes', () => {
       },
     ]);
 
-    const found = await stripeProvider().findChargeByReference!('order-1', LIVE);
+    const found = await stripeProvider(PT_BR_STRIPE_COPY).findChargeByReference!('order-1', LIVE);
 
     expect(found?.providerChargeId).toBe('pi_hit');
     // The list endpoint reads the primary datastore; `/search` is index-backed
@@ -1129,7 +1130,7 @@ describe('reconciliation probes', () => {
 
   it('stripe reports a MISS only after reading the whole window', async () => {
     stubFetch([{ body: { data: [{ id: 'pi_a', metadata: {} }], has_more: false } }]);
-    await expect(stripeProvider().findChargeByReference!('order-1', LIVE)).resolves.toBeNull();
+    await expect(stripeProvider(PT_BR_STRIPE_COPY).findChargeByReference!('order-1', LIVE)).resolves.toBeNull();
   });
 
   it('stripe refuses to call an exhausted page budget a MISS', async () => {
@@ -1137,7 +1138,7 @@ describe('reconciliation probes', () => {
     // proving absence, which is inconclusive — and must NOT be reported as
     // "no charge", or the walk would go charge someone else.
     const calls = stubFetch([{ body: { data: [{ id: 'pi_z', metadata: {} }], has_more: true } }]);
-    await expect(stripeProvider().findChargeByReference!('order-1', LIVE)).rejects.toThrow(
+    await expect(stripeProvider(PT_BR_STRIPE_COPY).findChargeByReference!('order-1', LIVE)).rejects.toThrow(
       /undetermined, not absent/,
     );
     expect(calls.length).toBeGreaterThan(1);
@@ -1148,7 +1149,7 @@ describe('reconciliation probes', () => {
       { body: { data: [{ id: 'or_9', charges: [{ id: 'ch_9', status: 'paid', amount: 12_50 }] }] } },
     ]);
 
-    const found = await stoneProvider().findChargeByReference!('order-1', {
+    const found = await stoneProvider(PT_BR_STONE_COPY).findChargeByReference!('order-1', {
       environment: 'PRODUCTION',
       fields: { secretKey: 'sk_live_x' },
     });
@@ -1163,7 +1164,7 @@ describe('reconciliation probes', () => {
   it('stone returns null for an empty result — proof it is safe to fail over', async () => {
     stubFetch([{ body: { data: [] } }]);
     await expect(
-      stoneProvider().findChargeByReference!('order-1', {
+      stoneProvider(PT_BR_STONE_COPY).findChargeByReference!('order-1', {
         environment: 'PRODUCTION',
         fields: { secretKey: 'sk_live_x' },
       }),
@@ -1175,7 +1176,7 @@ describe('reconciliation probes', () => {
       { body: { orders: [{ id: 'ORDE_9', charges: [{ id: 'CHAR_9', status: 'PAID', amount: { value: 12_50 } }] }] } },
     ]);
 
-    const found = await pagbankProvider().findChargeByReference!('order-1', {
+    const found = await pagbankProvider(PT_BR_PAGBANK_COPY).findChargeByReference!('order-1', {
       environment: 'SANDBOX',
       fields: { token: 'tok_live' },
     });
@@ -1191,20 +1192,20 @@ describe('reconciliation probes', () => {
     stubFetch([{ status: 404, body: { error: 'not found' } }]);
     // No PAYMENT under this reference — an orphaned checkout link is not
     // money, so this is genuine proof nothing was charged.
-    await expect(infinitePayProvider().findChargeByReference!('order-1', creds)).resolves.toBeNull();
+    await expect(infinitePayProvider(PT_BR_INFINITEPAY_COPY).findChargeByReference!('order-1', creds)).resolves.toBeNull();
 
     stubFetch([{ status: 503, body: { error: 'down' } }]);
     // An outage is NOT absence: it must stop the walk, not license a retry
     // somewhere else.
     await expect(
-      infinitePayProvider().findChargeByReference!('order-1', creds),
+      infinitePayProvider(PT_BR_INFINITEPAY_COPY).findChargeByReference!('order-1', creds),
     ).rejects.toThrow(ProviderRequestError);
   });
 
   it('every probe is inert in stub mode', async () => {
     const stub: ResolvedCredentials = { environment: 'SANDBOX', fields: {}, stub: true };
     stubFetch([{ status: 500, body: {} }]);
-    for (const adapter of [stripeProvider(), stoneProvider(), pagbankProvider(), infinitePayProvider()]) {
+    for (const adapter of [stripeProvider(PT_BR_STRIPE_COPY), stoneProvider(PT_BR_STONE_COPY), pagbankProvider(PT_BR_PAGBANK_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY)]) {
       await expect(adapter.findChargeByReference!('order-1', stub)).resolves.toBeNull();
     }
   });

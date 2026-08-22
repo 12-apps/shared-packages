@@ -6,6 +6,7 @@ import { UnsupportedOperationError } from '../core/errors';
 import type { ChargeInput } from '../core/types';
 import { pagbankProvider } from '../providers/pagbank';
 import { cardInput, setupGatewayWorld, STUB_CREDS, TENANT } from './fixtures';
+import { PT_BR_PAGBANK_COPY } from '../providers/pt-BR';
 
 /**
  * FUT-471/472 — how a WALLET instrument travels through the core.
@@ -60,7 +61,7 @@ describe('the capability table gates wallet charges', () => {
 
 describe('the client view publishes the wallet capability (FUT-471)', () => {
   it('stamps wallets from the capability table and normalizes googlePay', () => {
-    const published = toClientProviderConfig(pagbankProvider(), {
+    const published = toClientProviderConfig(pagbankProvider(PT_BR_PAGBANK_COPY), {
       environment: 'SANDBOX',
       fields: { token: 't', publicKey: 'pk', googlePayMerchantId: 'MID_1' },
     });

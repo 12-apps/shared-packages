@@ -15,59 +15,70 @@
  * ever say so.
  *
  * Table source: developer.pagbank.com.br `reference/codigos-de-erro-connect`.
+ *
+ * ## English, and NOT a copy port (FUT-760)
+ *
+ * These sentences were Portuguese, and moving them behind required copy config
+ * would have been the wrong repair. They are not product copy: no store owner
+ * is meant to act on `41008`, and no host would ever want to author a gloss of
+ * another company's OAuth error table. Their reader is whoever is debugging a
+ * broken Connect integration — they land in a log line and, beside PagBank's
+ * own untranslated response, in the raw-exchange detail support asks for. Half
+ * of them name env vars and endpoints (`PAGBANK_TOKEN`, `/oauth2/refresh`).
+ *
+ * So the repair is the repo's own rule rather than a port: what a DEVELOPER
+ * reads is English. The vendor's error `name` stays exactly as PagBank sends
+ * it, because that is the string to search their documentation for.
  */
 
 interface ConnectError {
   /** PagBank's own name for it — the string that rides with the code. */
   name: string;
-  /** What it actually means, for a log line someone has to act on. */
+  /** What it actually means, for the log line someone has to act on. */
   meaning: string;
 }
 
 const CONNECT_ERRORS: Readonly<Record<string, ConnectError>> = {
-  '41001': {
-    name: 'invalid_request',
-    meaning: 'um parâmetro obrigatório está ausente ou tem valor inválido.',
-  },
-  '41002': { name: 'invalid_redirect_uri', meaning: 'a URL de redirecionamento está malformada.' },
-  '41003': { name: 'invalid_client', meaning: 'a identificação do cliente falhou (client_id/secret).' },
+  '41001': { name: 'invalid_request', meaning: 'a required parameter is missing or invalid.' },
+  '41002': { name: 'invalid_redirect_uri', meaning: 'the redirect URL is malformed.' },
+  '41003': { name: 'invalid_client', meaning: 'client identification failed (client_id/secret).' },
   '41004': {
     name: 'invalid_grant',
     meaning:
-      'o código de autorização ou o refresh token é inválido, expirou, já foi consumido, ' +
-      'ou não pertence a este usuário.',
+      'the authorization code or refresh token is invalid, has expired, was already ' +
+      'consumed, or does not belong to this user.',
   },
   '41005': {
     name: 'unsupported_grant_type',
     meaning:
-      'apenas os grants authorization_code e refresh_token são suportados — confira também o ' +
-      'ENDPOINT: a renovação usa /oauth2/refresh, não /oauth2/token.',
+      'only the authorization_code and refresh_token grants are supported — check the ' +
+      'ENDPOINT too: renewal uses /oauth2/refresh, not /oauth2/token.',
   },
-  '41006': { name: 'unauthorized_client', meaning: 'o cliente não tem permissão para esta ação.' },
+  '41006': { name: 'unauthorized_client', meaning: 'the client may not perform this action.' },
   '41007': {
     name: 'unsupported_token_type',
-    meaning: 'na revogação, apenas access_token e refresh_token são aceitos.',
+    meaning: 'on revocation, only access_token and refresh_token are accepted.',
   },
   '41008': {
     name: 'invalid_token',
     meaning:
-      'o Bearer do header Authorization é inválido — é o TOKEN DA CONTA da plataforma, ' +
-      'não o client_id/client_secret (PAGBANK_TOKEN / PAGBANK_TOKEN_PROD).',
+      'the Bearer in the Authorization header is invalid — it is the PLATFORM ACCOUNT ' +
+      'TOKEN, not the client_id/client_secret (PAGBANK_TOKEN / PAGBANK_TOKEN_PROD).',
   },
   '41012': {
     name: 'token_is_no_longer_active',
-    meaning: 'o token já foi usado ou não pertence a este usuário.',
+    meaning: 'the token was already used, or does not belong to this user.',
   },
   '41013': {
     name: 'not_found_url',
-    meaning: 'nenhuma URL está configurada para este client — registre a URL de chave pública.',
+    meaning: 'no URL is configured for this client — register the public-key URL.',
   },
   '41014': {
     name: 'not_found_public_key',
-    meaning: 'a URL configurada não devolveu o resultado esperado (endpoint de chave pública).',
+    meaning: 'the configured URL did not return the expected result (public-key endpoint).',
   },
-  '41015': { name: 'invalid_format_url', meaning: 'a URL configurada está com formato incorreto.' },
-  '41016': { name: 'invalid_public_key', meaning: 'a chave pública encontrada não é válida.' },
+  '41015': { name: 'invalid_format_url', meaning: 'the configured URL has an incorrect format.' },
+  '41016': { name: 'invalid_public_key', meaning: 'the public key found is not valid.' },
 };
 
 /**

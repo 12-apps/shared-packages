@@ -10,7 +10,8 @@ import {
   refundCent,
 } from './card-attempt';
 import type { ActivationContext } from './context';
-import { failureFor, unreachableReason, type VerifyChargeResult } from './failure';
+import type { ActivationCopy } from './copy';
+import { failureFor, type VerifyChargeResult } from './failure';
 import {
   ownsVerificationReference,
   verificationAmountCents,
@@ -122,6 +123,8 @@ export async function verificationCardPublicKey(
 /** Everything one card-phase attempt runs against, resolved once. */
 interface CardPhase {
   ctx: ActivationContext;
+  /** Lifted off `ctx` so every helper below reads the words the same way. */
+  copy: ActivationCopy;
   adapter: PaymentProviderAdapter;
   merchant: MerchantRef;
   provider: string;
@@ -156,9 +159,9 @@ export async function verifyProviderCharge(
   const adapter = ctx.providers.get(provider);
 
   const credentials = await credentialsForVerification(ctx, merchant, provider);
-  if (!credentials) return { ok: false, reason: 'Conecte a conta antes de verificar a cobrança.' };
+  if (!credentials) return { ok: false, reason: ctx.copy.connectFirst };
 
-  const phase: CardPhase = { ctx, adapter, merchant, provider, credentials };
+  const phase: CardPhase = { ctx, copy: ctx.copy, adapter, merchant, provider, credentials };
 
   const earlier = await resolveEarlierAttempt(phase);
   if (earlier) return earlier;
@@ -201,7 +204,7 @@ export async function verifyProviderCharge(
   await clearCardAttempt(phase);
 
   if (snapshot.status !== 'PAID' && snapshot.status !== 'AUTHORIZED') {
-    return { ok: false, reason: notApprovedText(snapshot) };
+    return { ok: false, reason: notApprovedText(ctx.copy, snapshot) };
   }
 
   // Give the cent back. A failed refund must NOT fail the verification — the
@@ -245,12 +248,9 @@ async function resolveEarlierAttempt(phase: CardPhase): Promise<VerifyChargeResu
     return null;
   }
   if (outcome.kind === 'OPEN') {
-    return {
-      ok: false,
-      reason: 'A cobrança de teste anterior ainda está em processamento. Tente de novo em instantes.',
-    };
+    return { ok: false, reason: phase.copy.stillProcessing };
   }
-  return stillUnaccounted(adapter.displayName, outcome.error);
+  return stillUnaccounted(phase, adapter.displayName, outcome.error);
 }
 
 /**
@@ -271,7 +271,7 @@ async function settleFailedCreate(
   error: unknown,
 ): Promise<VerifyChargeResult> {
   const { adapter, credentials } = phase;
-  const failure: VerifyChargeResult = { ok: false, ...failureFor(error) };
+  const failure: VerifyChargeResult = { ok: false, ...failureFor(error, phase.copy) };
   if (!adapter.findChargeByReference) return failure;
 
   if (classifyFailure(error) !== 'AMBIGUOUS') {
@@ -285,7 +285,7 @@ async function settleFailedCreate(
     await clearCardAttempt(phase);
     return {
       ok: false,
-      reason: notApprovedText({ status: 'DECLINED', declineReason: outcome.declineReason }),
+      reason: notApprovedText(phase.copy, { status: 'DECLINED', declineReason: outcome.declineReason }),
     };
   }
   if (outcome.kind === 'GONE') {
@@ -319,11 +319,19 @@ async function clearCardAttempt(phase: CardPhase): Promise<void> {
   await phase.ctx.settings.setPendingVerification(phase.merchant, phase.provider, null);
 }
 
-/** The screen's sentence for a charge the provider did not approve. */
-function notApprovedText(snapshot: { status: string; declineReason?: string }): string {
+/**
+ * The screen's sentence for a charge the provider did not approve.
+ *
+ * Which of the two it is — the provider gave a reason, or only a status — is
+ * the decision that stays here; both sentences are the host's.
+ */
+function notApprovedText(
+  copy: Pick<ActivationCopy, 'chargeDeclined' | 'chargeNotApproved'>,
+  snapshot: { status: string; declineReason?: string },
+): string {
   return snapshot.declineReason
-    ? `A cobrança de teste foi recusada (${snapshot.declineReason}).`
-    : `A cobrança de teste não foi aprovada (${snapshot.status}).`;
+    ? copy.chargeDeclined(snapshot.declineReason)
+    : copy.chargeNotApproved(snapshot.status);
 }
 
 /**
@@ -331,11 +339,18 @@ function notApprovedText(snapshot: { status: string; declineReason?: string }): 
  * nothing was created NOW, so the honest offer is the transport one: wait and
  * ask again. The record stays; the sweep is the fallback nobody has to click.
  */
-function stillUnaccounted(displayName: string, error: unknown): VerifyChargeResult {
-  const failure = failureFor(error);
+function stillUnaccounted(
+  phase: CardPhase,
+  displayName: string,
+  error: unknown,
+): VerifyChargeResult {
+  const failure = failureFor(error, phase.copy);
   return {
     ok: false,
     ...failure,
-    ...(failure.transport ? { reason: unreachableReason(displayName) } : {}),
+    // The vendor is named here rather than inside `failureFor`, which has no
+    // adapter in hand — and only on `transport`, because "wait and try again"
+    // is the right action for an outage and the wrong one for a refusal.
+    ...(failure.transport ? { reason: phase.copy.unreachable(displayName) } : {}),
   };
 }

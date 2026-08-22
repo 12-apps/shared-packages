@@ -10,6 +10,7 @@ import { pagbankProvider } from '@12-apps/payments-backend/providers/pagbank';
 import { stoneProvider } from '@12-apps/payments-backend/providers/stone';
 import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
 import { describe, expect, it } from 'vitest';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
 
 /**
  * The server half of the assertion the frontend harness makes in a browser.
@@ -29,10 +30,10 @@ const EXPECTED = ['pagbank', 'stone', 'infinitepay', 'stripe'];
 
 function paymentsHttp() {
   const providers = defineProviders({
-    pagbank: pagbankProvider(),
-    stone: stoneProvider(),
-    infinitepay: infinitePayProvider(),
-    stripe: stripeProvider(),
+    pagbank: pagbankProvider(PT_BR_PAGBANK_COPY),
+    stone: stoneProvider(PT_BR_STONE_COPY),
+    infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
+    stripe: stripeProvider(PT_BR_STRIPE_COPY),
   });
 
   // The store is the in-memory one the package itself publishes for hosts that

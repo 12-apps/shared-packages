@@ -39,17 +39,14 @@ export function noAnswerArrived(error: unknown): boolean {
  * adapter maps the provider's actual answer itself (status codes and their
  * meanings are the one genuinely per-provider part of a probe).
  *
- * `providerSentence` is the provider's name with its article ("a Stripe",
- * "o PagBank"), because the message is the adapter's words — see
- * {@link ProbeOutcome}.
+ * The CLASSIFICATION is what this shares; the sentence arrives from the
+ * adapter's copy pack (FUT-760). It used to compose one here around a
+ * `providerSentence` fragment — "a Stripe", "o PagBank" — which made this
+ * function decide the Portuguese around a vendor's name whose article only
+ * Portuguese has. A whole sentence per provider is the honest unit: the pack
+ * writes it, and a language that orders it differently is free to.
  */
-export function unreachableOutcome(error: unknown, providerSentence: string): ProbeOutcome | null {
+export function unreachableOutcome(error: unknown, unreachable: string): ProbeOutcome | null {
   if (!noAnswerArrived(error)) return null;
-  return {
-    ok: false,
-    fault: 'UNREACHABLE',
-    message:
-      `Não conseguimos falar com ${providerSentence} agora. ` +
-      'Suas credenciais foram salvas — teste a conexão de novo em instantes.',
-  };
+  return { ok: false, fault: 'UNREACHABLE', message: unreachable };
 }

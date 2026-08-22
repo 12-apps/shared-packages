@@ -1,12 +1,8 @@
 import type { PendingVerification } from '../config/types';
 import type { ChargeInput, MerchantRef } from '../core/types';
 import type { ActivationContext } from './context';
-import {
-  failureFor,
-  unreachableReason,
-  type PollFlags,
-  type VerifyChargeResult,
-} from './failure';
+import type { ActivationCopy } from './copy';
+import { failureFor, type PollFlags, type VerifyChargeResult } from './failure';
 import {
   verificationAmountCents,
   verificationAttemptId,
@@ -100,7 +96,7 @@ export async function startRedirectVerification(
   const adapter = ctx.providers.get(provider);
 
   const credentials = await credentialsForVerification(ctx, merchant, provider);
-  if (!credentials) return { ok: false, reason: 'Conecte a conta antes de verificar a cobrança.' };
+  if (!credentials) return { ok: false, reason: ctx.copy.connectFirst };
 
   // Send the owner back to the screen they started from, not to a storefront
   // checkout. Beyond not abandoning them mid-activation, this is what makes
@@ -115,11 +111,11 @@ export async function startRedirectVerification(
   try {
     snapshot = await adapter.createCharge(input, credentials);
   } catch (error) {
-    return startFailure(adapter.displayName, error);
+    return startFailure(ctx.copy, adapter.displayName, error);
   }
 
   if (!snapshot.hostedCheckoutUrl) {
-    return { ok: false, reason: 'O provedor não devolveu a URL de pagamento.' };
+    return { ok: false, reason: ctx.copy.noPaymentUrl };
   }
 
   await rememberAttempt(ctx, merchant, provider, snapshot, input.reference);
@@ -151,14 +147,18 @@ function redirectChargeInput(
 }
 
 /** A refused (or unreachable) link, with the vendor named where we can. */
-function startFailure(displayName: string, error: unknown): RedirectStart {
-  const failure = failureFor(error);
+function startFailure(
+  copy: Pick<ActivationCopy, 'platformApproval' | 'unreachable'>,
+  displayName: string,
+  error: unknown,
+): RedirectStart {
+  const failure = failureFor(error, copy);
   return {
     ok: false,
     ...failure,
     // Named here rather than in `failureFor`, which has no adapter and could
     // only ever say "o provedor".
-    ...(failure.transport ? { reason: unreachableReason(displayName) } : {}),
+    ...(failure.transport ? { reason: copy.unreachable(displayName) } : {}),
   };
 }
 
@@ -229,11 +229,11 @@ export async function pollRedirectVerification(
   // REGISTERED adapter that cannot be polled (no `findChargeByReference`).
   const adapter = ctx.providers.get(provider);
   if (!adapter.findChargeByReference) {
-    return { ok: false, reason: `Provedor desconhecido: ${provider}` };
+    return { ok: false, reason: ctx.copy.unpollable(adapter.displayName) };
   }
 
   const credentials = await credentialsForVerification(ctx, merchant, provider);
-  if (!credentials) return { ok: false, reason: 'Conecte a conta antes de verificar a cobrança.' };
+  if (!credentials) return { ok: false, reason: ctx.copy.connectFirst };
 
   // The two halves of the correlation, from the two moments they exist: the
   // invoice code was kept when the link was minted, the transaction id
@@ -268,11 +268,11 @@ export async function pollRedirectVerification(
     // has learned nothing about the charge. Settling it as failed cleared the
     // pending row — destroying the stored slug — and switched the provider
     // off, on the strength of a network blip. The next tick simply asks again.
-    return { ok: false, pending: true, ...failureFor(error) };
+    return { ok: false, pending: true, ...failureFor(error, ctx.copy) };
   }
 
   await keepReturnedSlug(ctx, merchant, provider, pending, returned.slug);
-  return readPolledSnapshot(snapshot);
+  return readPolledSnapshot(ctx.copy, snapshot);
 }
 
 /**
@@ -318,9 +318,10 @@ async function keepReturnedSlug(
  * counts as open — the owner simply has not paid yet.
  */
 function readPolledSnapshot(
+  copy: ActivationCopy,
   snapshot: { status: string; declineReason?: string } | null,
 ): VerifyChargeResult & PollFlags {
-  const waiting = { ok: false as const, pending: true, reason: 'Aguardando o pagamento.' };
+  const waiting = { ok: false as const, pending: true, reason: copy.awaitingPayment };
   if (!snapshot) return waiting;
   if (snapshot.status === 'PAID' || snapshot.status === 'AUTHORIZED') {
     // No refund attempt: InfinitePay refunds are made in InfinitePay's own
@@ -334,11 +335,7 @@ function readPolledSnapshot(
   // the connection and nothing was charged — so the sentence must not read as
   // a failure, and the only useful offer is another link.
   if (snapshot.status === 'EXPIRED' || snapshot.status === 'CANCELED') {
-    return {
-      ok: false,
-      outcome: 'expired',
-      reason: 'A cobrança expirou. Geramos outra sem custo quando você quiser.',
-    };
+    return { ok: false, outcome: 'expired', reason: copy.expired };
   }
   // A refused payment METHOD, which is a fact about the owner's card and not
   // about their store. The charge itself is untouched and still payable, so
@@ -348,15 +345,14 @@ function readPolledSnapshot(
       ok: false,
       outcome: 'declined',
       retryable: true,
-      reason:
-        'O pagamento foi recusado pelo seu meio de pagamento. Tente outro cartão ou pague por Pix.',
+      reason: copy.instrumentDeclined,
     };
   }
   return {
     ok: false,
     outcome: 'refused',
     reason: snapshot.declineReason
-      ? `A cobrança de teste foi recusada (${snapshot.declineReason}).`
-      : `A cobrança de teste não foi aprovada (${snapshot.status}).`,
+      ? copy.chargeDeclined(snapshot.declineReason)
+      : copy.chargeNotApproved(snapshot.status),
   };
 }

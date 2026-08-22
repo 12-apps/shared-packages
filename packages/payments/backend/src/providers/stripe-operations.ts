@@ -6,6 +6,7 @@ import type {
   PaymentMethodKind,
   RefundSnapshot,
 } from '../core/types';
+import type { StripeCopy } from './copy';
 import { stubCharge, stubPendingSnapshot, stubRefund } from './shared';
 import {
   declineReasonOf,
@@ -108,51 +109,47 @@ export const createCharge: PaymentProviderAdapter['createCharge'] = async (input
  * `stripe-credential-checks`, and where Stripe offers no way to check at all,
  * reported as unchecked rather than passed.
  */
-export const verifyCredentials: PaymentProviderAdapter['verifyCredentials'] = async (
-  credentials,
-) => {
-  if (credentials.stub) return { ok: true, message: 'stub mode' };
-  try {
-    const account = await stripeRequest<StripeAccountFacts>('/v1/account', credentials, {
-      method: 'GET',
-    });
-    const checks = stripeCredentialChecks(credentials, account);
-    const message = stripeChecksSummary(checks);
-    // A credential that fails its own check fails the PROBE. Whether the key
-    // authenticates is not the question the owner is asking — they are asking
-    // whether this store can take money, and a live secret key beside a test
-    // publishable key cannot.
-    return message ? { ok: false, message, checks } : { ok: true, checks };
-  } catch (error) {
-    // Transport first: an unanswered probe learned NOTHING about the key, and
-    // reporting it without the fault is what let a DNS blip persist FAILED
-    // over good credentials (FUT-695) — `runVerify` skips the store only for
-    // an explicit UNREACHABLE.
-    const unreachable = unreachableOutcome(error, 'a Stripe');
-    if (unreachable) return unreachable;
-    const status = error instanceof ProviderRequestError ? error.options.httpStatus : undefined;
-    if (status === 401 || status === 403) {
-      // Stripe's OWN sentence, when it sent one. "Credenciais recusadas" alone
-      // names neither the credential nor the reason, and on this path there are
-      // four of them — the owner is left re-checking all four against a screen
-      // that knows which one failed and will not say. Stripe answers with
-      // things like "Invalid API Key provided: sk_test_***…***4242" or "The
-      // provided key does not have access to account acct_…", each of which
-      // points straight at the box to fix. Only the `message` string is taken:
-      // the rest of the body is the provider's, and this error type retains it
-      // whole (see the PII note on ProviderRequestError).
-      const detail = refusalDetail(error);
-      return {
-        ok: false,
-        fault: 'REFUSED',
-        message: detail
-          ? `Credenciais recusadas pela Stripe: ${detail}`
-          : 'Credenciais recusadas pela Stripe.',
-      };
+export function verifyCredentialsWith(
+  copy: StripeCopy,
+): NonNullable<PaymentProviderAdapter['verifyCredentials']> {
+  return async (credentials) => {
+    if (credentials.stub) return { ok: true, message: 'stub mode' };
+    try {
+      const account = await stripeRequest<StripeAccountFacts>('/v1/account', credentials, {
+        method: 'GET',
+      });
+      const checks = stripeCredentialChecks(copy.checks, credentials, account);
+      const message = stripeChecksSummary(copy.checks, checks);
+      // A credential that fails its own check fails the PROBE. Whether the key
+      // authenticates is not the question the owner is asking — they are asking
+      // whether this store can take money, and a live secret key beside a test
+      // publishable key cannot.
+      return message ? { ok: false, message, checks } : { ok: true, checks };
+    } catch (error) {
+      // Transport first: an unanswered probe learned NOTHING about the key, and
+      // reporting it without the fault is what let a DNS blip persist FAILED
+      // over good credentials (FUT-695) — `runVerify` skips the store only for
+      // an explicit UNREACHABLE.
+      const unreachable = unreachableOutcome(error, copy.unreachable);
+      if (unreachable) return unreachable;
+      const status = error instanceof ProviderRequestError ? error.options.httpStatus : undefined;
+      if (status === 401 || status === 403) {
+        // Stripe's OWN sentence, when it sent one. "Credenciais recusadas" alone
+        // names neither the credential nor the reason, and on this path there are
+        // four of them — the owner is left re-checking all four against a screen
+        // that knows which one failed and will not say. Stripe answers with
+        // things like "Invalid API Key provided: sk_test_***…***4242" or "The
+        // provided key does not have access to account acct_…", each of which
+        // points straight at the box to fix. Only the `message` string is taken:
+        // the rest of the body is the provider's, and this error type retains it
+        // whole (see the PII note on ProviderRequestError).
+        const detail = refusalDetail(error);
+        return { ok: false, fault: 'REFUSED', message: copy.refused(detail) };
+      }
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
     }
-    return { ok: false, message: error instanceof Error ? error.message : String(error) };
-  }
-};
+  };
+}
 
 /**
  * What Stripe said when it refused, or null when it said nothing usable.

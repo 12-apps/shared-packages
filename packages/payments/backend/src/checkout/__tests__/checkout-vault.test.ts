@@ -6,6 +6,7 @@ import type { VaultBeginInput, VaultCompleteInput } from '../../core/vault-types
 import { pagbankProvider } from '../../providers/pagbank';
 
 import { MERCHANT, call, setupCheckoutWorld, testAdapter } from './harness';
+import { PT_BR_PAGBANK_COPY } from '../../providers/pt-BR';
 
 /**
  * VAULT A CARD FROM THE BUYER SURFACE (FUT-478) — `POST /cards/begin` and
@@ -58,7 +59,7 @@ function vaultingAdapter(name: string, seam: VaultSeamLog): PaymentProviderAdapt
 
 describe('POST /cards/begin — equip the browser to mint the instrument', () => {
   it('given a PUBLIC_KEY provider (stub pagbank), when the buyer begins vaulting, then the answer carries the tokenization and the public key', async () => {
-    const world = setupCheckoutWorld({ chain: [{ name: 'pagbank', adapter: pagbankProvider() }] });
+    const world = setupCheckoutWorld({ chain: [{ name: 'pagbank', adapter: pagbankProvider(PT_BR_PAGBANK_COPY) }] });
     world.credentials.set(MERCHANT, 'pagbank', {
       environment: 'SANDBOX',
       fields: { publicKey: 'PUB_KEY_1' },
@@ -144,7 +145,7 @@ describe('POST /cards/begin — equip the browser to mint the instrument', () =>
 
 describe('POST /cards/complete — store the instrument, answer the display', () => {
   it('given a browser-encrypted token (stub pagbank), when the buyer completes vaulting, then the card is saved and the answer carries display only', async () => {
-    const world = setupCheckoutWorld({ chain: [{ name: 'pagbank', adapter: pagbankProvider() }] });
+    const world = setupCheckoutWorld({ chain: [{ name: 'pagbank', adapter: pagbankProvider(PT_BR_PAGBANK_COPY) }] });
 
     const { status, body } = await call(world.routes, 'POST', '/cards/complete', {
       token: 'tok_encrypted_blob',
@@ -168,7 +169,7 @@ describe('POST /cards/complete — store the instrument, answer the display', ()
 
   it('given the stub -declined suffix, when validation refuses the card, then the host mapping words the field-level reason and nothing is saved', async () => {
     const world = setupCheckoutWorld({
-      chain: [{ name: 'pagbank', adapter: pagbankProvider() }],
+      chain: [{ name: 'pagbank', adapter: pagbankProvider(PT_BR_PAGBANK_COPY) }],
       config: {
         // One vendor's error vocabulary is the HOST's to map — the same seam
         // the charge path words a provider 400 through.
@@ -193,7 +194,7 @@ describe('POST /cards/complete — store the instrument, answer the display', ()
   });
 
   it('given no host mapping, when validation refuses the card, then the library words one honest generic and no vendor sentence', async () => {
-    const world = setupCheckoutWorld({ chain: [{ name: 'pagbank', adapter: pagbankProvider() }] });
+    const world = setupCheckoutWorld({ chain: [{ name: 'pagbank', adapter: pagbankProvider(PT_BR_PAGBANK_COPY) }] });
 
     const { status, body } = await call(world.routes, 'POST', '/cards/complete', {
       token: 'tok-declined',
@@ -228,7 +229,7 @@ describe('POST /cards/complete — store the instrument, answer the display', ()
 
   it('given the host save throws, when completion runs, then the buyer gets an error rather than a card that is not on file', async () => {
     const world = setupCheckoutWorld({
-      chain: [{ name: 'pagbank', adapter: pagbankProvider() }],
+      chain: [{ name: 'pagbank', adapter: pagbankProvider(PT_BR_PAGBANK_COPY) }],
       config: {
         instruments: {
           list: async () => [],

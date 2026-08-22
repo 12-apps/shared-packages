@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { platformHomologacaoGuide } from '../platform/homologacao-guide';
+import {
+  ACCESS_INSTRUCTIONS_MAX,
+  platformHomologacaoGuide,
+} from '../platform/homologacao-guide';
+import { PT_BR_HOMOLOGACAO_ANSWERS } from '../platform/pt-BR';
 
 /**
  * The paste-ready homologação answers (FUT-483, packaged by FUT-573). Pinned:
@@ -9,10 +13,16 @@ import { platformHomologacaoGuide } from '../platform/homologacao-guide';
  * answer stays inside the form's 255-character cap.
  */
 
+const DEMO_STORE = 'https://app.example.com/demo-balcao/menu';
+
+/** What a host declares about itself — here, the sample pt-BR answers. */
 const FACTS = {
   brandName: 'Aurora',
   siteUrl: 'https://app.example.com',
-  demoStoreUrl: 'https://app.example.com/demo-balcao/menu',
+  demoStoreUrl: DEMO_STORE,
+  accessInstructions: PT_BR_HOMOLOGACAO_ANSWERS.accessInstructions(DEMO_STORE),
+  productsDescription: PT_BR_HOMOLOGACAO_ANSWERS.productsDescription('Aurora'),
+  slaText: PT_BR_HOMOLOGACAO_ANSWERS.slaText,
 };
 
 describe('platformHomologacaoGuide', () => {
@@ -41,14 +51,19 @@ describe('platformHomologacaoGuide', () => {
     expect(guide.exampleUrl).toContain('criar-pagar-pedido-com-cartao');
   });
 
-  it('keeps the access instructions inside the form 255-character cap', () => {
-    // A realistically long store URL still has to fit; the wording must not
-    // be lengthened without re-checking this budget.
-    const guide = platformHomologacaoGuide({
-      ...FACTS,
-      demoStoreUrl: 'https://some-quite-long-deployment-name.example.com.br/demo-balcao/menu',
-    });
+  /**
+   * The answer is the HOST's now (FUT-760), so the guide can no longer promise
+   * it fits — what the package still owes is PagBank's number, stated where a
+   * host writing that answer will find it. Measured against the sample pack,
+   * with a realistically long store URL: that is the wording the origin host
+   * submits, and it must not be lengthened without re-checking.
+   */
+  it('states the form cap, and the sample answer fits it', () => {
+    const longStore = 'https://some-quite-long-deployment-name.example.com.br/demo-balcao/menu';
 
-    expect(guide.accessInstructions.length).toBeLessThanOrEqual(255);
+    expect(ACCESS_INSTRUCTIONS_MAX).toBe(255);
+    expect(
+      PT_BR_HOMOLOGACAO_ANSWERS.accessInstructions(longStore).length,
+    ).toBeLessThanOrEqual(ACCESS_INSTRUCTIONS_MAX);
   });
 });

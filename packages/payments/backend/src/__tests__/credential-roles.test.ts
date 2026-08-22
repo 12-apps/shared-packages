@@ -4,6 +4,7 @@ import { webhookFieldOf } from '../core/credential-roles';
 import { infinitePayProvider } from '../providers/infinitepay';
 import { pagbankProvider } from '../providers/pagbank';
 import { stripeProvider } from '../providers/stripe';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STRIPE_COPY } from '../providers/pt-BR';
 
 /**
  * Adapter-declared field roles (FUT-761). The origin host kept
@@ -16,11 +17,11 @@ import { stripeProvider } from '../providers/stripe';
 
 describe('webhookFieldOf', () => {
   it('answers each adapter from its own schema', () => {
-    expect(webhookFieldOf(pagbankProvider())).toBe('webhookToken');
-    expect(webhookFieldOf(stripeProvider())).toBe('webhookSecret');
+    expect(webhookFieldOf(pagbankProvider(PT_BR_PAGBANK_COPY))).toBe('webhookToken');
+    expect(webhookFieldOf(stripeProvider(PT_BR_STRIPE_COPY))).toBe('webhookSecret');
   });
 
   it('answers null for a provider that declares no inbound-delivery secret', () => {
-    expect(webhookFieldOf(infinitePayProvider())).toBeNull();
+    expect(webhookFieldOf(infinitePayProvider(PT_BR_INFINITEPAY_COPY))).toBeNull();
   });
 });

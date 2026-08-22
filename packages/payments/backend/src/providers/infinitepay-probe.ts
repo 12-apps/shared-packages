@@ -1,5 +1,6 @@
 import { ProviderRequestError } from '../core/errors';
 import type { ProbeOutcome } from '../core/types';
+import type { InfinitePayCopy } from './copy';
 import { noAnswerArrived } from './probe-shared';
 
 /**
@@ -27,7 +28,7 @@ import { noAnswerArrived } from './probe-shared';
  * everything else falls through to `REFUSED`, which IS recorded — a loud wrong
  * answer being strictly better here than a silent one.
  */
-export function probeFailure(error: unknown): ProbeOutcome {
+export function probeFailure(error: unknown, copy: InfinitePayCopy): ProbeOutcome {
   // InfinitePay's own answer, or null when the throw never came from a response
   // at all. Kept as the ERROR rather than flattened straight to a status,
   // because "answered without a status" and "never answered" are different
@@ -51,14 +52,13 @@ export function probeFailure(error: unknown): ProbeOutcome {
       // either. "Confira as credenciais deste ambiente" — the sentence this
       // replaced — is advice you can follow all afternoon without ever finding
       // the one screen in the InfinitePay app that states the tag.
-      message:
-        'Não encontramos essa InfiniteTag na InfinitePay. Confira a tag no app e tente de novo.',
+      message: copy.tagNotFound,
     };
   }
   // 422 stays a pass: the handle resolved and only the reference was refused.
   if (status === 422) return { ok: true };
   if (status === 401 || status === 403) {
-    return { ok: false, fault: 'REFUSED', message: 'Handle recusado pela InfinitePay.' };
+    return { ok: false, fault: 'REFUSED', message: copy.refused };
   }
   // Nothing was learned about the tag, so the screen must not send the owner to
   // re-read it — it is already saved, and asking again in a moment is the fix.
@@ -66,8 +66,7 @@ export function probeFailure(error: unknown): ProbeOutcome {
     return {
       ok: false,
       fault: 'UNREACHABLE',
-      message:
-        'Não conseguimos falar com a InfinitePay agora. Sua tag foi salva — teste a conexão de novo em instantes.',
+      message: copy.unreachable,
     };
   }
   return {

@@ -12,6 +12,7 @@ import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
 
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
+import { PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
 
 /**
  * One connection path on screen at a time — and its OWN steps.
@@ -34,7 +35,7 @@ import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
  */
 
 function stripeDescriptor(): ProviderDescriptor {
-  const adapter = stripeProvider();
+  const adapter = stripeProvider(PT_BR_STRIPE_COPY);
   return {
     name: adapter.name,
     displayName: adapter.displayName,
@@ -45,7 +46,7 @@ function stripeDescriptor(): ProviderDescriptor {
 }
 
 function stripeGuide(connected: boolean): ProviderSetupGuide {
-  const guide = stripeProvider().setupGuide?.({
+  const guide = stripeProvider(PT_BR_STRIPE_COPY).setupGuide?.({
     brandName: 'Quitanda Digital',
     webhookUrl: 'https://loja.example/api/webhooks/payments/stripe/x',
     progress: { configured: {}, connected, proven: false },

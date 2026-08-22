@@ -6,6 +6,7 @@ import { ProviderRequestError } from '../core/errors';
 import { createMemoryChargeStore } from '../memory';
 import { pagbankProvider } from '../providers/pagbank';
 import { cardInput, pixInput } from './fixtures';
+import { PT_BR_PAGBANK_COPY } from '../providers/pt-BR';
 
 /**
  * Contract tests for the ported PagBank client. These pin the request shapes
@@ -52,7 +53,7 @@ describe('pagbank adapter — charges', () => {
           },
     );
 
-    await pagbankProvider().createCharge(kind === 'pix' ? pixInput() : cardInput(), {
+    await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(kind === 'pix' ? pixInput() : cardInput(), {
       ...LIVE,
       fields: { ...LIVE.fields, notificationUrl: 'https://paladira.com/api/webhooks/pagseguro/acme/notifications' },
     });
@@ -73,7 +74,7 @@ describe('pagbank adapter — charges', () => {
       id: 'ORDE_1',
       qr_codes: [{ text: '00020126-emv', expiration_date: '2030-01-01T00:00:00Z' }],
     });
-    const snapshot = await pagbankProvider().createCharge(
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(
       { ...pixInput('order-1'), idempotencyKey: 'order-1:1' },
       LIVE,
     );
@@ -107,7 +108,7 @@ describe('pagbank adapter — charges', () => {
 
   it('routes PRODUCTION credentials at the live host, sandbox by default', async () => {
     const spy = mockFetch({ id: 'O', qr_codes: [{ text: 'q' }] });
-    await pagbankProvider().createCharge(pixInput(), {
+    await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(pixInput(), {
       environment: 'PRODUCTION',
       fields: { token: 't' },
     });
@@ -116,7 +117,7 @@ describe('pagbank adapter — charges', () => {
 
   it('sends a fresh card as an encrypted blob and a saved card by vault id', async () => {
     const spy = mockFetch({ id: 'ORDE_2', charges: [{ id: 'CHAR_2', status: 'PAID' }] });
-    const adapter = pagbankProvider();
+    const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
 
     await adapter.createCharge(cardInput('order-2', 'ENCRYPTED_BLOB'), LIVE);
     let body = JSON.parse((spy.mock.calls[0] as [string, RequestInit])[1].body as string) as {
@@ -146,7 +147,7 @@ describe('pagbank adapter — charges', () => {
    */
   it('sends a Google Pay charge as payment_method.card.wallet (FUT-471)', async () => {
     const spy = mockFetch({ id: 'ORDE_W', charges: [{ id: 'CHAR_W', status: 'PAID' }] });
-    await pagbankProvider().createCharge(
+    await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(
       { ...cardInput('order-w'), card: { wallet: { type: 'GOOGLE_PAY', key: 'gp_tok_123' } } },
       LIVE,
     );
@@ -166,7 +167,7 @@ describe('pagbank adapter — charges', () => {
     // A body carrying both a wallet key and a vault id must not send two
     // instruments; the wallet is the one the buyer just authorized.
     const spy = mockFetch({ id: 'ORDE_W2', charges: [{ id: 'CHAR_W2', status: 'PAID' }] });
-    await pagbankProvider().createCharge(
+    await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(
       {
         ...cardInput('order-w2'),
         card: {
@@ -188,7 +189,7 @@ describe('pagbank adapter — charges', () => {
 
   it('treats a card decline as a DECLINED snapshot, not an exception', async () => {
     mockFetch({ id: 'ORDE_3', charges: [{ id: 'CHAR_3', status: 'DECLINED' }] });
-    const snapshot = await pagbankProvider().createCharge(cardInput('order-4'), LIVE);
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(cardInput('order-4'), LIVE);
     expect(snapshot.status).toBe('DECLINED');
     expect(snapshot.declineReason).toBe('CARD_DECLINED');
   });
@@ -198,7 +199,7 @@ describe('pagbank adapter — charges', () => {
     // with no stored-credential agreement behind it, and is entitled to
     // decline for exactly that reason.
     const spy = mockFetch({ id: 'ORDE_R', charges: [{ id: 'CHAR_R', status: 'PAID' }] });
-    await pagbankProvider().createCharge(
+    await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(
       {
         ...cardInput('sub-cycle-1'),
         card: { savedCardToken: 'CARD_9', tokenProvider: 'pagbank', merchantInitiated: true },
@@ -215,7 +216,7 @@ describe('pagbank adapter — charges', () => {
 
   it('omits the recurring flag on an ordinary storefront charge', async () => {
     const spy = mockFetch({ id: 'ORDE_S', charges: [{ id: 'CHAR_S', status: 'PAID' }] });
-    await pagbankProvider().createCharge(cardInput('order-s'), LIVE);
+    await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(cardInput('order-s'), LIVE);
 
     const body = JSON.parse((spy.mock.calls[0] as [string, RequestInit])[1].body as string) as {
       charges: Array<{ recurring?: unknown }>;
@@ -242,7 +243,7 @@ describe('pagbank adapter — charges', () => {
       id: 'ORDE_D',
       charges: [{ id: 'CHAR_D', status: 'DECLINED', payment_response: { code } }],
     });
-    const snapshot = await pagbankProvider().createCharge(cardInput('order-d'), LIVE);
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(cardInput('order-d'), LIVE);
 
     expect(snapshot.status).toBe('DECLINED');
     expect(snapshot.declineReason).toBe(reason);
@@ -271,7 +272,7 @@ describe('pagbank adapter — charges', () => {
         },
       ],
     });
-    const snapshot = await pagbankProvider().createCharge(cardInput('order-e'), LIVE);
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(cardInput('order-e'), LIVE);
 
     expect(snapshot.declineReason).toBe('EXPIRED_CARD');
     // PagBank's own verdict for the whole 20007 block, unchanged by the row.
@@ -286,7 +287,7 @@ describe('pagbank adapter — charges', () => {
       id: 'ORDE_U',
       charges: [{ id: 'CHAR_U', status: 'DECLINED', payment_response: { code: '29999' } }],
     });
-    const snapshot = await pagbankProvider().createCharge(cardInput('order-u'), LIVE);
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(cardInput('order-u'), LIVE);
 
     expect(snapshot.declineReason).toBe('CARD_DECLINED');
     expect(snapshot.declineRetriable).toBe(true);
@@ -297,7 +298,7 @@ describe('pagbank adapter — charges', () => {
       id: 'ORDE_P',
       charges: [{ id: 'CHAR_P', status: 'PAID', payment_response: { code: '20000' } }],
     });
-    const snapshot = await pagbankProvider().createCharge(cardInput('order-p'), LIVE);
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(cardInput('order-p'), LIVE);
 
     expect(snapshot.status).toBe('PAID');
     expect(snapshot.declineReason).toBeUndefined();
@@ -306,7 +307,7 @@ describe('pagbank adapter — charges', () => {
 
   it('surfaces an HTTP error as a ProviderRequestError', async () => {
     mockFetch({ error: 'bad token' }, 401);
-    await expect(pagbankProvider().createCharge(pixInput(), LIVE)).rejects.toThrow(
+    await expect(pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(pixInput(), LIVE)).rejects.toThrow(
       ProviderRequestError,
     );
   });
@@ -321,7 +322,7 @@ describe('pagbank adapter — charges', () => {
     async function failedCardCharge(): Promise<ProviderRequestError> {
       mockFetch({ error_messages: [{ code: '40002', description: 'x'.repeat(400) }] }, 400);
       try {
-        await pagbankProvider().createCharge(cardInput('order-f'), LIVE);
+        await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(cardInput('order-f'), LIVE);
       } catch (error) {
         return error as ProviderRequestError;
       }
@@ -365,7 +366,7 @@ describe('pagbank adapter — charges', () => {
 
   it('never retries a charge on an HTTP response (no double charge)', async () => {
     const spy = mockFetch({ error: 'boom' }, 500);
-    await expect(pagbankProvider().createCharge(pixInput(), LIVE)).rejects.toThrow();
+    await expect(pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(pixInput(), LIVE)).rejects.toThrow();
     // One POST only: retrying a request that REACHED PagBank could charge twice.
     expect(spy).toHaveBeenCalledTimes(1);
   });
@@ -383,7 +384,7 @@ describe('pagbank adapter — customer.phones', () => {
   async function sentCustomer(phone?: string) {
     const spy = mockFetch({ id: 'ORDE_1', qr_codes: [{ text: 'emv' }] });
     const input = pixInput();
-    await pagbankProvider().createCharge(
+    await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(
       { ...input, customer: { ...input.customer, phone } },
       LIVE,
     );
@@ -441,7 +442,7 @@ describe('pagbank adapter — order snapshots', () => {
 
   it('reports the amount PagBank captured, not a fabricated one', async () => {
     mockFetch({ id: 'ORDE_9', charges: [{ id: 'CHAR_9', status: 'PAID', amount: { value: 1234 } }] });
-    const snapshot = await pagbankProvider().getCharge('ORDE_9', CREDS);
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).getCharge('ORDE_9', CREDS);
     expect(snapshot).toMatchObject({ status: 'PAID', amount: { amountCents: 1234 } });
   });
 
@@ -450,7 +451,7 @@ describe('pagbank adapter — order snapshots', () => {
     // an order for an amount nobody reported is the worst available outcome.
     // Throwing makes the poll retry and the webhook delivery replay.
     mockFetch({ id: 'ORDE_10', charges: [{ id: 'CHAR_10', status: 'PAID' }] });
-    await expect(pagbankProvider().getCharge('ORDE_10', CREDS)).rejects.toThrow(
+    await expect(pagbankProvider(PT_BR_PAGBANK_COPY).getCharge('ORDE_10', CREDS)).rejects.toThrow(
       ProviderRequestError,
     );
   });
@@ -460,7 +461,7 @@ describe('pagbank adapter — order snapshots', () => {
     // carries no charge (and so no amount) on every single status poll, and
     // throwing would break both the buyer's screen and the reconciliation walk.
     mockFetch({ id: 'ORDE_11', qr_codes: [{ text: '00020126-emv' }] });
-    const snapshot = await pagbankProvider().getCharge('ORDE_11', CREDS);
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).getCharge('ORDE_11', CREDS);
     expect(snapshot).toMatchObject({
       status: 'PENDING',
       providerChargeId: 'ORDE_11',
@@ -471,7 +472,7 @@ describe('pagbank adapter — order snapshots', () => {
   it('rejects a webhook delivery whose PAID charge carries no amount', async () => {
     const missing = JSON.stringify({ id: 'ORDE_12', charges: [{ id: 'CHAR_12', status: 'PAID' }] });
     await expect(
-      pagbankProvider().webhook.parse(
+      pagbankProvider(PT_BR_PAGBANK_COPY).webhook.parse(
         { provider: 'pagbank', rawBody: missing, headers: {} },
         LIVE,
       ),
@@ -491,7 +492,7 @@ describe('pagbank adapter — webhooks', () => {
   const signature = createHash('sha256').update(`${token}-${body}`).digest('hex');
 
   it('accepts a delivery signed with SHA-256(token-body)', async () => {
-    const ok = await pagbankProvider().webhook.verify(
+    const ok = await pagbankProvider(PT_BR_PAGBANK_COPY).webhook.verify(
       { provider: 'pagbank', rawBody: body, headers: { 'x-authenticity-token': signature } },
       { environment: 'PRODUCTION', fields: { webhookToken: token } },
     );
@@ -499,7 +500,7 @@ describe('pagbank adapter — webhooks', () => {
   });
 
   it('rejects a tampered body, a wrong token, and a missing header', async () => {
-    const adapter = pagbankProvider();
+    const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
     const creds = { environment: 'PRODUCTION' as const, fields: { webhookToken: token } };
     await expect(
       adapter.webhook.verify(
@@ -520,7 +521,7 @@ describe('pagbank adapter — webhooks', () => {
 
   it('fails closed in live mode when no secret of any kind is configured', async () => {
     await expect(
-      pagbankProvider().webhook.verify(
+      pagbankProvider(PT_BR_PAGBANK_COPY).webhook.verify(
         { provider: 'pagbank', rawBody: body, headers: { 'x-authenticity-token': signature } },
         { environment: 'PRODUCTION', fields: {} },
       ),
@@ -540,7 +541,7 @@ describe('pagbank adapter — webhooks', () => {
       const accountToken = 'acct_tok';
       const signed = createHash('sha256').update(`${accountToken}-${body}`).digest('hex');
       await expect(
-        pagbankProvider().webhook.verify(
+        pagbankProvider(PT_BR_PAGBANK_COPY).webhook.verify(
           { provider: 'pagbank', rawBody: body, headers: { 'x-authenticity-token': signed } },
           { environment: 'PRODUCTION', fields: { token: accountToken } },
         ),
@@ -556,7 +557,7 @@ describe('pagbank adapter — webhooks', () => {
       const signedWithAccount = createHash('sha256').update(`acct_tok-${body}`).digest('hex');
 
       await expect(
-        pagbankProvider().webhook.verify(
+        pagbankProvider(PT_BR_PAGBANK_COPY).webhook.verify(
           {
             provider: 'pagbank',
             rawBody: body,
@@ -568,7 +569,7 @@ describe('pagbank adapter — webhooks', () => {
       // The override REPLACES the default rather than widening it: two live
       // secrets at once is a bigger surface than the configuration asked for.
       await expect(
-        pagbankProvider().webhook.verify(
+        pagbankProvider(PT_BR_PAGBANK_COPY).webhook.verify(
           {
             provider: 'pagbank',
             rawBody: body,
@@ -587,7 +588,7 @@ describe('pagbank adapter — webhooks', () => {
         'notificationCode=093C100E7FA87FA8C0B664B79F8359773B96&notificationType=transaction';
       const signed = createHash('sha256').update(`acct_tok-${legacyBody}`).digest('hex');
       await expect(
-        pagbankProvider().webhook.verify(
+        pagbankProvider(PT_BR_PAGBANK_COPY).webhook.verify(
           {
             provider: 'pagbank',
             rawBody: legacyBody,
@@ -600,7 +601,7 @@ describe('pagbank adapter — webhooks', () => {
   });
 
   it('parses the order payload into a PAID charge event', async () => {
-    const [event] = await pagbankProvider().webhook.parse(
+    const [event] = await pagbankProvider(PT_BR_PAGBANK_COPY).webhook.parse(
       { provider: 'pagbank', rawBody: body, headers: {} },
       LIVE,
     );
@@ -623,7 +624,7 @@ describe('pagbank adapter — webhooks', () => {
     const POSTED = 'notificationCode=093C100E7FA87FA8C0B664B79F8359773B96&notificationType=transaction';
 
     async function parse(rawBody: string) {
-      return pagbankProvider().webhook.parse({ provider: 'pagbank', rawBody, headers: {} }, LIVE);
+      return pagbankProvider(PT_BR_PAGBANK_COPY).webhook.parse({ provider: 'pagbank', rawBody, headers: {} }, LIVE);
     }
 
     it('parses the form-encoded delivery instead of throwing on it', async () => {
@@ -702,11 +703,11 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
     const merchant = { kind: 'TENANT', id: 'acme' } as const;
     // The row PIX create writes: keyed by the ORDER id, labeled as such.
     mockFetch({ id: 'ORDE_7', qr_codes: [{ text: 'emv' }] });
-    const created = await pagbankProvider().createCharge(pixInput('order-7'), LIVE);
+    const created = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(pixInput('order-7'), LIVE);
     await store.create({ merchant, reference: 'order-7', snapshot: created });
 
     // The paid webhook names the charge PagBank minted at payment time.
-    const [event] = await pagbankProvider().webhook.parse(
+    const [event] = await pagbankProvider(PT_BR_PAGBANK_COPY).webhook.parse(
       {
         provider: 'pagbank',
         rawBody: JSON.stringify({
@@ -734,7 +735,7 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
         id: 'ORDE_2',
         charges: [{ id: 'CHAR_2', status: 'PAID', amount: { value: 99_90 } }],
       });
-      const snapshot = await pagbankProvider().getCharge('CHAR_2', CREDS, { orderId: 'ORDE_2' });
+      const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).getCharge('CHAR_2', CREDS, { orderId: 'ORDE_2' });
       expect((spy.mock.calls[0] as [string])[0]).toBe(
         'https://sandbox.api.pagseguro.com/orders/ORDE_2',
       );
@@ -750,7 +751,7 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
         status: 'PAID',
         amount: { value: 99_90 },
       });
-      const snapshot = await pagbankProvider().getCharge('CHAR_3', CREDS);
+      const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).getCharge('CHAR_3', CREDS);
       expect((spy.mock.calls[0] as [string])[0]).toBe(
         'https://sandbox.api.pagseguro.com/charges/CHAR_3',
       );
@@ -764,7 +765,7 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
 
     it('polls /orders/{id} for a PIX row keyed by its order id', async () => {
       const spy = mockFetch({ id: 'ORDE_4', qr_codes: [{ text: 'emv' }] });
-      const snapshot = await pagbankProvider().getCharge('ORDE_4', CREDS);
+      const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).getCharge('ORDE_4', CREDS);
       expect((spy.mock.calls[0] as [string])[0]).toBe(
         'https://sandbox.api.pagseguro.com/orders/ORDE_4',
       );
@@ -778,7 +779,7 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
         { id: 'ORDE_5', charges: [{ id: 'CHAR_5', status: 'PAID', amount: { value: 12_50 } }] },
         { id: 'CHAR_5', status: 'CANCELED' },
       ]);
-      const refund = await pagbankProvider().refund!({ providerChargeId: 'ORDE_5' }, CREDS);
+      const refund = await pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'ORDE_5' }, CREDS);
 
       expect(calls[0]![0]).toBe('https://sandbox.api.pagseguro.com/orders/ORDE_5');
       expect(calls[1]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_5/cancel');
@@ -787,7 +788,7 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
 
     it('cancels a charge id directly, with no order read', async () => {
       const calls = mockFetchQueue([{ id: 'CHAR_6', status: 'CANCELED' }]);
-      await pagbankProvider().refund!({ providerChargeId: 'CHAR_6' }, CREDS);
+      await pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'CHAR_6' }, CREDS);
       expect(calls).toHaveLength(1);
       expect(calls[0]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_6/cancel');
     });
@@ -795,7 +796,7 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
     it('refuses to refund an order nobody paid instead of 404-ing blind', async () => {
       mockFetch({ id: 'ORDE_6', qr_codes: [{ text: 'emv' }] });
       await expect(
-        pagbankProvider().refund!({ providerChargeId: 'ORDE_6' }, CREDS),
+        pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'ORDE_6' }, CREDS),
       ).rejects.toThrow(ProviderRequestError);
     });
   });
@@ -806,7 +807,7 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
         id: 'ORDE_8',
         qr_codes: [{ text: 'emv', expiration_date: '2020-01-01T00:00:00Z' }],
       });
-      const snapshot = await pagbankProvider().getCharge('ORDE_8', CREDS);
+      const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).getCharge('ORDE_8', CREDS);
       expect(snapshot.status).toBe('EXPIRED');
     });
 
@@ -819,7 +820,7 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
         id: 'ORDE_8',
         qr_codes: [{ text: 'emv', expiration_date: '2030-01-01T12:00:00Z' }],
       });
-      const snapshot = await pagbankProvider().getCharge('ORDE_8', CREDS);
+      const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).getCharge('ORDE_8', CREDS);
       now.mockRestore();
       expect(snapshot.status).toBe('PENDING');
     });
@@ -828,7 +829,7 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
   describe('canceled and refunded charges stop collapsing into PENDING', () => {
     async function polledStatus(charge: Record<string, unknown>) {
       mockFetch({ id: 'ORDE_9', charges: [charge] });
-      return (await pagbankProvider().getCharge('ORDE_9', CREDS)).status;
+      return (await pagbankProvider(PT_BR_PAGBANK_COPY).getCharge('ORDE_9', CREDS)).status;
     }
 
     it('maps a voided charge to CANCELED and a refunded one to REFUNDED', async () => {
@@ -857,7 +858,7 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
           },
         ],
       });
-      const events = await pagbankProvider().webhook.parse(
+      const events = await pagbankProvider(PT_BR_PAGBANK_COPY).webhook.parse(
         { provider: 'pagbank', rawBody, headers: {} },
         LIVE,
       );
@@ -884,7 +885,7 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
         id: 'ORDE_11',
         charges: [{ id: 'CHAR_11', status: 'CANCELED' }],
       });
-      const events = await pagbankProvider().webhook.parse(
+      const events = await pagbankProvider(PT_BR_PAGBANK_COPY).webhook.parse(
         { provider: 'pagbank', rawBody, headers: {} },
         LIVE,
       );
@@ -897,11 +898,11 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
 describe('pagbank adapter — wallet capability and client config (FUT-471)', () => {
   it('declares the Google Pay wallet in its capability table', () => {
     // The single source the gateway's skip and the checkout's button gate on.
-    expect(pagbankProvider().capabilities.wallets).toContain('GOOGLE_PAY');
+    expect(pagbankProvider(PT_BR_PAGBANK_COPY).capabilities.wallets).toContain('GOOGLE_PAY');
   });
 
   it('publishes the PAYMENT_GATEWAY parameters when the connection carries a merchant id', () => {
-    const config = pagbankProvider().clientConfig({
+    const config = pagbankProvider(PT_BR_PAGBANK_COPY).clientConfig({
       environment: 'SANDBOX',
       fields: { token: 't', googlePayMerchantId: 'MID_123' },
     });
@@ -913,7 +914,7 @@ describe('pagbank adapter — wallet capability and client config (FUT-471)', ()
   it('publishes a null merchant id for a connection that has none', () => {
     // The button must not render for this store: a token minted against a
     // missing gatewayMerchantId charges nobody. Blank normalizes to null too.
-    const config = pagbankProvider().clientConfig({
+    const config = pagbankProvider(PT_BR_PAGBANK_COPY).clientConfig({
       environment: 'SANDBOX',
       fields: { token: 't', googlePayMerchantId: '' },
     });

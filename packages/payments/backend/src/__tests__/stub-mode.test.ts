@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { PT_BR_ACTIVATION_COPY } from '../activation/pt-BR';
 import { settleActivationCharge } from '../activation/webhook';
 import { credentialsForVerification } from '../activation/verify-charge';
 import { createSettingsService, credentialStoreFrom } from '../config/service';
@@ -18,6 +19,7 @@ import { infinitePayProvider } from '../providers/infinitepay';
 import { pagbankProvider } from '../providers/pagbank';
 import { stoneProvider } from '../providers/stone';
 import { stripeProvider } from '../providers/stripe';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '../providers/pt-BR';
 
 /**
  * Stub mode is never inferred, and never available in production (FUT-696).
@@ -79,7 +81,7 @@ function stubbedRow(provider: string): StoredProviderConfig {
 async function webhookWorld(allowStubMode: boolean) {
   const store = createMemoryProviderConfigStore();
   await store.save(TENANT, stubbedRow('infinitepay'));
-  const providers = defineProviders({ infinitepay: infinitePayProvider() } as const);
+  const providers = defineProviders({ infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY) } as const);
   const settings = createSettingsService(providers, store, { allowStubMode });
   const settled: string[] = [];
   const gateway = createPaymentsGateway({
@@ -145,7 +147,7 @@ describe('stubDeliveryTrusted — the one condition every verifier shares', () =
 
   it('is what every adapter with a secret-shaped verifier asks', async () => {
     const unsigned: WebhookDelivery = { provider: 'x', rawBody: '{}', headers: {} };
-    const adapters = [stripeProvider(), stoneProvider(), pagbankProvider()];
+    const adapters = [stripeProvider(PT_BR_STRIPE_COPY), stoneProvider(PT_BR_STONE_COPY), pagbankProvider(PT_BR_PAGBANK_COPY)];
     for (const adapter of adapters) {
       // No secret configured is the only way into the stub branch at all —
       // and a PRODUCTION connection must still fail closed there.
@@ -216,7 +218,8 @@ describe('a production deployment (stub mode never granted)', () => {
     const rows = createMemoryProviderConfigStore();
     await rows.save(TENANT, stubbedRow('stone'));
     const ctx = {
-      providers: defineProviders({ stone: stoneProvider() } as const),
+      providers: defineProviders({ stone: stoneProvider(PT_BR_STONE_COPY) } as const),
+      copy: PT_BR_ACTIVATION_COPY,
       config: rows,
       settings: {
         getPendingVerification: async () => null,
@@ -254,7 +257,7 @@ describe('a production deployment (stub mode never granted)', () => {
     const row = stubbedRow('stone');
     row.environments.SANDBOX = { secretKey: 'e2e-stub-token' };
     await rows.save(TENANT, row);
-    const registry = defineProviders({ stone: stoneProvider() } as const);
+    const registry = defineProviders({ stone: stoneProvider(PT_BR_STONE_COPY) } as const);
     const strict = createSettingsService(registry, rows);
 
     const result = await strict.verify(TENANT, 'stone');
@@ -304,7 +307,7 @@ describe('a dev deployment with PAYMENTS_STUB=1', () => {
     );
     const rows = createMemoryProviderConfigStore();
     await rows.save(TENANT, stubbedRow('stone'));
-    const registry = defineProviders({ stone: stoneProvider() } as const);
+    const registry = defineProviders({ stone: stoneProvider(PT_BR_STONE_COPY) } as const);
     const dev = createSettingsService(registry, rows, { allowStubMode: true });
 
     const result = await dev.verify(TENANT, 'stone');

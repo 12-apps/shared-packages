@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pagbankProvider } from '../providers/pagbank';
 import { stoneProvider } from '../providers/stone';
 import { stripeProvider } from '../providers/stripe';
+import { PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '../providers/pt-BR';
 
 /**
  * FUT-695 — a probe that never got an answer must say UNREACHABLE.
@@ -22,7 +23,7 @@ describe('verifyCredentials transport classification (stripe, pagbank, stone)', 
     {
       name: 'stripe',
       probe: () =>
-        stripeProvider().verifyCredentials({
+        stripeProvider(PT_BR_STRIPE_COPY).verifyCredentials({
           environment: 'PRODUCTION',
           fields: { secretKey: 'sk_live_x' },
           stub: false,
@@ -31,7 +32,7 @@ describe('verifyCredentials transport classification (stripe, pagbank, stone)', 
     {
       name: 'pagbank',
       probe: () =>
-        pagbankProvider().verifyCredentials({
+        pagbankProvider(PT_BR_PAGBANK_COPY).verifyCredentials({
           environment: 'PRODUCTION',
           fields: { token: 'tok-x' },
           stub: false,
@@ -40,7 +41,7 @@ describe('verifyCredentials transport classification (stripe, pagbank, stone)', 
     {
       name: 'stone',
       probe: () =>
-        stoneProvider().verifyCredentials({
+        stoneProvider(PT_BR_STONE_COPY).verifyCredentials({
           environment: 'PRODUCTION',
           fields: { secretKey: 'sk_live_x' },
           stub: false,
@@ -96,7 +97,7 @@ describe('verifyCredentials transport classification (stripe, pagbank, stone)', 
             headers: { 'content-type': 'application/json' },
           }),
       );
-      const result = await pagbankProvider().verifyCredentials({
+      const result = await pagbankProvider(PT_BR_PAGBANK_COPY).verifyCredentials({
         environment: 'PRODUCTION',
         fields: { token: 'tok-x' },
         stub: false,

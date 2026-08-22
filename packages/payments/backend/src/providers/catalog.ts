@@ -1,4 +1,5 @@
 import type { PaymentProviderAdapter } from '../core/provider';
+import type { ProviderCopyPacks } from './copy';
 import { infinitePayProvider } from './infinitepay';
 import { pagbankProvider } from './pagbank';
 import { stoneProvider } from './stone';
@@ -31,9 +32,17 @@ export const providerCatalog = {
   stone: stoneProvider,
   infinitepay: infinitePayProvider,
   stripe: stripeProvider,
-} as const satisfies Record<string, () => PaymentProviderAdapter>;
+} as const satisfies {
+  [K in keyof ProviderCopyPacks]: (copy: ProviderCopyPacks[K]) => PaymentProviderAdapter;
+};
 
 /** Fresh instances of every shipped adapter — a contract sweep's input. */
-export function allProviderAdapters(): PaymentProviderAdapter[] {
-  return Object.values(providerCatalog).map((create) => create());
+export function allProviderAdapters(copy: ProviderCopyPacks): PaymentProviderAdapter[] {
+  // Still ENUMERATED rather than listed: the cast is over the union of pack
+  // types, which the `satisfies` above has already proven line up key by key.
+  return Object.entries(providerCatalog).map(([name, create]) =>
+    (create as (pack: ProviderCopyPacks[keyof ProviderCopyPacks]) => PaymentProviderAdapter)(
+      copy[name as keyof ProviderCopyPacks],
+    ),
+  );
 }

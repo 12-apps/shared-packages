@@ -12,6 +12,7 @@ import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
 
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
+import { PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
 
 /**
  * The OAuth branch's layout contract (FUT-691).
@@ -182,7 +183,7 @@ describe('PaymentProviderSettings — the OAuth branch layout (FUT-691)', () => 
    * which is the point of asserting it from the outside.
    */
   it('opens stripe on the dashboard section for a connected store, outside the accordion', async () => {
-    const adapter = stripeProvider();
+    const adapter = stripeProvider(PT_BR_STRIPE_COPY);
     const descriptor = {
       name: adapter.name,
       displayName: adapter.displayName,

@@ -5,6 +5,7 @@ import type {
   DeclineReason,
   PaymentMethodKind,
 } from '../core/types';
+import type { StoneCopy } from './copy';
 import { capturedAmountCents, chargeDescription } from './shared';
 import { NAME, customerType, documentDigits } from './stone-http';
 
@@ -195,19 +196,19 @@ function pixPayment(input: ChargeInput): Record<string, unknown> {
   };
 }
 
-function boletoPayment(input: ChargeInput): Record<string, unknown> {
+function boletoPayment(input: ChargeInput, copy: StoneCopy): Record<string, unknown> {
   return {
     payment_method: 'boleto',
-    boleto: { instructions: 'Pagar até o vencimento', due_at: input.boleto?.dueDate },
+    boleto: { instructions: copy.payer.boletoInstructions, due_at: input.boleto?.dueDate },
   };
 }
 
-function cardPayment(input: ChargeInput): Record<string, unknown> {
+function cardPayment(input: ChargeInput, copy: StoneCopy): Record<string, unknown> {
   return {
     payment_method: 'credit_card',
     credit_card: {
       installments: input.card?.installments ?? 1,
-      statement_descriptor: 'PEDIDO',
+      statement_descriptor: copy.payer.statementDescriptor,
       // A saved card charges by its vault id; a fresh one by the token the
       // browser minted with the PUBLIC key. No PAN ever reaches this process.
       ...(input.card?.savedCardToken
@@ -217,23 +218,34 @@ function cardPayment(input: ChargeInput): Record<string, unknown> {
   };
 }
 
-const BY_METHOD = {
+/**
+ * Kept as a TABLE rather than a switch so a new `PaymentMethodKind` fails
+ * typecheck here instead of falling through to a card payload.
+ *
+ * PIX's entry ignores the copy — the code Stone mints carries no words of
+ * ours — and says so by taking only what it uses; the call below supplies both
+ * arguments and TypeScript accepts the narrower signature.
+ */
+const BY_METHOD: Record<
+  PaymentMethodKind,
+  (input: ChargeInput, copy: StoneCopy) => Record<string, unknown>
+> = {
   PIX: pixPayment,
   BOLETO: boletoPayment,
   CARD: cardPayment,
-} as const;
+};
 
-function paymentPayload(input: ChargeInput): Record<string, unknown> {
-  return BY_METHOD[input.method](input);
+function paymentPayload(input: ChargeInput, copy: StoneCopy): Record<string, unknown> {
+  return BY_METHOD[input.method](input, copy);
 }
 
 /** The full `POST /orders` body for one charge. */
-export function orderPayload(input: ChargeInput): Record<string, unknown> {
+export function orderPayload(input: ChargeInput, copy: StoneCopy): Record<string, unknown> {
   return {
     code: input.reference,
     customer: customerPayload(input),
     items: itemsPayload(input),
-    payments: [paymentPayload(input)],
+    payments: [paymentPayload(input, copy)],
     metadata: { ...input.metadata, reference: input.reference },
     closed: true,
   };
