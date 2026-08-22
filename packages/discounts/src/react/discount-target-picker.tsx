@@ -9,16 +9,18 @@ import type { ComboRequirement } from "../engine/types";
 import type { WireTargetGroup } from "./api";
 import { ComboSlotBuilder } from "./combo-slot-builder";
 import { fill, type DiscountsWebCopy } from "./copy";
+import { FreeUnitsBuilder } from "./free-units-builder";
 import { TargetPickerField } from "./target-picker-field";
 
 /**
  * What a scoped discount points at, picked from the host's own collections.
  *
- * This file is the ROUTER: it reads the scope and decides which shape the
+ * This file is the ROUTER: it reads the KIND and decides which shape the
  * targets take. The controls themselves live next door — one collection's
  * picker in `target-picker-field`, the quantified group list in
- * `combo-slot-builder` — because the combo builder needs the former per group
- * and a file cannot import its own importer.
+ * `combo-slot-builder`, the one-group "leve 3, pague 2" in
+ * `free-units-builder` — because the builders need the picker per group and a
+ * file cannot import its own importer.
  *
  * Which collections exist is not decided here. The surface reads them from
  * `GET /discounts/targets`, which answers whatever the host registered — so
@@ -61,17 +63,17 @@ function scopeFor(targetType: string): string {
 }
 
 /**
- * The scope-driven target block.
+ * The kind-driven target block.
  *
- * Reads the LIVE `scope` from the form context, so flipping the toggle swaps
- * the picker immediately without the parent form having to mirror the value
- * into its own state.
+ * Reads the LIVE `kind` and `scope` from the form context, so flipping either
+ * toggle swaps the control immediately without the parent form having to mirror
+ * the value into its own state.
  *
- * COMBO is the third branch (FUT-268) and it is a different SHAPE, not another
- * picker: a combo is a list of quantified groups, so it gets the builder and
- * every collection at once, while CATEGORY and ITEM each get exactly one
- * collection's picker. ORDER still renders nothing — an order-wide discount
- * covers everything, so a target list there is not empty, it is meaningless.
+ * The two combo kinds are a different SHAPE, not another picker (FUT-268): a
+ * combo is a list of quantified groups, so it gets a builder and every
+ * collection at once, while CATEGORY and ITEM each get exactly one collection's
+ * picker. ORDER renders nothing — an order-wide discount covers everything, so
+ * a target list there is not empty, it is meaningless.
  */
 export function DiscountTargetPicker({
   groups,
@@ -82,10 +84,25 @@ export function DiscountTargetPicker({
   copy: DiscountsWebCopy;
   selection: DiscountTargetSelection;
 }): JSX.Element | null {
-  const { values } = useFormContext();
+  const { values, errors, setFieldValue } = useFormContext();
+  const kind = values.kind ?? "PERCENTAGE";
   const scope = values.scope ?? "ORDER";
 
-  if (scope === "COMBO") {
+  if (kind === "FREE_UNITS") {
+    return (
+      <FreeUnitsBuilder
+        slots={selection.comboRequirements}
+        groups={groups}
+        copy={copy}
+        freeUnits={values.freeUnits ?? ""}
+        error={errors.freeUnits}
+        onChange={selection.onComboRequirementsChange}
+        onFreeUnitsChange={(next) => setFieldValue("freeUnits", next)}
+      />
+    );
+  }
+
+  if (kind === "COMBO" || kind === "BUNDLE_PRICE") {
     return (
       <ComboSlotBuilder
         slots={selection.comboRequirements}

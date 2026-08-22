@@ -43,6 +43,13 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     no: "Não",
   },
   labels: {
+    kind: {
+      PERCENTAGE: "Porcentagem",
+      FIXED_AMOUNT: "Valor fixo",
+      COMBO: "Combo",
+      FREE_UNITS: "Itens grátis",
+      BUNDLE_PRICE: "Preço de combo",
+    },
     type: {
       PERCENTAGE: "Porcentagem",
       FIXED_AMOUNT: "Valor fixo",
@@ -78,6 +85,9 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     submitEdit: "Salvar alterações",
     name: "Nome da promoção",
     type: "Tipo",
+    kind: "Tipo de promoção",
+    comboReward: "Desconto do combo",
+    comboRewardHint: "O combo sai pelo preço dos itens menos este desconto.",
     percentOff: "Desconto (%)",
     percentPlaceholder: "10",
     amountOff: "Valor do desconto",
@@ -96,6 +106,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     perBuyerLimit: "Limite por cliente",
     maxComboApplications: "Combos por pedido",
     maxComboApplicationsHint: "Deixe em branco para valer quantas vezes couber no carrinho.",
+    maxFreeUnitsApplications: "Vezes por pedido",
     active: "Ativo",
     activeHint: "Desligue para pausar a promoção sem excluí-la.",
     stackable: "Acumulável",
@@ -110,6 +121,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     invalidFreeUnits: "Informe quantos itens saem de graça, a partir de 1.",
     freeUnitsExceedCombo:
       "O combo tem {units} itens; deixe grátis no máximo {max} para ainda ser uma promoção.",
+    freeUnitsTargetRequired: "Escolha ao menos um produto para a promoção.",
     codeRequired: "Informe o código do cupom que o cliente vai digitar.",
     categoryTargetRequired: "Selecione ao menos uma categoria para este desconto.",
     itemTargetRequired: "Selecione ao menos um produto para este desconto.",
@@ -129,6 +141,12 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     pick: "{collection} deste grupo",
     empty: "Nenhum grupo ainda. Adicione o primeiro para montar o combo.",
     summary: "O combo leva {units} itens em {groups} grupos.",
+    freeUnitsTitle: "Leve mais, pague menos",
+    freeUnitsHint:
+      "Escolha os produtos, quantos o cliente leva e quantos saem de graça — é o clássico \"leve 3, pague 2\".",
+    buyQuantity: "O cliente leva",
+    freeUnitsPick: "{collection} da promoção",
+    freeUnitsSummary: "Leve {units}, pague {paid}.",
   },
   targets: {
     pick: "{collection} com desconto",
