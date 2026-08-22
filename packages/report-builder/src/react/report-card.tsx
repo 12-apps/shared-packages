@@ -26,6 +26,8 @@ import type { SavedReportSummary } from "./custom-reports-api";
 import { PlusIcon } from "./lib/block-icons";
 import { CONTAINER_RADIUS_PX, stateChipSx } from "./lib/report-surface";
 import { blockCountLabel, relativeReportTime, visibilityLabel } from "./report-list-filters";
+import type { ReportListCopy } from "./screens-copy";
+import { useReportCopy } from "./transport-context";
 
 /** The card's ⋮, revealed by hover OR focus — see {@link CARD_SX}. */
 const MENU_ATTR = "data-report-card-menu";
@@ -133,18 +135,20 @@ function Sparkline({ blockCount }: { blockCount: number }): JSX.Element {
  */
 export function reportCardChip(
   report: SavedReportSummary,
+  copy: ReportListCopy,
 ): { label: string; tone: "warning" | "muted" } | null {
-  if (report.status === "draft") return { label: "Rascunho", tone: "warning" };
-  if (report.status === "archived") return { label: "Arquivado", tone: "muted" };
+  if (report.status === "draft") return { label: copy.chipDraft, tone: "warning" };
+  if (report.status === "archived") return { label: copy.chipArchived, tone: "muted" };
   if (report.hasUnpublishedChanges) {
-    return { label: "Alterações não publicadas", tone: "warning" };
+    return { label: copy.chipUnpublished, tone: "warning" };
   }
   return null;
 }
 
 function StatusChips({ report }: { report: SavedReportSummary }): JSX.Element | null {
   const theme = useTheme();
-  const chip = reportCardChip(report);
+  const copy = useReportCopy().screens.list;
+  const chip = reportCardChip(report, copy);
   if (!chip) return null;
   return (
     // The tint and the label colour are computed against the surface (see
@@ -170,6 +174,7 @@ function StatusChips({ report }: { report: SavedReportSummary }): JSX.Element | 
 
 /** "3 blocos · Toda a equipe" on the left, "há 2 min" pushed to the right. */
 function CardFooter({ report, now }: { report: SavedReportSummary; now: Date }): JSX.Element {
+  const copy = useReportCopy().screens.list;
   return (
     <Stack
       direction="row"
@@ -177,17 +182,17 @@ function CardFooter({ report, now }: { report: SavedReportSummary; now: Date }):
       sx={{ alignItems: "center", mt: "auto", pt: 0.75, width: "100%", minWidth: 0 }}
     >
       <Text variant="body" size="xs" color="secondary" as="span">
-        {blockCountLabel(report.blockCount)}
+        {blockCountLabel(report.blockCount, copy)}
       </Text>
       <Text variant="body" size="xs" color="secondary" as="span" aria-hidden="true">
         ·
       </Text>
       <Text variant="body" size="xs" color="secondary" as="span">
-        {visibilityLabel(report.visibility)}
+        {visibilityLabel(report.visibility, copy)}
       </Text>
       <Box sx={{ flex: 1 }} />
       <Text variant="body" size="xs" color="secondary" as="span">
-        {relativeReportTime(report.updatedAt, now)}
+        {relativeReportTime(report.updatedAt, now, copy.relativeTime)}
       </Text>
     </Stack>
   );
@@ -195,6 +200,7 @@ function CardFooter({ report, now }: { report: SavedReportSummary; now: Date }):
 
 /** Everything inside the card, in reading order: name, what, how big, when. */
 function CardBody({ report, now }: { report: SavedReportSummary; now: Date }): JSX.Element {
+  const copy = useReportCopy().screens.list;
   return (
     <Stack spacing={1} sx={{ width: "100%", height: "100%", minWidth: 0 }}>
       <Stack
@@ -210,7 +216,7 @@ function CardBody({ report, now }: { report: SavedReportSummary; now: Date }): J
         <StatusChips report={report} />
       </Stack>
       <Text variant="body" size="sm" color="secondary" as="p" style={CLAMP_2}>
-        {report.description ?? "Sem descrição."}
+        {report.description ?? copy.noDescription}
       </Text>
       <Sparkline blockCount={report.blockCount} />
       <CardFooter report={report} now={now} />
@@ -240,13 +246,14 @@ function CardMenu({
   onEdit: () => void;
   onArchive: () => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.list;
   const items: DropdownMenuItem[] = [
-    { id: "edit", label: "Editar", onClick: onEdit },
+    { id: "edit", label: copy.edit, onClick: onEdit },
     {
       id: "archive",
       // Reachable from the CARD because opening a report now navigates away
       // (FUT-755); without it, filing a report costs a round trip and back.
-      label: report.status === "archived" ? "Restaurar" : "Arquivar",
+      label: report.status === "archived" ? copy.restore : copy.archive,
       onClick: onArchive,
     },
   ];
@@ -272,7 +279,7 @@ function CardMenu({
           <Button
             variant="ghost"
             size="sm"
-            aria-label={`Mais ações de ${report.name}`}
+            aria-label={copy.cardMenu(report.name)}
             dataTestId={`reports-card-${report.id}-menu`}
           >
             ⋮
@@ -316,6 +323,7 @@ export function ReportCard({
 
 /** The dashed tile that closes the grid — `prototype.html`'s `.card.new`. */
 export function NewReportCard({ onCreate }: { onCreate: () => void }): JSX.Element {
+  const copy = useReportCopy().screens.list;
   return (
     <Button
       variant="text"
@@ -342,10 +350,10 @@ export function NewReportCard({ onCreate }: { onCreate: () => void }): JSX.Eleme
     >
       <PlusIcon />
       <Text variant="body" size="sm" weight="semibold" as="span">
-        Novo relatório
+        {copy.newCardTitle}
       </Text>
       <Text variant="body" size="xs" color="secondary" as="span">
-        Comece de um modelo
+        {copy.newCardHint}
       </Text>
     </Button>
   );

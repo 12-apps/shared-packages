@@ -24,7 +24,8 @@ import { Input } from "@12-apps/ui/form/Input";
 import { Box } from "@12-apps/ui/mui/Box";
 
 import { CONTROL_HEIGHT_PX, CONTROL_ROW_SX } from "./lib/report-surface";
-import { REPORT_SCOPE_LABELS, REPORT_SCOPES, type ReportScope } from "./report-list-filters";
+import { reportScopeLabels, REPORT_SCOPES, type ReportScope } from "./report-list-filters";
+import { useReportCopy } from "./transport-context";
 
 /** Magnifier, inside the field on the left — the prototype's `.search svg`. */
 function SearchIcon(): JSX.Element {
@@ -72,6 +73,7 @@ function ScopePills({
   scope: ReportScope;
   onScopeChange: (scope: ReportScope) => void;
 }): JSX.Element {
+  const labels = reportScopeLabels(useReportCopy().screens.list);
   return (
     <>
       {REPORT_SCOPES.map((option) => (
@@ -87,7 +89,7 @@ function ScopePills({
           sx={{ borderRadius: "999px", flexShrink: 0 }}
           data-testid={`reports-scope-${option}`}
         >
-          {REPORT_SCOPE_LABELS[option]}
+          {labels[option]}
         </Button>
       ))}
     </>
@@ -107,6 +109,7 @@ export function ReportListToolbar({
   onSearchChange: (search: string) => void;
   onCreate: () => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.list;
   return (
     <Box
       sx={{
@@ -138,8 +141,8 @@ export function ReportListToolbar({
           size="sm"
           fullWidth
           type="search"
-          aria-label="Buscar relatório"
-          placeholder="Buscar relatório"
+          aria-label={copy.search}
+          placeholder={copy.search}
           startAdornment={<SearchIcon />}
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
@@ -157,7 +160,7 @@ export function ReportListToolbar({
         sx={{ ml: "auto", height: `${CONTROL_HEIGHT_PX}px`, whiteSpace: "nowrap", flexShrink: 0 }}
         data-testid="reports-new"
       >
-        Novo relatório
+        {copy.create}
       </Button>
     </Box>
   );
