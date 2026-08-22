@@ -24,7 +24,9 @@ export default defineConfig({
     'next/index': 'src/next/index.ts',
     'server/index': 'src/server/index.ts',
     'hono/index': 'src/hono/index.ts',
-    'coverage-gate/index': 'src/coverage-gate/index.ts'
+    'coverage-gate/index': 'src/coverage-gate/index.ts',
+    'manifest/index': 'src/manifest/index.ts',
+    'manifest/server': 'src/manifest/server.ts',
 },
   format: ['esm'],
   dts: true,

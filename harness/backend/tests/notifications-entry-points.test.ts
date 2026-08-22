@@ -56,6 +56,30 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
     expect(advertised).toEqual(proven);
   });
 
+  it('serves every subpath from ONE build output — no src/dist straddle', () => {
+    // The dual-package hazard, in the currency that actually bit. This package
+    // ships COMPILED entries, and for one release `./manifest/server` pointed
+    // at `src` while `./server` pointed at `dist`. A host importing both then
+    // held TWO copies of the module — so the error class the manifest's
+    // factory threw was NOT the class the host's `instanceof` tested against,
+    // and a 403 the host translates escaped untranslated as the package's own
+    // error type. It type-checked perfectly and passed every unit suite,
+    // because inside this repo both specifiers resolve to the same source.
+    //
+    // The invariant is cheap and total: whatever a subpath resolves to, every
+    // subpath must resolve into the same tree. Mixing them is the bug.
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as {
+      exports: Record<string, string | { default?: string }>;
+    };
+    const targets = Object.entries(manifest.exports)
+      .filter(([subpath]) => subpath !== './package.json')
+      .map(([subpath, value]) => [subpath, typeof value === 'string' ? value : (value.default ?? '')] as const);
+
+    const straddling = targets.filter(([, target]) => target.startsWith('./src/'));
+    expect(straddling).toEqual([]);
+    expect(targets.every(([, target]) => target.startsWith('./dist/'))).toBe(true);
+  });
+
   it('the MANIFEST subpaths carry the wiring declaration a host adopts', () => {
     // The subpath a consumer's `adoptServer` reads, imported from the TARBALL
     // rather than from source — which is the only place the `files` globs,
