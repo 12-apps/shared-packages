@@ -31,13 +31,11 @@ import { ReportBreadcrumbs, type ReportCrumb } from "./lib/report-breadcrumbs";
 import { ReportStatusChip } from "./lib/report-status-chip";
 import { CONTROL_ROW_SX } from "./lib/report-surface";
 import type { AutosaveState } from "./lib/use-autosave";
+import type { ReportEditorCopy, ReportScreensCopy } from "./screens-copy";
+import { useReportCopy } from "./transport-context";
 
 /** Who can see it, in the words the subtitle uses. */
-const VISIBILITY_WORDS: Record<PublishDraft["visibility"], string> = {
-  private: "só você",
-  tenant: "toda a equipe",
-  roles: "cargos específicos",
-};
+
 
 /**
  * "0 blocos · só você" — derived, never written down.
@@ -47,9 +45,15 @@ const VISIBILITY_WORDS: Record<PublishDraft["visibility"], string> = {
  * seconds. The singular is the case a naive `${n} blocos` gets wrong, and it
  * is also the most common one — every report passes through exactly one block.
  */
-export function editorSubtitle(blockCount: number, publish: PublishDraft): string {
-  const blocks = blockCount === 1 ? "1 bloco" : `${blockCount} blocos`;
-  return `${blocks} · ${VISIBILITY_WORDS[publish.visibility]}`;
+export function editorSubtitle(
+  blockCount: number,
+  publish: PublishDraft,
+  copy: ReportScreensCopy,
+): string {
+  return copy.editor.subtitle(
+    copy.list.blockCount(blockCount),
+    copy.editor.visibilityWords[publish.visibility] ?? "",
+  );
 }
 
 /**
@@ -96,13 +100,14 @@ function NameAndStatus({
   subtitle: string;
   onNameChange: (name: string) => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.editor;
   return (
     <Stack spacing={0.25} sx={{ flex: 1, minWidth: 180 }}>
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
         <Box sx={{ flex: 1, minWidth: 140, ...NAME_INPUT_SX }}>
           <Input
-            aria-label="Nome do relatório"
-            placeholder="Relatório sem título"
+            aria-label={copy.nameLabel}
+            placeholder={copy.namePlaceholder}
             value={name}
             onChange={(event) => onNameChange(event.target.value)}
             data-testid="report-editor-name"
@@ -134,6 +139,7 @@ function NameAndStatus({
  * broke and they are gone.
  */
 function AutosaveNotice({ autosave }: { autosave: AutosaveState }): JSX.Element | null {
+  const copy = useReportCopy().screens.editor;
   if (autosave !== "saving" && autosave !== "error") return null;
   const failed = autosave === "error";
   return (
@@ -145,8 +151,8 @@ function AutosaveNotice({ autosave }: { autosave: AutosaveState }): JSX.Element 
       data-testid="report-editor-autosave"
     >
       {failed
-        ? "Não foi possível salvar automaticamente. Suas alterações continuam aqui."
-        : "Salvando automaticamente…"}
+        ? copy.autosaveFailed
+        : copy.autosaving}
     </Text>
   );
 }
@@ -167,6 +173,7 @@ function HeaderActions({
   onCancel: () => void;
   onSave: () => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.editor;
   return (
     <Stack
       direction="row"
@@ -185,7 +192,7 @@ function HeaderActions({
           role="status"
           data-testid="report-editor-dirty"
         >
-          Alterações não salvas
+          {copy.unsavedChanges}
         </Text>
       ) : null}
       <Button
@@ -195,7 +202,7 @@ function HeaderActions({
         onClick={onOpenSettings}
         dataTestId="report-editor-settings"
       >
-        ⚙ Ajustes
+        {copy.settings}
       </Button>
       <Button variant="outline" size="sm" onClick={onCancel} dataTestId="report-editor-cancel">
         Descartar
@@ -207,7 +214,7 @@ function HeaderActions({
         disabled={saving}
         dataTestId="report-editor-save"
       >
-        {saving ? "Salvando…" : "Salvar ⌘S"}
+        {saving ? copy.saving : copy.save}
       </Button>
     </Stack>
   );
@@ -231,15 +238,20 @@ function HeaderActions({
  * `beforeunload` guard in `use-unsaved-changes` covers closing the tab, so
  * between them every exit this package can see is covered.
  */
-function editorCrumbs(tenantSlug: string, name: string, editId?: string): ReportCrumb[] {
+function editorCrumbs(
+  tenantSlug: string,
+  name: string,
+  copy: ReportEditorCopy,
+  editId?: string,
+): ReportCrumb[] {
   const list: ReportCrumb = {
-    label: "Relatórios",
+    label: copy.breadcrumbList,
     href: `/${tenantSlug}/reports`,
     ...(editId ? {} : { dataTestId: "report-editor-back" }),
   };
   // The name is being typed as this renders, so an empty one is a real state
   // and needs the same placeholder the input shows.
-  const reportLabel = name.trim() || "Relatório sem título";
+  const reportLabel = name.trim() || copy.namePlaceholder;
   if (!editId) return [list, { label: reportLabel }];
   return [
     list,
@@ -248,7 +260,7 @@ function editorCrumbs(tenantSlug: string, name: string, editId?: string): Report
       href: `/${tenantSlug}/reports/${editId}`,
       dataTestId: "report-editor-back",
     },
-    { label: "Editando" },
+    { label: copy.breadcrumbEditing },
   ];
 }
 
@@ -290,10 +302,11 @@ export function ReportEditorHeader({
    */
   onBeforeExit?: (href: string) => boolean;
 }): JSX.Element {
+  const screens = useReportCopy().screens;
   return (
     <Stack spacing={1}>
       <ReportBreadcrumbs
-        crumbs={editorCrumbs(tenantSlug, name, editId)}
+        crumbs={editorCrumbs(tenantSlug, name, screens.editor, editId)}
         dataTestId="report-editor-crumbs"
         {...(onBeforeExit ? { onBeforeNavigate: onBeforeExit } : {})}
       />
@@ -306,7 +319,7 @@ export function ReportEditorHeader({
         <NameAndStatus
           name={name}
           status={publish.status}
-          subtitle={editorSubtitle(blockCount, publish)}
+          subtitle={editorSubtitle(blockCount, publish, screens)}
           onNameChange={onNameChange}
         />
         <HeaderActions

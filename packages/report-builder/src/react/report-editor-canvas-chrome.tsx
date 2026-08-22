@@ -17,6 +17,7 @@ import { PlusIcon } from "./lib/block-icons";
 import { ConfirmDialog } from "./lib/confirm-dialog";
 import { ReportGridItem } from "./report-grid";
 import { REPORT_MAX_BLOCKS } from "./report-model";
+import { useReportCopy } from "./transport-context";
 
 /**
  * The add affordance: a full-row dashed strip closing the canvas, with a large
@@ -31,6 +32,7 @@ export function AddBlockRow({
   disabled: boolean;
   onAdd: () => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.editor;
   return (
     <ReportGridItem span={REPORT_GRID_COLUMNS} dataTestId="report-editor-add-cell">
       <Card variant="outlined" sx={{ borderStyle: "dashed", p: 0, overflow: "hidden" }}>
@@ -59,8 +61,8 @@ export function AddBlockRow({
           <PlusIcon />
           <Text variant="body" size="xs" color="secondary">
             {disabled
-              ? `Limite de ${REPORT_MAX_BLOCKS} blocos por relatório.`
-              : "Adicionar bloco — gráfico, tabela ou indicador"}
+              ? copy.addBlockLimit(REPORT_MAX_BLOCKS)
+              : copy.addBlock}
           </Text>
         </Box>
       </Card>
@@ -115,13 +117,14 @@ export function RemoveBlockConfirm({
   onConfirm: () => void;
   onCancel: () => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.editor;
   return (
     <ConfirmDialog
       open={targetId !== null}
       destructive
-      title="Remover bloco?"
-      description="O bloco sai do relatório. Você ainda pode cancelar a edição para desfazer tudo."
-      confirmText="Remover"
+      title={copy.removeBlockTitle}
+      description={copy.removeBlockBody}
+      confirmText={copy.removeBlockConfirm}
       onConfirm={onConfirm}
       onCancel={onCancel}
       dataTestId={`report-block-${targetId ?? "sem-selecao"}-remove-confirm`}

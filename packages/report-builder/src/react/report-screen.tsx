@@ -31,6 +31,8 @@ import { ReportStatusChip } from "./lib/report-status-chip";
 import { CONTROL_ROW_SX, PAGE_TITLE_SX } from "./lib/report-surface";
 import { windowDays, windowLabel } from "./lib/resolved-window";
 import { relativeReportTime, visibilityLabel } from "./report-list-filters";
+import type { ReportScreensCopy } from "./screens-copy";
+import { useReportCopy } from "./transport-context";
 import { ReportActionsMenu, ReportViewCanvas } from "./report-view";
 import type { ReportRangeSelection } from "./reports-api";
 
@@ -42,12 +44,17 @@ import type { ReportRangeSelection } from "./reports-api";
  * screen shows it to someone who should not see it, and whether the numbers
  * are the ones you looked at this morning.
  */
-function subtitleOf(view: SavedReportView, updatedAt: string, now: Date): string {
-  const edited = relativeReportTime(updatedAt, now);
+function subtitleOf(
+  view: SavedReportView,
+  updatedAt: string,
+  now: Date,
+  copy: ReportScreensCopy,
+): string {
+  const edited = relativeReportTime(updatedAt, now, copy.list.relativeTime);
   return [
-    view.description ?? "Sem descrição.",
-    `visível para ${visibilityLabel(view.visibility).toLocaleLowerCase("pt-BR")}`,
-    edited === "" ? "" : `editado ${edited}`,
+    view.description ?? copy.view.noDescription,
+    copy.view.visibleTo(visibilityLabel(view.visibility, copy.list)),
+    edited === "" ? "" : copy.view.editedAt(edited),
   ]
     .filter((part) => part !== "")
     .join(" · ");
@@ -76,6 +83,7 @@ function ReportHeaderActions({
   onEdit: () => void;
   onChanged: (status: string) => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.view;
   return (
     <Box
       sx={{
@@ -88,7 +96,7 @@ function ReportHeaderActions({
         minWidth: 0,
       }}
     >
-      <PrintExportButton title={view.name} label="Exportar" dataTestId="report-export-pdf" />
+      <PrintExportButton title={view.name} label={copy.export} dataTestId="report-export-pdf" />
       {/* Editing is the PRIMARY action on a report you are reading, so it is a
           filled button and not only a line in the ⋮ menu — which is where it
           lived, two clicks deep on a screen whose whole purpose is to make you
@@ -164,6 +172,7 @@ function ReportScreenHeader({
   onEdit: () => void;
   onChanged: (status: string) => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens;
   return (
     <Stack spacing={1}>
       {/* The trail, on its own line above the report — `report-back` rides on
@@ -176,7 +185,7 @@ function ReportScreenHeader({
         dataTestId="report-crumbs"
         crumbs={[
           {
-            label: "Relatórios",
+            label: copy.view.breadcrumbList,
             href: `/${tenantSlug}/reports`,
             dataTestId: "report-back",
             onSelect: onBack,
@@ -198,7 +207,7 @@ function ReportScreenHeader({
           ...CONTROL_ROW_SX,
         }}
       >
-        <ReportTitleColumn view={view} subtitle={subtitleOf(view, updatedAt, now)} />
+        <ReportTitleColumn view={view} subtitle={subtitleOf(view, updatedAt, now, copy)} />
         <ReportHeaderActions
           tenantSlug={tenantSlug}
           view={view}
@@ -311,13 +320,14 @@ export function ReportScreen({
   /** Told which lifecycle the report landed in, so the page can navigate. */
   onChanged: (status: string) => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens;
   const query = useSavedReport(tenantSlug, reportId, range);
 
   if (query.isError) {
     return (
       <ErrorState
-        title="Não foi possível carregar o relatório"
-        message="Ele pode ter sido excluído, ou você não tem permissão."
+        title={copy.view.loadFailedTitle}
+        message={copy.view.loadFailedBody}
         retryLabel="Tentar novamente"
         onRetry={() => {
           void query.refetch();

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 import { PT_BR_REPORT_SERVER_MESSAGES, PT_BR_BLANK_BLOCK_TEMPLATE_COPY } from '../server/pt-BR';
+import { PT_BR_REPORT_SCREENS_COPY } from '../react/pt-BR';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 
@@ -497,7 +498,11 @@ describe('the web surface renders the HOST vocabulary', () => {
     const { page: Page } = createWebReportBuilder({
       tenantSlug: TENANT,
       surface: SURFACE,
-      copy: { engine: PT_BR_REPORT_ENGINE_COPY, blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY },
+      copy: {
+      engine: PT_BR_REPORT_ENGINE_COPY,
+      blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+      screens: PT_BR_REPORT_SCREENS_COPY,
+    },
       transport: transport as never,
       standalone: true,
       initialPath: path,
@@ -568,7 +573,11 @@ describe('the web factory refuses an incoherent vocabulary', () => {
       createWebReportBuilder({
         tenantSlug: TENANT,
         surface: { ...SURFACE, sections: [] },
-        copy: { engine: PT_BR_REPORT_ENGINE_COPY, blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY },
+        copy: {
+      engine: PT_BR_REPORT_ENGINE_COPY,
+      blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+      screens: PT_BR_REPORT_SCREENS_COPY,
+    },
       }),
     ).toThrow(/section "circulacao"/);
   });
@@ -577,7 +586,11 @@ describe('the web factory refuses an incoherent vocabulary', () => {
     expect(() =>
       createWebReportBuilder({
         tenantSlug: TENANT,
-        copy: { engine: PT_BR_REPORT_ENGINE_COPY, blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY },
+        copy: {
+      engine: PT_BR_REPORT_ENGINE_COPY,
+      blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+      screens: PT_BR_REPORT_SCREENS_COPY,
+    },
         surface: {
           ...SURFACE,
           systemDashboards: [
@@ -605,7 +618,11 @@ describe('the web factory refuses an incoherent vocabulary', () => {
     expect(() =>
       createWebReportBuilder({
         tenantSlug: TENANT,
-        copy: { engine: PT_BR_REPORT_ENGINE_COPY, blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY },
+        copy: {
+      engine: PT_BR_REPORT_ENGINE_COPY,
+      blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+      screens: PT_BR_REPORT_SCREENS_COPY,
+    },
         surface: {
           ...SURFACE,
           systemDashboards: [
@@ -631,7 +648,11 @@ describe('the web factory refuses an incoherent vocabulary', () => {
       createWebReportBuilder({
         tenantSlug: TENANT,
         surface: { ...SURFACE, systemDashboards: [twin, twin] },
-        copy: { engine: PT_BR_REPORT_ENGINE_COPY, blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY },
+        copy: {
+      engine: PT_BR_REPORT_ENGINE_COPY,
+      blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+      screens: PT_BR_REPORT_SCREENS_COPY,
+    },
       }),
     ).toThrow(/share the key/);
   });
@@ -641,7 +662,11 @@ describe('the web factory refuses an incoherent vocabulary', () => {
       createWebReportBuilder({
         tenantSlug: TENANT,
         surface: { ...SURFACE, timeZone: 'Mars/Olympus' },
-        copy: { engine: PT_BR_REPORT_ENGINE_COPY, blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY },
+        copy: {
+      engine: PT_BR_REPORT_ENGINE_COPY,
+      blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+      screens: PT_BR_REPORT_SCREENS_COPY,
+    },
       }),
     ).toThrow(/timeZone/);
   });

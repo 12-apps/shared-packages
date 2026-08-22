@@ -7,6 +7,10 @@ import {
   relativeReportTime,
   visibilityLabel,
 } from '../report-list-filters';
+import { PT_BR_REPORT_SCREENS_COPY } from '../pt-BR';
+
+/** The card-footer words, from the pack a host would pass. */
+const LIST = PT_BR_REPORT_SCREENS_COPY.list;
 
 /**
  * FUT-391: archiving is a SCOPE of the list, not a display toggle floating
@@ -104,15 +108,15 @@ describe('filterReports', () => {
 
 describe('card footer labels', () => {
   it('says bloco for one and blocos for the rest', () => {
-    expect(blockCountLabel(1)).toBe('1 bloco');
-    expect(blockCountLabel(2)).toBe('2 blocos');
-    expect(blockCountLabel(0)).toBe('0 blocos');
+    expect(blockCountLabel(1, LIST)).toBe('1 bloco');
+    expect(blockCountLabel(2, LIST)).toBe('2 blocos');
+    expect(blockCountLabel(0, LIST)).toBe('0 blocos');
   });
 
   it('names who can read the report', () => {
-    expect(visibilityLabel('tenant')).toBe('Toda a equipe');
-    expect(visibilityLabel('private')).toBe('Só você');
-    expect(visibilityLabel('roles')).toBe('Cargos específicos');
+    expect(visibilityLabel('tenant', LIST)).toBe('Toda a equipe');
+    expect(visibilityLabel('private', LIST)).toBe('Só você');
+    expect(visibilityLabel('roles', LIST)).toBe('Cargos específicos');
   });
 });
 
@@ -138,41 +142,41 @@ const ago = (ms: number): string => new Date(Date.parse(NOW_ISO) - ms).toISOStri
  */
 describe('relativeReportTime', () => {
   it('counts the first hour in minutes', () => {
-    expect(relativeReportTime(ago(2 * MINUTE), now())).toBe('há 2 min');
-    expect(relativeReportTime(ago(59 * MINUTE), now())).toBe('há 59 min');
+    expect(relativeReportTime(ago(2 * MINUTE), now(), LIST.relativeTime)).toBe('há 2 min');
+    expect(relativeReportTime(ago(59 * MINUTE), now(), LIST.relativeTime)).toBe('há 59 min');
   });
 
   it('counts the first day in hours, singular at one', () => {
-    expect(relativeReportTime(ago(HOUR), now())).toBe('há 1 hora');
-    expect(relativeReportTime(ago(5 * HOUR), now())).toBe('há 5 horas');
+    expect(relativeReportTime(ago(HOUR), now(), LIST.relativeTime)).toBe('há 1 hora');
+    expect(relativeReportTime(ago(5 * HOUR), now(), LIST.relativeTime)).toBe('há 5 horas');
   });
 
   it('names the day before rather than counting it', () => {
-    expect(relativeReportTime(ago(DAY), now())).toBe('ontem');
-    expect(relativeReportTime(ago(DAY + 3 * HOUR), now())).toBe('ontem');
+    expect(relativeReportTime(ago(DAY), now(), LIST.relativeTime)).toBe('ontem');
+    expect(relativeReportTime(ago(DAY + 3 * HOUR), now(), LIST.relativeTime)).toBe('ontem');
   });
 
   it('counts the rest of the week in days', () => {
-    expect(relativeReportTime(ago(3 * DAY), now())).toBe('há 3 dias');
-    expect(relativeReportTime(ago(6 * DAY), now())).toBe('há 6 dias');
+    expect(relativeReportTime(ago(3 * DAY), now(), LIST.relativeTime)).toBe('há 3 dias');
+    expect(relativeReportTime(ago(6 * DAY), now(), LIST.relativeTime)).toBe('há 6 dias');
   });
 
   it('switches to weeks at seven days', () => {
-    expect(relativeReportTime(ago(7 * DAY), now())).toBe('há 1 semana');
-    expect(relativeReportTime(ago(21 * DAY), now())).toBe('há 3 semanas');
+    expect(relativeReportTime(ago(7 * DAY), now(), LIST.relativeTime)).toBe('há 1 semana');
+    expect(relativeReportTime(ago(21 * DAY), now(), LIST.relativeTime)).toBe('há 3 semanas');
   });
 
   it('says agora inside the first minute', () => {
-    expect(relativeReportTime(ago(20_000), now())).toBe('agora');
+    expect(relativeReportTime(ago(20_000), now(), LIST.relativeTime)).toBe('agora');
   });
 
   it('reads a server clock that runs ahead as now, not as a negative age', () => {
-    expect(relativeReportTime(ago(-5 * MINUTE), now())).toBe('agora');
+    expect(relativeReportTime(ago(-5 * MINUTE), now(), LIST.relativeTime)).toBe('agora');
   });
 
   it('says nothing at all for an unparseable timestamp', () => {
     // Inventing "agora" for a broken value would claim a freshness the row
     // does not have.
-    expect(relativeReportTime('not a date', now())).toBe('');
+    expect(relativeReportTime('not a date', now(), LIST.relativeTime)).toBe('');
   });
 });

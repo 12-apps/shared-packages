@@ -29,22 +29,25 @@ import {
   type SavedReportView,
 } from "./custom-reports-api";
 import { ConfirmDialog } from "./lib/confirm-dialog";
-import { useTransport } from "./transport-context";
+import type { ReportArchiveCopy } from "./screens-copy";
+import { useReportCopy, useTransport } from "./transport-context";
 
 /** Archive/restore copy, which differs enough to be worth a lookup. */
-function archiveCopy(archived: boolean): { action: string; title: string; description: string } {
+function archiveCopy(
+  archived: boolean,
+  copy: ReportArchiveCopy,
+): { action: string; title: string; description: string } {
   if (archived) {
     return {
-      action: "Restaurar",
-      title: "Restaurar relatório?",
-      description: "Ele volta para a lista de relatórios da loja.",
+      action: copy.restoreAction,
+      title: copy.restoreTitle,
+      description: copy.restoreBody,
     };
   }
   return {
-    action: "Arquivar",
-    title: "Arquivar relatório?",
-    description:
-      "Ele sai da lista de relatórios, mas nada é perdido — você pode restaurá-lo depois em “Arquivados”.",
+    action: copy.archiveAction,
+    title: copy.archiveTitle,
+    description: copy.archiveBodyFromList,
   };
 }
 
@@ -67,11 +70,12 @@ export function ArchiveFromListDialog({
   onDone: () => void;
 }): JSX.Element | null {
   const transport = useTransport();
+  const words = useReportCopy().screens.archive;
   const [busy, setBusy] = useState(false);
 
   if (report === null) return null;
   const archived = report.status === "archived";
-  const copy = archiveCopy(archived);
+  const copy = archiveCopy(archived, words);
 
   async function run(target: SavedReportSummary): Promise<void> {
     setBusy(true);
@@ -102,7 +106,7 @@ export function ArchiveFromListDialog({
       open
       title={copy.title}
       description={copy.description}
-      confirmText={busy ? "Aguarde…" : copy.action}
+      confirmText={busy ? words.busy : copy.action}
       onConfirm={() => void run(report)}
       onCancel={onClose}
       dataTestId="reports-card-archive-confirm"

@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { renderWithCopy as render } from './with-copy';
 import { MemoryRouter } from 'react-router-dom';
 
 import { editorSubtitle, ReportEditorHeader } from '../report-editor-header';
 import { ReportSettingsDialog } from '../report-settings-dialog';
 import type { PublishDraft } from '../lib/publish-section';
+import { PT_BR_REPORT_SCREENS_COPY } from '../pt-BR';
+
+/** The header's words, from the pack a host would pass. */
+const SCREENS = PT_BR_REPORT_SCREENS_COPY;
 
 /**
  * GAP 8 — the edit-mode header, and where the report's settings went.
@@ -39,8 +44,7 @@ beforeEach(() => {
     removeListener: () => undefined,
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
-    dispatchEvent: () => false,
-  })) as unknown as typeof window.matchMedia;
+    dispatchEvent: () => false })) as unknown as typeof window.matchMedia;
 });
 
 afterEach(() => {
@@ -80,17 +84,17 @@ function renderHeader(
 
 describe('editorSubtitle', () => {
   it('gets the singular right', () => {
-    expect(editorSubtitle(1, PUBLISH)).toBe('1 bloco · só você');
+    expect(editorSubtitle(1, PUBLISH, SCREENS)).toBe('1 bloco · só você');
   });
 
   it('uses the plural everywhere else, zero included', () => {
-    expect(editorSubtitle(0, PUBLISH)).toBe('0 blocos · só você');
-    expect(editorSubtitle(3, PUBLISH)).toBe('3 blocos · só você');
+    expect(editorSubtitle(0, PUBLISH, SCREENS)).toBe('0 blocos · só você');
+    expect(editorSubtitle(3, PUBLISH, SCREENS)).toBe('3 blocos · só você');
   });
 
   it('names the sharing rule in the same words the dialog offers', () => {
-    expect(editorSubtitle(2, { ...PUBLISH, visibility: 'tenant' })).toBe('2 blocos · toda a equipe');
-    expect(editorSubtitle(2, { ...PUBLISH, visibility: 'roles' })).toBe(
+    expect(editorSubtitle(2, { ...PUBLISH, visibility: 'tenant' }, SCREENS)).toBe('2 blocos · toda a equipe');
+    expect(editorSubtitle(2, { ...PUBLISH, visibility: 'roles' }, SCREENS)).toBe(
       '2 blocos · cargos específicos',
     );
   });

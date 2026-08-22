@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen } from '@testing-library/react';
+import { renderWithCopy as render } from './with-copy';
 
 import type { SavedReportSummary } from '../custom-reports-api';
 import { ReportCardList } from '../report-card-list';
@@ -37,8 +38,7 @@ function report(patch: Partial<SavedReportSummary> & { id: string }): SavedRepor
     visibility: 'tenant',
     ownedByMe: false,
     updatedAt: new Date(NOW.getTime() - 2 * HOUR_MS).toISOString(),
-    ...patch,
-  } as SavedReportSummary;
+    ...patch } as SavedReportSummary;
 }
 
 const REPORTS: SavedReportSummary[] = [
@@ -48,15 +48,13 @@ const REPORTS: SavedReportSummary[] = [
     description: 'Receita diária da loja',
     ownedByMe: true,
     blockCount: 4,
-    updatedAt: new Date(NOW.getTime() - 3 * DAY_MS).toISOString(),
-  }),
+    updatedAt: new Date(NOW.getTime() - 3 * DAY_MS).toISOString() }),
   report({
     id: 'equipe',
     name: 'Cozinha',
     visibility: 'private',
     blockCount: 1,
-    updatedAt: new Date(NOW.getTime() - 2 * HOUR_MS).toISOString(),
-  }),
+    updatedAt: new Date(NOW.getTime() - 2 * HOUR_MS).toISOString() }),
   report({
     id: 'rascunho',
     name: 'Ticket médio',
@@ -65,8 +63,7 @@ const REPORTS: SavedReportSummary[] = [
     // Explicit rather than shared with `equipe`: two equal timestamps would
     // leave the grid's order resting on sort stability, which is not what the
     // ordering assertions below are about.
-    updatedAt: new Date(NOW.getTime() - 5 * HOUR_MS).toISOString(),
-  }),
+    updatedAt: new Date(NOW.getTime() - 5 * HOUR_MS).toISOString() }),
   report({ id: 'velho', name: 'Antigo', status: 'archived' }),
 ];
 
@@ -80,8 +77,7 @@ const calls = {
   edited: [] as string[],
   filed: [] as string[],
   created: 0,
-  scopes: [] as string[],
-};
+  scopes: [] as string[] };
 
 const realMatchMedia = window.matchMedia;
 
@@ -98,8 +94,7 @@ beforeEach(() => {
     removeListener: () => undefined,
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
-    dispatchEvent: () => false,
-  })) as unknown as typeof window.matchMedia;
+    dispatchEvent: () => false })) as unknown as typeof window.matchMedia;
   calls.selected = [];
   calls.edited = [];
   calls.filed = [];
