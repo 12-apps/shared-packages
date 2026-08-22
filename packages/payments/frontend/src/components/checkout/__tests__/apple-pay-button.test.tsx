@@ -11,7 +11,7 @@
  * charge serialized verbatim, with the sheet completed on the charge's real
  * outcome. The card form is the tested fallback in every refusal direction.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { err, ok } from "../../../result";

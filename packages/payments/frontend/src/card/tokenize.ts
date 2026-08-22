@@ -26,6 +26,7 @@ import { err, ok, type Result } from "../result";
 import { detectBrand, onlyDigits } from "./format";
 import { tokenizeWithStripe } from "./stripe-token";
 import type { CardDetails, CardToken } from "./types";
+import type { CardCopy } from "./copy";
 
 /** Test PAN that always declines (mirrors common sandbox decline cards). */
 const DECLINE_PAN = "4000000000000002";
@@ -80,11 +81,11 @@ function ensurePagBankSdk(): Promise<boolean> {
 }
 
 /** Local card-field validation. Returns an error message, or `null` when valid. */
-function validateCardInput(card: CardDetails): string | null {
-  if (!passesLuhn(onlyDigits(card.number))) return "Número de cartão inválido.";
-  if (card.holder.trim().length < 2) return "Informe o nome impresso no cartão.";
-  if (!expiryIsFuture(card.expiry)) return "Validade inválida ou expirada.";
-  if (!/^\d{3,4}$/.test(card.cvv.trim())) return "CVV inválido.";
+function validateCardInput(card: CardDetails, copy: CardCopy): string | null {
+  if (!passesLuhn(onlyDigits(card.number))) return copy.fields.numberInvalid;
+  if (card.holder.trim().length < 2) return copy.fields.holderRequired;
+  if (!expiryIsFuture(card.expiry)) return copy.fields.expiryInvalid;
+  if (!/^\d{3,4}$/.test(card.cvv.trim())) return copy.fields.cvvInvalid;
   return null;
 }
 
@@ -98,12 +99,13 @@ function encryptWithSdk(
   publicKey: string,
   brand: string,
   last4: string,
+  copy: CardCopy,
 ): Result<CardToken> {
   if (typeof window === "undefined" || !window.PagSeguro?.encryptCard) {
-    return err("Não foi possível carregar o meio de pagamento. Recarregue a página.");
+    return err(copy.tokenize.sdkUnavailable);
   }
   const match = /^(\d{2})\/(\d{2})$/.exec(card.expiry.trim());
-  if (!match) return err("Validade inválida ou expirada.");
+  if (!match) return err(copy.fields.expiryInvalid);
   const encrypted = window.PagSeguro.encryptCard({
     publicKey,
     holder: card.holder.trim(),
@@ -113,7 +115,7 @@ function encryptWithSdk(
     securityCode: card.cvv.trim(),
   });
   if (encrypted.hasErrors || !encrypted.encryptedCard) {
-    return err("Não foi possível processar o cartão. Verifique os dados e tente novamente.");
+    return err(copy.tokenize.cardNotProcessed);
   }
   return ok({ token: encrypted.encryptedCard, brand, last4 });
 }
@@ -157,11 +159,12 @@ async function tokenizeWithPagarme(
   publicKey: string,
   brand: string,
   last4: string,
+  copy: CardCopy,
   /** Deadline for the round trip; an abort reads as "could not contact". */
   signal?: AbortSignal,
 ): Promise<Result<CardToken>> {
   const match = /^(\d{2})\/(\d{2})$/.exec(card.expiry.trim());
-  if (!match) return err("Validade inválida ou expirada.");
+  if (!match) return err(copy.fields.expiryInvalid);
 
   let response: Response;
   try {
@@ -181,7 +184,7 @@ async function tokenizeWithPagarme(
       }),
     });
   } catch {
-    return err("Não foi possível contatar o provedor do cartão. Verifique sua conexão.");
+    return err(copy.tokenize.providerUnreachable);
   }
 
   const body = (await response.json().catch(() => null)) as { id?: unknown } | null;
@@ -189,8 +192,7 @@ async function tokenizeWithPagarme(
     // Carried verbatim: a rejected tokenization is the provider's answer, and
     // the whole point of the activation screen is that it reaches a human.
     return err(
-      `O provedor recusou os dados do cartão (HTTP ${response.status}). ` +
-        `Resposta: ${JSON.stringify(body).slice(0, 300)}`,
+      copy.tokenize.providerRefused(response.status, JSON.stringify(body).slice(0, 300)),
     );
   }
   return ok({ token: body.id, brand, last4 });
@@ -205,6 +207,7 @@ async function tokenizeWithPagarme(
 export async function tokenizeCard(
   card: CardDetails,
   publicKey: string | null | undefined,
+  copy: CardCopy,
   tokenizer: CardTokenizer = "pagbank-sdk",
   /**
    * Bounds the network schemes (Pagar.me / Stripe). The PagBank one encrypts
@@ -212,31 +215,24 @@ export async function tokenizeCard(
    */
   signal?: AbortSignal,
 ): Promise<Result<CardToken>> {
-  const validationError = validateCardInput(card);
+  const validationError = validateCardInput(card, copy);
   if (validationError) return err(validationError);
 
-  if (!publicKey) {
-    return err(
-      "A chave pública do cartão não está disponível para esta loja. " +
-        "Reconecte o provedor e tente novamente.",
-    );
-  }
+  if (!publicKey) return err(copy.tokenize.noPublicKey);
 
   const pan = onlyDigits(card.number);
   const brand = detectBrand(pan);
   const last4 = pan.slice(-4);
 
   if (tokenizer === "pagarme-token") {
-    return tokenizeWithPagarme(card, pan, publicKey, brand, last4, signal);
+    return tokenizeWithPagarme(card, pan, publicKey, brand, last4, copy, signal);
   }
   if (tokenizer === "stripe-pm") {
-    return tokenizeWithStripe(card, pan, publicKey, brand, last4, signal);
+    return tokenizeWithStripe(card, pan, publicKey, brand, last4, copy, signal);
   }
 
-  if (!(await ensurePagBankSdk())) {
-    return err("Não foi possível carregar o meio de pagamento. Recarregue a página.");
-  }
-  return encryptWithSdk(card, pan, publicKey, brand, last4);
+  if (!(await ensurePagBankSdk())) return err(copy.tokenize.sdkUnavailable);
+  return encryptWithSdk(card, pan, publicKey, brand, last4, copy);
 }
 
 /**
@@ -259,10 +255,6 @@ export interface CardTokenizationConfig {
   mockTokenization: boolean;
 }
 
-/** The clear bail (FUT-697): said BEFORE any charge, naming the remedy. */
-const CARD_PATH_UNAVAILABLE =
-  "O pagamento com cartão está indisponível nesta loja no momento. Recarregue a página e tente de novo, escolha outro método de pagamento ou combine diretamente com a loja.";
-
 /**
  * Tokenize for the buyer checkout, speaking the ACTIVE provider's protocol.
  *
@@ -282,6 +274,7 @@ const CARD_PATH_UNAVAILABLE =
 export async function tokenizeForCheckout(
   card: CardDetails,
   config: CardTokenizationConfig,
+  copy: CardCopy,
   /**
    * Optional deadline for a provider that mints over the network. The chain
    * path passes one so a backup acquirer nobody can reach cannot hold the
@@ -290,11 +283,14 @@ export async function tokenizeForCheckout(
   signal?: AbortSignal,
 ): Promise<Result<CardToken>> {
   const scheme = config.provider ? tokenizerFor(config.provider) : null;
-  if (scheme && config.publicKey) return tokenizeCard(card, config.publicKey, scheme, signal);
+  if (scheme && config.publicKey) {
+    return tokenizeCard(card, config.publicKey, copy, scheme, signal);
+  }
 
-  if (!config.mockTokenization) return err(CARD_PATH_UNAVAILABLE);
+  // The clear bail (FUT-697): said BEFORE any charge, naming the remedy.
+  if (!config.mockTokenization) return err(copy.tokenize.cardUnavailable);
 
-  const validationError = validateCardInput(card);
+  const validationError = validateCardInput(card, copy);
   if (validationError) return err(validationError);
 
   const pan = onlyDigits(card.number);

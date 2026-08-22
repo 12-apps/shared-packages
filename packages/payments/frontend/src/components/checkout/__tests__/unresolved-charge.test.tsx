@@ -13,7 +13,7 @@
  * What is pinned here is the presentation, not the words: the code decides it,
  * so a copy edit cannot silently turn the affordance back on.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const client = vi.hoisted(() => ({

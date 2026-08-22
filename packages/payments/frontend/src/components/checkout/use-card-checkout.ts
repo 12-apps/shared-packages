@@ -28,6 +28,8 @@ import { useCheckoutNavigate, type CheckoutNavigate } from "./navigate-context";
 import type { CardChainLink } from "./method-capability";
 import type { BuyerInfo, CheckoutOrder, OrderStatus } from "./types";
 import { usePaymentPolling } from "./use-payment-polling";
+import type { CardCopy } from "../../card/copy";
+import { useCheckoutCopy } from "./copy-context";
 
 const EMPTY_CARD: CardDetails = { number: "", holder: "", expiry: "", cvv: "" };
 
@@ -190,6 +192,8 @@ async function resolveInstruments(input: {
   providerChain: readonly CardChainLink[];
   /** The bound key-refresh call (FUT-741) — the self-heal must hit OUR mount. */
   refreshKey: RefreshBrowserKey;
+  /** The words a failed mint reports with — the host's (FUT-760). */
+  copy: CardCopy;
 }): Promise<Result<CardInstruments>> {
   const { form } = input;
   if (!form.usingNewCard) return ok({ token: form.selection });
@@ -200,6 +204,7 @@ async function resolveInstruments(input: {
     input.onKeyRefreshed,
     form.saveCard,
     input.providerChain,
+    input.copy,
     undefined,
     input.refreshKey,
   );
@@ -228,6 +233,7 @@ function useCardSubmit(
   const { publicKey, setPublicKey } = useCardPublicKey(order.orderId, providerConfig);
   const client = useCheckoutClientApi();
   const navigate = useCheckoutNavigate();
+  const cardCopy = useCheckoutCopy().card;
 
   const { status, error: pollError, timedOut: pollTimedOut } = usePaymentPolling(order.orderId, {
     enabled: submitted,
@@ -252,6 +258,7 @@ function useCardSubmit(
       onKeyRefreshed: setPublicKey,
       providerChain,
       refreshKey: client.refreshBrowserKey,
+      copy: cardCopy,
     });
     if (!resolved.ok) {
       setError(resolved.error);
@@ -315,11 +322,13 @@ export function useCardCheckout(
   const brand = detectBrand(onlyDigits(card.number));
   const usingNewCard = selection === NEW_CARD;
 
+  const cardCopy = useCheckoutCopy().card;
+  const fieldCopy = cardCopy.fields;
   const validate = (): CardFieldErrors => ({
-    number: validateCardNumber(card.number),
-    holder: validateHolder(card.holder),
-    expiry: validateExpiry(card.expiry),
-    cvv: validateCvv(card.cvv, brand),
+    number: validateCardNumber(card.number, fieldCopy),
+    holder: validateHolder(card.holder, fieldCopy),
+    expiry: validateExpiry(card.expiry, fieldCopy),
+    cvv: validateCvv(card.cvv, fieldCopy, brand),
   });
 
   const submit = useCardSubmit(

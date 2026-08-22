@@ -8,6 +8,7 @@ import type { AddCardController, AddCardPhase } from "../flows/use-add-card";
 
 import { StoryFlow } from "./host";
 import type { StorySpec } from "./store";
+import { CheckoutCopyProvider } from "../components/checkout/copy-context";
 
 /**
  * The buyer-vault screens (FUT-183): adding a card OUTSIDE a purchase, and the
@@ -65,7 +66,7 @@ function stagedController(
     setCard: () => undefined,
     fieldErrors: {},
     setFieldErrors: () => undefined,
-    brand: "Cartão",
+    brand: "Unknown",
     saving: false,
     error: null,
     submit: async () => undefined,
@@ -74,7 +75,14 @@ function stagedController(
 }
 
 function StagedAddCard({ controller }: { controller: AddCardController }): JSX.Element {
-  return <AddCardView controller={controller} copy={STORY_CHECKOUT_COPY} />;
+  // Staged: the view alone, with no `FlowsShell` above it — so this host has to
+  // supply the words the card fields read from context, exactly as the shell
+  // would have (FUT-760).
+  return (
+    <CheckoutCopyProvider copy={STORY_CHECKOUT_COPY.views.screens}>
+      <AddCardView controller={controller} copy={STORY_CHECKOUT_COPY} />
+    </CheckoutCopyProvider>
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -10,6 +10,7 @@ import { err, ok, type Result } from "../../result";
 import { refreshCardPublicKey } from "./client";
 import type { CardChainLink } from "./method-capability";
 import type { SavedCardMeta } from "./types";
+import type { CardCopy } from "../../card/copy";
 
 /**
  * The order-scoped key refresh, as a parameter (FUT-741).
@@ -51,15 +52,16 @@ async function tokenizeNewCard(
   orderId: string,
   onKeyRefreshed: (key: string) => void,
   refreshKey: RefreshBrowserKey,
+  copy: CardCopy,
 ): Promise<Result<CardToken>> {
-  const first = await tokenizeForCheckout(card, config);
+  const first = await tokenizeForCheckout(card, config, copy);
   if (first.ok || !config.publicKey) return first;
   if (config.provider === null || tokenizerFor(config.provider) !== "pagbank-sdk") return first;
 
   const refreshed = await refreshKey({ orderId });
   if (refreshed.ok && refreshed.data.publicKey && refreshed.data.publicKey !== config.publicKey) {
     onKeyRefreshed(refreshed.data.publicKey);
-    return tokenizeForCheckout(card, { ...config, publicKey: refreshed.data.publicKey });
+    return tokenizeForCheckout(card, { ...config, publicKey: refreshed.data.publicKey }, copy);
   }
   return first;
 }
@@ -92,6 +94,7 @@ async function mintChainInstruments(
   card: CardDetails,
   chain: readonly CardChainLink[],
   timeoutMs: number,
+  copy: CardCopy,
 ): Promise<Record<string, CardToken>> {
   const results = await Promise.all(
     chain.map(async (link) => {
@@ -100,7 +103,7 @@ async function mintChainInstruments(
       // stub mode and an error everywhere else. It still travels in `chain`,
       // because the walk will reach it.
       if (!link.provider || !link.mintable) return null;
-      const tokenized = await mintWithDeadline(card, link, timeoutMs);
+      const tokenized = await mintWithDeadline(card, link, timeoutMs, copy);
       return tokenized.ok ? ([link.provider, tokenized.data] as const) : null;
     }),
   );
@@ -125,6 +128,7 @@ async function mintWithDeadline(
   card: CardDetails,
   link: CardChainLink,
   timeoutMs: number,
+  copy: CardCopy,
 ): Promise<Result<CardToken>> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -133,11 +137,14 @@ async function mintWithDeadline(
   const deadline = new Promise<Result<CardToken>>((resolve) => {
     timer = setTimeout(() => {
       controller.abort();
-      resolve(err("O provedor do cartão não respondeu a tempo."));
+      resolve(err(copy.tokenize.providerTimedOut));
     }, timeoutMs);
   });
   try {
-    return await Promise.race([tokenizeForCheckout(card, link, controller.signal), deadline]);
+    return await Promise.race([
+      tokenizeForCheckout(card, link, copy, controller.signal),
+      deadline,
+    ]);
   } finally {
     clearTimeout(timer);
   }
@@ -197,12 +204,20 @@ async function mintEveryEntry(input: {
   onKeyRefreshed: (key: string) => void;
   refreshKey: RefreshBrowserKey;
   timeoutMs: number;
+  copy: CardCopy;
 }): Promise<{ headToken: Result<CardToken>; minted: Record<string, CardToken> }> {
   const head = mintingConfig(input.config, input.entries);
   const rest = input.entries.filter((link) => link.provider !== head.provider);
   const [headToken, tail] = await Promise.all([
-    tokenizeNewCard(input.card, head, input.orderId, input.onKeyRefreshed, input.refreshKey),
-    mintChainInstruments(input.card, rest, input.timeoutMs),
+    tokenizeNewCard(
+      input.card,
+      head,
+      input.orderId,
+      input.onKeyRefreshed,
+      input.refreshKey,
+      input.copy,
+    ),
+    mintChainInstruments(input.card, rest, input.timeoutMs, input.copy),
   ]);
   // A failure in the tail is not fatal: that provider is simply one the walk
   // will skip.
@@ -226,6 +241,8 @@ export async function resolveNewCardToken(
   onKeyRefreshed: (key: string) => void,
   saveCard: boolean,
   chain: readonly CardChainLink[],
+  /** The words a failed mint reports with — the host's (FUT-760). */
+  copy: CardCopy,
   /** Per-entry mint deadline. Overridable so tests need not wait it out. */
   timeoutMs: number = MINT_TIMEOUT_MS,
   /** The bound key refresh (FUT-741); defaults to the unbound module call. */
@@ -242,6 +259,7 @@ export async function resolveNewCardToken(
     onKeyRefreshed,
     refreshKey,
     timeoutMs,
+    copy,
   });
 
   // Refused only when NO entry could be minted for. While one still can, the

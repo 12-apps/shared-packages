@@ -26,6 +26,7 @@ import { PT_BR_CHECKOUT_VIEW_COPY } from "../components/checkout/pt-BR";
 import { STORY_CHECKOUT_COPY } from "./demo-copy";
 import { raisePayable, StoryFlow, withConfigRead, type StoryHost } from "./host";
 import type { StoryWorld } from "./store";
+import { CheckoutCopyProvider } from "../components/checkout/copy-context";
 
 /**
  * THE FLAT SURFACE THAT PREDATES THE FACTORY, still exported and still real.
@@ -284,20 +285,22 @@ function SavedCardsPickerHost(): JSX.Element {
   const [selection, setSelection] = useState<string>("cartao_1");
   return (
     <CheckoutComponentsProvider>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <SavedCardsPicker savedCards={VAULTED_CARDS} selection={selection} onSelect={setSelection} />
-        <p style={{ fontSize: 12, opacity: 0.7 }}>
-          {selection === NEW_CARD ? (
-            <>
-              Sentinela <code>NEW_CARD</code>: aqui o host abriria o formulário de cartão novo.
-            </>
-          ) : (
-            <>
-              Selecionado: <code>{selection}</code>
-            </>
-          )}
-        </p>
-      </div>
+      <CheckoutCopyProvider copy={STORY_CHECKOUT_COPY.views.screens}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <SavedCardsPicker savedCards={VAULTED_CARDS} selection={selection} onSelect={setSelection} />
+          <p style={{ fontSize: 12, opacity: 0.7 }}>
+            {selection === NEW_CARD ? (
+              <>
+                Sentinela <code>NEW_CARD</code>: aqui o host abriria o formulário de cartão novo.
+              </>
+            ) : (
+              <>
+                Selecionado: <code>{selection}</code>
+              </>
+            )}
+          </p>
+        </div>
+      </CheckoutCopyProvider>
     </CheckoutComponentsProvider>
   );
 }

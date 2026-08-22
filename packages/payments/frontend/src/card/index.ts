@@ -27,7 +27,7 @@ export {
   type CardBrand,
 } from "./format";
 
-export { formatCpf, validateCpf } from "./cpf";
+export { formatCpf, isValidCpf, validateCpf } from "./cpf";
 
 export { CardPayBar, NewCardForm, SavedCardsPicker } from "./fields";
 
@@ -40,3 +40,5 @@ export {
 } from "./tokenize";
 
 export { NEW_CARD, type CardDetails, type CardFieldErrors, type CardToken, type SavedCard } from "./types";
+export type { CardCopy, CardFieldCopy, CardTokenizeCopy } from "./copy";
+export { PT_BR_CARD_COPY } from "./pt-BR";

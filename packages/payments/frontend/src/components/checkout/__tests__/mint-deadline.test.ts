@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resolveNewCardToken } from "../card-instruments";
 import type { CardChainLink } from "../method-capability";
+import { PT_BR_CARD_COPY } from "../../../card/pt-BR";
 
 vi.mock("../client", () => ({ refreshCardPublicKey: vi.fn() }));
 
@@ -59,7 +60,16 @@ describe("minting the chain is bounded and concurrent", () => {
   it("charges on the head when a TAIL acquirer never answers", async () => {
     const fetchMock = blackHole();
 
-    const resolved = await resolveNewCardToken(CARD, HEAD, "o1", vi.fn(), false, [HEAD, STONE], 20);
+    const resolved = await resolveNewCardToken(
+      CARD,
+      HEAD,
+      "o1",
+      vi.fn(),
+      false,
+      [HEAD, STONE],
+      PT_BR_CARD_COPY,
+      20,
+    );
 
     // The degradation this module already documents: the provider we could not
     // mint for is one the walk will skip. The payment still goes out.
@@ -85,6 +95,7 @@ describe("minting the chain is bounded and concurrent", () => {
       vi.fn(),
       false,
       [HEAD, STONE, STRIPE],
+      PT_BR_CARD_COPY,
       deadlineMs,
     );
     // Both requests are in flight well inside ONE deadline — which they could

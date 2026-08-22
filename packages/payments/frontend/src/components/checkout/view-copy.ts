@@ -1,3 +1,5 @@
+import type { CheckoutCopy } from "./copy-context";
+
 /**
  * Every string the legacy checkout views render — required props, with NO
  * defaults, deliberately (the payments extraction's own doctrine, FUT-760):
@@ -87,4 +89,15 @@ export interface CheckoutViewCopy {
   dados: DadosStepCopy;
   emptyCart: EmptyCartCopy;
   status: PaymentStatusCopy;
+  /**
+   * The words the screens BELOW these read — the card fields, the wallet
+   * panes, the buyer-details inputs (FUT-760).
+   *
+   * Carried here rather than as a second prop so a host still passes copy
+   * exactly once. `CheckoutFlow` mounts it as `CheckoutCopyProvider`, because
+   * threading it down through four intermediate components as props is how a
+   * copy port comes to exist, be required, and go unread — which is what
+   * happened to `unavailableWithRemedyTitle` before this port was finished.
+   */
+  screens: CheckoutCopy;
 }
