@@ -63,8 +63,7 @@ function DashboardBlock({
   grain,
   onRangeChange,
 }: BlockProps): JSX.Element {
-  const copy = useReportCopy().screens.system;
-  const ranges = useReportCopy().screens.ranges;
+  const { system: copy, ranges } = useReportCopy().screens;
   const query = useSystemReport(tenantSlug, reportKey, range, grain);
   const testId = `system-dashboard-block-${reportKey}`;
   // The catalog title, so the frame is labelled while the run is still in
@@ -118,8 +117,7 @@ function DashboardBlock({
 }
 
 export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX.Element {
-  const copy = useReportCopy().screens.system;
-  const builderCopy = useReportCopy().screens.builder;
+  const { system: copy, builder: builderCopy } = useReportCopy().screens;
   const { dashboardKey = "" } = useParams();
   const [range, setRange] = useState<ReportRange>("30d");
   const [grain, setGrain] = useState<ReportGrain>("day");

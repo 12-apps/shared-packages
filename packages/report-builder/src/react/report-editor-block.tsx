@@ -247,6 +247,21 @@ function BlockActions({
  * case is a click "in the middle of the canvas, on the body of another block",
  * so the whole frame selects, not just the ✎.
  */
+/**
+ * Enter on the BLOCK ITSELF selects it.
+ *
+ * The keyboard equivalent of clicking its body, and the only way to reach the
+ * panel without tabbing past the block's chrome. The target check is what
+ * keeps Enter in the title field — which bubbles from inside this group —
+ * from being read as a selection.
+ */
+function selectOnEnter(event: React.KeyboardEvent, onSelect: () => void): void {
+  if (event.defaultPrevented || event.key !== "Enter") return;
+  if (event.target !== event.currentTarget) return;
+  event.preventDefault();
+  onSelect();
+}
+
 function BlockGroup({
   tenantSlug,
   block,
@@ -284,15 +299,7 @@ function BlockGroup({
       onClick={onSelect}
       onKeyDown={(event) => {
         reorder.onKeyDown(event);
-        // Enter on the BLOCK ITSELF selects it — the keyboard equivalent of
-        // clicking its body, and the only way to reach the panel without
-        // tabbing past the block's chrome. The target check is what keeps
-        // Enter in the title field (which bubbles from inside this group)
-        // from being read as a selection.
-        if (event.defaultPrevented || event.key !== "Enter") return;
-        if (event.target !== event.currentTarget) return;
-        event.preventDefault();
-        onSelect();
+        selectOnEnter(event, onSelect);
       }}
       sx={{
         borderRadius: `${CONTAINER_RADIUS_PX}px`,

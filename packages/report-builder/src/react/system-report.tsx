@@ -28,8 +28,7 @@ import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-a
 import { useReportCopy, useReportEngineCopy, useReportSurface } from "./transport-context";
 
 export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.Element {
-  const systemCopy = useReportCopy().screens.system;
-  const builderCopy = useReportCopy().screens.builder;
+  const { system: systemCopy, builder: builderCopy } = useReportCopy().screens;
   const { reportKey = "" } = useParams();
   const [range, setRange] = useState<ReportRange>("30d");
   const [grain, setGrain] = useState<ReportGrain>("day");
