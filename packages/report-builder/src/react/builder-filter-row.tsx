@@ -24,9 +24,10 @@ import {
   valueOptionsFor,
   valueShapeFor,
 } from "./builder-filters";
-import { OPERATOR_LABELS, type BuilderDraft } from "./builder-model";
+import { operatorLabel, type BuilderDraft } from "./builder-model";
 import type { ReportField } from "./custom-reports-api";
 import { CloseIcon } from "./lib/block-icons";
+import { useReportCopy } from "./transport-context";
 
 type FilterDraftRow = BuilderDraft["filters"][number];
 type FilterPatch = (patch: Partial<FilterDraftRow>) => void;
@@ -118,6 +119,7 @@ function FilterListField({
   values: string[];
   onChange: (next: string[]) => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   return options ? (
     <Select
       multiple
@@ -135,7 +137,7 @@ function FilterListField({
       size="sm"
       label={visibleLabel(label)}
       aria-label={label}
-      placeholder="Valores separados por vírgula"
+      placeholder={copy.valuesPlaceholder}
       value={joinValueList(values)}
       onChange={(event) => onChange(splitValueList(event.target.value))}
       data-testid={testId}
@@ -163,11 +165,12 @@ function FilterWideValue({
   options: ValueOptions;
   onPatch: FilterPatch;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const testId = `builder-filter-value-${index}`;
   if (valueShapeFor(filter.operator) === "list") {
     return (
       <FilterListField
-        label={`Filtro ${index + 1} — valores`}
+        label={copy.filterValues(index + 1)}
         testId={testId}
         options={options}
         values={filter.values ?? []}
@@ -179,7 +182,7 @@ function FilterWideValue({
     <Stack direction="row" spacing={1}>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <FilterValueField
-          label={`Filtro ${index + 1} — de`}
+          label={copy.filterFrom(index + 1)}
           testId={`${testId}-from`}
           options={options}
           value={filter.from ?? ""}
@@ -189,11 +192,11 @@ function FilterWideValue({
       </Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <FilterValueField
-          label={`Filtro ${index + 1} — até`}
+          label={copy.filterTo(index + 1)}
           testId={`${testId}-to`}
           options={options}
           value={filter.to ?? ""}
-          placeholder="Até"
+          placeholder={copy.rangeEnd}
           onChange={(to) => onPatch({ to })}
         />
       </Box>
@@ -239,6 +242,7 @@ export function FilterRow({
   onPatch: FilterPatch;
   onRemove: () => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const options = valueOptionsFor(field);
   const inline = valueShapeFor(filter.operator) === "single";
   return (
@@ -246,7 +250,7 @@ export function FilterRow({
       <Select
         size="sm"
         label="Campo"
-        aria-label={`Filtro ${index + 1} — campo`}
+        aria-label={copy.filterField(index + 1)}
         options={fieldOptions}
         value={filter.field}
         onChange={(event) => onPatch({ field: event.target.value as string })}
@@ -256,13 +260,13 @@ export function FilterRow({
         <Box sx={{ width: 104, flexShrink: 0 }}>
           <Select
             size="sm"
-            label="Condição"
-            aria-label={`Filtro ${index + 1} — condição`}
+            label={copy.condition}
+            aria-label={copy.filterCondition(index + 1)}
             // Only the operators the FIELD accepts: "status a partir de Pago"
             // compiles and orders enum codes alphabetically, which is noise.
             options={operatorOptionsFor(field).map((value) => ({
               value,
-              label: OPERATOR_LABELS[value] ?? value,
+              label: operatorLabel(value, copy),
             }))}
             value={filter.operator}
             onChange={(event) => onPatch({ operator: event.target.value as string })}
@@ -275,7 +279,7 @@ export function FilterRow({
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {inline ? (
             <FilterValueField
-              label={`Filtro ${index + 1} — valor`}
+              label={copy.filterValue(index + 1)}
               testId={`builder-filter-value-${index}`}
               options={options}
               value={filter.value}

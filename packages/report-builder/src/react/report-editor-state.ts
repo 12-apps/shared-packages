@@ -16,7 +16,7 @@ import {
   sendSave,
 } from "./report-editor-writes";
 import type { ReportRange, ReportRollingRange } from "./reports-api";
-import { useTransport } from "./transport-context";
+import { useReportCopy, useTransport } from "./transport-context";
 
 /**
  * The report editor's mutable state, and the two ways an edit reaches the
@@ -51,12 +51,14 @@ function useSaveDocument(
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const transport = useTransport();
+  const copy = useReportCopy().screens.editor;
+  const builderCopy = useReportCopy().screens.builder;
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function save(state: PersistedEditorState): Promise<boolean> {
     setError(null);
-    const invalid = documentGuardError(state);
+    const invalid = documentGuardError(state, copy, builderCopy);
     if (invalid) {
       setError(invalid);
       return false;
@@ -278,6 +280,8 @@ function useWorkingCopy(context: {
   const transport = useTransport();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const copy = useReportCopy().screens.editor;
+  const builderCopy = useReportCopy().screens.builder;
   const [present, setPresent] = useState(source.hasUnpublishedChanges);
   const [discarding, setDiscarding] = useState(false);
 
@@ -320,8 +324,8 @@ function useWorkingCopy(context: {
       !context.saving &&
       !discarding &&
       (knownId === undefined
-        ? !documentGuardError(persisted)
-        : source.parksEdits || !documentGuardError(persisted)),
+        ? !documentGuardError(persisted, copy, builderCopy)
+        : source.parksEdits || !documentGuardError(persisted, copy, builderCopy)),
     onSave: (state) => runAutosave(runnerDeps, state),
   });
 

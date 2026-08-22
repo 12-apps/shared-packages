@@ -39,7 +39,8 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { REPORT_MAX_RANGE_DAYS } from "../../server/range";
-import { useReportSurface } from "../transport-context";
+import { useReportCopy, useReportSurface } from "../transport-context";
+import type { ReportBuilderPanelCopy } from "../screens-copy";
 
 /** A custom period, as two INCLUSIVE calendar days on the tenant's clock. */
 export interface CustomRangeWindow {
@@ -59,17 +60,9 @@ export interface CustomRangeWindow {
  * window. The other five are periods the toggle does not offer at all, which is
  * most of the reason this column exists.
  */
-const QUICK_RANGES: QuickRange[] = createQuickRanges({
-  today: "Hoje",
-  yesterday: "Ontem",
-  "this-week": "Esta semana",
-  "last-7-days": "7 dias",
-  "this-month": "Este mês",
-  "last-30-days": "30 dias",
-  "this-quarter": "Este trimestre",
-  "this-year": "Este ano",
-  "last-365-days": "365 dias",
-});
+function quickRanges(copy: ReportBuilderPanelCopy): QuickRange[] {
+  return createQuickRanges(copy.quickRanges);
+}
 
 /**
  * The refusals, in the SAME words the server uses (`server/range.ts`).
@@ -79,14 +72,16 @@ const QUICK_RANGES: QuickRange[] = createQuickRanges({
  * sentence — rather than one of them meeting it as "não foi possível carregar
  * o relatório".
  */
-const MESSAGES: Partial<DateRangePickerMessages> = {
-  from: "Data inicial",
-  to: "Data final",
-  quickRanges: "Períodos rápidos",
-  incomplete: "Informe as datas inicial e final do período.",
-  reversed: "A data final deve ser igual ou posterior à inicial.",
-  overMax: ({ maxRangeDays }) => `O período não pode exceder ${maxRangeDays} dias.`,
-};
+function messages(copy: ReportBuilderPanelCopy): Partial<DateRangePickerMessages> {
+  return {
+    from: copy.dateFrom,
+    to: copy.dateTo,
+    quickRanges: copy.quickRangesHeading,
+    incomplete: copy.rangeIncomplete,
+    reversed: copy.rangeReversed,
+    overMax: ({ maxRangeDays }) => copy.rangeOverMax(maxRangeDays),
+  };
+}
 
 /** The seed as the picker's own value; an empty draft when there is none. */
 function seedDraft(seed: CustomRangeWindow | null): DateRangeDraft {
@@ -212,6 +207,7 @@ export function CustomRangeDialog({
   dataTestId,
   timeZone,
 }: CustomRangeDialogProps): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const surface = useReportSurface();
   const picker = usePickerDraft(open, seed);
   const status = resolveDayRange(picker.draft, REPORT_MAX_RANGE_DAYS);
@@ -233,7 +229,7 @@ export function CustomRangeDialog({
       <ModalContent dataTestId={`${dataTestId}-content`}>
         <Stack spacing={2}>
           <Text variant="heading" size="lg" weight="semibold" as="h2">
-            Período personalizado
+            {copy.customRange}
           </Text>
           <DateRangePicker
             value={picker.draft}
@@ -256,8 +252,8 @@ export function CustomRangeDialog({
             // less than the control should to keep a selector short would be
             // the tail wagging the dog.
             numberOfMonths={2}
-            quickRanges={QUICK_RANGES}
-            messages={MESSAGES}
+            quickRanges={quickRanges(copy)}
+            messages={messages(copy)}
             dataTestId="report-range-picker"
           />
           <PickerFooter

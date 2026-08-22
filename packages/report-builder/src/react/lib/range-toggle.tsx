@@ -16,21 +16,22 @@ import { useState, type JSX } from "react";
 import { ToggleGroup } from "@12-apps/ui/form/ToggleGroup";
 
 import {
-  REPORT_RANGE_LABELS,
+  reportRangeLabel,
   REPORT_RANGES,
   REPORT_ROLLING_RANGES,
   type ReportRange,
 } from "../reports-api";
 import { CustomRangeDialog, type CustomRangeWindow } from "./custom-range-dialog";
 import { CONTROL_HEIGHT_PX, CONTROL_RADIUS_PX } from "./report-surface";
+import type { ReportRangeCopy } from "../screens-copy";
+import { useReportCopy } from "../transport-context";
 
-const option = (range: ReportRange): { value: ReportRange; label: string } => ({
-  value: range,
-  label: REPORT_RANGE_LABELS[range],
-});
-
-const ROLLING_OPTIONS = REPORT_ROLLING_RANGES.map(option);
-const ALL_OPTIONS = REPORT_RANGES.map(option);
+const option =
+  (copy: ReportRangeCopy) =>
+  (range: ReportRange): { value: ReportRange; label: string } => ({
+    value: range,
+    label: reportRangeLabel(range, copy),
+  });
 
 /**
  * The picker's quick entries that ARE one of our own rolling presets.
@@ -116,6 +117,8 @@ export function RangeToggle({
   /** Omitted: rolling presets only. Passed: the fifth pill and its picker. */
   custom?: CustomRangeSupport;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
+  const ranges = useReportCopy().screens.ranges;
   const [picking, setPicking] = useState(false);
 
   return (
@@ -123,7 +126,7 @@ export function RangeToggle({
       <ToggleGroup
         variant="exclusive"
         size="sm"
-        options={custom ? ALL_OPTIONS : ROLLING_OPTIONS}
+        options={(custom ? REPORT_RANGES : REPORT_ROLLING_RANGES).map(option(ranges))}
         value={value}
         onChange={(_event, next) => {
           // An exclusive `ToggleButtonGroup` reports `null` when the pill that
@@ -149,7 +152,7 @@ export function RangeToggle({
           }
           onChange(next as ReportRange);
         }}
-        aria-label="Período"
+        aria-label={copy.period}
         sx={SEGMENT_SX}
         dataTestId={dataTestId}
       />

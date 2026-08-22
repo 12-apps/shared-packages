@@ -161,6 +161,7 @@ function useCanvasActions({
   selection: CanvasSelection;
   onChange: (next: (draft: ReportDraft) => ReportDraft) => void;
 }): CanvasActions {
+  const copy = useReportCopy().screens.builder;
   // Lazy initial state: read on mount and never again, so dismissing the
   // picker on a new report leaves a usable empty canvas rather than a modal
   // that reappears. The entity check keeps it from opening a picker whose
@@ -215,7 +216,7 @@ function useCanvasActions({
       const source = selection.selectedId;
       if (source === null || draft.blocks.length >= REPORT_MAX_BLOCKS) return;
       const id = nextBlockId(draft.blocks);
-      onChange((current) => duplicateBlock(current, source));
+      onChange((current) => duplicateBlock(current, source, copy));
       // The panel follows the copy: the reason to duplicate a block is to then
       // change something about the copy.
       landOn(id);
@@ -255,6 +256,7 @@ export function EditorCanvas({
 }): JSX.Element {
   const first = entities[0];
   const selection = useCanvasSelection();
+  const words = useReportCopy().screens.builder;
   const actions = useCanvasActions({ draft, first, startWithPicker, selection, onChange });
   const dnd = useDragReorder((sourceId, targetId) =>
     onChange((current) => reorderBlock(current, sourceId, targetId)),
@@ -263,7 +265,7 @@ export function EditorCanvas({
   // RENDERED, so "one position up" means the same thing to every path that
   // uses it — the chord, and the block menu's move actions.
   const keyboard = useKeyboardReorder({
-    items: draft.blocks.map((block) => ({ id: block.id, label: blockLabel(block) })),
+    items: draft.blocks.map((block) => ({ id: block.id, label: blockLabel(block, words) })),
     onMove: (id, delta) => onChange((current) => moveBlock(current, id, delta)),
   });
   const full = draft.blocks.length >= REPORT_MAX_BLOCKS;

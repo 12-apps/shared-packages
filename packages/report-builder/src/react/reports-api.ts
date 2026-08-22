@@ -8,6 +8,7 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { apiFetch } from "./lib/api";
 import type { ChartSpec } from "@12-apps/ui/charts";
+import type { ReportRangeCopy } from "./screens-copy";
 
 /**
  * The presets that resolve against the CLOCK, narrow → wide-ish.
@@ -36,13 +37,16 @@ export type ReportRollingRange = (typeof REPORT_ROLLING_RANGES)[number];
 export const REPORT_RANGES = [...REPORT_ROLLING_RANGES, "custom"] as const;
 export type ReportRange = (typeof REPORT_RANGES)[number];
 
-export const REPORT_RANGE_LABELS: Record<ReportRange, string> = {
-  today: "Hoje",
-  "7d": "7 dias",
-  "30d": "30 dias",
-  month: "Este mês",
-  custom: "Personalizado…",
-};
+/**
+ * The period labels, from the host's own words.
+ *
+ * A lookup rather than the constant it replaces: a preset's NAME is copy, while
+ * which presets exist is this package's. `?? range` keeps an unnamed preset
+ * showing its id rather than a hole nobody can trace.
+ */
+export function reportRangeLabel(range: ReportRange, copy: ReportRangeCopy): string {
+  return copy.ranges[range] ?? range;
+}
 
 /**
  * A period as a SCREEN holds it: the preset, plus the two dates `custom` means.
@@ -105,11 +109,10 @@ export function rangeQueryKey(range: ReportRangeSelection): [string, string, str
 export const REPORT_GRAINS = ["day", "week", "month"] as const;
 export type ReportGrain = (typeof REPORT_GRAINS)[number];
 
-export const REPORT_GRAIN_LABELS: Record<ReportGrain, string> = {
-  day: "Dia",
-  week: "Semana",
-  month: "Mês",
-};
+/** The bucket labels, from the host's own words. */
+export function reportGrainLabel(grain: ReportGrain, copy: ReportRangeCopy): string {
+  return copy.grains[grain] ?? grain;
+}
 
 /** One built-in report, as `GET /reports/system` lists it. */
 export interface SystemReportSummary {

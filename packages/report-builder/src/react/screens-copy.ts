@@ -80,8 +80,228 @@ export interface ReportViewCopy {
   loadFailedBody: string;
 }
 
+/** The editor: its header, its exit guards, its canvas and one block. */
+export interface ReportEditorCopy {
+  /** The name field, which doubles as the breadcrumb when it is empty. */
+  nameLabel: string;
+  namePlaceholder: string;
+  /**
+   * "0 blocos · só você" — both halves change while the editor is open, so it
+   * is composed rather than written down. The block count comes from the
+   * list's own plural, so the two screens cannot disagree.
+   */
+  subtitle(blocks: string, audience: string): string;
+  /** Who can read the draft, keyed by the stored visibility. */
+  visibilityWords: Readonly<Record<string, string>>;
+  autosaving: string;
+  autosaveFailed: string;
+  saving: string;
+  save: string;
+  breadcrumbList: string;
+  breadcrumbEditing: string;
+  /** The header's dirty marker, and the button that opens the settings. */
+  unsavedChanges: string;
+  settings: string;
+  /** The banner over a draft being previewed against real data. */
+  previewBanner: string;
+  openFailedTitle: string;
+  openFailedBody: string;
+  retry: string;
+  /** Leaving with unpublished work: one title, two bodies. */
+  exitTitle: string;
+  exitPublishedBody: string;
+  exitDraftBody: string;
+  exitConfirm: string;
+  /** The standing bar over a report whose draft is ahead of its publication. */
+  unpublishedTitle: string;
+  unpublishedBody: string;
+  discard: string;
+  discarding: string;
+  discardTitle: string;
+  discardBody: string;
+  discardConfirm: string;
+  /** Why a save is refused. */
+  needsName: string;
+  needsBlock: string;
+  /** The canvas: adding a block, and removing one. */
+  addBlock: string;
+  addBlockLimit(max: number): string;
+  removeBlockTitle: string;
+  removeBlockBody: string;
+  removeBlockConfirm: string;
+  /** One block's own chrome. */
+  blockRunFailed: string;
+  blockDragHint: string;
+  blockTitleLabel: string;
+  moveUp: string;
+  moveDown: string;
+  blockMenu: string;
+}
+
+/** Archiving and restoring, from either the card menu or the viewer. */
+export interface ReportArchiveCopy {
+  restoreAction: string;
+  restoreTitle: string;
+  restoreBody: string;
+  archiveAction: string;
+  archiveTitle: string;
+  /**
+   * Two bodies, because the two entry points name a DIFFERENT way back: the
+   * list says "Arquivados" (its own filter pill) and the viewer says
+   * "Mostrar arquivados". Naming the wrong one sends the reader looking for a
+   * control that is not on the screen they are on.
+   */
+  archiveBodyFromList: string;
+  archiveBodyFromViewer: string;
+  /** The confirm button while the write is in flight. */
+  busy: string;
+  /** The viewer's kebab. */
+  reportMenu: string;
+}
+
+/** The periods and grains a report is read over. */
+export interface ReportRangeCopy {
+  /** Preset labels, keyed by range id. */
+  ranges: Readonly<Record<string, string>>;
+  /** Bucket labels, keyed by grain id. */
+  grains: Readonly<Record<string, string>>;
+  /** The block that ran and matched nothing. */
+  emptyTitle: string;
+  emptyBody: string;
+  /** The empty state's offer to widen — "Ver 30 dias", given the period. */
+  widen(rangeLabel: string): string;
+}
+
+/** The host's built-in reports and dashboards. */
+export interface ReportSystemCopy {
+  blockFailed: string;
+  dashboardMissingTitle: string;
+  dashboardMissingBody: string;
+  reportFailedTitle: string;
+  reportFailedBody: string;
+}
+
+/**
+ * The block builder: the panel, its fields, and the vocabulary of a query.
+ *
+ * The three label MAPS here — operators, chart kinds, aggregations — are copy
+ * rather than data even though their keys are wire values: what an operator is
+ * CALLED is a product decision (this host says "é um de" where another would
+ * say "is one of"), while which operators exist is the engine's.
+ */
+export interface ReportBuilderPanelCopy {
+  /** Nothing is selected, so the panel has nothing to edit. */
+  emptySelection: string;
+  duplicateBlocked(max: number): string;
+  blockTitleLabel: string;
+  /** What an empty title falls back to, quoting the derived one. */
+  blockTitleHelper(autoTitle: string): string;
+  untitledBlock: string;
+  /** A duplicated block's name, given the original's. */
+  copyOf(title: string): string;
+  viewAsChart: string;
+  viewAsTable: string;
+  blockMenu: string;
+  /** The template picker. */
+  templateOption(title: string, description: string): string;
+  templateHint: string;
+  cancel: string;
+  /**
+   * Block heights, keyed by the stored height. `auto` is the segment with no
+   * number, which is why the key set is not just 1..3.
+   */
+  heights: Readonly<Record<string, string>>;
+  collection: string;
+  /** The block-height picker's own heading. */
+  height: string;
+  /** One filter row. The index is 1-based, as the reader counts. */
+  valuesPlaceholder: string;
+  filterValues(position: number): string;
+  filterFrom(position: number): string;
+  filterTo(position: number): string;
+  filterField(position: number): string;
+  filterCondition(position: number): string;
+  filterValue(position: number): string;
+  rangeEnd: string;
+  condition: string;
+  /** The builder's section headings and field labels. */
+  splitSeries: string;
+  seriesBy: string;
+  groupBy: string;
+  aggregation: string;
+  visualization: string;
+  operators: Readonly<Record<string, string>>;
+  charts: Readonly<Record<string, string>>;
+  aggregations: Readonly<Record<string, string>>;
+  /** Why a share cannot be saved. */
+  needsRole: string;
+  /** The role picker inside the publish section. */
+  rolesLoading: string;
+  rolesFailed: string;
+  rolesHeading: string;
+  rolesEmpty: string;
+  /** The keyboard reorder's live region. */
+  moved(label: string, position: number, total: number): string;
+  /** The period control, and the trail above it. */
+  period: string;
+  breadcrumbAria: string;
+  /** The default period a report opens on, and its options. */
+  defaultRange: string;
+  defaultRanges: Readonly<Record<string, string>>;
+  /**
+   * The custom-window dialog: its heading, its quick ranges, and the refusals.
+   *
+   * The refusals are the SAME words the server uses, so a reader who ignores
+   * the message and one who reaches the API by hand meet the same sentence.
+   */
+  customRange: string;
+  quickRangesHeading: string;
+  quickRanges: Readonly<Record<string, string>>;
+  dateFrom: string;
+  dateTo: string;
+  rangeIncomplete: string;
+  rangeReversed: string;
+  rangeOverMax(maxRangeDays: number): string;
+  /** The list link a built-in report's back button falls back to. */
+  backToList: string;
+}
+
+/**
+ * One choice card in the settings dialog.
+ *
+ * A pair rather than two flat keys because the title and its explanation are
+ * one thought — a translator moving the qualifier from one to the other is
+ * making a legitimate call, and a flat shape would hide that they are related.
+ */
+export interface ReportChoiceCardCopy {
+  title: string;
+  description: string;
+}
+
+/** The settings dialog: what a report IS, and who may read it. */
+export interface ReportSettingsCopy {
+  title: string;
+  descriptionLabel: string;
+  descriptionPlaceholder: string;
+  descriptionHelper: string;
+  /** The lifecycle cards, keyed by the stored status. */
+  statusCards: Readonly<Record<string, ReportChoiceCardCopy>>;
+  /** The audience cards, keyed by the stored visibility. */
+  visibilityCards: Readonly<Record<string, ReportChoiceCardCopy>>;
+  /** The inert scheduled-delivery row (FUT-776). */
+  scheduleLabel: string;
+  scheduleValue: string;
+  scheduleReason: string;
+}
+
 /** Everything these screens render, in one object a host passes once. */
 export interface ReportScreensCopy {
   list: ReportListCopy;
   view: ReportViewCopy;
+  editor: ReportEditorCopy;
+  archive: ReportArchiveCopy;
+  ranges: ReportRangeCopy;
+  system: ReportSystemCopy;
+  builder: ReportBuilderPanelCopy;
+  settings: ReportSettingsCopy;
 }

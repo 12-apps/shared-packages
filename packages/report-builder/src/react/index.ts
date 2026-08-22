@@ -69,3 +69,20 @@ export type {
 
 export type { ReportBuilderCopy } from './copy';
 export { useReportCopy, useReportEngineCopy } from './transport-context';
+
+// The screens' words, and the pt-BR pack a host passes to keep today's
+// wording. REQUIRED config since FUT-760 — this package ships no defaults.
+export { PT_BR_REPORT_SCREENS_COPY } from './pt-BR';
+export type {
+  ReportScreensCopy,
+  ReportListCopy,
+  ReportRelativeTimeCopy,
+  ReportViewCopy,
+  ReportEditorCopy,
+  ReportArchiveCopy,
+  ReportRangeCopy,
+  ReportSystemCopy,
+  ReportBuilderPanelCopy,
+  ReportSettingsCopy,
+  ReportChoiceCardCopy,
+} from './screens-copy';

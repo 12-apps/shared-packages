@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, screen } from '@testing-library/react';
+import { renderWithCopy as render } from './with-copy';
 
 import { exportColumnsFor, ReportRenderView } from '../report-render';
 import { kpiFigures } from '../lib/kpi-figures';
@@ -27,8 +28,7 @@ const ONE_MEASURE: ReportRender = {
   suppressed: false,
   format: 'brl',
   figures: [{ label: 'Receita', value: 1_234_00, suppressed: false, format: 'brl' }],
-  rows: [{ revenueCents: 1_234_00 }],
-};
+  rows: [{ revenueCents: 1_234_00 }] };
 
 /** The same tile as a host that predates `figures` would send it. */
 const LEGACY_PAYLOAD: ReportRender = {
@@ -37,8 +37,7 @@ const LEGACY_PAYLOAD: ReportRender = {
   value: 1_234_00,
   suppressed: false,
   format: 'brl',
-  rows: [{ revenueCents: 1_234_00 }],
-};
+  rows: [{ revenueCents: 1_234_00 }] };
 
 const THREE_MEASURES: ReportRender = {
   kind: 'kpi',
@@ -51,8 +50,7 @@ const THREE_MEASURES: ReportRender = {
     { label: 'Pedidos', value: 42, suppressed: false, format: 'integer' },
     { label: 'Ticket médio', value: 29_38, suppressed: false, format: 'brl' },
   ],
-  rows: [{ revenueCents: 1_234_00, orders: 42, ticket: 29_38 }],
-};
+  rows: [{ revenueCents: 1_234_00, orders: 42, ticket: 29_38 }] };
 
 afterEach(cleanup);
 

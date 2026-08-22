@@ -82,7 +82,7 @@ import {
   type SentencePart,
 } from "./lib/spec-sentence";
 import { REPORT_MAX_BLOCKS } from "./report-model";
-import { useReportEngineCopy } from "./transport-context";
+import { useReportCopy, useReportEngineCopy } from "./transport-context";
 
 /**
  * The panel's own name for itself, in the prototype's two states.
@@ -95,7 +95,7 @@ const IDLE_HEADING = "Bloco";
 const EDITING_HEADING = "Editando bloco";
 
 /** Why *Duplicar* is refused — the canvas's own wording for the same ceiling. */
-const DUPLICATE_BLOCKED_TEXT = `Limite de ${REPORT_MAX_BLOCKS} blocos por relatório.`;
+
 
 /**
  * Everything the panel knows about the selected block, recomputed on every
@@ -236,6 +236,7 @@ function PanelBody({
   onRemove: () => void;
   testId: string;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   // Nothing selected: the prompt, and NO footer — there is nothing to copy and
   // nothing to drop, so either control would be one that cannot mean anything.
   if (block === null) {
@@ -268,7 +269,7 @@ function PanelBody({
       </DrawerContent>
       <BlockPanelFooter
         canDuplicate={canDuplicate}
-        blockedReason={DUPLICATE_BLOCKED_TEXT}
+        blockedReason={copy.duplicateBlocked(REPORT_MAX_BLOCKS)}
         onDuplicate={onDuplicate}
         onRemove={onRemove}
         testId={testId}

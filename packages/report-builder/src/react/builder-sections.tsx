@@ -15,11 +15,12 @@ import { dimensionAt, withDimension } from "./builder-dimensions";
 import { VizPicker } from "./viz-picker";
 import { editFilterRow } from "./builder-filters";
 import { FilterRow } from "./builder-filter-row";
-import { AGGREGATION_LABELS, aggregationOptions, editMeasureRow } from "./builder-measures";
-import { chartOptions, GRAIN_LABELS, stackedOption, type BuilderDraft } from "./builder-model";
+import { aggregationLabel, aggregationOptions, editMeasureRow } from "./builder-measures";
+import { chartOptions, grainLabel, stackedOption, type BuilderDraft } from "./builder-model";
+import { REPORT_GRAINS, type ReportGrain as GrainId } from "./reports-api";
 import { SECTION_LABEL_STYLE } from "./lib/report-surface";
 import type { ReportGrain } from "./reports-api";
-import { useReportEngineCopy } from "./transport-context";
+import { useReportCopy, useReportEngineCopy } from "./transport-context";
 
 type Patch = (patch: Partial<BuilderDraft>) => void;
 
@@ -48,6 +49,7 @@ function fieldOptions(fields: ReportField[], role?: ReportField["role"]): Array<
 
 /** The X axis, plus its granularity when the field is a date. */
 export function GroupBySection({ draft, fields, update }: SectionProps): JSX.Element {
+  const ranges = useReportCopy().screens.ranges;
   const byName = new Map(fields.map((field) => [field.field, field]));
   const dimension = dimensionAt(draft, 0);
   return (
@@ -66,7 +68,7 @@ export function GroupBySection({ draft, fields, update }: SectionProps): JSX.Ele
           <Select
             size="sm"
             label="Por"
-            options={Object.entries(GRAIN_LABELS).map(([value, label]) => ({ value, label }))}
+            options={REPORT_GRAINS.map((value: GrainId) => ({ value, label: grainLabel(value, ranges) }))}
             value={dimension.timeGrain}
             onChange={(event) =>
               update(withDimension(draft, 0, { timeGrain: event.target.value as ReportGrain }))
@@ -85,13 +87,14 @@ export function GroupBySection({ draft, fields, update }: SectionProps): JSX.Ele
  * beside the axis in one row said the two were the same kind of choice.
  */
 export function SplitBySection({ draft, fields, update }: SectionProps): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const axis = dimensionAt(draft, 0);
   return (
     <Stack spacing={1}>
-      <SectionHeading>Separar em séries</SectionHeading>
+      <SectionHeading>{copy.splitSeries}</SectionHeading>
       <Select
         size="sm"
-        label="Uma série por"
+        label={copy.seriesBy}
         // Splitting without grouping has nothing to split, so the control is
         // disabled with the reason rather than silently producing nothing.
         disabled={axis.field === ""}
@@ -106,6 +109,7 @@ export function SplitBySection({ draft, fields, update }: SectionProps): JSX.Ele
 }
 
 export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const byName = new Map(fields.map((field) => [field.field, field]));
   const setMeasure = (index: number, field: string, aggregation: string): void => {
     update(editMeasureRow(draft, index, field, aggregation, byName.get(field)));
@@ -132,11 +136,11 @@ export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.El
           />
           <Select
             size="sm"
-            label="Agregação"
-            aria-label="Agregação"
+            label={copy.aggregation}
+            aria-label={copy.aggregation}
             options={aggregationOptions(byName.get(measure.field)).map((aggregation) => ({
               value: aggregation,
-              label: AGGREGATION_LABELS[aggregation] ?? aggregation,
+              label: aggregationLabel(aggregation, copy),
             }))}
             value={measure.aggregation}
             onChange={(event) => setMeasure(index, measure.field, event.target.value as string)}
@@ -278,12 +282,13 @@ export function PresentationSection({ draft, fields, update }: SectionProps): JS
   // guess which of their choices caused it when the compiler already knows.
   const byName = new Map(fields.map((field) => [field.field, field]));
   const copy = useReportEngineCopy();
+  const words = useReportCopy().screens.builder;
   const stacking = stackedOption(draft, byName, copy.presentation);
   return (
     <Stack spacing={1}>
-      <SectionHeading>Visualização</SectionHeading>
+      <SectionHeading>{words.visualization}</SectionHeading>
       <VizPicker
-        options={chartOptions(draft, byName, copy.presentation)}
+        options={chartOptions(draft, byName, copy.presentation, words)}
         value={draft.chartType}
         onChange={(chartType) => update({ chartType })}
       />

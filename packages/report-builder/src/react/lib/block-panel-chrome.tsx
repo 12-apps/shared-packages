@@ -32,6 +32,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 
 import { CONTROL_RADIUS_PX } from "./report-surface";
 import type { SentencePart } from "./spec-sentence";
+import { useReportCopy } from "../transport-context";
 
 /** What the panel says when nothing is selected — the spec's exact wording. */
 const EMPTY_TEXT = "Selecione um bloco para editar";
@@ -164,13 +165,14 @@ export function BlockTitleField({
   onTitleChange: (title: string) => void;
   testId: string;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   return (
     <Input
       size="sm"
-      label="Título"
+      label={copy.blockTitleLabel}
       value={title}
       placeholder={autoTitle}
-      helperText={`Vazio = usa a descrição automática: “${autoTitle}”.`}
+      helperText={copy.blockTitleHelper(autoTitle)}
       InputLabelProps={{ shrink: true }}
       onChange={(event: ChangeEvent<HTMLInputElement>) => onTitleChange(event.target.value)}
       data-testid={`${testId}-title-override`}

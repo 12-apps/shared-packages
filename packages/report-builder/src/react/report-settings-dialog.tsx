@@ -30,6 +30,8 @@ import { RolesAllowlist, type PublishDraft } from "./lib/publish-section";
 import { DefaultRangeField, Field } from "./lib/settings-fields";
 import type { ReportRollingRange } from "./reports-api";
 import { CONTAINER_RADIUS_PX, CONTROL_RADIUS_PX } from "./lib/report-surface";
+import type { ReportSettingsCopy } from "./screens-copy";
+import { useReportCopy } from "./transport-context";
 
 /**
  * A radio CARD: the control, a bold title, and the line that says what the
@@ -154,25 +156,21 @@ interface ChoiceCard<T> {
   description: string;
 }
 
-const STATUS_CARDS: Array<ChoiceCard<ReportStatusWire>> = [
-  { value: "published", title: "Publicado", description: "Aparece na lista para quem tem acesso." },
-  { value: "draft", title: "Rascunho", description: "Só você vê, mesmo que compartilhado." },
-];
+function statusCards(copy: ReportSettingsCopy): Array<ChoiceCard<ReportStatusWire>> {
+  return (["published", "draft"] as const).map((value) => ({
+    value,
+    title: copy.statusCards[value]?.title ?? "",
+    description: copy.statusCards[value]?.description ?? "",
+  }));
+}
 
-const VISIBILITY_CARDS: Array<ChoiceCard<ReportVisibilityWire>> = [
-  { value: "private", title: "Só você", description: "Ninguém mais da loja vê." },
-  {
-    value: "tenant",
-    title: "Toda a equipe",
-    description: "Qualquer pessoa com acesso ao admin da loja.",
-  },
-  {
-    value: "roles",
-    title: "Cargos específicos",
-    description:
-      "Campos de custo continuam ocultos para quem não tem permissão, qualquer que seja o cargo.",
-  },
-];
+function visibilityCards(copy: ReportSettingsCopy): Array<ChoiceCard<ReportVisibilityWire>> {
+  return (["private", "tenant", "roles"] as const).map((value) => ({
+    value,
+    title: copy.visibilityCards[value]?.title ?? "",
+    description: copy.visibilityCards[value]?.description ?? "",
+  }));
+}
 
 interface ReportSettingsValue {
   name: string;
@@ -194,11 +192,12 @@ function SharingFields({
   onPublishChange: (next: PublishDraft) => void;
   testId: string;
 }): JSX.Element {
+  const copy = useReportCopy().screens.settings;
   return (
     <>
       <Field label="Status">
         <Stack spacing={0.75}>
-          {STATUS_CARDS.map((option) => (
+          {statusCards(copy).map((option) => (
             <RadioCard
               key={option.value}
               name={`${testId}-status`}
@@ -215,7 +214,7 @@ function SharingFields({
 
       <Field label="Quem pode ver">
         <Stack spacing={0.75}>
-          {VISIBILITY_CARDS.map((option) => (
+          {visibilityCards(copy).map((option) => (
             <RadioCard
               key={option.value}
               name={`${testId}-visibility`}
@@ -238,10 +237,11 @@ function SharingFields({
 
 /** The dialog's own title row, with the × that closes it. */
 function DialogHeader({ testId, onClose }: { testId: string; onClose: () => void }): JSX.Element {
+  const copy = useReportCopy().screens.settings;
   return (
     <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
       <Text variant="heading" size="lg" weight="semibold" as="h2">
-        Ajustes do relatório
+        {copy.title}
       </Text>
       <Box sx={{ flex: 1 }} />
       <Button
@@ -268,6 +268,7 @@ function IdentityFields({
   value: ReportSettingsValue;
   onChange: (next: ReportSettingsValue) => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.settings;
   return (
     <>
       <Input
@@ -280,14 +281,14 @@ function IdentityFields({
           addresses the description has to learn a new name — it moved, it did
           not disappear. */}
       <Textarea
-        label="Descrição"
+        label={copy.descriptionLabel}
         variant="autosize"
         // `sm`, not the default `md`: the default carries a 100px floor and
         // grew the field to a third of the dialog for a one-line description.
         size="sm"
         minRows={3}
-        placeholder="Para que serve este relatório?"
-        helperText="Aparece no card da lista — ajuda a equipe a achar o certo."
+        placeholder={copy.descriptionPlaceholder}
+        helperText={copy.descriptionHelper}
         value={value.description}
         onChange={(event) => onChange({ ...value, description: event.target.value })}
         data-testid="report-editor-description"
@@ -311,6 +312,7 @@ export function ReportSettingsDialog({
   onClose: () => void;
   testId?: string;
 }): JSX.Element {
+  const copy = useReportCopy().screens.settings;
   return (
     <Modal open={open} onClose={onClose} size="sm" dataTestId={testId}>
       <ModalContent dataTestId={`${testId}-content`}>
@@ -336,9 +338,9 @@ export function ReportSettingsDialog({
               dialog disagree with the design; inert because there is no
               column, no job and no address list behind it yet. */}
           <ComingSoonRow
-            label="Envio automático"
-            value="Enviar por e-mail toda segunda, 8h"
-            reason="Em breve (FUT-776) — ainda não é possível agendar o envio."
+            label={copy.scheduleLabel}
+            value={copy.scheduleValue}
+            reason={copy.scheduleReason}
             testId={`${testId}-schedule`}
           />
 
