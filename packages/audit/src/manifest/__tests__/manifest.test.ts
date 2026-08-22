@@ -9,11 +9,13 @@ import {
   assertDbMirror,
   assertExportsMirror,
   defineManifest,
+  defineServerManifest,
 } from '@12-apps/wiring/producer';
 import type { PackageManifest } from '@12-apps/wiring';
 
 import packageJson from '../../../package.json';
 import { auditManifest } from '../index';
+import { auditServerManifest } from '../server';
 
 /**
  * The manifest as an ADOPTER's type sees it. `as const satisfies` narrows the
@@ -40,18 +42,25 @@ describe('the audit manifest', () => {
     });
   });
 
-  it('is DATA ONLY — no runtime inventory, so no host owes an unbound answer', () => {
-    // The package does ship `createApiAudit`, and declaring `http` is its own
-    // adoption: the inventory is what `assemble()` holds a host to, so listing
-    // a surface an adopter may be mounting by hand would turn it red today.
-    expect(declared().server).toBeUndefined();
+  it('inventories the http capability, and nothing this package does not ship', () => {
+    // The inventory is what `assemble()` holds a host to. `web` stays absent:
+    // the React viewer is a component, not a mountable web surface.
+    expect(auditManifest.server).toEqual(['http']);
     expect(declared().web).toBeUndefined();
   });
 
-  it('declares no observability namespace — the contract exempts pure-data manifests', () => {
-    // A namespace with nothing logging under it is a declaration about nobody.
-    // It becomes mandatory on the release that declares a runtime capability.
-    expect(declared().observability).toBeUndefined();
+  it('files its telemetry under `audit` — mandatory now a runtime half exists', () => {
+    // Withheld while the manifest was pure data (a namespace with nothing
+    // logging under it is a declaration about nobody); required the moment a
+    // capability runs, so a refused read files here rather than nowhere.
+    expect(auditManifest.observability).toEqual({ namespace: 'audit' });
+  });
+
+  it('matches the inventory it declares — the server manifest cannot drift', () => {
+    // `defineServerManifest` is the producer assertion that the runtime
+    // manifest's keys are exactly what `./index` inventoried. A capability
+    // added to one and not the other is a boot failure, not a silent 404.
+    expect(defineServerManifest(auditManifest, auditServerManifest)).toBe(auditServerManifest);
   });
 
   it('mirrors the db declaration and the manifest subpath into package.json', () => {

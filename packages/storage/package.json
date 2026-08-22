@@ -5,11 +5,13 @@
   "description": "Image uploads that land at YOUR OWN ORIGIN, never at the bucket (12-20). Isomorphic core (format allowlist, upload ceiling, object-key grammar, rendition set, refusal taxonomy, wire schemas), host-mounted backend surface (./server: createApiStorage, the local-disk driver, the image-pipeline port, the orphan reclaim), Hono adapter (./hono), the S3-compatible driver behind its own subpath (./s3) and the bound picker + upload hook (./react). Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
-    "./server": "./src/server/index.ts",
-    "./react": "./src/react/index.ts",
     "./hono": "./src/hono/index.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./manifest/server": "./src/manifest/server.ts",
+    "./package.json": "./package.json",
+    "./react": "./src/react/index.ts",
     "./s3": "./src/s3/index.ts",
-    "./package.json": "./package.json"
+    "./server": "./src/server/index.ts"
   },
   "scripts": {
     "clean": "rm -rf node_modules coverage",
@@ -20,6 +22,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
+    "@12-apps/wiring": ">=1.9.0",
     "@aws-sdk/client-s3": ">=3.700.0",
     "hono": ">=4.0.0",
     "react": ">=19.0.0",
@@ -46,6 +49,7 @@
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
     "@aws-sdk/client-s3": "^3.703.0",
     "@testing-library/react": "^16.1.0",
     "@types/react": "19.2.2",
