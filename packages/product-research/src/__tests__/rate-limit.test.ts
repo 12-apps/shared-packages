@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import type { ConnectorContext } from '../connectors/types';
 import { InMemoryRateLimiter, silentLogger } from '../memory';
@@ -47,6 +48,7 @@ const harness = () => {
   };
   const ctx: ConnectorContext = {
     logger: silentLogger,
+    diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
     fetchJson: (url) => {
       calls.fetched.push(url);
       return Promise.resolve(null);
@@ -142,7 +144,7 @@ describe('rateLimitedContext', () => {
 
   it('does not invent a postForm or a reason seam on a host that has neither', () => {
     const limiter: RateLimiterPort = { acquire: () => Promise.resolve() };
-    const bare: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null) };
+    const bare: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null), diagnostics: PT_BR_RESEARCH_DIAGNOSTICS };
     const wrapped = rateLimitedContext(bare, limiter, 2);
     expect(wrapped.postForm).toBeUndefined();
     expect(wrapped.postJsonResult).toBeUndefined();

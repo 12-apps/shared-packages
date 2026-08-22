@@ -3,7 +3,7 @@ import { ConnectorRegistry } from '../connectors/registry';
 import { cacheKey } from '../ports';
 import type { ResearchConfig, ResearchDeps } from '../ports';
 import { pacedContext } from './rate-limit';
-import { budgetedContext, hitCeiling, SOURCE_CEILING_ERROR, sourceDeadlineAt } from './source-budget';
+import { budgetedContext, hitCeiling, sourceCeilingError, sourceDeadlineAt } from './source-budget';
 import type { RawOffer, ResearchQuery, SourceRecord, SourceStat } from '../types';
 
 /**
@@ -244,7 +244,12 @@ const settleLiveAnswer = async (
     // research-permission holder, and what we actually observed is our own
     // fan-out running out of time. The connector's own error is dropped for the
     // same reason — it blames the store for a request we stopped sending.
-    if (truncated === true) return finish('FAILED', [], { truncated, error: SOURCE_CEILING_ERROR });
+    if (truncated === true) {
+      return finish('FAILED', [], {
+        truncated,
+        error: sourceCeilingError(deps.diagnostics.budget),
+      });
+    }
     await noteSourceDegraded(deps, source, result.error);
     return finish('FAILED', [], { error: result.error });
   }

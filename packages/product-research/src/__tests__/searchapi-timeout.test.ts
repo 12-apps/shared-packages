@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { createAmazonConnector } from '../connectors/amazon';
@@ -56,6 +57,7 @@ const resultCtx = (
   seen: Seen[] = [],
 ): ConnectorContext => ({
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: () => Promise.resolve(null),
   fetchJsonResult: (url: string, init?: FetchInit) => {
     seen.push({ url, timeoutMs: init?.timeoutMs });

@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { createAmazonConnector, parseAmazonResponse } from '../connectors/amazon';
 import { ConnectorRegistry } from '../connectors/registry';
@@ -86,6 +87,7 @@ const ctxWith = (
   seen: { url: string; headers?: Record<string, string> }[] = [],
 ): ConnectorContext => ({
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: (url, init) => {
     seen.push({ url, headers: init?.headers });
     return Promise.resolve(responder(url));
@@ -337,6 +339,7 @@ describe('amazon offers inside a research run', () => {
     cache: new InMemoryCache(),
     budget,
     logger: silentLogger,
+    diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   });
 
   it('ranks a 6-pack by unit price against single cans from Giga', async () => {

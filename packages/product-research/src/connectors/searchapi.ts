@@ -183,7 +183,7 @@ export const callSearchApi = async (
   input: SearchApiCallInput,
 ): Promise<SearchApiCallResult> => {
   if (!input.apiKey) {
-    return { ok: false, error: searchApiKeyMissingMessage(input.engine) };
+    return { ok: false, error: searchApiKeyMissingMessage(input.engine, ctx.diagnostics.searchApi) };
   }
   const url = buildSearchApiUrl(input.engine, input.params);
   const outcome = await fetchJsonOutcome(ctx, url, {
@@ -193,16 +193,16 @@ export const callSearchApi = async (
   if (!outcome.ok) {
     return {
       ok: false,
-      error: searchApiFailureMessage(input.engine, outcome.failure, SEARCHAPI_TIMEOUT_MS),
+      error: searchApiFailureMessage(input.engine, outcome.failure, SEARCHAPI_TIMEOUT_MS, ctx.diagnostics.searchApi),
     };
   }
   const payload = outcome.payload;
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
-    return { ok: false, error: searchApiPayloadShapeMessage(input.engine) };
+    return { ok: false, error: searchApiPayloadShapeMessage(input.engine, ctx.diagnostics.searchApi) };
   }
   const record = payload as Record<string, unknown>;
   if (typeof record.error === 'string') {
-    return { ok: false, error: searchApiVendorErrorMessage(input.engine, record.error) };
+    return { ok: false, error: searchApiVendorErrorMessage(input.engine, record.error, ctx.diagnostics.searchApi) };
   }
   return { ok: true, payload: record };
 };

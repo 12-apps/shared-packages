@@ -50,13 +50,15 @@ function priceListRoutes(config: ResearchApiConfig): ResearchRoute[] {
           ? (record['rows'] as ManualPriceRowInput[])
           : [];
         if (record['csv'] !== undefined) {
-          const parsed = parseCsvPriceList(record['csv'] as never);
+          const parsed = parseCsvPriceList(record['csv'] as never, config.diagnostics.manualImport);
           rows = [...rows, ...parsed.rows];
           problems.push(...parsed.problems);
         }
-        const normalized = normalizeManualRows(rows, {
-          defaultValidUntil: validUntilOf(config, record['validUntil']),
-        });
+        const normalized = normalizeManualRows(
+          rows,
+          { defaultValidUntil: validUntilOf(config, record['validUntil']) },
+          config.diagnostics.manualImport,
+        );
         problems.push(...normalized.problems);
         const stored = await store.manual.store({
           clientId: actor.clientId,
@@ -85,9 +87,11 @@ function quoteRoute(config: ResearchApiConfig): ResearchRoute {
     permission: 'research:write',
     async handle({ actor, params, body }) {
       const source = await store.manual.requireSource(params['sourceId'] ?? '', actor.clientId);
-      const normalized = normalizeManualRows([recordOf(body) as never], {
-        defaultValidUntil: validUntilOf(config, undefined),
-      });
+      const normalized = normalizeManualRows(
+        [recordOf(body) as never],
+        { defaultValidUntil: validUntilOf(config, undefined) },
+        config.diagnostics.manualImport,
+      );
       if (normalized.entries.length === 0) {
         return refuse(400, normalized.problems[0]?.reason ?? messages.invalidQuote);
       }

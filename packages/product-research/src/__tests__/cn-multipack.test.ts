@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { ConnectorRegistry } from '../connectors/registry';
 import { createSerpConnector } from '../connectors/serp';
@@ -36,11 +37,12 @@ const QUERY: ResearchQuery = { term: 'coca cola 220ml', quantity: 12 };
 const makeDeps = (): ResearchDeps => {
   const store = new InMemoryResearchStore();
   store.sources = [SERP_SOURCE];
-  return { store, cache: new InMemoryCache(), budget: new FixedBudget(10), logger: silentLogger };
+  return { store, cache: new InMemoryCache(), budget: new FixedBudget(10), logger: silentLogger, diagnostics: PT_BR_RESEARCH_DIAGNOSTICS };
 };
 
 const ctx: ConnectorContext = {
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: () => Promise.resolve(CN_MULTIPACK_FIXTURE),
 };
 

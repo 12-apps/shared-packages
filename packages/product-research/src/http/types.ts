@@ -1,3 +1,4 @@
+import type { ResearchDiagnosticsCopy } from '../connectors/diagnostics-copy';
 import type { NormalizedManualRow } from '../import/manual';
 
 /**
@@ -189,6 +190,12 @@ export interface ResearchHttpMessages {
 }
 
 export interface ResearchApiConfig {
+  /**
+   * Every sentence the connectors and the manual importer answer with.
+   * REQUIRED: this package used to compile in its own pt-BR, which made the
+   * origin host's Portuguese the silent default for every adopter.
+   */
+  diagnostics: ResearchDiagnosticsCopy;
   store: ResearchHttpStore;
   checks: ResearchHttpChecks;
   credentials: ResearchCredentialCodec;

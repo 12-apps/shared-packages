@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { ConnectorRegistry } from '../connectors/registry';
 import type { ConnectorContext } from '../connectors/types';
@@ -84,13 +85,14 @@ const apoioSource: SourceRecord = {
 
 const ctx: ConnectorContext = {
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: () => Promise.resolve(APOIO_FIXTURE),
 };
 
 const makeDeps = (): ResearchDeps => {
   const store = new InMemoryResearchStore();
   store.sources = [apoioSource];
-  return { store, cache: new InMemoryCache(), budget: new FixedBudget(10), logger: silentLogger };
+  return { store, cache: new InMemoryCache(), budget: new FixedBudget(10), logger: silentLogger, diagnostics: PT_BR_RESEARCH_DIAGNOSTICS };
 };
 
 describe('FUT-436 — 6-pack unit price (Apoio Entrega live capture)', () => {
