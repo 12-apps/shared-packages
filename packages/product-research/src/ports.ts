@@ -1,3 +1,4 @@
+import type { ResearchDiagnosticsCopy } from './connectors/diagnostics-copy';
 import type {
   CatalogItem,
   CatalogRef,
@@ -203,6 +204,14 @@ export interface ResearchDeps {
   cache: CachePort;
   budget: BudgetPort;
   logger: LoggerPort;
+  /**
+   * Every sentence the pipeline puts in front of a store owner (FUT-760).
+   *
+   * Here as well as on `ConnectorContext` because the PIPELINE writes some of
+   * them itself — a source that spent its whole wall-clock budget is the
+   * pipeline's verdict, not any connector's — and it holds `deps`, not a `ctx`.
+   */
+  diagnostics: ResearchDiagnosticsCopy;
   /** Optional observers (degradation alerts). Absent = nothing listens. */
   events?: ResearchEventsPort;
   /** Optional per-domain fetch pacing. Absent = unthrottled (legacy hosts). */

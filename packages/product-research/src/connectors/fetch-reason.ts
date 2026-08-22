@@ -1,3 +1,4 @@
+import type { FetchFailureCopy } from './diagnostics-copy';
 import type { ConnectorContext, FetchFailure, FetchInit, FetchOutcome } from './types';
 
 /**
@@ -20,26 +21,22 @@ import type { ConnectorContext, FetchFailure, FetchInit, FetchOutcome } from './
  * endpoint that failed is the useful half; the query can carry a tenant key
  * (and `?ft=` search terms are noise in an error message anyway).
  */
-export const diagnosticUrl = (url: string): string => {
+export const diagnosticUrl = (url: string, copy: FetchFailureCopy): string => {
   try {
     const parsed = new URL(url);
     return `${parsed.origin}${parsed.pathname}`;
   } catch {
-    return '(endereço inválido)';
+    return copy.invalidUrl;
   }
 };
 
 /** What an HTTP status means for a store search, in the operator's terms. */
-const httpReason = (status: number): string => {
-  if (status === 401 || status === 403) {
-    return `a loja recusou nosso acesso (HTTP ${status} — bloqueio de bot ou de IP)`;
-  }
-  if (status === 404) return 'o endereço não existe na loja (HTTP 404) — confira a URL';
-  if (status === 429) return 'a loja limitou nossa taxa de consultas (HTTP 429 — consultas demais)';
-  if (status >= 500) {
-    return `a loja está com erro interno (HTTP ${status}) — pode ser instabilidade momentânea`;
-  }
-  return `a loja recusou a consulta (HTTP ${status})`;
+const httpReason = (status: number, copy: FetchFailureCopy): string => {
+  if (status === 401 || status === 403) return copy.refused(status);
+  if (status === 404) return copy.notFound;
+  if (status === 429) return copy.rateLimited(status);
+  if (status >= 500) return copy.serverError(status);
+  return copy.rejected(status);
 };
 
 /**
@@ -61,21 +58,16 @@ export const CREDENTIALS_STRIPPED = 'CREDENTIALS_STRIPPED';
  * the fix is a FIELD the operator controls, so it must not read as a network
  * failure either.
  */
-const CODED_TRANSPORT_REASONS: Readonly<Record<string, string>> = {
-  DNS_UNRESOLVED: 'o domínio da loja não foi encontrado (DNS) — confira o endereço da fonte',
-  ENOTFOUND: 'o domínio da loja não foi encontrado (DNS) — confira o endereço da fonte',
-  EAI_AGAIN: 'a consulta de DNS do domínio da loja falhou — pode ser instabilidade momentânea',
-  [CREDENTIALS_STRIPPED]:
-    'a loja redireciona para outro endereço e a chave de aplicação não pode viajar junto — ' +
-    'configure na fonte o endereço final da loja (normalmente o "www")',
-};
-
 /** The transport arm: a known code's own sentence, or the generic clause. */
-const transportReason = (code: string | undefined): string => {
-  if (code === undefined) return 'falha de conexão com a loja (rede, DNS ou TLS)';
-  return (
-    CODED_TRANSPORT_REASONS[code] ?? `falha de conexão com a loja (rede, DNS ou TLS: ${code})`
-  );
+const transportReason = (code: string | undefined, copy: FetchFailureCopy): string => {
+  if (code === undefined) return copy.transport;
+  // A name that does not resolve is a TYPO in the source's URL, not an outage;
+  // a stripped credential is not a network failure at all. Both earn their own
+  // sentence rather than reading as `(rede, DNS ou TLS: ENOTFOUND)`.
+  if (code === 'DNS_UNRESOLVED' || code === 'ENOTFOUND') return copy.dnsUnresolved;
+  if (code === 'EAI_AGAIN') return copy.dnsTransient;
+  if (code === CREDENTIALS_STRIPPED) return copy.credentialsStripped;
+  return copy.transportCoded(code);
 };
 
 /**
@@ -84,24 +76,17 @@ const transportReason = (code: string | undefined): string => {
  * of the VTEX tiers, which endpoint), and that composition is the message the
  * operator reads on the run screen.
  */
-export const describeFetchFailure = (failure: FetchFailure): string => {
-  if (failure.kind === 'http') return httpReason(failure.status);
-  if (failure.kind === 'body') {
-    return (
-      `a loja respondeu (HTTP ${failure.status}) mas não em JSON — ` +
-      'provável página de erro ou de bloqueio'
-    );
-  }
-  if (failure.kind === 'timeout') return 'a loja não respondeu dentro do tempo limite';
+export const describeFetchFailure = (failure: FetchFailure, copy: FetchFailureCopy): string => {
+  if (failure.kind === 'http') return httpReason(failure.status, copy);
+  if (failure.kind === 'body') return copy.notJson(failure.status);
+  if (failure.kind === 'timeout') return copy.timeout;
   // NOT the transport arm below, and not the timeout arm above: the store never
   // received this request. Blaming it would be the same wrong-operator-message
   // FUT-495 exists to remove, one step earlier — someone would go check a store
   // that is perfectly healthy. Names no endpoint and no url: this text is
   // stored and rendered, and a source URL can carry a key in its query.
-  if (failure.kind === 'deadline') {
-    return 'a busca nesta fonte atingiu o tempo total permitido antes desta consulta';
-  }
-  return transportReason(failure.code);
+  if (failure.kind === 'deadline') return copy.deadline;
+  return transportReason(failure.code, copy);
 };
 
 /** A status-carrying exchange read as an outcome — the middle host tier. */

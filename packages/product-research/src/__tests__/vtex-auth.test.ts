@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { CREDENTIALS_KEY } from '../integrations';
@@ -89,7 +90,7 @@ describe('vtexFailureMessage — the keyed 401/403 arm', () => {
   const CATALOG = 'https://www.atacadao.com.br/api/catalog_system/pub/products/search?ft=coca';
 
   it('adds the possibly-invalid-key clause on a keyed refusal, without a value', () => {
-    const message = vtexFailureMessage('catalog', { kind: 'http', status: 403 }, CATALOG, true);
+    const message = vtexFailureMessage('catalog', { kind: 'http', status: 403 }, CATALOG, PT_BR_RESEARCH_DIAGNOSTICS, true);
 
     expect(message).toContain('bloqueio de bot ou de IP');
     expect(message).toContain('chave de aplicação da fonte');
@@ -99,7 +100,7 @@ describe('vtexFailureMessage — the keyed 401/403 arm', () => {
   });
 
   it('leaves an UNKEYED refusal byte-identical to what it said before', () => {
-    const unkeyed = vtexFailureMessage('catalog', { kind: 'http', status: 403 }, CATALOG);
+    const unkeyed = vtexFailureMessage('catalog', { kind: 'http', status: 403 }, CATALOG, PT_BR_RESEARCH_DIAGNOSTICS);
 
     expect(unkeyed).toBe(
       'Busca no catálogo VTEX falhou: a loja recusou nosso acesso ' +
@@ -116,7 +117,7 @@ describe('vtexFailureMessage — the keyed 401/403 arm', () => {
       { kind: 'timeout' },
       { kind: 'transport', code: 'ENOTFOUND' },
     ] as const) {
-      expect(vtexFailureMessage('catalog', failure, CATALOG, true)).not.toContain(
+      expect(vtexFailureMessage('catalog', failure, CATALOG, PT_BR_RESEARCH_DIAGNOSTICS, true)).not.toContain(
         'chave de aplicação',
       );
     }

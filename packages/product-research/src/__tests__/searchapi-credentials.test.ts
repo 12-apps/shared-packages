@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { createAmazonConnector } from '../connectors/amazon';
 import { resolveSearchApiKey, SEARCHAPI_ACCOUNT_URL, validateSearchApiKey } from '../connectors/searchapi';
@@ -25,6 +26,7 @@ const ctxWithStatus = (
   seen: SeenRequest[] = [],
 ): ConnectorContext => ({
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: () => Promise.resolve(null),
   fetchJsonStatus: (url, init) => {
     seen.push({ url, headers: init?.headers });
@@ -37,6 +39,7 @@ const ctxWithoutStatus = (
   seen: SeenRequest[] = [],
 ): ConnectorContext => ({
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: (url, init) => {
     seen.push({ url, headers: init?.headers });
     return Promise.resolve(respond());

@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { ConnectorRegistry } from '../connectors/registry';
 import { createSerpConnector } from '../connectors/serp';
@@ -74,6 +75,7 @@ const makeHarness = (budget = new FixedBudget(10)): Harness => {
     },
     budget,
     logger: silentLogger,
+    diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
     now: () => new Date(clock.nowMs),
   };
 
@@ -85,6 +87,7 @@ const makeHarness = (budget = new FixedBudget(10)): Harness => {
 
 const ctxFor = (harness: Harness): ConnectorContext => ({
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: () => {
     harness.vendorCalls.count += 1;
     return Promise.resolve(RESPONSE);

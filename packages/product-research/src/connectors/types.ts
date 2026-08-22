@@ -1,3 +1,4 @@
+import type { ResearchDiagnosticsCopy } from './diagnostics-copy';
 import type { LoggerPort } from '../ports';
 import type { RawOffer, ResearchQuery, SourceRecord } from '../types';
 
@@ -99,6 +100,17 @@ export interface FetchInit {
 
 export interface ConnectorContext {
   logger: LoggerPort;
+  /**
+   * Every sentence this connector puts in front of a store owner when the
+   * source fails (FUT-760).
+   *
+   * On the CONTEXT rather than as a parameter on each helper, because this is
+   * the object that already reaches every diagnostic call site — a connector
+   * holds a `ctx` precisely so a host can supply what only a host knows. The
+   * package ships no default: `PT_BR_RESEARCH_DIAGNOSTICS` is the wording it
+   * used to compile in, now chosen by name.
+   */
+  diagnostics: ResearchDiagnosticsCopy;
   /** Never-throw JSON fetch the host provides (timeout, identified UA). */
   fetchJson(url: string, init?: FetchInit): Promise<unknown | null>;
   /**

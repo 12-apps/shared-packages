@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { ConnectorRegistry } from '../connectors/registry';
@@ -75,6 +76,7 @@ describe('validateCredentials capability', () => {
     };
     const ctx = {
       logger: { info: () => {}, warn: () => {}, error: () => {} },
+      diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
       fetchJson: async () => null,
     };
 

@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { ConnectorRegistry } from '../connectors/registry';
 import type { ConnectorContext, PriceSourceConnector } from '../connectors/types';
@@ -32,7 +33,7 @@ const OFFER: RawOffer = {
   availability: 'IN_STOCK',
 };
 
-const ctx: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null) };
+const ctx: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null), diagnostics: PT_BR_RESEARCH_DIAGNOSTICS };
 
 interface Harness {
   store: InMemoryResearchStore;
@@ -49,6 +50,7 @@ const makeHarness = (sources: SourceRecord[], budget?: FixedBudget): Harness => 
     cache: new InMemoryCache(),
     budget: budget ?? new FixedBudget(10),
     logger: silentLogger,
+    diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
     events: {
       sourceDegraded: () => undefined,
       runProgress: (event) => {

@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { ConnectorRegistry } from '../connectors/registry';
 import type { ConnectorContext, PriceSourceConnector } from '../connectors/types';
@@ -107,7 +108,7 @@ describe('cross-connector dedupe inside a research run', () => {
     search: () => Promise.resolve({ ok: true as const, offers }),
   });
 
-  const ctx: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null) };
+  const ctx: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null), diagnostics: PT_BR_RESEARCH_DIAGNOSTICS };
 
   it('shows the same amazon listing arriving via SERP and AMAZON exactly once', async () => {
     const store = new InMemoryResearchStore();
@@ -120,6 +121,7 @@ describe('cross-connector dedupe inside a research run', () => {
       cache: new InMemoryCache(),
       budget: new FixedBudget(10),
       logger: silentLogger,
+      diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
     };
     // Google Shopping deep-links the listing with tracking noise; the AMAZON
     // connector reports the clean /dp/ link. Same ASIN = same listing.
