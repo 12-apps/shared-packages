@@ -43,6 +43,7 @@
     "@12-apps/ui": "workspace:*"
   },
   "peerDependencies": {
+    "@12-apps/wiring": ">=1.3.0",
     "hono": ">=4.0.0",
     "react": ">=19.0.0",
     "react-dom": ">=19.0.0",
