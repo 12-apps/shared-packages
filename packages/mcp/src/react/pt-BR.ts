@@ -1,3 +1,5 @@
+import { PT_BR_CONFIRM_ACTION_COPY } from "@12-apps/ui/pt-BR";
+
 import type { McpAiCopy } from "./copy";
 
 /**
@@ -80,8 +82,10 @@ export const PT_BR_MCP_AI_COPY: McpAiCopy = {
     disconnectBody:
       "Ele perde o acesso à sua loja na hora. Para voltar a usar, será preciso conectar de novo.",
     disconnectConfirm: "Desconectar",
+    disconnectError: "Não foi possível desconectar. Tente de novo.",
     boardTitle: "Assistentes conectados",
     boardCaption: "Em verde os que já operam a sua loja; em vermelho os que faltam conectar.",
+    confirmAction: PT_BR_CONFIRM_ACTION_COPY,
   },
   summary: {
     activeNow: "ativo agora",
@@ -105,5 +109,6 @@ export const PT_BR_MCP_AI_COPY: McpAiCopy = {
   onboarding: {
     title: "Conecte assistentes de IA à sua loja",
     editLabel: "Conectar IA",
+    collapseLabel: "Ocultar",
   },
 };

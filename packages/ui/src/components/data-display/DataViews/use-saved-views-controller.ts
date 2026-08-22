@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { useViewMutations, type ViewMutations } from "./data-views-view-mutations";
 import {
   coerceViewState,
@@ -99,6 +100,7 @@ export function useSavedViewsController(
   initialView: SavedViewSummary | undefined,
   initialState: DataViewState | undefined,
 ): SavedViewsController {
+  const copy = useDataViewsCopy();
   const { applied, currentRef, activeViewName, applyView, selectMain } =
     useAppliedView(router, columnIds, views, initialView, initialState);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -122,7 +124,7 @@ export function useSavedViewsController(
     } else {
       // A rejected pin/share/default/delete must be visible (FUT-100) — the
       // menus close on click, so an inline Alert is the only surviving signal.
-      setMutationError(error ?? "Não foi possível salvar a alteração da visão.");
+      setMutationError(error ?? copy.nav.saveFailed);
     }
   };
 

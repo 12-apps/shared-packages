@@ -2,6 +2,7 @@
 
 import { useState, type JSX } from 'react';
 
+import type { ConfirmActionCopy } from '../../../copy';
 import { ConfirmActionDialog, useConfirmAction } from '../../feedback/ConfirmAction';
 
 /**
@@ -36,7 +37,9 @@ interface RowConfirmOptions<T> {
   describe: (rows: T[]) => RowConfirmCopy;
   dataTestId: string;
   /** Shown when `write` fails without a message of its own. */
-  errorText?: string;
+  errorText: string;
+  /** The dialog's own words. REQUIRED — this package ships no default copy. */
+  copy: ConfirmActionCopy;
 }
 
 export interface RowConfirm<T> {
@@ -65,6 +68,7 @@ export function useRowConfirm<T>({
   describe,
   dataTestId,
   errorText,
+  copy,
 }: RowConfirmOptions<T>): RowConfirm<T> {
   const [target, setTarget] = useState<T[] | null>(null);
 
@@ -85,7 +89,8 @@ export function useRowConfirm<T>({
   return {
     request,
     dialog: target ? (
-      <ConfirmActionDialog state={state} {...describe(target)} dataTestId={dataTestId} />
+      <ConfirmActionDialog state={state}
+        copy={copy} {...describe(target)} dataTestId={dataTestId} />
     ) : null,
   };
 }

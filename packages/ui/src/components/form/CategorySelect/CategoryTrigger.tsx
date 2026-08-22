@@ -1,5 +1,6 @@
 'use client';
 
+import type { CategorySelectCopy } from "../../../copy";
 import { Box } from '@mui/material';
 
 import { CaretGlyph } from './CategoryIcons';
@@ -11,6 +12,8 @@ import {
 } from './CategorySelect.styles';
 
 interface CategoryTriggerProps {
+  /** The words this renders. REQUIRED — this package ships no default copy. */
+  copy: CategorySelectCopy;
   /** Text shown when nothing is selected. */
   placeholder: string;
   /** Resolved label when there IS a selection (single mode shows "Pai › Filha"). */
@@ -46,6 +49,7 @@ export function CategoryTrigger({
   onClear,
   triggerRef,
   dataTestId,
+  copy,
 }: CategoryTriggerProps): React.JSX.Element {
   const hasSelection = Boolean(selectionLabel) || (count ?? 0) > 0;
   return (
@@ -86,7 +90,7 @@ export function CategoryTrigger({
           component="span"
           role="button"
           tabIndex={0}
-          aria-label="Limpar seleção"
+          aria-label={copy.clearSelection}
           data-testid={`${dataTestId}-clear-trigger`}
           sx={triggerClearSx}
           onClick={(event: React.MouseEvent) => {

@@ -258,6 +258,11 @@ export interface SavedViewsMenuProps<V extends SavedViewLike = SavedViewLike> {
   onToggleShare: (view: V) => void;
   onManageAll: () => void;
   /** Override any of the default (pt-BR) strings. */
-  labels?: Partial<SavedViewsLabels>;
+  /**
+   * Every word this menu renders. REQUIRED since FUT-760: it used to be
+   * `Partial<…>` over a pt-BR default, so a host that passed nothing shipped
+   * one product's Portuguese. `PT_BR_SAVED_VIEWS_LABELS` is that exact set.
+   */
+  labels: SavedViewsLabels;
   testIdPrefix?: string;
 }

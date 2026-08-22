@@ -74,3 +74,23 @@ export type {
   DataViewQuery,
   DataViewServer,
 } from "./data-views-types";
+
+// The words this surface renders, and the provider that puts them in scope.
+// REQUIRED config: `useDataViewsCopy` throws outside a provider rather than
+// falling back to the origin host's Portuguese (FUT-760).
+export { DataViewsCopyProvider, useDataViewsCopy } from "./data-views-copy-context";
+export type {
+  DataViewsCopy,
+  DataViewsBoardCopy,
+  DeleteViewCopy,
+  ManageViewsCopy,
+  SaveViewCopy,
+  DataViewsColumnsCopy,
+  DataViewsDisplayCopy,
+  DataViewsExportCopy,
+  DataViewsGridCopy,
+  DataViewsFiltersCopy,
+  DataViewsSelectionCopy,
+  DataViewsNavCopy,
+  DataViewsSearchCopy,
+} from "./data-views-copy";

@@ -1,5 +1,6 @@
 "use client";
 
+import type { CategorySelectCopy } from "@12-apps/ui/copy";
 import { useState, type JSX } from "react";
 
 import { Autocomplete } from "@12-apps/ui/form/Autocomplete";
@@ -100,6 +101,7 @@ export function TargetPickerField({
   ids,
   onChange,
   dataTestId,
+  copy,
 }: {
   group: WireTargetGroup;
   label: string;
@@ -108,6 +110,8 @@ export function TargetPickerField({
   ids: readonly string[];
   onChange: (next: string[]) => void;
   dataTestId: string;
+  /** `CategorySelect`'s own words — required since FUT-760, never defaulted. */
+  copy: CategorySelectCopy;
 }): JSX.Element {
   if (group.nests) {
     return (
@@ -119,6 +123,7 @@ export function TargetPickerField({
         value={[...ids]}
         onChange={onChange}
         error={requiredMessage !== undefined && ids.length === 0 ? requiredMessage : undefined}
+        copy={copy}
         dataTestId={dataTestId}
       />
     );

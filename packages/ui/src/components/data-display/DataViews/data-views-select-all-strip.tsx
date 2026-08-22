@@ -2,6 +2,7 @@
 
 import { Checkbox } from "@mui/material";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
@@ -38,6 +39,7 @@ export function SelectAllStrip<T>({
   onChange: (next: Set<string | number>) => void;
   testIdPrefix: string;
 }): React.JSX.Element | null {
+  const copy = useDataViewsCopy();
   if (rows.length === 0) return null;
   const pageIds = rows.map(getRowId);
   const selectedHere = pageIds.filter((id) => selectedIds.has(id)).length;
@@ -81,7 +83,7 @@ export function SelectAllStrip<T>({
         indeterminate={some}
         onChange={toggle}
         data-testid={`${testIdPrefix}-select-all-box`}
-        inputProps={{ "aria-label": "Selecionar todos nesta página" }}
+        inputProps={{ "aria-label": copy.selection.selectAllOnPage }}
         sx={{ p: 0.5 }}
       />
       <Button
@@ -91,13 +93,13 @@ export function SelectAllStrip<T>({
         onClick={toggle}
         dataTestId={`${testIdPrefix}-select-all-toggle`}
       >
-        {all ? "Limpar seleção" : "Selecionar tudo"}
+        {all ? copy.selection.clearSelection : copy.selection.selectAll}
       </Button>
       <Text variant="caption" as="span">
         {/* "nesta página" is load-bearing: the scope tabs above show
             whole-query totals, so an unqualified count here would read as one. */}
         <Box component="span" sx={{ ml: "auto", color: "text.disabled", whiteSpace: "nowrap" }}>
-          {rows.length} nesta página
+          {copy.selection.onThisPage(rows.length)}
         </Box>
       </Text>
     </Box>

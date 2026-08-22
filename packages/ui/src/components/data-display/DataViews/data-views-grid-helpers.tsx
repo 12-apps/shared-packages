@@ -1,5 +1,6 @@
 "use client";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { type GridColumn } from "../DataGrid";
 import { type SortFieldDefinition } from "../../layout/ContentToolbar";
 import { Box } from "../../../mui/Box";
@@ -105,6 +106,7 @@ function renderAutoKebab<T extends Record<string, unknown>>(
   testIdPrefix: string,
   getRowId: (row: T) => string | number,
 ): React.ReactNode {
+  const copy = useDataViewsCopy();
   const items: DropdownMenuItem[] = kebabActions
     .filter((action) => action.isVisible?.(row) ?? true)
     .map((action) => ({
@@ -119,7 +121,7 @@ function renderAutoKebab<T extends Record<string, unknown>>(
       size="sm"
       items={items}
       trigger={
-        <Button variant="text" size="sm" dataTestId={`${testIdPrefix}-actions-${getRowId(row)}`} aria-label="Ações">
+        <Button variant="text" size="sm" dataTestId={`${testIdPrefix}-actions-${getRowId(row)}`} aria-label={copy.grid.rowActions}>
           ⋮
         </Button>
       }
@@ -222,6 +224,7 @@ export function renderBulkActions<T extends Record<string, unknown>>({
   clearSelection,
   testIdPrefix,
 }: RenderBulkArgs<T>): React.ReactNode {
+  const copy = useDataViewsCopy();
   if (selectedRows.length === 0) return undefined;
   if (rowActions) {
     const items = bulkMenuItems(rowActions, selectedRows, clearSelection);
@@ -232,7 +235,7 @@ export function renderBulkActions<T extends Record<string, unknown>>({
         items={items}
         trigger={
           <Button variant="outline" size="sm" dataTestId={`${testIdPrefix}-bulk-actions`}>
-            Ações ({selectedRows.length}) ▾
+            {copy.grid.bulkActions(selectedRows.length)}
           </Button>
         }
       />

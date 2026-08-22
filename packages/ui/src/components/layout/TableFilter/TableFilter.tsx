@@ -328,7 +328,7 @@ const TableFilterRangeField = ({
   step,
   minPlaceholder = 'min',
   maxPlaceholder = 'max',
-  invalidLabel = 'O máximo deve ser maior ou igual ao mínimo.',
+  invalidLabel,
   testId,
 }: TableFilterRangeFieldProps): React.JSX.Element => {
   const invalid = isRangeInverted(value);

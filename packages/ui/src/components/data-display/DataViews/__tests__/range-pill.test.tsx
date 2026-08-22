@@ -6,7 +6,7 @@
  * screen. A range filter was therefore invisible on exactly the screens that
  * use it, which is what pushed Pedidos to hang its own inputs outside the grid.
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "./test-utils";
 import { describe, expect, it, vi } from "vitest";
 
 import { InlineFilterControls } from "../data-views-inline-bar";

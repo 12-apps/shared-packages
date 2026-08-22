@@ -536,6 +536,14 @@
     "./data-display/CardKit": {
       "types": "./dist/types/components/data-display/CardKit/index.d.ts",
       "default": "./dist/data-display/CardKit.js"
+    },
+    "./copy": {
+      "types": "./dist/types/copy.d.ts",
+      "default": "./dist/copy.js"
+    },
+    "./pt-BR": {
+      "types": "./dist/types/pt-BR.d.ts",
+      "default": "./dist/pt-BR.js"
     }
   },
   "typesVersions": {

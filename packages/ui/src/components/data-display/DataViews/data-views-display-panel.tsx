@@ -1,5 +1,6 @@
 "use client";
 
+import type { DataViewsCopy } from "./data-views-copy";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 // Says "display settings" rather than the generic tune sliders it used to
 // share with the "Mais" FILTER trigger — see the note there.
@@ -7,6 +8,7 @@ import DisplaySettingsRoundedIcon from "@mui/icons-material/DisplaySettingsRound
 import { Popover } from "@mui/material";
 import { useState } from "react";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 
@@ -39,11 +41,13 @@ import type { DataViewsController } from "./use-data-views-state";
 /** Which tab is showing. `columns` first: it is what an operator opens this for. */
 type DisplayTabKey = "sort" | "columns" | "display";
 
-const TABS: { key: DisplayTabKey; label: string }[] = [
-  { key: "sort", label: "Ordenar" },
-  { key: "columns", label: "Colunas" },
-  { key: "display", label: "Exibição" },
-];
+function displayTabs(copy: DataViewsCopy): { key: DisplayTabKey; label: string }[] {
+  return [
+    { key: "sort", label: copy.display.sortTab },
+    { key: "columns", label: copy.display.columnsTab },
+    { key: "display", label: copy.display.panelTab },
+  ];
+}
 
 /** The saved-view chrome the panel brackets its tabs with, when a host supplies it. */
 export interface DisplayPanelView {
@@ -89,9 +93,10 @@ function PanelTabs({
   muted?: boolean;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Box sx={{ display: "flex", gap: 0.5, p: 0.75, bgcolor: "action.hover", borderBottom: 1, borderColor: "divider" }}>
-      {TABS.map((entry) => {
+      {displayTabs(copy).map((entry) => {
         const active = tab === entry.key && !muted;
         return (
         <Box
@@ -258,6 +263,7 @@ function DisplayTrigger({
   onOpen: (anchor: HTMLElement) => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Button
       variant="outline"
@@ -265,14 +271,14 @@ function DisplayTrigger({
       color="neutral"
       onClick={(event) => onOpen(event.currentTarget as HTMLElement)}
       dataTestId={`${testIdPrefix}-display-trigger`}
-      aria-label="Exibir"
-      title={compact ? "Exibir" : undefined}
+      aria-label={copy.display.trigger}
+      title={compact ? copy.display.trigger : undefined}
     >
       <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
         <DisplaySettingsRoundedIcon fontSize="small" />
         {!compact && (
           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-            Exibir
+            {copy.display.trigger}
           </Box>
         )}
         {dirty && (

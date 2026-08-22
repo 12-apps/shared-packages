@@ -1,3 +1,4 @@
+import type { ConfirmActionCopy } from '../../../copy';
 import { Button } from '../../form/Button';
 import type { ButtonProps } from '../../form/Button/Button.types';
 
@@ -12,7 +13,14 @@ import type { ConfirmableComponent } from './ConfirmAction.types';
  * The baked-in defaults are only the wording and tone every destructive
  * confirmation shares, and each instance can still override them.
  */
-export const ConfirmButton: ConfirmableComponent<ButtonProps> = withConfirmation<ButtonProps>(
-  Button,
-  { cancelText: 'Cancelar', tone: 'destructive' },
-);
+export function createConfirmButton(
+  copy: ConfirmActionCopy,
+  errorText: string,
+): ConfirmableComponent<ButtonProps> {
+  return withConfirmation<ButtonProps>(Button, {
+    cancelText: copy.cancel,
+    tone: 'destructive',
+    errorText,
+    copy,
+  });
+}

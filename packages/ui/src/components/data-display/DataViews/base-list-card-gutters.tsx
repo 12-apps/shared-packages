@@ -7,6 +7,7 @@ import { Checkbox } from "../../form/Checkbox";
 import { Box } from "../../../mui/Box";
 
 import { DragHandle, useDragItem } from "./data-views-drag";
+import { useDataViewsCopy } from "./data-views-copy-context";
 
 /**
  * THE THREE GUTTERS AT THE HEAD OF A ROW — the disclosure chevron, the drag grip
@@ -72,6 +73,7 @@ export function SelectSlot({
   onToggleSelect?: (event?: React.MouseEvent) => void;
   testId?: string;
 }): React.JSX.Element | null {
+  const copy = useDataViewsCopy();
   if (!selectable) return reserve ? <Box data-slot="select" /> : null;
   return (
     // z-index 1: above the stretched link, or the anchor swallows the click.
@@ -88,7 +90,7 @@ export function SelectSlot({
         }}
         size="small"
         data-testid={testId}
-        aria-label="Selecionar"
+        aria-label={copy.selection.selectRow}
       />
     </Box>
   );

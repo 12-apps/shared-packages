@@ -1,5 +1,6 @@
 "use client";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { CategorySelect } from "../../form/CategorySelect";
 import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 
@@ -65,10 +66,12 @@ export function PillControl<T extends Record<string, unknown>>({
   testIdPrefix,
   layout = "pill",
 }: PillControlProps<T>): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const testId = `${testIdPrefix}-filter-${fieldId}`;
   if (pill.control === "category") {
     return (
       <CategorySelect
+        copy={copy.categorySelect}
         placeholder={pill.label}
         label={layout === "stacked" ? pill.label : undefined}
         fullWidth={layout === "stacked"}
@@ -86,10 +89,10 @@ export function PillControl<T extends Record<string, unknown>>({
       selected={new Set(selected)}
       onToggle={(value, checked) => onTogglePill(fieldId, value, checked)}
       onClear={() => onClearField(fieldId)}
-      allLabel="Todas"
+      allLabel={copy.filters.allOption}
       searchable={pill.searchEnabled ? true : undefined}
-      searchPlaceholder="Buscar…"
-      noResultsLabel="Nenhum resultado"
+      searchPlaceholder={copy.filters.optionSearchPlaceholder}
+      noResultsLabel={copy.filters.optionsEmpty}
       layout={layout}
       onOpenChange={onOpenChange}
       data-testid={testId}

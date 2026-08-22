@@ -1,6 +1,10 @@
 "use client";
 
-import { ConfirmButton } from "../../feedback/ConfirmAction";
+import { useMemo } from "react";
+
+import type { ConfirmActionCopy } from "../../../copy";
+import { useDataViewsCopy } from "./data-views-copy-context";
+import { createConfirmButton } from "../../feedback/ConfirmAction";
 import { Dialog, DialogContent } from "../../feedback/Dialog";
 import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
@@ -10,6 +14,8 @@ import { Text } from "../../typography/Text";
 import type { SavedViewSummary } from "./data-views-types";
 
 interface ManageViewsDialogProps {
+  /** The confirm dialog's words. REQUIRED — this package ships no default copy. */
+  confirmCopy: ConfirmActionCopy;
   open: boolean;
   onClose: () => void;
   views: SavedViewSummary[];
@@ -19,11 +25,12 @@ interface ManageViewsDialogProps {
 }
 
 function tags(view: SavedViewSummary): string[] {
+  const copy = useDataViewsCopy();
   const list: string[] = [];
-  if (view.isDefault) list.push("Padrão");
+  if (view.isDefault) list.push(copy.manageViews.defaultTag);
   if (view.pinned) list.push("Fixada");
   if (view.shared) list.push("Compartilhada");
-  if (!view.isOwner) list.push("De outro usuário");
+  if (!view.isOwner) list.push(copy.manageViews.otherUserTag);
   return list;
 }
 
@@ -37,12 +44,19 @@ function ManageViewRow({
   onEdit,
   onDelete,
   testIdPrefix,
+  confirmCopy,
 }: {
   view: SavedViewSummary;
   onEdit: (view: SavedViewSummary) => void;
   onDelete: (view: SavedViewSummary) => void;
   testIdPrefix: string;
+  confirmCopy: ConfirmActionCopy;
 }): React.JSX.Element {
+  const ConfirmButton = useMemo(
+    () => createConfirmButton(confirmCopy, confirmCopy.defaultError),
+    [confirmCopy],
+  );
+  const copy = useDataViewsCopy();
   return (
     <Stack
       direction="row"
@@ -83,15 +97,15 @@ function ManageViewRow({
             color="danger"
             onClick={() => onDelete(view)}
             confirm={{
-              title: 'Excluir a visão salva?',
+              title: copy.manageViews.deleteTitle,
               entityName: view.name,
               description:
-                'Os filtros e colunas guardados nela são perdidos. Não é possível restaurar.',
-              confirmText: 'Excluir',
+                copy.manageViews.deleteBody,
+              confirmText: copy.manageViews.deleteConfirm,
             }}
             dataTestId={`${testIdPrefix}-manage-delete-${view.id}`}
           >
-            Excluir
+            {copy.manageViews.deleteConfirm}
           </ConfirmButton>
         </Stack>
       )}
@@ -106,12 +120,14 @@ export function ManageViewsDialog({
   onEdit,
   onDelete,
   testIdPrefix = "views",
+  confirmCopy,
 }: ManageViewsDialogProps): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title="Gerenciar visões"
+      title={copy.manageViews.title}
       size="md"
       showCloseButton
       dataTestId={`${testIdPrefix}-manage-dialog`}
@@ -120,11 +136,11 @@ export function ManageViewsDialog({
         <Stack spacing={1.5} data-testid={`${testIdPrefix}-manage-list`}>
           {views.length === 0 ? (
             <Text variant="body" as="p">
-              Nenhuma visão salva.
+              {copy.manageViews.empty}
             </Text>
           ) : (
             views.map((view) => (
-              <ManageViewRow
+              <ManageViewRow confirmCopy={confirmCopy}
                 key={view.id}
                 view={view}
                 onEdit={onEdit}
