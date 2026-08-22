@@ -84,19 +84,21 @@ export {
   type VaultedCardDisplay,
 } from './components/checkout/transport';
 export { type CheckoutHostPorts } from './components/checkout/use-checkout-controller';
-export { PaymentsUnavailable } from './components/checkout/payments-unavailable';
+// No `PaymentsUnavailable` here. The store-cannot-charge screen ships once, as
+// `createPaymentFlows().screens.PaymentsUnavailable`, which asks the host for a
+// `CheckoutAvailability.remedy` — `{ label, onSelect }`, filled with whatever
+// that host's remedy actually is. The component this line used to export was a
+// second copy of the same screen with the origin host's dining room in its API.
 export type {
   CheckoutStepperCopy,
   CheckoutViewCopy,
   DadosStepCopy,
   EmptyCartCopy,
   PaymentStatusCopy,
-  PaymentsUnavailableCopy,
   StatusOutcomeCopy,
 } from './components/checkout/view-copy';
 export {
   PT_BR_CHECKOUT_VIEW_COPY,
-  PT_BR_PAYMENTS_UNAVAILABLE_COPY,
   PT_BR_PAYMENT_STATUS_COPY,
 } from './components/checkout/pt-BR';
 export { fetchCheckoutConfig } from './components/checkout/client';

@@ -1,8 +1,4 @@
-import type {
-  CheckoutViewCopy,
-  PaymentsUnavailableCopy,
-  PaymentStatusCopy,
-} from "./view-copy";
+import type { CheckoutViewCopy, PaymentStatusCopy } from "./view-copy";
 
 /**
  * The pt-BR pack — the exact sentences these views compiled in until 6.0.0,
@@ -10,15 +6,6 @@ import type {
  * what exempts this file from the copy-portability gate: Portuguese may ship,
  * it may not be silent.
  */
-export const PT_BR_PAYMENTS_UNAVAILABLE_COPY: PaymentsUnavailableCopy = {
-  title: "Pagamento online indisponível",
-  body: "Esta loja não recebe pagamentos pelo site. Combine o pagamento diretamente com a loja para concluir seu pedido.",
-  remedyTitle: "Pagamento com o garçom",
-  remedyBody: "Esta loja não recebe pagamentos pelo site. Chame o garçom para fechar a conta na mesa.",
-  callAction: "Chamar garçom",
-  callingAction: "Chamando...",
-};
-
 export const PT_BR_PAYMENT_STATUS_COPY: PaymentStatusCopy = {
   paid: {
     heading: "Pedido confirmado",
