@@ -73,6 +73,13 @@ export interface DiscountsScreenCopy {
 
 /** The four closed sets, each labelled in full. */
 export interface DiscountsVocabularyCopy {
+  /**
+   * The KIND toggle's words — the one question the form actually asks (see
+   * `./form-kind`). It is keyed by `DiscountType` because every kind is named
+   * after the type it stands for, `COMBO` included: a combo IS a discount, and
+   * `BUNDLE_PRICE`'s label survives for the legacy rules that still carry it.
+   */
+  readonly kind: LabelsFor<DiscountType | "COMBO">;
   readonly type: LabelsFor<DiscountType>;
   readonly scope: LabelsFor<DiscountScope>;
   readonly trigger: LabelsFor<DiscountTrigger>;
@@ -99,6 +106,11 @@ export interface DiscountsFormCopy {
   readonly submitEdit: string;
   readonly name: string;
   readonly type: string;
+  /** The kind toggle's own label — the form's first real question. */
+  readonly kind: string;
+  /** Which of the two rewards a COMBO gives, and the sentence under it. */
+  readonly comboReward: string;
+  readonly comboRewardHint: string;
   readonly percentOff: string;
   /** The example inside the empty percentage input. */
   readonly percentPlaceholder: string;
@@ -122,6 +134,8 @@ export interface DiscountsFormCopy {
   /** How many times ONE cart may claim the combo. Blank = as often as it fits. */
   readonly maxComboApplications: string;
   readonly maxComboApplicationsHint: string;
+  /** The same cap for "leve 3, pague 2", which nobody calls a combo. */
+  readonly maxFreeUnitsApplications: string;
   readonly active: string;
   readonly activeHint: string;
   readonly stackable: string;
@@ -142,6 +156,8 @@ export interface DiscountsFormCopy {
    * that number, so the operator is told the ceiling rather than just refused.
    */
   readonly freeUnitsExceedCombo: string;
+  /** The free-units builder names PRODUCTS, so its refusal says products. */
+  readonly freeUnitsTargetRequired: string;
   readonly codeRequired: string;
   readonly categoryTargetRequired: string;
   readonly itemTargetRequired: string;
@@ -185,6 +201,20 @@ export interface DiscountsComboCopy {
    * checked without saving it. `{units}` and `{groups}`.
    */
   readonly summary: string;
+  /**
+   * The "leve 3, pague 2" builder (`./free-units-builder`), which is the same
+   * stored shape wearing the sentence an operator would actually say. Its own
+   * keys rather than the group builder's: "Grupo 1" and "Quantidade" are right
+   * for a combo of several groups and wrong for one offer about one shelf.
+   */
+  readonly freeUnitsTitle: string;
+  readonly freeUnitsHint: string;
+  /** How many units the customer takes to earn the free ones. */
+  readonly buyQuantity: string;
+  /** That builder's picker label, `{collection}` — one offer, not one group. */
+  readonly freeUnitsPick: string;
+  /** The read-back, once both numbers make an offer. `{units}` and `{paid}`. */
+  readonly freeUnitsSummary: string;
 }
 
 /** The target pickers, and what an empty selection says. */

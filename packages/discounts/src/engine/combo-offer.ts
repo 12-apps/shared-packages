@@ -121,6 +121,32 @@ function toOffer(rule: DiscountRule): ComboOffer {
 }
 
 /**
+ * Every combo the store is currently advertising, in the evaluator's canonical
+ * rule order.
+ *
+ * The STORE-level sibling of {@link comboOffersForItem}: same predicate, no
+ * item. A storefront that shows combos as their own shelf — "here are the
+ * bundles this shop is running" rather than "this card takes part in one" —
+ * needs the list before it has a product in hand, and answering it host-side
+ * means a second copy of "live enough to advertise" that drifts from this one
+ * the first time a rule gains a way to be over.
+ *
+ * It says nothing about whether the store can still SELL them: a combo whose
+ * group has no orderable product left is a question about the host's catalog,
+ * which this package cannot see. The caller resolves the groups and drops what
+ * it cannot fill.
+ */
+export function advertisableCombos(
+  rules: readonly DiscountRule[],
+  now: Date,
+): readonly ComboOffer[] {
+  return rules
+    .filter((rule) => isAdvertisable(rule, now))
+    .sort(compareRuleOrder)
+    .map(toOffer);
+}
+
+/**
  * Every live combo one of whose slots this item can fill, in the evaluator's
  * canonical rule order so a card and a cart never disagree about which combo
  * comes first. Empty when the item is in none — the common case, and the one a

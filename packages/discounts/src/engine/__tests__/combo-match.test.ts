@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { comboCoveredLineIds, freshComboPool, matchCombo } from "../combo-match";
+import {
+  comboCoveredLineIds,
+  comboSlotAcceptsLine,
+  freshComboPool,
+  matchCombo,
+} from "../combo-match";
 import type { ComboMatch } from "../combo-match";
 import type { DiscountCartLine } from "../types";
 import { bundleRule, comboRule, freeUnitsRule, line, slot } from "./fixtures";
@@ -272,5 +277,49 @@ describe("the covered set the screen reads (R3)", () => {
 
   it("M21: covers NOTHING when the cart cannot assemble the combo", () => {
     expect(comboCoveredLineIds(comboRule(SNACK_SLOTS, { id: "snack" }), [POPCORN]).size).toBe(0);
+  });
+});
+
+describe("which GROUP a product fills", () => {
+  /*
+   * The question a storefront asks and the cart never does. "Escolha 2
+   * refrigerantes" has to offer sodas and not popcorn, and the ONLY safe answer
+   * is the matcher's own predicate — a host deriving it would eventually offer
+   * a product the matcher refuses, i.e. a combo the buyer assembles on screen
+   * and never earns.
+   */
+
+  it("M23: a slot naming a category accepts anything on that path, and nothing else", () => {
+    const drinks = slot({ categoryIds: ["drinks"], quantity: 2 });
+    expect(comboSlotAcceptsLine(drinks, SODAS)).toBe(true);
+    expect(comboSlotAcceptsLine(drinks, POPCORN)).toBe(false);
+  });
+
+  it("M24: a slot naming an item accepts that item, and not its category siblings", () => {
+    const popcorn = slot({ menuItemIds: ["popcorn-lg"], quantity: 1 });
+    expect(comboSlotAcceptsLine(popcorn, POPCORN)).toBe(true);
+    expect(comboSlotAcceptsLine(popcorn, SODAS)).toBe(false);
+  });
+
+  it("M25: it reaches a chosen VARIATION, the same way an ITEM-scoped rule does", () => {
+    const zero = line({
+      lineId: "l-zero",
+      menuItemId: "soda",
+      variationMenuItemId: "soda-zero",
+      categoryPath: [],
+    });
+    expect(comboSlotAcceptsLine(slot({ menuItemIds: ["soda-zero"] }), zero)).toBe(true);
+  });
+
+  it("M26: a slot naming both accepts either — the two lists are a union", () => {
+    const either = slot({ menuItemIds: ["popcorn-lg"], categoryIds: ["drinks"], quantity: 1 });
+    expect(comboSlotAcceptsLine(either, POPCORN)).toBe(true);
+    expect(comboSlotAcceptsLine(either, SODAS)).toBe(true);
+  });
+
+  it("M27: a slot naming nothing accepts nothing, rather than everything", () => {
+    // The empty-target group the admin form refuses. If it ever reaches the
+    // storefront it must offer an empty picker, not the whole menu.
+    expect(comboSlotAcceptsLine(slot({ quantity: 1 }), SODAS)).toBe(false);
   });
 });

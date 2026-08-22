@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { comboOffersForItem, type ComboOffersInput } from "../combo-offer";
+import { advertisableCombos, comboOffersForItem, type ComboOffersInput } from "../combo-offer";
 import { previewItemDiscount } from "../preview";
 import type { DiscountRule } from "../types";
 import { NOW, at, bundleRule, comboRule, freeUnitsRule, percentRule, slot } from "./fixtures";
@@ -132,5 +132,44 @@ describe("a combo that is not live is not advertised", () => {
       bundleRule(2_500, SNACK_SLOTS, { id: "snack", minSubtotalCents: 10_000 }),
     ]);
     expect(result.map((offer) => offer.discountId)).toEqual(["snack"]);
+  });
+});
+
+describe("the store's whole shelf of combos", () => {
+  /*
+   * The same predicate with no item in hand — what a storefront shows when it
+   * gives combos a shelf of their own rather than a badge on a card. It exists
+   * so a host never writes "live enough to advertise" a second time; these
+   * cases are the ones that would drift if it did.
+   */
+
+  const SNACK = bundleRule(2_500, SNACK_SLOTS, { id: "snack" });
+
+  it("O11: lists a live combo the buyer has not got a single component of", () => {
+    // The whole point of a shelf: the buyer does not yet know the bundle
+    // exists, so nothing about their cart may decide whether they see it.
+    expect(advertisableCombos([SNACK], NOW).map((offer) => offer.discountId)).toEqual(["snack"]);
+  });
+
+  it("O12: leaves out everything a card would leave out, for the same reasons", () => {
+    const rules = [
+      SNACK,
+      bundleRule(2_500, SNACK_SLOTS, { id: "off", active: false }),
+      bundleRule(2_500, SNACK_SLOTS, { id: "later", startsAt: at(1) }),
+      bundleRule(2_500, SNACK_SLOTS, { id: "over", endsAt: at(0) }),
+      bundleRule(2_500, SNACK_SLOTS, { id: "spent", usageLimit: 3, usageCount: 3 }),
+      bundleRule(2_500, SNACK_SLOTS, { id: "coupon", trigger: "CODE", code: "COMBO" }),
+      percentRule(10, { id: "not-a-combo", scope: "ORDER" }),
+    ];
+    expect(advertisableCombos(rules, NOW).map((offer) => offer.discountId)).toEqual(["snack"]);
+  });
+
+  it("O13: hands back the reward columns whole, so the host writes its own line", () => {
+    const [offer] = advertisableCombos(
+      [freeUnitsRule(1, [slot({ menuItemIds: ["burger"], quantity: 3 })], { id: "three" })],
+      NOW,
+    );
+    expect(offer).toMatchObject({ type: "FREE_UNITS", freeUnits: 1, bundlePriceCents: null });
+    expect(offer?.requirements).toHaveLength(1);
   });
 });
