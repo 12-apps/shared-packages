@@ -132,7 +132,14 @@ export function ConfirmActionDialog({
       title={title}
       description={confirmBody(description, copy, entityName)}
       confirmText={confirmText}
-      cancelText={cancelText}
+      // `copy.cancel` is the fallback, NOT `AlertDialog`'s own. The 6.3.0 copy
+      // sweep deleted this component's `cancelText = 'Cancelar'` default and
+      // put the word in `ConfirmActionCopy` — where nothing then read it, so
+      // every confirmation that names no `cancelText` of its own fell through
+      // to `AlertDialog`'s English `'Cancel'`, in a pt-BR dialog. That is the
+      // precise failure the sweep exists to prevent, one layer down: a port
+      // that is required, supplied, and ignored.
+      cancelText={cancelText ?? copy.cancel}
       loading={state.pending}
       confirmDisabled={gateUnmet}
       initialFocus={resolveInitialFocus(tone, initialFocus)}
