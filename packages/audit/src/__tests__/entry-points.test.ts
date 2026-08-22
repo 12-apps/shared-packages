@@ -14,7 +14,7 @@
  * the set so a NEW subpath cannot arrive unreviewed, and then walks each one to
  * the hazard behind it.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 
 import { AuditConfigError } from '../core/errors';
 import { defineAuditVocabulary, type AuditVocabulary } from '../core/vocabulary';
+import { auditManifest } from '../manifest/index';
 import * as rootEntry from '../index';
 import * as honoEntry from '../hono/index';
 import { auditRouter } from '../hono/index';
@@ -123,11 +124,52 @@ describe('the published entry points', () => {
     expect(publishedSubpaths()).toEqual([
       '.',
       './hono',
+      './manifest',
       './package.json',
       './react',
       './server',
     ]);
   });
+});
+
+describe('`./manifest` — what this package tells a host it contributes', () => {
+  /**
+   * The hazard behind THIS subpath is not a missing guard, it is a missing
+   * DECLARATION. The partial reached an adopting host's schema through the
+   * assembler's structural-discovery fallback long before this entry existed:
+   * composition succeeded, the table appeared, and nothing recorded that a
+   * package had put a table in someone else's database. So what this walks to
+   * is the mirror — the plain JSON a host's assembler actually reads, because
+   * it cannot execute this package's TypeScript.
+   */
+  it('names the partial and the migrations the host composes', () => {
+    expect(auditManifest.name).toBe('@12-apps/audit');
+    expect(auditManifest.db).toEqual({
+      partial: 'prisma/audit.prisma',
+      migrations: 'prisma/migrations',
+    });
+  });
+
+  /* eslint-disable test-flakiness/no-unmocked-fs --
+     the tree on disk IS the subject, exactly as it is for `publishedSubpaths`
+     above: the question is whether this package's DECLARATION matches what it
+     actually ships, and a mocked filesystem would answer with what the test
+     invented. Every path read is inside this package. */
+  it('says the same thing in `package.json`, which is the copy tooling reads', () => {
+    const manifest = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8')) as {
+      wiring?: { db?: unknown };
+    };
+    expect(manifest.wiring?.db).toEqual(auditManifest.db);
+  });
+
+  it('points at files this package actually ships', () => {
+    // The declaration is a promise about the TARBALL. A partial named but not
+    // shipped is the dead-subpath failure one directory over, in the currency
+    // that matters here: a host would compose nothing and never be told.
+    expect(existsSync(join(PACKAGE_ROOT, auditManifest.db.partial))).toBe(true);
+    expect(existsSync(join(PACKAGE_ROOT, auditManifest.db.migrations))).toBe(true);
+  });
+  /* eslint-enable test-flakiness/no-unmocked-fs */
 });
 
 describe('`.` — the framework-free root', () => {
