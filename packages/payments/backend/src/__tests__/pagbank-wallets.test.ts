@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProviderRequestError } from '../core/errors';
 import { pagbankProvider } from '../providers/pagbank';
 import { cardInput } from './fixtures';
+import { PT_BR_PAGBANK_COPY } from '../providers/pt-BR';
 
 /**
  * FUT-472 — Apple Pay through the PagBank adapter: the wallet branch of the
@@ -39,7 +40,7 @@ afterEach(() => {
 
 describe('pagbank adapter — Apple Pay charges (FUT-472)', () => {
   it('declares the Apple Pay wallet in its capability table', () => {
-    expect(pagbankProvider().capabilities.wallets).toContain('APPLE_PAY');
+    expect(pagbankProvider(PT_BR_PAGBANK_COPY).capabilities.wallets).toContain('APPLE_PAY');
   });
 
   it('sends an Apple Pay charge as payment_method.card.wallet', async () => {
@@ -47,7 +48,7 @@ describe('pagbank adapter — Apple Pay charges (FUT-472)', () => {
     // forwarded VERBATIM — the adapter neither parses nor re-encodes it.
     const spy = mockFetch({ id: 'ORDE_A', charges: [{ id: 'CHAR_A', status: 'PAID' }] });
     const paymentData = JSON.stringify({ data: 'opaque', header: {}, signature: 'sig' });
-    await pagbankProvider().createCharge(
+    await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(
       { ...cardInput('order-a'), card: { wallet: { type: 'APPLE_PAY', key: paymentData } } },
       LIVE,
     );
@@ -64,7 +65,7 @@ describe('pagbank adapter — Apple Pay charges (FUT-472)', () => {
 describe('pagbank adapter — the Apple Pay certificate round-trip (FUT-472)', () => {
   it('POSTs the CSR request with bearer auth and finds the PEM in a schema-less body', async () => {
     const spy = mockFetch({ data: { certificate_request: PEM } });
-    const answer = await pagbankProvider().applePay!.requestCsr(LIVE);
+    const answer = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.requestCsr(LIVE);
 
     const [url, init] = spy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://sandbox.api.pagseguro.com/wallets/apple-pay/csr');
@@ -75,7 +76,7 @@ describe('pagbank adapter — the Apple Pay certificate round-trip (FUT-472)', (
 
   it('finds a CSR answered as a bare PEM string too', async () => {
     mockFetch(PEM);
-    const answer = await pagbankProvider().applePay!.requestCsr(LIVE);
+    const answer = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.requestCsr(LIVE);
     expect(answer.csr).toBe(PEM);
   });
 
@@ -83,14 +84,14 @@ describe('pagbank adapter — the Apple Pay certificate round-trip (FUT-472)', (
     // The operator finishes the enrolment by hand from `raw` — a guess at a
     // field name here would answer confidently and wrongly forever.
     mockFetch({ unexpected: 'shape' });
-    const answer = await pagbankProvider().applePay!.requestCsr(LIVE);
+    const answer = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.requestCsr(LIVE);
     expect(answer.csr).toBeNull();
     expect(answer.raw).toEqual({ unexpected: 'shape' });
   });
 
   it('activates by POSTing the .cer and reads activation off the HTTP outcome', async () => {
     const spy = mockFetch({});
-    const answer = await pagbankProvider().applePay!.activateCertificate('CER_B64', LIVE);
+    const answer = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.activateCertificate('CER_B64', LIVE);
 
     const [url, init] = spy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://sandbox.api.pagseguro.com/wallets/apple-pay/cer');
@@ -101,14 +102,14 @@ describe('pagbank adapter — the Apple Pay certificate round-trip (FUT-472)', (
   it('a refused activation throws the typed provider error, never a silent false', async () => {
     mockFetch({ error_messages: ['invalid certificate'] }, 400);
     await expect(
-      pagbankProvider().applePay!.activateCertificate('BAD', LIVE),
+      pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.activateCertificate('BAD', LIVE),
     ).rejects.toThrow(ProviderRequestError);
   });
 
   it('stub credentials answer deterministically with no network call', async () => {
     const spy = mockFetch({});
-    const csr = await pagbankProvider().applePay!.requestCsr(STUB);
-    const activation = await pagbankProvider().applePay!.activateCertificate('CER', STUB);
+    const csr = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.requestCsr(STUB);
+    const activation = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.activateCertificate('CER', STUB);
     expect(csr.csr).toContain('BEGIN CERTIFICATE REQUEST');
     expect(activation.activated).toBe(true);
     expect(spy).not.toHaveBeenCalled();

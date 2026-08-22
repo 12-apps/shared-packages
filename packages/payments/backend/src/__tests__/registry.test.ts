@@ -7,12 +7,13 @@ import { infinitePayProvider } from '../providers/infinitepay';
 import { stoneProvider } from '../providers/stone';
 import { stripeProvider } from '../providers/stripe';
 import { activationAdapter } from './activation-fixtures';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '../providers/pt-BR';
 
 describe('defineProviders', () => {
   const providers = defineProviders({
-    stone: stoneProvider(),
-    infinitepay: infinitePayProvider(),
-    stripe: stripeProvider(),
+    stone: stoneProvider(PT_BR_STONE_COPY),
+    infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
+    stripe: stripeProvider(PT_BR_STRIPE_COPY),
   } as const);
 
   it('exposes the registered names', () => {
@@ -35,9 +36,9 @@ describe('defineProviders', () => {
   // as shared mutable state.
   function slugRegistry() {
     return defineProviders({
-      stone: stoneProvider(),
-      infinitepay: infinitePayProvider(),
-      stripe: stripeProvider(),
+      stone: stoneProvider(PT_BR_STONE_COPY),
+      infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
+      stripe: stripeProvider(PT_BR_STRIPE_COPY),
     } as const);
   }
 

@@ -17,6 +17,7 @@ import {
   type FakeSettings,
 } from './activation-fixtures';
 import { cardInput } from './fixtures';
+import { PT_BR_STRIPE_COPY } from '../providers/pt-BR';
 
 /**
  * Stripe's activation charge, driven entirely through the stub path (FUT-689).
@@ -38,7 +39,7 @@ const VERIFY_INPUT = {
 
 /** The real adapter, with `createCharge` recorded — never replaced. */
 function recordingStripe(): { adapter: PaymentProviderAdapter; references: string[] } {
-  const stripe = stripeProvider();
+  const stripe = stripeProvider(PT_BR_STRIPE_COPY);
   const references: string[] = [];
   const createCharge: PaymentProviderAdapter['createCharge'] = async (input, credentials) => {
     references.push(input.reference);
@@ -138,7 +139,7 @@ describe('stripe activation charge, stub path (FUT-689)', () => {
       stub: true,
     };
 
-    const error: unknown = await stripeProvider()
+    const error: unknown = await stripeProvider(PT_BR_STRIPE_COPY)
       .createCharge(cardInput('verify-stripe-client-1'), credentials)
       .then(() => null, (thrown: unknown) => thrown);
 

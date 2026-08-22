@@ -17,6 +17,7 @@ import {
 } from '../memory';
 import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
 import { pagbankProvider } from '../providers/pagbank';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY } from '../providers/pt-BR';
 
 /**
  * Charging and listening are different questions (FUT-463).
@@ -165,7 +166,7 @@ describe('the InfinitePay invoice slug', () => {
       }),
     );
 
-    const snapshot = await infinitePayProvider().createCharge(
+    const snapshot = await infinitePayProvider(PT_BR_INFINITEPAY_COPY).createCharge(
       {
         reference: 'order-1',
         amount: { amountCents: 101, currency: 'BRL' },
@@ -197,7 +198,7 @@ describe('the InfinitePay invoice slug', () => {
       ),
     );
 
-    const snapshot = await infinitePayProvider().createCharge(
+    const snapshot = await infinitePayProvider(PT_BR_INFINITEPAY_COPY).createCharge(
       {
         reference: 'order-2',
         amount: { amountCents: 101, currency: 'BRL' },
@@ -239,7 +240,7 @@ describe('payment_check carries every hint it was given', () => {
       }),
     );
 
-    const snapshot = await infinitePayProvider().findChargeByReference?.(
+    const snapshot = await infinitePayProvider(PT_BR_INFINITEPAY_COPY).findChargeByReference?.(
       'order-9',
       { environment: 'PRODUCTION', fields: { handle: 'thompson-moreira' }, stub: false },
       { slug: 'HN1QkSYx6k', transactionNsu: '79c778f0-0fbe-408c-b610-7a43b6ecb10e' },
@@ -307,7 +308,7 @@ describe('webhook verification across both environments', () => {
     const configStore = createMemoryProviderConfigStore();
     const webhooks = createMemoryWebhookInbox();
     const gateway = createPaymentsGateway({
-      providers: defineProviders({ pagbank: pagbankProvider() } as const),
+      providers: defineProviders({ pagbank: pagbankProvider(PT_BR_PAGBANK_COPY) } as const),
       credentials: credentialStoreFrom(configStore),
       charges: createMemoryChargeStore(),
       webhooks,
@@ -383,7 +384,7 @@ describe('InfinitePay webhook verification with a stored secret', () => {
       ),
     );
 
-    const verified = await infinitePayProvider().webhook.verify(
+    const verified = await infinitePayProvider(PT_BR_INFINITEPAY_COPY).webhook.verify(
       {
         provider: 'infinitepay',
         rawBody: JSON.stringify({

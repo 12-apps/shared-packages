@@ -3,6 +3,7 @@ import type { SettingsService } from '../config/service';
 import type { ProviderRegistry } from '../core/registry';
 import type { MerchantRef, ResolvedCredentials } from '../core/types';
 import type { MerchantWebhookUrlResolver } from '../core/webhook-url';
+import type { ActivationCopy } from './copy';
 
 /**
  * What the activation/verification flow needs from a host (FUT-558).
@@ -16,6 +17,17 @@ import type { MerchantWebhookUrlResolver } from '../core/webhook-url';
 export interface ActivationContext {
   /** The adapters this deployment routes to. */
   providers: ProviderRegistry;
+  /**
+   * Every sentence this flow can put in front of the owner.
+   *
+   * REQUIRED, with no default in the package (FUT-760). Which situation the
+   * owner is in — refused, expired, unreachable, ours to fix rather than
+   * theirs — is this package's answer and stays here; the words are the
+   * host's, and a default would be one product's Portuguese silently
+   * compiled into every other product's screen. `PT_BR_ACTIVATION_COPY`
+   * reproduces today's wording for a host that wants it.
+   */
+  copy: ActivationCopy;
   /**
    * Raw connection rows. Read WITHOUT the enabled gate on purpose:
    * verification runs BEFORE activation, on a provider that is by definition

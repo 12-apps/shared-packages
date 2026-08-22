@@ -1,5 +1,6 @@
 import { ProviderRequestError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
+import type { StripeCopy } from './copy';
 import type { CustomerSchema } from '../core/customer-schema';
 import type { NormalizedWebhookEvent, WebhookDelivery } from '../core/types';
 import { sha256Hex } from './shared';
@@ -18,7 +19,7 @@ import {
   getCharge,
   methodOf,
   refund,
-  verifyCredentials,
+  verifyCredentialsWith,
 } from './stripe-operations';
 import { stripeSetupGuide } from './stripe-setup-guide';
 import { stripeIntakeFreshness, verifyStripeSignature } from './stripe-webhook-verify';
@@ -185,31 +186,32 @@ const oauth: NonNullable<PaymentProviderAdapter['oauth']> = {
  * per call, and inlining it pushed `stripeProvider` past the size gate — the
  * adapter's shape is what that function is for, not four field descriptions.
  */
-const CREDENTIAL_SCHEMA: PaymentProviderAdapter['credentialSchema'] = [
-      { key: 'secretKey', label: 'Secret key (sk_...)', secret: true, required: false, fulfilledBy: 'accessToken' },
-      { key: 'publishableKey', label: 'Publishable key (pk_...)', secret: false, required: false },
-      {
-        key: 'webhookSecret',
-        label: 'Webhook signing secret (whsec_...)',
-        secret: true,
-        required: false,
-        role: 'webhookSecret',
-      },
-      {
-        key: 'connectedAccountId',
-        label: 'Connected account (acct_...)',
-        secret: false,
-        required: false,
-        // Sends `Stripe-Account:` — only meaningful for a platform charging on
-        // behalf of an account it onboarded. A store using its own key must
-        // leave this empty; its own id here makes Stripe refuse every call.
-        advanced: true,
-        helperText:
-          'Deixe em branco. Só preencha se você é uma plataforma Connect cobrando em nome de outra conta — com as suas próprias chaves, este campo faz a Stripe recusar a conexão.',
-      },
-    ];
+function credentialSchemaFor(copy: StripeCopy): PaymentProviderAdapter['credentialSchema'] {
+  return [
+    { key: 'secretKey', label: 'Secret key (sk_...)', secret: true, required: false, fulfilledBy: 'accessToken' },
+    { key: 'publishableKey', label: 'Publishable key (pk_...)', secret: false, required: false },
+    {
+      key: 'webhookSecret',
+      label: 'Webhook signing secret (whsec_...)',
+      secret: true,
+      required: false,
+      role: 'webhookSecret',
+    },
+    {
+      key: 'connectedAccountId',
+      label: 'Connected account (acct_...)',
+      secret: false,
+      required: false,
+      // Sends `Stripe-Account:` — only meaningful for a platform charging on
+      // behalf of an account it onboarded. A store using its own key must
+      // leave this empty; its own id here makes Stripe refuse every call.
+      advanced: true,
+      helperText: copy.fields.connectedAccountHelp,
+    },
+  ];
+}
 
-export function stripeProvider(): PaymentProviderAdapter {
+export function stripeProvider(copy: StripeCopy): PaymentProviderAdapter {
   return {
     name: NAME,
     displayName: 'Stripe',
@@ -238,10 +240,10 @@ export function stripeProvider(): PaymentProviderAdapter {
     // key under `accessToken`, never `secretKey` (`apiKeyOf` says why the two
     // must not share a slot) — `fulfilledBy` is what keeps the masked view
     // reading that store as configured, not as empty fields (FUT-691).
-    credentialSchema: CREDENTIAL_SCHEMA,
+    credentialSchema: credentialSchemaFor(copy),
     customerSchema,
 
-    verifyCredentials,
+    verifyCredentials: verifyCredentialsWith(copy),
     createCharge,
     getCharge,
     findChargeByReference,
@@ -258,7 +260,7 @@ export function stripeProvider(): PaymentProviderAdapter {
       parse: async (delivery) => parseStripeEvent(delivery),
     },
 
-    setupGuide: stripeSetupGuide,
+    setupGuide: (ctx) => stripeSetupGuide(copy.setupGuide, ctx),
 
     clientConfig(credentials) {
       return {

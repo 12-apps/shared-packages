@@ -11,6 +11,7 @@ import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
 
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
+import { PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
 
 /**
  * The rendered SHAPE of the redesigned panel, asserted where a screenshot
@@ -22,7 +23,7 @@ import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
  */
 
 function descriptorOf(): ProviderDescriptor {
-  const adapter = stripeProvider();
+  const adapter = stripeProvider(PT_BR_STRIPE_COPY);
   return {
     name: adapter.name,
     displayName: adapter.displayName,
@@ -42,7 +43,7 @@ function renderPanel(enabled = false) {
     environments: { SANDBOX: { secretKey: { configured: true, hint: '••••42' } }, PRODUCTION: {} },
   } as unknown as MaskedProviderConfig;
 
-  const guide = stripeProvider().setupGuide?.({
+  const guide = stripeProvider(PT_BR_STRIPE_COPY).setupGuide?.({
     brandName: 'Quitanda Digital',
     webhookUrl: 'https://loja.example/api/webhooks/payments/stripe/x',
     progress: { configured: {}, connected: true, proven: false },
