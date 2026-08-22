@@ -2,7 +2,7 @@
   "name": "@12-apps/ui",
   "version": "1.0.0",
   "license": "MIT",
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@10.34.5",
   "type": "module",
   "engines": {
     "node": ">=18.0.0",

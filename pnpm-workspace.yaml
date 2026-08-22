@@ -1,3 +1,29 @@
 packages:
   - "packages/*"
   - "packages/payments/*"
+
+# pnpm 10 runs NO dependency lifecycle scripts unless the package is listed
+# here (https://pnpm.io/settings#onlybuiltdependencies) — an unlisted package
+# installs fine and then fails at REQUIRE time (missing binding/binary), never
+# at install. This list is every dependency whose build script pnpm 9 used to
+# run and that actually needs it:
+#
+#   - @prisma/engines + prisma  — download the query/migrate engines
+#   - @sentry/cli               — downloads the sentry-cli binary
+#   - @swc/core                 — fetches its native napi binding
+#   - esbuild                   — installs the platform binary (vite, tsx)
+#   - msgpackr-extract          — optional native speedup for msgpackr
+#   - unrs-resolver             — fetches its native napi binding
+#
+# Deliberately NOT listed: eslint-plugin-test-flakiness — its only lifecycle
+# script is `preinstall: npx only-allow pnpm`, a guard that is meaningless
+# when the package is installed AS a dependency; blocking it skips a
+# pointless npx download at install time.
+onlyBuiltDependencies:
+  - "@prisma/engines"
+  - "@sentry/cli"
+  - "@swc/core"
+  - esbuild
+  - msgpackr-extract
+  - prisma
+  - unrs-resolver
