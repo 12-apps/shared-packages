@@ -1,0 +1,130 @@
+/**
+ * The wiring-compliance suite (the report-builder shape): the manifests are
+ * plain `satisfies`-checked values with the contract as a type-only
+ * devDependency, so the producer factories' runtime assertions run HERE.
+ */
+
+import { describe, expect, it } from 'vitest';
+import {
+  assertExportsMirror,
+  defineManifest,
+  defineServerManifest,
+} from '@12-apps/wiring/producer';
+import type { PackageManifest } from '@12-apps/wiring';
+
+import packageJson from '../../../package.json';
+import { impersonationManifest, impersonationPreviewManifest } from '../index';
+import {
+  asWireAnswer,
+  impersonationPreviewServerManifest,
+  impersonationServerManifest,
+  readCookie,
+  serializeCookie,
+} from '../server';
+
+/** The manifest as an ADOPTER's type sees it — see the audit suite for why. */
+function declared(manifest: PackageManifest): PackageManifest {
+  return manifest;
+}
+
+describe('the impersonation manifests', () => {
+  it('pass the producer assertions, each server half against its own shared half', () => {
+    expect(defineManifest(impersonationManifest)).toBe(impersonationManifest);
+    expect(defineManifest(impersonationPreviewManifest)).toBe(impersonationPreviewManifest);
+    expect(defineServerManifest(impersonationManifest, impersonationServerManifest)).toBe(
+      impersonationServerManifest,
+    );
+    expect(
+      defineServerManifest(impersonationPreviewManifest, impersonationPreviewServerManifest),
+    ).toBe(impersonationPreviewServerManifest);
+  });
+
+  it('are NAMED apart, which is what keeps the two mounts from merging', () => {
+    // One binding for two mounts would hand a host one mountPath for surfaces
+    // that sit behind different gates — and let a version bump widen the
+    // tenant mount with a platform row. Distinct names make that unsayable.
+    expect(impersonationManifest.name).toBe('@12-apps/impersonation');
+    expect(impersonationPreviewManifest.name).toBe('@12-apps/impersonation-preview');
+  });
+
+  it('declare the e2e world on the operator half, and no db or env anywhere', () => {
+    expect(impersonationManifest.e2e).toEqual({
+      entry: '@12-apps/impersonation/e2e',
+      world: { factory: 'defineImpersonationWorld' },
+    });
+    // The session is a signed COOKIE, not a row; every deployment choice is an
+    // argument; the gating permission id is the host's own.
+    for (const manifest of [impersonationManifest, impersonationPreviewManifest]) {
+      expect(declared(manifest).db).toBeUndefined();
+      expect(declared(manifest).env).toBeUndefined();
+      expect(declared(manifest).permissions).toBeUndefined();
+    }
+  });
+
+  it('mirrors the manifest subpaths into package.json', () => {
+    assertExportsMirror(impersonationManifest, packageJson);
+  });
+});
+
+describe('the wire view of a descriptor answer', () => {
+  const cookie = {
+    name: 'fp_imp',
+    value: 'signed-payload',
+    options: { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 900 },
+  } as const;
+
+  it('stays `{status, body}` when there is no cookie to apply', () => {
+    // Only what the JSON half cannot express takes the raw half.
+    expect(asWireAnswer({ status: 200, body: { active: false } })).toEqual({
+      status: 200,
+      body: { active: false },
+    });
+  });
+
+  it('becomes a raw Response carrying Set-Cookie when there is', () => {
+    // The cookie rides the descriptor precisely because a framework-neutral
+    // handler has no response object to set it on — so "the session started
+    // but the cookie never left" stops being a per-adapter bug.
+    const answer = asWireAnswer({ status: 201, body: { active: true }, cookie });
+
+    expect('response' in answer).toBe(true);
+    const { response } = answer as { response: Response };
+    expect(response.status).toBe(201);
+    expect(response.headers.get('set-cookie')).toContain('fp_imp=signed-payload');
+  });
+
+  it('serializes every attribute the package already decided', () => {
+    const header = serializeCookie(cookie);
+    expect(header).toContain('Path=/');
+    expect(header).toContain('Max-Age=900');
+    expect(header).toContain('SameSite=Lax');
+    expect(header).toContain('HttpOnly');
+    expect(header).toContain('Secure');
+  });
+
+  it('omits Secure when the host is not on https, rather than forcing it', () => {
+    // `secure` is the host's argument; a serializer that always set it would
+    // make the session silently unreadable over plain http in development.
+    expect(serializeCookie({ ...cookie, options: { ...cookie.options, secure: false } })).not.toContain(
+      'Secure',
+    );
+  });
+});
+
+describe('reading the session cookie off a request', () => {
+  it('picks the named entry, not the whole header', () => {
+    // The bug this replaces: handing the package the entire Cookie header,
+    // where it expects one value, reads as "no session" every time.
+    expect(readCookie('other=1; fp_imp=abc; third=2', 'fp_imp')).toBe('abc');
+  });
+
+  it('is undefined when absent, and when there is no header at all', () => {
+    expect(readCookie('other=1', 'fp_imp')).toBeUndefined();
+    expect(readCookie(null, 'fp_imp')).toBeUndefined();
+  });
+
+  it('does not match a cookie whose name merely ends with the one asked for', () => {
+    // `xfp_imp` is a different cookie; a naive `includes` would return it.
+    expect(readCookie('xfp_imp=wrong', 'fp_imp')).toBeUndefined();
+  });
+});

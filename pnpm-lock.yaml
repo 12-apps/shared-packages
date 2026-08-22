@@ -640,6 +640,9 @@ importers:
       '@12-apps/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@12-apps/wiring':
+        specifier: workspace:*
+        version: link:../wiring
       '@playwright/test':
         specifier: ^1.56.1
         version: 1.61.1
@@ -1616,6 +1619,9 @@ importers:
       '@12-apps/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@12-apps/wiring':
+        specifier: workspace:*
+        version: link:../wiring
       '@aws-sdk/client-s3':
         specifier: ^3.703.0
         version: 3.1089.0

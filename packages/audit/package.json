@@ -5,11 +5,12 @@
   "description": "Generic, portable action audit. Framework-free core (the action/resource vocabulary and the deny-by-default diff redaction), host-mounted backend surface (./server: the transactional writer, the per-request actor context, the created_by/updated_by stamp and append-only Prisma extensions, the retention sweep and the audit-log listing endpoints), Hono adapter (./hono), the React audit-log viewer (./react) and the package-owned Prisma partial + migrations. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
-    "./server": "./src/server/index.ts",
     "./hono": "./src/hono/index.ts",
-    "./react": "./src/react/index.ts",
     "./manifest": "./src/manifest/index.ts",
-    "./package.json": "./package.json"
+    "./manifest/server": "./src/manifest/server.ts",
+    "./package.json": "./package.json",
+    "./react": "./src/react/index.ts",
+    "./server": "./src/server/index.ts"
   },
   "scripts": {
     "clean": "rm -rf node_modules coverage",

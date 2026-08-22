@@ -5,14 +5,16 @@
   "description": "Generic, portable impersonation / preview sessions. An operator previews as a tenant user: reads are scoped, writes are refused unless opted in, money paths are always refused, and revoking the entitlement ends the session live. Framework-free core (cookie codec, path rules, per-kind write rule, permission vocabulary), host-mounted backend surface (./server: start/stop/describe descriptors, the per-request write gate, the audit and directory ports), Hono adapter (./hono), React banner + start dialog (./react), and the packaged Gherkin journeys (./e2e). Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
-    "./server": "./src/server/index.ts",
-    "./hono": "./src/hono/index.ts",
-    "./react": "./src/react/index.ts",
     "./e2e": {
       "types": "./dist/e2e/index.d.ts",
       "default": "./dist/e2e/index.js"
     },
-    "./package.json": "./package.json"
+    "./hono": "./src/hono/index.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./manifest/server": "./src/manifest/server.ts",
+    "./package.json": "./package.json",
+    "./react": "./src/react/index.ts",
+    "./server": "./src/server/index.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.e2e.json",
@@ -24,6 +26,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
+    "@12-apps/wiring": ">=1.9.0",
     "@playwright/test": ">=1.40.0",
     "hono": ">=4.0.0",
     "playwright-bdd": ">=8.0.0",
@@ -50,6 +53,7 @@
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
     "@playwright/test": "^1.56.1",
     "@testing-library/react": "^16.1.0",
     "@types/react": "19.2.2",

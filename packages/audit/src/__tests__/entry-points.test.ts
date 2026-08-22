@@ -125,6 +125,7 @@ describe('the published entry points', () => {
       '.',
       './hono',
       './manifest',
+      './manifest/server',
       './package.json',
       './react',
       './server',
