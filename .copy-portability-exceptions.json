@@ -1,13 +1,4 @@
 {
-  "packages/mcp/src/guide.ts": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
-  "packages/mcp/src/react/ai-capabilities.tsx": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
-  "packages/mcp/src/react/ai-connection-utils.ts": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
-  "packages/mcp/src/react/ai-flow-steps.tsx": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
-  "packages/mcp/src/react/ai-landing.tsx": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
-  "packages/mcp/src/react/ai-onboarding.tsx": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
-  "packages/mcp/src/react/ai-status-board.tsx": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
-  "packages/mcp/src/react/host-connect-guide.tsx": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
-  "packages/mcp/src/react/host-select-step.tsx": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
   "packages/payments/backend/src/activation/failure.ts": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
   "packages/payments/backend/src/activation/verify-charge.ts": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",
   "packages/payments/backend/src/activation/verify-redirect.ts": "shipped before the copy gate — convert to required copy config or a named pt-BR pack in this package's adoption wave",

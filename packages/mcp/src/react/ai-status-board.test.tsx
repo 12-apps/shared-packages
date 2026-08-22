@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 // fireEvent/render from @testing-library/react — no user-event, no jest-dom.
+import { PT_BR_MCP_AI_COPY } from "./pt-BR";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -43,7 +44,7 @@ const clickDisconnect = (hostId: string): void => {
 
 describe("AiStatusBoard — disconnecting an assistant", () => {
   it("offers Desconectar only on the connected boxes", () => {
-    render(<AiStatusBoard statuses={statuses()} onConnect={vi.fn()} onDisconnect={vi.fn()} />);
+    render(<AiStatusBoard copy={PT_BR_MCP_AI_COPY.statusBoard} statuses={statuses()} onConnect={vi.fn()} onDisconnect={vi.fn()} />);
 
     expect(screen.getByTestId("ai-status-disconnect-claude")).toBeTruthy();
     // The disconnected host keeps its Conectar call to action instead.
@@ -52,7 +53,7 @@ describe("AiStatusBoard — disconnecting an assistant", () => {
   });
 
   it("keeps the board read-only when the app passes no onDisconnect", () => {
-    render(<AiStatusBoard statuses={statuses()} onConnect={vi.fn()} />);
+    render(<AiStatusBoard copy={PT_BR_MCP_AI_COPY.statusBoard} statuses={statuses()} onConnect={vi.fn()} />);
 
     expect(screen.getByTestId("ai-status-claude")).toBeTruthy();
     expect(screen.queryAllByTestId("ai-status-disconnect-claude")).toHaveLength(0);
@@ -62,7 +63,7 @@ describe("AiStatusBoard — disconnecting an assistant", () => {
     const onConnect = vi.fn();
     // Every host connected — the state that left the setup steps unreachable.
     render(
-      <AiStatusBoard
+      <AiStatusBoard copy={PT_BR_MCP_AI_COPY.statusBoard}
         statuses={statuses([{}, { connected: true, detail: "ativo agora" }])}
         onConnect={onConnect}
         onDisconnect={vi.fn()}
@@ -79,7 +80,7 @@ describe("AiStatusBoard — disconnecting an assistant", () => {
   it("confirms before revoking, and reports the host that was revoked", async () => {
     const onDisconnect = vi.fn();
     render(
-      <AiStatusBoard statuses={statuses()} onConnect={vi.fn()} onDisconnect={onDisconnect} />,
+      <AiStatusBoard copy={PT_BR_MCP_AI_COPY.statusBoard} statuses={statuses()} onConnect={vi.fn()} onDisconnect={onDisconnect} />,
     );
 
     clickDisconnect("claude");
@@ -97,7 +98,7 @@ describe("AiStatusBoard — disconnecting an assistant", () => {
   it("revokes nothing when the owner cancels", async () => {
     const onDisconnect = vi.fn();
     render(
-      <AiStatusBoard statuses={statuses()} onConnect={vi.fn()} onDisconnect={onDisconnect} />,
+      <AiStatusBoard copy={PT_BR_MCP_AI_COPY.statusBoard} statuses={statuses()} onConnect={vi.fn()} onDisconnect={onDisconnect} />,
     );
 
     clickDisconnect("claude");
@@ -115,7 +116,7 @@ describe("AiStatusBoard — disconnecting an assistant", () => {
   it("holds the popup open carrying the reason when the revoke fails", async () => {
     const onDisconnect = vi.fn().mockRejectedValue(new Error("A loja recusou o pedido."));
     render(
-      <AiStatusBoard statuses={statuses()} onConnect={vi.fn()} onDisconnect={onDisconnect} />,
+      <AiStatusBoard copy={PT_BR_MCP_AI_COPY.statusBoard} statuses={statuses()} onConnect={vi.fn()} onDisconnect={onDisconnect} />,
     );
 
     clickDisconnect("claude");

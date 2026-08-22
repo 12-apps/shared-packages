@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 // fireEvent/render from @testing-library/react — no user-event, no jest-dom.
+import { PT_BR_MCP_AI_COPY } from "./pt-BR";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -71,7 +72,7 @@ describe("StatusBoard — where a revoke leaves the owner", () => {
   it("returns to the host's setup steps when the last assistant is revoked", async () => {
     const nav = makeNav();
     render(
-      <StatusBoard
+      <StatusBoard copy={PT_BR_MCP_AI_COPY}
         nav={nav}
         connections={[connection("claude")]}
         hosts={HOSTS}
@@ -89,7 +90,7 @@ describe("StatusBoard — where a revoke leaves the owner", () => {
   it("sends a plugin host back to its install step instead of the copy step", async () => {
     const nav = makeNav();
     render(
-      <StatusBoard
+      <StatusBoard copy={PT_BR_MCP_AI_COPY}
         nav={nav}
         connections={[connection("claude")]}
         hosts={[CLAUDE_WITH_PLUGIN, CHATGPT]}
@@ -108,7 +109,7 @@ describe("StatusBoard — where a revoke leaves the owner", () => {
     const nav = makeNav();
     const onDisconnect = vi.fn();
     render(
-      <StatusBoard
+      <StatusBoard copy={PT_BR_MCP_AI_COPY}
         nav={nav}
         connections={[connection("claude"), connection("chatgpt")]}
         hosts={HOSTS}
@@ -127,7 +128,7 @@ describe("StatusBoard — where a revoke leaves the owner", () => {
   it("does not navigate when the revoke itself failed", async () => {
     const nav = makeNav();
     render(
-      <StatusBoard
+      <StatusBoard copy={PT_BR_MCP_AI_COPY}
         nav={nav}
         connections={[connection("claude")]}
         hosts={HOSTS}

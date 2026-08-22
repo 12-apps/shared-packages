@@ -1,5 +1,6 @@
 "use client";
 
+import type { AiStatusBoardCopy } from "./copy";
 import AddLinkOutlinedIcon from "@mui/icons-material/AddLinkOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import LinkOffOutlinedIcon from "@mui/icons-material/LinkOffOutlined";
@@ -33,7 +34,7 @@ export interface HostStatus {
  * The right-hand side of a CONNECTED box: the green pill, then the two things
  * the pill alone left the owner unable to do.
  *
- * "Instruções" exists because the setup steps were reachable ONLY from a RED
+ * "{copy.instructions}" exists because the setup steps were reachable ONLY from a RED
  * card's "Conectar" — so on an all-green board there was no way to re-read how
  * any of them was connected, which is exactly when someone re-doing the setup on
  * a second machine needs them. It re-enters the same flow that button does.
@@ -45,10 +46,12 @@ function ConnectedControls({
   host,
   onConnect,
   onDisconnect,
+  copy,
 }: {
   host: AiHostGuide;
   onConnect: (hostId: string) => void;
   onDisconnect?: DisconnectHandler;
+  copy: AiStatusBoardCopy;
 }): React.JSX.Element {
   return (
     <Stack
@@ -80,7 +83,7 @@ function ConnectedControls({
         data-testid={`ai-status-instructions-${host.id}`}
       >
         <MenuBookOutlinedIcon sx={{ fontSize: 16, mr: 0.5 }} />
-        Instruções
+        {copy.instructions}
       </Button>
       {onDisconnect ? (
         <ConfirmButton
@@ -89,11 +92,11 @@ function ConnectedControls({
           size="sm"
           onClick={() => onDisconnect(host.id)}
           confirm={{
-            title: "Desconectar o assistente?",
+            title: copy.disconnectTitle,
             entityName: host.label,
             description:
-              "Ele perde o acesso à sua loja na hora. Para voltar a usar, será preciso conectar de novo.",
-            confirmText: "Desconectar",
+              copy.disconnectBody,
+            confirmText: copy.disconnectConfirm,
             dataTestId: `ai-status-disconnect-confirm-${host.id}`,
           }}
           data-testid={`ai-status-disconnect-${host.id}`}
@@ -111,10 +114,12 @@ function StatusBox({
   status,
   onConnect,
   onDisconnect,
+  copy,
 }: {
   status: HostStatus;
   onConnect: (hostId: string) => void;
   onDisconnect?: DisconnectHandler;
+  copy: AiStatusBoardCopy;
 }): React.JSX.Element {
   const { host, connected, detail } = status;
   return (
@@ -141,11 +146,11 @@ function StatusBox({
           {connected ? <CheckCircleIcon sx={{ fontSize: 18, color: "success.main" }} /> : null}
         </Stack>
         <Text variant="caption" as="p" color="secondary">
-          {connected ? (detail ?? "Conectado") : "Ainda não conectado"}
+          {connected ? (detail ?? copy.connected) : copy.notConnected}
         </Text>
       </Box>
       {connected ? (
-        <ConnectedControls host={host} onConnect={onConnect} onDisconnect={onDisconnect} />
+        <ConnectedControls copy={copy} host={host} onConnect={onConnect} onDisconnect={onDisconnect} />
       ) : (
         <Button
           variant="outline"
@@ -169,7 +174,7 @@ function StatusBox({
  * `announceAiConnection`), so several assistants can show connected at once.
  *
  * A connected box carries two more controls, because the pill it used to show
- * alone was a dead end in both directions: "Instruções" re-enters the host's
+ * alone was a dead end in both directions: "{copy.instructions}" re-enters the host's
  * setup steps (previously reachable only from a RED card, so an all-green board
  * hid them entirely), and "Desconectar" — when the app passes `onDisconnect` —
  * revokes access, which nothing in the UI could do at all.
@@ -178,20 +183,22 @@ export function AiStatusBoard({
   statuses,
   onConnect,
   onDisconnect,
+  copy,
 }: {
   statuses: readonly HostStatus[];
   onConnect: (hostId: string) => void;
   /** Revoke this host's access. Omit to render a read-only board. */
   onDisconnect?: DisconnectHandler;
+  copy: AiStatusBoardCopy;
 }): React.JSX.Element {
   return (
     <Stack spacing={2} data-testid="ai-status-board">
       <Box>
         <Text variant="heading" size="sm" as="h2">
-          Assistentes conectados
+          {copy.boardTitle}
         </Text>
         <Text variant="caption" as="p" color="secondary">
-          Em verde os que já operam a sua loja; em vermelho os que faltam conectar.
+          {copy.boardCaption}
         </Text>
       </Box>
       <Box
@@ -202,7 +209,7 @@ export function AiStatusBoard({
         }}
       >
         {statuses.map((status) => (
-          <StatusBox
+          <StatusBox copy={copy}
             key={status.host.id}
             status={status}
             onConnect={onConnect}

@@ -1,5 +1,6 @@
 "use client";
 
+import type { AiConnectGuideCopy, AiFlowCopy } from "./copy";
 import CheckIcon from "@mui/icons-material/Check";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -24,10 +25,14 @@ export function EndpointCopyBlock({
   endpointUrl,
   copied,
   onCopy,
+  flowCopy,
+  copy,
 }: {
   endpointUrl: string;
   copied: boolean;
   onCopy: () => void;
+  flowCopy: AiFlowCopy;
+  copy: AiConnectGuideCopy;
 }): React.JSX.Element {
   const handleClick = (): void => {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -47,10 +52,10 @@ export function EndpointCopyBlock({
       }}
     >
       <Text variant="caption" as="p" weight="bold">
-        URL do servidor da sua loja
+        {copy.urlLabel}
       </Text>
       <Text variant="caption" as="p" color="secondary">
-        Copie esta URL e cole no seu assistente para conectá-lo à loja.
+        {copy.urlHint}
       </Text>
       <Box sx={{ mt: 1 }}>
         <McpEndpointUrl url={endpointUrl} copyable={false} />
@@ -62,7 +67,7 @@ export function EndpointCopyBlock({
           ) : (
             <ContentCopyOutlinedIcon sx={{ fontSize: 18, mr: 0.5 }} />
           )}
-          {copied ? "Copiado" : "Copiar URL"}
+          {copied ? flowCopy.copied : flowCopy.copyUrl}
         </Button>
       </Box>
     </Box>
@@ -78,10 +83,12 @@ export function PromptCopyBlock({
   title,
   caption,
   message,
+  flowCopy,
 }: {
   title: string;
   caption: string;
   message: string;
+  flowCopy: AiFlowCopy;
 }): React.JSX.Element {
   const [copied, setCopied] = useState(false);
 
@@ -130,7 +137,7 @@ export function PromptCopyBlock({
           ) : (
             <ContentCopyOutlinedIcon sx={{ fontSize: 18, mr: 0.5 }} />
           )}
-          {copied ? "Copiado" : "Copiar mensagem"}
+          {copied ? flowCopy.copied : flowCopy.copyMessage}
         </Button>
       </Box>
     </Box>
@@ -138,12 +145,18 @@ export function PromptCopyBlock({
 }
 
 /** The brand mark + "Conectar no <host>" header shared by the connect sub-steps. */
-export function HostConnectHeader({ host }: { host: AiHostGuide }): React.JSX.Element {
+export function HostConnectHeader({
+  host,
+  copy,
+}: {
+  host: AiHostGuide;
+  copy: AiConnectGuideCopy;
+}): React.JSX.Element {
   return (
     <Stack direction="row" spacing={1.5} alignItems="center">
       <HostBrandAvatar brand={host.brand} size={36} />
       <Text variant="heading" size="sm" as="h3">
-        Conectar no {host.label}
+        {copy.connectOn(host.label)}
       </Text>
     </Stack>
   );
@@ -179,11 +192,14 @@ export function HostOpenButton({
 }
 
 /** A "Para mais informações" reference to the host's official connector docs. */
-export function HostDocsLink({ host }: { host: AiHostGuide }): React.JSX.Element | null {
+export function HostDocsLink({ host,
+  copy,
+}: { host: AiHostGuide;
+  copy: AiConnectGuideCopy;}): React.JSX.Element | null {
   if (!host.docs) return null;
   return (
     <Text variant="caption" as="p" color="secondary">
-      Para mais informações, consulte a{" "}
+      {copy.moreInfo}{" "}
       <Box
         component="a"
         href={host.docs.url}

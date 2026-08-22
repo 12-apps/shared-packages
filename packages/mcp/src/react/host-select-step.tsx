@@ -1,5 +1,6 @@
 "use client";
 
+import type { AiHostSelectCopy } from "./copy";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
 import { Box } from "@12-apps/ui/mui/Box";
@@ -72,10 +73,12 @@ export function HostSelectStep({
   hosts,
   selectedId,
   onSelect,
+  copy,
 }: {
   hosts: readonly AiHostGuide[];
   selectedId: string | null;
   onSelect: (hostId: string) => void;
+  copy: AiHostSelectCopy;
 }): React.JSX.Element {
   return (
     <Stack spacing={3} data-testid="ai-host-select">
@@ -84,7 +87,7 @@ export function HostSelectStep({
           Escolha o seu assistente
         </Text>
         <Text variant="caption" as="p" color="secondary">
-          Selecione onde você usa a IA — o passo a passo é feito sob medida para ele.
+          {copy.caption}
         </Text>
       </Box>
 
