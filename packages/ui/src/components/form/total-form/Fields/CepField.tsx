@@ -1,5 +1,6 @@
 'use client';
 
+import type { CepFieldCopy } from "../../../../copy";
 import React, { useCallback, useMemo, useRef } from 'react';
 
 import { CepField as BaseCepField, type CepAddress } from '../../CepField';
@@ -16,6 +17,8 @@ export type CepFills = Partial<Record<CepPart, string>>;
 
 /** Props for the `total-form` {@link CepField}. */
 export interface CepFieldProps {
+  /** The lookup status wording. REQUIRED — no default copy. */
+  copy: CepFieldCopy;
   /** Field name; also the key into the form's values/errors. */
   name: string;
   /** Optional visible label. Defaults to `CEP`. */
@@ -103,6 +106,7 @@ export function CepField({
   lookup,
   fills,
   debounceMs,
+  copy,
 }: CepFieldProps): React.ReactElement {
   const { values, errors, setFieldValue } = useFormContext();
   const { write, clearOwned } = useOwnedAutofill();
@@ -128,6 +132,7 @@ export function CepField({
 
   return (
     <BaseCepField
+      copy={copy}
       name={name}
       label={label}
       value={values[name] ?? ''}

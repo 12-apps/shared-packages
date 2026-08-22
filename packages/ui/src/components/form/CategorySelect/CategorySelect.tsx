@@ -102,7 +102,7 @@ function usePanelFocus(
  * is the only way a 290px-tall list stays usable one-handed.
  */
 export function CategorySelect(props: CategorySelectProps): React.JSX.Element {
-  const { options, label, error, onCreateCategory } = props;
+  const { options, label, error, onCreateCategory, copy } = props;
   const {
     single,
     placeholder,
@@ -135,7 +135,7 @@ export function CategorySelect(props: CategorySelectProps): React.JSX.Element {
   return (
     <FormControl fullWidth={fullWidth} error={Boolean(error)}>
       {label && <FormLabel error={Boolean(error)}>{label}</FormLabel>}
-      <CategoryTrigger
+      <CategoryTrigger copy={copy}
         placeholder={placeholder}
         selectionLabel={
           props.mode === 'single' ? singleLabel(state.allGroups, props.value) : undefined
@@ -155,7 +155,7 @@ export function CategorySelect(props: CategorySelectProps): React.JSX.Element {
         anchorEl={state.triggerRef.current}
         onClose={actions.cancel}
       >
-        <CategoryPanel
+        <CategoryPanel copy={copy}
           state={state}
           chips={chips}
           rowIds={rowIds}

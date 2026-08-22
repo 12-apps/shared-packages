@@ -69,7 +69,6 @@ export interface GuidedSectionProps {
   title: string;
   description?: string;
   illustration?: ReactNode;
-  /** Landing CTA label — begins the flow at step 1. @default 'Começar' */
   /** The landing hero's begin action — REQUIRED, the host's words. */
   startLabel: string;
   /** Marketing shown BELOW the default hero on the landing (e.g. capability cards). */
@@ -84,10 +83,12 @@ export interface GuidedSectionProps {
   configuredTitle?: string;
   configuredSummary?: ReactNode;
   /**
-   * Label for the button that reveals `completedContent` in the configured
-   * state. @default 'Editar' (from the shell).
+   * The toggle that reveals `completedContent` in the configured state, and
+   * its collapsed twin. REQUIRED since FUT-760 — the shell stopped defaulting
+   * them to this host's Portuguese, so they are the caller's words now.
    */
-  editLabel?: string;
+  editLabel: string;
+  collapseLabel: string;
   /** Optional editable content revealed behind the edit toggle when completed. */
   completedContent?: (nav: GuidedNav) => ReactNode;
   /**
@@ -124,7 +125,8 @@ interface DefaultSectionProps {
   onStart: () => void;
   configuredTitle?: string;
   configuredSummary?: ReactNode;
-  editLabel?: string;
+  editLabel: string;
+  collapseLabel: string;
   landingExtra?: ReactNode;
   stepBody: ReactNode;
   dataTestId: string;
@@ -145,9 +147,11 @@ function DefaultSection(p: DefaultSectionProps): React.JSX.Element {
         activeStepId={p.activeStepId}
         completedStepIds={p.completedStepIds}
         primaryAction={{ label: p.startLabel, onClick: p.onStart }}
+        startLabel={p.startLabel}
         configuredTitle={p.configuredTitle}
         configuredSummary={p.configuredSummary}
         editLabel={p.editLabel}
+        collapseLabel={p.collapseLabel}
         dataTestId={`${p.dataTestId}-section`}
       >
         {p.stepBody}
@@ -175,6 +179,7 @@ export function GuidedSection({
   configuredTitle,
   configuredSummary,
   editLabel,
+  collapseLabel,
   completedContent,
   renderLanding,
   devReset = false,
@@ -212,6 +217,7 @@ export function GuidedSection({
           configuredTitle={configuredTitle}
           configuredSummary={configuredSummary}
           editLabel={editLabel}
+          collapseLabel={collapseLabel}
           landingExtra={landingExtra}
           stepBody={stepBody}
           dataTestId={dataTestId}

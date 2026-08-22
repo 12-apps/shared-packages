@@ -1,3 +1,5 @@
+import type { DataViewsCopy } from '@12-apps/ui/data-display/DataViews';
+
 /**
  * Every user-facing string of the research screens — REQUIRED on each screen,
  * with no defaults (the copy-portability doctrine): the old pt-BR defaults
@@ -128,6 +130,12 @@ export interface ResearchMessages {
   historyStatusRunning: string;
   historyStatusFailed: string;
   historyStatusNone: string;
+  /**
+   * The offers grid is a `@12-apps/ui` DataViews surface, and that package
+   * stopped shipping default words for it (FUT-760). This screen mounts the
+   * surface, so it is the one that has to name them.
+   */
+  dataViews: DataViewsCopy;
 }
 
 /** The defaults with a screen's overrides folded in. */

@@ -1,3 +1,9 @@
+import {
+  PT_BR_CATEGORY_SELECT_COPY,
+  PT_BR_CONFIRM_ACTION_COPY,
+  PT_BR_DATA_VIEWS_COPY,
+} from "@12-apps/ui/pt-BR";
+
 import type { DiscountsWebCopy } from "./copy";
 
 /**
@@ -154,4 +160,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     perBuyerLimit: "Limite por cliente",
     unlimited: "Sem limite",
   },
+  confirmAction: PT_BR_CONFIRM_ACTION_COPY,
+  dataViews: PT_BR_DATA_VIEWS_COPY,
+  categorySelect: PT_BR_CATEGORY_SELECT_COPY,
 };

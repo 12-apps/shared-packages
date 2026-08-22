@@ -10,6 +10,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Button } from '../../../form/Button';
+import { PT_BR_CONFIRM_ACTION_COPY } from '../../../../pt-BR';
 import { ConfirmAction, withConfirmation } from '../index';
 
 afterEach(cleanup);
@@ -18,6 +19,8 @@ const OPTIONS = {
   title: 'Excluir a categoria?',
   description: 'Ela vai para a lixeira e pode ser restaurada de lá.',
   confirmText: 'Excluir',
+  errorText: 'Não foi possível excluir.',
+  copy: PT_BR_CONFIRM_ACTION_COPY,
 };
 
 /** The dialog's buttons, by the test ids `AlertDialog` derives from ours. */
@@ -239,7 +242,10 @@ describe('ConfirmAction', () => {
 });
 
 describe('withConfirmation', () => {
-  const ConfirmButton = withConfirmation(Button);
+  const ConfirmButton = withConfirmation(Button, {
+    errorText: 'Não foi possível excluir.',
+    copy: PT_BR_CONFIRM_ACTION_COPY,
+  });
 
   it("guards the wrapped component's own onClick", async () => {
     const onClick = vi.fn();

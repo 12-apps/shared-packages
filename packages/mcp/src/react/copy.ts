@@ -1,3 +1,4 @@
+import type { ConfirmActionCopy } from "@12-apps/ui/copy";
 /**
  * Every word the AI-integration screens render, as REQUIRED host config
  * (FUT-760).
@@ -95,8 +96,16 @@ export interface AiStatusBoardCopy {
   disconnectTitle: string;
   disconnectBody: string;
   disconnectConfirm: string;
+  /** Shown when the disconnect write fails without a reason of its own. */
+  disconnectError: string;
   boardTitle: string;
   boardCaption: string;
+  /**
+   * The confirmation popup's own furniture — its cancel button and fallbacks.
+   * `@12-apps/ui` stopped shipping defaults for these (FUT-760), so the words
+   * arrive here rather than from the design system's Portuguese.
+   */
+  confirmAction: ConfirmActionCopy;
 }
 
 /**
@@ -138,7 +147,9 @@ export interface AiConnectGuideCopy {
 
 export interface AiOnboardingCopy {
   title: string;
+  /** The reveal toggle in the configured state, and its collapsed twin. */
   editLabel: string;
+  collapseLabel: string;
 }
 
 /** Every screen's words, for a host mounting the whole flow. */

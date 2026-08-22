@@ -15,6 +15,7 @@ import FilterAltOffRoundedIcon from "@mui/icons-material/FilterAltOffRounded";
 import { Tooltip } from "@mui/material";
 
 import { Box } from "../../../mui/Box";
+import { useDataViewsCopy } from "./data-views-copy-context";
 
 /**
  * "Limpar" — one gesture back to the unfiltered list.
@@ -38,6 +39,7 @@ export function ClearAllControl({
   compact: boolean;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   // No border, no fill. Every other control on this row is an outlined pill
   // because it OPENS something; this one is an escape hatch, and giving it the
   // same weight made it read as a sixth filter. Quiet until hovered.
@@ -47,7 +49,7 @@ export function ClearAllControl({
       type="button"
       onClick={onClearAll}
       data-testid={`${testIdPrefix}-clear-all`}
-      aria-label="Limpar filtros"
+      aria-label={copy.filters.clearAll}
       sx={{
         display: "inline-flex",
         alignItems: "center",
@@ -66,10 +68,10 @@ export function ClearAllControl({
       }}
     >
       <FilterAltOffRoundedIcon sx={{ fontSize: 16 }} />
-      {!compact && <Box component="span">Limpar</Box>}
+      {!compact && <Box component="span">{copy.filters.clear}</Box>}
     </Box>
   );
-  return compact ? <Tooltip title="Limpar filtros">{button}</Tooltip> : button;
+  return compact ? <Tooltip title={copy.filters.clearAll}>{button}</Tooltip> : button;
 }
 
 /**
@@ -91,13 +93,14 @@ export function CloseSearchControl({
   onClose: () => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
-    <Tooltip title="Fechar busca">
+    <Tooltip title={copy.search.close}>
       <Box
         component="button"
         type="button"
         onClick={onClose}
-        aria-label="Fechar busca"
+        aria-label={copy.search.close}
         data-testid={`${testIdPrefix}-search-close`}
         sx={{
           display: "inline-flex",

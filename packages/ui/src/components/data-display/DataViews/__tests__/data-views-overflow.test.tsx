@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "./test-utils";
 import { ThemeProvider, createTheme } from "../../../../mui/styles";
 
 import { DataViewsGrid } from "../DataViewsGrid";

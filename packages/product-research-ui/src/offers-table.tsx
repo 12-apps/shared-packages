@@ -9,7 +9,7 @@
 import type { JSX } from 'react';
 
 import { Chip } from '@12-apps/ui/data-display/Chip';
-import { DataViewsGrid } from '@12-apps/ui/data-display/DataViews';
+import { DataViewsCopyProvider, DataViewsGrid } from '@12-apps/ui/data-display/DataViews';
 import type { DataViewColumn } from '@12-apps/ui/data-display/DataViews';
 import { EmptyState } from '@12-apps/ui/data-display/EmptyState';
 import { Stack } from '@12-apps/ui/mui/Stack';
@@ -243,18 +243,22 @@ export function OffersTable({ offers, messages }: OffersTableProps): JSX.Element
     );
   }
   return (
-    <DataViewsGrid<OfferRow>
-      rows={toRows(offers, t)}
-      columns={buildColumns(t)}
-      fields={[]}
-      getRowId={(row) => row.id}
-      dataTestId="offers-table"
-      testIdPrefix="offers"
-      emptyState={
-        <Text variant="body" as="p">
-          {t.offersEmptyTitle}
-        </Text>
-      }
-    />
+    // The grid's own words come from this screen's copy: `@12-apps/ui` ships
+    // none, and throws rather than falling back to one host's Portuguese.
+    <DataViewsCopyProvider copy={t.dataViews}>
+      <DataViewsGrid<OfferRow>
+        rows={toRows(offers, t)}
+        columns={buildColumns(t)}
+        fields={[]}
+        getRowId={(row) => row.id}
+        dataTestId="offers-table"
+        testIdPrefix="offers"
+        emptyState={
+          <Text variant="body" as="p">
+            {t.offersEmptyTitle}
+          </Text>
+        }
+      />
+    </DataViewsCopyProvider>
   );
 }

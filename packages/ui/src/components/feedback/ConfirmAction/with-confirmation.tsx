@@ -1,3 +1,4 @@
+import type { ConfirmActionCopy } from '../../../copy';
 import React from 'react';
 import type { ComponentType } from 'react';
 
@@ -81,12 +82,12 @@ function useGuardedHandler(onClick: ConfirmableProps['onClick']): ConfirmHandler
  */
 export function withConfirmation<P extends ConfirmableProps>(
   Wrapped: ComponentType<P>,
-  defaults?: Partial<ConfirmOptions>,
+  defaults: Partial<ConfirmOptions> & { errorText: string; copy: ConfirmActionCopy },
 ): ConfirmableComponent<P> {
   function WithConfirmation(props: P & WithConfirmationProps): React.ReactElement {
     const { confirm, onClick } = props;
     const options = resolveOptions(defaults, confirm);
-    const state = useConfirmAction(useGuardedHandler(onClick), options?.errorText);
+    const state = useConfirmAction(useGuardedHandler(onClick), defaults.errorText);
 
     // `confirm` is ours and must not reach the DOM — an unknown attribute on a
     // <button> is a React warning at every render. The cast is the standard HOC
@@ -99,7 +100,7 @@ export function withConfirmation<P extends ConfirmableProps>(
     return (
       <>
         <Wrapped {...forwarded} onClick={state.request} />
-        <ConfirmActionDialog state={state} {...options} />
+        <ConfirmActionDialog state={state} {...options} copy={defaults.copy} />
       </>
     );
   }

@@ -1,3 +1,4 @@
+import { PT_BR_CONFIRM_ACTION_COPY } from "../../../../pt-BR";
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState, type JSX } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -106,7 +107,7 @@ describe('the ambient wiring', () => {
 
 /** A self-contained menu, as a real kind menu is written. */
 function RemoveMenu({ result }: { result: { ok: boolean; error?: string } }): JSX.Element {
-  const remove = useRemoveConfirm({
+  const remove = useRemoveConfirm({ copy: PT_BR_CONFIRM_ACTION_COPY,
     write: () => Promise.resolve(result),
     title: 'Delete it?',
     entityName: ROW.name,
@@ -183,6 +184,8 @@ function SelectionHarness({ rows }: { rows: Row[] }): JSX.Element {
       confirmText: 'Delete',
     }),
     dataTestId: 'row-confirm',
+    errorText: 'Não foi possível excluir.',
+    copy: PT_BR_CONFIRM_ACTION_COPY,
   });
   return (
     <>

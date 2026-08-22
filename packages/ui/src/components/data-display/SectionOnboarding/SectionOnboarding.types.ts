@@ -64,7 +64,14 @@ export interface SectionOnboardingProps {
    * and `children` exist. Clicking it advances the hero to the in-progress view
    * (steps + form) without the parent managing state. @default 'Começar'
    */
-  startLabel?: string;
+  /** The button that begins the section. REQUIRED since FUT-760. */
+  startLabel: string;
+
+  /** Label of the reveal toggle in the configured state. */
+  editLabel: string;
+
+  /** Label of that toggle while the form is revealed. */
+  collapseLabel: string;
 
   /** Optional secondary CTA of the hero — e.g. "Ver como funciona". */
   secondaryAction?: SectionOnboardingAction;
@@ -80,12 +87,6 @@ export interface SectionOnboardingProps {
    * status chip, the account name, the environment. Kept short.
    */
   configuredSummary?: ReactNode;
-
-  /** Label of the reveal toggle in the configured state. @default 'Editar' */
-  editLabel?: string;
-
-  /** Label of the reveal toggle while expanded. @default 'Ocultar' */
-  collapseLabel?: string;
 
   /** Start the configured state with the form already revealed. @default false */
   defaultExpanded?: boolean;

@@ -1,12 +1,13 @@
 "use client";
 
+import { useMemo } from "react";
 import type { AiStatusBoardCopy } from "./copy";
 import AddLinkOutlinedIcon from "@mui/icons-material/AddLinkOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import LinkOffOutlinedIcon from "@mui/icons-material/LinkOffOutlined";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 
-import { ConfirmButton } from "@12-apps/ui/feedback/ConfirmAction";
+import { createConfirmButton } from "@12-apps/ui/feedback/ConfirmAction";
 import { Button } from "@12-apps/ui/form/Button";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
@@ -53,6 +54,13 @@ function ConnectedControls({
   onDisconnect?: DisconnectHandler;
   copy: AiStatusBoardCopy;
 }): React.JSX.Element {
+  // Built from the copy rather than at module scope: `createConfirmButton`
+  // takes the words, and they only arrive as a prop. Memoised so the wrapped
+  // component keeps its identity across renders and React does not remount it.
+  const DisconnectButton = useMemo(
+    () => createConfirmButton(copy.confirmAction, copy.disconnectError),
+    [copy.confirmAction, copy.disconnectError],
+  );
   return (
     <Stack
       direction="row"
@@ -73,7 +81,7 @@ function ConnectedControls({
         }}
       >
         <Text variant="caption" weight="bold" as="span">
-          Conectado
+          {copy.connected}
         </Text>
       </Box>
       <Button
@@ -86,7 +94,7 @@ function ConnectedControls({
         {copy.instructions}
       </Button>
       {onDisconnect ? (
-        <ConfirmButton
+        <DisconnectButton
           variant="outline"
           color="danger"
           size="sm"
@@ -102,8 +110,8 @@ function ConnectedControls({
           data-testid={`ai-status-disconnect-${host.id}`}
         >
           <LinkOffOutlinedIcon sx={{ fontSize: 16, mr: 0.5 }} />
-          Desconectar
-        </ConfirmButton>
+          {copy.disconnect}
+        </DisconnectButton>
       ) : null}
     </Stack>
   );

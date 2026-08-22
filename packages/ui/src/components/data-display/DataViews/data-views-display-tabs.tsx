@@ -1,10 +1,12 @@
 "use client";
 
+import type { DataViewsCopy } from "./data-views-copy";
 import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
 import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
 import { useMediaQuery } from "@mui/material";
 import type { Theme } from "@mui/material";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import type { SortFieldDefinition } from "../../layout/ContentToolbar";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
@@ -121,12 +123,13 @@ export function SortTab({
   sortKinds,
   testIdPrefix,
 }: SortTabProps): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const [ascLabel, descLabel] = directionLabels(sortKinds?.[activeField]);
   return (
     <Box sx={{ p: 1 }}>
       <Text variant="caption" as="p">
         <Box component="span" sx={{ px: 0.5, color: "text.secondary" }}>
-          Direção
+          {copy.display.direction}
         </Box>
       </Text>
       <Box sx={{ display: "flex", gap: 0.75, mb: 1.5, mt: 0.5 }}>
@@ -214,13 +217,6 @@ function SortFieldRow({
 
 /* ── Exibição ────────────────────────────────────────────────────────────── */
 
-/** One line of copy per layout, saying what it is FOR rather than what it is. */
-const LAYOUT_HINTS: Record<DataViewsLayout, string> = {
-  table: "Colunas comparáveis, boa para varrer números.",
-  list: "Uma linha por item, com os dados principais.",
-  cards: "Blocos maiores, bom para poucos itens.",
-  board: "Colunas por etapa, para acompanhar o que está onde.",
-};
 
 /**
  * What density MEANS in each layout — same three values, three different
@@ -229,29 +225,21 @@ const LAYOUT_HINTS: Record<DataViewsLayout, string> = {
  * tile labels change with the layout because "Alta" over a board is meaningless
  * where "Larga" is not.
  */
-const DENSITY_HEADINGS: Record<DataViewsLayout, string> = {
-  table: "Altura das linhas",
-  list: "Altura das linhas",
-  cards: "Cards por linha",
-  board: "Largura das colunas",
-};
 
-const DENSITY_LABELS: Record<DataViewsLayout, Record<DataViewsDensity, string>> = {
-  table: { compact: "Baixa", cozy: "Média", comfortable: "Alta" },
-  list: { compact: "Baixa", cozy: "Média", comfortable: "Alta" },
-  cards: { compact: "Muitos", cozy: "Médio", comfortable: "Poucos" },
-  board: { compact: "Estreita", cozy: "Média", comfortable: "Larga" },
-};
 
 /** The density tiles, phrased for whichever layout is on screen. */
 function densityTiles(
   layout: DataViewsLayout,
+  copy: DataViewsCopy,
 ): { value: DataViewsDensity; label: string; gap: number; columns: number }[] {
-  const labels = DENSITY_LABELS[layout];
+  // A layout the pack does not key falls back to the table's words rather
+  // than rendering three blank tiles — a host adding a layout should still see
+  // a usable control while it writes the labels for it.
+  const labels = copy.display.densityLabels[layout] ?? copy.display.densityLabels.table;
   return [
-    { value: "compact", label: labels.compact, gap: 2, columns: 4 },
-    { value: "cozy", label: labels.cozy, gap: 5, columns: 3 },
-    { value: "comfortable", label: labels.comfortable, gap: 8, columns: 2 },
+    { value: "compact", label: labels?.compact ?? "compact", gap: 2, columns: 4 },
+    { value: "cozy", label: labels?.cozy ?? "cozy", gap: 5, columns: 3 },
+    { value: "comfortable", label: labels?.comfortable ?? "comfortable", gap: 8, columns: 2 },
   ];
 }
 
@@ -294,6 +282,7 @@ const LAYOUT_TILE_LABELS: Record<DataViewsLayout, string> = {
  * so rather than vanishing, for the same reason as the board note below it.
  */
 function DensityTiles({ testIdPrefix }: { testIdPrefix: string }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const { layout, density, setDensity } = useDataViewsLayout();
   // Matches the card grid's own `xs: "1fr"` track, so the control and the thing
   // it controls agree on where density stops meaning anything.
@@ -302,14 +291,14 @@ function DensityTiles({ testIdPrefix }: { testIdPrefix: string }): React.JSX.Ele
     return (
       <Text variant="caption" as="p">
         <Box component="span" sx={{ px: 0.5, pt: 0.5, display: "block", color: "text.disabled" }}>
-          Um card por linha nesta largura — a densidade volta em telas maiores.
+          {copy.display.densityUnavailableNarrow}
         </Box>
       </Text>
     );
   }
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75, mt: 0.5 }}>
-      {densityTiles(layout).map((tile) => (
+      {densityTiles(layout, copy).map((tile) => (
         <Tile
           key={tile.value}
           active={density === tile.value}
@@ -325,6 +314,7 @@ function DensityTiles({ testIdPrefix }: { testIdPrefix: string }): React.JSX.Ele
 }
 
 export function DisplayTab({ testIdPrefix }: { testIdPrefix: string }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const { layout, setLayout, canUseCards, canUseList, canUseBoard } = useDataViewsLayout();
   const available: DataViewsLayout[] = [
     "table",
@@ -361,7 +351,7 @@ export function DisplayTab({ testIdPrefix }: { testIdPrefix: string }): React.JS
       </Box>
       <Text variant="caption" as="p">
         <Box component="span" sx={{ px: 0.5, py: 1, display: "block", color: "text.disabled" }}>
-          {LAYOUT_HINTS[layout]}
+          {copy.display.layoutHints[layout]}
         </Box>
       </Text>
       {/* Every layout gets this, the board included. It used to be hidden on
@@ -370,14 +360,14 @@ export function DisplayTab({ testIdPrefix }: { testIdPrefix: string }): React.JS
           control that broke rather than one that does not apply. */}
       <Text variant="caption" as="p">
         <Box component="span" sx={{ px: 0.5, color: "text.secondary" }}>
-          {DENSITY_HEADINGS[layout]}
+          {copy.display.densityHeadings[layout]}
         </Box>
       </Text>
       <DensityTiles testIdPrefix={testIdPrefix} />
       {!canUseBoard && (
         <Text variant="caption" as="p">
           <Box component="span" sx={{ px: 0.5, pt: 1.25, display: "block", color: "text.disabled" }}>
-            Esta tela não declara etapas, então não oferece quadro.
+            {copy.display.boardUnavailable}
           </Box>
         </Text>
       )}

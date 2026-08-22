@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "./test-utils";
 import { ThemeProvider, createTheme } from "../../../../mui/styles";
 
 import { DataViewsGrid } from "../DataViewsGrid";

@@ -108,6 +108,7 @@ export function DiscountTargetPicker({
       requiredMessage={copy.targets.required}
       ids={ids}
       onChange={onChange}
+      copy={copy.categorySelect}
       dataTestId={`discount-${group.slug}-targets`}
     />
   );

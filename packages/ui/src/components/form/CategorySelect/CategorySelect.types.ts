@@ -1,3 +1,4 @@
+import type { CategorySelectCopy } from "../../../copy";
 import type { SizeValue } from '../../../tokens/scales';
 
 /**
@@ -84,6 +85,8 @@ export interface CategorySelectBaseProps {
  * not reload on every tick.
  */
 export interface CategoryMultiSelectProps extends CategorySelectBaseProps {
+  /** The words this control renders. REQUIRED — no default copy. */
+  copy: CategorySelectCopy;
   mode?: 'multi';
   /** The APPLIED selection — subcategory ids. */
   value: string[];
@@ -93,6 +96,8 @@ export interface CategoryMultiSelectProps extends CategorySelectBaseProps {
 
 /** Single-select mode: the "move to…" picker. Choosing a row commits at once. */
 export interface CategorySingleSelectProps extends CategorySelectBaseProps {
+  /** The words this control renders. REQUIRED — no default copy. */
+  copy: CategorySelectCopy;
   mode: 'single';
   /** The chosen category or subcategory id, or `null`. */
   value: string | null;

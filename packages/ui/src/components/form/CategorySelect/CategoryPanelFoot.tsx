@@ -2,6 +2,7 @@
 
 import { Box, Button } from '@mui/material';
 
+import type { CategorySelectCopy } from '../../../copy';
 import { footerSx, METRICS } from './CategorySelect.styles';
 
 const buttonSx = (sheet: boolean) =>
@@ -23,6 +24,7 @@ interface MultiFootProps {
   onClear: () => void;
   onApply: () => void;
   dataTestId: string;
+  copy: CategorySelectCopy;
 }
 
 /**
@@ -37,11 +39,12 @@ export function CategoryMultiFoot({
   onClear,
   onApply,
   dataTestId,
+  copy,
 }: MultiFootProps): React.JSX.Element {
   return (
     <Box sx={footerSx} data-testid={`${dataTestId}-footer`}>
       <Box component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>
-        <strong>{count}</strong> selecionada{count === 1 ? '' : 's'}
+        {copy.footer.selectedCount(count)}
       </Box>
       <Box sx={{ display: 'flex', gap: '6px' }}>
         <Button
@@ -51,7 +54,7 @@ export function CategoryMultiFoot({
           onClick={onClear}
           data-testid={`${dataTestId}-clear`}
         >
-          Limpar
+          {copy.footer.clear}
         </Button>
         <Button
           variant="contained"
@@ -59,7 +62,7 @@ export function CategoryMultiFoot({
           onClick={onApply}
           data-testid={`${dataTestId}-apply`}
         >
-          {changed ? 'Aplicar' : 'Fechar'}
+          {changed ? copy.footer.apply : copy.footer.close}
         </Button>
       </Box>
     </Box>
@@ -71,15 +74,17 @@ export function CategorySingleFoot({
   sheet,
   onCancel,
   dataTestId,
+  copy,
 }: {
   sheet: boolean;
   onCancel: () => void;
   dataTestId: string;
+  copy: CategorySelectCopy;
 }): React.JSX.Element {
   return (
     <Box sx={footerSx} data-testid={`${dataTestId}-footer`}>
       <Box component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>
-        Escolha uma categoria
+        {copy.footer.singleHint}
       </Box>
       <Button
         variant="outlined"
@@ -87,7 +92,7 @@ export function CategorySingleFoot({
         onClick={onCancel}
         data-testid={`${dataTestId}-cancel`}
       >
-        Cancelar
+        {copy.footer.cancel}
       </Button>
     </Box>
   );

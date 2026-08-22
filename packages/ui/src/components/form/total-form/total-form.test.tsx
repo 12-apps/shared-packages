@@ -5,6 +5,7 @@ import { email, required } from "@12-apps/forms-core";
 import { FormContainer, Fields, FormErrorSnackbar, SubmitButton } from "./index";
 import type { FormSubmitHelpers } from "./index";
 import type { CepAddress } from "../CepField";
+import { PT_BR_CEP_FIELD_COPY } from "../../../pt-BR";
 
 interface LoginValues extends Record<string, string> {
   email: string;
@@ -147,7 +148,13 @@ function renderAddressForm(lookup: (cep: string) => Promise<CepAddress | null>) 
       }}
       onSubmit={() => undefined}
     >
-      <Fields.CepField name="postalCode" lookup={lookup} fills={CEP_FILLS} debounceMs={0} />
+      <Fields.CepField
+        name="postalCode"
+        lookup={lookup}
+        fills={CEP_FILLS}
+        debounceMs={0}
+        copy={PT_BR_CEP_FIELD_COPY}
+      />
       <Fields.TextField name="addressLine1" label="Endereço" />
       <Fields.TextField name="neighborhood" label="Bairro" />
       <Fields.TextField name="city" label="Cidade" />

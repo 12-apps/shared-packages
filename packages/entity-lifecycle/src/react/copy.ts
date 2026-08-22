@@ -1,3 +1,5 @@
+import type { ConfirmActionCopy } from '@12-apps/ui/copy';
+
 /**
  * Every sentence the lifecycle admin surface renders — REQUIRED host config,
  * with NO defaults (the copy-portability doctrine): five screens compiled in
@@ -39,6 +41,12 @@ export interface RecycleBinCopy {
   purgeBody: (label: string) => string;
   purgeTypeToConfirmLabel: (label: string) => string;
   purgeFailed: string;
+  /**
+   * The confirmation popup's own furniture — its cancel button and fallbacks.
+   * `@12-apps/ui` stopped shipping defaults for these (FUT-760), so they are
+   * this surface's config now rather than the design system's Portuguese.
+   */
+  confirmAction: ConfirmActionCopy;
   /** "Excluído em" — the date renders right after it. */
   deletedAtPrefix: string;
   /** " por Ana" — appended when the deleter is known. */

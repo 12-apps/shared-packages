@@ -1,5 +1,6 @@
 'use client';
 
+import type { CategorySelectCopy } from '../../../copy';
 import { Box, InputBase } from '@mui/material';
 
 import { SearchGlyph } from './CategoryIcons';
@@ -21,6 +22,7 @@ interface PanelHeadProps {
   onQueryChange: (next: string) => void;
   searchInputRef: React.RefObject<HTMLInputElement | null>;
   dataTestId: string;
+  copy: CategorySelectCopy;
 }
 
 const searchFieldSx = {
@@ -72,6 +74,7 @@ export function CategoryPanelHead({
   onQueryChange,
   searchInputRef,
   dataTestId,
+  copy,
 }: PanelHeadProps): React.JSX.Element {
   return (
     <Box sx={(theme) => panelHeadSx(theme, sheet)}>
@@ -99,7 +102,7 @@ export function CategoryPanelHead({
           <Box
             component="button"
             type="button"
-            aria-label="Limpar busca"
+            aria-label={copy.search.clear}
             data-testid={`${dataTestId}-search-clear`}
             sx={clearButtonSx}
             onClick={() => onQueryChange('')}
@@ -129,6 +132,7 @@ interface PinnedTrayProps {
   chips: CategorySelectionChip[];
   onRemove: (chipId: string) => void;
   dataTestId: string;
+  copy: CategorySelectCopy;
 }
 
 /**
@@ -142,18 +146,19 @@ export function CategoryPinnedTray({
   chips,
   onRemove,
   dataTestId,
+  copy,
 }: PinnedTrayProps): React.JSX.Element | null {
   if (chips.length === 0) return null;
   return (
     <Box sx={pinnedSx} data-testid={`${dataTestId}-pinned`}>
-      <Box sx={pinnedLabelSx}>Selecionadas · {chips.length}</Box>
+      <Box sx={pinnedLabelSx}>{copy.search.pinnedLabel(chips.length)}</Box>
       <Box sx={chipWrapSx}>
         {chips.map((chip) => (
           <Box component="span" key={chip.id} sx={chipSx}>
             {chip.label}
             <button
               type="button"
-              aria-label={`Remover ${chip.label}`}
+              aria-label={copy.search.removeChip(chip.label)}
               data-testid={`${dataTestId}-unpin-${chip.id}`}
               onClick={() => onRemove(chip.id)}
             >

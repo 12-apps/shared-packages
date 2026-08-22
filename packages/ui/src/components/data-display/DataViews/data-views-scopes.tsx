@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { Box } from "../../../mui/Box";
 
 /**
@@ -320,6 +321,7 @@ export function DataViewsScopeTabs({
   counts,
   testIdPrefix,
 }: DataViewsScopeTabsProps): React.JSX.Element | null {
+  const copy = useDataViewsCopy();
   const stripRef = useScrollActiveIntoView(value);
   const moveTo = (index: number): void => {
     // Focus FIRST, then select: the roving tabindex follows the selection, so
@@ -337,7 +339,7 @@ export function DataViewsScopeTabs({
   );
 
   return (
-    <Box ref={stripRef} role="tablist" aria-label="Situação" data-testid={`${testIdPrefix}-scopes`} sx={STRIP_SX}>
+    <Box ref={stripRef} role="tablist" aria-label={copy.filters.scopesLabel} data-testid={`${testIdPrefix}-scopes`} sx={STRIP_SX}>
       {scopes.map((scope, index) => (
         <ScopeTab
           key={scope.id}

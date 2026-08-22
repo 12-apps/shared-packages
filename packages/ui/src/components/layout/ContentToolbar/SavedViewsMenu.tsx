@@ -13,26 +13,6 @@ import type {
   SavedViewsMenuProps,
 } from './ContentToolbar.types';
 
-/** Default (pt-BR) strings; override any via the `labels` prop. */
-const DEFAULT_LABELS: SavedViewsLabels = {
-  trigger: 'Visões',
-  mainView: 'Visão principal',
-  pinned: 'Fixadas',
-  recent: 'Recentes',
-  empty: 'Nenhuma visão salva ainda.',
-  saveCurrent: '+ Salvar visão atual',
-  manageAll: 'Gerenciar visões',
-  apply: 'Aplicar',
-  setDefault: 'Definir como padrão',
-  pin: 'Fixar na barra lateral',
-  unpin: 'Desafixar',
-  share: 'Compartilhar com a equipe',
-  unshare: 'Tornar privada',
-  edit: 'Editar',
-  remove: 'Excluir',
-  defaultTag: 'Padrão',
-};
-
 /** How many non-pinned views show under "Recentes". */
 const RECENT_LIMIT = 5;
 
@@ -280,7 +260,7 @@ export function SavedViewsMenu<V extends SavedViewLike = SavedViewLike>({
     action();
     close();
   };
-  const labels = { ...DEFAULT_LABELS, ...labelOverrides };
+  const labels = labelOverrides;
   const pinned = views.filter((view) => view.pinned);
   const recent = views.filter((view) => !view.pinned).slice(0, RECENT_LIMIT);
 

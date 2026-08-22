@@ -1,5 +1,6 @@
 "use client";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { Alert } from "../Alert";
 import { SavedViewsMenu } from "../../layout/ContentToolbar";
 
@@ -25,13 +26,14 @@ export function ViewMutationErrorAlert({
   onClose: () => void;
   testIdPrefix: string;
 }): React.JSX.Element | null {
+  const copy = useDataViewsCopy();
   if (!error) {
     return null;
   }
   return (
     <Alert
       variant="danger"
-      title="Não foi possível atualizar a visão"
+      title={copy.nav.updateFailed}
       description={error}
       closable
       onClose={onClose}
@@ -75,8 +77,10 @@ export function ViewsMenuSlot({
   onManageAll,
   testIdPrefix,
 }: ViewsMenuSlotProps): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <SavedViewsMenu<SavedViewSummary>
+      labels={copy.savedViewsMenu}
       views={views}
       activeViewName={activeViewName}
       onApply={applyView}
@@ -125,6 +129,7 @@ export function ViewDialogs<T extends Record<string, unknown>>({
   onDelete,
   testIdPrefix,
 }: ViewDialogsProps<T>): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <>
       {/* Keyed by the view being edited: the form seeds its fields with
@@ -142,7 +147,7 @@ export function ViewDialogs<T extends Record<string, unknown>>({
         onSave={onSave}
         testIdPrefix={`${testIdPrefix}-views`}
       />
-      <ManageViewsDialog
+      <ManageViewsDialog confirmCopy={copy.confirmAction}
         open={manageOpen}
         onClose={onCloseManage}
         views={views}

@@ -1,3 +1,4 @@
+import { PT_BR_CONFIRM_ACTION_COPY } from '@12-apps/ui/pt-BR';
 import type { LifecycleWebCopy } from './copy';
 
 /**
@@ -38,6 +39,7 @@ export const PT_BR_LIFECYCLE_WEB_COPY: LifecycleWebCopy = {
       `"${label}" será excluído para sempre, junto com seus itens vinculados. Esta ação não pode ser desfeita.`,
     purgeTypeToConfirmLabel: (label) => `Digite "${label}" para confirmar.`,
     purgeFailed: 'Não foi possível excluir definitivamente.',
+    confirmAction: PT_BR_CONFIRM_ACTION_COPY,
     deletedAtPrefix: 'Excluído em',
     deletedBy: (name) => ` por ${name}`,
     emptyTitle: 'A lixeira está vazia.',

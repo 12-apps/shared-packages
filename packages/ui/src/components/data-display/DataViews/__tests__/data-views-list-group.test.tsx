@@ -18,7 +18,7 @@
  *      around it giving false assurance.
  */
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen } from "./test-utils";
 import { ThemeProvider, createTheme } from "../../../../mui/styles";
 
 import { BaseListCard } from "../base-list-card";

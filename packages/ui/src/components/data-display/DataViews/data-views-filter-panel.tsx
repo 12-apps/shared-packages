@@ -7,6 +7,7 @@ import { TableFilter } from "../../layout/TableFilter";
 
 import { PillControl } from "./data-views-category-pill";
 import { PanelRangeField } from "./data-views-range-pill";
+import { useDataViewsCopy } from "./data-views-copy-context";
 import type {
   FilterFieldConfig,
   RangeFieldConfig,
@@ -84,17 +85,18 @@ function FilterControls<T extends Record<string, unknown>>({
   onChangeRange,
   onClearField,
 }: Omit<GridFilterPanelProps<T>, "onClearAll">): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <>
       <TableFilter.Keyword
         value={search}
         onChange={onSearchChange}
-        label="Buscar em todas as colunas"
-        placeholder="Pressione Enter para filtrar"
+        label={copy.search.allColumnsLabel}
+        placeholder={copy.search.keywordPlaceholder}
         testId={`${testIdPrefix}-search-all`}
       />
       {(fields.length > 0 || rangeFields.length > 0) && (
-        <TableFilter.Section title="Filtros">
+        <TableFilter.Section title={copy.filters.panelTitle}>
           {fields.map((field) => (
             <PillField
               key={field.id}
@@ -124,11 +126,12 @@ function FilterControls<T extends Record<string, unknown>>({
 export function GridFilterPanel<T extends Record<string, unknown>>(
   props: GridFilterPanelProps<T>,
 ): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <TableFilter.Panel
       onClearAll={props.onClearAll}
       clearTestId={`${props.testIdPrefix}-clear-filters`}
-      ariaLabel="Filtros"
+      ariaLabel={copy.filters.panelTitle}
     >
       <FilterControls {...props} />
     </TableFilter.Panel>
@@ -150,11 +153,12 @@ export function FilterDialog<T extends Record<string, unknown>>({
   onClose,
   ...props
 }: FilterDialogProps<T>): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <StackedModal
       open={open}
       onClose={onClose}
-      navigationTitle="Filtros"
+      navigationTitle={copy.filters.panelTitle}
       modalId={`${props.testIdPrefix}-filters`}
       maxWidth="xs"
       dataTestId={`${props.testIdPrefix}-filter-dialog`}

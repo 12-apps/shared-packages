@@ -1,3 +1,5 @@
+import { PT_BR_DATA_VIEWS_COPY } from '@12-apps/ui/pt-BR';
+
 import type { ResearchMessages } from './messages';
 
 /**
@@ -7,6 +9,7 @@ import type { ResearchMessages } from './messages';
  * Portuguese may ship, it may not be silent.
  */
 export const PT_BR_RESEARCH_MESSAGES: ResearchMessages = {
+  dataViews: PT_BR_DATA_VIEWS_COPY,
   formTitle: 'O que você precisa comprar?',
   formTermLabel: 'Produto',
   formTermPlaceholder: 'Coca-Cola Original Lata 350ml',

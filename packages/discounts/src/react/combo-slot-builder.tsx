@@ -136,6 +136,7 @@ function ComboSlotRow({
             requiredMessage={undefined}
             ids={idsFor(slot, group.targetType)}
             onChange={(ids) => onChange(withIds(slot, group.targetType, ids))}
+            copy={copy.categorySelect}
             dataTestId={`combo-slot-${index}-${group.slug}`}
           />
         ))}

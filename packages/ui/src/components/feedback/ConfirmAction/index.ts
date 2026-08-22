@@ -1,6 +1,6 @@
 export { ConfirmAction } from './ConfirmAction';
-export { ConfirmButton } from './ConfirmButton';
-export { DEFAULT_ERROR_TEXT, useConfirmAction } from './ConfirmAction.hooks';
+export { createConfirmButton } from './ConfirmButton';
+export { useConfirmAction } from './ConfirmAction.hooks';
 export { ConfirmActionDialog } from './ConfirmAction.parts';
 export { withConfirmation } from './with-confirmation';
 export type {

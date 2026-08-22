@@ -5,6 +5,7 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 import { CircularProgress, Popover } from "@mui/material";
 import { useState } from "react";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
@@ -55,11 +56,6 @@ export interface DataViewExport {
 }
 
 /** One line per format: what it is, and when to reach for it. */
-const FORMAT_COPY: Record<DataViewExportFormat, { label: string; hint: string }> = {
-  xlsx: { label: "Excel (.xlsx)", hint: "Abre direto, com as colunas dimensionadas" },
-  csv: { label: "CSV (.csv)", hint: "Para importar em outro sistema" },
-  json: { label: "JSON (.json)", hint: "Para integrações" },
-};
 
 const ALL_FORMATS: DataViewExportFormat[] = ["xlsx", "csv", "json"];
 
@@ -97,6 +93,7 @@ function ExportTrigger({
   /** Icon only — step 2 of the toolbar's degradation ladder. */
   compact?: boolean;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Button
       variant="outline"
@@ -105,9 +102,9 @@ function ExportTrigger({
       disabled={busy}
       onClick={(event) => onOpen(event.currentTarget as HTMLElement)}
       dataTestId={`${testIdPrefix}-export-trigger`}
-      aria-label="Exportar"
+      aria-label={copy.export.trigger}
       // The label is gone, so the tooltip is the only thing naming the control.
-      title={compact ? "Exportar" : undefined}
+      title={compact ? copy.export.trigger : undefined}
     >
       <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
         {busy ? <CircularProgress size={14} /> : <DownloadRoundedIcon fontSize="small" />}
@@ -133,6 +130,7 @@ function FormatRow({
   onPick: () => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Box
       component="button"
@@ -155,10 +153,10 @@ function FormatRow({
       }}
     >
       <Box component="span" sx={{ fontSize: "0.8125rem" }}>
-        {FORMAT_COPY[format].label}
+        {copy.export.formats[format]?.label ?? format}
       </Box>
       <Box component="span" sx={{ fontSize: "0.6875rem", color: "text.disabled" }}>
-        {FORMAT_COPY[format].hint}
+        {copy.export.formats[format]?.hint ?? ""}
       </Box>
     </Box>
   );
@@ -180,6 +178,7 @@ function ExportPanel({
   onPick: (format: DataViewExportFormat) => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Box data-testid={`${testIdPrefix}-export-panel`}>
       <Box sx={{ px: 1.5, pt: 1, pb: 1, borderBottom: 1, borderColor: "divider" }}>
@@ -190,7 +189,7 @@ function ExportPanel({
         </Text>
         <Text variant="caption" as="p">
           <Box component="span" sx={{ color: "text.disabled" }}>
-            {columnCount} colunas visíveis, na ordem atual
+            {copy.export.visibleColumns(columnCount)}
           </Box>
         </Text>
       </Box>

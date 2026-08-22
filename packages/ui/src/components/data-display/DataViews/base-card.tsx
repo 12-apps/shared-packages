@@ -22,6 +22,7 @@ import {
   type CardSurfaceProps,
 } from "./card-surface";
 import { CARD_ASPECT_RATIOS, type CardAspectRatio } from "./data-views-types";
+import { useDataViewsCopy } from "./data-views-copy-context";
 
 export interface BaseCardProps extends CardSurfaceProps {
   /** Extra body content below the caption (chips, meta). Optional. */
@@ -127,6 +128,7 @@ function CardOverlays({
   checkboxTestId,
   menu,
 }: Pick<BaseCardProps, "selected" | "onToggleSelect" | "checkboxTestId" | "menu">): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <>
       {onToggleSelect && (
@@ -138,7 +140,7 @@ function CardOverlays({
             onClick={(event) => event.stopPropagation()}
             size="small"
             data-testid={checkboxTestId}
-            aria-label="Selecionar"
+            aria-label={copy.selection.selectRow}
           />
         </Box>
       )}

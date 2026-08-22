@@ -1,5 +1,6 @@
 'use client';
 
+import type { CategorySelectCopy } from "../../../copy";
 import { Box, Button, Skeleton } from '@mui/material';
 
 import { categoryCheckState } from './category-tree';
@@ -18,6 +19,8 @@ const SENTENCE_CASE = { textTransform: 'none' } as const;
 const SKELETON_ROWS = 6;
 
 interface PanelListProps {
+  /** The words this panel renders. REQUIRED — no default copy. */
+  copy: CategorySelectCopy;
   groups: CategoryGroup[];
   query: string;
   draft: ReadonlySet<string>;
@@ -52,17 +55,19 @@ function LoadingRows(): React.JSX.Element {
 function EmptyCatalogue({
   onCreateCategory,
   dataTestId,
+  copy,
 }: {
   onCreateCategory?: (name?: string) => void;
   dataTestId: string;
+  copy: CategorySelectCopy;
 }): React.JSX.Element {
   return (
     <Box sx={emptySx} data-testid={`${dataTestId}-empty-catalogue`}>
-      <strong>Nenhuma categoria ainda</strong>
-      <p>Categorias organizam o cardápio e os filtros da loja.</p>
+      <strong>{copy.emptyTitle}</strong>
+      <p>{copy.purpose}</p>
       {onCreateCategory && (
         <Button variant="contained" size="small" sx={SENTENCE_CASE} onClick={() => onCreateCategory()}>
-          Criar categoria
+          {copy.createCategory}
         </Button>
       )}
     </Box>
@@ -75,19 +80,21 @@ function NoResults({
   onClearQuery,
   onCreateCategory,
   dataTestId,
+  copy,
 }: {
   query: string;
   onClearQuery: () => void;
   onCreateCategory?: (name?: string) => void;
   dataTestId: string;
+  copy: CategorySelectCopy;
 }): React.JSX.Element {
   return (
     <Box sx={emptySx} data-testid={`${dataTestId}-no-results`}>
-      <strong>Nada encontrado para “{query}”</strong>
-      <p>Tente outro termo ou verifique a grafia.</p>
+      <strong>{copy.noResults.title(query)}</strong>
+      <p>{copy.noResults.hint}</p>
       <Box sx={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
         <Button variant="outlined" size="small" sx={SENTENCE_CASE} onClick={onClearQuery}>
-          Limpar busca
+          {copy.noResults.clearSearch}
         </Button>
         {onCreateCategory && (
           <Button
@@ -97,7 +104,7 @@ function NoResults({
             data-testid={`${dataTestId}-create`}
             onClick={() => onCreateCategory(query.trim())}
           >
-            Criar “{query.trim()}”
+            {copy.noResults.create(query.trim())}
           </Button>
         )}
       </Box>
@@ -161,13 +168,13 @@ function CategoryGroupRows({
 
 /** The scrolling body of the panel, including its three non-list states. */
 export function CategoryPanelList(props: PanelListProps): React.JSX.Element {
-  const { groups, loading, query, listRef, sheet, dataTestId } = props;
+  const { groups, loading, query, listRef, sheet, dataTestId, copy } = props;
 
   const body = (): React.JSX.Element => {
     if (loading) return <LoadingRows />;
     if (groups.length === 0 && query.trim().length > 0) {
       return (
-        <NoResults
+        <NoResults copy={copy}
           query={query}
           onClearQuery={props.onClearQuery}
           onCreateCategory={props.onCreateCategory}
@@ -177,7 +184,7 @@ export function CategoryPanelList(props: PanelListProps): React.JSX.Element {
     }
     if (groups.length === 0) {
       return (
-        <EmptyCatalogue
+        <EmptyCatalogue copy={copy}
           onCreateCategory={props.onCreateCategory}
           dataTestId={dataTestId}
         />

@@ -22,6 +22,7 @@ import type { OverflowField } from "./data-views-overflow";
 import { RangeBounds } from "./data-views-range-pill";
 import { isRangeSet } from "./data-views-range-values";
 import type { RangeValue } from "./data-views-types";
+import { useDataViewsCopy } from "./data-views-copy-context";
 
 /** What each field's control needs, minus the panel's own chrome. */
 export interface MoreFieldProps {
@@ -54,6 +55,7 @@ function OverflowPill<T extends Record<string, unknown>>({
   onClear: () => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const options = field.pill?.options ?? [];
   if (options.length > INLINE_OPTION_LIMIT) {
     return (
@@ -63,10 +65,10 @@ function OverflowPill<T extends Record<string, unknown>>({
         selected={new Set(values)}
         onToggle={onToggle}
         onClear={onClear}
-        allLabel="Todas"
+        allLabel={copy.filters.allOption}
         searchable={options.length > 6 ? true : undefined}
-        searchPlaceholder="Buscar…"
-        noResultsLabel="Nenhum resultado"
+        searchPlaceholder={copy.filters.optionSearchPlaceholder}
+        noResultsLabel={copy.filters.optionsEmpty}
         layout="pill"
         data-testid={`${testIdPrefix}-more-${field.id}`}
       />

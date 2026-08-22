@@ -1,3 +1,4 @@
+import type { DataViewsCopy } from "./data-views-copy";
 import type { RangeFieldConfig, RangePreset, RangeValue } from "./data-views-types";
 
 /**
@@ -41,10 +42,10 @@ function shiftDays(date: Date, days: number): Date {
  * The week starts on SUNDAY, following the Brazilian calendar these grids are
  * read against rather than ISO-8601's Monday.
  */
-export const DAY_RANGE_PRESETS: RangePreset[] = [
+export function dayRangePresets(copy: DataViewsCopy): RangePreset[] {
+  return [
   {
     id: "hoje",
-    label: "Hoje",
     range: () => {
       const today = isoDay(new Date());
       return { min: today, max: today };
@@ -52,7 +53,6 @@ export const DAY_RANGE_PRESETS: RangePreset[] = [
   },
   {
     id: "ontem",
-    label: "Ontem",
     range: () => {
       const yesterday = isoDay(shiftDays(new Date(), -1));
       return { min: yesterday, max: yesterday };
@@ -60,7 +60,6 @@ export const DAY_RANGE_PRESETS: RangePreset[] = [
   },
   {
     id: "semana",
-    label: "Esta semana",
     range: () => {
       const now = new Date();
       const sunday = shiftDays(now, -now.getDay());
@@ -69,7 +68,6 @@ export const DAY_RANGE_PRESETS: RangePreset[] = [
   },
   {
     id: "mes",
-    label: "Este mês",
     range: () => {
       const now = new Date();
       const year = now.getFullYear();
@@ -81,13 +79,13 @@ export const DAY_RANGE_PRESETS: RangePreset[] = [
   },
   {
     id: "ano",
-    label: "Este ano",
     range: () => {
       const year = new Date().getFullYear();
       return { min: `${year}-01-01`, max: `${year}-12-31` };
     },
   },
-];
+  ].map((preset) => ({ ...preset, label: copy.filters.rangePresets[preset.id] ?? preset.id }));
+}
 
 /**
  * The presets a field offers: its own, or the calendar defaults for a day field
@@ -96,9 +94,10 @@ export const DAY_RANGE_PRESETS: RangePreset[] = [
  */
 export function presetsFor<T extends Record<string, unknown>>(
   field: RangeFieldConfig<T>,
+  copy: DataViewsCopy,
 ): RangePreset[] {
   if (field.presets) return field.presets;
-  return field.kind === "day" ? DAY_RANGE_PRESETS : [];
+  return field.kind === "day" ? dayRangePresets(copy) : [];
 }
 
 /** A preset's window, evaluating it if it is time-dependent. */

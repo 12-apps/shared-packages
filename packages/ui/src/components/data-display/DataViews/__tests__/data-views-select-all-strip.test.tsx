@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "./test-utils";
 import { ThemeProvider, createTheme } from "../../../../mui/styles";
 
 import { SelectAllStrip } from "../data-views-select-all-strip";

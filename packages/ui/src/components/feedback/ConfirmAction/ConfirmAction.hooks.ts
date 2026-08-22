@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ConfirmHandler, UseConfirmActionResult } from './ConfirmAction.types';
 
 /** Used when the guarded action rejects and the caller supplied no wording. */
-export const DEFAULT_ERROR_TEXT = 'Não foi possível concluir a ação. Tente novamente.';
+
 
 /**
  * What the popup says after a failed attempt.
@@ -29,7 +29,7 @@ function failureMessage(cause: unknown, errorText: string): string {
  */
 export function useConfirmAction(
   onConfirm: ConfirmHandler,
-  errorText: string = DEFAULT_ERROR_TEXT,
+  errorText: string,
 ): UseConfirmActionResult {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);

@@ -11,6 +11,7 @@ import { IconButton, InputAdornment, TextField } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 
 import { Box } from "../../../mui/Box";
+import { useDataViewsCopy } from "./data-views-copy-context";
 
 /** How long the box waits after the last keystroke before it queries. */
 const SEARCH_DEBOUNCE_MS = 350;
@@ -60,6 +61,7 @@ export function InlineKeyword({
   /** Take whatever width there is, with no minimum — see {@link boxWidth}. */
   fill?: boolean;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const [draft, setDraft] = useState(value);
   const prev = useRef(value);
   // An external change (a saved view, the URL, "Limpar") wins over the draft.
@@ -92,8 +94,8 @@ export function InlineKeyword({
         event.preventDefault();
         if (draft !== value) onChange(draft);
       }}
-      placeholder="Buscar…"
-      inputProps={{ "aria-label": "Buscar em todas as colunas", "data-testid": testId }}
+      placeholder={copy.search.placeholder}
+      inputProps={{ "aria-label": copy.search.allColumnsLabel, "data-testid": testId }}
       InputProps={{
         startAdornment: (
           <InputAdornment position="start">
@@ -104,7 +106,7 @@ export function InlineKeyword({
           <InputAdornment position="end">
             <IconButton
               size="small"
-              aria-label="Limpar busca"
+              aria-label={copy.search.clear}
               data-testid={testId ? `${testId}-clear` : undefined}
               onClick={() => setDraft("")}
               sx={{ p: 0.25 }}
@@ -137,11 +139,12 @@ export function CollapsedSearch({
   onOpen: () => void;
   testId?: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <IconButton
       size="small"
       onClick={onOpen}
-      aria-label="Buscar"
+      aria-label={copy.search.open}
       aria-expanded={false}
       data-testid={testId ? `${testId}-collapsed` : undefined}
       sx={{
