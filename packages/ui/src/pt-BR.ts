@@ -136,6 +136,7 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     submitEditing: "Salvar alterações",
     submitCreating: "Salvar visão",
     nameLabel: "Nome",
+    cancel: "Cancelar",
     pinnedTitle: "Fixar na barra lateral",
     pinnedDescription: "Aparece como atalho no menu, abaixo desta tela.",
     sharedTitle: "Compartilhar com a equipe",

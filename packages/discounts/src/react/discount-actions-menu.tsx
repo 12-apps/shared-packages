@@ -2,7 +2,11 @@
 
 import { useState, type JSX } from "react";
 
-import { CardKebab, useCardActions, useRemoveConfirm } from "@12-apps/ui/data-display/CardKit";
+import {
+  CardKebab,
+  useCardActions,
+  useRemoveConfirm,
+} from "@12-apps/ui/data-display/CardKit";
 import { Dialog, DialogContent } from "@12-apps/ui/feedback/Dialog";
 import type { DropdownMenuItem } from "@12-apps/ui/navigation/DropdownMenu";
 
@@ -45,20 +49,19 @@ export interface DiscountActionsMenuProps {
   onError: (error: unknown, context: string) => void;
 }
 
-export function DiscountActionsMenu({
-  row,
-  api,
-  copy,
-  formatters,
-  currencyField,
-  groups,
-  onError,
-}: DiscountActionsMenuProps): JSX.Element {
-  const { onRefresh } = useCardActions();
-  const [editOpen, setEditOpen] = useState(false);
-  const canEdit = groups !== undefined;
-
-  const remove = useRemoveConfirm({
+/**
+ * The row's delete, popup and all.
+ *
+ * Split out of the menu only to keep that component inside the size gate: the
+ * options object is a dozen lines of pure wording, and it reads better named.
+ */
+function useDeleteConfirm(
+  row: DiscountListItem,
+  api: DiscountsApiClient,
+  copy: DiscountsWebCopy,
+  onError: (error: unknown, context: string) => void,
+): ReturnType<typeof useRemoveConfirm> {
+  return useRemoveConfirm({
     write: async () => {
       const result = await api.remove(row.id);
       if (!result.ok) onError(result, "discounts.delete");
@@ -72,10 +75,30 @@ export function DiscountActionsMenu({
     copy: copy.confirmAction,
     dataTestId: "discount-delete-confirm",
   });
+}
+
+export function DiscountActionsMenu({
+  row,
+  api,
+  copy,
+  formatters,
+  currencyField,
+  groups,
+  onError,
+}: DiscountActionsMenuProps): JSX.Element {
+  const { onRefresh } = useCardActions();
+  const [editOpen, setEditOpen] = useState(false);
+  const canEdit = groups !== undefined;
+
+  const remove = useDeleteConfirm(row, api, copy, onError);
 
   const items: DropdownMenuItem[] = [];
   if (canEdit) {
-    items.push({ id: "edit", label: copy.actions.edit, onClick: () => setEditOpen(true) });
+    items.push({
+      id: "edit",
+      label: copy.actions.edit,
+      onClick: () => setEditOpen(true),
+    });
   }
   items.push({
     id: "delete",

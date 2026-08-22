@@ -60,6 +60,8 @@ export interface SaveViewCopy {
   submitEditing: string;
   submitCreating: string;
   nameLabel: string;
+  /** The dialog's way out, beside the submit. */
+  cancel: string;
   /** The pin toggle. Its share twin reuses `sharedDescription` below. */
   pinnedTitle: string;
   pinnedDescription: string;

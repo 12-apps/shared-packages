@@ -15,6 +15,7 @@ import { Stack } from "../../../mui/Stack";
 import { Text } from "../../typography/Text";
 
 import { describeViewState } from "./data-views-preview";
+import { PreviewBox } from "./save-view-preview";
 import type {
   DataViewColumn,
   DataViewState,
@@ -151,71 +152,6 @@ function FlagsSwitches({
   );
 }
 
-interface PreviewBoxProps {
-  preview: { filters: string[]; columns: string[]; sort: string[] };
-  testIdPrefix: string;
-}
-
-/** One "label — value" line of the summary. */
-function SummaryRow({
-  label,
-  items,
-  testId,
-}: {
-  label: string;
-  items: string[];
-  testId: string;
-}): React.JSX.Element | null {
-  if (items.length === 0) return null;
-  return (
-    <Box sx={{ display: "flex", gap: 1.5 }} data-testid={testId}>
-      <Text variant="caption" as="span">
-        <Box component="span" sx={{ width: 116, flexShrink: 0, color: "text.secondary" }}>
-          {label}
-        </Box>
-      </Text>
-      <Text variant="caption" as="span">
-        <Box component="span" sx={{ minWidth: 0, flex: 1 }}>
-          {items.join(", ")}
-        </Box>
-      </Text>
-    </Box>
-  );
-}
-
-function PreviewBox({ preview, testIdPrefix }: PreviewBoxProps): React.JSX.Element {
-  const copy = useDataViewsCopy();
-  const empty =
-    preview.filters.length === 0 && preview.columns.length === 0 && preview.sort.length === 0;
-  return (
-    <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: "action.hover", border: (theme) => `1px solid ${theme.palette.divider}` }}>
-      <Text variant="caption" as="p">
-        <Box
-          component="span"
-          sx={{ display: "block", mb: 1, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 600, color: "text.disabled" }}
-        >
-          {copy.saveView.previewHeading}
-        </Box>
-      </Text>
-      {empty ? (
-        // Saving is still allowed — an operator may be naming the default on
-        // purpose — but it should not be a surprise afterwards.
-        <Text variant="caption" as="p">
-          <Box component="span" sx={{ color: "warning.main", lineHeight: 1.6 }} data-testid={`${testIdPrefix}-preview-empty`}>
-            {copy.saveView.previewUnchanged}
-          </Box>
-        </Text>
-      ) : (
-        <Stack spacing={0.75}>
-          <SummaryRow label={copy.saveView.previewFilters} items={preview.filters} testId={`${testIdPrefix}-preview-filters`} />
-          <SummaryRow label={copy.saveView.previewHiddenColumns} items={preview.columns} testId={`${testIdPrefix}-preview-columns`} />
-          <SummaryRow label={copy.saveView.sortRowLabel} items={preview.sort} testId={`${testIdPrefix}-preview-sort`} />
-        </Stack>
-      )}
-    </Box>
-  );
-}
-
 interface SaveViewFormState {
   name: string;
   description: string;
@@ -299,6 +235,38 @@ function useSaveViewForm(
  * share / default flags, and previews the filters, visible columns, and sort the
  * view will store. Used for both create and edit.
  */
+/**
+ * The dialog's two buttons.
+ *
+ * Cancel first, primary last: the confirming action sits where the eye lands
+ * at the end of the dialog, not before the way out.
+ */
+function FormFooter({
+  editing,
+  canSave,
+  onSubmit,
+  onClose,
+  testIdPrefix,
+}: {
+  editing: SaveViewModalProps<never>["editing"];
+  canSave: boolean;
+  onSubmit: () => void;
+  onClose: () => void;
+  testIdPrefix: string;
+}): React.JSX.Element {
+  const copy = useDataViewsCopy();
+  return (
+    <Stack direction="row" spacing={1.5} sx={{ justifyContent: "flex-end" }}>
+      <Button variant="text" color="neutral" onClick={onClose} dataTestId={`${testIdPrefix}-save-cancel`}>
+        {copy.saveView.cancel}
+      </Button>
+      <Button onClick={onSubmit} disabled={!canSave} dataTestId={`${testIdPrefix}-save-submit`}>
+        {editing ? copy.saveView.submitEditing : copy.saveView.submitCreating}
+      </Button>
+    </Stack>
+  );
+}
+
 export function SaveViewModal<T extends Record<string, unknown>>({
   open,
   onClose,
@@ -361,20 +329,13 @@ export function SaveViewModal<T extends Record<string, unknown>>({
             </Text>
           )}
 
-          {/* Cancel first, primary last: the confirming action sits where the
-              eye lands at the end of the dialog, not before the way out. */}
-          <Stack direction="row" spacing={1.5} sx={{ justifyContent: "flex-end" }}>
-            <Button variant="text" color="neutral" onClick={onClose} dataTestId={`${testIdPrefix}-save-cancel`}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => void form.submit()}
-              disabled={!form.canSave}
-              dataTestId={`${testIdPrefix}-save-submit`}
-            >
-              {editing ? copy.saveView.submitEditing : copy.saveView.submitCreating}
-            </Button>
-          </Stack>
+          <FormFooter
+            editing={editing}
+            canSave={form.canSave}
+            onSubmit={() => void form.submit()}
+            onClose={onClose}
+            testIdPrefix={testIdPrefix}
+          />
         </Stack>
       </DialogContent>
     </Dialog>

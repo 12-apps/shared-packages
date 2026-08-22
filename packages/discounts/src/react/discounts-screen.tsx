@@ -244,6 +244,68 @@ function CreateDialog({
   );
 }
 
+/**
+ * Everything below the header: the create dialog and the grid.
+ *
+ * Split out of {@link DiscountsScreen} only to keep that component inside the
+ * size gate — this is one tree, not a second concern.
+ */
+function ScreenBody({
+  createOpen,
+  setCreateOpen,
+  menu,
+  refresh,
+  rows,
+  copy,
+  appliedState,
+  server,
+  onVisibleRowsChange,
+  bulkDelete,
+}: {
+  createOpen: boolean;
+  setCreateOpen: (open: boolean) => void;
+  menu: MenuBinding;
+  refresh: () => void;
+  rows: DiscountListItem[];
+  copy: DiscountsWebCopy;
+  appliedState: DataViewState;
+  server: ReturnType<typeof useServerDataViews>;
+  onVisibleRowsChange: (rows: DiscountListItem[]) => void;
+  bulkDelete: ReturnType<typeof useBulkDelete>;
+}): JSX.Element {
+  return (
+    <Dashboard.Body>
+      <CreateDialog
+        open={createOpen}
+        menu={menu}
+        onClose={() => setCreateOpen(false)}
+        onSaved={() => {
+          setCreateOpen(false);
+          refresh();
+        }}
+      />
+      <CardActionsProvider
+        // The menus read the refresh and the error channel from here; the
+        // tenant is already baked into `apiBase`, so there is nothing for a
+        // slug to do but be a second place it could disagree.
+        tenantSlug=""
+        onRefresh={refresh}
+        errorTitle={copy.actions.actionFailed}
+      >
+        <DiscountsGrid
+          rows={rows}
+          copy={copy}
+          menu={menu}
+          appliedState={appliedState}
+          server={server}
+          onVisibleRowsChange={onVisibleRowsChange}
+          bulkDelete={bulkDelete}
+        />
+      </CardActionsProvider>
+    </Dashboard.Body>
+  );
+}
+
 export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
   const { api, copy, formatters, currencyField, onError, breadcrumb } = props;
   const [searchParams] = useSearchParams();
@@ -308,35 +370,18 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
             onCreate={() => setCreateOpen(true)}
           />
         </Dashboard.Header>
-        <Dashboard.Body>
-          <CreateDialog
-            open={createOpen}
-            menu={menu}
-            onClose={() => setCreateOpen(false)}
-            onSaved={() => {
-              setCreateOpen(false);
-              data.refresh();
-            }}
-          />
-          <CardActionsProvider
-            // The menus read the refresh and the error channel from here; the
-            // tenant is already baked into `apiBase`, so there is nothing for a
-            // slug to do but be a second place it could disagree.
-            tenantSlug=""
-            onRefresh={data.refresh}
-            errorTitle={copy.actions.actionFailed}
-          >
-            <DiscountsGrid
-              rows={rows}
-              copy={copy}
-              menu={menu}
-              appliedState={appliedState}
-              server={server}
-              onVisibleRowsChange={setVisibleRows}
-              bulkDelete={bulkDelete}
-            />
-          </CardActionsProvider>
-        </Dashboard.Body>
+        <ScreenBody
+          createOpen={createOpen}
+          setCreateOpen={setCreateOpen}
+          menu={menu}
+          refresh={data.refresh}
+          rows={rows}
+          copy={copy}
+          appliedState={appliedState}
+          server={server}
+          onVisibleRowsChange={setVisibleRows}
+          bulkDelete={bulkDelete}
+        />
       </Dashboard>
     </DataViewsCopyProvider>
   );
